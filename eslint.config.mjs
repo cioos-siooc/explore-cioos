@@ -28,6 +28,7 @@ export default [
     ignores: [
       "**/dist/**",
       "**/build/**",
+      "**/coverage/**",
       "**/node_modules/**",
       "**/.venv/**",
       "**/venv/**",
@@ -51,7 +52,10 @@ export default [
   {
     files: ["frontend/**/*.{js,jsx,mjs}"],
     ...react.configs.flat.recommended,
-    settings: { react: { version: "detect" } },
+    // The root tooling package intentionally does not depend on React; the
+    // application package pins React 18.3. Detection from the root would
+    // otherwise warn before ESLint reaches app code.
+    settings: { react: { version: "18.3" } },
   },
   reactHooks.configs.flat.recommended,
   {
@@ -70,6 +74,34 @@ export default [
     // Vite config runs in Node, not the browser.
     files: ["frontend/*.{js,mjs}"],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // Vitest runs with globals: true, so these are ambient in the unit tests
+    // and in the helpers under src/test/ that they share.
+    files: ["frontend/src/**/*.test.{js,jsx}", "frontend/src/test/**/*.{js,jsx}"],
+    languageOptions: {
+      globals: {
+        describe: "readonly",
+        it: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        vi: "readonly",
+        beforeAll: "readonly",
+        beforeEach: "readonly",
+        afterAll: "readonly",
+        afterEach: "readonly",
+      },
+    },
+  },
+  {
+    // The Playwright suite is a set of Node programs that read process.env and
+    // the filesystem, but their page.evaluate bodies are browser code, so both
+    // sets of globals are in scope for a single file.
+    files: ["frontend/e2e/**/*.{js,mjs}"],
+    languageOptions: {
+      sourceType: "module",
+      globals: { ...globals.node, ...globals.browser },
+    },
   },
 
   {

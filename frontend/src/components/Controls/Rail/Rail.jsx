@@ -62,7 +62,7 @@ export default function Rail({
         : (event.clientX - rect.left) / rect.width;
       return Number.isFinite(along) ? Math.min(Math.max(along, 0), 1) : 0;
     },
-    [vertical],
+    [trackRef, vertical],
   );
 
   const setHandleFromPointer = useCallback(

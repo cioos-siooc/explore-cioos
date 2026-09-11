@@ -311,7 +311,7 @@ export default function DatasetsTable({
   };
 
   const controls = (
-    <div className="datasetsCardControls">
+    <div className="datasetsCardControls" data-testid="datasets-controls">
       <div className="datasetsCardToolbar">
         <button
           type="button"

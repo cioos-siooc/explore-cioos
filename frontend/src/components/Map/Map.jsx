@@ -47,7 +47,6 @@ import {
   clickHighlightColor,
   colorScale,
   hexOutlineColor,
-  HEX_METRIC,
   MARKER_MIN_ZOOM,
   trackLineColor,
   tracksMinDate,
@@ -58,7 +57,6 @@ import {
 } from "../config";
 import platformColors from "../../components/platformColors";
 import {
-  PROFILE_TYPE_KEYS,
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
 } from "../../state/dataLayers.js";
@@ -68,6 +66,8 @@ import {
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS,
 } from "./basemapStyle.js";
+import { buildTileSuffix } from "./tileQuery.js";
+import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
 
 // direct_select's own dragVertex/toDisplayFeatures, captured once here at
 // module load — before the component below patches these modes on every
@@ -207,49 +207,6 @@ function filterTimeWindow(queryString) {
     min: instant(params.get("timeMin")),
     max: instant(params.get("timeMax")),
   };
-}
-
-// Combine the filter-derived query string with the geometry selection into a
-// tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the Source
-// filter already emitted; a profile-type subset adds profileTypes=<comma list>
-// and a trajectory-type subset trajectoryTypes=<comma list> (empty = none). A
-// param is omitted when its layer(s) are fully on, so the URL stays clean.
-// Returns '' or '?...'.
-//
-// Trajectory cells are requested whenever a trajectory geometry is selected,
-// full stop — their counts belong to the hexes the same way every other
-// geometry's do, and there is one switch for all of them (the hex/point
-// visibility one). There used to be a second, trajectory-only hex switch here,
-// which meant trajectory data could be missing from a hexagon for a reason the
-// hex ramp had no way of showing. The track lines are unaffected either way:
-// they come from a separate source (/tiles/tracks).
-function buildTileSuffix(baseQuery, dataLayers) {
-  const params = new URLSearchParams(baseQuery);
-  // Always written out: the API counts something else when the param is absent
-  // — see HEX_METRIC.
-  params.set("metric", HEX_METRIC);
-  if (dataLayers) {
-    if (!dataLayers.obis || params.get("includeObis") === "false") {
-      params.set("includeObis", "false");
-    }
-    const enabledTypes = PROFILE_TYPE_KEYS.filter(
-      ([key]) => dataLayers[key],
-    ).map(([, type]) => type);
-    if (enabledTypes.length < PROFILE_TYPE_KEYS.length) {
-      params.set("profileTypes", enabledTypes.join(","));
-    }
-    const enabledTrajectoryTypes = TRAJECTORY_TYPE_KEYS.filter(
-      ([key]) => dataLayers[key],
-    ).map(([, type]) => type);
-    if (enabledTrajectoryTypes.length < TRAJECTORY_TYPE_KEYS.length) {
-      params.set("trajectoryTypes", enabledTrajectoryTypes.join(","));
-    }
-    if (!enabledTrajectoryTypes.length) {
-      params.set("includeTrajectory", "false");
-    }
-  }
-  const s = params.toString();
-  return s ? `?${s}` : "";
 }
 
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
@@ -601,9 +558,6 @@ export default function CreateMap({
   // and the marker tier starting are the same boundary, and they must not
   // drift.
   const hexMaxZoom = MARKER_MIN_ZOOM;
-  // Zoom at which griddap coverage rectangles take hover/click priority over
-  // the hex aggregates (which stop being drawn at hexMaxZoom anyway).
-  const griddapPriorityZoom = 5;
   // What a colour-coded border is worth once it is carrying the cell on its own.
   // Nearly solid: it is a hairline standing in for a whole hexagon of fill, and
   // the ramp has to be readable off it.
@@ -661,6 +615,10 @@ export default function CreateMap({
   // on them is the one they will keep.
   const dataRevealed = useRef(false);
   const firstPaintReported = useRef(false);
+  // The same fact as firstPaintReported, in state rather than a ref, purely so
+  // it can reach the DOM as an attribute. The ref stays the guard — it is read
+  // synchronously inside reportFirstPaint, where a state value would be stale.
+  const [firstPainted, setFirstPainted] = useState(false);
   // Latest rangeLevels, for the once-registered measurement handler: it runs on
   // the first render's closure (like setColorStops, which it reaches through a
   // ref of its own), so the prop it captured is forever the mount-time one.
@@ -927,6 +885,10 @@ export default function CreateMap({
     );
     if (!basemapDrawn) return;
     firstPaintReported.current = true;
+    // Mirrored onto the container as data-map-ready so tests can wait on the
+    // same condition the splash trusts, rather than on the splash's CSS fade —
+    // which is exactly what screenshot capture disables.
+    setFirstPainted(true);
     onFirstPaint();
   }
 
@@ -3142,12 +3104,12 @@ export default function CreateMap({
 
     // Griddap coverage rectangles defer to the point/hex layers, so a hover
     // meant for an observation isn't swallowed by the grid drawn over it. Past
-    // griddapPriorityZoom the rectangles outrank the hex aggregates instead:
-    // the hexes are a coarse backdrop by then, and someone zoomed in that far
-    // is working with a specific grid.
+    // GRIDDAP_PRIORITY_ZOOM the rectangles outrank the hex aggregates instead —
+    // see griddapOutranksHexesIn in hitTest.js, which holds the other half of
+    // this rule.
     const griddapCoveredIn = (hits) => {
       const covering =
-        map.current.getZoom() >= griddapPriorityZoom
+        map.current.getZoom() >= GRIDDAP_PRIORITY_ZOOM
           ? ["points"]
           : ["points", "hexes"];
       return (
@@ -3155,10 +3117,6 @@ export default function CreateMap({
         Boolean(trackFeatureIn(hits))
       );
     };
-
-    const griddapOutranksHexesIn = (hits) =>
-      map.current.getZoom() >= griddapPriorityZoom &&
-      hits.some((feature) => feature.layer.id === "griddap-coverage-fill");
 
     // The whole hover vocabulary: a chip naming what is under the cursor, with
     // no markup and no click hint.
@@ -3363,7 +3321,7 @@ export default function CreateMap({
       {
         id: "hexes",
         layers: ["hexes"],
-        when: (hits) => !griddapOutranksHexesIn(hits),
+        when: (hits) => !griddapOutranksHexesIn(hits, map.current.getZoom()),
         show: (e, features) =>
           showChip(e.lngLat, metricCountLabel(features[0].properties.count)),
       },
@@ -4319,5 +4277,12 @@ export default function CreateMap({
     });
   }, [i18n.language]);
 
-  return <div ref={mapContainer} className="map" />;
+  return (
+    <div
+      ref={mapContainer}
+      className="map"
+      data-testid="map-container"
+      data-map-ready={firstPainted || undefined}
+    />
+  );
 }

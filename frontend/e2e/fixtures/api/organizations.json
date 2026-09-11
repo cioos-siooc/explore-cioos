@@ -1,0 +1,242 @@
+[
+  {
+    "pk": 73,
+    "pk_url": 73,
+    "name": "Ahousaht Nation",
+    "color": null
+  },
+  {
+    "pk": 21,
+    "pk_url": 21,
+    "name": "Amundsen Science",
+    "color": null
+  },
+  {
+    "pk": 72,
+    "pk_url": 72,
+    "name": "Aqua America - Ashtabula",
+    "color": null
+  },
+  {
+    "pk": 76,
+    "pk_url": 76,
+    "name": "Aqua America - Ohio, Mentor",
+    "color": null
+  },
+  {
+    "pk": 28,
+    "pk_url": 28,
+    "name": "ArcticNet",
+    "color": null
+  },
+  {
+    "pk": 22,
+    "pk_url": 22,
+    "name": "Avon Lake Regional Water",
+    "color": null
+  },
+  {
+    "pk": 68,
+    "pk_url": 68,
+    "name": "BGSU",
+    "color": null
+  },
+  {
+    "pk": 5,
+    "pk_url": 5,
+    "name": "British Columbia Ferry Services Inc.",
+    "color": null
+  },
+  {
+    "pk": 51,
+    "pk_url": 51,
+    "name": "Bruce Power",
+    "color": null
+  },
+  {
+    "pk": 25,
+    "pk_url": 25,
+    "name": "Canada Research Chair in Marine Geology, Paleomagnetism and Marine Geology Laboratory | Chaire de recherche du Canada en géologie marine, Laboratoire de paléomagnétisme et géologie marine - UQAR ISMER",
+    "color": null
+  },
+  {
+    "pk": 89,
+    "pk_url": 89,
+    "name": "Canadian Coast Guard (CCG)",
+    "color": null
+  },
+  {
+    "pk": 120,
+    "pk_url": 120,
+    "name": "Carroll Water and Sewer District",
+    "color": null
+  },
+  {
+    "pk": 63,
+    "pk_url": 63,
+    "name": "Cascadia Seaweed Corporation",
+    "color": null
+  },
+  {
+    "pk": 30,
+    "pk_url": 30,
+    "name": "Centre for Marine Applied Research (CMAR)",
+    "color": null
+  },
+  {
+    "pk": 75,
+    "pk_url": 75,
+    "name": "Cerema",
+    "color": null
+  },
+  {
+    "pk": 54,
+    "pk_url": 54,
+    "name": "Chicago Park District",
+    "color": null
+  },
+  {
+    "pk": 58,
+    "pk_url": 58,
+    "name": "Chippewas of Nawash Unceded First Nation (CNUFN)",
+    "color": null
+  },
+  {
+    "pk": 80,
+    "pk_url": 80,
+    "name": "City of Defiance",
+    "color": null
+  },
+  {
+    "pk": 86,
+    "pk_url": 86,
+    "name": "City of Duluth",
+    "color": null
+  },
+  {
+    "pk": 97,
+    "pk_url": 97,
+    "name": "City of Elyria",
+    "color": null
+  },
+  {
+    "pk": 116,
+    "pk_url": 116,
+    "name": "City of Huron, OH",
+    "color": null
+  },
+  {
+    "pk": 53,
+    "pk_url": 53,
+    "name": "City of Lorain",
+    "color": null
+  },
+  {
+    "pk": 67,
+    "pk_url": 67,
+    "name": "City of Oregon, OH",
+    "color": null
+  },
+  {
+    "pk": 93,
+    "pk_url": 93,
+    "name": "City of Toledo",
+    "color": null
+  },
+  {
+    "pk": 107,
+    "pk_url": 107,
+    "name": "City of Vermilion, OH",
+    "color": null
+  },
+  {
+    "pk": 48,
+    "pk_url": 48,
+    "name": "Cleveland Water",
+    "color": null
+  },
+  {
+    "pk": 13,
+    "pk_url": 13,
+    "name": "Consejo Superior de Investigaciones Cientificas",
+    "color": null
+  },
+  {
+    "pk": 6,
+    "pk_url": 6,
+    "name": "Council of the Haida Nation",
+    "color": null
+  },
+  {
+    "pk": 8,
+    "pk_url": 8,
+    "name": "COVE",
+    "color": null
+  },
+  {
+    "pk": 77,
+    "pk_url": 77,
+    "name": "Dalhousie University",
+    "color": null
+  },
+  {
+    "pk": 101,
+    "pk_url": 101,
+    "name": "Defence Research and Development Canada (DRDC)",
+    "color": null
+  },
+  {
+    "pk": 26,
+    "pk_url": 26,
+    "name": "DFO",
+    "color": null
+  },
+  {
+    "pk": 27,
+    "pk_url": 27,
+    "name": "DFO MEDS",
+    "color": null
+  },
+  {
+    "pk": 14,
+    "pk_url": 14,
+    "name": "DFO-MPO",
+    "color": null
+  },
+  {
+    "pk": 29,
+    "pk_url": 29,
+    "name": "ECCC",
+    "color": null
+  },
+  {
+    "pk": 83,
+    "pk_url": 83,
+    "name": "ECCC-WQMSD",
+    "color": null
+  },
+  {
+    "pk": 18,
+    "pk_url": 18,
+    "name": "EM Fluids Inc.",
+    "color": null
+  },
+  {
+    "pk": 85,
+    "pk_url": 85,
+    "name": "Environment and Climate Change Canada",
+    "color": null
+  },
+  {
+    "pk": 94,
+    "pk_url": 94,
+    "name": "Fisheries and Oceans Canada",
+    "color": null
+  },
+  {
+    "pk": 40,
+    "pk_url": 40,
+    "name": "Fisheries and Oceans Canada - Pêches et Océans Canada",
+    "color": null
+  }
+]

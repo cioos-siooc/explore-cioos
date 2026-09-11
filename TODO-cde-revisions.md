@@ -7,6 +7,10 @@ and tagged **[2026-09-09]**; they are re-prioritised against *this* document's l
 (P0 = broken now, P1 = cheap and independent, P2 = structural), which is not the
 severity ladder the audit used. All ten were re-verified against the working tree
 before merging, and line references were corrected where the files had drifted.
+Updated 2026-09-10: **§P3 was measured** against a real database rather than read, and
+rewritten from the results. Five of its twelve items changed verdict — three were wrong
+or already fixed, two needed a different fix from the one proposed — so items closed
+there carry the numbers that closed them.
 
 **How to read this.** Every item is independently actionable — take them one at a time.
 Items marked **[verified]** were re-checked directly against the working tree after the
@@ -15,7 +19,10 @@ File references are `path:line` at the commit above, so they will drift as you w
 
 **Ordering.** P0 is broken right now. P1 is cheap and independent. P2 is structural and
 should not start until P0 is done — a deepening pass with no CI gate is how the drift in
-§P2.1 happened in the first place. P3/P4 can be picked up at any time.
+§P2.1 happened in the first place. P3 has had its first pass; P4 can be picked up at any
+time. A P3 item closed "by measurement" should not be re-raised without new numbers —
+that section was written statically once and three of its items did not survive contact
+with a database.
 
 There is no `CONTEXT.md` and no `docs/adr/` in this repo, so none of this contradicts a
 recorded decision. If you reject an item for a load-bearing reason, an ADR is the place
@@ -833,78 +840,112 @@ missing directory surfaced as a confusing import error rather than an empty pack
 
 ### P2.6 — Give `Map.jsx` a seam that isn't WebGL `[Strong]` — *largest prize, largest risk*
 
-`frontend/src/components/Map/Map.jsx` — 4320 lines, one default export
+`frontend/src/components/Map/Map.jsx` — 4338 lines, one default export
 
-> **Re-verified 2026-09-09 against `fix/p0-cleanup-backlog @ b233d792`.** The file has grown 23%
-> since the 2026-08-27 survey (3508 → 4320), so every reference below has been refreshed and will
-> drift again. Every finding still holds, and all but one of the counts understated it.
+> **Re-verified 2026-09-10 against `fix/p0-cleanup-backlog @ 8f5f36e1`.** References below are
+> anchored by **symbol name**, not line number: the 2026-09-09 pass refreshed every offset and they
+> had all drifted again by +11 to +18 within a day, while *every function span was byte-for-byte
+> unchanged*. Line numbers are given only where a symbol does not identify the site.
 >
-> **Prerequisite — do not start this item yet.** Its whole payoff is testability, and there is no
-> frontend test harness on this branch: `frontend/package.json:43` is still
-> `"test": "echo \"Error: no test specified\" && exit 1"` — no vitest, no `*.test.jsx`, no
-> `playwright.config`. The four-layer suite exists on `feat/frontend-test-suite` (`8abc8b87`) and is
-> **unmerged**. CI's only frontend gate is `test/frontend_loads_without_errors.js`, 62 lines that
-> exit 1 on a console error: it catches a mount-effect crash, not a radius formula drifting from its
-> expression or a hit-test ranking regression. Extracting these functions without it is an
-> unverified refactor with a live WebGL blast radius — which is the failure this file's own preamble
-> names. **Merge `feat/frontend-test-suite` first.**
+> **Prerequisite — now partly satisfied.** The four-layer suite is merged (PR #143): `vitest run`
+> at `frontend/package.json:51`, 12 test files, `playwright.config.js`, and — the part that matters
+> here — `vite.config.mjs` already aliases `maplibre-gl` to `src/test/stubs/maplibre.js`, which is
+> the harness a seam module needs.
+>
+> **But there is still no behavioural gate on map interaction, so steps 3–4 stay gated.** The e2e
+> suite asserts only that the map *paints*: `e2e/specs/smoke.spec.js:7` and `mobile.spec.js:13`
+> check `map-container` is visible, `visual.spec.js:22` **hides the WebGL canvas** in every shot
+> (`.maplibregl-canvas{visibility:hidden!important}`), and `axeBaseline.js:29` excludes
+> `.maplibregl-canvas-container`. Nothing anywhere clicks or hovers the canvas; there is no
+> `FeatureCard` assertion in the repo. Hover/click ranking — precisely what step 3 moves — has no
+> regression net. Steps 1–2 are pure functions under vitest and are unblocked today.
 
-- [ ] 22 `useEffect`, 42 `useRef`, 2 `useState`, 32 props, 22 `addLayer`. **~1900 lines sit behind a
-      live WebGL context.** The mount effect alone is 1750 lines (2359–4108). **[re-verified]**
+- [ ] 22 `useEffect`, 42 `useRef`, **3** `useState`, 32 props, 22 `addLayer`. **~1900 lines sit
+      behind a live WebGL context.** The mount effect alone is 1749 lines (2371–4119).
+      **[re-verified 2026-09-10 — `useState` was 2, now 3; the other four are exact]**
 - [ ] The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
-      and allocates a fresh `MapboxDraw` (640) and `Popup` (963) on **every render**, plus eight ref
-      writes during render (668, 702, 1380, 2032, 2039, 2044, 2046, 2053).
-- [ ] **Twin maths kept in step by hand**: `radiusExpression` (1157–1170) builds a MapLibre
-      expression and `pointRadiusFor` (1176–1186) re-implements the same arithmetic in JS. The test
-      that would keep them honest cannot be written — neither is exported, and one reads
-      `pointRadiusRange.current` from closure rather than taking it as an argument. They agree today
-      (both clamp outside the domain; the comment at 1172–1175 says why), which is exactly the state
-      that rots silently.
-- [ ] Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus` :679,
-      `trackFocusApplied` :683, `appliedTrailRef` :758, `wmsRenderToken` :1646,
-      `lastClickHandledAt` :3769 — a plain `let`, not a ref), each documented as fixing one loop or flicker.
-      One of them is also wrong today: `wmsRenderToken` is bumped only on overlay removal, so it does
-      not discard a stale same-overlay render — a one-line fix, filed in P1 (2026-09-09) so it is not
-      blocked behind this section's test-suite prerequisite. **[re-verified — the
-      survey named eight: `hexesRevealed` is now `dataRevealed` (:662), `rampMeasuredForPk` is now
-      `rampMeasuredFor` (:692), and `hexRangeDirty` is gone entirely]**
-- [ ] Pure but unexported, so untestable: `buildTileSuffix` (226–253, the whole tile query contract —
-      already at module scope, so `export` is a one-word diff), `tracksTimeWindow` (716–726),
-      `rampExpression` (1127–1131), `featureHasDataset` (1026–1032), `dedupeGriddapByPk` (1676–1683),
-      `datasetPksOf` (3507–3514), and the dedupe/role/bbox rules inside `buildFeatureQuery`
-      (3555–3762, 208 lines).
-- [ ] **The seam is the hit-test group, and it is only two map methods wide.** `isOnAPointIn` (3116),
-      `trackFeatureIn` (3131), `griddapCoveredIn` (3145), `griddapOutranksHexesIn` (3156),
-      `datasetPksOf` (3507), `trackItemsIn` (3521) and `buildFeatureQuery` (3555) are ~420 lines of
-      array-of-feature ranking and dedupe buried inside the mount effect. Their *entire* dependency
-      on MapLibre is `map.current.getZoom()` and `map.current.project(lngLat)`. A module taking
-      `(hits, { zoom, project })` lifts all of it out — a camera seam, not a WebGL abstraction.
-      **[new — the survey scattered these across bullets and missed that they group]**
-- [ ] `setColorStops` (1274–1379, 106 lines) has **four entry points** — the `[rangeLevels,
-      coverageRangeLevels]` effect (1041), the `load` handler (2410), a `zoomend` listener (4254),
-      and `refreshViewportHexRange` via `setColorStopsRef` (1522). **[re-verified — the survey said
-      five, counting two functions through the ref; only one reaches it now]**
+      and allocates a fresh `MapboxDraw` (640) and `Popup` (978) on **every render**, plus eight ref
+      writes during render (`rangeLevelsRef`, `onViewportHexRangeRef`, `selectedTrajectoryRef`,
+      `setColorStopsRef`, `mapQueryRef`, `onFeatureQueryRef`, `onMarkerClickRef`, `onTrackClickRef`).
+      **[re-verified — still eight, one substitution: `selectedTrajectoryRef` is new]**
+- [ ] **Twin maths kept in step by hand**: `radiusExpression` builds a MapLibre expression and
+      `pointRadiusFor` re-implements the same arithmetic in JS. The test that would keep them honest
+      cannot be written — neither is exported, and `pointRadiusFor` reads `pointRadiusRange.current`
+      from closure rather than taking it as an argument. They agree today (both clamp outside the
+      domain; the comment above `pointRadiusFor` says why), which is exactly the state that rots
+      silently. Note they only *need* to agree at `padding = 0`: `radiusExpression` takes a padding
+      the JS twin has no parameter for, and the `points` layer that `isOnAPointIn` hit-tests is the
+      `padding = 0` entry in `POINT_LAYERS`. **[re-verified]**
+- [ ] Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus`,
+      `trackFocusApplied`, `appliedTrailRef`, `wmsRenderToken`, `lastClickHandledAt` — a plain
+      `let`, not a ref), each documented as fixing one loop or flicker. One of them is also wrong
+      today: `wmsRenderToken` is bumped only on overlay removal (`removeWmsOverlay`), so it does not
+      discard a stale same-overlay render — a one-line fix, filed in P1 (2026-09-09) so it is not
+      blocked behind this section. **Still unfixed as of 2026-09-10.** The survey named eight:
+      `hexesRevealed` is now `dataRevealed`, `rampMeasuredForPk` is now `rampMeasuredFor`, and
+      `hexRangeDirty` is gone entirely. **[re-verified — all seven refs present]**
+- [x] Pure but unexported, so untestable: **`buildTileSuffix` and `griddapOutranksHexesIn` are done**
+      — see step 1 below. Still inside `Map.jsx`: `filterTimeWindow` (16 lines — the obvious
+      co-mover into `tileQuery.js`, it parses the same query string), `tracksTimeWindow` (11),
+      `rampExpression` (5), `featureHasDataset` (7), `dedupeGriddapByPk` (8), `datasetPksOf` (8),
+      and the dedupe/role/bbox rules inside `buildFeatureQuery` (208).
+      **[re-verified — every span byte-identical to the 2026-09-09 pass]**
+- [ ] **The seam is the hit-test group, and it is three map methods wide.** `isOnAPointIn`,
+      `trackFeatureIn`, `griddapCoveredIn`, `datasetPksOf`, `trackItemsIn`
+      and `buildFeatureQuery` are ~280 lines of array-of-feature ranking and dedupe buried inside the
+      mount effect. Their dependency on MapLibre is `map.current.getZoom()`,
+      `map.current.project(lngLat)` — **and `map.current.queryRenderedFeatures` (`:3610`)**, the
+      re-query that pulls every rendered fragment sharing a hex's `pk` so the turf union can rebuild
+      the cell from its MVT slivers. That third method is materially heavier to stub than the two
+      arithmetic ones: it reads the live tile cache. So either the seam takes it as a third injected
+      function — `(hits, { zoom, project, queryRendered })`, whose stub is a canned fragment array —
+      or the fragment-union block stays in `Map.jsx` and only the ranking/dedupe rules move, which is
+      where the untested logic actually lives. **Decide this before moving anything.**
+      **[corrected 2026-09-10 — the 2026-09-09 pass claimed the *entire* MapLibre dependency was two
+      methods and missed `queryRenderedFeatures`]**
+- [ ] **`buildFeatureQuery`'s event coupling is already gone in practice.** It is declared
+      `(e, hits)` but reads only `e.lngLat` (`:3765`), and the second of its two call sites (`:4102`)
+      *already* fabricates `{ lngLat: { lng, lat } }` from a bare coordinate pair. Narrowing the
+      signature to `(lngLat, hits)` is a no-behaviour-change diff at both call sites, and it is worth
+      doing *before* the risky move rather than as part of it. **[new 2026-09-10]**
+- [ ] `setColorStops` (106 lines) has **four entry points** — the `[rangeLevels,
+      coverageRangeLevels]` effect, the `load` handler, a `zoomend` listener, and
+      `refreshViewportHexRange` via `setColorStopsRef`. **[re-verified]**
 - [ ] Dead: `Map.jsx` no longer declares a `setDatasetsSelected` prop, yet `MapContainer.jsx:14`
       still reads it from context and `:146` still forwards it — a prop handed to a component that
-      does not accept it. Layer id `'points-hovered'` (:1207) is in `POINT_LAYERS` but never added
-      anywhere in the repo; a `getLayer` guard makes it silently inert. Both are safe to delete
-      today, independently of everything else in this section. **[re-verified]**
+      does not accept it. Layer id `'points-hovered'` is in `POINT_LAYERS` but never added anywhere
+      in the repo (`Map.jsx:1224` is its sole occurrence); a `getLayer` guard makes it silently
+      inert. Both are safe to delete today, independently of everything else in this section.
+      **[re-verified]**
 - [ ] `Map.jsx` reads the URL directly twice (`useSearchParams` at 375, and
-      `new URL(window.location.href)` at 3076 inside the `load` handler), bypassing both context and
-      its props. There are now **eight** independent modules reading `window.location` across eleven
+      `new URL(window.location.href)` at 3087 inside the `load` handler), bypassing both context and
+      its props. There are **eight** independent modules reading `window.location` across eleven
       sites (`index.jsx:36`, `config.js:13`, `state/usePersistentState.js:46`,
-      `FilterProvider.jsx:249`, `SelectionProvider.jsx:75`, `MapStateProvider.jsx:107,177,218,249,269`),
-      up from the five the survey counted.
+      `FilterProvider.jsx:249`, `SelectionProvider.jsx:89`,
+      `MapStateProvider.jsx:107,177,218,249,269`). **[re-verified — count unchanged;
+      `SelectionProvider` moved 75 → 89]**
 
-**Suggested order once the test suite is merged**, cheapest proof first:
+**Suggested order**, cheapest proof first. Steps 1–3 are unblocked; 4–5 are not.
 
-1. `buildTileSuffix` — already module-level and pure, zero closure captures. Add `export`, test the
-   tile query contract. The cheapest possible demonstration that the seam works.
+1. ~~`griddapOutranksHexesIn` and `buildTileSuffix`~~ — **DONE 2026-09-10.** `buildTileSuffix` moved
+   to `Map/tileQuery.js` (body byte-identical, verified mechanically); `griddapOutranksHexesIn` moved
+   to `Map/hitTest.js` as `(hits, zoom)`, taking the camera scalar as an argument instead of reading
+   `map.current` — the first function through the seam. `griddapPriorityZoom` went with it as the
+   exported `GRIDDAP_PRIORITY_ZOOM`, so `griddapCoveredIn` (still in `Map.jsx`, it is part of the
+   step-4 group) now imports the threshold its other half tests. 22 tests in
+   `tileQuery.test.js` + `hitTest.test.js`; suite 117 passed, `eslint .` clean, `vite build` passes.
+   `HEX_METRIC` and `PROFILE_TYPE_KEYS` left `Map.jsx`'s import list with the function.
 2. The twin maths — give `pointRadiusFor` the range as a parameter instead of reading the ref, move
-   both into a module, and test that they agree across a swept range.
-3. The hit-test group above — the largest prize, and much narrower than "largest risk" implies.
-4. The 1750-line mount effect and the guards — leave alone until there is a Playwright gate.
-   Nothing in 1–3 requires moving them.
+   both into a module, and test that they agree across a swept range at `padding = 0`.
+3. `buildFeatureQuery(e, hits)` → `(lngLat, hits)`. Zero-behaviour diff, removes the last event
+   coupling, done before the risky move rather than inside it.
+4. The hit-test group above — the largest prize, and much narrower than "largest risk" implies, but
+   there is no e2e gate under hover/click ranking (see the preamble). So: settle the
+   `queryRenderedFeatures` question, then move in a commit that is *provably* a pure move — bodies
+   byte-identical, no tidying — and add characterisation tests against the new module immediately.
+   Extract-and-tidy in one commit is still an unverified refactor.
+5. The 1749-line mount effect and the guards — leave alone until there is a Playwright gate that
+   actually drives the canvas. Nothing in 1–4 requires moving them.
 
 ### P2.7 — One descriptor for the metric and the tiers `[Worth exploring]`
 
@@ -956,36 +997,193 @@ missing directory surfaced as a confusing import error rather than an empty pack
 
 ---
 
-## P3 — Performance (visible statically, not yet measured)
+## P3 — Performance — **measured against production** (2026-09-10)
 
-- [ ] **No index on `time_min`/`time_max` or `depth_min`/`depth_max`** on any of the three cell
-      tables — and the time filter fires on every slider drag (`dbFilter.js:86,90,113,117`).
-- [ ] **`cde.datasets` has almost no indexes.** Nothing on `pk_url`, `platform`, `cdm_data_type` or
-      `source_type`; no GIN on `organization_pks`, `eovs` or `obis_nodes` — all actively filtered.
-- [ ] **`/legend` has no spatial prefilter** while `/tiles` prunes each branch (whose comment measures
-      the unpruned cost at ~2.5 s CPU per tile), then `percentile_disc` forces a full sort of every
-      group. `/legend` gates first map paint.
-- [ ] **The `scientificNames` expansion query runs per tile** (`dbFilter.js:192`) — ~20 identical GIN
-      scans per viewport, unmemoized, fired serially before the main query. `/download` calls
-      `createDBFilter` twice (`download.js:94-95` plus `shapeQuery.js:8`), so it fires twice there.
-- [ ] **`/harvest` slug resolution can use no index** — a `DISTINCT` over the whole append-only
-      attempts table plus a double `regexp_replace` per row, on every one of three routes
-      (`harvest.js:53-57`). `listServers` also has a correlated scalar subquery inside a `GROUP BY`,
-      the exact pattern `recentRuns` was restructured to avoid.
-- [ ] Eleven routes are unbounded (no LIMIT), several over append-only tables:
-      `/datasets`, `/organizations`, `/platforms`, `/oceanVariables`, `/obisNodes`, `/erddapServers`,
-      `/trajectories/track`, three `/harvest/*`, and `/pointQuery`.
-- [ ] `griddapCoverage.js:57` does `SELECT d.*`, pulling stored geometry and two jsonb blobs to use
-      eight fields.
-- [ ] `/preview` builds an unfiltered `profiles ⨝ datasets` CTE and filters at the end on an
-      unindexable `COALESCE`; it has no cache.
-- [ ] MVT tiles are cached as JSON byte arrays — a ~200 KB tile becomes a ~1 MB redis string.
-- [ ] Knex pool max is 16 (`db.js:25-29`) while `/legend` uses 2 connections per request and
-      `/download` 3+, so ~5 concurrent legend requests saturate it.
-- [ ] `4_create_hexes.sql:337-355` computes `ST_Y(ST_Transform(ST_Centroid(...)))` per row in both
-      UNION arms — four PostGIS calls per output row, when `hexes_zoom_*` could carry the centroid.
-- [ ] `obis_scientific_name_popularity` is `REFRESH MATERIALIZED VIEW CONCURRENTLY`-ed on every load
-      to serve an offline `--top N` ordering in `populate_vernaculars.py`.
+The section was written from a static read and headed "not yet measured". It has now
+been measured with `EXPLAIN (ANALYZE, BUFFERS)` on the SQL the routes actually emit,
+first against a local dev volume and then — because the dev volume turned out to
+mislead on two counts — against **production** (`cioos-co-prod-coolify`, read-only).
+
+Production, 2026-09-10:
+
+| table | rows | size |
+|---|---|---|
+| `trajectory_hexes` | 794 545 | 332 MB |
+| `trajectory_points` | 499 054 | 275 MB |
+| `profiles` | 375 951 | **805 MB** (~2.2 kB/row) |
+| `points` | 256 581 | 122 MB |
+| `harvest_attempts` | 5 819 | 4.8 MB |
+| `datasets` | 2 164 | 3.5 MB |
+| `obis_cells` | **0** | — |
+
+Two things the dev volume got wrong, both of which changed conclusions:
+
+1. **Scale.** `/legend` is **2 341 ms** in production, not the 294 ms measured locally.
+   Anything sized as a percentage of the local number was undersized ~8x.
+2. **Distribution — and it is inverted.** Local data was recent-heavy; production
+   `profiles.time_max` has a median of **2003** (p25 1991, p75 2015). So "recent data
+   only" filters are *more* selective in production and "historical only" filters are
+   *less* selective than the local measurements suggested. Measured from production
+   statistics: `time_max >= 2020` → 12.5% of rows, `depth_max >= 1000` → 7.4%,
+   `time_min <= 2005` → 52%, `depth_min <= 10` → 97%.
+
+Also worth knowing before planning anything OBIS-shaped: **production has no OBIS rows
+at all**, so every occurrence-cell and scientific-name path is currently unexercised
+there.
+
+Measuring changed the answer on six of the twelve items. Each item below carries the
+numbers that decided it, so none of this has to be re-derived — and a number quoted
+below is a *production* number unless it says otherwise.
+
+### Open — the section's real headline
+
+- [ ] **`/legend` takes 2 341 ms in production and gates first map paint.** (1 033 ms
+      with a time filter active.) This was previously written up as a missing spatial
+      prefilter, which is a misdiagnosis — the ramp domain is over the whole selection by
+      design, so there is nothing to prune it to. The actual shape, from
+      `EXPLAIN (ANALYZE, BUFFERS)` on production:
+
+        ~730 ms   build the shared hex_records CTE
+                    (seq scan profiles 415 ms + trajectory_hexes 312 ms)
+        1 422 ms  sub1 / zoom0 aggregate, over 1.17 M spilled CTE rows
+          625 ms  sub3 / zoom2 aggregate, including a SECOND independent
+                    seq scan of profiles
+          433 ms  sub2 / zoom1 aggregate
+
+      830 MB of buffer reads and 75 MB spilled to temp. Two rewrites were measured and
+      neither is the answer on its own:
+      1. *Derive the point tier from the hex CTE* rather than re-scanning `profiles`:
+         **2 337 ms vs 2 341 ms** — a wash on production, and the same wash locally. The
+         saved table scan is paid back by the point aggregate reading spilled CTE rows
+         instead of table rows.
+      2. *Compute only the tier the caller's zoom needs.* Capped by a real coupling:
+         `Map.jsx:1283` reads the **zoom2** tier for the point-radius ramp at every zoom,
+         so zoom2 can never be dropped and only `sub2` can be skipped — ~433 ms of
+         2 341 ms (18%), in exchange for partial-response merging and a second fetch
+         trigger in `MapStateProvider.jsx`. Worth doing at this scale, but it is a
+         frontend-state change and wants its own pass.
+
+      Anyone picking this up should know two things. `Map.jsx:1265,1274` prefer
+      `viewportHexRange` — a ramp measured from the rendered tiles — over the `/legend`
+      response as soon as hexes are on screen, so this 2.3 s buys the bootstrap and
+      empty-view value, not the steady-state one. And the cost is the **aggregation over
+      1.1 M CTE rows**, not the scans: that is what any real fix has to attack
+      (materialised per-hex aggregates, avoiding the temp spill, or not deriving the
+      domain from a live full-catalogue aggregate at all).
+
+- [ ] **MVT tiles are stored in redis as a JSON array of byte values.**
+      `apicache/src/apicache.js:138` does `JSON.stringify(value)` before our adapter sees
+      it, so a `Buffer` becomes `{"type":"Buffer","data":[…]}`. Measured on a 200 KB tile:
+      **3.6x storage** (731 KB), **9.9 ms of blocking JS per cache write** and **2.4 ms
+      per cache hit** — ~48 ms of event-loop time per warm viewport of 20 tiles, on a
+      single-threaded server. Base64 in the same envelope would be 1.3x / 0.25 ms /
+      0.09 ms. The fix is **not** available in `utils/cache.js`: apicache stringifies
+      before calling the adapter and exposes no serializer hook. It needs a small
+      binary-aware redis middleware for the three tile routes, bypassing apicache — which
+      means re-implementing its key derivation, TTL and redis-down fallback, so it is its
+      own item.
+
+### Done
+
+- [x] **Time and depth bounds indexed on the three cell tables — three of the four
+      predicates.** The original item was right that no index existed and wrong about
+      why: the filter does not fire per slider drag (`FilterProvider.jsx:119-126`
+      debounces 500 ms, so a settled drag is one request set). Which columns are worth
+      indexing turned out to be a property of production's *distribution*, not of the
+      column names, and the local volume pointed the wrong way on one of them — so this
+      was settled against a restored copy of production `profiles` and
+      `trajectory_hexes`:
+
+        predicate                          rows    scan     indexed
+        time_max >= 2020  (start date)      12%    55 ms      16 ms
+        time_max >= 2024                     4%    27 ms       5 ms
+        time_min <= 1990  (end date)        24%    72 ms      31 ms
+        depth_max >= 1000 (deep only)        7%    42 ms      19 ms
+        time_min <= 2005                    52%       —   seq scan, ignored
+        depth_min <= 10                     97%       —   seq scan, ignored
+
+      `time_min` is indexed **because production's catalogue is historical** — profiles'
+      median `time_max` is 2003 and the data reaches back to 1917, so "before 1990"
+      really is a quarter of it. The local volume was recent-heavy, where the same index
+      goes unused; that reading would have left it out. `depth_min` is not indexed and
+      cannot usefully be: the predicate asks "does this feature start above the selected
+      floor", true of 97% of rows.
+
+      **The honest whole-query number is smaller than the branch numbers.** On the full
+      `/legend` query against production data, the indexes are worth **~19%**
+      (380 ms → 309 ms locally) — because `/legend` is dominated by the aggregation over
+      1.1 M CTE rows, not by the scan they speed up. They are used only when a filter is
+      genuinely narrow; the default range correctly plans a seq scan, so they cost
+      nothing when they cannot help, apart from harvest write time on the three largest
+      tables. Whether that trade is worth ~19% of the filtered legend is a judgement
+      call, recorded here so it can be revisited rather than re-derived.
+
+- [x] **`scientificNames` expansion memoized** (`dbFilter.js`). It ran once per
+      `createDBFilter`, i.e. once per uncached tile — ~20 identical expansions per
+      viewport, serially ahead of each tile's own query, plus twice for `/download`
+      (`getShapeQuery` runs it, then the route runs it again). The **promise** is
+      memoized, not the value, so the tiles of one viewport share a single query instead
+      of all missing together; a rejection is evicted so a blip is not pinned for the
+      TTL. Keyed on the sorted name set, 5-minute TTL to match the route cache.
+      **Not measurable in production: there are no OBIS rows there**, so this path is
+      currently unexercised and the ~30 ms per expansion is the code's own figure from
+      when the data existed.
+
+- [x] **`/harvest` slug resolution indexed.** The `DISTINCT` over the whole append-only
+      attempts table is gone; the transform is now a plain predicate backed by
+      `harvest_attempts_slug_idx`. This one got *worse* with scale, not better: measured
+      on a slug that matches nothing, **0.5 ms locally (293 rows) but 19.9 ms in
+      production (5 819 rows)** — superlinear, because the `DISTINCT` and the double
+      `regexp_replace` run over every row, on three routes, per request. Verified the
+      rewrite returns the same URL as the old query. `listServers`'s correlated scalar
+      subquery is now `DISTINCT ON (erddap_url, source)` — the shape `recentRuns` already
+      uses — and was diffed against the old version on real data: identical.
+
+- [x] **`datasetHistory` bounded** at 200 rows with the truncation reported, because
+      `HarvestDataset.jsx` renders every row it is handed into an unpaginated table.
+      Scale note: production currently holds **one attempt per dataset** (10 runs,
+      5 819 attempts, 2 164 datasets), so this cap does not bite today — it is a guard on
+      an append-only table that gains a row per dataset per run, not a fix for a live
+      problem.
+
+- [x] **Knex pool max raised to 32** (`db.js`), with the reasoning in the comment:
+      `/legend` holds 2 connections and `/download` 3+, so 16 saturated at ~8 concurrent
+      legend requests — and `/legend` is a 2.3 s query that gates first map paint, so
+      those connections are held for a long time.
+
+- [x] **`4_create_hexes.sql` centroid computed once per cell.** Was four PostGIS calls
+      per output row in both UNION arms; now a `used_cells` → `hex_pos` CTE resolves each
+      distinct cell once (two calls) and the two arms collapse into one INSERT. Verified
+      by rebuilding a dataset's rows in a transaction and diffing against the stored
+      rows: 43 rows, 0 differing. Load-path only.
+
+- [x] **`obis_scientific_name_popularity` off the load path.** It has no runtime reader —
+      only `populate_vernaculars.py`'s `--top N` ordering — so it is refreshed there
+      (once per run, CONCURRENTLY, failure tolerated) instead of after every harvest.
+      `obis_scientific_names`, which the web-api reads live, still refreshes on load.
+
+### Closed by measurement — do not re-raise without new numbers
+
+- [x] **`cde.datasets` indexes: still not worth it, but it is closer than it looks.**
+      2 164 rows / 3.5 MB. Every tile and legend query already reaches it by
+      `Index Only Scan using datasets_pkey`, because it is the small build side of a hash
+      join. The one query where the missing `pk_url` index shows is
+      `/trajectories/track`: the `datasets` seq scan is **98% of its estimated cost**
+      (408 of 416 units) and **1.35 ms of its 3.2 ms** actual runtime. Real, but 1.35 ms.
+      GIN on `organization_pks`/`eovs`/`obis_nodes` would sit unused on a 2 164-row table
+      and slow every harvest write. Revisit if the catalogue reaches five figures, or if
+      `pk_url` lookups move onto a hot path.
+- [x] **`/preview` has a cache** — added since the audit (`preview.js:173-174`, 5 minutes
+      with `cache.onlyOk`). The `COALESCE(profile_id, timeseries_id)` filter is still
+      unindexable but the branch is reached through `profiles(dataset_pk)`, so it is
+      already bounded to one dataset.
+- [x] **"Eleven unbounded routes" was mostly a false positive.** `/datasets`,
+      `/organizations`, `/platforms`, `/oceanVariables`, `/obisNodes` and
+      `/erddapServers` return one row per catalogue entry and the frontend needs all of
+      them — a LIMIT would silently truncate the filter menus. `/trajectories/track` is
+      bounded by the harvester's retained-fix cap (`trajectories.js:77`) and
+      `/pointQuery` by the drawn selection. Only `datasetHistory` grew without bound;
+      that one is capped above.
 
 ---
 
@@ -1037,6 +1235,15 @@ missing directory surfaced as a confusing import error rather than an empty pack
 - [ ] `docs/api.md` documents 1 of 20 routes and is superseded by the `swagger.js` build. Delete or finish.
 - [ ] No architecture doc. The closest things are the comment blocks in `docker-compose.yaml`.
       Consider a `CONTEXT.md` for the domain vocabulary — this backlog had to take its terms from the code.
+
+### Clarity, not speed
+
+- [ ] `griddapCoverage.js:54` selects `d.*` from a CTE to use eight fields. Moved down from P3:
+      the CTE is referenced once, so Postgres inlines it and prunes the projection — the two jsonb
+      blobs and the stored geometry are never materialised, and there is no time to win. An explicit
+      column list would still be worth writing, because it would document which `cde.datasets`
+      columns dbFilter's unqualified predicates depend on (`selection.js` explains why they have to
+      be in scope at all).
 
 ### Long functions worth splitting
 

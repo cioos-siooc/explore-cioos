@@ -34,18 +34,37 @@
     "react-router-dom": "^6.30.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.62.1",
     "@sentry/vite-plugin": "^5.4.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "jsdom": "^30.0.1",
     "rollup-plugin-visualizer": "^7.0.1",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^4.1.11"
   },
   "scripts": {
-    "test": "node --test \"src/**/*.test.mjs\"",
+    "test": "vitest run",
     "dev": "vite",
     "start": "vite --open",
     "build": "vite build",
     "build:analyze": "ANALYZE=1 vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --project=desktop --project=tablet --project=mobile",
+    "test:visual": "e2e/in-container.sh test --project=visual",
+    "test:visual:update": "e2e/in-container.sh test --project=visual --update-snapshots",
+    "test:a11y": "e2e/in-container.sh test --project=a11y",
+    "test:a11y:baseline": "A11Y_BASELINE=record e2e/in-container.sh test --project=a11y",
+    "test:all": "npm run test && e2e/in-container.sh test",
+    "dev:test": "vite --mode test",
+    "test:e2e:live": "LIVE_BASE_URL=${LIVE_BASE_URL:-http://localhost:8098} playwright test --project=live",
+    "test:e2e:record": "node e2e/record-fixtures.mjs"
   },
   "author": "",
   "license": "ISC"

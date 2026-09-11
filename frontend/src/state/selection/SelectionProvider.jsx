@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useRef,
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -49,6 +50,14 @@ const isPlatformlessDataset = (row) =>
   PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) ||
   row.source_type === "obis";
 
+function datasetInLanguage(point, language) {
+  return {
+    ...point,
+    title: point.title_translated?.[language] || point.title,
+    selected: false,
+  };
+}
+
 export function useSelection() {
   return useContext(SelectionContext);
 }
@@ -56,6 +65,7 @@ export function useSelection() {
 // Note: datasets and points are exchangable terminology
 export default function SelectionProvider({ children }) {
   const { i18n } = useTranslation();
+  const languageRef = useRef(i18n.language);
   const { query, catalogLoaded } = useFilters();
   const {
     setActiveWmsOverlay,
@@ -67,6 +77,10 @@ export default function SelectionProvider({ children }) {
     dataLayers,
   } = useMapState();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    languageRef.current = i18n.language;
+  }, [i18n.language]);
 
   // Everything below that is seeded from the URL is read once, from the
   // address the app was opened at — UrlSync owns the URL from then on and
@@ -295,7 +309,7 @@ export default function SelectionProvider({ children }) {
             .filter((row) => !hiddenDatasetPks.has(row.pk))
             .map((row) => row.pk),
     );
-  }, [hiddenDatasetPks, pointsData]);
+  }, [hiddenDatasetPks, pointsData, setMapDatasetPKs]);
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
@@ -316,7 +330,12 @@ export default function SelectionProvider({ children }) {
       inspectDataset.coverage_bbox_geojson;
     if (footprint) zoomToGeometry(footprint);
     setPendingDatasetZoom(false);
-  }, [pendingDatasetZoom, inspectDataset]);
+  }, [
+    pendingDatasetZoom,
+    inspectDataset,
+    setPendingDatasetZoom,
+    zoomToGeometry,
+  ]);
 
   // Opening or closing a dataset page is a navigation the user made, so it
   // pushes an entry that Back reverses. Automatic opens/closes (auto-inspecting
@@ -506,17 +525,17 @@ export default function SelectionProvider({ children }) {
       // no longer among them (a filter excluded it, say): the page has already
       // closed itself — inspectDataset stopped resolving — so clear the params
       // it left behind rather than carry a dead key in the URL.
-      setInspectDataset(undefined, { replace: true });
+      setSearchParams(
+        (previous) => {
+          const next = withoutPreviewParams(previous);
+          next.delete("dataset");
+          next.delete("server");
+          return next;
+        },
+        { replace: true },
+      );
     }
-  }, [pointsData]);
-
-  function datasetsInLanguage(point) {
-    return {
-      ...point,
-      title: point.title_translated?.[i18n.language] || point.title,
-      selected: false,
-    };
-  }
+  }, [pointsData, searchParams, setSearchParams]);
 
   // The pointQuery waits for the catalog so the filters it sends are hydrated
   // from the URL first. It must not wait for a non-empty EOV list: OBIS
@@ -525,7 +544,7 @@ export default function SelectionProvider({ children }) {
   // even when the fetches fail, so a dead API lands on an empty list rather
   // than an endless spinner.
   useEffect(() => {
-    if (!selectionLoading && catalogLoaded) {
+    if (catalogLoaded) {
       const filtersQuery = createDataFilterQueryString(query);
       let shapeQuery = [];
       if (polygon) {
@@ -543,11 +562,16 @@ export default function SelectionProvider({ children }) {
       const urlString = `${server}/pointQuery${
         combinedQueries ? "?" + combinedQueries : ""
       }`;
-      fetch(urlString)
+      const controller = new AbortController();
+      fetch(urlString, { signal: controller.signal })
         .then((response) => {
           if (response.ok) {
             response.json().then((data) => {
-              setPointsData(data.map(datasetsInLanguage));
+              setPointsData(
+                data.map((point) =>
+                  datasetInLanguage(point, languageRef.current),
+                ),
+              );
             });
           } else {
             setPointsData([]);
@@ -555,20 +579,24 @@ export default function SelectionProvider({ children }) {
           setInitialPointsQueryComplete(true);
         })
         .catch((error) => {
+          if (error.name === "AbortError") return;
           // network failure / gateway timeout: land on an empty list rather
           // than an endless spinner
           reportError("pointQuery failed", error);
           setPointsData([]);
           setInitialPointsQueryComplete(true);
         });
+      return () => controller.abort();
     }
   }, [query, polygon, catalogLoaded]);
 
   useEffect(() => {
-    if (!selectionLoading) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
-      setPointsData(pointsData.map(datasetsInLanguage));
-    }
+    // Translating a response after a locale change requires replacing the
+    // stored labels.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPointsData((previous) =>
+      previous.map((point) => datasetInLanguage(point, i18n.language)),
+    );
   }, [i18n.language]);
 
   function handleSelectDataset(point) {
@@ -620,7 +648,7 @@ export default function SelectionProvider({ children }) {
     setHighlightedRecord((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current,
     );
-  }, [inspectDataset]);
+  }, [inspectDataset, setActiveWmsOverlay]);
 
   // The share link's highlight, once its dataset is in hand. Declared after the
   // effect above so that on the render where the page resolves, this one runs
@@ -658,12 +686,14 @@ export default function SelectionProvider({ children }) {
   // where the dataset param is (setInspectDataset drops the whole preview), not
   // here, because doing it here is what would wipe a shared link's own record
   // before its dataset had a chance to load.
+  const inspectDatasetId = inspectDataset?.dataset_id;
+
   useEffect(() => {
-    if (!inspectDataset || !inspectRecordID) return;
+    if (!inspectDatasetId || !inspectRecordID) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setRecordLoading(true);
     const previewUrl = `${server}/preview?dataset=${encodeURIComponent(
-      inspectDataset.dataset_id,
+      inspectDatasetId,
     )}&profile=${encodeURIComponent(inspectRecordID)}`;
     fetch(previewUrl)
       .then((response) => {
@@ -688,7 +718,7 @@ export default function SelectionProvider({ children }) {
         reportError("preview fetch failed", error);
         setRecordLoading(false);
       });
-  }, [inspectRecordID, inspectDataset?.dataset_id]);
+  }, [inspectRecordID, inspectDatasetId]);
 
   const value = {
     polygon,
