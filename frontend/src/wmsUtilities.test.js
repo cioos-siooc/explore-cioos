@@ -91,9 +91,7 @@ describe("buildWmsGetMapUrl", () => {
       ...base,
       time: "2020-01-01T00:00:00+00:00",
     });
-    expect(new URL(url).searchParams.get("time")).toBe(
-      "2020-01-01T00:00:00Z",
-    );
+    expect(new URL(url).searchParams.get("time")).toBe("2020-01-01T00:00:00Z");
   });
 
   it("omits time and elevation when absent", () => {
@@ -113,11 +111,7 @@ describe("buildGriddapLegendUrl", () => {
   const base = {
     erddapUrl: "https://erddap.example/griddap/ds1.html",
     variable: "temperature",
-    dimensions: [
-      { name: "time" },
-      { name: "latitude" },
-      { name: "longitude" },
-    ],
+    dimensions: [{ name: "time" }, { name: "latitude" }, { name: "longitude" }],
   };
 
   it("returns null without an erddapUrl or a variable", () => {
@@ -156,7 +150,9 @@ describe("buildGriddapLegendUrl", () => {
 
   it("slices every other (non-spatial, non-time) dimension at its first level", () => {
     const dimensions = [...base.dimensions, { name: "scenario" }];
-    const url = decodeURIComponent(buildGriddapLegendUrl({ ...base, dimensions }));
+    const url = decodeURIComponent(
+      buildGriddapLegendUrl({ ...base, dimensions }),
+    );
     expect(url).toContain("temperature[(last)][0:10:last][0:10:last][0]");
   });
 });
@@ -281,9 +277,7 @@ describe("intersectBoundsWithPolygonBbox", () => {
   const viewport = { west: -10, south: -10, east: 10, north: 10 };
 
   it("returns the viewport unchanged without a polygon", () => {
-    expect(intersectBoundsWithPolygonBbox(viewport, undefined)).toBe(
-      viewport,
-    );
+    expect(intersectBoundsWithPolygonBbox(viewport, undefined)).toBe(viewport);
     expect(intersectBoundsWithPolygonBbox(viewport, [[0, 0]])).toBe(viewport);
   });
 
@@ -327,9 +321,7 @@ describe("getTimeDimension / getVerticalDimension", () => {
 
   it("finds depth or altitude as the vertical dimension", () => {
     expect(getVerticalDimension(dimensions)).toBe(dimensions[3]);
-    expect(
-      getVerticalDimension([{ name: "altitude" }]).name,
-    ).toBe("altitude");
+    expect(getVerticalDimension([{ name: "altitude" }]).name).toBe("altitude");
   });
 
   it("returns undefined when absent, without throwing on a missing list", () => {
@@ -374,12 +366,8 @@ describe("toElevation / defaultElevation", () => {
   });
 
   it("defaults to the endpoint nearest the surface", () => {
-    expect(
-      defaultElevation([{ name: "depth", min: 5, max: 500 }]),
-    ).toBe(-5);
-    expect(
-      defaultElevation([{ name: "altitude", min: 5, max: 500 }]),
-    ).toBe(5);
+    expect(defaultElevation([{ name: "depth", min: 5, max: 500 }])).toBe(-5);
+    expect(defaultElevation([{ name: "altitude", min: 5, max: 500 }])).toBe(5);
   });
 
   it("returns undefined without a vertical dimension", () => {

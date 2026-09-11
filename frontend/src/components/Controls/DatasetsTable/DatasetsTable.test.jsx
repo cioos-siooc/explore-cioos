@@ -47,11 +47,9 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       { providers: "app" },
     );
     const cards = await screen.findAllByTestId("dataset-card");
-    expect(cards.map((c) => c.querySelector(".datasetCardTitle").textContent)).toEqual([
-      "Alpha station",
-      "Beta station",
-      "Gamma grid",
-    ]);
+    expect(
+      cards.map((c) => c.querySelector(".datasetCardTitle").textContent),
+    ).toEqual(["Alpha station", "Beta station", "Gamma grid"]);
   });
 
   // DatasetsTable's own search box writes to SelectionProvider's shared
@@ -168,7 +166,9 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     await screen.findAllByTestId("dataset-card");
     await user.selectOptions(screen.getByLabelText("Group"), "platform");
     await waitFor(() => {
-      expect(document.querySelector(".datasetsCardGroupHeader")).toBeInTheDocument();
+      expect(
+        document.querySelector(".datasetsCardGroupHeader"),
+      ).toBeInTheDocument();
     });
   });
 });

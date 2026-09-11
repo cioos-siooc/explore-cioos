@@ -16,7 +16,12 @@ describe("SortSelect", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderWithProviders(
-      <SortSelect fields={FIELDS} sort={{ field: "title", dir: "desc" }} onChange={onChange} label="Sort" />,
+      <SortSelect
+        fields={FIELDS}
+        sort={{ field: "title", dir: "desc" }}
+        onChange={onChange}
+        label="Sort"
+      />,
     );
     await user.selectOptions(screen.getByLabelText("Sort"), "platform");
     expect(onChange).toHaveBeenCalledWith({ field: "platform", dir: "desc" });
@@ -26,7 +31,12 @@ describe("SortSelect", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderWithProviders(
-      <SortSelect fields={FIELDS} sort={{ field: "title", dir: "asc" }} onChange={onChange} label="Sort" />,
+      <SortSelect
+        fields={FIELDS}
+        sort={{ field: "title", dir: "asc" }}
+        onChange={onChange}
+        label="Sort"
+      />,
     );
     await user.click(screen.getByRole("button"));
     expect(onChange).toHaveBeenCalledWith({ field: "title", dir: "desc" });
@@ -34,7 +44,12 @@ describe("SortSelect", () => {
 
   it("labels the direction toggle for the CURRENT direction, not the one it switches to", () => {
     renderWithProviders(
-      <SortSelect fields={FIELDS} sort={{ field: "title", dir: "asc" }} onChange={() => {}} label="Sort" />,
+      <SortSelect
+        fields={FIELDS}
+        sort={{ field: "title", dir: "asc" }}
+        onChange={() => {}}
+        label="Sort"
+      />,
     );
     expect(
       screen.getByRole("button", { name: "Sorted ascending — tap to reverse" }),
@@ -43,7 +58,11 @@ describe("SortSelect", () => {
 
   it("falls back to the translated default label when none is given", () => {
     renderWithProviders(
-      <SortSelect fields={FIELDS} sort={{ field: "title", dir: "asc" }} onChange={() => {}} />,
+      <SortSelect
+        fields={FIELDS}
+        sort={{ field: "title", dir: "asc" }}
+        onChange={() => {}}
+      />,
     );
     expect(screen.getByLabelText("Sort")).toBeInTheDocument();
   });

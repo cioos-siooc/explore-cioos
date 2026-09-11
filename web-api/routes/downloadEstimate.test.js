@@ -18,9 +18,7 @@ test("reshapes getShapeQuery's rows to {pk, dataset_id, size}", async () => {
     { pk_url: 1, dataset_id: "obs_270", size: 184320, title: "dropped" },
   ]);
 
-  const res = await agent
-    .get("/downloadEstimate")
-    .query({ datasetPKs: "1" });
+  const res = await agent.get("/downloadEstimate").query({ datasetPKs: "1" });
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, [{ pk: 1, dataset_id: "obs_270", size: 184320 }]);

@@ -30,7 +30,9 @@ const FEATURE_ROW = {
 test("returns ERDDAP's tabledap JSON for a resolved record", async () => {
   db.queueRaw([FEATURE_ROW]);
   axios.queueResponse({
-    data: { table: { columnNames: ["time", "temp"], rows: [["2024-03-01", 5.2]] } },
+    data: {
+      table: { columnNames: ["time", "temp"], rows: [["2024-03-01", 5.2]] },
+    },
   });
 
   const res = await agent
@@ -49,7 +51,9 @@ test("attaches columnMeta positionally when the harvest recorded table_variables
     },
   ]);
   axios.queueResponse({
-    data: { table: { columnNames: ["time", "temp"], rows: [["2024-03-01", 5.2]] } },
+    data: {
+      table: { columnNames: ["time", "temp"], rows: [["2024-03-01", 5.2]] },
+    },
   });
 
   const res = await agent
@@ -66,7 +70,9 @@ test("attaches columnMeta positionally when the harvest recorded table_variables
 test("truncates rows to 1000 even when ERDDAP returns more", async () => {
   db.queueRaw([FEATURE_ROW]);
   const manyRows = Array.from({ length: 1500 }, (_, i) => [i]);
-  axios.queueResponse({ data: { table: { columnNames: ["i"], rows: manyRows } } });
+  axios.queueResponse({
+    data: { table: { columnNames: ["i"], rows: manyRows } },
+  });
 
   const res = await agent
     .get("/preview")
@@ -109,7 +115,10 @@ test("404s NO_DATA when ERDDAP itself has nothing for the constraint", async () 
 test("404s NO_DATA (not 502) when ERDDAP's error body says no matching results", async () => {
   db.queueRaw([FEATURE_ROW]);
   const error = new Error("Request failed with status code 404");
-  error.response = { status: 404, data: "Your query produced no matching results." };
+  error.response = {
+    status: 404,
+    data: "Your query produced no matching results.",
+  };
   axios.queueError(error);
 
   const res = await agent

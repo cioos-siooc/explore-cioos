@@ -16,7 +16,10 @@ test("returns the matched min/max time bounds", async () => {
   const res = await agent.get("/timeExtent");
 
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { min: "2010-01-01T00:00:00Z", max: "2024-01-01T00:00:00Z" });
+  assert.deepEqual(res.body, {
+    min: "2010-01-01T00:00:00Z",
+    max: "2024-01-01T00:00:00Z",
+  });
 });
 
 test("falls back to {min: null, max: null} for an empty result set", async () => {
@@ -27,7 +30,9 @@ test("falls back to {min: null, max: null} for an empty result set", async () =>
 });
 
 test("rejects an unrecognized trajectoryTypes entry", async () => {
-  const res = await agent.get("/timeExtent").query({ trajectoryTypes: "NotAType" });
+  const res = await agent
+    .get("/timeExtent")
+    .query({ trajectoryTypes: "NotAType" });
   assert.equal(res.status, 400);
   assert.equal(db.queries.length, 0);
 });

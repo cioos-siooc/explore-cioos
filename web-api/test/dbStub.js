@@ -1,4 +1,3 @@
-const path = require("node:path");
 const Module = require("node:module");
 
 // Stands in for ../db so route tests need no Postgres — the same trick
@@ -49,7 +48,8 @@ function install() {
   // terminal (awaited) query. Consuming at .then() time means only a Raw
   // someone actually awaits counts as "a call".
   function fakeRaw(sql, bindings) {
-    const raw = bindings === undefined ? knex.raw(sql) : knex.raw(sql, bindings);
+    const raw =
+      bindings === undefined ? knex.raw(sql) : knex.raw(sql, bindings);
     raw.then = (onFulfilled, onRejected) => {
       queries.push(raw.toString());
       const result = nextResult();

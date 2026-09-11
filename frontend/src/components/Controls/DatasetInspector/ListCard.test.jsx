@@ -4,7 +4,11 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
-import ListCard, { CardField, CardTags, useExpandableList } from "./ListCard.jsx";
+import ListCard, {
+  CardField,
+  CardTags,
+  useExpandableList,
+} from "./ListCard.jsx";
 
 describe("ListCard", () => {
   it("renders its id and children as a description list", () => {
@@ -111,7 +115,6 @@ describe("CardTags", () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     renderWithProviders(
-      // eslint-disable-next-line jsx-a11y/click-events-have-key-events
       <div onClick={onClick}>
         <CardTags values={["a", "b", "c"]} limit={1} />
       </div>,

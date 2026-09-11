@@ -7,8 +7,14 @@ import useElementSize from "./useElementSize.js";
 // jsdom never computes real layout, so clientWidth/clientHeight are 0 unless
 // explicitly stubbed — this stands in for "the element actually has a box".
 function stubClientBox(el, width, height) {
-  Object.defineProperty(el, "clientWidth", { value: width, configurable: true });
-  Object.defineProperty(el, "clientHeight", { value: height, configurable: true });
+  Object.defineProperty(el, "clientWidth", {
+    value: width,
+    configurable: true,
+  });
+  Object.defineProperty(el, "clientHeight", {
+    value: height,
+    configurable: true,
+  });
 }
 
 function Harness({ onSize }) {

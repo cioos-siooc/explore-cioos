@@ -26,7 +26,15 @@ describe("isCommittable", () => {
 describe("DepthField", () => {
   it("commits as soon as a complete in-range integer is typed", () => {
     const onCommit = vi.fn();
-    render(<DepthField value={0} min={0} max={1000} label="Start" onCommit={onCommit} />);
+    render(
+      <DepthField
+        value={0}
+        min={0}
+        max={1000}
+        label="Start"
+        onCommit={onCommit}
+      />,
+    );
     const input = screen.getByLabelText("Start");
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "500" } });
@@ -34,7 +42,15 @@ describe("DepthField", () => {
   });
 
   it("restores the committed value on blur when left incomplete", () => {
-    render(<DepthField value={100} min={0} max={1000} label="Start" onCommit={() => {}} />);
+    render(
+      <DepthField
+        value={100}
+        min={0}
+        max={1000}
+        label="Start"
+        onCommit={() => {}}
+      />,
+    );
     const input = screen.getByLabelText("Start");
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "" } });
@@ -88,7 +104,11 @@ describe("useDepthAxis", () => {
   it("builds an axis spanning the given min/max", () => {
     function Probe() {
       const axis = useDepthAxis(0, 12000);
-      return <span data-testid="out">{axis.min}-{axis.max}</span>;
+      return (
+        <span data-testid="out">
+          {axis.min}-{axis.max}
+        </span>
+      );
     }
     render(<Probe />);
     expect(screen.getByTestId("out")).toHaveTextContent("0-12000");
@@ -99,7 +119,12 @@ describe("DepthRail (component)", () => {
   it("renders start/end handles at the given depths", () => {
     const axis = createDepthAxis(0, 12000);
     render(
-      <DepthRail axis={axis} startDepth={100} endDepth={500} onCommit={() => {}} />,
+      <DepthRail
+        axis={axis}
+        startDepth={100}
+        endDepth={500}
+        onCommit={() => {}}
+      />,
     );
     const [start, end] = screen.getAllByRole("slider");
     expect(start).toHaveAttribute("aria-valuenow", "100");
@@ -110,7 +135,12 @@ describe("DepthRail (component)", () => {
     const axis = createDepthAxis(0, 12000);
     const onCommit = vi.fn();
     render(
-      <DepthRail axis={axis} startDepth={100} endDepth={500} onCommit={onCommit} />,
+      <DepthRail
+        axis={axis}
+        startDepth={100}
+        endDepth={500}
+        onCommit={onCommit}
+      />,
     );
     const [, end] = screen.getAllByRole("slider");
     fireEvent.keyDown(end, { key: "End" });

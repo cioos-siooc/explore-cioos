@@ -27,7 +27,11 @@ function renderList(props) {
       emptyText="No results"
       pagerLabel="Page"
       perPageLabel="Per page"
-      renderItem={(row) => <div data-testid="row">{row.id}:{row.n}</div>}
+      renderItem={(row) => (
+        <div data-testid="row">
+          {row.id}:{row.n}
+        </div>
+      )}
       {...props}
     />,
   );

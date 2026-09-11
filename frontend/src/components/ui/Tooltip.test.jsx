@@ -12,7 +12,9 @@ describe("Tooltip", () => {
         <button>hover me</button>
       </Tooltip>,
     );
-    expect(screen.getByRole("button", { name: "hover me" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "hover me" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 

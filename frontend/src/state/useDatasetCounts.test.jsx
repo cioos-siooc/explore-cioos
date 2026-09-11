@@ -12,7 +12,13 @@ function Probe() {
   if (!ready) return <span data-testid="state">not ready</span>;
   return (
     <span data-testid="state">
-      {JSON.stringify({ updating, filteredCount, total, allDatasetsShown, label })}
+      {JSON.stringify({
+        updating,
+        filteredCount,
+        total,
+        allDatasetsShown,
+        label,
+      })}
     </span>
   );
 }

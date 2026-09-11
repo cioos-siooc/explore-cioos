@@ -25,7 +25,13 @@ describe("WmsLegend", () => {
   });
 
   it("renders the colorbar image and links to the dataset's ERDDAP page", async () => {
-    renderWithProviders(<WmsLegend overlay={OVERLAY} onClose={() => {}} setActiveWmsOverlay={() => {}} />);
+    renderWithProviders(
+      <WmsLegend
+        overlay={OVERLAY}
+        onClose={() => {}}
+        setActiveWmsOverlay={() => {}}
+      />,
+    );
     await waitFor(() => {
       expect(document.querySelector(".wmsLegendImage")).toBeInTheDocument();
     });
@@ -49,14 +55,24 @@ describe("WmsLegend", () => {
   it("the close button calls onClose", async () => {
     const onClose = vi.fn();
     const { user } = renderWithProviders(
-      <WmsLegend overlay={OVERLAY} onClose={onClose} setActiveWmsOverlay={() => {}} />,
+      <WmsLegend
+        overlay={OVERLAY}
+        onClose={onClose}
+        setActiveWmsOverlay={() => {}}
+      />,
     );
     await user.click(screen.getByTitle("Hide overlay"));
     expect(onClose).toHaveBeenCalled();
   });
 
   it("falls back to a title-only card when the image fails to load", async () => {
-    renderWithProviders(<WmsLegend overlay={OVERLAY} onClose={() => {}} setActiveWmsOverlay={() => {}} />);
+    renderWithProviders(
+      <WmsLegend
+        overlay={OVERLAY}
+        onClose={() => {}}
+        setActiveWmsOverlay={() => {}}
+      />,
+    );
     const img = await screen.findByAltText(/temp/);
     img.dispatchEvent(new Event("error"));
     await waitFor(() => {
@@ -67,7 +83,12 @@ describe("WmsLegend", () => {
   it("on a phone-width floating card, renders as a peek button until opened", () => {
     setViewportWidth(MOBILE_WIDTH);
     renderWithProviders(
-      <WmsLegend overlay={OVERLAY} onClose={() => {}} setActiveWmsOverlay={() => {}} variant="floating" />,
+      <WmsLegend
+        overlay={OVERLAY}
+        onClose={() => {}}
+        setActiveWmsOverlay={() => {}}
+        variant="floating"
+      />,
     );
     expect(document.querySelector(".wmsLegendPeek")).toBeInTheDocument();
     expect(document.querySelector(".wmsLegendImage")).not.toBeInTheDocument();
@@ -76,7 +97,12 @@ describe("WmsLegend", () => {
   it("an inline card (dataset page) is never collapsed to a peek button, even at phone width", async () => {
     setViewportWidth(MOBILE_WIDTH);
     renderWithProviders(
-      <WmsLegend overlay={OVERLAY} onClose={() => {}} setActiveWmsOverlay={() => {}} variant="inline" />,
+      <WmsLegend
+        overlay={OVERLAY}
+        onClose={() => {}}
+        setActiveWmsOverlay={() => {}}
+        variant="inline"
+      />,
     );
     expect(document.querySelector(".wmsLegendPeek")).not.toBeInTheDocument();
     await waitFor(() =>

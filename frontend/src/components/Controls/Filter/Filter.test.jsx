@@ -151,7 +151,11 @@ describe("Filter search / reset / info", () => {
     const user = userEvent.setup();
     const resetButton = vi.fn();
     render(
-      <Filter badgeTitle="Ocean variables" filterName="eovs" resetButton={resetButton}>
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        resetButton={resetButton}
+      >
         <div>options</div>
       </Filter>,
     );

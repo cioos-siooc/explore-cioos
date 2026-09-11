@@ -11,18 +11,24 @@ vi.mock("@sentry/react", () => ({ getFeedback: () => undefined }));
 
 describe("IntroModal", () => {
   it("renders nothing (Modal unmounts its body) when show is false", () => {
-    renderWithProviders(<IntroModal showModal={false} setShowModal={() => {}} />);
+    renderWithProviders(
+      <IntroModal showModal={false} setShowModal={() => {}} />,
+    );
     expect(screen.queryByText("CIOOS Data Explorer")).not.toBeInTheDocument();
   });
 
   it("shows the welcome message by default when open", () => {
     renderWithProviders(<IntroModal showModal setShowModal={() => {}} />);
     expect(screen.getByText("CIOOS Data Explorer")).toBeInTheDocument();
-    expect(screen.getByText(/Welcome to the CIOOS Data Explorer/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Welcome to the CIOOS Data Explorer/),
+    ).toBeInTheDocument();
   });
 
   it("hovering a step shows that step's info instead of the welcome message", async () => {
-    const { user } = renderWithProviders(<IntroModal showModal setShowModal={() => {}} />);
+    const { user } = renderWithProviders(
+      <IntroModal showModal setShowModal={() => {}} />,
+    );
     await user.hover(screen.getByText("Filter", { selector: ".stepImage" }));
     expect(
       screen.getAllByText("Filter").some((el) => el.closest(".stepInfo")),

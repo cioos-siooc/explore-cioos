@@ -99,9 +99,9 @@ describe("HarvestDownloads", () => {
       "FAILED",
     );
     await waitFor(() => {
-      expect(
-        new URL(window.location.href).searchParams.get("status"),
-      ).toBe("FAILED");
+      expect(new URL(window.location.href).searchParams.get("status")).toBe(
+        "FAILED",
+      );
     });
   });
 

@@ -20,7 +20,11 @@ function Probe() {
     selection: useSelection(),
     mapState: useMapState(),
   };
-  return <span data-testid="ready">{hooks.filters.catalogLoaded ? "loaded" : "loading"}</span>;
+  return (
+    <span data-testid="ready">
+      {hooks.filters.catalogLoaded ? "loaded" : "loading"}
+    </span>
+  );
 }
 
 const params = () => new URLSearchParams(window.location.search);
@@ -40,7 +44,9 @@ describe("UrlSync", () => {
 
   it("writes the title search into ?search=, and drops it when cleared", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("loaded"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
 
     act(() => hooks.selection.setDatasetTitleSearchText("orca"));
     await waitFor(() => expect(params().get("search")).toBe("orca"));
@@ -51,7 +57,9 @@ describe("UrlSync", () => {
 
   it("writes onlyInView only when true (the unfiltered state carries no param)", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("loaded"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
 
     act(() => hooks.selection.setOnlyInView(true));
     await waitFor(() => expect(params().get("onlyInView")).toBe("true"));
@@ -62,7 +70,9 @@ describe("UrlSync", () => {
 
   it("writes groupBy only for a real dimension, never for GROUP_NONE", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("loaded"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
 
     act(() => hooks.selection.setGroupBy("platform"));
     await waitFor(() => expect(params().get("groupBy")).toBe("platform"));
@@ -70,7 +80,9 @@ describe("UrlSync", () => {
 
   it("records the observations-layer switch only when turned off", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("loaded"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
     expect(params().has("obs")).toBe(false);
 
     act(() => hooks.mapState.setDataLayersVisible(false));
@@ -79,7 +91,9 @@ describe("UrlSync", () => {
 
   it("records the debounced filter query once it settles (an EOV selection)", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("loaded"));
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
 
     const eov = hooks.filters.eovsSelected[0];
     act(() =>
@@ -89,9 +103,8 @@ describe("UrlSync", () => {
         ),
       ),
     );
-    await waitFor(
-      () => expect(params().get("eovs")).toBe(eov.title),
-      { timeout: 2000 },
-    );
+    await waitFor(() => expect(params().get("eovs")).toBe(eov.title), {
+      timeout: 2000,
+    });
   });
 });

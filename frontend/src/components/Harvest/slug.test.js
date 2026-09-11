@@ -15,9 +15,7 @@ describe("slugify", () => {
   });
 
   it("is case-insensitive on the scheme", () => {
-    expect(slugify("HTTPS://erddap.example.com")).toBe(
-      "erddap-example-com",
-    );
+    expect(slugify("HTTPS://erddap.example.com")).toBe("erddap-example-com");
   });
 
   it("coerces a non-string input to a string first", () => {

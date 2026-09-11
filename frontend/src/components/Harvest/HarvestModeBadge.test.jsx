@@ -7,7 +7,9 @@ import HarvestModeBadge from "./HarvestModeBadge.jsx";
 
 describe("HarvestModeBadge", () => {
   it("renders nothing when the mode can't be determined", () => {
-    const { container } = renderWithProviders(<HarvestModeBadge dataset={{}} />);
+    const { container } = renderWithProviders(
+      <HarvestModeBadge dataset={{}} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -24,7 +26,9 @@ describe("HarvestModeBadge", () => {
 
   it("shows 'source' for a database-backed (full) dataset", () => {
     renderWithProviders(
-      <HarvestModeBadge dataset={{ content_hash_reason: "HASH_NO_FILE_LIST" }} />,
+      <HarvestModeBadge
+        dataset={{ content_hash_reason: "HASH_NO_FILE_LIST" }}
+      />,
     );
     expect(screen.getByText("source")).toBeInTheDocument();
   });

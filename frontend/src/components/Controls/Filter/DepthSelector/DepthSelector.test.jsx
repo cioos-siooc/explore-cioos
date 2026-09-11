@@ -37,9 +37,13 @@ async function renderReady() {
 // field's label and the handle's aria-label read the same translation key),
 // so getByLabelText matches both — narrow to the <input>, which is the field.
 const startInput = () =>
-  screen.getAllByLabelText("Start Depth (m)").find((el) => el.tagName === "INPUT");
+  screen
+    .getAllByLabelText("Start Depth (m)")
+    .find((el) => el.tagName === "INPUT");
 const endInput = () =>
-  screen.getAllByLabelText("End Depth (m)").find((el) => el.tagName === "INPUT");
+  screen
+    .getAllByLabelText("End Depth (m)")
+    .find((el) => el.tagName === "INPUT");
 
 describe("DepthSelector", () => {
   beforeEach(() => {

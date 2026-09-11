@@ -56,7 +56,9 @@ describe("HarvestDownloadJob", () => {
       [`/downloads/${JOB_ID}`]: { job: JOB, datasets: DATASETS },
     });
     renderJob();
-    expect(await screen.findByText("Download request job-1")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Download request job-1"),
+    ).toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
     expect(screen.getByText("obs_270")).toBeInTheDocument();
     expect(screen.getByText("obs_512")).toBeInTheDocument();

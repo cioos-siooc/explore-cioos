@@ -83,7 +83,9 @@ describe("useActivityTask / useActivityTasks", () => {
         </ActivityProvider>
       );
     }
-    render(<Harness labels={["activityLayerTracks", "activityLayerBathymetry"]} />);
+    render(
+      <Harness labels={["activityLayerTracks", "activityLayerBathymetry"]} />,
+    );
     expect(state().labelKeys.sort()).toEqual(
       ["activityLayerBathymetry", "activityLayerTracks"].sort(),
     );

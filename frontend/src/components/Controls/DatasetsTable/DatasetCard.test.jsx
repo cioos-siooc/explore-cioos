@@ -53,8 +53,18 @@ describe("DatasetCard", () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const onInspect = vi.fn();
-    render(<DatasetCard row={ROW} t={t} i18n={i18n} onSelect={onSelect} onInspect={onInspect} />);
-    await user.click(screen.getByRole("button", { name: "datasetsCardSelectForDownloadText" }));
+    render(
+      <DatasetCard
+        row={ROW}
+        t={t}
+        i18n={i18n}
+        onSelect={onSelect}
+        onInspect={onInspect}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "datasetsCardSelectForDownloadText" }),
+    );
     expect(onSelect).toHaveBeenCalledWith(ROW);
     expect(onInspect).not.toHaveBeenCalled();
   });
@@ -93,7 +103,15 @@ describe("DatasetCard", () => {
     const user = userEvent.setup();
     const onHover = vi.fn();
     const onHoverEnd = vi.fn();
-    render(<DatasetCard row={ROW} t={t} i18n={i18n} onHover={onHover} onHoverEnd={onHoverEnd} />);
+    render(
+      <DatasetCard
+        row={ROW}
+        t={t}
+        i18n={i18n}
+        onHover={onHover}
+        onHoverEnd={onHoverEnd}
+      />,
+    );
     const card = screen.getByTestId("dataset-card");
     await user.hover(card);
     expect(onHover).toHaveBeenCalledWith(ROW);
@@ -104,16 +122,31 @@ describe("DatasetCard", () => {
   describe("download modal variant", () => {
     it("shows a spinner while estimates are loading", () => {
       render(
-        <DatasetCard row={ROW} t={t} i18n={i18n} isDownloadModal estimatesLoading />,
+        <DatasetCard
+          row={ROW}
+          t={t}
+          i18n={i18n}
+          isDownloadModal
+          estimatesLoading
+        />,
       );
       expect(document.querySelector(".datasetsTableSpinner")).toBeTruthy();
     });
 
     it("shows 'unavailable' once loading finished with no estimate", () => {
       render(
-        <DatasetCard row={ROW} t={t} i18n={i18n} isDownloadModal estimatesLoading={false} downloadSizeEstimates={{}} />,
+        <DatasetCard
+          row={ROW}
+          t={t}
+          i18n={i18n}
+          isDownloadModal
+          estimatesLoading={false}
+          downloadSizeEstimates={{}}
+        />,
       );
-      expect(screen.getByText("downloadSizeUnavailableTitle")).toBeInTheDocument();
+      expect(
+        screen.getByText("downloadSizeUnavailableTitle"),
+      ).toBeInTheDocument();
     });
 
     it("shows the size and a CDE-downloadable badge once the estimate is ready", () => {
@@ -131,7 +164,9 @@ describe("DatasetCard", () => {
           downloadSizeEstimates={{ 1: withEstimate.sizeEstimate }}
         />,
       );
-      expect(screen.getByText("datasetsCardSortDownloadableText")).toBeInTheDocument();
+      expect(
+        screen.getByText("datasetsCardSortDownloadableText"),
+      ).toBeInTheDocument();
       expect(screen.getByText("488.28KB")).toBeInTheDocument();
     });
 
@@ -139,7 +174,8 @@ describe("DatasetCard", () => {
       const external = {
         ...ROW,
         internalDownload: false,
-        erddapLink: "https://seagull-erddap.glos.org/erddap/tabledap/obs_270.html",
+        erddapLink:
+          "https://seagull-erddap.glos.org/erddap/tabledap/obs_270.html",
         sizeEstimate: { filteredSize: 500000, unfilteredSize: 500000 },
       };
       render(
@@ -158,10 +194,18 @@ describe("DatasetCard", () => {
     it("disables selection when the CDE can't deliver the dataset", () => {
       const external = { ...ROW, internalDownload: false };
       render(
-        <DatasetCard row={external} t={t} i18n={i18n} isDownloadModal onSelect={() => {}} />,
+        <DatasetCard
+          row={external}
+          t={t}
+          i18n={i18n}
+          isDownloadModal
+          onSelect={() => {}}
+        />,
       );
       expect(
-        screen.getByRole("button", { name: "datasetsCardSelectForDownloadText" }),
+        screen.getByRole("button", {
+          name: "datasetsCardSelectForDownloadText",
+        }),
       ).toBeDisabled();
     });
   });

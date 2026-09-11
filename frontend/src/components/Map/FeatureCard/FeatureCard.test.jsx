@@ -89,7 +89,9 @@ describe("FeatureCard", () => {
       latestMap.setFeatureQuery({
         nonce: 3,
         lngLat: [0, 0],
-        items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
+        items: [
+          { kind: "observation", pk: row.pk, count: 1, title: row.title },
+        ],
       });
     });
     await user.click(screen.getByTitle("Close"));
@@ -103,7 +105,9 @@ describe("FeatureCard", () => {
       latestMap.setFeatureQuery({
         nonce: 4,
         lngLat: [0, 0],
-        items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
+        items: [
+          { kind: "observation", pk: row.pk, count: 1, title: row.title },
+        ],
       });
     });
     await user.keyboard("{Escape}");
@@ -112,12 +116,15 @@ describe("FeatureCard", () => {
 
   it("Add one adds the dataset to the selection without closing the card", async () => {
     const { user } = await renderReady();
-    const row = pointQueryFixture.find((r) => !r.selected) || pointQueryFixture[0];
+    const row =
+      pointQueryFixture.find((r) => !r.selected) || pointQueryFixture[0];
     act(() => {
       latestMap.setFeatureQuery({
         nonce: 5,
         lngLat: [0, 0],
-        items: [{ kind: "observation", pk: row.pk, count: 1, title: row.title }],
+        items: [
+          { kind: "observation", pk: row.pk, count: 1, title: row.title },
+        ],
       });
     });
     await user.click(screen.getByTitle("Add this dataset to the selection"));

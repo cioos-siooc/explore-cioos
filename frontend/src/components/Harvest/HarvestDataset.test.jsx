@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import { Routes, Route } from "react-router-dom";
 
@@ -90,7 +90,9 @@ describe("HarvestDataset", () => {
     });
     const { user } = renderDataset();
     await waitFor(() =>
-      expect(document.querySelector(".harvest-latest-card")).toBeInTheDocument(),
+      expect(
+        document.querySelector(".harvest-latest-card"),
+      ).toBeInTheDocument(),
     );
     // The single history row duplicates the same attempt's error_message, so
     // it carries its own "Request URLs" disclosure too (inside the history
@@ -121,6 +123,9 @@ describe("HarvestDataset", () => {
     });
     renderDataset();
     const link = await screen.findByText("View on OBIS ↗");
-    expect(link).toHaveAttribute("href", `https://obis.org/dataset/${DATASET_ID}`);
+    expect(link).toHaveAttribute(
+      "href",
+      `https://obis.org/dataset/${DATASET_ID}`,
+    );
   });
 });

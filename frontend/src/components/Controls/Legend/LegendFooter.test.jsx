@@ -29,7 +29,9 @@ describe("LegendFooter", () => {
   it("adopts the scale control once a map instance is published", async () => {
     renderWithProviders(<Harness />, { providers: "app" });
     await waitFor(() => {
-      expect(document.querySelector(".legendScale").children.length).toBeGreaterThan(0);
+      expect(
+        document.querySelector(".legendScale").children.length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -39,6 +41,8 @@ describe("LegendFooter", () => {
     expect(button).toHaveAttribute("aria-expanded", "false");
     await user.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
-    expect(document.querySelector(".legendCredits")).not.toHaveAttribute("hidden");
+    expect(document.querySelector(".legendCredits")).not.toHaveAttribute(
+      "hidden",
+    );
   });
 });

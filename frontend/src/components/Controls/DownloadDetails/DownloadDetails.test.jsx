@@ -92,7 +92,9 @@ describe("DownloadDetails", () => {
       filterDownloadByTime: true,
       setFilterDownloadByTime,
     });
-    const chip = await screen.findByText(`${QUERY.startDate} – ${QUERY.endDate}`);
+    const chip = await screen.findByText(
+      `${QUERY.startDate} – ${QUERY.endDate}`,
+    );
     await user.click(chip);
     expect(setFilterDownloadByTime).toHaveBeenCalledWith(false);
   });
@@ -154,8 +156,6 @@ describe("DownloadDetails", () => {
         document.querySelector(".datasetSizeTotalSpinner"),
       ).not.toBeInTheDocument();
     });
-    expect(
-      screen.getByTitle("Size estimate unavailable"),
-    ).toBeInTheDocument();
+    expect(screen.getByTitle("Size estimate unavailable")).toBeInTheDocument();
   });
 });

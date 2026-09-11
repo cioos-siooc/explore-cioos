@@ -69,7 +69,9 @@ describe("MapContainer", () => {
   it("handleFeatureQuery returns to the dataset list when a page is open and the query found something", async () => {
     await renderReady();
     latestSelection.setInspectDataset(ROW);
-    await waitFor(() => expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk));
+    await waitFor(() =>
+      expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk),
+    );
 
     latestMapProps.onFeatureQuery({
       nonce: 1,
@@ -88,7 +90,9 @@ describe("MapContainer", () => {
   it("handleFeatureQuery does not touch the open dataset page for a null (cleared) query", async () => {
     await renderReady();
     latestSelection.setInspectDataset(ROW);
-    await waitFor(() => expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk));
+    await waitFor(() =>
+      expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk),
+    );
 
     latestMapProps.onFeatureQuery(null);
 
@@ -155,7 +159,9 @@ describe("MapContainer", () => {
 
     await renderReady();
     await latestMapProps.onMarkerClick(ROW.pk, 123);
-    await waitFor(() => expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk));
+    await waitFor(() =>
+      expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk),
+    );
     expect(latestSelection.highlightedRecord).toBeUndefined();
   });
 
@@ -173,6 +179,8 @@ describe("MapContainer", () => {
     await expect(
       latestMapProps.onMarkerClick(ROW.pk, 123),
     ).resolves.not.toThrow();
-    await waitFor(() => expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk));
+    await waitFor(() =>
+      expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk),
+    );
   });
 });

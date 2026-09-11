@@ -16,14 +16,22 @@ const render = (ui) => renderWithProviders(ui);
 describe("MultiCheckboxFilter", () => {
   it("renders one checkbox row per option", () => {
     render(
-      <MultiCheckboxFilter optionsSelected={OPTIONS} setOptionsSelected={() => {}} allOptions={OPTIONS} />,
+      <MultiCheckboxFilter
+        optionsSelected={OPTIONS}
+        setOptionsSelected={() => {}}
+        allOptions={OPTIONS}
+      />,
     );
     expect(screen.getAllByTestId("filter-option")).toHaveLength(2);
   });
 
   it("reflects isSelected via aria-checked", () => {
     render(
-      <MultiCheckboxFilter optionsSelected={OPTIONS} setOptionsSelected={() => {}} allOptions={OPTIONS} />,
+      <MultiCheckboxFilter
+        optionsSelected={OPTIONS}
+        setOptionsSelected={() => {}}
+        allOptions={OPTIONS}
+      />,
     );
     const checked = screen
       .getAllByTestId("filter-option")
@@ -33,7 +41,11 @@ describe("MultiCheckboxFilter", () => {
 
   it("shows the 'no filter options' message when there are none", () => {
     render(
-      <MultiCheckboxFilter optionsSelected={[]} setOptionsSelected={() => {}} allOptions={[]} />,
+      <MultiCheckboxFilter
+        optionsSelected={[]}
+        setOptionsSelected={() => {}}
+        allOptions={[]}
+      />,
     );
     expect(screen.getByText("No filter options")).toBeInTheDocument();
   });
@@ -43,7 +55,11 @@ describe("MultiCheckboxFilter", () => {
     const setOptionsSelected = vi.fn();
     const original = [...OPTIONS];
     render(
-      <MultiCheckboxFilter optionsSelected={OPTIONS} setOptionsSelected={setOptionsSelected} allOptions={OPTIONS} />,
+      <MultiCheckboxFilter
+        optionsSelected={OPTIONS}
+        setOptionsSelected={setOptionsSelected}
+        allOptions={OPTIONS}
+      />,
     );
     const option = screen
       .getAllByTestId("filter-option")
@@ -62,7 +78,11 @@ describe("MultiCheckboxFilter", () => {
     const user = userEvent.setup();
     const setOptionsSelected = vi.fn();
     render(
-      <MultiCheckboxFilter optionsSelected={OPTIONS} setOptionsSelected={setOptionsSelected} allOptions={OPTIONS} />,
+      <MultiCheckboxFilter
+        optionsSelected={OPTIONS}
+        setOptionsSelected={setOptionsSelected}
+        allOptions={OPTIONS}
+      />,
     );
     const option = screen
       .getAllByTestId("filter-option")
@@ -73,24 +93,44 @@ describe("MultiCheckboxFilter", () => {
   });
 
   it('offers "select search results" only when the visible subset is narrower than the full universe', () => {
-    const allOptions = [...OPTIONS, { pk: 3, title: "oxygen", isSelected: false }];
+    const allOptions = [
+      ...OPTIONS,
+      { pk: 3, title: "oxygen", isSelected: false },
+    ];
     const { rerender } = render(
-      <MultiCheckboxFilter optionsSelected={OPTIONS} setOptionsSelected={() => {}} allOptions={allOptions} />,
+      <MultiCheckboxFilter
+        optionsSelected={OPTIONS}
+        setOptionsSelected={() => {}}
+        allOptions={allOptions}
+      />,
     );
     expect(screen.getByTestId("filter-select-all-results")).toBeInTheDocument();
 
     rerender(
-      <MultiCheckboxFilter optionsSelected={allOptions} setOptionsSelected={() => {}} allOptions={allOptions} />,
+      <MultiCheckboxFilter
+        optionsSelected={allOptions}
+        setOptionsSelected={() => {}}
+        allOptions={allOptions}
+      />,
     );
-    expect(screen.queryByTestId("filter-select-all-results")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("filter-select-all-results"),
+    ).not.toBeInTheDocument();
   });
 
   it('"select search results" selects every visible option, leaving the rest of the universe untouched', async () => {
     const user = userEvent.setup();
     const setOptionsSelected = vi.fn();
-    const allOptions = [...OPTIONS, { pk: 3, title: "oxygen", isSelected: false }];
+    const allOptions = [
+      ...OPTIONS,
+      { pk: 3, title: "oxygen", isSelected: false },
+    ];
     render(
-      <MultiCheckboxFilter optionsSelected={OPTIONS} setOptionsSelected={setOptionsSelected} allOptions={allOptions} />,
+      <MultiCheckboxFilter
+        optionsSelected={OPTIONS}
+        setOptionsSelected={setOptionsSelected}
+        allOptions={allOptions}
+      />,
     );
     await user.click(screen.getByTestId("filter-select-all-results"));
     expect(setOptionsSelected).toHaveBeenCalledWith([

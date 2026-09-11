@@ -12,7 +12,9 @@ afterEach(() => vi.clearAllMocks());
 
 describe("reportError", () => {
   it("logs and forwards a real error to Sentry, tagged with its context", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     const error = new Error("boom");
 
     reportError("pointQuery failed", error);
@@ -25,7 +27,9 @@ describe("reportError", () => {
   });
 
   it("silently ignores an AbortError — expected control flow, not a failure", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     const abortError = new DOMException("aborted", "AbortError");
 
     reportError("legend fetch failed", abortError);

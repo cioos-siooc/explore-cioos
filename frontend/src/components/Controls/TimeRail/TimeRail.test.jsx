@@ -40,7 +40,13 @@ describe("DateField", () => {
   it("commits as soon as a complete, in-range value is typed", () => {
     const onCommit = vi.fn();
     render(
-      <DateField value="2015-01-01" min="1900-01-01" max="2025-01-01" label="Start" onCommit={onCommit} />,
+      <DateField
+        value="2015-01-01"
+        min="1900-01-01"
+        max="2025-01-01"
+        label="Start"
+        onCommit={onCommit}
+      />,
     );
     const input = screen.getByLabelText("Start");
     fireEvent.focus(input);
@@ -63,7 +69,9 @@ describe("DateField", () => {
     const { rerender } = render(
       <DateField value="2015-01-01" label="Start" onCommit={() => {}} />,
     );
-    rerender(<DateField value="2016-02-02" label="Start" onCommit={() => {}} />);
+    rerender(
+      <DateField value="2016-02-02" label="Start" onCommit={() => {}} />,
+    );
     expect(screen.getByLabelText("Start").value).toBe("2016-02-02");
   });
 });
@@ -89,21 +97,23 @@ describe("QUICK_PICKS / lastDaysRange / matchQuickPick / slideRange", () => {
   });
 
   it("slideRange keeps the window's length while moving its start", () => {
-    const result = slideRange(
-      "start",
-      "2010-06-01",
-      { startDate: "2010-01-01", endDate: "2010-01-31", minIso: "1900-01-01", maxIso: "2025-01-01" },
-    );
+    const result = slideRange("start", "2010-06-01", {
+      startDate: "2010-01-01",
+      endDate: "2010-01-31",
+      minIso: "1900-01-01",
+      maxIso: "2025-01-01",
+    });
     expect(result.start).toBe("2010-06-01");
     expect(result.end).toBe("2010-07-01");
   });
 
   it("slideRange fills the whole domain when the window is longer than it", () => {
-    const result = slideRange(
-      "start",
-      "2010-06-01",
-      { startDate: "1900-01-01", endDate: "2025-01-01", minIso: "1900-01-01", maxIso: "2025-01-01" },
-    );
+    const result = slideRange("start", "2010-06-01", {
+      startDate: "1900-01-01",
+      endDate: "2025-01-01",
+      minIso: "1900-01-01",
+      maxIso: "2025-01-01",
+    });
     expect(result).toEqual({ start: "1900-01-01", end: "2025-01-01" });
   });
 
@@ -159,13 +169,18 @@ describe("useTimeAxis", () => {
   it("defaults the domain to the data extent when the filter is inactive", () => {
     render(
       <Probe
-        timeExtent={{ min: "2010-01-01T00:00:00+00:00", max: "2015-06-01T00:00:00+00:00" }}
+        timeExtent={{
+          min: "2010-01-01T00:00:00+00:00",
+          max: "2015-06-01T00:00:00+00:00",
+        }}
         timeFilterActive={false}
         startDate="1900-01-01"
         endDate={todayIso()}
       />,
     );
-    const [domainStart, domainEnd] = screen.getByTestId("out").textContent.split("|");
+    const [domainStart, domainEnd] = screen
+      .getByTestId("out")
+      .textContent.split("|");
     expect(domainStart).toBe("2010-01-01");
     expect(domainEnd).toBe("2015-06-01");
   });
@@ -173,7 +188,10 @@ describe("useTimeAxis", () => {
   it("widens the domain to an active filter's start when it reaches earlier than the data", () => {
     render(
       <Probe
-        timeExtent={{ min: "2010-01-01T00:00:00+00:00", max: "2015-06-01T00:00:00+00:00" }}
+        timeExtent={{
+          min: "2010-01-01T00:00:00+00:00",
+          max: "2015-06-01T00:00:00+00:00",
+        }}
         timeFilterActive
         startDate="1950-01-01"
         endDate="2012-01-01"
@@ -202,7 +220,12 @@ describe("TimeRail (component)", () => {
   it("renders only the two range handles when scrub is absent", () => {
     const axis = createTimeAxis("2010-01-01", "2020-01-01");
     render(
-      <TimeRail axis={axis} startDate="2012-01-01" endDate="2018-01-01" onCommit={() => {}} />,
+      <TimeRail
+        axis={axis}
+        startDate="2012-01-01"
+        endDate="2018-01-01"
+        onCommit={() => {}}
+      />,
     );
     expect(screen.getAllByRole("slider")).toHaveLength(2);
   });
@@ -211,10 +234,17 @@ describe("TimeRail (component)", () => {
     const axis = createTimeAxis("2010-01-01", "2020-01-01");
     const onCommit = vi.fn();
     render(
-      <TimeRail axis={axis} startDate="2012-01-01" endDate="2018-01-01" onCommit={onCommit} />,
+      <TimeRail
+        axis={axis}
+        startDate="2012-01-01"
+        endDate="2018-01-01"
+        onCommit={onCommit}
+      />,
     );
     const [startHandle] = screen.getAllByRole("slider");
     fireEvent.keyDown(startHandle, { key: "Home" });
-    await waitFor(() => expect(onCommit).toHaveBeenCalledWith("start", "2010-01-01"));
+    await waitFor(() =>
+      expect(onCommit).toHaveBeenCalledWith("start", "2010-01-01"),
+    );
   });
 });

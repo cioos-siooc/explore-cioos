@@ -60,9 +60,7 @@ describe("HarvestOverview", () => {
 
   it("renders a server card per source, with its success/skip/error counts", async () => {
     renderWithProviders(<HarvestOverview />);
-    expect(
-      await screen.findByText("erddap.example.com"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("erddap.example.com")).toBeInTheDocument();
     expect(screen.getByText("✓ 40")).toBeInTheDocument();
     expect(screen.getByText("✗ 1")).toBeInTheDocument();
   });

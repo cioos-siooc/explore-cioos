@@ -20,9 +20,15 @@ describe("ActivityList", () => {
     const { rerender } = renderWithProviders(
       <ActivityList labelKeys={["activityCatalogText"]} />,
     );
-    expect(document.querySelector(".activityList li .cioosSpinner")).toBeTruthy();
+    expect(
+      document.querySelector(".activityList li .cioosSpinner"),
+    ).toBeTruthy();
 
-    rerender(<ActivityList labelKeys={["activityCatalogText"]} marks={false} />);
-    expect(document.querySelector(".activityList li .cioosSpinner")).toBeFalsy();
+    rerender(
+      <ActivityList labelKeys={["activityCatalogText"]} marks={false} />,
+    );
+    expect(
+      document.querySelector(".activityList li .cioosSpinner"),
+    ).toBeFalsy();
   });
 });

@@ -14,7 +14,8 @@ function Probe() {
   return <span data-testid="keys">{[...labelKeys].sort().join(",")}</span>;
 }
 
-const keys = () => screen.getByTestId("keys").textContent.split(",").filter(Boolean);
+const keys = () =>
+  screen.getByTestId("keys").textContent.split(",").filter(Boolean);
 
 describe("ActivityTasks", () => {
   beforeEach(() => {

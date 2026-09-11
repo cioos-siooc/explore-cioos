@@ -7,9 +7,9 @@ describe("harvestMode", () => {
   });
 
   it("is 'full' when hashing was skipped for having no file list", () => {
-    expect(
-      harvestMode({ content_hash_reason: "HASH_NO_FILE_LIST" }),
-    ).toBe("full");
+    expect(harvestMode({ content_hash_reason: "HASH_NO_FILE_LIST" })).toBe(
+      "full",
+    );
   });
 
   it("is 'unknown' when neither applies, including with no dataset at all", () => {

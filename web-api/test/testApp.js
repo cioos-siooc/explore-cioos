@@ -36,7 +36,6 @@ const redisStub = require("./redisStub");
 function createTestApp() {
   redisStub.install();
   const db = dbStub.install();
-  // eslint-disable-next-line global-require -- must run after the stubs above
   const app = require("../app");
   return { app, agent: request(app), db, resetCache: () => apicache.clear() };
 }

@@ -42,9 +42,9 @@ describe("FilterProvider", () => {
 
   it("filters the obis.org sentinel out of erddapServersSelected", async () => {
     await renderLoaded();
-    expect(latest.erddapServersSelected.some((s) => s.url === "https://obis.org")).toBe(
-      false,
-    );
+    expect(
+      latest.erddapServersSelected.some((s) => s.url === "https://obis.org"),
+    ).toBe(false);
   });
 
   it("seeds selections from the URL the app was opened at (share-link hydration)", async () => {
@@ -132,7 +132,9 @@ describe("FilterProvider", () => {
   it("drops scientificNamesSelected from query while OBIS is hidden by the source filter", async () => {
     await renderLoaded({ url: "/?scientificNames=Orcinus%20orca" });
     expect(latest.scientificNamesSelected).toEqual(["Orcinus orca"]);
-    await waitFor(() => expect(latest.query.scientificNamesSelected).toEqual(["Orcinus orca"]));
+    await waitFor(() =>
+      expect(latest.query.scientificNamesSelected).toEqual(["Orcinus orca"]),
+    );
 
     act(() => {
       latest.setErddapServersSelected(
@@ -140,7 +142,9 @@ describe("FilterProvider", () => {
       );
     });
     await waitFor(() => expect(latest.showObis).toBe(false));
-    await waitFor(() => expect(latest.query.scientificNamesSelected).toEqual([]));
+    await waitFor(() =>
+      expect(latest.query.scientificNamesSelected).toEqual([]),
+    );
     // The selection itself survives — only the outgoing query drops it, so a
     // later source change can bring it back without the user re-typing it.
     expect(latest.scientificNamesSelected).toEqual(["Orcinus orca"]);

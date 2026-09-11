@@ -8,7 +8,11 @@ import QuestionIconTooltip from "./QuestionIconTooltip.jsx";
 describe("QuestionIconTooltip", () => {
   it("shows the tooltip text on hover", async () => {
     const { user } = renderWithProviders(
-      <QuestionIconTooltip tooltipText="Explains the thing" tooltipPlacement="right" size={16} />,
+      <QuestionIconTooltip
+        tooltipText="Explains the thing"
+        tooltipPlacement="right"
+        size={16}
+      />,
     );
     await user.hover(document.querySelector(".helpIcon"));
     await waitFor(() =>

@@ -72,7 +72,12 @@ describe("SelectionProvider", () => {
 
   it("handleSelectDataset is a no-op for a Grid (metadata-only) dataset", async () => {
     await renderLoaded();
-    const grid = { ...latest.pointsData[0], pk: 999999, cdm_data_type: "Grid", selected: false };
+    const grid = {
+      ...latest.pointsData[0],
+      pk: 999999,
+      cdm_data_type: "Grid",
+      selected: false,
+    };
     act(() => latest.setPointsData([...latest.pointsData, grid]));
     await waitFor(() =>
       expect(latest.pointsData.find((p) => p.pk === 999999)).toBeTruthy(),
@@ -150,22 +155,35 @@ describe("SelectionProvider", () => {
 
   it("addDatasetsToSelection puts the named pks aside, skipping Grid rows", async () => {
     await renderLoaded();
-    const grid = { ...latest.pointsData[0], pk: 888888, cdm_data_type: "Grid", selected: false };
+    const grid = {
+      ...latest.pointsData[0],
+      pk: 888888,
+      cdm_data_type: "Grid",
+      selected: false,
+    };
     act(() => latest.setPointsData([...latest.pointsData, grid]));
-    await waitFor(() => expect(latest.pointsData).toHaveLength(pointQueryFixture.length + 1));
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length + 1),
+    );
 
     const target = latest.pointsData[0];
     act(() => latest.addDatasetsToSelection([target.pk, 888888]));
     await waitFor(() => {
-      expect(latest.pointsData.find((p) => p.pk === target.pk).selected).toBe(true);
-      expect(latest.pointsData.find((p) => p.pk === 888888).selected).toBe(false);
+      expect(latest.pointsData.find((p) => p.pk === target.pk).selected).toBe(
+        true,
+      );
+      expect(latest.pointsData.find((p) => p.pk === 888888).selected).toBe(
+        false,
+      );
     });
   });
 
   it("selectTrajectoryFromMap opens the dataset's page and selects the track", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];
-    act(() => latest.selectTrajectoryFromMap(target.pk, "track-1", target.title));
+    act(() =>
+      latest.selectTrajectoryFromMap(target.pk, "track-1", target.title),
+    );
     await waitFor(() => {
       expect(latest.selectedTrajectory).toEqual({
         datasetPk: target.pk,
@@ -179,11 +197,17 @@ describe("SelectionProvider", () => {
   it("re-clicking the already-selected track is a no-op, not a toggle", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];
-    act(() => latest.selectTrajectoryFromMap(target.pk, "track-1", target.title));
-    await waitFor(() => expect(latest.selectedTrajectory?.trajectoryId).toBe("track-1"));
+    act(() =>
+      latest.selectTrajectoryFromMap(target.pk, "track-1", target.title),
+    );
+    await waitFor(() =>
+      expect(latest.selectedTrajectory?.trajectoryId).toBe("track-1"),
+    );
 
     const selectionBefore = latest.selectedTrajectory;
-    act(() => latest.selectTrajectoryFromMap(target.pk, "track-1", target.title));
+    act(() =>
+      latest.selectTrajectoryFromMap(target.pk, "track-1", target.title),
+    );
     // A toggle would have cleared it; the guard leaves it exactly as it was.
     expect(latest.selectedTrajectory).toBe(selectionBefore);
   });

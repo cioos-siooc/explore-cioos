@@ -11,7 +11,9 @@ test.beforeEach(() => {
 });
 
 test("returns the recordsCount / coverageCount ramp domains", async () => {
-  db.queueRaw([{ zoom0: [1, 100, 100], zoom1: [1, 50, 50], zoom2: [1, 10, 10] }]);
+  db.queueRaw([
+    { zoom0: [1, 100, 100], zoom1: [1, 50, 50], zoom2: [1, 10, 10] },
+  ]);
   db.queueRaw([{ zoom1: [1, 20, 20] }]);
 
   const res = await agent.get("/legend");
@@ -38,6 +40,8 @@ test("rejects an out-of-range depth filter", async () => {
 });
 
 test("rejects an unrecognized profileTypes entry", async () => {
-  const res = await agent.get("/legend").query({ profileTypes: "NotARealType" });
+  const res = await agent
+    .get("/legend")
+    .query({ profileTypes: "NotARealType" });
   assert.equal(res.status, 400);
 });

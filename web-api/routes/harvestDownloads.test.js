@@ -11,7 +11,16 @@ test.beforeEach(() => {
 });
 
 test("GET /harvest/downloads/summary returns the headline counters", async () => {
-  db.queueRaw([{ n_jobs: 10, n_completed: 8, n_failed: 1, n_open: 1, n_stuck: 0, n_stalled: 0 }]);
+  db.queueRaw([
+    {
+      n_jobs: 10,
+      n_completed: 8,
+      n_failed: 1,
+      n_open: 1,
+      n_stuck: 0,
+      n_stalled: 0,
+    },
+  ]);
 
   const res = await agent.get("/harvest/downloads/summary");
 
@@ -63,7 +72,9 @@ test("GET /harvest/downloads/:jobId returns the job and its dataset breakdown", 
 
   assert.equal(res.status, 200);
   assert.equal(res.body.job.job_id, "job-1");
-  assert.deepEqual(res.body.datasets, [{ dataset_id: "obs_270", status: "COMPLETED" }]);
+  assert.deepEqual(res.body.datasets, [
+    { dataset_id: "obs_270", status: "COMPLETED" },
+  ]);
 });
 
 // /summary, /recent and /datasets must resolve before /:jobId, or each gets

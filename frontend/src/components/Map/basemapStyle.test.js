@@ -49,7 +49,9 @@ describe("buildBasemapStyle", () => {
 
   it("defaults to English when no language is given", () => {
     const style = buildBasemapStyle();
-    const waterway = style.layers.find((layer) => layer.id === "label-waterway");
+    const waterway = style.layers.find(
+      (layer) => layer.id === "label-waterway",
+    );
     expect(waterway.layout["text-field"]).toEqual(getLabelTextField("en"));
   });
 

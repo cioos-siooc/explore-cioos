@@ -33,9 +33,7 @@ test("GET /harvest/servers/:slug resolves the slug and returns its datasets", as
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl lookup
   db.queueRaw([{ dataset_id: "obs_270", status: "success" }]);
 
-  const res = await agent.get(
-    "/harvest/servers/erddap-example-com-erddap",
-  );
+  const res = await agent.get("/harvest/servers/erddap-example-com-erddap");
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, [{ dataset_id: "obs_270", status: "success" }]);
@@ -129,9 +127,7 @@ test("GET /harvest/reasons/:slug scopes the breakdown to one server", async () =
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
   db.queueRaw([{ reason_code: "HTTP_ERROR", n: 2 }]);
 
-  const res = await agent.get(
-    "/harvest/reasons/erddap-example-com-erddap",
-  );
+  const res = await agent.get("/harvest/reasons/erddap-example-com-erddap");
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, [{ reason_code: "HTTP_ERROR", n: 2 }]);

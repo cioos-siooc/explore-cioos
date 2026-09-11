@@ -14,11 +14,19 @@ test.beforeEach(() => {
   resetCache();
 });
 
-const VALID_QUERY = { email: "diver@example.com", latMin: "40", latMax: "50", lonMin: "-70", lonMax: "-50" };
+const VALID_QUERY = {
+  email: "diver@example.com",
+  latMin: "40",
+  latMax: "50",
+  lonMin: "-70",
+  lonMax: "-50",
+};
 
 test("queues a download job and returns the matched count", async () => {
   shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
-  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }, { dataset_id: "obs_512" }] }]);
+  db.queueRaw([
+    { json_agg: [{ dataset_id: "obs_270" }, { dataset_id: "obs_512" }] },
+  ]);
   db.queueRows({}); // the .insert() into cde.download_jobs
 
   const res = await agent.get("/download").query(VALID_QUERY);
@@ -75,7 +83,9 @@ test("requires a valid email", async () => {
 test("with no shape at all, still accepted — queues against an unbounded selection", async () => {
   shapeQuery.queueResult([]);
   db.queueRaw([{ json_agg: null }]);
-  const res = await agent.get("/download").query({ email: "diver@example.com" });
+  const res = await agent
+    .get("/download")
+    .query({ email: "diver@example.com" });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { count: 0 });
 });

@@ -46,12 +46,16 @@ describe("MapStateProvider", () => {
 
     act(() => latest.setMapView({ ...latest.mapView, zoom: 6 }));
     await waitFor(() =>
-      expect(latest.currentRangeLevel).toEqual(legendFixture.recordsCount.zoom1),
+      expect(latest.currentRangeLevel).toEqual(
+        legendFixture.recordsCount.zoom1,
+      ),
     );
 
     act(() => latest.setMapView({ ...latest.mapView, zoom: 10 }));
     await waitFor(() =>
-      expect(latest.currentRangeLevel).toEqual(legendFixture.recordsCount.zoom2),
+      expect(latest.currentRangeLevel).toEqual(
+        legendFixture.recordsCount.zoom2,
+      ),
     );
   });
 

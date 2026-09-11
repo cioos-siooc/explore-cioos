@@ -112,9 +112,9 @@ describe("datasetLink", () => {
 
 describe("displayStatus", () => {
   it("maps a hash-verified skip to 'unchanged'", () => {
-    expect(
-      displayStatus({ status: "skipped", reason_code: "UNCHANGED" }),
-    ).toBe("unchanged");
+    expect(displayStatus({ status: "skipped", reason_code: "UNCHANGED" })).toBe(
+      "unchanged",
+    );
   });
 
   it("leaves every other status/reason combination as-is", () => {

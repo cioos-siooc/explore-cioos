@@ -23,8 +23,5 @@ test("GET /erddapServers returns the distinct ERDDAP server URLs, excluding OBIS
     "https://erddap.example.com/erddap",
     "https://erddap2.example.com/erddap",
   ]);
-  assert.match(
-    db.queries[0],
-    /source_type IS DISTINCT FROM 'obis'/,
-  );
+  assert.match(db.queries[0], /source_type IS DISTINCT FROM 'obis'/);
 });

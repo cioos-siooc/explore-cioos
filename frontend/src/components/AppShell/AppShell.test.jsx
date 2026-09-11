@@ -13,7 +13,9 @@ import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 // treats real map behavior as e2e-only. This test is about whether the
 // chrome AROUND the map (sidebar, filters, legend, counts) composes
 // correctly from the provider stack, not about the map canvas itself.
-vi.mock("../Map/Map.jsx", () => ({ default: () => <div data-testid="mock-map" /> }));
+vi.mock("../Map/Map.jsx", () => ({
+  default: () => <div data-testid="mock-map" />,
+}));
 
 import AppShell from "./AppShell.jsx";
 
@@ -24,7 +26,9 @@ describe("AppShell (composition)", () => {
 
   it("renders the full shell once the catalog and results have loaded", async () => {
     renderWithProviders(<AppShell />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("mock-map")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
+    );
     await waitFor(() => {
       expect(screen.getByTestId("sidebar-toggle-count")).toHaveTextContent(
         String(pointQueryFixture.length),
@@ -38,14 +42,22 @@ describe("AppShell (composition)", () => {
     // so opening it here is itself part of what this test exercises.
     setViewportWidth(MOBILE_WIDTH);
     renderWithProviders(<AppShell />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("mock-map")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
+    );
 
     const toggle = screen.getByTestId("sidebar-toggle");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     await user.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "true"));
+    await waitFor(() =>
+      expect(toggle).toHaveAttribute("aria-expanded", "true"),
+    );
 
-    const cards = await screen.findAllByTestId("dataset-card", {}, { timeout: 3000 });
+    const cards = await screen.findAllByTestId(
+      "dataset-card",
+      {},
+      { timeout: 3000 },
+    );
     const card = cards[0];
     // The first result rendered isn't necessarily fixture[0] (the list may
     // sort) — resolve the actual first card's title instead of assuming.
@@ -57,7 +69,9 @@ describe("AppShell (composition)", () => {
     // SelectionProvider resolves back into `inspectDataset`, and the
     // DatasetInspector renders that dataset's own page from it.
     await waitFor(() => {
-      expect(new URL(window.location.href).searchParams.get("dataset")).toBeTruthy();
+      expect(
+        new URL(window.location.href).searchParams.get("dataset"),
+      ).toBeTruthy();
     });
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
@@ -69,12 +83,16 @@ describe("AppShell (composition)", () => {
   it("opening the Filters modal shows the filter panel", async () => {
     const user = userEvent.setup();
     renderWithProviders(<AppShell />, { providers: "app" });
-    await waitFor(() => expect(screen.getByTestId("mock-map")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
+    );
 
     const filtersButton = await screen.findByText("Filters");
     await user.click(filtersButton);
     await waitFor(() => {
-      expect(document.querySelector(".filtersPanel, .filtersPanelBody")).toBeTruthy();
+      expect(
+        document.querySelector(".filtersPanel, .filtersPanelBody"),
+      ).toBeTruthy();
     });
   });
 
@@ -90,7 +108,9 @@ describe("AppShell (composition)", () => {
     };
     renderWithProviders(<AppShell />, { providers: "app" });
     await waitFor(() => {
-      expect(document.querySelector(".apiErrorBanner, [class*=ErrorBanner]")).toBeTruthy();
+      expect(
+        document.querySelector(".apiErrorBanner, [class*=ErrorBanner]"),
+      ).toBeTruthy();
     });
   });
 });

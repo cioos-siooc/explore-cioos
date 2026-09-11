@@ -52,9 +52,9 @@ describe("groupKeysFor", () => {
     expect(
       groupKeysFor({ organizations: [1, 2] }, "organization", null),
     ).toEqual([1, 2]);
-    expect(groupKeysFor({ organizations: [] }, "organization", null)).toEqual(
-      [UNCATEGORIZED_KEY],
-    );
+    expect(groupKeysFor({ organizations: [] }, "organization", null)).toEqual([
+      UNCATEGORIZED_KEY,
+    ]);
     expect(groupKeysFor({ eovs: ["salinity"] }, "eov", null)).toEqual([
       "salinity",
     ]);
@@ -86,9 +86,7 @@ describe("groupKeysFor", () => {
 describe("groupLabel", () => {
   it("translates the sentinel keys regardless of the active dimension", () => {
     expect(groupLabel(GRID_KEY, "type", t)).toBe("griddapTypeLabel");
-    expect(groupLabel(OTHER_KEY, "type", t)).toBe(
-      "datasetsCardGroupOtherText",
-    );
+    expect(groupLabel(OTHER_KEY, "type", t)).toBe("datasetsCardGroupOtherText");
     expect(groupLabel(UNCATEGORIZED_KEY, "organization", t)).toBe(
       "datasetsCardGroupUncategorizedText",
     );
@@ -161,9 +159,9 @@ describe("hiddenDatasetPksFor", () => {
   ];
 
   it("hides nothing without a group dimension or an empty hidden set", () => {
-    expect(hiddenDatasetPksFor(datasets, GROUP_NONE, new Set([1]), null).size).toBe(
-      0,
-    );
+    expect(
+      hiddenDatasetPksFor(datasets, GROUP_NONE, new Set([1]), null).size,
+    ).toBe(0);
     expect(
       hiddenDatasetPksFor(datasets, "organization", new Set(), null).size,
     ).toBe(0);

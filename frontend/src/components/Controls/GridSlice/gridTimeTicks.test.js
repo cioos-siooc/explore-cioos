@@ -17,7 +17,9 @@ describe("gridTimeTicks", () => {
     const maxMs = Date.UTC(2020, 0, 1, 12, 0);
     const ticks = gridTimeTicks(600, minMs, maxMs);
     expect(ticks.length).toBeGreaterThan(0);
-    ticks.forEach((tick) => expect(tick.label).toMatch(/^\d{2}(:\d{2}|-\d{2})$/));
+    ticks.forEach((tick) =>
+      expect(tick.label).toMatch(/^\d{2}(:\d{2}|-\d{2})$/),
+    );
     expect(ticks[0].label).toBe("01-01"); // the first tick lands on midnight
   });
 

@@ -37,7 +37,9 @@ describe("filterRows", () => {
 
 describe("TableFilter", () => {
   it("renders the current value and placeholder", () => {
-    render(<TableFilter value="orca" onChange={() => {}} placeholder="Search" />);
+    render(
+      <TableFilter value="orca" onChange={() => {}} placeholder="Search" />,
+    );
     expect(screen.getByPlaceholderText("Search")).toHaveValue("orca");
   });
 

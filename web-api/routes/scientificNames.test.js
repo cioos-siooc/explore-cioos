@@ -11,7 +11,9 @@ test.beforeEach(() => {
 });
 
 test("a bare GET (no q, no names) searches with an empty prefix and the default limit", async () => {
-  db.queueRaw([{ scientificName: "Orcinus orca", vernacular: null, rank: "Species" }]);
+  db.queueRaw([
+    { scientificName: "Orcinus orca", vernacular: null, rank: "Species" },
+  ]);
 
   const res = await agent.get("/scientificNames");
 
@@ -24,7 +26,11 @@ test("a bare GET (no q, no names) searches with an empty prefix and the default 
 
 test("q searches by scientific-name prefix or vernacular substring", async () => {
   db.queueRaw([
-    { scientificName: "Orcinus orca", vernacular: "Killer whale", rank: "Species" },
+    {
+      scientificName: "Orcinus orca",
+      vernacular: "Killer whale",
+      rank: "Species",
+    },
   ]);
 
   const res = await agent.get("/scientificNames").query({ q: "orca" });
@@ -35,8 +41,16 @@ test("q searches by scientific-name prefix or vernacular substring", async () =>
 
 test("names= hydrates an exact list and skips the search branch entirely", async () => {
   db.queueRaw([
-    { scientificName: "Orcinus orca", vernacular: "Killer whale", rank: "Species" },
-    { scientificName: "Gadus morhua", vernacular: "Atlantic cod", rank: "Species" },
+    {
+      scientificName: "Orcinus orca",
+      vernacular: "Killer whale",
+      rank: "Species",
+    },
+    {
+      scientificName: "Gadus morhua",
+      vernacular: "Atlantic cod",
+      rank: "Species",
+    },
   ]);
 
   const res = await agent
@@ -57,9 +71,13 @@ test("names= with only commas/whitespace short-circuits to [] without querying",
 });
 
 test("lang selects the vernacular column, defaulting to English", async () => {
-  db.queueRaw([{ scientificName: "Orcinus orca", vernacular: "Épaulard", rank: "Species" }]);
+  db.queueRaw([
+    { scientificName: "Orcinus orca", vernacular: "Épaulard", rank: "Species" },
+  ]);
 
-  const res = await agent.get("/scientificNames").query({ q: "orca", lang: "fr" });
+  const res = await agent
+    .get("/scientificNames")
+    .query({ q: "orca", lang: "fr" });
 
   assert.equal(res.status, 200);
   assert.match(db.queries[0], /vernaculars_fr/);

@@ -14,7 +14,11 @@ const OPTIONS = [
 describe("FilterButton", () => {
   it("renders nothing when option is absent (undefined)", () => {
     const { container } = renderWithProviders(
-      <FilterButton optionsSelected={OPTIONS} setOptionsSelected={() => {}} option={undefined} />,
+      <FilterButton
+        optionsSelected={OPTIONS}
+        setOptionsSelected={() => {}}
+        option={undefined}
+      />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -66,7 +70,12 @@ describe("FilterButton", () => {
   it("uses the localized hover_<lang> field for the tooltip when present", async () => {
     const user = userEvent.setup();
     const withHover = [
-      { pk: 1, title: "Temperature", isSelected: false, hover_en: "Measured in Celsius" },
+      {
+        pk: 1,
+        title: "Temperature",
+        isSelected: false,
+        hover_en: "Measured in Celsius",
+      },
     ];
     renderWithProviders(
       <FilterButton
