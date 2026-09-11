@@ -11,6 +11,13 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
+
+from cde_harvester.core.harvest_files import (
+    DATASETS,
+    PROFILES,
+    SKIPPED,
+    write_table,
+)
 from cde_harvester.loading.loader import (
     ensure_organization_pks,
     load_cells_copy,
@@ -24,10 +31,10 @@ from cde_harvester.loading.loader import (
 
 @pytest.fixture
 def harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
-    """Write CSVs as the harvester would and return the folder path string."""
-    sample_datasets_df.to_csv(tmp_path / "datasets.csv", index=False)
-    sample_profiles_df.to_csv(tmp_path / "profiles.csv", index=False)
-    sample_skipped_df.to_csv(tmp_path / "skipped.csv", index=False)
+    """Write the harvest tables as the harvester would; return the folder path."""
+    write_table(str(tmp_path), DATASETS, sample_datasets_df)
+    write_table(str(tmp_path), PROFILES, sample_profiles_df)
+    write_table(str(tmp_path), SKIPPED, sample_skipped_df)
     return str(tmp_path)
 
 

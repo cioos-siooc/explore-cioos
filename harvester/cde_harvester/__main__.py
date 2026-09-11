@@ -8,17 +8,29 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 from prefect import flow, get_run_logger, task
 from sentry_sdk.crons import monitor
 
+from cde_common.env import load_env
+from cde_common.issues import report_issues
+from cde_common.observability import init_sentry
 from cde_harvester.core.config import load_config, resolve_obis_config
 from cde_harvester.core.day_sets import ranges_to_iso
-from cde_harvester.core.issues import report_issues
-from cde_harvester.core.observability import (
-    init_sentry,
-    setup_logging,
+from cde_harvester.core.harvest_files import (
+    CKAN,
+    DATASETS,
+    HARVEST_ATTEMPTS,
+    HARVEST_RUNS,
+    OBIS_CELLS,
+    PROFILES,
+    SKIPPED,
+    TRAJECTORY_DAYS,
+    TRAJECTORY_POINTS,
+    VERIFIED,
+    drop_duplicate_rows,
+    write_table,
 )
+from cde_harvester.core.observability import setup_logging
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources import resolve_source
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
@@ -32,7 +44,7 @@ from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisG
 from cde_harvester.sources.obis.harvester import harvest_obis
 from cde_harvester.utils import cf_standard_names, supported_standard_names
 
-load_dotenv()
+load_env()
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -111,20 +123,15 @@ def _publish_status_artifact(df_attempts, run_id, run_status, logger):
         logger.debug("Could not publish dataset-status artifact: %s", e)
 
 
-def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
-                          status, error_message, attempts_frames, logger,
-                          prefect_flow_run_id=None, scope="full",
-                          triggered_source=None, triggered_by=None):
-    """Write harvest_runs.csv and harvest_attempts.csv into the harvest folder.
+def _write_run_audit(folder, run_id, started_at, finished_at, git_sha,
+                     status, error_message, attempts_frames, logger,
+                     prefect_flow_run_id=None, scope="full",
+                     triggered_source=None, triggered_by=None):
+    """Write the harvest_runs and harvest_attempts tables into the harvest folder.
 
     Always called at the end of a run (success or failure) so the
     harvest-dashboard service has a consistent audit trail per-run.
     """
-    if not os.path.exists(folder):
-        os.makedirs(folder, exist_ok=True)
-
-    runs_file = f"{folder}/harvest_runs.csv"
-    attempts_file = f"{folder}/harvest_attempts.csv"
 
     run_row = pd.DataFrame([{
         "run_id": run_id,
@@ -138,12 +145,12 @@ def _write_run_audit_csvs(folder, run_id, started_at, finished_at, git_sha,
         "triggered_source": triggered_source,
         "triggered_by": triggered_by,
     }])
-    run_row.to_csv(runs_file, index=False)
+    runs_file = write_table(folder, HARVEST_RUNS, run_row)
 
     attempt_columns = list(HarvestAttemptSchema.to_schema().columns.keys())
     frames = [f for f in attempts_frames if f is not None and not f.empty]
     df_attempts = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=attempt_columns)
-    df_attempts.to_csv(attempts_file, index=False)
+    attempts_file = write_table(folder, HARVEST_ATTEMPTS, df_attempts)
 
     logger.info(
         "Wrote run audit: %s (status=%s) + %s (%d attempts)",
@@ -173,21 +180,13 @@ def _run_logger():
         return logger
 
 
-@task(task_run_name="merge-and-write-csvs")
-def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
-                         obis_datasets, obis_cells, obis_skipped, df_ckan,
-                         erddap_verified=None, erddap_trajectory_days=None,
-                         erddap_trajectory_points=None):
-    """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
+@task(task_run_name="merge-and-write-tables")
+def merge_and_write_tables(folder, erddap_datasets, erddap_profiles, erddap_skipped,
+                          obis_datasets, obis_cells, obis_skipped, df_ckan,
+                          erddap_verified=None, erddap_trajectory_days=None,
+                          erddap_trajectory_points=None):
+    """Join CKAN metadata, merge all sources, and write the output tables (@task)."""
     logger = _run_logger()
-    datasets_file = f"{folder}/datasets.csv"
-    profiles_file = f"{folder}/profiles.csv"
-    skipped_datasets_file = f"{folder}/skipped.csv"
-    ckan_file = f"{folder}/ckan.csv"
-    obis_cells_file = f"{folder}/obis_cells.csv"
-    trajectory_days_file = f"{folder}/trajectory_days.csv"
-    trajectory_points_file = f"{folder}/trajectory_points.csv"
-    verified_file = f"{folder}/verified.csv"
 
     if erddap_trajectory_days is None:
         erddap_trajectory_days = pd.DataFrame()
@@ -257,9 +256,8 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
             _missing_title, "dataset_id"
         ]
 
-    # ERDDAP rows don't have obis_nodes — fill with empty lists so the loader's
-    # ast.literal_eval doesn't choke on NaN, and so the column exists when only
-    # the ERDDAP source is being harvested.
+    # ERDDAP rows don't have obis_nodes — fill with empty lists so the column
+    # exists (and is a list everywhere) when only the ERDDAP source is harvested.
     if "obis_nodes" not in datasets.columns:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
     else:
@@ -274,61 +272,60 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         len(erddap_trajectory_days), len(erddap_trajectory_points),
     )
 
-    # Write output CSVs
-    datasets.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
-        datasets_file, index=False
-    )
-    # Serialize the per-feature EOV list to its Python repr up front: the CSV
-    # round-trip would do it anyway (the loader reads it back with
-    # ast.literal_eval, as it does for the dataset arrays), and lists are
-    # unhashable, so drop_duplicates() below cannot see the column otherwise.
-    if "eovs" in erddap_profiles.columns:
-        erddap_profiles["eovs"] = erddap_profiles["eovs"].apply(
-            lambda x: repr(list(x)) if isinstance(x, (list, tuple)) else x
-        )
-    # Same treatment for the day set, with one extra step: literal_eval only
-    # accepts literals, and the repr of a datetime.date is a constructor call —
-    # so the runs go through as ISO-string pairs (day_sets.ranges_to_iso).
+    # Write output tables. Day sets go out as ISO-string pairs rather than
+    # datetime.date: parquet would carry real dates, but duckdb hands them back
+    # as numpy.datetime64, which day_sets.ranges_from_iso does not accept.
     if "day_ranges" in erddap_profiles.columns:
         erddap_profiles["day_ranges"] = erddap_profiles["day_ranges"].apply(
-            lambda x: repr(ranges_to_iso(x)) if isinstance(x, (list, tuple)) else x
+            lambda x: ranges_to_iso(x) if isinstance(x, (list, tuple)) else x
         )
-    erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
-    if not df_ckan.empty:
-        df_ckan.to_csv(ckan_file, index=False)
-    skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
-    if not obis_cells.empty:
-        obis_cells.to_csv(obis_cells_file, index=False)
-
-    if not erddap_trajectory_days.empty:
-        erddap_trajectory_days.to_csv(trajectory_days_file, index=False)
-
-    if not erddap_trajectory_points.empty:
-        erddap_trajectory_points.to_csv(trajectory_points_file, index=False)
-
-    # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
-    if erddap_verified is not None and not erddap_verified.empty:
-        erddap_verified.drop_duplicates(["erddap_url", "dataset_id"]).to_csv(
-            verified_file, index=False
-        )
-        logger.info("Wrote %s (%d unchanged datasets)", verified_file, len(erddap_verified))
-
+    datasets_file = write_table(
+        folder, DATASETS, datasets.drop_duplicates(["erddap_url", "dataset_id"])
+    )
+    # drop_duplicate_rows, not drop_duplicates: eovs and day_ranges are lists,
+    # and pandas cannot hash a row containing one.
+    profiles_file = write_table(
+        folder, PROFILES, drop_duplicate_rows(erddap_profiles)
+    )
+    skipped_datasets_file = write_table(
+        folder, SKIPPED, skipped_datasets.drop_duplicates()
+    )
     written_files = [datasets_file, profiles_file, skipped_datasets_file]
+
     if not df_ckan.empty:
-        written_files.append(ckan_file)
-    logger.info("Wrote %s", " ".join(str(f) for f in written_files))
+        written_files.append(write_table(folder, CKAN, df_ckan))
+
     if not obis_cells.empty:
+        obis_cells_file = write_table(folder, OBIS_CELLS, obis_cells)
         logger.info("Wrote %s (%d cells)", obis_cells_file, len(obis_cells))
+
     if not erddap_trajectory_days.empty:
+        trajectory_days_file = write_table(
+            folder, TRAJECTORY_DAYS, erddap_trajectory_days
+        )
         logger.info(
             "Wrote %s (%d days)", trajectory_days_file, len(erddap_trajectory_days)
         )
+
     if not erddap_trajectory_points.empty:
+        trajectory_points_file = write_table(
+            folder, TRAJECTORY_POINTS, erddap_trajectory_points
+        )
         logger.info(
             "Wrote %s (%d track points)",
             trajectory_points_file, len(erddap_trajectory_points),
         )
+
+    # Datasets skipped as unchanged — only their verified_at is bumped by the loader.
+    if erddap_verified is not None and not erddap_verified.empty:
+        verified_file = write_table(
+            folder, VERIFIED,
+            erddap_verified.drop_duplicates(["erddap_url", "dataset_id"]),
+        )
+        logger.info("Wrote %s (%d unchanged datasets)", verified_file, len(erddap_verified))
+
+    logger.info("Wrote %s", " ".join(str(f) for f in written_files))
 
     if not skipped_datasets.empty:
         logger.info(
@@ -481,7 +478,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     except Exception as e:
         run_status = "failed"
         run_error_message = f"{type(e).__name__}: {e}"
-        _write_run_audit_csvs(
+        _write_run_audit(
             folder=folder,
             run_id=run_id,
             started_at=started_at,
@@ -504,11 +501,11 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     # Empty erddap_datasets/obis_datasets is NOT a failure when skip_unchanged
     # caching is on and every dataset hashed unchanged: those rows live in
     # erddap_verified and still need their verified_at bumped via
-    # merge_and_write_csvs below. Only a run that harvested nothing AND verified
+    # merge_and_write_tables below. Only a run that harvested nothing AND verified
     # nothing genuinely had no datasets to process.
     if erddap_datasets.empty and obis_datasets.empty and erddap_verified.empty:
         logger.info("No datasets harvested from any source")
-        _write_run_audit_csvs(
+        _write_run_audit(
             folder=folder,
             run_id=run_id,
             started_at=started_at,
@@ -570,7 +567,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         )
 
     # df_ckan may be a future; Prefect resolves it (and draws the edge) on submit.
-    merge_and_write_csvs.submit(
+    merge_and_write_tables.submit(
         folder=folder,
         erddap_datasets=erddap_datasets,
         erddap_profiles=erddap_profiles,
@@ -585,7 +582,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         wait_for=[f for f in [*erddap_futures, obis_future] if f is not None],
     ).result()
 
-    _write_run_audit_csvs(
+    _write_run_audit(
         folder=folder,
         run_id=run_id,
         started_at=started_at,

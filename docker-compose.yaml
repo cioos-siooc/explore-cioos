@@ -153,9 +153,11 @@ services:
       # elsewhere it is unset and APP_DOMAIN from .env is used.
       - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
       # Same reason as web-api: Coolify supplies DB_NAME/USER/PASSWORD/PORT but
-      # not the host. download_scheduler.py reads envs["DB_HOST"] unconditionally
-      # at import, so without this the module raises KeyError before it can poll
-      # and the container crash-loops on restart: unless-stopped.
+      # not the host. The scheduler builds its engine at import (via
+      # cde_common/db.py), so without a host it would fall back to "localhost"
+      # and every poll would fail. DB_HOST rather than DB_HOST_EXTERNAL because
+      # the scheduler runs on the container network; cde_common/db.py prefers
+      # DB_HOST_EXTERNAL and falls back to this, so either name reaches it.
       - "DB_HOST=db"
       # As above: interpolation as well as `env_file`, so an empty .env cannot
       # leave the scheduler unable to reach the queue.
@@ -260,7 +262,7 @@ services:
       # reads can be absent or empty on a deployment. When that happened, this
       # container started with no DB settings at all and every flow run died at
       # connection time ("DB_NAME is not set") while db and prefect ran happily
-      # on the very same credentials — see harvester/core/db.py:REQUIRED_DB_SETTINGS
+      # on the very same credentials — see cde_common/db.py:REQUIRED_DB_SETTINGS
       # and the startup pre-flight in worker-entrypoint.sh.
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}

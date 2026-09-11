@@ -10,8 +10,9 @@ Sentry owns de-duplication: each group is reported with an explicit fingerprint
 of ``[component, host, signature_hash]``, so a repeat of a known problem lands on
 the existing issue (no new-issue alert) and a genuinely new one opens a new issue.
 
-Shared by the harvest side and the downloader, which already imports
-``cde_harvester``.
+Shared by the harvest side, the downloader and the download scheduler — which is
+why it lives here rather than under the harvester, where reaching it meant
+installing a harvest pipeline.
 """
 
 import hashlib

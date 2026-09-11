@@ -5,12 +5,21 @@ description = "CIOOS Explorer Downloader Scheduler"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
+    # `harvester` used to be here too, to reach the issue grouping and the
+    # error codes — so a scheduler image installed duckdb, redis, pandera and
+    # erddapy for them. Those live in cde-python-common now.
+    "cde-python-common",
     "downloader",
-    "harvester",
     "jinja2>=3.1.6",
     "loguru>=0.7.3",
-    "psycopg2-binary>=2.9.10",
-    "python-dotenv>=1.1.1",
+    # Prefect also arrived through `harvester`, but not incidentally: each
+    # download is reported as a flow run (download_scheduler.run_download_observed),
+    # so the queue is visible in the same UI as the harvests. Declared directly
+    # now that the harvester dependency is gone. Floor matches harvester's, so
+    # the two speak to one server. Not a transitive freebie: dropping it turns
+    # every download into a ModuleNotFoundError the moment PREFECT_API_URL is
+    # set, which docker-compose.yaml does by default.
+    "prefect>=3.6.23",
     "sentry-sdk>=2.38.0",
     "sqlalchemy>=2.0.0,<3.0.0"
 ]
@@ -26,5 +35,5 @@ dev = [
 ]
 
 [tool.uv.sources]
+cde-python-common = { path = "../python-common", editable = true }
 downloader = { path = "../downloader", editable = true }
-harvester = { path = "../harvester", editable = true }

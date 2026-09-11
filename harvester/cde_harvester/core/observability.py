@@ -1,12 +1,13 @@
-"""Sentry init and logging helpers shared by the harvest and loading sides."""
+"""Harvest-side logging helpers.
+
+Sentry's init lives in :mod:`cde_common.observability` — every service needs it,
+and reaching it here meant installing the harvester.
+"""
 
 import logging
 import os
 import time
 from datetime import datetime, timezone
-
-import sentry_sdk
-from sentry_sdk.integrations.logging import LoggingIntegration
 
 try:
     from prefect import get_run_logger
@@ -14,28 +15,6 @@ except Exception:
     get_run_logger = None
 
 _root_logger = logging.getLogger()
-
-
-def init_sentry():
-    """Identical Sentry setup previously inlined in both package __main__ modules.
-
-    Log records become breadcrumbs only (``event_level=None``). Sending every
-    WARNING as its own event meant an alert per dataset per run, grouped by log
-    message so all servers collapsed together. Dataset failures now arrive via
-    ``core.issues.report_issues``, grouped by the error the server actually
-    returned and de-duped by Sentry; unhandled exceptions are still captured by
-    Sentry's default integrations.
-    """
-    sentry_sdk.init(
-        dsn=os.environ.get("SENTRY_DSN"),
-        integrations=[
-            LoggingIntegration(
-                level=logging.INFO,  # Capture info and above as breadcrumbs
-                event_level=None,  # Don't turn log records into events
-            ),
-        ],
-        environment=os.environ.get("ENVIRONMENT", "development"),
-    )
 
 
 def run_logger(fallback=None):

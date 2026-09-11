@@ -6,6 +6,8 @@ erddap_server.erddap_csv_to_df. The mock_erddap_server fixture wires
 that method to return the standard info fixture so no HTTP calls occur.
 """
 
+import json
+
 import pandas as pd
 from conftest import (
     DATASET_ID,
@@ -226,20 +228,10 @@ class TestTableVariables:
         assert by_name["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
 
     def test_entries_are_json_serialisable(self, mock_erddap_server):
-        # It lands in a jsonb column via a Python-repr CSV round trip, so a
-        # numpy scalar leaking in here fails far downstream in the loader.
-        import json
-
+        # It lands in a jsonb column, which psycopg2 binds through json.dumps,
+        # so a numpy scalar leaking in here fails far downstream in the loader.
         ds = _make_dataset(mock_erddap_server)
         assert json.loads(json.dumps(ds.table_variables)) == ds.table_variables
-
-    def test_survives_the_csv_repr_round_trip(self, mock_erddap_server):
-        # loading/loader.py reads these back with ast.literal_eval; long_name
-        # values contain apostrophes in real data ("latitude de l'observation").
-        import ast
-
-        ds = _make_dataset(mock_erddap_server)
-        assert ast.literal_eval(repr(ds.table_variables)) == ds.table_variables
 
     def test_empty_frame_yields_empty_list(self):
         from cde_harvester.core.variables import extract_variables

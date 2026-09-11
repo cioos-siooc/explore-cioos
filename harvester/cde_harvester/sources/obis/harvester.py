@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 
 import pandas as pd
 import requests
+from prefect import task
+
 from cde_harvester.core.day_sets import days_to_ranges
 from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.core.observability import run_logger
@@ -22,7 +24,6 @@ from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
-from prefect import task
 
 logger = logging.getLogger(__name__)
 

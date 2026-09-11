@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 from urllib.parse import unquote
 
 import pandas as pd
+from requests.exceptions import HTTPError
+
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
     MAX_TRACK_POINTS_CAP,
@@ -23,7 +25,6 @@ from cde_harvester.loading.loader import (
     prepare_trajectory_days_dataframe,
     prepare_trajectory_points_dataframe,
 )
-from requests.exceptions import HTTPError
 
 ERDDAP_URL = "https://test.erddap.com/erddap"
 DATASET_ID = "test_trajectory_001"
@@ -261,7 +262,7 @@ class TestTrajectoryProfile:
         # The per-day profile count is a display enhancement; a too-large
         # response there must not fail a dataset whose days succeeded (this
         # exact failure took out a whole glider dataset in production).
-        from cde_harvester.core.errors import ResponseTooLargeError
+        from cde_common.errors import ResponseTooLargeError
 
         dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
         inner = dataset.dataset_tabledap_query.side_effect

@@ -1,4 +1,3 @@
-import ast
 import csv
 import io
 import logging
@@ -11,14 +10,26 @@ import pandas as pd
 from prefect import get_run_logger, task
 from sqlalchemy import text
 
+from cde_common.db import create_db_engine, db_host
+from cde_common.observability import init_sentry
 from cde_harvester.core.day_sets import (
     merge_ranges,
     ranges_from_iso,
     ranges_to_pg_literal,
     ranges_to_psycopg,
 )
-from cde_harvester.core.db import create_db_engine, db_host
-from cde_harvester.core.observability import init_sentry
+from cde_harvester.core.harvest_files import (
+    DATASETS,
+    HARVEST_ATTEMPTS,
+    HARVEST_RUNS,
+    OBIS_CELLS,
+    PROFILES,
+    SKIPPED,
+    TRAJECTORY_DAYS,
+    TRAJECTORY_POINTS,
+    VERIFIED,
+    read_table,
+)
 from cde_harvester.core.schemas import (
     DATASET_ARRAY_DTYPES,
     PROFILE_ARRAY_DTYPES,
@@ -80,20 +91,17 @@ init_sentry()
 def prepare_profiles_dataframe(profiles):
     """Clean and prepare profiles DataFrame for insertion."""
     profiles = profiles.replace("", np.NaN)
-    # day_ranges arrives as a repr'd list of ISO pairs from the CSV, or as the
-    # live list when the harvester hands the frame over in-process. to_sql
-    # binds parameters rather than running them through a column input
-    # function, and psycopg2 adapts a list of strings as text[] — which
-    # PostgreSQL refuses to assign to a daterange[] column. Its own DateRange
-    # type adapts correctly, so convert here, at the one place both callers
-    # pass through.
+    # day_ranges arrives as a list of ISO pairs from the harvest folder, or as
+    # the live list of date pairs when the harvester hands the frame over
+    # in-process — ranges_from_iso accepts either. to_sql binds parameters
+    # rather than running them through a column input function, and psycopg2
+    # adapts a list of strings as text[], which PostgreSQL refuses to assign to
+    # a daterange[] column. Its own DateRange type adapts correctly, so convert
+    # here, at the one place both callers pass through.
     if "day_ranges" in profiles.columns:
 
         def _to_ranges(value):
-            # NaN is truthy, so `value or []` would let a missing cell through
-            # into ranges_from_iso; check the types explicitly instead.
-            if isinstance(value, str):
-                value = ast.literal_eval(value)
+            # A dataset with no day set has None here, not a list.
             if not isinstance(value, (list, tuple)):
                 return []
             return ranges_to_psycopg(ranges_from_iso(value))
@@ -119,13 +127,9 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     whose names weren't yet in scientific_name_vernaculars at COPY time).
     """
     obis_cells = obis_cells.copy()
-    # Parse scientific_names from CSV string repr back to list, or default to empty list
+    # Already a list off the harvest folder; None for a cell that named nothing.
     obis_cells["scientific_names"] = obis_cells["scientific_names"].apply(
-        lambda x: (
-            ast.literal_eval(x)
-            if isinstance(x, str)
-            else (x if isinstance(x, list) else [])
-        )
+        lambda x: x if isinstance(x, list) else []
     )
     # Round lat/lon to 8 dp before dedup to avoid float-precision duplicates
     # (e.g. 45.83333333333333 vs 45.833333333333336 from grid arithmetic)
@@ -394,94 +398,40 @@ def main(folder, incremental=False):
     engine.connect()
     logger.info("Connected to %s", db_host())
 
-    datasets_file = f"{folder}/datasets.csv"
-    profiles_file = f"{folder}/profiles.csv"
-    skipped_datasets_file = f"{folder}/skipped.csv"
-    obis_cells_file = f"{folder}/obis_cells.csv"
-    trajectory_days_file = f"{folder}/trajectory_days.csv"
-    trajectory_points_file = f"{folder}/trajectory_points.csv"
-    verified_file = f"{folder}/verified.csv"
-    harvest_runs_file = f"{folder}/harvest_runs.csv"
-    harvest_attempts_file = f"{folder}/harvest_attempts.csv"
+    # Every table arrives with its types intact (harvest_files), so list
+    # columns are already lists and timestamps are already tz-aware UTC — no
+    # literal_eval, no parse_dates.
+    datasets = read_table(folder, DATASETS)
+    if datasets is None:
+        raise FileNotFoundError(f"No {DATASETS} table in {folder}")
+    skipped_datasets = read_table(folder, SKIPPED)
+    if skipped_datasets is None:
+        skipped_datasets = pd.DataFrame()
+    logger.info("Read %s and %s from %s", DATASETS, SKIPPED, folder)
 
-    logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
+    profiles = read_table(folder, PROFILES)
+    if profiles is None:
+        profiles = pd.DataFrame()
 
-    datasets = pd.read_csv(datasets_file)
-    profiles = (
-        pd.read_csv(profiles_file)
-        if os.path.isfile(profiles_file) and os.path.getsize(profiles_file) > 1
-        else pd.DataFrame()
-    )
-    skipped_datasets = pd.read_csv(skipped_datasets_file)
+    # Optional: absent from a harvest that produced none of this kind.
+    obis_cells = read_table(folder, OBIS_CELLS)
+    trajectory_days = read_table(folder, TRAJECTORY_DAYS)
+    trajectory_points = read_table(folder, TRAJECTORY_POINTS)
+    verified = read_table(folder, VERIFIED)
+    # Audit tables come from the harvester's run lifecycle and feed the
+    # harvest-dashboard service.
+    harvest_runs_df = read_table(folder, HARVEST_RUNS)
+    harvest_attempts_df = read_table(folder, HARVEST_ATTEMPTS)
 
-    obis_cells = None
-    if os.path.isfile(obis_cells_file):
-        logger.info("Reading %s", obis_cells_file)
-        obis_cells = pd.read_csv(obis_cells_file)
-
-    trajectory_days = None
-    if os.path.isfile(trajectory_days_file):
-        logger.info("Reading %s", trajectory_days_file)
-        trajectory_days = pd.read_csv(trajectory_days_file)
-
-    trajectory_points = None
-    if os.path.isfile(trajectory_points_file):
-        logger.info("Reading %s", trajectory_points_file)
-        trajectory_points = pd.read_csv(trajectory_points_file)
-
-    verified = None
-    if os.path.isfile(verified_file) and os.path.getsize(verified_file) > 1:
-        logger.info("Reading %s", verified_file)
-        verified = pd.read_csv(verified_file, parse_dates=["verified_at"])
-
-    # Harvest audit CSVs are produced by the harvester's run lifecycle and
-    # feed the harvest-dashboard service. Optional so old harvest folders
-    # (pre-dashboard) still load cleanly.
-    harvest_runs_df = None
-    harvest_attempts_df = None
-    if os.path.isfile(harvest_runs_file):
-        logger.info("Reading %s", harvest_runs_file)
-        harvest_runs_df = pd.read_csv(
-            harvest_runs_file, parse_dates=["started_at", "finished_at"]
-        )
-    if os.path.isfile(harvest_attempts_file):
-        logger.info("Reading %s", harvest_attempts_file)
-        harvest_attempts_df = pd.read_csv(
-            harvest_attempts_file, parse_dates=["attempted_at"]
-        )
-
-    if "eovs" in profiles.columns:
-        profiles["eovs"] = profiles["eovs"].apply(
-            lambda x: ast.literal_eval(x) if isinstance(x, str) else []
-        )
-
-    datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
-    datasets["organizations"] = datasets["organizations"].apply(ast.literal_eval)
-    datasets["profile_variables"] = datasets["profile_variables"].apply(
-        ast.literal_eval
-    )
-    if "obis_nodes" in datasets.columns:
-        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
-            lambda x: (
-                ast.literal_eval(x)
-                if isinstance(x, str)
-                else (x if isinstance(x, list) else [])
-            )
-        )
-    else:
+    if "obis_nodes" not in datasets.columns:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
 
     # jsonb metadata columns (table_variables for every dataset type, the two
     # grid_* ones for griddap). All nullable; absent entirely from older harvest
-    # folders. They arrive as Python-repr strings (same CSV contract as eovs);
-    # NaN must become None or the JSONB binding fails. coverage_time_* is parsed
-    # to datetime so NaT binds as NULL on the timestamptz columns.
+    # folders. coverage_time_* is normalized to datetime so NaT binds as NULL on
+    # the timestamptz columns.
     for col in ("table_variables", "grid_variables", "grid_dimensions"):
-        if col in datasets.columns:
-            datasets[col] = datasets[col].apply(
-                lambda x: ast.literal_eval(x) if isinstance(x, str) and x else None
-            )
-        else:
+        if col not in datasets.columns:
             datasets[col] = None
     for col in ("coverage_time_min", "coverage_time_max"):
         if col not in datasets.columns:
@@ -507,7 +457,7 @@ def main(folder, incremental=False):
             raise RuntimeError(
                 "Full reload found no datasets; refusing to wipe the database"
             )
-        # Incremental runs legitimately produce an empty datasets.csv when every
+        # Incremental runs legitimately produce an empty datasets table when every
         # dataset was unchanged and skipped by the harvester (skip_unchanged).
         # That is a successful no-op, not a crash: fall through so we still bump
         # verified_at for the unchanged datasets and append the harvest audit rows.

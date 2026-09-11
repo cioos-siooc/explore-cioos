@@ -115,6 +115,7 @@ To manually trigger a run:
 For more details, see:
 - [Harvester Usage Guide](harvester/README.md)
 - [DB Loader README](db-loader/README.md)
+- [cde-python-common: the neutral layer under the Python services](python-common/README.md)
 
 ## Front End Development
 

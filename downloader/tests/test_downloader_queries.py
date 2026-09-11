@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+
 from erddap_downloader import downloader_wrapper
 
 QUERIES = list((Path(__file__).parent / "queries").glob("*.json"))
@@ -16,21 +17,24 @@ _FAKE_CSV_BYTES = (
     b"2020-01-01T00:00:00Z,52.0,-130.0,5.0\r\n"
 )
 
-_FAKE_VARS = pd.DataFrame(
-    {"name": ["time", "latitude", "longitude", "depth"], "cf_role": ["", "", "", ""]}
+# An ERDDAP /info/ table, in the shape get_variables_from_info() parses: a
+# variable is an attribute-less, non-NC_GLOBAL row, so the global title and the
+# per-variable attribute row below must both be excluded from the variable list.
+_FAKE_INFO = pd.DataFrame(
+    [
+        ("attribute", "NC_GLOBAL", "title", "", "Fake dataset"),
+        ("variable", "time", "", "double", ""),
+        ("variable", "latitude", "", "double", ""),
+        ("variable", "longitude", "", "double", ""),
+        ("variable", "depth", "", "double", ""),
+        ("attribute", "depth", "units", "", "m"),
+    ],
+    columns=["Row Type", "Variable Name", "Attribute Name", "Data Type", "Value"],
 )
 
 
-def _mock_erddap_class():
-    """Mock for cde_harvester.sources.erddap.client — returns a fake dataset with minimal variable metadata."""
-    instance = MagicMock()
-    instance.get_dataset.return_value.df_variables = _FAKE_VARS
-    cls = MagicMock(return_value=instance)
-    return cls
-
-
-def _mock_requests_response():
-    """Mock for requests.get — 200 response yielding fake CSV bytes."""
+def _mock_data_response():
+    """Mock for session.get — 200 response yielding fake CSV bytes."""
     resp = MagicMock()
     resp.status_code = 200
     resp.iter_content = MagicMock(return_value=[_FAKE_CSV_BYTES])
@@ -56,16 +60,19 @@ def test_downloader_query(query, tmp_path):
     query_data = json.loads(query.read_text())
     with (
         patch(
-            "erddap_downloader.download_erddap.cde_harvester.ERDDAP",
-            new=_mock_erddap_class(),
-        ),
-        patch(
             "erddap_downloader.download_erddap.ERDDAP",
             new=_mock_erddapy_class(),
         ),
+        # get_variables_from_info() is left real: the variable list the download
+        # URL is built from is now derived here rather than by constructing the
+        # harvester's Dataset, so the parse is worth exercising.
         patch(
-            "erddap_downloader.download_erddap.requests.get",
-            return_value=_mock_requests_response(),
+            "erddap_downloader.download_erddap.get_erddap_info",
+            return_value=_FAKE_INFO,
+        ),
+        patch(
+            "erddap_downloader.download_erddap.session.get",
+            return_value=_mock_data_response(),
         ),
         patch("erddap_downloader.download_erddap.save_erddap_metadata"),
     ):

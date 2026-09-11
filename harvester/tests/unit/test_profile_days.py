@@ -21,6 +21,8 @@ import logging
 
 import pandas as pd
 import pytest
+from requests.exceptions import HTTPError
+
 from cde_harvester.core.day_sets import (
     bucket_index_to_day,
     day_bucket_group,
@@ -32,6 +34,7 @@ from cde_harvester.core.day_sets import (
     ranges_to_psycopg,
     total_days,
 )
+from cde_harvester.core.harvest_files import PROFILES, read_table, write_table
 from cde_harvester.dataset_types.profile import ProfileHandler
 from cde_harvester.dataset_types.tabledap_features import (
     MAX_DAY_COUNT_ROWS,
@@ -40,7 +43,6 @@ from cde_harvester.dataset_types.tabledap_features import (
 from cde_harvester.dataset_types.timeseries import TimeSeriesHandler
 from cde_harvester.dataset_types.timeseries_profile import TimeSeriesProfileHandler
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
-from requests.exceptions import HTTPError
 
 LOG = logging.getLogger("test.profile_days")
 
@@ -409,14 +411,20 @@ class TestSerialisationRoundTrips:
     """A day set crosses two boundaries with different rules, and getting
     either wrong silently reverts every row to the span fallback."""
 
-    def test_csv_round_trip_is_literal_eval_safe(self):
-        import ast
+    def test_harvest_folder_round_trip_preserves_the_run_list(self, tmp_path):
+        """Through the real parquet handoff, not a simulation of it.
 
+        Nested lists come back from duckdb as nested numpy arrays, which
+        ranges_from_iso cannot index as pairs — read_table normalizing them to
+        plain lists is what makes this pass.
+        """
         runs = days_to_ranges([d("2020-01-01"), d("2020-01-02"), d("2021-03-01")])
-        # The repr of a datetime.date is a constructor call, which literal_eval
-        # rejects — ISO pairs are what survive the CSV.
-        restored = ranges_from_iso(ast.literal_eval(repr(ranges_to_iso(runs))))
-        assert restored == runs
+        write_table(
+            str(tmp_path), PROFILES, pd.DataFrame({"day_ranges": [ranges_to_iso(runs)]})
+        )
+        stored = read_table(str(tmp_path), PROFILES)["day_ranges"].iloc[0]
+        assert isinstance(stored, list) and isinstance(stored[0], list)
+        assert ranges_from_iso(stored) == runs
 
     def test_ranges_from_iso_tolerates_dates(self):
         runs = [(d("2020-01-01"), d("2020-01-03"))]
@@ -435,26 +443,29 @@ class TestSerialisationRoundTrips:
         assert adapted[0].lower == d("2020-01-01")
         assert adapted[0].upper == d("2020-01-03")
 
-    def test_loader_parses_day_ranges_from_csv_text(self):
+    def test_loader_converts_iso_pairs_to_range_objects(self):
         from cde_harvester.loading.loader import prepare_profiles_dataframe
 
         runs = days_to_ranges([d("2020-01-01"), d("2020-01-02")])
         frame = pd.DataFrame({
             "time_min": [pd.Timestamp("2020-01-01T00:00:00Z")],
             "time_max": [pd.Timestamp("2020-01-02T00:00:00Z")],
-            "day_ranges": [repr(ranges_to_iso(runs))],
+            "day_ranges": [ranges_to_iso(runs)],
         })
         out = prepare_profiles_dataframe(frame)
         assert [type(r).__name__ for r in out["day_ranges"].iloc[0]] == ["DateRange"]
 
-    def test_loader_tolerates_a_missing_day_set(self):
-        """NaN is truthy, so a missing cell must be type-checked, not `or`-ed."""
+    @pytest.mark.parametrize("missing", [None, float("nan")], ids=["none", "nan"])
+    def test_loader_tolerates_a_missing_day_set(self, missing):
+        """A cell with no day set reads back as None off parquet, and as NaN
+        from a frame handed over in-process. NaN is truthy, so both have to be
+        type-checked rather than `or`-ed."""
         from cde_harvester.loading.loader import prepare_profiles_dataframe
 
         frame = pd.DataFrame({
             "time_min": [pd.Timestamp("2020-01-01T00:00:00Z")],
             "time_max": [pd.Timestamp("2020-01-02T00:00:00Z")],
-            "day_ranges": [float("nan")],
+            "day_ranges": [missing],
         })
         out = prepare_profiles_dataframe(frame)
         assert out["day_ranges"].iloc[0] == []

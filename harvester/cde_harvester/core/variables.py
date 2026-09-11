@@ -9,9 +9,9 @@ harvest and discarded, which left the browser with nothing but ERDDAP's
 ``columnNames``/``columnTypes``/``columnUnits`` and so no way to title a plot
 panel with anything better than a BODC code like ``TE90_01``.
 
-The output is a plain list of dicts so it round-trips through the harvester's
-CSV contract (Python repr on the way out, ``ast.literal_eval`` in the loader)
-and lands in a ``jsonb`` column.
+The output is a plain list of dicts so it round-trips through the harvest
+folder's parquet handoff (see ``core/harvest_files``) and lands in a ``jsonb``
+column.
 """
 
 # Persisted per variable. Deliberately NOT the whole of

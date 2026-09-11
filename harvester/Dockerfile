@@ -2,7 +2,10 @@ FROM ghcr.io/astral-sh/uv:python3.10-bookworm
 
 WORKDIR /app
 
-# 1. Copy manifests for harvester
+# 1. Copy manifests for harvester. cde-python-common is an editable path dependency, so
+# its whole project has to be present before `uv sync` can resolve it — see
+# python-common/README.md for what lives there.
+COPY ./python-common ./python-common
 COPY ./harvester/pyproject.toml ./harvester/uv.lock ./harvester/README.md ./harvester/
 
 WORKDIR /app/harvester

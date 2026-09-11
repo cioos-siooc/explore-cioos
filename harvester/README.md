@@ -121,11 +121,16 @@ docker compose run --rm -e HARVEST_CONFIG_FILE=/app/harvester/custom_config.yaml
 
 ## Output Files
 
-The harvester generates CSV files in the `harvest/` directory:
-- `datasets.csv` - Dataset metadata
-- `profiles.csv` - Profile/timeseries information
-- `ckan.csv` - CKAN metadata
-- `skipped.csv` - Datasets that were skipped (with reasons)
+The harvester generates Parquet files in the `harvest/` directory:
+- `datasets.parquet` - Dataset metadata
+- `profiles.parquet` - Profile/timeseries information
+- `ckan.parquet` - CKAN metadata
+- `skipped.parquet` - Datasets that were skipped (with reasons)
+
+Parquet, not CSV, because several columns are lists (`eovs`, `organizations`,
+`day_ranges`) and a CSV can only carry those as text. The names and the
+read/write helpers live in `cde_harvester/core/harvest_files.py`; a folder
+written by an older, CSV-era harvester is not loadable and must be re-harvested.
 
 These files are then loaded into the database by the
 [db-loader](cde_harvester/loading/README.md), which lives in this package at
@@ -184,7 +189,8 @@ Configure the harvester through a `.env` file in the harvester directory (copy f
 # Database connection
 DB_USER=postgres
 DB_PASSWORD=password
-DB_HOST=localhost  # Use 'db' when running in Docker
+DB_HOST=localhost  # Use 'db' when running in Docker.
+                   # DB_HOST_EXTERNAL is preferred if both are set; see python-common/README.md
 DB_NAME=cde
 
 # Sentry error tracking (optional)
@@ -303,7 +309,7 @@ a harvest:
 
 ```bash
 uv run python scripts/discover_obis_datasets.py -f ../harvest_config.yaml \
-    --compare ../Obis_Datasets.json --cells ../harvest/obis_cells.csv
+    --compare ../Obis_Datasets.json --cells ../harvest
 ```
 
 That prints the per-query counts, the reduced query geometry, and a diff
@@ -436,5 +442,5 @@ Check the `*_skipped.json` files in the output folder for details.
 
 If running locally outside Docker:
 - Ensure PostgreSQL is running (can use `docker compose up -d db`)
-- Set `DB_HOST=localhost` in your `.env` file
+- Set `DB_HOST=localhost` (or `DB_HOST_EXTERNAL`, which wins if both are set) in your `.env` file
 - Verify database credentials match your PostgreSQL configuration

@@ -3,17 +3,21 @@ name = "explore-cioos"
 version = "0.1.0"
 description = "CIOOS Explorer"
 readme = "README.md"
-# Upper bound matches every member project (harvester, downloader,
+# Upper bound matches every member project (python-common, harvester, downloader,
 # download_scheduler) and .python-version. Unbounded, the root lock
 # resolved markers for 3.11-3.13 that no image can satisfy.
 requires-python = ">=3.10,<3.11"
+# download-scheduler pulls in downloader, and both pull in cde-python-common, so this
+# installs every Python project in the tree for the whole-suite pytest run.
 dependencies = [
     "download-scheduler",
     "harvester",
 ]
 
 [tool.uv.sources]
+cde-python-common = { path = "python-common", editable = true }
 download-scheduler = { path = "download_scheduler", editable = true }
+downloader = { path = "downloader", editable = true }
 harvester = { path = "harvester", editable = true }
 
 [dependency-groups]
@@ -57,6 +61,19 @@ target-version = "py310"
 # they are loguru calls, where an f-string is the documented style — the rule
 # is written for stdlib %-style lazy formatting.
 select = ["E", "W", "F", "I", "UP", "B", "C4", "LOG", "DTZ", "SIM", "RUF100"]
+
+[tool.ruff.lint.isort]
+# Every project here is installed as an editable path dependency, which ruff
+# cannot tell apart from a wheel off PyPI — so without this the tree's own
+# packages get sorted in among requests and pandas, and `cde_common` (the
+# neutral layer under all of them) reads like a third-party library.
+known-first-party = [
+    "cde_common",
+    "cde_db_loader",
+    "cde_harvester",
+    "download_scheduler",
+    "erddap_downloader",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # pytest passes fixtures as parameters, so every test that uses a fixture

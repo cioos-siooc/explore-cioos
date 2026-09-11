@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import os
+import textwrap
 from pathlib import Path
 from typing import NamedTuple
 
@@ -110,21 +111,16 @@ CONFIG_ENV_HINT = (
 
 
 def normalize_coolify_multiline(value: str) -> str:
-    """Strip the uniform leading indent Coolify prepends to multi-line env var continuations."""
-    lines = value.split("\n")
-    if len(lines) <= 1:
-        return value
-    continuation = [ln for ln in lines[1:] if ln.strip()]
-    if not continuation:
-        return value
-    min_indent = min(len(ln) - len(ln.lstrip(" ")) for ln in continuation)
-    first_indent = len(lines[0]) - len(lines[0].lstrip(" "))
-    # Only strip when the first line is less-indented than the block (Coolify's signature).
-    if first_indent >= min_indent or min_indent == 0:
-        return value
-    return "\n".join(
-        [lines[0]] + [ln[min_indent:] if ln.strip() else ln for ln in lines[1:]]
-    )
+    """Strip the uniform leading indent Coolify prepends to multi-line env var continuations.
+
+    Only the continuation lines are dedented, which is why textwrap.dedent is
+    applied to them rather than to the whole value: Coolify's signature is a
+    first line that is *less* indented than the block under it, and dedent
+    computes its common prefix over every line — including that first one — so
+    on the whole string it would find no common indent and strip nothing.
+    """
+    head, sep, rest = value.partition("\n")
+    return head + sep + textwrap.dedent(rest) if sep else value
 
 
 def decode_harvest_config_b64(value: str) -> str:

@@ -39,6 +39,9 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from cde_common import db as core_db
+from cde_common.env import dotenv_path as env_dotenv_path
+
 # Applied by the db container's entrypoint on a fresh volume; holds every CREATE TABLE.
 INIT_SQL_NAME = "1_schema.sql"
 # The function/procedure files db_migrate re-applies on every deploy. DROP SCHEMA
@@ -79,11 +82,13 @@ def check_confirmation(confirm, db_name=None, host=None):
     typed makes that click deliberate, and makes it hard to wipe the wrong environment
     by re-running a flow that was parameterised for another one.
     """
-    expected = db_name if db_name is not None else os.environ.get("DB_NAME", "")
+    # Resolved through cde_common.db, not os.environ, so the guard demands
+    # confirmation for whatever database_url() would actually connect to — the
+    # asymmetry is what once had this report DB_NAME unset on a worker whose
+    # harvests were connecting fine.
+    expected = db_name if db_name is not None else core_db.db_name()
     if not expected:
-        from dotenv import find_dotenv
-
-        dotenv_path = find_dotenv(usecwd=True) or "none found"
+        dotenv_path = env_dotenv_path() or "none found"
         raise ValueError(
             "DB_NAME is not set, so there is no database name to confirm against and no "
             "safe way to identify what would be dropped. This resolves DB_NAME exactly as "

@@ -32,20 +32,17 @@ import logging
 from dataclasses import dataclass, field
 
 import requests
+from shapely import wkt as shp_wkt
+
+from cde_common.http import retry_session
 from cde_harvester.sources.obis.geo_filter import (
     DEFAULT_EXEMPT_NODE_IDS,
     load_boundary_polygon,
 )
-from requests.adapters import HTTPAdapter
-from shapely import wkt as shp_wkt
-from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.obis.org/v3/dataset"
-
-# Transient statuses worth retrying.
-_RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
 
 # Hard ceiling on the `size` param used by the retry-once path.
 _MAX_PAGE_SIZE = 20000
@@ -153,22 +150,6 @@ class DiscoveryResult:
     geometry_tolerance: float = None
 
 
-def _build_session() -> requests.Session:
-    session = requests.Session()
-    retry = Retry(
-        total=4,
-        backoff_factor=1.0,         # 0s, 2s, 4s, 8s between attempts
-        status_forcelist=_RETRY_STATUSES,
-        allowed_methods=frozenset(["GET"]),
-        raise_on_status=False,      # let raise_for_status() give a clean error
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
-
-
 def simplify_for_query(polygon, tolerance=0.25, max_bytes=4500, max_attempts=6):
     """Reduce ``polygon`` to a WKT string that fits OBIS's query-string limit.
 
@@ -219,7 +200,7 @@ class ObisDatasetDiscovery:
         self.config = config
         self.geo_filter = geo_filter
         self.logger = logger or globals()["logger"]
-        self.session = session or _build_session()
+        self.session = session or retry_session()
 
     # -- geometry ---------------------------------------------------------
 

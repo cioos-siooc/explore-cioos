@@ -6,6 +6,7 @@ missing init file aborts rather than dropping a schema it cannot recreate.
 """
 
 import pytest
+
 from cde_harvester.core import schema
 
 
@@ -149,7 +150,7 @@ class TestDbNameResolution:
     resolves it via load_dotenv from the run's working directory."""
 
     def test_db_name_reads_dotenv_from_cwd(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.delenv("DB_NAME", raising=False)
         (tmp_path / ".env").write_text("DB_NAME=cde_from_dotenv\n")
@@ -157,7 +158,7 @@ class TestDbNameResolution:
         assert core_db.db_name() == "cde_from_dotenv"
 
     def test_db_name_empty_when_nothing_sets_it(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.delenv("DB_NAME", raising=False)
         monkeypatch.chdir(tmp_path)
@@ -166,7 +167,7 @@ class TestDbNameResolution:
     def test_db_host_also_reads_dotenv(self, tmp_path, monkeypatch):
         """Same asymmetry: db_host() is used in the guard's error message, so it has to
         report the host the engine would actually use."""
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.delenv("DB_HOST_EXTERNAL", raising=False)
         (tmp_path / ".env").write_text("DB_HOST_EXTERNAL=db.internal\n")
@@ -180,7 +181,7 @@ class TestDotenvSearchesAncestors:
     to the guard while harvests connected fine."""
 
     def test_db_name_found_in_parent_directory(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.delenv("DB_NAME", raising=False)
         (tmp_path / ".env").write_text("DB_NAME=cde_from_parent\n")
@@ -190,7 +191,7 @@ class TestDotenvSearchesAncestors:
         assert core_db.db_name() == "cde_from_parent"
 
     def test_nearest_dotenv_wins(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.delenv("DB_NAME", raising=False)
         (tmp_path / ".env").write_text("DB_NAME=from_parent\n")
@@ -202,7 +203,7 @@ class TestDotenvSearchesAncestors:
 
     def test_real_environment_is_not_overridden(self, tmp_path, monkeypatch):
         """load_dotenv must not clobber what the container already set."""
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.setenv("DB_NAME", "from_container_env")
         (tmp_path / ".env").write_text("DB_NAME=from_dotenv\n")
@@ -212,7 +213,7 @@ class TestDotenvSearchesAncestors:
     def test_guard_and_connection_agree_on_the_same_dotenv(self, tmp_path, monkeypatch):
         """The invariant that matters: whatever database_url() would connect to is what
         the guard demands confirmation for."""
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         for v in ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST_EXTERNAL"):
             monkeypatch.delenv(v, raising=False)
@@ -237,7 +238,7 @@ class TestRequiredDbSettings:
     and then fail inside every flow run — so they are reported up front instead."""
 
     def test_missing_settings_are_all_reported(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         for v in core_db.REQUIRED_DB_SETTINGS:
             monkeypatch.delenv(v, raising=False)
@@ -245,7 +246,7 @@ class TestRequiredDbSettings:
         assert set(core_db.missing_db_settings()) == set(core_db.REQUIRED_DB_SETTINGS)
 
     def test_nothing_missing_when_complete(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.setenv("DB_NAME", "cde")
         monkeypatch.setenv("DB_USER", "postgres")
@@ -254,7 +255,7 @@ class TestRequiredDbSettings:
         assert core_db.missing_db_settings() == []
 
     def test_partial_config_reports_only_the_gaps(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.setenv("DB_NAME", "cde")
         monkeypatch.delenv("DB_USER", raising=False)
@@ -264,7 +265,7 @@ class TestRequiredDbSettings:
 
     def test_empty_string_counts_as_missing(self, tmp_path, monkeypatch):
         """Coolify writes empty values for variables left blank in the UI."""
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.setenv("DB_NAME", "")
         monkeypatch.setenv("DB_USER", "postgres")
@@ -274,7 +275,7 @@ class TestRequiredDbSettings:
 
     def test_database_url_names_every_missing_setting(self, tmp_path, monkeypatch):
         """Was a bare KeyError naming only the first gap, with no hint it was config."""
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         for v in core_db.REQUIRED_DB_SETTINGS:
             monkeypatch.delenv(v, raising=False)
@@ -283,7 +284,7 @@ class TestRequiredDbSettings:
             core_db.database_url()
 
     def test_database_url_still_builds_when_complete(self, tmp_path, monkeypatch):
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.setenv("DB_NAME", "cde")
         monkeypatch.setenv("DB_USER", "postgres")
@@ -433,7 +434,7 @@ class TestEnsureDatabase:
     def test_maintenance_engine_targets_the_postgres_database(self, tmp_path, monkeypatch):
         """CREATE DATABASE has to run from a database that always exists, and in
         AUTOCOMMIT — it cannot run inside a transaction block."""
-        from cde_harvester.core import db as core_db
+        from cde_common import db as core_db
 
         monkeypatch.setenv("DB_NAME", "cde")
         monkeypatch.setenv("DB_USER", "postgres")

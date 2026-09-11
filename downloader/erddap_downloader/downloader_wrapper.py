@@ -2,7 +2,6 @@ import os
 import shutil
 
 from erddap_downloader import download_erddap
-from erddap_downloader.zip_folder import zip_folder
 
 
 def run_download_query(download_query, output_folder, create_pdf=False):
@@ -28,11 +27,11 @@ def run_download_query(download_query, output_folder, create_pdf=False):
             query_report["zip_file_size"] = 0
             return query_report
 
-        # Zip the download
-        zip_filename = temp_folder + ".zip"
-        zip_full_path = os.path.join(output_folder, zip_filename)
-
-        zip_folder(temp_folder, zip_full_path)
+        # Zip the download. base_dir (not root_dir) so the archive keeps the
+        # temp folder as its top-level directory, which is what users unzip into.
+        zip_full_path = shutil.make_archive(
+            os.path.join(output_folder, temp_folder), "zip", base_dir=temp_folder
+        )
 
         # Output run report json
         query_report["zip_file_size"] = os.stat(zip_full_path).st_size

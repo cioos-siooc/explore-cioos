@@ -1,23 +1,18 @@
 """
-Unit tests for CSV file generation and structural validation.
+Unit tests for harvest-table generation and structural validation.
 
 Each test generates its DataFrame by calling real codebase functions with
 mocked ERDDAP responses — not by constructing fixtures by hand.
 
-  datasets.csv  →  Dataset.get_df()      (cde_harvester.sources.erddap.dataset)
-  profiles.csv  →  extract_features()    (cde_harvester.dataset_types)
-  skipped.csv   →  CDEComplianceChecker  (cde_harvester.sources.erddap.compliance)
-                   + harvester skipped-row assembly
+  datasets  →  Dataset.get_df()      (cde_harvester.sources.erddap.dataset)
+  profiles  →  extract_features()    (cde_harvester.dataset_types)
+  skipped   →  CDEComplianceChecker  (cde_harvester.sources.erddap.compliance)
+               + harvester skipped-row assembly
 """
 
-import ast
 from io import StringIO
 
 import pandas as pd
-from cde_harvester.core.schemas import SkippedDatasetSchema
-from cde_harvester.dataset_types import extract_features as get_profiles
-from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
-from cde_harvester.sources.erddap.dataset import Dataset
 from conftest import (
     DATASET_ID,
     DOMAIN,
@@ -27,6 +22,18 @@ from conftest import (
     build_mock_dataset,
     mock_erddap_server,  # noqa: F401 — imported so pytest discovers the fixture
 )
+
+from cde_harvester.core.harvest_files import (
+    DATASETS,
+    PROFILES,
+    SKIPPED,
+    read_table,
+    write_table,
+)
+from cde_harvester.core.schemas import SkippedDatasetSchema
+from cde_harvester.dataset_types import extract_features as get_profiles
+from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
+from cde_harvester.sources.erddap.dataset import Dataset
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -71,11 +78,10 @@ def _skipped_df():
     return pd.DataFrame(reasons, columns=skipped_columns)
 
 
-def _roundtrip(df: pd.DataFrame, tmp_path, filename: str) -> pd.DataFrame:
-    """Write a DataFrame to CSV and read it back, as the db-loader does."""
-    path = tmp_path / filename
-    df.to_csv(path, index=False)
-    return pd.read_csv(path)
+def _roundtrip(df: pd.DataFrame, tmp_path, name: str) -> pd.DataFrame:
+    """Through the real harvest-folder write and read, as the db-loader does."""
+    write_table(str(tmp_path), name, df)
+    return read_table(str(tmp_path), name)
 
 
 # ---------------------------------------------------------------------------
@@ -111,30 +117,26 @@ class TestDatasetsCsvGeneration:
         assert isinstance(eovs, list)
         assert len(eovs) > 0
 
-    def test_eovs_survives_csv_roundtrip(self, mock_erddap_server, tmp_path):
-        df = _datasets_df(mock_erddap_server)
-        df_back = _roundtrip(df, tmp_path, "datasets.csv")
-        eovs = ast.literal_eval(df_back["eovs"].iloc[0])
+    def test_eovs_survives_roundtrip_as_a_list(self, mock_erddap_server, tmp_path):
+        """No parse step on the read side — that is the point of the format."""
+        df_back = _roundtrip(_datasets_df(mock_erddap_server), tmp_path, DATASETS)
+        eovs = df_back["eovs"].iloc[0]
         assert isinstance(eovs, list)
         assert len(eovs) > 0
 
-    def test_organizations_survives_csv_roundtrip(self, mock_erddap_server, tmp_path):
-        df = _datasets_df(mock_erddap_server)
-        df_back = _roundtrip(df, tmp_path, "datasets.csv")
-        orgs = ast.literal_eval(df_back["organizations"].iloc[0])
-        assert isinstance(orgs, list)
+    def test_organizations_survives_roundtrip_as_a_list(self, mock_erddap_server, tmp_path):
+        df_back = _roundtrip(_datasets_df(mock_erddap_server), tmp_path, DATASETS)
+        assert isinstance(df_back["organizations"].iloc[0], list)
 
-    def test_profile_variables_survives_csv_roundtrip(self, mock_erddap_server, tmp_path):
-        df = _datasets_df(mock_erddap_server)
-        df_back = _roundtrip(df, tmp_path, "datasets.csv")
-        pv = ast.literal_eval(df_back["profile_variables"].iloc[0])
-        assert isinstance(pv, list)
+    def test_profile_variables_survives_roundtrip_as_a_list(self, mock_erddap_server, tmp_path):
+        df_back = _roundtrip(_datasets_df(mock_erddap_server), tmp_path, DATASETS)
+        assert isinstance(df_back["profile_variables"].iloc[0], list)
 
     def test_deduplication_removes_duplicate_rows(self, mock_erddap_server, tmp_path):
         df = _datasets_df(mock_erddap_server)
         duplicated = pd.concat([df, df], ignore_index=True)
         deduped = duplicated.drop_duplicates(["erddap_url", "dataset_id"])
-        df_back = _roundtrip(deduped, tmp_path, "datasets.csv")
+        df_back = _roundtrip(deduped, tmp_path, DATASETS)
         assert df_back.duplicated(["erddap_url", "dataset_id"]).sum() == 0
         assert len(df_back) == 1
 
@@ -190,7 +192,7 @@ class TestProfilesCsvGeneration:
 
     def test_roundtrip_preserves_row_count(self, tmp_path):
         df = _profiles_df()
-        df_back = _roundtrip(df, tmp_path, "profiles.csv")
+        df_back = _roundtrip(df, tmp_path, PROFILES)
         assert len(df_back) == len(df)
 
 
@@ -222,5 +224,5 @@ class TestSkippedCsvGeneration:
     def test_roundtrip_preserves_reason_code(self, tmp_path):
         df = _skipped_df()
         original_codes = df["reason_code"].tolist()
-        df_back = _roundtrip(df, tmp_path, "skipped.csv")
+        df_back = _roundtrip(df, tmp_path, SKIPPED)
         assert df_back["reason_code"].tolist() == original_codes

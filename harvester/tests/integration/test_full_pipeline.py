@@ -12,23 +12,12 @@ The test does NOT contact any live services.  It exercises the complete
 data-flow transformation described in docs/data_flow.md.
 """
 
-import ast
 import logging
 import os
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-from cde_harvester.__main__ import (
-    get_ckan_records,
-    merge_and_write_csvs,
-)
-from cde_harvester.__main__ import (
-    main as harvester_main,
-)
-from cde_harvester.loading.loader import main as db_main
-from cde_harvester.sources.base import HarvestResult
-from cde_harvester.sources.erddap.harvester import harvest_erddap
 from conftest import (
     CKAN_EMPTY_RESPONSE,
     CKAN_PACKAGE_SEARCH_RESPONSE,
@@ -37,6 +26,24 @@ from conftest import (
     MockResponse,
     _route_erddap_url,
 )
+
+from cde_harvester.__main__ import (
+    get_ckan_records,
+    merge_and_write_tables,
+)
+from cde_harvester.__main__ import (
+    main as harvester_main,
+)
+from cde_harvester.core.harvest_files import (
+    DATASETS,
+    PROFILES,
+    SKIPPED,
+    read_table,
+    table_path,
+)
+from cde_harvester.loading.loader import main as db_main
+from cde_harvester.sources.base import HarvestResult
+from cde_harvester.sources.erddap.harvester import harvest_erddap
 
 # ---------------------------------------------------------------------------
 # Session-level mock for all ERDDAP HTTP calls
@@ -68,7 +75,9 @@ def harvest_result(tmp_path_factory):
     Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
     """
     with (
-        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
+        patch(
+            "cde_harvester.sources.erddap.client.retry_session"
+        ) as mock_session_cls,
         patch(
             "cde_harvester.sources.ckan.create_ckan_erddap_link.requests.get",
             side_effect=_ckan_side_effects(),
@@ -151,7 +160,7 @@ def _submit_without_flow(task, *, as_future=False):
 
 
 @pytest.fixture(scope="module")
-def written_csv_folder(tmp_path_factory, harvest_result):
+def written_harvest_folder(tmp_path_factory, harvest_result):
     """
     Run harvester __main__.main() (CKAN merge + CSV write) using the
     harvest DataFrames from harvest_result.
@@ -159,7 +168,7 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     Patches:
       - harvest_erddap.submit → returns a synchronous mock future holding
         the pre-collected HarvestResult so main() doesn't re-harvest
-      - get_ckan_records.submit / merge_and_write_csvs.submit → run their
+      - get_ckan_records.submit / merge_and_write_tables.submit → run their
         wrapped fns synchronously (no flow context / task runner needed)
       - get_run_logger → stdlib logger (no Prefect context needed)
       - CKAN requests → fixture data
@@ -175,12 +184,14 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     mock_future.result.return_value = hr
 
     with (
-        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
-        # CKAN fetching now goes through a requests.Session built by
-        # _build_ckan_session() and read with resp.json(), so patch the session
-        # builder rather than the (now unused) module-level requests.get.
+        # Both the ERDDAP client and the CKAN reader build their session with
+        # cde_common.http.retry_session(), so patch that per module rather than
+        # the (unused) module-level requests.get.
         patch(
-            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+            "cde_harvester.sources.erddap.client.retry_session"
+        ) as mock_session_cls,
+        patch(
+            "cde_harvester.sources.ckan.create_ckan_erddap_link.retry_session",
         ) as mock_ckan_session_builder,
         patch(
             "cde_harvester.__main__.get_run_logger",
@@ -196,9 +207,9 @@ def written_csv_folder(tmp_path_factory, harvest_result):
             get_ckan_records, "submit", _submit_without_flow(get_ckan_records)
         ),
         patch.object(
-            merge_and_write_csvs,
+            merge_and_write_tables,
             "submit",
-            _submit_without_flow(merge_and_write_csvs, as_future=True),
+            _submit_without_flow(merge_and_write_tables, as_future=True),
         ),
     ):
         mock_session = MagicMock()
@@ -226,36 +237,34 @@ def written_csv_folder(tmp_path_factory, harvest_result):
 
 
 class TestCsvFilesWritten:
-    def test_datasets_csv_exists(self, written_csv_folder):
-        assert os.path.exists(os.path.join(written_csv_folder, "datasets.csv"))
+    def test_datasets_table_exists(self, written_harvest_folder):
+        assert os.path.exists(table_path(written_harvest_folder, DATASETS))
 
-    def test_profiles_csv_exists(self, written_csv_folder):
-        assert os.path.exists(os.path.join(written_csv_folder, "profiles.csv"))
+    def test_profiles_table_exists(self, written_harvest_folder):
+        assert os.path.exists(table_path(written_harvest_folder, PROFILES))
 
-    def test_skipped_csv_exists(self, written_csv_folder):
-        assert os.path.exists(os.path.join(written_csv_folder, "skipped.csv"))
+    def test_skipped_table_exists(self, written_harvest_folder):
+        assert os.path.exists(table_path(written_harvest_folder, SKIPPED))
 
-    def test_datasets_csv_readable(self, written_csv_folder):
-        df = pd.read_csv(os.path.join(written_csv_folder, "datasets.csv"))
-        assert not df.empty
+    def test_datasets_table_readable(self, written_harvest_folder):
+        assert not read_table(written_harvest_folder, DATASETS).empty
 
-    def test_profiles_csv_readable(self, written_csv_folder):
-        df = pd.read_csv(os.path.join(written_csv_folder, "profiles.csv"))
-        assert not df.empty
+    def test_profiles_table_readable(self, written_harvest_folder):
+        assert not read_table(written_harvest_folder, PROFILES).empty
 
-    def test_datasets_csv_array_columns_parse_correctly(self, written_csv_folder):
-        df = pd.read_csv(os.path.join(written_csv_folder, "datasets.csv"))
+    def test_datasets_array_columns_come_back_as_lists(self, written_harvest_folder):
+        """The point of the parquet handoff: no parsing step on the read side."""
+        df = read_table(written_harvest_folder, DATASETS)
         for col in ["eovs", "organizations", "profile_variables"]:
-            parsed = df[col].apply(ast.literal_eval)
-            assert all(isinstance(v, list) for v in parsed)
+            assert all(isinstance(v, list) for v in df[col]), col
 
-    def test_ckan_title_merged_into_datasets(self, written_csv_folder):
-        df = pd.read_csv(os.path.join(written_csv_folder, "datasets.csv"))
+    def test_ckan_title_merged_into_datasets(self, written_harvest_folder):
+        df = read_table(written_harvest_folder, DATASETS)
         row = df[df["dataset_id"] == DATASET_ID].iloc[0]
         assert "Test Dataset" in str(row["title"])
 
-    def test_french_title_present(self, written_csv_folder):
-        df = pd.read_csv(os.path.join(written_csv_folder, "datasets.csv"))
+    def test_french_title_present(self, written_harvest_folder):
+        df = read_table(written_harvest_folder, DATASETS)
         row = df[df["dataset_id"] == DATASET_ID].iloc[0]
         assert pd.notna(row.get("title_fr"))
 
@@ -265,7 +274,7 @@ class TestCsvFilesWritten:
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def db_load_calls(written_csv_folder):
+def db_load_calls(written_harvest_folder):
     """
     Run db-loader main() against the written CSVs with a mocked SQLAlchemy
     engine. Returns the list of SQL strings passed to text().
@@ -298,7 +307,7 @@ def db_load_calls(written_csv_folder):
             },
         ),
     ):
-        db_main.fn(written_csv_folder, incremental=False)
+        db_main.fn(written_harvest_folder, incremental=False)
 
     return sql_calls
 
