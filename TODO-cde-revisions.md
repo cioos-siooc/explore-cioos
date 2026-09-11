@@ -713,8 +713,8 @@ now split, was two specific call sites.
 
 `python-common/cde_common/*` (new), `harvester/cde_harvester/core/*`, `downloader/`, `download_scheduler/`
 
-The target module exists: `common/` is a fourth Python project, `cde-python-common`, holding the
-connection url, `.env` loading, the retry session, the Sentry init, the reason-code
+The target module exists: `python-common/` is a fourth Python project, `cde-python-common`,
+holding the connection url, `.env` loading, the retry session, the Sentry init, the reason-code
 vocabulary and the issue reporting — with the harvest pipeline sitting above it. Its only
 dependencies are dotenv, requests, sentry-sdk, sqlalchemy and psycopg2; nothing in it may
 import from the three services. See `python-common/README.md`.
