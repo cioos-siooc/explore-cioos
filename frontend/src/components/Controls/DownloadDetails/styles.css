@@ -381,3 +381,154 @@
     flex: 1 1 100%;
   }
 }
+
+/* --- Direct links strip: the second delivery route, on the same page as the
+   first. Sits under the white order bar in sand, so the page reads
+   "your order → email it to me → or take the URLs" top to bottom. --- */
+.directLinks {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-sand);
+}
+
+.directLinksIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+
+.directLinksTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+}
+
+.directLinks .helpIcon {
+  margin: 0;
+}
+
+.directLinksCount {
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+.directLinksControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  flex: 1 1 auto;
+}
+
+.directLinksObis {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* What the chosen OBIS option costs — the 10 000-record page cap, or the
+   snapshot's total lack of filtering. It changes with the select beside it, so
+   it reads as that select's caption rather than as a footnote. */
+.directLinksObisNote {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+  max-width: 22ch;
+  line-height: 1.15;
+}
+
+.directLinks .form-switch {
+  margin: 0;
+}
+
+.directLinks .form-check-label {
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+/* Right-aligned by justify-content rather than by margin-left:auto, and
+   shrinkable (flex-basis auto + min-width 0) rather than sized to its content:
+   a `flex: 0 0 auto` row of four buttons is one flex item too wide for a phone,
+   and the parent's wrap cannot break it up — the last button just leaves the
+   modal. Shrinking lets this row's own wrap do the breaking. */
+.directLinksActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.directLinksButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--cioos-radius-sm);
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink);
+  font-weight: 600;
+  font-size: var(--cioos-font-size-sm);
+  white-space: nowrap;
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast);
+}
+
+.directLinksButton svg {
+  color: var(--cioos-primary-700);
+  flex: 0 0 auto;
+}
+
+.directLinksButton:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+}
+
+.directLinksButton:disabled {
+  color: var(--cioos-ink-40);
+  cursor: not-allowed;
+}
+
+.directLinksButton:disabled svg {
+  color: var(--cioos-ink-40);
+}
+
+/* Caveats about the links as built. Full-width row of its own so adding one
+   never reflows the controls above it. */
+.directLinksNotes {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.directLinksNotes:empty {
+  display: none;
+}
+
+/* Narrow enough that right-aligning the buttons would strand them opposite the
+   controls they belong to; they read better as one left-aligned block. */
+@media (max-width: 700px) {
+  .directLinksActions {
+    justify-content: flex-start;
+  }
+}

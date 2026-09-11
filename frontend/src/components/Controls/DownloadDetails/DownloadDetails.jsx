@@ -5,6 +5,7 @@ import classNames from "classnames";
 import bytes from "bytes";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
+import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
 import polygonImage from "../../Images/polygonIcon.png";
 import rectangleImage from "../../Images/rectangleIcon.png";
 import isEmpty from "lodash-es/isEmpty";
@@ -291,6 +292,18 @@ export default function DownloadDetails({
     });
   }
   const selectedCount = pointsData.filter((point) => point.selected).length;
+  // What the direct links are built from: everything the user kept, plus the
+  // datasets the 1 GB ceiling deselected for them. Those are exactly the ones
+  // the CDE's queue refuses to deliver, which is where a direct link is worth
+  // most — leaving them out would hide the feature from the case it exists for.
+  //
+  // `!== false` rather than truthy: `selected` is only set once the size
+  // estimates land, and a direct link needs no estimate. Testing for truth
+  // would empty the links strip for as long as the slowest request in this
+  // modal takes, which reads as broken rather than as pending.
+  const linkableDatasets = pointsData.filter(
+    (point) => point.selected !== false || point.downloadDisabled,
+  );
 
   return (
     <div className="container downloadDetails">
@@ -453,6 +466,19 @@ export default function DownloadDetails({
         </div>
         {children}
       </div>
+
+      {/* The same order, taken from the source instead of the queue. Below the
+          order bar rather than behind a tab: it is a delivery option, and one
+          of the things it answers ("this dataset is too large for the zip") is
+          only legible next to the bar that says so. */}
+      <DirectDownloadLinks
+        rows={linkableDatasets}
+        query={query}
+        polygon={polygon}
+        filterDownloadByTime={filterDownloadByTime}
+        filterDownloadByDepth={filterDownloadByDepth}
+        filterDownloadByPolygon={filterDownloadByPolygon}
+      />
     </div>
   );
 }
