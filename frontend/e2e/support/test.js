@@ -5,6 +5,22 @@ import { installMockApi } from "./mockApi.js";
 
 const API_ORIGIN = "http://api.test";
 
+// Console noise that says nothing about this application, so the guard below
+// reports on what is left rather than being all-or-nothing.
+//
+// Aborting an in-flight request is ordinary control flow here, not a failure:
+// MapLibre cancels tile and source requests on every view change and whenever a
+// source is removed, and the app cancels its own fetches in effect cleanups.
+// The app already treats it as such wherever it can see it (src/state/reportError.js
+// returns early on AbortError), but MapLibre's rejections surface at the window
+// where no .catch can reach them. Every spec saw three to six of these, so the
+// guard failed all 63 tests regardless of what they were asserting.
+//
+// Matched on the message rather than switched off: a genuine uncaught error
+// still fails the spec it happens in. Add a pattern here only for noise that is
+// provably outside this codebase's control.
+const BENIGN_CONSOLE_ERRORS = [/^AbortError: /];
+
 // The test object every mocked spec imports. Three auto-fixtures, so no spec
 // repeats setup and none can forget it.
 export const test = base.extend({
@@ -49,7 +65,12 @@ export const test = base.extend({
       });
       page.on("pageerror", (error) => errors.push(String(error)));
       await use(errors);
-      expect(errors, "console errors during the test").toEqual([]);
+      expect(
+        errors.filter(
+          (text) => !BENIGN_CONSOLE_ERRORS.some((p) => p.test(text)),
+        ),
+        "console errors during the test",
+      ).toEqual([]);
     },
     { auto: true },
   ],
