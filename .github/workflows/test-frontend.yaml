@@ -1,6 +1,16 @@
 name: Frontend Tests
 
 on:
+  # Long-lived branches are verified on what actually landed, not only on what
+  # a pull request predicted would land.
+  push:
+    branches:
+      - main
+      - master
+      - "development*"
+    paths:
+      - "frontend/**"
+      - ".github/workflows/test-frontend.yaml"
   pull_request:
     branches:
       - main
@@ -49,9 +59,23 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: E2E behaviour (visual and accessibility advisory)
+    name: E2E, visual and accessibility
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Whether the UI-coupled suites gate or merely report. Every step below
+      # reads this, so the policy lives in one place.
+      #
+      # Strict on the release path — anything pushed to main, master or a
+      # development branch, any pull request promoting one of those into
+      # main/master, and any manual run — because that is where the interface
+      # has to be held to its baselines.
+      #
+      # Relaxed elsewhere, which in this repo means the feature branches that
+      # stack onto an integration branch. Those are where the UI is actively
+      # being reworked, and gating them on pixel baselines is the slowdown this
+      # is meant to avoid. Behaviour still gates everywhere.
+      STRICT: ${{ github.event_name != 'pull_request' || github.base_ref == 'main' || github.base_ref == 'master' }}
     container:
       # Must match @playwright/test in frontend/package.json exactly — a
       # mismatch fails with "Executable doesn't exist at /ms-playwright/…".
@@ -83,31 +107,32 @@ jobs:
         env:
           CI: "true"
 
-      # Advisory until the UI settles. The baseline is a ratchet — markup that
-      # trips a rule it has not seen before is a hard failure — which is the
-      # right bar for a stable interface and the wrong one for an interface
-      # being rebuilt. It still runs and still reports; it just does not block.
-      - name: Run the accessibility suite (advisory)
-        continue-on-error: true
+      # Runs everywhere; gates only on the release path. The baseline is a
+      # ratchet — markup that trips a rule it has not seen before is a hard
+      # failure — which is the right bar for promoting an interface and the
+      # wrong one for a branch still rebuilding it. Off the release path it
+      # still reports, it just does not block.
+      - name: Run the accessibility suite
+        continue-on-error: ${{ env.STRICT != 'true' }}
         run: npx playwright test --project=a11y
         env:
           CI: "true"
 
-      # Off the pull-request path entirely. These assert pixels against
-      # committed baselines, so a UI under active change makes them stale on
-      # purpose, and re-recording them every commit is the slowdown this is
-      # meant to avoid. Run them from a manual dispatch when a change is worth
-      # comparing, or locally with `npm run test:visual` (and
-      # `npm run test:visual:update` to re-record).
-      - name: Run the visual suite (advisory, manual runs only)
-        if: github.event_name == 'workflow_dispatch'
-        continue-on-error: true
+      # Gates on the release path, skipped off it — skipped rather than
+      # advisory, because a UI under active change makes these stale on purpose
+      # and a failure nobody should act on is just noise and runtime. To compare
+      # a work-in-progress branch anyway, run the workflow manually, or locally
+      # with `npm run test:visual` (`npm run test:visual:update` to re-record).
+      # Baselines are recorded in this same image so the renderer and the
+      # fallback font stack match — see e2e/in-container.sh.
+      - name: Run the visual suite
+        if: ${{ env.STRICT == 'true' }}
         run: npx playwright test --project=visual
         env:
           CI: "true"
 
-      # always(), not failure(): the advisory steps leave the job green, and
-      # their report is the only way to see what they found.
+      # always(), not failure(): off the release path a failing advisory step
+      # still leaves the job green, and the report is the only way to see it.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
