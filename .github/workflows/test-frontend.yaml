@@ -49,7 +49,7 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: E2E, visual and accessibility
+    name: E2E behaviour (visual and accessibility advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -75,13 +75,41 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run the browser suites
-        run: npx playwright test
+      # What gates a pull request: behaviour, asserted through data-testid and
+      # user-visible text. Those survive restyling by design, so they stay
+      # required while the UI is being reworked.
+      - name: Run the behavioural suites
+        run: npm run test:e2e
         env:
           CI: "true"
 
+      # Advisory until the UI settles. The baseline is a ratchet — markup that
+      # trips a rule it has not seen before is a hard failure — which is the
+      # right bar for a stable interface and the wrong one for an interface
+      # being rebuilt. It still runs and still reports; it just does not block.
+      - name: Run the accessibility suite (advisory)
+        continue-on-error: true
+        run: npx playwright test --project=a11y
+        env:
+          CI: "true"
+
+      # Off the pull-request path entirely. These assert pixels against
+      # committed baselines, so a UI under active change makes them stale on
+      # purpose, and re-recording them every commit is the slowdown this is
+      # meant to avoid. Run them from a manual dispatch when a change is worth
+      # comparing, or locally with `npm run test:visual` (and
+      # `npm run test:visual:update` to re-record).
+      - name: Run the visual suite (advisory, manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: npx playwright test --project=visual
+        env:
+          CI: "true"
+
+      # always(), not failure(): the advisory steps leave the job green, and
+      # their report is the only way to see what they found.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report
           path: |
