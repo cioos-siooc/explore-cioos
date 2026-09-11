@@ -325,6 +325,7 @@
   "harvest.recentRuns": "Recent harvest runs",
   "harvest.topFailureReasons": "Top failure reasons",
   "harvest.dataset.historyTitle": "Attempt history",
+  "harvest.dataset.historyTruncated": "Showing the {{count}} most recent attempts.",
   "harvest.dataset.viewOnObis": "View on OBIS ↗",
   "harvest.dataset.viewOnErddap": "View on ERDDAP ↗",
   "harvest.dataset.requestUrls": "Request URLs ({{count}})",

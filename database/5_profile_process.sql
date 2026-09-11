@@ -257,14 +257,20 @@ $$ LANGUAGE plpgsql;
 -- CONCURRENTLY costs ~2x and is only needed when readers might be hitting the
 -- matview during the refresh; on a full rebuild after TRUNCATE there are none.
 -- Caller passes FALSE on full rebuild; default TRUE applies for incremental.
+--
+-- Only cde.obis_scientific_names is refreshed here: the web-api reads it live
+-- (routes/scientificNames.js, the taxon autocomplete), so it has to track the
+-- catalogue. cde.obis_scientific_name_popularity does NOT belong on the load
+-- path — it exists solely to order populate_vernaculars.py's `--top N`, an
+-- offline script that may not run for weeks, and rebuilding it meant an
+-- unnest + GROUP BY over the whole obis_cells table after every harvest. That
+-- script refreshes it itself now (see refresh_popularity there).
 CREATE OR REPLACE FUNCTION obis_refresh_matviews(concurrent_refresh BOOLEAN DEFAULT TRUE) RETURNS bigint AS $$
 BEGIN
   IF concurrent_refresh THEN
     REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_names;
-    REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity;
   ELSE
     REFRESH MATERIALIZED VIEW cde.obis_scientific_names;
-    REFRESH MATERIALIZED VIEW cde.obis_scientific_name_popularity;
   END IF;
   RETURN 0;
 END;

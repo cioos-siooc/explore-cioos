@@ -54,7 +54,11 @@ jobs:
 
       - name: Run web-api unit tests
         working-directory: web-api
-        run: npm test
+        run: npm run test:unit
+
+      - name: Run web-api route-contract tests
+        working-directory: web-api
+        run: npm run test:contract
 
   frontend-unit-tests:
     name: Frontend unit tests

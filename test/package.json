@@ -4,8 +4,9 @@
   "description": "",
   "main": "tst.js",
   "scripts": {
-    "test": "npm run test:api",
-    "test:api": "node test_api_endpoints.js",
+    "test": "npm run test:integration",
+    "test:api": "npm run test:integration",
+    "test:integration": "node test_api_endpoints.js",
     "test:download": "node test_download_request.js"
   },
   "author": "",
