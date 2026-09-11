@@ -4,43 +4,55 @@ import { useTranslation } from "react-i18next";
 
 import "./styles.css";
 
-// One row of a dataset page's record or platform list, as a card: the item's
-// id on top and its fields as label/value pairs beneath, each on its own line.
-// This is the shape that survives the sidebar's width — see CardList.jsx for
-// why these lists are cards at all.
+// One row of a dataset page's record list, as a card: the record's id on top
+// and its fields as label/value pairs beneath, each on its own line. This is
+// the shape that survives the sidebar's width — see CardList.jsx for why these
+// lists are cards at all.
 //
 // A div rather than a <button> (with the keyboard handling a button would have
 // given for free) because the card's body is a description list, which a
 // button may not contain. Same treatment DatasetCard uses.
 export default function ListCard({
   id,
-  // Toggle cards (a platform, whose track the click draws or clears) say so
-  // with aria-pressed; a card that opens something leaves this undefined.
-  pressed,
-  // Held at the top of the list because the last map click found this item —
+  // Accent only: this is the record the map is currently drawing (a
+  // trajectory's track). The control that toggles that — and the aria-pressed
+  // saying so — is the `action` button beside the id, not the card itself.
+  selected,
+  // Held at the top of the list because the last map click found this record —
   // wearing the same goldenrod the map put on what was clicked.
   pinned,
+  // A control belonging to this record rather than to opening it: rendered
+  // beside the id, and expected to stop the click from reaching the card.
+  action,
+  // Opening the record. Omitted when there is nothing to open (a record with
+  // no id — an unnamed single trajectory — has nothing to preview), which
+  // leaves the card inert rather than a button that does nothing.
   onClick,
   children,
 }) {
-  const handleKeyDown = (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    e.preventDefault();
-    onClick();
-  };
+  const clickable = typeof onClick === "function";
+  const handleKeyDown = clickable
+    ? (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onClick();
+      }
+    : undefined;
 
   return (
     <div
-      className={classNames("listCard", { selected: pressed, pinned })}
-      role="button"
-      tabIndex={0}
-      aria-pressed={pressed}
-      onClick={onClick}
+      className={classNames("listCard", { selected, pinned, clickable })}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? onClick : undefined}
       onKeyDown={handleKeyDown}
     >
-      <span className="listCardId" title={id}>
-        {id}
-      </span>
+      <div className="listCardHead">
+        <span className="listCardId" title={id}>
+          {id}
+        </span>
+        {action}
+      </div>
       <dl className="listCardFields">{children}</dl>
     </div>
   );

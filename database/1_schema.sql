@@ -495,8 +495,8 @@ CREATE INDEX trajectory_points_geom_gist ON trajectory_points USING GIST (geom);
 ALTER TABLE cde.trajectory_points SET (fillfactor = 90);
 
 -- Per-trajectory summary, rebuilt on each load by trajectory_refresh_track_stats()
--- (5_profile_process.sql). Serves the /trajectories/platforms list and lets the
--- /tiles/tracks route prune candidate trajectories by bbox before assembling
+-- (5_profile_process.sql). Resolves a trajectory record for /preview, and lets
+-- the /tiles/tracks route prune candidate trajectories by bbox before assembling
 -- lines (a per-point spatial filter would break segments at tile borders).
 DROP TABLE IF EXISTS trajectory_track_stats;
 CREATE TABLE trajectory_track_stats (

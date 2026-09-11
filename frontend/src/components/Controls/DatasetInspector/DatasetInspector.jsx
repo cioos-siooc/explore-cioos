@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
-import { Funnel, FunnelFill } from "react-bootstrap-icons";
+import { Bezier2, Funnel, FunnelFill } from "react-bootstrap-icons";
 // import platformColors from '../../platformColors'
 import Loading from "../Loading/Loading.jsx";
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
@@ -58,7 +58,7 @@ function GridNodeCount({ dimensions }) {
 // which of its variables carries that role. The record list hands every kind
 // back under the one `profile_id` key (shapeQuery.js coalesces profile_id /
 // timeseries_id, and aliases a trajectory's trajectory_id into the same slot),
-// so the column can only be named from the dataset's own cf_role variables.
+// so a record can only be named from the dataset's own cf_role variables.
 // The order below follows that coalesce, with a trajectory's own role first
 // when the dataset is one. Datasets that declare no role at all (OBIS, a
 // tabledap table with no cf_role attribute anywhere) fall back to the generic
@@ -81,20 +81,60 @@ function cfRoleColumn(dataset, roleOrder, t) {
   const role = roleOrder.find((r) => variableFor[r]);
   return {
     label: role ? t(CF_ROLE_LABELS[role]) : t("datasetInspectorRecordIDText"),
+    role,
     variable: role ? variableFor[role] : undefined,
   };
 }
 
-// A caption over a list that names the role its cards are identified by and,
-// after it, the variable carrying that role — so the list says both what its
-// IDs mean and where they came from. On a card the id has no column header to
-// carry this, and repeating it on every card would say it a hundred times.
-function IdCaption({ label, variable }) {
+// A caption over the record list that declares what a card's id actually is:
+// the label, the cf_role it comes from spelled out as `cf_role = trajectory_id`,
+// and the dataset variable carrying that role. One record list now serves every
+// dataset type, so what its ids mean changes with the dataset — a trajectory
+// dataset's cards are missions, a profile dataset's are casts — and this line is
+// where that is said. On a card the id has no column header to carry it, and
+// repeating it on every card would say it a hundred times.
+function IdCaption({ label, role, variable }) {
+  const { t } = useTranslation();
   return (
     <span className="recordIdCaption">
-      {label}
-      {variable && <code className="recordIdVariable">{variable}</code>}
+      {t("recordIdCaptionLabel")}: {label}
+      <code className="recordIdRole">
+        {role ? t("recordIdCfRoleText", { role }) : t("recordIdNoCfRoleText")}
+      </code>
+      {variable && (
+        <code className="recordIdVariable" title={t("recordIdVariableTitle")}>
+          {variable}
+        </code>
+      )}
     </span>
+  );
+}
+
+// Draws one record's track on the map, or clears it again. A trajectory record
+// covers a path rather than sitting at a point, so its card carries this
+// control — the card's own click opens the record's preview, the same as every
+// other kind of record's does.
+function TrackButton({ drawn, onToggle, t }) {
+  const title = t(
+    drawn ? "trajectoryTrackButtonHide" : "trajectoryTrackButtonShow",
+  );
+  return (
+    <button
+      type="button"
+      className={classNames("listCardTrack", { drawn })}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      // The card opens its preview on Enter/Space; keep this button's own
+      // activation from being read as that too (same guard as CardTags).
+      onKeyDown={(e) => e.stopPropagation()}
+      aria-pressed={drawn}
+      aria-label={title}
+      title={title}
+    >
+      <Bezier2 size={15} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -104,9 +144,8 @@ function IdCaption({ label, variable }) {
 // down the sheet.
 const EOV_VISIBLE_LIMIT = 3;
 
-// Stable identities so CardList's sort memo is not rebuilt on every render of
+// Stable identity so CardList's sort memo is not rebuilt on every render of
 // this page.
-const trajectoryKeyOf = (row) => row.trajectory_id;
 const recordKeyOf = (row) => row.profile_id;
 
 export default function DatasetInspector({
@@ -131,7 +170,6 @@ export default function DatasetInspector({
   const { t } = useTranslation();
   const { zoomToDataset } = useZoomToDataset();
   const [datasetRecords, setDatasetRecords] = useState();
-  const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
   const inspectorRef = useRef(null);
   const isGrid = dataset.cdm_data_type === "Grid";
   // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
@@ -207,23 +245,6 @@ export default function DatasetInspector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset, hasRecordList]);
 
-  // Trajectory datasets: list the platforms (trajectory ids) so one can be
-  // picked to draw its track on the map.
-  useEffect(() => {
-    if (!isTrajectoryDataset) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTrajectoryPlatforms();
-      return;
-    }
-    fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((platforms) => setTrajectoryPlatforms(platforms))
-      .catch((error) => {
-        reportError("trajectory platforms fetch failed", error);
-        setTrajectoryPlatforms([]);
-      });
-  }, [dataset, isTrajectoryDataset]);
-
   // Browser Back needs no handling here: the open dataset lives in the URL
   // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
   // entry closes the page through the router.
@@ -298,8 +319,8 @@ export default function DatasetInspector({
     };
   }, [returnToList]);
 
-  // Trajectory datasets list one row per mission, so their record column is the
-  // trajectory role; every other type resolves to whichever of profile_id /
+  // Trajectory datasets list one record per mission, so their record label is
+  // the trajectory role; every other type resolves to whichever of profile_id /
   // timeseries_id the dataset declares.
   const recordIdField = cfRoleColumn(
     dataset,
@@ -355,42 +376,35 @@ export default function DatasetInspector({
   // (see DatasetsTable's pinnedPks).
   const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk;
 
-  // Same value the record id carries, named the same way: the
-  // cf_role=trajectory_id variable, or the plain "Platform ID" when the dataset
-  // is a single unnamed trajectory with no such variable.
-  const platformIdLabel = dataset.trajectory_id_variable
-    ? t("cfRoleTrajectoryIdText")
-    : t("trajectoryPlatformIdText");
+  // The one record of this dataset whose track the map is drawing, if any (only
+  // a trajectory dataset ever has one). Its card wears the map's accent and its
+  // track button reads as pressed. '' is a legitimate value here — a dataset
+  // with a single unnamed mission — so the "none" case is undefined, not falsy,
+  // and `trackDrawn` tests for it rather than comparing ids straight (two
+  // undefineds would match).
+  const drawnTrajectoryId =
+    isTrajectoryDataset && selectedTrajectory?.datasetPk === dataset.pk
+      ? selectedTrajectory.trajectoryId
+      : undefined;
+  const trackDrawn = (row) =>
+    drawnTrajectoryId !== undefined && row.profile_id === drawnTrajectoryId;
 
-  const platformSortFields = useMemo(
-    () => [
-      {
-        id: "id",
-        label: platformIdLabel,
-        type: "string",
-        value: (row) => row.trajectory_id,
-      },
-      {
-        id: "timeMin",
-        label: t("timeSelectorStartDate"),
-        type: "string",
-        value: (row) => row.time_min,
-      },
-      {
-        id: "timeMax",
-        label: t("timeSelectorEndDate"),
-        type: "string",
-        value: (row) => row.time_max,
-      },
-      {
-        id: "fixes",
-        label: t("trajectoryPlatformFixesText"),
-        type: "number",
-        value: (row) => row.n_points,
-      },
-    ],
-    [t, platformIdLabel],
-  );
+  // Draw this record's track on the map, or clear it when it is the one already
+  // drawn. Framing the view is the difference from a track picked on the map: a
+  // record in this list gives no clue where its platform sailed, so the map has
+  // to travel there, while a clicked track is already in view (see
+  // selectTrajectoryFromMap).
+  const toggleTrack = (trajectoryId) =>
+    setSelectedTrajectory(
+      trajectoryId === drawnTrajectoryId
+        ? undefined
+        : {
+            datasetPk: dataset.pk,
+            datasetTitle: dataset.title,
+            trajectoryId,
+            frameView: true,
+          },
+    );
 
   const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet;
 
@@ -639,68 +653,6 @@ export default function DatasetInspector({
             setActiveWmsOverlay={setActiveWmsOverlay}
           />
         )}
-        {isTrajectoryDataset && trajectoryPlatforms?.length > 0 && (
-          <div className="recordSection">
-            <div className="recordSectionHeader">
-              <strong>{t("trajectoryPlatformsTitle")}</strong>
-              <span className="recordHint">
-                {t("trajectoryPlatformsClickText")}
-              </span>
-              <IdCaption
-                label={platformIdLabel}
-                variable={dataset.trajectory_id_variable || undefined}
-              />
-            </div>
-            <CardList
-              items={trajectoryPlatforms}
-              keyOf={trajectoryKeyOf}
-              sortFields={platformSortFields}
-              defaultSort={{ field: "id", dir: "asc" }}
-              filterPlaceholder={t("trajectoryPlatformsSearchPlaceholder")}
-              emptyText={t("trajectoryPlatformsNoResultsText")}
-              focusKey={
-                selectedTrajectory?.datasetPk === dataset.pk
-                  ? selectedTrajectory.trajectoryId
-                  : undefined
-              }
-              pagerLabel={t("trajectoryPlatformsPagerLabel")}
-              perPageLabel={t("trajectoryPlatformsPerPageLabel")}
-              renderItem={(row) => (
-                <ListCard
-                  id={row.trajectory_id || "—"}
-                  pressed={
-                    selectedTrajectory?.datasetPk === dataset.pk &&
-                    selectedTrajectory?.trajectoryId === row.trajectory_id
-                  }
-                  onClick={() =>
-                    setSelectedTrajectory &&
-                    setSelectedTrajectory(
-                      selectedTrajectory?.trajectoryId === row.trajectory_id
-                        ? undefined // click the drawn platform again to clear
-                        : {
-                            datasetPk: dataset.pk,
-                            datasetTitle: dataset.title,
-                            trajectoryId: row.trajectory_id,
-                            // A row in this list gives no clue where its
-                            // platform sailed, so the map has to go there —
-                            // unlike a track clicked on the map, which is
-                            // already in view (see selectTrajectoryFromMap).
-                            frameView: true,
-                          },
-                    )
-                  }
-                >
-                  <CardField label={t("datasetInspectorTimeframeText")}>
-                    {formatInstantRange(row.time_min, row.time_max)}
-                  </CardField>
-                  <CardField label={t("trajectoryPlatformFixesText")}>
-                    {row.n_points?.toLocaleString()}
-                  </CardField>
-                </ListCard>
-              )}
-            />
-          </div>
-        )}
         {hasRecordList && (
           <div className="recordSection">
             <div className="recordSectionHeader">
@@ -708,6 +660,14 @@ export default function DatasetInspector({
               <span className="recordHint">
                 {t("datasetInspectorClickPreviewText")}
               </span>
+              {/* A trajectory record covers a path, so its card carries a
+                  control the others have no use for. Said once, over the list,
+                  rather than on every card. */}
+              {isTrajectoryDataset && (
+                <span className="recordHint">
+                  {t("trajectoryTrackHintText")}
+                </span>
+              )}
               <IdCaption {...recordIdField} />
             </div>
             {/* Names the accent ListCard puts on the pinned card below, and
@@ -740,6 +700,10 @@ export default function DatasetInspector({
                 pinnedKey={
                   markerRecordPinned ? highlightedRecord.profileId : undefined
                 }
+                // A track clicked on the map names one record of this dataset;
+                // turn to the page that record is on, so the card wearing the
+                // map's accent is one the user can see.
+                focusKey={drawnTrajectoryId}
                 pagerLabel={t("datasetInspectorRecordsPagerLabel")}
                 perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
                 renderItem={(row) => {
@@ -749,14 +713,34 @@ export default function DatasetInspector({
                   // (trajectory, OBIS, grid), where the dataset's own list is
                   // the best answer available.
                   const eovs = (row.eovs ?? dataset.eovs)?.map((eov) => t(eov));
+                  // '' is a real record id: a trajectory dataset with a single
+                  // unnamed mission has one. There is nothing to name it by,
+                  // and nothing to open either — ?preview= cannot carry an
+                  // empty id — so the card shows a dash and stays inert, with
+                  // its track button (below) the one thing it can do.
+                  const hasId = Boolean(row.profile_id);
                   return (
                     <ListCard
-                      id={row.profile_id}
+                      id={hasId ? row.profile_id : "—"}
                       pinned={
                         markerRecordPinned &&
                         row.profile_id === highlightedRecord.profileId
                       }
-                      onClick={() => setInspectRecordID(row.profile_id)}
+                      selected={trackDrawn(row)}
+                      action={
+                        isTrajectoryDataset && setSelectedTrajectory ? (
+                          <TrackButton
+                            drawn={trackDrawn(row)}
+                            onToggle={() => toggleTrack(row.profile_id)}
+                            t={t}
+                          />
+                        ) : undefined
+                      }
+                      onClick={
+                        hasId
+                          ? () => setInspectRecordID(row.profile_id)
+                          : undefined
+                      }
                     >
                       <CardField label={t("datasetInspectorTimeframeText")}>
                         {formatInstantRange(row.time_min, row.time_max)}

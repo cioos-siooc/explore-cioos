@@ -469,7 +469,7 @@ BEGIN
 
   -- trajectory_track_stats has no FK (no crash) but is keyed on dataset_pk;
   -- clear it too so pruned datasets leave no orphaned rows behind the
-  -- /trajectories/platforms list.
+  -- /tiles/tracks and /preview lookups that read it.
   DELETE FROM cde.trajectory_track_stats s USING _prune_candidates c
   WHERE s.dataset_pk = c.pk;
 

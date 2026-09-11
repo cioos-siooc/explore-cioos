@@ -5,13 +5,12 @@ import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 
-// A searchable, sortable, paged list of cards — the dataset page's records and
-// its trajectory platforms are both one of these. Cards rather than a data
-// table because this page lives in a ~420px column (a phone gives it the whole
-// viewport): a table of six columns could only be read by scrolling it
-// sideways, while a card lays the same fields out down the page and is legible
-// whole at any width. Same reason the datasets list and the griddap dimensions
-// are cards.
+// A searchable, sortable, paged list of cards — the dataset page's record list
+// is one of these. Cards rather than a data table because this page lives in a
+// ~420px column (a phone gives it the whole viewport): a table of six columns
+// could only be read by scrolling it sideways, while a card lays the same
+// fields out down the page and is legible whole at any width. Same reason the
+// datasets list and the griddap dimensions are cards.
 //
 // The list owns searching, sorting and paging; the caller owns what one item
 // looks like (`renderItem`) and what clicking it does.
@@ -20,7 +19,7 @@ import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 // off an item and `type` ('string' | 'number') says how to compare it.
 // `pinnedKey` names one item to hold at the top of the first page whatever the
 // sort (the record a map click resolved to), and `focusKey` one to page to
-// wherever it falls (the platform whose track is drawn).
+// wherever it falls (the record whose track the map is drawing).
 export default function CardList({
   items,
   keyOf,

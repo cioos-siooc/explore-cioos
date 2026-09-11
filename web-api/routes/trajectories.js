@@ -16,57 +16,6 @@ const trajectoryIdCheck = check("trajectoryId")
 
 /**
  * @swagger
- * /trajectories/platforms:
- *   get:
- *     summary: List a trajectory dataset's platforms (trajectory ids)
- *     tags: [Trajectories]
- *     description: >
- *       Returns one row per trajectory_id in the dataset, from the
- *       per-trajectory summary (cde.trajectory_track_stats) the harvester
- *       rebuilds on each load — time extents and retained-fix counts included.
- *     parameters:
- *       - in: query
- *         name: datasetPKs
- *         required: true
- *         schema: { type: integer }
- *         description: The dataset's pk_url.
- *     responses:
- *       200:
- *         description: Array of platform/trajectory summaries.
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   trajectory_id: { type: string }
- *                   time_min: { type: string, format: date-time }
- *                   time_max: { type: string, format: date-time }
- *                   n_points: { type: integer }
- */
-router.get(
-  "/platforms",
-  ...pipeline({ filters: false, checks: [check("datasetPKs").isInt()] }),
-  async (req, res) => {
-    const { datasetPKs } = req.query;
-
-    const SQL = `
-      SELECT s.trajectory_id, s.time_min, s.time_max, s.n_points
-      FROM cde.trajectory_track_stats s
-      JOIN cde.datasets d ON d.pk = s.dataset_pk
-      WHERE d.pk_url = :datasetPK
-      ORDER BY s.trajectory_id`;
-
-    const { rows } = await db.raw(SQL, {
-      datasetPK: parseInt(datasetPKs, 10),
-    });
-    res.send(rows);
-  },
-);
-
-/**
- * @swagger
  * /trajectories/track:
  *   get:
  *     summary: Full ordered track for one platform (trajectory id)
