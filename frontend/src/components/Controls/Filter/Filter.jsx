@@ -1,17 +1,20 @@
-import * as React from 'react'
-import { useRef, useState, useEffect } from 'react'
+import * as React from "react";
+import { useRef, useState } from "react";
 import {
   ChevronCompactDown,
   ChevronCompactUp,
   X,
-  BoxArrowUpRight
-} from 'react-bootstrap-icons'
-import { useTranslation } from 'react-i18next'
-import noop from 'lodash/noop'
+  BoxArrowUpRight,
+} from "react-bootstrap-icons";
+import { useTranslation } from "react-i18next";
 
-import { abbreviateString, useOutsideAlerter } from '../../../utilities'
+import {
+  abbreviateString,
+  useChanged,
+  useOutsideAlerter,
+} from "../../../utilities";
 
-import './styles.css'
+import "./styles.css";
 
 export default function Filter({
   active,
@@ -33,23 +36,25 @@ export default function Filter({
   searchPlaceholder,
   resetButton,
   infoButton,
-  children
+  children,
 }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   // Open/Closed state for filter dropdown
-  const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false)
-  const wrapperRef = useRef(null)
-  useOutsideAlerter(wrapperRef, setFilterOpen, false)
+  const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false);
+  const wrapperRef = useRef(null);
+  useOutsideAlerter(wrapperRef, setFilterOpen, false);
 
-  useEffect(() => {
-    controlled ? setFilterOpen(openFilter) : noop()
-  }, [openFilter])
+  // A controlled Filter follows the panel's idea of which row is open, but it
+  // keeps its own state so an outside click can still close it. Mirroring the
+  // prop during render rather than in an effect keeps the two from disagreeing
+  // for a frame.
+  if (useChanged(openFilter) && controlled) setFilterOpen(openFilter);
 
   // This is the filter being edited. Controlled, that also takes the panel
   // agreeing it is the open one; either way a disabled row never opens.
-  const isOpen = filterOpen && (!controlled || Boolean(openFilter))
-  const paneShown = isOpen && !disabled
+  const isOpen = filterOpen && (!controlled || Boolean(openFilter));
+  const paneShown = isOpen && !disabled;
 
   // `active` (this filter constrains something) and `open` (this is the filter
   // whose options the pane is showing) are different facts and get different
@@ -57,67 +62,73 @@ export default function Filter({
   // active at once and exactly one is being edited.
   const filterButton = (
     <button
-      className={`filterHeader ${active && !disabled ? 'active' : ''} ${
-        isOpen ? 'open' : ''
-      } ${disabled ? 'disabled' : ''}`}
-      aria-current={isOpen ? 'true' : undefined}
+      data-testid="filter-header"
+      className={`filterHeader ${active && !disabled ? "active" : ""} ${
+        isOpen ? "open" : ""
+      } ${disabled ? "disabled" : ""}`}
+      aria-current={isOpen ? "true" : undefined}
       // aria-disabled rather than the `disabled` attribute: a disabled button
       // takes no pointer events, and the caption explaining why it is off is
       // the whole point of leaving the row there.
-      aria-disabled={disabled ? 'true' : undefined}
+      aria-disabled={disabled ? "true" : undefined}
       onClick={() => {
-        if (disabled) return
-        setFilterOpen(!filterOpen)
-        if (controlled) setOpenFilter(filterName)
+        if (disabled) return;
+        setFilterOpen(!filterOpen);
+        if (controlled) setOpenFilter(filterName);
       }}
     >
       {icon}
-      <div className='badgeTitle' title={badgeTitle}>
+      <div className="badgeTitle" title={badgeTitle}>
         {abbreviateString(badgeTitle, 35)}
       </div>
       {isOpen ? <ChevronCompactUp /> : <ChevronCompactDown />}
     </button>
-  )
+  );
 
   // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
-    <div className='filter' ref={wrapperRef}>
+    <div
+      className="filter"
+      ref={wrapperRef}
+      data-testid="filter"
+      data-filter-name={filterName}
+    >
       {filterButton}
       {/* A disabled row never opens, so its explanation has nowhere else to
           live — shown as plain text right under the row itself, always
           readable, no hover or tap needed. */}
       {disabled && (disabledTooltip || tooltip) && (
-        <div className='filterCaption'>{disabledTooltip || tooltip}</div>
+        <div className="filterCaption">{disabledTooltip || tooltip}</div>
       )}
       {paneShown && (
-        <div className='filterOptions'>
+        <div className="filterOptions" data-testid="filter-options">
           {/* What this filter does, at the top of its section and above the
               inputs below — plain text again, not a hover/tap tooltip. */}
-          {tooltip && <div className='filterOptionsCaption'>{tooltip}</div>}
+          {tooltip && <div className="filterOptionsCaption">{tooltip}</div>}
           {/* The field and its clear button are one unit, so the button can
               be positioned against the field rather than against the pane —
               whose first child is a caption of unpredictable height, which is
               what used to leave the button sitting on the caption instead of
               in the field. */}
           {searchable && (
-            <div className='filterSearchRow'>
+            <div className="filterSearchRow">
               <input
                 autoFocus
-                className='filterSearch'
-                type='text'
+                className="filterSearch"
+                type="text"
                 value={searchTerms}
                 onChange={(e) => setSearchTerms(e.target.value)}
                 placeholder={searchPlaceholder}
               />
               {searchTerms && (
                 <button
-                  type='button'
-                  className='clearFilter'
-                  onClick={() => setSearchTerms('')}
-                  title={t('filterClearSearchTitle')} // 'Clear search terms'
-                  aria-label={t('filterClearSearchTitle')}
+                  type="button"
+                  className="clearFilter"
+                  onClick={() => setSearchTerms("")}
+                  title={t("filterClearSearchTitle")} // 'Clear search terms'
+                  aria-label={t("filterClearSearchTitle")}
                 >
-                  <X size={20} aria-hidden='true' />
+                  <X size={20} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -125,7 +136,7 @@ export default function Filter({
           {/* The options themselves are the one scrolling region: the pane
               fills the modal, so the list grows into it and the actions below
               stay put instead of being pushed off the end of a long list. */}
-          <div className='filterOptionsBody'>{children}</div>
+          <div className="filterOptionsBody">{children}</div>
           {/* No Select all: an all-ticked selection and an empty one both
               narrow nothing (see MultiCheckboxFilter on why empty means all),
               so the button was a second, wordier Reset — and the one way they
@@ -133,10 +144,10 @@ export default function Filter({
               excluding the records that have none and the options harvested
               after it was built. */}
           {(resetButton || infoButton) && (
-            <div className='filterOptionsActions'>
+            <div className="filterOptionsActions">
               {resetButton && (
                 <button onClick={() => resetButton()}>
-                  {t('resetButtonText')}
+                  {t("resetButtonText")}
                 </button>
               )}
               {/* No Close button: the filter row toggles itself shut, clicking
@@ -145,14 +156,14 @@ export default function Filter({
                   was just one more thing between the user and the options. */}
               {infoButton && (
                 <a
-                  className='filterInfoButton'
+                  className="filterInfoButton"
                   href={infoButton}
-                  target='_blank'
-                  title={t('filterInfoButtonTitle')}
-                  rel='noreferrer'
+                  target="_blank"
+                  title={t("filterInfoButtonTitle")}
+                  rel="noreferrer"
                 >
                   Info&nbsp;
-                  <BoxArrowUpRight color='#52A79B' size={17.5} />
+                  <BoxArrowUpRight color="#52A79B" size={17.5} />
                 </a>
               )}
             </div>
@@ -160,5 +171,5 @@ export default function Filter({
         </div>
       )}
     </div>
-  )
+  );
 }

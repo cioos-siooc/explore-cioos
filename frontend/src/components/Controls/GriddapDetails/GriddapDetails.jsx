@@ -1,13 +1,13 @@
-import React, { useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
-import Switch from '../../ui/Switch.jsx'
+import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import Switch from "../../ui/Switch.jsx";
 
-import { buildWmsOverlay } from '../../../wmsUtilities'
-import { useFilters } from '../../../state/filters/FilterProvider.jsx'
-import { useMapState } from '../../../state/map/MapStateProvider.jsx'
-import { useUI } from '../../../state/ui/UIProvider.jsx'
-import WmsLegend from '../WmsLegend/WmsLegend.jsx'
-import './styles.css'
+import { buildWmsOverlay } from "../../../wmsUtilities";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
+import WmsLegend from "../WmsLegend/WmsLegend.jsx";
+import "./styles.css";
 
 // Griddap-specific section of the dataset inspector: grid structure, variable
 // list, and (when the ERDDAP serves WMS) the show-on-map switch. While the
@@ -18,28 +18,28 @@ import './styles.css'
 export default function GriddapDetails({
   dataset,
   activeWmsOverlay,
-  setActiveWmsOverlay
+  setActiveWmsOverlay,
 }) {
-  const { t } = useTranslation()
-  const { eovsSelected } = useFilters()
-  const { pendingWmsSlice, setPendingWmsSlice } = useMapState()
-  const { sidebarOpen } = useUI()
-  const dimensions = dataset.grid_dimensions || []
-  const variables = dataset.grid_variables || []
-  const overlayActive = activeWmsOverlay?.pk === dataset.pk
+  const { t } = useTranslation();
+  const { eovsSelected } = useFilters();
+  const { pendingWmsSlice, setPendingWmsSlice } = useMapState();
+  const { sidebarOpen } = useUI();
+  const dimensions = dataset.grid_dimensions || [];
+  const variables = dataset.grid_variables || [];
+  const overlayActive = activeWmsOverlay?.pk === dataset.pk;
 
   const selectedEovTitles = (eovsSelected || [])
     .filter((eov) => eov.isSelected)
-    .map((eov) => eov.title)
+    .map((eov) => eov.title);
 
   // The share link's slice, if this is the overlay it was written for, applies
   // to the first overlay built and then gets out of the way — turning the
   // overlay off and back on is a fresh start, not a return to the link.
   function showOverlay() {
     setActiveWmsOverlay(
-      buildWmsOverlay(dataset, selectedEovTitles, pendingWmsSlice)
-    )
-    if (pendingWmsSlice) setPendingWmsSlice(undefined)
+      buildWmsOverlay(dataset, selectedEovTitles, pendingWmsSlice),
+    );
+    if (pendingWmsSlice) setPendingWmsSlice(undefined);
   }
 
   // Auto-show the WMS overlay when a griddap dataset with a WMS endpoint is
@@ -47,30 +47,31 @@ export default function GriddapDetails({
   // off must not immediately re-show it, so the effect only re-runs when a
   // different dataset is inspected.
   useEffect(() => {
-    if (dataset.wms_url && variables.length) showOverlay()
-  }, [dataset.pk])
+    if (dataset.wms_url && variables.length) showOverlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset.pk]);
 
   function formatDimensionValue(value) {
-    if (value === null || value === undefined) return '—'
-    if (typeof value === 'number') {
-      return Number.isInteger(value) ? value : value.toFixed(4)
+    if (value === null || value === undefined) return "—";
+    if (typeof value === "number") {
+      return Number.isInteger(value) ? value : value.toFixed(4);
     }
     // ISO time strings: keep them readable
-    return String(value).replace('T', ' ').replace('+00:00', 'Z')
+    return String(value).replace("T", " ").replace("+00:00", "Z");
   }
 
   function variableLabel(variable) {
-    return variable.long_name || variable.standard_name || variable.name
+    return variable.long_name || variable.standard_name || variable.name;
   }
 
   return (
-    <div className='griddapDetails'>
+    <div className="griddapDetails">
       {dataset.wms_url ? (
-        <div className='metadataGridItem griddapWmsControls'>
-          <strong>{t('griddapMapPreviewTitle')}</strong>
+        <div className="metadataGridItem griddapWmsControls">
+          <strong>{t("griddapMapPreviewTitle")}</strong>
           <Switch
-            id='griddapShowOnMapSwitch'
-            label={t('griddapShowOnMapToggle')}
+            id="griddapShowOnMapSwitch"
+            label={t("griddapShowOnMapToggle")}
             checked={overlayActive}
             disabled={!variables.length}
             onChange={(event) =>
@@ -80,72 +81,72 @@ export default function GriddapDetails({
           {overlayActive && sidebarOpen && (
             <WmsLegend
               overlay={activeWmsOverlay}
-              variant='inline'
+              variant="inline"
               onClose={() => setActiveWmsOverlay()}
               setActiveWmsOverlay={setActiveWmsOverlay}
             />
           )}
         </div>
       ) : (
-        <div className='metadataGridItem griddapNoWms'>
-          {t('griddapNoWmsText')}
+        <div className="metadataGridItem griddapNoWms">
+          {t("griddapNoWmsText")}
         </div>
       )}
-      <div className='metadataGridItem'>
-        <strong>{t('griddapDimensionsTitle')}</strong>
+      <div className="metadataGridItem">
+        <strong>{t("griddapDimensionsTitle")}</strong>
         {/* One card per axis rather than a 5-column table: at the sidebar's
             width the table's columns collapsed into unreadable slivers. */}
-        <ul className='griddapDimensionsList'>
+        <ul className="griddapDimensionsList">
           {dimensions.map((dim) => (
-            <li key={dim.name} className='griddapDimension'>
-              <div className='griddapDimensionHead'>
-                <span className='griddapDimensionName'>{dim.name}</span>
-                <span className='griddapDimensionNodes'>
-                  {dim.n_values?.toLocaleString()}{' '}
-                  {t('griddapDimensionNodes').toLowerCase()}
+            <li key={dim.name} className="griddapDimension">
+              <div className="griddapDimensionHead">
+                <span className="griddapDimensionName">{dim.name}</span>
+                <span className="griddapDimensionNodes">
+                  {dim.n_values?.toLocaleString()}{" "}
+                  {t("griddapDimensionNodes").toLowerCase()}
                 </span>
               </div>
-              <div className='griddapDimensionRange'>
-                <span className='griddapDimensionBound'>
+              <div className="griddapDimensionRange">
+                <span className="griddapDimensionBound">
                   {formatDimensionValue(dim.min)}
                 </span>
-                <span className='griddapDimensionArrow'>→</span>
-                <span className='griddapDimensionBound'>
+                <span className="griddapDimensionArrow">→</span>
+                <span className="griddapDimensionBound">
                   {formatDimensionValue(dim.max)}
                 </span>
                 {dim.units && (
-                  <span className='griddapDimensionUnits'>{dim.units}</span>
+                  <span className="griddapDimensionUnits">{dim.units}</span>
                 )}
               </div>
               {dim.spacing && (
-                <div className='griddapDimensionSpacing'>
-                  {t('griddapDimensionResolution')}: {dim.spacing}
+                <div className="griddapDimensionSpacing">
+                  {t("griddapDimensionResolution")}: {dim.spacing}
                 </div>
               )}
             </li>
           ))}
         </ul>
       </div>
-      <div className='metadataGridItem'>
-        <strong>{t('griddapVariablesTitle')}</strong>
-        <ul className='griddapVariablesList'>
+      <div className="metadataGridItem">
+        <strong>{t("griddapVariablesTitle")}</strong>
+        <ul className="griddapVariablesList">
           {variables.map((variable) => (
-            <li key={variable.name} className='griddapVariable'>
-              <div className='griddapVariableHead'>
-                <span className='griddapVariableLabel'>
+            <li key={variable.name} className="griddapVariable">
+              <div className="griddapVariableHead">
+                <span className="griddapVariableLabel">
                   {variableLabel(variable)}
                 </span>
                 {variable.units && (
-                  <span className='griddapVariableUnits'>
+                  <span className="griddapVariableUnits">
                     ({variable.units})
                   </span>
                 )}
               </div>
-              <code className='griddapVariableName'>{variable.name}</code>
+              <code className="griddapVariableName">{variable.name}</code>
             </li>
           ))}
         </ul>
       </div>
     </div>
-  )
+  );
 }

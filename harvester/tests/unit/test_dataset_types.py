@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-
 from cde_harvester.dataset_types import (
     extract_features,
     get_handler,

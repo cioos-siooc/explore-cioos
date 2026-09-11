@@ -19,24 +19,25 @@
  * *below* FIRST_LABEL_LAYER_ID so labels always stay readable on top.
  */
 
-import { server } from '../../config'
+import { server } from "../../config";
 import {
   basemapHandoffEndZoom,
   basemapHandoffStartZoom,
   basemapPrewarmZoom,
   bathymetryFadeInZoom,
-  bathymetryFullZoom
-} from '../config.js'
+  bathymetryFullZoom,
+} from "../config.js";
 
-const OFM_TILEJSON = 'https://tiles.openfreemap.org/planet'
-const OFM_GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
+const OFM_TILEJSON = "https://tiles.openfreemap.org/planet";
+const OFM_GLYPHS =
+  "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 
 const EMODNET_TILES =
-  'https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png'
+  "https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png";
 
 // Esri tile REST convention is {z}/{y}/{x} (y before x), unlike XYZ schemes.
 const ESRI_IMAGERY_TILES =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
 // CHS NONNA bathymetry, through our own API rather than direct. CHS allowlists
 // request origins exactly and 403s every other one — including the CORS
@@ -44,42 +45,42 @@ const ESRI_IMAGERY_TILES =
 // the browser cannot fetch these itself. web-api/routes/nonna.js fetches them
 // server-side (no Origin header) and re-serves them same-origin; the reasoning
 // is written out there.
-const NONNA_100_TILES = `${server}/nonna/100/{z}/{x}/{y}.png`
-const NONNA_10_TILES = `${server}/nonna/10/{z}/{x}/{y}.png`
+const NONNA_100_TILES = `${server}/nonna/100/{z}/{x}/{y}.png`;
+const NONNA_10_TILES = `${server}/nonna/10/{z}/{x}/{y}.png`;
 
 const CHS_ATTRIBUTION =
-  'Bathymetry © <a href="https://www.charts.gc.ca/data-gestion/index-eng.html">Canadian Hydrographic Service</a> (NONNA)'
+  'Bathymetry © <a href="https://www.charts.gc.ca/data-gestion/index-eng.html">Canadian Hydrographic Service</a> (NONNA)';
 
 // Attribution for OpenFreeMap's OSM-derived vector data (coastline, rivers,
 // boundaries, labels).
 const OSM_ATTRIBUTION =
-  '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 export const LABEL_LAYER_IDS = [
-  'label-waterway',
-  'label-water',
-  'label-water-line',
-  'label-place'
-]
+  "label-waterway",
+  "label-water",
+  "label-water-line",
+  "label-place",
+];
 // Anchor for every data layer Map.js adds: insert *before* this id so data
 // renders under the labels.
-export const FIRST_LABEL_LAYER_ID = 'label-waterway'
+export const FIRST_LABEL_LAYER_ID = "label-waterway";
 
 // text-field expression for every label layer: interface language, falling
 // back to the tile's default name when no translation exists.
-export function getLabelTextField (lang) {
-  return ['coalesce', ['get', `name:${lang}`], ['get', 'name']]
+export function getLabelTextField(lang) {
+  return ["coalesce", ["get", `name:${lang}`], ["get", "name"]];
 }
 
 // Water polygons whose outline reads as a shoreline. Docks and pools are
 // building-scale artifacts that would only add noise at high zoom.
 const SHORELINE_FILTER = [
-  'match',
-  ['get', 'class'],
-  ['swimming_pool', 'dock'],
+  "match",
+  ["get", "class"],
+  ["swimming_pool", "dock"],
   false,
-  true
-]
+  true,
+];
 
 // Shared between label-water and label-water-line so the two stay in sync:
 // same size/weight tiering and colour regardless of which geometry a given
@@ -87,35 +88,35 @@ const SHORELINE_FILTER = [
 // bold — so freshwater names read as distinct from the ocean/sea teal text
 // around them without changing colour.
 const WATER_LABEL_TEXT_SIZE = [
-  'match',
-  ['get', 'class'],
-  'ocean',
+  "match",
+  ["get", "class"],
+  "ocean",
   16,
-  'sea',
+  "sea",
   13,
-  'lake',
+  "lake",
   13,
-  11
-]
+  11,
+];
 const WATER_LABEL_TEXT_FONT = [
-  'match',
-  ['get', 'class'],
-  'lake',
-  ['literal', ['Noto Sans Bold']],
-  ['literal', ['Noto Sans Italic']]
-]
+  "match",
+  ["get", "class"],
+  "lake",
+  ["literal", ["Noto Sans Bold"]],
+  ["literal", ["Noto Sans Italic"]],
+];
 const WATER_LABEL_PAINT = {
-  'text-color': '#0F6D8E',
-  'text-halo-color': '#F3F0EC',
-  'text-halo-width': 1.5
-}
+  "text-color": "#0F6D8E",
+  "text-halo-color": "#F3F0EC",
+  "text-halo-width": 1.5,
+};
 
-export function buildBasemapStyle (lang = 'en') {
+export function buildBasemapStyle(lang = "en") {
   const layers = [
     {
-      id: 'background',
-      type: 'background',
-      paint: { 'background-color': '#DCE8E5' }
+      id: "background",
+      type: "background",
+      paint: { "background-color": "#DCE8E5" },
     },
     // The two base rasters swap at z10: EMODnet owns the world view, satellite
     // owns the local view, and the change happens over the half zoom below z10
@@ -143,24 +144,24 @@ export function buildBasemapStyle (lang = 'en') {
     // fade already ends at, so nothing changes on screen — they only stop the
     // work being done for pixels that were never going to be drawn.
     {
-      id: 'bathymetry',
-      type: 'raster',
-      source: 'bathymetry',
+      id: "bathymetry",
+      type: "raster",
+      source: "bathymetry",
       // Also stops EMODnet tiles being fetched and cached past the hand-off: a
       // layer outside its zoom range marks its source unused.
       maxzoom: basemapHandoffEndZoom,
       paint: {
-        'raster-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "raster-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           basemapHandoffStartZoom,
           1,
           basemapHandoffEndZoom,
-          0
+          0,
         ],
-        'raster-saturation': -0.15
-      }
+        "raster-saturation": -0.15,
+      },
     },
     // minzoom is what stops imagery tiles being fetched at world zooms. It sits
     // below the fade rather than on it: the ramp is short enough now that a
@@ -168,24 +169,24 @@ export function buildBasemapStyle (lang = 'en') {
     // is over, so the layer is mounted (and its tiles requested) half a zoom
     // early and held at zero opacity until the hand-off begins.
     {
-      id: 'imagery',
-      type: 'raster',
-      source: 'imagery',
+      id: "imagery",
+      type: "raster",
+      source: "imagery",
       minzoom: basemapPrewarmZoom,
       paint: {
-        'raster-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "raster-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           basemapHandoffStartZoom,
           0,
           basemapHandoffEndZoom,
-          1
+          1,
         ],
         // Matches the bathymetry's muting so full-colour imagery doesn't shout
         // against the pastel palette everything else in the style shares.
-        'raster-saturation': -0.15
-      }
+        "raster-saturation": -0.15,
+      },
     },
     // Depth, back on top of the satellite. NONNA is transparent over land and
     // anywhere CHS holds no soundings, so unlike the EMODnet raster it can be
@@ -212,48 +213,48 @@ export function buildBasemapStyle (lang = 'en') {
     // That same pre-rendering is why the legend's depth axis had to be
     // calibrated from the tiles — see bathymetryColorScale in config.js.
     {
-      id: 'bathymetry-nonna-100',
-      type: 'raster',
-      source: 'nonna100',
+      id: "bathymetry-nonna-100",
+      type: "raster",
+      source: "nonna100",
       // Mounted below the fade for the same reason as the imagery, and it
       // matters more here: these tiles come through our own proxy and are the
       // slowest thing on the map on a cold cache.
       minzoom: basemapPrewarmZoom,
       paint: {
-        'raster-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "raster-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           bathymetryFadeInZoom,
           0,
           bathymetryFullZoom,
-          0.7
+          0.7,
         ],
         // Three raster sources are stacked here, and the default 300 ms
         // cross-fade draws both the outgoing and incoming tile for its
         // duration. These two are translucent and sit over the satellite, so
         // that is the most overdrawn part of the map; fading instantly also
         // lets the parent tiles be released sooner.
-        'raster-fade-duration': 0
-      }
+        "raster-fade-duration": 0,
+      },
     },
     {
-      id: 'bathymetry-nonna-10',
-      type: 'raster',
-      source: 'nonna10',
+      id: "bathymetry-nonna-10",
+      type: "raster",
+      source: "nonna10",
       minzoom: basemapPrewarmZoom,
       paint: {
-        'raster-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "raster-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           bathymetryFadeInZoom,
           0,
           bathymetryFullZoom,
-          0.7
+          0.7,
         ],
-        'raster-fade-duration': 0
-      }
+        "raster-fade-duration": 0,
+      },
     },
     // Pulls the sea toward CIOOS teal and unifies the raster palette while
     // EMODnet is the base. It used to deepen with zoom, to keep a cue about
@@ -262,23 +263,23 @@ export function buildBasemapStyle (lang = 'en') {
     // over the same window the imagery arrives in and leaves the water reading
     // as it actually looks.
     {
-      id: 'water-tint',
-      type: 'fill',
-      source: 'ofm',
-      'source-layer': 'water',
+      id: "water-tint",
+      type: "fill",
+      source: "ofm",
+      "source-layer": "water",
       maxzoom: basemapHandoffEndZoom,
       paint: {
-        'fill-color': '#52A79B',
-        'fill-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "fill-color": "#52A79B",
+        "fill-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           basemapHandoffStartZoom,
           0.1,
           basemapHandoffEndZoom,
-          0
-        ]
-      }
+          0,
+        ],
+      },
     },
     // Coastline, for the zooms EMODnet owns. Its land/sea edge is a soft
     // grey-to-blue gradient rather than a drawn line, and it reads worst in
@@ -299,20 +300,20 @@ export function buildBasemapStyle (lang = 'en') {
     // dense with ponds, docks and river polygons. Without the bound all of that
     // was tessellated on every tile and then not drawn.
     {
-      id: 'coastline-casing',
-      type: 'line',
-      source: 'ofm',
-      'source-layer': 'water',
+      id: "coastline-casing",
+      type: "line",
+      source: "ofm",
+      "source-layer": "water",
       filter: SHORELINE_FILTER,
       maxzoom: basemapHandoffEndZoom,
-      layout: { 'line-join': 'round' },
+      layout: { "line-join": "round" },
       paint: {
-        'line-color': '#F3F0EC',
+        "line-color": "#F3F0EC",
         // Off by z10, with the imagery fully in — see the coastline layer below.
-        'line-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           4,
           0,
           7,
@@ -320,35 +321,35 @@ export function buildBasemapStyle (lang = 'en') {
           basemapHandoffStartZoom,
           0.5,
           basemapHandoffEndZoom,
-          0
+          0,
         ],
         // Only ramps to the hand-off now; the stops past it keyed zooms the
         // layer no longer reaches.
-        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.2, 10, 2.4]
-      }
+        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.2, 10, 2.4],
+      },
     },
     {
-      id: 'coastline',
-      type: 'line',
-      source: 'ofm',
-      'source-layer': 'water',
+      id: "coastline",
+      type: "line",
+      source: "ofm",
+      "source-layer": "water",
       filter: SHORELINE_FILTER,
       maxzoom: basemapHandoffEndZoom,
-      layout: { 'line-join': 'round' },
+      layout: { "line-join": "round" },
       paint: {
         // Slate-teal rather than near-black: dark enough to hold the edge
         // against pale land, but it sits in the basemap's own hue range
         // instead of reading as ink drawn over the top of it.
-        'line-color': '#33555F',
+        "line-color": "#33555F",
         // Lifts off as the imagery arrives. This stroke exists because the
         // overzoomed EMODnet shore blurred away; the satellite draws its own
         // shore, and the OSM polygon it follows can sit tens of metres off the
         // visible waterline at z15+, so keeping it would add a second, wrong
         // coastline next to the real one.
-        'line-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           2,
           0.3,
           6,
@@ -356,21 +357,21 @@ export function buildBasemapStyle (lang = 'en') {
           basemapHandoffStartZoom,
           0.72,
           basemapHandoffEndZoom,
-          0
+          0,
         ],
         // Width still ramps for the zooms where the line is visible at all.
-        'line-width': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           2,
           0.4,
           6,
           0.8,
           10,
-          1.2
-        ]
-      }
+          1.2,
+        ],
+      },
     },
     // Watercourse centrelines — rivers, canals, and the streams/drains/ditches
     // below them — are a z12+ detail only.
@@ -390,76 +391,70 @@ export function buildBasemapStyle (lang = 'en') {
     // Streams stay a separate layer, under the rivers: they only exist in the
     // tiles from z12 anyway, and they want a thinner, lighter line.
     {
-      id: 'waterway-stream',
-      type: 'line',
-      source: 'ofm',
-      'source-layer': 'waterway',
+      id: "waterway-stream",
+      type: "line",
+      source: "ofm",
+      "source-layer": "waterway",
       minzoom: 12,
       filter: [
-        'match',
-        ['get', 'class'],
-        ['stream', 'drain', 'ditch'],
+        "match",
+        ["get", "class"],
+        ["stream", "drain", "ditch"],
         true,
-        false
+        false,
       ],
       paint: {
-        'line-color': '#3C8377',
-        'line-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "line-color": "#3C8377",
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           12,
           0.35,
           14,
-          0.5
+          0.5,
         ],
-        'line-width': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           12,
           0.5,
           14,
           1,
           18,
-          2
-        ]
-      }
+          2,
+        ],
+      },
     },
     {
-      id: 'waterway',
-      type: 'line',
-      source: 'ofm',
-      'source-layer': 'waterway',
+      id: "waterway",
+      type: "line",
+      source: "ofm",
+      "source-layer": "waterway",
       minzoom: 12,
-      filter: [
-        'match',
-        ['get', 'class'],
-        ['river', 'canal'],
-        true,
-        false
-      ],
+      filter: ["match", ["get", "class"], ["river", "canal"], true, false],
       paint: {
-        'line-color': '#3C8377',
-        'line-opacity': 0.6,
-        'line-width': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
+        "line-color": "#3C8377",
+        "line-opacity": 0.6,
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
           12,
           1,
           14,
           1.6,
           18,
-          2.6
-        ]
-      }
+          2.6,
+        ],
+      },
     },
     {
-      id: 'boundary',
-      type: 'line',
-      source: 'ofm',
-      'source-layer': 'boundary',
+      id: "boundary",
+      type: "line",
+      source: "ofm",
+      "source-layer": "boundary",
       // Land boundaries only. The maritime halves of the same borders run
       // clean across open water — the provincial lines through the Gulf of
       // St Lawrence and Cabot Strait — which is noise on an ocean map. The
@@ -467,63 +462,63 @@ export function buildBasemapStyle (lang = 'en') {
       // filtered out. `maritime` is absent on plenty of features, and a
       // missing property compares unequal here, so those still draw.
       filter: [
-        'all',
-        ['<=', ['get', 'admin_level'], 4],
-        ['!=', ['get', 'maritime'], 1]
+        "all",
+        ["<=", ["get", "admin_level"], 4],
+        ["!=", ["get", "maritime"], 1],
       ],
       paint: {
-        'line-color': 'rgba(21, 47, 55, 0.3)',
-        'line-width': 1,
-        'line-dasharray': [3, 2]
-      }
+        "line-color": "rgba(21, 47, 55, 0.3)",
+        "line-width": 1,
+        "line-dasharray": [3, 2],
+      },
     },
     {
-      id: 'label-waterway',
-      type: 'symbol',
-      source: 'ofm',
-      'source-layer': 'waterway',
+      id: "label-waterway",
+      type: "symbol",
+      source: "ofm",
+      "source-layer": "waterway",
       // Matches the centreline it is placed along: without this the estuary
       // still reads "Saint Lawrence River" across open water on an invisible
       // line. Big water bodies keep their name via label-water regardless.
       minzoom: 12,
-      filter: ['match', ['get', 'class'], ['river', 'canal'], true, false],
+      filter: ["match", ["get", "class"], ["river", "canal"], true, false],
       layout: {
-        'symbol-placement': 'line',
-        'text-field': getLabelTextField(lang),
-        'text-font': ['Noto Sans Italic'],
-        'text-size': 11
+        "symbol-placement": "line",
+        "text-field": getLabelTextField(lang),
+        "text-font": ["Noto Sans Italic"],
+        "text-size": 11,
       },
       paint: {
-        'text-color': '#0F6D8E',
-        'text-halo-color': '#F3F0EC',
-        'text-halo-width': 1.2
-      }
+        "text-color": "#0F6D8E",
+        "text-halo-color": "#F3F0EC",
+        "text-halo-width": 1.2,
+      },
     },
     {
       // Point-geometry water bodies only (oceans, seas, most lakes) — the
       // elongated ones (Great Lakes among them) are LineString/MultiLineString
       // in this source layer and are handled by label-water-line below, since
       // a point-placed symbol can't reliably anchor on a line's geometry.
-      id: 'label-water',
-      type: 'symbol',
-      source: 'ofm',
-      'source-layer': 'water_name',
-      filter: ['!=', ['geometry-type'], 'LineString'],
+      id: "label-water",
+      type: "symbol",
+      source: "ofm",
+      "source-layer": "water_name",
+      filter: ["!=", ["geometry-type"], "LineString"],
       layout: {
-        'text-field': getLabelTextField(lang),
-        'text-font': WATER_LABEL_TEXT_FONT,
-        'text-size': WATER_LABEL_TEXT_SIZE,
-        'text-letter-spacing': 0.1,
-        'text-max-width': 6,
+        "text-field": getLabelTextField(lang),
+        "text-font": WATER_LABEL_TEXT_FONT,
+        "text-size": WATER_LABEL_TEXT_SIZE,
+        "text-letter-spacing": 0.1,
+        "text-max-width": 6,
         // Large water bodies (bays especially) are often tagged as several
         // separate same-named point features scattered along a coastline in
         // OSM — e.g. Hudson Bay is ~217 distinct "Hudson Bay" points. Padding
         // this far past the glyph box makes MapLibre's own collision system
         // treat nearby duplicates as overlapping and drop all but one,
         // without needing to know they share a name.
-        'text-padding': 80
+        "text-padding": 80,
       },
-      paint: WATER_LABEL_PAINT
+      paint: WATER_LABEL_PAINT,
     },
     {
       // The elongated-water-body half of water_name (see label-water above):
@@ -533,78 +528,78 @@ export function buildBasemapStyle (lang = 'en') {
       // map-aligned rotation, which otherwise bends the text glyph-by-glyph
       // to follow the line's own curve — upright, straight text reads more
       // clearly for a lake name than one bent along its shoreline.
-      id: 'label-water-line',
-      type: 'symbol',
-      source: 'ofm',
-      'source-layer': 'water_name',
-      filter: ['==', ['geometry-type'], 'LineString'],
+      id: "label-water-line",
+      type: "symbol",
+      source: "ofm",
+      "source-layer": "water_name",
+      filter: ["==", ["geometry-type"], "LineString"],
       layout: {
-        'symbol-placement': 'line-center',
-        'text-rotation-alignment': 'viewport',
-        'text-field': getLabelTextField(lang),
-        'text-font': WATER_LABEL_TEXT_FONT,
-        'text-size': WATER_LABEL_TEXT_SIZE,
-        'text-letter-spacing': 0.1
+        "symbol-placement": "line-center",
+        "text-rotation-alignment": "viewport",
+        "text-field": getLabelTextField(lang),
+        "text-font": WATER_LABEL_TEXT_FONT,
+        "text-size": WATER_LABEL_TEXT_SIZE,
+        "text-letter-spacing": 0.1,
       },
-      paint: WATER_LABEL_PAINT
+      paint: WATER_LABEL_PAINT,
     },
     {
-      id: 'label-place',
-      type: 'symbol',
-      source: 'ofm',
-      'source-layer': 'place',
+      id: "label-place",
+      type: "symbol",
+      source: "ofm",
+      "source-layer": "place",
       filter: [
-        'match',
-        ['get', 'class'],
-        ['country', 'state', 'city', 'town'],
+        "match",
+        ["get", "class"],
+        ["country", "state", "city", "town"],
         true,
-        false
+        false,
       ],
       layout: {
-        'text-field': getLabelTextField(lang),
-        'text-font': ['Noto Sans Regular'],
-        'text-size': [
-          'match',
-          ['get', 'class'],
-          'country',
+        "text-field": getLabelTextField(lang),
+        "text-font": ["Noto Sans Regular"],
+        "text-size": [
+          "match",
+          ["get", "class"],
+          "country",
           14,
-          'state',
+          "state",
           12,
-          'city',
+          "city",
           12,
-          10
+          10,
         ],
-        'text-transform': [
-          'match',
-          ['get', 'class'],
-          'country',
-          'uppercase',
-          'none'
-        ]
+        "text-transform": [
+          "match",
+          ["get", "class"],
+          "country",
+          "uppercase",
+          "none",
+        ],
       },
       paint: {
-        'text-color': '#152F37',
-        'text-halo-color': '#F3F0EC',
-        'text-halo-width': 1.2
-      }
-    }
-  ]
+        "text-color": "#152F37",
+        "text-halo-color": "#F3F0EC",
+        "text-halo-width": 1.2,
+      },
+    },
+  ];
 
   return {
     version: 8,
     glyphs: OFM_GLYPHS,
     sources: {
       bathymetry: {
-        type: 'raster',
+        type: "raster",
         tiles: [EMODNET_TILES],
         tileSize: 256,
         // pre-rendered up to z12; overzoom covers deeper levels
         maxzoom: 12,
         attribution:
-          '© <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a>'
+          '© <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a>',
       },
       imagery: {
-        type: 'raster',
+        type: "raster",
         tiles: [ESRI_IMAGERY_TILES],
         tileSize: 256,
         // Declared to z23, but only actually cached that deep in populated
@@ -616,7 +611,7 @@ export function buildBasemapStyle (lang = 'en') {
         // z17 is ~0.8 m/px at 45°N and ~0.4 m/px at 70°N.
         maxzoom: 17,
         attribution:
-          'Imagery © <a href="https://www.esri.com">Esri</a>, Vantor, Earthstar Geographics'
+          'Imagery © <a href="https://www.esri.com">Esri</a>, Vantor, Earthstar Geographics',
       },
       // Both products are served through the proxy, which answers a transparent
       // tile wherever CHS has nothing.
@@ -633,26 +628,26 @@ export function buildBasemapStyle (lang = 'en') {
       // tile requests per viewport to ~6, and because a coarse tile covers 32x
       // (100) or 4x (10) more ground, panning stops re-triggering them at all.
       nonna100: {
-        type: 'raster',
+        type: "raster",
         tiles: [NONNA_100_TILES],
         tileSize: 256,
         maxzoom: 11,
-        attribution: CHS_ATTRIBUTION
+        attribution: CHS_ATTRIBUTION,
       },
       nonna10: {
-        type: 'raster',
+        type: "raster",
         tiles: [NONNA_10_TILES],
         tileSize: 256,
-        maxzoom: 14
+        maxzoom: 14,
       },
       ofm: {
-        type: 'vector',
+        type: "vector",
         url: OFM_TILEJSON,
         attribution:
           OSM_ATTRIBUTION +
-          ', <a href="https://openfreemap.org">OpenFreeMap</a>'
-      }
+          ', <a href="https://openfreemap.org">OpenFreeMap</a>',
+      },
     },
-    layers
-  }
+    layers,
+  };
 }

@@ -17,6 +17,7 @@
  * ------------------------------------------------------------------ */
 .rail {
   padding: 0 16px;
+
   /* Nothing here is text to copy — it is labels on a control, and dragging a
      handle used to sweep a selection across them. */
   user-select: none;
@@ -26,6 +27,7 @@
 .railTrack {
   position: relative;
   height: 18px;
+
   /* Dragging a handle must not pan the map or scroll the panel under it. */
   touch-action: none;
   cursor: pointer;
@@ -107,6 +109,7 @@
   font-size: var(--cioos-font-size-xs);
   line-height: 1;
   font-variant-numeric: tabular-nums;
+
   /* Read at a glance against the map showing through — the 40% ink these
      started at was too faint to scan. */
   color: var(--cioos-ink-60);
@@ -134,6 +137,7 @@
   align-items: stretch;
   gap: 4px;
   height: 100%;
+
   /* The inset that keeps a handle parked at either end, and its label, inside
      the box — the horizontal rail's left/right padding, turned. */
   padding: 8px 0;
@@ -146,10 +150,7 @@
 }
 
 .railVertical .railLine {
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  right: auto;
+  inset: 0 auto 0 50%;
   width: 3px;
   height: auto;
   margin: 0 0 0 -1.5px;
@@ -170,6 +171,7 @@
 
 .railVertical .railTicks {
   flex: 1 1 auto;
+
   /* Wide enough for a five-digit metre count, and said here rather than left to
      the labels themselves — they are absolutely positioned, so they contribute
      no width of their own and would otherwise be squeezed out of the box by
@@ -265,7 +267,6 @@
   font-weight: 600;
   white-space: nowrap;
 }
-
 
 .railFieldSep,
 .railFieldUnits {

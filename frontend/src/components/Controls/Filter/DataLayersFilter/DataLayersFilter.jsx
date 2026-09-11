@@ -1,17 +1,15 @@
-/* eslint-disable react/prop-types */
-
-import * as React from 'react'
-import { CheckSquare, Square } from 'react-bootstrap-icons'
-import { useTranslation } from 'react-i18next'
+import * as React from "react";
+import { CheckSquare, Square } from "react-bootstrap-icons";
+import { useTranslation } from "react-i18next";
 
 import {
   DATA_LAYER_HINT_KEYS,
   DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
-  isDataLayerChecked
-} from '../../../../state/dataLayers.js'
-import { useMapState } from '../../../../state/map/MapStateProvider.jsx'
-import './styles.css'
+  isDataLayerChecked,
+} from "../../../../state/dataLayers.js";
+import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
+import "./styles.css";
 
 // Which observation geometries the map draws. It behaves as every other filter
 // does, down to the semantics and not just the idiom: no ticks means unfiltered
@@ -31,28 +29,28 @@ import './styles.css'
 // places once the legend grew switches of its own — and they never belonged in
 // a filter: they change how the trajectories are drawn, not which datasets are
 // selected. They live on the legend entries they key (see Legend.jsx).
-export default function DataLayersFilter () {
-  const { t } = useTranslation()
-  const { dataLayers, toggleDataLayer } = useMapState()
+export default function DataLayersFilter() {
+  const { t } = useTranslation();
+  const { dataLayers, toggleDataLayer } = useMapState();
 
   return (
-    <div className='multiCheckboxFilter dataLayersFilter'>
+    <div className="multiCheckboxFilter dataLayersFilter">
       {DATA_LAYER_KEYS.map((key) => {
-        const checked = isDataLayerChecked(dataLayers, key)
+        const checked = isDataLayerChecked(dataLayers, key);
         return (
           <div
             key={key}
-            className={`optionButton ${checked ? 'selected' : ''}`}
+            className={`optionButton ${checked ? "selected" : ""}`}
             onClick={() => toggleDataLayer(key)}
           >
             {checked ? <CheckSquare /> : <Square />}
-            <span className='optionName'>
+            <span className="optionName">
               {t(DATA_LAYER_LABEL_KEYS[key])}
-              <span className='optionHint'>{t(DATA_LAYER_HINT_KEYS[key])}</span>
+              <span className="optionHint">{t(DATA_LAYER_HINT_KEYS[key])}</span>
             </span>
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

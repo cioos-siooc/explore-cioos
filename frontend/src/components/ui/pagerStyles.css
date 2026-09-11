@@ -44,8 +44,10 @@
   font-weight: 600;
   color: var(--cioos-ink-60);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast), border-color var(--cioos-transition-fast);
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast);
 }
 
 .pagerStep:hover:not(:disabled),

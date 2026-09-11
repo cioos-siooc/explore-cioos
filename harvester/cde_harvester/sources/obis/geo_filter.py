@@ -72,10 +72,7 @@ class ObisGeoFilter:
         """True when the dataset should be harvested in full (no geo filter applied)."""
         if self.mode == "none":
             return True
-        for node in (metadata.get("nodes") or []):
-            if node.get("id") in self.exempt_node_ids:
-                return True
-        return False
+        return any(node.get("id") in self.exempt_node_ids for node in metadata.get("nodes") or [])
 
     def extent_intersects(self, extent_wkt):
         """True/False if a dataset extent intersects the boundary polygon.

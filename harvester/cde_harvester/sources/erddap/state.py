@@ -23,7 +23,7 @@ def load_previous_hashes(erddap_url):
                 ),
                 {"url": erddap_url.rstrip("/")},
             ).all()
-        hashes = {dataset_id: content_hash for dataset_id, content_hash in rows}
+        hashes = dict(rows)
         logger.info("Loaded %d previous content hashes for %s", len(hashes), erddap_url)
         return hashes
     except Exception as e:

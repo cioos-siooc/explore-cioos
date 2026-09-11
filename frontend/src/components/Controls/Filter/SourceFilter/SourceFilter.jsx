@@ -1,17 +1,15 @@
-/* eslint-disable react/prop-types */
-
-import * as React from 'react'
-import { useState } from 'react'
+import * as React from "react";
+import { useState } from "react";
 import {
   CheckSquare,
   ChevronDown,
   ChevronRight,
   DashSquare,
-  Square
-} from 'react-bootstrap-icons'
-import { useTranslation } from 'react-i18next'
-import { capitalizeFirstLetter } from '../../../../utilities'
-import './styles.css'
+  Square,
+} from "react-bootstrap-icons";
+import { useTranslation } from "react-i18next";
+import { capitalizeFirstLetter } from "../../../../utilities";
+import "./styles.css";
 
 // Combined data-source filter: ERDDAP servers as a flat list, plus a single
 // expandable OBIS group whose parent checkbox selects/deselects every OBIS
@@ -21,17 +19,17 @@ export default function SourceFilter({
   setErddapServersSelected,
   obisNodesSelected,
   setObisNodesSelected,
-  searchTerms
+  searchTerms,
 }) {
-  const { t, i18n } = useTranslation()
-  const [obisExpanded, setObisExpanded] = useState(false)
+  const { t, i18n } = useTranslation();
+  const [obisExpanded, setObisExpanded] = useState(false);
 
-  const search = (searchTerms || '').toString().toLowerCase()
-  const obisGroupMatchesSearch = 'obis'.includes(search)
+  const search = (searchTerms || "").toString().toLowerCase();
+  const obisGroupMatchesSearch = "obis".includes(search);
 
   const serversShown = erddapServersSelected
     .filter((server) => !search || server.title.toLowerCase().includes(search))
-    .sort((a, b) => a.title.localeCompare(b.title, i18n.language))
+    .sort((a, b) => a.title.localeCompare(b.title, i18n.language));
 
   // When the search matches the group label itself, show every node
   const nodesShown = obisNodesSelected
@@ -39,68 +37,70 @@ export default function SourceFilter({
       (node) =>
         !search ||
         obisGroupMatchesSearch ||
-        node.title.toLowerCase().includes(search)
+        node.title.toLowerCase().includes(search),
     )
-    .sort((a, b) => a.title.localeCompare(b.title, i18n.language))
+    .sort((a, b) => a.title.localeCompare(b.title, i18n.language));
 
   const showObisGroup =
-    obisNodesSelected.length > 0 && (!search || nodesShown.length > 0)
+    obisNodesSelected.length > 0 && (!search || nodesShown.length > 0);
 
   // Nothing ticked anywhere constrains nothing, so an empty selection already
   // means every source — see MultiCheckboxFilter. Shown as it is stored: no
   // ticks until the user picks something.
-  const isChecked = (option) => option.isSelected
+  const isChecked = (option) => option.isSelected;
 
   const allNodesSelected =
-    obisNodesSelected.length > 0 && obisNodesSelected.every(isChecked)
-  const someNodesSelected = obisNodesSelected.some(isChecked)
+    obisNodesSelected.length > 0 && obisNodesSelected.every(isChecked);
+  const someNodesSelected = obisNodesSelected.some(isChecked);
 
   function toggleServer(pk) {
     setErddapServersSelected(
       erddapServersSelected.map((server) =>
-        server.pk === pk ? { ...server, isSelected: !server.isSelected } : server
-      )
-    )
+        server.pk === pk
+          ? { ...server, isSelected: !server.isSelected }
+          : server,
+      ),
+    );
   }
 
   function toggleNode(pk) {
     setObisNodesSelected(
       obisNodesSelected.map((node) =>
-        node.pk === pk ? { ...node, isSelected: !node.isSelected } : node
-      )
-    )
+        node.pk === pk ? { ...node, isSelected: !node.isSelected } : node,
+      ),
+    );
   }
 
   function toggleAllNodes() {
     setObisNodesSelected(
       obisNodesSelected.map((node) => ({
         ...node,
-        isSelected: !allNodesSelected
-      }))
-    )
+        isSelected: !allNodesSelected,
+      })),
+    );
   }
 
-  const obisChildrenVisible = obisExpanded || (search && nodesShown.length > 0)
+  const obisChildrenVisible = obisExpanded || (search && nodesShown.length > 0);
 
   if (serversShown.length === 0 && !showObisGroup) {
     return (
-      <div className='multiCheckboxFilter sourceFilter'>
-        <div>{t('multiCheckboxFilterNoFilterWarning')}</div>
+      <div className="multiCheckboxFilter sourceFilter">
+        <div>{t("multiCheckboxFilterNoFilterWarning")}</div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className='multiCheckboxFilter sourceFilter'>
+    <div className="multiCheckboxFilter sourceFilter">
       {serversShown.map((server) => (
         <div
           key={server.pk}
-          className={`optionButton ${isChecked(server) && 'selected'}`}
+          className={`optionButton ${isChecked(server) && "selected"}`}
           title={server.title}
           onClick={() => toggleServer(server.pk)}
         >
           {isChecked(server) ? <CheckSquare /> : <Square />}
-          <span className='optionName'>
+          <span className="optionName">
             {capitalizeFirstLetter(server.title)}
           </span>
         </div>
@@ -108,8 +108,8 @@ export default function SourceFilter({
       {showObisGroup && (
         <>
           <div
-            className={`optionButton obisGroupButton ${allNodesSelected && 'selected'}`}
-            title={t('sourceFilterObisGroupTooltip')}
+            className={`optionButton obisGroupButton ${allNodesSelected && "selected"}`}
+            title={t("sourceFilterObisGroupTooltip")}
             onClick={() => toggleAllNodes()}
           >
             {allNodesSelected ? (
@@ -119,28 +119,28 @@ export default function SourceFilter({
             ) : (
               <Square />
             )}
-            <span className='optionName'>OBIS</span>
+            <span className="optionName">OBIS</span>
             <span
-              className='obisGroupChevron'
+              className="obisGroupChevron"
               onClick={(e) => {
-                e.stopPropagation()
-                setObisExpanded(!obisExpanded)
+                e.stopPropagation();
+                setObisExpanded(!obisExpanded);
               }}
             >
               {obisChildrenVisible ? <ChevronDown /> : <ChevronRight />}
             </span>
           </div>
           {obisChildrenVisible && (
-            <div className='obisGroupChildren'>
+            <div className="obisGroupChildren">
               {nodesShown.map((node) => (
                 <div
                   key={node.pk}
-                  className={`optionButton ${isChecked(node) && 'selected'}`}
+                  className={`optionButton ${isChecked(node) && "selected"}`}
                   title={node.title}
                   onClick={() => toggleNode(node.pk)}
                 >
                   {isChecked(node) ? <CheckSquare /> : <Square />}
-                  <span className='optionName'>{node.title}</span>
+                  <span className="optionName">{node.title}</span>
                 </div>
               ))}
             </div>
@@ -148,5 +148,5 @@ export default function SourceFilter({
         </>
       )}
     </div>
-  )
+  );
 }

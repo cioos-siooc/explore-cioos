@@ -9,8 +9,16 @@ const timeMax = new Date(process.env.CI_TIME_MAX);
 
 assert.ok(Number.isFinite(latitude), "CI_LATITUDE must be a finite number");
 assert.ok(Number.isFinite(longitude), "CI_LONGITUDE must be a finite number");
-assert.equal(Number.isNaN(timeMin.getTime()), false, "CI_TIME_MIN must be an ISO timestamp");
-assert.equal(Number.isNaN(timeMax.getTime()), false, "CI_TIME_MAX must be an ISO timestamp");
+assert.equal(
+  Number.isNaN(timeMin.getTime()),
+  false,
+  "CI_TIME_MIN must be an ISO timestamp",
+);
+assert.equal(
+  Number.isNaN(timeMax.getTime()),
+  false,
+  "CI_TIME_MAX must be an ISO timestamp",
+);
 assert.ok(timeMax >= timeMin, "CI_TIME_MAX must not precede CI_TIME_MIN");
 
 // Use the selected profile's actual extent plus a one-day buffer. A polygon is
@@ -37,5 +45,8 @@ console.log("Submitting download request:", url);
 const response = await fetch(url);
 assert.equal(response.ok, true, `${url} returned HTTP ${response.status}`);
 const result = await response.json();
-assert.ok(result.count > 0, "download request did not select any harvested datasets");
+assert.ok(
+  result.count > 0,
+  "download request did not select any harvested datasets",
+);
 console.log(`Queued download for ${result.count} dataset(s).`);

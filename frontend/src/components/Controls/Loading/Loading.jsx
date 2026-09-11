@@ -1,10 +1,10 @@
-import * as React from 'react'
+import * as React from "react";
 
-import ActivityList from '../../ui/ActivityList.jsx'
-import CioosLogo from '../../ui/CioosLogo.jsx'
-import Spinner from '../../ui/Spinner.jsx'
-import { useActivity } from '../../../state/activity/ActivityProvider.jsx'
-import './styles.css'
+import ActivityList from "../../ui/ActivityList.jsx";
+import CioosLogo from "../../ui/CioosLogo.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import { useActivity } from "../../../state/activity/ActivityProvider.jsx";
+import "./styles.css";
 
 // A cover over the nearest positioned ancestor, with the animated CIOOS mark at
 // its centre.
@@ -31,43 +31,55 @@ import './styles.css'
 // Dissolving what's in front of it costs nothing and reveals the map, the
 // legend and the rest of the chrome together. The caller keeps this mounted
 // until onDismissed, since an unmount would cut the fade short.
-export default function Loading ({ variant = 'brand', dismissed = false, onDismissed }) {
+export default function Loading({
+  variant = "brand",
+  dismissed = false,
+  onDismissed,
+}) {
   // Empty outside AppProviders — which is where index.jsx's Suspense fallback
   // renders this, before any of the registry's producers exist.
-  const { labelKeys } = useActivity()
+  const { labelKeys } = useActivity();
 
-  if (variant !== 'brand') {
+  if (variant !== "brand") {
     return (
-      <div className='loading loading-inline'>
+      <div
+        className="loading loading-inline"
+        data-testid="loading-inline"
+        role="status"
+      >
         <Spinner />
       </div>
-    )
+    );
   }
 
   return (
     <div
-      className={`loading loading-brand${dismissed ? ' loading-dismissed' : ''}`}
+      className={`loading loading-brand${dismissed ? " loading-dismissed" : ""}`}
+      data-testid="app-splash"
+      // A full-screen opaque cover that announces nothing is a gap for a screen
+      // reader, and this is the app's longest wait.
+      role="status"
       // Only the cover's own fade ends the splash: the mark's pulse is an
       // animation rather than a transition, so nothing else here fires this.
       onTransitionEnd={(event) => {
-        if (dismissed && event.propertyName === 'opacity') onDismissed?.()
+        if (dismissed && event.propertyName === "opacity") onDismissed?.();
       }}
     >
       {/* The lockup is what the cover centres, and it holds that spot for the
           whole wait: the list of waits hangs off it absolutely, so rows
           arriving and finishing extend the block downwards without ever
           shifting the logo. */}
-      <div className='loadingBrand'>
-        <CioosLogo layout='stacked' />
+      <div className="loadingBrand">
+        <CioosLogo layout="stacked" />
         {/* What the wait is actually made of. The splash is the longest wait in
             the app, so it names its parts rather than leaving the user to
             guess. */}
         <ActivityList
           labelKeys={labelKeys}
-          className='loadingActivity'
+          className="loadingActivity"
           marks={false}
         />
       </div>
     </div>
-  )
+  );
 }

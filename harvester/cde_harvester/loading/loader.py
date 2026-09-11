@@ -8,9 +8,8 @@ from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import text
-
 from prefect import get_run_logger, task
+from sqlalchemy import text
 
 from cde_harvester.core.day_sets import (
     merge_ranges,
@@ -22,7 +21,6 @@ from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.observability import init_sentry
 from cde_harvester.core.schemas import (
     DATASET_ARRAY_DTYPES,
-    OBIS_ARRAY_DTYPES,
     PROFILE_ARRAY_DTYPES,
 )
 
@@ -141,22 +139,22 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
 
     # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
     key_cols = ["dataset_id", "latitude", "longitude"]
-    aggregations = dict(
-        scientific_names=(
+    aggregations = {
+        "scientific_names": (
             "scientific_names",
-            lambda lists: sorted(set(name for lst in lists for name in lst)),
+            lambda lists: sorted({name for lst in lists for name in lst}),
         ),
-        n_records=("n_records", "sum"),
+        "n_records": ("n_records", "sum"),
         # max, not sum: this dedup merges rows that are the SAME cell split by
         # float noise, so their day sets overlap and summing would inflate —
         # the defect this column exists to remove. n_records sums because its
         # occurrence subsets really are disjoint.
-        days=("days", "max"),
-        time_min=("time_min", "min"),
-        time_max=("time_max", "max"),
-        depth_min=("depth_min", "min"),
-        depth_max=("depth_max", "max"),
-    )
+        "days": ("days", "max"),
+        "time_min": ("time_min", "min"),
+        "time_max": ("time_max", "max"),
+        "depth_min": ("depth_min", "min"),
+        "depth_max": ("depth_max", "max"),
+    }
     if has_day_ranges:
         # Union, not max or concat: these rows are the SAME cell split by float
         # noise, so their day sets overlap. merge_ranges is the Python twin of
@@ -260,7 +258,7 @@ def load_cells_copy(df, table_name, transaction, schema=None):
         writer = csv.writer(line, quoting=csv.QUOTE_MINIMAL)
         for row in df.itertuples(index=False, name=None):
             out = []
-            for col, val in zip(cols, row):
+            for col, val in zip(cols, row, strict=True):
                 if val is None or val is pd.NA or (isinstance(val, float) and pd.isna(val)):
                     out.append(r"\N")
                 elif col == "scientific_names":
@@ -473,12 +471,12 @@ def main(folder, incremental=False):
     else:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
 
-    # Griddap metadata columns. All nullable; absent entirely from
-    # pre-griddap harvest folders. The jsonb columns arrive as Python-repr
-    # strings (same CSV contract as eovs); NaN must become None or the JSONB
-    # binding fails. coverage_time_* is parsed to datetime so NaT binds as
-    # NULL on the timestamptz columns.
-    for col in ("grid_variables", "grid_dimensions"):
+    # jsonb metadata columns (table_variables for every dataset type, the two
+    # grid_* ones for griddap). All nullable; absent entirely from older harvest
+    # folders. They arrive as Python-repr strings (same CSV contract as eovs);
+    # NaN must become None or the JSONB binding fails. coverage_time_* is parsed
+    # to datetime so NaT binds as NULL on the timestamptz columns.
+    for col in ("table_variables", "grid_variables", "grid_dimensions"):
         if col in datasets.columns:
             datasets[col] = datasets[col].apply(
                 lambda x: ast.literal_eval(x) if isinstance(x, str) and x else None
@@ -859,7 +857,7 @@ def main(folder, incremental=False):
                     [
                         pk_map.get(key)
                         for key in zip(
-                            prepared["erddap_url"], prepared["dataset_id"]
+                            prepared["erddap_url"], prepared["dataset_id"], strict=True
                         )
                     ],
                     dtype="Int64",
@@ -876,7 +874,7 @@ def main(folder, incremental=False):
                     [
                         pk_map.get(key)
                         for key in zip(
-                            prepared["erddap_url"], prepared["dataset_id"]
+                            prepared["erddap_url"], prepared["dataset_id"], strict=True
                         )
                     ],
                     dtype="Int64",
@@ -1064,13 +1062,12 @@ def main(folder, incremental=False):
             "(may take several minutes, no output until done)",
             vacuum_targets,
         )
-        with _timed("post-load VACUUM ANALYZE", logger):
-            with engine.connect().execution_options(
-                isolation_level="AUTOCOMMIT"
-            ) as conn:
-                if trajectory_points is not None:
-                    conn.execute(text("VACUUM ANALYZE cde.trajectory_hexes"))
-                if trajectory_days is not None:
-                    conn.execute(text("VACUUM ANALYZE cde.trajectory_days"))
-                if trajectory_points is not None:
-                    conn.execute(text("VACUUM ANALYZE cde.trajectory_points"))
+        with _timed("post-load VACUUM ANALYZE", logger), engine.connect().execution_options(
+            isolation_level="AUTOCOMMIT"
+        ) as conn:
+            if trajectory_points is not None:
+                conn.execute(text("VACUUM ANALYZE cde.trajectory_hexes"))
+            if trajectory_days is not None:
+                conn.execute(text("VACUUM ANALYZE cde.trajectory_days"))
+            if trajectory_points is not None:
+                conn.execute(text("VACUUM ANALYZE cde.trajectory_points"))

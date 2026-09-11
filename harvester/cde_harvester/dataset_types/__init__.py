@@ -62,8 +62,9 @@ def extract_track_points(dataset):
 
 # Default registrations. Order matters for reproducible skip messages: it is
 # the order supported_cdm_data_types() reports.
-from cde_harvester.dataset_types.timeseries import TimeSeriesHandler  # noqa: E402
+from cde_harvester.dataset_types.grid import GridHandler  # noqa: E402
 from cde_harvester.dataset_types.profile import ProfileHandler  # noqa: E402
+from cde_harvester.dataset_types.timeseries import TimeSeriesHandler  # noqa: E402
 from cde_harvester.dataset_types.timeseries_profile import (  # noqa: E402
     TimeSeriesProfileHandler,
 )
@@ -71,7 +72,6 @@ from cde_harvester.dataset_types.trajectory import (  # noqa: E402
     TrajectoryHandler,
     TrajectoryProfileHandler,
 )
-from cde_harvester.dataset_types.grid import GridHandler  # noqa: E402
 
 register(TimeSeriesHandler())
 register(ProfileHandler())

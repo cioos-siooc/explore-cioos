@@ -1,8 +1,9 @@
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 const express = require("express");
 const axios = require("axios");
 const { RESP_TYPES } = require("redis");
-const redisClient = require("../utils/redis");
+const { ensureConnected, markDown, withTimeout } = require("../utils/redis");
+const { pipeline } = require("../utils/routePipeline");
 
 const router = express.Router();
 
@@ -35,7 +36,8 @@ const router = express.Router();
  * and the frontend pointed straight at the upstream URL.
  */
 
-const NONNA_WMTS = "https://nonna-geoserver.data.chs-shc.ca/geoserver/gwc/service/wmts";
+const NONNA_WMTS =
+  "https://nonna-geoserver.data.chs-shc.ca/geoserver/gwc/service/wmts";
 
 // The two published grids. NONNA 10 is the 10 m product — sharp enough at z16
 // to show individual wharves — but it only covers surveyed areas; NONNA 100 is
@@ -99,9 +101,10 @@ const ERROR_MAX_AGE_S = 60;
  * MB in practice. Override with NONNA_TILE_CACHE_MAX where the container is
  * memory-tight.
  */
-const TILE_CACHE_MAX = Number(process.env.NONNA_TILE_CACHE_MAX) > 0
-  ? Number(process.env.NONNA_TILE_CACHE_MAX)
-  : 3000;
+const TILE_CACHE_MAX =
+  Number(process.env.NONNA_TILE_CACHE_MAX) > 0
+    ? Number(process.env.NONNA_TILE_CACHE_MAX)
+    : 3000;
 const TILE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const tileCache = new Map();
 
@@ -131,70 +134,22 @@ function cacheSet(key, body) {
 const REDIS_TTL_S = 30 * 24 * 60 * 60;
 const redisKey = (key) => `nonna:tile:${key}`;
 
-/*
- * Every redis call is bounded. node-redis keeps retrying a refused connection
- * under its default reconnect strategy, so an un-raced `await connect()` never
- * settles when redis is down — which stalls the tile request behind it and
- * hangs the layer. The cache is an optimisation; it must fail in milliseconds,
- * not hold the map hostage.
- */
-const REDIS_CONNECT_TIMEOUT_MS = 2000;
+// Reads and writes are bounded for the same reason the connect is (see
+// utils/redis): the tile cache is an optimisation and must fail in
+// milliseconds rather than hang the bathymetry layer.
 const REDIS_OP_TIMEOUT_MS = 1000;
-// After a failure, stop trying for a while rather than paying the timeout on
-// every tile — but do retry eventually, so a redis that comes back is picked up
-// without restarting the API.
-const REDIS_RETRY_AFTER_MS = 60000;
-
-let redisReadyPromise = null;
-let redisUnavailableUntil = 0;
-
-function withTimeout(promise, ms, label) {
-  let timer;
-  const bell = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    // Don't let a pending timer keep the process alive.
-    if (timer.unref) timer.unref();
-  });
-  return Promise.race([promise, bell]).finally(() => clearTimeout(timer));
-}
-
-function markRedisDown(reason) {
-  console.warn("NONNA: redis unavailable, serving without it:", reason);
-  redisUnavailableUntil = Date.now() + REDIS_RETRY_AFTER_MS;
-  redisReadyPromise = null;
-}
 
 /*
  * Resolves to a redis client that returns Buffers, or null if redis is not
- * usable right now.
- *
- * The connect is single-flight for the reason utils/cache documents: redis@5
- * throws "Socket already opened" on a second connect(). That module races this
- * one at startup on the SAME shared client, so `isOpen` can still be false
- * while its connect is in flight — hence catching that specific error and
- * carrying on rather than treating it as a failure.
+ * usable right now. The connect lifecycle — single-flight, timeout, retry
+ * window — lives in utils/redis, which owns the client that utils/cache shares
+ * with this module; all that is left here is the Buffer type mapping the tile
+ * bodies need.
  */
-function ensureRedis() {
-  if (Date.now() < redisUnavailableUntil) return Promise.resolve(null);
-  if (redisReadyPromise) return redisReadyPromise;
-  redisReadyPromise = (async () => {
-    try {
-      if (!redisClient.isOpen) {
-        await withTimeout(
-          redisClient.connect(),
-          REDIS_CONNECT_TIMEOUT_MS,
-          "redis connect",
-        );
-      }
-    } catch (e) {
-      if (!/already opened/i.test(e.message) || !redisClient.isOpen) {
-        markRedisDown(e.message);
-        return null;
-      }
-    }
-    return redisClient.withTypeMapping({ [RESP_TYPES.BLOB_STRING]: Buffer });
-  })();
-  return redisReadyPromise;
+async function ensureRedis() {
+  const client = await ensureConnected();
+  if (!client) return null;
+  return client.withTypeMapping({ [RESP_TYPES.BLOB_STRING]: Buffer });
 }
 
 async function redisGet(key) {
@@ -208,7 +163,7 @@ async function redisGet(key) {
     );
     return Buffer.isBuffer(body) && body.length ? body : null;
   } catch (e) {
-    markRedisDown(`read failed: ${e.message}`);
+    markDown(`NONNA tile read failed: ${e.message}`);
     return null;
   }
 }
@@ -223,7 +178,7 @@ async function redisSet(key, body) {
       "redis set",
     );
   } catch (e) {
-    markRedisDown(`write failed: ${e.message}`);
+    markDown(`NONNA tile write failed: ${e.message}`);
   }
 }
 
@@ -277,84 +232,80 @@ function sendTile(res, body, maxAgeSeconds) {
  *         description: Unknown layer, or tile coordinates outside the zoom's grid.
  */
 /* GET /nonna/:layer/:z/:x/:y.png */
-router.get("/:layer/:z/:x/:y.png", async (req, res) => {
-  const {
-    layer, z, x, y,
-  } = req.params;
+// The tile-coordinate check is the shared one (utils/routePipeline.js) — it
+// rejects out-of-grid indices rather than forwarding them, because upstream
+// would answer anyway and each forwarded request is one we made CHS serve.
+// No apicache: this route runs its own two-tier tile cache below.
+router.get(
+  "/:layer/:z/:x/:y.png",
+  ...pipeline({
+    filters: false,
+    cacheFor: null,
+    tileParams: { maxZoom: MAX_ZOOM },
+  }),
+  async (req, res) => {
+    const { layer, z, x, y } = req.params;
 
-  const wmtsLayer = LAYERS[layer];
-  if (!wmtsLayer) {
-    return res
-      .status(400)
-      .json({ error: `unknown NONNA layer '${layer}'; expected 10 or 100` });
-  }
+    const wmtsLayer = LAYERS[layer];
+    if (!wmtsLayer) {
+      return res.status(400).json({
+        errors: [`unknown NONNA layer '${layer}'; expected 10 or 100`],
+      });
+    }
 
-  const zoom = Number(z);
-  const col = Number(x);
-  const row = Number(y);
-  if (!Number.isInteger(zoom) || zoom < 0 || zoom > MAX_ZOOM) {
-    return res.status(400).json({ error: `zoom must be an integer 0-${MAX_ZOOM}` });
-  }
-  // Reject out-of-grid indices rather than forwarding them: upstream would
-  // answer anyway, and each forwarded request is one we made CHS serve.
-  const tilesPerAxis = 2 ** zoom;
-  if (
-    !Number.isInteger(col) || col < 0 || col >= tilesPerAxis
-    || !Number.isInteger(row) || row < 0 || row >= tilesPerAxis
-  ) {
-    return res
-      .status(400)
-      .json({ error: `tile ${col}/${row} is outside the grid at zoom ${zoom}` });
-  }
+    const zoom = Number(z);
+    const col = Number(x);
+    const row = Number(y);
 
-  const key = `${layer}/${zoom}/${col}/${row}`;
-  const cached = cacheGet(key);
-  if (cached) {
-    return sendTile(res, cached, BROWSER_MAX_AGE_S);
-  }
+    const key = `${layer}/${zoom}/${col}/${row}`;
+    const cached = cacheGet(key);
+    if (cached) {
+      return sendTile(res, cached, BROWSER_MAX_AGE_S);
+    }
 
-  // L2. Promote into L1 on the way out so a region being panned around does not
-  // pay the redis round trip per tile.
-  const fromRedis = await redisGet(key);
-  if (fromRedis) {
-    cacheSet(key, fromRedis);
-    return sendTile(res, fromRedis, BROWSER_MAX_AGE_S);
-  }
+    // L2. Promote into L1 on the way out so a region being panned around does not
+    // pay the redis round trip per tile.
+    const fromRedis = await redisGet(key);
+    if (fromRedis) {
+      cacheSet(key, fromRedis);
+      return sendTile(res, fromRedis, BROWSER_MAX_AGE_S);
+    }
 
-  try {
-    const upstream = await axios.get(NONNA_WMTS, {
-      params: {
-        service: "WMTS",
-        version: "1.0.0",
-        request: "GetTile",
-        layer: wmtsLayer,
-        style: "",
-        tilematrixset: TILE_MATRIX_SET,
-        format: "image/png",
-        tilematrix: `${TILE_MATRIX_SET}:${zoom}`,
-        tilerow: row,
-        tilecol: col,
-      },
-      responseType: "arraybuffer",
-      timeout: UPSTREAM_TIMEOUT_MS,
-    });
+    try {
+      const upstream = await axios.get(NONNA_WMTS, {
+        params: {
+          service: "WMTS",
+          version: "1.0.0",
+          request: "GetTile",
+          layer: wmtsLayer,
+          style: "",
+          tilematrixset: TILE_MATRIX_SET,
+          format: "image/png",
+          tilematrix: `${TILE_MATRIX_SET}:${zoom}`,
+          tilerow: row,
+          tilecol: col,
+        },
+        responseType: "arraybuffer",
+        timeout: UPSTREAM_TIMEOUT_MS,
+      });
 
-    const body = Buffer.from(upstream.data);
-    cacheSet(key, body);
-    // Not awaited: the tile is already in hand, and a slow or dead redis must
-    // not hold up the response. redisSet swallows its own errors.
-    redisSet(key, body);
-    return sendTile(res, body, BROWSER_MAX_AGE_S);
-  } catch (e) {
-    // A 403 here means CHS changed the allowlist or the gateway rules; anything
-    // else is a timeout or an upstream error. Either way the map should stay
-    // usable, so serve a transparent tile on a short TTL.
-    console.error(
-      `NONNA tile ${key} failed:`,
-      e.response ? `upstream ${e.response.status}` : e.message,
-    );
-    return sendTile(res, TRANSPARENT_PNG, ERROR_MAX_AGE_S);
-  }
-});
+      const body = Buffer.from(upstream.data);
+      cacheSet(key, body);
+      // Not awaited: the tile is already in hand, and a slow or dead redis must
+      // not hold up the response. redisSet swallows its own errors.
+      redisSet(key, body);
+      return sendTile(res, body, BROWSER_MAX_AGE_S);
+    } catch (e) {
+      // A 403 here means CHS changed the allowlist or the gateway rules; anything
+      // else is a timeout or an upstream error. Either way the map should stay
+      // usable, so serve a transparent tile on a short TTL.
+      console.error(
+        `NONNA tile ${key} failed:`,
+        e.response ? `upstream ${e.response.status}` : e.message,
+      );
+      return sendTile(res, TRANSPARENT_PNG, ERROR_MAX_AGE_S);
+    }
+  },
+);
 
 module.exports = router;

@@ -5,21 +5,20 @@ Each test builds a mock Dataset, sets specific attributes, and verifies
 whether the compliance checker passes or rejects it with the right code.
 """
 
-import pytest
 
+from cde_harvester.core.errors import (
+    DEPTH_AND_ALTITUDE,
+    INGEST_FLAG_FALSE,
+    MISSING_REQUIRED_VARS,
+    NO_SUPPORTED_VARIABLES,
+)
+from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
 from conftest import (
     ERDDAP_INFO_CSV,
     ERDDAP_INFO_DEPTH_AND_ALTITUDE_CSV,
     ERDDAP_INFO_INGEST_FALSE_CSV,
     ERDDAP_INFO_NO_EOVS_CSV,
     build_mock_dataset,
-)
-from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
-from cde_harvester.core.errors import (
-    DEPTH_AND_ALTITUDE,
-    INGEST_FLAG_FALSE,
-    MISSING_REQUIRED_VARS,
-    NO_SUPPORTED_VARIABLES,
 )
 
 

@@ -60,6 +60,7 @@
   justify-content: center;
   gap: 8px;
   min-width: 0;
+
   /* min-height, not height: the Datasets segment stacks a label over its
      counts, and a long label can take a second line on a narrow viewport.
      All three segments stretch together (the grid's align-items), so the
@@ -67,18 +68,21 @@
   min-height: 40px;
   padding: 4px 10px;
   border: none;
+
   /* Square, not the generic dropdown chrome's rounded corners — the row's
      only curve is the outer one .topBarActions cuts at its own bottom
      corners. */
   border-radius: 0;
+
   /* Dimmed primary: a translucent teal wash that highlights the three entry
      points without competing with the white brand row above them. */
-  background-color: rgba(82, 167, 155, 0.14);
+  background-color: rgb(82 167 155 / 14%);
   font: inherit;
   font-weight: 600;
   color: var(--cioos-primary-700);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
+  transition:
+    background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
 }
 
@@ -110,6 +114,7 @@
   /* Floor the label at its longest word so flex shrinking can't squeeze it
      narrower than "données" and split the word. */
   min-width: min-content;
+
   /* Not centered: a wrapped label's box is as wide as its longest line, so
      centering set the short first line ("Jeux") adrift in the middle of it and
      opened a gap between the icon and the text that read as a layout error.
@@ -118,6 +123,7 @@
      wide as its text, so this changes nothing for the other segments. */
   text-align: start;
   line-height: 1.2;
+
   /* break-word, not anywhere: a word only ever splits when it cannot fit on a
      line of its own, so "données" drops to its own line instead of breaking
      into "don / nées" on the narrowest phones. */
@@ -132,11 +138,12 @@
    weld; only the leading one — always the Datasets toggle, the first DOM
    child of .topBarActions — has nothing to its left to weld against. */
 .topBar .topBarActions .topBarButton {
-  border-left: 1px solid rgba(82, 167, 155, 0.32);
+  border-left: 1px solid rgb(82 167 155 / 32%);
 }
 
 .topBarActions > .topBarButton:first-child {
   border-left: none;
+
   /* Matches .topBarActions' own bottom-left radius. The row's overflow:hidden
      clips a plain button to that curve, but .active (below) promotes the
      button to its own compositing layer via transform + box-shadow, and that
@@ -156,7 +163,7 @@
 }
 
 .topBar .topBarActions .topBarButton:hover {
-  background-color: rgba(82, 167, 155, 0.24);
+  background-color: rgb(82 167 155 / 24%);
 }
 
 /* Applied-but-closed state: a shape stays drawn, or filters stay set, after
@@ -191,7 +198,8 @@
   background-color: var(--cioos-primary);
   color: var(--cioos-white);
   transform: var(--cioos-perspective);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 55%),
     var(--cioos-shadow-3d-sm);
 }
 
@@ -246,6 +254,7 @@
    the strip stays a line of type. */
 .topBarCountsInView {
   padding: 0;
+
   /* Breathing room inside the brackets. A margin rather than padding so the
      underline stays under the words and doesn't run out to the brackets. */
   margin: 0 4px;
@@ -294,7 +303,7 @@
 /* On the active (teal) tab the badge stays white too — a translucent white
    pill keeps the number legible without a dark-on-white patch. */
 .topBarButton.active .topBarCount {
-  background-color: rgba(255, 255, 255, 0.24);
+  background-color: rgb(255 255 255 / 24%);
   color: var(--cioos-white);
 }
 
@@ -309,14 +318,17 @@
     top: 0;
     left: 0;
     right: 0;
+
     /* The centering translate has nothing left to centre and would only pull
        the full-width bar off the screen. */
     transform: none;
     max-width: none;
+
     /* Load-bearing: the column centres its children, which leaves the brand
        card shrink-to-fit — its own `width: 100%` would then resolve against
        that shrunken box and never reach the screen edges. */
     align-items: stretch;
+
     /* Only the chips are still a floating layer under the header, so the gap
        belongs to them rather than to the stack. */
     gap: 6px;
@@ -359,6 +371,7 @@
 
   .topBar .topBarActions .topBarButton {
     gap: 6px;
+
     /* Taller, not wider: a 40px row is a cramped touch target for the app's
        three primary entry points, and the height is the dimension a phone can
        spare. */
@@ -387,6 +400,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+
   /* The same width as the brand card above (see TopLeft/styles.css, which
      defines the token and the viewport cap): the chips read as that card's
      own footer rather than a row of loose pills spilling wider than it. */
@@ -400,12 +414,14 @@
 .activeFilterGroup {
   pointer-events: all;
   display: inline-flex;
+
   /* The label (left) and clear-all (right) are fixed rails that stretch to
      the group's full height; only the value chips in the middle wrap, so the
      group grows taller with the rails following suit. */
   align-items: stretch;
   flex-wrap: nowrap;
   gap: 4px;
+
   /* A group never reaches past the row it sits in — which is the brand card's
      width; past that the value chips wrap in the middle lane (below). */
   max-width: 100%;
@@ -413,6 +429,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   padding: 3px;
+
   /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder.
      preserve-3d floats the inner value chips above the pill face. */
   transform: var(--cioos-perspective);
@@ -449,13 +466,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+
   /* Centre the chips both ways while they fit. The `safe` keyword is load-bearing:
      plain `center` alignment centres the overflow too, pushing the first rows above
      the scroll origin where they can't be reached. `safe` falls back to flex-start
      once the content overflows so every row stays scrollable. */
-  justify-content: safe center;
-  align-content: safe center;
+  place-content: safe center safe center;
   gap: 4px;
+
   /* Cap the lane at ~three rows of chips; anything beyond scrolls vertically
      so the group stays compact while the two rails hold their full height. */
   max-height: 78px;
@@ -485,7 +503,8 @@
   border-radius: var(--cioos-radius-sm);
   color: var(--cioos-ink-60);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
+  transition:
+    background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
 }
 
@@ -526,7 +545,8 @@
   border-radius: 50%;
   color: var(--cioos-ink-60);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
+  transition:
+    background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
 }
 
@@ -593,6 +613,7 @@
   flex-direction: column;
   align-items: center;
   gap: 5px;
+
   /* The chips' width, so the bar's lower layers line up as one column. */
   max-width: min(var(--cioos-brand-width), calc(100vw - 24px));
   padding: 6px 10px 8px;

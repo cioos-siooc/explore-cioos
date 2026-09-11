@@ -4,25 +4,69 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import requests
+from requests.exceptions import HTTPError
+
 from cde_harvester.core.observability import run_logger
+from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import (
     eov_to_standard_name,
     intersection,
     standard_name_to_eovs,
 )
-from requests.exceptions import HTTPError
 
 
 def is_valid_duration(duration):
     try:
         pd.Timedelta(duration)
         return True
-    except:
+    except (ValueError, TypeError):
+        # pd.Timedelta rejects an unparseable string with ValueError and a
+        # non-string with TypeError; anything else here is a real bug.
         return False
 
 
-class Dataset(object):
+# Per-variable attributes pulled out of /info/{id}/index.csv and kept on
+# df_variables. ERDDAP publishes far more than this; anything not listed here is
+# dropped when get_metadata() pivots the info frame.
+#
+#   identity/units    cf_role, standard_name, units, long_name, axis,
+#                     actual_range   - the original set, used for EOV mapping,
+#                     CF-role detection and the griddap variable/dimension jsonb.
+#   colour            colorBar*      - the publisher's intended colour ramp and
+#                     range for a variable. Only ~18% of variables declare a
+#                     palette, so consumers must have a default.
+#   grouping          ioos_category  - variable families (Temperature, Salinity,
+#                     Optical Properties, Identifier...), ~48% coverage.
+#   axis direction    positive       - "down" | "up" on a vertical coordinate.
+#                     A depth axis has to be drawn reversed and this is the only
+#                     attribute that says so; ~41 variables declare it.
+#   quality flags     flag_values, flag_meanings, ancillary_variables - how a QC
+#                     flag column announces itself, so plots can exclude them.
+#
+# tests/conftest.py imports this list rather than restating it: the fixtures
+# built by build_variables_df() must pivot exactly what production pivots.
+CONSIDERED_VARIABLE_ATTRIBUTES = [
+    "cf_role",
+    "standard_name",
+    "actual_range",
+    "units",
+    "long_name",
+    "axis",
+    "positive",
+    "colorBarPalette",
+    "colorBarMinimum",
+    "colorBarMaximum",
+    "colorBarScale",
+    "colorBarContinuous",
+    "ioos_category",
+    "flag_values",
+    "flag_meanings",
+    "ancillary_variables",
+]
+
+
+class Dataset:
     def __init__(self, erddap_server, id, data_structure="table"):
         self.id = id
         self.erddap_server = erddap_server
@@ -66,6 +110,9 @@ class Dataset(object):
         self.coverage_depth_max = None
         self.grid_variables = None
         self.grid_dimensions = None
+        # Per-variable metadata for every column, griddap and tabledap alike.
+        # get_metadata() fills it; see core/variables.py for why.
+        self.table_variables = None
 
         self.get_metadata()
 
@@ -102,6 +149,7 @@ class Dataset(object):
                 "coverage_time_max": [self.coverage_time_max],
                 "coverage_depth_min": [self.coverage_depth_min],
                 "coverage_depth_max": [self.coverage_depth_max],
+                "table_variables": [self.table_variables],
                 "grid_variables": [self.grid_variables],
                 "grid_dimensions": [self.grid_dimensions],
                 "wms_url": [self.wms_url],
@@ -118,7 +166,8 @@ class Dataset(object):
     def get_max_min(self, vars):
         """
         Get max/min values for each of certain variables, in each profile
-        usually time,depth (lat/long are handle differently since the min of lat,lon might not be a point in the dataset)
+        usually time,depth (lat/long are handle differently since the min of
+        lat,lon might not be a point in the dataset)
         """
 
         url = f"{','.join(vars)}" + requests.utils.quote(
@@ -160,7 +209,7 @@ class Dataset(object):
         )
 
         # sorting so the url is consistent every time for query caching
-        profile_variable_list = sorted(list(profile_variables.values()))
+        profile_variable_list = sorted(profile_variables.values())
         self.profile_variables = profile_variables
 
         self.timeseries_id_variable = profile_variables.get("timeseries_id")
@@ -216,7 +265,7 @@ class Dataset(object):
             and time_coverage_resolution
             and is_valid_duration(time_coverage_resolution)
         ):
-            self.logger.debug(f"Using time_coverage_resolution for count")
+            self.logger.debug("Using time_coverage_resolution for count")
             df_profile_ids = self.profile_ids.copy()
             readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
                 time_coverage_resolution
@@ -340,7 +389,7 @@ class Dataset(object):
 
         # transform this JSON to an easier to use format
         url = "/info/" + self.id + "/index.csv"
-        # erddap_csv_to_df's skiprows defaults to [1]
+        # erddap_csv_to_df's skiprows defaults to (1,)
         df = self.erddap_csv_to_df(url, skiprows=[], dataset=self).fillna("")
 
         if df.empty:
@@ -351,10 +400,9 @@ class Dataset(object):
         # "dimension"/"variable" rows (tabledap types never need it).
         self.df_info = df
 
-        considered_attributes = [
-            "cf_role", "standard_name", "actual_range", "units", "long_name",
-            "axis",
-        ]
+        # Read by the @-reference in the df.query() below, which ruff
+        # cannot see into.
+        considered_attributes = CONSIDERED_VARIABLE_ATTRIBUTES  # noqa: F841
 
         data_types = df.query(
             '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'
@@ -391,10 +439,13 @@ class Dataset(object):
         )
         self.globals = globals_dict
 
-        if not "standard_name" in df_variables:
+        if "standard_name" not in df_variables:
             df_variables["standard_name"] = None
         df_variables.set_index("name", drop=False, inplace=True)
         self.df_variables = df_variables
+        # Every column, coordinates and cf_role variables included: the preview
+        # needs those to choose a shared axis and to exclude them from panels.
+        self.table_variables = extract_variables(df_variables)
         self.eovs = self.get_eovs()
 
         # Try to get organizations list from globals, starting with "institution"
@@ -413,7 +464,7 @@ class Dataset(object):
             organization_fields.append("contributor")
 
         self.organizations = list(
-            filter(None, set([globals_dict.get(x) for x in organization_fields]))
+            filter(None, {globals_dict.get(x) for x in organization_fields})
         )
 
         self.platform = self.get_platform_code()

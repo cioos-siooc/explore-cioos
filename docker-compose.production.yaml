@@ -9,20 +9,21 @@
 services:
   db:
     ports:
-      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
+      # Bound to one interface, not 0.0.0.0. This port IS needed here: the
+      # harvester and any remote prefect_worker run outside this compose
+      # project and reach Postgres over the VPN at DB_HOST_EXTERNAL
+      # (docker-compose.worker.yaml). Published bare, though, it also listened
+      # on every other interface of the host — inverted from local dev, which
+      # deliberately publishes nothing.
+      #
+      # DB_BIND_ADDRESS should be the host's VPN address (the same one
+      # DB_HOST_EXTERNAL points at). It defaults to loopback so a host that
+      # forgets to set it fails closed rather than exposing the database.
+      - "${DB_BIND_ADDRESS:-127.0.0.1}:${DB_PORT:-5432}:${DB_PORT:-5432}"
 
   nginx:
     ports:
       - "${NGINX_PORT:-8098}:4000"
-
-  frontend:
-    build:
-      args:
-        ENVIRONMENT: $ENVIRONMENT
-        SENTRY_RELEASE: $SENTRY_RELEASE
-        SENTRY_AUTH_TOKEN: $SENTRY_AUTH_TOKEN
-        SENTRY_ORG: $SENTRY_ORG
-        SENTRY_PROJECT: $SENTRY_PROJECT
 
   prefect:
     ports:

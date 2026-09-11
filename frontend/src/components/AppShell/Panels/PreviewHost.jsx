@@ -1,23 +1,22 @@
-import * as React from 'react'
+import * as React from "react";
 
-import DatasetPreview from '../../Controls/DatasetPreview/DatasetPreview.jsx'
-import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
+import DatasetPreview from "../../Controls/DatasetPreview/DatasetPreview.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
 // Keeps the record-preview modal mounted at the shell level so it survives
 // panel swaps (its open/close state lives in the selection provider).
-export default function PreviewHost () {
+export default function PreviewHost() {
   const {
     datasetPreview,
     setDatasetPreview,
     inspectDataset,
     setInspectDataset,
     showPreviewModal,
-    setShowPreviewModal,
     inspectRecordID,
     setInspectRecordID,
     recordLoading,
-    setRecordLoading
-  } = useSelection()
+    setRecordLoading,
+  } = useSelection();
 
   return (
     <DatasetPreview
@@ -25,12 +24,11 @@ export default function PreviewHost () {
       setDatasetPreview={setDatasetPreview}
       inspectDataset={inspectDataset}
       setInspectDataset={setInspectDataset}
-      showModal={showPreviewModal || recordLoading}
-      setShowModal={setShowPreviewModal}
+      showModal={showPreviewModal}
       inspectRecordID={inspectRecordID}
       setInspectRecordID={setInspectRecordID}
       recordLoading={recordLoading}
       setRecordLoading={setRecordLoading}
     />
-  )
+  );
 }

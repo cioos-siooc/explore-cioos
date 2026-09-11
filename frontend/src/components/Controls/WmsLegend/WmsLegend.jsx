@@ -1,23 +1,25 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { ChevronUp, Grid3x3Gap, X } from 'react-bootstrap-icons'
-import classNames from 'classnames'
-import { Dropdown, DropdownButton } from '../../ui/Dropdown.jsx'
-import { useTranslation } from 'react-i18next'
+import React, { useRef, useState } from "react";
+import { ChevronUp, Grid3x3Gap, X } from "react-bootstrap-icons";
+import classNames from "classnames";
+import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
+import { useTranslation } from "react-i18next";
 
-import { abbreviateString, useDebounce } from '../../../utilities'
-import { buildGriddapLegendUrl } from '../../../wmsUtilities'
-import { GridTimeSlice, GridDepthSlice } from '../GridSlice/GridSlice.jsx'
-import usePublishedFootprint from '../../../state/ui/usePublishedFootprint.js'
-import useMediaQuery, { MOBILE_QUERY } from '../../../state/ui/useMediaQuery.js'
-import './styles.css'
+import { abbreviateString, useChanged, useDebounce } from "../../../utilities";
+import { buildGriddapLegendUrl } from "../../../wmsUtilities";
+import { GridTimeSlice, GridDepthSlice } from "../GridSlice/GridSlice.jsx";
+import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
+import "./styles.css";
 
 // How far up the bottom-right corner this card reaches, plus a gap — the same
 // measurement whether it is the card or the button it folds into. MapLibre's
 // own controls sit in that corner and step up over whichever is there; the
 // property is cleared when the overlay goes away, and the controls drop back.
-const CORNER_STACK_GAP = 8
-function measureWmsLegendSpace ({ top }) {
-  return window.innerHeight - top + CORNER_STACK_GAP
+const CORNER_STACK_GAP = 8;
+function measureWmsLegendSpace({ top }) {
+  return window.innerHeight - top + CORNER_STACK_GAP;
 }
 
 // Below this width the card is a large fraction of the map it is drawn over,
@@ -29,7 +31,7 @@ function measureWmsLegendSpace ({ top }) {
 // bottom-right corner now, which nothing else reaches, so what is left is the
 // plain question of how much of a small screen a colorbar should take — which
 // is the app's own phone breakpoint, and not a number of this card's own.
-const COMPACT_QUERY = MOBILE_QUERY
+const COMPACT_QUERY = MOBILE_QUERY;
 
 // Card shown while a griddap WMS overlay is active: the colorbar, the variable
 // picker over it, and the overlay's always-available off switch. It renders
@@ -53,33 +55,32 @@ export default function WmsLegend({
   overlay,
   onClose,
   setActiveWmsOverlay,
-  variant = 'floating'
+  variant = "floating",
 }) {
-  const { t } = useTranslation()
-  const [legendFailed, setLegendFailed] = useState(false)
+  const { t } = useTranslation();
+  const [legendFailed, setLegendFailed] = useState(false);
 
   // Only the floating card is drawn over the map; the inline one is inside the
   // dataset page and always has its own room.
-  const isCompact = useMediaQuery(COMPACT_QUERY) && variant === 'floating'
-  const [compactOpen, setCompactOpen] = useState(false)
+  const isCompact = useMediaQuery(COMPACT_QUERY) && variant === "floating";
+  const [compactOpen, setCompactOpen] = useState(false);
 
   // Attached to whichever of the two the floating variant is showing, and to
   // neither when this card is inline — nothing in the map's corner then.
-  const cornerRef = useRef(null)
+  const cornerRef = useRef(null);
   usePublishedFootprint(
     cornerRef,
-    '--cioos-wms-legend-space',
-    measureWmsLegendSpace
-  )
+    "--cioos-wms-legend-space",
+    measureWmsLegendSpace,
+  );
 
-  const variables = overlay.variables || []
+  const variables = overlay.variables || [];
 
   // "long_name (units)" on a single line — the units are folded into the
   // picker label rather than shown on a separate line beneath it.
   function variableLabel(variable) {
-    const name =
-      variable.long_name || variable.standard_name || variable.name
-    return variable.units ? `${name} (${variable.units})` : name
+    const name = variable.long_name || variable.standard_name || variable.name;
+    return variable.units ? `${name} (${variable.units})` : name;
   }
 
   // The legend is asked for the slice actually on the map, so its caption
@@ -92,12 +93,13 @@ export default function WmsLegend({
       variable: overlay.variable?.name,
       dimensions: overlay.dimensions,
       time: overlay.time,
-      elevation: overlay.elevation
+      elevation: overlay.elevation,
     }),
-    400
-  )
+    400,
+  );
 
-  useEffect(() => setLegendFailed(false), [legendUrl])
+  // A new legend image gets a fresh chance to load.
+  if (useChanged(legendUrl)) setLegendFailed(false);
 
   // Stood down to a button (see COMPACT_QUERY). It names the variable rather
   // than saying "Legend": what the overlay is drawing is the one thing worth
@@ -110,26 +112,26 @@ export default function WmsLegend({
   if (isCompact && !compactOpen) {
     return (
       <button
-        type='button'
-        className='wmsLegendPeek'
+        type="button"
+        className="wmsLegendPeek"
         ref={cornerRef}
         onClick={() => setCompactOpen(true)}
-        title={t('wmsLegendShowTitle')}
+        title={t("wmsLegendShowTitle")}
       >
-        <Grid3x3Gap size={15} color='#52a79b' aria-hidden='true' />
-        <span className='wmsLegendPeekLabel'>
+        <Grid3x3Gap size={15} color="#52a79b" aria-hidden="true" />
+        <span className="wmsLegendPeekLabel">
           {overlay.variable
             ? variableLabel(overlay.variable)
-            : t('wmsLegendShowTitle')}
+            : t("wmsLegendShowTitle")}
         </span>
       </button>
-    )
+    );
   }
 
   return (
     <div
-      className={classNames('wmsLegend', variant, { compactOpen: isCompact })}
-      ref={variant === 'floating' ? cornerRef : undefined}
+      className={classNames("wmsLegend", variant, { compactOpen: isCompact })}
+      ref={variant === "floating" ? cornerRef : undefined}
     >
       {/* One row above the image, holding the two controls: what is drawn, and
           the way out. It sits above rather than over the image because the top
@@ -137,16 +139,16 @@ export default function WmsLegend({
           without covering a reading. A dataset serving one variable has
           nothing to pick, and the image has already named it — then the row is
           the close button alone. */}
-      <div className='wmsLegendHeader'>
+      <div className="wmsLegendHeader">
         {variables.length > 1 && (
           <DropdownButton
-            className='wmsLegendVariableSelector'
-            size='sm'
-            variant='outline-secondary'
-            tooltip={t('griddapVariableSelect')}
+            className="wmsLegendVariableSelector"
+            size="sm"
+            variant="outline-secondary"
+            tooltip={t("griddapVariableSelect")}
             title={
-              <span className='wmsLegendVariableName'>
-                {overlay.variable ? variableLabel(overlay.variable) : ''}
+              <span className="wmsLegendVariableName">
+                {overlay.variable ? variableLabel(overlay.variable) : ""}
               </span>
             }
           >
@@ -166,58 +168,58 @@ export default function WmsLegend({
             and it is only here where the card has a button to fold back to. */}
         {isCompact && (
           <button
-            className='wmsLegendCloseButton'
+            className="wmsLegendCloseButton"
             onClick={() => setCompactOpen(false)}
-            title={t('wmsLegendCollapseTitle')}
-            aria-label={t('wmsLegendCollapseTitle')}
+            title={t("wmsLegendCollapseTitle")}
+            aria-label={t("wmsLegendCollapseTitle")}
           >
             <ChevronUp size={16} />
           </button>
         )}
         <button
-          className='wmsLegendCloseButton'
+          className="wmsLegendCloseButton"
           onClick={onClose}
-          title={t('wmsLegendCloseTitle')}
-          aria-label={t('wmsLegendCloseTitle')}
+          title={t("wmsLegendCloseTitle")}
+          aria-label={t("wmsLegendCloseTitle")}
         >
           <X size={16} />
         </button>
       </div>
       {legendUrl && !legendFailed ? (
         <a
-          className='wmsLegendFigure'
+          className="wmsLegendFigure"
           href={overlay.erddapUrl}
-          target='_blank'
-          rel='noreferrer'
+          target="_blank"
+          rel="noreferrer"
           title={overlay.erddapUrl}
         >
           <img
-            className='wmsLegendImage'
+            className="wmsLegendImage"
             src={legendUrl}
-            alt={`${overlay.variable?.name} ${t('griddapLegendAltText')}`}
+            alt={`${overlay.variable?.name} ${t("griddapLegendAltText")}`}
             onError={() => setLegendFailed(true)}
           />
         </a>
       ) : (
         // With no image there is nothing to read the dataset off, so the card
         // says it itself — the one case it has to.
-        <div className='wmsLegendFallback'>
+        <div className="wmsLegendFallback">
           <a
-            className='wmsLegendTitle'
+            className="wmsLegendTitle"
             href={overlay.erddapUrl}
-            target='_blank'
-            rel='noreferrer'
+            target="_blank"
+            rel="noreferrer"
             title={overlay.erddapUrl}
           >
             {abbreviateString(overlay.title, 45)}
           </a>
           {overlay.variable && (
-            <div className='wmsLegendVariable'>
+            <div className="wmsLegendVariable">
               {variableLabel(overlay.variable)}
             </div>
           )}
-          <div className='wmsLegendUnavailable'>
-            {t('griddapLegendUnavailable')}
+          <div className="wmsLegendUnavailable">
+            {t("griddapLegendUnavailable")}
           </div>
         </div>
       )}
@@ -229,9 +231,8 @@ export default function WmsLegend({
       />
       <GridDepthSlice
         overlay={overlay}
-        onChange={(elevation) =>
-          setActiveWmsOverlay({ ...overlay, elevation })}
+        onChange={(elevation) => setActiveWmsOverlay({ ...overlay, elevation })}
       />
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 import {
   CheckCircleFill,
   CircleFill,
@@ -8,18 +8,18 @@ import {
   XCircle,
   Server,
   PinMapFill,
-  FileEarmarkSpreadsheet
-} from 'react-bootstrap-icons'
-import classNames from 'classnames'
-import bytes from 'bytes'
-import isEmpty from 'lodash/isEmpty'
+  FileEarmarkSpreadsheet,
+} from "react-bootstrap-icons";
+import classNames from "classnames";
+import bytes from "bytes";
+import isEmpty from "lodash-es/isEmpty";
 
-import platformColors from '../../platformColors'
-import { formatErddapServerName } from '../../../utilities'
-import { formatGridSize } from '../../../wmsUtilities'
-import erddapServersJSONfile from '../../../erddapServers.json'
-import Spinner from '../../ui/Spinner.jsx'
-import Tooltip from '../../ui/Tooltip.jsx'
+import platformColors from "../../platformColors";
+import { formatErddapServerName } from "../../../utilities";
+import { formatGridSize } from "../../../wmsUtilities";
+import erddapServersJSONfile from "../../../erddapServers.json";
+import Spinner from "../../ui/Spinner.jsx";
+import Tooltip from "../../ui/Tooltip.jsx";
 
 // A single dataset rendered as a card. Shared shell for the sidebar list and
 // the download-review modal; the modal variant (isDownloadModal) adds the
@@ -31,8 +31,8 @@ export default function DatasetCard({
   estimatesLoading,
   onSelect,
   onInspect,
-  onHover = () => { },
-  onHoverEnd = () => { },
+  onHover = () => {},
+  onHoverEnd = () => {},
   // The card's group is hidden from the map: the dataset stays in the list
   // (and downloadable), so it's dimmed rather than dropped.
   hiddenFromMap,
@@ -42,71 +42,76 @@ export default function DatasetCard({
   // itself.
   fromMapClick,
   t,
-  i18n
+  i18n,
 }) {
-  const isGrid = row.cdm_data_type === 'Grid'
+  const isGrid = row.cdm_data_type === "Grid";
   // griddap is metadata-only, and in the modal a dataset is only selectable
   // when the CDE can deliver it (internalDownload).
-  const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload)
-  const estimatesReady = !isEmpty(downloadSizeEstimates)
+  const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload);
+  const estimatesReady = !isEmpty(downloadSizeEstimates);
   // Estimates that failed to load: the size and download status are unknown,
   // and no amount of waiting will produce them — say so instead of spinning.
-  const estimatesFailed = !estimatesLoading && !estimatesReady
+  const estimatesFailed = !estimatesLoading && !estimatesReady;
 
   const handleSelect = (e) => {
-    e.stopPropagation()
-    if (!selectDisabled) onSelect(row)
-  }
+    e.stopPropagation();
+    if (!selectDisabled) onSelect(row);
+  };
 
-  const clickable = typeof onInspect === 'function'
-  const handleCardClick = clickable ? () => onInspect(row) : undefined
+  const clickable = typeof onInspect === "function";
+  const handleCardClick = clickable ? () => onInspect(row) : undefined;
   const handleKeyDown = clickable
     ? (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        onInspect(row)
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onInspect(row);
+        }
       }
-    }
-    : undefined
+    : undefined;
 
-  const platformColor = platformColors.find((pc) => pc.platform === row.platform)
+  const platformColor = platformColors.find(
+    (pc) => pc.platform === row.platform,
+  );
 
   const serverName = formatErddapServerName(
     row.erddap_server_url || row.erddap_url,
     i18n.language,
-    erddapServersJSONfile
-  )
+    erddapServersJSONfile,
+  );
 
   const typeLabel = isGrid
-    ? t('griddapTypeLabel')
-    : (row.cdm_data_type || '')
-      .replace('TimeSeriesProfile', 'Time series / Profile')
-      .replace('TimeSeries', 'Time series')
+    ? t("griddapTypeLabel")
+    : (row.cdm_data_type || "")
+        .replace("TimeSeriesProfile", "Time series / Profile")
+        .replace("TimeSeries", "Time series");
 
   const locationsLabel = isGrid
-    ? formatGridSize(row.grid_dimensions) || '—'
+    ? formatGridSize(row.grid_dimensions) || "—"
     : row.profiles_count !== row.n_profiles
       ? `${row.profiles_count} / ${row.n_profiles}`
-      : row.profiles_count
+      : row.profiles_count;
 
   const selectTitle = isGrid
-    ? t('griddapNotDownloadableTooltip')
-    : t('datasetsTableDownloadModalDatasetCheckboxTooltip')
+    ? t("griddapNotDownloadableTooltip")
+    : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
 
   return (
     <div
-      className={classNames('datasetCard', {
+      data-testid="dataset-card"
+      data-dataset-pk={row.pk}
+      data-selected={Boolean(row.selected)}
+      className={classNames("datasetCard", {
         selected: row.selected,
         clickable,
         downloadModal: isDownloadModal,
         hiddenFromMap,
-        fromMapClick
+        fromMapClick,
       })}
-      title={fromMapClick ? t('datasetCardFromMapTitle') : undefined}
+      title={fromMapClick ? t("datasetCardFromMapTitle") : undefined}
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHoverEnd()}
-      role={clickable ? 'button' : undefined}
+      role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={handleKeyDown}
     >
@@ -118,75 +123,79 @@ export default function DatasetCard({
           were in the download could not be read off the list at a glance, which
           is the one thing this control has to answer. */}
       <button
-        type='button'
-        className={classNames('datasetCardAdd', { checked: row.selected })}
+        type="button"
+        className={classNames("datasetCardAdd", { checked: row.selected })}
         title={selectTitle}
         onClick={handleSelect}
         disabled={selectDisabled}
         aria-pressed={Boolean(row.selected)}
-        aria-label={t('datasetsCardSelectForDownloadText')}
+        aria-label={t("datasetsCardSelectForDownloadText")}
       >
         {row.selected ? (
-          <CheckCircleFill size={17} aria-hidden='true' />
+          <CheckCircleFill size={17} aria-hidden="true" />
         ) : (
-          <Plus size={18} aria-hidden='true' />
+          <Plus size={18} aria-hidden="true" />
         )}
       </button>
 
-      <div className='datasetCardBody'>
-        <div className='datasetCardHeadline'>
+      <div className="datasetCardBody">
+        <div className="datasetCardHeadline">
           {/* The wrapper is the height of the title's first line, so the dot
               stays centered on that line however the title wraps. */}
-          <span className='datasetCardPlatform'>
+          <span className="datasetCardPlatform">
             {isGrid ? (
               <Grid3x3Gap
-                title={t('griddapTypeLabel')}
-                color='#52a79b'
+                title={t("griddapTypeLabel")}
+                color="#52a79b"
                 size={15}
               />
             ) : (
               <CircleFill
                 title={t(row.platform)}
-                fill={platformColor?.color || '#000000'}
+                fill={platformColor?.color || "#000000"}
                 size={13}
               />
             )}
           </span>
-          <span className='datasetCardTitle' title={row.title}>
+          <span className="datasetCardTitle" title={row.title}>
             {row.title}
           </span>
         </div>
 
-        <div className='datasetCardMeta'>
-          <span className='datasetCardMetaItem' title='ERDDAP™ Server'>
-            <Server size={13} aria-hidden='true' />
+        <div className="datasetCardMeta">
+          <span className="datasetCardMetaItem" title="ERDDAP™ Server">
+            <Server size={13} aria-hidden="true" />
             {serverName}
           </span>
-          <span className='datasetCardMetaItem' title={t('datasetsTableHeaderTypeText')}>
-            <FileEarmarkSpreadsheet size={13} aria-hidden='true' />
+          <span
+            className="datasetCardMetaItem"
+            title={t("datasetsTableHeaderTypeText")}
+          >
+            <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
             {typeLabel}
           </span>
           <span
-            className='datasetCardMetaItem'
+            className="datasetCardMetaItem"
             title={
               isGrid
-                ? t('griddapGridSizeTooltip')
-                : t('datasetsTableHeaderLocationsText')
+                ? t("griddapGridSizeTooltip")
+                : t("datasetsTableHeaderLocationsText")
             }
           >
-            <PinMapFill size={13} aria-hidden='true' />
+            <PinMapFill size={13} aria-hidden="true" />
             {locationsLabel}
           </span>
         </div>
 
         {isDownloadModal && (
-          <div className='datasetCardDownloadInfo'>
+          <div className="datasetCardDownloadInfo">
             {estimatesReady ? (
               <>
-                <span className='datasetCardSize'>
+                <span className="datasetCardSize">
                   <span
-                    className={classNames('datasetCardSizePill', {
-                      downloadable: row?.sizeEstimate?.filteredSize < 1000000000
+                    className={classNames("datasetCardSizePill", {
+                      downloadable:
+                        row?.sizeEstimate?.filteredSize < 1000000000,
                     })}
                   >
                     {bytes(row?.sizeEstimate?.filteredSize)}
@@ -197,47 +206,54 @@ export default function DatasetCard({
                 </span>
                 {row.internalDownload ? (
                   <Tooltip
-                    placement='top'
-                    content={t('datasetTableDownloadModalCDEDownloadableColumnNameTooltip')}
+                    placement="top"
+                    content={t(
+                      "datasetTableDownloadModalCDEDownloadableColumnNameTooltip",
+                    )}
                   >
-                    <span className='datasetCardStatus'>
-                      <Check2Circle className='downloadableIcon success' size={18} />
-                      {t('datasetsCardSortDownloadableText')}
+                    <span className="datasetCardStatus">
+                      <Check2Circle
+                        className="downloadableIcon success"
+                        size={18}
+                      />
+                      {t("datasetsCardSortDownloadableText")}
                     </span>
                   </Tooltip>
                 ) : (
                   <Tooltip
-                    placement='top'
-                    content={t('datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip')}
+                    placement="top"
+                    content={t(
+                      "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip",
+                    )}
                   >
-                    <span className='datasetCardStatus'>
-                      <XCircle className='downloadableIcon error' size={18} />
+                    <span className="datasetCardStatus">
+                      <XCircle className="downloadableIcon error" size={18} />
                       {row.erddapLink ? (
                         <a
                           href={row.erddapLink}
-                          target='_blank'
-                          rel='noreferrer'
+                          target="_blank"
+                          rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
                         >
                           ERDDAP™
                         </a>
                       ) : (
-                        t('datasetTableDownloadModalExternalDownloadColumnName')
+                        t("datasetTableDownloadModalExternalDownloadColumnName")
                       )}
                     </span>
                   </Tooltip>
                 )}
               </>
             ) : estimatesFailed ? (
-              <span className='datasetCardSizeUnavailable'>
-                {t('downloadSizeUnavailableTitle')}
+              <span className="datasetCardSizeUnavailable">
+                {t("downloadSizeUnavailableTitle")}
               </span>
             ) : (
-              <Spinner size='sm' className='datasetsTableSpinner' />
+              <Spinner size="sm" className="datasetsTableSpinner" />
             )}
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

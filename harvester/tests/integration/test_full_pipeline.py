@@ -19,7 +19,16 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-
+from cde_harvester.__main__ import (
+    get_ckan_records,
+    merge_and_write_csvs,
+)
+from cde_harvester.__main__ import (
+    main as harvester_main,
+)
+from cde_harvester.loading.loader import main as db_main
+from cde_harvester.sources.base import HarvestResult
+from cde_harvester.sources.erddap.harvester import harvest_erddap
 from conftest import (
     CKAN_EMPTY_RESPONSE,
     CKAN_PACKAGE_SEARCH_RESPONSE,
@@ -28,16 +37,6 @@ from conftest import (
     MockResponse,
     _route_erddap_url,
 )
-
-from cde_harvester.sources.base import HarvestResult
-from cde_harvester.sources.erddap.harvester import harvest_erddap
-from cde_harvester.__main__ import (
-    get_ckan_records,
-    main as harvester_main,
-    merge_and_write_csvs,
-)
-from cde_harvester.loading.loader import main as db_main
-
 
 # ---------------------------------------------------------------------------
 # Session-level mock for all ERDDAP HTTP calls

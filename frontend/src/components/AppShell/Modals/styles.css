@@ -32,7 +32,7 @@
 }
 
 .filtersModal .filtersModalTitleCurrent::before {
-  content: '›';
+  content: "›";
   margin: 0 8px;
   color: var(--cioos-ink-40);
 }
@@ -68,6 +68,7 @@
 
 .downloadModal .modal-content {
   height: min(78vh, 820px);
+
   /* Clip the full-bleed header + sand order bar to the modal's rounded
      corners (tooltips render in a portal, so they still escape). */
   overflow: hidden;

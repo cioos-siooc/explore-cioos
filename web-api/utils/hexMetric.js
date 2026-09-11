@@ -92,8 +92,9 @@ const DAY_SET_JOIN = `LEFT JOIN LATERAL (
 
 // The per-row quantity a branch contributes to its hex/point bucket, aliased
 // metric_value so every branch of the UNION lines up. Its type depends on the
-// metric (bigint, or daterange for `days`) — which is why the empty-branch
-// guards go through nullMetricExpr rather than hardcoding a 0.
+// metric (bigint, or daterange for `days`) — which is why the "nothing to
+// show" guards in utils/selection.js wrap a real branch instead of spelling
+// out a typed NULL of their own.
 function metricValueExpr(table, metric) {
   if (metric === "days") return "metric_days.day as metric_value";
   if (metric === "datasets") return "0 as metric_value";
@@ -104,14 +105,6 @@ function metricValueExpr(table, metric) {
 // metric_value, or nothing when the metric is a plain per-row number.
 function metricJoin(table, metric) {
   return metric === "days" ? DAY_SET_JOIN : "";
-}
-
-// For the "nothing to show" branches both routes keep so the CTE still has the
-// right columns. Typed, because `days` aggregates dateranges.
-function nullMetricExpr(metric) {
-  return metric === "days"
-    ? "NULL::daterange as metric_value"
-    : "NULL::bigint as metric_value";
 }
 
 // The aggregate that produces a bucket's `count`, over rows qualified by
@@ -139,6 +132,5 @@ module.exports = {
   parseMetric,
   metricValueExpr,
   metricJoin,
-  nullMetricExpr,
   countAggregate,
 };

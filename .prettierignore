@@ -1,0 +1,10 @@
+dist/
+build/
+coverage/
+node_modules/
+.venv/
+venv/
+package-lock.json
+uv.lock
+frontend/src/locales/
+*.min.js

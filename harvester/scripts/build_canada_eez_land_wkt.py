@@ -8,7 +8,6 @@ Usage:
     cd harvester
     uv run python scripts/build_canada_eez_land_wkt.py
 """
-import json
 import sys
 from pathlib import Path
 
@@ -87,11 +86,17 @@ def validate(polygon, wkt_str):
     print("Validating polygon...")
     bounds = polygon.bounds
     print(f"  bounds: {bounds}")
-    if not (-141 <= bounds[0] <= -50 and 41 <= bounds[1] <= 50 and
-            -50 <= bounds[2] <= -49.9 + 1 and 70 <= bounds[3] <= 84):
-        # Loose check; main goal is "looks like Canada"
-        if not (bounds[0] < -100 and bounds[2] > -60 and bounds[3] > 60):
-            sys.exit(f"  FAIL: bounds don't look like Canada: {bounds}")
+    # Tight box first; if that misses, fall back to a loose "looks like Canada"
+    # check and only fail when that misses too.
+    tight = (
+        -141 <= bounds[0] <= -50
+        and 41 <= bounds[1] <= 50
+        and -50 <= bounds[2] <= -49.9 + 1
+        and 70 <= bounds[3] <= 84
+    )
+    loose = bounds[0] < -100 and bounds[2] > -60 and bounds[3] > 60
+    if not tight and not loose:
+        sys.exit(f"  FAIL: bounds don't look like Canada: {bounds}")
 
     # Approximate area using equirectangular at 60°N. Just a sanity floor.
     # Marine Regions reports ~15.7M km²; we expect something in that ballpark
