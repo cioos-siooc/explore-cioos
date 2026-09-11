@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useRef } from "react";
-import { Filter, ListUl } from "react-bootstrap-icons";
+import { BarChartLine, Filter, ListUl } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -57,8 +57,13 @@ export default function TopControls() {
     timeFilterActive,
     depthFilterActive,
   } = useFilters();
-  const { showFiltersModal, setShowFiltersModal, sidebarOpen, setSidebarOpen } =
-    useUI();
+  const {
+    showFiltersModal,
+    setShowFiltersModal,
+    setShowCoverageModal,
+    sidebarOpen,
+    setSidebarOpen,
+  } = useUI();
   const { inspectDataset, returnToDatasetList } = useSelection();
 
   const barRef = useRef(null);
@@ -98,6 +103,16 @@ export default function TopControls() {
             <span className="topBarButtonLabel">
               {t("topBarDatasetsLabel")}
             </span>
+          </button>
+          <button
+            type="button"
+            className="topBarButton topBarIconButton"
+            data-testid="topbar-coverage-button"
+            onClick={() => setShowCoverageModal(true)}
+            aria-label={t("coverageButton")}
+            title={t("coverageButtonTitle")}
+          >
+            <BarChartLine size={18} aria-hidden="true" />
           </button>
           <SpatialFilterButton />
           <button

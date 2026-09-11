@@ -34,6 +34,7 @@ const harvestRouter = require("./routes/harvest");
 const harvestDownloadsRouter = require("./routes/harvestDownloads");
 const trajectoriesRouter = require("./routes/trajectories");
 const nonnaRouter = require("./routes/nonna");
+const coverageHistogramRouter = require("./routes/coverageHistogram");
 const swaggerSpec = require("./swagger");
 
 const app = express();
@@ -110,6 +111,7 @@ app.use("/harvest/downloads", harvestDownloadsRouter);
 app.use("/harvest", harvestRouter);
 app.use("/trajectories", trajectoriesRouter);
 app.use("/nonna", nonnaRouter);
+app.use("/coverageHistogram", coverageHistogramRouter);
 
 // Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== "false") {
