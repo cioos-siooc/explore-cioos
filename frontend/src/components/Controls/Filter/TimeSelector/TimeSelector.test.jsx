@@ -61,4 +61,55 @@ describe("TimeSelector", () => {
     fireEvent.change(input, { target: { value: "2015-06-15" } });
     await waitFor(() => expect(input.value).toBe("2015-06-15"));
   });
+
+  it("choosing an interval locks the range, so dragging a handle slides the whole window", async () => {
+    const { user } = await renderReady();
+    await user.selectOptions(screen.getByLabelText("Interval"), "30");
+    const startBefore = screen.getByLabelText("Start Date").value;
+    const endBefore = screen.getByLabelText("End Date").value;
+    expect(startBefore < endBefore).toBe(true);
+
+    // The picked window ends today, so it's already flush against the axis's
+    // right edge — ArrowLeft (earlier) is what moves it without clamping.
+    fireEvent.keyDown(
+      screen.getByRole("slider", { name: "Time range start" }),
+      { key: "ArrowLeft" },
+    );
+
+    await waitFor(() => {
+      const start = screen.getByLabelText("Start Date").value;
+      const end = screen.getByLabelText("End Date").value;
+      // The window kept its length (30 days) rather than just the start
+      // handle moving on its own.
+      expect(start < startBefore).toBe(true);
+      expect(end < endBefore).toBe(true);
+    });
+  });
+
+  it("dragging a handle on a hand-set (unlocked) range moves only that end", async () => {
+    await renderReady();
+    const input = screen.getByLabelText("Start Date");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "2015-01-01" } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(input.value).toBe("2015-01-01"));
+    const endInput = screen.getByLabelText("End Date");
+    fireEvent.focus(endInput);
+    fireEvent.change(endInput, { target: { value: "2015-06-01" } });
+    fireEvent.blur(endInput);
+    await waitFor(() => expect(endInput.value).toBe("2015-06-01"));
+    const endBefore = endInput.value;
+
+    fireEvent.keyDown(
+      screen.getByRole("slider", { name: "Time range start" }),
+      { key: "ArrowRight" },
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Start Date").value).toBe("2015-01-02"),
+    );
+    // The end date is untouched — this range isn't one of the ready-made
+    // windows, so a drag moves only the handle that moved.
+    expect(screen.getByLabelText("End Date").value).toBe(endBefore);
+  });
 });

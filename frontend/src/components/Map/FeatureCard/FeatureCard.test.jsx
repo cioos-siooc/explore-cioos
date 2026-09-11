@@ -130,4 +130,132 @@ describe("FeatureCard", () => {
     await user.click(screen.getByTitle("Add this dataset to the selection"));
     await waitFor(() => expect(latestMap.featureQuery).not.toBeNull());
   });
+
+  it("opening a track row selects the trajectory and closes the card", async () => {
+    const { user } = await renderReady();
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 6,
+        lngLat: [0, 0],
+        items: [
+          {
+            kind: "track",
+            pk: 424242,
+            trajectoryId: "traj-a",
+            title: "Glider track",
+          },
+        ],
+      });
+    });
+    await user.click(screen.getByTitle("Glider track"));
+    await waitFor(() =>
+      expect(latestSelection.selectedTrajectory).toMatchObject({
+        datasetPk: 424242,
+        trajectoryId: "traj-a",
+      }),
+    );
+    expect(latestMap.featureQuery).toBeNull();
+  });
+
+  it("Add all adds every selectable row and closes the card", async () => {
+    const { user } = await renderReady();
+    const [rowA, rowB] = pointQueryFixture.filter((r) => !r.selected);
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 7,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: rowA.pk, count: 2, title: rowA.title },
+          { kind: "observation", pk: rowB.pk, count: 1, title: rowB.title },
+        ],
+      });
+    });
+    await user.click(screen.getByTitle("Select all 2 datasets here"));
+    await waitFor(() => {
+      const updated = latestSelection.pointsData.find((p) => p.pk === rowA.pk);
+      expect(updated.selected).toBe(true);
+    });
+    expect(latestMap.featureQuery).toBeNull();
+  });
+
+  it("Zoom here frames the click's bounds and closes the card", async () => {
+    const { user } = await renderReady();
+    const row = pointQueryFixture[0];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 8,
+        lngLat: [0, 0],
+        bounds: [
+          [-10, -10],
+          [10, 10],
+        ],
+        items: [
+          { kind: "observation", pk: row.pk, count: 1, title: row.title },
+        ],
+      });
+    });
+    await user.click(screen.getByText("Zoom here"));
+    await waitFor(() =>
+      expect(latestMap.zoomTarget?.geometry?.type).toBe("Polygon"),
+    );
+    expect(latestMap.featureQuery).toBeNull();
+  });
+
+  it("shows a Show more button past the visible-row cap, and expands the list", async () => {
+    const { user } = await renderReady();
+    const rows = pointQueryFixture.slice(0, 7);
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 9,
+        lngLat: [0, 0],
+        items: rows.map((row) => ({
+          kind: "observation",
+          pk: row.pk,
+          count: 1,
+          title: row.title,
+        })),
+      });
+    });
+    const moreButton = await screen.findByText("Show 2 more");
+    expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(5);
+    await user.click(moreButton);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(7),
+    );
+  });
+
+  it("a track row and grid row sort before observations, and a grid row shows the grid icon", async () => {
+    const row = pointQueryFixture[0];
+    await renderReady();
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 10,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: row.pk, count: 1, title: row.title },
+          {
+            kind: "track",
+            pk: 111,
+            trajectoryId: "t1",
+            title: "A track",
+          },
+          {
+            kind: "grid",
+            pk: 222,
+            title: "A gridded dataset",
+          },
+        ],
+      });
+    });
+    const rowsShown = document.querySelectorAll(".featureCardRow");
+    // KIND_ORDER is track, observation, grid.
+    expect(rowsShown[0]).toHaveTextContent("A track");
+    expect(rowsShown[1]).toHaveTextContent(row.title);
+    expect(rowsShown[2]).toHaveTextContent("A gridded dataset");
+    // A grid row's "+" is disabled — griddap is metadata-only, never
+    // selectable — and titled accordingly.
+    expect(
+      screen.getByTitle("Gridded datasets are accessed directly on ERDDAP"),
+    ).toBeInTheDocument();
+  });
 });

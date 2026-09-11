@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -58,5 +58,28 @@ describe("DepthBar", () => {
     await waitFor(() =>
       expect(document.querySelector(".depthBar")).not.toBeInTheDocument(),
     );
+  });
+
+  // The start handle and the start field share one aria-label ("Start Depth
+  // (m)") — one names the number input, the other the rail's slider — so
+  // getByLabelText alone is ambiguous; scope to the input.
+  const startInput = () =>
+    document.querySelector(
+      '.depthBarTagRange input[aria-label="Start Depth (m)"]',
+    );
+
+  it("typing a valid start depth commits it", async () => {
+    await renderReady({ url: "/?depthMin=100" });
+    const input = startInput();
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "150" } });
+    await waitFor(() => expect(input.value).toBe("150"));
+  });
+
+  it("dragging the start handle commits a clamped value via the rail", async () => {
+    await renderReady({ url: "/?depthMin=100" });
+    const [startHandle] = screen.getAllByRole("slider");
+    fireEvent.keyDown(startHandle, { key: "ArrowDown" });
+    await waitFor(() => expect(startInput().value).toBe("101"));
   });
 });
