@@ -77,6 +77,29 @@ test("GET /harvest/dataset/:slug/:datasetId returns history + meta when found", 
   assert.equal(res.body.history.length, 1);
   assert.equal(res.body.meta.content_hash, "abc123");
   assert.equal(res.body.erddap_url, "https://erddap.example.com/erddap");
+  assert.equal(res.body.historyTruncated, false);
+  assert.equal(res.body.historyLimit, 200);
+});
+
+test("GET /harvest/dataset/:slug/:datasetId flags historyTruncated once the row cap is hit", async () => {
+  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
+  // datasetHistory asks for HISTORY_MAX_ROWS(200) + 1 to detect truncation —
+  // queue 201 rows so the route sees more than the cap.
+  db.queueRaw(
+    Array.from({ length: 201 }, (_, i) => ({
+      run_id: `r${i}`,
+      status: "success",
+    })),
+  );
+  db.queueRaw([{ content_hash: "abc123" }]); // datasetMeta
+
+  const res = await agent.get(
+    "/harvest/dataset/erddap-example-com-erddap/obs_270",
+  );
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.history.length, 200);
+  assert.equal(res.body.historyTruncated, true);
 });
 
 test("GET /harvest/runs/recent returns the recent-runs summary", async () => {

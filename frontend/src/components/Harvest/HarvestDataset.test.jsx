@@ -113,6 +113,40 @@ describe("HarvestDataset", () => {
     expect(await screen.findByText(/404/)).toBeInTheDocument();
   });
 
+  it("shows a truncation notice when the API caps the attempt history", async () => {
+    installMockHarvestFetch({
+      [PATH]: {
+        history: [LATEST, OLDER],
+        historyTruncated: true,
+        historyLimit: 200,
+        meta: null,
+        erddap_url: "https://erddap.example.com/erddap",
+      },
+    });
+    renderDataset();
+    expect(
+      await screen.findByText("Showing the 2 most recent attempts."),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the truncation notice when the API returns the full history", async () => {
+    installMockHarvestFetch({
+      [PATH]: {
+        history: [LATEST, OLDER],
+        historyTruncated: false,
+        meta: null,
+        erddap_url: "https://erddap.example.com/erddap",
+      },
+    });
+    renderDataset();
+    await waitFor(() =>
+      expect(
+        document.querySelector(".harvest-latest-card"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/most recent attempts/)).not.toBeInTheDocument();
+  });
+
   it("links out to ERDDAP by default, and to OBIS for an OBIS-sourced dataset", async () => {
     installMockHarvestFetch({
       [PATH]: {
