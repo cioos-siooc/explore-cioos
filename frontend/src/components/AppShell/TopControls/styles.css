@@ -40,6 +40,7 @@
      no label to size to), Filters, Time distribution. The count is explicit,
      so adding a segment without widening this list drops it onto an implicit
      SECOND grid row instead of into the strip. */
+
   /* One column per segment, in DOM order: Datasets, Time distribution, the
      draw button, Filters. The two middle ones are icon-only, so they take
      `auto` — the width of their icon — and the two worded ones share what is
@@ -101,6 +102,7 @@
    needs (grid-template-columns above) rather than sharing the row equally
    with Datasets/Filters. No dropdown caret either — the icon alone is the
    affordance. */
+
 /* Icon-only segments: no label to keep clear of, so they sit tighter than a
    worded one and claim only their icon's width. Shared by the draw button and
    Time distribution. */

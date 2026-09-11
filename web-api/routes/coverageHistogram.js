@@ -34,9 +34,19 @@ const YEAR_MS = 365.25 * DAY_MS;
 // keeps the bin count at or under the target is used, so the histogram stays
 // readable at any zoom of the time filter.
 const TIME_BIN_WIDTHS_MS = [
-  DAY_MS, 2 * DAY_MS, 7 * DAY_MS, 14 * DAY_MS,
-  YEAR_MS / 12, YEAR_MS / 6, YEAR_MS / 4, YEAR_MS / 2,
-  YEAR_MS, 2 * YEAR_MS, 5 * YEAR_MS, 10 * YEAR_MS, 25 * YEAR_MS,
+  DAY_MS,
+  2 * DAY_MS,
+  7 * DAY_MS,
+  14 * DAY_MS,
+  YEAR_MS / 12,
+  YEAR_MS / 6,
+  YEAR_MS / 4,
+  YEAR_MS / 2,
+  YEAR_MS,
+  2 * YEAR_MS,
+  5 * YEAR_MS,
+  10 * YEAR_MS,
+  25 * YEAR_MS,
 ];
 const TARGET_TIME_BINS = 60;
 
@@ -55,8 +65,9 @@ const GROUP_BY = {
     // OBIS datasets carry the https://obis.org sentinel erddap_url; their real
     // provenance is the OBIS node. ERDDAP datasets key on their server URL,
     // which the frontend maps to a friendly label via erddapServers.json.
-    keyExpr: "CASE WHEN d.source_type = 'obis' "
-      + "THEN coalesce(d.obis_nodes[1], 'OBIS') ELSE d.erddap_url END",
+    keyExpr:
+      "CASE WHEN d.source_type = 'obis' " +
+      "THEN coalesce(d.obis_nodes[1], 'OBIS') ELSE d.erddap_url END",
     kindExpr: "CASE WHEN d.source_type = 'obis' THEN 'obis' ELSE 'erddap' END",
   },
   platform: {
@@ -75,8 +86,9 @@ const GROUP_BY = {
   // organization has here", which is the same thing the organizations filter
   // means (dbFilter matches on array overlap, not on a single owner).
   organization: {
-    join: "CROSS JOIN LATERAL unnest(CASE WHEN coalesce(array_length(d.organizations, 1), 0) = 0 "
-      + "THEN ARRAY['unknown']::text[] ELSE d.organizations END) AS org(name)",
+    join:
+      "CROSS JOIN LATERAL unnest(CASE WHEN coalesce(array_length(d.organizations, 1), 0) = 0 " +
+      "THEN ARRAY['unknown']::text[] ELSE d.organizations END) AS org(name)",
     keyExpr: "org.name",
     kindExpr: "'organization'",
   },
@@ -90,12 +102,12 @@ function buildTimeBins(timeMin, timeMax) {
   if (end <= start) end = start + DAY_MS;
 
   const rawWidth = (end - start) / TARGET_TIME_BINS;
-  const width = TIME_BIN_WIDTHS_MS.find((w) => w >= rawWidth)
-    || TIME_BIN_WIDTHS_MS[TIME_BIN_WIDTHS_MS.length - 1];
+  const width =
+    TIME_BIN_WIDTHS_MS.find((w) => w >= rawWidth) ||
+    TIME_BIN_WIDTHS_MS[TIME_BIN_WIDTHS_MS.length - 1];
   const numBins = Math.max(1, Math.ceil((end - start) / width));
-  const edges = Array.from(
-    { length: numBins + 1 },
-    (_, i) => new Date(start + i * width).toISOString(),
+  const edges = Array.from({ length: numBins + 1 }, (_, i) =>
+    new Date(start + i * width).toISOString(),
   );
   return { edges, start, end: start + numBins * width, numBins };
 }
@@ -178,13 +190,18 @@ router.get(
   "/",
   ...pipeline({ checks: [check("count").isIn(COUNTS).optional()] }),
   async (req, res) => {
-    const groupByKey = Object.prototype.hasOwnProperty.call(GROUP_BY, req.query.groupBy)
+    const groupByKey = Object.prototype.hasOwnProperty.call(
+      GROUP_BY,
+      req.query.groupBy,
+    )
       ? req.query.groupBy
       : "source";
     const group = GROUP_BY[groupByKey];
     // What each bar counts: distinct datasets (default) or distinct cf_role
     // features (individual profiles / timeseries / trajectories).
-    const count = COUNTS.includes(req.query.count) ? req.query.count : "datasets";
+    const count = COUNTS.includes(req.query.count)
+      ? req.query.count
+      : "datasets";
 
     // Client errors (a bad polygon, too broad a taxon selection) carry a
     // statusCode that app.js's error handler turns into the response.
@@ -420,8 +437,9 @@ router.get(
       // The days query builds its bins as date ranges rather than by bucketing
       // an epoch, because a day set is measured in whole UTC days.
       binWidthSec: (timeBins.end - timeBins.start) / 1000 / timeBins.numBins,
-      windowRange: `[${new Date(timeBins.start).toISOString().slice(0, 10)},`
-        + `${new Date(timeBins.end).toISOString().slice(0, 10)})`,
+      windowRange:
+        `[${new Date(timeBins.start).toISOString().slice(0, 10)},` +
+        `${new Date(timeBins.end).toISOString().slice(0, 10)})`,
     };
 
     // Both scan the same tables independently; run concurrently so latency is

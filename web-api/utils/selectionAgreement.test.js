@@ -129,7 +129,13 @@ test("every route hides ERDDAP data for a taxon selection", async () => {
   // all; the rest must drop their ERDDAP arms.
   const taxon = { scientificNames: "Gadus morhua" };
 
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
+  for (const name of [
+    "tiles",
+    "tiles/cells",
+    "legend",
+    "timeExtent",
+    "coverageHistogram",
+  ]) {
     const sql = (await sqlFrom(name, taxon)).map(stripEmptyGuard).join(" ");
     assert.ok(!readsProfiles(sql), `${name} still reads cde.profiles`);
     assert.ok(!readsTrajectory(sql), `${name} still reads trajectory hexes`);
@@ -146,7 +152,13 @@ test("every route hides ERDDAP data for a taxon selection", async () => {
 });
 
 test("an obisNodes selection hides ERDDAP data unless erddapServers joins it", async () => {
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
+  for (const name of [
+    "tiles",
+    "tiles/cells",
+    "legend",
+    "timeExtent",
+    "coverageHistogram",
+  ]) {
     const nodesOnly = (await sqlFrom(name, { obisNodes: "n1" }))
       .map(stripEmptyGuard)
       .join(" ");
@@ -162,7 +174,13 @@ test("an obisNodes selection hides ERDDAP data unless erddapServers joins it", a
 });
 
 test("includeObis=false drops the OBIS arm from every route that has one", async () => {
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
+  for (const name of [
+    "tiles",
+    "tiles/cells",
+    "legend",
+    "timeExtent",
+    "coverageHistogram",
+  ]) {
     const sql = (await sqlFrom(name, { includeObis: "false" }))
       .map(stripEmptyGuard)
       .join(" ");
@@ -255,7 +273,13 @@ test("a selection containing no source still yields runnable SQL", async () => {
     includeTrajectory: "false",
     profileTypes: "",
   };
-  for (const name of ["tiles", "tiles/cells", "legend", "timeExtent", "coverageHistogram"]) {
+  for (const name of [
+    "tiles",
+    "tiles/cells",
+    "legend",
+    "timeExtent",
+    "coverageHistogram",
+  ]) {
     const sql = (await sqlFrom(name, nothing)).join(" ");
     assert.match(sql, /empty_combined WHERE FALSE/, name);
     assert.doesNotMatch(sql, /UNION ALL\s*\)/, `${name} left a dangling UNION`);

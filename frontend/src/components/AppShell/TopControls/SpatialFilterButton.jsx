@@ -76,14 +76,17 @@ export default function SpatialFilterButton() {
     <DropdownButton
       data-testid="topbar-spatial-filter"
       onOpenChange={handleOpenChange}
-      toggleClassName={classNames("topBarButton topBarIconButton topBarSpatialFilterToggle", {
-        // Solid/active while the menu itself is open; once it's closed, a
-        // drawn shape still gets the lighter "applied" wash so the button
-        // keeps signalling the filter is in effect without competing with
-        // whichever segment's UI is actually up.
-        active: menuOpen,
-        applied: !menuOpen && hasSelection,
-      })}
+      toggleClassName={classNames(
+        "topBarButton topBarIconButton topBarSpatialFilterToggle",
+        {
+          // Solid/active while the menu itself is open; once it's closed, a
+          // drawn shape still gets the lighter "applied" wash so the button
+          // keeps signalling the filter is in effect without competing with
+          // whichever segment's UI is actually up.
+          active: menuOpen,
+          applied: !menuOpen && hasSelection,
+        },
+      )}
       tooltip={t("spatialFilterMenuTitle")}
       title={<Icon size={18} aria-hidden="true" />}
       align="center"
