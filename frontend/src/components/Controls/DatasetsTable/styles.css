@@ -112,6 +112,66 @@
   gap: 6px;
 }
 
+/* --- Download modal: one row, not three.
+   The sidebar stacks its toolbar over its arrange row because both are full of
+   controls. The modal has two — select-all and sort — and the size legend, so
+   the three sit inline with the legend pushed to the right, and the rows saved
+   go to the cards. --- */
+.datasetsTable.downloadModal .datasetsCardControls {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.datasetsTable.downloadModal .datasetsCardToolbar {
+  width: auto;
+}
+
+/* Which datasets the CDE can deliver directly: the key to the size pill and
+   the tick/cross on every card below. margin-left rather than an order change
+   so that when the row is too narrow to hold all three it is the legend —
+   the only one of the three that is read once — that wraps away. */
+.downloadLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: auto;
+  gap: 4px 18px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+}
+
+.downloadLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.downloadLegendItem .legendIcon.success {
+  color: var(--cioos-success);
+}
+
+.downloadLegendItem .legendIcon.error {
+  color: var(--cioos-error);
+}
+
+.legendBadge {
+  border-radius: var(--cioos-radius-pill);
+  padding: 1px 8px;
+  font-weight: 600;
+}
+
+.legendBadge.success {
+  background-color: var(--cioos-success-bg);
+  color: var(--cioos-primary-700);
+}
+
+.legendBadge.error {
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-error);
+}
+
 /* --- Card list: the one scroll region --- */
 .datasetsCardList {
   flex: 1 1 auto;
@@ -449,6 +509,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 12px;
+  /* The add/tick button is absolutely positioned over this row's right end
+     (.datasetCardAdd, 22px at right: 4px). This row is the only one that
+     reaches that corner, so it keeps the space clear — otherwise the ERDDAP
+     link ends up underneath the button. */
+  padding-right: 26px;
   padding-top: 4px;
   margin-top: 2px;
   border-top: 1px solid var(--cioos-hairline);
@@ -480,6 +545,19 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+/* The dataset's own URL on the publishing server. Pushed to the end of the row
+   so it reads as where the data is rather than as part of the size/status pair
+   it follows, and kept a plain link because it is one. */
+.datasetCardSourceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--cioos-primary-700);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .downloadableIcon.success {

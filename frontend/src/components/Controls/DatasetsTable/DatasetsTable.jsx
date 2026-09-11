@@ -8,10 +8,12 @@ import React, {
 import {
   CaretDownFill,
   CaretRightFill,
+  Check2Circle,
   CheckSquare,
   Eye,
   EyeSlash,
   Search,
+  XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -368,6 +370,33 @@ export default function DatasetsTable({
           </>
         )}
       </div>
+
+      {/* What the size pill and the tick/cross on each card below mean. It
+          belongs on this row rather than under the list: it is a key to the
+          cards, and read before them it saves the reader working out what the
+          colours meant after the fact. */}
+      {isDownloadModal && (
+        <div className="downloadLegend">
+          <span className="downloadLegendItem">
+            <Check2Circle
+              className="legendIcon success"
+              size={16}
+              aria-hidden="true"
+            />
+            <span className="legendBadge success">
+              {t("downloadDetailsDownloadLimitsDownloadableMessagePart2")}
+            </span>
+            {t("downloadDetailsDownloadLimitsDownloadableMessagePart3")}
+          </span>
+          <span className="downloadLegendItem">
+            <XCircle className="legendIcon error" size={16} aria-hidden="true" />
+            <span className="legendBadge error">
+              {t("downloadDetailsDownloadLimitsNotDownloadableMessagePart2")}
+            </span>
+            {t("downloadDetailsDownloadLimitsNotDownloadableMessagePart3")}
+          </span>
+        </div>
+      )}
     </div>
   );
 

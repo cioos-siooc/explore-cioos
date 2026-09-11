@@ -25,12 +25,7 @@ import {
 import { server } from "../../../config.js";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
-import {
-  ArrowsExpand,
-  CalendarWeek,
-  Check2Circle,
-  XCircle,
-} from "react-bootstrap-icons";
+import { ArrowsExpand, CalendarWeek } from "react-bootstrap-icons";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 
@@ -400,27 +395,6 @@ export default function DownloadDetails({
             estimatesLoading={estimatesLoading}
           />
         </div>
-      </div>
-
-      <div className="downloadLegend">
-        <span className="downloadLegendItem">
-          <Check2Circle
-            className="legendIcon success"
-            size={16}
-            aria-hidden="true"
-          />
-          <span className="legendBadge success">
-            {t("downloadDetailsDownloadLimitsDownloadableMessagePart2")}
-          </span>
-          {t("downloadDetailsDownloadLimitsDownloadableMessagePart3")}
-        </span>
-        <span className="downloadLegendItem">
-          <XCircle className="legendIcon error" size={16} aria-hidden="true" />
-          <span className="legendBadge error">
-            {t("downloadDetailsDownloadLimitsNotDownloadableMessagePart2")}
-          </span>
-          {t("downloadDetailsDownloadLimitsNotDownloadableMessagePart3")}
-        </span>
       </div>
 
       <div className="downloadOrderBar">

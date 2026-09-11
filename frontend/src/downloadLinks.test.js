@@ -246,7 +246,8 @@ describe("the exported list", () => {
   it("is one URL per line under a commented header", () => {
     const lines = linksToText(links, meta).trim().split("\n");
     expect(lines.filter((line) => line.startsWith("#"))).toHaveLength(3);
-    expect(lines.filter((line) => line.startsWith("http"))).toHaveLength(2);
+    // Two data URLs, plus the catalogue record of the one dataset that has one.
+    expect(lines.filter((line) => line.startsWith("http"))).toHaveLength(3);
   });
 
   it("is a curl script that fails loudly and resumes", () => {
@@ -278,15 +279,8 @@ describe("the exported list", () => {
     expect(linksToCurlScript(quoted, meta)).toContain("# it's here");
   });
 
-  it("leaves the catalogue out until it is asked for", () => {
-    expect(linksToText(links, meta)).not.toContain("package_show");
-    expect(linksToCurlScript(links, meta)).not.toContain("package_show");
-    expect(linksToCsv(links)).not.toContain("catalogue_url");
-  });
-
   it("fetches each catalogue record beside its dataset", () => {
-    const withCatalogue = { ...meta, includeCatalogue: true };
-    const script = linksToCurlScript(links, withCatalogue);
+    const script = linksToCurlScript(links, meta);
     expect(script).toContain(
       "'https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e'",
     );
@@ -301,7 +295,7 @@ describe("the exported list", () => {
     // The OBIS row has no catalogue entry, so it contributes no second line.
     expect(script.match(/package_show/g)).toHaveLength(1);
 
-    const urls = linksToText(links, withCatalogue).trim().split("\n");
+    const urls = linksToText(links, meta).trim().split("\n");
     expect(
       urls.indexOf(
         "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
@@ -310,7 +304,7 @@ describe("the exported list", () => {
   });
 
   it("gives the CSV the page a person clicks, not the API record", () => {
-    const csv = linksToCsv(links, { includeCatalogue: true });
+    const csv = linksToCsv(links);
     const [header, erddap, obis] = csv.trim().split("\n");
     expect(header).toContain('"catalogue_url"');
     expect(erddap).toContain('"https://catalogue.cioos.ca/dataset/ff21-4d1e"');
@@ -329,7 +323,7 @@ describe("the exported list", () => {
     );
     const [header, row] = csv.trim().split("\n");
     expect(header).toBe(
-      '"dataset_id","title","source","format","filename","url"',
+      '"dataset_id","title","source","format","filename","url","catalogue_url"',
     );
     expect(row).toContain('"Profiles, ""inshore"""');
   });

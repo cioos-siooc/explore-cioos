@@ -10,7 +10,6 @@ import {
 } from "react-bootstrap-icons";
 
 import SelectPill from "../../ui/SelectPill.jsx";
-import Switch from "../../ui/Switch.jsx";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import reportError from "../../../state/reportError.js";
 import {
@@ -52,7 +51,6 @@ export default function DirectDownloadLinks({
   const { t } = useTranslation();
   const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
   const [obisFormat, setObisFormat] = useState(defaultObisFormat);
-  const [includeCatalogue, setIncludeCatalogue] = useState(false);
   // "Copied" has to be visible for a moment and then not: the clipboard gives
   // no other sign that the click did anything.
   const [copyState, setCopyState] = useState(null);
@@ -86,7 +84,6 @@ export default function DirectDownloadLinks({
   // use for a tabledap format, and vice versa.
   const hasErddap = links.some((link) => link.source === "erddap");
   const hasObis = links.some((link) => link.source === "obis");
-  const hasCatalogue = links.some((link) => link.ckanRecordUrl);
   const obisNoteKey = OBIS_FORMATS.find(
     (format) => format.id === obisFormat,
   )?.noteKey;
@@ -100,7 +97,6 @@ export default function DirectDownloadLinks({
   const exportMeta = {
     generatedAt: new Date().toISOString(),
     filterSummary: filterSummaryText(constraints),
-    includeCatalogue,
   };
   // One stem for all three files so a folder of exports sorts together.
   const stem = `cioos-direct-links-${exportMeta.generatedAt.slice(0, 10)}`;
@@ -120,7 +116,7 @@ export default function DirectDownloadLinks({
       return;
     }
     navigator.clipboard
-      .writeText(linksToText(links, { includeCatalogue }))
+      .writeText(linksToText(links))
       .then(() => flashCopy("copied"))
       .catch((error) => {
         reportError("copying direct download links failed", error);
@@ -171,16 +167,6 @@ export default function DirectDownloadLinks({
               <span className="directLinksObisNote">{t(obisNoteKey)}</span>
             )}
           </span>
-        )}
-        {hasCatalogue && (
-          <Switch
-            id="directLinksCatalogue"
-            label={t("directLinksCatalogueLabel")}
-            title={t("directLinksCatalogueTooltipText")}
-            checked={includeCatalogue}
-            onChange={() => setIncludeCatalogue(!includeCatalogue)}
-            data-testid="direct-links-catalogue"
-          />
         )}
       </div>
 
@@ -233,11 +219,7 @@ export default function DirectDownloadLinks({
           className="directLinksButton"
           disabled={disabled}
           onClick={() =>
-            downloadTextFile(
-              `${stem}.csv`,
-              linksToCsv(links, { includeCatalogue }),
-              "text/csv",
-            )
+            downloadTextFile(`${stem}.csv`, linksToCsv(links), "text/csv")
           }
         >
           <FiletypeCsv size={16} aria-hidden="true" />

@@ -110,12 +110,8 @@ describe("DirectDownloadLinks", () => {
     );
   });
 
-  it("fetches the catalogue record beside the data once asked to", async () => {
+  it("fetches the catalogue record beside the data", async () => {
     const { user } = open();
-    await user.click(button(/curl script/i));
-    expect(await savedText()).not.toContain("package_show");
-
-    await user.click(screen.getByTestId("direct-links-catalogue"));
     await user.click(button(/curl script/i));
 
     const script = await savedText();
@@ -125,9 +121,10 @@ describe("DirectDownloadLinks", () => {
     expect(script).toContain(".ckan.json");
   });
 
-  it("offers no catalogue switch when nothing in the selection has a record", () => {
-    open({ rows: [obisRow] });
-    expect(screen.queryByTestId("direct-links-catalogue")).toBeNull();
+  it("has nothing extra to fetch for a dataset with no catalogue record", async () => {
+    const { user } = open({ rows: [obisRow] });
+    await user.click(button(/curl script/i));
+    expect(await savedText()).not.toContain("package_show");
   });
 
   it("puts the URL list on the clipboard", async () => {
@@ -135,7 +132,8 @@ describe("DirectDownloadLinks", () => {
     await user.click(button(/copy urls/i));
 
     const copied = await navigator.clipboard.readText();
-    expect(copied.trim().split("\n")).toHaveLength(2);
+    // Both data URLs, plus the catalogue record the ERDDAP dataset has.
+    expect(copied.trim().split("\n")).toHaveLength(3);
     expect(
       await screen.findByRole("button", { name: /copied/i }),
     ).toBeVisible();

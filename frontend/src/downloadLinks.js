@@ -357,25 +357,19 @@ const header = (generatedAt, filterSummary) => [
 ];
 
 /*
- * The catalogue record to fetch alongside a link's data, when the export was
- * asked to carry records and this dataset has one. All three exports apply the
- * same two conditions, so they ask once here.
+ * Every export carries the catalogue record of every dataset that has one:
+ * licence, citation and contacts are what make a downloaded file usable
+ * later, and a download that arrives without them is the thing this panel
+ * exists to avoid. Only a dataset the harvest never matched to a CKAN entry
+ * contributes nothing.
  */
-const catalogueRecord = (link, includeCatalogue) =>
-  includeCatalogue && link.ckanRecordUrl ? link.ckanRecordUrl : null;
-
-export function linksToText(
-  links,
-  { generatedAt, filterSummary, includeCatalogue } = {},
-) {
+export function linksToText(links, { generatedAt, filterSummary } = {}) {
   return [
     ...(generatedAt ? header(generatedAt, filterSummary) : []),
     // Each catalogue record directly under the data URL it describes: read top
     // to bottom the pair stays together, and piped to xargs they are fetched
     // in that order.
-    ...links.flatMap((link) =>
-      [link.url, catalogueRecord(link, includeCatalogue)].filter(Boolean),
-    ),
+    ...links.flatMap((link) => [link.url, link.ckanRecordUrl].filter(Boolean)),
     "",
   ].join("\n");
 }
@@ -388,10 +382,7 @@ export function linksToText(
  * the .csv and exits 0. `--continue-at -` makes a re-run resume rather than
  * restart, since these are the downloads too big for the CDE's own queue.
  */
-export function linksToCurlScript(
-  links,
-  { generatedAt, filterSummary, includeCatalogue } = {},
-) {
+export function linksToCurlScript(links, { generatedAt, filterSummary } = {}) {
   const obisCapped = links.some(
     (link) => link.source === "obis" && link.format.filtered,
   );
@@ -413,7 +404,7 @@ export function linksToCurlScript(
     "set -euo pipefail",
     "",
     ...links.flatMap((link) => {
-      const record = catalogueRecord(link, includeCatalogue);
+      const record = link.ckanRecordUrl;
       return [
         `# ${link.title || link.datasetId}`,
         `curl --fail --location --retry 3 --continue-at - --output ${shellQuote(
@@ -435,7 +426,7 @@ export function linksToCurlScript(
   ].join("\n");
 }
 
-export function linksToCsv(links, { includeCatalogue } = {}) {
+export function linksToCsv(links) {
   const rows = [
     [
       "dataset_id",
@@ -446,7 +437,7 @@ export function linksToCsv(links, { includeCatalogue } = {}) {
       "url",
       // The human catalogue page here, not the API record: a CSV is read in a
       // spreadsheet, where the useful cell is the one you click.
-      ...(includeCatalogue ? ["catalogue_url"] : []),
+      "catalogue_url",
     ],
     ...links.map((link) => [
       link.datasetId,
@@ -455,7 +446,7 @@ export function linksToCsv(links, { includeCatalogue } = {}) {
       link.format.id,
       link.filename,
       link.url,
-      ...(includeCatalogue ? [link.ckanUrl || ""] : []),
+      link.ckanUrl || "",
     ]),
   ];
   return `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;

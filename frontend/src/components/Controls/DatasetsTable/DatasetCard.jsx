@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  BoxArrowUpRight,
   CheckCircleFill,
   CircleFill,
   Grid3x3Gap,
@@ -23,7 +24,7 @@ import Tooltip from "../../ui/Tooltip.jsx";
 
 // A single dataset rendered as a card. Shared shell for the sidebar list and
 // the download-review modal; the modal variant (isDownloadModal) adds the
-// size estimate, CDE-downloadable status and external ERDDAP link.
+// size estimate, CDE-downloadable status and the dataset's own ERDDAP URL.
 export default function DatasetCard({
   row,
   isDownloadModal,
@@ -204,45 +205,30 @@ export default function DatasetCard({
                     row?.sizeEstimate?.unfilteredSize &&
                     ` / ${bytes(row?.sizeEstimate?.unfilteredSize)}`}
                 </span>
-                {row.internalDownload ? (
-                  <Tooltip
-                    placement="top"
-                    content={t(
-                      "datasetTableDownloadModalCDEDownloadableColumnNameTooltip",
-                    )}
-                  >
-                    <span className="datasetCardStatus">
+                <Tooltip
+                  placement="top"
+                  content={t(
+                    row.internalDownload
+                      ? "datasetTableDownloadModalCDEDownloadableColumnNameTooltip"
+                      : "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip",
+                  )}
+                >
+                  <span className="datasetCardStatus">
+                    {row.internalDownload ? (
                       <Check2Circle
                         className="downloadableIcon success"
                         size={18}
                       />
-                      {t("datasetsCardSortDownloadableText")}
-                    </span>
-                  </Tooltip>
-                ) : (
-                  <Tooltip
-                    placement="top"
-                    content={t(
-                      "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip",
-                    )}
-                  >
-                    <span className="datasetCardStatus">
+                    ) : (
                       <XCircle className="downloadableIcon error" size={18} />
-                      {row.erddapLink ? (
-                        <a
-                          href={row.erddapLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          ERDDAP™
-                        </a>
-                      ) : (
-                        t("datasetTableDownloadModalExternalDownloadColumnName")
-                      )}
-                    </span>
-                  </Tooltip>
-                )}
+                    )}
+                    {t(
+                      row.internalDownload
+                        ? "datasetsCardSortDownloadableText"
+                        : "datasetsCardNotDownloadableText",
+                    )}
+                  </span>
+                </Tooltip>
               </>
             ) : estimatesFailed ? (
               <span className="datasetCardSizeUnavailable">
@@ -250,6 +236,25 @@ export default function DatasetCard({
               </span>
             ) : (
               <Spinner size="sm" className="datasetsTableSpinner" />
+            )}
+
+            {/* Where this dataset is actually served from. Outside the
+                estimates branch because the URL does not depend on them: the
+                one dataset the queue will refuse is also the one whose link is
+                wanted soonest, and making it wait on the slowest request in the
+                modal is what hid it. */}
+            {row.erddapLink && (
+              <a
+                className="datasetCardSourceLink"
+                href={row.erddapLink}
+                title={row.erddapLink}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BoxArrowUpRight size={12} aria-hidden="true" />
+                ERDDAP™
+              </a>
             )}
           </div>
         )}
