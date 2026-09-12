@@ -21,8 +21,8 @@
 
   /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
   --cioos-ink: #152f37; /* body + heading text */
-  --cioos-ink-60: rgb(21 47 55 / 62%); /* secondary text */
-  --cioos-ink-40: rgb(21 47 55 / 40%); /* muted text / icons */
+  --cioos-ink-60: #52676c; /* secondary text; 5.3:1 on sand */
+  --cioos-ink-40: #5f7176; /* muted text / icons; 4.5:1 on sand */
   --cioos-hairline: #dce8e5; /* hairline borders between sand & teal-light */
   --cioos-surface-2: #eef6f4; /* subtle hover wash on white surfaces */
 
@@ -334,6 +334,11 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+::placeholder {
+  color: var(--cioos-ink-60);
+  opacity: 1;
 }
 
 button {
