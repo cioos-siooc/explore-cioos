@@ -80,8 +80,12 @@ CREATE TABLE datasets (
     content_hash_reason TEXT,
     last_updated_at timestamptz,
     verified_at timestamptz,
-    -- Griddap (metadata-only) coverage. Kept at table end so temp_datasets
-    -- (LIKE ...) column order stays stable.
+    -- Dataset-level coverage. lat/lon/depth are griddap-only (metadata-only
+    -- datasets with no feature rows); coverage_time_* is populated for EVERY
+    -- type -- grids from their time dimension, everything else from the
+    -- allDatasets listing -- and feeds dataset_is_realtime() in
+    -- 8_range_functions.sql. Kept at table end so temp_datasets (LIKE ...)
+    -- column order stays stable.
     coverage_lat_min double precision,
     coverage_lat_max double precision,
     coverage_lon_min double precision,

@@ -56,6 +56,7 @@ export default function TopControls() {
     scientificNamesSelected,
     timeFilterActive,
     depthFilterActive,
+    realtimeOnly,
   } = useFilters();
   const { showFiltersModal, setShowFiltersModal, sidebarOpen, setSidebarOpen } =
     useUI();
@@ -74,6 +75,7 @@ export default function TopControls() {
     scientificNamesSelected.length > 0,
     timeFilterActive,
     depthFilterActive,
+    realtimeOnly,
   ].filter(Boolean).length;
 
   return (

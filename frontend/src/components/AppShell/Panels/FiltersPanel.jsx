@@ -11,6 +11,7 @@ import {
   Water,
   BroadcastPin,
   Server,
+  Reception4,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -96,6 +97,8 @@ export default function FiltersPanel() {
     setEndDepth,
     scientificNamesSelected,
     setScientificNamesSelected,
+    realtimeOnly,
+    setRealtimeOnly,
     timeFilterActive,
     depthFilterActive,
     anyServersSelected,
@@ -123,6 +126,7 @@ export default function FiltersPanel() {
     useState("");
 
   const inViewFilterName = t("datasetsCardOnlyInViewText");
+  const realtimeFilterName = t("realtimeFilterName");
 
   // Same badge rule as the catalogue filters: the bare filter name while the
   // filter is doing nothing, the chosen value(s) once it is.
@@ -452,6 +456,31 @@ export default function FiltersPanel() {
                 endDepth={endDepth}
                 setEndDepth={setEndDepth}
               />
+            </Filter>
+            <Filter
+              active={realtimeOnly}
+              badgeTitle={t("realtimeFilterName")}
+              tooltip={t("realtimeFilterTooltip")}
+              icon={<Reception4 />}
+              controlled
+              filterName={realtimeFilterName}
+              openFilter={openFilter === realtimeFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                realtimeOnly ? () => setRealtimeOnly(false) : undefined
+              }
+            >
+              <label className="inViewFilterToggle">
+                <input
+                  type="checkbox"
+                  checked={realtimeOnly}
+                  onChange={(e) => setRealtimeOnly(e.target.checked)}
+                />
+                <span>{t("realtimeFilterOptionText")}</span>
+              </label>
+              <div className="inViewFilterCount">
+                {t("realtimeFilterHelpText")}
+              </div>
             </Filter>
             <Filter
               active={onlyInView}

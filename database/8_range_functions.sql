@@ -149,3 +149,48 @@ $$
            )
          );
 $$;
+
+/*
+
+dataset_is_realtime( coverage_time_max, last_updated_at )
+
+"Was this dataset still producing data at the moment we harvested it?"
+
+Both arguments are stored columns on cde.datasets, so this is IMMUTABLE: the
+answer is fixed at harvest time and does not drift as the clock moves. That is
+deliberate. A now()-relative test would need the catalogue refreshed on a timer
+to stay honest, and would flip a dataset's badge between page loads; "this
+dataset is updated in real time" is a property of the dataset, not of this
+instant. The cost is that the flag ages with the harvest: a feed that died
+yesterday keeps its badge until the next harvest re-measures it.
+
+coverage_time_max is the dataset's newest data as the server itself reported it
+(from the allDatasets listing, or the time dimension for grids);
+last_updated_at is when the harvest ran. A dataset whose newest data is less
+than a day behind its own harvest was live at that moment.
+
+Forecast grids have a coverage_time_max in the future and so are realtime,
+which is correct -- they are continuously reissued.
+
+NULL on either side means "unknown", which is not evidence of being live, so
+the answer is false rather than NULL. That keeps callers from needing IS TRUE /
+IS NOT TRUE to avoid three-valued logic dropping rows from both sides of the
+filter.
+
+  SELECT dataset_is_realtime(coverage_time_max, last_updated_at)
+    FROM cde.datasets;
+
+*/
+
+CREATE OR REPLACE FUNCTION dataset_is_realtime(
+    coverage_time_max timestamptz,
+    last_updated_at timestamptz
+  )
+  RETURNS boolean
+  LANGUAGE sql IMMUTABLE PARALLEL SAFE
+AS
+$$
+  SELECT coverage_time_max IS NOT NULL
+     AND last_updated_at IS NOT NULL
+     AND coverage_time_max >= last_updated_at - interval '1 day';
+$$;

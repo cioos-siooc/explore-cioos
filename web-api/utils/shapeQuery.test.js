@@ -173,3 +173,15 @@ test("the trajectory arm is pinned to one tier", async () => {
   assert.match(sql, new RegExp(`t\\.hex_tier = ${FINE.tier}\\b`));
   assert.match(sql, new RegExp(`JOIN ${FINE.hexesTable} h`));
 });
+
+test("the dataset payload carries the freshness fields the frontend reads", async () => {
+  // DatasetInspector and DatasetCard read these off /pointQuery rather than
+  // fetching, and wmsUtilities falls back to coverage_time_max, so dropping
+  // them from the select list would break the UI with no server-side error.
+  const { sql } = await build({});
+  assert.match(sql, /AS coverage_time_max/);
+  assert.match(sql, /AS is_realtime/);
+  // Stamped in UTC with a Z, like the record extents — these reach the browser
+  // as strings and are parsed there.
+  assert.match(sql, /to_char\(d\.coverage_time_max AT TIME ZONE 'UTC'/);
+});

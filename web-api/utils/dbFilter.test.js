@@ -206,3 +206,33 @@ test("the fetcher is not called when no scientific name is selected", async () =
   );
   assert.equal(called, false, "assembly must not touch the database");
 });
+
+test("realtimeOnly adds a dataset-level freshness predicate", async () => {
+  const f = await createDBFilter({ realtimeOnly: "true" });
+  const sql = f.shared.toString();
+  // Qualified with `d.`, because the bare column names would be ambiguous
+  // against the feature tables the branches union together.
+  assert.match(
+    sql,
+    /dataset_is_realtime\(d\.coverage_time_max, d\.last_updated_at\)/,
+  );
+  // A plain boolean test, never `NOT dataset_is_realtime(...)`: the function is
+  // IMMUTABLE over two stored columns and cannot return NULL, and a negation
+  // over a three-valued result would drop rows from both sides of the facet.
+  assert.doesNotMatch(sql, /NOT dataset_is_realtime/);
+  assert.equal(f.hasShared, true);
+});
+
+test("realtimeOnly is dataset-level, so it stays out of the profile fragment", async () => {
+  const f = await createDBFilter({ realtimeOnly: "true" });
+  assert.doesNotMatch(f.profileOnly.toString(), /dataset_is_realtime/);
+  assert.doesNotMatch(f.obisOnly.toString(), /dataset_is_realtime/);
+});
+
+test("realtimeOnly off or absent constrains nothing", async () => {
+  for (const request of [{}, { realtimeOnly: "false" }]) {
+    const f = await createDBFilter(request);
+    assert.equal(f.shared.toString(), "TRUE");
+    assert.equal(f.hasShared, false);
+  }
+});

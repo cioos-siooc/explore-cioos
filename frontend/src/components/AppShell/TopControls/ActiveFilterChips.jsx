@@ -63,6 +63,8 @@ export default function ActiveFilterChips() {
     endDate,
     startDepth,
     endDepth,
+    realtimeOnly,
+    setRealtimeOnly,
   } = useFilters();
   const {
     polygon,
@@ -124,6 +126,22 @@ export default function ActiveFilterChips() {
           id: "search",
           label: datasetTitleSearchText,
           remove: () => setDatasetTitleSearchText(""),
+        },
+      ],
+    },
+    realtimeOnly && {
+      key: "realtimeOnly",
+      label: t("realtimeFilterName"),
+      goToFilter: () => {
+        setOpenFilter(t("realtimeFilterName"));
+        setShowFiltersModal(true);
+      },
+      removeAll: () => setRealtimeOnly(false),
+      items: [
+        {
+          id: "realtimeOnly",
+          label: t("realtimeFilterChipText"),
+          remove: () => setRealtimeOnly(false),
         },
       ],
     },

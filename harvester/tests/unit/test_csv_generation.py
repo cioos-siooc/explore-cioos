@@ -224,3 +224,49 @@ class TestSkippedCsvGeneration:
         original_codes = df["reason_code"].tolist()
         df_back = _roundtrip(df, tmp_path, "skipped.csv")
         assert df_back["reason_code"].tolist() == original_codes
+
+
+class TestDatasetLevelTimeCoverage:
+    """coverage_time_min/max on the datasets row.
+
+    Populated from the allDatasets listing, which the harvest already fetches --
+    so every dataset type gets dataset-level time coverage for no extra request,
+    and dataset_is_realtime() (database/8_range_functions.sql) has something to
+    compare against last_updated_at.
+    """
+
+    def test_listing_coverage_reaches_the_datasets_row(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        ds.profile_ids = pd.DataFrame({"station_id": ["STATION_001"]})
+        ds.listing_time_min = "2020-01-01T00:00:00+00:00"
+        ds.listing_time_max = "2025-01-01T00:00:00+00:00"
+
+        df = ds.get_df()
+        assert df["coverage_time_min"][0] == "2020-01-01T00:00:00+00:00"
+        assert df["coverage_time_max"][0] == "2025-01-01T00:00:00+00:00"
+
+    def test_a_handler_derived_extent_wins_over_the_listing(self, mock_erddap_server):
+        # The Grid handler reads the time dimension's own actual_range, which is
+        # more precise than the listing; get_df() runs after extract_features(),
+        # so by here the handler's value is already set and must not be
+        # overwritten.
+        ds = _make_dataset(mock_erddap_server)
+        ds.profile_ids = pd.DataFrame({"station_id": ["STATION_001"]})
+        ds.coverage_time_min = "1999-01-01T00:00:00+00:00"
+        ds.coverage_time_max = "2030-01-01T00:00:00+00:00"
+        ds.listing_time_min = "2020-01-01T00:00:00+00:00"
+        ds.listing_time_max = "2025-01-01T00:00:00+00:00"
+
+        df = ds.get_df()
+        assert df["coverage_time_min"][0] == "1999-01-01T00:00:00+00:00"
+        assert df["coverage_time_max"][0] == "2030-01-01T00:00:00+00:00"
+
+    def test_a_server_that_reports_no_times_leaves_them_null(self, mock_erddap_server):
+        # Older ERDDAPs omit minTime/maxTime from the listing entirely; the row
+        # must still be written, with no coverage rather than a bad value.
+        ds = _make_dataset(mock_erddap_server)
+        ds.profile_ids = pd.DataFrame({"station_id": ["STATION_001"]})
+
+        df = ds.get_df()
+        assert df["coverage_time_min"][0] is None
+        assert df["coverage_time_max"][0] is None
