@@ -388,7 +388,6 @@ export default function DownloadDetails({
             handleSelectAllDatasets={handleSelectAllDatasets}
             handleSelectDataset={handleSelectDataset}
             selectAll={selectAll}
-            setDatasets={setPointsData}
             datasets={pointsData}
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}

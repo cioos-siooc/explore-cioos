@@ -10,10 +10,9 @@
   text-align: left;
 }
 
-/* --- Controls: two rows above the list — select-all and search, then how the
-   list is arranged (sort and grouping, both ui/SelectPill.jsx). Two, and not
-   the four they were, because this block sits between the panel header and the
-   first card: every row it takes is a row of results a phone doesn't show. --- */
+/* --- Controls: search, then how the list is arranged (sort and grouping, both
+   ui/SelectPill.jsx). The download modal also puts its local select-all beside
+   the sort control. --- */
 .datasetsCardControls {
   flex: 0 0 auto;
   display: flex;
@@ -210,6 +209,105 @@
   box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
 }
 
+/* --- Download shortlist: pinned below the paginated results, with its own
+   scroll region so a large basket cannot consume the sidebar. --- */
+.datasetsCardShortlist {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsCardShortlistHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+.datasetsCardShortlistToggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: color var(--cioos-transition-fast);
+}
+
+.datasetsCardShortlistToggle:hover {
+  color: var(--cioos-primary-700);
+}
+
+.datasetsCardShortlistToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.datasetsCardShortlistTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+}
+
+.datasetsCardShortlistCount {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-60);
+  font-family: var(--cioos-font-body, inherit);
+  font-size: var(--cioos-font-size-xs);
+  text-align: center;
+}
+
+.datasetsCardShortlistClear {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--cioos-transition-fast),
+    background-color var(--cioos-transition-fast);
+}
+
+.datasetsCardShortlistClear:hover {
+  background-color: var(--cioos-white);
+}
+
+.datasetsCardShortlistClear:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.datasetsCardShortlistList {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
 /* --- Card --- */
 .datasetCard {
   position: relative;
@@ -267,7 +365,7 @@
 }
 
 .datasetCard.selected {
-  background-color: rgb(198 227 223 / 35%);
+  background-color: var(--cioos-white);
   border-color: var(--cioos-primary);
 }
 
@@ -388,14 +486,14 @@
   text-align: center;
 }
 
-/* --- Add to download: a plus in the card's bottom-right corner that becomes a
-   tick once the dataset is in the download selection.
+/* --- Add to download: one download sign in the card's bottom-right corner.
+   The glyph turns green once the dataset is in the download selection.
 
    Always visible, at rest, on every device. The control it replaces was a
    circle-and-label badge on the top-left that faded in only on hover, so on a
    mouse the resting list showed nothing about what was in the download —
    answering "which of these have I picked?" meant sweeping the cursor down the
-   column. A tick that is simply there costs one small glyph per row and answers
+   column. A sign that is simply there costs one small glyph per row and answers
    it at a glance.
 
    Bottom-right because the meta row is the card's shortest line, so the button
@@ -413,37 +511,77 @@
   padding: 0;
 
   /* No pill around it. The border and its inner padding took most of a small
-     box and left the glyph cramped; the icon is a complete shape on its own (a
-     plus, then a filled tick), so it carries the control unaided. */
+      box and left the glyph cramped; the icon carries the control unaided. */
   border: none;
+  border-radius: 50%;
   background: transparent;
   color: var(--cioos-ink-40);
   cursor: pointer;
-  transition: color var(--cioos-transition-fast);
+  transition:
+    color var(--cioos-transition-fast),
+    background-color var(--cioos-transition-fast);
 }
 
 @media (hover: hover) {
-  .datasetCardAdd:not(:disabled):hover {
+  .datasetCardAdd:not(.checked):not(:disabled):hover {
+    color: var(--cioos-primary-700);
+  }
+
+  .datasetCardAdd.checked:not(:disabled):hover {
     color: var(--cioos-primary-700);
   }
 }
 
 .datasetCardAdd:focus-visible {
-  border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-focus);
   outline: none;
 }
 
-/* In the selection. The filled tick in the brand teal reads from across the
-   list, which is the whole point of keeping this control visible at rest. */
+/* In the selection. The green glyph reads without changing the sign's meaning. */
 .datasetCardAdd.checked {
-  color: var(--cioos-primary);
+  background-color: transparent;
+  color: var(--cioos-success);
 }
 
 /* Griddap: metadata-only, never downloadable through the CDE. */
 .datasetCardAdd:disabled {
   color: var(--cioos-hairline);
   cursor: not-allowed;
+}
+
+.datasetCardAdd.checked:disabled {
+  background-color: transparent;
+  color: var(--cioos-hairline);
+}
+
+.datasetCardRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+  transition:
+    color var(--cioos-transition-fast),
+    background-color var(--cioos-transition-fast);
+}
+
+.datasetCardRemove:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+}
+
+.datasetCardRemove:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* --- Card body --- */
@@ -459,6 +597,10 @@
   display: flex;
   align-items: flex-start;
   gap: 7px;
+}
+
+.datasetCard.shortlisted .datasetCardHeadline {
+  padding-right: 20px;
 }
 
 /* Platform dot: a box exactly one title line tall, so the dot sits centered on

@@ -446,16 +446,6 @@ export function rangeLevelHasData(rangeLevel) {
   return Array.isArray(rangeLevel) && Number.isFinite(rangeLevel[1]);
 }
 
-export function getPointsDataSize(pointsData) {
-  let total = 0;
-  pointsData.forEach((point) => {
-    if (point.selected && point.size !== "NaN" && point.size !== null) {
-      total += point.size;
-    }
-  });
-  return total;
-}
-
 // returns true for rectangles, false for rotated rectangles
 // [[west, south], [east, north]] for any GeoJSON geometry (the coordinate
 // nesting differs per type, so just walk down to the [lng, lat] positions).

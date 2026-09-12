@@ -49,6 +49,72 @@ test.describe("the datasets sidebar", () => {
     await expect(page.getByTestId("dataset-card").first()).toBeVisible();
   });
 
+  test("keeps a removable download shortlist", async ({ page }) => {
+    await openApp(page);
+    const panel = page.getByTestId("sidebar-datasets");
+    if ((await panel.getAttribute("data-expanded")) !== "true") {
+      await page.getByTestId("topbar-datasets-button").click();
+    }
+
+    const cards = panel.getByTestId("dataset-card");
+    const datasetPk = await cards.first().getAttribute("data-dataset-pk");
+    await cards
+      .first()
+      .getByRole("button", { name: "Add to selection" })
+      .click();
+
+    const shortlist = panel.locator(".datasetsCardShortlist");
+    const shortlistedCard = shortlist.locator(
+      `[data-dataset-pk="${datasetPk}"]`,
+    );
+    await expect(shortlist).toBeVisible();
+    await expect(shortlistedCard).toHaveAttribute("data-selected", "true");
+    await expect(
+      panel.locator(`[data-dataset-pk="${datasetPk}"]`),
+    ).toHaveCount(2);
+
+    const shortlistToggle = shortlist.locator(".datasetsCardShortlistToggle");
+    await shortlistToggle.click();
+    await expect(shortlistToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(shortlistedCard).toBeHidden();
+    await shortlistToggle.click();
+    await expect(shortlistToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(shortlistedCard).toBeVisible();
+
+    await page.getByTestId("sidebar-toggle").click();
+    await page.getByTestId("topbar-filters-button").click();
+    await page.locator('[data-filter-name="oceanVariablesFiltername"]').click();
+    const filteredResults = page.waitForResponse((response) =>
+      response.url().includes("/pointQuery?"),
+    );
+    await page.getByTestId("filter-option").first().click();
+    await filteredResults;
+    await page.getByTestId("filters-modal").getByRole("button", {
+      name: "Close",
+    }).click();
+    await page.getByTestId("topbar-datasets-button").click();
+    await expect(shortlistedCard).toHaveAttribute("data-selected", "true");
+
+    await shortlistedCard
+      .getByRole("button", { name: "Add to selection" })
+      .click();
+    await expect(shortlistedCard).toHaveAttribute("data-selected", "false");
+    await expect(shortlistedCard).toBeVisible();
+
+    await shortlistedCard
+      .getByRole("button", { name: "Add to selection" })
+      .click();
+    await expect(shortlistedCard).toHaveAttribute("data-selected", "true");
+
+    await shortlistedCard
+      .getByRole("button", { name: "Remove from shortlist" })
+      .click();
+    await expect(shortlist).toBeHidden();
+    await expect(
+      panel.locator(`[data-dataset-pk="${datasetPk}"]`),
+    ).toHaveCount(1);
+  });
+
   test("a user override outlives a resize", async ({ page }) => {
     // The rule is undocumented outside a comment in UIProvider and is exactly
     // what a responsive-layout change breaks: once the user has made the call,

@@ -14,8 +14,6 @@ export const OTHER_KEY = "__other__";
 export const UNCATEGORIZED_KEY = "__uncategorized__";
 export const IN_VIEW_KEY = "in";
 export const OUT_OF_VIEW_KEY = "out";
-export const SELECTED_KEY = "selected";
-export const UNSELECTED_KEY = "unselected";
 
 // Groups that sort last regardless of their label.
 const LAST_KEYS = new Set([OTHER_KEY, UNCATEGORIZED_KEY]);
@@ -23,9 +21,7 @@ const LAST_KEYS = new Set([OTHER_KEY, UNCATEGORIZED_KEY]);
 // 'inView' groups by the current map viewport rather than by a property of the
 // dataset, so its membership changes on every pan — hiding it from the map is
 // not offered (see DatasetsTable), which would otherwise reload the tiles on
-// each pan for no visible gain. 'selected' is the same shape of thing: it
-// groups by what the user has put aside, which they change constantly, so it
-// isn't hideable either.
+// each pan for no visible gain.
 export const HIDEABLE_DIMENSIONS = new Set([
   "type",
   "platform",
@@ -43,7 +39,6 @@ export function groupOptions(t) {
     { id: "eov", label: t("datasetsCardGroupEovText") },
     { id: "source", label: t("datasetsCardGroupSourceText") },
     { id: "inView", label: t("datasetsCardOnlyInViewText") },
-    { id: "selected", label: t("datasetsCardGroupSelectedText") },
   ];
 }
 
@@ -71,8 +66,6 @@ export function groupKeysFor(row, groupBy, datasetsInViewPks) {
       return row.eovs?.length ? row.eovs : [UNCATEGORIZED_KEY];
     case "inView":
       return [datasetsInViewPks?.has(row.pk) ? IN_VIEW_KEY : OUT_OF_VIEW_KEY];
-    case "selected":
-      return [row.selected ? SELECTED_KEY : UNSELECTED_KEY];
     default:
       return [];
   }
@@ -93,10 +86,6 @@ export function groupLabel(key, groupBy, t) {
       return key === IN_VIEW_KEY
         ? t("datasetsCardOnlyInViewText")
         : t("datasetsCardGroupOutOfViewText");
-    case "selected":
-      return key === SELECTED_KEY
-        ? t("datasetsCardGroupInSelectionText")
-        : t("datasetsCardGroupNotInSelectionText");
     default:
       return key;
   }
@@ -107,7 +96,6 @@ export function groupLabel(key, groupBy, t) {
 // asked about goes first.
 const FIRST_KEY_BY_DIMENSION = {
   inView: IN_VIEW_KEY,
-  selected: SELECTED_KEY,
 };
 
 // Alphabetical by label, with Other/Uncategorized pinned to the bottom.

@@ -1,11 +1,11 @@
 import React from "react";
 import {
   BoxArrowUpRight,
-  CheckCircleFill,
   CircleFill,
+  Download,
   Grid3x3Gap,
   Check2Circle,
-  Plus,
+  X,
   XCircle,
   Server,
   PinMapFill,
@@ -27,11 +27,13 @@ import Tooltip from "../../ui/Tooltip.jsx";
 // size estimate, CDE-downloadable status and the dataset's own ERDDAP URL.
 export default function DatasetCard({
   row,
+  selected,
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
   onSelect,
   onInspect,
+  onRemove,
   onHover = () => {},
   onHoverEnd = () => {},
   // The card's group is hidden from the map: the dataset stays in the list
@@ -63,6 +65,7 @@ export default function DatasetCard({
   const handleCardClick = clickable ? () => onInspect(row) : undefined;
   const handleKeyDown = clickable
     ? (e) => {
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onInspect(row);
@@ -100,9 +103,10 @@ export default function DatasetCard({
     <div
       data-testid="dataset-card"
       data-dataset-pk={row.pk}
-      data-selected={Boolean(row.selected)}
+      data-selected={Boolean(selected)}
       className={classNames("datasetCard", {
-        selected: row.selected,
+        selected,
+        shortlisted: typeof onRemove === "function",
         clickable,
         downloadModal: isDownloadModal,
         hiddenFromMap,
@@ -116,27 +120,33 @@ export default function DatasetCard({
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={handleKeyDown}
     >
-      {/* Add-to-download. A plus that becomes a tick, in the card's bottom-right
-          corner — the same control, in the same two states, as the "+" in the
-          map's "what's here" card, so adding a dataset looks the same wherever
-          you do it. It replaces a hover-revealed circle-and-label badge on the
-          top-left: that one was invisible at rest on a mouse, so which rows
-          were in the download could not be read off the list at a glance, which
-          is the one thing this control has to answer. */}
+      {onRemove && (
+        <button
+          type="button"
+          className="datasetCardRemove"
+          title={t("datasetsCardShortlistRemoveTitle")}
+          aria-label={t("datasetsCardShortlistRemoveTitle")}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove(row.pk);
+          }}
+        >
+          <X size={15} aria-hidden="true" />
+        </button>
+      )}
+
+      {/* The download glyph stays constant; its ground changes to show whether
+          this dataset is included in the download basket. */}
       <button
         type="button"
-        className={classNames("datasetCardAdd", { checked: row.selected })}
+        className={classNames("datasetCardAdd", { checked: selected })}
         title={selectTitle}
         onClick={handleSelect}
         disabled={selectDisabled}
-        aria-pressed={Boolean(row.selected)}
+        aria-pressed={Boolean(selected)}
         aria-label={t("datasetsCardSelectForDownloadText")}
       >
-        {row.selected ? (
-          <CheckCircleFill size={17} aria-hidden="true" />
-        ) : (
-          <Plus size={18} aria-hidden="true" />
-        )}
+        <Download size={15} aria-hidden="true" />
       </button>
 
       <div className="datasetCardBody">

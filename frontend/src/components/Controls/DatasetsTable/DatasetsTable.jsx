@@ -67,7 +67,12 @@ export default function DatasetsTable({
     hiddenGroups,
     toggleGroupHidden,
     showAllGroups,
+    shortlist,
+    selectedPks,
+    removeFromShortlist,
+    clearShortlist,
   } = useSelection();
+  const shortlistEntries = isDownloadModal ? [] : shortlist;
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
   // card named datasets that could be on page 6 of 8, and there was no way to
@@ -121,6 +126,7 @@ export default function DatasetsTable({
 
   const [sort, setSort] = useState({ field: "title", dir: "asc" });
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const [shortlistCollapsed, setShortlistCollapsed] = useState(false);
 
   const groupByOptions = useMemo(() => groupOptions(t), [t]);
   // Hiding a group takes its datasets off the map. Not offered for the
@@ -174,7 +180,14 @@ export default function DatasetsTable({
       return String(va).localeCompare(String(vb), i18n.language) * factor;
     });
     return sorted;
-  }, [datasets, sort, i18n.language, pinnedPks, sortFields, sortValue]);
+  }, [
+    datasets,
+    sort,
+    i18n.language,
+    pinnedPks,
+    sortFields,
+    sortValue,
+  ]);
 
   // Flat render list: without grouping it's just the sorted rows; with grouping
   // it's the rows bucketed under headers. Each entry is either
@@ -286,10 +299,8 @@ export default function DatasetsTable({
   };
 
   // Which datasets are in the results, as a value rather than an array
-  // identity. Adding one to the selection rewrites every row object (the
-  // provider maps over pointsData), so keying the reset below on `datasets`
-  // itself sent the reader back to page 1 on every "+" — which is exactly the
-  // action they are most likely to repeat.
+  // identity. Snapshot refreshes can replace every row object without changing
+  // the result set, which should not send the reader back to page 1.
   const datasetsKey = useMemo(
     () => (datasets || []).map((row) => row.pk).join(","),
     [datasets],
@@ -315,16 +326,18 @@ export default function DatasetsTable({
   const controls = (
     <div className="datasetsCardControls" data-testid="datasets-controls">
       <div className="datasetsCardToolbar">
-        <button
-          type="button"
-          className={classNames("selectAllToggle", { active: selectAll })}
-          onClick={handleSelectAllDatasets}
-          aria-pressed={selectAll}
-          title={t("datasetsTableHeaderSelectAllTitle")}
-        >
-          <CheckSquare size={13} aria-hidden="true" />
-          {t("datasetsTableHeaderSelectAllTitle")}
-        </button>
+        {isDownloadModal && (
+          <button
+            type="button"
+            className={classNames("selectAllToggle", { active: selectAll })}
+            onClick={handleSelectAllDatasets}
+            aria-pressed={selectAll}
+            title={t("datasetsTableHeaderSelectAllTitle")}
+          >
+            <CheckSquare size={13} aria-hidden="true" />
+            {t("datasetsTableHeaderSelectAllTitle")}
+          </button>
+        )}
         {!isDownloadModal && (
           <div className="datasetsTableSearchWrap">
             <Search size={13} aria-hidden="true" />
@@ -419,7 +432,7 @@ export default function DatasetsTable({
         </div>
       )}
       <div className="datasetsCardList" ref={listRef}>
-        {visibleRows.length === 0 ? (
+        {visibleRows.length === 0 && shortlistEntries.length === 0 ? (
           <div className="datasetsCardEmpty">
             {t("datasetsCardNoResultsText")}
           </div>
@@ -430,6 +443,11 @@ export default function DatasetsTable({
                 <DatasetCard
                   key={`${item.group ?? ""}:${item.row.pk ?? item.row.dataset_id ?? item.row.title}`}
                   row={item.row}
+                  selected={
+                    isDownloadModal
+                      ? item.row.selected
+                      : selectedPks.has(item.row.pk)
+                  }
                   isDownloadModal={isDownloadModal}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
@@ -504,6 +522,64 @@ export default function DatasetsTable({
         label={t("datasetsPagerLabel")}
         perPageLabel={t("datasetsPagerPerPageLabel")}
       />
+      {shortlistEntries.length > 0 && (
+        <section className="datasetsCardShortlist">
+          <div className="datasetsCardShortlistHeader">
+            <button
+              type="button"
+              className="datasetsCardShortlistToggle"
+              onClick={() => setShortlistCollapsed((previous) => !previous)}
+              aria-expanded={!shortlistCollapsed}
+              title={t(
+                shortlistCollapsed
+                  ? "datasetsCardShortlistShowTitle"
+                  : "datasetsCardShortlistHideTitle",
+              )}
+            >
+              {shortlistCollapsed ? (
+                <CaretRightFill size={10} aria-hidden="true" />
+              ) : (
+                <CaretDownFill size={10} aria-hidden="true" />
+              )}
+              <span className="datasetsCardShortlistTitle">
+                {t("datasetsCardShortlistTitle")}
+              </span>
+              <span className="datasetsCardShortlistCount">
+                {shortlistEntries.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="datasetsCardShortlistClear"
+              onClick={clearShortlist}
+            >
+              {t("datasetsCardShortlistClearText")}
+            </button>
+          </div>
+          {!shortlistCollapsed && (
+            <div className="datasetsCardShortlistList">
+              {shortlistEntries.map((entry) => (
+                <DatasetCard
+                  key={`shortlist:${entry.pk}`}
+                  row={entry.row}
+                  selected={entry.selected}
+                  onSelect={handleSelectDataset}
+                  onRemove={removeFromShortlist}
+                  onInspect={entry.inResults ? setInspectDataset : undefined}
+                  onHover={entry.inResults ? setHoveredDataset : undefined}
+                  onHoverEnd={
+                    entry.inResults ? () => setHoveredDataset() : undefined
+                  }
+                  hiddenFromMap={false}
+                  fromMapClick={pinnedPks.has(Number(entry.pk))}
+                  t={t}
+                  i18n={i18n}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
