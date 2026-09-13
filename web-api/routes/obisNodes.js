@@ -25,19 +25,15 @@ const { pipeline } = require("../utils/routePipeline");
  *                     type: string
  */
 
-router.get(
-  "/",
-  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
-  async (req, res) => {
-    const { rows } = await db.raw(`
+router.get("/", ...pipeline({ filters: false }), async (req, res) => {
+  const { rows } = await db.raw(`
     SELECT DISTINCT unnest(obis_nodes) AS name
     FROM cde.datasets
     WHERE source_type = 'obis'
       AND obis_nodes IS NOT NULL
     ORDER BY name
   `);
-    res.send(rows);
-  },
-);
+  res.send(rows);
+});
 
 module.exports = router;
