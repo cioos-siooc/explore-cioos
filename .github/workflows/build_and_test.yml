@@ -89,6 +89,17 @@ jobs:
           cp docker-compose.override.yaml.sample docker-compose.override.yaml
           cp harvest_config.sample.yaml harvest_config.yaml
 
+      - name: Verify shared source-cache configuration
+        run: |
+          HARVEST_SOURCE_CACHE_VOLUME=cde-ci-shared-source-cache \
+            docker compose $COMPOSE_FILES config --format json > compose-config.json
+          jq -e '
+            .volumes.source_cache.name == "cde-ci-shared-source-cache" and
+            ([.services.prefect_worker.volumes[] |
+              select(.target == "/app/harvester/source_cache") |
+              .source] == ["source_cache"])
+          ' compose-config.json
+
       - name: Start the full application
         run: docker compose $COMPOSE_FILES --profile tools up -d --build --wait --wait-timeout 300
 
