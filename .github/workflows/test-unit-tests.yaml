@@ -56,6 +56,10 @@ jobs:
         working-directory: web-api
         run: npm run test:unit
 
+      - name: Run web-api route tests (node:test, supertest against the real app)
+        working-directory: web-api
+        run: npm run test:routes
+
       - name: Run web-api route-contract tests
         working-directory: web-api
         run: npm run test:contract

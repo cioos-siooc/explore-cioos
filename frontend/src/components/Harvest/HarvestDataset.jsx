@@ -185,6 +185,13 @@ export default function HarvestDataset() {
       <h2 className="harvest-section-title">
         {t("harvest.dataset.historyTitle")}
       </h2>
+      {/* The attempt table is append-only and unpaginated, so the API caps it.
+          Say so rather than letting a capped list read as the whole history. */}
+      {data?.historyTruncated && (
+        <p className="harvest-text-sm">
+          {t("harvest.dataset.historyTruncated", { count: history.length })}
+        </p>
+      )}
       <table className="harvest-table">
         <thead>
           <tr>

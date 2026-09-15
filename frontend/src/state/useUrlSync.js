@@ -185,11 +185,22 @@ export default function UrlSync() {
     selectedTrajectory,
   ]);
 
+  // `i18n` deliberately excluded from the deps, despite reading it in the
+  // body: it is a stable instance (react-i18next never gives useTranslation a
+  // new one), so listing it buys nothing — except a real bug. `lang` is
+  // computed each render from `i18n.resolvedLanguage`, which can still read
+  // last render's value on the very render a changeLanguage() call commits;
+  // with `i18n` in the deps that stale `lang` was enough to re-run this
+  // effect and call changeLanguage(lang) right back to the language a caller
+  // (e.g. LanguageSelector, or a test) had just switched away from — the
+  // switch would silently revert one render later. Reproduced and confirmed
+  // by FilterProvider.test.jsx's language-switch case.
   useEffect(() => {
     if (lang !== i18n.language) {
       i18n.changeLanguage(lang);
     }
-  }, [i18n, lang]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   return null;
 }

@@ -29,9 +29,18 @@ const db = require("knex")({
   // Explicit pool so a slow DB (e.g. during a harvest load) degrades into
   // clear acquire-timeout errors instead of every request queueing until
   // nginx 504s and the API stops responding entirely.
+  //
+  // A request is not one connection: /legend runs its two aggregations
+  // concurrently (routes/legend.js) and /download holds three or more. At the
+  // old max of 16 that is ~8 concurrent legend requests, or five alongside a
+  // download, before callers start waiting out the 30 s acquire timeout — and
+  // /legend gates first map paint, so the saturation point is "eight people
+  // opened the map at once". 32 leaves headroom against Postgres's default
+  // max_connections of 100, which this API shares with the harvester, the
+  // db-loader and Prefect; check that ceiling before raising this again.
   pool: {
     min: Number(DB_POOL_MIN || 2),
-    max: Number(DB_POOL_MAX || 16),
+    max: Number(DB_POOL_MAX || 32),
     acquireTimeoutMillis: 30000,
   },
 });

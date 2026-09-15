@@ -360,27 +360,37 @@ BEGIN
   DELETE FROM cde.trajectory_hexes
    WHERE p_dataset_pks IS NULL OR dataset_pk = ANY (p_dataset_pks);
 
+  -- The display point is a property of the HEX, not of the row: many
+  -- trajectories sweep the same cell, and the tier-0/tier-1 arms below used to
+  -- spell the centroid out per output row — ST_Centroid + ST_Transform twice
+  -- over, so four PostGIS calls each. Resolving it once per distinct cell
+  -- first turns that into two calls per cell, and lets the two arms collapse
+  -- into one INSERT ... SELECT.
+  WITH used_cells AS (
+    SELECT DISTINCT tier, i, j FROM _traj_hex_agg
+  ),
+  hex_pos AS (
+    SELECT u.tier, u.i, u.j, h.pk, ST_Y(c.geom_4326) AS latitude,
+           ST_X(c.geom_4326) AS longitude
+      FROM used_cells u
+      JOIN cde.hexes_zoom_0 h ON u.tier = 0 AND h.i = u.i AND h.j = u.j
+      CROSS JOIN LATERAL (SELECT ST_Transform(ST_Centroid(h.geom), 4326)) AS c(geom_4326)
+    UNION ALL
+    SELECT u.tier, u.i, u.j, h.pk, ST_Y(c.geom_4326), ST_X(c.geom_4326)
+      FROM used_cells u
+      JOIN cde.hexes_zoom_1 h ON u.tier = 1 AND h.i = u.i AND h.j = u.j
+      CROSS JOIN LATERAL (SELECT ST_Transform(ST_Centroid(h.geom), 4326)) AS c(geom_4326)
+  )
   INSERT INTO cde.trajectory_hexes
         (dataset_pk, trajectory_id, hex_tier, hex_pk, latitude, longitude,
          time_min, time_max, depth_min, depth_max, days, day_ranges,
          n_records, n_profiles, records_per_day)
-  SELECT a.dataset_pk, a.trajectory_id, a.tier, h.pk,
-         ST_Y(ST_Transform(ST_Centroid(h.geom), 4326)),
-         ST_X(ST_Transform(ST_Centroid(h.geom), 4326)),
+  SELECT a.dataset_pk, a.trajectory_id, a.tier, p.pk, p.latitude, p.longitude,
          a.time_min, a.time_max, a.depth_min, a.depth_max, a.days, a.day_ranges,
          a.n_records, a.n_profiles,
          a.n_records::float / GREATEST(a.days, 1)
     FROM _traj_hex_agg a
-    JOIN cde.hexes_zoom_0 h ON a.tier = 0 AND h.i = a.i AND h.j = a.j
-  UNION ALL
-  SELECT a.dataset_pk, a.trajectory_id, a.tier, h.pk,
-         ST_Y(ST_Transform(ST_Centroid(h.geom), 4326)),
-         ST_X(ST_Transform(ST_Centroid(h.geom), 4326)),
-         a.time_min, a.time_max, a.depth_min, a.depth_max, a.days, a.day_ranges,
-         a.n_records, a.n_profiles,
-         a.n_records::float / GREATEST(a.days, 1)
-    FROM _traj_hex_agg a
-    JOIN cde.hexes_zoom_1 h ON a.tier = 1 AND h.i = a.i AND h.j = a.j;
+    JOIN hex_pos p USING (tier, i, j);
 
   GET DIAGNOSTICS n = ROW_COUNT;
 

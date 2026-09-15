@@ -40,6 +40,7 @@ from urllib.parse import urlencode
 
 import requests
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from urllib3.util.retry import Retry
 
 from cde_harvester.core.db import create_db_engine, db_host
@@ -294,6 +295,37 @@ UPSERT_SQL = text(
 )
 
 
+def refresh_popularity(engine):
+    """Refresh cde.obis_scientific_name_popularity, this script's ordering input.
+
+    The view exists only to order ``--top N`` by OBIS record count, and this is
+    its only reader — so it is refreshed here, once per run, instead of on the
+    load path. ``obis_refresh_matviews()`` used to rebuild it after every
+    harvest (an unnest + GROUP BY over the whole obis_cells table) to serve a
+    script that may not run for weeks.
+
+    CONCURRENTLY so a run started while the site is up doesn't take an ACCESS
+    EXCLUSIVE lock on the view; it needs the unique index the view already
+    carries. A failure is logged and tolerated — a stale ordering is a worse
+    ``--top N`` choice, not a wrong result, and the run can still do its work.
+    """
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "REFRESH MATERIALIZED VIEW CONCURRENTLY "
+                    "cde.obis_scientific_name_popularity"
+                )
+            )
+        logger.info("Refreshed cde.obis_scientific_name_popularity")
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "Could not refresh cde.obis_scientific_name_popularity (%s); "
+            "ordering by a possibly stale popularity",
+            exc,
+        )
+
+
 def names_to_process(conn, refresh_statuses, top_n=None):
     """Return scientific_names to process, ordered by OBIS record popularity.
 
@@ -328,8 +360,9 @@ def names_to_process(conn, refresh_statuses, top_n=None):
         limit_clause = "LIMIT :top_n"
         params["top_n"] = top_n
 
-    # Popularity is precomputed in cde.obis_scientific_name_popularity (a
-    # materialized view refreshed by 5_profile_process.sql after each harvest).
+    # Popularity is precomputed in cde.obis_scientific_name_popularity, which
+    # this script refreshes above — it is the view's only reader, so the load
+    # path no longer pays for it (see refresh_popularity).
     # Recomputing it inline here was a multi-minute unnest+GROUP BY over the
     # whole obis_cells table — fine for a 6-hour backfill, but disastrous for
     # short --top N runs that pay the bootstrap cost without amortising it.
@@ -513,6 +546,7 @@ def main():
     engine = build_engine(workers)
     session = build_session(workers)
 
+    refresh_popularity(engine)
     with engine.connect() as conn:
         todo = names_to_process(conn, refresh, top_n=args.top)
     if args.limit is not None:

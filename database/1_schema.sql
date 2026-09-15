@@ -242,6 +242,35 @@ CREATE INDEX ON profiles(dataset_pk);
 -- every tile/legend/shape query; without GIN it seq-scans the largest table in
 -- the app on every pan.
 CREATE INDEX ON profiles USING GIN (eovs);
+-- The time and depth filters (utils/dbFilter.js) reach every cell table as a
+-- pair of one-sided comparisons. Three of the four earn an index; measured on
+-- a copy of production (376 k rows, 805 MB, ~2.2 kB/row), which is the only
+-- scale and distribution these numbers mean anything at:
+--
+--   time_max >= :timeMin    the START date. 12% of rows at 2020: 55 -> 16 ms.
+--                           4% at 2024: 27 -> 5 ms.
+--   time_min <= :timeMax    the END date. 24% of rows at 1990: 72 -> 31 ms.
+--   depth_max >= :depthMin  deep features. 7% at >= 1000 m: 42 -> 19 ms.
+--
+--   depth_min <= :depthMax  NOT indexed, and cannot be: the predicate asks
+--                           "does this feature start above the selected
+--                           floor", which is true of 97% of rows because
+--                           almost everything starts near the surface. It
+--                           stayed on a seq scan with an index available.
+--
+-- Only `time_min` is a close call, and only because production's catalogue is
+-- historical: profiles' median `time_max` is 2003 and its data reaches back to
+-- 1917, so "before 1990" really does select a quarter of it. On a recent-heavy
+-- database the same index goes unused — this pair was chosen from the
+-- distribution, not from the column names.
+--
+-- All three are used only when a filter is genuinely narrow. The default range
+-- (1900..today, the whole water column) sends both time predicates and
+-- correctly gets a seq scan, so they cost nothing when they cannot help.
+-- See the P3 measurements in TODO-cde-revisions.md.
+CREATE INDEX ON profiles (time_max);
+CREATE INDEX ON profiles (time_min);
+CREATE INDEX ON profiles (depth_max);
 
 
 
@@ -309,6 +338,12 @@ CREATE INDEX ON obis_cells (hex_1_pk);
 CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scientific_names)
   WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
 CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia_ids);
+-- Same three as cde.profiles above, and same reasoning for why depth_min is
+-- left out. Untested against real data: production carries no OBIS rows yet,
+-- so these are sized from the identical predicate shape rather than measured.
+CREATE INDEX ON obis_cells (time_max);
+CREATE INDEX ON obis_cells (time_min);
+CREATE INDEX ON obis_cells (depth_max);
 
 -- FILLFACTOR leaves room on each page for HOT updates on non-indexed columns
 -- (dataset_pk, point_pk, hex_*_pk are filled by post-load UPDATEs). Reduces
@@ -411,6 +446,15 @@ CREATE INDEX trajectory_hexes_dataset_pk_idx ON trajectory_hexes (dataset_pk);
 -- dbFilter lat/lon bounds + drawn-polygon ST_Intersects on search_geom.
 CREATE INDEX trajectory_hexes_geom_gist ON trajectory_hexes USING GIST (geom);
 CREATE INDEX trajectory_hexes_latlon_idx ON trajectory_hexes (latitude, longitude);
+-- Same three as cde.profiles above, and same reasoning for why depth_min is
+-- left out (97% of rows here start within 10 m of the surface, so that
+-- predicate stayed on a seq scan with an index available). This is the
+-- largest cell table — 795 k rows in production. Measured on a copy of it:
+-- a 2024 start date is 16% of rows and takes the index at 29 ms; an end date
+-- of 2005 is 15% and takes it at 25 ms.
+CREATE INDEX trajectory_hexes_time_max_idx ON trajectory_hexes (time_max);
+CREATE INDEX trajectory_hexes_time_min_idx ON trajectory_hexes (time_min);
+CREATE INDEX trajectory_hexes_depth_max_idx ON trajectory_hexes (depth_max);
 
 
 -- Ordered, downsampled track fixes for Trajectory / TrajectoryProfile
@@ -505,7 +549,10 @@ CREATE INDEX obis_scientific_names_trgm
 -- by popularity (so --top N targets the most-impactful subset). The unnest +
 -- GROUP BY over the full obis_cells table is a multi-minute scan, so we cache
 -- it as a materialized view rather than recomputing on every script run.
--- Refreshed alongside obis_scientific_names in 5_profile_process.sql.
+-- Refreshed by that script, not by the harvest load: it has no runtime reader,
+-- so rebuilding it after every harvest paid a multi-minute scan for a consumer
+-- that may not run for weeks (obis_scientific_names, which the web-api DOES
+-- read live, is still refreshed in 5_profile_process.sql).
 DROP MATERIALIZED VIEW IF EXISTS cde.obis_scientific_name_popularity;
 CREATE MATERIALIZED VIEW cde.obis_scientific_name_popularity AS
   SELECT sn AS scientific_name,
@@ -638,3 +685,17 @@ CREATE INDEX harvest_attempts_status_idx
     ON cde.harvest_attempts (status);
 CREATE INDEX harvest_attempts_attempted_at_idx
     ON cde.harvest_attempts (attempted_at DESC);
+-- Dashboard URLs carry a slug: the source URL with its scheme dropped and '.'
+-- and '/' folded to '-'. That fold is lossy, so resolving a slug back to a
+-- stored erddap_url means applying the same transform to the stored values —
+-- which, unindexed, is a full pass over this append-only table (it gains a row
+-- per dataset per run) on every one of the three /harvest routes that take a
+-- slug. The expression must match routes/harvest.js's resolveErddapUrl
+-- character for character or the index is silently unused; all three functions
+-- are IMMUTABLE, which is what makes it indexable at all.
+CREATE INDEX harvest_attempts_slug_idx
+    ON cde.harvest_attempts (
+      (translate(
+         regexp_replace(regexp_replace(erddap_url, '^[a-z]+://', '', 'i'), '/+$', ''),
+         './', '--'))
+    );

@@ -6,6 +6,15 @@ const { pipeline } = require("../utils/routePipeline");
 
 const SPARKLINE_DEPTH = 10;
 
+// Cap on the per-dataset attempt history. cde.harvest_attempts is append-only
+// and gains a row per dataset per run, so this was the one dashboard query
+// whose result grows without bound — and HarvestDataset.jsx renders every row
+// it is given into an unpaginated table. Deep enough that the answer the page
+// exists to give ("what has this dataset been doing lately") is never cut off;
+// the response says when it truncated so the page can admit it rather than
+// present a partial history as the whole one.
+const HISTORY_MAX_ROWS = 200;
+
 // A hash-unchanged skip (status='skipped', reason_code='UNCHANGED') means the
 // dataset was verified as up to date — one HTTP request, nothing re-uploaded.
 // In the dataset-centric dashboard views that counts as a healthy "success"
@@ -43,10 +52,15 @@ async function resolveErddapUrl(slug) {
   } catch {
     /* not a base64 slug — fall through to the transform lookup */
   }
+  // Matched against the stored URLs by the same transform, which
+  // harvest_attempts_slug_idx (1_schema.sql) indexes: as a plain predicate the
+  // planner can use that index, whereas the DISTINCT subquery this replaced
+  // had to read every row of an append-only table — one full pass per request,
+  // on all three routes below, growing with every harvest run.
   // NB: avoid '?' in the regexes — knex treats it as a positional binding.
   const sql = `
     SELECT erddap_url
-    FROM (SELECT DISTINCT erddap_url FROM cde.harvest_attempts) u
+    FROM cde.harvest_attempts
     WHERE translate(
             regexp_replace(regexp_replace(erddap_url, '^[a-z]+://', '', 'i'), '/+$', ''),
             './', '--'
@@ -63,20 +77,29 @@ async function resolveErddapUrl(slug) {
 // the CAST(? AS text) IS NULL pattern in the SQL handles them correctly.
 
 async function listServers() {
+  // latest_run_per_server is one row per (server, source) describing its most
+  // recent attempt. DISTINCT ON over the (erddap_url, dataset_id,
+  // attempted_at DESC) index, rather than a GROUP BY carrying a correlated
+  // scalar subquery that re-ran a per-server ORDER BY ... LIMIT 1 for every
+  // group — the pattern recentRuns below was already restructured away from.
+  //
+  // That subquery keyed last_run_id on erddap_url alone while the group is
+  // (erddap_url, source); each group now takes the run of its own latest
+  // attempt. A URL only ever carries one source ('erddap' or 'obis' — OBIS
+  // rows use the obis.org sentinel), so the two agree on real data, and the
+  // old and new CTEs were diffed on a live database to confirm it.
+  //
+  // Kept out of the SQL string on purpose: knex substitutes its :name and ?
+  // bindings inside `--` comments too, so prose belongs here.
   const sql = `
     WITH latest_run_per_server AS (
-        SELECT erddap_url,
+        SELECT DISTINCT ON (erddap_url, source)
+               erddap_url,
                source,
-               MAX(attempted_at) AS last_attempted_at,
-               (
-                   SELECT run_id
-                   FROM cde.harvest_attempts ha2
-                   WHERE ha2.erddap_url = ha1.erddap_url
-                   ORDER BY attempted_at DESC
-                   LIMIT 1
-               ) AS last_run_id
-        FROM cde.harvest_attempts ha1
-        GROUP BY erddap_url, source
+               attempted_at AS last_attempted_at,
+               run_id       AS last_run_id
+        FROM cde.harvest_attempts
+        ORDER BY erddap_url, source, attempted_at DESC
     )
     SELECT s.erddap_url,
            s.source,
@@ -219,7 +242,9 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
   return result.rows;
 }
 
-async function datasetHistory(erddapUrl, datasetId) {
+async function datasetHistory(erddapUrl, datasetId, limit = HISTORY_MAX_ROWS) {
+  // One row over the cap, so "there is more" is answered by the same query
+  // rather than by a second COUNT over the same append-only table.
   const sql = `
     SELECT a.run_id,
            a.attempted_at,
@@ -237,9 +262,11 @@ async function datasetHistory(erddapUrl, datasetId) {
     WHERE a.erddap_url = ?
       AND a.dataset_id = ?
     ORDER BY a.attempted_at DESC
+    LIMIT ?
   `;
-  const result = await db.raw(sql, [erddapUrl, datasetId]);
-  return result.rows;
+  const result = await db.raw(sql, [erddapUrl, datasetId, limit + 1]);
+  const truncated = result.rows.length > limit;
+  return { rows: result.rows.slice(0, limit), truncated };
 }
 
 async function datasetMeta(erddapUrl, datasetId) {
@@ -341,11 +368,22 @@ router.get(
   ...pipeline({ filters: false, cacheFor: "1 minute" }),
   async (req, res) => {
     const erddapUrl = await resolveErddapUrl(req.params.slug);
-    const history = await datasetHistory(erddapUrl, req.params.datasetId);
+    const { rows: history, truncated } = await datasetHistory(
+      erddapUrl,
+      req.params.datasetId,
+    );
     if (!history.length)
       return res.status(404).json({ error: "No harvest history found" });
     const meta = await datasetMeta(erddapUrl, req.params.datasetId);
-    res.json({ history, meta, erddap_url: erddapUrl });
+    res.json({
+      history,
+      // Present so the page can say it is showing the most recent N rather
+      // than implying these are all the attempts there have ever been.
+      historyTruncated: truncated,
+      historyLimit: HISTORY_MAX_ROWS,
+      meta,
+      erddap_url: erddapUrl,
+    });
   },
 );
 

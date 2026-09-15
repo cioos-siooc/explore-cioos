@@ -47,7 +47,6 @@ export default function MapContainer() {
     setInspectDataset,
     setHighlightedRecord,
     setInspectRecordID,
-    setShowPreviewModal,
     returnToDatasetList,
     selectedTrajectory,
     selectTrajectoryFromMap,
@@ -97,8 +96,9 @@ export default function MapContainer() {
     // marker belongs to the SAME dataset as the last one), and the
     // navigation entry is replaced rather than pushed, so browsing several
     // stations by clicking around the map doesn't turn "Back" into a
-    // step-by-step replay of every marker visited.
-    setShowPreviewModal(false);
+    // step-by-step replay of every marker visited. Closing the preview needs
+    // no call of its own — showPreviewModal is derived from inspectRecordID
+    // (see SelectionProvider), so clearing that below already closes it.
     setInspectRecordID(undefined);
     setHighlightedRecord(undefined);
     setInspectDataset(row, { replace: true });

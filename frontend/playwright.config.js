@@ -47,7 +47,19 @@ export default defineConfig({
     "{testDir}/__screenshots__/{projectName}/{testFileName}/{arg}{ext}",
 
   expect: {
-    toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: "disabled" },
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+      animations: "disabled",
+      // Not the 5s default. toHaveScreenshot re-shoots until two consecutive
+      // captures agree before it ever compares against the baseline, and on a
+      // hosted runner rasterising through SwiftShader that handshake does not
+      // always finish in five seconds: CI failed ten of twelve visual tests
+      // with "Timeout 5000ms exceeded" while the same baselines passed in
+      // 20.9s total in the same container locally. This buys the slow machine
+      // time to settle; it does not loosen what is compared — maxDiffPixelRatio
+      // still decides whether the pixels match.
+      timeout: 20_000,
+    },
   },
 
   use: {

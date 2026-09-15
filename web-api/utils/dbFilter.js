@@ -41,6 +41,58 @@ async function fetchAphiaIdsFromDb(scientificNamesArr) {
   return rows.map((r) => r.aphia_id);
 }
 
+/*
+ * The expansion above depends on nothing but the selected names, and every
+ * route that narrows the catalogue calls createDBFilter once per request — so
+ * one taxon selection fires it ~20 times for the tiles of a single viewport,
+ * serially ahead of each tile's own query, plus twice more for /download
+ * (getShapeQuery runs it, then the route runs it again). Measured at ~30 ms
+ * even for a Phylum, that is the whole first paint of a taxon selection spent
+ * re-deriving one answer.
+ *
+ * The PROMISE is memoized, not the value: the tiles of a viewport arrive
+ * together, so caching only settled results would still let the whole batch
+ * miss and fire N queries. A rejection is evicted rather than kept — the same
+ * reasoning as utils/redis.js's readyPromise, where memoizing a failure pinned
+ * the process to it.
+ *
+ * The TTL matches the route cache in utils/routePipeline.js, so a name's
+ * expansion is never staler than the tile drawn from it, and the map is
+ * bounded because a request's names come from a fixed-vocabulary autocomplete
+ * (/scientificNames) rather than free text.
+ */
+const APHIA_CACHE_TTL_MS = 5 * 60 * 1000;
+const APHIA_CACHE_MAX_ENTRIES = 500;
+const aphiaCache = new Map();
+
+function memoizeAphiaFetch(fetcher) {
+  return function fetchAphiaIdsMemoized(scientificNamesArr) {
+    // Sorted, so two selections of the same taxa in a different order share an
+    // entry — the frontend's order follows the click sequence.
+    const key = JSON.stringify([...scientificNamesArr].sort());
+    const hit = aphiaCache.get(key);
+    if (hit && hit.expiresAt > Date.now()) return hit.promise;
+
+    const promise = Promise.resolve(fetcher(scientificNamesArr)).catch(
+      (error) => {
+        aphiaCache.delete(key);
+        throw error;
+      },
+    );
+    aphiaCache.set(key, {
+      promise,
+      expiresAt: Date.now() + APHIA_CACHE_TTL_MS,
+    });
+    // Map preserves insertion order, so the first key is the oldest.
+    if (aphiaCache.size > APHIA_CACHE_MAX_ENTRIES) {
+      aphiaCache.delete(aphiaCache.keys().next().value);
+    }
+    return promise;
+  };
+}
+
+const fetchAphiaIdsCached = memoizeAphiaFetch(fetchAphiaIdsFromDb);
+
 class InvalidPolygonError extends Error {
   constructor() {
     // polygonJSONToWKT returns false for unparseable JSON, a non-array, or a
@@ -70,7 +122,7 @@ class ScientificNameSelectionTooBroadError extends Error {
 
 async function createDBFilter(
   request,
-  { fetchAphiaIds = fetchAphiaIdsFromDb } = {},
+  { fetchAphiaIds = fetchAphiaIdsCached } = {},
 ) {
   const {
     timeMin,
@@ -285,3 +337,8 @@ module.exports.ScientificNameSelectionTooBroadError =
   ScientificNameSelectionTooBroadError;
 module.exports.InvalidPolygonError = InvalidPolygonError;
 module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;
+// The memo is process-global, so a test that drives it has to be able to put
+// it back — same seam as utils/cache.js's _resetAdapterForTests.
+module.exports.memoizeAphiaFetch = memoizeAphiaFetch;
+module.exports.APHIA_CACHE_TTL_MS = APHIA_CACHE_TTL_MS;
+module.exports._resetAphiaCacheForTests = () => aphiaCache.clear();
