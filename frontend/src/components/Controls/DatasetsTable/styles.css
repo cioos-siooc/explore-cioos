@@ -146,7 +146,6 @@
   height: 10px;
   border-radius: 3px;
   border: 2px solid var(--cioos-map-click);
-  background-color: var(--cioos-map-click-surface);
   box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
 }
 
@@ -176,9 +175,9 @@
    border would grow the card by 2px and jostle its neighbours in the list every
    time a row's state changed; a shadow ring reads the same but costs no layout.
    The glow applies to selected rows too — it says where the row came from,
-   which is orthogonal to whether it is in the download — while the wash and the
-   border are left to `:not(.selected)`, the selection's own teal border and
-   background wash being the more important of the two facts about such a row. */
+   which is orthogonal to whether it is in the download — while the wash is
+   left to `:not(.selected)`, the selection's own teal border being the more
+   important of the two facts about such a row. */
 .datasetCard.fromMapClick {
   box-shadow:
     0 0 0 2px var(--cioos-map-click-glow),
@@ -188,7 +187,6 @@
 
 .datasetCard.fromMapClick:not(.selected) {
   border-color: var(--cioos-map-click);
-  background-color: var(--cioos-map-click-surface);
 }
 
 .datasetCard.clickable {
@@ -207,7 +205,6 @@
 }
 
 .datasetCard.selected {
-  background-color: rgb(198 227 223 / 35%);
   border-color: var(--cioos-primary);
 }
 

@@ -458,7 +458,6 @@
    card costs it no layout. */
 .listCard.pinned {
   border-color: var(--cioos-map-click);
-  background-color: var(--cioos-map-click-surface);
   box-shadow:
     0 0 0 2px var(--cioos-map-click-glow),
     0 0 10px 1px var(--cioos-map-click-glow),
