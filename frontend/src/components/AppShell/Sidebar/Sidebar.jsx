@@ -112,22 +112,29 @@ export default function Sidebar() {
             aria-expanded={expanded}
             title={expanded ? t("sidebarCollapseTitle") : t("sidebarShowTitle")}
           >
-            <ListUl size={18} aria-hidden="true" />
-            <span className="datasetsToggleLabel">
-              {t("datasetsFilterName")}
-            </span>
-            <span
-              className={classNames("datasetsToggleCount", {
-                updating: countsUpdating,
-              })}
-              data-testid="sidebar-toggle-count"
-              title={countsTitle}
-            >
-              {countsReady ? (
-                countLabel
-              ) : (
-                <Spinner size="xs" className="countSpinner" />
-              )}
+            <ListUl className="datasetsToggleIcon" size={20} aria-hidden="true" />
+            <span className="datasetsToggleText">
+              <span className="datasetsToggleTitleRow">
+                <span className="datasetsToggleLabel">
+                  {t("datasetsFilterName")}
+                </span>
+                <span
+                  className={classNames("datasetsToggleCount", {
+                    updating: countsUpdating,
+                  })}
+                  data-testid="sidebar-toggle-count"
+                  title={countsTitle}
+                >
+                  {countsReady ? (
+                    countLabel
+                  ) : (
+                    <Spinner size="xs" className="countSpinner" />
+                  )}
+                </span>
+              </span>
+              <span className="datasetsToggleSubtitle">
+                {t("datasetsToggleSubtitleText")}
+              </span>
             </span>
             <DismissIcon
               className="datasetsToggleChevron"

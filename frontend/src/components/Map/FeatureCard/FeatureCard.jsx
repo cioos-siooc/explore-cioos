@@ -4,6 +4,7 @@ import {
   ArrowRight,
   CheckCircleFill,
   CircleFill,
+  GeoAlt,
   Grid3x3Gap,
   Plus,
   Search,
@@ -215,9 +216,16 @@ export default function FeatureCard() {
       aria-label={t("featureCardTitle")}
     >
       <div className="featureCardHeader">
+        <GeoAlt
+          className="featureCardHeadingIcon"
+          size={20}
+          aria-hidden="true"
+        />
         <div className="featureCardHeading">
-          <span className="featureCardHeadingTitle">
-            {t("featureCardTitle")}
+          <span className="featureCardHeadingTitleRow">
+            <span className="featureCardHeadingTitle">
+              {t("featureCardTitle")}
+            </span>
             {!empty && (
               <span
                 className="featureCardMapClickSwatch"
@@ -225,12 +233,15 @@ export default function FeatureCard() {
                 title={t("featureCardMapClickHint")}
               />
             )}
+            {!empty && (
+              <span className="featureCardHeadingCounter">
+                {t("featureCardSummary", { n: rows.length })}
+              </span>
+            )}
           </span>
-          {!empty && (
+          {!empty && featureQuery.observationCount > 0 && (
             <span className="featureCardHeadingMeta">
-              {t("featureCardSummary", { n: rows.length })}
-              {featureQuery.observationCount > 0 &&
-                ` · ${countLabel(featureQuery.observationCount)}`}
+              {countLabel(featureQuery.observationCount)}
             </span>
           )}
         </div>
