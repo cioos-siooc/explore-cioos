@@ -163,6 +163,37 @@ export function buildBasemapStyle(lang = "en") {
         "raster-saturation": -0.15,
       },
     },
+    // A shoreline that stays under the satellite for the rest of the map's
+    // life, past where coastline/coastline-casing above hand off to imagery
+    // and stop. Esri's raster tiles are far slower to arrive than this vector
+    // line — OSM's water polygons are already loaded as part of the `ofm`
+    // source the labels need anyway — so on every pan to a fresh area there is
+    // a gap where imagery hasn't painted in yet. Sitting below the imagery
+    // layer means it only shows through that gap: once a satellite tile
+    // lands, its full opacity covers the line again, so this never competes
+    // with or duplicates the real shoreline the imagery shows.
+    {
+      id: "coastline-satellite-underlay",
+      type: "line",
+      source: "ofm",
+      "source-layer": "water",
+      filter: SHORELINE_FILTER,
+      minzoom: basemapHandoffStartZoom,
+      layout: { "line-join": "round" },
+      paint: {
+        "line-color": "#33555F",
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          basemapHandoffStartZoom,
+          0,
+          basemapHandoffEndZoom,
+          0.6,
+        ],
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1, 16, 2],
+      },
+    },
     // minzoom is what stops imagery tiles being fetched at world zooms. It sits
     // below the fade rather than on it: the ramp is short enough now that a
     // request started when the first pixel is drawn would land after the swap
