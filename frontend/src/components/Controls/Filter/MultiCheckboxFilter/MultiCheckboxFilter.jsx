@@ -15,7 +15,11 @@ export default function MultiCheckboxFilter({
 }) {
   const { t, i18n } = useTranslation();
 
-  const optionsSelectedSorted = optionsSelected.sort((a, b) =>
+  // Array.prototype.sort mutates in place — copy first. optionsSelected is a
+  // slice of caller state (FilterProvider's eovsSelected etc.); sorting it
+  // directly would silently reorder that state's backing array as a side
+  // effect of rendering, with no state update to signal it.
+  const optionsSelectedSorted = [...optionsSelected].sort((a, b) =>
     t(a.title).localeCompare(t(b.title), i18n.language),
   );
 

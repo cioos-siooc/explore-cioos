@@ -466,6 +466,13 @@ def main(folder, incremental=False):
             "skipping dataset load, will still bump verified_at and write harvest audit"
         )
 
+    # Outcome counters, reported in the summary this function returns. Both are
+    # assigned inside conditional branches below — pruning only on incremental
+    # runs with CDE_PRUNE_STALE enabled, GC only when the try-lock is won — so
+    # they need a value for the runs that take neither branch.
+    n_pruned = 0
+    n_gc = 0
+
     schema = "cde"
 
     def acquire_loader_lock():
@@ -1021,3 +1028,18 @@ def main(folder, incremental=False):
                 conn.execute(text("VACUUM ANALYZE cde.trajectory_days"))
             if trajectory_points is not None:
                 conn.execute(text("VACUUM ANALYZE cde.trajectory_points"))
+
+    # What this load actually did. The caller uses `changed` to decide whether
+    # to drop the redis cache: an incremental run where every dataset hashed
+    # unchanged still bumps verified_at and appends harvest audit rows, but
+    # nothing any cached API response is built from has moved, so flushing
+    # would throw away a warm cache for nothing. (The harvest dashboard routes
+    # that do read the audit tables carry their own 30s-2min TTLs and heal on
+    # their own.) A full reload always counts as changed — it TRUNCATEs.
+    return {
+        "changed": (not datasets.empty) or bool(n_pruned) or (not incremental),
+        "changed_datasets": len(datasets),
+        "pruned": n_pruned,
+        "gc": n_gc,
+        "full_reload": not incremental,
+    }
