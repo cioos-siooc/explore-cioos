@@ -4,8 +4,10 @@ import {
   ERDDAP_FORMATS,
   OBIS_RECORD_CAP,
   buildDownloadLinks,
+  ckanRecordUrl,
   downloadConstraints,
   erddapDownloadUrl,
+  filterSummaryText,
   linksToCsv,
   linksToCurlScript,
   linksToText,
@@ -20,6 +22,7 @@ const erddapRow = {
   erddap_server_url: "https://data.cioospacific.ca/erddap",
   cdm_data_type: "Profile",
   has_depth: true,
+  ckan_url: "https://catalogue.cioos.ca/dataset/ff21-4d1e",
 };
 
 const obisRow = {
@@ -206,6 +209,77 @@ describe("buildDownloadLinks", () => {
     expect(depthless.polygonSquared).toBe(true);
     expect(obis.unfiltered).toBe(true);
   });
+
+  it("flags the box on every spatially filtered ERDDAP link", () => {
+    const triangle = downloadConstraints({
+      polygon: [
+        [-140, 40],
+        [-120, 40],
+        [-130, 60],
+        [-140, 40],
+      ],
+      byPolygon: true,
+    });
+    for (const constraints of [allFilters, triangle]) {
+      const [erddap, obis] = buildDownloadLinks(
+        [erddapRow, obisRow],
+        formats,
+        constraints,
+      );
+      // A rectangle is its own bounding box and a polygon is not, but either
+      // way the link constrains by a box and the reader is told which.
+      expect(erddap.polygonSquared).toBe(true);
+      // OBIS takes the drawn shape itself, so its link loses nothing.
+      expect(obis.polygonSquared).toBe(false);
+    }
+  });
+
+  it("says nothing about a box when no area filter is applied", () => {
+    const [erddap] = buildDownloadLinks(
+      [erddapRow],
+      formats,
+      // An area is drawn, but the download is not being narrowed by it.
+      downloadConstraints({
+        polygon: [
+          [-140, 40],
+          [-120, 40],
+          [-120, 60],
+          [-140, 60],
+          [-140, 40],
+        ],
+        byPolygon: false,
+      }),
+    );
+    expect(erddap.polygonSquared).toBe(false);
+  });
+});
+
+describe("ckanRecordUrl", () => {
+  it("reads the catalogue page as the record behind it", () => {
+    expect(ckanRecordUrl("https://catalogue.cioos.ca/dataset/ff21-4d1e")).toBe(
+      "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
+    );
+  });
+
+  it("has nothing to offer for a dataset with no catalogue entry", () => {
+    // ckan_id NULL makes the whole concatenation NULL upstream.
+    expect(ckanRecordUrl(null)).toBeNull();
+    expect(ckanRecordUrl("https://catalogue.cioos.ca/")).toBeNull();
+  });
+});
+
+describe("filterSummaryText", () => {
+  it("says what the URLs were filtered by, in the URLs' own terms", () => {
+    expect(filterSummaryText(allFilters)).toBe(
+      "time 2020-01-01 to 2020-12-31; depth 0 to 100 m; bbox -140, 40, -120, 60",
+    );
+  });
+
+  it("is empty when nothing was applied, which the header reads as 'none'", () => {
+    expect(filterSummaryText({})).toBe("");
+    // Depth 0 is a depth, not an absent filter.
+    expect(filterSummaryText({ startDepth: 0 })).toBe("depth 0 to … m");
+  });
 });
 
 describe("the exported list", () => {
@@ -215,7 +289,8 @@ describe("the exported list", () => {
   it("is one URL per line under a commented header", () => {
     const lines = linksToText(links, meta).trim().split("\n");
     expect(lines.filter((line) => line.startsWith("#"))).toHaveLength(3);
-    expect(lines.filter((line) => line.startsWith("http"))).toHaveLength(2);
+    // Two data URLs, plus the catalogue record of the one dataset that has one.
+    expect(lines.filter((line) => line.startsWith("http"))).toHaveLength(3);
   });
 
   it("is a curl script that fails loudly and resumes", () => {
@@ -247,6 +322,40 @@ describe("the exported list", () => {
     expect(linksToCurlScript(quoted, meta)).toContain("# it's here");
   });
 
+  it("fetches each catalogue record beside its dataset", () => {
+    const script = linksToCurlScript(links, meta);
+    expect(script).toContain(
+      "'https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e'",
+    );
+    expect(script).toContain(
+      "'data-cioospacific-ca-erddap_ios_ctd_profiles.ckan.json'",
+    );
+    // Resuming a complete metadata file would 416; only the data file resumes.
+    const metadataLine = script
+      .split("\n")
+      .find((line) => line.includes("package_show"));
+    expect(metadataLine).not.toContain("--continue-at");
+    // The OBIS row has no catalogue entry, so it contributes no second line.
+    expect(script.match(/package_show/g)).toHaveLength(1);
+
+    const urls = linksToText(links, meta).trim().split("\n");
+    expect(
+      urls.indexOf(
+        "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
+      ),
+    ).toBe(urls.findIndex((line) => line.includes("/tabledap/")) + 1);
+  });
+
+  it("gives the CSV the page a person clicks, not the API record", () => {
+    const csv = linksToCsv(links);
+    const [header, erddap, obis] = csv.trim().split("\n");
+    expect(header).toContain('"catalogue_url"');
+    expect(erddap).toContain('"https://catalogue.cioos.ca/dataset/ff21-4d1e"');
+    // A dataset the harvest never matched to a catalogue entry gets an empty
+    // cell rather than a broken URL.
+    expect(obis.endsWith('""')).toBe(true);
+  });
+
   it("is a CSV whose cells survive a comma in the title", () => {
     const csv = linksToCsv(
       buildDownloadLinks(
@@ -257,7 +366,7 @@ describe("the exported list", () => {
     );
     const [header, row] = csv.trim().split("\n");
     expect(header).toBe(
-      '"dataset_id","title","source","format","filename","url"',
+      '"dataset_id","title","source","format","filename","url","catalogue_url"',
     );
     expect(row).toContain('"Profiles, ""inshore"""');
   });

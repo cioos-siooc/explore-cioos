@@ -194,116 +194,117 @@
   min-height: 0;
 }
 
-/* --- Legend / key: which datasets the CDE can deliver directly. A quiet
-   single-line key sitting just above the order bar. --- */
-.downloadLegend {
-  flex: 0 0 auto;
-  display: flex;
+/* --- Format pickers, rendered onto the datasets toolbar above the list
+   (see DownloadFormats). Styled here because that is where they are built:
+   the toolbar only provides the row. --- */
+.downloadFormats {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 4px 18px;
-  padding: 7px 16px;
-  color: var(--cioos-ink-60);
-  font-size: var(--cioos-font-size-sm);
+  gap: 6px 10px;
 }
 
-.downloadLegendItem {
+.downloadFormatsObis {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.downloadLegendItem .legendIcon.success {
-  color: var(--cioos-success);
+/* What the chosen OBIS option costs — the 10 000-record page cap, or the
+   snapshot's total lack of filtering. It changes with the select beside it, so
+   it reads as that select's caption rather than as a footnote. */
+.downloadFormatsObisNote {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+  max-width: 22ch;
+  line-height: 1.15;
 }
 
-.downloadLegendItem .legendIcon.error {
-  color: var(--cioos-error);
-}
-
-.legendBadge {
-  border-radius: var(--cioos-radius-pill);
-  padding: 1px 8px;
-  font-weight: 600;
-}
-
-.legendBadge.success {
-  background-color: var(--cioos-success-bg);
-  color: var(--cioos-primary-700);
-}
-
-.legendBadge.error {
-  background-color: var(--cioos-error-bg);
-  color: var(--cioos-error);
-}
-
-/* --- Order bar: the sand "checkout" zone at the foot of the modal.
-   Order summary (count + size) on the left, email + submit CTA on the right,
-   so it reads as an order total feeding the action. --- */
-.downloadOrderBar {
+/* ------------------------------------------------------------------
+ * Order footer — the three things a reviewed order leads to, side by side:
+ * what you picked | have it emailed | take the URLs yourself.
+ *
+ * Horizontal because the second and third are alternative delivery routes for
+ * one selection. Stacked, choosing between them meant scrolling past one to
+ * read the other, and the pair spent ~180px of a fixed-height modal — rows the
+ * dataset list above wanted back. The summary leads because both routes ship
+ * whatever it counts.
+ *
+ * Columns collapse in the order they can afford to: the links block, widest
+ * and with the most to say, drops to a full-width row of its own first; below
+ * that everything stacks.
+ * ------------------------------------------------------------------ */
+.downloadFooter {
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px 24px;
-  padding: 10px 16px;
+  display: grid;
+  /* The links column is weighted well above the email one because its row of
+     four export buttons is the widest indivisible thing in the footer: a
+     column narrower than that wraps the last button onto a line of its own and
+     spends a row on it. The summary takes what its two figures need. */
+  grid-template-columns: auto minmax(240px, 1fr) minmax(330px, 1.7fr);
+  align-items: stretch;
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
 }
 
-/* --- Direct links, as a file. Its own full-width line of the order bar under
-   the summary and the email, because it is about the whole selection while
-   they are about the ticked part of it. --- */
-.downloadExports {
+.downloadFooterSection {
   display: flex;
-  flex: 1 1 100%;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--cioos-hairline);
-}
-
-.downloadExportsLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--cioos-ink-60);
-  font-weight: 600;
-}
-
-.downloadExportsButtons {
-  display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
+  min-width: 0;
+  padding: 12px 16px;
 }
 
-.downloadExportButton {
-  display: inline-flex;
-  gap: 6px;
+/* Hairlines between the columns, not around them: one band divided, rather
+   than three cards set down on it. */
+.downloadFooterSection + .downloadFooterSection {
+  border-left: 1px solid var(--cioos-hairline);
+}
+
+/* One caption style across all three, so they read as peers rather than as a
+   heading with two footnotes.
+
+   Wraps, unlike the other captions in this file: these sit in columns that are
+   a third of the modal, and the French for "Email download link to" is half as
+   long again as the English. A caption on two lines costs a row; one that
+   cannot wrap runs into the column beside it. */
+.downloadFooterTitle {
+  display: flex;
+  flex-wrap: wrap;
+  /* Centred, not baseline-aligned: an svg's baseline is its bottom edge, so
+     the help icon in the links caption sat its full 16px above the baseline
+     and pushed that caption's text down a few pixels out of step with the two
+     beside it. Centring within a line box the icon cannot outgrow puts all
+     three captions' text on the same line whatever is inline with them. */
   align-items: center;
-  padding: 7px 12px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-sm);
-  background-color: var(--cioos-white);
-  color: var(--cioos-ink);
-  font-weight: 600;
-  cursor: pointer;
+  align-content: flex-start;
+  gap: 4px;
+  min-height: 20px;
+  max-width: 100%;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cioos-ink-60);
 }
 
-.downloadExportButton:hover {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
+.downloadFooterTitle svg {
+  flex: 0 0 auto;
 }
 
+.downloadFooter .helpIcon {
+  margin: 0;
+}
+
+/* --- Column 1: what the order is. Both figures wait on the size estimates,
+   which also decide how many datasets stay selected. --- */
 .downloadSummary {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  flex-shrink: 0;
   gap: 16px;
 }
 
@@ -344,39 +345,35 @@
   color: var(--cioos-ink-60);
 }
 
-/* --- Email + submit CTA (rendered by DownloadPanel as children) --- */
-.downloadSubmit {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1 1 300px;
-  max-width: 460px;
+/* Stand-in for a figure still being estimated; the size comes from the
+   spinner's own `size` prop. */
+.downloadDetails .datasetSizeTotalSpinner {
+  opacity: 0.3;
 }
 
-.downloadSubmitLabel {
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--cioos-ink-60);
-}
-
+/* --- Column 2: the queue. Email in, zip out (rendered by DownloadPanel as
+   this component's children). --- */
 .downloadSubmitRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
+/* Basis rather than `auto` + `min-width: 0`: an auto-basis field shrinks
+   forever and never lets the row wrap, so a narrow column ends in a one-letter
+   input beside a full-width button instead of the two on separate lines. */
 .downloadSubmit .emailAddress {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 200px;
+  min-width: 140px;
   height: 40px;
   margin: 0;
   background-color: var(--cioos-white);
 }
 
 .submitRequestButton {
+  flex: 0 1 auto;
   height: 40px;
   padding: 0 20px;
   border: none;
@@ -398,12 +395,15 @@
   cursor: not-allowed;
 }
 
+/* Holds its line whether or not there is anything to say, so a submission's
+   result does not shove the column it lands in. */
 .downloadSubmit .submissionFeedback {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 5px;
   min-height: 18px;
   font-size: var(--cioos-font-size-sm);
+  line-height: 1.25;
   color: var(--cioos-ink-60);
 }
 
@@ -415,10 +415,135 @@
   color: var(--cioos-error);
 }
 
-/* Stand-in for a figure still being estimated; the size comes from the
-   spinner's own `size` prop. */
-.downloadDetails .datasetSizeTotalSpinner {
-  opacity: 0.3;
+/* --- Column 3: the same order taken from the source instead of the queue.
+   The export buttons, with the caveats about what the links could not carry
+   under them — which is what the slack beside the buttons is held for. --- */
+
+/* Sits in the caption's own row rather than under it: the count is what the
+   caption is counting, and the column has rows to spare for the buttons. */
+.directLinksCount {
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cioos-ink-60);
+}
+
+.directLinksActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.directLinksButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--cioos-radius-sm);
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink);
+  font-weight: 600;
+  font-size: var(--cioos-font-size-sm);
+  white-space: nowrap;
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast);
+}
+
+.directLinksButton svg {
+  color: var(--cioos-primary-700);
+  flex: 0 0 auto;
+}
+
+.directLinksButton:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
+  border-color: var(--cioos-primary);
+}
+
+.directLinksButton:disabled {
+  color: var(--cioos-ink-40);
+  cursor: not-allowed;
+}
+
+.directLinksButton:disabled svg {
+  color: var(--cioos-ink-40);
+}
+
+/* Caveats about the links as built. Pushed to the foot of the column so they
+   stay the last thing in it however many there are. */
+.directLinksNotes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: auto;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.directLinksNotes:empty {
+  display: none;
+}
+
+/* The one note that is a warning rather than a footnote: the ERDDAP links
+   carry the bounding box of the drawn shape, so the file holds data from
+   outside it. Given the warning's ground because the grey micro-copy it used
+   to be sat under four buttons at the foot of a long modal and was, in
+   practice, not there at all. */
+.directLinksWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 9px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-warn-bg);
+  /* Ink rather than --cioos-warn: the amber that reads as a warning against
+     white does not clear 4.5:1 against its own tint (3.4:1 measured). The
+     glyph carries the colour — it only has 3:1 to meet — and the sentence
+     stays legible, the same division .legendBadge makes. */
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.directLinksWarning svg {
+  flex: 0 0 auto;
+  /* Centred on the first line of the sentence rather than on the block, so a
+     wrapped warning does not leave the glyph floating in the middle of it. */
+  margin-top: 2px;
+  color: var(--cioos-warn);
+}
+
+/* --- Collapse. The links column is the one that stops fitting first (two
+   pickers and four buttons), so it is the one that leaves the row. --- */
+@media (max-width: 1040px) {
+  .downloadFooter {
+    grid-template-columns: auto minmax(240px, 1fr);
+  }
+
+  .downloadFooter .directLinks {
+    grid-column: 1 / -1;
+    border-left: none;
+    border-top: 1px solid var(--cioos-hairline);
+  }
+
+  /* Back to a row across the full width, where the notes can sit beside the
+     buttons instead of under them. */
+  .directLinksNotes {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+
+  .directLinksWarning {
+    flex: 1 1 100%;
+  }
 }
 
 @media (max-width: 900px) {
@@ -441,40 +566,12 @@
     flex: 0 0 auto;
   }
 
-  .downloadOrderBar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+  .downloadFooter {
+    grid-template-columns: 1fr;
   }
 
-  .downloadSummary {
-    justify-content: center;
-  }
-
-  .downloadSubmit {
-    flex: 0 0 auto;
-    max-width: 100%;
-  }
-
-  .downloadSubmit .emailAddress,
-  .submitRequestButton {
-    flex: 1 1 100%;
-  }
-
-  /* The order bar is a column here, so the row-wrapping basis above would
-     ask for the whole of its height rather than the whole of its width. */
-  .downloadExports {
-    flex: 0 0 auto;
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .downloadExportsButtons {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .downloadExportButton {
-    justify-content: center;
+  .downloadFooterSection + .downloadFooterSection {
+    border-left: none;
+    border-top: 1px solid var(--cioos-hairline);
   }
 }

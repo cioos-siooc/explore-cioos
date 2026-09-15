@@ -52,6 +52,7 @@ export default function FeatureCard() {
     setInspectDataset,
     selectTrajectoryFromMap,
     addDatasetsToSelection,
+    selectedPks,
   } = useSelection();
   const { sidebarOpen } = useUI();
 
@@ -109,7 +110,7 @@ export default function FeatureCard() {
         // list's own button is disabled for one, so the card says the same
         // rather than offering a "+" that would quietly do nothing.
         selectable: item.kind !== "grid" && row?.cdm_data_type !== "Grid",
-        inSelection: Boolean(row?.selected),
+        inSelection: selectedPks.has(row?.pk),
       };
     })
     .filter(Boolean)

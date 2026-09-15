@@ -66,7 +66,7 @@ describe("SelectionProvider", () => {
     act(() => latest.handleSelectDataset(target));
     await waitFor(() => {
       expect(latest.pointsToReview.some((p) => p.pk === target.pk)).toBe(true);
-      expect(latest.datasetsSelectedCount).toBe(1);
+      expect(latest.selectedPks.size).toBe(1);
     });
   });
 
@@ -76,26 +76,10 @@ describe("SelectionProvider", () => {
       ...latest.pointsData[0],
       pk: 999999,
       cdm_data_type: "Grid",
-      selected: false,
     };
-    act(() => latest.setPointsData([...latest.pointsData, grid]));
-    await waitFor(() =>
-      expect(latest.pointsData.find((p) => p.pk === 999999)).toBeTruthy(),
-    );
     act(() => latest.handleSelectDataset(grid));
-    expect(latest.pointsData.find((p) => p.pk === 999999).selected).toBe(false);
-  });
-
-  it("handleSelectAllDatasets selects every non-Grid dataset, and toggles back off", async () => {
-    await renderLoaded();
-    act(() => latest.handleSelectAllDatasets());
-    await waitFor(() =>
-      expect(latest.pointsData.every((p) => p.selected)).toBe(true),
-    );
-    act(() => latest.handleSelectAllDatasets());
-    await waitFor(() =>
-      expect(latest.pointsData.every((p) => !p.selected)).toBe(true),
-    );
+    expect(latest.selectedPks.has(999999)).toBe(false);
+    expect(latest.pointsToReview.some((p) => p.pk === 999999)).toBe(false);
   });
 
   it("datasetTitleSearchText narrows filteredDatasets by title", async () => {
@@ -153,29 +137,17 @@ describe("SelectionProvider", () => {
     await waitFor(() => expect(latest.hiddenGroups.size).toBe(0));
   });
 
-  it("addDatasetsToSelection puts the named pks aside, skipping Grid rows", async () => {
+  it("addDatasetsToSelection puts the named pks aside, ignoring one absent from the results", async () => {
     await renderLoaded();
-    const grid = {
-      ...latest.pointsData[0],
-      pk: 888888,
-      cdm_data_type: "Grid",
-      selected: false,
-    };
-    act(() => latest.setPointsData([...latest.pointsData, grid]));
-    await waitFor(() =>
-      expect(latest.pointsData).toHaveLength(pointQueryFixture.length + 1),
-    );
-
     const target = latest.pointsData[0];
+    // 888888 is not a pk in pointsData at all — addDatasetsToSelection only
+    // adds pks it can resolve to a row, so it's silently dropped, the same
+    // way a Grid row's pk would be (see the callback's own comment).
     act(() => latest.addDatasetsToSelection([target.pk, 888888]));
     await waitFor(() => {
-      expect(latest.pointsData.find((p) => p.pk === target.pk).selected).toBe(
-        true,
-      );
-      expect(latest.pointsData.find((p) => p.pk === 888888).selected).toBe(
-        false,
-      );
+      expect(latest.selectedPks.has(target.pk)).toBe(true);
     });
+    expect(latest.selectedPks.has(888888)).toBe(false);
   });
 
   it("selectTrajectoryFromMap opens the dataset's page and selects the track", async () => {

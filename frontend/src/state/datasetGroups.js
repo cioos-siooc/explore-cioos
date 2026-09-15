@@ -53,8 +53,9 @@ export function isGroupDimension(groupBy) {
 
 // The group key(s) a dataset belongs to under the active dimension. The
 // array-valued dimensions (organization, eov) return several, so a dataset
-// shows under each of its values.
-export function groupKeysFor(row, groupBy, datasetsInViewPks) {
+// shows under each of its values. `selectedPks` is only read for the
+// 'selected' dimension — membership there is the shortlist, not a row field.
+export function groupKeysFor(row, groupBy, datasetsInViewPks, selectedPks) {
   const isGrid = row.cdm_data_type === "Grid";
   switch (groupBy) {
     case "type":
@@ -72,7 +73,7 @@ export function groupKeysFor(row, groupBy, datasetsInViewPks) {
     case "inView":
       return [datasetsInViewPks?.has(row.pk) ? IN_VIEW_KEY : OUT_OF_VIEW_KEY];
     case "selected":
-      return [row.selected ? SELECTED_KEY : UNSELECTED_KEY];
+      return [selectedPks?.has(row.pk) ? SELECTED_KEY : UNSELECTED_KEY];
     default:
       return [];
   }
@@ -136,11 +137,12 @@ export function hiddenDatasetPksFor(
   groupBy,
   hiddenGroups,
   datasetsInViewPks,
+  selectedPks,
 ) {
   const hidden = new Set();
   if (!isGroupDimension(groupBy) || hiddenGroups.size === 0) return hidden;
   for (const row of datasets) {
-    const keys = groupKeysFor(row, groupBy, datasetsInViewPks);
+    const keys = groupKeysFor(row, groupBy, datasetsInViewPks, selectedPks);
     if (keys.length > 0 && keys.every((key) => hiddenGroups.has(key))) {
       hidden.add(row.pk);
     }

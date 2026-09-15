@@ -46,6 +46,7 @@
   --cioos-error: #e25563; /* Atlantic red-coral, reused for errors */
   --cioos-error-bg: #fbe3e6;
   --cioos-warn: #b07a00;
+  --cioos-warn-bg: #fdf3da; /* the tinted ground --cioos-warn sits on */
   --cioos-info: #0f6d8e;
 
   /* --- Map data keys --- */
@@ -338,6 +339,11 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+::placeholder {
+  color: var(--cioos-ink-60);
+  opacity: 1;
 }
 
 button {
