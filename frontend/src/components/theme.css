@@ -21,6 +21,7 @@
 
   /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
   --cioos-ink: #152f37; /* body + heading text */
+
   /* secondary text at normal weight and small (12-14px) size — ink-60 only
      clears WCAG AA contrast at larger or bolder sizes. */
   --cioos-ink-80: rgb(21 47 55 / 82%);
