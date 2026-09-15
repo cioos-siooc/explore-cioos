@@ -8,6 +8,7 @@ import BrandSearch from "../TopLeft/BrandSearch.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 import SingleDatasetView from "./SingleDatasetView.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
+import SearchButton from "./SearchButton.jsx";
 import SpatialFilterButton from "./SpatialFilterButton.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
@@ -37,13 +38,15 @@ function measureTopBarSpace(rect) {
 }
 
 // Centered top header. First layer: the brand bar. Second layer: the dataset
-// tally (shown / in view / total), which is what the three layers below act
+// tally (shown / in view / total), which is what the four layers below act
 // on. Third layer, merged into a single segmented pill: the Datasets toggle
-// (opens/closes the left datasets sidebar), the spatial filter button (starts
-// a bounding-box or polygon draw on the map — see SpatialFilterButton) and
-// the Filters button (opens the filters modal). All three segments carry a
-// dimmed-primary wash so they read as the map's primary entry points. The
-// active-filter chips flow beneath, staying centered.
+// (opens/closes the left datasets sidebar), the search button (the same
+// free-text search as the datasets list and the Filters modal — see
+// SearchButton), the spatial filter button (starts a bounding-box or polygon
+// draw on the map — see SpatialFilterButton) and the Filters button (opens
+// the filters modal). All four segments carry a dimmed-primary wash so they
+// read as the map's primary entry points. The active-filter chips flow
+// beneath, staying centered.
 export default function TopControls() {
   const { t } = useTranslation();
   const {
@@ -99,6 +102,7 @@ export default function TopControls() {
               {t("topBarDatasetsLabel")}
             </span>
           </button>
+          <SearchButton />
           <SpatialFilterButton />
           <button
             type="button"

@@ -56,6 +56,8 @@
   "sourceFilterName": "Portail de données",
   "sourcesMulti": " portails de données",
   "textSearchFilterName": "Recherche textuelle",
+  "textSearchFilterTooltip": "Rechercher les jeux de données par titre",
+  "textSearchFilterPlaceholder": "Rechercher les titres de jeux de données",
   "timeframeFilterName": "Période",
   "depthRangeFilterName": "Profondeur",
   "filtersMenuButton": "Filtres",

@@ -6,6 +6,7 @@ import {
   Building,
   CalendarWeek,
   FileEarmarkSpreadsheet,
+  Search,
   Stack,
   Tag,
   Water,
@@ -105,8 +106,13 @@ export default function FiltersPanel() {
     obisDataAvailable,
     resetFilters,
   } = useFilters();
-  const { setDatasetTitleSearchText, onlyInView, setOnlyInView, inViewCount } =
-    useSelection();
+  const {
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
+    onlyInView,
+    setOnlyInView,
+    inViewCount,
+  } = useSelection();
   const { openFilter, setOpenFilter } = useUI();
   const {
     ready: countsReady,
@@ -134,6 +140,14 @@ export default function FiltersPanel() {
       : dataLayersChosen.length === 1
         ? t(DATA_LAYER_LABEL_KEYS[dataLayersChosen[0]])
         : dataLayersChosen.length + t("dataLayersMulti");
+
+  // No options list of its own (it matches free text against dataset titles),
+  // so it skips generateMultipleSelectBadgeTitle: idle it reads as a bare
+  // filter name, active it shows the typed text itself — same rule as the
+  // scientific name search below.
+  const textSearchFilterTranslationKey = "textSearchFilterName";
+  const textSearchBadgeTitle =
+    datasetTitleSearchText || t(textSearchFilterTranslationKey);
 
   const eovsFilterTranslationKey = "oceanVariablesFiltername";
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -217,9 +231,33 @@ export default function FiltersPanel() {
       <div className="filtersPanelBody">
         <div className="filtersPanelList" data-testid="filters-panel-list">
           <FilterSection title={t("filterGroupWhat")}>
-            {/* First in the section: this is the coarsest "what" there is — it
-                decides which families of data exist for the filters below to
-                narrow. */}
+            {/* Ahead of Data Layers: it matches free text against dataset
+                titles directly, rather than narrowing by facet, so it is the
+                one row here that isn't picking from an options list — the
+                same state the brand bar's search icon and the datasets list
+                search box read and write (SelectionProvider). */}
+            <Filter
+              active={Boolean(datasetTitleSearchText)}
+              badgeTitle={textSearchBadgeTitle}
+              tooltip={t("textSearchFilterTooltip")}
+              icon={<Search />}
+              controlled
+              searchable
+              searchTerms={datasetTitleSearchText}
+              setSearchTerms={setDatasetTitleSearchText}
+              searchPlaceholder={t("textSearchFilterPlaceholder")}
+              filterName={textSearchFilterTranslationKey}
+              openFilter={openFilter === textSearchFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                datasetTitleSearchText
+                  ? () => setDatasetTitleSearchText("")
+                  : undefined
+              }
+            />
+            {/* First of the facet rows: this is the coarsest "what" there is —
+                it decides which families of data exist for the filters below
+                to narrow. */}
             <Filter
               active={dataLayersChosen.length > 0}
               badgeTitle={dataLayersBadgeTitle}

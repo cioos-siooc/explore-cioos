@@ -56,6 +56,8 @@
   "sourceFilterName": "Data Portal",
   "sourcesMulti": " data portals",
   "textSearchFilterName": "Text Search",
+  "textSearchFilterTooltip": "Search datasets by title",
+  "textSearchFilterPlaceholder": "Search dataset titles",
   "timeframeFilterName": "Time",
   "depthRangeFilterName": "Depth",
   "filtersMenuButton": "Filters",
