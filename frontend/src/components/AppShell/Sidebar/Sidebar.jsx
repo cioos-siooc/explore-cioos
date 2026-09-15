@@ -112,7 +112,11 @@ export default function Sidebar() {
             aria-expanded={expanded}
             title={expanded ? t("sidebarCollapseTitle") : t("sidebarShowTitle")}
           >
-            <ListUl className="datasetsToggleIcon" size={20} aria-hidden="true" />
+            <ListUl
+              className="datasetsToggleIcon"
+              size={20}
+              aria-hidden="true"
+            />
             <span className="datasetsToggleText">
               <span className="datasetsToggleTitleRow">
                 <span className="datasetsToggleLabel">
