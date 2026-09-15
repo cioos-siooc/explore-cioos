@@ -50,6 +50,10 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
+  // Direct download URL per dataset pk, in the download modal only. Built by
+  // DownloadPanel from the whole selection, so a row the packager refuses
+  // still has one.
+  linksByPk,
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
@@ -402,6 +406,7 @@ export default function DatasetsTable({
                   key={`${item.group ?? ""}:${item.row.pk ?? item.row.dataset_id ?? item.row.title}`}
                   row={item.row}
                   isDownloadModal={isDownloadModal}
+                  link={linksByPk?.get(item.row.pk)}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
                   onSelect={handleSelectDataset}

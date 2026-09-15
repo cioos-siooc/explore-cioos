@@ -31,6 +31,20 @@
   width: 100%;
 }
 
+/* In the download modal the toolbar has no search box and the arrange row no
+   grouping pill, so the two rows hold one control each — and a row spent here
+   is a dataset the list does not show, in a panel that also has to fit a
+   filter band, a legend and an order bar. One row instead. */
+.datasetsTable.downloadModal .datasetsCardControls {
+  flex-flow: row wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.datasetsTable.downloadModal .datasetsCardToolbar {
+  width: auto;
+}
+
 /* Keeps its label at every width, unlike the two pills below it: it is the one
    control here that commits the reader to something — every dataset in the
    results joins the download — and the search box beside it still has room to
@@ -497,4 +511,112 @@
 .datasetCardSizeUnavailable {
   color: var(--cioos-ink-40);
   font-size: var(--cioos-font-size-xs);
+}
+
+/* --- Direct download link (download modal only; see DatasetLink.jsx) ---
+   A second line under the size/status row, on the same hairline rhythm: the
+   URL that fetches this dataset from its own server, what it will return, and
+   what it could not carry. */
+.datasetCardLink {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--cioos-hairline);
+}
+
+.datasetCardLinkRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* What following the link returns. The row's other text says which dataset
+   and which server; this is the only place the chosen format appears per
+   dataset, and ERDDAP and OBIS rows do not share it. */
+.datasetCardLinkFormat {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* One line, ellipsised. A download URL carrying every constraint runs to a
+   couple of hundred characters; wrapped, it would be the tallest thing on the
+   card and the list would stop being scannable. The full text is in the title
+   attribute and one click away in the clipboard. */
+.datasetCardLinkUrl {
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datasetCardLinkActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.datasetCardLinkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.datasetCardLinkButton:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-primary-700);
+}
+
+.datasetCardLinkCopied {
+  color: var(--cioos-success);
+}
+
+/* Where the URL is not quite the selection on screen: a squared-off polygon, a
+   dropped depth constraint, an unfiltered snapshot. Warn-coloured rather than
+   error — the link works, it just answers a slightly wider question. */
+.datasetCardLinkNote {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  color: var(--cioos-warn);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.datasetCardLinkNote svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+/* Phone, download modal only: the panel around this list has become one
+   scrolling column (DownloadDetails/styles.css), so the list gives up its own
+   scroll rather than holding a second one inside the page's. */
+@media (max-width: 700px) {
+  .datasetsTable.downloadModal,
+  .datasetsTable.downloadModal .datasetsCardList {
+    height: auto;
+    overflow: visible;
+  }
 }
