@@ -28,16 +28,12 @@ const { changePKtoPkURL } = require("../utils/misc");
  *                     type: string
  */
 
-router.get(
-  "/",
-  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
-  async (req, res) => {
-    res.send(
-      (await db("cde.organizations").orderByRaw("UPPER(name)")).map(
-        changePKtoPkURL,
-      ),
-    );
-  },
-);
+router.get("/", ...pipeline({ filters: false }), async (req, res) => {
+  res.send(
+    (await db("cde.organizations").orderByRaw("UPPER(name)")).map(
+      changePKtoPkURL,
+    ),
+  );
+});
 
 module.exports = router;
