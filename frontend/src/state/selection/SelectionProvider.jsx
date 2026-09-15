@@ -669,14 +669,6 @@ export default function SelectionProvider({ children }) {
     });
   }
 
-  const removeFromShortlist = useCallback((pk) => {
-    setShortlist((previous) =>
-      previous.filter((entry) => entry.pk !== pk),
-    );
-  }, []);
-
-  const clearShortlist = useCallback(() => setShortlist([]), []);
-
   // The WMS overlay lives only while its dataset is inspected: navigating
   // back or to another dataset clears it (the WmsLegend close button is the
   // other exit). Functional update on purpose — GriddapDetails auto-shows the
@@ -788,10 +780,7 @@ export default function SelectionProvider({ children }) {
     setInspectDataset,
     returnToDatasetList,
     addDatasetsToSelection,
-    shortlist,
     selectedPks,
-    removeFromShortlist,
-    clearShortlist,
     selectionLoading,
     initialPointsQueryComplete,
     inspectRecordID,

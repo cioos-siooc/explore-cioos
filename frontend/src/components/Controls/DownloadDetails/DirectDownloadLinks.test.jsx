@@ -4,6 +4,12 @@ import * as React from "react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
+import {
+  buildDownloadLinks,
+  defaultErddapFormat,
+  defaultObisFormat,
+  downloadConstraints,
+} from "../../../downloadLinks.js";
 
 const erddapRow = {
   pk: 1,
@@ -32,7 +38,22 @@ const query = {
   endDepth: 100,
 };
 
+// Deliberately not a rectangle — the notch at the top is what makes the ERDDAP
+// links a squared-off approximation of it, which is the caveat the strip warns
+// about. Its extent is still -140,40 to -120,60, which the export headers
+// below quote.
 const polygon = [
+  [-140, 40],
+  [-120, 40],
+  [-120, 60],
+  [-130, 55],
+  [-140, 60],
+  [-140, 40],
+];
+
+// The same extent drawn with the rectangle tool: its bounding box IS the
+// selection, so nothing was squared off.
+const rectangle = [
   [-140, 40],
   [-120, 40],
   [-120, 60],
@@ -45,18 +66,42 @@ const polygon = [
 // this replaces that stub with one that keeps what it was given.
 let saved;
 
-function open(props = {}) {
-  return renderWithProviders(
+// The strip is handed its links rather than building them (DownloadDetails
+// owns that, so the cards above can show the same ones). This stands in for
+// that parent: the same rows and filters, and the format state the two pickers
+// drive.
+function Harness({
+  rows = [erddapRow, obisRow],
+  polygon: shape = polygon,
+  filterDownloadByPolygon = true,
+}) {
+  const [erddapFormat, setErddapFormat] = React.useState(defaultErddapFormat);
+  const [obisFormat, setObisFormat] = React.useState(defaultObisFormat);
+  const constraints = downloadConstraints({
+    query,
+    polygon: shape,
+    byTime: true,
+    byDepth: true,
+    byPolygon: filterDownloadByPolygon,
+  });
+  return (
     <DirectDownloadLinks
-      rows={[erddapRow, obisRow]}
-      query={query}
-      polygon={polygon}
-      filterDownloadByTime
-      filterDownloadByDepth
-      filterDownloadByPolygon
-      {...props}
-    />,
+      links={buildDownloadLinks(
+        rows,
+        { erddapFormat, obisFormat },
+        constraints,
+      )}
+      constraints={constraints}
+      erddapFormat={erddapFormat}
+      setErddapFormat={setErddapFormat}
+      obisFormat={obisFormat}
+      setObisFormat={setObisFormat}
+    />
   );
+}
+
+function open(props = {}) {
+  return renderWithProviders(<Harness {...props} />);
 }
 
 const button = (name) => screen.getByRole("button", { name });
@@ -144,8 +189,15 @@ describe("DirectDownloadLinks", () => {
     const panel = screen.getByTestId("direct-links");
     // The polygon became a bounding box, and a dataset with no depth variable
     // got a link without the depth constraint rather than one that 400s.
-    expect(panel).toHaveTextContent(/bounding box/i);
+    expect(panel).toHaveTextContent(/latitude\/longitude box/i);
     expect(panel).toHaveTextContent(/no depth variable/i);
+  });
+
+  it("warns about the box for a rectangle too, which is also one", () => {
+    open({ rows: [erddapRow], polygon: rectangle });
+    expect(screen.getByTestId("direct-links")).toHaveTextContent(
+      /latitude\/longitude box/i,
+    );
   });
 
   it("stays quiet about filters that were carried in full", () => {
@@ -155,7 +207,7 @@ describe("DirectDownloadLinks", () => {
       filterDownloadByPolygon: false,
     });
     const panel = screen.getByTestId("direct-links");
-    expect(panel).not.toHaveTextContent(/bounding box/i);
+    expect(panel).not.toHaveTextContent(/latitude\/longitude box/i);
     expect(panel).not.toHaveTextContent(/depth variable/i);
   });
 

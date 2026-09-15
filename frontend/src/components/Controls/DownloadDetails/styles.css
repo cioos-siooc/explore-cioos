@@ -481,6 +481,36 @@
   display: none;
 }
 
+/* The one note that is a warning rather than a footnote: the ERDDAP links
+   carry the bounding box of the drawn shape, so the file holds data from
+   outside it. Given the row to itself and the warning's ground because the
+   grey micro-copy it used to be sat under four buttons at the foot of a long
+   modal and was, in practice, not there at all. */
+.directLinksWarning {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 9px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-warn-bg);
+  /* Ink rather than --cioos-warn: the amber that reads as a warning against
+     white does not clear 4.5:1 against its own tint (3.4:1 measured). The
+     glyph carries the colour — it only has 3:1 to meet — and the sentence
+     stays legible, the same division .legendBadge makes. */
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+}
+
+.directLinksWarning svg {
+  flex: 0 0 auto;
+  /* Centred on the first line of the sentence rather than on the block, so a
+     wrapped warning does not leave the glyph floating in the middle of it. */
+  margin-top: 2px;
+  color: var(--cioos-warn);
+}
+
 /* Narrow enough that right-aligning the buttons would strand them opposite the
    controls they belong to; they read better as one left-aligned block. */
 @media (max-width: 700px) {

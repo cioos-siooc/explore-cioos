@@ -1,9 +1,9 @@
 import * as React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Clipboard,
   ClipboardCheck,
+  ExclamationTriangleFill,
   FiletypeCsv,
   FiletypeSh,
   FiletypeTxt,
@@ -11,14 +11,10 @@ import {
 
 import SelectPill from "../../ui/SelectPill.jsx";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
-import reportError from "../../../state/reportError.js";
+import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
 import {
   ERDDAP_FORMATS,
   OBIS_FORMATS,
-  buildDownloadLinks,
-  defaultErddapFormat,
-  defaultObisFormat,
-  downloadConstraints,
   downloadTextFile,
   filterSummaryText,
   linksToCsv,
@@ -37,48 +33,21 @@ import "./styles.css";
  * other rather than behind tabs: nothing here changes what the queue would
  * send, and a user comparing the two can read both at once.
  *
- * Everything the links say is derived — the rows, the map's filters, the two
- * format choices. The only state is the choices themselves.
+ * The links themselves are built by DownloadDetails, which also hands them to
+ * the card list above so a dataset's card can show the one query it would be
+ * fetched with. This strip owns nothing but the copy button's flash: what it
+ * exports and what the cards show are the same links.
  */
 export default function DirectDownloadLinks({
-  rows,
-  query,
-  polygon,
-  filterDownloadByTime,
-  filterDownloadByDepth,
-  filterDownloadByPolygon,
+  links,
+  constraints,
+  erddapFormat,
+  setErddapFormat,
+  obisFormat,
+  setObisFormat,
 }) {
   const { t } = useTranslation();
-  const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
-  const [obisFormat, setObisFormat] = useState(defaultObisFormat);
-  // "Copied" has to be visible for a moment and then not: the clipboard gives
-  // no other sign that the click did anything.
-  const [copyState, setCopyState] = useState(null);
-  const copyTimer = useRef(null);
-  useEffect(() => () => clearTimeout(copyTimer.current), []);
-
-  const constraints = useMemo(
-    () =>
-      downloadConstraints({
-        query,
-        polygon,
-        byTime: filterDownloadByTime,
-        byDepth: filterDownloadByDepth,
-        byPolygon: filterDownloadByPolygon,
-      }),
-    [
-      query,
-      polygon,
-      filterDownloadByTime,
-      filterDownloadByDepth,
-      filterDownloadByPolygon,
-    ],
-  );
-
-  const links = useMemo(
-    () => buildDownloadLinks(rows, { erddapFormat, obisFormat }, constraints),
-    [rows, erddapFormat, obisFormat, constraints],
-  );
+  const [copyState, copy] = useCopyToClipboard("direct download links");
 
   // Which pickers to show at all: a selection of only OBIS occurrences has no
   // use for a tabledap format, and vice versa.
@@ -100,29 +69,6 @@ export default function DirectDownloadLinks({
   };
   // One stem for all three files so a folder of exports sorts together.
   const stem = `cioos-direct-links-${exportMeta.generatedAt.slice(0, 10)}`;
-
-  function flashCopy(state) {
-    setCopyState(state);
-    clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopyState(null), 2000);
-  }
-
-  function handleCopy() {
-    // The clipboard API is secure-context only, so over plain http there is no
-    // navigator.clipboard to call. Either way the button says so rather than
-    // appearing to have worked — the three file buttons still do.
-    if (!navigator.clipboard) {
-      flashCopy("failed");
-      return;
-    }
-    navigator.clipboard
-      .writeText(linksToText(links))
-      .then(() => flashCopy("copied"))
-      .catch((error) => {
-        reportError("copying direct download links failed", error);
-        flashCopy("failed");
-      });
-  }
 
   const disabled = links.length === 0;
 
@@ -175,7 +121,7 @@ export default function DirectDownloadLinks({
           type="button"
           className="directLinksButton"
           disabled={disabled}
-          onClick={handleCopy}
+          onClick={() => copy(linksToText(links))}
         >
           {copyState === "copied" ? (
             <ClipboardCheck size={16} aria-hidden="true" />
@@ -228,9 +174,21 @@ export default function DirectDownloadLinks({
       </div>
 
       {/* Each caveat is about the links as built, so it is read after them.
-          aria-live because the set changes when a format or filter does. */}
+          aria-live because the set changes when a format or filter does.
+
+          The squared-off polygon is the one that changes what arrives rather
+          than qualifying it: the file a user opens will hold points they drew
+          around, and nothing in the link or the query on the cards above says
+          so. The other two describe a link doing less filtering than asked;
+          this one describes data the user did not ask for, so it is a warning
+          and the others stay footnotes. */}
       <div className="directLinksNotes" aria-live="polite">
-        {polygonSquared && <span>{t("directLinksNotePolygon")}</span>}
+        {polygonSquared && (
+          <strong className="directLinksWarning" role="alert">
+            <ExclamationTriangleFill size={14} aria-hidden="true" />
+            {t("directLinksNotePolygon")}
+          </strong>
+        )}
         {depthDropped > 0 && (
           <span>{t("directLinksNoteDepth", { count: depthDropped })}</span>
         )}

@@ -1,3 +1,4 @@
+import bytes from "bytes";
 import isEmpty from "lodash-es/isEmpty";
 import { scaleLinear, scaleLog } from "d3-scale";
 import React, { useState, useEffect } from "react";
@@ -12,6 +13,20 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
       };
     }),
   );
+}
+
+/*
+ * A download size as the modal shows it. Every byte figure there comes from
+ * /downloadEstimate, which counts rows against the filters and multiplies —
+ * it is never a measured file size, so the tilde travels with the number
+ * rather than being stated once in a legend: the figures are read one card at
+ * a time, and a bare "1.2GB" beside a dataset reads as a fact about that file.
+ *
+ * `bytes()` returns null for a null or NaN input, which is how a dataset the
+ * estimate response did not cover arrives here.
+ */
+export function formatSizeEstimate(size) {
+  return `~${bytes(size) || "0B"}`;
 }
 
 export function capitalizeFirstLetter(string) {

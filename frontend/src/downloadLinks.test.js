@@ -209,6 +209,49 @@ describe("buildDownloadLinks", () => {
     expect(depthless.polygonSquared).toBe(true);
     expect(obis.unfiltered).toBe(true);
   });
+
+  it("flags the box on every spatially filtered ERDDAP link", () => {
+    const triangle = downloadConstraints({
+      polygon: [
+        [-140, 40],
+        [-120, 40],
+        [-130, 60],
+        [-140, 40],
+      ],
+      byPolygon: true,
+    });
+    for (const constraints of [allFilters, triangle]) {
+      const [erddap, obis] = buildDownloadLinks(
+        [erddapRow, obisRow],
+        formats,
+        constraints,
+      );
+      // A rectangle is its own bounding box and a polygon is not, but either
+      // way the link constrains by a box and the reader is told which.
+      expect(erddap.polygonSquared).toBe(true);
+      // OBIS takes the drawn shape itself, so its link loses nothing.
+      expect(obis.polygonSquared).toBe(false);
+    }
+  });
+
+  it("says nothing about a box when no area filter is applied", () => {
+    const [erddap] = buildDownloadLinks(
+      [erddapRow],
+      formats,
+      // An area is drawn, but the download is not being narrowed by it.
+      downloadConstraints({
+        polygon: [
+          [-140, 40],
+          [-120, 40],
+          [-120, 60],
+          [-140, 60],
+          [-140, 40],
+        ],
+        byPolygon: false,
+      }),
+    );
+    expect(erddap.polygonSquared).toBe(false);
+  });
 });
 
 describe("ckanRecordUrl", () => {

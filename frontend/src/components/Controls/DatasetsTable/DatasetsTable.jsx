@@ -9,7 +9,6 @@ import {
   CaretDownFill,
   CaretRightFill,
   Check2Circle,
-  CheckSquare,
   Eye,
   EyeSlash,
   Search,
@@ -52,6 +51,10 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
+  // The built direct-download link per dataset pk (download modal only), so a
+  // card can show the query its own dataset would be fetched with. Built by
+  // DownloadDetails, which owns the format choice the strip below shares.
+  downloadLinksByPk,
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
@@ -67,12 +70,8 @@ export default function DatasetsTable({
     hiddenGroups,
     toggleGroupHidden,
     showAllGroups,
-    shortlist,
     selectedPks,
-    removeFromShortlist,
-    clearShortlist,
   } = useSelection();
-  const shortlistEntries = isDownloadModal ? [] : shortlist;
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
   // card named datasets that could be on page 6 of 8, and there was no way to
@@ -126,7 +125,6 @@ export default function DatasetsTable({
 
   const [sort, setSort] = useState({ field: "title", dir: "asc" });
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
-  const [shortlistCollapsed, setShortlistCollapsed] = useState(false);
 
   const groupByOptions = useMemo(() => groupOptions(t), [t]);
   // Hiding a group takes its datasets off the map. Not offered for the
@@ -180,14 +178,7 @@ export default function DatasetsTable({
       return String(va).localeCompare(String(vb), i18n.language) * factor;
     });
     return sorted;
-  }, [
-    datasets,
-    sort,
-    i18n.language,
-    pinnedPks,
-    sortFields,
-    sortValue,
-  ]);
+  }, [datasets, sort, i18n.language, pinnedPks, sortFields, sortValue]);
 
   // Flat render list: without grouping it's just the sorted rows; with grouping
   // it's the rows bucketed under headers. Each entry is either
@@ -327,16 +318,19 @@ export default function DatasetsTable({
     <div className="datasetsCardControls" data-testid="datasets-controls">
       <div className="datasetsCardToolbar">
         {isDownloadModal && (
-          <button
-            type="button"
-            className={classNames("selectAllToggle", { active: selectAll })}
-            onClick={handleSelectAllDatasets}
-            aria-pressed={selectAll}
+          // The same checkbox the rows below carry, so the control that ticks
+          // them all reads as one of them rather than as a pill that lights up.
+          <label
+            className="selectAllToggle"
             title={t("datasetsTableHeaderSelectAllTitle")}
           >
-            <CheckSquare size={13} aria-hidden="true" />
+            <input
+              type="checkbox"
+              checked={selectAll}
+              onChange={handleSelectAllDatasets}
+            />
             {t("datasetsTableHeaderSelectAllTitle")}
-          </button>
+          </label>
         )}
         {!isDownloadModal && (
           <div className="datasetsTableSearchWrap">
@@ -402,7 +396,11 @@ export default function DatasetsTable({
             {t("downloadDetailsDownloadLimitsDownloadableMessagePart3")}
           </span>
           <span className="downloadLegendItem">
-            <XCircle className="legendIcon error" size={16} aria-hidden="true" />
+            <XCircle
+              className="legendIcon error"
+              size={16}
+              aria-hidden="true"
+            />
             <span className="legendBadge error">
               {t("downloadDetailsDownloadLimitsNotDownloadableMessagePart2")}
             </span>
@@ -432,7 +430,7 @@ export default function DatasetsTable({
         </div>
       )}
       <div className="datasetsCardList" ref={listRef}>
-        {visibleRows.length === 0 && shortlistEntries.length === 0 ? (
+        {visibleRows.length === 0 ? (
           <div className="datasetsCardEmpty">
             {t("datasetsCardNoResultsText")}
           </div>
@@ -451,6 +449,7 @@ export default function DatasetsTable({
                   isDownloadModal={isDownloadModal}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
+                  downloadLink={downloadLinksByPk?.get(item.row.pk)}
                   onSelect={handleSelectDataset}
                   onInspect={isDownloadModal ? undefined : setInspectDataset}
                   onHover={setHoveredDataset}
@@ -522,64 +521,6 @@ export default function DatasetsTable({
         label={t("datasetsPagerLabel")}
         perPageLabel={t("datasetsPagerPerPageLabel")}
       />
-      {shortlistEntries.length > 0 && (
-        <section className="datasetsCardShortlist">
-          <div className="datasetsCardShortlistHeader">
-            <button
-              type="button"
-              className="datasetsCardShortlistToggle"
-              onClick={() => setShortlistCollapsed((previous) => !previous)}
-              aria-expanded={!shortlistCollapsed}
-              title={t(
-                shortlistCollapsed
-                  ? "datasetsCardShortlistShowTitle"
-                  : "datasetsCardShortlistHideTitle",
-              )}
-            >
-              {shortlistCollapsed ? (
-                <CaretRightFill size={10} aria-hidden="true" />
-              ) : (
-                <CaretDownFill size={10} aria-hidden="true" />
-              )}
-              <span className="datasetsCardShortlistTitle">
-                {t("datasetsCardShortlistTitle")}
-              </span>
-              <span className="datasetsCardShortlistCount">
-                {shortlistEntries.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="datasetsCardShortlistClear"
-              onClick={clearShortlist}
-            >
-              {t("datasetsCardShortlistClearText")}
-            </button>
-          </div>
-          {!shortlistCollapsed && (
-            <div className="datasetsCardShortlistList">
-              {shortlistEntries.map((entry) => (
-                <DatasetCard
-                  key={`shortlist:${entry.pk}`}
-                  row={entry.row}
-                  selected={entry.selected}
-                  onSelect={handleSelectDataset}
-                  onRemove={removeFromShortlist}
-                  onInspect={entry.inResults ? setInspectDataset : undefined}
-                  onHover={entry.inResults ? setHoveredDataset : undefined}
-                  onHoverEnd={
-                    entry.inResults ? () => setHoveredDataset() : undefined
-                  }
-                  hiddenFromMap={false}
-                  fromMapClick={pinnedPks.has(Number(entry.pk))}
-                  t={t}
-                  i18n={i18n}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
     </div>
   );
 }

@@ -297,6 +297,15 @@ export function buildDownloadLinks(
         // filters altogether.
         depthDropped:
           !obis && !row.has_depth && constraints?.startDepth != null,
+        // Every spatially-filtered ERDDAP link, not only the ones that lost
+        // area to the squaring. Gating this on the shape not already being a
+        // rectangle is defensible — a rectangle IS its own bounding box, so
+        // nothing is returned that was not selected — but it puts the sign
+        // where the user is least likely to be and takes it away from the
+        // commonest selection there is. What the reader needs to know is what
+        // the link constrains by, which is a latitude/longitude box in both
+        // cases; the wording carries the part that only applies to a drawn
+        // polygon.
         polygonSquared: !obis && Boolean(constraints?.bounds),
         unfiltered: obis && format.filtered === false,
       };

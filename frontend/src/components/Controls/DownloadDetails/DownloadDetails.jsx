@@ -1,8 +1,7 @@
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
-import bytes from "bytes";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
 import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
@@ -14,6 +13,7 @@ import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 
 import {
   createDataFilterQueryString,
+  formatSizeEstimate,
   polygonIsRectangle,
 } from "../../../utilities.jsx";
 import {
@@ -23,6 +23,12 @@ import {
   defaultStartDepth,
 } from "../../config.js";
 import { server } from "../../../config.js";
+import {
+  buildDownloadLinks,
+  defaultErddapFormat,
+  defaultObisFormat,
+  downloadConstraints,
+} from "../../../downloadLinks.js";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
 import { ArrowsExpand, CalendarWeek } from "react-bootstrap-icons";
@@ -50,6 +56,14 @@ export default function DownloadDetails({
 }) {
   const { t } = useTranslation();
   const [selectAll, setSelectAll] = useState(true);
+  // The direct-link format lives here rather than in DirectDownloadLinks
+  // because two things below read the links it produces: the strip at the
+  // bottom, which exports them in bulk, and every card in the list, which
+  // shows the one query its own dataset would be fetched with. Building them
+  // once here is also what keeps the two in step — a card promising a .csv
+  // under a strip set to Parquet would be a lie about the same order.
+  const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
+  const [obisFormat, setObisFormat] = useState(defaultObisFormat);
   const [pointsData, setPointsData] = useState(
     pointsToReview
       // defensive: griddap datasets are metadata-only and must never reach
@@ -183,7 +197,6 @@ export default function DownloadDetails({
           selected: estimates.filteredSize < 1000000000,
           sizeEstimate: estimates,
           internalDownload: estimates.filteredSize < 1000000000,
-          erddapLink: ds.erddap_url,
           downloadDisabled: estimates.filteredSize > 1000000000,
         };
       });
@@ -296,8 +309,47 @@ export default function DownloadDetails({
   // estimates land, and a direct link needs no estimate. Testing for truth
   // would empty the links strip for as long as the slowest request in this
   // modal takes, which reads as broken rather than as pending.
-  const linkableDatasets = pointsData.filter(
-    (point) => point.selected !== false || point.downloadDisabled,
+  const linkableDatasets = useMemo(
+    () =>
+      pointsData.filter(
+        (point) => point.selected !== false || point.downloadDisabled,
+      ),
+    [pointsData],
+  );
+
+  const constraints = useMemo(
+    () =>
+      downloadConstraints({
+        query,
+        polygon,
+        byTime: filterDownloadByTime,
+        byDepth: filterDownloadByDepth,
+        byPolygon: filterDownloadByPolygon,
+      }),
+    [
+      query,
+      polygon,
+      filterDownloadByTime,
+      filterDownloadByDepth,
+      filterDownloadByPolygon,
+    ],
+  );
+
+  const links = useMemo(
+    () =>
+      buildDownloadLinks(
+        linkableDatasets,
+        { erddapFormat, obisFormat },
+        constraints,
+      ),
+    [linkableDatasets, erddapFormat, obisFormat, constraints],
+  );
+
+  // The card for a dataset shows that dataset's own query, so the list needs
+  // the links by pk rather than in order.
+  const linksByPk = useMemo(
+    () => new Map(links.map((link) => [link.pk, link])),
+    [links],
   );
 
   return (
@@ -392,6 +444,7 @@ export default function DownloadDetails({
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
+            downloadLinksByPk={linksByPk}
           />
         </div>
       </div>
@@ -421,8 +474,10 @@ export default function DownloadDetails({
               <Spinner size="sm" className="datasetSizeTotalSpinner" />
             ) : downloadSizeEstimates ? (
               <span className="downloadSummaryValue">
-                {bytes(dataTotal.filteredSize) || "0B"}
-                <span className="downloadSummaryValueMuted">{` / ${bytes(dataTotal.unfilteredSize) || "0B"}`}</span>
+                {formatSizeEstimate(dataTotal.filteredSize)}
+                <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
+                  dataTotal.unfilteredSize,
+                )}`}</span>
               </span>
             ) : (
               <span
@@ -445,12 +500,12 @@ export default function DownloadDetails({
           of the things it answers ("this dataset is too large for the zip") is
           only legible next to the bar that says so. */}
       <DirectDownloadLinks
-        rows={linkableDatasets}
-        query={query}
-        polygon={polygon}
-        filterDownloadByTime={filterDownloadByTime}
-        filterDownloadByDepth={filterDownloadByDepth}
-        filterDownloadByPolygon={filterDownloadByPolygon}
+        links={links}
+        constraints={constraints}
+        erddapFormat={erddapFormat}
+        setErddapFormat={setErddapFormat}
+        obisFormat={obisFormat}
+        setObisFormat={setObisFormat}
       />
     </div>
   );

@@ -49,12 +49,17 @@
   box-shadow: var(--cioos-shadow-md, 0 2px 8px rgb(21 47 55 / 20%));
 }
 
+/* One option. The text is the whole target, so the padding is what the row is
+   made of: 16px each side keeps the label off the menu's edges (and clear of
+   the scrollbar the taller menus grow), and 10px top and bottom puts the rows
+   near 38px — a comfortable pointer target, and enough separation that a list
+   of similar labels reads as a list rather than a block of text. */
 .dropdown-item {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 16px;
   border: 0;
   background: none;
   font-family: var(--cioos-font-body, sans-serif);
