@@ -169,7 +169,7 @@
   font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-sm);
   font-weight: 400;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .datasetsToggleCount {
