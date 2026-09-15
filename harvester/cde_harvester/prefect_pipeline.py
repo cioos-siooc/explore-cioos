@@ -25,12 +25,12 @@ from cde_harvester.core.config import (
     resolve_obis_config,
 )
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
-from cde_harvester.core.source_cache import source_cache_path
 from cde_harvester.core.schema import (
     check_confirmation,
     ensure_database,
     rebuild_schema,
 )
+from cde_harvester.core.source_cache import source_cache_path
 from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
