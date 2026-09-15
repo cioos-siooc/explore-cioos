@@ -74,14 +74,14 @@ export const OBIS_FORMATS = [
     ext: "json",
     label: "JSON",
     filtered: true,
-    noteKey: "directLinksObisApiNote",
+    noteKey: "downloadFormatObisApiNote",
   },
   {
     id: "obisParquet",
     ext: "parquet",
     label: "Parquet",
     filtered: false,
-    noteKey: "directLinksObisSnapshotNote",
+    noteKey: "downloadFormatObisSnapshotNote",
   },
 ];
 

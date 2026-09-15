@@ -55,6 +55,7 @@ export default function DatasetsTable({
   // card can show the query its own dataset would be fetched with. Built by
   // DownloadDetails, which owns the format choice the strip below shares.
   downloadLinksByPk,
+  downloadFormatControls,
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
@@ -347,9 +348,13 @@ export default function DatasetsTable({
       </div>
 
       {/* How the list is arranged: what it is sorted on and what it is grouped
-          by, as the same pill so the pair reads as one row of settings. */}
+          by, as the same pill so the pair reads as one row of settings. The
+          download modal adds its format pickers here (DownloadFormats), which
+          are settings of the same kind: they change what every Download button
+          on the cards below asks the server for. */}
       <div className="datasetsCardArrange">
         <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
+        {isDownloadModal && downloadFormatControls}
         {!isDownloadModal && (
           <>
             <SelectPill

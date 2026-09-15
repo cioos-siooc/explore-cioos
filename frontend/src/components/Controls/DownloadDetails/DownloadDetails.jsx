@@ -5,6 +5,7 @@ import classNames from "classnames";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
 import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
+import DownloadFormats from "./DownloadFormats.jsx";
 import polygonImage from "../../Images/polygonIcon.png";
 import rectangleImage from "../../Images/rectangleIcon.png";
 import isEmpty from "lodash-es/isEmpty";
@@ -56,12 +57,13 @@ export default function DownloadDetails({
 }) {
   const { t } = useTranslation();
   const [selectAll, setSelectAll] = useState(true);
-  // The direct-link format lives here rather than in DirectDownloadLinks
-  // because two things below read the links it produces: the strip at the
-  // bottom, which exports them in bulk, and every card in the list, which
-  // shows the one query its own dataset would be fetched with. Building them
-  // once here is also what keeps the two in step — a card promising a .csv
-  // under a strip set to Parquet would be a lie about the same order.
+  // The download format lives here rather than with either of the things that
+  // read it, because two do: the export buttons in the footer, which take the
+  // links in bulk, and every card in the list, which shows the one query its
+  // own dataset would be fetched with. Building the links once here is what
+  // keeps the two in step — a card promising a .csv under a footer set to
+  // Parquet would be a lie about the same order. The picker itself sits on the
+  // list's toolbar (DownloadFormats), which is the one place above both.
   const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
   const [obisFormat, setObisFormat] = useState(defaultObisFormat);
   const [pointsData, setPointsData] = useState(
@@ -445,68 +447,82 @@ export default function DownloadDetails({
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
             downloadLinksByPk={linksByPk}
+            downloadFormatControls={
+              <DownloadFormats
+                links={links}
+                erddapFormat={erddapFormat}
+                setErddapFormat={setErddapFormat}
+                obisFormat={obisFormat}
+                setObisFormat={setObisFormat}
+              />
+            }
           />
         </div>
       </div>
 
-      <div className="downloadOrderBar">
-        <div className="downloadSummary">
-          {/* The estimates decide which datasets are downloadable, hence how
+      {/* The order's three outcomes on one band: what you picked, having it
+          emailed, and taking the URLs yourself. The last two are alternative
+          ways to ship the first, so they sit beside it rather than under it —
+          neither is a mode of the modal, and a user weighing one against the
+          other can read both without scrolling. */}
+      <div className="downloadFooter">
+        <div className="downloadFooterSection">
+          <span className="downloadFooterTitle">
+            {t("downloadDetailsSelectionTitle")}
+          </span>
+          <div className="downloadSummary">
+            {/* The estimates decide which datasets are downloadable, hence how
               many stay selected — so both stats wait for them rather than
               showing a count that is about to change under the user. If they
               fail outright, the sizes are unknowable but the counts aren't. */}
-          <div className="downloadSummaryStat">
-            {estimatesLoading ? (
-              <Spinner size="sm" className="datasetSizeTotalSpinner" />
-            ) : (
-              <span className="downloadSummaryValue">
-                {selectedCount}
-                <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
+            <div className="downloadSummaryStat">
+              {estimatesLoading ? (
+                <Spinner size="sm" className="datasetSizeTotalSpinner" />
+              ) : (
+                <span className="downloadSummaryValue">
+                  {selectedCount}
+                  <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
+                </span>
+              )}
+              <span className="downloadSummaryLabel">
+                {t("downloadDetailsDownloadInfoDatasets")}
               </span>
-            )}
-            <span className="downloadSummaryLabel">
-              {t("downloadDetailsDownloadInfoDatasets")}
-            </span>
-          </div>
-          <div className="downloadSummaryDivider" aria-hidden="true" />
-          <div className="downloadSummaryStat">
-            {estimatesLoading ? (
-              <Spinner size="sm" className="datasetSizeTotalSpinner" />
-            ) : downloadSizeEstimates ? (
-              <span className="downloadSummaryValue">
-                {formatSizeEstimate(dataTotal.filteredSize)}
-                <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
-                  dataTotal.unfilteredSize,
-                )}`}</span>
+            </div>
+            <div className="downloadSummaryDivider" aria-hidden="true" />
+            <div className="downloadSummaryStat">
+              {estimatesLoading ? (
+                <Spinner size="sm" className="datasetSizeTotalSpinner" />
+              ) : downloadSizeEstimates ? (
+                <span className="downloadSummaryValue">
+                  {formatSizeEstimate(dataTotal.filteredSize)}
+                  <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
+                    dataTotal.unfilteredSize,
+                  )}`}</span>
+                </span>
+              ) : (
+                <span
+                  className="downloadSummaryValue downloadSummaryValueMuted"
+                  title={t("downloadSizeUnavailableTitle")}
+                >
+                  {t("downloadSizeUnavailable")}
+                </span>
+              )}
+              <span className="downloadSummaryLabel">
+                {t("downloadDetailsDownloadInfoDownloadSize")}
               </span>
-            ) : (
-              <span
-                className="downloadSummaryValue downloadSummaryValueMuted"
-                title={t("downloadSizeUnavailableTitle")}
-              >
-                {t("downloadSizeUnavailable")}
-              </span>
-            )}
-            <span className="downloadSummaryLabel">
-              {t("downloadDetailsDownloadInfoDownloadSize")}
-            </span>
+            </div>
           </div>
         </div>
-        {children}
-      </div>
 
-      {/* The same order, taken from the source instead of the queue. Below the
-          order bar rather than behind a tab: it is a delivery option, and one
-          of the things it answers ("this dataset is too large for the zip") is
-          only legible next to the bar that says so. */}
-      <DirectDownloadLinks
-        links={links}
-        constraints={constraints}
-        erddapFormat={erddapFormat}
-        setErddapFormat={setErddapFormat}
-        obisFormat={obisFormat}
-        setObisFormat={setObisFormat}
-      />
+        {/* Column two, the queue: DownloadPanel's email field and submit. */}
+        {children}
+
+        {/* Column three, the same order taken from the source instead of the
+            queue. Beside the summary rather than behind a tab, because one of
+            the things it answers ("this dataset is too large for the zip") is
+            only legible next to the figures that say so. */}
+        <DirectDownloadLinks links={links} constraints={constraints} />
+      </div>
     </div>
   );
 }

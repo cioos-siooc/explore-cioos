@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
+import DownloadFormats from "./DownloadFormats.jsx";
 import {
   buildDownloadLinks,
   defaultErddapFormat,
@@ -66,10 +67,12 @@ const rectangle = [
 // this replaces that stub with one that keeps what it was given.
 let saved;
 
-// The strip is handed its links rather than building them (DownloadDetails
-// owns that, so the cards above can show the same ones). This stands in for
-// that parent: the same rows and filters, and the format state the two pickers
-// drive.
+// The links column is handed its links rather than building them
+// (DownloadDetails owns that, so the cards above can show the same ones), and
+// the format pickers that decide what the links ask for now live on the
+// datasets toolbar. This stands in for that parent: the same rows and filters,
+// and the one piece of format state the pickers drive and the exports read —
+// which is the pairing these tests are about.
 function Harness({
   rows = [erddapRow, obisRow],
   polygon: shape = polygon,
@@ -84,19 +87,22 @@ function Harness({
     byDepth: true,
     byPolygon: filterDownloadByPolygon,
   });
+  const links = buildDownloadLinks(
+    rows,
+    { erddapFormat, obisFormat },
+    constraints,
+  );
   return (
-    <DirectDownloadLinks
-      links={buildDownloadLinks(
-        rows,
-        { erddapFormat, obisFormat },
-        constraints,
-      )}
-      constraints={constraints}
-      erddapFormat={erddapFormat}
-      setErddapFormat={setErddapFormat}
-      obisFormat={obisFormat}
-      setObisFormat={setObisFormat}
-    />
+    <>
+      <DownloadFormats
+        links={links}
+        erddapFormat={erddapFormat}
+        setErddapFormat={setErddapFormat}
+        obisFormat={obisFormat}
+        setObisFormat={setObisFormat}
+      />
+      <DirectDownloadLinks links={links} constraints={constraints} />
+    </>
   );
 }
 

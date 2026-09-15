@@ -9,12 +9,9 @@ import {
   FiletypeTxt,
 } from "react-bootstrap-icons";
 
-import SelectPill from "../../ui/SelectPill.jsx";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
 import {
-  ERDDAP_FORMATS,
-  OBIS_FORMATS,
   downloadTextFile,
   filterSummaryText,
   linksToCsv,
@@ -26,36 +23,23 @@ import "./styles.css";
 /*
  * The second way out of the download modal, on the same page as the first.
  *
- * The order bar above delivers the selection as a zip, by email, from the CDE's
- * own queue. This strip delivers the same selection as URLs the user fetches
- * themselves, straight from the publishing server. They are two shipping
- * options for one order, not two modes of the modal, so they sit one above the
- * other rather than behind tabs: nothing here changes what the queue would
- * send, and a user comparing the two can read both at once.
+ * The column to the left delivers the selection as a zip, by email, from the
+ * CDE's own queue. This one delivers the same selection as URLs the user
+ * fetches themselves, straight from the publishing server. They are two
+ * shipping options for one order, not two modes of the modal, so they sit side
+ * by side rather than behind tabs: nothing here changes what the queue would
+ * send, and a user comparing the two reads both at once.
  *
  * The links themselves are built by DownloadDetails, which also hands them to
  * the card list above so a dataset's card can show the one query it would be
- * fetched with. This strip owns nothing but the copy button's flash: what it
- * exports and what the cards show are the same links.
+ * fetched with — and the format they are built in is set on that list's
+ * toolbar (DownloadFormats), because it governs both. This column owns nothing
+ * but the copy button's flash: what it exports and what the cards show are the
+ * same links.
  */
-export default function DirectDownloadLinks({
-  links,
-  constraints,
-  erddapFormat,
-  setErddapFormat,
-  obisFormat,
-  setObisFormat,
-}) {
+export default function DirectDownloadLinks({ links, constraints }) {
   const { t } = useTranslation();
   const [copyState, copy] = useCopyToClipboard("direct download links");
-
-  // Which pickers to show at all: a selection of only OBIS occurrences has no
-  // use for a tabledap format, and vice versa.
-  const hasErddap = links.some((link) => link.source === "erddap");
-  const hasObis = links.some((link) => link.source === "obis");
-  const obisNoteKey = OBIS_FORMATS.find(
-    (format) => format.id === obisFormat,
-  )?.noteKey;
 
   // What the links could not carry — counted rather than listed, because the
   // rows they belong to are in the table directly above.
@@ -73,48 +57,23 @@ export default function DirectDownloadLinks({
   const disabled = links.length === 0;
 
   return (
-    <div className="directLinks" data-testid="direct-links">
-      <div className="directLinksIntro">
-        <span className="directLinksTitle">
-          {t("directLinksTitle")}
-          <QuestionIconTooltip
-            tooltipText={t("directLinksTooltipText")}
-            tooltipPlacement="top"
-            size={16}
-          />
-        </span>
+    <div
+      className="downloadFooterSection directLinks"
+      data-testid="direct-links"
+    >
+      <span className="downloadFooterTitle">
+        {t("directLinksTitle")}
+        <QuestionIconTooltip
+          tooltipText={t("directLinksTooltipText")}
+          tooltipPlacement="top"
+          size={16}
+        />
         <span className="directLinksCount">
           {disabled
             ? t("directLinksEmpty")
             : t("directLinksCount", { count: links.length })}
         </span>
-      </div>
-
-      <div className="directLinksControls">
-        {hasErddap && (
-          <SelectPill
-            label={t("directLinksErddapFormatLabel")}
-            value={erddapFormat}
-            options={ERDDAP_FORMATS}
-            onChange={setErddapFormat}
-            data-testid="direct-links-erddap-format"
-          />
-        )}
-        {hasObis && (
-          <span className="directLinksObis">
-            <SelectPill
-              label={t("directLinksObisFormatLabel")}
-              value={obisFormat}
-              options={OBIS_FORMATS}
-              onChange={setObisFormat}
-              data-testid="direct-links-obis-format"
-            />
-            {obisNoteKey && (
-              <span className="directLinksObisNote">{t(obisNoteKey)}</span>
-            )}
-          </span>
-        )}
-      </div>
+      </span>
 
       <div className="directLinksActions">
         <button
@@ -173,8 +132,9 @@ export default function DirectDownloadLinks({
         </button>
       </div>
 
-      {/* Each caveat is about the links as built, so it is read after them.
-          aria-live because the set changes when a format or filter does.
+      {/* Each caveat is about the links as built, so it sits at the foot of
+          the column they are built in. aria-live because the set changes when
+          a format or filter does.
 
           The squared-off polygon is the one that changes what arrives rather
           than qualifying it: the file a user opens will hold points they drew

@@ -68,8 +68,12 @@ export default function DownloadPanel() {
         setFilterDownloadByPolygon={setFilterDownloadByPolygon}
         setSubmissionState={setSubmissionState}
       >
-        <div className="downloadSubmit">
-          <label className="downloadSubmitLabel" htmlFor="downloadEmailInput">
+        {/* The queue column of DownloadDetails' order footer. Passed as
+            children rather than rendered there because the submission state it
+            drives lives in this panel's providers; the class is what places it
+            in the footer's grid, beside the summary and the direct links. */}
+        <div className="downloadFooterSection downloadSubmit">
+          <label className="downloadFooterTitle" htmlFor="downloadEmailInput">
             {t("downloadEmailLabelText")}
           </label>
           <div className="downloadSubmitRow">
