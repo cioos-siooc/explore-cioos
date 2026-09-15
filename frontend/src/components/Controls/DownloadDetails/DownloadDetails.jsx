@@ -1,20 +1,14 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import classNames from "classnames";
 import bytes from "bytes";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
-import polygonImage from "../../Images/polygonIcon.png";
-import rectangleImage from "../../Images/rectangleIcon.png";
 import isEmpty from "lodash-es/isEmpty";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 
-import {
-  createDataFilterQueryString,
-  polygonIsRectangle,
-} from "../../../utilities.jsx";
+import { createDataFilterQueryString } from "../../../utilities.jsx";
 import {
   defaultEndDate,
   defaultEndDepth,
@@ -24,31 +18,30 @@ import {
 import { server } from "../../../config.js";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
-import {
-  ArrowsExpand,
-  CalendarWeek,
-  Check2Circle,
-  XCircle,
-} from "react-bootstrap-icons";
-import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
+import { Check2Circle, XCircle } from "react-bootstrap-icons";
 import Spinner from "../../ui/Spinner.jsx";
 
-// Note: datasets and points are exchangable terminology
+/*
+ * The order under review: every dataset in the selection as a card carrying its
+ * size estimate, whether the CDE can package it, and its direct download URL —
+ * then the totals and, as `children`, the order bar's own controls.
+ *
+ * The filter switches arrive as values only: the chips that set them sit above
+ * this component (DownloadPanel), because the same switches decide both what a
+ * packaged order contains and what the links carry.
+ *
+ * Note: datasets and points are exchangable terminology
+ */
 export default function DownloadDetails({
   pointsToReview,
   setPointsToDownload,
   setHoveredDataset,
+  linksByPk,
   polygon,
   query,
-  timeFilterActive,
   filterDownloadByTime,
-  setFilterDownloadByTime,
-  depthFilterActive,
   filterDownloadByDepth,
-  setFilterDownloadByDepth,
-  polygonFilterActive,
   filterDownloadByPolygon,
-  setFilterDownloadByPolygon,
   setSubmissionState,
   children,
 }) {
@@ -253,126 +246,10 @@ export default function DownloadDetails({
     setSelectAll(!selectAll);
   }
 
-  const filterToggleClassname = "filterDownloadToggle";
-  const timeFilterToggleClassName = classNames(
-    filterToggleClassname,
-    { active: filterDownloadByTime },
-    { disabled: !timeFilterActive },
-  );
-  const depthFilterToggleClassName = classNames(
-    filterToggleClassname,
-    { active: filterDownloadByDepth },
-    { disabled: !depthFilterActive },
-  );
-  const polygonFilterToggleClassName = classNames(
-    filterToggleClassname,
-    { active: filterDownloadByPolygon },
-    { disabled: !polygonFilterActive },
-  );
-  let polygonFilterText = "";
-
-  if (polygon) {
-    polygon.forEach((coordinate, index) => {
-      if (polygon.length >= 6) {
-        if (index === polygon.length - 2) {
-          polygonFilterText += `...[${coordinate[0].toFixed(
-            1,
-          )}, ${coordinate[1].toFixed(1)}]`;
-        } else if (index <= 3) {
-          polygonFilterText += `[${coordinate[0].toFixed(
-            1,
-          )}, ${coordinate[1].toFixed(1)}]`;
-        }
-      } else if (index < polygon.length - 1) {
-        polygonFilterText += `[${coordinate[0].toFixed(
-          1,
-        )}, ${coordinate[1].toFixed(1)}]`;
-      }
-    });
-  }
   const selectedCount = pointsData.filter((point) => point.selected).length;
 
   return (
     <div className="container downloadDetails">
-      <div className="filterDownloadToggles">
-        <span className="filterDownloadTogglesTitle">
-          {t("downloadDetailsFilterSectionTitle")}
-          <QuestionIconTooltip
-            tooltipText={t("downloadDetailsFilterQuestionTooltipText")}
-            tooltipPlacement={"right"}
-            size={16}
-          />
-        </span>
-        <div className="filterDownloadTogglesChips">
-          {!timeFilterActive && !depthFilterActive && !polygonFilterActive && (
-            <i className="noFiltersMessage">
-              {t("downloadDetailsNoFiltersActiveMessage")}
-            </i>
-          )}
-          {timeFilterActive && (
-            <div className={timeFilterToggleClassName}>
-              <button
-                onClick={() => setFilterDownloadByTime(!filterDownloadByTime)}
-                disabled={!timeFilterActive}
-              >
-                <CalendarWeek
-                  className="filterToggleIcon"
-                  size={16}
-                  aria-hidden="true"
-                />
-                <span>{`${query.startDate} – ${query.endDate}`}</span>
-              </button>
-            </div>
-          )}
-          {depthFilterActive && (
-            <div className={depthFilterToggleClassName}>
-              <button
-                onClick={() => setFilterDownloadByDepth(!filterDownloadByDepth)}
-                disabled={!depthFilterActive}
-              >
-                <ArrowsExpand
-                  className="filterToggleIcon"
-                  size={16}
-                  aria-hidden="true"
-                />
-                <span>{`${query.startDepth} – ${query.endDepth} m`}</span>
-              </button>
-            </div>
-          )}
-          {polygonFilterActive && (
-            <div className={polygonFilterToggleClassName}>
-              <button
-                onClick={() =>
-                  setFilterDownloadByPolygon(!filterDownloadByPolygon)
-                }
-                disabled={!polygonFilterActive}
-              >
-                <div
-                  className="mapbox-gl-draw-polygon filterToggleIcon"
-                  style={{
-                    display: "inline",
-                    backgroundImage: `url(${
-                      polygonIsRectangle(polygon)
-                        ? rectangleImage
-                        : polygonImage
-                    })`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundSize: "24px 24px",
-                    backgroundPositionX: "8px",
-                    backgroundPositionY: "-3px",
-                    borderRadius: "0px",
-                    height: "34px",
-                    paddingLeft: "38px",
-                  }}
-                >
-                  {polygonFilterText}
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="row downloadDataRow">
         <div className="col">
           <DatasetsTable
@@ -385,6 +262,7 @@ export default function DownloadDetails({
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
+            linksByPk={linksByPk}
           />
         </div>
       </div>

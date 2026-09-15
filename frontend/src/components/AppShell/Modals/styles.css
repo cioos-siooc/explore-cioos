@@ -234,6 +234,13 @@
     border-radius: 0;
   }
 
+  /* The download panel is one scrolling column at this width rather than a
+     fixed frame with a scrolling list inside it, so the body is what scrolls
+     (DownloadDetails/styles.css). */
+  .downloadModal .modal-body {
+    overflow-y: auto;
+  }
+
   /* Clear of the home indicator on a notched phone: this body scrolls to its
      own bottom edge, which is now the screen's. The filters modal is not here
      because its own footer is the thing that reaches that edge, and pays the

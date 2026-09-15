@@ -20,13 +20,18 @@ import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
+import DatasetLink from "./DatasetLink.jsx";
 
 // A single dataset rendered as a card. Shared shell for the sidebar list and
 // the download-review modal; the modal variant (isDownloadModal) adds the
-// size estimate, CDE-downloadable status and external ERDDAP link.
+// size estimate, CDE-downloadable status, external ERDDAP link and — when the
+// dataset can be fetched from its source — its direct download URL.
 export default function DatasetCard({
   row,
   isDownloadModal,
+  // One buildDownloadLinks entry for this dataset, or undefined for a dataset
+  // with no direct URL (a grid, which has no constraint-based subsetting).
+  link,
   downloadSizeEstimates,
   estimatesLoading,
   onSelect,
@@ -186,6 +191,8 @@ export default function DatasetCard({
             {locationsLabel}
           </span>
         </div>
+
+        {isDownloadModal && link && <DatasetLink link={link} t={t} />}
 
         {isDownloadModal && (
           <div className="datasetCardDownloadInfo">
