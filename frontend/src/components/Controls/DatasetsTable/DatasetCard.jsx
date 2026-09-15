@@ -165,7 +165,7 @@ export default function DatasetCard({
               <Grid3x3Gap
                 title={t("griddapTypeLabel")}
                 color="#52a79b"
-                size={15}
+                size={13}
               />
             ) : (
               <CircleFill
