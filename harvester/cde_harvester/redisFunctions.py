@@ -31,13 +31,16 @@ REDIS_URL = os.environ.get("REDIS_URL")
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD") or None
+REDIS_TLS = os.environ.get("REDIS_TLS", "").lower() == "true"
 
 
 def _redis_client():
     # No db index: flushall covers every database anyway.
     if REDIS_URL:
         return redis.Redis.from_url(REDIS_URL)
-    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD)
+    return redis.Redis(
+        host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, ssl=REDIS_TLS
+    )
 
 
 @task(name="clear-redis-cache")
