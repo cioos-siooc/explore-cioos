@@ -74,6 +74,7 @@ def payload(ids):
 # ObisDiscoveryConfig.from_config
 # ---------------------------------------------------------------------------
 
+
 class TestDiscoveryConfig:
     def test_absent_block_is_disabled(self):
         assert ObisDiscoveryConfig.from_config(None).enabled is False
@@ -126,6 +127,7 @@ class TestDiscoveryConfig:
 # simplify_for_query
 # ---------------------------------------------------------------------------
 
+
 class TestSimplifyForQuery:
     def test_result_contains_original(self):
         wkt, _ = simplify_for_query(TEST_POLYGON, tolerance=0.25, max_bytes=4500)
@@ -162,6 +164,7 @@ class TestSimplifyForQuery:
 # _query
 # ---------------------------------------------------------------------------
 
+
 class TestQuery:
     def _discovery(self, responses, **cfg_overrides):
         cfg = ObisDiscoveryConfig.from_config({"nodes": [NODE_A], "geometry": "none", **cfg_overrides})
@@ -179,19 +182,23 @@ class TestQuery:
 
     def test_truncated_response_retries_with_bigger_size(self):
         # total says 5, first response only carries 2 -> retry, then complete.
-        d = self._discovery([
-            {"total": 5, "results": [{"id": "a"}, {"id": "b"}]},
-            payload(["a", "b", "c", "d", "e"]),
-        ])
+        d = self._discovery(
+            [
+                {"total": 5, "results": [{"id": "a"}, {"id": "b"}]},
+                payload(["a", "b", "c", "d", "e"]),
+            ]
+        )
         assert len(d._query("node:x", {"nodeid": "x"})) == 5
         assert d.session.get.call_count == 2
         assert d.session.get.call_args_list[1].kwargs["params"]["size"] == 1005
 
     def test_still_truncated_after_retry_raises(self):
-        d = self._discovery([
-            {"total": 5, "results": [{"id": "a"}]},
-            {"total": 5, "results": [{"id": "a"}]},
-        ])
+        d = self._discovery(
+            [
+                {"total": 5, "results": [{"id": "a"}]},
+                {"total": 5, "results": [{"id": "a"}]},
+            ]
+        )
         with pytest.raises(ObisDiscoveryError, match="refusing to harvest a truncated list"):
             d._query("node:x", {"nodeid": "x"})
 
@@ -214,11 +221,14 @@ class TestQuery:
 # discover()
 # ---------------------------------------------------------------------------
 
+
 class TestDiscover:
     def _discover(self, responses, geo_filter=None, **cfg):
         cfg = ObisDiscoveryConfig.from_config({"min_datasets": 0, **cfg})
         return ObisDatasetDiscovery(
-            cfg, geo_filter=geo_filter, session=fake_session(responses),
+            cfg,
+            geo_filter=geo_filter,
+            session=fake_session(responses),
         ).discover()
 
     def test_unions_and_dedupes_sorted(self, geo_filter):
@@ -239,15 +249,21 @@ class TestDiscover:
 
     def test_include_adds_ids(self):
         result = self._discover(
-            [payload(["a"])], nodes=[NODE_A], geometry="none", include=["z"],
+            [payload(["a"])],
+            nodes=[NODE_A],
+            geometry="none",
+            include=["z"],
         )
         assert result.dataset_ids == ["a", "z"]
         assert result.per_query["include"] == 1
 
     def test_exclude_beats_include(self):
         result = self._discover(
-            [payload(["a"])], nodes=[NODE_A], geometry="none",
-            include=["z"], exclude=["z", "a"],
+            [payload(["a"])],
+            nodes=[NODE_A],
+            geometry="none",
+            include=["z"],
+            exclude=["z", "a"],
         )
         assert result.dataset_ids == []
         assert result.per_query["exclude"] == -2
@@ -272,9 +288,7 @@ class TestDiscover:
     def test_min_datasets_floor_raises_even_when_queries_succeed(self):
         with pytest.raises(ObisDiscoveryError, match="below the min_datasets floor"):
             ObisDatasetDiscovery(
-                ObisDiscoveryConfig.from_config(
-                    {"nodes": [NODE_A], "geometry": "none", "min_datasets": 700}
-                ),
+                ObisDiscoveryConfig.from_config({"nodes": [NODE_A], "geometry": "none", "min_datasets": 700}),
                 session=fake_session([payload(["a", "b"])]),
             ).discover()
 

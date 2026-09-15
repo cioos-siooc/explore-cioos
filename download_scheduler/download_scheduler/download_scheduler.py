@@ -60,9 +60,7 @@ def get_a_download_job():
     session = Session(engine)
 
     rs = session.execute(
-        text(
-            "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
-        )
+        text("SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED")
     )
     # .mappings() so columns remain accessible by name (row["pk"]) under SQLAlchemy 2.0
     row = rs.mappings().fetchone()
@@ -71,9 +69,7 @@ def get_a_download_job():
         pk = row["pk"]
         job_id = row["job_id"]
         logger.info("Starting job: pk={} job_id={}", pk, job_id)
-        update_download_jobs(
-            pk, {"status": "downloading", "time_start": SQL_NOW}, session
-        )
+        update_download_jobs(pk, {"status": "downloading", "time_start": SQL_NOW}, session)
     session.commit()
     return row
 
@@ -110,28 +106,22 @@ def email_user(email, status, zip_filename, downloader_output, language):
                 source_url = "https://obis.org/dataset/" + dataset["dataset_id"]
             else:
                 source_label = "ERDDAP"
-                source_url = (
-                    dataset["erddap_url"] + "/info/" + dataset["dataset_id"] + "/index.html"
-                )
+                source_url = dataset["erddap_url"] + "/info/" + dataset["dataset_id"] + "/index.html"
 
             if dataset.get("status") not in _INCLUDED:
-                failed_datasets += [{
-                    "dataset_id": dataset["dataset_id"],
-                    "reason": _MISS_REASON.get(
-                        dataset.get("status"), "could not be included"
-                    ),
-                    "reason_fr": _MISS_REASON_FR.get(
-                        dataset.get("status"), "n'a pas pu être inclus"
-                    ),
-                }]
+                failed_datasets += [
+                    {
+                        "dataset_id": dataset["dataset_id"],
+                        "reason": _MISS_REASON.get(dataset.get("status"), "could not be included"),
+                        "reason_fr": _MISS_REASON_FR.get(dataset.get("status"), "n'a pas pu être inclus"),
+                    }
+                ]
                 # Don't cite a dataset that isn't in the zip.
                 continue
 
             out = {"source_label": source_label, "source_url": source_url}
             if dataset["ckan_id"]:
-                out["ckan_url"] = (
-                    "https://catalogue.cioos.ca/dataset/" + dataset["ckan_id"]
-                )
+                out["ckan_url"] = "https://catalogue.cioos.ca/dataset/" + dataset["ckan_id"]
 
             dataset_urls += [out]
 
@@ -230,9 +220,7 @@ def run_download(row):
         # explicitly. Fingerprinting on the normalized exception text groups
         # every job that fails the same way into one issue instead of one per job.
         with sentry_sdk.new_scope() as scope:
-            scope.fingerprint = [
-                "downloader", "job-failed", error_signature(f"{type(e).__name__}: {e}")
-            ]
+            scope.fingerprint = ["downloader", "job-failed", error_signature(f"{type(e).__name__}: {e}")]
             scope.set_tag("component", "downloader")
             scope.set_context("job", {"job_id": user_query["job_id"], "pk": pk})
             sentry_sdk.capture_exception(e)
@@ -249,9 +237,7 @@ def run_download(row):
         )
     else:
         # these probably dont both need to be here
-        if downloader_output.get("zip_file_size") == 0 or downloader_output.get(
-            "empty_download"
-        ):
+        if downloader_output.get("zip_file_size") == 0 or downloader_output.get("empty_download"):
             status = "no-data"
 
         if downloader_output.get("over_limit"):
@@ -385,9 +371,7 @@ def run_download_observed(row):
             if sink_id is not None:
                 logger.remove(sink_id)
         if status in FAILED_STATUSES:
-            raise DownloadJobFailed(
-                f"download job {row['job_id']} finished as '{status}'"
-            )
+            raise DownloadJobFailed(f"download job {row['job_id']} finished as '{status}'")
         return status
 
     try:

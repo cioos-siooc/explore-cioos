@@ -22,9 +22,7 @@ def _ckan_get_result(session, url):
         payload = resp.json()
     except requests.exceptions.JSONDecodeError as e:
         snippet = resp.text[:200].replace("\n", " ").strip()
-        raise RuntimeError(
-            f"CKAN returned a non-JSON body (HTTP {resp.status_code}) for {url}: {snippet!r}"
-        ) from e
+        raise RuntimeError(f"CKAN returned a non-JSON body (HTTP {resp.status_code}) for {url}: {snippet!r}") from e
     return payload["result"]
 
 
@@ -155,6 +153,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
         logger = get_run_logger()
     except Exception:
         import logging as _logging
+
         logger = _logging.getLogger(__name__)
     logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
@@ -166,8 +165,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
     session = retry_session()
     while records_remaining:
         erddap_datasets_query = (
-            CKAN_API_URL
-            + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
+            CKAN_API_URL + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
         )
         logger.info(erddap_datasets_query)
         # print(erddap_datasets_query)

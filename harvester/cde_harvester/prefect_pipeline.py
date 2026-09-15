@@ -49,6 +49,7 @@ def _run_logger():
     outside a flow context (e.g. init_config on the prod deploy path)."""
     return run_logger(logger)
 
+
 # Upload at most this many bytes (tail) of the log into the markdown artifact;
 # Prefect/UI handle large markdown poorly, and the full file stays on disk.
 _LOG_ARTIFACT_MAX_BYTES = 200_000
@@ -81,8 +82,7 @@ def _publish_log_artifact(log_path):
     if base:
         lines.append(f"[Open full log]({base}/harvester_logs/{name})\n")
     lines.append(
-        f"_Showing last {_LOG_ARTIFACT_MAX_BYTES // 1000} KB of `{name}`._\n"
-        if truncated else f"_`{name}`_\n"
+        f"_Showing last {_LOG_ARTIFACT_MAX_BYTES // 1000} KB of `{name}`._\n" if truncated else f"_`{name}`_\n"
     )
     lines.append("```\n" + text + "\n```")
     try:
@@ -130,9 +130,7 @@ def _harvest_file_log(log_dir, log_level, label):
     log_path = Path(log_dir) / f"harvest_{_timestamp()}_{label}.log"
     handler = logging.FileHandler(log_path)
     handler.setLevel(logging.getLevelName(str(log_level or "INFO").upper()))
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)-8s - %(name)s : %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"))
     root = logging.getLogger()
     root.addHandler(handler)
     try:
@@ -192,8 +190,11 @@ def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
     data loss. Note that under discovery `obis_dataset_ids` is empty at config
     time, so it can't be used alone to decide whether OBIS is configured.
     """
-    sources = [u.strip() for u in (erddap_urls or "").split(",") if u.strip()] \
-        if isinstance(erddap_urls, str) else [u.strip() for u in (erddap_urls or []) if u and u.strip()]
+    sources = (
+        [u.strip() for u in (erddap_urls or "").split(",") if u.strip()]
+        if isinstance(erddap_urls, str)
+        else [u.strip() for u in (erddap_urls or []) if u and u.strip()]
+    )
     if obis_dataset_ids or (obis_discovery or {}).get("enabled", bool(obis_discovery)):
         sources.append("obis")
     return sources
@@ -279,9 +280,7 @@ class PrefectCDEPipeline:
                 # OBIS cache is shared across runs and MUST live outside the per-run tree
                 # (pruning rmtrees per-server run dirs); keep it a sibling of base_folder.
                 obis_folder = (
-                    Path(self.obis_folder)
-                    if self.obis_folder
-                    else base_folder.resolve().parent / "obis_cache"
+                    Path(self.obis_folder) if self.obis_folder else base_folder.resolve().parent / "obis_cache"
                 )
                 abs_run, abs_obis = run_folder.resolve(), obis_folder.resolve()
                 assert abs_obis != abs_run and abs_run not in abs_obis.parents, (
@@ -321,9 +320,7 @@ class PrefectCDEPipeline:
 
                 logger.info("Running cde_db_loader subflow")
                 try:
-                    load_summary = db_loader_main(
-                        folder=str(run_folder), incremental=effective_incremental
-                    )
+                    load_summary = db_loader_main(folder=str(run_folder), incremental=effective_incremental)
                     logger.info("cde_db_loader completed successfully")
                     # Prune only after a successful load so failed runs' CSVs survive.
                     _prune_server_run_folders(base_folder, protect=[run_folder])
@@ -346,8 +343,7 @@ class PrefectCDEPipeline:
                         raise
                 elif self.flush_redis:
                     logger.info(
-                        "Nothing changed in this load (%d changed dataset(s), %d pruned); "
-                        "keeping the redis cache warm",
+                        "Nothing changed in this load (%d changed dataset(s), %d pruned); keeping the redis cache warm",
                         load_summary["changed_datasets"],
                         load_summary["pruned"],
                     )
@@ -458,9 +454,7 @@ class PrefectCDEPipeline:
         # One on-demand deployment per source (re-deploy updates rather than
         # duplicates). The dashboard "Trigger harvest" button and the orchestrator
         # both run these by name; each forces incremental db-load (see cde_pipeline).
-        per_source = _configured_sources(
-            self.erddap_urls, self.obis_dataset_ids, self.obis_discovery
-        )
+        per_source = _configured_sources(self.erddap_urls, self.obis_dataset_ids, self.obis_discovery)
         source_deployment_names = []
         for src in per_source:
             dep_name = f"cde-harvester-{deployment_slug(src)}"
@@ -510,7 +504,11 @@ class PrefectCDEPipeline:
         logger.info(
             "Deployments created: cde-harvester=%s cde-harvest-all=%s "
             "populate-vernaculars=%s rebuild-database=%s per-source=%s",
-            harvest_id, orchestrator_id, vernaculars_id, rebuild_id, source_deployment_names,
+            harvest_id,
+            orchestrator_id,
+            vernaculars_id,
+            rebuild_id,
+            source_deployment_names,
         )
         return harvest_id
 
@@ -580,13 +578,22 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
     try:
         flow_run = run_deployment(name=deployment_name, parameters=params, timeout=0)
     except Exception as e:  # deployment missing / API error — report, don't abort the batch
-        return {"source": source, "deployment": deployment_name,
-                "flow_run_id": None, "state": "TRIGGER_ERROR", "error": str(e)}
+        return {
+            "source": source,
+            "deployment": deployment_name,
+            "flow_run_id": None,
+            "state": "TRIGGER_ERROR",
+            "error": str(e),
+        }
 
     flow_run_id = flow_run.id
     flow_run_name = flow_run.name
-    base = {"source": source, "deployment": deployment_name,
-            "flow_run_id": str(flow_run_id), "flow_run_name": flow_run_name}
+    base = {
+        "source": source,
+        "deployment": deployment_name,
+        "flow_run_id": str(flow_run_id),
+        "flow_run_name": flow_run_name,
+    }
 
     # Wait for a terminal state, polling by id and tolerating transient read errors.
     consecutive_failures = 0
@@ -602,22 +609,30 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
             last_error = str(e)
             logger.warning(
                 "Transient error polling %s (%s), attempt %d/%d: %s",
-                source, flow_run_id, consecutive_failures,
-                _MAX_CONSECUTIVE_POLL_FAILURES, last_error,
+                source,
+                flow_run_id,
+                consecutive_failures,
+                _MAX_CONSECUTIVE_POLL_FAILURES,
+                last_error,
             )
             if consecutive_failures >= _MAX_CONSECUTIVE_POLL_FAILURES:
                 # API unreachable for too long — surface it, but distinct from
                 # TRIGGER_ERROR: the child was submitted and may well have completed.
-                return {**base, "state": "POLL_ERROR", "completed": False,
-                        "error": f"gave up polling after {consecutive_failures} "
-                                 f"consecutive failures: {last_error}"}
+                return {
+                    **base,
+                    "state": "POLL_ERROR",
+                    "completed": False,
+                    "error": f"gave up polling after {consecutive_failures} consecutive failures: {last_error}",
+                }
             continue
 
         if state and state.is_final():
-            return {**base,
-                    "state": state.name,
-                    "completed": state.is_completed(),
-                    "error": None if state.is_completed() else f"final state {state.name}"}
+            return {
+                **base,
+                "state": state.name,
+                "completed": state.is_completed(),
+                "error": None if state.is_completed() else f"final state {state.name}",
+            }
 
 
 @flow(name="Harvest All Sources", log_prints=True)
@@ -635,13 +650,10 @@ def cde_harvest_all_run(
     config = load_config(config_file)
 
     obis = resolve_obis_config(config)
-    sources = _configured_sources(
-        config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery
-    )
+    sources = _configured_sources(config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery)
     if not sources:
         raise ValueError(
-            "No sources configured to harvest (erddap_urls / obis_discovery / "
-            "obis_dataset_ids / obis_datasets_file)"
+            "No sources configured to harvest (erddap_urls / obis_discovery / obis_dataset_ids / obis_datasets_file)"
         )
 
     logger.info("Fanning out %d per-source harvest job(s): %s", len(sources), sources)
@@ -649,17 +661,14 @@ def cde_harvest_all_run(
     results = [f.result() for f in futures]
 
     for r in results:
-        logger.info("Source %s -> %s [%s] (flow_run=%s)",
-                    r["source"], r["deployment"], r["state"], r.get("flow_run_id"))
+        logger.info(
+            "Source %s -> %s [%s] (flow_run=%s)", r["source"], r["deployment"], r["state"], r.get("flow_run_id")
+        )
     failed = [r for r in results if not r.get("completed")]
     if failed:
         raise RuntimeError(
             f"{len(failed)}/{len(sources)} per-source harvest job(s) did not complete: "
-            + ", ".join(
-                f"{r['source']}={r['state']}"
-                + (f" ({r['error']})" if r.get("error") else "")
-                for r in failed
-            )
+            + ", ".join(f"{r['source']}={r['state']}" + (f" ({r['error']})" if r.get("error") else "") for r in failed)
         )
     logger.info("All %d per-source harvest job(s) completed", len(sources))
 
@@ -729,13 +738,13 @@ def cde_rebuild_database_run(
     # can be driven by hand if the Prefect API is unreachable.
     logger = _run_logger()
 
-    expected = check_confirmation(
-        confirm, db_name=core_db.db_name(), host=core_db.db_host()
-    )
+    expected = check_confirmation(confirm, db_name=core_db.db_name(), host=core_db.db_host())
 
     logger.warning(
         "Rebuilding schema '%s' on %s — dropping all harvested data%s",
-        expected, core_db.db_host(), f" (triggered by {triggered_by})" if triggered_by else "",
+        expected,
+        core_db.db_host(),
+        f" (triggered by {triggered_by})" if triggered_by else "",
     )
 
     # The database itself may not exist: a volume that initialised before DB_NAME was
@@ -747,7 +756,9 @@ def cde_rebuild_database_run(
         if ensure_database(maint, expected):
             logger.warning(
                 "Database %r did not exist on %s — created it. This deployment's Postgres "
-                "volume was initialised before DB_NAME was set.", expected, core_db.db_host(),
+                "volume was initialised before DB_NAME was set.",
+                expected,
+                core_db.db_host(),
             )
     finally:
         maint.dispose()
@@ -760,7 +771,9 @@ def cde_rebuild_database_run(
 
     logger.info(
         "Schema rebuilt: %s + %s -> %d tables",
-        report["init_file"], ", ".join(report["function_files"]), report["tables_created"],
+        report["init_file"],
+        ", ".join(report["function_files"]),
+        report["tables_created"],
     )
 
     # Tiles and legend ranges are cached per-geometry; after a wipe they describe data
@@ -773,8 +786,7 @@ def cde_rebuild_database_run(
 
     if not run_harvest:
         logger.warning(
-            "run_harvest=False — the schema is empty. Trigger a harvest before expecting "
-            "the app to show data."
+            "run_harvest=False — the schema is empty. Trigger a harvest before expecting the app to show data."
         )
         return report
 

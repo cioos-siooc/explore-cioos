@@ -46,9 +46,7 @@ def _ddl_columns():
     tables = {}
     # Terminator: the first line whose first non-blank character is the
     # closing paren (some tables in 1_schema.sql indent it).
-    pattern = re.compile(
-        r"CREATE TABLE (?:IF NOT EXISTS )?(?:cde\.)?(\w+)\s*\((.*?)\n[ \t]*\)", re.S
-    )
+    pattern = re.compile(r"CREATE TABLE (?:IF NOT EXISTS )?(?:cde\.)?(\w+)\s*\((.*?)\n[ \t]*\)", re.S)
     for name, body in pattern.findall(sql):
         cols = set()
         depth = 0
@@ -66,9 +64,7 @@ def _ddl_columns():
     return tables
 
 
-@pytest.mark.parametrize(
-    "schema,table", SCHEMA_TO_TABLE.items(), ids=list(SCHEMA_TO_TABLE.values())
-)
+@pytest.mark.parametrize("schema,table", SCHEMA_TO_TABLE.items(), ids=list(SCHEMA_TO_TABLE.values()))
 def test_schema_columns_exist_in_ddl(schema, table):
     ddl = _ddl_columns()
     assert table in ddl, f"CREATE TABLE {table} not found in {SCHEMA_SQL}"

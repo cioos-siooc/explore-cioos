@@ -294,7 +294,7 @@ class HarvestAttemptSchema(pa.DataFrameModel):
     erddap_url: Series[str]
     dataset_id: Series[str]
     source: Series[str]
-    status: Series[str]                                 # 'success' | 'skipped' | 'error'
+    status: Series[str]  # 'success' | 'skipped' | 'error'
     reason_code: Series[str] = pa.Field(nullable=True)  # set when status != 'success'
     error_message: Series[str] = pa.Field(nullable=True)
     duration_ms: Series[float] = pa.Field(nullable=True)

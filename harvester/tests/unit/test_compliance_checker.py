@@ -5,7 +5,6 @@ Each test builds a mock Dataset, sets specific attributes, and verifies
 whether the compliance checker passes or rejects it with the right code.
 """
 
-
 from conftest import (
     ERDDAP_INFO_CSV,
     ERDDAP_INFO_DEPTH_AND_ALTITUDE_CSV,
@@ -46,25 +45,19 @@ class TestRequiredVariables:
     def test_missing_time_fails(self):
         checker = _checker()
         # Remove 'time' from variables_list
-        checker.dataset.variables_list = [
-            v for v in checker.dataset.variables_list if v != "time"
-        ]
+        checker.dataset.variables_list = [v for v in checker.dataset.variables_list if v != "time"]
         assert checker.check_required_variables() is False
         assert checker.failure_reason_code == MISSING_REQUIRED_VARS
 
     def test_missing_latitude_fails(self):
         checker = _checker()
-        checker.dataset.variables_list = [
-            v for v in checker.dataset.variables_list if v != "latitude"
-        ]
+        checker.dataset.variables_list = [v for v in checker.dataset.variables_list if v != "latitude"]
         assert checker.check_required_variables() is False
         assert checker.failure_reason_code == MISSING_REQUIRED_VARS
 
     def test_missing_longitude_fails(self):
         checker = _checker()
-        checker.dataset.variables_list = [
-            v for v in checker.dataset.variables_list if v != "longitude"
-        ]
+        checker.dataset.variables_list = [v for v in checker.dataset.variables_list if v != "longitude"]
         assert checker.check_required_variables() is False
         assert checker.failure_reason_code == MISSING_REQUIRED_VARS
 
@@ -115,7 +108,5 @@ class TestDepthAndAltitude:
 
     def test_only_altitude_passes(self):
         checker = _checker()
-        checker.dataset.variables_list = [
-            v for v in checker.dataset.variables_list if v != "depth"
-        ] + ["altitude"]
+        checker.dataset.variables_list = [v for v in checker.dataset.variables_list if v != "depth"] + ["altitude"]
         assert checker.check_only_one_depth() is True

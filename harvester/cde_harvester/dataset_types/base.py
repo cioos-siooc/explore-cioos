@@ -38,7 +38,11 @@ class DatasetTypeHandler(ABC):
         """
 
     def adjust_feature_identity(
-        self, dataset, profiles_with_lat_lon, profiles, profile_variables,
+        self,
+        dataset,
+        profiles_with_lat_lon,
+        profiles,
+        profile_variables,
         profile_variable_list,
     ):
         """Hook: reshape the raw CF-role identity frame before min/max

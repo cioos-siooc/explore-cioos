@@ -125,9 +125,7 @@ def _day_counts(dataset, traj_var):
     for a coverage layer whose geometry is positions.
     """
     request_vars = ([traj_var] if traj_var else []) + ["time", "latitude"]
-    url = ",".join(request_vars) + requests.utils.quote(
-        f'&orderByCount("{_day_group(traj_var)}")'
-    )
+    url = ",".join(request_vars) + requests.utils.quote(f'&orderByCount("{_day_group(traj_var)}")')
     df = dataset.dataset_tabledap_query(url)
     if df.empty:
         return df
@@ -144,9 +142,7 @@ def _day_depths(dataset, traj_var):
     Two rows per group (the min row and the max row); collapsed by the caller.
     """
     request_vars = ([traj_var] if traj_var else []) + ["time", "depth"]
-    url = ",".join(request_vars) + requests.utils.quote(
-        f'&orderByMinMax("{_day_group(traj_var)},depth")'
-    )
+    url = ",".join(request_vars) + requests.utils.quote(f'&orderByMinMax("{_day_group(traj_var)},depth")')
     return dataset.dataset_tabledap_query(url)
 
 
@@ -179,21 +175,15 @@ def _iter_raw_chunks(dataset, traj_var, has_depth):
         request_vars.append("depth")
     columns = ",".join(request_vars)
 
-    start = pd.to_datetime(
-        dataset.globals.get("time_coverage_start"), errors="coerce", utc=True
-    )
-    end = pd.to_datetime(
-        dataset.globals.get("time_coverage_end"), errors="coerce", utc=True
-    )
+    start = pd.to_datetime(dataset.globals.get("time_coverage_start"), errors="coerce", utc=True)
+    end = pd.to_datetime(dataset.globals.get("time_coverage_end"), errors="coerce", utc=True)
 
     if pd.isna(start) or pd.isna(end):
         chunks = [""]  # no coverage metadata — single unchunked query
     else:
         # Monthly chunk starts, plus a final bound past the end so a dataset
         # shorter than one chunk still yields exactly one query.
-        bounds = list(
-            pd.date_range(start.floor("D"), end.ceil("D"), freq=pd.DateOffset(months=1))
-        )
+        bounds = list(pd.date_range(start.floor("D"), end.ceil("D"), freq=pd.DateOffset(months=1)))
         bounds.append(end.ceil("D") + pd.Timedelta(days=1))
         chunks = [
             f"&time>={a.strftime('%Y-%m-%dT%H:%M:%SZ')}&time<{b.strftime('%Y-%m-%dT%H:%M:%SZ')}"
@@ -257,13 +247,12 @@ def _profile_fixes(dataset, traj_var, profile_var):
     if cached is not None:
         return cached
     request_vars = [v for v in (traj_var, profile_var) if v] + [
-        "time", "latitude", "longitude",
+        "time",
+        "latitude",
+        "longitude",
     ]
     group = ",".join(v for v in (traj_var, profile_var) if v)
-    df = dataset.dataset_tabledap_query(
-        ",".join(request_vars)
-        + requests.utils.quote(f'&orderByMin("{group},time")')
-    )
+    df = dataset.dataset_tabledap_query(",".join(request_vars) + requests.utils.quote(f'&orderByMin("{group},time")'))
     dataset._trajectory_profile_fixes = df
     return df
 
@@ -282,11 +271,7 @@ def _first_fix_per_interval(df, traj_var, interval_seconds):
     epoch_seconds = df["time"].astype("int64") // 10**9
     bucket = (epoch_seconds // interval_seconds) * interval_seconds
     group_cols = ([traj_var] if traj_var else []) + [bucket]
-    return (
-        df.sort_values("time")
-        .groupby(group_cols, dropna=False, group_keys=False)
-        .head(1)
-    )
+    return df.sort_values("time").groupby(group_cols, dropna=False, group_keys=False).head(1)
 
 
 def _first_fix_per_day(df, traj_var):
@@ -317,10 +302,7 @@ def _cap_for_active_days(n_active_days):
     that trajectory actually has data on, clamped to
     [MIN_TRACK_POINTS_CAP, MAX_TRACK_POINTS_CAP] -- a 44-day deployment and a
     708-day one shouldn't share one flat cap."""
-    return int(
-        min(max(n_active_days * TRACK_POINTS_PER_ACTIVE_DAY, MIN_TRACK_POINTS_CAP),
-            MAX_TRACK_POINTS_CAP)
-    )
+    return int(min(max(n_active_days * TRACK_POINTS_PER_ACTIVE_DAY, MIN_TRACK_POINTS_CAP), MAX_TRACK_POINTS_CAP))
 
 
 def _simplify_shape(group, tolerance_km=TRACK_SIMPLIFY_TOLERANCE_KM):
@@ -384,16 +366,12 @@ def _densify_long_chords(group, kept, max_chord_km=TRACK_MAX_CHORD_KM):
     pos = group.index.get_indexer(kept.index)
     lat = group["latitude"].to_numpy()
     lon = group["longitude"].to_numpy()
-    chords = _haversine_km(
-        lat[pos[:-1]], lon[pos[:-1]], lat[pos[1:]], lon[pos[1:]]
-    )
+    chords = _haversine_km(lat[pos[:-1]], lon[pos[:-1]], lat[pos[1:]], lon[pos[1:]])
     out_positions = [pos[0]]
     for a, b, chord in zip(pos[:-1], pos[1:], chords, strict=True):
         if chord > max_chord_km and b - a > 1:
             n_segments = int(np.ceil(chord / max_chord_km))
-            inner = np.unique(
-                np.linspace(a, b, min(n_segments, b - a) + 1).round().astype(int)
-            )[1:-1]
+            inner = np.unique(np.linspace(a, b, min(n_segments, b - a) + 1).round().astype(int))[1:-1]
             out_positions.extend(inner.tolist())
         out_positions.append(b)
     return group.iloc[sorted(set(out_positions))]
@@ -493,7 +471,9 @@ def extract_track_points(dataset, per_profile=False):
             # -- omitting it (e.g. orderByMin("traj,time/86400") alone) 404s
             # on every server tested (2.19-2.28), hence the trailing ",time".
             request_vars = ([traj_var] if traj_var else []) + [
-                "time", "latitude", "longitude",
+                "time",
+                "latitude",
+                "longitude",
             ]
             group_prefix = f"{traj_var}," if traj_var else ""
 
@@ -519,8 +499,8 @@ def extract_track_points(dataset, per_profile=False):
                         points = _first_fix_per_interval(finer_points, traj_var, finer_interval)
     except HTTPError:
         log.warning(
-            "Server-side track-point grouping failed for %s; falling back to "
-            "chunked download + local daily downsample", dataset.id,
+            "Server-side track-point grouping failed for %s; falling back to chunked download + local daily downsample",
+            dataset.id,
         )
         points = pd.DataFrame()
 
@@ -537,9 +517,7 @@ def extract_track_points(dataset, per_profile=False):
         for df in _iter_raw_chunks(dataset, traj_var, has_depth=False):
             df = df.copy()
             df["time"] = ERDDAP.parse_erddap_dates(df["time"])
-            reduced = _first_fix_per_interval(
-                df, traj_var, TRACK_FALLBACK_INTERVAL_SECONDS
-            )
+            reduced = _first_fix_per_interval(df, traj_var, TRACK_FALLBACK_INTERVAL_SECONDS)
             if not reduced.empty:
                 frames.append(reduced)
         points = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
@@ -555,9 +533,7 @@ def extract_track_points(dataset, per_profile=False):
     points = points.dropna(subset=["time", "latitude", "longitude"])
     # Same validity filter as extract_day_stats — also drops Argo's 99.999 /
     # 999.999 bad-position sentinels.
-    points = points.query(
-        "latitude > -90 and latitude < 90 and longitude >= -180 and longitude <= 180"
-    ).copy()
+    points = points.query("latitude > -90 and latitude < 90 and longitude >= -180 and longitude <= 180").copy()
     if points.empty:
         log.warning("No valid track points remain for %s", dataset.id)
         return points
@@ -583,14 +559,13 @@ def extract_track_points(dataset, per_profile=False):
 
     points["dataset_id"] = dataset.id
     points["erddap_url"] = dataset.erddap_url
-    points = points[
-        ["erddap_url", "dataset_id", "trajectory_id", "profile_id",
-         "time", "latitude", "longitude"]
-    ]
+    points = points[["erddap_url", "dataset_id", "trajectory_id", "profile_id", "time", "latitude", "longitude"]]
 
     log.info(
         "Extracted %d track points across %d trajectories for %s",
-        len(points), points["trajectory_id"].nunique(), dataset.id,
+        len(points),
+        points["trajectory_id"].nunique(),
+        dataset.id,
     )
     return points
 
@@ -610,9 +585,7 @@ def extract_day_stats(dataset, count_profiles=False):
     # query — that would return one row per GPS fix on a trajectory.
     df_variables = dataset.df_variables
     profile_variables = (
-        df_variables.set_index("cf_role", drop=False)
-        .query('cf_role != ""')[["cf_role", "name"]]["name"]
-        .to_dict()
+        df_variables.set_index("cf_role", drop=False).query('cf_role != ""')[["cf_role", "name"]]["name"].to_dict()
     )
     dataset.profile_variables = profile_variables
     dataset.profile_variable_list = sorted(profile_variables.values())
@@ -640,15 +613,11 @@ def extract_day_stats(dataset, count_profiles=False):
         days = _day_counts(dataset, traj_var)
         if not days.empty:
             days["n_records"] = pd.to_numeric(days["n_records"], errors="coerce")
-            days = (
-                days.groupby(group_cols, dropna=False)
-                .agg(n_records=("n_records", "sum"))
-                .reset_index()
-            )
+            days = days.groupby(group_cols, dropna=False).agg(n_records=("n_records", "sum")).reset_index()
     except HTTPError:
         log.warning(
-            "Server-side day grouping failed for %s; falling back to "
-            "chunked download + local reduction", dataset.id,
+            "Server-side day grouping failed for %s; falling back to chunked download + local reduction",
+            dataset.id,
         )
         days = pd.DataFrame()
 
@@ -685,15 +654,14 @@ def extract_day_stats(dataset, count_profiles=False):
             fixes = _to_days(_profile_fixes(dataset, traj_var, profile_var), traj_var)
         except (HTTPError, ResponseTooLargeError):
             log.warning(
-                "Per-day profile count failed for %s; keeping days without "
-                "n_profiles", dataset.id, exc_info=True,
+                "Per-day profile count failed for %s; keeping days without n_profiles",
+                dataset.id,
+                exc_info=True,
             )
             fixes = pd.DataFrame()
         if not fixes.empty:
             profile_counts = (
-                fixes.groupby(group_cols, dropna=False)
-                .agg(n_profiles=(profile_var, "nunique"))
-                .reset_index()
+                fixes.groupby(group_cols, dropna=False).agg(n_profiles=(profile_var, "nunique")).reset_index()
             )
             days = days.merge(profile_counts, on=group_cols, how="left")
     if "n_profiles" not in days:
@@ -717,9 +685,10 @@ def extract_day_stats(dataset, count_profiles=False):
 
     log.info(
         "Extracted %d trajectory days across %d trajectories for %s",
-        len(days), days["trajectory_id"].nunique(), dataset.id,
+        len(days),
+        days["trajectory_id"].nunique(),
+        dataset.id,
     )
     return days[
-        ["erddap_url", "dataset_id", "trajectory_id", "day",
-         "n_records", "n_profiles", "depth_min", "depth_max"]
+        ["erddap_url", "dataset_id", "trajectory_id", "day", "n_records", "n_profiles", "depth_min", "depth_max"]
     ]

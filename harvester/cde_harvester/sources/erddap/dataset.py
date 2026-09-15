@@ -159,9 +159,7 @@ class Dataset:
         return self.df
 
     def dataset_tabledap_query(self, url):
-        return self.erddap_csv_to_df(
-            "/tabledap/" + self.id + ".csv?" + url, dataset=self
-        )
+        return self.erddap_csv_to_df("/tabledap/" + self.id + ".csv?" + url, dataset=self)
 
     def get_max_min(self, vars):
         """
@@ -170,9 +168,7 @@ class Dataset:
         lat,lon might not be a point in the dataset)
         """
 
-        url = f"{','.join(vars)}" + requests.utils.quote(
-            f'&orderByMinMax("{",".join(vars)}")'
-        )
+        url = f"{','.join(vars)}" + requests.utils.quote(f'&orderByMinMax("{",".join(vars)}")')
 
         df = self.dataset_tabledap_query(url)
 
@@ -189,9 +185,7 @@ class Dataset:
         df.iloc[::2, df.columns.get_loc("maxmin")] = max_column
         df.loc[df.maxmin != max_column, "maxmin"] = min_column
 
-        df_min_max = df.pivot(
-            index=index_vars, columns=["maxmin"], values=[last_var]
-        ).reset_index()
+        df_min_max = df.pivot(index=index_vars, columns=["maxmin"], values=[last_var]).reset_index()
         df_min_max.columns = index_vars + [min_column, max_column]
         df_min_max.set_index(index_vars, inplace=True)
 
@@ -203,9 +197,7 @@ class Dataset:
         # Organize dataset variables by their cf_roles
         # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
         profile_variables = (
-            df_variables.set_index("cf_role", drop=False)
-            .query('cf_role != ""')[["cf_role", "name"]]["name"]
-            .to_dict()
+            df_variables.set_index("cf_role", drop=False).query('cf_role != ""')[["cf_role", "name"]]["name"].to_dict()
         )
 
         # sorting so the url is consistent every time for query caching
@@ -226,9 +218,7 @@ class Dataset:
         # feature. Per-feature lat/lon min/max (the bounding box) is fetched
         # separately in tabledap_features via orderByMinMax, which is bounded
         # by feature count regardless of how much the feature moves.
-        profile_ids = self.dataset_tabledap_query(
-            f"{','.join(profile_variable_list)}&distinct()"
-        )
+        profile_ids = self.dataset_tabledap_query(f"{','.join(profile_variable_list)}&distinct()")
 
         if profile_ids.empty:
             return profile_ids
@@ -260,30 +250,20 @@ class Dataset:
         # dataset using time_coverage_resolution
         time_coverage_resolution = self.globals.get("time_coverage_resolution")
 
-        if (
-            is_single_profile_dataset
-            and time_coverage_resolution
-            and is_valid_duration(time_coverage_resolution)
-        ):
+        if is_single_profile_dataset and time_coverage_resolution and is_valid_duration(time_coverage_resolution):
             self.logger.debug("Using time_coverage_resolution for count")
             df_profile_ids = self.profile_ids.copy()
-            readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
-                time_coverage_resolution
-            )
+            readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(time_coverage_resolution)
             total_records = readings_per_day * days_in_dataset
             df_profile_ids["time"] = total_records
             return df_profile_ids
 
         extraplolation_days = 30
-        skip_full_count = (
-            days_in_dataset >= extraplolation_days and is_single_profile_dataset
-        )
+        skip_full_count = days_in_dataset >= extraplolation_days and is_single_profile_dataset
 
         if skip_full_count:
             start_date = time_min.date()
-            end_date = (
-                pd.to_datetime(time_min) + pd.Timedelta(days=extraplolation_days)
-            ).date()
+            end_date = (pd.to_datetime(time_min) + pd.Timedelta(days=extraplolation_days)).date()
 
             time_query = f"&time>={start_date}&time<={end_date}"
 
@@ -295,9 +275,7 @@ class Dataset:
         except HTTPError as e:
             response = e.response
 
-            self.logger.error(
-                f"HTTP ERROR during count: {response.status_code} {response.reason}"
-            )
+            self.logger.error(f"HTTP ERROR during count: {response.status_code} {response.reason}")
             return pd.DataFrame()
 
         if skip_full_count and not df_count.empty:
@@ -313,18 +291,14 @@ class Dataset:
         dataset_standard_names = self.df_variables["standard_name"].to_list()
 
         for eov in eov_to_standard_name:
-            overlap = intersection(
-                dataset_standard_names, eov_to_standard_name[eov]
-            )
+            overlap = intersection(dataset_standard_names, eov_to_standard_name[eov])
             if overlap:
                 # check if list of standard names in this EOV overlaps with list of standard names in this dataset
 
                 # set first_eov_column, which is used to set default column in preview
                 first_standard_name = overlap[0]
                 self.first_eov_column = (
-                    self.df_variables.query(f"standard_name=='{first_standard_name}'")
-                    .head(1)["name"]
-                    .item()
+                    self.df_variables.query(f"standard_name=='{first_standard_name}'").head(1)["name"].item()
                 )
                 eovs.append(eov)
         return eovs
@@ -349,16 +323,12 @@ class Dataset:
         platform_vocabulary = self.globals.get("platform_vocabulary")
 
         if not (platform and platform_vocabulary):
-            self.logger.debug(
-                "Found platform without platform_vocabulary, setting platform to 'unknown'"
-            )
+            self.logger.debug("Found platform without platform_vocabulary, setting platform to 'unknown'")
             return "unknown"
 
         if "ioos" in platform_vocabulary:
             try:
-                l06_platform_label = platforms_nerc_ioos.query(
-                    f"ioos_label=='{platform}'"
-                )["category"].item()
+                l06_platform_label = platforms_nerc_ioos.query(f"ioos_label=='{platform}'")["category"].item()
 
                 return l06_platform_label
 
@@ -366,14 +336,10 @@ class Dataset:
                 self.logger.error("Found unsupported IOOS platform: %s", platform)
 
         if "L06" in platform_vocabulary:
-            platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
-                subset=["l06_label"]
-            )
+            platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(subset=["l06_label"])
 
             if platform.lower() in list(platforms_nerc_ioos["l06_label"]):
-                return platforms_nerc_ioos_no_duplicates.query(
-                    f"l06_label=='{platform.lower()}'"
-                )["category"].item()
+                return platforms_nerc_ioos_no_duplicates.query(f"l06_label=='{platform.lower()}'")["category"].item()
             else:
                 self.logger.error("Found unsupported L06 platform: %s", platform)
 
@@ -404,13 +370,11 @@ class Dataset:
         # cannot see into.
         considered_attributes = CONSIDERED_VARIABLE_ATTRIBUTES  # noqa: F841
 
-        data_types = df.query(
-            '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'
-        )[["Variable Name", "Data Type"]].set_index("Variable Name")
+        data_types = df.query('(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")')[
+            ["Variable Name", "Data Type"]
+        ].set_index("Variable Name")
         attributes = (
-            df.query("`Attribute Name` in @considered_attributes")[
-                ["Variable Name", "Attribute Name", "Value"]
-            ]
+            df.query("`Attribute Name` in @considered_attributes")[["Variable Name", "Attribute Name", "Value"]]
             .pivot(index="Variable Name", columns="Attribute Name", values="Value")
             .fillna("")
         )
@@ -425,18 +389,14 @@ class Dataset:
 
         df_variables["erddap_url"] = self.erddap_url
         df_variables["dataset_id"] = self.id
-        df_global = df.query('`Variable Name`=="NC_GLOBAL"')[
-            ["Attribute Name", "Value"]
-        ].set_index("Attribute Name")
+        df_global = df.query('`Variable Name`=="NC_GLOBAL"')[["Attribute Name", "Value"]].set_index("Attribute Name")
         globals_dict = df_global["Value"].to_dict()
 
         self.variables_list = df_variables["name"].to_list()
         # Griddap datasets may omit the cdm_data_type global; they are always
         # Grid. Tabledap datasets keep the hard requirement (empty string
         # fails the supported-type check downstream, as before).
-        self.cdm_data_type = globals_dict.get(
-            "cdm_data_type", "Grid" if self.data_structure == "grid" else ""
-        )
+        self.cdm_data_type = globals_dict.get("cdm_data_type", "Grid" if self.data_structure == "grid" else "")
         self.globals = globals_dict
 
         if "standard_name" not in df_variables:
@@ -463,13 +423,9 @@ class Dataset:
         if globals_dict.get("contributor_type") in group_type:
             organization_fields.append("contributor")
 
-        self.organizations = list(
-            filter(None, {globals_dict.get(x) for x in organization_fields})
-        )
+        self.organizations = list(filter(None, {globals_dict.get(x) for x in organization_fields}))
 
         self.platform = self.get_platform_code()
 
     def get_logger(self):
-        return run_logger(
-            logging.getLogger(f"{self.erddap_server.domain}.{self.id}")
-        )
+        return run_logger(logging.getLogger(f"{self.erddap_server.domain}.{self.id}"))

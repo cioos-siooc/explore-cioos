@@ -294,15 +294,10 @@ CKAN_PACKAGE_SEARCH_RESPONSE = {
                     "en": "English summary.",
                     "fr": "French summary.",
                 },
-                "cited-responsible-party": [
-                    {"organisation-name": "CIOOS Test Organization"}
-                ],
+                "cited-responsible-party": [{"organisation-name": "CIOOS Test Organization"}],
                 "resources": [
                     {
-                        "url": (
-                            "https://test.erddap.com/erddap/tabledap/"
-                            "test_timeseries_001.html"
-                        ),
+                        "url": ("https://test.erddap.com/erddap/tabledap/test_timeseries_001.html"),
                         "format": "ERDDAP tabledap",
                     }
                 ],
@@ -318,6 +313,7 @@ CKAN_EMPTY_RESPONSE = {"result": {"count": 1, "results": []}}
 # ---------------------------------------------------------------------------
 # MockResponse — simulates a requests.Response object
 # ---------------------------------------------------------------------------
+
 
 class MockResponse:
     """Minimal requests.Response substitute for HTTP mocking.
@@ -339,7 +335,7 @@ class MockResponse:
 
     def iter_content(self, chunk_size=1):
         for start in range(0, len(self.content), chunk_size):
-            yield self.content[start:start + chunk_size]
+            yield self.content[start : start + chunk_size]
 
     def close(self):
         self.closed = True
@@ -347,6 +343,7 @@ class MockResponse:
     def raise_for_status(self):
         if self.status_code >= 400:
             import requests
+
             raise requests.exceptions.HTTPError(response=self)
 
 
@@ -376,9 +373,11 @@ class MockStreamingResponse(MockResponse):
 # URL routing helper — maps an ERDDAP request URL to a fixture CSV string
 # ---------------------------------------------------------------------------
 
+
 def _route_erddap_url(url: str) -> str:
     """Return the appropriate fixture CSV text for a given ERDDAP request URL."""
     from urllib.parse import unquote
+
     decoded = unquote(url)
 
     if "allDatasets" in decoded:
@@ -413,6 +412,7 @@ def make_mock_session_get(url, **kwargs):
 # Helpers to build DataFrames directly (bypassing HTTP) for unit tests
 # ---------------------------------------------------------------------------
 
+
 def build_info_df(csv_text: str = ERDDAP_INFO_CSV) -> pd.DataFrame:
     """Parse an ERDDAP info CSV string into a DataFrame as Dataset.get_metadata() would."""
     return pd.read_csv(StringIO(csv_text)).fillna("")
@@ -430,24 +430,18 @@ def build_variables_df(csv_text: str = ERDDAP_INFO_CSV) -> pd.DataFrame:
     # Read by the @-reference in the df.query() below.
     considered_attributes = CONSIDERED_VARIABLE_ATTRIBUTES  # noqa: F841
 
-    data_types = df.query(
-        '(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")'
-    )[["Variable Name", "Data Type"]].set_index("Variable Name")
+    data_types = df.query('(`Variable Name`!="NC_GLOBAL" and `Attribute Name`=="")')[
+        ["Variable Name", "Data Type"]
+    ].set_index("Variable Name")
 
-    attr_df = df.query("`Attribute Name` in @considered_attributes")[
-        ["Variable Name", "Attribute Name", "Value"]
-    ]
+    attr_df = df.query("`Attribute Name` in @considered_attributes")[["Variable Name", "Attribute Name", "Value"]]
     if not attr_df.empty:
-        attributes = attr_df.pivot(
-            index="Variable Name", columns="Attribute Name", values="Value"
-        ).fillna("")
+        attributes = attr_df.pivot(index="Variable Name", columns="Attribute Name", values="Value").fillna("")
     else:
         attributes = pd.DataFrame(index=data_types.index)
 
     df_variables = data_types.join(attributes).fillna("")
-    df_variables = df_variables.reset_index().rename(
-        columns={"Variable Name": "name", "Data Type": "type"}
-    )
+    df_variables = df_variables.reset_index().rename(columns={"Variable Name": "name", "Data Type": "type"})
     df_variables["erddap_url"] = ERDDAP_URL
     df_variables["dataset_id"] = DATASET_ID
     if "standard_name" not in df_variables:
@@ -481,13 +475,12 @@ def build_mock_dataset(
 
     # Globals parsed from NC_GLOBAL attributes
     info_df = build_info_df(info_csv)
-    global_rows = info_df.query('`Variable Name`=="NC_GLOBAL"')[
-        ["Attribute Name", "Value"]
-    ].set_index("Attribute Name")
+    global_rows = info_df.query('`Variable Name`=="NC_GLOBAL"')[["Attribute Name", "Value"]].set_index("Attribute Name")
     mock.globals = global_rows["Value"].to_dict()
 
     # EOVs — use the real utility to derive them
     from cde_harvester.utils import eov_to_standard_name, intersection
+
     eovs = []
     dataset_standard_names = df_variables["standard_name"].tolist()
     for eov, standard_names in eov_to_standard_name.items():
@@ -499,11 +492,7 @@ def build_mock_dataset(
     mock.platform = "unknown"
 
     # profile_variables / profile_variable_list from cf_role column
-    pv = (
-        df_variables.query('cf_role != ""')
-        .set_index("cf_role")["name"]
-        .to_dict()
-    )
+    pv = df_variables.query('cf_role != ""').set_index("cf_role")["name"].to_dict()
     mock.profile_variables = pv
     mock.profile_variable_list = sorted(pv.values())
 
@@ -514,14 +503,8 @@ def build_mock_dataset(
     mock.first_eov_column = "temperature"
 
     # profile_ids DataFrame (single station for unit tests)
-    profile_ids_df = pd.read_csv(
-        StringIO(ERDDAP_PROFILE_IDS_CSV), skiprows=[1]
-    )
-    profile_ids_df["latlon"] = (
-        profile_ids_df["latitude"].astype(str)
-        + ","
-        + profile_ids_df["longitude"].astype(str)
-    )
+    profile_ids_df = pd.read_csv(StringIO(ERDDAP_PROFILE_IDS_CSV), skiprows=[1])
+    profile_ids_df["latlon"] = profile_ids_df["latitude"].astype(str) + "," + profile_ids_df["longitude"].astype(str)
     profile_ids_df = profile_ids_df.drop_duplicates(mock.profile_variable_list)
     del profile_ids_df["latlon"]
     mock.profile_ids = profile_ids_df
@@ -565,9 +548,7 @@ def build_mock_dataset(
     mock.get_max_min.side_effect = _get_max_min
 
     # get_count() — return counts indexed by profile variable
-    count_df = pd.DataFrame(
-        {"depth": [1000], "station_id": ["STATION_001"], "time": [1000]}
-    )
+    count_df = pd.DataFrame({"depth": [1000], "station_id": ["STATION_001"], "time": [1000]})
     mock.get_count.return_value = count_df
 
     # get_df() — DataFrame row for the datasets CSV
@@ -595,6 +576,7 @@ def build_mock_dataset(
 # ---------------------------------------------------------------------------
 # Pytest fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_dataset():

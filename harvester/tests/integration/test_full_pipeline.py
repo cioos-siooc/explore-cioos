@@ -49,6 +49,7 @@ from cde_harvester.sources.erddap.harvester import harvest_erddap
 # Session-level mock for all ERDDAP HTTP calls
 # ---------------------------------------------------------------------------
 
+
 def _erddap_session_get(url, **kwargs):
     """Route every ERDDAP request to the right fixture CSV."""
     text = _route_erddap_url(url)
@@ -67,6 +68,7 @@ def _ckan_side_effects():
 # Step 1 + 2 + 3: Harvest phase (ERDDAP → HarvestResult)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def harvest_result(tmp_path_factory):
     """
@@ -75,9 +77,7 @@ def harvest_result(tmp_path_factory):
     Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
     """
     with (
-        patch(
-            "cde_harvester.sources.erddap.client.retry_session"
-        ) as mock_session_cls,
+        patch("cde_harvester.sources.erddap.client.retry_session") as mock_session_cls,
         patch(
             "cde_harvester.sources.ckan.create_ckan_erddap_link.requests.get",
             side_effect=_ckan_side_effects(),
@@ -97,6 +97,7 @@ def harvest_result(tmp_path_factory):
 # Step 3 tests: harvest output content
 # ---------------------------------------------------------------------------
 
+
 class TestHarvestOutput:
     def test_compliant_dataset_is_harvested(self, harvest_result):
         _, datasets, _, _ = harvest_result
@@ -109,8 +110,15 @@ class TestHarvestOutput:
     def test_profiles_have_required_columns(self, harvest_result):
         profiles, _, _, _ = harvest_result
         required = [
-            "latitude", "longitude", "time_min", "time_max",
-            "depth_min", "depth_max", "n_records", "dataset_id", "erddap_url",
+            "latitude",
+            "longitude",
+            "time_min",
+            "time_max",
+            "depth_min",
+            "depth_max",
+            "n_records",
+            "dataset_id",
+            "erddap_url",
         ]
         for col in required:
             assert col in profiles.columns, f"Profiles missing column: {col}"
@@ -138,6 +146,7 @@ class TestHarvestOutput:
 # Step 4: CSV writing phase
 # ---------------------------------------------------------------------------
 
+
 def _submit_without_flow(task, *, as_future=False):
     """Stand-in for Prefect ``Task.submit()`` with no flow context.
 
@@ -148,6 +157,7 @@ def _submit_without_flow(task, *, as_future=False):
     The Prefect-only ``wait_for`` kwarg is stripped. ``as_future=True`` wraps the
     result so the caller's ``.submit(...).result()`` still works.
     """
+
     def _submit(*args, wait_for=None, **kwargs):
         value = task.fn(*args, **kwargs)
         if not as_future:
@@ -177,8 +187,7 @@ def written_harvest_folder(tmp_path_factory, harvest_result):
     tmp = tmp_path_factory.mktemp("csv_phase")
     folder = str(tmp)
 
-    hr = HarvestResult(profiles=profiles, datasets=datasets,
-                       variables=variables, skipped=skipped)
+    hr = HarvestResult(profiles=profiles, datasets=datasets, variables=variables, skipped=skipped)
 
     mock_future = MagicMock()
     mock_future.result.return_value = hr
@@ -187,9 +196,7 @@ def written_harvest_folder(tmp_path_factory, harvest_result):
         # Both the ERDDAP client and the CKAN reader build their session with
         # cde_common.http.retry_session(), so patch that per module rather than
         # the (unused) module-level requests.get.
-        patch(
-            "cde_harvester.sources.erddap.client.retry_session"
-        ) as mock_session_cls,
+        patch("cde_harvester.sources.erddap.client.retry_session") as mock_session_cls,
         patch(
             "cde_harvester.sources.ckan.create_ckan_erddap_link.retry_session",
         ) as mock_ckan_session_builder,
@@ -197,15 +204,11 @@ def written_harvest_folder(tmp_path_factory, harvest_result):
             "cde_harvester.__main__.get_run_logger",
             return_value=logging.getLogger("test"),
         ),
-        patch(
-            "cde_harvester.__main__.harvest_erddap"
-        ) as mock_harvest_task,
+        patch("cde_harvester.__main__.harvest_erddap") as mock_harvest_task,
         # get_ckan_records feeds a real DataFrame into merge; merge writes the
         # CSVs the assertions read. Run both synchronously so the test drives the
         # real merge + CSV-write logic without a flow context.
-        patch.object(
-            get_ckan_records, "submit", _submit_without_flow(get_ckan_records)
-        ),
+        patch.object(get_ckan_records, "submit", _submit_without_flow(get_ckan_records)),
         patch.object(
             merge_and_write_tables,
             "submit",
@@ -273,6 +276,7 @@ class TestCsvFilesWritten:
 # Step 5: DB load phase
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def db_load_calls(written_harvest_folder):
     """
@@ -301,9 +305,11 @@ def db_load_calls(written_harvest_folder):
         patch.dict(
             os.environ,
             {
-                "DB_USER": "u", "DB_PASSWORD": "p",
+                "DB_USER": "u",
+                "DB_PASSWORD": "p",
                 "DB_HOST_EXTERNAL": "localhost",
-                "DB_PORT": "5432", "DB_NAME": "testdb",
+                "DB_PORT": "5432",
+                "DB_NAME": "testdb",
             },
         ),
     ):

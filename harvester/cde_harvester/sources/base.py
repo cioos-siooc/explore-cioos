@@ -38,13 +38,9 @@ class HarvestResult:
         if self.obis_cells is None:
             self.obis_cells = pd.DataFrame(columns=ObisCellSchema.to_schema().columns.keys())
         if self.trajectory_days is None:
-            self.trajectory_days = pd.DataFrame(
-                columns=TrajectoryDaySchema.to_schema().columns.keys()
-            )
+            self.trajectory_days = pd.DataFrame(columns=TrajectoryDaySchema.to_schema().columns.keys())
         if self.trajectory_points is None:
-            self.trajectory_points = pd.DataFrame(
-                columns=TrajectoryPointSchema.to_schema().columns.keys()
-            )
+            self.trajectory_points = pd.DataFrame(columns=TrajectoryPointSchema.to_schema().columns.keys())
         if self.attempts is None:
             self.attempts = pd.DataFrame(columns=HarvestAttemptSchema.to_schema().columns.keys())
         if self.verified is None:

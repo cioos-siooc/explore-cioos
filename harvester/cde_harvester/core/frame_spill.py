@@ -22,6 +22,7 @@ Pickle, not parquet: this is an ephemeral in-process handoff, not a durable or
 interchange format, it round-trips dtypes exactly, and pyarrow/fastparquet
 aren't dependencies here.
 """
+
 import gc
 import logging
 import os
@@ -111,9 +112,7 @@ class SpillSet:
             if not pending:
                 continue
             chunk = pd.concat(pending, ignore_index=True)
-            path = os.path.join(
-                self._dir, f"{name}_{len(self._chunk_paths[name]):05d}.pkl"
-            )
+            path = os.path.join(self._dir, f"{name}_{len(self._chunk_paths[name]):05d}.pkl")
             chunk.to_pickle(path)
             self._chunk_paths[name].append(path)
             pending.clear()

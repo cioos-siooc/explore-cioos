@@ -39,22 +39,25 @@ from cde_harvester.sources.erddap.dataset import Dataset
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_dataset(server, info_csv=ERDDAP_INFO_CSV):
     """Construct a real Dataset backed by a mocked ERDDAP server."""
-    server.erddap_csv_to_df.side_effect = lambda url, skiprows=None, dataset=None: (
-        pd.read_csv(StringIO(info_csv)).fillna("")
-    )
+    server.erddap_csv_to_df.side_effect = lambda url, skiprows=None, dataset=None: pd.read_csv(
+        StringIO(info_csv)
+    ).fillna("")
     return Dataset(server, DATASET_ID)
 
 
 def _datasets_df(server):
     """Call the real Dataset.get_df() and return the resulting DataFrame."""
     ds = _make_dataset(server)
-    ds.profile_ids = pd.DataFrame({
-        "station_id": ["STATION_001"],
-        "latitude": [48.5],
-        "longitude": [-125.0],
-    })
+    ds.profile_ids = pd.DataFrame(
+        {
+            "station_id": ["STATION_001"],
+            "latitude": [48.5],
+            "longitude": [-125.0],
+        }
+    )
     return ds.get_df()
 
 
@@ -88,6 +91,7 @@ def _roundtrip(df: pd.DataFrame, tmp_path, name: str) -> pd.DataFrame:
 # datasets.csv
 # ---------------------------------------------------------------------------
 
+
 class TestDatasetsCsvGeneration:
     def test_get_df_returns_dataframe(self, mock_erddap_server):
         df = _datasets_df(mock_erddap_server)
@@ -97,9 +101,16 @@ class TestDatasetsCsvGeneration:
     def test_required_columns_present(self, mock_erddap_server):
         df = _datasets_df(mock_erddap_server)
         for col in [
-            "title", "erddap_url", "dataset_id", "cdm_data_type",
-            "platform", "eovs", "organizations", "n_profiles",
-            "profile_variables", "timeseries_id_variable",
+            "title",
+            "erddap_url",
+            "dataset_id",
+            "cdm_data_type",
+            "platform",
+            "eovs",
+            "organizations",
+            "n_profiles",
+            "profile_variables",
+            "timeseries_id_variable",
         ]:
             assert col in df.columns, f"Missing column: {col}"
 
@@ -145,6 +156,7 @@ class TestDatasetsCsvGeneration:
 # profiles.csv
 # ---------------------------------------------------------------------------
 
+
 class TestProfilesCsvGeneration:
     def test_get_profiles_returns_dataframe(self):
         df = _profiles_df()
@@ -154,9 +166,16 @@ class TestProfilesCsvGeneration:
     def test_required_columns_present(self):
         df = _profiles_df()
         for col in [
-            "dataset_id", "erddap_url", "latitude", "longitude",
-            "time_min", "time_max", "depth_min", "depth_max",
-            "n_records", "records_per_day",
+            "dataset_id",
+            "erddap_url",
+            "latitude",
+            "longitude",
+            "time_min",
+            "time_max",
+            "depth_min",
+            "depth_max",
+            "n_records",
+            "records_per_day",
         ]:
             assert col in df.columns, f"Missing column: {col}"
 
@@ -199,6 +218,7 @@ class TestProfilesCsvGeneration:
 # ---------------------------------------------------------------------------
 # skipped.csv
 # ---------------------------------------------------------------------------
+
 
 class TestSkippedCsvGeneration:
     def test_compliance_checker_rejects_no_eov_dataset(self):

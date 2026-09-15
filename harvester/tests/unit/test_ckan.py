@@ -5,7 +5,6 @@ All outbound CKAN HTTP calls are intercepted with pytest-mock so the tests run
 offline and deterministically.
 """
 
-
 import pandas as pd
 import pytest
 from conftest import (
@@ -24,6 +23,7 @@ from cde_harvester.sources.ckan.create_ckan_erddap_link import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_ckan_get(mocker, pages):
     """
@@ -50,18 +50,15 @@ def _make_ckan_get(mocker, pages):
 # Tests: URL parsing
 # ---------------------------------------------------------------------------
 
+
 class TestSplitErddapUrl:
     def test_standard_tabledap_url(self):
-        host, ds_id = split_erddap_url(
-            "https://data.cioospacific.ca/erddap/tabledap/IOS_BOT_Profiles.html"
-        )
+        host, ds_id = split_erddap_url("https://data.cioospacific.ca/erddap/tabledap/IOS_BOT_Profiles.html")
         assert host == "https://data.cioospacific.ca"
         assert ds_id == "IOS_BOT_Profiles"
 
     def test_url_with_language_prefix(self):
-        host, ds_id = split_erddap_url(
-            "https://cnodc.example.ca/erddap/fr/tabledap/cnodc_dataset.html"
-        )
+        host, ds_id = split_erddap_url("https://cnodc.example.ca/erddap/fr/tabledap/cnodc_dataset.html")
         assert ds_id == "cnodc_dataset"
 
     def test_invalid_url_raises_value_error(self):
@@ -72,6 +69,7 @@ class TestSplitErddapUrl:
 # ---------------------------------------------------------------------------
 # Tests: ASCII unescaping
 # ---------------------------------------------------------------------------
+
 
 class TestUnescapeAscii:
     def test_plain_string_unchanged(self):
@@ -103,6 +101,7 @@ class TestUnescapeAscii:
 # ---------------------------------------------------------------------------
 # Tests: get_ckan_records
 # ---------------------------------------------------------------------------
+
 
 class TestGetCkanRecords:
     def test_returns_dataframe(self, mocker):

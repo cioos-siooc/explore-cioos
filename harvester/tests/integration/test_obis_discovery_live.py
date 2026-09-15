@@ -43,12 +43,14 @@ def geo_filter():
 
 def single_query_count(node_id=None, geometry=None):
     """Run one discovery query live and return the id count."""
-    cfg = ObisDiscoveryConfig.from_config({
-        "enabled": True,
-        "nodes": [node_id] if node_id else [],
-        "geometry": geometry or "none",
-        "min_datasets": 0,
-    })
+    cfg = ObisDiscoveryConfig.from_config(
+        {
+            "enabled": True,
+            "nodes": [node_id] if node_id else [],
+            "geometry": geometry or "none",
+            "min_datasets": 0,
+        }
+    )
     d = ObisDatasetDiscovery(cfg, geo_filter=ObisGeoFilter(mode="canada"))
     label = f"node:{node_id}" if node_id else "geometry"
     params = {"nodeid": node_id} if node_id else {"geometry": geometry}
@@ -72,7 +74,8 @@ class TestPerQuery:
 class TestFullDiscovery:
     def test_default_config_resolves_a_plausible_union(self, geo_filter):
         result = ObisDatasetDiscovery(
-            default_discovery_config(min_datasets=0), geo_filter=geo_filter,
+            default_discovery_config(min_datasets=0),
+            geo_filter=geo_filter,
         ).discover()
 
         assert len(result.dataset_ids) >= 850
@@ -85,7 +88,8 @@ class TestFullDiscovery:
         """The geometry query and the node queries must each contribute — if one
         silently returned nothing the union would still look plausible."""
         result = ObisDatasetDiscovery(
-            default_discovery_config(min_datasets=0), geo_filter=geo_filter,
+            default_discovery_config(min_datasets=0),
+            geo_filter=geo_filter,
         ).discover()
         biggest_single = max(result.per_query.values())
         assert len(result.dataset_ids) > biggest_single

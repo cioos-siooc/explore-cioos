@@ -53,9 +53,7 @@ def init_sentry():
         dsn=os.environ.get("SENTRY_DSN"),
         integrations=integrations,
         environment=os.environ.get("ENVIRONMENT", "development"),
-        traces_sample_rate=float(
-            os.environ.get("SENTRY_TRACES_SAMPLE_RATE") or DEFAULT_TRACES_SAMPLE_RATE
-        ),
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE") or DEFAULT_TRACES_SAMPLE_RATE),
         # Ctrl-C on a long-running harvest or a stopped scheduler container is an
         # operator action, not an incident.
         ignore_errors=[KeyboardInterrupt],

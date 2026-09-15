@@ -47,8 +47,7 @@ class OBISHarvester(BaseHarvester):
     # allocator arenas on this path make it worse than most.
     CELLS_FLUSH_EVERY = 50
 
-    def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None,
-                 geo_filter=None, run_id=None):
+    def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None, geo_filter=None, run_id=None):
         self.limit_dataset_ids = limit_dataset_ids or []
         self.folder = folder
         self.logger = prefect_logger or logger
@@ -69,26 +68,27 @@ class OBISHarvester(BaseHarvester):
         all_attempts = []
         spills = SpillSet(flush_every=self.CELLS_FLUSH_EVERY, prefix="obis_cells_")
 
-        def record_attempt(dataset_id, status, reason_code=None,
-                           error_message=None, duration_ms=None):
+        def record_attempt(dataset_id, status, reason_code=None, error_message=None, duration_ms=None):
             # Surface the two OBIS endpoints we hit so the dashboard can show
             # exactly what was fetched per dataset.
             query_urls = [
                 f"https://api.obis.org/v3/dataset/{dataset_id}",
                 f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet",
             ]
-            all_attempts.append({
-                "run_id": self.run_id,
-                "erddap_url": OBIS_SOURCE_URL,
-                "dataset_id": dataset_id,
-                "source": "obis",
-                "status": status,
-                "reason_code": reason_code,
-                "error_message": error_message,
-                "duration_ms": duration_ms,
-                "attempted_at": datetime.now(timezone.utc),
-                "query_urls": "\n".join(query_urls),
-            })
+            all_attempts.append(
+                {
+                    "run_id": self.run_id,
+                    "erddap_url": OBIS_SOURCE_URL,
+                    "dataset_id": dataset_id,
+                    "source": "obis",
+                    "status": status,
+                    "reason_code": reason_code,
+                    "error_message": error_message,
+                    "duration_ms": duration_ms,
+                    "attempted_at": datetime.now(timezone.utc),
+                    "query_urls": "\n".join(query_urls),
+                }
+            )
 
         with spills:
             spills.register("cells", ObisCellSchema.to_schema().columns.keys())
@@ -106,11 +106,13 @@ class OBISHarvester(BaseHarvester):
                             hit = self.geo_filter.extent_intersects(metadata.get("extent"))
                             if hit is False:
                                 self.logger.info(
-                                    "Skipping %s: extent outside Canadian borders", dataset_id,
+                                    "Skipping %s: extent outside Canadian borders",
+                                    dataset_id,
                                 )
                                 all_skipped.append([OBIS_SOURCE_URL, dataset_id, "OUT_OF_REGION"])
                                 record_attempt(
-                                    dataset_id, status="skipped",
+                                    dataset_id,
+                                    status="skipped",
                                     reason_code="OUT_OF_REGION",
                                     error_message="Dataset extent outside Canadian borders",
                                     duration_ms=int((time.monotonic() - t0) * 1000),
@@ -124,7 +126,8 @@ class OBISHarvester(BaseHarvester):
                             self.logger.warning("No occurrences for dataset %s", dataset_id)
                             all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
                             record_attempt(
-                                dataset_id, status="skipped",
+                                dataset_id,
+                                status="skipped",
                                 reason_code="NO_OCCURRENCES",
                                 error_message="OBIS returned no occurrence records",
                                 duration_ms=int((time.monotonic() - t0) * 1000),
@@ -135,7 +138,8 @@ class OBISHarvester(BaseHarvester):
                         if cells.empty:
                             all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_VALID_COORDINATES"])
                             record_attempt(
-                                dataset_id, status="skipped",
+                                dataset_id,
+                                status="skipped",
                                 reason_code="NO_VALID_COORDINATES",
                                 error_message="No occurrences had valid lat/lon after filtering",
                                 duration_ms=int((time.monotonic() - t0) * 1000),
@@ -147,7 +151,8 @@ class OBISHarvester(BaseHarvester):
                         spills.append("cells", cells)
                         all_datasets.append(dataset_row)
                         record_attempt(
-                            dataset_id, status="success",
+                            dataset_id,
+                            status="success",
                             duration_ms=int((time.monotonic() - t0) * 1000),
                         )
                         break
@@ -156,7 +161,11 @@ class OBISHarvester(BaseHarvester):
                         last_error = e
                         self.logger.error(
                             "Error processing OBIS dataset %s (attempt %d/%d): %s",
-                            dataset_id, attempt, self.MAX_RETRIES, e, exc_info=True,
+                            dataset_id,
+                            attempt,
+                            self.MAX_RETRIES,
+                            e,
+                            exc_info=True,
                         )
                         if attempt < self.MAX_RETRIES:
                             self._clear_cache(dataset_id)
@@ -169,12 +178,13 @@ class OBISHarvester(BaseHarvester):
                     )
                     all_skipped.append([OBIS_SOURCE_URL, dataset_id, "UNKNOWN_ERROR"])
                     record_attempt(
-                        dataset_id, status="error",
+                        dataset_id,
+                        status="error",
                         reason_code="UNKNOWN_ERROR",
                         error_message=(
-                            f"All {self.MAX_RETRIES} attempts failed: "
-                            f"{type(last_error).__name__}: {last_error}"
-                            if last_error else f"All {self.MAX_RETRIES} attempts failed"
+                            f"All {self.MAX_RETRIES} attempts failed: {type(last_error).__name__}: {last_error}"
+                            if last_error
+                            else f"All {self.MAX_RETRIES} attempts failed"
                         ),
                         duration_ms=int((time.monotonic() - t0) * 1000),
                     )
@@ -186,20 +196,19 @@ class OBISHarvester(BaseHarvester):
             df_obis_cells = spills.collect("cells")
             df_profiles = pd.DataFrame(columns=ProfileSchema.to_schema().columns.keys())
             df_datasets = (
-                pd.concat(all_datasets, ignore_index=True) if all_datasets
+                pd.concat(all_datasets, ignore_index=True)
+                if all_datasets
                 else pd.DataFrame(columns=DatasetSchema.to_schema().columns.keys())
             )
             skipped_columns = list(SkippedDatasetSchema.to_schema().columns.keys())
             df_skipped = (
-                pd.DataFrame(all_skipped, columns=skipped_columns) if all_skipped
+                pd.DataFrame(all_skipped, columns=skipped_columns)
+                if all_skipped
                 else pd.DataFrame(columns=skipped_columns)
             )
             df_variables = pd.DataFrame(columns=VariableSchema.to_schema().columns.keys())
             attempt_columns = list(HarvestAttemptSchema.to_schema().columns.keys())
-            df_attempts = (
-                pd.DataFrame(all_attempts) if all_attempts
-                else pd.DataFrame(columns=attempt_columns)
-            )
+            df_attempts = pd.DataFrame(all_attempts) if all_attempts else pd.DataFrame(columns=attempt_columns)
 
             # Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs)
             if not df_datasets.empty:
@@ -249,10 +258,7 @@ class OBISHarvester(BaseHarvester):
 
         # Drop coordinates outside Web Mercator range (EPSG:3857 limit ~±85.06°)
         n_before = len(df)
-        df = df[
-            (df["decimalLatitude"].abs() <= 85.06) &
-            (df["decimalLongitude"].abs() <= 180)
-        ]
+        df = df[(df["decimalLatitude"].abs() <= 85.06) & (df["decimalLongitude"].abs() <= 180)]
         dropped = n_before - len(df)
         if dropped:
             self.logger.warning("Dropped %d occurrences with out-of-range coordinates for %s", dropped, dataset_id)
@@ -270,7 +276,9 @@ class OBISHarvester(BaseHarvester):
             df = df[mask]
             self.logger.info(
                 "Geo filter kept %d/%d occurrences for %s",
-                len(df), n_before, dataset_id,
+                len(df),
+                n_before,
+                dataset_id,
             )
             if df.empty:
                 return df
@@ -354,28 +362,32 @@ class OBISHarvester(BaseHarvester):
         nodes = metadata.get("nodes") or []
         obis_nodes = [n.get("name") for n in nodes if n.get("name")]
 
-        dataset_row = pd.DataFrame([{
-            # Fall back to dataset_id if OBIS metadata fetch returned no title
-            # (empty dict from a transient error, missing field, etc.).
-            # cde.datasets has NOT NULL on `title`; an empty string can also
-            # cause issues downstream.
-            "title": metadata.get("title") or dataset_id,
-            "erddap_url": OBIS_SOURCE_URL,
-            "dataset_id": dataset_id,
-            "cdm_data_type": "Point",
-            "platform": "unknown",
-            "eovs": [],
-            "organizations": organizations,
-            "n_profiles": len(cells),
-            "profile_variables": [],
-            "timeseries_id_variable": None,
-            "profile_id_variable": None,
-            "trajectory_id_variable": None,
-            "num_columns": None,
-            "first_eov_column": None,
-            "source_type": "obis",
-            "obis_nodes": obis_nodes,
-        }])
+        dataset_row = pd.DataFrame(
+            [
+                {
+                    # Fall back to dataset_id if OBIS metadata fetch returned no title
+                    # (empty dict from a transient error, missing field, etc.).
+                    # cde.datasets has NOT NULL on `title`; an empty string can also
+                    # cause issues downstream.
+                    "title": metadata.get("title") or dataset_id,
+                    "erddap_url": OBIS_SOURCE_URL,
+                    "dataset_id": dataset_id,
+                    "cdm_data_type": "Point",
+                    "platform": "unknown",
+                    "eovs": [],
+                    "organizations": organizations,
+                    "n_profiles": len(cells),
+                    "profile_variables": [],
+                    "timeseries_id_variable": None,
+                    "profile_id_variable": None,
+                    "trajectory_id_variable": None,
+                    "num_columns": None,
+                    "first_eov_column": None,
+                    "source_type": "obis",
+                    "obis_nodes": obis_nodes,
+                }
+            ]
+        )
         return dataset_row
 
     def _clear_cache(self, dataset_id):
@@ -447,6 +459,7 @@ class OBISHarvester(BaseHarvester):
             return cached
 
         import duckdb
+
         url = f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
         query = f"""
             SELECT
@@ -464,10 +477,7 @@ class OBISHarvester(BaseHarvester):
         """
         try:
             df = duckdb.sql(query).df()
-            results = [
-                {k: None if v is pd.NA else v for k, v in row.items()}
-                for row in df.to_dict(orient="records")
-            ]
+            results = [{k: None if v is pd.NA else v for k, v in row.items()} for row in df.to_dict(orient="records")]
             occurrences_data = {"results": results, "total": len(results)}
             self.logger.info("Loaded %d occurrences from parquet for %s", len(results), dataset_id)
             self._write_cache(cache_file, occurrences_data)
@@ -516,8 +526,7 @@ class OBISHarvester(BaseHarvester):
 
 
 @task(task_run_name="harvest-obis")
-def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_id=None,
-                 discovery=None):
+def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_id=None, discovery=None):
     """Run the OBIS harvester.
 
     When no explicit ``limit_dataset_ids`` are given and ``discovery`` is
@@ -532,7 +541,9 @@ def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_
 
     if not limit_dataset_ids and discovery is not None and discovery.enabled:
         result = ObisDatasetDiscovery(
-            discovery, geo_filter=geo_filter, logger=prefect_logger,
+            discovery,
+            geo_filter=geo_filter,
+            logger=prefect_logger,
         ).discover()
         limit_dataset_ids = result.dataset_ids
         _publish_discovery_artifact(result, prefect_logger)
@@ -543,7 +554,8 @@ def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_
         )
 
     harvester = OBISHarvester(
-        limit_dataset_ids, folder,
+        limit_dataset_ids,
+        folder,
         prefect_logger=prefect_logger,
         geo_filter=geo_filter,
         run_id=run_id,

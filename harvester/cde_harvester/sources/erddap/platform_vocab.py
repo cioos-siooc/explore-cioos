@@ -17,12 +17,8 @@ CDE converts IOOS to L06 using a mapping found here:  https://mmisw.org/ont?iri=
 
 logger = logging.getLogger(__name__)
 
-PLATFORM_L06_CODES_AND_LABELS_CSV = Path(
-    str(files("cde_harvester.data") / "platform_nerc_l06_codes_and_labels.csv")
-)
-PLATFORM_L06_MAPPING_CSV = Path(
-    str(files("cde_harvester.data") / "platform_nerc_ioos_l06.csv")
-)
+PLATFORM_L06_CODES_AND_LABELS_CSV = Path(str(files("cde_harvester.data") / "platform_nerc_l06_codes_and_labels.csv"))
+PLATFORM_L06_MAPPING_CSV = Path(str(files("cde_harvester.data") / "platform_nerc_ioos_l06.csv"))
 
 
 def _download_json(url):
@@ -107,9 +103,7 @@ def get_ioos_to_l06_mapping():
 
     df = pd.DataFrame(rows)
     preference_list = ["exactMatch", "narrowMatch", "broadMatch", "relatedMatch"]
-    df["Pref"] = pd.Categorical(
-        df["predicate"], categories=preference_list, ordered=True
-    )
+    df["Pref"] = pd.Categorical(df["predicate"], categories=preference_list, ordered=True)
     df = df.sort_values(["ioos_label", "Pref"]).drop_duplicates("ioos_label")
     df.drop(["Pref", "predicate"], axis=1, inplace=True)
     df.reset_index(inplace=True, drop=True)
@@ -120,9 +114,7 @@ def get_ioos_to_l06_mapping():
 l06_codes_and_labels = get_l06_codes_and_labels()
 ioos_to_l06_mapping = get_ioos_to_l06_mapping()
 
-platforms_nerc_ioos = (
-    l06_codes_and_labels.join(ioos_to_l06_mapping).fillna("")
-)
+platforms_nerc_ioos = l06_codes_and_labels.join(ioos_to_l06_mapping).fillna("")
 
 if __name__ == "__main__":
     logger.info("Save platforms mapping and labels to CSV")

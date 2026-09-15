@@ -29,6 +29,7 @@ def load_previous_hashes(erddap_url):
     except Exception as e:
         logger.warning(
             "Could not load previous content hashes for %s (harvesting all): %s",
-            erddap_url, e,
+            erddap_url,
+            e,
         )
         return {}

@@ -29,6 +29,7 @@ from cde_harvester.loading.loader import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
     """Write the harvest tables as the harvester would; return the folder path."""
@@ -89,10 +90,7 @@ def _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False, sc
     connect() chains: the load runs on the former, the prune on the latter."""
     engine, conn = mock_engine
     conn.execute.return_value.scalar.return_value = scalar
-    (
-        engine.connect.return_value.__enter__.return_value
-        .execute.return_value.scalar.return_value
-    ) = scalar
+    (engine.connect.return_value.__enter__.return_value.execute.return_value.scalar.return_value) = scalar
     _patch_loader(mock_engine, mocker)
 
     return main.fn(harvest_folder, incremental=incremental)
@@ -101,6 +99,7 @@ def _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False, sc
 # ---------------------------------------------------------------------------
 # Pure function tests
 # ---------------------------------------------------------------------------
+
 
 class TestPrepareProfilesDataframe:
     def test_removes_altitude_columns(self, sample_profiles_df):
@@ -133,10 +132,7 @@ class TestLoadCellsCopy:
         """Run load_cells_copy against a mocked cursor and return the CSV body
         handed to copy_expert."""
         transaction = MagicMock()
-        cur = (
-            transaction.connection.driver_connection.cursor
-            .return_value.__enter__.return_value
-        )
+        cur = transaction.connection.driver_connection.cursor.return_value.__enter__.return_value
         captured = {}
 
         def grab(sql, buf):
@@ -181,6 +177,7 @@ class TestEnsureOrganizationPks:
 # main() — full reload mode
 # ---------------------------------------------------------------------------
 
+
 class TestDbLoaderMainFullReload:
     def test_no_constraint_ddl_toggling(self, harvest_folder, mock_engine, mocker):
         # Full reload no longer drops/re-adds constraints via ALTER TABLE:
@@ -205,6 +202,7 @@ class TestDbLoaderMainFullReload:
 # main() — incremental mode
 # ---------------------------------------------------------------------------
 
+
 class TestDbLoaderMainIncremental:
     def test_create_temp_tables_called(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
@@ -224,6 +222,7 @@ class TestDbLoaderMainIncremental:
 # main() — the summary it returns
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def unchanged_harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
     """A harvest run where every dataset hashed unchanged: the harvester writes
@@ -239,33 +238,23 @@ class TestLoadSummary:
     """The pipeline drops the redis cache off this summary, so `changed` has to
     mean "something a cached API response is built from moved"."""
 
-    def test_incremental_with_changed_datasets_is_changed(
-        self, harvest_folder, mock_engine, mocker
-    ):
+    def test_incremental_with_changed_datasets_is_changed(self, harvest_folder, mock_engine, mocker):
         summary = _run_main_summary(harvest_folder, mock_engine, mocker, incremental=True)
         assert summary["changed"] is True
         assert summary["changed_datasets"] == 1
         assert summary["full_reload"] is False
 
-    def test_incremental_with_nothing_changed_is_unchanged(
-        self, unchanged_harvest_folder, mock_engine, mocker
-    ):
+    def test_incremental_with_nothing_changed_is_unchanged(self, unchanged_harvest_folder, mock_engine, mocker):
         # The whole point: a no-op harvest must leave the cache warm.
-        summary = _run_main_summary(
-            unchanged_harvest_folder, mock_engine, mocker, incremental=True
-        )
+        summary = _run_main_summary(unchanged_harvest_folder, mock_engine, mocker, incremental=True)
         assert summary["changed"] is False
         assert summary["changed_datasets"] == 0
         assert summary["pruned"] == 0
 
-    def test_pruning_alone_counts_as_changed(
-        self, unchanged_harvest_folder, mock_engine, mocker
-    ):
+    def test_pruning_alone_counts_as_changed(self, unchanged_harvest_folder, mock_engine, mocker):
         # No dataset changed, but some disappeared upstream and were removed —
         # cached responses still reference them.
-        summary = _run_main_summary(
-            unchanged_harvest_folder, mock_engine, mocker, incremental=True, scalar=3
-        )
+        summary = _run_main_summary(unchanged_harvest_folder, mock_engine, mocker, incremental=True, scalar=3)
         assert summary["pruned"] == 3
         assert summary["changed"] is True
 

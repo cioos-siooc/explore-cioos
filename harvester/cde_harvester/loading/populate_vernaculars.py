@@ -253,17 +253,11 @@ def refresh_popularity(engine):
     """
     try:
         with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "REFRESH MATERIALIZED VIEW CONCURRENTLY "
-                    "cde.obis_scientific_name_popularity"
-                )
-            )
+            conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity"))
         logger.info("Refreshed cde.obis_scientific_name_popularity")
     except SQLAlchemyError as exc:
         logger.warning(
-            "Could not refresh cde.obis_scientific_name_popularity (%s); "
-            "ordering by a possibly stale popularity",
+            "Could not refresh cde.obis_scientific_name_popularity (%s); ordering by a possibly stale popularity",
             exc,
         )
 
@@ -337,9 +331,7 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
     try:
         en, fr = fetch_vernaculars(session, aid)
     except requests.RequestException as exc:
-        logger.warning(
-            "AphiaVernacularsByAphiaID failed for %r (%s): %s", name, aid, exc
-        )
+        logger.warning("AphiaVernacularsByAphiaID failed for %r (%s): %s", name, aid, exc)
         return TaxonResult(name, aid, rank, [], [], [], STATUS_ERROR)
 
     cached = classification_cache.get(aid)
@@ -349,17 +341,13 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
     try:
         ancestors = fetch_classification(session, aid)
     except requests.RequestException as exc:
-        logger.warning(
-            "AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc
-        )
+        logger.warning("AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc)
         ancestors = []
     classification_cache.put(aid, ancestors)
     return TaxonResult(name, aid, rank, ancestors, en, fr, STATUS_OK)
 
 
-def process_chunk(
-    session, engine, executor, names, sleep_seconds, counts, classification_cache
-):
+def process_chunk(session, engine, executor, names, sleep_seconds, counts, classification_cache):
     """Resolve a chunk of names and persist results.
 
     All upserts for the chunk are committed in a single transaction.
@@ -367,9 +355,7 @@ def process_chunk(
     try:
         matches = match_aphia_ids(session, names)
     except requests.RequestException as exc:
-        logger.warning(
-            "Batch AphiaRecordsByMatchNames failed (%d names): %s", len(names), exc
-        )
+        logger.warning("Batch AphiaRecordsByMatchNames failed (%d names): %s", len(names), exc)
         with engine.begin() as conn:
             for name in names:
                 conn.execute(
@@ -400,9 +386,7 @@ def process_chunk(
 
     if executor is not None:
         futures = [
-            executor.submit(
-                _fetch_taxon_data, session, name, aid, rank, classification_cache
-            )
+            executor.submit(_fetch_taxon_data, session, name, aid, rank, classification_cache)
             for name, aid, rank in pending
         ]
         for fut in concurrent.futures.as_completed(futures):
@@ -410,9 +394,7 @@ def process_chunk(
     else:
         # Serial path: keep the per-call throttle.
         for name, aid, rank in pending:
-            results.append(
-                _fetch_taxon_data(session, name, aid, rank, classification_cache)
-            )
+            results.append(_fetch_taxon_data(session, name, aid, rank, classification_cache))
             time.sleep(sleep_seconds)
 
     with engine.begin() as conn:
@@ -445,8 +427,7 @@ def main():
         "--limit",
         type=int,
         default=None,
-        help="Process at most this many names this run, after --top is applied "
-        "(useful for smoke tests).",
+        help="Process at most this many names this run, after --top is applied (useful for smoke tests).",
     )
     parser.add_argument(
         "--workers",
@@ -509,11 +490,7 @@ def main():
     processed = 0
 
     classification_cache = ClassificationCache()
-    executor = (
-        concurrent.futures.ThreadPoolExecutor(max_workers=workers)
-        if workers > 1
-        else None
-    )
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers) if workers > 1 else None
     try:
         for start in range(0, total, batch_size):
             chunk = todo[start : start + batch_size]

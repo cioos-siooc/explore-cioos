@@ -12,9 +12,7 @@ QUERIES = list((Path(__file__).parent / "queries").glob("*.json"))
 # Minimal ERDDAP CSV: header row + units row + one data row.
 # Point (52.0, -130.0) is inside the ADCP polygon used by adcp_query.json.
 _FAKE_CSV_BYTES = (
-    b"time,latitude,longitude,depth\r\n"
-    b"UTC,degrees_north,degrees_east,m\r\n"
-    b"2020-01-01T00:00:00Z,52.0,-130.0,5.0\r\n"
+    b"time,latitude,longitude,depth\r\nUTC,degrees_north,degrees_east,m\r\n2020-01-01T00:00:00Z,52.0,-130.0,5.0\r\n"
 )
 
 # An ERDDAP /info/ table, in the shape get_variables_from_info() parses: a

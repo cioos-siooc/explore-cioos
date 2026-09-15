@@ -34,10 +34,10 @@ ERDDAP_ERROR_BODY = """Error {
 # erddap_error_text
 # ---------------------------------------------------------------------------
 
+
 def test_extracts_message_from_erddap_error_envelope():
     assert erddap_error_text(_Response(ERDDAP_ERROR_BODY)) == (
-        "java.lang.RuntimeException: Query error: "
-        "Unrecognized constraint variable=&quot;salinity&quot;"
+        "java.lang.RuntimeException: Query error: Unrecognized constraint variable=&quot;salinity&quot;"
     )
 
 
@@ -58,6 +58,7 @@ def test_returns_empty_string_when_there_is_no_usable_body(response):
 # error_signature
 # ---------------------------------------------------------------------------
 
+
 def test_same_complaint_about_different_variables_shares_a_signature():
     a = error_signature('Query error: Unrecognized constraint variable="sea_water_temperature"')
     b = error_signature('Query error: Unrecognized constraint variable="salinity"')
@@ -65,7 +66,7 @@ def test_same_complaint_about_different_variables_shares_a_signature():
 
 
 def test_different_complaints_keep_different_signatures():
-    a = error_signature("Query error: Unrecognized constraint variable=\"salinity\"")
+    a = error_signature('Query error: Unrecognized constraint variable="salinity"')
     b = error_signature("Your query produced no matching results. (nRows = 0)")
     assert a != b
     assert signature_hash(a) != signature_hash(b)
@@ -74,11 +75,12 @@ def test_different_complaints_keep_different_signatures():
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("Your query produced no matching results. (nRows = 0)",
-         "Your query produced no matching results. (nRows = <N>)"),
+        (
+            "Your query produced no matching results. (nRows = 0)",
+            "Your query produced no matching results. (nRows = <N>)",
+        ),
         ("HTTP 500 Internal Server Error", "HTTP <N> Internal Server Error"),
-        ("Timeout fetching https://x.ca/erddap/tabledap/ds.csv?time",
-         "Timeout fetching <URL>"),
+        ("Timeout fetching https://x.ca/erddap/tabledap/ds.csv?time", "Timeout fetching <URL>"),
         ("No data after 2024-01-05T00:00:00Z", "No data after <TIME>"),
         ("Bad request id 4f8a2b1c9d0e5f6a7b8c9d0e1f2a3b4c", "Bad request id <ID>"),
         ("value 1.5e-3 out of range", "value <N> out of range"),
@@ -104,8 +106,8 @@ def test_blank_input_signatures_to_empty(raw):
 # group_issues
 # ---------------------------------------------------------------------------
 
-def _attempt(dataset_id, erddap_url, error_message, status="error",
-             reason_code="HTTP_ERROR", query_urls=None):
+
+def _attempt(dataset_id, erddap_url, error_message, status="error", reason_code="HTTP_ERROR", query_urls=None):
     return {
         "dataset_id": dataset_id,
         "erddap_url": erddap_url,
@@ -120,11 +122,17 @@ CONSTRAINT_ERROR = 'HTTP 500 Internal Server Error: Query error: Unrecognized co
 
 
 def test_same_error_on_one_server_groups_its_datasets_together():
-    groups = group_issues([
-        _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity"),
-                 query_urls="https://a.ca/one\nhttps://a.ca/two"),
-        _attempt("ds2", "https://a.ca/erddap", CONSTRAINT_ERROR.format("temp")),
-    ])
+    groups = group_issues(
+        [
+            _attempt(
+                "ds1",
+                "https://a.ca/erddap",
+                CONSTRAINT_ERROR.format("salinity"),
+                query_urls="https://a.ca/one\nhttps://a.ca/two",
+            ),
+            _attempt("ds2", "https://a.ca/erddap", CONSTRAINT_ERROR.format("temp")),
+        ]
+    )
     assert len(groups) == 1
     assert groups[0].dataset_ids == ["ds1", "ds2"]
     assert groups[0].host == "a.ca"
@@ -132,10 +140,12 @@ def test_same_error_on_one_server_groups_its_datasets_together():
 
 
 def test_same_error_on_different_servers_stays_separate():
-    groups = group_issues([
-        _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
-        _attempt("ds2", "https://b.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
-    ])
+    groups = group_issues(
+        [
+            _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
+            _attempt("ds2", "https://b.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
+        ]
+    )
     assert len(groups) == 2
     assert {g.host for g in groups} == {"a.ca", "b.ca"}
     # Same problem, different server: the signature matches but the fingerprint
@@ -145,11 +155,12 @@ def test_same_error_on_different_servers_stays_separate():
 
 
 def test_different_errors_on_one_server_stay_separate():
-    groups = group_issues([
-        _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
-        _attempt("ds2", "https://a.ca/erddap", "KeyError: time",
-                 reason_code="UNKNOWN_ERROR"),
-    ])
+    groups = group_issues(
+        [
+            _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
+            _attempt("ds2", "https://a.ca/erddap", "KeyError: time", reason_code="UNKNOWN_ERROR"),
+        ]
+    )
     assert len(groups) == 2
     assert {g.reason_code for g in groups} == {"HTTP_ERROR", "UNKNOWN_ERROR"}
 
@@ -157,21 +168,24 @@ def test_different_errors_on_one_server_stay_separate():
 def test_successes_and_skips_are_not_issues():
     """Skips like NO_PROFILES_FOUND are expected outcomes, not incidents —
     reporting them would restore the per-dataset noise this replaces."""
-    groups = group_issues([
-        _attempt("ds1", "https://a.ca/erddap", None, status="success", reason_code=None),
-        _attempt("ds2", "https://a.ca/erddap", "no profiles",
-                 status="skipped", reason_code="NO_PROFILES_FOUND"),
-    ])
+    groups = group_issues(
+        [
+            _attempt("ds1", "https://a.ca/erddap", None, status="success", reason_code=None),
+            _attempt("ds2", "https://a.ca/erddap", "no profiles", status="skipped", reason_code="NO_PROFILES_FOUND"),
+        ]
+    )
     assert groups == []
 
 
 def test_accepts_a_dataframe_with_null_columns():
     """The harvester passes harvest_attempts straight through, where unset
     columns arrive as NaN rather than None."""
-    df = pd.DataFrame([
-        _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
-        _attempt("ds2", "https://a.ca/erddap", None, reason_code=None),
-    ])
+    df = pd.DataFrame(
+        [
+            _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
+            _attempt("ds2", "https://a.ca/erddap", None, reason_code=None),
+        ]
+    )
     groups = group_issues(df)
     assert len(groups) == 2
     # A failure with no message still groups, under its reason code.
@@ -187,12 +201,12 @@ def test_empty_input_yields_no_groups(records):
 # report_issues
 # ---------------------------------------------------------------------------
 
+
 def test_reports_one_sentry_event_per_group_with_a_scoped_fingerprint():
     records = [
         _attempt("ds1", "https://a.ca/erddap", CONSTRAINT_ERROR.format("salinity")),
         _attempt("ds2", "https://a.ca/erddap", CONSTRAINT_ERROR.format("temp")),
-        _attempt("ds3", "https://b.ca/erddap", "KeyError: time",
-                 reason_code="UNKNOWN_ERROR"),
+        _attempt("ds3", "https://b.ca/erddap", "KeyError: time", reason_code="UNKNOWN_ERROR"),
     ]
     with patch("cde_common.issues.sentry_sdk.capture_event") as capture:
         groups = report_issues("harvester", records)
@@ -214,11 +228,9 @@ def test_reports_one_sentry_event_per_group_with_a_scoped_fingerprint():
 def test_repeat_of_the_same_problem_reuses_the_fingerprint():
     """The whole point: a second run of an unchanged problem must land on the
     existing Sentry issue, so no new-issue alert fires."""
+
     def fingerprints_for(dataset_ids):
-        records = [
-            _attempt(ds, "https://a.ca/erddap", CONSTRAINT_ERROR.format(ds))
-            for ds in dataset_ids
-        ]
+        records = [_attempt(ds, "https://a.ca/erddap", CONSTRAINT_ERROR.format(ds)) for ds in dataset_ids]
         with patch("cde_common.issues.sentry_sdk.capture_event") as capture:
             report_issues("harvester", records)
         return [call.args[0]["fingerprint"] for call in capture.call_args_list]
@@ -237,10 +249,7 @@ def test_component_separates_harvester_from_downloader():
 
 
 def test_dataset_id_list_is_capped_but_the_count_is_not():
-    records = [
-        _attempt(f"ds{n}", "https://a.ca/erddap", "KeyError: time")
-        for n in range(120)
-    ]
+    records = [_attempt(f"ds{n}", "https://a.ca/erddap", "KeyError: time") for n in range(120)]
     with patch("cde_common.issues.sentry_sdk.capture_event") as capture:
         report_issues("harvester", records)
     extra = capture.call_args_list[0].args[0]["extra"]
@@ -252,6 +261,5 @@ def test_dataset_id_list_is_capped_but_the_count_is_not():
 def test_reporting_never_raises_into_the_caller():
     """Observability must not fail a run that otherwise succeeded."""
     records = [_attempt("ds1", "https://a.ca/erddap", "KeyError: time")]
-    with patch("cde_common.issues.sentry_sdk.capture_event",
-               side_effect=RuntimeError("sentry down")):
+    with patch("cde_common.issues.sentry_sdk.capture_event", side_effect=RuntimeError("sentry down")):
         assert len(report_issues("harvester", records)) == 1

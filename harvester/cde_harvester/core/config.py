@@ -46,8 +46,8 @@ class ObisSelection(NamedTuple):
     """
 
     dataset_ids: list
-    discovery: dict          # raw obis_discovery block, or None
-    geo_filter: dict         # raw obis_geo_filter block (always a dict)
+    discovery: dict  # raw obis_discovery block, or None
+    geo_filter: dict  # raw obis_geo_filter block (always a dict)
     mode: str
 
 
@@ -97,17 +97,12 @@ def resolve_obis_config(config, dataset_ids=None, datasets_file=None, discover=N
         return ObisSelection([], discovery_cfg, geo_filter_cfg, "discovery")
 
     if file_path:
-        return ObisSelection(
-            load_obis_dataset_ids(datasets_file=file_path), None, geo_filter_cfg, "file"
-        )
+        return ObisSelection(load_obis_dataset_ids(datasets_file=file_path), None, geo_filter_cfg, "file")
 
     return ObisSelection([], None, geo_filter_cfg, "off")
 
 
-CONFIG_ENV_HINT = (
-    "prefer HARVEST_CONFIG_B64 — regenerate with: "
-    "base64 < harvest_config.yaml | tr -d '\\n'"
-)
+CONFIG_ENV_HINT = "prefer HARVEST_CONFIG_B64 — regenerate with: base64 < harvest_config.yaml | tr -d '\\n'"
 
 
 def normalize_coolify_multiline(value: str) -> str:
@@ -130,9 +125,7 @@ def decode_harvest_config_b64(value: str) -> str:
         # or pads the value. b64decode/decode raise ValueError subclasses.
         return base64.b64decode("".join(value.split()), validate=True).decode("utf-8")
     except ValueError as e:
-        raise ValueError(
-            f"HARVEST_CONFIG_B64 is not valid base64-encoded UTF-8 ({e}); {CONFIG_ENV_HINT}"
-        ) from e
+        raise ValueError(f"HARVEST_CONFIG_B64 is not valid base64-encoded UTF-8 ({e}); {CONFIG_ENV_HINT}") from e
 
 
 def validate_harvest_config(yaml_text: str, source: str) -> str:

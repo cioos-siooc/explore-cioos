@@ -38,9 +38,7 @@ def _redis_client():
     # No db index: flushall covers every database anyway.
     if REDIS_URL:
         return redis.Redis.from_url(REDIS_URL)
-    return redis.Redis(
-        host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, ssl=REDIS_TLS
-    )
+    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, ssl=REDIS_TLS)
 
 
 @task(name="clear-redis-cache")
@@ -49,6 +47,7 @@ def clearRedisCache():
 
     _redis_client().flushall()
     logger.info("redis cache flushed")
+
 
 @task(name="reload-top-requests")
 def reloadTopRequests():
@@ -79,9 +78,7 @@ def reloadTopRequests():
 
     # most_common already dedupes and orders by hit count — the routes real
     # visitors ask for most are the ones worth having warm.
-    routes = [request for request, _count in Counter(apiRequests).most_common(
-        CACHE_WARM_MAX_ROUTES
-    )]
+    routes = [request for request, _count in Counter(apiRequests).most_common(CACHE_WARM_MAX_ROUTES)]
 
     def warm(request):
         # The response body is deliberately discarded: the side effect of the
@@ -95,23 +92,20 @@ def reloadTopRequests():
         # reads a thread-local Prefect run context that worker threads do not
         # have.
         try:
-            response = requests.get(
-                CACHE_WARM_BASE_URL + request, timeout=CACHE_WARM_TIMEOUT_SECONDS
-            )
+            response = requests.get(CACHE_WARM_BASE_URL + request, timeout=CACHE_WARM_TIMEOUT_SECONDS)
             response.raise_for_status()
             return True
         except requests.RequestException:
             logger.exception(f"error while refreshing cache for {request}")
             return False
 
-    logger.info(
-        "Warming %d route(s) with %d workers", len(routes), CACHE_WARM_CONCURRENCY
-    )
+    logger.info("Warming %d route(s) with %d workers", len(routes), CACHE_WARM_CONCURRENCY)
     with ThreadPoolExecutor(max_workers=CACHE_WARM_CONCURRENCY) as pool:
         # Per-request success logging would be up to 5000 lines into the Prefect
         # run; the failures above are the part worth reading.
         warmed = sum(pool.map(warm, routes))
     logger.info("Warmed %d of %d route(s)", warmed, len(routes))
+
 
 def redisFlow():
     """Plain helper for the standalone CLI below; the pipeline calls the two

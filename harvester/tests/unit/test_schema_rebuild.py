@@ -78,9 +78,7 @@ class TestRepoSqlFilesAreDiscoverable:
 
     def test_repo_database_dir_resolves(self, monkeypatch):
         monkeypatch.delenv("CDE_DATABASE_DIR", raising=False)
-        init, functions = schema.schema_files(
-            schema.Path(__file__).resolve().parents[3] / "database"
-        )
+        init, functions = schema.schema_files(schema.Path(__file__).resolve().parents[3] / "database")
         assert init.is_file()
         names = [p.name for p in functions]
         # The function files db_migrate re-applies; all must survive a rebuild.
@@ -92,9 +90,7 @@ class TestRepoSqlFilesAreDiscoverable:
         """1_schema.sql is the ONLY place these are created; if that stops being true
         the rebuild flow's premise is wrong."""
         monkeypatch.delenv("CDE_DATABASE_DIR", raising=False)
-        init, _ = schema.schema_files(
-            schema.Path(__file__).resolve().parents[3] / "database"
-        )
+        init, _ = schema.schema_files(schema.Path(__file__).resolve().parents[3] / "database")
         body = init.read_text()
         assert "CREATE TABLE trajectory_hexes" in body
         assert "CREATE TABLE trajectory_days" in body
@@ -217,9 +213,7 @@ class TestDotenvSearchesAncestors:
 
         for v in ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST_EXTERNAL"):
             monkeypatch.delenv(v, raising=False)
-        (tmp_path / ".env").write_text(
-            "DB_NAME=cde_agree\nDB_USER=u\nDB_PASSWORD=p\nDB_HOST_EXTERNAL=h\n"
-        )
+        (tmp_path / ".env").write_text("DB_NAME=cde_agree\nDB_USER=u\nDB_PASSWORD=p\nDB_HOST_EXTERNAL=h\n")
         monkeypatch.chdir(tmp_path)
         assert core_db.db_name() == "cde_agree"
         assert core_db.database_url().endswith("/cde_agree")
@@ -318,9 +312,7 @@ class TestRebuildFlowBody:
             "function_files": ["4_create_hexes.sql"],
             "tables_created": 18,
         }
-        monkeypatch.setattr(
-            pp, "rebuild_schema", rebuild or (lambda engine: dict(default_report))
-        )
+        monkeypatch.setattr(pp, "rebuild_schema", rebuild or (lambda engine: dict(default_report)))
         monkeypatch.setattr(pp, "run_deployment", trigger or (lambda **kw: None))
         monkeypatch.setattr(pp, "clearRedisCache", flush or (lambda: None))
         monkeypatch.setattr(pp.core_db, "create_db_engine", lambda **kw: _FakeEngine())
@@ -368,6 +360,7 @@ class TestRebuildFlowBody:
 
     def test_rebuild_failure_does_propagate(self, monkeypatch):
         """A failure of the rebuild itself must fail the run — nothing was committed."""
+
         def boom(engine):
             raise RuntimeError("lock timeout")
 
@@ -499,9 +492,10 @@ class TestFlowCreatesMissingDatabase:
         monkeypatch.setattr(
             pp,
             "rebuild_schema",
-            lambda engine: rebuild_calls.append(1)
-            or {"schema": "cde", "init_file": "1_schema.sql",
-                "function_files": [], "tables_created": 18},
+            lambda engine: (
+                rebuild_calls.append(1)
+                or {"schema": "cde", "init_file": "1_schema.sql", "function_files": [], "tables_created": 18}
+            ),
         )
         monkeypatch.setattr(pp, "run_deployment", lambda **kw: None)
         monkeypatch.setattr(pp, "clearRedisCache", lambda: None)

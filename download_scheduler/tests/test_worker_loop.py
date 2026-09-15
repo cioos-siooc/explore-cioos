@@ -17,9 +17,7 @@ from download_scheduler import download_scheduler as ds
 def updates(monkeypatch):
     """Capture update_download_jobs calls as (pk, fields) pairs."""
     calls = []
-    monkeypatch.setattr(
-        ds, "update_download_jobs", lambda pk, row, session=None: calls.append((pk, row))
-    )
+    monkeypatch.setattr(ds, "update_download_jobs", lambda pk, row, session=None: calls.append((pk, row)))
     return calls
 
 
@@ -56,16 +54,12 @@ def test_returns_true_and_runs_the_job_on_the_happy_path(monkeypatch, job, updat
 
 def test_returns_true_when_the_queue_is_empty(monkeypatch):
     monkeypatch.setattr(ds, "get_a_download_job", lambda: None)
-    monkeypatch.setattr(
-        ds, "run_download", lambda row: pytest.fail("should not run without a job")
-    )
+    monkeypatch.setattr(ds, "run_download", lambda row: pytest.fail("should not run without a job"))
 
     assert ds.process_next_job() is True
 
 
-def test_failing_job_is_marked_failed_instead_of_killing_the_worker(
-    monkeypatch, job, updates
-):
+def test_failing_job_is_marked_failed_instead_of_killing_the_worker(monkeypatch, job, updates):
     def boom(row):
         raise TypeError("the JSON object must be str, bytes or bytearray, not NoneType")
 
@@ -83,9 +77,7 @@ def test_failing_job_is_marked_failed_instead_of_killing_the_worker(
     assert "TypeError" in fields["downloader_output"]
 
 
-def test_worker_survives_even_if_marking_the_job_failed_also_fails(
-    monkeypatch, job
-):
+def test_worker_survives_even_if_marking_the_job_failed_also_fails(monkeypatch, job):
     """A database blip while recording the failure must not resurrect the crash."""
 
     def boom(row):
@@ -105,9 +97,7 @@ def test_unclaimable_job_returns_false_so_the_caller_backs_off(monkeypatch):
         raise RuntimeError("could not connect to database")
 
     monkeypatch.setattr(ds, "get_a_download_job", boom)
-    monkeypatch.setattr(
-        ds, "run_download", lambda row: pytest.fail("should not run without a job")
-    )
+    monkeypatch.setattr(ds, "run_download", lambda row: pytest.fail("should not run without a job"))
 
     assert ds.process_next_job() is False
 
@@ -156,10 +146,7 @@ class TestUpdateDownloadJobs:
         ds.update_download_jobs(42, {"status": "failed", "erddap_report": report})
 
         sql, params = executed[0]
-        assert sql == (
-            "UPDATE cde.download_jobs SET status = :status, "
-            "erddap_report = :erddap_report WHERE pk = :pk"
-        )
+        assert sql == ("UPDATE cde.download_jobs SET status = :status, erddap_report = :erddap_report WHERE pk = :pk")
         assert params == {"pk": 42, "status": "failed", "erddap_report": report}
         # The value itself never reaches the statement text.
         assert report not in sql
@@ -181,8 +168,7 @@ class TestUpdateDownloadJobs:
         ds.update_download_jobs(7, {"status": "downloading"}, FakeSession())
 
         assert calls == [
-            ("UPDATE cde.download_jobs SET status = :status WHERE pk = :pk",
-             {"pk": 7, "status": "downloading"}),
+            ("UPDATE cde.download_jobs SET status = :status WHERE pk = :pk", {"pk": 7, "status": "downloading"}),
         ]
 
 
@@ -197,9 +183,7 @@ class TestPrefectObservability:
     replace that status with a traceback.
     """
 
-    def test_runs_the_job_directly_when_prefect_is_not_configured(
-        self, monkeypatch, job
-    ):
+    def test_runs_the_job_directly_when_prefect_is_not_configured(self, monkeypatch, job):
         monkeypatch.delenv("PREFECT_API_URL", raising=False)
         ran = []
         monkeypatch.setattr(ds, "run_download", ran.append)
@@ -259,9 +243,7 @@ class TestPrefectObservability:
 
         assert ran == [job]
 
-    def test_a_failed_job_does_not_raise_out_of_a_real_flow_run(
-        self, prefect_server, monkeypatch, job
-    ):
+    def test_a_failed_job_does_not_raise_out_of_a_real_flow_run(self, prefect_server, monkeypatch, job):
         """As above, but through the flow: DownloadJobFailed marks the run red
         and stops there. Raised inside the flow, caught outside it."""
         monkeypatch.setenv("PREFECT_API_URL", prefect_server)

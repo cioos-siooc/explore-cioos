@@ -61,8 +61,7 @@ def profiles_frame(rows, index_name="station_id"):
 @pytest.fixture
 def one_station():
     return profiles_frame(
-        [{"station_id": "S1", "time_min": "2020-01-01T00:00:00Z",
-          "time_max": "2020-12-31T00:00:00Z"}]
+        [{"station_id": "S1", "time_min": "2020-01-01T00:00:00Z", "time_max": "2020-12-31T00:00:00Z"}]
     )
 
 
@@ -95,9 +94,7 @@ def day_count_response(pairs, index_name="station_id"):
         rows.append(
             {
                 index_name: station,
-                "time": pd.Timestamp(index, unit="s", tz="UTC").strftime(
-                    "%Y-%m-%dT%H:%M:%SZ"
-                ),
+                "time": pd.Timestamp(index, unit="s", tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "latitude": 1,
             }
         )
@@ -106,16 +103,12 @@ def day_count_response(pairs, index_name="station_id"):
 
 class TestDaySetsFromErddap:
     def test_distinct_days_count_separately(self, one_station):
-        ds = FakeDataset(day_count_response(
-            [("S1", "2020-03-01"), ("S1", "2020-06-15"), ("S1", "2020-09-30")]
-        ))
+        ds = FakeDataset(day_count_response([("S1", "2020-03-01"), ("S1", "2020-06-15"), ("S1", "2020-09-30")]))
         out = _extract_day_sets(ds, one_station, ["station_id"], LOG)
         assert out.loc["S1", "days"] == 3
 
     def test_same_day_counts_once(self, one_station):
-        ds = FakeDataset(day_count_response(
-            [("S1", "2020-03-01"), ("S1", "2020-03-01")]
-        ))
+        ds = FakeDataset(day_count_response([("S1", "2020-03-01"), ("S1", "2020-03-01")]))
         out = _extract_day_sets(ds, one_station, ["station_id"], LOG)
         assert out.loc["S1", "days"] == 1
 
@@ -126,9 +119,7 @@ class TestDaySetsFromErddap:
         elapsed span would claim. If `days` ever tracks time_max - time_min
         again, this fails.
         """
-        ds = FakeDataset(day_count_response(
-            [("S1", "2020-01-01"), ("S1", "2020-12-31")]
-        ))
+        ds = FakeDataset(day_count_response([("S1", "2020-01-01"), ("S1", "2020-12-31")]))
         out = _extract_day_sets(ds, one_station, ["station_id"], LOG)
         assert out.loc["S1", "days"] == 2
         span_days = (d("2020-12-31") - d("2020-01-01")).days + 1
@@ -136,19 +127,16 @@ class TestDaySetsFromErddap:
         assert out.loc["S1", "days"] < span_days
 
     def test_consecutive_days_collapse_to_one_range(self, one_station):
-        ds = FakeDataset(day_count_response(
-            [("S1", "2020-03-01"), ("S1", "2020-03-02"), ("S1", "2020-03-03")]
-        ))
+        ds = FakeDataset(day_count_response([("S1", "2020-03-01"), ("S1", "2020-03-02"), ("S1", "2020-03-03")]))
         out = _extract_day_sets(ds, one_station, ["station_id"], LOG)
         assert out.loc["S1", "days"] == 3
         assert len(out.loc["S1", "day_ranges"]) == 1
 
     def test_seasonal_station_keeps_one_range_per_season(self, one_station):
         """A station sampled each January is 2 ranges, not the decade between."""
-        ds = FakeDataset(day_count_response(
-            [("S1", "2020-01-01"), ("S1", "2020-01-02"),
-             ("S1", "2030-01-01"), ("S1", "2030-01-02")]
-        ))
+        ds = FakeDataset(
+            day_count_response([("S1", "2020-01-01"), ("S1", "2020-01-02"), ("S1", "2030-01-01"), ("S1", "2030-01-02")])
+        )
         out = _extract_day_sets(ds, one_station, ["station_id"], LOG)
         assert out.loc["S1", "days"] == 4
         assert len(out.loc["S1", "day_ranges"]) == 2
@@ -159,31 +147,25 @@ class TestDaySetsFromErddap:
         Read literally the fixture's timestamps are all in January 1970, so a
         missing decode collapses every row onto one day in the wrong decade.
         """
-        ds = FakeDataset(day_count_response(
-            [("S1", "2020-01-01"), ("S1", "2021-07-04")]
-        ))
+        ds = FakeDataset(day_count_response([("S1", "2020-01-01"), ("S1", "2021-07-04")]))
         out = _extract_day_sets(ds, one_station, ["station_id"], LOG)
         lows = [lo for lo, _ in out.loc["S1", "day_ranges"]]
         assert lows == [d("2020-01-01"), d("2021-07-04")]
 
     def test_per_feature_sets_are_independent(self):
-        frame = profiles_frame([
-            {"station_id": "S1", "time_min": "2020-01-01T00:00:00Z",
-             "time_max": "2020-12-31T00:00:00Z"},
-            {"station_id": "S2", "time_min": "2020-01-01T00:00:00Z",
-             "time_max": "2020-12-31T00:00:00Z"},
-        ])
-        ds = FakeDataset(day_count_response(
-            [("S1", "2020-03-01"), ("S2", "2020-03-01"), ("S2", "2020-04-01")]
-        ))
+        frame = profiles_frame(
+            [
+                {"station_id": "S1", "time_min": "2020-01-01T00:00:00Z", "time_max": "2020-12-31T00:00:00Z"},
+                {"station_id": "S2", "time_min": "2020-01-01T00:00:00Z", "time_max": "2020-12-31T00:00:00Z"},
+            ]
+        )
+        ds = FakeDataset(day_count_response([("S1", "2020-03-01"), ("S2", "2020-03-01"), ("S2", "2020-04-01")]))
         out = _extract_day_sets(ds, frame, ["station_id"], LOG)
         assert out.loc["S1", "days"] == 1
         assert out.loc["S2", "days"] == 2
 
     def test_days_never_exceeds_the_span(self, one_station):
-        ds = FakeDataset(day_count_response(
-            [("S1", f"2020-01-{n:02d}") for n in range(1, 11)]
-        ))
+        ds = FakeDataset(day_count_response([("S1", f"2020-01-{n:02d}") for n in range(1, 11)]))
         out = _extract_day_sets(ds, one_station, ["station_id"], LOG)
         span_days = (d("2020-12-31") - d("2020-01-01")).days + 1
         assert out.loc["S1", "days"] <= span_days
@@ -205,9 +187,7 @@ class TestFallsBackInsteadOfFailing:
     """Every miss returns None so the caller uses the span. Losing the day set
     costs accuracy; raising here would cost the whole dataset."""
 
-    @pytest.mark.parametrize(
-        "error", [ResponseTooLargeError("too big"), HTTPError("500")]
-    )
+    @pytest.mark.parametrize("error", [ResponseTooLargeError("too big"), HTTPError("500")])
     def test_query_error_falls_back(self, one_station, error):
         ds = FakeDataset(raises=error)
         assert _extract_day_sets(ds, one_station, ["station_id"], LOG) is None
@@ -219,15 +199,11 @@ class TestFallsBackInsteadOfFailing:
         assert _extract_day_sets(ds, one_station, ["station_id"], LOG) is None
 
     def test_unparseable_dates_fall_back(self, one_station):
-        ds = FakeDataset(pd.DataFrame(
-            {"station_id": ["S1"], "time": ["not-a-date"], "latitude": [1]}
-        ))
+        ds = FakeDataset(pd.DataFrame({"station_id": ["S1"], "time": ["not-a-date"], "latitude": [1]}))
         assert _extract_day_sets(ds, one_station, ["station_id"], LOG) is None
 
     def test_unusable_time_bounds_fall_back(self):
-        frame = profiles_frame(
-            [{"station_id": "S1", "time_min": "", "time_max": ""}]
-        )
+        frame = profiles_frame([{"station_id": "S1", "time_min": "", "time_max": ""}])
         ds = FakeDataset(day_count_response([("S1", "2020-03-01")]))
         assert _extract_day_sets(ds, frame, ["station_id"], LOG) is None
         assert ds.queries == []  # never even asked
@@ -239,8 +215,7 @@ class TestFallsBackInsteadOfFailing:
         enrichments a raised ResponseTooLargeError here would lose the dataset.
         """
         rows = [
-            {"station_id": f"S{n}", "time_min": "1900-01-01T00:00:00Z",
-             "time_max": "2025-01-01T00:00:00Z"}
+            {"station_id": f"S{n}", "time_min": "1900-01-01T00:00:00Z", "time_max": "2025-01-01T00:00:00Z"}
             for n in range(1000)
         ]
         frame = profiles_frame(rows)
@@ -257,8 +232,7 @@ class TestFallsBackInsteadOfFailing:
         returns 16,524. Sizing the cap to the estimate would have skipped it.
         """
         rows = [
-            {"station_id": f"S{n}", "time_min": "2010-01-01T00:00:00Z",
-             "time_max": "2025-01-01T00:00:00Z"}
+            {"station_id": f"S{n}", "time_min": "2010-01-01T00:00:00Z", "time_max": "2025-01-01T00:00:00Z"}
             for n in range(390)
         ]
         frame = profiles_frame(rows)
@@ -277,10 +251,12 @@ class TestAwkwardCfRoleVariables:
         grouping by the raw time alongside its own day bucket would ask for one
         group per record.
         """
-        frame = profiles_frame([
-            {"id": "A", "time_min": "2020-01-01T00:00:00Z",
-             "time_max": "2020-12-31T00:00:00Z"},
-        ], index_name="id")
+        frame = profiles_frame(
+            [
+                {"id": "A", "time_min": "2020-01-01T00:00:00Z", "time_max": "2020-12-31T00:00:00Z"},
+            ],
+            index_name="id",
+        )
         ds = FakeDataset(day_count_response([("A", "2020-03-01")], index_name="id"))
         _extract_day_sets(ds, frame, ["id", "time"], LOG)
         request_vars = ds.queries[0].split("%26")[0]
@@ -289,10 +265,12 @@ class TestAwkwardCfRoleVariables:
 
     def test_counted_variable_avoids_the_grouped_ones(self):
         """orderByCount returns no count column for a variable it grouped on."""
-        frame = profiles_frame([
-            {"latitude": "48.5", "time_min": "2020-01-01T00:00:00Z",
-             "time_max": "2020-12-31T00:00:00Z"},
-        ], index_name="latitude")
+        frame = profiles_frame(
+            [
+                {"latitude": "48.5", "time_min": "2020-01-01T00:00:00Z", "time_max": "2020-12-31T00:00:00Z"},
+            ],
+            index_name="latitude",
+        )
         ds = FakeDataset(pd.DataFrame())
         _extract_day_sets(ds, frame, ["latitude"], LOG)
         request_vars = ds.queries[0].split("%26")[0].split(",")
@@ -307,14 +285,14 @@ class TestIndexAlignment:
     def test_numeric_feature_ids_still_match(self):
         """distinct() reads an integer station id as int64; the count response
         is cast to str. Joined raw, those never meet."""
-        frame = pd.DataFrame({
-            "station_id": [101, 102],
-            "time_min": ["2020-01-01T00:00:00Z"] * 2,
-            "time_max": ["2020-12-31T00:00:00Z"] * 2,
-        }).set_index("station_id")
-        ds = FakeDataset(day_count_response(
-            [(101, "2020-03-01"), (102, "2020-03-01"), (102, "2020-04-01")]
-        ))
+        frame = pd.DataFrame(
+            {
+                "station_id": [101, 102],
+                "time_min": ["2020-01-01T00:00:00Z"] * 2,
+                "time_max": ["2020-12-31T00:00:00Z"] * 2,
+            }
+        ).set_index("station_id")
+        ds = FakeDataset(day_count_response([(101, "2020-03-01"), (102, "2020-03-01"), (102, "2020-04-01")]))
         out = _extract_day_sets(ds, frame, ["station_id"], LOG)
         assert out is not None
         assert out["days"].tolist() == [1, 2]
@@ -328,11 +306,13 @@ class TestIndexAlignment:
     def test_feature_with_no_days_gets_an_empty_set_not_nan(self):
         """A station absent from the count response keeps an empty day set, so
         the web-api reads it as unknown and falls back per row."""
-        frame = pd.DataFrame({
-            "station_id": ["S1", "S2"],
-            "time_min": ["2020-01-01T00:00:00Z"] * 2,
-            "time_max": ["2020-12-31T00:00:00Z"] * 2,
-        }).set_index("station_id")
+        frame = pd.DataFrame(
+            {
+                "station_id": ["S1", "S2"],
+                "time_min": ["2020-01-01T00:00:00Z"] * 2,
+                "time_max": ["2020-12-31T00:00:00Z"] * 2,
+            }
+        ).set_index("station_id")
         ds = FakeDataset(day_count_response([("S1", "2020-03-01")]))
         out = _extract_day_sets(ds, frame, ["station_id"], LOG)
         assert out.loc["S1", "days"] == 1
@@ -361,12 +341,10 @@ class TestDaySetHelpers:
 
     def test_runs_are_maximal(self):
         runs = days_to_ranges([d("2020-01-01"), d("2020-01-02"), d("2020-01-04")])
-        assert runs == [(d("2020-01-01"), d("2020-01-03")),
-                        (d("2020-01-04"), d("2020-01-05"))]
+        assert runs == [(d("2020-01-01"), d("2020-01-03")), (d("2020-01-04"), d("2020-01-05"))]
 
     def test_unsorted_and_duplicate_input(self):
-        runs = days_to_ranges([d("2020-01-03"), d("2020-01-01"), d("2020-01-01"),
-                               d("2020-01-02")])
+        runs = days_to_ranges([d("2020-01-03"), d("2020-01-01"), d("2020-01-01"), d("2020-01-02")])
         assert runs == [(d("2020-01-01"), d("2020-01-04"))]
 
     def test_missing_days_are_dropped(self):
@@ -374,8 +352,7 @@ class TestDaySetHelpers:
         assert total_days([]) == 0
 
     def test_timestamps_are_floored_to_the_day(self):
-        runs = days_to_ranges([pd.Timestamp("2020-01-01T23:00Z"),
-                               pd.Timestamp("2020-01-01T01:00Z")])
+        runs = days_to_ranges([pd.Timestamp("2020-01-01T23:00Z"), pd.Timestamp("2020-01-01T01:00Z")])
         assert total_days(runs) == 1
 
     @pytest.mark.parametrize(
@@ -419,9 +396,7 @@ class TestSerialisationRoundTrips:
         plain lists is what makes this pass.
         """
         runs = days_to_ranges([d("2020-01-01"), d("2020-01-02"), d("2021-03-01")])
-        write_table(
-            str(tmp_path), PROFILES, pd.DataFrame({"day_ranges": [ranges_to_iso(runs)]})
-        )
+        write_table(str(tmp_path), PROFILES, pd.DataFrame({"day_ranges": [ranges_to_iso(runs)]}))
         stored = read_table(str(tmp_path), PROFILES)["day_ranges"].iloc[0]
         assert isinstance(stored, list) and isinstance(stored[0], list)
         assert ranges_from_iso(stored) == runs
@@ -447,11 +422,13 @@ class TestSerialisationRoundTrips:
         from cde_harvester.loading.loader import prepare_profiles_dataframe
 
         runs = days_to_ranges([d("2020-01-01"), d("2020-01-02")])
-        frame = pd.DataFrame({
-            "time_min": [pd.Timestamp("2020-01-01T00:00:00Z")],
-            "time_max": [pd.Timestamp("2020-01-02T00:00:00Z")],
-            "day_ranges": [ranges_to_iso(runs)],
-        })
+        frame = pd.DataFrame(
+            {
+                "time_min": [pd.Timestamp("2020-01-01T00:00:00Z")],
+                "time_max": [pd.Timestamp("2020-01-02T00:00:00Z")],
+                "day_ranges": [ranges_to_iso(runs)],
+            }
+        )
         out = prepare_profiles_dataframe(frame)
         assert [type(r).__name__ for r in out["day_ranges"].iloc[0]] == ["DateRange"]
 
@@ -462,11 +439,13 @@ class TestSerialisationRoundTrips:
         type-checked rather than `or`-ed."""
         from cde_harvester.loading.loader import prepare_profiles_dataframe
 
-        frame = pd.DataFrame({
-            "time_min": [pd.Timestamp("2020-01-01T00:00:00Z")],
-            "time_max": [pd.Timestamp("2020-01-02T00:00:00Z")],
-            "day_ranges": [missing],
-        })
+        frame = pd.DataFrame(
+            {
+                "time_min": [pd.Timestamp("2020-01-01T00:00:00Z")],
+                "time_max": [pd.Timestamp("2020-01-02T00:00:00Z")],
+                "day_ranges": [missing],
+            }
+        )
         out = prepare_profiles_dataframe(frame)
         assert out["day_ranges"].iloc[0] == []
 

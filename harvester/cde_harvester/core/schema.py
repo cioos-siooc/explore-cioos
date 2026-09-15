@@ -165,9 +165,7 @@ def ensure_database(maint_engine, name):
         # could break out of the quoting rather than escaping it cleverly.
         raise ValueError(f"Refusing to create a database with a quote in its name: {name!r}")
     with maint_engine.connect() as conn:
-        exists = conn.execute(
-            text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": name}
-        ).scalar()
+        exists = conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": name}).scalar()
         if exists:
             return False
         conn.execute(text(f'CREATE DATABASE "{name}"'))
@@ -228,10 +226,7 @@ def rebuild_schema(engine, directory=None, lock_timeout=DEFAULT_LOCK_TIMEOUT):
             _apply_sql_file(conn, path)
 
         tables = conn.execute(
-            text(
-                "SELECT count(*) FROM information_schema.tables "
-                "WHERE table_schema = :schema"
-            ),
+            text("SELECT count(*) FROM information_schema.tables WHERE table_schema = :schema"),
             {"schema": SCHEMA_NAME},
         ).scalar()
 

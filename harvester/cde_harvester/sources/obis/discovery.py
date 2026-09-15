@@ -28,6 +28,7 @@ A partial union (say, the two node queries without the geometry query) would
 look like a legitimate but much smaller dataset list, and the db-loader's
 ``prune_stale_datasets`` would then delete hundreds of real datasets.
 """
+
 import logging
 from dataclasses import dataclass, field
 
@@ -83,7 +84,7 @@ class ObisDiscoveryConfig:
 
     enabled: bool = False
     node_ids: tuple = ()
-    geometry: str = "eez"          # "eez" | "none" | inline WKT
+    geometry: str = "eez"  # "eez" | "none" | inline WKT
     area_ids: tuple = ()
     include: tuple = ()
     exclude: tuple = ()
@@ -104,10 +105,7 @@ class ObisDiscoveryConfig:
         if unknown:
             # A typo'd `min_dataset` silently defaulting to 700 is exactly the
             # kind of thing that later prunes the database.
-            raise ValueError(
-                f"Unknown obis_discovery key(s): {sorted(unknown)}. "
-                f"Valid keys: {sorted(_VALID_KEYS)}"
-            )
+            raise ValueError(f"Unknown obis_discovery key(s): {sorted(unknown)}. Valid keys: {sorted(_VALID_KEYS)}")
 
         geometry = raw.get("geometry", "eez")
         geometry = "none" if geometry is None else str(geometry).strip()
@@ -144,8 +142,8 @@ class ObisDiscoveryConfig:
 
 @dataclass
 class DiscoveryResult:
-    dataset_ids: list = field(default_factory=list)   # sorted, deduped
-    per_query: dict = field(default_factory=dict)     # {"node:7dfb...": 305, "geometry": 868}
+    dataset_ids: list = field(default_factory=list)  # sorted, deduped
+    per_query: dict = field(default_factory=dict)  # {"node:7dfb...": 305, "geometry": 868}
     geometry_bytes: int = None
     geometry_tolerance: float = None
 
@@ -167,11 +165,7 @@ def simplify_for_query(polygon, tolerance=0.25, max_bytes=4500, max_attempts=6):
 
     tol = tolerance
     for _ in range(max_attempts):
-        reduced = (
-            polygon.simplify(tol, preserve_topology=True)
-            .buffer(tol, join_style="mitre", quad_segs=1)
-            .buffer(0)
-        )
+        reduced = polygon.simplify(tol, preserve_topology=True).buffer(tol, join_style="mitre", quad_segs=1).buffer(0)
         reduced = reduced.simplify(tol / 4, preserve_topology=True).buffer(0)
         wkt = reduced.wkt
         n_bytes = len(wkt.encode())
@@ -264,7 +258,10 @@ class ObisDatasetDiscovery:
             bigger = min(total + 1000, _MAX_PAGE_SIZE)
             self.logger.warning(
                 "OBIS discovery query %s returned %d of %d datasets; retrying with size=%d",
-                label, len(results), total, bigger,
+                label,
+                len(results),
+                total,
+                bigger,
             )
             try:
                 total, results = fetch(dict(params, size=bigger))
@@ -282,8 +279,7 @@ class ObisDatasetDiscovery:
         if not ids and not allow_empty:
             # A typo'd node/area id must not silently shrink the union.
             raise ObisDiscoveryError(
-                f"OBIS discovery query {label!r} returned no datasets. Check the "
-                "configured node/area id."
+                f"OBIS discovery query {label!r} returned no datasets. Check the configured node/area id."
             )
 
         self.logger.info("OBIS discovery %s -> %d datasets", label, len(ids))
@@ -333,7 +329,9 @@ class ObisDatasetDiscovery:
         dataset_ids = sorted(found)
         self.logger.info(
             "OBIS discovery resolved %d datasets from %d queries: %s",
-            len(dataset_ids), len(queries), per_query,
+            len(dataset_ids),
+            len(queries),
+            per_query,
         )
 
         if len(dataset_ids) < cfg.min_datasets:

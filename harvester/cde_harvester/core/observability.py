@@ -48,14 +48,10 @@ def cleanup_old_logs(log_dir, days=30):
                     removed_count += 1
                     _root_logger.info(f"Removed old log file: {filename}")
                 except OSError as e:
-                    _root_logger.warning(
-                        f"Warning: Failed to remove old log file {filename}: {e}"
-                    )
+                    _root_logger.warning(f"Warning: Failed to remove old log file {filename}: {e}")
 
     if removed_count > 0:
-        _root_logger.info(
-            f"Cleaned up {removed_count} log file(s) older than {days} days"
-        )
+        _root_logger.info(f"Cleaned up {removed_count} log file(s) older than {days} days")
 
 
 def setup_logging(log_time, log_level, log_dir=None):
@@ -69,10 +65,7 @@ def setup_logging(log_time, log_level, log_dir=None):
     logger.handlers.clear()
 
     # Define log format
-    log_format = (
-        ("%(asctime)s - " if log_time else "")
-        + "%(levelname)-8s - %(name)s : %(message)s"
-    )
+    log_format = ("%(asctime)s - " if log_time else "") + "%(levelname)-8s - %(name)s : %(message)s"
 
     # Add console handler
     c_handler = logging.StreamHandler()
@@ -89,9 +82,7 @@ def setup_logging(log_time, log_level, log_dir=None):
 
         f_handler = logging.FileHandler(log_file)
         f_handler.setLevel(logging.getLevelName(log_level.upper()))
-        f_format = logging.Formatter(
-            "%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
-        )
+        f_format = logging.Formatter("%(asctime)s - %(levelname)-8s - %(name)s : %(message)s")
         f_handler.setFormatter(f_format)
         logger.addHandler(f_handler)
         logger.info(f"Logging to file: {log_file}")

@@ -23,10 +23,11 @@ def _make_dataset(server, info_csv=ERDDAP_INFO_CSV):
     """Create a real Dataset object backed by a mock server."""
     from io import StringIO
 
-    server.erddap_csv_to_df.side_effect = lambda url, skiprows=None, dataset=None: (
-        pd.read_csv(StringIO(info_csv)).fillna("")
-    )
+    server.erddap_csv_to_df.side_effect = lambda url, skiprows=None, dataset=None: pd.read_csv(
+        StringIO(info_csv)
+    ).fillna("")
     from cde_harvester.sources.erddap.dataset import Dataset
+
     return Dataset(server, DATASET_ID)
 
 
@@ -126,10 +127,7 @@ class TestPlottingAttributes:
 
     def test_axis_attribute_parsed(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)
-        axes = {
-            name: ds.df_variables.loc[name]["axis"]
-            for name in ["time", "latitude", "longitude", "depth"]
-        }
+        axes = {name: ds.df_variables.loc[name]["axis"] for name in ["time", "latitude", "longitude", "depth"]}
         assert axes == {"time": "T", "latitude": "Y", "longitude": "X", "depth": "Z"}
 
     def test_long_name_and_units_parsed(self, mock_erddap_server):
@@ -154,10 +152,7 @@ class TestPlottingAttributes:
         # This is the signal that lets a plot drop a flag column even when the
         # column name follows no naming convention.
         ds = _make_dataset(mock_erddap_server, info_csv=ERDDAP_INFO_QC_AND_LOG_CSV)
-        assert (
-            ds.df_variables.loc["chlorophyll"]["ancillary_variables"]
-            == "chlorophyll_qc"
-        )
+        assert ds.df_variables.loc["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
 
     def test_widening_the_allowlist_did_not_change_num_columns(self, mock_erddap_server):
         # num_columns counts df_variables ROWS (variables), not attributes, so
@@ -195,9 +190,7 @@ class TestTableVariables:
 
     def test_carries_the_attributes_a_panel_needs(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)
-        temperature = next(
-            v for v in ds.table_variables if v["name"] == "temperature"
-        )
+        temperature = next(v for v in ds.table_variables if v["name"] == "temperature")
         assert temperature["long_name"] == "Sea Water Temperature"
         assert temperature["units"] == "degree_C"
         assert temperature["standard_name"] == "sea_water_temperature"

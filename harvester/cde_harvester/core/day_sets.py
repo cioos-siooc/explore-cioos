@@ -112,12 +112,7 @@ def merge_ranges(range_lists):
     time: their day sets overlap, so neither concatenating the runs nor taking
     the longer list is right.
     """
-    runs = sorted(
-        (lo, hi)
-        for lst in range_lists
-        if lst is not None and len(lst)
-        for lo, hi in lst
-    )
+    runs = sorted((lo, hi) for lst in range_lists if lst is not None and len(lst) for lo, hi in lst)
     if not runs:
         return []
 

@@ -54,10 +54,12 @@ class TestModes:
         assert sel.dataset_ids == IDS
 
     def test_discovery_disabled_falls_through_to_file(self, datasets_file):
-        sel = resolve_obis_config({
-            "obis_discovery": {"enabled": False, "nodes": [NODE_A]},
-            "obis_datasets_file": datasets_file,
-        })
+        sel = resolve_obis_config(
+            {
+                "obis_discovery": {"enabled": False, "nodes": [NODE_A]},
+                "obis_datasets_file": datasets_file,
+            }
+        )
         assert sel.mode == "file"
         assert sel.dataset_ids == IDS
 
@@ -69,10 +71,12 @@ class TestModes:
 class TestPrecedenceWarnings:
     def test_ids_bypass_discovery_with_warning(self, caplog):
         with caplog.at_level("WARNING"):
-            sel = resolve_obis_config({
-                "obis_dataset_ids": IDS,
-                "obis_discovery": DISCOVERY,
-            })
+            sel = resolve_obis_config(
+                {
+                    "obis_dataset_ids": IDS,
+                    "obis_discovery": DISCOVERY,
+                }
+            )
         assert sel.mode == "ids"
         assert sel.discovery is None
         assert "discovery is bypassed" in caplog.text
@@ -81,10 +85,12 @@ class TestPrecedenceWarnings:
         # Unioning the legacy list back in would resurrect the datasets that
         # discovery deliberately drops.
         with caplog.at_level("WARNING"):
-            sel = resolve_obis_config({
-                "obis_discovery": DISCOVERY,
-                "obis_datasets_file": datasets_file,
-            })
+            sel = resolve_obis_config(
+                {
+                    "obis_discovery": DISCOVERY,
+                    "obis_datasets_file": datasets_file,
+                }
+            )
         assert sel.mode == "discovery"
         assert sel.dataset_ids == []
         assert "is ignored because obis_discovery is enabled" in caplog.text

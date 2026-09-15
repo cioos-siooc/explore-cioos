@@ -37,7 +37,8 @@ class TestListColumns:
     def test_nested_lists_are_converted_all_the_way_down(self, tmp_path):
         """day_ranges is a list of pairs, so a shallow conversion is not enough."""
         write_table(
-            str(tmp_path), PROFILES,
+            str(tmp_path),
+            PROFILES,
             pd.DataFrame({"day_ranges": [[["2020-01-01", "2020-02-01"]]]}),
         )
         value = read_table(str(tmp_path), PROFILES)["day_ranges"].iloc[0]
@@ -57,18 +58,14 @@ class TestListColumns:
         """organization_pks and aphia_ids are ARRAY(INTEGER) columns. duckdb
         returns their elements as numpy.int32, which psycopg2 adapts no better
         than it adapts the array — so unwrapping the array alone is not enough."""
-        write_table(
-            str(tmp_path), DATASETS, pd.DataFrame({"organization_pks": [[7, 8]]})
-        )
+        write_table(str(tmp_path), DATASETS, pd.DataFrame({"organization_pks": [[7, 8]]}))
         value = read_table(str(tmp_path), DATASETS)["organization_pks"].iloc[0]
         assert value == [7, 8]
         assert all(type(v) is int for v in value)
         assert adapt(value).getquoted() == b"ARRAY[7,8]"
 
     def test_empty_and_absent_lists_are_distinguishable(self, tmp_path):
-        write_table(
-            str(tmp_path), DATASETS, pd.DataFrame({"eovs": [["a"], [], None]})
-        )
+        write_table(str(tmp_path), DATASETS, pd.DataFrame({"eovs": [["a"], [], None]}))
         values = list(read_table(str(tmp_path), DATASETS)["eovs"])
         assert values[0] == ["a"]
         assert values[1] == []
@@ -97,7 +94,8 @@ class TestTimestamps:
 
     def test_missing_timestamps_stay_null(self, tmp_path):
         write_table(
-            str(tmp_path), DATASETS,
+            str(tmp_path),
+            DATASETS,
             pd.DataFrame({"verified_at": pd.to_datetime([None, "2026-01-01"], utc=True)}),
         )
         assert pd.isna(read_table(str(tmp_path), DATASETS)["verified_at"].iloc[0])
