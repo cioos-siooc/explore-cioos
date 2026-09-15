@@ -25,6 +25,7 @@ from cde_harvester.core.errors import (
     HASH_NO_FILE_LIST,
     ResponseTooLargeError,
 )
+from cde_harvester.core.source_cache import source_cache_path
 from cde_harvester.sources.erddap.dataset import Dataset
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -115,7 +116,7 @@ class ERDDAP:
         if cache_requests:
             # limit cache to 10gb
             self.cache = dc.Cache(
-                "harvester_cache",
+                source_cache_path("erddap-v1", "harvester_cache"),
                 eviction_policy="none",
                 size_limit=10000000000,
                 cull_limit=0,

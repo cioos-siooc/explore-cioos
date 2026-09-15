@@ -25,6 +25,7 @@ from cde_harvester.core.config import (
     resolve_obis_config,
 )
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
+from cde_harvester.core.source_cache import source_cache_path
 from cde_harvester.core.schema import (
     check_confirmation,
     ensure_database,
@@ -281,7 +282,9 @@ class PrefectCDEPipeline:
                 obis_folder = (
                     Path(self.obis_folder)
                     if self.obis_folder
-                    else base_folder.resolve().parent / "obis_cache"
+                    else Path(source_cache_path(
+                        "obis-v1", str(base_folder.resolve().parent / "obis_cache")
+                    ))
                 )
                 abs_run, abs_obis = run_folder.resolve(), obis_folder.resolve()
                 assert abs_obis != abs_run and abs_run not in abs_obis.parents, (
