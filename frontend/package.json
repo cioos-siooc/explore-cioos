@@ -48,14 +48,15 @@
     "vitest": "^4.1.11"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && npm run test:node",
     "dev": "vite",
     "start": "vite --open",
     "build": "vite build",
     "build:analyze": "ANALYZE=1 vite build",
     "preview": "vite preview",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage && npm run test:node",
+    "test:node": "node --test $(find src -name '*.test.mjs')",
     "test:e2e": "playwright test --project=desktop --project=tablet --project=mobile",
     "test:visual": "e2e/in-container.sh test --project=visual",
     "test:visual:update": "e2e/in-container.sh test --project=visual --update-snapshots",
