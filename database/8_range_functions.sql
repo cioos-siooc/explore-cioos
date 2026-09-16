@@ -14,11 +14,11 @@ eg:
 
 DROP FUNCTION IF EXISTS range_intersection_length( numrange, numrange );
 CREATE OR REPLACE FUNCTION range_intersection_length(a numrange,b numrange )
-   RETURNS numeric 
+   RETURNS numeric
    LANGUAGE plpgsql
   AS
 $$
-DECLARE 
+DECLARE
 BEGIN
 RETURN upper(a*b)-lower(a*b);
 END;
@@ -26,11 +26,11 @@ $$;
 
 DROP FUNCTION IF EXISTS range_intersection_length( tstzrange, tstzrange );
 CREATE OR REPLACE FUNCTION range_intersection_length(a tstzrange,b tstzrange )
-   RETURNS interval 
+   RETURNS interval
    LANGUAGE plpgsql
   as
 $$
-DECLARE 
+DECLARE
 BEGIN
 RETURN upper(a*b)-lower(a*b);
 END;

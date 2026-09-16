@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from "react";
 
-import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
-import SortSelect from '../../ui/SortSelect.jsx'
-import Pager, { PAGE_SIZES } from '../../ui/Pager.jsx'
+import { useChanged } from "../../../utilities.jsx";
+import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
+import SortSelect from "../../ui/SortSelect.jsx";
+import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 
 // A searchable, sortable, paged list of cards — the dataset page's records and
 // its trajectory platforms are both one of these. Cards rather than a data
@@ -20,7 +21,7 @@ import Pager, { PAGE_SIZES } from '../../ui/Pager.jsx'
 // `pinnedKey` names one item to hold at the top of the first page whatever the
 // sort (the record a map click resolved to), and `focusKey` one to page to
 // wherever it falls (the platform whose track is drawn).
-export default function CardList ({
+export default function CardList({
   items,
   keyOf,
   sortFields,
@@ -31,49 +32,48 @@ export default function CardList ({
   pinnedKey,
   focusKey,
   pagerLabel,
-  perPageLabel
+  perPageLabel,
 }) {
-  const [filterText, setFilterText] = useState('')
-  const [sort, setSort] = useState(defaultSort)
-  const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
-  const [page, setPage] = useState(1)
+  const [filterText, setFilterText] = useState("");
+  const [sort, setSort] = useState(defaultSort);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
-    const field = sortFields.find((f) => f.id === sort.field)
-    const factor = sort.dir === 'asc' ? 1 : -1
+    const field = sortFields.find((f) => f.id === sort.field);
+    const factor = sort.dir === "asc" ? 1 : -1;
     return [...(filterRows(items, filterText) || [])].sort((a, b) => {
       // The pinned item rides on top of the sort rather than replacing it, so
       // the sort control still does what it says — the pin just puts one item in
       // front of the order they produce.
-      const pa = pinnedKey !== undefined && keyOf(a) === pinnedKey ? 0 : 1
-      const pb = pinnedKey !== undefined && keyOf(b) === pinnedKey ? 0 : 1
-      if (pa !== pb) return pa - pb
-      const va = field?.value(a)
-      const vb = field?.value(b)
-      if (field?.type === 'number') return ((va ?? 0) - (vb ?? 0)) * factor
-      return String(va ?? '').localeCompare(String(vb ?? '')) * factor
-    })
-  }, [items, filterText, sort, pinnedKey])
+      const pa = pinnedKey !== undefined && keyOf(a) === pinnedKey ? 0 : 1;
+      const pb = pinnedKey !== undefined && keyOf(b) === pinnedKey ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      const va = field?.value(a);
+      const vb = field?.value(b);
+      if (field?.type === "number") return ((va ?? 0) - (vb ?? 0)) * factor;
+      return String(va ?? "").localeCompare(String(vb ?? "")) * factor;
+    });
+  }, [items, filterText, sort, pinnedKey, keyOf, sortFields]);
 
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   // Clamped rather than stored: a page can vanish under the list when the
   // search narrows the results between renders.
-  const currentPage = Math.min(page, pageCount)
-  const firstRow = (currentPage - 1) * pageSize
+  const currentPage = Math.min(page, pageCount);
+  const firstRow = (currentPage - 1) * pageSize;
 
   // Back to page one whenever the list or its ordering changes: page 7 of the
   // previous results is not page 7 of these.
-  useEffect(() => setPage(1), [items, filterText, sort, pageSize])
+  if (useChanged(items, filterText, sort, pageSize)) setPage(1);
 
   // An item picked on the map can sit on any page of the list — turn to the
   // page holding it, so the highlighted card is one the user can actually see.
   // Runs on `items` too: the pick is usually already made when the list is
   // still loading, and the effect above sends that arrival back to page one.
-  useEffect(() => {
-    if (focusKey === undefined) return
-    const index = rows.findIndex((row) => keyOf(row) === focusKey)
-    if (index >= 0) setPage(Math.floor(index / pageSize) + 1)
-  }, [focusKey, items, pageSize])
+  if (useChanged(focusKey, items, pageSize) && focusKey !== undefined) {
+    const index = rows.findIndex((row) => keyOf(row) === focusKey);
+    if (index >= 0) setPage(Math.floor(index / pageSize) + 1);
+  }
 
   return (
     <>
@@ -84,9 +84,9 @@ export default function CardList ({
       />
       <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
       {rows.length === 0 ? (
-        <div className='cardListEmpty'>{emptyText}</div>
+        <div className="cardListEmpty">{emptyText}</div>
       ) : (
-        <div className='cardList'>
+        <div className="cardList">
           {rows.slice(firstRow, firstRow + pageSize).map((row) => (
             <React.Fragment key={keyOf(row)}>{renderItem(row)}</React.Fragment>
           ))}
@@ -103,5 +103,5 @@ export default function CardList ({
         perPageLabel={perPageLabel}
       />
     </>
-  )
+  );
 }

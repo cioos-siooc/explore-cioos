@@ -1,15 +1,15 @@
-import * as React from 'react'
-import PropTypes from 'prop-types'
-import { useTranslation } from 'react-i18next'
+import * as React from "react";
+import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 
-import { defaultStartDepth, defaultEndDepth } from '../../../config.js'
+import { defaultStartDepth, defaultEndDepth } from "../../../config.js";
 import DepthRail, {
   DepthField,
   DepthPresetSelect,
-  useDepthAxis
-} from '../../DepthRail/DepthRail.jsx'
-import { clampDepth } from '../../DepthRail/depthAxis.js'
-import '../styles.css'
+  useDepthAxis,
+} from "../../DepthRail/DepthRail.jsx";
+import { clampDepth } from "../../DepthRail/depthAxis.js";
+import "../styles.css";
 
 // The Depth filter inside the Filters panel.
 //
@@ -23,65 +23,63 @@ import '../styles.css'
 // a red warning under them. Nothing can be left invalid now: a typed figure
 // commits only once it is complete and inside the range the other end allows,
 // exactly as a typed date does.
-export default function DepthSelector (props) {
-  const { t } = useTranslation()
-  const { startDepth, endDepth, setStartDepth, setEndDepth } = props
+export default function DepthSelector(props) {
+  const { t } = useTranslation();
+  const { startDepth, endDepth, setStartDepth, setEndDepth } = props;
 
-  const axis = useDepthAxis(defaultStartDepth, defaultEndDepth)
+  const axis = useDepthAxis(defaultStartDepth, defaultEndDepth);
 
   // Either end moves alone, bounded by the other — from the rail and from the
   // fields alike. Unlike a time window, a chosen depth band is a place in the
   // water column rather than a thickness, so dragging one end resizes it
   // instead of sliding the whole band deeper.
-  function setHandleValue (handle, value) {
-    if (handle === 'start') {
-      setStartDepth(clampDepth(value, defaultStartDepth, endDepth))
+  function setHandleValue(handle, value) {
+    if (handle === "start") {
+      setStartDepth(clampDepth(value, defaultStartDepth, endDepth));
     } else {
-      setEndDepth(clampDepth(value, startDepth, defaultEndDepth))
+      setEndDepth(clampDepth(value, startDepth, defaultEndDepth));
     }
   }
 
   return (
-    <div className='filterRangeSelector depthSelector'>
+    <div className="filterRangeSelector depthSelector">
       {/* Each field is wrapped in its own <label>, so the text beside it is the
           field's name to a screen reader and a click target to everyone else. */}
-      <div className='filterRangeForm'>
-        <label className='filterRangeRow'>
-          <span className='filterRangeLabel'>
-            {t('depthSelectorPresetLabel')}
+      <div className="filterRangeForm">
+        <label className="filterRangeRow">
+          <span className="filterRangeLabel">
+            {t("depthSelectorPresetLabel")}
           </span>
           <DepthPresetSelect
-            className='filterRangeInput filterRangeSelect'
+            className="filterRangeInput filterRangeSelect"
             startDepth={startDepth}
             endDepth={endDepth}
             min={defaultStartDepth}
             max={defaultEndDepth}
             onSelect={(start, end) => {
-              setStartDepth(start)
-              setEndDepth(end)
+              setStartDepth(start);
+              setEndDepth(end);
             }}
           />
         </label>
-        <label className='filterRangeRow'>
-          <span className='filterRangeLabel'>
-            {t('depthFilterStartDepth')}
-          </span>
+        <label className="filterRangeRow">
+          <span className="filterRangeLabel">{t("depthFilterStartDepth")}</span>
           <DepthField
-            className='filterRangeInput'
+            className="filterRangeInput"
             value={startDepth}
             min={defaultStartDepth}
             max={endDepth}
-            onCommit={(value) => setHandleValue('start', value)}
+            onCommit={(value) => setHandleValue("start", value)}
           />
         </label>
-        <label className='filterRangeRow'>
-          <span className='filterRangeLabel'>{t('depthFilterEndDepth')}</span>
+        <label className="filterRangeRow">
+          <span className="filterRangeLabel">{t("depthFilterEndDepth")}</span>
           <DepthField
-            className='filterRangeInput'
+            className="filterRangeInput"
             value={endDepth}
             min={startDepth}
             max={defaultEndDepth}
-            onCommit={(value) => setHandleValue('end', value)}
+            onCommit={(value) => setHandleValue("end", value)}
           />
         </label>
       </div>
@@ -92,12 +90,12 @@ export default function DepthSelector (props) {
         onCommit={setHandleValue}
       />
     </div>
-  )
+  );
 }
 
 DepthSelector.propTypes = {
   startDepth: PropTypes.number.isRequired,
   endDepth: PropTypes.number.isRequired,
   setStartDepth: PropTypes.func.isRequired,
-  setEndDepth: PropTypes.func.isRequired
-}
+  setEndDepth: PropTypes.func.isRequired,
+};

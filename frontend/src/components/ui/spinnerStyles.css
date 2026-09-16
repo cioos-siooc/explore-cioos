@@ -14,6 +14,7 @@
   display: block;
   width: 100%;
   height: 100%;
+
   /* The dots scale past their own bounding box at the peak of the pulse. */
   overflow: visible;
 }
@@ -44,7 +45,8 @@
 /* Both parts take currentColor, so one `color` on a call site tints the whole
    mark and the existing opacity wrappers keep working. */
 .cioosSpinnerMesh {
-  fill: currentColor;
+  fill: currentcolor;
+
   /* Heavier than the favicon's own light-background mesh (which is this teal at
      28%, landing on #C6E3DF): at 28px that reads as a smudge, and the vertices
      need to be legible for the mark to be recognisable at all. */
@@ -52,7 +54,8 @@
 }
 
 .cioosSpinnerNode {
-  fill: currentColor;
+  fill: currentcolor;
+
   /* Scale each dot about its own centre rather than the viewBox origin — this
      is what lets the five mesh nodes stay verbatim copies of the favicon's
      paths instead of hand-computed circles. */

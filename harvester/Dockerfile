@@ -8,8 +8,14 @@ COPY ./harvester/pyproject.toml ./harvester/uv.lock ./harvester/README.md ./harv
 WORKDIR /app/harvester
 
 # 2. Install dependencies only (no project code yet)
+# --locked with no fallback. The fallback here used to be
+#   || (uv lock && uv sync --no-install-project)
+# which regenerated the lockfile inside the build on any mismatch — so the
+# image resolved fresh transitive versions that nothing had tested, and the
+# `--locked` on the final stage below could still pass. A mismatch is a
+# committed-lockfile problem; fail here and fix it in the repo.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project || (echo "Lock mismatch, regenerating" && uv lock && uv sync --no-install-project)
+    uv sync --locked --no-install-project
 
 # 3. Copy source code (cde_db_loader is the deprecated `python -m cde_db_loader` shim)
 COPY ./harvester/cde_harvester ./cde_harvester

@@ -1,5 +1,5 @@
-import * as React from 'react'
-import { useState } from 'react'
+import * as React from "react";
+import { useState } from "react";
 import {
   ArrowsExpand,
   BoundingBox,
@@ -10,50 +10,50 @@ import {
   Tag,
   Water,
   BroadcastPin,
-  Server
-} from 'react-bootstrap-icons'
-import { useTranslation } from 'react-i18next'
-import classNames from 'classnames'
+  Server,
+} from "react-bootstrap-icons";
+import { useTranslation } from "react-i18next";
+import classNames from "classnames";
 
-import Spinner from '../../ui/Spinner.jsx'
-import Filter from '../../Controls/Filter/Filter.jsx'
-import FilterSection from '../../Controls/Filter/FilterMenu/FilterSection.jsx'
-import DataLayersFilter from '../../Controls/Filter/DataLayersFilter/DataLayersFilter.jsx'
-import MultiCheckboxFilter from '../../Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
-import SourceFilter from '../../Controls/Filter/SourceFilter/SourceFilter.jsx'
-import ScientificNameFilter from '../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx'
-import TimeSelector from '../../Controls/Filter/TimeSelector/TimeSelector.jsx'
-import DepthSelector from '../../Controls/Filter/DepthSelector/DepthSelector.jsx'
+import Spinner from "../../ui/Spinner.jsx";
+import Filter from "../../Controls/Filter/Filter.jsx";
+import FilterSection from "../../Controls/Filter/FilterMenu/FilterSection.jsx";
+import DataLayersFilter from "../../Controls/Filter/DataLayersFilter/DataLayersFilter.jsx";
+import MultiCheckboxFilter from "../../Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx";
+import SourceFilter from "../../Controls/Filter/SourceFilter/SourceFilter.jsx";
+import ScientificNameFilter from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
+import TimeSelector from "../../Controls/Filter/TimeSelector/TimeSelector.jsx";
+import DepthSelector from "../../Controls/Filter/DepthSelector/DepthSelector.jsx";
 import {
   defaultStartDate,
   defaultEndDate,
   defaultStartDepth,
-  defaultEndDepth
-} from '../../config.js'
+  defaultEndDepth,
+} from "../../config.js";
 import {
   capitalizeFirstLetter,
   generateMultipleSelectBadgeTitle,
   generateRangeSelectBadgeTitle,
-  setAllOptionsIsSelectedTo
-} from '../../../utilities.jsx'
+  setAllOptionsIsSelectedTo,
+} from "../../../utilities.jsx";
 import {
   DATA_LAYER_LABEL_KEYS,
-  selectedDataLayerKeys
-} from '../../../state/dataLayers.js'
-import useDatasetCounts from '../../../state/useDatasetCounts.js'
-import { useFilters } from '../../../state/filters/FilterProvider.jsx'
-import { useMapState } from '../../../state/map/MapStateProvider.jsx'
-import { useSelection } from '../../../state/selection/SelectionProvider.jsx'
-import { useUI } from '../../../state/ui/UIProvider.jsx'
-import './styles.css'
+  selectedDataLayerKeys,
+} from "../../../state/dataLayers.js";
+import useDatasetCounts from "../../../state/useDatasetCounts.js";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
+import "./styles.css";
 
-function createOptionSubset (searchTerms, allOptions) {
+function createOptionSubset(searchTerms, allOptions) {
   if (searchTerms) {
     return allOptions.filter((option) =>
-      option.title.toLowerCase().includes(searchTerms.toString().toLowerCase())
-    )
+      option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()),
+    );
   } else {
-    return allOptions
+    return allOptions;
   }
 }
 
@@ -61,8 +61,8 @@ function createOptionSubset (searchTerms, allOptions) {
 // open filter's options in the detail pane on the right (see styles.css —
 // the .filterOptions flyout is re-anchored inside the sheet), over a footer
 // that reports what the filters currently add up to.
-export default function FiltersPanel () {
-  const { t } = useTranslation()
+export default function FiltersPanel() {
+  const { t } = useTranslation();
   const {
     eovsSelected,
     setEovsSelected,
@@ -103,126 +103,127 @@ export default function FiltersPanel () {
     allObisNodesSelected,
     showObis,
     obisDataAvailable,
-    resetFilters
-  } = useFilters()
-  const {
-    setDatasetTitleSearchText,
-    onlyInView,
-    setOnlyInView,
-    inViewCount
-  } = useSelection()
-  const { openFilter, setOpenFilter } = useUI()
+    resetFilters,
+  } = useFilters();
+  const { setDatasetTitleSearchText, onlyInView, setOnlyInView, inViewCount } =
+    useSelection();
+  const { openFilter, setOpenFilter } = useUI();
   const {
     ready: countsReady,
     updating: countsUpdating,
     filteredCount,
-    total
-  } = useDatasetCounts()
-  const { dataLayers, resetDataLayers, requestDraw } = useMapState()
+    total,
+  } = useDatasetCounts();
+  const { dataLayers, resetDataLayers, requestDraw } = useMapState();
 
   // The one search box whose terms aren't a filter over options already in
   // state — it is a query against WoRMS — so it is kept here rather than in the
   // filter state the URL is built from.
-  const [scientificNameSearchTerms, setScientificNameSearchTerms] = useState('')
+  const [scientificNameSearchTerms, setScientificNameSearchTerms] =
+    useState("");
 
-  const inViewFilterName = t('datasetsCardOnlyInViewText')
+  const inViewFilterName = t("datasetsCardOnlyInViewText");
 
   // Same badge rule as the catalogue filters: the bare filter name while the
   // filter is doing nothing, the chosen value(s) once it is.
-  const dataLayersFilterTranslationKey = 'layerSelectorLabel'
-  const dataLayersChosen = selectedDataLayerKeys(dataLayers)
+  const dataLayersFilterTranslationKey = "layerSelectorLabel";
+  const dataLayersChosen = selectedDataLayerKeys(dataLayers);
   const dataLayersBadgeTitle =
     dataLayersChosen.length === 0
       ? t(dataLayersFilterTranslationKey)
       : dataLayersChosen.length === 1
         ? t(DATA_LAYER_LABEL_KEYS[dataLayersChosen[0]])
-        : dataLayersChosen.length + t('dataLayersMulti')
+        : dataLayersChosen.length + t("dataLayersMulti");
 
-  const eovsFilterTranslationKey = 'oceanVariablesFiltername'
+  const eovsFilterTranslationKey = "oceanVariablesFiltername";
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     eovsFilterTranslationKey,
-    eovsSelected
-  )
-  const orgsFilterTranslationKey = 'organizationFilterName'
+    eovsSelected,
+  );
+  const orgsFilterTranslationKey = "organizationFilterName";
   const orgsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     orgsFilterTranslationKey,
-    orgsSelected
-  )
-  const datasetsFilterTranslationKey = 'datasetsFilterName'
+    orgsSelected,
+  );
+  const datasetsFilterTranslationKey = "datasetsFilterName";
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     datasetsFilterTranslationKey,
-    datasetsSelected
-  )
-  const platformsFilterTranslationKey = 'platformsFilterName'
+    datasetsSelected,
+  );
+  const platformsFilterTranslationKey = "platformsFilterName";
   const platformsBadgeTitle = generateMultipleSelectBadgeTitle(
+    t,
     platformsFilterTranslationKey,
-    platformsSelected
-  )
-  const sourcesFilterTranslationKey = 'sourceFilterName'
+    platformsSelected,
+  );
+  const sourcesFilterTranslationKey = "sourceFilterName";
 
   const sourcesBadgeTitle = (() => {
     const selectedTitles = [
       ...erddapServersSelected.filter((s) => s.isSelected).map((s) => s.title),
       // a fully selected OBIS group reads as one source
       ...(allObisNodesSelected
-        ? ['OBIS']
-        : obisNodesSelected.filter((n) => n.isSelected).map((n) => n.title))
-    ]
-    if (selectedTitles.length === 0) return t(sourcesFilterTranslationKey)
+        ? ["OBIS"]
+        : obisNodesSelected.filter((n) => n.isSelected).map((n) => n.title)),
+    ];
+    if (selectedTitles.length === 0) return t(sourcesFilterTranslationKey);
     if (selectedTitles.length === 1) {
-      return capitalizeFirstLetter(selectedTitles[0])
+      return capitalizeFirstLetter(selectedTitles[0]);
     }
-    return selectedTitles.length + t('sourcesMulti')
-  })()
+    return selectedTitles.length + t("sourcesMulti");
+  })();
 
-  const timeframesFilterName = t('timeframeFilterName')
+  const timeframesFilterName = t("timeframeFilterName");
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
     timeframesFilterName,
     [startDate, endDate],
-    [defaultStartDate, defaultEndDate]
-  )
+    [defaultStartDate, defaultEndDate],
+  );
   // Not one of the catalogue's own facets, so it has no options list to count:
   // the badge names the picked species instead, on the same one/many rule.
-  const scientificNamesFilterTranslationKey = 'scientificNameFilterName'
+  const scientificNamesFilterTranslationKey = "scientificNameFilterName";
   const scientificNamesBadgeTitle =
     scientificNamesSelected.length === 0
       ? t(scientificNamesFilterTranslationKey)
       : scientificNamesSelected.length === 1
         ? scientificNamesSelected[0]
-        : scientificNamesSelected.length + t('scientificNamesMulti')
+        : scientificNamesSelected.length + t("scientificNamesMulti");
 
-  const depthRangeFilterName = t('depthRangeFilterName')
+  const depthRangeFilterName = t("depthRangeFilterName");
   const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(
     depthRangeFilterName,
     [startDepth, endDepth],
     [defaultStartDepth, defaultEndDepth],
-    '(m)'
-  )
+    "(m)",
+  );
 
   // A failed /datasets leaves no catalogue total; what came back filtered is
   // then all we know it to be (same fallback as the top bar's counter).
-  const totalCount = total ?? filteredCount
+  const totalCount = total ?? filteredCount;
 
-  function resetEverything () {
-    resetFilters()
-    resetDataLayers()
-    requestDraw('clear')
-    setDatasetTitleSearchText('')
-    setOnlyInView(false)
+  function resetEverything() {
+    resetFilters();
+    resetDataLayers();
+    requestDraw("clear");
+    setDatasetTitleSearchText("");
+    setOnlyInView(false);
   }
 
   return (
-    <div className='filtersPanel'>
-      <div className='filtersPanelBody'>
-        <div className='filtersPanelList'>
-          <FilterSection title={t('filterGroupWhat')}>
+    <div className="filtersPanel" data-testid="filters-panel">
+      <div className="filtersPanelBody">
+        <div className="filtersPanelList" data-testid="filters-panel-list">
+          <FilterSection title={t("filterGroupWhat")}>
             {/* First in the section: this is the coarsest "what" there is — it
                 decides which families of data exist for the filters below to
                 narrow. */}
             <Filter
               active={dataLayersChosen.length > 0}
               badgeTitle={dataLayersBadgeTitle}
-              tooltip={t('dataLayersFilterTooltip')}
+              tooltip={t("dataLayersFilterTooltip")}
               icon={<Stack />}
               controlled
               filterName={dataLayersFilterTranslationKey}
@@ -237,13 +238,13 @@ export default function FiltersPanel () {
               badgeTitle={eovsBadgeTitle}
               optionsSelected={eovsSelected}
               setOptionsSelected={setEovsSelected}
-              tooltip={t('oceanVariableFilterTooltip')}
+              tooltip={t("oceanVariableFilterTooltip")}
               icon={<Water />}
               controlled
               searchable
               searchTerms={eovsSearchTerms}
               setSearchTerms={setEovsSearchTerms}
-              searchPlaceholder={t('oceanVariableFilterSeachPlaceholder')}
+              searchPlaceholder={t("oceanVariableFilterSeachPlaceholder")}
               filterName={eovsFilterTranslationKey}
               openFilter={openFilter === eovsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
@@ -252,7 +253,10 @@ export default function FiltersPanel () {
               }
             >
               <MultiCheckboxFilter
-                optionsSelected={createOptionSubset(eovsSearchTerms, eovsSelected)}
+                optionsSelected={createOptionSubset(
+                  eovsSearchTerms,
+                  eovsSelected,
+                )}
                 setOptionsSelected={setEovsSelected}
                 searchable
                 translatable
@@ -265,13 +269,13 @@ export default function FiltersPanel () {
               }
               badgeTitle={platformsBadgeTitle}
               setOptionsSelected={setPlatformsSelected}
-              tooltip={t('platformFilterTooltip')}
+              tooltip={t("platformFilterTooltip")}
               icon={<BroadcastPin />}
               controlled
               searchable
               searchTerms={platformsSearchTerms}
               setSearchTerms={setPlatformsSearchTerms}
-              searchPlaceholder={t('platformsFilterSeachPlaceholder')}
+              searchPlaceholder={t("platformsFilterSeachPlaceholder")}
               filterName={platformsFilterTranslationKey}
               openFilter={openFilter === platformsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
@@ -279,15 +283,15 @@ export default function FiltersPanel () {
                 setAllOptionsIsSelectedTo(
                   false,
                   platformsSelected,
-                  setPlatformsSelected
+                  setPlatformsSelected,
                 )
               }
-              infoButton='http://vocab.nerc.ac.uk/collection/L06/current/'
+              infoButton="http://vocab.nerc.ac.uk/collection/L06/current/"
             >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   platformsSearchTerms,
-                  platformsSelected
+                  platformsSelected,
                 )}
                 setOptionsSelected={setPlatformsSelected}
                 searchable
@@ -297,19 +301,19 @@ export default function FiltersPanel () {
               />
             </Filter>
           </FilterSection>
-          <FilterSection title={t('filterGroupFrom')}>
+          <FilterSection title={t("filterGroupFrom")}>
             <Filter
               active={orgsSelected.filter((eov) => eov.isSelected).length !== 0}
               badgeTitle={orgsBadgeTitle}
               optionsSelected={orgsSelected}
               setOptionsSelected={setOrgsSelected}
-              tooltip={t('organizationFilterTooltip')}
+              tooltip={t("organizationFilterTooltip")}
               icon={<Building />}
               controlled
               searchable
               searchTerms={orgsSearchTerms}
               setSearchTerms={setOrgsSearchTerms}
-              searchPlaceholder={t('organizationFilterSearchPlaceholder')}
+              searchPlaceholder={t("organizationFilterSearchPlaceholder")}
               filterName={orgsFilterTranslationKey}
               openFilter={openFilter === orgsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
@@ -318,7 +322,10 @@ export default function FiltersPanel () {
               }
             >
               <MultiCheckboxFilter
-                optionsSelected={createOptionSubset(orgsSearchTerms, orgsSelected)}
+                optionsSelected={createOptionSubset(
+                  orgsSearchTerms,
+                  orgsSelected,
+                )}
                 setOptionsSelected={setOrgsSelected}
                 searchable
                 allOptions={orgsSelected}
@@ -331,13 +338,13 @@ export default function FiltersPanel () {
               badgeTitle={datasetsBadgeTitle}
               optionsSelected={datasetsSelected}
               setOptionsSelected={setDatasetsSelected}
-              tooltip={t('datasetFilterTooltip')}
+              tooltip={t("datasetFilterTooltip")}
               icon={<FileEarmarkSpreadsheet />}
               controlled
               searchable
               searchTerms={datasetSearchTerms}
               setSearchTerms={setDatasetSearchTerms}
-              searchPlaceholder={t('datasetSearchPlaceholder')}
+              searchPlaceholder={t("datasetSearchPlaceholder")}
               filterName={datasetsFilterTranslationKey}
               openFilter={openFilter === datasetsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
@@ -345,14 +352,14 @@ export default function FiltersPanel () {
                 setAllOptionsIsSelectedTo(
                   false,
                   datasetsSelected,
-                  setDatasetsSelected
+                  setDatasetsSelected,
                 )
               }
             >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   datasetSearchTerms,
-                  datasetsSelected
+                  datasetsSelected,
                 )}
                 setOptionsSelected={setDatasetsSelected}
                 searchable
@@ -363,13 +370,13 @@ export default function FiltersPanel () {
             <Filter
               active={anyServersSelected || anyObisNodesSelected}
               badgeTitle={sourcesBadgeTitle}
-              tooltip={t('sourceFilterTooltip')}
+              tooltip={t("sourceFilterTooltip")}
               icon={<Server />}
               controlled
               searchable
               searchTerms={sourcesSearchTerms}
               setSearchTerms={setSourcesSearchTerms}
-              searchPlaceholder={t('sourceFilterSearchPlaceholder')}
+              searchPlaceholder={t("sourceFilterSearchPlaceholder")}
               filterName={sourcesFilterTranslationKey}
               openFilter={openFilter === sourcesFilterTranslationKey}
               setOpenFilter={setOpenFilter}
@@ -377,13 +384,13 @@ export default function FiltersPanel () {
                 setAllOptionsIsSelectedTo(
                   false,
                   erddapServersSelected,
-                  setErddapServersSelected
-                )
+                  setErddapServersSelected,
+                );
                 setAllOptionsIsSelectedTo(
                   false,
                   obisNodesSelected,
-                  setObisNodesSelected
-                )
+                  setObisNodesSelected,
+                );
               }}
             >
               <SourceFilter
@@ -395,23 +402,23 @@ export default function FiltersPanel () {
               />
             </Filter>
           </FilterSection>
-          <FilterSection title={t('filterGroupWhenWhere')}>
+          <FilterSection title={t("filterGroupWhenWhere")}>
             <Filter
               active={timeFilterActive}
               badgeTitle={timeframesBadgeTitle}
               setOptionsSelected={() => {
-                setStartDate(defaultStartDate)
-                setEndDate(defaultEndDate)
+                setStartDate(defaultStartDate);
+                setEndDate(defaultEndDate);
               }}
-              tooltip={t('timeframeFilterTooltip')}
+              tooltip={t("timeframeFilterTooltip")}
               icon={<CalendarWeek />}
               controlled
               filterName={timeframesFilterName}
               openFilter={openFilter === timeframesFilterName}
               setOpenFilter={setOpenFilter}
               resetButton={() => {
-                setStartDate(defaultStartDate)
-                setEndDate(defaultEndDate)
+                setStartDate(defaultStartDate);
+                setEndDate(defaultEndDate);
               }}
             >
               <TimeSelector
@@ -425,18 +432,18 @@ export default function FiltersPanel () {
               active={depthFilterActive}
               badgeTitle={depthRangeBadgeTitle}
               setOptionsSelected={() => {
-                setStartDepth(defaultStartDepth)
-                setEndDepth(defaultEndDepth)
+                setStartDepth(defaultStartDepth);
+                setEndDepth(defaultEndDepth);
               }}
-              tooltip={t('depthrangeFilterTooltip')}
+              tooltip={t("depthrangeFilterTooltip")}
               icon={<ArrowsExpand />}
               controlled
               filterName={depthRangeFilterName}
               openFilter={openFilter === depthRangeFilterName}
               setOpenFilter={setOpenFilter}
               resetButton={() => {
-                setStartDepth(defaultStartDepth)
-                setEndDepth(defaultEndDepth)
+                setStartDepth(defaultStartDepth);
+                setEndDepth(defaultEndDepth);
               }}
             >
               <DepthSelector
@@ -448,8 +455,8 @@ export default function FiltersPanel () {
             </Filter>
             <Filter
               active={onlyInView}
-              badgeTitle={t('datasetsCardOnlyInViewText')}
-              tooltip={t('datasetsCardOnlyInViewTitle')}
+              badgeTitle={t("datasetsCardOnlyInViewText")}
+              tooltip={t("datasetsCardOnlyInViewTitle")}
               icon={<BoundingBox />}
               controlled
               filterName={inViewFilterName}
@@ -457,33 +464,33 @@ export default function FiltersPanel () {
               setOpenFilter={setOpenFilter}
               resetButton={onlyInView ? () => setOnlyInView(false) : undefined}
             >
-              <label className='inViewFilterToggle'>
+              <label className="inViewFilterToggle">
                 <input
-                  type='checkbox'
+                  type="checkbox"
                   checked={onlyInView}
                   onChange={(e) => setOnlyInView(e.target.checked)}
                 />
-                <span>{t('datasetsCardOnlyInViewTitle')}</span>
+                <span>{t("datasetsCardOnlyInViewTitle")}</span>
               </label>
-              <div className='inViewFilterCount'>
-                {t('datasetsCardInViewCountText', { count: inViewCount })}
+              <div className="inViewFilterCount">
+                {t("datasetsCardInViewCountText", { count: inViewCount })}
               </div>
             </Filter>
           </FilterSection>
           {obisDataAvailable && (
-            <FilterSection title={t('filterGroupBiodiversity')}>
+            <FilterSection title={t("filterGroupBiodiversity")}>
               <Filter
                 active={scientificNamesSelected.length > 0}
                 badgeTitle={scientificNamesBadgeTitle}
-                tooltip={t('scientificNameFilterTooltip')}
+                tooltip={t("scientificNameFilterTooltip")}
                 disabled={!showObis}
-                disabledTooltip={t('scientificNameFilterDisabledTooltip')}
+                disabledTooltip={t("scientificNameFilterDisabledTooltip")}
                 icon={<Tag />}
                 controlled
                 searchable
                 searchTerms={scientificNameSearchTerms}
                 setSearchTerms={setScientificNameSearchTerms}
-                searchPlaceholder={t('scientificNameFilterSearchPlaceholder')}
+                searchPlaceholder={t("scientificNameFilterSearchPlaceholder")}
                 filterName={scientificNamesFilterTranslationKey}
                 openFilter={openFilter === scientificNamesFilterTranslationKey}
                 setOpenFilter={setOpenFilter}
@@ -503,9 +510,7 @@ export default function FiltersPanel () {
           )}
         </div>
         {!openFilter && (
-          <div className='filtersPanelPlaceholder'>
-            {t('filtersPanelHint')}
-          </div>
+          <div className="filtersPanelPlaceholder">{t("filtersPanelHint")}</div>
         )}
       </div>
       {/* Filters apply live, so there is nothing to confirm here — but the
@@ -514,36 +519,38 @@ export default function FiltersPanel () {
           filtering towards. Reset sits beside it because it is the other thing
           you do to the whole set, rather than at the end of a list that has to
           be scrolled past to reach it. */}
-      <div className='filtersPanelFooter'>
+      <div className="filtersPanelFooter">
         <span
-          className={classNames('filtersPanelCount', {
-            updating: countsUpdating
+          className={classNames("filtersPanelCount", {
+            updating: countsUpdating,
           })}
           title={
             countsReady
-              ? t('dockDatasetsCountTitle', {
-                filtered: filteredCount,
-                total: totalCount
-              })
-              : t('datasetsCountLoadingTitle')
+              ? t("dockDatasetsCountTitle", {
+                  filtered: filteredCount,
+                  total: totalCount,
+                })
+              : t("datasetsCountLoadingTitle")
           }
         >
-          {countsReady
-            ? t('topBarCountsSummary', {
+          {countsReady ? (
+            t("topBarCountsSummary", {
               filtered: filteredCount,
-              total: totalCount
+              total: totalCount,
             })
-            : <Spinner size='xs' className='countSpinner' />}
+          ) : (
+            <Spinner size="xs" className="countSpinner" />
+          )}
         </span>
         <button
-          type='button'
-          className='filtersPanelReset'
+          type="button"
+          className="filtersPanelReset"
           onClick={resetEverything}
-          title={t('resetFiltersButtonTooltipText')}
+          title={t("resetFiltersButtonTooltipText")}
         >
-          {t('filtersPanelResetAll')}
+          {t("filtersPanelResetAll")}
         </button>
       </div>
     </div>
-  )
+  );
 }

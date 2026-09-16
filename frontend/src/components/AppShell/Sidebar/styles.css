@@ -18,6 +18,7 @@
    and the empty space between/below them stays click-through to the map. */
 .sidebar {
   position: fixed;
+
   /* Start below the centered top bar whenever it reaches over this column —
      which it does on narrower screens, and does further down the more
      active-filter chips are wrapped under it. TopControls publishes that reach
@@ -25,6 +26,7 @@
      the column goes back to starting at the top of the map. */
   top: max(12px, var(--cioos-top-bar-space, 0px));
   left: 12px;
+
   /* Stop above the tracks-mode time bar rather than running under it. --cioos-
      time-bar-space is 0 unless the bar is mounted (TimeBar publishes its
      measured footprint), so with the bar absent this is the plain 12px inset.
@@ -66,6 +68,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-lg);
   overflow: hidden;
+
   /* 3D depth (shared tokens; see theme.css). The panel clips its content, so
      preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
   transform: var(--cioos-perspective);
@@ -91,6 +94,7 @@
        the card travels in rather than growing out of it. */
     transform: translateX(calc(-100% - 16px)) var(--cioos-perspective);
   }
+
   to {
     transform: translateX(0) var(--cioos-perspective);
   }
@@ -245,12 +249,12 @@
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden auto;
+
   /* The list and the dataset page slide in horizontally (Panels/styles.css);
      clipped rather than scrolled, so those few frames can't flash a horizontal
      scrollbar (a scroll box with overflow-y: auto resolves overflow-x to auto
      unless it is set). Nothing in this column is meant to reach past its edge. */
-  overflow-x: hidden;
   border-top: 1px solid var(--cioos-hairline);
 }
 
@@ -301,6 +305,7 @@
   flex-shrink: 0;
   padding: 8px 16px;
   border: 1px solid var(--cioos-primary-700);
+
   /* Same corner radius as the dataset cards it sits under. */
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-primary);
@@ -364,6 +369,7 @@
     inset: 0;
     height: 100dvh;
     max-height: 100dvh;
+
     /* Nothing shows past it, so it has no edges of its own to draw and no
        plane to be lifted off. */
     border: none;
@@ -418,6 +424,7 @@
      touch target, and the counts beside it stay on one line each. */
   .sidebarFooter {
     padding: var(--cioos-space-md) var(--cioos-space-lg);
+
     /* Clear of the home indicator on a notched phone. */
     padding-bottom: max(var(--cioos-space-md), env(safe-area-inset-bottom));
   }
@@ -431,6 +438,7 @@
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }

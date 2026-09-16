@@ -1,6 +1,6 @@
-import { useFilters } from './filters/FilterProvider.jsx'
-import { useSelection } from './selection/SelectionProvider.jsx'
-import { formatDatasetCount } from '../utilities.jsx'
+import { useFilters } from "./filters/FilterProvider.jsx";
+import { useSelection } from "./selection/SelectionProvider.jsx";
+import { formatDatasetCount } from "../utilities.jsx";
 
 // The datasets counters shown in the top bar and the sidebar (pill + footer).
 //
@@ -17,18 +17,18 @@ import { formatDatasetCount } from '../utilities.jsx'
 // `updating` marks a refetch in flight *after* the first one landed. The
 // previous counts stay on screen (dimmed) instead of collapsing back to a
 // spinner, so a filter tweak doesn't make the numbers flicker.
-export default function useDatasetCounts () {
-  const { totalNumberOfDatasets, catalogLoaded } = useFilters()
+export default function useDatasetCounts() {
+  const { totalNumberOfDatasets, catalogLoaded } = useFilters();
   const { filteredDatasets, selectionLoading, initialPointsQueryComplete } =
-    useSelection()
+    useSelection();
 
   const ready =
     initialPointsQueryComplete &&
-    (totalNumberOfDatasets !== undefined || catalogLoaded)
+    (totalNumberOfDatasets !== undefined || catalogLoaded);
 
   // Reflects the title-search / "only in view" narrowing too, not just the
   // server-side filters, so the counters agree with the list they sit next to.
-  const filteredCount = filteredDatasets?.length ?? 0
+  const filteredCount = filteredDatasets?.length ?? 0;
 
   return {
     ready,
@@ -39,6 +39,6 @@ export default function useDatasetCounts () {
     // "filtered / total" split is noise, so state the single number alone.
     allDatasetsShown:
       !totalNumberOfDatasets || filteredCount === totalNumberOfDatasets,
-    label: formatDatasetCount(filteredCount, totalNumberOfDatasets)
-  }
+    label: formatDatasetCount(filteredCount, totalNumberOfDatasets),
+  };
 }

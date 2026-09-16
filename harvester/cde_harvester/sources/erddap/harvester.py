@@ -9,10 +9,21 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import pandas as pd
+from prefect import task
+from requests.exceptions import HTTPError
+
+from cde_harvester.core.errors import (
+    CDM_DATA_TYPE_UNSUPPORTED,
+    HTTP_ERROR,
+    NO_PROFILES_FOUND,
+    ON_SKIP_LIST,
+    RESPONSE_TOO_LARGE,
+    UNCHANGED,
+    UNKNOWN_ERROR,
+    ResponseTooLargeError,
+)
 from cde_harvester.core.frame_spill import SpillSet
-from cde_harvester.sources.base import BaseHarvester, HarvestResult
-from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
-from cde_harvester.sources.erddap.client import ERDDAP
+from cde_harvester.core.issues import erddap_error_text
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
@@ -23,17 +34,6 @@ from cde_harvester.core.schemas import (
     VariableSchema,
     VerifiedDatasetSchema,
 )
-from cde_harvester.core.errors import (
-    CDM_DATA_TYPE_UNSUPPORTED,
-    HTTP_ERROR,
-    NO_PROFILES_FOUND,
-    ON_SKIP_LIST,
-    RESPONSE_TOO_LARGE,
-    ResponseTooLargeError,
-    UNCHANGED,
-    UNKNOWN_ERROR,
-)
-from cde_harvester.core.issues import erddap_error_text
 from cde_harvester.dataset_types import (
     extract_features,
     extract_track_points,
@@ -42,9 +42,10 @@ from cde_harvester.dataset_types import (
     supported_data_structures,
 )
 from cde_harvester.dataset_types.geo import POINT_THRESHOLD_M
+from cde_harvester.sources.base import BaseHarvester, HarvestResult
+from cde_harvester.sources.erddap.client import ERDDAP
+from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
 from cde_harvester.sources.erddap.state import load_previous_hashes
-from requests.exceptions import HTTPError
-from prefect import task
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +148,7 @@ class ERDDAPHarvester(BaseHarvester):
             with open(skipped_datasets_path) as f:
                 datasets_to_skip = json.load(f)
                 return datasets_to_skip
-        logger.info(f"No skipped datasets list found")
+        logger.info("No skipped datasets list found")
         return {}
 
     def harvest(self) -> HarvestResult:
@@ -211,7 +212,8 @@ class ERDDAPHarvester(BaseHarvester):
         if not unsupported_datasets.empty:
             unsupported_datasets_list = unsupported_datasets["datasetID"].to_list()
             erddap_logger.warning(
-                f"Skipping datasets because cdm_data_type is not {str(cdm_data_types_supported)}: {unsupported_datasets_list}"
+                f"Skipping datasets because cdm_data_type is not "
+                f"{cdm_data_types_supported}: {unsupported_datasets_list}"
             )
             base = self.erddap_url.rstrip("/")
             for dataset_id in unsupported_datasets_list:

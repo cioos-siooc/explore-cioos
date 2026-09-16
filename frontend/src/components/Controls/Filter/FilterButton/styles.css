@@ -5,7 +5,9 @@ button.filterButton {
   padding: 2px 12px;
   margin: 0 6px 6px 0;
   font-weight: 500;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 button.filterButton.selected {

@@ -8,7 +8,7 @@
 //  - 'unknown': hashing was attempted but unavailable (Croissant error,
 //    federated source unresolved, …) or the dataset has never been hashed yet.
 export function harvestMode(dataset = {}) {
-  if (dataset.content_hash) return 'incremental'
-  if (dataset.content_hash_reason === 'HASH_NO_FILE_LIST') return 'full'
-  return 'unknown'
+  if (dataset.content_hash) return "incremental";
+  if (dataset.content_hash_reason === "HASH_NO_FILE_LIST") return "full";
+  return "unknown";
 }

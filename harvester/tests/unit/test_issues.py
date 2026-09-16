@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-
 from cde_harvester.core.issues import (
     erddap_error_text,
     error_signature,

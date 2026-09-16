@@ -1,7 +1,18 @@
 name: Deploy
 
+# Gated on tests. This workflow used to trigger on `push` while reading
+# `github.event.workflow_run.*` in three places — an expression that is always
+# null outside a workflow_run event — so it fell through to `github.ref_name`
+# and a red build deployed anyway. It now runs only when the Integration Tests
+# workflow finishes on a deployable branch, and only when that run succeeded.
+#
+# Integration Tests is the single gate because it is a superset: it runs the
+# whole Python suite (`uv run pytest`) before standing up compose, on top of the
+# JS API/frontend suite and the download-request check.
 on:
-  push:
+  workflow_run:
+    workflows: ["Integration Tests"]
+    types: [completed]
     branches:
       - master
       - development
@@ -9,6 +20,9 @@ on:
 
 jobs:
   deploy:
+    # workflow_dispatch has no workflow_run context — deploying by hand stays a
+    # deliberate override.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     name: Deploy to ${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
@@ -16,6 +30,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # A workflow_run event checks out the DEFAULT branch unless told
+          # otherwise, which would deploy master's compose files to development.
+          # Deploy exactly the commit that was tested.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:

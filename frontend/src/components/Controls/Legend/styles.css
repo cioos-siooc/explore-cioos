@@ -12,10 +12,12 @@
   min-width: 124px;
   max-width: 190px;
   max-height: calc(100vh - 120px);
+
   /* The card no longer scrolls as a whole: its body does (below), so the
      header stays reachable and the footer's scale bar stays on screen however
      long the list of keys grows. */
   overflow: hidden;
+
   /* 3D depth (shared tokens; see theme.css). The card scrolls, so
      preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
   transform: var(--cioos-perspective);
@@ -76,6 +78,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+
   /* the row owns the gap to its contents, since its children are zeroed */
   margin-bottom: 3px;
 }
@@ -96,6 +99,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cioos-ink-60);
+
   /* Wraps rather than nowrap: the card is capped at 190px and the longer French
      labels ran past it, where the card's overflow simply cut them off. */
   line-height: 1.25;
@@ -168,8 +172,7 @@
 /* A pair of short entries that belong on one row (the point-size key). Wraps
    rather than overflowing if a translation runs long. */
 .legendItems.inline {
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-flow: row wrap;
   gap: 2px 10px;
 }
 
@@ -198,6 +201,7 @@
   align-items: center;
   gap: 4px;
   min-height: 15px;
+
   /* Indented off the card's left edge. The row leads with a 6px circle inside a
      12px swatch box, so its ink starts further right than the colour bar's does
      and the row read as if it were hanging off the edge. */
@@ -414,14 +418,12 @@
    the brand section — instead of leaving it beside the bar. */
 @media (max-width: 900px) {
   .legend {
-    top: auto;
-    right: auto;
+    inset: auto auto calc(12px + var(--cioos-time-bar-space, 0px)) 8px;
+
     /* Stacked directly above the tracks-mode time bar, which owns the bottom
        edge of the screen here. --cioos-time-bar-space is 0 while the bar isn't
        shown (TimeBar publishes its measured footprint), leaving the plain
        bottom-corner offset. */
-    bottom: calc(12px + var(--cioos-time-bar-space, 0px));
-    left: 8px;
     max-height: calc(100vh - 148px - var(--cioos-time-bar-space, 0px));
   }
 }

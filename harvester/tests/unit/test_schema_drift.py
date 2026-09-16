@@ -13,7 +13,6 @@ import re
 from pathlib import Path
 
 import pytest
-
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
@@ -67,7 +66,7 @@ def _ddl_columns():
 
 
 @pytest.mark.parametrize(
-    "schema,table", SCHEMA_TO_TABLE.items(), ids=[t for t in SCHEMA_TO_TABLE.values()]
+    "schema,table", SCHEMA_TO_TABLE.items(), ids=list(SCHEMA_TO_TABLE.values())
 )
 def test_schema_columns_exist_in_ddl(schema, table):
     ddl = _ddl_columns()

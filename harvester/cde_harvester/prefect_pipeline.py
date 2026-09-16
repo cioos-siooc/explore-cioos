@@ -6,7 +6,7 @@ import shutil
 import sys
 import time
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -18,24 +18,24 @@ from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
 
 from cde_harvester.__main__ import main as harvester_main
+from cde_harvester.core import db as core_db
 from cde_harvester.core.config import (
     load_config,
     resolve_harvest_config_file,
     resolve_obis_config,
 )
-from cde_harvester.core import db as core_db
 from cde_harvester.core.observability import cleanup_old_logs, run_logger
 from cde_harvester.core.schema import (
     check_confirmation,
     ensure_database,
     rebuild_schema,
 )
+from cde_harvester.loading.loader import main as db_loader_main
+from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
+from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.sources import OBIS_ALIASES
 from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
-from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
-from cde_harvester.loading.loader import main as db_loader_main
-from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 
 load_dotenv()
 
@@ -109,7 +109,9 @@ PRUNE_GRACE_SECONDS = 6 * 3600
 
 
 def _timestamp():
-    return datetime.now().strftime(TIMESTAMP_FMT)
+    # UTC: these name the per-run output folders, which are compared and
+    # pruned by timestamp order (see PRUNE_GRACE_SECONDS).
+    return datetime.now(timezone.utc).strftime(TIMESTAMP_FMT)
 
 
 def _server_run_folder(base_folder, slug, timestamp):
@@ -276,7 +278,11 @@ class PrefectCDEPipeline:
             try:
                 # OBIS cache is shared across runs and MUST live outside the per-run tree
                 # (pruning rmtrees per-server run dirs); keep it a sibling of base_folder.
-                obis_folder = Path(self.obis_folder) if self.obis_folder else base_folder.resolve().parent / "obis_cache"
+                obis_folder = (
+                    Path(self.obis_folder)
+                    if self.obis_folder
+                    else base_folder.resolve().parent / "obis_cache"
+                )
                 abs_run, abs_obis = run_folder.resolve(), obis_folder.resolve()
                 assert abs_obis != abs_run and abs_run not in abs_obis.parents, (
                     f"OBIS cache {obis_folder} must not be inside the per-run folder {run_folder}"
@@ -315,7 +321,9 @@ class PrefectCDEPipeline:
 
                 logger.info("Running cde_db_loader subflow")
                 try:
-                    db_loader_main(folder=str(run_folder), incremental=effective_incremental)
+                    load_summary = db_loader_main(
+                        folder=str(run_folder), incremental=effective_incremental
+                    )
                     logger.info("cde_db_loader completed successfully")
                     # Prune only after a successful load so failed runs' CSVs survive.
                     _prune_server_run_folders(base_folder, protect=[run_folder])
@@ -323,7 +331,11 @@ class PrefectCDEPipeline:
                     logger.error(f"cde_db_loader failed: {e}", exc_info=True)
                     raise
 
-                if self.flush_redis:
+                # A run where every dataset hashed unchanged moved nothing the API
+                # serves, so dropping the cache would only make the next visitor
+                # pay for a rebuild that changes no bytes. The load itself decides
+                # this — see the summary returned by loading/loader.py:main.
+                if self.flush_redis and load_summary["changed"]:
                     logger.info("Refreshing redis cache")
                     try:
                         clearRedisCache()
@@ -332,6 +344,13 @@ class PrefectCDEPipeline:
                     except Exception as e:
                         logger.error(f"redis refresh failed: {e}", exc_info=True)
                         raise
+                elif self.flush_redis:
+                    logger.info(
+                        "Nothing changed in this load (%d changed dataset(s), %d pruned); "
+                        "keeping the redis cache warm",
+                        load_summary["changed_datasets"],
+                        load_summary["pruned"],
+                    )
 
                 logger.info("CDE Pipeline completed successfully")
             finally:
@@ -795,7 +814,13 @@ def deploy(pipeline):
 
 def main():
     parser = argparse.ArgumentParser(description="Run CDE Pipeline with Prefect")
-    parser.add_argument("-f", "--file", type=str, default="harvest_config.yaml", help="Path to harvest_config.yaml file")
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        default="harvest_config.yaml",
+        help="Path to harvest_config.yaml file",
+    )
     parser.add_argument("-d", "--deployment", type=str, default="local", help="Deployment target (local or prod)")
     args = parser.parse_args()
 

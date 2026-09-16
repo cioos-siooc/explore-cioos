@@ -1,14 +1,35 @@
+/* Status palette for the admin views. Scoped to .harvest-root: these are the
+   on-status text and surface tints the run tables need, not global brand
+   values, so they stay out of theme.css. */
+.harvest-root {
+  --harvest-success-ink: #0e3d35;
+  --harvest-error-ink: #7a1520;
+  --harvest-error-border: #e8b9bf;
+  --harvest-warn-bg: #f3ecd6;
+  --harvest-warn-ink: #7a5c00;
+  --harvest-warn-border: #ddd0b0;
+  --harvest-info-bg: #dceef7;
+  --harvest-info-ink: #0d5c80;
+  --harvest-muted: #8a9ea2;
+  --harvest-muted-strong: #5a7a7f;
+  --harvest-muted-soft: #7a8e91;
+  --harvest-hairline: #ede8e2;
+  --harvest-row-hover: #f8f6f3;
+  --harvest-input-border: #c6d8db;
+  --harvest-spark-empty: #aaa;
+}
+
 /* ── Harvest section root layout ──────────────────────────────────────────── */
 .harvest-root {
   min-height: 100vh;
-  background: #F3F0EC;
-  font-family: 'Montserrat', sans-serif;
-  color: #152F37;
+  background: var(--cioos-sand);
+  font-family: Montserrat, sans-serif;
+  color: var(--cioos-ink);
 }
 
 .harvest-header {
-  background: #152F37;
-  color: #fff;
+  background: var(--cioos-navy);
+  color: var(--cioos-white);
   padding: 0.75rem 1.5rem;
   display: flex;
   align-items: center;
@@ -21,21 +42,21 @@
 }
 
 .harvest-home-link {
-  color: #C6E3DF;
+  color: var(--cioos-teal-light);
   text-decoration: none;
   font-size: 0.85rem;
 }
 
 .harvest-home-link:hover {
   text-decoration: underline;
-  color: #fff;
+  color: var(--cioos-white);
 }
 
 .harvest-lang-toggle {
   margin-left: auto;
   background: transparent;
-  border: 1px solid #C6E3DF;
-  color: #C6E3DF;
+  border: 1px solid var(--cioos-teal-light);
+  color: var(--cioos-teal-light);
   font-size: 0.78rem;
   font-weight: 600;
   padding: 3px 9px;
@@ -45,8 +66,8 @@
 }
 
 .harvest-lang-toggle:hover {
-  background: #C6E3DF;
-  color: #152F37;
+  background: var(--cioos-teal-light);
+  color: var(--cioos-ink);
 }
 
 .harvest-breadcrumb {
@@ -54,11 +75,11 @@
   margin: 0 auto;
   padding: 0.5rem 1.5rem;
   font-size: 0.85rem;
-  color: #5a7a7f;
+  color: var(--harvest-muted-strong);
 }
 
 .harvest-breadcrumb a {
-  color: #52A79B;
+  color: var(--cioos-primary);
   text-decoration: none;
 }
 
@@ -83,18 +104,45 @@
   white-space: nowrap;
 }
 
-.harvest-status-success   { background: #C6E3DF; color: #0e3d35; }
-.harvest-status-skipped   { background: #F3ECD6; color: #7a5c00; border: 1px solid #ddd0b0; }
-.harvest-status-error     { background: #FBE3E6; color: #7a1520; }
-.harvest-status-running   { background: #DCEEF7; color: #0d5c80; }
-.harvest-status-failed    { background: #FBE3E6; color: #7a1520; }
+.harvest-status-success {
+  background: var(--cioos-success-bg);
+  color: var(--harvest-success-ink);
+}
+
+.harvest-status-skipped {
+  background: var(--harvest-warn-bg);
+  color: var(--harvest-warn-ink);
+  border: 1px solid var(--harvest-warn-border);
+}
+
+.harvest-status-error {
+  background: var(--cioos-error-bg);
+  color: var(--harvest-error-ink);
+}
+
+.harvest-status-running {
+  background: var(--harvest-info-bg);
+  color: var(--harvest-info-ink);
+}
+
+.harvest-status-failed {
+  background: var(--cioos-error-bg);
+  color: var(--harvest-error-ink);
+}
+
 /* hash-verified, nothing re-harvested (run audit views) */
-.harvest-status-unchanged { background: #DCEEF7; color: #0d5c80; }
+.harvest-status-unchanged {
+  background: var(--harvest-info-bg);
+  color: var(--harvest-info-ink);
+}
 
 /* ── Hashable column (file-based vs source-queried) ────────────────────────── */
+
 /* Cell text matches the rest of the table; the explanation is in the tooltip.
    Summary count pill matches the success/skipped/error count pills. */
-.harvest-count-files { color: #0e3d35; }
+.harvest-count-files {
+  color: var(--harvest-success-ink);
+}
 
 /* ── Sparkline ────────────────────────────────────────────────────────────── */
 .harvest-spark {
@@ -107,25 +155,36 @@
   display: inline-block;
 }
 
-.harvest-spark-success { color: #52A79B; }
-.harvest-spark-skipped { color: #B07A00; }
-.harvest-spark-error   { color: #E25563; }
-.harvest-spark-empty   { color: #aaa; }
+.harvest-spark-success {
+  color: var(--cioos-success);
+}
+
+.harvest-spark-skipped {
+  color: var(--cioos-warn);
+}
+
+.harvest-spark-error {
+  color: var(--cioos-error);
+}
+
+.harvest-spark-empty {
+  color: var(--harvest-spark-empty);
+}
 
 /* ── Shared table styles ──────────────────────────────────────────────────── */
 .harvest-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--cioos-white);
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
   font-size: 0.88rem;
 }
 
 .harvest-table th {
-  background: #152F37;
-  color: #C6E3DF;
+  background: var(--cioos-navy);
+  color: var(--cioos-teal-light);
   text-align: left;
   padding: 0.6rem 0.75rem;
   font-weight: 500;
@@ -136,7 +195,7 @@
 
 .harvest-table td {
   padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid #EDE8E2;
+  border-bottom: 1px solid var(--harvest-hairline);
   vertical-align: middle;
 }
 
@@ -145,7 +204,7 @@
 }
 
 .harvest-table tr:hover td {
-  background: #F8F6F3;
+  background: var(--harvest-row-hover);
 }
 
 /* ── Card grid (overview server cards) ───────────────────────────────────── */
@@ -157,10 +216,10 @@
 }
 
 .harvest-card {
-  background: #fff;
+  background: var(--cioos-white);
   border-radius: 6px;
   padding: 1rem 1.1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
   text-decoration: none;
   color: inherit;
   display: block;
@@ -168,7 +227,7 @@
 }
 
 .harvest-card:hover {
-  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+  box-shadow: 0 3px 8px rgb(0 0 0 / 12%);
   text-decoration: none;
   color: inherit;
 }
@@ -176,7 +235,7 @@
 .harvest-card-hostname {
   font-weight: 600;
   font-size: 0.95rem;
-  color: #152F37;
+  color: var(--cioos-ink);
   margin-bottom: 0.15rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -185,7 +244,7 @@
 
 .harvest-card-url {
   font-size: 0.75rem;
-  color: #7a8e91;
+  color: var(--harvest-muted-soft);
   margin-bottom: 0.6rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -209,24 +268,39 @@
   font-weight: 600;
 }
 
-.harvest-count-success   { background: #C6E3DF; color: #0e3d35; }
-.harvest-count-unchanged { background: #DCEEF7; color: #0d5c80; }
-.harvest-count-skipped   { background: #F3ECD6; color: #7a5c00; }
-.harvest-count-error     { background: #FBE3E6; color: #7a1520; }
+.harvest-count-success {
+  background: var(--cioos-success-bg);
+  color: var(--harvest-success-ink);
+}
+
+.harvest-count-unchanged {
+  background: var(--harvest-info-bg);
+  color: var(--harvest-info-ink);
+}
+
+.harvest-count-skipped {
+  background: var(--harvest-warn-bg);
+  color: var(--harvest-warn-ink);
+}
+
+.harvest-count-error {
+  background: var(--cioos-error-bg);
+  color: var(--harvest-error-ink);
+}
 
 .harvest-card-meta {
   font-size: 0.75rem;
-  color: #8a9ea2;
+  color: var(--harvest-muted);
 }
 
 /* ── Section headings ────────────────────────────────────────────────────── */
 .harvest-section-title {
   font-size: 1.05rem;
   font-weight: 600;
-  color: #152F37;
+  color: var(--cioos-ink);
   margin: 1.75rem 0 0.75rem;
   padding-bottom: 0.35rem;
-  border-bottom: 2px solid #C6E3DF;
+  border-bottom: 2px solid var(--cioos-teal-light);
 }
 
 /* A "view all" link sitting on the right of a section heading. */
@@ -239,9 +313,9 @@
 /* Downloads queued with nothing consuming them — the scheduler being down.
    Loud on purpose: nothing else in the UI reveals that state. */
 .harvest-queue-warning {
-  background: #FBE3E6;
-  color: #7a1520;
-  border: 1px solid #e8b9bf;
+  background: var(--cioos-error-bg);
+  color: var(--harvest-error-ink);
+  border: 1px solid var(--harvest-error-border);
   border-radius: 4px;
   padding: 0.6rem 0.9rem;
   margin: 1rem 0;
@@ -249,20 +323,20 @@
 }
 
 .harvest-queue-warning a {
-  color: #7a1520;
+  color: var(--harvest-error-ink);
 }
 
 /* Stack traces on the download job page. */
 .harvest-error-block {
-  background: #FBE3E6;
-  color: #7a1520;
-  border: 1px solid #e8b9bf;
+  background: var(--cioos-error-bg);
+  color: var(--harvest-error-ink);
+  border: 1px solid var(--harvest-error-border);
   border-radius: 4px;
   padding: 0.75rem;
   font-size: 0.75rem;
   line-height: 1.45;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
   max-height: 320px;
   overflow: auto;
 }
@@ -279,11 +353,11 @@
 .harvest-filter-bar select,
 .harvest-filter-bar input[type="text"] {
   padding: 0.35rem 0.6rem;
-  border: 1px solid #C6D8DB;
+  border: 1px solid var(--harvest-input-border);
   border-radius: 4px;
   font-size: 0.88rem;
-  background: #fff;
-  color: #152F37;
+  background: var(--cioos-white);
+  color: var(--cioos-ink);
 }
 
 .harvest-filter-bar input[type="text"] {
@@ -300,11 +374,11 @@
 
 /* ── Run meta row ────────────────────────────────────────────────────────── */
 .harvest-run-meta {
-  background: #fff;
+  background: var(--cioos-white);
   border-radius: 6px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
   display: flex;
   flex-wrap: wrap;
   gap: 1.25rem;
@@ -321,48 +395,52 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #7a8e91;
+  color: var(--harvest-muted-soft);
 }
 
 .harvest-run-meta-value {
   font-weight: 500;
-  color: #152F37;
+  color: var(--cioos-ink);
 }
 
 /* ── Error box ───────────────────────────────────────────────────────────── */
 .harvest-error-box {
-  background: #FBE3E6;
-  color: #7a1520;
+  background: var(--cioos-error-bg);
+  color: var(--harvest-error-ink);
   border-radius: 4px;
   padding: 0.6rem 0.85rem;
   font-size: 0.85rem;
   margin-bottom: 1rem;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Non-fatal warning on an otherwise-successful dataset (amber, matches the
    skipped palette so it reads as "heads-up", not "failure"). */
 .harvest-warning-box {
-  background: #F3ECD6;
-  color: #7a5c00;
-  border: 1px solid #ddd0b0;
+  background: var(--harvest-warn-bg);
+  color: var(--harvest-warn-ink);
+  border: 1px solid var(--harvest-warn-border);
   border-radius: 4px;
   padding: 0.6rem 0.85rem;
   font-size: 0.85rem;
   margin-bottom: 1rem;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
-.harvest-warning-text { color: #7a5c00; font-size: 0.8rem; }
+
+.harvest-warning-text {
+  color: var(--harvest-warn-ink);
+  font-size: 0.8rem;
+}
 
 /* ── Latest attempt card ─────────────────────────────────────────────────── */
 .harvest-latest-card {
-  background: #fff;
+  background: var(--cioos-white);
   border-radius: 6px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 7%);
   font-size: 0.88rem;
 }
 
@@ -382,17 +460,123 @@
   word-break: break-all;
 }
 
-.harvest-url-ok   { color: #52A79B; font-weight: 700; }
-.harvest-url-fail { color: #E25563; font-weight: 700; }
+.harvest-url-ok {
+  color: var(--cioos-success);
+  font-weight: 700;
+}
+
+.harvest-url-fail {
+  color: var(--cioos-error);
+  font-weight: 700;
+}
 
 /* ── Misc helpers ────────────────────────────────────────────────────────── */
-.harvest-mono { font-family: monospace; font-size: 0.85em; }
-.harvest-muted { color: #8a9ea2; }
-.harvest-page-title { font-size: 1.5rem; font-weight: 700; color: #152F37; margin-bottom: 0.25rem; }
-.harvest-page-sub   { font-size: 0.88rem; color: #5a7a7f; margin-bottom: 1rem; }
+.harvest-mono {
+  font-family: monospace;
+  font-size: 0.85em;
+}
 
-.harvest-loading { padding: 2rem; text-align: center; color: #8a9ea2; }
-.harvest-fetch-error { padding: 1rem; color: #7a1520; background: #FBE3E6; border-radius: 4px; }
+.harvest-muted {
+  color: var(--harvest-muted);
+}
 
-a.harvest-link { color: #52A79B; text-decoration: none; }
-a.harvest-link:hover { text-decoration: underline; }
+.harvest-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  margin-bottom: 0.25rem;
+}
+
+.harvest-page-sub {
+  font-size: 0.88rem;
+  color: var(--harvest-muted-strong);
+  margin-bottom: 1rem;
+}
+
+.harvest-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--harvest-muted);
+}
+
+.harvest-fetch-error {
+  padding: 1rem;
+  color: var(--harvest-error-ink);
+  background: var(--cioos-error-bg);
+  border-radius: 4px;
+}
+
+a.harvest-link {
+  color: var(--cioos-primary);
+  text-decoration: none;
+}
+
+a.harvest-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+
+/* Numeric table columns. */
+.harvest-num {
+  text-align: right;
+}
+
+.harvest-num-total {
+  text-align: right;
+  font-weight: 600;
+}
+
+/* Four rungs replacing seven near-identical inline sizes (0.72–1.2rem);
+   the widest collapse moves a cell by half a pixel. */
+.harvest-text-xs {
+  font-size: 0.72rem;
+}
+
+.harvest-text-sm {
+  font-size: 0.8rem;
+}
+
+.harvest-text-md {
+  font-size: 0.85rem;
+}
+
+.harvest-text-lg {
+  font-size: 1.2rem;
+}
+
+.harvest-error-text {
+  color: var(--harvest-error-ink);
+}
+
+.harvest-clickable {
+  cursor: pointer;
+}
+
+.harvest-self-center {
+  align-self: center;
+}
+
+.harvest-wrap {
+  overflow-wrap: break-word;
+}
+
+.harvest-muted-strong {
+  color: var(--harvest-muted-strong);
+}
+
+.harvest-muted-soft {
+  color: var(--harvest-muted-soft);
+}
+
+/* Compact control in the filter bars. */
+.harvest-btn-sm {
+  padding: 0.35rem 0.8rem;
+}
+
+/* "No rows" placeholder spanning a table. */
+.harvest-empty-row {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--harvest-muted);
+}

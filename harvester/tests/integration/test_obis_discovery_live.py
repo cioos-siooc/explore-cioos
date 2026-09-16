@@ -15,7 +15,6 @@ API contracts discovery depends on still hold:
 import os
 
 import pytest
-
 from cde_harvester.sources.obis.discovery import (
     ObisDatasetDiscovery,
     ObisDiscoveryConfig,

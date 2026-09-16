@@ -6,14 +6,14 @@ import pathlib
 import traceback
 
 import sentry_sdk
-from dotenv import load_dotenv
-from sentry_sdk.integrations.loguru import LoguruIntegration
 from cde_harvester.core.issues import error_signature, report_issues
+from dotenv import load_dotenv
 from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
+from loguru import logger
+from sentry_sdk.integrations.loguru import LoguruIntegration
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
-from loguru import logger
 
 from download_scheduler.download_email import send_email
 
@@ -44,9 +44,17 @@ sentry_sdk.init(
 )
 
 
-database_link = f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-logger.debug("Connecting to", envs["DB_HOST"])
+database_link = (
+    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
+    f"@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
+)
+logger.debug("Connecting to {}", envs["DB_HOST"])
 engine = create_engine(database_link)
+
+# Sentinel for update_download_jobs: the column takes the database's NOW(),
+# not a bound value. Compared by identity, so a job that literally stores the
+# string "NOW()" in a text column is unaffected.
+SQL_NOW = "NOW()"
 
 create_pdf = False
 
@@ -56,7 +64,7 @@ output_folder = "./downloads"
 
 if "CREATE_PDF" in envs:
     create_pdf = envs["CREATE_PDF"] == "True"
-    logger.info("Create PDFs:", create_pdf)
+    logger.info("Create PDFs: {}", create_pdf)
 
 
 def get_a_download_job():
@@ -76,9 +84,9 @@ def get_a_download_job():
     if row:
         pk = row["pk"]
         job_id = row["job_id"]
-        logger.info("Starting job:", pk, job_id)
+        logger.info("Starting job: pk={} job_id={}", pk, job_id)
         update_download_jobs(
-            pk, {"status": "downloading", "time_start": "NOW()"}, session
+            pk, {"status": "downloading", "time_start": SQL_NOW}, session
         )
     session.commit()
     return row
@@ -153,7 +161,10 @@ def email_user(email, status, zip_filename, downloader_output, language):
         },
         "over-limit": {
             "en": "Your CIOOS Data Explorer data query completed but found too much data.",
-            "fr": "Votre requête à l'Explorateur de Données du SIOOC est terminée mais a atteint la limite de téléchargement.",
+            "fr": (
+                "Votre requête à l'Explorateur de Données du SIOOC est terminée "
+                "mais a atteint la limite de téléchargement."
+            ),
         },
         "no-data": {
             "en": "Your CIOOS Data Explorer data query failed.",
@@ -165,15 +176,9 @@ def email_user(email, status, zip_filename, downloader_output, language):
         },
     }
 
-    if status == "over-limit":
-        template_name = "completed"
-    else:
-        template_name = status
+    template_name = "completed" if status == "over-limit" else status
 
-    if language == "en":
-        language_list = ["en", "fr"]
-    else:
-        language_list = ["fr", "en"]
+    language_list = ["en", "fr"] if language == "en" else ["fr", "en"]
 
     subject = []
     body = []
@@ -229,8 +234,7 @@ def run_download(row):
 
     except Exception as e:
         status = "failed"
-        stack_trace = traceback.format_exc()
-        downloader_error = str(stack_trace).replace("'", "")
+        downloader_error = traceback.format_exc()
         logger.bind(
             email=email,
             job_id=user_query["job_id"],
@@ -253,10 +257,8 @@ def run_download(row):
             pk,
             {
                 "status": status,
-                "downloader_output": str(downloader_error)
-                .replace("%", "")
-                .replace("'", ""),
-                "time_complete": "NOW()",
+                "downloader_output": downloader_error,
+                "time_complete": SQL_NOW,
             },
         )
     else:
@@ -287,11 +289,8 @@ def run_download(row):
             "status": status,
             # clear downloader_output in case it was an error before and now works
             "downloader_output": "",
-            # SQLAlchemy struggles with '%
-            "erddap_report": json.dumps(downloader_output)
-            .replace("%", "")
-            .replace("'", ""),
-            "time_complete": "NOW()",
+            "erddap_report": json.dumps(downloader_output),
+            "time_complete": SQL_NOW,
             "download_size": str(downloader_output.get("total_size")),
         }
         update_download_jobs(
@@ -322,9 +321,8 @@ def fail_job(pk, error):
         pk,
         {
             "status": "failed",
-            # SQLAlchemy struggles with '%
-            "downloader_output": str(error).replace("%", "").replace("'", ""),
-            "time_complete": "NOW()",
+            "downloader_output": str(error),
+            "time_complete": SQL_NOW,
         },
     )
 
@@ -454,13 +452,29 @@ def process_next_job():
 
 
 def update_download_jobs(pk, row, session=None):
-    params = ",".join([f"{key}='{value}'" for key, value in row.items()])
-    sql = f"UPDATE cde.download_jobs SET {params} WHERE PK={pk}"
+    """Update one download_jobs row. Values are bound, never interpolated.
+
+    Column names come from the literals in this module, so they are safe to
+    format into the statement; values are not — they carry tracebacks and the
+    downloader's JSON report. Those used to be interpolated too, which is why
+    callers stripped "%" and "'" out of every value by hand before passing it.
+    """
+    assignments = []
+    params = {"pk": pk}
+    for key, value in row.items():
+        if value is SQL_NOW:
+            # A SQL expression, not a value — the database clock, not ours.
+            assignments.append(f"{key} = NOW()")
+        else:
+            assignments.append(f"{key} = :{key}")
+            params[key] = value
+
+    sql = f"UPDATE cde.download_jobs SET {', '.join(assignments)} WHERE pk = :pk"
     if session is not None:
         # Caller owns the transaction/commit (see get_a_download_job).
-        session.execute(text(sql))
+        session.execute(text(sql), params)
     else:
         # SQLAlchemy 2.0 removed Engine.execute(); run in an auto-committing
         # transaction via engine.begin().
         with engine.begin() as conn:
-            conn.execute(text(sql))
+            conn.execute(text(sql), params)

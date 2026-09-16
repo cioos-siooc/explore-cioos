@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * @swagger
@@ -25,7 +25,7 @@ const cache = require("../utils/cache");
  *                     type: string
  */
 
-router.get("/", cache.route(), async (req, res) => {
+router.get("/", ...pipeline({ filters: false }), async (req, res) => {
   const { rows } = await db.raw(`
     SELECT DISTINCT unnest(obis_nodes) AS name
     FROM cde.datasets

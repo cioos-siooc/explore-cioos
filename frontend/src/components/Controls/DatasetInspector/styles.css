@@ -14,7 +14,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px 12px 24px 12px;
+  padding: 12px 12px 24px;
 }
 
 /* --- Dataset title: set like the title of a research record. The two actions
@@ -71,7 +71,9 @@
   background-color: var(--cioos-white);
   color: var(--cioos-primary-700, var(--cioos-primary));
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
     color 0.15s ease;
 }
 
@@ -147,12 +149,13 @@
    the fields flow two to a row. The narrow ones (platform, record count) pair
    up; the ones carrying chips or links take a full row. Whitespace does the
    dividing, so there are no rules and no 86px label gutter eating the width. */
+
 /* No top rule of its own: the pinned title block above already draws one. */
 .datasetMetaSheet {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 14px;
-  margin: 0 0 10px 0;
+  margin: 0 0 10px;
   padding: 9px 11px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
@@ -192,6 +195,7 @@
 .datasetMetaSheet .metadataValue {
   flex: 1 1 140px;
   margin: 0;
+
   /* Chips wrap onto new lines when there are many; top-align them so each
      wrapped row lines up cleanly under the label. */
   align-items: flex-start;
@@ -407,7 +411,7 @@
 /* The pager sits inside the section's white card, so it needs no background or
    top rule of its own beyond the hairline. */
 .recordSection .pager {
-  padding: 8px 0 0 0;
+  padding: 8px 0 0;
   background: none;
 }
 
@@ -421,7 +425,8 @@
   background-color: var(--cioos-white);
   box-shadow: var(--cioos-shadow-card);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast),
+  transition:
+    background-color var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast),
     box-shadow var(--cioos-transition-fast);
 }
@@ -445,8 +450,10 @@
 .listCard.pinned {
   border-color: var(--cioos-map-click);
   background-color: var(--cioos-map-click-surface);
-  box-shadow: 0 0 0 2px var(--cioos-map-click-glow),
-    0 0 10px 1px var(--cioos-map-click-glow), var(--cioos-shadow-card);
+  box-shadow:
+    0 0 0 2px var(--cioos-map-click-glow),
+    0 0 10px 1px var(--cioos-map-click-glow),
+    var(--cioos-shadow-card);
 }
 
 /* The platform whose track is drawn on the map, in the goldenrod the map now
@@ -574,7 +581,7 @@
    longer has to fit. */
 @media (max-width: 700px) {
   .datasetInspectorBody {
-    padding: 0 10px 20px 10px;
+    padding: 0 10px 20px;
   }
 
   .datasetTitleBlock {

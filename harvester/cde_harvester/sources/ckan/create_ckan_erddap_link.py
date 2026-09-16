@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 
 
 import re
@@ -71,8 +70,8 @@ def split_erddap_url(url):
     return (erddap_host, dataset_id)
 
 
-def unescape_ascii_list(l):
-    return [unescape_ascii(x) for x in l]
+def unescape_ascii_list(values):
+    return [unescape_ascii(x) for x in values]
 
 
 def unescape_ascii(x):
@@ -91,7 +90,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
     if limit:
         records = records[0:limit]
     out = []
-    for i, record_full in enumerate(records):
+    for record_full in records:
         resources = record_full["resources"]
         erddap_url = ""
         for resource in resources:
@@ -110,7 +109,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         # retreive the data for each record
 
         title_translated = record_full.get("title_translated")
-        notes_translated = record_full.get("notes_translated")
+        # Kept for the commented-out ckan_summary fields below.
+        notes_translated = record_full.get("notes_translated")  # noqa: F841
 
         def remove_newlines(s):
             # not sure why all these are needed but they seem to be

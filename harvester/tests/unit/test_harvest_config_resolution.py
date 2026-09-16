@@ -14,7 +14,6 @@ from pathlib import Path
 
 import pytest
 import yaml
-
 from cde_harvester.core.config import (
     decode_harvest_config_b64,
     normalize_coolify_multiline,

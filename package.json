@@ -1,0 +1,25 @@
+{
+  "name": "explore-cioos",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repo-wide JavaScript and CSS tooling. The services themselves are in frontend/, web-api/ and test/.",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:css": "stylelint \"frontend/src/**/*.css\"",
+    "lint:css:fix": "stylelint \"frontend/src/**/*.css\" --fix",
+    "format": "prettier --write --ignore-path .prettierignore \"frontend/**/*.{js,jsx,mjs,css,json}\" \"web-api/**/*.js\" \"web-api/bin/www\" \"test/**/*.js\"",
+    "format:check": "prettier --check --ignore-path .prettierignore \"frontend/**/*.{js,jsx,mjs,css,json}\" \"web-api/**/*.js\" \"web-api/bin/www\" \"test/**/*.js\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
+    "stylelint": "^17.15.0",
+    "stylelint-config-standard": "^40.0.0"
+  }
+}

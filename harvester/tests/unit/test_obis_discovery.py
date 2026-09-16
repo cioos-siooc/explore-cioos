@@ -10,9 +10,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
-from shapely import wkt as shp_wkt
-from shapely.geometry import MultiPolygon, box
-
 from cde_harvester.sources.obis.discovery import (
     ObisDatasetDiscovery,
     ObisDiscoveryConfig,
@@ -25,6 +22,8 @@ from cde_harvester.sources.obis.geo_filter import (
     ObisGeoFilter,
     load_boundary_polygon,
 )
+from shapely import wkt as shp_wkt
+from shapely.geometry import MultiPolygon, box
 
 NODE_A = "7dfb2d90-9317-434d-8d4e-64adf324579a"
 NODE_B = "68f83ea7-69a7-44fd-be77-3c3afd6f3cf8"

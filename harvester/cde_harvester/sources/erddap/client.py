@@ -17,8 +17,7 @@ from prefect import get_run_logger, task
 from prefect.cache_policies import NO_CACHE
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-from cde_harvester.sources.erddap.dataset import Dataset
+
 from cde_harvester.core.errors import (
     HASH_CROISSANT_HTTP_ERROR,
     HASH_CROISSANT_UNREADABLE,
@@ -26,6 +25,9 @@ from cde_harvester.core.errors import (
     HASH_NO_FILE_LIST,
     ResponseTooLargeError,
 )
+from cde_harvester.sources.erddap.dataset import Dataset
+
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # size in bytes
 MAX_RESPONSE_SIZE = 2e8
@@ -103,11 +105,11 @@ def _build_retry_session() -> requests.Session:
     return session
 
 
-class ERDDAP(object):
+class ERDDAP:
     "Stores the ERDDAP server URL and functions related to querying it"
 
     def __init__(self, erddap_url, cache_requests=False):
-        super(ERDDAP, self).__init__()
+        super().__init__()
         self.cache_requests = cache_requests
 
         if cache_requests:
@@ -199,7 +201,7 @@ class ERDDAP(object):
 
         return pd.to_datetime(series, errors="coerce", utc=True)
 
-    def erddap_csv_to_df(self, url, skiprows=[1], dataset=None):
+    def erddap_csv_to_df(self, url, skiprows=(1,), dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
         if dataset:
             logger = dataset.logger
@@ -231,11 +233,10 @@ class ERDDAP(object):
             original_hostname = urlparse(url_combined).hostname
             actual_hostname = urlparse(response.url).hostname
 
-            if original_hostname != actual_hostname:
-                # redirect due to EDDTableFromErddap
-                if dataset:
-                    logger.debug("Redirecting %s to %s", original_hostname, actual_hostname)
-                    dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
+            # redirect due to EDDTableFromErddap
+            if original_hostname != actual_hostname and dataset:
+                logger.debug("Redirecting %s to %s", original_hostname, actual_hostname)
+                dataset.erddap_url = response.url.split("/erddap")[0] + "/erddap"
 
             no_data = False
             # Newer erddaps respond with 404 for no data
@@ -311,10 +312,7 @@ class ERDDAP(object):
 
         response = self.session.get(url_combined, timeout=3600, stream=True)
         try:
-            if response.status_code != 200:
-                body = io.BytesIO(response.content)
-            else:
-                body = self._spool(response, decoded_url)
+            body = io.BytesIO(response.content) if response.status_code != 200 else self._spool(response, decoded_url)
         finally:
             response.close()
 

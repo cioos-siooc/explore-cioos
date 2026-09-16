@@ -3,8 +3,7 @@ const { check } = require("express-validator");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
-const { errorHandler } = require("../utils/validatorMiddlewares");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * @swagger
@@ -50,18 +49,21 @@ const { errorHandler } = require("../utils/validatorMiddlewares");
  */
 router.get(
   "/",
-  check("q")
-    .matches(/^[\p{L}\p{N} .,'()\-]*$/u)
-    .isLength({ max: 200 })
-    .optional(),
-  check("limit").isInt({ min: 1, max: 500 }).optional(),
-  check("lang").isIn(["en", "fr"]).optional(),
-  check("names")
-    .matches(/^[\p{L}\p{N} .,'()\-]*(,[\p{L}\p{N} .,'()\-]*)*$/u)
-    .isLength({ max: 4000 })
-    .optional(),
-  errorHandler,
-  cache.route(),
+  ...pipeline({
+    filters: false,
+    checks: [
+      check("q")
+        .matches(/^[\p{L}\p{N} .,'()-]*$/u)
+        .isLength({ max: 200 })
+        .optional(),
+      check("limit").isInt({ min: 1, max: 500 }).optional(),
+      check("lang").isIn(["en", "fr"]).optional(),
+      check("names")
+        .matches(/^[\p{L}\p{N} .,'()-]*(,[\p{L}\p{N} .,'()-]*)*$/u)
+        .isLength({ max: 4000 })
+        .optional(),
+    ],
+  }),
   async (req, res) => {
     const q = (req.query.q || "").trim();
     const limit = Math.min(parseInt(req.query.limit, 10) || 200, 500);

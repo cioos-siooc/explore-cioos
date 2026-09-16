@@ -6,20 +6,20 @@ reshaping is delegated to the handler's ``adjust_feature_identity`` hook —
 this module contains no cdm_data_type branches.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 import requests
+from requests.exceptions import HTTPError
+
 from cde_harvester.core.day_sets import (
     bucket_index_to_day,
     day_bucket_group,
     days_to_ranges,
-    ranges_to_psycopg,
     total_days,
 )
 from cde_harvester.dataset_types.geo import classify_profile_location
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
-from requests.exceptions import HTTPError
 
 
 def _axis_bounds_from_metadata(dataset, axis):
@@ -284,7 +284,8 @@ def extract_features(dataset, handler):
 
     vertical_variables = ["depth", "altitude"]
 
-    # lat,lon not in this list. They have to be treated differently as getting the min of the lat and lon could create a point not in the dataset
+    # lat,lon not in this list. They have to be treated differently as getting
+    # the min of the lat and lon could create a point not in the dataset
     llat_variables = [
         "depth",
         "altitude",
@@ -347,7 +348,7 @@ def extract_features(dataset, handler):
 
             # For ongoing datasets
             if "NaN" in max:
-                max = datetime.utcnow().isoformat()
+                max = datetime.now(timezone.utc).isoformat()
 
             if llat_variable in vertical_variables:
                 min = float(min)
@@ -420,7 +421,7 @@ def extract_features(dataset, handler):
     time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
     time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
 
-    count_variables = sorted(list(set(count_variables)))
+    count_variables = sorted(set(count_variables))
 
     # Variables carrying an EOV are counted per feature as well: ERDDAP's
     # orderByCount answers with one non-null count column per requested
@@ -462,9 +463,9 @@ def extract_features(dataset, handler):
         profiles["eovs"] = _eovs_per_feature(
             profile_count, eov_variables, dataset.eovs
         )
-    if not "n_records" in profiles:
+    if "n_records" not in profiles:
         profiles["n_records"] = None
-    if not "eovs" in profiles:
+    if "eovs" not in profiles:
         profiles["eovs"] = [list(dataset.eovs)] * len(profiles)
 
     # something went wrong with counting records
@@ -517,10 +518,10 @@ def extract_features(dataset, handler):
     profiles["depth_min"].fillna(0, inplace=True)
     profiles["depth_max"].fillna(0, inplace=True)
 
-    if not "profile_id" in profiles:
+    if "profile_id" not in profiles:
         profiles["profile_id"] = ""
 
-    if not "timeseries_id" in profiles:
+    if "timeseries_id" not in profiles:
         profiles["timeseries_id"] = ""
 
     cols_to_convert = ["latitude", "longitude"]
@@ -559,7 +560,7 @@ def extract_features(dataset, handler):
 
     profiles = profiles.round(4)
 
-    profiles_bad_geom_query = f"""((latitude <= -90) or (latitude >= 90) or  \
+    profiles_bad_geom_query = """((latitude <= -90) or (latitude >= 90) or  \
                                 (longitude <= -180) or (longitude >= 180) or  \
                                 (depth_max > 15000) or (depth_min < -100)) or \
                                 records_per_day.isnull()

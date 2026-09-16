@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 const db = require("../db");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * @swagger
@@ -28,7 +28,7 @@ const cache = require("../utils/cache");
  *
  * */
 
-router.get("/", cache.route(), async (req, res, next) => {
+router.get("/", ...pipeline({ filters: false }), async (req, res) => {
   res.send(
     (
       await db.raw(

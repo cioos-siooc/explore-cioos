@@ -6,7 +6,6 @@ missing init file aborts rather than dropping a schema it cannot recreate.
 """
 
 import pytest
-
 from cde_harvester.core import schema
 
 

@@ -2,11 +2,10 @@
 Unit tests for cde_harvester.utils — EOV/CF standard name mappings and helpers.
 """
 
-import pytest
 
 from cde_harvester.utils import (
-    eov_to_standard_name,
     df_eov_to_standard_name,
+    eov_to_standard_name,
     get_eov_to_standard_name,
     intersection,
     supported_standard_names,

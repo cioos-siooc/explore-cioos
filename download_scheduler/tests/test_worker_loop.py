@@ -6,6 +6,8 @@ service, the queue then had no consumer at all and every later download sat as
 an 'open' row forever, with nothing surfaced to the user or the logs.
 """
 
+import contextlib
+
 import pytest
 
 from download_scheduler import download_scheduler as ds
@@ -63,7 +65,7 @@ def test_failing_job_is_marked_failed_instead_of_killing_the_worker(
     pk, fields = updates[0]
     assert pk == 42
     assert fields["status"] == "failed"
-    assert fields["time_complete"] == "NOW()"
+    assert fields["time_complete"] is ds.SQL_NOW
     assert "TypeError" in fields["downloader_output"]
 
 
@@ -96,12 +98,78 @@ def test_unclaimable_job_returns_false_so_the_caller_backs_off(monkeypatch):
     assert ds.process_next_job() is False
 
 
-def test_fail_job_strips_characters_sqlalchemy_chokes_on(updates):
-    ds.fail_job(7, "boom 50% of the time, it's bad")
+def test_fail_job_records_the_error_verbatim(updates):
+    # update_download_jobs binds its values now, so nothing has to be mangled on
+    # the way in. This used to strip every "%" and "'" out of the message
+    # because the statement was built by f-string.
+    message = "boom 50% of the time, it's bad"
+    ds.fail_job(7, message)
 
-    _, fields = updates[0]
-    assert "%" not in fields["downloader_output"]
-    assert "'" not in fields["downloader_output"]
+    pk, fields = updates[0]
+    assert pk == 7
+    assert fields["status"] == "failed"
+    assert fields["downloader_output"] == message
+    assert fields["time_complete"] is ds.SQL_NOW
+
+
+class TestUpdateDownloadJobs:
+    """The one writer to cde.download_jobs.
+
+    It formats column names into the statement (they are literals in the module)
+    but must bind every value: they carry tracebacks and the downloader's JSON
+    report, which are exactly the strings an f-string-built UPDATE breaks on.
+    """
+
+    @pytest.fixture
+    def executed(self, monkeypatch):
+        """Capture (sql_text, params) from the engine.begin() path."""
+        calls = []
+
+        class FakeConnection:
+            def execute(self, statement, params=None):
+                calls.append((str(statement), params))
+
+        class FakeEngine:
+            @contextlib.contextmanager
+            def begin(self):
+                yield FakeConnection()
+
+        monkeypatch.setattr(ds, "engine", FakeEngine())
+        return calls
+
+    def test_binds_values_instead_of_interpolating_them(self, executed):
+        report = """{"note": "100% done, don't drop this"}"""
+        ds.update_download_jobs(42, {"status": "failed", "erddap_report": report})
+
+        sql, params = executed[0]
+        assert sql == (
+            "UPDATE cde.download_jobs SET status = :status, "
+            "erddap_report = :erddap_report WHERE pk = :pk"
+        )
+        assert params == {"pk": 42, "status": "failed", "erddap_report": report}
+        # The value itself never reaches the statement text.
+        assert report not in sql
+
+    def test_sql_now_becomes_a_database_expression_not_a_bound_string(self, executed):
+        ds.update_download_jobs(42, {"status": "completed", "time_complete": ds.SQL_NOW})
+
+        sql, params = executed[0]
+        assert "time_complete = NOW()" in sql
+        assert "time_complete" not in params
+
+    def test_a_caller_owned_session_gets_the_same_statement_and_params(self):
+        calls = []
+
+        class FakeSession:
+            def execute(self, statement, params=None):
+                calls.append((str(statement), params))
+
+        ds.update_download_jobs(7, {"status": "downloading"}, FakeSession())
+
+        assert calls == [
+            ("UPDATE cde.download_jobs SET status = :status WHERE pk = :pk",
+             {"pk": 7, "status": "downloading"}),
+        ]
 
 
 class TestPrefectObservability:

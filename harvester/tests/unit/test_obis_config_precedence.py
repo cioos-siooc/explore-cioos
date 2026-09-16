@@ -10,7 +10,6 @@ silently ignored on the Prefect path.
 import json
 
 import pytest
-
 from cde_harvester.core.config import resolve_obis_config
 
 NODE_A = "7dfb2d90-9317-434d-8d4e-64adf324579a"

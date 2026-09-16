@@ -12,14 +12,12 @@ disk periodically and correctly reassembled, and the returned result does not
 depend on the flush interval.
 """
 import os
-
-import pandas as pd
-import pytest
 from unittest.mock import MagicMock, patch
 
 import cde_harvester.core.frame_spill as frame_spill_module
+import pandas as pd
+import pytest
 from cde_harvester.sources.erddap.harvester import ERDDAPHarvester
-
 from conftest import ERDDAP_URL, build_mock_dataset
 
 
@@ -120,7 +118,7 @@ def test_profiles_keep_the_full_schema_columns():
     result = _harvest(n_datasets=2, flush_every=1)
     from cde_harvester.core.schemas import ProfileSchema
 
-    for column in ProfileSchema.to_schema().columns.keys():
+    for column in ProfileSchema.to_schema().columns:
         assert column in result.profiles.columns
 
 
@@ -162,9 +160,8 @@ def test_chunk_temp_directory_is_cleaned_up_even_on_error():
     try:
         with patch(
             "cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock
-        ):
-            with pytest.raises(RuntimeError):
-                ERDDAPHarvester(ERDDAP_URL).harvest()
+        ), pytest.raises(RuntimeError):
+            ERDDAPHarvester(ERDDAP_URL).harvest()
     finally:
         frame_spill_module.tempfile.TemporaryDirectory = original_cls
 

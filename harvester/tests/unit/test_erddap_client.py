@@ -5,13 +5,11 @@ All HTTP calls are intercepted by patching requests.Session so no network
 traffic is produced.
 """
 
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 import requests
-
 from conftest import (
     ERDDAP_ALL_DATASETS_CSV,
     ERDDAP_INFO_CSV,
@@ -142,8 +140,8 @@ class TestErddapCsvToDf:
         cap must never be pulled down in full.
         """
         erddap = _make_erddap()
-        from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
         from cde_harvester.core.errors import ResponseTooLargeError
+        from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
         mock_resp = MockStreamingResponse(
             total_bytes=int(MAX_RESPONSE_SIZE) * 4, url=ERDDAP_URL
         )

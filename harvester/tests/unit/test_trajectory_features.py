@@ -5,9 +5,6 @@ from unittest.mock import MagicMock
 from urllib.parse import unquote
 
 import pandas as pd
-import pytest
-from requests.exceptions import HTTPError
-
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
     MAX_TRACK_POINTS_CAP,
@@ -26,6 +23,7 @@ from cde_harvester.loading.loader import (
     prepare_trajectory_days_dataframe,
     prepare_trajectory_points_dataframe,
 )
+from requests.exceptions import HTTPError
 
 ERDDAP_URL = "https://test.erddap.com/erddap"
 DATASET_ID = "test_trajectory_001"
@@ -133,7 +131,7 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
                 "traj_id": ["m1"] * n,
                 "latitude": [48.001] * 3 + [48.0823] * 3,
                 "longitude": [-125.0 + 0.02 * (i % 2) for i in range(n)],
-                "time": ["2021-01-0%dT00:00:00Z" % (i + 1) for i in range(n)],
+                "time": [f"2021-01-0{i + 1}T00:00:00Z" for i in range(n)],
                 "depth": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             })
         raise AssertionError(f"Unexpected query: {plain}")

@@ -1,6 +1,7 @@
 .cioosTooltip {
   position: fixed;
   z-index: var(--cioos-z-tooltip, 1080);
+
   /* Sized to its text rather than to the space left over beside the offset it
      is positioned at, which for a trigger near a viewport edge is a few pixels
      — max-content is what lets max-width below actually govern the wrap. */
@@ -17,6 +18,6 @@
   font-size: var(--cioos-font-size-xs, 11px);
   line-height: 1.4;
   border-radius: var(--cioos-radius-sm, 6px);
-  box-shadow: var(--cioos-shadow-md, 0 2px 8px rgba(21, 47, 55, 0.2));
+  box-shadow: var(--cioos-shadow-md, 0 2px 8px rgb(21 47 55 / 20%));
   text-align: center;
 }

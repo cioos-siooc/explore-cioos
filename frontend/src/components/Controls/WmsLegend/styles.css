@@ -27,11 +27,13 @@
   border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-shadow-float);
   padding: 4px 8px 8px;
+
   /* Wide enough to show the legend at the size ERDDAP drew it. The text in it
      is rendered at a fixed size whatever image width is asked for, so a card
      narrower than the image doesn't get a smaller legend — it gets the same
      legend with unreadable type. See GRIDDAP_LEGEND_WIDTH in wmsUtilities. */
   max-width: 376px;
+
   /* Two ceilings, whichever is lower: the viewport, and the foot of the depth
      strip when one is up (DepthBar publishes it; the term is 0, and so never
      the lower of the two, whenever the strip isn't mounted). A legend image
@@ -53,7 +55,7 @@
    the time bar), and the bar itself on the viewports where its right edge
    passes the corner and no card is mounted to have accounted for it. */
 .maplibregl-ctrl-bottom-right {
-  margin-bottom: var(--cioos-wms-legend-space, 0px);
+  margin-bottom: var(--cioos-wms-legend-space, 0);
 }
 
 @media (max-width: 1100px) {
@@ -125,6 +127,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+
   /* With no picker the close button still keeps the right edge. */
   justify-content: flex-end;
 }

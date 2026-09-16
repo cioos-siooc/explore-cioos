@@ -5,24 +5,20 @@ All outbound CKAN HTTP calls are intercepted with pytest-mock so the tests run
 offline and deterministically.
 """
 
-import json
 
 import pandas as pd
 import pytest
-
-from conftest import (
-    CKAN_EMPTY_RESPONSE,
-    CKAN_PACKAGE_SEARCH_RESPONSE,
-    DATASET_ID,
-    ERDDAP_URL,
-)
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
     split_erddap_url,
     unescape_ascii,
     unescape_ascii_list,
 )
-
+from conftest import (
+    CKAN_EMPTY_RESPONSE,
+    CKAN_PACKAGE_SEARCH_RESPONSE,
+    DATASET_ID,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

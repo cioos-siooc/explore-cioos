@@ -1,9 +1,9 @@
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 const express = require("express");
 
 const router = express.Router();
 const { getShapeQuery } = require("../utils/shapeQuery");
-const cache = require("../utils/cache");
+const { pipeline } = require("../utils/routePipeline");
 
 /**
  * @swagger
@@ -33,14 +33,8 @@ const cache = require("../utils/cache");
  *                   size: { type: number }
  */
 
-router.get("/", cache.route(), async (req, res, next) => {
-  let shapeQueryResponse;
-  try {
-    shapeQueryResponse = await getShapeQuery(req.query, true, false);
-  } catch (err) {
-    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-    throw err;
-  }
+router.get("/", ...pipeline(), async (req, res) => {
+  const shapeQueryResponse = await getShapeQuery(req.query, true, false);
   res.send(
     shapeQueryResponse.map((row) => ({
       pk: row.pk_url,

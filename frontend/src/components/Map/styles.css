@@ -35,6 +35,7 @@
 
 .mapChip {
   display: inline-block;
+
   /* Fits a full instant range (see CHIP_MAX_CHARS) without wrapping. */
   max-width: 280px;
   padding: 3px 7px;
@@ -45,6 +46,7 @@
   font-size: var(--cioos-font-size-xs);
   line-height: 1.35;
   overflow: hidden;
+
   /* Reads over both a pale hex and dark bathymetry without a border. */
   box-shadow: var(--cioos-shadow-sm);
 }

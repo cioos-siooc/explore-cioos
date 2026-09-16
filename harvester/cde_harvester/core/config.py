@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def load_config(config_file):
     # get config settings from file, eg harvest_config.yaml
-    with open(config_file, "r") as stream:
+    with open(config_file) as stream:
         try:
             config = yaml.safe_load(stream)
             return config
@@ -28,7 +28,7 @@ def load_obis_dataset_ids(dataset_ids=None, datasets_file=None):
     if dataset_ids:
         return dataset_ids
     if datasets_file:
-        with open(datasets_file, "r") as f:
+        with open(datasets_file) as f:
             return json.load(f).get("datasets", [])
     return []
 

@@ -1,4 +1,3 @@
-import os
 import traceback
 import warnings
 
@@ -18,4 +17,4 @@ def download_pdf(url, filename):
     except Exception as e:
         print(e)
         print(traceback.format_exc())
-        warnings.warn("Error creating PDF")
+        warnings.warn("Error creating PDF", stacklevel=2)

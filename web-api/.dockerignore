@@ -1,0 +1,16 @@
+# Build context for the `web-api` service (context: ./web-api).
+#
+# node_modules first: the Dockerfile copies the tree before running npm ci, so
+# the host's install was shipped into the context (104 MB) for nothing.
+# .env.sample second: it has no secrets, but nothing in an image should look
+# like a credentials file.
+node_modules
+.env
+.env.*
+
+.DS_Store
+.git
+.vscode
+.eslintrc.js
+README.md
+*.log

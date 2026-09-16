@@ -1,0 +1,5 @@
+# Build context for the `nginx` service (context: ./nginx).
+# Rotated access logs and logrotate state are runtime volumes, not build input.
+logs
+logrotate_state
+.DS_Store

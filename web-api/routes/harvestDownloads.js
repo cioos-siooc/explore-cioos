@@ -10,24 +10,24 @@
 // dashboard has no authentication at any layer, so exposing it here would
 // publish requesters' email addresses.
 
-const express = require('express')
+const express = require("express");
 
-const router = express.Router()
-const db = require('../db')
-const cache = require('../utils/cache')
+const router = express.Router();
+const db = require("../db");
+const { pipeline } = require("../utils/routePipeline");
 
-const RECENT_JOB_LIMIT = 25
+const RECENT_JOB_LIMIT = 25;
 
 // erddap_report is a text column holding the downloader's JSON result, but it
 // is empty for a queued job and holds a stack trace for a job that died before
 // the downloader returned. Guard the cast so one bad row can't 500 the route:
 // Postgres 13 has no pg_input_is_valid(), so screen on the leading brace.
-const REPORT_JSON = col =>
-  `CASE WHEN ${col}.erddap_report LIKE '{%' THEN ${col}.erddap_report::jsonb END`
+const REPORT_JSON = (col) =>
+  `CASE WHEN ${col}.erddap_report LIKE '{%' THEN ${col}.erddap_report::jsonb END`;
 
 // Datasets that made it into the zip. Anything else was left out, and the
 // per-dataset status says why (mirrors _INCLUDED in download_scheduler).
-const INCLUDED = `('COMPLETED', 'PARTIAL')`
+const INCLUDED = "('COMPLETED', 'PARTIAL')";
 
 // ── SQL query helpers ─────────────────────────────────────────────────────────
 
@@ -58,14 +58,14 @@ async function recentJobs(limit = RECENT_JOB_LIMIT) {
     FROM recent j
     LEFT JOIN LATERAL (
         SELECT elem->>'status' AS status
-        FROM jsonb_array_elements((${REPORT_JSON('j')})->'erddap_report') elem
+        FROM jsonb_array_elements((${REPORT_JSON("j")})->'erddap_report') elem
     ) d ON true
     GROUP BY j.pk, j.job_id, j.time, j.status, j.time_start, j.time_complete,
              j.download_size, j.downloader_output
     ORDER BY j.time DESC
-  `
-  const result = await db.raw(sql, [limit])
-  return result.rows
+  `;
+  const result = await db.raw(sql, [limit]);
+  return result.rows;
 }
 
 async function datasetOutcomes(statusFilter = null, q = null) {
@@ -81,7 +81,7 @@ async function datasetOutcomes(statusFilter = null, q = null) {
                NULLIF(elem->>'erddap_error', '')    AS erddap_error,
                NULLIF(elem->>'file_size', '')::numeric AS file_size
         FROM cde.download_jobs j,
-             LATERAL jsonb_array_elements((${REPORT_JSON('j')})->'erddap_report') elem
+             LATERAL jsonb_array_elements((${REPORT_JSON("j")})->'erddap_report') elem
     )
     SELECT dataset_id,
            erddap_url,
@@ -108,9 +108,9 @@ async function datasetOutcomes(statusFilter = null, q = null) {
       COUNT(*) FILTER (WHERE status = 'FAILED') DESC,
       COUNT(*) DESC,
       dataset_id
-  `
-  const result = await db.raw(sql, [statusFilter, statusFilter, q, q, q])
-  return result.rows
+  `;
+  const result = await db.raw(sql, [statusFilter, statusFilter, q, q, q]);
+  return result.rows;
 }
 
 async function jobDetail(jobId) {
@@ -123,9 +123,9 @@ async function jobDetail(jobId) {
     WHERE job_id = ?
     ORDER BY time DESC
     LIMIT 1
-  `
-  const result = await db.raw(sql, [jobId])
-  return result.rows[0] || null
+  `;
+  const result = await db.raw(sql, [jobId]);
+  return result.rows[0] || null;
 }
 
 async function jobDatasets(jobId) {
@@ -142,7 +142,7 @@ async function jobDatasets(jobId) {
            (elem->>'query_limit_hit')::boolean     AS query_limit_hit,
            elem->'download_url_list'               AS download_url_list
     FROM cde.download_jobs j,
-         LATERAL jsonb_array_elements((${REPORT_JSON('j')})->'erddap_report') elem
+         LATERAL jsonb_array_elements((${REPORT_JSON("j")})->'erddap_report') elem
     WHERE j.job_id = ?
     ORDER BY
       CASE elem->>'status'
@@ -153,9 +153,9 @@ async function jobDatasets(jobId) {
         ELSE 4
       END,
       elem->>'dataset_id'
-  `
-  const result = await db.raw(sql, [jobId])
-  return result.rows
+  `;
+  const result = await db.raw(sql, [jobId]);
+  return result.rows;
 }
 
 async function summary() {
@@ -173,48 +173,53 @@ async function summary() {
                               AND time_start < NOW() - INTERVAL '5 minutes') AS n_stalled,
            MAX(time)                                                      AS last_request_at
     FROM cde.download_jobs
-  `
-  const result = await db.raw(sql)
-  return result.rows[0]
+  `;
+  const result = await db.raw(sql);
+  return result.rows[0];
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-router.get('/summary', cache.route('30 seconds'), async (req, res, next) => {
-  try {
-    res.json(await summary())
-  } catch (err) {
-    next(err)
-  }
-})
+router.get(
+  "/summary",
+  ...pipeline({ filters: false, cacheFor: "30 seconds" }),
+  async (req, res) => {
+    res.json(await summary());
+  },
+);
 
-router.get('/recent', cache.route('30 seconds'), async (req, res, next) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || RECENT_JOB_LIMIT, 200)
-    res.json(await recentJobs(limit))
-  } catch (err) {
-    next(err)
-  }
-})
+router.get(
+  "/recent",
+  ...pipeline({ filters: false, cacheFor: "30 seconds" }),
+  async (req, res) => {
+    const limit = Math.min(
+      parseInt(req.query.limit, 10) || RECENT_JOB_LIMIT,
+      200,
+    );
+    res.json(await recentJobs(limit));
+  },
+);
 
-router.get('/datasets', cache.route('1 minute'), async (req, res, next) => {
-  try {
-    res.json(await datasetOutcomes(req.query.status || null, req.query.q || null))
-  } catch (err) {
-    next(err)
-  }
-})
+router.get(
+  "/datasets",
+  ...pipeline({ filters: false, cacheFor: "1 minute" }),
+  async (req, res) => {
+    res.json(
+      await datasetOutcomes(req.query.status || null, req.query.q || null),
+    );
+  },
+);
 
 // Defined after /summary, /recent and /datasets so those literals aren't
 // swallowed by :jobId.
-router.get('/:jobId', cache.route('1 minute'), async (req, res, next) => {
-  try {
-    const job = await jobDetail(req.params.jobId)
-    if (!job) return res.status(404).json({ error: 'Download job not found' })
-    res.json({ job, datasets: await jobDatasets(req.params.jobId) })
-  } catch (err) {
-    next(err)
-  }
-})
+router.get(
+  "/:jobId",
+  ...pipeline({ filters: false, cacheFor: "1 minute" }),
+  async (req, res) => {
+    const job = await jobDetail(req.params.jobId);
+    if (!job) return res.status(404).json({ error: "Download job not found" });
+    res.json({ job, datasets: await jobDatasets(req.params.jobId) });
+  },
+);
 
-module.exports = router
+module.exports = router;

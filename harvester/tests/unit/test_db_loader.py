@@ -11,14 +11,12 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
-
 from cde_harvester.loading.loader import (
     ensure_organization_pks,
     load_cells_copy,
     main,
     prepare_profiles_dataframe,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -53,23 +51,44 @@ def db_env(monkeypatch):
     monkeypatch.setenv("DB_NAME", "testdb")
 
 
+def _patch_loader(mock_engine, mocker):
+    """Patch the loader's DB and logging seams. Returns the mocked `text`,
+    whose call args are the SQL strings the run executed."""
+    engine, _conn = mock_engine
+    mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
+    mocker.patch("cde_harvester.loading.loader.get_run_logger", return_value=__import__("logging").getLogger("test"))
+    mocker.patch("pandas.DataFrame.to_sql")
+    # Capture SQL strings; return the raw string so conn.execute gets it
+    return mocker.patch("cde_harvester.loading.loader.text", side_effect=lambda s: s)
+
+
 def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
     """
     Shared helper: patch create_db_engine and capture SQL strings passed to text().
     Returns the list of SQL strings that were executed.
     """
-    engine, conn = mock_engine
-    mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
-    mocker.patch("cde_harvester.loading.loader.get_run_logger", return_value=__import__("logging").getLogger("test"))
-    # Capture SQL strings; return the raw string so conn.execute gets it
-    mock_text = mocker.patch(
-        "cde_harvester.loading.loader.text", side_effect=lambda s: s
-    )
-    mocker.patch("pandas.DataFrame.to_sql")
+    mock_text = _patch_loader(mock_engine, mocker)
 
     main.fn(harvest_folder, incremental=incremental)
 
     return [c.args[0] for c in mock_text.call_args_list]
+
+
+def _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False, scalar=0):
+    """Run main() and return its summary dict. `scalar` is what every
+    `.scalar()` call yields — notably prune_stale_datasets' removed-row count,
+    which feeds the summary's `pruned` (a bare MagicMock would read as truthy
+    and make every run look changed). It has to be set on both the begin() and
+    connect() chains: the load runs on the former, the prune on the latter."""
+    engine, conn = mock_engine
+    conn.execute.return_value.scalar.return_value = scalar
+    (
+        engine.connect.return_value.__enter__.return_value
+        .execute.return_value.scalar.return_value
+    ) = scalar
+    _patch_loader(mock_engine, mocker)
+
+    return main.fn(harvest_folder, incremental=incremental)
 
 
 # ---------------------------------------------------------------------------
@@ -192,3 +211,59 @@ class TestDbLoaderMainIncremental:
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
         assert not any("drop_constraints" in s for s in sql_calls)
         assert not any("remove_all_data" in s for s in sql_calls)
+
+
+# ---------------------------------------------------------------------------
+# main() — the summary it returns
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def unchanged_harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
+    """A harvest run where every dataset hashed unchanged: the harvester writes
+    the columns but no rows to datasets.csv (the changed ones), and the
+    unchanged ones go to verified.csv instead."""
+    sample_datasets_df.iloc[0:0].to_csv(tmp_path / "datasets.csv", index=False)
+    sample_profiles_df.iloc[0:0].to_csv(tmp_path / "profiles.csv", index=False)
+    sample_skipped_df.to_csv(tmp_path / "skipped.csv", index=False)
+    return str(tmp_path)
+
+
+class TestLoadSummary:
+    """The pipeline drops the redis cache off this summary, so `changed` has to
+    mean "something a cached API response is built from moved"."""
+
+    def test_incremental_with_changed_datasets_is_changed(
+        self, harvest_folder, mock_engine, mocker
+    ):
+        summary = _run_main_summary(harvest_folder, mock_engine, mocker, incremental=True)
+        assert summary["changed"] is True
+        assert summary["changed_datasets"] == 1
+        assert summary["full_reload"] is False
+
+    def test_incremental_with_nothing_changed_is_unchanged(
+        self, unchanged_harvest_folder, mock_engine, mocker
+    ):
+        # The whole point: a no-op harvest must leave the cache warm.
+        summary = _run_main_summary(
+            unchanged_harvest_folder, mock_engine, mocker, incremental=True
+        )
+        assert summary["changed"] is False
+        assert summary["changed_datasets"] == 0
+        assert summary["pruned"] == 0
+
+    def test_pruning_alone_counts_as_changed(
+        self, unchanged_harvest_folder, mock_engine, mocker
+    ):
+        # No dataset changed, but some disappeared upstream and were removed —
+        # cached responses still reference them.
+        summary = _run_main_summary(
+            unchanged_harvest_folder, mock_engine, mocker, incremental=True, scalar=3
+        )
+        assert summary["pruned"] == 3
+        assert summary["changed"] is True
+
+    def test_full_reload_is_always_changed(self, harvest_folder, mock_engine, mocker):
+        # A full reload TRUNCATEs, so every cached response is stale by definition.
+        summary = _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False)
+        assert summary["changed"] is True
+        assert summary["full_reload"] is True

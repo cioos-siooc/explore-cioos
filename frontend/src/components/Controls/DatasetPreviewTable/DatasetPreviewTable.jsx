@@ -1,40 +1,43 @@
-import React, { useState } from 'react'
+import React, { useState } from "react";
 
-import './styles.css'
-import DataTable from 'react-data-table-component'
-import { useTranslation } from 'react-i18next'
-import TableFilter, { filterRows } from '../../ui/TableFilter.jsx'
-import { splitLines } from '../../../utilities'
+import "./styles.css";
+import DataTable from "react-data-table-component";
+import { useTranslation } from "react-i18next";
+import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
+import { splitLines } from "../../../utilities";
 
 export default function DatasetPreviewTable({ datasetPreview, data }) {
-  if (!datasetPreview) return <div />
+  // Hooks run before the empty-state guard: `datasetPreview` arrives
+  // asynchronously, so returning early above them would change the hook order
+  // between renders.
+  const { t } = useTranslation();
+  const [filterText, setFilterText] = useState("");
 
-  const { t } = useTranslation()
-  const [filterText, setFilterText] = useState('')
-
-  const { columnNames, columnUnits } = datasetPreview.table || {
+  const { columnNames, columnUnits } = datasetPreview?.table || {
     rows: [],
-    columnNames: []
-  }
+    columnNames: [],
+  };
 
   const columns = columnNames.map((colName, i) => ({
     name: splitLines(
-      colName + ' ' + (columnUnits[i] ? `(${columnUnits[i]})` : '')
+      colName + " " + (columnUnits[i] ? `(${columnUnits[i]})` : ""),
     ),
     selector: (row) => row[colName],
     reorder: true,
     wrap: true,
-    sortable: true
-  }))
+    sortable: true,
+  }));
 
-  const filteredData = filterRows(data, filterText)
+  const filteredData = filterRows(data, filterText);
+
+  if (!datasetPreview) return <div />;
 
   return (
     <>
       <TableFilter
         value={filterText}
         onChange={setFilterText}
-        placeholder={t('datasetInspectorFilterText')}
+        placeholder={t("datasetInspectorFilterText")}
       />
       <DataTable
         striped
@@ -44,12 +47,12 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
         paginationPerPage={10}
         paginationRowsPerPageOptions={[10, 100, 150, 200, 250]}
         paginationComponentOptions={{
-          rowsPerPageText: t('tableComponentRowsPerPage'),
-          rangeSeparatorText: t('tableComponentOf'),
-          selectAllRowsItem: false
+          rowsPerPageText: t("tableComponentRowsPerPage"),
+          rangeSeparatorText: t("tableComponentOf"),
+          selectAllRowsItem: false,
         }}
         dense
       />
     </>
-  )
+  );
 }

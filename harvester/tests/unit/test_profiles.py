@@ -8,15 +8,12 @@ any HTTP calls.
 
 import pandas as pd
 import pytest
-
+from cde_harvester.dataset_types import extract_features as get_profiles
 from conftest import (
     DATASET_ID,
-    ERDDAP_PROFILE_IDS_CSV,
     ERDDAP_URL,
     build_mock_dataset,
 )
-from cde_harvester.dataset_types import extract_features as get_profiles
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

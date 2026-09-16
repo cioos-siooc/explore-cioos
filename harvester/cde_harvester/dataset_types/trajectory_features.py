@@ -35,8 +35,8 @@ import requests
 from requests.exceptions import HTTPError
 from shapely.geometry import LineString
 
-from cde_harvester.core.errors import ResponseTooLargeError
 from cde_harvester.core.day_sets import bucket_index_to_day, day_bucket_group
+from cde_harvester.core.errors import ResponseTooLargeError
 from cde_harvester.sources.erddap.client import ERDDAP
 
 logger = logging.getLogger(__name__)
@@ -197,7 +197,7 @@ def _iter_raw_chunks(dataset, traj_var, has_depth):
         bounds.append(end.ceil("D") + pd.Timedelta(days=1))
         chunks = [
             f"&time>={a.strftime('%Y-%m-%dT%H:%M:%SZ')}&time<{b.strftime('%Y-%m-%dT%H:%M:%SZ')}"
-            for a, b in zip(bounds[:-1], bounds[1:])
+            for a, b in zip(bounds[:-1], bounds[1:], strict=True)
         ]
 
     for time_query in chunks:
@@ -388,7 +388,7 @@ def _densify_long_chords(group, kept, max_chord_km=TRACK_MAX_CHORD_KM):
         lat[pos[:-1]], lon[pos[:-1]], lat[pos[1:]], lon[pos[1:]]
     )
     out_positions = [pos[0]]
-    for a, b, chord in zip(pos[:-1], pos[1:], chords):
+    for a, b, chord in zip(pos[:-1], pos[1:], chords, strict=True):
         if chord > max_chord_km and b - a > 1:
             n_segments = int(np.ceil(chord / max_chord_km))
             inner = np.unique(

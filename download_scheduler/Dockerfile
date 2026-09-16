@@ -36,7 +36,9 @@ COPY downloader ./downloader
 COPY harvester ./harvester
 
 WORKDIR /usr/src/app/download_scheduler
+# --locked, like harvester/Dockerfile: without it uv is free to re-resolve
+# and the image can pin different transitive versions than CI tested.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-install-project
+    uv sync --locked --no-install-project
 
 CMD [ "uv", "run", "python", "-m", "download_scheduler" ]
