@@ -274,9 +274,7 @@ export default function SelectionProvider({ children }) {
   const selectedPks = useMemo(
     () =>
       new Set(
-        shortlist
-          .filter((entry) => entry.selected)
-          .map((entry) => entry.pk),
+        shortlist.filter((entry) => entry.selected).map((entry) => entry.pk),
       ),
     [shortlist],
   );
@@ -539,6 +537,7 @@ export default function SelectionProvider({ children }) {
   }, [pointsToReview]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setSelectionLoading(false);
     // A single remaining result used to open its own dataset page. That made
     // the outcome of a map click depend on how dense the data happened to be —

@@ -158,8 +158,7 @@
    the three sit inline with the legend pushed to the right, and the rows saved
    go to the cards. --- */
 .datasetsTable.downloadModal .datasetsCardControls {
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-flow: row wrap;
   align-items: center;
   gap: 6px 12px;
 }

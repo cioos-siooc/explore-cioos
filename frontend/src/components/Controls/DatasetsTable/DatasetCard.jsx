@@ -18,10 +18,7 @@ import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
 import platformColors from "../../platformColors";
-import {
-  formatErddapServerName,
-  formatSizeEstimate,
-} from "../../../utilities";
+import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
 import Spinner from "../../ui/Spinner.jsx";
@@ -324,7 +321,10 @@ export default function DatasetCard({
                     selection. On the link itself because that is what carries
                     the flaw — the queued zip beside it respects the polygon. */}
                 {downloadLink.polygonSquared && (
-                  <Tooltip placement="top" content={t("directLinksNotePolygon")}>
+                  <Tooltip
+                    placement="top"
+                    content={t("directLinksNotePolygon")}
+                  >
                     <span
                       className="datasetCardLinkWarning"
                       role="img"

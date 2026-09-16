@@ -237,6 +237,7 @@
 .downloadFooter {
   flex: 0 0 auto;
   display: grid;
+
   /* The links column is weighted well above the email one because its row of
      four export buttons is the widest indivisible thing in the footer: a
      column narrower than that wraps the last button onto a line of its own and
@@ -272,6 +273,7 @@
 .downloadFooterTitle {
   display: flex;
   flex-wrap: wrap;
+
   /* Centred, not baseline-aligned: an svg's baseline is its bottom edge, so
      the help icon in the links caption sat its full 16px above the baseline
      and pushed that caption's text down a few pixels out of step with the two
@@ -502,6 +504,7 @@
   padding: 6px 9px;
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-warn-bg);
+
   /* Ink rather than --cioos-warn: the amber that reads as a warning against
      white does not clear 4.5:1 against its own tint (3.4:1 measured). The
      glyph carries the colour — it only has 3:1 to meet — and the sentence
@@ -514,6 +517,7 @@
 
 .directLinksWarning svg {
   flex: 0 0 auto;
+
   /* Centred on the first line of the sentence rather than on the block, so a
      wrapped warning does not leave the glyph floating in the middle of it. */
   margin-top: 2px;
@@ -536,8 +540,7 @@
   /* Back to a row across the full width, where the notes can sit beside the
      buttons instead of under them. */
   .directLinksNotes {
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-flow: row wrap;
     gap: 4px 14px;
   }
 

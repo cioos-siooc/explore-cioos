@@ -10,7 +10,10 @@ import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 
-import { createDataFilterQueryString, formatSizeEstimate } from "../../../utilities.jsx";
+import {
+  createDataFilterQueryString,
+  formatSizeEstimate,
+} from "../../../utilities.jsx";
 import {
   defaultEndDate,
   defaultEndDepth,
