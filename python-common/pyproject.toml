@@ -1,0 +1,33 @@
+[project]
+name = "cde-python-common"
+version = "0.1.0"
+description = "Neutral foundations shared by every CIOOS Explorer Python service."
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+# Deliberately small, and deliberately free of prefect, duckdb, redis, pandas
+# and pandera: the point of this package is that the downloader and the download
+# scheduler can have the connection string, the retry session and the Sentry
+# wiring without installing a harvest pipeline to get at them.
+dependencies = [
+    "psycopg2-binary>=2.9.10",
+    "python-dotenv>=1.1.1",
+    "requests>=2.31.0",
+    "sentry-sdk>=2.38.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
+]
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cde_common"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

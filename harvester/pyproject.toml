@@ -5,6 +5,9 @@ description = "CIOOS Explorer Harvester"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
+    # The neutral layer: connection string, .env loading, retry session, Sentry
+    # init and issue reporting. See python-common/README.md.
+    "cde-python-common",
     "duckdb>=1.0.0",
     "diskcache>=5.6.3",
     "erddapy>=2.2.0",
@@ -14,8 +17,6 @@ dependencies = [
     "pandas<2.0.0",
     "prefect>=3.6.23",
     "prefect-docker>=0.6.0",
-    "psycopg2-binary>=2.9.10",
-    "python-dotenv>=1.1.1",
     "pyyaml>=6.0.1",
     "redis>=6.4.0",
     "requests>=2.31.0",
@@ -23,6 +24,9 @@ dependencies = [
     "shapely>=2.0.3",
     "sqlalchemy>=2.0.0,<3.0.0",
 ]
+
+[tool.uv.sources]
+cde-python-common = { path = "../python-common", editable = true }
 
 [build-system]
 requires = ["hatchling >= 1.26"]

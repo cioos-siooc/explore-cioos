@@ -1,3 +1,11 @@
+"""The ``reason_code`` vocabulary, shared by everything that writes one.
+
+These strings land in the database (``cde.harvest_attempts.reason_code``,
+``cde.datasets.content_hash_reason``) and in the download-job reports, so the
+harvester and the downloader have to agree on them, and
+:mod:`cde_common.issues` groups on them. One file, so they cannot drift.
+"""
+
 CDM_DATA_TYPE_UNSUPPORTED = "CDM_DATA_TYPE_UNSUPPORTED"
 HTTP_ERROR = "HTTP_ERROR"
 MISSING_REQUIRED_VARS = "MISSING_REQUIRED_VARS"
@@ -13,7 +21,7 @@ UNCHANGED = "UNCHANGED"
 # Why a dataset has no content_hash (stored on cde.datasets.content_hash_reason).
 # Distinct from the harvest-status reason codes above: these explain hash *absence*,
 # not why a harvest attempt was skipped/errored. A NULL reason means a hash was produced.
-HASH_NO_FILE_LIST = "HASH_NO_FILE_LIST"                  # Croissant lists no files (database-backed) — benign
+HASH_NO_FILE_LIST = "HASH_NO_FILE_LIST"  # Croissant lists no files (database-backed) — benign
 HASH_CROISSANT_HTTP_ERROR = "HASH_CROISSANT_HTTP_ERROR"  # .croissant endpoint returned non-200
 HASH_CROISSANT_UNREADABLE = "HASH_CROISSANT_UNREADABLE"  # request/JSON parse failed (timeout, bad JSON)
 HASH_FEDERATED_UNRESOLVED = "HASH_FEDERATED_UNRESOLVED"  # federated source not resolved within 3 hops

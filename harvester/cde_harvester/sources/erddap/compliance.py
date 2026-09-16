@@ -1,4 +1,4 @@
-from cde_harvester.core.errors import (
+from cde_common.errors import (
     DEPTH_AND_ALTITUDE,
     INGEST_FLAG_FALSE,
     MISSING_REQUIRED_VARS,
@@ -31,9 +31,7 @@ class CDEComplianceChecker:
         else:
             required_variables = ["time", "latitude", "longitude"]
 
-        missing_required_vars = [
-            x for x in required_variables if x not in self.dataset.variables_list
-        ]
+        missing_required_vars = [x for x in required_variables if x not in self.dataset.variables_list]
 
         if missing_required_vars:
             self.failed_error(
@@ -48,19 +46,13 @@ class CDEComplianceChecker:
         the dataset."""
 
         standard_names_in_dataset = (
-            self.dataset.df_variables.query("standard_name != ''")["standard_name"]
-            .unique()
-            .tolist()
+            self.dataset.df_variables.query("standard_name != ''")["standard_name"].unique().tolist()
         )
 
         #  List non-CF standard names
-        non_standard_names = [
-            x for x in standard_names_in_dataset if x not in cf_standard_names
-        ]
+        non_standard_names = [x for x in standard_names_in_dataset if x not in cf_standard_names]
         if non_standard_names:
-            self.logger.warn(
-                "Found unstandard standard_name:" + str(non_standard_names)
-            )
+            self.logger.warn("Found unstandard standard_name:" + str(non_standard_names))
 
         #  This dataset has at least one standard name mapped to GOOS
         supported_variables = intersection(
@@ -84,10 +76,7 @@ class CDEComplianceChecker:
         return True
 
     def check_only_one_depth(self):
-        if (
-            "depth" in self.dataset.variables_list
-            and "altitude" in self.dataset.variables_list
-        ):
+        if "depth" in self.dataset.variables_list and "altitude" in self.dataset.variables_list:
             self.failed_error("Found both depth and altitude", DEPTH_AND_ALTITUDE)
             return False
         return True

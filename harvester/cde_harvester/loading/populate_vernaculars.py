@@ -41,60 +41,15 @@ from urllib.parse import urlencode
 import requests
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from urllib3.util.retry import Retry
 
-from cde_harvester.core.db import create_db_engine, db_host
+from cde_common.db import create_db_engine, db_host
+from cde_common.http import retry_session
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s",
 )
 logger = logging.getLogger("populate_vernaculars")
-
-# Silence urllib3's generic "Retrying (Retry(total=3, …)) after connection
-# broken by '…': /rest/…" warning — our LoggingRetry below emits a richer line
-# with the full URL and remaining attempts, so leaving the default in would
-# just duplicate every retry.
-logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
-
-
-class LoggingRetry(Retry):
-    """urllib3.Retry that logs each retry with full URL and reason."""
-
-    def increment(
-        self,
-        method=None,
-        url=None,
-        response=None,
-        error=None,
-        _pool=None,
-        _stacktrace=None,
-    ):
-        full_url = url or ""
-        if _pool is not None and url:
-            full_url = f"{_pool.scheme}://{_pool.host}{url}"
-        if error is not None:
-            reason = f"{type(error).__name__}: {error}"
-        elif response is not None:
-            reason = f"HTTP {response.status}"
-        else:
-            reason = "unknown"
-        attempts_left = self.total - 1 if isinstance(self.total, int) else "?"
-        logger.info(
-            "Retrying %s %s (attempts left=%s) after %s",
-            method or "GET",
-            full_url,
-            attempts_left,
-            reason,
-        )
-        return super().increment(
-            method=method,
-            url=url,
-            response=response,
-            error=error,
-            _pool=_pool,
-            _stacktrace=_stacktrace,
-        )
 
 
 WORMS_BASE = "https://www.marinespecies.org/rest"
@@ -130,34 +85,21 @@ def build_engine(workers: int = DEFAULT_WORKERS):
 
 
 def build_session(workers: int = DEFAULT_WORKERS):
-    s = requests.Session()
-    s.headers["User-Agent"] = "cioos-cde/populate_vernaculars (+https://cioos.ca)"
-    s.headers["Accept"] = "application/json"
-    # Auto-retry transient server-side issues: stale keep-alive disconnects
-    # (RemoteDisconnected), 429 rate-limit pushes, and 5xx server errors.
-    # Connection errors are retried by default; status_forcelist covers HTTP
-    # responses that succeeded in reaching us but the server signalled retry.
-    retry = LoggingRetry(
-        total=4,
-        connect=4,
-        read=4,
-        backoff_factor=0.5,  # 0.5s, 1s, 2s, 4s between attempts
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=frozenset(["GET"]),
-        raise_on_status=False,
-        respect_retry_after_header=True,
+    """WoRMS session: gentler backoff than the shared default, pooled per worker.
+
+    backoff_factor 0.5 (0.5s/1s/2s/4s) rather than 1.0 because WoRMS publishes no
+    hard rate limit and recovers quickly. The pool is sized to the worker count
+    to avoid the urllib3 "Connection pool is full, discarding connection" churn
+    that thrashes WoRMS with TLS reconnects when --workers exceeds the default.
+    """
+    return retry_session(
+        backoff_factor=0.5,
+        pool_size=workers + 2,
+        headers={
+            "User-Agent": "cioos-cde/populate_vernaculars (+https://cioos.ca)",
+            "Accept": "application/json",
+        },
     )
-    # Connection pool sized to the worker count to avoid the urllib3
-    # "Connection pool is full, discarding connection" churn that thrashes
-    # WoRMS with TLS reconnects when --workers exceeds the default.
-    adapter = requests.adapters.HTTPAdapter(
-        pool_connections=workers + 2,
-        pool_maxsize=workers + 2,
-        max_retries=retry,
-    )
-    s.mount("https://", adapter)
-    s.mount("http://", adapter)
-    return s
 
 
 def match_aphia_ids(session: requests.Session, names: list[str]):
@@ -311,17 +253,11 @@ def refresh_popularity(engine):
     """
     try:
         with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "REFRESH MATERIALIZED VIEW CONCURRENTLY "
-                    "cde.obis_scientific_name_popularity"
-                )
-            )
+            conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY cde.obis_scientific_name_popularity"))
         logger.info("Refreshed cde.obis_scientific_name_popularity")
     except SQLAlchemyError as exc:
         logger.warning(
-            "Could not refresh cde.obis_scientific_name_popularity (%s); "
-            "ordering by a possibly stale popularity",
+            "Could not refresh cde.obis_scientific_name_popularity (%s); ordering by a possibly stale popularity",
             exc,
         )
 
@@ -395,9 +331,7 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
     try:
         en, fr = fetch_vernaculars(session, aid)
     except requests.RequestException as exc:
-        logger.warning(
-            "AphiaVernacularsByAphiaID failed for %r (%s): %s", name, aid, exc
-        )
+        logger.warning("AphiaVernacularsByAphiaID failed for %r (%s): %s", name, aid, exc)
         return TaxonResult(name, aid, rank, [], [], [], STATUS_ERROR)
 
     cached = classification_cache.get(aid)
@@ -407,17 +341,13 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
     try:
         ancestors = fetch_classification(session, aid)
     except requests.RequestException as exc:
-        logger.warning(
-            "AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc
-        )
+        logger.warning("AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc)
         ancestors = []
     classification_cache.put(aid, ancestors)
     return TaxonResult(name, aid, rank, ancestors, en, fr, STATUS_OK)
 
 
-def process_chunk(
-    session, engine, executor, names, sleep_seconds, counts, classification_cache
-):
+def process_chunk(session, engine, executor, names, sleep_seconds, counts, classification_cache):
     """Resolve a chunk of names and persist results.
 
     All upserts for the chunk are committed in a single transaction.
@@ -425,9 +355,7 @@ def process_chunk(
     try:
         matches = match_aphia_ids(session, names)
     except requests.RequestException as exc:
-        logger.warning(
-            "Batch AphiaRecordsByMatchNames failed (%d names): %s", len(names), exc
-        )
+        logger.warning("Batch AphiaRecordsByMatchNames failed (%d names): %s", len(names), exc)
         with engine.begin() as conn:
             for name in names:
                 conn.execute(
@@ -458,9 +386,7 @@ def process_chunk(
 
     if executor is not None:
         futures = [
-            executor.submit(
-                _fetch_taxon_data, session, name, aid, rank, classification_cache
-            )
+            executor.submit(_fetch_taxon_data, session, name, aid, rank, classification_cache)
             for name, aid, rank in pending
         ]
         for fut in concurrent.futures.as_completed(futures):
@@ -468,9 +394,7 @@ def process_chunk(
     else:
         # Serial path: keep the per-call throttle.
         for name, aid, rank in pending:
-            results.append(
-                _fetch_taxon_data(session, name, aid, rank, classification_cache)
-            )
+            results.append(_fetch_taxon_data(session, name, aid, rank, classification_cache))
             time.sleep(sleep_seconds)
 
     with engine.begin() as conn:
@@ -503,8 +427,7 @@ def main():
         "--limit",
         type=int,
         default=None,
-        help="Process at most this many names this run, after --top is applied "
-        "(useful for smoke tests).",
+        help="Process at most this many names this run, after --top is applied (useful for smoke tests).",
     )
     parser.add_argument(
         "--workers",
@@ -567,11 +490,7 @@ def main():
     processed = 0
 
     classification_cache = ClassificationCache()
-    executor = (
-        concurrent.futures.ThreadPoolExecutor(max_workers=workers)
-        if workers > 1
-        else None
-    )
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers) if workers > 1 else None
     try:
         for start in range(0, total, batch_size):
             chunk = todo[start : start + batch_size]

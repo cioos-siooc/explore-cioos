@@ -10,6 +10,7 @@ The load now reports what it did, and the flush is gated on it.
 
 import pytest
 import yaml
+
 from cde_harvester import prefect_pipeline
 from cde_harvester.prefect_pipeline import PrefectCDEPipeline
 
@@ -20,10 +21,18 @@ BASE_CONFIG = {
 }
 
 UNCHANGED = {
-    "changed": False, "changed_datasets": 0, "pruned": 0, "gc": 0, "full_reload": False,
+    "changed": False,
+    "changed_datasets": 0,
+    "pruned": 0,
+    "gc": 0,
+    "full_reload": False,
 }
 CHANGED = {
-    "changed": True, "changed_datasets": 4, "pruned": 0, "gc": 0, "full_reload": False,
+    "changed": True,
+    "changed_datasets": 4,
+    "pruned": 0,
+    "gc": 0,
+    "full_reload": False,
 }
 
 
@@ -38,6 +47,7 @@ def config_file(tmp_path, monkeypatch):
         f = tmp_path / "harvest_config.yaml"
         f.write_text(yaml.safe_dump(config))
         return str(f)
+
     return _write
 
 
@@ -51,12 +61,8 @@ def run_pipeline(config_file, tmp_path, monkeypatch):
         monkeypatch.setattr(prefect_pipeline, "harvester_main", lambda **kw: None)
         monkeypatch.setattr(prefect_pipeline, "db_loader_main", lambda **kw: load_summary)
         monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
-        monkeypatch.setattr(
-            prefect_pipeline, "clearRedisCache", lambda: calls.append("clear")
-        )
-        monkeypatch.setattr(
-            prefect_pipeline, "reloadTopRequests", lambda: calls.append("warm")
-        )
+        monkeypatch.setattr(prefect_pipeline, "clearRedisCache", lambda: calls.append("clear"))
+        monkeypatch.setattr(prefect_pipeline, "reloadTopRequests", lambda: calls.append("warm"))
 
         config = dict(BASE_CONFIG, folder=str(tmp_path / "harvest"), **config_overrides)
         p = PrefectCDEPipeline()

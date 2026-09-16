@@ -3,7 +3,8 @@ from importlib.resources import files
 from pathlib import Path
 
 import pandas as pd
-import requests
+
+from cde_common.http import DEFAULT_TIMEOUT, retry_session
 
 """
 
@@ -16,12 +17,17 @@ CDE converts IOOS to L06 using a mapping found here:  https://mmisw.org/ont?iri=
 
 logger = logging.getLogger(__name__)
 
-PLATFORM_L06_CODES_AND_LABELS_CSV = Path(
-    str(files("cde_harvester.data") / "platform_nerc_l06_codes_and_labels.csv")
-)
-PLATFORM_L06_MAPPING_CSV = Path(
-    str(files("cde_harvester.data") / "platform_nerc_ioos_l06.csv")
-)
+PLATFORM_L06_CODES_AND_LABELS_CSV = Path(str(files("cde_harvester.data") / "platform_nerc_l06_codes_and_labels.csv"))
+PLATFORM_L06_MAPPING_CSV = Path(str(files("cde_harvester.data") / "platform_nerc_ioos_l06.csv"))
+
+
+def _download_json(url):
+    """Fetch a vocabulary document. Reached only when the bundled CSV is absent,
+    so the session is built per call rather than at import."""
+    logger.info("Downloading %s", url)
+    response = retry_session().get(url, timeout=DEFAULT_TIMEOUT)
+    response.raise_for_status()
+    return response.json()
 
 
 def get_l06_codes_and_labels():
@@ -31,8 +37,7 @@ def get_l06_codes_and_labels():
         return pd.read_csv(PLATFORM_L06_CODES_AND_LABELS_CSV, index_col="l06_code")
 
     url = "http://vocab.nerc.ac.uk/collection/L06/current/?_profile=nvs&_mediatype=application/ld+json"
-    logger.info("Downloading %s", url)
-    platforms = requests.get(url).json()["@graph"]
+    platforms = _download_json(url)["@graph"]
 
     platforms_parsed = {}
     l06Lookup = {}
@@ -76,8 +81,7 @@ def get_ioos_to_l06_mapping():
 
     # download mapping
     url = "https://mmisw.org/ont/api/v0/ont?format=jsonld&iri=http://mmisw.org/ont/bodc/MapSeaVoxPlatforms2IOOSandRDIPlatforms"
-    logger.info("Downloading %s", url)
-    res = requests.get(url).json()
+    res = _download_json(url)
     rows = []
     # parse mapping
     for k in res["@graph"]:
@@ -99,9 +103,7 @@ def get_ioos_to_l06_mapping():
 
     df = pd.DataFrame(rows)
     preference_list = ["exactMatch", "narrowMatch", "broadMatch", "relatedMatch"]
-    df["Pref"] = pd.Categorical(
-        df["predicate"], categories=preference_list, ordered=True
-    )
+    df["Pref"] = pd.Categorical(df["predicate"], categories=preference_list, ordered=True)
     df = df.sort_values(["ioos_label", "Pref"]).drop_duplicates("ioos_label")
     df.drop(["Pref", "predicate"], axis=1, inplace=True)
     df.reset_index(inplace=True, drop=True)
@@ -112,9 +114,7 @@ def get_ioos_to_l06_mapping():
 l06_codes_and_labels = get_l06_codes_and_labels()
 ioos_to_l06_mapping = get_ioos_to_l06_mapping()
 
-platforms_nerc_ioos = (
-    l06_codes_and_labels.join(ioos_to_l06_mapping).fillna("")
-)
+platforms_nerc_ioos = l06_codes_and_labels.join(ioos_to_l06_mapping).fillna("")
 
 if __name__ == "__main__":
     logger.info("Save platforms mapping and labels to CSV")

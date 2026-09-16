@@ -15,16 +15,15 @@ import pandas as pd
 import requests
 from prefect import get_run_logger, task
 from prefect.cache_policies import NO_CACHE
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
-from cde_harvester.core.errors import (
+from cde_common.errors import (
     HASH_CROISSANT_HTTP_ERROR,
     HASH_CROISSANT_UNREADABLE,
     HASH_FEDERATED_UNRESOLVED,
     HASH_NO_FILE_LIST,
     ResponseTooLargeError,
 )
+from cde_common.http import DATA_TIMEOUT, DEFAULT_TIMEOUT, retry_session
 from cde_harvester.sources.erddap.dataset import Dataset
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -58,22 +57,8 @@ class _SpooledBody(tempfile.SpooledTemporaryFile):
     def seekable(self):
         return True
 
-# Transient HTTP statuses we should retry. 500 is included even though some
-# ERDDAPs use it semantically for "no data" / "query too big"; those responses
-# have a body we still need to inspect, so the retry only kicks in when the
-# server keeps returning 500 across attempts — i.e. it really is broken.
-# 413 is here because seagull-erddap's WAF returns it when the harvester
-# issues parallel requests too quickly; the queries themselves are tiny and
-# succeed when retried after backoff.
-# 408 (Request Timeout) and 520 (Cloudflare "unknown error") are transient
-# timeouts seen on the cioosatlantic/cioospacific CTD-profile endpoints under
-# load; the same queries succeed on a later attempt, so retry rather than skip.
-_RETRY_STATUSES = (408, 413, 500, 502, 503, 504, 520, 522, 524)
 
-
-_ERDDAP_SOURCE_RE = re.compile(
-    r"(https?://.+?/erddap)/(tabledap|griddap)/([^/?.\s]+)"
-)
+_ERDDAP_SOURCE_RE = re.compile(r"(https?://.+?/erddap)/(tabledap|griddap)/([^/?.\s]+)")
 
 
 def _croissant_source_url(doc):
@@ -87,22 +72,6 @@ def _parse_erddap_source(source_url):
     endpoint."""
     match = _ERDDAP_SOURCE_RE.match(source_url) if source_url else None
     return (match.group(1), match.group(2), match.group(3)) if match else None
-
-
-def _build_retry_session() -> requests.Session:
-    session = requests.Session()
-    retry = Retry(
-        total=3,
-        backoff_factor=1.0,         # waits 0s, 2s, 4s between attempts
-        status_forcelist=_RETRY_STATUSES,
-        allowed_methods=frozenset(["GET", "HEAD"]),
-        raise_on_status=False,      # let the existing 5xx-handling logic run
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
 
 
 class ERDDAP:
@@ -128,7 +97,10 @@ class ERDDAP:
 
         self.domain = urlparse(erddap_url).netloc
         self.host_slug = self.domain.lower().replace(".", "-")  # for the task run label
-        self.session = _build_retry_session()
+        # total=3 rather than the shared default of 4: this is by far the
+        # highest-volume caller in the tree, and a fourth attempt against a
+        # server that is genuinely down costs another 8s per request.
+        self.session = retry_session(total=3)
 
         try:
             self.logger = get_run_logger()
@@ -218,9 +190,7 @@ class ERDDAP:
         # quotes, truncating ERDDAP queries like orderByMinMax("...") and
         # distinct(). Percent-encode just those characters so the whole URL
         # stays clickable; ERDDAP decodes them server-side either way.
-        log_url = decoded_url.translate(
-            str.maketrans({"(": "%28", ")": "%29", '"': "%22", " ": "%20"})
-        )
+        log_url = decoded_url.translate(str.maketrans({"(": "%28", ")": "%29", '"': "%22", " ": "%20"}))
         logger.info(f"Requesting: {log_url}")
         # Record exactly what we requested so the dashboard can show the
         # admin a clickable, reproducible link list per dataset attempt.
@@ -244,22 +214,17 @@ class ERDDAP:
                 no_data = True
             elif (
                 response.status_code == 500
-                and "Query error: No operator found in constraint=&quot;orderByCount"
-                in response.text
+                and "Query error: No operator found in constraint=&quot;orderByCount" in response.text
             ):
                 logger.error("OrderByCount not available within this ERDDAP Version")
                 no_data = True
             elif (
                 # Older erddaps respond with 500 for no data
-                response.status_code == 500
-                and "Your query produced no matching results" in response.text
+                response.status_code == 500 and "Your query produced no matching results" in response.text
             ):
                 no_data = True
 
-            elif (
-                response.status_code == 500
-                and "You are requesting too much data." in response.text
-            ):
+            elif response.status_code == 500 and "You are requesting too much data." in response.text:
                 logger.error("Query too big for the server")
                 no_data = True
             elif response.status_code != 200:
@@ -273,9 +238,7 @@ class ERDDAP:
                 # ignores that for an already-decoded text buffer, which is what
                 # it always got, and applying it to raw bytes would turn every
                 # UTF-8 accent into mojibake.
-                text_body = io.TextIOWrapper(
-                    body, encoding=response.encoding or "utf-8", errors="replace"
-                )
+                text_body = io.TextIOWrapper(body, encoding=response.encoding or "utf-8", errors="replace")
                 # skip units line
                 return pd.read_csv(text_body, skiprows=skiprows)
             if no_data:
@@ -310,7 +273,7 @@ class ERDDAP:
             response._content = content
             return response, io.BytesIO(content)
 
-        response = self.session.get(url_combined, timeout=3600, stream=True)
+        response = self.session.get(url_combined, timeout=DATA_TIMEOUT, stream=True)
         try:
             body = io.BytesIO(response.content) if response.status_code != 200 else self._spool(response, decoded_url)
         finally:
@@ -326,8 +289,11 @@ class ERDDAP:
             content = body.read()
             body.seek(0)
             self.cache[url_combined] = (
-                response.status_code, response.url, response.reason,
-                response.encoding, content,
+                response.status_code,
+                response.url,
+                response.reason,
+                response.encoding,
+                content,
             )
         return response, body
 
@@ -341,8 +307,7 @@ class ERDDAP:
                 total += len(chunk)
                 if total > MAX_RESPONSE_SIZE:
                     raise ResponseTooLargeError(
-                        f"Response exceeds {MAX_RESPONSE_SIZE:.0f} bytes "
-                        f"(aborted after {total}): {decoded_url}"
+                        f"Response exceeds {MAX_RESPONSE_SIZE:.0f} bytes (aborted after {total}): {decoded_url}"
                     )
                 spool.write(chunk)
         except BaseException:
@@ -351,8 +316,7 @@ class ERDDAP:
         spool.seek(0)
         return spool
 
-    def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0,
-                                  dap="tabledap"):
+    def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0, dap="tabledap"):
         """Return (content_hash, has_files, reason) from the dataset's Croissant ld+json.
 
         Pulls ERDDAP's generated Croissant straight from the .croissant data
@@ -366,35 +330,26 @@ class ERDDAP:
         try:
             # Small metadata doc — don't inherit the 1h data-query timeout; a
             # hung .croissant endpoint would otherwise stall every dataset.
-            response = self.session.get(
-                f"{erddap_base}/{dap}/{dataset_id}.croissant", timeout=60
-            )
+            response = self.session.get(f"{erddap_base}/{dap}/{dataset_id}.croissant", timeout=DEFAULT_TIMEOUT)
             if response.status_code != 200:
                 return None, False, HASH_CROISSANT_HTTP_ERROR
             doc = response.json()
         except Exception:
-            self.logger.warning(
-                "Could not read Croissant for %s", dataset_id, exc_info=True
-            )
+            self.logger.warning("Could not read Croissant for %s", dataset_id, exc_info=True)
             return None, False, HASH_CROISSANT_UNREADABLE
 
         distribution = doc.get("distribution") or []
         if isinstance(distribution, dict):
             distribution = [distribution]
-        if any(isinstance(d, dict) and d.get("@type") == "cr:FileObject"
-               for d in distribution):
-            digest = hashlib.sha256(
-                json.dumps(doc, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest()
+        if any(isinstance(d, dict) and d.get("@type") == "cr:FileObject" for d in distribution):
+            digest = hashlib.sha256(json.dumps(doc, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
             return digest, True, None
 
         if _hops < 3:
             origin = _parse_erddap_source(_croissant_source_url(doc))
             if origin:
                 # Propagate the origin's outcome (hash or its own reason).
-                return self.get_croissant_fingerprint(
-                    origin[0], origin[2], _hops + 1, dap=origin[1]
-                )
+                return self.get_croissant_fingerprint(origin[0], origin[2], _hops + 1, dap=origin[1])
             return None, False, HASH_NO_FILE_LIST
 
         return None, False, HASH_FEDERATED_UNRESOLVED

@@ -11,14 +11,16 @@ These mirror tests/unit/test_obis_harvester_memory.py: features are flushed to
 disk periodically and correctly reassembled, and the returned result does not
 depend on the flush interval.
 """
+
 import os
 from unittest.mock import MagicMock, patch
 
-import cde_harvester.core.frame_spill as frame_spill_module
 import pandas as pd
 import pytest
-from cde_harvester.sources.erddap.harvester import ERDDAPHarvester
 from conftest import ERDDAP_URL, build_mock_dataset
+
+import cde_harvester.core.frame_spill as frame_spill_module
+from cde_harvester.sources.erddap.harvester import ERDDAPHarvester
 
 
 def _erddap_mock(n_datasets):
@@ -40,20 +42,22 @@ def _erddap_mock(n_datasets):
 def _features_for(dataset):
     """One profile row, tagged with the dataset being harvested so the
     reassembled frame can be checked for completeness and ordering."""
-    return pd.DataFrame({
-        "dataset_id": [dataset.id],
-        "erddap_url": [ERDDAP_URL],
-        "timeseries_id": ["STATION_001"],
-        "profile_id": [""],
-        "latitude": [48.5],
-        "longitude": [-125.0],
-        "time_min": [pd.Timestamp("2020-01-01", tz="UTC")],
-        "time_max": [pd.Timestamp("2023-12-31", tz="UTC")],
-        "depth_min": [0.5],
-        "depth_max": [200.5],
-        "n_records": [1000.0],
-        "records_per_day": [0.75],
-    })
+    return pd.DataFrame(
+        {
+            "dataset_id": [dataset.id],
+            "erddap_url": [ERDDAP_URL],
+            "timeseries_id": ["STATION_001"],
+            "profile_id": [""],
+            "latitude": [48.5],
+            "longitude": [-125.0],
+            "time_min": [pd.Timestamp("2020-01-01", tz="UTC")],
+            "time_max": [pd.Timestamp("2023-12-31", tz="UTC")],
+            "depth_min": [0.5],
+            "depth_max": [200.5],
+            "n_records": [1000.0],
+            "records_per_day": [0.75],
+        }
+    )
 
 
 def _harvest(n_datasets, flush_every):
@@ -106,9 +110,7 @@ def test_final_result_is_identical_regardless_of_chunk_size():
     chunked = _harvest(n_datasets=5, flush_every=2)
 
     for table in ("profiles", "datasets", "variables"):
-        pd.testing.assert_frame_equal(
-            getattr(unchunked, table), getattr(chunked, table)
-        )
+        pd.testing.assert_frame_equal(getattr(unchunked, table), getattr(chunked, table))
 
 
 def test_profiles_keep_the_full_schema_columns():
@@ -158,9 +160,10 @@ def test_chunk_temp_directory_is_cleaned_up_even_on_error():
     erddap_mock = _erddap_mock(1)
     erddap_mock.get_all_datasets.side_effect = RuntimeError("boom")
     try:
-        with patch(
-            "cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock
-        ), pytest.raises(RuntimeError):
+        with (
+            patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+            pytest.raises(RuntimeError),
+        ):
             ERDDAPHarvester(ERDDAP_URL).harvest()
     finally:
         frame_spill_module.tempfile.TemporaryDirectory = original_cls

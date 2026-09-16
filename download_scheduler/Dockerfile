@@ -31,9 +31,13 @@ RUN strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so
 
 WORKDIR /usr/src/app
 
+# harvester is deliberately NOT copied: the scheduler used to depend on it to
+# reach the issue grouping and the reason codes, which meant this image also
+# installed Prefect, duckdb, redis, pandera and erddapy. Those pieces are in
+# python-common/ now (see python-common/README.md).
 COPY download_scheduler ./download_scheduler
 COPY downloader ./downloader
-COPY harvester ./harvester
+COPY python-common ./python-common
 
 WORKDIR /usr/src/app/download_scheduler
 # --locked, like harvester/Dockerfile: without it uv is free to re-resolve

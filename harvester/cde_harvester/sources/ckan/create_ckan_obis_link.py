@@ -112,13 +112,15 @@ def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL, cache_folder=N
         title_translated = pkg.get("title_translated") or {}
         eovs = pkg.get("eov") or []
 
-        records.append({
-            "dataset_id": dataset_id,
-            "ckan_id": pkg["id"],
-            "ckan_eovs": eovs,
-            "ckan_title": title_translated.get("en"),
-            "title_fr": title_translated.get("fr"),
-        })
+        records.append(
+            {
+                "dataset_id": dataset_id,
+                "ckan_id": pkg["id"],
+                "ckan_eovs": eovs,
+                "ckan_title": title_translated.get("en"),
+                "title_fr": title_translated.get("fr"),
+            }
+        )
 
     df = pd.DataFrame(records)
     if not df.empty:
@@ -126,6 +128,9 @@ def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL, cache_folder=N
 
     logger.info(
         "Matched %d / %d OBIS datasets to CKAN records (%d fetched, %d from cache)",
-        len(df), len(dataset_ids), fetched, len(dataset_ids) - fetched,
+        len(df),
+        len(dataset_ids),
+        fetched,
+        len(dataset_ids) - fetched,
     )
     return df

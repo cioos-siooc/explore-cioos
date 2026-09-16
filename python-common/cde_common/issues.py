@@ -10,8 +10,9 @@ Sentry owns de-duplication: each group is reported with an explicit fingerprint
 of ``[component, host, signature_hash]``, so a repeat of a known problem lands on
 the existing issue (no new-issue alert) and a genuinely new one opens a new issue.
 
-Shared by the harvest side and the downloader, which already imports
-``cde_harvester``.
+Shared by the harvest side, the downloader and the download scheduler — which is
+why it lives here rather than under the harvester, where reaching it meant
+installing a harvest pipeline.
 """
 
 import hashlib
@@ -33,9 +34,7 @@ MAX_SIGNATURE_CHARS = 300
 MAX_DATASET_IDS = 50
 
 # ERDDAP error envelope: Error { code=500; message="Query error: ..."; }
-_ERDDAP_MESSAGE_RE = re.compile(
-    r'message\s*=\s*"(.*?)"\s*;?\s*\}?\s*$', re.DOTALL | re.IGNORECASE
-)
+_ERDDAP_MESSAGE_RE = re.compile(r'message\s*=\s*"(.*?)"\s*;?\s*\}?\s*$', re.DOTALL | re.IGNORECASE)
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -47,9 +46,7 @@ _NORMALIZERS = (
     (re.compile(r"&quot;.*?&quot;", re.DOTALL), "<STR>"),
     (re.compile(r'"[^"]*"'), "<STR>"),
     (re.compile(r"'[^']*'"), "<STR>"),
-    (re.compile(
-        r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z?)?"
-    ), "<TIME>"),
+    (re.compile(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z?)?"), "<TIME>"),
     (re.compile(r"\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b", re.I), "<ID>"),
     (re.compile(r"\b[0-9a-f]{16,}\b", re.I), "<ID>"),
     (re.compile(r"[-+]?\b\d+(?:\.\d+)?(?:[eE][-+]?\d+)?\b"), "<N>"),
@@ -129,10 +126,7 @@ class IssueGroup:
         return signature_hash(self.signature)
 
     def __str__(self):
-        return (
-            f"{self.host}: {self.signature} "
-            f"[{self.reason_code}] ({len(self.dataset_ids)} datasets)"
-        )
+        return f"{self.host}: {self.signature} [{self.reason_code}] ({len(self.dataset_ids)} datasets)"
 
 
 def _as_records(records):
@@ -185,10 +179,7 @@ def group_issues(records):
                 signature=signature,
                 reason_code=reason_code,
                 sample_error=error_message[:MAX_ERROR_CHARS],
-                sample_query_url=(
-                    None if _is_missing(query_urls)
-                    else str(query_urls).splitlines()[0]
-                ),
+                sample_query_url=(None if _is_missing(query_urls) else str(query_urls).splitlines()[0]),
             )
 
         dataset_id = record.get("dataset_id")
@@ -223,27 +214,29 @@ def report_issues(component, records, log=None):
         # run log names the distinct problems without a Sentry round-trip.
         log.warning(f"Issue group — {group}")
         try:
-            sentry_sdk.capture_event({
-                "level": "error",
-                "message": f"{group.signature} — {group.host} ({len(group.dataset_ids)} datasets)",
-                # Grouping key. Sentry de-dupes on this, so a repeat of a known
-                # problem raises no new-issue alert.
-                "fingerprint": [component, group.host, group.fingerprint_hash],
-                "tags": {
-                    "component": component,
-                    "erddap_url": group.erddap_url,
-                    "erddap_host": group.host,
-                    "reason_code": group.reason_code,
-                },
-                "extra": {
-                    "dataset_count": len(group.dataset_ids),
-                    "dataset_ids": group.dataset_ids[:MAX_DATASET_IDS],
-                    "dataset_ids_truncated": len(group.dataset_ids) > MAX_DATASET_IDS,
-                    "sample_error_message": group.sample_error,
-                    "sample_query_url": group.sample_query_url,
-                    "error_signature": group.signature,
-                },
-            })
+            sentry_sdk.capture_event(
+                {
+                    "level": "error",
+                    "message": f"{group.signature} — {group.host} ({len(group.dataset_ids)} datasets)",
+                    # Grouping key. Sentry de-dupes on this, so a repeat of a known
+                    # problem raises no new-issue alert.
+                    "fingerprint": [component, group.host, group.fingerprint_hash],
+                    "tags": {
+                        "component": component,
+                        "erddap_url": group.erddap_url,
+                        "erddap_host": group.host,
+                        "reason_code": group.reason_code,
+                    },
+                    "extra": {
+                        "dataset_count": len(group.dataset_ids),
+                        "dataset_ids": group.dataset_ids[:MAX_DATASET_IDS],
+                        "dataset_ids_truncated": len(group.dataset_ids) > MAX_DATASET_IDS,
+                        "sample_error_message": group.sample_error,
+                        "sample_query_url": group.sample_query_url,
+                        "error_signature": group.signature,
+                    },
+                }
+            )
         except Exception as e:
             log.warning(f"Could not report issue group to Sentry: {group}: {e!r}")
 

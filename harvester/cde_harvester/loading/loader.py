@@ -1,4 +1,3 @@
-import ast
 import csv
 import io
 import logging
@@ -11,14 +10,26 @@ import pandas as pd
 from prefect import get_run_logger, task
 from sqlalchemy import text
 
+from cde_common.db import create_db_engine, db_host
+from cde_common.observability import init_sentry
 from cde_harvester.core.day_sets import (
     merge_ranges,
     ranges_from_iso,
     ranges_to_pg_literal,
     ranges_to_psycopg,
 )
-from cde_harvester.core.db import create_db_engine, db_host
-from cde_harvester.core.observability import init_sentry
+from cde_harvester.core.harvest_files import (
+    DATASETS,
+    HARVEST_ATTEMPTS,
+    HARVEST_RUNS,
+    OBIS_CELLS,
+    PROFILES,
+    SKIPPED,
+    TRAJECTORY_DAYS,
+    TRAJECTORY_POINTS,
+    VERIFIED,
+    read_table,
+)
 from cde_harvester.core.schemas import (
     DATASET_ARRAY_DTYPES,
     PROFILE_ARRAY_DTYPES,
@@ -67,9 +78,7 @@ DB_LOADER_ADVISORY_LOCK_KEY = 738825001
 # load that is the largest single allocation the loader makes.
 SQL_INSERT_CHUNKSIZE = 5000
 
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
-)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)-8s - %(name)s : %(message)s")
 
 logger = logging.getLogger()
 
@@ -80,20 +89,17 @@ init_sentry()
 def prepare_profiles_dataframe(profiles):
     """Clean and prepare profiles DataFrame for insertion."""
     profiles = profiles.replace("", np.NaN)
-    # day_ranges arrives as a repr'd list of ISO pairs from the CSV, or as the
-    # live list when the harvester hands the frame over in-process. to_sql
-    # binds parameters rather than running them through a column input
-    # function, and psycopg2 adapts a list of strings as text[] — which
-    # PostgreSQL refuses to assign to a daterange[] column. Its own DateRange
-    # type adapts correctly, so convert here, at the one place both callers
-    # pass through.
+    # day_ranges arrives as a list of ISO pairs from the harvest folder, or as
+    # the live list of date pairs when the harvester hands the frame over
+    # in-process — ranges_from_iso accepts either. to_sql binds parameters
+    # rather than running them through a column input function, and psycopg2
+    # adapts a list of strings as text[], which PostgreSQL refuses to assign to
+    # a daterange[] column. Its own DateRange type adapts correctly, so convert
+    # here, at the one place both callers pass through.
     if "day_ranges" in profiles.columns:
 
         def _to_ranges(value):
-            # NaN is truthy, so `value or []` would let a missing cell through
-            # into ranges_from_iso; check the types explicitly instead.
-            if isinstance(value, str):
-                value = ast.literal_eval(value)
+            # A dataset with no day set has None here, not a list.
             if not isinstance(value, (list, tuple)):
                 return []
             return ranges_to_psycopg(ranges_from_iso(value))
@@ -103,9 +109,9 @@ def prepare_profiles_dataframe(profiles):
     # mirroring the harvester's filter (profiles.py): a time_max that passes the
     # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
     # would otherwise slip through and fail validate_loaded_data().
-    profiles = profiles.drop(
-        columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore"
-    ).dropna(subset=["time_min", "time_max"])
+    profiles = profiles.drop(columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore").dropna(
+        subset=["time_min", "time_max"]
+    )
     return profiles
 
 
@@ -119,14 +125,8 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     whose names weren't yet in scientific_name_vernaculars at COPY time).
     """
     obis_cells = obis_cells.copy()
-    # Parse scientific_names from CSV string repr back to list, or default to empty list
-    obis_cells["scientific_names"] = obis_cells["scientific_names"].apply(
-        lambda x: (
-            ast.literal_eval(x)
-            if isinstance(x, str)
-            else (x if isinstance(x, list) else [])
-        )
-    )
+    # Already a list off the harvest folder; None for a cell that named nothing.
+    obis_cells["scientific_names"] = obis_cells["scientific_names"].apply(lambda x: x if isinstance(x, list) else [])
     # Round lat/lon to 8 dp before dedup to avoid float-precision duplicates
     # (e.g. 45.83333333333333 vs 45.833333333333336 from grid arithmetic)
     obis_cells["latitude"] = obis_cells["latitude"].round(8)
@@ -161,11 +161,7 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
         # day_union_days, keeping `days` and `day_ranges` consistent.
         aggregations["day_ranges"] = ("day_ranges", merge_ranges)
 
-    agg = (
-        obis_cells.groupby(key_cols, dropna=False)
-        .agg(**aggregations)
-        .reset_index()
-    )
+    agg = obis_cells.groupby(key_cols, dropna=False).agg(**aggregations).reset_index()
 
     if name_to_aphia:
 
@@ -262,9 +258,7 @@ def load_cells_copy(df, table_name, transaction, schema=None):
                 if val is None or val is pd.NA or (isinstance(val, float) and pd.isna(val)):
                     out.append(r"\N")
                 elif col == "scientific_names":
-                    out.append(
-                        _pg_text_array(val if isinstance(val, (list, tuple)) else [])
-                    )
+                    out.append(_pg_text_array(val if isinstance(val, (list, tuple)) else []))
                 elif col == "aphia_ids":
                     out.append(_pg_int_array(val if isinstance(val, (list, tuple)) else []))
                 elif col == "day_ranges":
@@ -272,9 +266,7 @@ def load_cells_copy(df, table_name, transaction, schema=None):
                     # so the text literal is coerced to daterange[] for free.
                     # (The to_sql path can't do this — see
                     # day_sets.ranges_to_psycopg.)
-                    out.append(
-                        ranges_to_pg_literal(val if isinstance(val, (list, tuple)) else [])
-                    )
+                    out.append(ranges_to_pg_literal(val if isinstance(val, (list, tuple)) else []))
                 else:
                     out.append(val)
             writer.writerow(out)
@@ -292,8 +284,7 @@ def load_cells_copy(df, table_name, transaction, schema=None):
     )
     with raw.cursor() as cur:
         cur.copy_expert(
-            f"COPY {qualified} ({','.join(cols)}) "
-            f"FROM STDIN WITH (FORMAT CSV, NULL '\\N')",
+            f"COPY {qualified} ({','.join(cols)}) FROM STDIN WITH (FORMAT CSV, NULL '\\N')",
             buf,
         )
     logger.info("  %s: %d rows loaded via COPY", table_name, len(df))
@@ -353,29 +344,18 @@ def prepare_trajectory_points_dataframe(trajectory_points):
         points["profile_id"] = pd.NA
 
     key_cols = ["erddap_url", "dataset_id", "trajectory_id", "time"]
-    points = (
-        points.sort_values(key_cols)
-        .drop_duplicates(subset=key_cols, keep="first")
-        .reset_index(drop=True)
-    )
-    return points[
-        ["erddap_url", "dataset_id", "trajectory_id", "profile_id",
-         "time", "latitude", "longitude"]
-    ]
+    points = points.sort_values(key_cols).drop_duplicates(subset=key_cols, keep="first").reset_index(drop=True)
+    return points[["erddap_url", "dataset_id", "trajectory_id", "profile_id", "time", "latitude", "longitude"]]
 
 
 def ensure_organization_pks(datasets):
     """Ensure organization_pks column has empty arrays instead of null values."""
-    if (
-        "organization_pks" not in datasets.columns
-        or datasets["organization_pks"].isna().all()
-    ):
+    if "organization_pks" not in datasets.columns or datasets["organization_pks"].isna().all():
         datasets["organization_pks"] = [[] for _ in range(len(datasets))]
     else:
-        datasets["organization_pks"] = datasets["organization_pks"].apply(
-            lambda x: x if isinstance(x, list) else []
-        )
+        datasets["organization_pks"] = datasets["organization_pks"].apply(lambda x: x if isinstance(x, list) else [])
     return datasets
+
 
 # timeout_seconds: hard ceiling well above any observed load (full reload incl.
 # hex build runs tens of minutes). A run that exceeds it is genuinely wedged —
@@ -394,103 +374,52 @@ def main(folder, incremental=False):
     engine.connect()
     logger.info("Connected to %s", db_host())
 
-    datasets_file = f"{folder}/datasets.csv"
-    profiles_file = f"{folder}/profiles.csv"
-    skipped_datasets_file = f"{folder}/skipped.csv"
-    obis_cells_file = f"{folder}/obis_cells.csv"
-    trajectory_days_file = f"{folder}/trajectory_days.csv"
-    trajectory_points_file = f"{folder}/trajectory_points.csv"
-    verified_file = f"{folder}/verified.csv"
-    harvest_runs_file = f"{folder}/harvest_runs.csv"
-    harvest_attempts_file = f"{folder}/harvest_attempts.csv"
+    # Every table arrives with its types intact (harvest_files), so list
+    # columns are already lists and timestamps are already tz-aware UTC — no
+    # literal_eval, no parse_dates.
+    datasets = read_table(folder, DATASETS)
+    if datasets is None:
+        raise FileNotFoundError(f"No {DATASETS} table in {folder}")
+    skipped_datasets = read_table(folder, SKIPPED)
+    if skipped_datasets is None:
+        skipped_datasets = pd.DataFrame()
+    logger.info("Read %s and %s from %s", DATASETS, SKIPPED, folder)
 
-    logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
+    profiles = read_table(folder, PROFILES)
+    if profiles is None:
+        profiles = pd.DataFrame()
 
-    datasets = pd.read_csv(datasets_file)
-    profiles = (
-        pd.read_csv(profiles_file)
-        if os.path.isfile(profiles_file) and os.path.getsize(profiles_file) > 1
-        else pd.DataFrame()
-    )
-    skipped_datasets = pd.read_csv(skipped_datasets_file)
+    # Optional: absent from a harvest that produced none of this kind.
+    obis_cells = read_table(folder, OBIS_CELLS)
+    trajectory_days = read_table(folder, TRAJECTORY_DAYS)
+    trajectory_points = read_table(folder, TRAJECTORY_POINTS)
+    verified = read_table(folder, VERIFIED)
+    # Audit tables come from the harvester's run lifecycle and feed the
+    # harvest-dashboard service.
+    harvest_runs_df = read_table(folder, HARVEST_RUNS)
+    harvest_attempts_df = read_table(folder, HARVEST_ATTEMPTS)
 
-    obis_cells = None
-    if os.path.isfile(obis_cells_file):
-        logger.info("Reading %s", obis_cells_file)
-        obis_cells = pd.read_csv(obis_cells_file)
-
-    trajectory_days = None
-    if os.path.isfile(trajectory_days_file):
-        logger.info("Reading %s", trajectory_days_file)
-        trajectory_days = pd.read_csv(trajectory_days_file)
-
-    trajectory_points = None
-    if os.path.isfile(trajectory_points_file):
-        logger.info("Reading %s", trajectory_points_file)
-        trajectory_points = pd.read_csv(trajectory_points_file)
-
-    verified = None
-    if os.path.isfile(verified_file) and os.path.getsize(verified_file) > 1:
-        logger.info("Reading %s", verified_file)
-        verified = pd.read_csv(verified_file, parse_dates=["verified_at"])
-
-    # Harvest audit CSVs are produced by the harvester's run lifecycle and
-    # feed the harvest-dashboard service. Optional so old harvest folders
-    # (pre-dashboard) still load cleanly.
-    harvest_runs_df = None
-    harvest_attempts_df = None
-    if os.path.isfile(harvest_runs_file):
-        logger.info("Reading %s", harvest_runs_file)
-        harvest_runs_df = pd.read_csv(
-            harvest_runs_file, parse_dates=["started_at", "finished_at"]
-        )
-    if os.path.isfile(harvest_attempts_file):
-        logger.info("Reading %s", harvest_attempts_file)
-        harvest_attempts_df = pd.read_csv(
-            harvest_attempts_file, parse_dates=["attempted_at"]
-        )
-
-    if "eovs" in profiles.columns:
-        profiles["eovs"] = profiles["eovs"].apply(
-            lambda x: ast.literal_eval(x) if isinstance(x, str) else []
-        )
-
-    datasets["eovs"] = datasets["eovs"].apply(ast.literal_eval)
-    datasets["organizations"] = datasets["organizations"].apply(ast.literal_eval)
-    datasets["profile_variables"] = datasets["profile_variables"].apply(
-        ast.literal_eval
-    )
-    if "obis_nodes" in datasets.columns:
-        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
-            lambda x: (
-                ast.literal_eval(x)
-                if isinstance(x, str)
-                else (x if isinstance(x, list) else [])
-            )
-        )
-    else:
+    if "obis_nodes" not in datasets.columns:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
 
     # jsonb metadata columns (table_variables for every dataset type, the two
     # grid_* ones for griddap). All nullable; absent entirely from older harvest
-    # folders. They arrive as Python-repr strings (same CSV contract as eovs);
-    # NaN must become None or the JSONB binding fails. coverage_time_* is parsed
-    # to datetime so NaT binds as NULL on the timestamptz columns.
+    # folders. coverage_time_* is normalized to datetime so NaT binds as NULL on
+    # the timestamptz columns.
     for col in ("table_variables", "grid_variables", "grid_dimensions"):
-        if col in datasets.columns:
-            datasets[col] = datasets[col].apply(
-                lambda x: ast.literal_eval(x) if isinstance(x, str) and x else None
-            )
-        else:
+        if col not in datasets.columns:
             datasets[col] = None
     for col in ("coverage_time_min", "coverage_time_max"):
         if col not in datasets.columns:
             datasets[col] = pd.NaT
         datasets[col] = pd.to_datetime(datasets[col], utc=True, errors="coerce")
     for col in (
-        "coverage_lat_min", "coverage_lat_max",
-        "coverage_lon_min", "coverage_lon_max",
-        "coverage_depth_min", "coverage_depth_max",
+        "coverage_lat_min",
+        "coverage_lat_max",
+        "coverage_lon_min",
+        "coverage_lon_max",
+        "coverage_depth_min",
+        "coverage_depth_max",
     ):
         if col not in datasets.columns:
             datasets[col] = None
@@ -504,10 +433,8 @@ def main(folder, incremental=False):
             # don't sys.exit: this also runs inside a Prefect flow, where
             # SystemExit reports as "Crashed" instead of a clean Failed (the
             # CLI wrapper in loading/__main__.py handles the exit code).
-            raise RuntimeError(
-                "Full reload found no datasets; refusing to wipe the database"
-            )
-        # Incremental runs legitimately produce an empty datasets.csv when every
+            raise RuntimeError("Full reload found no datasets; refusing to wipe the database")
+        # Incremental runs legitimately produce an empty datasets table when every
         # dataset was unchanged and skipped by the harvester (skip_unchanged).
         # That is a successful no-op, not a crash: fall through so we still bump
         # verified_at for the unchanged datasets and append the harvest audit rows.
@@ -579,12 +506,7 @@ def main(folder, incremental=False):
         # acquire_loader_lock() temporarily lifts the timeout for exactly that
         # wait (the zombie-holder case is covered by the idle timeout above,
         # so the wait still can't be infinite in practice).
-        transaction.execute(
-            text(
-                "SET idle_in_transaction_session_timeout = '10min'; "
-                "SET lock_timeout = '2min';"
-            )
-        )
+        transaction.execute(text("SET idle_in_transaction_session_timeout = '10min'; SET lock_timeout = '2min';"))
 
         # Pre-fetch scientific_name → aphia_id mappings from existing
         # vernaculars so prepare_obis_cells_dataframe can populate
@@ -606,9 +528,7 @@ def main(folder, incremental=False):
                 logger.info("Pre-fetched %d name→aphia_id mappings", len(name_to_aphia))
 
         if incremental:
-            logger.info(
-                "Using INCREMENTAL mode - will load to temp tables, process, then UPSERT"
-            )
+            logger.info("Using INCREMENTAL mode - will load to temp tables, process, then UPSERT")
 
             # Deprioritize this load relative to live web-api traffic: without
             # this, the merge phase's larger scans can fan out across every
@@ -657,9 +577,7 @@ def main(folder, incremental=False):
             if obis_cells is not None:
                 prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("temp_obis_cells COPY", logger):
-                    logger.info(
-                        "Loading obis_cells into temp table (%d rows)", len(prepared)
-                    )
+                    logger.info("Loading obis_cells into temp table (%d rows)", len(prepared))
                     load_cells_copy(prepared, "temp_obis_cells", transaction)
 
             if trajectory_days is not None:
@@ -714,10 +632,12 @@ def main(folder, incremental=False):
             if verified is not None and not verified.empty:
                 with _timed("verified_at bump", logger):
                     logger.info("Bumping verified_at for %d unchanged datasets", len(verified))
-                    transaction.execute(text(
-                        "CREATE TEMP TABLE IF NOT EXISTS temp_verified "
-                        "(erddap_url text, dataset_id text, verified_at timestamptz)"
-                    ))
+                    transaction.execute(
+                        text(
+                            "CREATE TEMP TABLE IF NOT EXISTS temp_verified "
+                            "(erddap_url text, dataset_id text, verified_at timestamptz)"
+                        )
+                    )
                     verified[["erddap_url", "dataset_id", "verified_at"]].to_sql(
                         "temp_verified",
                         con=transaction,
@@ -726,12 +646,14 @@ def main(folder, incremental=False):
                         method="multi",
                         chunksize=SQL_INSERT_CHUNKSIZE,
                     )
-                    transaction.execute(text(
-                        "UPDATE cde.datasets d SET verified_at = v.verified_at "
-                        "FROM temp_verified v "
-                        "WHERE d.dataset_id = v.dataset_id "
-                        "AND d.erddap_url = v.erddap_url"
-                    ))
+                    transaction.execute(
+                        text(
+                            "UPDATE cde.datasets d SET verified_at = v.verified_at "
+                            "FROM temp_verified v "
+                            "WHERE d.dataset_id = v.dataset_id "
+                            "AND d.erddap_url = v.erddap_url"
+                        )
+                    )
 
             # Prune datasets that disappeared upstream. A harvest fully
             # enumerates each source it covers (changed -> temp_datasets,
@@ -744,9 +666,7 @@ def main(folder, incremental=False):
             # (> 50% of a source) as a harvester-bug precaution.
             if os.environ.get("CDE_PRUNE_STALE", "1").lower() not in ("0", "false", "no"):
                 with _timed("prune_stale_datasets", logger):
-                    n_pruned = transaction.execute(
-                        text("SELECT prune_stale_datasets();")
-                    ).scalar()
+                    n_pruned = transaction.execute(text("SELECT prune_stale_datasets();")).scalar()
                     if n_pruned:
                         logger.info("Pruned %d dataset(s) no longer present upstream", n_pruned)
 
@@ -769,10 +689,7 @@ def main(folder, incremental=False):
             # to permit it (it then prunes the removed source).
             incoming_sources = set(datasets["erddap_url"].dropna().unique())
             existing_sources = {
-                r[0]
-                for r in transaction.execute(
-                    text("SELECT DISTINCT erddap_url FROM cde.datasets")
-                ).all()
+                r[0] for r in transaction.execute(text("SELECT DISTINCT erddap_url FROM cde.datasets")).all()
             }
             allow_full = os.environ.get("CDE_ALLOW_FULL_RELOAD", "").lower() in (
                 "1",
@@ -844,53 +761,35 @@ def main(folder, incremental=False):
                 prepared = prepare_obis_cells_dataframe(obis_cells, name_to_aphia)
                 with _timed("obis_cells COPY", logger):
                     logger.info("Writing obis_cells (%d rows)", len(prepared))
-                    load_cells_copy(
-                        prepared, "obis_cells", transaction, schema=schema
-                    )
+                    load_cells_copy(prepared, "obis_cells", transaction, schema=schema)
 
             if trajectory_days is not None or trajectory_points is not None:
                 # Resolve dataset_pk at COPY time (datasets were just written
                 # above) so the *_link_dataset_pk() passes don't rewrite every
                 # row post-load. Unmatched rows COPY a NULL and are caught by
                 # those backfill passes.
-                pk_rows = transaction.execute(
-                    text("SELECT pk, erddap_url, dataset_id FROM cde.datasets")
-                ).all()
+                pk_rows = transaction.execute(text("SELECT pk, erddap_url, dataset_id FROM cde.datasets")).all()
                 pk_map = {(r.erddap_url, r.dataset_id): r.pk for r in pk_rows}
 
             if trajectory_days is not None:
                 prepared = prepare_trajectory_days_dataframe(trajectory_days)
                 prepared["dataset_pk"] = pd.array(
-                    [
-                        pk_map.get(key)
-                        for key in zip(
-                            prepared["erddap_url"], prepared["dataset_id"], strict=True
-                        )
-                    ],
+                    [pk_map.get(key) for key in zip(prepared["erddap_url"], prepared["dataset_id"], strict=True)],
                     dtype="Int64",
                 )
                 with _timed("trajectory_days COPY", logger):
                     logger.info("Writing trajectory_days (%d rows)", len(prepared))
-                    load_cells_copy(
-                        prepared, "trajectory_days", transaction, schema=schema
-                    )
+                    load_cells_copy(prepared, "trajectory_days", transaction, schema=schema)
 
             if trajectory_points is not None:
                 prepared = prepare_trajectory_points_dataframe(trajectory_points)
                 prepared["dataset_pk"] = pd.array(
-                    [
-                        pk_map.get(key)
-                        for key in zip(
-                            prepared["erddap_url"], prepared["dataset_id"], strict=True
-                        )
-                    ],
+                    [pk_map.get(key) for key in zip(prepared["erddap_url"], prepared["dataset_id"], strict=True)],
                     dtype="Int64",
                 )
                 with _timed("trajectory_points COPY", logger):
                     logger.info("Writing trajectory_points (%d rows)", len(prepared))
-                    load_cells_copy(
-                        prepared, "trajectory_points", transaction, schema=schema
-                    )
+                    load_cells_copy(prepared, "trajectory_points", transaction, schema=schema)
 
             with _timed("skipped_datasets to_sql", logger):
                 logger.info("Writing skipped_datasets")
@@ -930,9 +829,7 @@ def main(folder, incremental=False):
                 for fn, args in obis_steps:
                     with _timed(fn, logger):
                         n = transaction.execute(text(f"SELECT {fn}{args};")).scalar()
-                        logger.info(
-                            "  %s: %s rows affected", fn, n if n is not None else 0
-                        )
+                        logger.info("  %s: %s rows affected", fn, n if n is not None else 0)
 
             if trajectory_days is not None:
                 # dataset_pk backfill only (~0 rows: it is set at COPY time
@@ -940,9 +837,7 @@ def main(folder, incremental=False):
                 # incremental calls the trajectory_process() wrapper instead.
                 logger.info("Processing trajectory_days")
                 with _timed("trajectory_link_dataset_pk", logger):
-                    n = transaction.execute(
-                        text("SELECT trajectory_link_dataset_pk();")
-                    ).scalar()
+                    n = transaction.execute(text("SELECT trajectory_link_dataset_pk();")).scalar()
                     logger.info(
                         "  trajectory_link_dataset_pk: %s rows affected",
                         n if n is not None else 0,
@@ -966,9 +861,7 @@ def main(folder, incremental=False):
                 for fn in trajectory_point_steps:
                     with _timed(fn, logger):
                         n = transaction.execute(text(f"SELECT {fn}();")).scalar()
-                        logger.info(
-                            "  %s: %s rows affected", fn, n if n is not None else 0
-                        )
+                        logger.info("  %s: %s rows affected", fn, n if n is not None else 0)
 
             with _timed("create_hexes", logger):
                 logger.info("Creating hexes")
@@ -997,9 +890,7 @@ def main(folder, incremental=False):
                 )
         if harvest_attempts_df is not None and not harvest_attempts_df.empty:
             with _timed("harvest_attempts to_sql", logger):
-                logger.info(
-                    "Writing harvest_attempts (%d rows)", len(harvest_attempts_df)
-                )
+                logger.info("Writing harvest_attempts (%d rows)", len(harvest_attempts_df))
                 harvest_attempts_df.to_sql(
                     "harvest_attempts",
                     con=transaction,
@@ -1038,9 +929,7 @@ def main(folder, incremental=False):
         ).scalar()
         if got_lock:
             with _timed("gc_orphan_points_and_hexes", logger):
-                n_gc = tx.execute(
-                    text("SELECT gc_orphan_points_and_hexes();")
-                ).scalar()
+                n_gc = tx.execute(text("SELECT gc_orphan_points_and_hexes();")).scalar()
                 logger.info("GC removed %d orphaned point/hex row(s)", n_gc)
         else:
             logger.info("Skipping orphan GC: another load holds the loader lock")
@@ -1065,13 +954,13 @@ def main(folder, incremental=False):
             if present
         )
         logger.info(
-            "Data committed. Running post-load VACUUM ANALYZE on %s "
-            "(may take several minutes, no output until done)",
+            "Data committed. Running post-load VACUUM ANALYZE on %s (may take several minutes, no output until done)",
             vacuum_targets,
         )
-        with _timed("post-load VACUUM ANALYZE", logger), engine.connect().execution_options(
-            isolation_level="AUTOCOMMIT"
-        ) as conn:
+        with (
+            _timed("post-load VACUUM ANALYZE", logger),
+            engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn,
+        ):
             if trajectory_points is not None:
                 conn.execute(text("VACUUM ANALYZE cde.trajectory_hexes"))
             if trajectory_days is not None:

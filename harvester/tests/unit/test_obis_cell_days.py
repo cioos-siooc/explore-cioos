@@ -9,7 +9,9 @@ these tests exist to prevent coming back -- it averaged 2171 days per cell and
 reached 65454, which is why OBIS outweighed every other source in 87% of the
 hexes holding both.
 """
+
 import pandas as pd
+
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 DAY = 86_400_000  # OBIS dates are epoch milliseconds
@@ -60,9 +62,7 @@ class TestDayCount:
         """
         cells = cells_for([occurrence(0), occurrence(3650)])
         assert cells["days"].iloc[0] == 2
-        span_days = (
-            cells["time_max"].iloc[0] - cells["time_min"].iloc[0]
-        ).days + 1
+        span_days = (cells["time_max"].iloc[0] - cells["time_min"].iloc[0]).days + 1
         assert span_days == 3651
         assert cells["days"].iloc[0] < span_days
 
@@ -90,9 +90,7 @@ class TestDayCount:
     def test_days_never_exceeds_the_span(self):
         """The invariant the post-harvest SQL check asserts against the live DB."""
         cells = cells_for([occurrence(i) for i in (0, 1, 5, 5, 40)])
-        span_days = (
-            cells["time_max"].iloc[0] - cells["time_min"].iloc[0]
-        ).days + 1
+        span_days = (cells["time_max"].iloc[0] - cells["time_min"].iloc[0]).days + 1
         assert cells["days"].iloc[0] == 4
         assert cells["days"].iloc[0] <= span_days
 
@@ -115,17 +113,14 @@ class TestDayCountPerCell:
         """Two cells sampled on the same day are two rows of one day each --
         the map sums them, which is the "two stations on a day is two days"
         semantic the ramp is meant to carry."""
-        cells = cells_for(
-            [occurrence(10, lat=44.6, lon=-63.6), occurrence(10, lat=48.0, lon=-60.0)]
-        )
+        cells = cells_for([occurrence(10, lat=44.6, lon=-63.6), occurrence(10, lat=48.0, lon=-60.0)])
         assert len(cells) == 2
         assert set(cells["days"]) == {1}
         assert cells["days"].sum() == 2
 
     def test_one_cell_busy_the_other_not(self):
         cells = cells_for(
-            [occurrence(d, lat=44.6, lon=-63.6) for d in (1, 2, 3)]
-            + [occurrence(1, lat=48.0, lon=-60.0)]
+            [occurrence(d, lat=44.6, lon=-63.6) for d in (1, 2, 3)] + [occurrence(1, lat=48.0, lon=-60.0)]
         )
         by_lat = cells.set_index(cells["latitude"].round(2))["days"]
         assert by_lat.loc[44.58] == 3

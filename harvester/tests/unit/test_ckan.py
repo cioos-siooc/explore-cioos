@@ -5,30 +5,31 @@ All outbound CKAN HTTP calls are intercepted with pytest-mock so the tests run
 offline and deterministically.
 """
 
-
 import pandas as pd
 import pytest
-from cde_harvester.sources.ckan.create_ckan_erddap_link import (
-    get_ckan_records,
-    split_erddap_url,
-    unescape_ascii,
-    unescape_ascii_list,
-)
 from conftest import (
     CKAN_EMPTY_RESPONSE,
     CKAN_PACKAGE_SEARCH_RESPONSE,
     DATASET_ID,
 )
 
+from cde_harvester.sources.ckan.create_ckan_erddap_link import (
+    get_ckan_records,
+    split_erddap_url,
+    unescape_ascii,
+    unescape_ascii_list,
+)
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_ckan_get(mocker, pages):
     """
-    Patch the CKAN session builder so session.get() yields the given page
-    responses. CKAN fetching now goes through a requests.Session built by
-    _build_ckan_session() rather than the module-level requests.get.
+    Patch the shared session builder so session.get() yields the given page
+    responses. CKAN fetching goes through a requests.Session built by
+    cde_common.http.retry_session() rather than the module-level requests.get.
     Each call to list_ckan_records_with_erddap_urls paginates until results empty.
     """
     responses = []
@@ -40,7 +41,7 @@ def _make_ckan_get(mocker, pages):
     mock_session = mocker.MagicMock()
     mock_session.get.side_effect = responses
     mocker.patch(
-        "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+        "cde_harvester.sources.ckan.create_ckan_erddap_link.retry_session",
         return_value=mock_session,
     )
 
@@ -49,18 +50,15 @@ def _make_ckan_get(mocker, pages):
 # Tests: URL parsing
 # ---------------------------------------------------------------------------
 
+
 class TestSplitErddapUrl:
     def test_standard_tabledap_url(self):
-        host, ds_id = split_erddap_url(
-            "https://data.cioospacific.ca/erddap/tabledap/IOS_BOT_Profiles.html"
-        )
+        host, ds_id = split_erddap_url("https://data.cioospacific.ca/erddap/tabledap/IOS_BOT_Profiles.html")
         assert host == "https://data.cioospacific.ca"
         assert ds_id == "IOS_BOT_Profiles"
 
     def test_url_with_language_prefix(self):
-        host, ds_id = split_erddap_url(
-            "https://cnodc.example.ca/erddap/fr/tabledap/cnodc_dataset.html"
-        )
+        host, ds_id = split_erddap_url("https://cnodc.example.ca/erddap/fr/tabledap/cnodc_dataset.html")
         assert ds_id == "cnodc_dataset"
 
     def test_invalid_url_raises_value_error(self):
@@ -71,6 +69,7 @@ class TestSplitErddapUrl:
 # ---------------------------------------------------------------------------
 # Tests: ASCII unescaping
 # ---------------------------------------------------------------------------
+
 
 class TestUnescapeAscii:
     def test_plain_string_unchanged(self):
@@ -102,6 +101,7 @@ class TestUnescapeAscii:
 # ---------------------------------------------------------------------------
 # Tests: get_ckan_records
 # ---------------------------------------------------------------------------
+
 
 class TestGetCkanRecords:
     def test_returns_dataframe(self, mocker):

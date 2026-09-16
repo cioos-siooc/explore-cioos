@@ -8,16 +8,17 @@ import os
 import sys
 from urllib.parse import urlparse
 
-import cde_harvester.sources.erddap.client as cde_harvester
+import duckdb
+import numpy as np
 import pandas as pd
-import requests
 import shapely.wkt
-from cde_harvester.core.errors import HTTP_ERROR, UNKNOWN_ERROR
-from cde_harvester.core.issues import erddap_error_text
 from erddapy import ERDDAP
 from loguru import logger
-from shapely.geometry import Point
+from shapely import contains, points
 
+from cde_common.errors import HTTP_ERROR, UNKNOWN_ERROR
+from cde_common.http import DATA_TIMEOUT, DEFAULT_TIMEOUT, retry_session
+from cde_common.issues import erddap_error_text
 from erddap_downloader.download_pdf import download_pdf
 
 ONE_MB = 10**6
@@ -28,9 +29,12 @@ QUERY_SIZE_LIMIT = 5000 * ONE_MB
 # urllib's default "Python-urllib/x.y" User-Agent with HTTP 403. pandas'
 # read_csv(url) uses urllib, so metadata fetches must go through requests with
 # an explicit UA instead. Reuse this UA on the data requests too.
-REQUEST_HEADERS = {
-    "User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"
-}
+REQUEST_HEADERS = {"User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"}
+
+# One session for every outbound request: retries the transient statuses that
+# used to fail a user's whole download (a 502 from a proxy, a WAF 413 under
+# parallel load) and keeps connections warm across the datasets in one job.
+session = retry_session(headers=REQUEST_HEADERS)
 
 DOWNLOADING = "DOWNLOADING"
 COMPLETED = "COMPLETED"
@@ -67,9 +71,7 @@ def get_variable_list(df_variables: list, all_variables: bool = True):
 
     # Reduced set: mandatory coordinates plus any cf_role-tagged variable.
     mandatory_variables = ["time", "latitude", "longitude", "depth"]  # noqa: F841 — read by the @-reference in the query below
-    variables_to_download = df_variables.query(
-        "(name in @mandatory_variables) or (cf_role != '')"
-    )["name"].to_list()
+    variables_to_download = df_variables.query("(name in @mandatory_variables) or (cf_role != '')")["name"].to_list()
 
     return variables_to_download
 
@@ -151,19 +153,41 @@ def get_erddap_download_url(
     return e.get_download_url()
 
 
-def save_erddap_metadata(dataset, output_path, file_name="erddap_metadata.csv"):
-    # Define ERDDAPy dataset connection
+def get_erddap_info(dataset):
+    """The dataset's ERDDAP ``/info/`` table: one row per variable and attribute.
+
+    Fetched via requests, not ``pd.read_csv(url)``: pandas uses urllib, whose
+    default User-Agent is answered with 403 by the WAF in front of some ERDDAP
+    servers (e.g. data.cioospacific.ca).
+    """
     e = ERDDAP(server=dataset["erddap_url"], protocol="tabledap", response="csv")
     e.dataset_id = dataset["dataset_id"]
 
-    # Retrieve info url
-    metadata_url = e.get_info_url()
-
-    # Fetch via requests (not pd.read_csv, which uses urllib and gets 403 from
-    # WAF-protected servers), then parse the CSV from memory.
-    resp = requests.get(metadata_url, headers=REQUEST_HEADERS, timeout=60)
+    resp = session.get(e.get_info_url(), timeout=DEFAULT_TIMEOUT)
     resp.raise_for_status()
-    df_meta = pd.read_csv(io.StringIO(resp.text))
+    return pd.read_csv(io.StringIO(resp.text)).fillna("")
+
+
+def get_variables_from_info(df_info):
+    """The ``name``/``cf_role`` frame ``get_variable_list`` reads, from an info table.
+
+    This used to be obtained by constructing the *harvester's* ``Dataset``
+    object, which fetches this same ``/info/`` table and pivots far more out of
+    it than the download path ever looks at — and which dragged Prefect,
+    duckdb, redis and pandera into the downloader behind an ERDDAP reader. The
+    row predicate is the harvester's: an attribute-less, non-global row is a
+    variable (or a griddap dimension).
+    """
+    variables = df_info.query('`Variable Name` != "NC_GLOBAL" and `Attribute Name` == ""')[["Variable Name"]].rename(
+        columns={"Variable Name": "name"}
+    )
+    cf_roles = df_info.query('`Attribute Name` == "cf_role"').set_index("Variable Name")["Value"]
+    variables["cf_role"] = variables["name"].map(cf_roles).fillna("")
+    return variables
+
+
+def save_erddap_metadata(dataset, output_path, file_name="erddap_metadata.csv"):
+    df_meta = get_erddap_info(dataset)
     df_meta.insert(loc=0, column="erddap_url", value=dataset["erddap_url"])
     df_meta.insert(loc=1, column="dataset_id", value=dataset["dataset_id"])
 
@@ -182,9 +206,7 @@ def get_file_name_output(dataset_info, output_path, extension):
     :return:
     """
     # Output file is {erddap server}_{dataset_id}_{CKAN_ID}
-    file_name = "{}_{}".format(
-        dataset_info["dataset_id"], erddap_server_to_name(dataset_info["erddap_url"])
-    )
+    file_name = "{}_{}".format(dataset_info["dataset_id"], erddap_server_to_name(dataset_info["erddap_url"]))
     return os.path.join(output_path, f"{file_name}.{extension}")
 
 
@@ -197,10 +219,9 @@ def save_obis_metadata(dataset_id, output_path):
     record counts, etc.) alongside the occurrence CSV. Mirrors the harvester's
     metadata source. Best-effort — a failure here must not fail the download."""
     try:
-        resp = requests.get(
+        resp = session.get(
             OBIS_DATASET_API.format(dataset_id=dataset_id),
-            headers=REQUEST_HEADERS,
-            timeout=30,
+            timeout=DEFAULT_TIMEOUT,
         )
         resp.raise_for_status()
         results = resp.json().get("results", [])
@@ -272,8 +293,6 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
     obis_error = ""
     reason_code = None
     try:
-        import duckdb
-
         df = duckdb.sql(query).df()
 
         # Depth filter (numeric columns).
@@ -303,14 +322,7 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
         # inside ANY region (regions include the ±360 antimeridian duplicates
         # built by get_datasets).
         if polygon_regions and not df.empty:
-            df[["latitude", "longitude"]] = df[["latitude", "longitude"]].astype(float)
-            inside = df.apply(
-                lambda x: any(
-                    r.contains(Point(x.longitude, x.latitude)) for r in polygon_regions
-                ),
-                axis=1,
-            )
-            df = df[inside]
+            df = df[points_in_any_region(df, polygon_regions)]
 
         n_records = len(df)
         if not df.empty:
@@ -349,6 +361,23 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
     }
 
 
+def points_in_any_region(data, regions):
+    """Boolean mask: True where a row's (latitude, longitude) is inside ANY region.
+
+    Vectorized through shapely 2.x — one C call per region over the whole
+    column — rather than building a Point per row. Same pattern the harvester
+    uses in sources/obis/geo_filter.filter_points; the row-wise `.apply` this
+    replaced was ~36x slower on a 200k-row download and returned a DataFrame
+    instead of a Series on an empty frame.
+
+    Mutates `data` to coerce the two coordinate columns to float, as the
+    row-wise version did.
+    """
+    data[["latitude", "longitude"]] = data[["latitude", "longitude"]].astype(float)
+    pts = points(data["longitude"].values, data["latitude"].values)
+    return np.logical_or.reduce([contains(region, pts) for region in regions])
+
+
 def filter_polygon_region(data, polygone):
     """
     ERDDAP is only compatible with a box method to filter lat/long data.
@@ -357,13 +386,7 @@ def filter_polygon_region(data, polygone):
     :param file_path: path to the file data.
     :param polygone: Polygone region to use
     """
-    # Retrieve lat/long and keep only data within the polygon
-    data[["latitude", "longitude"]] = data[["latitude", "longitude"]].astype(float)
-    data = data.loc[
-        data.apply(lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1)
-    ]
-
-    return data
+    return data.loc[points_in_any_region(data, [polygone])]
 
 
 def get_datasets(json_query, output_path="", create_pdf=False):
@@ -390,10 +413,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
     if polygon_regions and (polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180):
         for shift in [-360, 360]:
             new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
-            if (
-                -180 < new_region.bounds[0] < 180
-                or -180 < new_region.bounds[2] < 180
-            ):
+            if -180 < new_region.bounds[0] < 180 or -180 < new_region.bounds[2] < 180:
                 polygon_regions += [new_region]
 
     # Download file locally
@@ -404,9 +424,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
         # OBIS datasets aren't ERDDAP-backed — pull their occurrences from the
         # OBIS parquet export instead of the tabledap path.
         if dataset.get("source_type") == "obis":
-            obis_report = download_obis_parquet(
-                dataset, json_query["user_query"], output_path, polygon_regions
-            )
+            obis_report = download_obis_parquet(dataset, json_query["user_query"], output_path, polygon_regions)
             if not obis_report["no_data"]:
                 report["empty_download"] = False
             report["total_size"] += obis_report["file_size"]
@@ -438,18 +456,12 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                 or "variables" not in dataset["erddap_metadata"]
                 or dataset["erddap_metadata"]["variables"] == []
             ):
-
-                harvest_erddap = cde_harvester.ERDDAP(dataset["erddap_url"])
-
-                harvester_dataset = harvest_erddap.get_dataset(dataset["dataset_id"])
-
-                dataset["erddap_metadata"] = harvester_dataset.df_variables
+                dataset["erddap_metadata"] = get_variables_from_info(get_erddap_info(dataset))
 
             # Get variable list to download
             variable_list = get_variable_list(dataset["erddap_metadata"])
 
             for polygon_region in polygon_regions or ["all"]:
-
                 # Get download url
                 download_url = get_erddap_download_url(
                     dataset,
@@ -463,19 +475,20 @@ def get_datasets(json_query, output_path="", create_pdf=False):
 
                 # If maximum size of query reached just don't download and give query url
                 # or if maximum download for this dataset is reached
-                if (
-                    report["total_size"] > QUERY_SIZE_LIMIT
-                    or bytes_downloaded > DATASET_SIZE_LIMIT
-                ):
+                if report["total_size"] > QUERY_SIZE_LIMIT or bytes_downloaded > DATASET_SIZE_LIMIT:
                     download_status = IGNORED
                     continue
 
                 # Download data
                 logger.info(f"Download {download_url}")
                 data_downloaded = b""
-                with requests.get(
-                    download_url, headers=REQUEST_HEADERS, stream=True
-                ) as response:
+                # A timeout is not optional here: this is the scheduler's single
+                # threaded main path, so an ERDDAP that accepts the connection and
+                # then goes silent used to wedge the whole download queue forever.
+                # DATA_TIMEOUT is generous (ERDDAP can be slow to produce the first
+                # byte of a large query) but finite, and it also applies between
+                # chunks, so a stalled mid-stream transfer is caught too.
+                with session.get(download_url, stream=True, timeout=DATA_TIMEOUT) as response:
                     # Make sure the connection is working otherswise make a warning and send the error.
                     if response.status_code != 200:
                         if response.status_code == 404:
@@ -517,7 +530,7 @@ def get_datasets(json_query, output_path="", create_pdf=False):
                             break
 
                 # Update how much download done
-                print(f"Downloaded {bytes_downloaded/ONE_MB:.3f} MB")
+                print(f"Downloaded {bytes_downloaded / ONE_MB:.3f} MB")
 
                 # Parse downloaded data
                 # Read CSV file with pandas

@@ -8,6 +8,7 @@ Usage:
     cd harvester
     uv run python scripts/build_canada_eez_land_wkt.py
 """
+
 import sys
 from pathlib import Path
 
@@ -26,18 +27,18 @@ SIMPLIFY_TOLERANCE_DEG = 0.05  # ~5 km near the equator, ~3 km at 50°N
 
 # Sanity-check anchor points (lon, lat) that must lie inside the final polygon.
 INSIDE_ANCHORS = {
-    "Halifax, NS":         (-63.57, 44.65),
-    "Tofino, BC":          (-125.91, 49.15),
-    "Iqaluit, NU":         (-68.52, 63.75),
-    "Hudson Bay (mid)":    (-85.00, 60.00),
+    "Halifax, NS": (-63.57, 44.65),
+    "Tofino, BC": (-125.91, 49.15),
+    "Iqaluit, NU": (-68.52, 63.75),
+    "Hudson Bay (mid)": (-85.00, 60.00),
     "Halifax shelf (sea)": (-62.00, 43.50),
-    "Beaufort Sea (sea)":  (-135.00, 71.00),
-    "Lake Ontario (CAN)":  (-77.50, 43.85),
+    "Beaufort Sea (sea)": (-135.00, 71.00),
+    "Lake Ontario (CAN)": (-77.50, 43.85),
 }
 OUTSIDE_ANCHORS = {
-    "Boston, MA":          (-71.06, 42.36),
-    "Sydney, AU":          (151.21, -33.87),
-    "Reykjavik, IS":       (-21.94, 64.15),
+    "Boston, MA": (-71.06, 42.36),
+    "Sydney, AU": (151.21, -33.87),
+    "Reykjavik, IS": (-21.94, 64.15),
 }
 
 
@@ -89,10 +90,7 @@ def validate(polygon, wkt_str):
     # Tight box first; if that misses, fall back to a loose "looks like Canada"
     # check and only fail when that misses too.
     tight = (
-        -141 <= bounds[0] <= -50
-        and 41 <= bounds[1] <= 50
-        and -50 <= bounds[2] <= -49.9 + 1
-        and 70 <= bounds[3] <= 84
+        -141 <= bounds[0] <= -50 and 41 <= bounds[1] <= 50 and -50 <= bounds[2] <= -49.9 + 1 and 70 <= bounds[3] <= 84
     )
     loose = bounds[0] < -100 and bounds[2] > -60 and bounds[3] > 60
     if not tight and not loose:
@@ -115,6 +113,7 @@ def validate(polygon, wkt_str):
 
     # Anchor checks
     from shapely.geometry import Point
+
     failures = []
     for name, (lon, lat) in INSIDE_ANCHORS.items():
         if not parsed.contains(Point(lon, lat)):

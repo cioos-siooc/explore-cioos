@@ -36,6 +36,12 @@ for _ in $(seq 1 60); do
       ;;
     failed|no-data|over-limit)
       echo "Download job $job_id finished with status: $status" >&2
+      # The scheduler stores the traceback here (fail_job). Without printing it
+      # the only record is a status word, and the reason has to be dug out of
+      # the whole stack's interleaved compose logs.
+      docker compose $COMPOSE_FILES exec -T db \
+        psql -U postgres -d cde -At \
+        -c "SELECT downloader_output FROM cde.download_jobs WHERE job_id = '$job_id'" >&2
       exit 1
       ;;
   esac

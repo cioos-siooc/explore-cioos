@@ -46,13 +46,17 @@ def connection():
 
 def test_no_download_job_stuck_open(connection):
     """An 'open' job older than STUCK_AFTER means the scheduler isn't running."""
-    stuck = connection.execute(
-        text(
-            "SELECT pk, job_id, email, time FROM cde.download_jobs "
-            "WHERE status = 'open' AND time < NOW() - :age ORDER BY time"
-        ),
-        {"age": STUCK_AFTER},
-    ).mappings().all()
+    stuck = (
+        connection.execute(
+            text(
+                "SELECT pk, job_id, email, time FROM cde.download_jobs "
+                "WHERE status = 'open' AND time < NOW() - :age ORDER BY time"
+            ),
+            {"age": STUCK_AFTER},
+        )
+        .mappings()
+        .all()
+    )
 
     assert not stuck, (
         f"{len(stuck)} download job(s) stuck in 'open' for over {STUCK_AFTER}: "
@@ -65,16 +69,19 @@ def test_no_download_job_stuck_open(connection):
 def test_jobs_that_started_also_finished(connection):
     """A job left in 'downloading' well past STUCK_AFTER means a worker picked
     it up and died mid-download — the user never gets mail either way."""
-    stalled = connection.execute(
-        text(
-            "SELECT pk, job_id, email, time_start FROM cde.download_jobs "
-            "WHERE status = 'downloading' AND time_start < NOW() - :age "
-            "ORDER BY time_start"
-        ),
-        {"age": STUCK_AFTER},
-    ).mappings().all()
+    stalled = (
+        connection.execute(
+            text(
+                "SELECT pk, job_id, email, time_start FROM cde.download_jobs "
+                "WHERE status = 'downloading' AND time_start < NOW() - :age "
+                "ORDER BY time_start"
+            ),
+            {"age": STUCK_AFTER},
+        )
+        .mappings()
+        .all()
+    )
 
-    assert not stalled, (
-        f"{len(stalled)} download job(s) stalled mid-download for over {STUCK_AFTER}: "
-        + ", ".join(f"{r['job_id']} ({r['email']}, started {r['time_start']})" for r in stalled)
+    assert not stalled, f"{len(stalled)} download job(s) stalled mid-download for over {STUCK_AFTER}: " + ", ".join(
+        f"{r['job_id']} ({r['email']}, started {r['time_start']})" for r in stalled
     )

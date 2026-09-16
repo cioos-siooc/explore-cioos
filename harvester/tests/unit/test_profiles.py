@@ -8,16 +8,18 @@ any HTTP calls.
 
 import pandas as pd
 import pytest
-from cde_harvester.dataset_types import extract_features as get_profiles
 from conftest import (
     DATASET_ID,
     ERDDAP_URL,
     build_mock_dataset,
 )
 
+from cde_harvester.dataset_types import extract_features as get_profiles
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def single_station_dataset():
@@ -41,7 +43,7 @@ def bad_geometry_dataset(single_station_dataset):
     pipeline sources lat/lon since the bbox change.
     """
     df_vars = single_station_dataset.df_variables
-    df_vars.loc["latitude", "actual_range"] = "95.0,95.0"   # > 90 → invalid
+    df_vars.loc["latitude", "actual_range"] = "95.0,95.0"  # > 90 → invalid
     df_vars.loc["longitude", "actual_range"] = "-125.0,-125.0"
     return single_station_dataset
 
@@ -49,6 +51,7 @@ def bad_geometry_dataset(single_station_dataset):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestGetProfilesHappyPath:
     def test_returns_dataframe(self, single_station_dataset):
@@ -62,9 +65,17 @@ class TestGetProfilesHappyPath:
     def test_required_columns_present(self, single_station_dataset):
         result = get_profiles(single_station_dataset)
         required = [
-            "timeseries_id", "latitude", "longitude",
-            "time_min", "time_max", "depth_min", "depth_max",
-            "n_records", "records_per_day", "dataset_id", "erddap_url",
+            "timeseries_id",
+            "latitude",
+            "longitude",
+            "time_min",
+            "time_max",
+            "depth_min",
+            "depth_max",
+            "n_records",
+            "records_per_day",
+            "dataset_id",
+            "erddap_url",
         ]
         for col in required:
             assert col in result.columns, f"Missing column: {col}"
@@ -91,9 +102,7 @@ class TestGetProfilesHappyPath:
 
     def test_depth_defaults_to_zero_when_no_depth_var(self, single_station_dataset):
         """If the dataset has no depth variable, depth_min and depth_max default to 0."""
-        single_station_dataset.variables_list = [
-            v for v in single_station_dataset.variables_list if v != "depth"
-        ]
+        single_station_dataset.variables_list = [v for v in single_station_dataset.variables_list if v != "depth"]
         result = get_profiles(single_station_dataset)
         assert not result.empty
         assert (result["depth_min"] == 0).all()
@@ -107,8 +116,7 @@ class TestGetProfilesHappyPath:
 class TestBoundingBoxAndDisplayFlag:
     def test_bbox_columns_present(self, single_station_dataset):
         result = get_profiles(single_station_dataset)
-        for col in ["latitude_min", "latitude_max", "longitude_min",
-                    "longitude_max", "show_as_point"]:
+        for col in ["latitude_min", "latitude_max", "longitude_min", "longitude_max", "show_as_point"]:
             assert col in result.columns, f"Missing column: {col}"
 
     def test_fixed_station_is_a_point(self, single_station_dataset):
@@ -152,6 +160,7 @@ class TestGetProfilesEmptyAndEdgeCases:
 # ---------------------------------------------------------------------------
 # Per-feature EOV detection
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def two_station_dataset(single_station_dataset):
@@ -254,9 +263,7 @@ class TestPerFeatureEovs:
         assert with_eovs.loc["STATION_001", "n_records"] == 1000
         assert with_eovs.loc["STATION_002", "n_records"] == 800
 
-    def test_widened_count_failure_falls_back_to_dataset_eovs(
-        self, two_station_dataset
-    ):
+    def test_widened_count_failure_falls_back_to_dataset_eovs(self, two_station_dataset):
         """The widened request can fail where the narrow one succeeds. The
         dataset must survive, and every feature must inherit the dataset's
         EOVs rather than ending up with an empty list."""
@@ -265,9 +272,7 @@ class TestPerFeatureEovs:
         def _get_count(variables, groupby, time_min, time_max):
             if "oxygen" in variables:
                 return pd.DataFrame()
-            return pd.DataFrame(
-                {"station_id": stations, "time": [1000, 800], "depth": [1000, 800]}
-            )
+            return pd.DataFrame({"station_id": stations, "time": [1000, 800], "depth": [1000, 800]})
 
         two_station_dataset.get_count.side_effect = _get_count
         result = get_profiles(two_station_dataset)
@@ -276,9 +281,7 @@ class TestPerFeatureEovs:
         for eovs in result["eovs"]:
             assert eovs == two_station_dataset.eovs
 
-    def test_feature_with_no_counts_falls_back_to_dataset_eovs(
-        self, two_station_dataset
-    ):
+    def test_feature_with_no_counts_falls_back_to_dataset_eovs(self, two_station_dataset):
         """A feature whose EOV variables are all zero keeps the dataset's list:
         an empty array would hide it from the web-api's overlap filter."""
         stations = ["STATION_001", "STATION_002"]
@@ -295,9 +298,7 @@ class TestPerFeatureEovs:
         result = get_profiles(two_station_dataset).set_index("timeseries_id")
         assert result.loc["STATION_002", "eovs"] == two_station_dataset.eovs
 
-    def test_single_feature_dataset_inherits_dataset_eovs(
-        self, single_station_dataset
-    ):
+    def test_single_feature_dataset_inherits_dataset_eovs(self, single_station_dataset):
         """One feature is the dataset, so detection is skipped entirely — that
         also sidesteps get_count's single-feature shortcuts, which return a
         time-only or window-limited frame."""

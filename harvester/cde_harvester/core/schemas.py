@@ -12,10 +12,10 @@ from pandera.typing import Series
 from sqlalchemy.dialects.postgresql import ARRAY, DATERANGE, INTEGER, JSONB, TEXT
 
 # --- Loader-side column metadata ------------------------------------------
-# List-valued columns are serialized by the harvester as Python-repr strings in
-# the CSVs; the loader parses them back (ast.literal_eval) and writes them as
-# PostgreSQL arrays with these dtypes. Kept here, next to the schemas, so the
-# CSV contract has a single home.
+# List-valued columns arrive from the harvest folder as real lists (parquet
+# carries the type — see core/harvest_files). These map them onto the
+# PostgreSQL array/JSONB types the loader writes them to. Kept here, next to
+# the schemas, so the column contract has a single home.
 
 DATASET_ARRAY_DTYPES = {
     "eovs": ARRAY(TEXT),
@@ -294,7 +294,7 @@ class HarvestAttemptSchema(pa.DataFrameModel):
     erddap_url: Series[str]
     dataset_id: Series[str]
     source: Series[str]
-    status: Series[str]                                 # 'success' | 'skipped' | 'error'
+    status: Series[str]  # 'success' | 'skipped' | 'error'
     reason_code: Series[str] = pa.Field(nullable=True)  # set when status != 'success'
     error_message: Series[str] = pa.Field(nullable=True)
     duration_ms: Series[float] = pa.Field(nullable=True)

@@ -28,24 +28,22 @@ A partial union (say, the two node queries without the geometry query) would
 look like a legitimate but much smaller dataset list, and the db-loader's
 ``prune_stale_datasets`` would then delete hundreds of real datasets.
 """
+
 import logging
 from dataclasses import dataclass, field
 
 import requests
+from shapely import wkt as shp_wkt
+
+from cde_common.http import retry_session
 from cde_harvester.sources.obis.geo_filter import (
     DEFAULT_EXEMPT_NODE_IDS,
     load_boundary_polygon,
 )
-from requests.adapters import HTTPAdapter
-from shapely import wkt as shp_wkt
-from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.obis.org/v3/dataset"
-
-# Transient statuses worth retrying.
-_RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
 
 # Hard ceiling on the `size` param used by the retry-once path.
 _MAX_PAGE_SIZE = 20000
@@ -86,7 +84,7 @@ class ObisDiscoveryConfig:
 
     enabled: bool = False
     node_ids: tuple = ()
-    geometry: str = "eez"          # "eez" | "none" | inline WKT
+    geometry: str = "eez"  # "eez" | "none" | inline WKT
     area_ids: tuple = ()
     include: tuple = ()
     exclude: tuple = ()
@@ -107,10 +105,7 @@ class ObisDiscoveryConfig:
         if unknown:
             # A typo'd `min_dataset` silently defaulting to 700 is exactly the
             # kind of thing that later prunes the database.
-            raise ValueError(
-                f"Unknown obis_discovery key(s): {sorted(unknown)}. "
-                f"Valid keys: {sorted(_VALID_KEYS)}"
-            )
+            raise ValueError(f"Unknown obis_discovery key(s): {sorted(unknown)}. Valid keys: {sorted(_VALID_KEYS)}")
 
         geometry = raw.get("geometry", "eez")
         geometry = "none" if geometry is None else str(geometry).strip()
@@ -147,26 +142,10 @@ class ObisDiscoveryConfig:
 
 @dataclass
 class DiscoveryResult:
-    dataset_ids: list = field(default_factory=list)   # sorted, deduped
-    per_query: dict = field(default_factory=dict)     # {"node:7dfb...": 305, "geometry": 868}
+    dataset_ids: list = field(default_factory=list)  # sorted, deduped
+    per_query: dict = field(default_factory=dict)  # {"node:7dfb...": 305, "geometry": 868}
     geometry_bytes: int = None
     geometry_tolerance: float = None
-
-
-def _build_session() -> requests.Session:
-    session = requests.Session()
-    retry = Retry(
-        total=4,
-        backoff_factor=1.0,         # 0s, 2s, 4s, 8s between attempts
-        status_forcelist=_RETRY_STATUSES,
-        allowed_methods=frozenset(["GET"]),
-        raise_on_status=False,      # let raise_for_status() give a clean error
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
 
 
 def simplify_for_query(polygon, tolerance=0.25, max_bytes=4500, max_attempts=6):
@@ -186,11 +165,7 @@ def simplify_for_query(polygon, tolerance=0.25, max_bytes=4500, max_attempts=6):
 
     tol = tolerance
     for _ in range(max_attempts):
-        reduced = (
-            polygon.simplify(tol, preserve_topology=True)
-            .buffer(tol, join_style="mitre", quad_segs=1)
-            .buffer(0)
-        )
+        reduced = polygon.simplify(tol, preserve_topology=True).buffer(tol, join_style="mitre", quad_segs=1).buffer(0)
         reduced = reduced.simplify(tol / 4, preserve_topology=True).buffer(0)
         wkt = reduced.wkt
         n_bytes = len(wkt.encode())
@@ -219,7 +194,7 @@ class ObisDatasetDiscovery:
         self.config = config
         self.geo_filter = geo_filter
         self.logger = logger or globals()["logger"]
-        self.session = session or _build_session()
+        self.session = session or retry_session()
 
     # -- geometry ---------------------------------------------------------
 
@@ -283,7 +258,10 @@ class ObisDatasetDiscovery:
             bigger = min(total + 1000, _MAX_PAGE_SIZE)
             self.logger.warning(
                 "OBIS discovery query %s returned %d of %d datasets; retrying with size=%d",
-                label, len(results), total, bigger,
+                label,
+                len(results),
+                total,
+                bigger,
             )
             try:
                 total, results = fetch(dict(params, size=bigger))
@@ -301,8 +279,7 @@ class ObisDatasetDiscovery:
         if not ids and not allow_empty:
             # A typo'd node/area id must not silently shrink the union.
             raise ObisDiscoveryError(
-                f"OBIS discovery query {label!r} returned no datasets. Check the "
-                "configured node/area id."
+                f"OBIS discovery query {label!r} returned no datasets. Check the configured node/area id."
             )
 
         self.logger.info("OBIS discovery %s -> %d datasets", label, len(ids))
@@ -352,7 +329,9 @@ class ObisDatasetDiscovery:
         dataset_ids = sorted(found)
         self.logger.info(
             "OBIS discovery resolved %d datasets from %d queries: %s",
-            len(dataset_ids), len(queries), per_query,
+            len(dataset_ids),
+            len(queries),
+            per_query,
         )
 
         if len(dataset_ids) < cfg.min_datasets:

@@ -6,6 +6,8 @@ erddap_server.erddap_csv_to_df. The mock_erddap_server fixture wires
 that method to return the standard info fixture so no HTTP calls occur.
 """
 
+import json
+
 import pandas as pd
 from conftest import (
     DATASET_ID,
@@ -21,10 +23,11 @@ def _make_dataset(server, info_csv=ERDDAP_INFO_CSV):
     """Create a real Dataset object backed by a mock server."""
     from io import StringIO
 
-    server.erddap_csv_to_df.side_effect = lambda url, skiprows=None, dataset=None: (
-        pd.read_csv(StringIO(info_csv)).fillna("")
-    )
+    server.erddap_csv_to_df.side_effect = lambda url, skiprows=None, dataset=None: pd.read_csv(
+        StringIO(info_csv)
+    ).fillna("")
     from cde_harvester.sources.erddap.dataset import Dataset
+
     return Dataset(server, DATASET_ID)
 
 
@@ -124,10 +127,7 @@ class TestPlottingAttributes:
 
     def test_axis_attribute_parsed(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)
-        axes = {
-            name: ds.df_variables.loc[name]["axis"]
-            for name in ["time", "latitude", "longitude", "depth"]
-        }
+        axes = {name: ds.df_variables.loc[name]["axis"] for name in ["time", "latitude", "longitude", "depth"]}
         assert axes == {"time": "T", "latitude": "Y", "longitude": "X", "depth": "Z"}
 
     def test_long_name_and_units_parsed(self, mock_erddap_server):
@@ -152,10 +152,7 @@ class TestPlottingAttributes:
         # This is the signal that lets a plot drop a flag column even when the
         # column name follows no naming convention.
         ds = _make_dataset(mock_erddap_server, info_csv=ERDDAP_INFO_QC_AND_LOG_CSV)
-        assert (
-            ds.df_variables.loc["chlorophyll"]["ancillary_variables"]
-            == "chlorophyll_qc"
-        )
+        assert ds.df_variables.loc["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
 
     def test_widening_the_allowlist_did_not_change_num_columns(self, mock_erddap_server):
         # num_columns counts df_variables ROWS (variables), not attributes, so
@@ -193,9 +190,7 @@ class TestTableVariables:
 
     def test_carries_the_attributes_a_panel_needs(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)
-        temperature = next(
-            v for v in ds.table_variables if v["name"] == "temperature"
-        )
+        temperature = next(v for v in ds.table_variables if v["name"] == "temperature")
         assert temperature["long_name"] == "Sea Water Temperature"
         assert temperature["units"] == "degree_C"
         assert temperature["standard_name"] == "sea_water_temperature"
@@ -226,20 +221,10 @@ class TestTableVariables:
         assert by_name["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
 
     def test_entries_are_json_serialisable(self, mock_erddap_server):
-        # It lands in a jsonb column via a Python-repr CSV round trip, so a
-        # numpy scalar leaking in here fails far downstream in the loader.
-        import json
-
+        # It lands in a jsonb column, which psycopg2 binds through json.dumps,
+        # so a numpy scalar leaking in here fails far downstream in the loader.
         ds = _make_dataset(mock_erddap_server)
         assert json.loads(json.dumps(ds.table_variables)) == ds.table_variables
-
-    def test_survives_the_csv_repr_round_trip(self, mock_erddap_server):
-        # loading/loader.py reads these back with ast.literal_eval; long_name
-        # values contain apostrophes in real data ("latitude de l'observation").
-        import ast
-
-        ds = _make_dataset(mock_erddap_server)
-        assert ast.literal_eval(repr(ds.table_variables)) == ds.table_variables
 
     def test_empty_frame_yields_empty_list(self):
         from cde_harvester.core.variables import extract_variables

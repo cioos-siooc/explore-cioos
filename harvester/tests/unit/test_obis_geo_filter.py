@@ -7,12 +7,11 @@ written to a tmp_path file, avoiding the large Canada EEZ polygon.
 
 import numpy as np
 import pytest
+
 from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
 
 # A small box on the BC coast: lon -130..-120, lat 48..55
-TEST_POLYGON_WKT = (
-    "POLYGON((-130.0 48.0, -120.0 48.0, -120.0 55.0, -130.0 55.0, -130.0 48.0))"
-)
+TEST_POLYGON_WKT = "POLYGON((-130.0 48.0, -120.0 48.0, -120.0 55.0, -130.0 55.0, -130.0 48.0))"
 
 # A point clearly inside the box
 INSIDE_LAT, INSIDE_LON = 51.0, -125.0
@@ -36,6 +35,7 @@ def geo_filter(polygon_file):
 # ---------------------------------------------------------------------------
 # Initialisation
 # ---------------------------------------------------------------------------
+
 
 class TestObisGeoFilterInit:
     def test_mode_none_sets_no_polygon(self):
@@ -63,6 +63,7 @@ class TestObisGeoFilterInit:
 # is_exempt
 # ---------------------------------------------------------------------------
 
+
 class TestIsExempt:
     def test_known_exempt_node_returns_true(self, geo_filter):
         obis_canada_id = "7dfb2d90-9317-434d-8d4e-64adf324579a"
@@ -88,6 +89,7 @@ class TestIsExempt:
 # ---------------------------------------------------------------------------
 # extent_intersects
 # ---------------------------------------------------------------------------
+
 
 class TestExtentIntersects:
     def test_overlapping_extent_returns_true(self, geo_filter):
@@ -118,6 +120,7 @@ class TestExtentIntersects:
 # ---------------------------------------------------------------------------
 # filter_points
 # ---------------------------------------------------------------------------
+
 
 class TestFilterPoints:
     def test_point_inside_returns_true(self, geo_filter):

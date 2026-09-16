@@ -37,8 +37,8 @@ flowchart TD
 
     subgraph CSVOutput["Output Files"]
         direction LR
-        CSV["datasets.csv\nprofiles.csv\nvariables.csv\nskipped.csv"]
-        AUDIT["harvest_runs.csv\nattempts.csv"]
+        CSV["datasets.parquet\nprofiles.parquet\nvariables.parquet\nskipped.parquet"]
+        AUDIT["harvest_runs.parquet\nharvest_attempts.parquet"]
     end
 
     PG[("PostgreSQL\ncde schema")]

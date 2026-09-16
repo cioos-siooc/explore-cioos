@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy import text
 
-from cde_harvester.core.db import create_db_engine
+from cde_common.db import create_db_engine
 from cde_harvester.core.observability import run_logger
 
 _module_logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ def load_previous_hashes(erddap_url):
     except Exception as e:
         logger.warning(
             "Could not load previous content hashes for %s (harvesting all): %s",
-            erddap_url, e,
+            erddap_url,
+            e,
         )
         return {}

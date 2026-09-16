@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from cde_harvester.core.config import (
     decode_harvest_config_b64,
     normalize_coolify_multiline,
@@ -65,9 +66,7 @@ class TestDecodeHarvestConfigB64:
     def test_tolerates_whitespace_in_the_value(self):
         """Base64 ignores whitespace, so a soft-wrapped or padded paste still decodes."""
         encoded = b64(SAMPLE_YAML)
-        wrapped = "  " + "\n".join(
-            encoded[i : i + 40] for i in range(0, len(encoded), 40)
-        ) + "\n"
+        wrapped = "  " + "\n".join(encoded[i : i + 40] for i in range(0, len(encoded), 40)) + "\n"
         assert decode_harvest_config_b64(wrapped) == SAMPLE_YAML
 
     def test_rejects_invalid_base64(self):
@@ -214,9 +213,7 @@ class TestResolveHarvestConfigFile:
 
         assert "HARVEST_CONFIG_B64" in caplog.text
 
-    def test_mangled_yaml_env_var_raises_instead_of_using_the_mounted_file(
-        self, monkeypatch, tmp_path
-    ):
+    def test_mangled_yaml_env_var_raises_instead_of_using_the_mounted_file(self, monkeypatch, tmp_path):
         """The corruption this channel is prone to must stop the deploy, not slip through."""
         mounted = tmp_path / "harvest_config.yaml"
         mounted.write_text("erddap_urls:\n  - https://stale.example/erddap\n")

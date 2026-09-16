@@ -709,30 +709,86 @@ now split, was two specific call sites.
       newly-validated param, tile coordinates, the empty-type-list selection, and the
       throw-with-`statusCode` contract. **47 pass**, up from 38.
 
-### P2.4 — A neutral module under the Python tree `[Strong]`
+### P2.4 — A neutral module under the Python tree — **DONE** (2026-09-09)
 
-`harvester/cde_harvester/core/*`, `downloader/`, `download_scheduler/`
+`python-common/cde_common/*` (new), `harvester/cde_harvester/core/*`, `downloader/`, `download_scheduler/`
 
-- [ ] `downloader` and `download_scheduler` import the *harvester* package, dragging Prefect, duckdb,
-      redis and pandera in behind an ERDDAP reader. There is no neutral `cde_common`.
-- [ ] **Two different env vars for one host**: `core/db.py:20` reads `DB_HOST_EXTERNAL`;
-      `download_scheduler.py:47` reads `DB_HOST` — while importing `cde_harvester.core`. Every
-      `.env.sample` ships `DB_HOST`, so copying the sample silently yields the `"localhost"` default
-      rather than an error. **[verified]**
-- [ ] The `requests` retry-session builder is written three times with three different policies
-      (`client.py:65-78`, `create_ckan_erddap_link.py:21-35`, `populate_vernaculars.py:131-159`).
-- [ ] `.env` loading duplicated three times with three different sentinel guards; `core/db.py:18`
-      calls `load_dotenv` *inside* `database_url()`, so it re-runs on every engine creation.
-- [ ] Two `sentry_sdk.init()` calls with different logging integrations and different
-      `traces_sample_rate`; two logging stacks (stdlib+Prefect vs loguru) duck-typed through
-      `report_issues`.
-- [ ] `download_erddap.py` imports **two** ERDDAP clients and aliases one as `cde_harvester`,
-      shadowing the top-level package name inside the module.
-- [ ] Missing timeouts on `requests` calls: `platform_vocab.py:35,80`, and
-      `download_erddap.py:276` on the *main data download path* — a hung ERDDAP stalls the
-      scheduler's single-threaded `while True` loop forever.
-- [ ] Target: one module holding the connection url, `.env` loading, retry session, Sentry init and
-      issue reporting, with the harvest pipeline sitting above it rather than beneath.
+The target module exists: `python-common/` is a fourth Python project, `cde-python-common`,
+holding the connection url, `.env` loading, the retry session, the Sentry init, the reason-code
+vocabulary and the issue reporting — with the harvest pipeline sitting above it. Its only
+dependencies are dotenv, requests, sentry-sdk, sqlalchemy and psycopg2; nothing in it may
+import from the three services. See `python-common/README.md`.
+
+- [x] **The harvester dependency is gone from both downstream services.** `downloader` and
+      `download_scheduler` depend on `cde-python-common` instead, and `download_scheduler/Dockerfile`
+      no longer copies `harvester/` at all. The scheduler's resolved dependency set went from
+      ~100 packages to 41 and the downloader's to 38 — no Prefect, duckdb, redis or pandera in a
+      download image.
+- [x] **One host resolution.** `cde_common/db.py` resolves `DB_HOST_EXTERNAL`, then `DB_HOST`,
+      then `localhost`, so a copied `.env.sample` (all of which ship `DB_HOST`) works and both
+      compose audiences keep their name. `download_scheduler.py` no longer builds a URL by hand —
+      it calls `create_db_engine()`, so the process cannot disagree with itself about the host
+      again. Pinned by `python-common/tests/test_db_host_resolution.py`.
+- [x] **One retry session.** `cde_common.http.retry_session()` replaces *four* builders (the
+      count was three plus `obis/discovery.py`, missed by the survey). The status list, the two
+      Retry flags that must not vary (`raise_on_status=False`,
+      `respect_retry_after_header=True`) and the retry logging are settled there; `total` and
+      `backoff_factor` stay arguments because they are the one thing that genuinely differs per
+      upstream. Two accidental divergences closed on the way: the ERDDAP list had 413 (a WAF
+      quirk) but not 429, the other three the reverse, and only one of the four logged what it
+      retried. The `LoggingRetry` subclass and its urllib3 quieting moved with it.
+- [x] **One `.env` load.** `cde_common.env.load_env()` replaces three copies and both
+      single-variable sentinels (`if not os.getenv("DB_HOST")` / `("GMAIL_USER")`) — each of
+      which guessed at one name to decide whether the whole file had been supplied, so a
+      container that set one and not the other loaded the file for half of itself. It searches
+      ancestors, never overrides the real environment, and caches per working directory, so
+      calling it on every engine creation is free while a Prefect run's
+      `set_working_directory` is still resolved correctly. `core/schema.py` no longer reads
+      `os.environ["DB_NAME"]` behind a deferred `find_dotenv` import; it asks
+      `cde_common.db.db_name()`, which is what its docstring always claimed.
+- [x] **One `sentry_sdk.init()`.** `cde_common.observability.init_sentry()` configures both the
+      stdlib and the loguru integration (each installed when its logging library is importable)
+      at `event_level=None`, reads `SENTRY_TRACES_SAMPLE_RATE` — the same variable web-api and
+      the frontend already read — and keeps the scheduler's `ignore_errors=[KeyboardInterrupt]`.
+      The split had been an artifact of which logging library each file happened to use.
+- [x] **One ERDDAP client in the downloader.** `download_erddap.py` no longer imports the
+      harvester's client under the alias `cde_harvester`. `get_erddap_info()` fetches the
+      `/info/` table once (the function `save_erddap_metadata` already needed) and
+      `get_variables_from_info()` derives the `name`/`cf_role` frame from it using the
+      harvester's own predicate. Cross-checked against `Dataset.get_metadata()` on the shared
+      test fixture — identical names and cf_roles — and pinned by
+      `downloader/tests/test_erddap_variables.py`.
+- [x] **Timeouts.** `platform_vocab.py` (both vocabulary downloads, now through one
+      `_download_json` helper that also raises for status) and the main data download path in
+      `download_erddap.py`, which had none — that is the request that could wedge the
+      scheduler's single-threaded `while True` loop forever. `cde_common.http` owns the two
+      values (`DEFAULT_TIMEOUT`, `DATA_TIMEOUT`), which also retires the inline `timeout=3600`
+      in the ERDDAP client noted under §P4.
+- [x] Tests: 31 new in `python-common/tests` (host resolution, `.env` precedence, retry policy, the
+      Sentry policy) and 8 in `downloader/tests/test_erddap_variables.py`. Full suite **572
+      pass**, `ruff check` clean. `[tool.ruff.lint.isort] known-first-party` now names the five
+      in-tree packages — every one is an editable path dependency, which ruff otherwise cannot
+      tell from a wheel, so `cde_common` read as a third-party library.
+
+**Found while verifying the images — a live P0, not from the survey.**
+`.dockerignore`'s `**/obis` (added for the OBIS *cache* directory) also matched
+`harvester/cde_harvester/sources/obis`, so **every harvester image since the OBIS source
+package landed shipped without it** and died at startup with
+`ModuleNotFoundError: No module named 'cde_harvester.sources.obis'` on
+`import cde_harvester.__main__`. Nothing caught it because CI never builds and runs the
+harvester image's entrypoint — the integration workflow harvests through an
+already-running `prefect_worker`. Fixed with an explicit re-include
+(`!harvester/cde_harvester/sources/obis`), the same idiom the CSV rule already uses, and
+confirmed by a `--no-cache` build plus a container that imports `prefect_pipeline`.
+Still worth having: a CI step that imports the entrypoint inside the built image.
+
+Noticed alongside it and **left alone**: `sources/obis/` has no `__init__.py` while `ckan/`
+and `erddap/` do. It works as an implicit namespace package, but it is the reason the
+missing directory surfaced as a confusing import error rather than an empty package.
+
+**Also fixed while here** (both were open items elsewhere in this file):
+`download_scheduler/.env.sample` had drifted to `DB_NAME=postgres` (§Config sprawl); the
+`import duckdb` deferred inside `download_obis_parquet` is now at module top.
 
 ### P2.5 — Schema change needs a module, not a glob `[Strong]`
 
@@ -1248,11 +1304,14 @@ below is a *production* number unless it says otherwise.
       `__main__.py:571`, bypassing its four-level precedence chain.
 - [ ] `CDE_ALLOW_FULL_RELOAD` is read at `loader.py:667` and separately marshalled at
       `prefect_pipeline.py:368`.
-- [ ] `harvester/.env.sample` ships `DB_HOST` but the code reads `DB_HOST_EXTERNAL`, so copying the
-      sample silently yields a default instead of an error. Neither sample documents `DB_PORT`,
-      `HARVEST_CONFIG_*`, `DOWNLOAD_WAF_URL`, `HARVESTER_LOG_DIR`, `CDE_PRUNE_STALE` or
-      `CDE_ALLOW_FULL_RELOAD`. The same `DB_PASSWORD` placeholder is duplicated across four sample
-      files with no source of truth, and `download_scheduler/.env.sample` has already drifted.
+- [x] ~~`harvester/.env.sample` ships `DB_HOST` but the code reads `DB_HOST_EXTERNAL`, so copying
+      the sample silently yields a default instead of an error.~~ Fixed in §P2.4:
+      `cde_common/db.py` accepts either name, both samples document the precedence and `DB_PORT`,
+      and `download_scheduler/.env.sample`'s drifted `DB_NAME` is corrected.
+- [ ] **Still open from that bullet:** no sample documents `HARVEST_CONFIG_*`,
+      `DOWNLOAD_WAF_URL`, `HARVESTER_LOG_DIR`, `CDE_PRUNE_STALE` or `CDE_ALLOW_FULL_RELOAD`, and
+      the same `DB_PASSWORD` placeholder is duplicated across four sample files with no source of
+      truth.
 - [ ] Hardcoded infrastructure in source: `http://nginx:4000` and `redis:6379` (with a
       `##TODO use env varibles here`), the container path `/app/nginx/logs/access.log*` baked into a
       Python glob, three separate hardcodings of the CKAN base URL — and
@@ -1260,8 +1319,8 @@ below is a *production* number unless it says otherwise.
 - [ ] `redisFunctions.py` is camelCase in an otherwise snake_case tree (module and functions), and
       uses a bare `result[0:4999]` slice and a positional `line.split(" ")[6]` nginx-log field index.
 - [ ] `sources/erddap/client.py:175` has a mutable default argument (`skiprows=[1]`) on the hottest
-      function in the client; `MAX_RESPONSE_SIZE = 2e8` is a float used as a byte threshold;
-      `timeout=3600` appears inline twice.
+      function in the client; `MAX_RESPONSE_SIZE = 2e8` is a float used as a byte threshold.
+      (The inline `timeout=3600` is gone — `cde_common.http.DATA_TIMEOUT`, see §P2.4.)
 - [ ] Redis is unauthenticated — `redis-config/redis.conf` sets no `requirepass` and
       `web-api/utils/redis.js:13` treats `REDIS_PASSWORD` as optional, relying entirely on `expose:`
       keeping it off the host network.

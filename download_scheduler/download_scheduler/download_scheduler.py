@@ -1,21 +1,22 @@
 # from sqlalchemy import JSON, Text
 import json
-import logging
 import os
 import pathlib
 import traceback
 
 import sentry_sdk
-from cde_harvester.core.issues import error_signature, report_issues
-from dotenv import load_dotenv
-from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
 from loguru import logger
-from sentry_sdk.integrations.loguru import LoguruIntegration
-from sqlalchemy import create_engine, text
+from prefect import flow, get_run_logger
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from cde_common.db import create_db_engine, db_host
+from cde_common.env import load_env
+from cde_common.issues import error_signature, report_issues
+from cde_common.observability import init_sentry
 from download_scheduler.download_email import send_email
+from erddap_downloader import downloader_wrapper
 
 this_directory = pathlib.Path(__file__).parent.absolute()
 schema_path = os.path.join(this_directory, "templates")
@@ -23,33 +24,18 @@ schema_path = os.path.join(this_directory, "templates")
 template_loader = FileSystemLoader(searchpath=schema_path)
 template_env = Environment(loader=template_loader)
 
-# check if docker has set env variables, if not load from .env
 envs = os.environ
 
-if not os.getenv("DB_HOST"):
-    load_dotenv(os.getcwd() + "/.env")
+load_env()
+init_sentry()
 
-sentry_sdk.init(
-    dsn=os.environ.get("SENTRY_DSN"),
-    integrations=[
-        # Log records become breadcrumbs only. Turning every ERROR into its own
-        # event meant an alert per failed job; failures are now reported grouped
-        # by the error itself (see cde_harvester.core.issues) and de-duped by
-        # Sentry, so a known-broken server stops re-alerting on every run.
-        LoguruIntegration(level=logging.INFO, event_level=None),
-    ],
-    environment=os.environ.get("ENVIRONMENT", "development"),
-    traces_sample_rate=1.0,
-    ignore_errors=[KeyboardInterrupt],
-)
-
-
-database_link = (
-    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
-    f"@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
-)
-logger.debug("Connecting to {}", envs["DB_HOST"])
-engine = create_engine(database_link)
+# Built by cde_common.db, not by hand: this module used to assemble the URL from
+# DB_HOST while the cde_common code it imports resolved DB_HOST_EXTERNAL, so one
+# process had two answers for which host the database is on — and copying any
+# .env.sample (all of which ship DB_HOST) silently gave the other half
+# "localhost".
+engine = create_db_engine()
+logger.debug("Connecting to {}", db_host())
 
 # Sentinel for update_download_jobs: the column takes the database's NOW(),
 # not a bound value. Compared by identity, so a job that literally stores the
@@ -74,9 +60,7 @@ def get_a_download_job():
     session = Session(engine)
 
     rs = session.execute(
-        text(
-            "SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
-        )
+        text("SELECT * FROM cde.download_jobs WHERE status='open' ORDER BY time ASC LIMIT 1 FOR UPDATE SKIP LOCKED")
     )
     # .mappings() so columns remain accessible by name (row["pk"]) under SQLAlchemy 2.0
     row = rs.mappings().fetchone()
@@ -85,9 +69,7 @@ def get_a_download_job():
         pk = row["pk"]
         job_id = row["job_id"]
         logger.info("Starting job: pk={} job_id={}", pk, job_id)
-        update_download_jobs(
-            pk, {"status": "downloading", "time_start": SQL_NOW}, session
-        )
+        update_download_jobs(pk, {"status": "downloading", "time_start": SQL_NOW}, session)
     session.commit()
     return row
 
@@ -124,28 +106,22 @@ def email_user(email, status, zip_filename, downloader_output, language):
                 source_url = "https://obis.org/dataset/" + dataset["dataset_id"]
             else:
                 source_label = "ERDDAP"
-                source_url = (
-                    dataset["erddap_url"] + "/info/" + dataset["dataset_id"] + "/index.html"
-                )
+                source_url = dataset["erddap_url"] + "/info/" + dataset["dataset_id"] + "/index.html"
 
             if dataset.get("status") not in _INCLUDED:
-                failed_datasets += [{
-                    "dataset_id": dataset["dataset_id"],
-                    "reason": _MISS_REASON.get(
-                        dataset.get("status"), "could not be included"
-                    ),
-                    "reason_fr": _MISS_REASON_FR.get(
-                        dataset.get("status"), "n'a pas pu être inclus"
-                    ),
-                }]
+                failed_datasets += [
+                    {
+                        "dataset_id": dataset["dataset_id"],
+                        "reason": _MISS_REASON.get(dataset.get("status"), "could not be included"),
+                        "reason_fr": _MISS_REASON_FR.get(dataset.get("status"), "n'a pas pu être inclus"),
+                    }
+                ]
                 # Don't cite a dataset that isn't in the zip.
                 continue
 
             out = {"source_label": source_label, "source_url": source_url}
             if dataset["ckan_id"]:
-                out["ckan_url"] = (
-                    "https://catalogue.cioos.ca/dataset/" + dataset["ckan_id"]
-                )
+                out["ckan_url"] = "https://catalogue.cioos.ca/dataset/" + dataset["ckan_id"]
 
             dataset_urls += [out]
 
@@ -244,9 +220,7 @@ def run_download(row):
         # explicitly. Fingerprinting on the normalized exception text groups
         # every job that fails the same way into one issue instead of one per job.
         with sentry_sdk.new_scope() as scope:
-            scope.fingerprint = [
-                "downloader", "job-failed", error_signature(f"{type(e).__name__}: {e}")
-            ]
+            scope.fingerprint = ["downloader", "job-failed", error_signature(f"{type(e).__name__}: {e}")]
             scope.set_tag("component", "downloader")
             scope.set_context("job", {"job_id": user_query["job_id"], "pk": pk})
             sentry_sdk.capture_exception(e)
@@ -263,9 +237,7 @@ def run_download(row):
         )
     else:
         # these probably dont both need to be here
-        if downloader_output.get("zip_file_size") == 0 or downloader_output.get(
-            "empty_download"
-        ):
+        if downloader_output.get("zip_file_size") == 0 or downloader_output.get("empty_download"):
             status = "no-data"
 
         if downloader_output.get("over_limit"):
@@ -365,8 +337,6 @@ def _mirror_logs_to_prefect():
     (PREFECT_LOGGING_EXTRA_LOGGERS only reaches stdlib loggers). Returns None
     outside a run context, so the caller knows there is no sink to remove.
     """
-    from prefect import get_run_logger
-
     try:
         run_logger = get_run_logger()
     except Exception:
@@ -386,8 +356,6 @@ def run_download_observed(row):
         run_download(row)
         return
 
-    from prefect import flow
-
     # Declared per job so the run can be named after it, while the flow NAME
     # stays constant so Prefect still groups every download under one flow.
     # Deliberately parameterless: `row` is a SQLAlchemy RowMapping, which is not
@@ -403,9 +371,7 @@ def run_download_observed(row):
             if sink_id is not None:
                 logger.remove(sink_id)
         if status in FAILED_STATUSES:
-            raise DownloadJobFailed(
-                f"download job {row['job_id']} finished as '{status}'"
-            )
+            raise DownloadJobFailed(f"download job {row['job_id']} finished as '{status}'")
         return status
 
     try:

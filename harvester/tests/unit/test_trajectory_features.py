@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 from urllib.parse import unquote
 
 import pandas as pd
+from requests.exceptions import HTTPError
+
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
     MAX_TRACK_POINTS_CAP,
@@ -23,7 +25,6 @@ from cde_harvester.loading.loader import (
     prepare_trajectory_days_dataframe,
     prepare_trajectory_points_dataframe,
 )
-from requests.exceptions import HTTPError
 
 ERDDAP_URL = "https://test.erddap.com/erddap"
 DATASET_ID = "test_trajectory_001"
@@ -34,54 +35,67 @@ def _day_count_df():
     group column carries the BUCKET INDEX (day number since the epoch),
     formatted as if it were epoch seconds, and `latitude` carries the count.
     Jan 1 2021 is day 18628, Jan 2 is 18629."""
-    return pd.DataFrame({
-        "traj_id": ["m1", "m1"],
-        "time": ["1970-01-01T05:10:28Z", "1970-01-01T05:10:29Z"],  # 18628, 18629
-        "latitude": [500, 300],
-    })
+    return pd.DataFrame(
+        {
+            "traj_id": ["m1", "m1"],
+            "time": ["1970-01-01T05:10:28Z", "1970-01-01T05:10:29Z"],  # 18628, 18629
+            "latitude": [500, 300],
+        }
+    )
 
 
 def _day_depth_df():
     """orderByMinMax("traj,time/86400,depth"): 2 rows (min,max) per day."""
-    return pd.DataFrame({
-        "traj_id": ["m1"] * 4,
-        "time": [
-            "2021-01-01T00:00:00Z", "2021-01-01T00:00:00Z",
-            "2021-01-02T00:00:00Z", "2021-01-02T00:00:00Z",
-        ],
-        "depth": [0.0, 100.0, 5.0, 80.0],
-    })
+    return pd.DataFrame(
+        {
+            "traj_id": ["m1"] * 4,
+            "time": [
+                "2021-01-01T00:00:00Z",
+                "2021-01-01T00:00:00Z",
+                "2021-01-02T00:00:00Z",
+                "2021-01-02T00:00:00Z",
+            ],
+            "depth": [0.0, 100.0, 5.0, 80.0],
+        }
+    )
 
 
 def _per_profile_track_df():
     """orderByMin("traj,prof,time"): one raw fix per profile. Serves both the
     track geometry and the per-day profile count (p1/p2 on Jan 1, p3 on Jan 2).
     """
-    return pd.DataFrame({
-        "traj_id": ["m1", "m1", "m1"],
-        "prof_id": ["p1", "p2", "p3"],
-        "time": [
-            "2021-01-01T06:00:00Z", "2021-01-01T18:00:00Z", "2021-01-02T06:00:00Z",
-        ],
-        "latitude": [48.0132, 48.0300, 48.0972],
-        "longitude": [-125.0021, -125.0388, -125.0300],
-    })
+    return pd.DataFrame(
+        {
+            "traj_id": ["m1", "m1", "m1"],
+            "prof_id": ["p1", "p2", "p3"],
+            "time": [
+                "2021-01-01T06:00:00Z",
+                "2021-01-01T18:00:00Z",
+                "2021-01-02T06:00:00Z",
+            ],
+            "latitude": [48.0132, 48.0300, 48.0972],
+            "longitude": [-125.0021, -125.0388, -125.0300],
+        }
+    )
 
 
 def _per_day_track_df():
     """orderByMin("traj,time/1day,time"): first fix of each day (raw coords)."""
-    return pd.DataFrame({
-        "traj_id": ["m1", "m1", "m1"],
-        "time": [
-            "2021-01-01T00:30:00Z", "2021-01-02T00:15:00Z", "2021-01-03T01:00:00Z",
-        ],
-        "latitude": [48.0132, 48.0451, 48.0972],
-        "longitude": [-125.0021, -125.0388, -125.0779],
-    })
+    return pd.DataFrame(
+        {
+            "traj_id": ["m1", "m1", "m1"],
+            "time": [
+                "2021-01-01T00:30:00Z",
+                "2021-01-02T00:15:00Z",
+                "2021-01-03T01:00:00Z",
+            ],
+            "latitude": [48.0132, 48.0451, 48.0972],
+            "longitude": [-125.0021, -125.0388, -125.0779],
+        }
+    )
 
 
-def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
-                             fail_server_binning=False):
+def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True, fail_server_binning=False):
     dataset = MagicMock()
     dataset.id = DATASET_ID
     dataset.erddap_url = ERDDAP_URL
@@ -91,9 +105,7 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
         "time_coverage_start": "2021-01-01T00:00:00Z",
         "time_coverage_end": "2021-01-20T00:00:00Z",
     }
-    dataset.variables_list = ["traj_id", "prof_id", "latitude", "longitude", "time"] + (
-        ["depth"] if with_depth else []
-    )
+    dataset.variables_list = ["traj_id", "prof_id", "latitude", "longitude", "time"] + (["depth"] if with_depth else [])
     rows = [
         {"name": "traj_id", "cf_role": "trajectory_id"},
     ]
@@ -127,13 +139,15 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
         # keeps every fix.
         if plain.startswith("traj_id,latitude,longitude,time"):
             n = 6
-            return pd.DataFrame({
-                "traj_id": ["m1"] * n,
-                "latitude": [48.001] * 3 + [48.0823] * 3,
-                "longitude": [-125.0 + 0.02 * (i % 2) for i in range(n)],
-                "time": [f"2021-01-0{i + 1}T00:00:00Z" for i in range(n)],
-                "depth": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            })
+            return pd.DataFrame(
+                {
+                    "traj_id": ["m1"] * n,
+                    "latitude": [48.001] * 3 + [48.0823] * 3,
+                    "longitude": [-125.0 + 0.02 * (i % 2) for i in range(n)],
+                    "time": [f"2021-01-0{i + 1}T00:00:00Z" for i in range(n)],
+                    "depth": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+                }
+            )
         raise AssertionError(f"Unexpected query: {plain}")
 
     dataset.dataset_tabledap_query = MagicMock(side_effect=fake_query)
@@ -148,14 +162,18 @@ class TestDayStatsExtraction:
         assert set(days["dataset_id"]) == {DATASET_ID}
         assert set(days["erddap_url"]) == {ERDDAP_URL}
         assert list(days.columns) == [
-            "erddap_url", "dataset_id", "trajectory_id", "day",
-            "n_records", "n_profiles", "depth_min", "depth_max",
+            "erddap_url",
+            "dataset_id",
+            "trajectory_id",
+            "day",
+            "n_records",
+            "n_profiles",
+            "depth_min",
+            "depth_max",
         ]
 
     def test_counts_and_depths(self):
-        days = extract_day_stats(build_trajectory_dataset()).sort_values(
-            "n_records", ascending=False
-        )
+        days = extract_day_stats(build_trajectory_dataset()).sort_values("n_records", ascending=False)
         assert days["n_records"].tolist() == [500, 300]
         a = days.iloc[0]
         assert a["depth_min"] == 0.0 and a["depth_max"] == 100.0
@@ -228,9 +246,7 @@ class TestDayStatsExtraction:
 class TestTrajectoryProfile:
     def test_profiles_per_day(self):
         dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
-        days = extract_day_stats(dataset, count_profiles=True).sort_values(
-            "n_records", ascending=False
-        )
+        days = extract_day_stats(dataset, count_profiles=True).sort_values("n_records", ascending=False)
         assert days["n_profiles"].tolist() == [2, 1]
 
     def test_plain_trajectory_has_zero_profiles(self):
@@ -261,7 +277,7 @@ class TestTrajectoryProfile:
         # The per-day profile count is a display enhancement; a too-large
         # response there must not fail a dataset whose days succeeded (this
         # exact failure took out a whole glider dataset in production).
-        from cde_harvester.core.errors import ResponseTooLargeError
+        from cde_common.errors import ResponseTooLargeError
 
         dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")
         inner = dataset.dataset_tabledap_query.side_effect
@@ -299,9 +315,7 @@ class TestFallback:
             "time_coverage_end": "2021-03-15T00:00:00Z",
         }
         queries = []
-        dataset.dataset_tabledap_query = MagicMock(
-            side_effect=lambda url: (queries.append(url), pd.DataFrame())[1]
-        )
+        dataset.dataset_tabledap_query = MagicMock(side_effect=lambda url: (queries.append(url), pd.DataFrame())[1])
 
         list(_iter_raw_chunks(dataset, "traj_id", has_depth=False))
 
@@ -310,17 +324,19 @@ class TestFallback:
 
 class TestPrepareTrajectoryDaysDataframe:
     def test_dedup_on_unique_key(self):
-        df = pd.DataFrame({
-            "erddap_url": [ERDDAP_URL] * 2,
-            "dataset_id": [DATASET_ID] * 2,
-            "trajectory_id": ["m1", "m1"],
-            # same day, reported twice (a dataset harvested in two passes)
-            "day": ["2021-01-01", "2021-01-01T00:00:00Z"],
-            "n_records": [10, 20],
-            "n_profiles": [1, 2],
-            "depth_min": [5.0, 0.0],
-            "depth_max": [50.0, 100.0],
-        })
+        df = pd.DataFrame(
+            {
+                "erddap_url": [ERDDAP_URL] * 2,
+                "dataset_id": [DATASET_ID] * 2,
+                "trajectory_id": ["m1", "m1"],
+                # same day, reported twice (a dataset harvested in two passes)
+                "day": ["2021-01-01", "2021-01-01T00:00:00Z"],
+                "n_records": [10, 20],
+                "n_profiles": [1, 2],
+                "depth_min": [5.0, 0.0],
+                "depth_max": [50.0, 100.0],
+            }
+        )
         out = prepare_trajectory_days_dataframe(df)
         assert len(out) == 1
         row = out.iloc[0]
@@ -332,60 +348,62 @@ class TestPrepareTrajectoryDaysDataframe:
     def test_time_of_day_does_not_split_a_day(self):
         # The DB column is a DATE and the hex sweep joins on it; a stray
         # time-of-day would make one day look like two.
-        df = pd.DataFrame({
-            "erddap_url": [ERDDAP_URL] * 2,
-            "dataset_id": [DATASET_ID] * 2,
-            "trajectory_id": ["m1", "m1"],
-            "day": ["2021-01-01T00:00:00Z", "2021-01-01T13:45:00Z"],
-            "n_records": [1, 1],
-            "n_profiles": [0, 0],
-            "depth_min": [0.0, 0.0],
-            "depth_max": [1.0, 1.0],
-        })
+        df = pd.DataFrame(
+            {
+                "erddap_url": [ERDDAP_URL] * 2,
+                "dataset_id": [DATASET_ID] * 2,
+                "trajectory_id": ["m1", "m1"],
+                "day": ["2021-01-01T00:00:00Z", "2021-01-01T13:45:00Z"],
+                "n_records": [1, 1],
+                "n_profiles": [0, 0],
+                "depth_min": [0.0, 0.0],
+                "depth_max": [1.0, 1.0],
+            }
+        )
         assert len(prepare_trajectory_days_dataframe(df)) == 1
 
     def test_bigint_columns_come_out_int64(self):
         # regression: a merge/fillna upcasts n_records to float64, and
         # Postgres COPY rejects "2.0" for a bigint column
-        df = pd.DataFrame({
-            "erddap_url": [ERDDAP_URL] * 2,
-            "dataset_id": [DATASET_ID] * 2,
-            "trajectory_id": ["m1", "m2"],
-            "day": ["2021-01-01", "2021-02-01"],
-            "n_records": [2.0, float("nan")],
-            "n_profiles": [1.0, float("nan")],
-            "depth_min": [0.0, 0.0],
-            "depth_max": [50.0, 60.0],
-        })
+        df = pd.DataFrame(
+            {
+                "erddap_url": [ERDDAP_URL] * 2,
+                "dataset_id": [DATASET_ID] * 2,
+                "trajectory_id": ["m1", "m2"],
+                "day": ["2021-01-01", "2021-02-01"],
+                "n_records": [2.0, float("nan")],
+                "n_profiles": [1.0, float("nan")],
+                "depth_min": [0.0, 0.0],
+                "depth_max": [50.0, 60.0],
+            }
+        )
         out = prepare_trajectory_days_dataframe(df)
         for col in ("n_records", "n_profiles"):
             assert out[col].dtype == "Int64", col
         assert out.loc[out["trajectory_id"] == "m1", "n_records"].iloc[0] == 2
 
     def test_null_trajectory_id_becomes_empty_string(self):
-        df = pd.DataFrame({
-            "erddap_url": [ERDDAP_URL],
-            "dataset_id": [DATASET_ID],
-            "trajectory_id": [None],
-            "day": ["2021-01-01"],
-            "n_records": [10],
-            "n_profiles": [0],
-            "depth_min": [0.0],
-            "depth_max": [50.0],
-        })
+        df = pd.DataFrame(
+            {
+                "erddap_url": [ERDDAP_URL],
+                "dataset_id": [DATASET_ID],
+                "trajectory_id": [None],
+                "day": ["2021-01-01"],
+                "n_records": [10],
+                "n_profiles": [0],
+                "depth_min": [0.0],
+                "depth_max": [50.0],
+            }
+        )
         out = prepare_trajectory_days_dataframe(df)
         assert out.iloc[0]["trajectory_id"] == ""
 
 
 def _dataset_for_tracks(cdm_data_type="Trajectory", fail_server_binning=False):
     """Trajectory dataset with the CF-role attrs extract_day_stats would set."""
-    dataset = build_trajectory_dataset(
-        cdm_data_type=cdm_data_type, fail_server_binning=fail_server_binning
-    )
+    dataset = build_trajectory_dataset(cdm_data_type=cdm_data_type, fail_server_binning=fail_server_binning)
     dataset.trajectory_id_variable = "traj_id"
-    dataset.profile_id_variable = (
-        "prof_id" if cdm_data_type == "TrajectoryProfile" else None
-    )
+    dataset.profile_id_variable = "prof_id" if cdm_data_type == "TrajectoryProfile" else None
     return dataset
 
 
@@ -431,18 +449,18 @@ class TestTrackPointExtraction:
     def test_schema_validates(self):
         from cde_harvester.core.schemas import TrajectoryPointSchema
 
-        points = extract_track_points(
-            _dataset_for_tracks("TrajectoryProfile"), per_profile=True
-        )
+        points = extract_track_points(_dataset_for_tracks("TrajectoryProfile"), per_profile=True)
         TrajectoryPointSchema.validate(points)
 
 
 class TestDecimateTracks:
     def test_under_cap_untouched(self):
-        df = pd.DataFrame({
-            "trajectory_id": ["m1"] * 10,
-            "time": pd.date_range("2021-01-01", periods=10, freq="D"),
-        })
+        df = pd.DataFrame(
+            {
+                "trajectory_id": ["m1"] * 10,
+                "time": pd.date_range("2021-01-01", periods=10, freq="D"),
+            }
+        )
         assert len(_decimate_tracks(df, max_points=10)) == 10
 
     def test_over_cap_keeps_first_last_and_stride(self):
@@ -451,12 +469,14 @@ class TestDecimateTracks:
         # Douglas-Peucker alone can't reduce it below the cap and the even
         # stride actually has to run.
         n = 100
-        df = pd.DataFrame({
-            "trajectory_id": ["m1"] * n,
-            "time": pd.date_range("2021-01-01", periods=n, freq="D"),
-            "latitude": 48.0 + 0.02 * (pd.Series(range(n)) % 2),
-            "longitude": -125.0 + 0.01 * pd.Series(range(n)),
-        })
+        df = pd.DataFrame(
+            {
+                "trajectory_id": ["m1"] * n,
+                "time": pd.date_range("2021-01-01", periods=n, freq="D"),
+                "latitude": 48.0 + 0.02 * (pd.Series(range(n)) % 2),
+                "longitude": -125.0 + 0.01 * pd.Series(range(n)),
+            }
+        )
         out = _decimate_tracks(df, max_points=10)
         assert len(out) <= 11  # stride keeps ceil(100/10)=10th rows + last
         assert out["time"].iloc[0] == df["time"].iloc[0]
@@ -464,18 +484,24 @@ class TestDecimateTracks:
 
     def test_cap_is_per_trajectory(self):
         n = 100
-        df = pd.concat([
-            pd.DataFrame({
-                "trajectory_id": ["m1"] * n,
-                "time": pd.date_range("2021-01-01", periods=n, freq="D"),
-                "latitude": 48.0 + 0.02 * (pd.Series(range(n)) % 2),
-                "longitude": -125.0 + 0.01 * pd.Series(range(n)),
-            }),
-            pd.DataFrame({
-                "trajectory_id": ["m2"] * 5,
-                "time": pd.date_range("2021-01-01", periods=5, freq="D"),
-            }),
-        ])
+        df = pd.concat(
+            [
+                pd.DataFrame(
+                    {
+                        "trajectory_id": ["m1"] * n,
+                        "time": pd.date_range("2021-01-01", periods=n, freq="D"),
+                        "latitude": 48.0 + 0.02 * (pd.Series(range(n)) % 2),
+                        "longitude": -125.0 + 0.01 * pd.Series(range(n)),
+                    }
+                ),
+                pd.DataFrame(
+                    {
+                        "trajectory_id": ["m2"] * 5,
+                        "time": pd.date_range("2021-01-01", periods=5, freq="D"),
+                    }
+                ),
+            ]
+        )
         out = _decimate_tracks(df, max_points=10)
         assert len(out[out["trajectory_id"] == "m2"]) == 5
 
@@ -485,12 +511,14 @@ class TestDecimateTracks:
         # a vessel idling at dock reports the same position for hours -- those
         # collapse to the segment endpoints.
         n = 50
-        df = pd.DataFrame({
-            "trajectory_id": ["m1"] * n,
-            "time": pd.date_range("2021-01-01", periods=n, freq="10min"),
-            "latitude": [48.0] * n,
-            "longitude": [-125.0] * n,
-        })
+        df = pd.DataFrame(
+            {
+                "trajectory_id": ["m1"] * n,
+                "time": pd.date_range("2021-01-01", periods=n, freq="10min"),
+                "latitude": [48.0] * n,
+                "longitude": [-125.0] * n,
+            }
+        )
         out = _decimate_tracks(df, max_points=1000, always_simplify=True)
         assert len(out) == 2  # endpoints only
         # ...but per-profile rows under the cap stay untouched
@@ -505,18 +533,23 @@ class TestDecimateTracks:
             TRACK_MAX_CHORD_KM,
             _haversine_km,
         )
+
         n = 100
-        df = pd.DataFrame({
-            "trajectory_id": ["m1"] * n,
-            "time": pd.date_range("2021-01-01", periods=n, freq="30min"),
-            "latitude": 48.0 + 0.045 * pd.Series(range(n)),  # ~5km steps north
-            "longitude": [-125.0] * n,
-        })
+        df = pd.DataFrame(
+            {
+                "trajectory_id": ["m1"] * n,
+                "time": pd.date_range("2021-01-01", periods=n, freq="30min"),
+                "latitude": 48.0 + 0.045 * pd.Series(range(n)),  # ~5km steps north
+                "longitude": [-125.0] * n,
+            }
+        )
         out = _decimate_tracks(df, max_points=1000, always_simplify=True)
         assert 2 < len(out) < n
         chords = _haversine_km(
-            out["latitude"].to_numpy()[:-1], out["longitude"].to_numpy()[:-1],
-            out["latitude"].to_numpy()[1:], out["longitude"].to_numpy()[1:],
+            out["latitude"].to_numpy()[:-1],
+            out["longitude"].to_numpy()[:-1],
+            out["latitude"].to_numpy()[1:],
+            out["longitude"].to_numpy()[1:],
         )
         assert chords.max() <= TRACK_MAX_CHORD_KM * 1.2  # rounding slack
 
@@ -532,12 +565,14 @@ class TestDecimateTracks:
         lon2 = pd.Series([corner_lon] * leg)
         lat2 = 48.0 + 0.01 * pd.Series(range(1, leg + 1))
         n = leg * 2
-        df = pd.DataFrame({
-            "trajectory_id": ["m1"] * n,
-            "time": pd.date_range("2021-01-01", periods=n, freq="D"),
-            "latitude": pd.concat([lat1, lat2], ignore_index=True),
-            "longitude": pd.concat([lon1, lon2], ignore_index=True),
-        })
+        df = pd.DataFrame(
+            {
+                "trajectory_id": ["m1"] * n,
+                "time": pd.date_range("2021-01-01", periods=n, freq="D"),
+                "latitude": pd.concat([lat1, lat2], ignore_index=True),
+                "longitude": pd.concat([lon1, lon2], ignore_index=True),
+            }
+        )
         out = _decimate_tracks(df, max_points=5)
         assert len(out) == 3
         assert any(abs(out["longitude"] - corner_lon) < 1e-9)
@@ -601,20 +636,22 @@ class TestCapForActiveDays:
 
 class TestPrepareTrajectoryPointsDataframe:
     def test_dedupe_and_drop_unusable(self):
-        df = pd.DataFrame({
-            "erddap_url": [ERDDAP_URL] * 4,
-            "dataset_id": [DATASET_ID] * 4,
-            "trajectory_id": ["m1", "m1", "m1", None],
-            "profile_id": ["p1", "p1-dup", None, "p9"],
-            "time": [
-                "2021-01-01T00:00:00Z",
-                "2021-01-01T00:00:00Z",   # duplicate key -> dropped
-                "not-a-date",             # unparseable -> dropped
-                "2021-01-02T00:00:00Z",
-            ],
-            "latitude": [48.0, 48.1, 48.2, 48.3],
-            "longitude": [-125.0, -125.1, -125.2, -125.3],
-        })
+        df = pd.DataFrame(
+            {
+                "erddap_url": [ERDDAP_URL] * 4,
+                "dataset_id": [DATASET_ID] * 4,
+                "trajectory_id": ["m1", "m1", "m1", None],
+                "profile_id": ["p1", "p1-dup", None, "p9"],
+                "time": [
+                    "2021-01-01T00:00:00Z",
+                    "2021-01-01T00:00:00Z",  # duplicate key -> dropped
+                    "not-a-date",  # unparseable -> dropped
+                    "2021-01-02T00:00:00Z",
+                ],
+                "latitude": [48.0, 48.1, 48.2, 48.3],
+                "longitude": [-125.0, -125.1, -125.2, -125.3],
+            }
+        )
         out = prepare_trajectory_points_dataframe(df)
         assert len(out) == 2
         # first-wins on the duplicate timestamp
@@ -624,14 +661,16 @@ class TestPrepareTrajectoryPointsDataframe:
         assert (out["trajectory_id"] == "").sum() == 1
 
     def test_empty_profile_id_becomes_null(self):
-        df = pd.DataFrame({
-            "erddap_url": [ERDDAP_URL],
-            "dataset_id": [DATASET_ID],
-            "trajectory_id": ["m1"],
-            "profile_id": [""],
-            "time": ["2021-01-01T00:00:00Z"],
-            "latitude": [48.0],
-            "longitude": [-125.0],
-        })
+        df = pd.DataFrame(
+            {
+                "erddap_url": [ERDDAP_URL],
+                "dataset_id": [DATASET_ID],
+                "trajectory_id": ["m1"],
+                "profile_id": [""],
+                "time": ["2021-01-01T00:00:00Z"],
+                "latitude": [48.0],
+                "longitude": [-125.0],
+            }
+        )
         out = prepare_trajectory_points_dataframe(df)
         assert out["profile_id"].isna().all()

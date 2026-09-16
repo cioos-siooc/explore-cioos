@@ -5,13 +5,13 @@ description = "CIOOS Explorer ERDDAP/OBIS downloader."
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
+    # The reason-code vocabulary, the issue grouping and the retry session. This
+    # used to be reached through `harvester`, which meant a download image
+    # installed Prefect, redis and pandera to import two error-code constants
+    # and an ERDDAP /info/ parse.
+    "cde-python-common",
     "duckdb>=1.1.0",
     "erddapy>=2.2.4",
-    # download_erddap imports cde_harvester at module scope, so this is a
-    # runtime dependency. It was declared only in the dev group and happened to
-    # resolve because download_scheduler also depends on harvester; a
-    # downloader-only install (`uv sync --no-dev`) failed on import.
-    "harvester",
     "loguru>=0.7.3",
     "numpy<2.0.0",
     "pandas<2.0.0",
@@ -24,7 +24,7 @@ dependencies = [
 packages = ["erddap_downloader"]
 
 [tool.uv.sources]
-harvester = { path = "../harvester", editable = true }
+cde-python-common = { path = "../python-common", editable = true }
 
 
 [build-system]

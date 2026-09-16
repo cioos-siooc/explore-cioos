@@ -7,43 +7,22 @@ import diskcache as dc
 import pandas as pd
 import requests
 from prefect import get_run_logger, task
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+
+from cde_common.http import retry_session
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
 
-# Transient statuses worth retrying (CKAN's Cloudflare/Caddy returns these intermittently).
-_RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
-
-
-def _build_ckan_session() -> requests.Session:
-    session = requests.Session()
-    retry = Retry(
-        total=4,
-        backoff_factor=1.0,         # waits 0s, 2s, 4s, 8s between attempts
-        status_forcelist=_RETRY_STATUSES,
-        allowed_methods=frozenset(["GET"]),
-        raise_on_status=False,      # let raise_for_status() give a clean error
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
-
 
 def _ckan_get_result(session, url):
     """GET a CKAN action endpoint and return its `result` (clear error on non-JSON)."""
-    resp = session.get(url, timeout=120)
+    resp = session.get(url, timeout=120)  # a 1000-row package_search page is slow
     resp.raise_for_status()
     try:
         payload = resp.json()
     except requests.exceptions.JSONDecodeError as e:
         snippet = resp.text[:200].replace("\n", " ").strip()
-        raise RuntimeError(
-            f"CKAN returned a non-JSON body (HTTP {resp.status_code}) for {url}: {snippet!r}"
-        ) from e
+        raise RuntimeError(f"CKAN returned a non-JSON body (HTTP {resp.status_code}) for {url}: {snippet!r}") from e
     return payload["result"]
 
 
@@ -174,6 +153,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
         logger = get_run_logger()
     except Exception:
         import logging as _logging
+
         logger = _logging.getLogger(__name__)
     logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
@@ -182,11 +162,10 @@ def list_ckan_records_with_erddap_urls(cache_requests):
     # 1000 records per query (or as defined on the server)
     records_remaining = 1
     records_total = []
-    session = _build_ckan_session()
+    session = retry_session()
     while records_remaining:
         erddap_datasets_query = (
-            CKAN_API_URL
-            + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
+            CKAN_API_URL + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
         )
         logger.info(erddap_datasets_query)
         # print(erddap_datasets_query)

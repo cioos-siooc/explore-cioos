@@ -1,12 +1,13 @@
-"""Sentry init and logging helpers shared by the harvest and loading sides."""
+"""Harvest-side logging helpers.
+
+Sentry's init lives in :mod:`cde_common.observability` — every service needs it,
+and reaching it here meant installing the harvester.
+"""
 
 import logging
 import os
 import time
 from datetime import datetime, timezone
-
-import sentry_sdk
-from sentry_sdk.integrations.logging import LoggingIntegration
 
 try:
     from prefect import get_run_logger
@@ -14,28 +15,6 @@ except Exception:
     get_run_logger = None
 
 _root_logger = logging.getLogger()
-
-
-def init_sentry():
-    """Identical Sentry setup previously inlined in both package __main__ modules.
-
-    Log records become breadcrumbs only (``event_level=None``). Sending every
-    WARNING as its own event meant an alert per dataset per run, grouped by log
-    message so all servers collapsed together. Dataset failures now arrive via
-    ``core.issues.report_issues``, grouped by the error the server actually
-    returned and de-duped by Sentry; unhandled exceptions are still captured by
-    Sentry's default integrations.
-    """
-    sentry_sdk.init(
-        dsn=os.environ.get("SENTRY_DSN"),
-        integrations=[
-            LoggingIntegration(
-                level=logging.INFO,  # Capture info and above as breadcrumbs
-                event_level=None,  # Don't turn log records into events
-            ),
-        ],
-        environment=os.environ.get("ENVIRONMENT", "development"),
-    )
 
 
 def run_logger(fallback=None):
@@ -69,14 +48,10 @@ def cleanup_old_logs(log_dir, days=30):
                     removed_count += 1
                     _root_logger.info(f"Removed old log file: {filename}")
                 except OSError as e:
-                    _root_logger.warning(
-                        f"Warning: Failed to remove old log file {filename}: {e}"
-                    )
+                    _root_logger.warning(f"Warning: Failed to remove old log file {filename}: {e}")
 
     if removed_count > 0:
-        _root_logger.info(
-            f"Cleaned up {removed_count} log file(s) older than {days} days"
-        )
+        _root_logger.info(f"Cleaned up {removed_count} log file(s) older than {days} days")
 
 
 def setup_logging(log_time, log_level, log_dir=None):
@@ -90,10 +65,7 @@ def setup_logging(log_time, log_level, log_dir=None):
     logger.handlers.clear()
 
     # Define log format
-    log_format = (
-        ("%(asctime)s - " if log_time else "")
-        + "%(levelname)-8s - %(name)s : %(message)s"
-    )
+    log_format = ("%(asctime)s - " if log_time else "") + "%(levelname)-8s - %(name)s : %(message)s"
 
     # Add console handler
     c_handler = logging.StreamHandler()
@@ -110,9 +82,7 @@ def setup_logging(log_time, log_level, log_dir=None):
 
         f_handler = logging.FileHandler(log_file)
         f_handler.setLevel(logging.getLevelName(log_level.upper()))
-        f_format = logging.Formatter(
-            "%(asctime)s - %(levelname)-8s - %(name)s : %(message)s"
-        )
+        f_format = logging.Formatter("%(asctime)s - %(levelname)-8s - %(name)s : %(message)s")
         f_handler.setFormatter(f_format)
         logger.addHandler(f_handler)
         logger.info(f"Logging to file: {log_file}")

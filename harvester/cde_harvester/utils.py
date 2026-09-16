@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import xml.etree.ElementTree as ET
+from itertools import chain
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -52,15 +53,13 @@ standard_name_to_eovs = get_standard_name_to_eovs(eov_to_standard_name)
 
 
 def intersection(lst1, lst2):
-    """
-    intersection doesnt include nulls
-    """
-    lst3 = [value for value in lst1 if value in lst2 and value != ""]
-    return lst3
+    """Values of lst1 that also appear in lst2, in lst1's order, blanks dropped.
 
-
-def flatten(t):
-    return [item for sublist in t for item in sublist]
+    lst2 is hashed first: both callers pass CF standard-name lists and run this
+    once per EOV per dataset, so the membership test has to be O(1).
+    """
+    haystack = set(lst2)
+    return [value for value in lst1 if value in haystack and value != ""]
 
 
 CF_STANDARD_NAMES_CSV = Path(__file__).parent / "data" / "cf_standard_names.csv"
@@ -100,13 +99,15 @@ def check_cf_version():
 
 
 def get_cf_names():
+    """The CF standard names, as a frozenset — every caller only asks "is this
+    name in there?", over 5.6k entries, once per variable per dataset."""
     if not CF_STANDARD_NAMES_CSV.exists():
         raise FileNotFoundError(
             f"CF standard names cache not found at {CF_STANDARD_NAMES_CSV}. "
             "Run 'python -m cde_harvester.utils' to download it."
         )
     logger.info("Loading CF standard names from %s", CF_STANDARD_NAMES_CSV)
-    return pd.read_csv(CF_STANDARD_NAMES_CSV)["id"].unique()
+    return frozenset(pd.read_csv(CF_STANDARD_NAMES_CSV)["id"].unique().tolist())
 
 
 cf_standard_names = get_cf_names()
@@ -137,5 +138,6 @@ if __name__ == "__main__":
     CF_STANDARD_NAMES_VERSION_FILE.write_text(version)
     logger.info("Saved %d CF standard names (version %s) to %s", len(names), version, CF_STANDARD_NAMES_CSV)
 
-# list of standard names that are supported by CDE
-supported_standard_names = flatten(eov_to_standard_name.values())
+# list of standard names that are supported by CDE. Stays a list: __main__
+# concatenates it with IGNORED_STANDARD_NAMES using `+`.
+supported_standard_names = list(chain.from_iterable(eov_to_standard_name.values()))

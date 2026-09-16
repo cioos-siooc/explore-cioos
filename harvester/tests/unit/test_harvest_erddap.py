@@ -9,11 +9,6 @@ harvest_erddap is a Prefect @task; .fn() bypasses the task wrapper.
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-from cde_harvester.core.errors import (
-    CDM_DATA_TYPE_UNSUPPORTED,
-    HTTP_ERROR,
-)
-from cde_harvester.sources.erddap.harvester import harvest_erddap
 from conftest import (
     DATASET_ID,
     ERDDAP_INFO_NO_EOVS_CSV,
@@ -21,9 +16,16 @@ from conftest import (
     build_mock_dataset,
 )
 
+from cde_common.errors import (
+    CDM_DATA_TYPE_UNSUPPORTED,
+    HTTP_ERROR,
+)
+from cde_harvester.sources.erddap.harvester import harvest_erddap
+
 # ---------------------------------------------------------------------------
 # Fixture helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_erddap_mock(datasets: list[tuple], domain: str = "test.erddap.com"):
     """
@@ -48,20 +50,22 @@ def _make_erddap_mock(datasets: list[tuple], domain: str = "test.erddap.com"):
 
 
 def _make_profiles_df():
-    return pd.DataFrame({
-        "timeseries_id": ["STATION_001"],
-        "latitude": [48.5],
-        "longitude": [-125.0],
-        "time_min": [pd.Timestamp("2020-01-01", tz="UTC")],
-        "time_max": [pd.Timestamp("2023-12-31", tz="UTC")],
-        "depth_min": [0.5],
-        "depth_max": [200.5],
-        "n_records": [1000.0],
-        "records_per_day": [0.75],
-        "dataset_id": [DATASET_ID],
-        "erddap_url": [ERDDAP_URL],
-        "profile_id": [""],
-    })
+    return pd.DataFrame(
+        {
+            "timeseries_id": ["STATION_001"],
+            "latitude": [48.5],
+            "longitude": [-125.0],
+            "time_min": [pd.Timestamp("2020-01-01", tz="UTC")],
+            "time_max": [pd.Timestamp("2023-12-31", tz="UTC")],
+            "depth_min": [0.5],
+            "depth_max": [200.5],
+            "n_records": [1000.0],
+            "records_per_day": [0.75],
+            "dataset_id": [DATASET_ID],
+            "erddap_url": [ERDDAP_URL],
+            "profile_id": [""],
+        }
+    )
 
 
 def _run_harvest(erddap_mock, dataset_mock=None, limit=None):
@@ -98,10 +102,12 @@ class TestHarvestErddapHappyPath:
         assert DATASET_ID in result.datasets["dataset_id"].values
 
     def test_dataset_id_filter_respected(self):
-        erddap_mock = _make_erddap_mock([
-            (DATASET_ID, "TimeSeries"),
-            ("other_dataset", "TimeSeries"),
-        ])
+        erddap_mock = _make_erddap_mock(
+            [
+                (DATASET_ID, "TimeSeries"),
+                ("other_dataset", "TimeSeries"),
+            ]
+        )
         result = _run_harvest(erddap_mock, limit=[DATASET_ID])
         assert DATASET_ID in result.datasets["dataset_id"].values
         assert "other_dataset" not in result.datasets["dataset_id"].values
@@ -124,14 +130,13 @@ class TestHarvestErddapSkipping:
 
     def test_http_error_adds_to_skipped(self):
         import requests
+
         erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])
 
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.reason = "Internal Server Error"
-        erddap_mock.get_dataset.side_effect = requests.exceptions.HTTPError(
-            response=mock_response
-        )
+        erddap_mock.get_dataset.side_effect = requests.exceptions.HTTPError(response=mock_response)
 
         with (
             patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
@@ -146,18 +151,16 @@ class TestHarvestErddapSkipping:
         The attempt row must carry ERDDAP's own complaint so issues group by what
         actually went wrong rather than by 'HTTP 500'."""
         import requests
+
         erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])
 
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.reason = "Internal Server Error"
         mock_response.text = (
-            'Error {\n  code=500;\n  message="Query error: '
-            'Unrecognized constraint variable=&quot;salinity&quot;";\n}'
+            'Error {\n  code=500;\n  message="Query error: Unrecognized constraint variable=&quot;salinity&quot;";\n}'
         )
-        erddap_mock.get_dataset.side_effect = requests.exceptions.HTTPError(
-            response=mock_response
-        )
+        erddap_mock.get_dataset.side_effect = requests.exceptions.HTTPError(response=mock_response)
 
         with (
             patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),

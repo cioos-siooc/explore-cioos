@@ -24,7 +24,7 @@ To run the scheduler outside of Docker:
    pip install -e .
    ```
 
-   This will create a local `.venv` directory and install all dependencies including the downloader and harvester packages.
+   This will create a local `.venv` directory and install all dependencies including the `downloader` and `cde-python-common` packages. It no longer installs the harvester — see `python-common/README.md`.
 
 3. Run the scheduler:
 
@@ -39,7 +39,8 @@ To run the scheduler outside of Docker:
 
 The scheduler uses these environment variables from `.env`:
 
-- `DB_HOST`: Database hostname (use `localhost` when running outside Docker)
+- `DB_HOST`: Database hostname (use `localhost` when running outside Docker).
+  `DB_HOST_EXTERNAL` is checked first and wins if set — see `python-common/README.md`.
 - `DB_NAME`: Database name
 - `DB_USER`: Database username
 - `DB_PASSWORD`: Database password

@@ -64,9 +64,7 @@ def _eovs_per_feature(profile_count, eov_variables, dataset_eovs):
     selection.
     """
     if not eov_variables:
-        return pd.Series(
-            [list(dataset_eovs)] * len(profile_count), index=profile_count.index
-        )
+        return pd.Series([list(dataset_eovs)] * len(profile_count), index=profile_count.index)
 
     per_feature = []
     for _, counts in profile_count.iterrows():
@@ -186,7 +184,10 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
         logger.warning(
             "Skipping per-feature day count: ~%d rows (%d features x %d days) "
             "exceeds the %d cap; falling back to the time span",
-            estimated_rows, len(profiles), span_days, MAX_DAY_COUNT_ROWS,
+            estimated_rows,
+            len(profiles),
+            span_days,
+            MAX_DAY_COUNT_ROWS,
         )
         return None
 
@@ -197,9 +198,7 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
         return None
 
     request_vars = group_vars + ["time", counted]
-    url = ",".join(request_vars) + requests.utils.quote(
-        f'&orderByCount("{day_bucket_group(group_vars)}")'
-    )
+    url = ",".join(request_vars) + requests.utils.quote(f'&orderByCount("{day_bucket_group(group_vars)}")')
     try:
         df_days = dataset.dataset_tabledap_query(url)
     except (HTTPError, ResponseTooLargeError):
@@ -242,9 +241,7 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
     # error to notice. Comparing as strings is also what makes a grouping that
     # lost a level (time dropped above) fail loudly here instead.
     if day_sets.index.nlevels != profiles.index.nlevels:
-        logger.warning(
-            "Day-set grouping does not match the feature identity; using the time span"
-        )
+        logger.warning("Day-set grouping does not match the feature identity; using the time span")
         return None
 
     day_sets = day_sets.reindex(_string_key(profiles.index))
@@ -255,12 +252,11 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
     if not matched.all():
         logger.info(
             "Day sets found for %d of %d features; the rest use the time span",
-            int(matched.sum()), len(day_sets),
+            int(matched.sum()),
+            len(day_sets),
         )
     day_sets.index = profiles.index
-    day_sets["day_ranges"] = day_sets["day_ranges"].apply(
-        lambda runs: runs if isinstance(runs, list) else []
-    )
+    day_sets["day_ranges"] = day_sets["day_ranges"].apply(lambda runs: runs if isinstance(runs, list) else [])
     return day_sets
 
 
@@ -291,9 +287,7 @@ def extract_features(dataset, handler):
         "altitude",
         "time",
     ]
-    llat_variables_in_dataset = [
-        x for x in llat_variables if x in dataset.variables_list
-    ]
+    llat_variables_in_dataset = [x for x in llat_variables if x in dataset.variables_list]
 
     profiles_with_lat_lon = dataset.get_profile_ids()
 
@@ -317,11 +311,12 @@ def extract_features(dataset, handler):
 
     # Type-specific identity reshaping (e.g. TimeSeriesProfile's collapse to
     # timeseries when there are too many profiles per timeseries).
-    profiles_with_lat_lon, profile_variables, profile_variable_list = (
-        handler.adjust_feature_identity(
-            dataset, profiles_with_lat_lon, profiles, profile_variables,
-            profile_variable_list,
-        )
+    profiles_with_lat_lon, profile_variables, profile_variable_list = handler.adjust_feature_identity(
+        dataset,
+        profiles_with_lat_lon,
+        profiles,
+        profile_variables,
+        profile_variable_list,
     )
 
     if "profile_id" in profile_variables:
@@ -383,23 +378,21 @@ def extract_features(dataset, handler):
 
     classified = profiles_with_lat_lon.apply(
         lambda r: classify_profile_location(
-            r["latitude_min"], r["latitude_max"],
-            r["longitude_min"], r["longitude_max"],
+            r["latitude_min"],
+            r["latitude_max"],
+            r["longitude_min"],
+            r["longitude_max"],
         ),
         axis="columns",
         result_type="expand",
     )
     profiles_with_lat_lon[["latitude", "longitude", "show_as_point"]] = classified
     # Drop features whose box had null coordinates (classify returns nan point).
-    profiles_with_lat_lon = profiles_with_lat_lon.dropna(
-        subset=["latitude", "longitude"]
-    )
+    profiles_with_lat_lon = profiles_with_lat_lon.dropna(subset=["latitude", "longitude"])
     # result_type="expand" leaves these object-typed; the DB columns are
     # double precision / boolean. lat/lon are re-coerced below with the rest,
     # but the bool has no later coercion, so fix it here.
-    profiles_with_lat_lon["show_as_point"] = profiles_with_lat_lon[
-        "show_as_point"
-    ].astype(bool)
+    profiles_with_lat_lon["show_as_point"] = profiles_with_lat_lon["show_as_point"].astype(bool)
 
     profiles = profiles_with_lat_lon
 
@@ -414,9 +407,7 @@ def extract_features(dataset, handler):
         count_variables.append("depth")
 
     # Retrieve Count value per profile
-    profiles = profiles.query(
-        "(not time_min.isnull()) and not (time_max.isnull())"
-    ).copy()
+    profiles = profiles.query("(not time_min.isnull()) and not (time_max.isnull())").copy()
 
     time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
     time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
@@ -448,21 +439,15 @@ def extract_features(dataset, handler):
         # the original request and fall back to the dataset's EOVs.
         logger.warning("Count including EOV variables failed, retrying without them")
         eov_variables = {}
-        profile_count = dataset.get_count(
-            count_variables, profile_variable_list, time_min, time_max
-        )
+        profile_count = dataset.get_count(count_variables, profile_variable_list, time_min, time_max)
 
     if not profile_count.empty:
         profile_count = profile_count.set_index(profile_variable_list)
         # n_records counts records, not variables: it has to keep ranging over
         # the same columns it did before the EOV columns joined the request.
-        n_records_columns = [
-            column for column in count_variables if column in profile_count.columns
-        ]
+        n_records_columns = [column for column in count_variables if column in profile_count.columns]
         profiles["n_records"] = profile_count[n_records_columns].max(axis="columns")
-        profiles["eovs"] = _eovs_per_feature(
-            profile_count, eov_variables, dataset.eovs
-        )
+        profiles["eovs"] = _eovs_per_feature(profile_count, eov_variables, dataset.eovs)
     if "n_records" not in profiles:
         profiles["n_records"] = None
     if "eovs" not in profiles:
@@ -489,9 +474,7 @@ def extract_features(dataset, handler):
     # Rename cf_role variables as cf_role and drop from index.
     # Eg rename 'station_id' to 'timeseries_id'
     # del profiles["STN_ID"]
-    profiles.rename(
-        columns={value: key for key, value in profile_variables.items()}, inplace=True
-    )
+    profiles.rename(columns={value: key for key, value in profile_variables.items()}, inplace=True)
 
     # Convert time variables and add dataset_id so the records can be linked to dataset in the DB
     profiles["time_min"] = ERDDAP.parse_erddap_dates(profiles["time_min"])
@@ -526,9 +509,7 @@ def extract_features(dataset, handler):
 
     cols_to_convert = ["latitude", "longitude"]
 
-    profiles[cols_to_convert] = profiles[cols_to_convert].apply(
-        pd.to_numeric, errors="coerce"
-    )
+    profiles[cols_to_convert] = profiles[cols_to_convert].apply(pd.to_numeric, errors="coerce")
     # records_per_day is a rate over days that HAVE data, so the denominator is
     # the day set where we harvested one and the elapsed span only where we
     # didn't. The distinction matters: a seasonal station sampled ~430 days
@@ -571,9 +552,7 @@ def extract_features(dataset, handler):
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
-        logger.warn(
-            "These profiles with bad lat/long/depth/time values will be removed:"
-        )
+        logger.warn("These profiles with bad lat/long/depth/time values will be removed:")
         # TODO this could use record_id if it existed
         logger.warn(set(profiles_bad_geom["profile_id"].to_list()))
         logger.warn(set(profiles_bad_geom["timeseries_id"].to_list()))

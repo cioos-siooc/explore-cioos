@@ -12,9 +12,9 @@ Two real bugs are pinned here:
      time, so OBIS would silently stop being harvested.
 """
 
-
 import pytest
 import yaml
+
 from cde_harvester import prefect_pipeline
 from cde_harvester.prefect_pipeline import PrefectCDEPipeline, _configured_sources
 
@@ -40,6 +40,7 @@ def config_file(tmp_path, monkeypatch):
         f = tmp_path / "harvest_config.yaml"
         f.write_text(yaml.safe_dump(config))
         return str(f)
+
     return _write
 
 
@@ -47,10 +48,13 @@ def config_file(tmp_path, monkeypatch):
 # _configured_sources
 # ---------------------------------------------------------------------------
 
+
 class TestConfiguredSources:
     def test_includes_obis_under_discovery_with_no_ids(self):
         sources = _configured_sources(
-            "https://a.example/erddap", [], {"enabled": True, "nodes": [NODE_A]},
+            "https://a.example/erddap",
+            [],
+            {"enabled": True, "nodes": [NODE_A]},
         )
         assert sources == ["https://a.example/erddap", "obis"]
 
@@ -58,18 +62,17 @@ class TestConfiguredSources:
         assert _configured_sources("", ["some-uuid"], None) == ["obis"]
 
     def test_excludes_obis_when_off(self):
-        assert _configured_sources("https://a.example/erddap", [], None) == [
-            "https://a.example/erddap"
-        ]
+        assert _configured_sources("https://a.example/erddap", [], None) == ["https://a.example/erddap"]
 
     def test_excludes_obis_when_discovery_disabled(self):
         assert _configured_sources("", [], {"enabled": False, "nodes": [NODE_A]}) == []
 
     def test_accepts_a_list_of_urls(self):
         # cde_harvest_all_run passes the raw YAML list, create_deployment a string.
-        assert _configured_sources(
-            ["https://a.example/erddap", " https://b.example/erddap "], [], None
-        ) == ["https://a.example/erddap", "https://b.example/erddap"]
+        assert _configured_sources(["https://a.example/erddap", " https://b.example/erddap "], [], None) == [
+            "https://a.example/erddap",
+            "https://b.example/erddap",
+        ]
 
     def test_empty_when_nothing_configured(self):
         assert _configured_sources("", [], None) == []
@@ -78,6 +81,7 @@ class TestConfiguredSources:
 # ---------------------------------------------------------------------------
 # init_config
 # ---------------------------------------------------------------------------
+
 
 class TestInitConfig:
     def test_discovery_config_leaves_dataset_ids_empty(self, config_file):
@@ -90,6 +94,7 @@ class TestInitConfig:
     def test_makes_no_network_calls(self, config_file, monkeypatch):
         """init_config also runs at deployment-registration time, so a network
         call here would make container startup depend on api.obis.org."""
+
         def explode(*args, **kwargs):
             raise AssertionError("init_config must not make network calls")
 
@@ -102,8 +107,7 @@ class TestInitConfig:
 
     def test_typo_in_discovery_block_fails_at_registration(self, config_file):
         """A malformed OBIS block must fail here, not at the first harvest."""
-        bad = dict(DISCOVERY_CONFIG,
-                   obis_discovery={"enabled": True, "nodes": [NODE_A], "min_dataset": 5})
+        bad = dict(DISCOVERY_CONFIG, obis_discovery={"enabled": True, "nodes": [NODE_A], "min_dataset": 5})
         with pytest.raises(ValueError, match="Unknown obis_discovery key"):
             PrefectCDEPipeline().init_config(config_file(bad))
 
@@ -116,10 +120,14 @@ class TestInitConfig:
         ids_file = tmp_path / "Obis_Datasets.json"
         ids_file.write_text('{"datasets": ["uuid-one", "uuid-two"]}')
         p = PrefectCDEPipeline()
-        p.init_config(config_file({
-            "erddap_urls": [],
-            "obis_datasets_file": str(ids_file),
-        }))
+        p.init_config(
+            config_file(
+                {
+                    "erddap_urls": [],
+                    "obis_datasets_file": str(ids_file),
+                }
+            )
+        )
         assert p.obis_dataset_ids == ["uuid-one", "uuid-two"]
         assert p.obis_discovery is None
 
@@ -128,10 +136,9 @@ class TestInitConfig:
 # cde_pipeline -> harvester_main
 # ---------------------------------------------------------------------------
 
+
 class TestCdePipelineWiring:
-    def test_cde_pipeline_passes_obis_geo_filter_and_discovery(
-        self, config_file, tmp_path, monkeypatch
-    ):
+    def test_cde_pipeline_passes_obis_geo_filter_and_discovery(self, config_file, tmp_path, monkeypatch):
         captured = {}
 
         def fake_harvester_main(**kwargs):
@@ -148,7 +155,8 @@ class TestCdePipelineWiring:
 
         # The bug: neither of these was ever passed.
         assert captured["obis_geo_filter"] == {
-            "mode": "canada", "exempt_node_ids": [NODE_A, NODE_B],
+            "mode": "canada",
+            "exempt_node_ids": [NODE_A, NODE_B],
         }
         assert captured["obis_discovery"]["enabled"] is True
         assert captured["obis_dataset_ids"] == []
@@ -157,6 +165,7 @@ class TestCdePipelineWiring:
 # ---------------------------------------------------------------------------
 # cde_harvest_all_run fan-out
 # ---------------------------------------------------------------------------
+
 
 class TestFanOut:
     def test_obis_in_fanout_under_discovery(self, config_file, monkeypatch):
@@ -167,16 +176,19 @@ class TestFanOut:
                 self.source = source
 
             def result(self):
-                return {"source": self.source, "deployment": "d", "state": "COMPLETED",
-                        "completed": True, "flow_run_id": "x"}
+                return {
+                    "source": self.source,
+                    "deployment": "d",
+                    "state": "COMPLETED",
+                    "completed": True,
+                    "flow_run_id": "x",
+                }
 
         def fake_submit(src, triggered_by):
             triggered.append(src)
             return FakeFuture(src)
 
-        monkeypatch.setattr(
-            prefect_pipeline._trigger_source_harvest, "submit", fake_submit, raising=False
-        )
+        monkeypatch.setattr(prefect_pipeline._trigger_source_harvest, "submit", fake_submit, raising=False)
         prefect_pipeline.cde_harvest_all_run.fn(config_file(DISCOVERY_CONFIG))
         assert triggered == ["https://data.cioospacific.ca/erddap", "obis"]
 

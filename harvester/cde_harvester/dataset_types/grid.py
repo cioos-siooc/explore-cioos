@@ -3,7 +3,7 @@
 Griddap datasets are harvested METADATA-ONLY: no per-feature rows are
 produced. ``feature_kind = "dataset_extent"`` is routed to no feature table by
 the harvester — the grid's extent, structure and variable list are set on the
-Dataset object here and flow into datasets.csv via ``Dataset.get_df()``
+Dataset object here and flow into the datasets table via ``Dataset.get_df()``
 (coverage_*, grid_variables, grid_dimensions columns on cde.datasets).
 
 The one-row frame returned by ``extract_features`` only signals "extent
@@ -108,11 +108,7 @@ def _extract_dimensions(dataset):
         name = row["Variable Name"]
         value = row["Value"]
         n_values, even_spacing, spacing = _parse_dimension_attrs(value)
-        var_meta = (
-            dataset.df_variables.loc[name]
-            if name in dataset.df_variables.index
-            else {}
-        )
+        var_meta = dataset.df_variables.loc[name] if name in dataset.df_variables.index else {}
         bounds = _actual_range(dataset, name) or (None, None)
         is_time = name == "time" or var_meta.get("standard_name") == "time"
         if is_time:
@@ -140,9 +136,7 @@ def _extract_variables(dataset):
     letting the frontend default the WMS overlay to the first EOV-related
     variable."""
     df_info = dataset.df_info
-    names = (
-        df_info.query('`Row Type` == "variable"')["Variable Name"].unique().tolist()
-    )
+    names = df_info.query('`Row Type` == "variable"')["Variable Name"].unique().tolist()
     # Shares the extraction with datasets.table_variables but NOT its shape:
     # GriddapDetails.jsx and wmsUtilities.js read these five keys, so the extra
     # attributes table_variables carries are projected away rather than widening
@@ -203,12 +197,12 @@ def extract_grid_extent(dataset):
     dataset.grid_variables = _extract_variables(dataset)
 
     time_dim = next((d for d in dimensions if d["name"] == "time"), None)
-    dataset.coverage_time_min = (
-        time_dim and time_dim["min"]
-    ) or _erddap_time_to_iso(dataset.globals.get("time_coverage_start"))
-    dataset.coverage_time_max = (
-        time_dim and time_dim["max"]
-    ) or _erddap_time_to_iso(dataset.globals.get("time_coverage_end"))
+    dataset.coverage_time_min = (time_dim and time_dim["min"]) or _erddap_time_to_iso(
+        dataset.globals.get("time_coverage_start")
+    )
+    dataset.coverage_time_max = (time_dim and time_dim["max"]) or _erddap_time_to_iso(
+        dataset.globals.get("time_coverage_end")
+    )
 
     depth_min, depth_max = _vertical_extent(dataset, dimensions)
     dataset.coverage_depth_min = depth_min
@@ -216,9 +210,7 @@ def extract_grid_extent(dataset):
 
     # Marker row: non-empty = extent resolved (passes the shared
     # NO_PROFILES_FOUND check); the row itself is never persisted.
-    return pd.DataFrame(
-        [{"erddap_url": dataset.erddap_url, "dataset_id": dataset.id}]
-    )
+    return pd.DataFrame([{"erddap_url": dataset.erddap_url, "dataset_id": dataset.id}])
 
 
 class GridHandler(DatasetTypeHandler):

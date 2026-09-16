@@ -49,13 +49,13 @@ fi
 
 # --- Database pre-flight -----------------------------------------------------
 # Every flow builds its connection from DB_NAME/DB_USER/DB_PASSWORD via
-# cde_harvester/core/db.py. Coolify supplies NONE of these automatically (see
+# cde_common/db.py (see python-common/README.md). Coolify supplies NONE of these automatically (see
 # .env.coolify.sample), and without them the worker still starts and registers
 # deployments happily — then every single flow run dies at connection time. On the
 # "Rebuild Database" flow that surfaces as "DB_NAME is not set", which reads like a
 # code bug rather than missing deployment config. Fail here instead, naming exactly
 # what is absent, the same way the harvest-config check above does.
-MISSING_DB="$(uv run python -m cde_harvester.core.db --print-missing 2>/dev/null || true)"
+MISSING_DB="$(uv run python -m cde_common.db --print-missing 2>/dev/null || true)"
 if [ -n "${MISSING_DB}" ]; then
   echo "[worker-entrypoint] ERROR: missing database settings: ${MISSING_DB}" >&2
   echo "[worker-entrypoint] Every harvest and the Rebuild Database flow need these to" >&2
@@ -92,7 +92,7 @@ if [ "${REGISTER_DEPLOYMENTS:-true}" = "true" ]; then
       ;;
     true|once)
       # Run only on a fresh install: an empty (or not-yet-created) cde.datasets.
-      if uv run python -m cde_harvester.core.db; then
+      if uv run python -m cde_common.db; then
         SHOULD_HARVEST=true
         echo "[worker-entrypoint] RUN_ON_DEPLOY=${RUN_ON_DEPLOY_MODE} and database is empty -> triggering initial harvest fan-out"
       else

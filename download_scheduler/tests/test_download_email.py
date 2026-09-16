@@ -76,10 +76,7 @@ def test_erddap_dataset_cited_with_info_page(sent):
     ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset()), "en")
 
     body = sent[0][1]
-    assert (
-        "ERDDAP: https://data.cioospacific.ca/erddap/info/IOS_CTD_Profiles/index.html"
-        in body
-    )
+    assert "ERDDAP: https://data.cioospacific.ca/erddap/info/IOS_CTD_Profiles/index.html" in body
 
 
 def test_obis_dataset_cited_with_obis_dataset_page(sent):
@@ -93,9 +90,7 @@ def test_obis_dataset_cited_with_obis_dataset_page(sent):
 
 
 def test_ckan_url_included_when_dataset_has_ckan_id(sent):
-    ds.email_user(
-        "a@b.ca", "completed", "z.zip", _report(_erddap_dataset(ckan_id="ckan-99")), "en"
-    )
+    ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset(ckan_id="ckan-99")), "en")
 
     body = sent[0][1]
     assert "CKAN: https://catalogue.cioos.ca/dataset/ckan-99" in body
@@ -141,9 +136,7 @@ def test_omitted_dataset_is_listed_with_reason_and_not_cited(sent, status, reaso
 
 @pytest.mark.parametrize("status", ["COMPLETED", "PARTIAL"])
 def test_included_statuses_are_cited_not_listed_as_omitted(sent, status):
-    ds.email_user(
-        "a@b.ca", "completed", "z.zip", _report(_erddap_dataset(status=status)), "en"
-    )
+    ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset(status=status)), "en")
 
     body = sent[0][1]
     assert "/info/IOS_CTD_Profiles/index.html" in body
@@ -151,9 +144,7 @@ def test_included_statuses_are_cited_not_listed_as_omitted(sent, status):
 
 
 def test_unknown_status_falls_back_to_generic_reason(sent):
-    ds.email_user(
-        "a@b.ca", "completed", "z.zip", _report(_erddap_dataset("Odd", status="WEIRD")), "en"
-    )
+    ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset("Odd", status="WEIRD")), "en")
 
     assert "- Odd — could not be included." in sent[0][1]
 
@@ -170,9 +161,7 @@ def test_over_limit_uses_completed_template_but_over_limit_subject(sent):
     assert "cut off to return less data" in body
     # the zip still exists and must still be linked
     assert f"{WAF_URL}/z.zip" in body
-    assert subject.startswith(
-        "Your CIOOS Data Explorer data query completed but found too much data."
-    )
+    assert subject.startswith("Your CIOOS Data Explorer data query completed but found too much data.")
 
 
 def test_english_first_puts_english_subject_and_body_first(sent):

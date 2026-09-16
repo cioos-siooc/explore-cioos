@@ -4,12 +4,13 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
+from conftest import ERDDAP_URL, build_info_df, build_variables_df
+
 from cde_harvester.dataset_types.grid import (
     GridHandler,
     extract_grid_extent,
     normalize_lon_extent,
 )
-from conftest import ERDDAP_URL, build_info_df, build_variables_df
 
 # Modeled on erddap.ogsl.ca/erddap/info/mpoChloroSatellitesAqua/index.csv —
 # the exact CSV shape ERDDAP emits for a griddap dataset (dimension rows carry
@@ -83,9 +84,9 @@ def build_grid_dataset(info_csv=GRID_INFO_CSV):
     dataset.logger = logging.getLogger("test.grid_dataset")
     dataset.df_info = build_info_df(info_csv)
     dataset.df_variables = build_variables_df(info_csv)
-    global_rows = dataset.df_info.query('`Variable Name`=="NC_GLOBAL"')[
-        ["Attribute Name", "Value"]
-    ].set_index("Attribute Name")
+    global_rows = dataset.df_info.query('`Variable Name`=="NC_GLOBAL"')[["Attribute Name", "Value"]].set_index(
+        "Attribute Name"
+    )
     dataset.globals = global_rows["Value"].to_dict()
     return dataset
 
@@ -173,7 +174,8 @@ class TestExtractGridExtent:
         assert dataset.coverage_time_min is None
         assert dataset.coverage_time_max is None
         assert [d["name"] for d in dataset.grid_dimensions] == [
-            "latitude", "longitude",
+            "latitude",
+            "longitude",
         ]
 
     def test_no_extent_returns_empty_frame(self):

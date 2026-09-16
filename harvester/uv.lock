@@ -157,6 +157,30 @@ wheels = [
 ]
 
 [[package]]
+name = "cde-python-common"
+version = "0.1.0"
+source = { editable = "../python-common" }
+dependencies = [
+    { name = "psycopg2-binary" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "sentry-sdk" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "psycopg2-binary", specifier = ">=2.9.10" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "requests", specifier = ">=2.31.0" },
+    { name = "sentry-sdk", specifier = ">=2.38.0" },
+    { name = "sqlalchemy", specifier = ">=2.0.0,<3.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.3" }]
+
+[[package]]
 name = "certifi"
 version = "2025.8.3"
 source = { registry = "https://pypi.org/simple" }
@@ -550,6 +574,7 @@ name = "harvester"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cde-python-common" },
     { name = "diskcache" },
     { name = "duckdb" },
     { name = "erddapy" },
@@ -559,8 +584,6 @@ dependencies = [
     { name = "pandera" },
     { name = "prefect" },
     { name = "prefect-docker" },
-    { name = "psycopg2-binary" },
-    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "redis" },
     { name = "requests" },
@@ -578,6 +601,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cde-python-common", editable = "../python-common" },
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "duckdb", specifier = ">=1.0.0" },
     { name = "erddapy", specifier = ">=2.2.0" },
@@ -587,8 +611,6 @@ requires-dist = [
     { name = "pandera", specifier = ">=0.18.0,<0.19.0" },
     { name = "prefect", specifier = ">=3.6.23" },
     { name = "prefect-docker", specifier = ">=0.6.0" },
-    { name = "psycopg2-binary", specifier = ">=2.9.10" },
-    { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "redis", specifier = ">=6.4.0" },
     { name = "requests", specifier = ">=2.31.0" },

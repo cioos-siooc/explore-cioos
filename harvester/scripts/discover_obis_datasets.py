@@ -8,18 +8,21 @@ Usage:
     cd harvester
     uv run python scripts/discover_obis_datasets.py -f ../harvest_config.yaml
     uv run python scripts/discover_obis_datasets.py -f ../harvest_config.yaml \
-        --compare ../Obis_Datasets.json --cells ../harvest/obis_cells.csv
+        --compare ../Obis_Datasets.json --cells ../harvest
     uv run python scripts/discover_obis_datasets.py -f ../harvest_config.yaml --json
 """
+
 import argparse
 import collections
-import csv
 import json
 import logging
 import sys
 from pathlib import Path
 
+from shapely import wkt as shp_wkt
+
 from cde_harvester.core.config import load_config, resolve_obis_config
+from cde_harvester.core.harvest_files import DATASETS, OBIS_CELLS, read_table
 from cde_harvester.sources.obis.discovery import (
     ObisDatasetDiscovery,
     ObisDiscoveryConfig,
@@ -52,45 +55,51 @@ def report_geometry(cfg, geo_filter):
         tolerance=cfg.geometry_simplify_tolerance,
         max_bytes=cfg.geometry_max_bytes,
     )
-    reduced = __import__("shapely.wkt", fromlist=["loads"]).loads(wkt)
+    reduced = shp_wkt.loads(wkt)
     print("Geometry query: packaged boundary polygon, reduced for the query string")
     print(f"  original:  {len(polygon.wkt.encode()):>7,} bytes  {count_vertices(polygon):>6,} vertices")
-    print(f"  reduced:   {len(wkt.encode()):>7,} bytes  {count_vertices(reduced):>6,} vertices"
-          f"   (tolerance {tol}, budget {cfg.geometry_max_bytes:,})")
-    print(f"  contains original: {reduced.contains(polygon)}"
-          "   <- must be True, or the query could clip coastal datasets")
+    print(
+        f"  reduced:   {len(wkt.encode()):>7,} bytes  {count_vertices(reduced):>6,} vertices"
+        f"   (tolerance {tol}, budget {cfg.geometry_max_bytes:,})"
+    )
+    print(
+        f"  contains original: {reduced.contains(polygon)}   <- must be True, or the query could clip coastal datasets"
+    )
 
 
 def load_comparison_ids(path):
-    """Dataset ids from a JSON list file or a datasets.csv."""
+    """Dataset ids from a JSON list file, or from a harvest folder's datasets table."""
     p = Path(path)
     if p.suffix == ".json":
         return set(json.loads(p.read_text()).get("datasets", []))
-    with p.open() as f:
-        return {row["dataset_id"] for row in csv.DictReader(f) if row.get("dataset_id")}
+    datasets = read_table(str(p), DATASETS)
+    if datasets is None:
+        raise SystemExit(f"No {DATASETS} table in {p}")
+    return set(datasets["dataset_id"].dropna())
 
 
-def load_cell_counts(path):
-    """{dataset_id: n_cells} from an obis_cells.csv, i.e. what actually produced data."""
-    counts = collections.Counter()
-    with Path(path).open() as f:
-        for row in csv.DictReader(f):
-            counts[row["dataset_id"]] += 1
-    return counts
+def load_cell_counts(folder):
+    """{dataset_id: n_cells} from a harvest folder, i.e. what actually produced data."""
+    cells = read_table(folder, OBIS_CELLS)
+    if cells is None:
+        raise SystemExit(f"No {OBIS_CELLS} table in {folder}")
+    return collections.Counter(cells["dataset_id"].dropna())
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-f", "--file", required=True, help="harvest config YAML")
-    parser.add_argument("--compare", default=None,
-                        help="JSON list or datasets.csv to diff the result against")
-    parser.add_argument("--cells", default=None,
-                        help="obis_cells.csv from a previous harvest, to report how many "
-                             "datasets that actually produced data would be dropped")
-    parser.add_argument("--json", action="store_true",
-                        help="print the resolved id list as JSON (suitable for "
-                             "obis_datasets_file) instead of a report")
+    parser.add_argument("--compare", default=None, help="JSON list, or a harvest folder, to diff the result against")
+    parser.add_argument(
+        "--cells",
+        default=None,
+        help="a previous harvest folder, to report how many datasets that actually produced data would be dropped",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print the resolved id list as JSON (suitable for obis_datasets_file) instead of a report",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
@@ -153,8 +162,10 @@ def main():
             print(f"\nAgainst {args.cells}:")
             print(f"  datasets that produced cells:        {len(productive):,}")
             print(f"  ... still covered by discovery:      {len(productive & discovered):,}")
-            print(f"  ... DROPPED (real data lost):        {len(lost):,}"
-                  f"  ({sum(counts[d] for d in lost):,} of {sum(counts.values()):,} cells)")
+            print(
+                f"  ... DROPPED (real data lost):        {len(lost):,}"
+                f"  ({sum(counts[d] for d in lost):,} of {sum(counts.values()):,} cells)"
+            )
             for did in sorted(lost, key=lambda d: -counts[d])[:20]:
                 print(f"      {did}  {counts[did]:,} cells")
 
