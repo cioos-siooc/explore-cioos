@@ -19,6 +19,7 @@ If you just want to see how a dataset is harvested by CDE:
 2. Rename file `.env.sample` to `.env` and change any settings if needed. If you are running on your local machine these settings don't need to change
 3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and modify if needed. This step is required — the config is not baked into the image, and the worker refuses to start without one (see [Harvest configuration](#harvest-configuration)).
 4. Copy `docker-compose.override.yaml.sample` to `docker-compose.override.yaml`. The base `docker-compose.yaml` publishes **no** host ports (so it can be deployed as-is behind a proxy such as Coolify); the override publishes nginx and Prefect locally. Ports are configurable via `NGINX_PORT` (default 8098) and `PREFECT_PORT` (default 4200) in `.env`.
+   Shortcut for steps 2–4: `./scripts/init-dev-env.sh` creates all three files from their templates (skipping any that already exist; `--force` overwrites). It seeds `harvest_config.yaml` from `harvest_config.production.yaml` — the full source list — so use `harvest_config.sample.yaml` instead if you want a small, fast first harvest.
 5. Run locally with docker compose:
     1. Development environment: `docker compose up -d`
     2. Production configuration: `docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d` — `docker-compose.production.yaml` is an **overlay**, not a standalone stack (see [Production deployment](#production-deployment)).

@@ -9,9 +9,12 @@ these tests exist to prevent coming back -- it averaged 2171 days per cell and
 reached 65454, which is why OBIS outweighed every other source in 87% of the
 hexes holding both.
 """
+import datetime
 
 import pandas as pd
 
+from cde_harvester.core.day_sets import total_days
+from cde_harvester.loading.loader import prepare_obis_cells_dataframe
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 DAY = 86_400_000  # OBIS dates are epoch milliseconds
@@ -178,3 +181,72 @@ class TestLoaderRoundTrip:
         assert len(out) == 1
         assert out["days"].iloc[0] == 3
         assert out["n_records"].iloc[0] == 6
+
+
+class TestDayRangesRoundTrip:
+    """obis_cells day_ranges through prepare_obis_cells_dataframe.
+
+    The harvest folder round-trips list columns as native types (parquet --
+    see harvest_files.py), so these hand aggregate_cells' output straight to
+    the loader, the way the harvester and loader actually connect. It went
+    untested: TestLoaderRoundTrip above hands prepare_obis_cells_dataframe a
+    frame with no day_ranges column at all, so every OBIS load failed in
+    merge_ranges with "not enough values to unpack (expected 2, got 1)".
+    """
+
+    def test_day_ranges_pass_through(self):
+        cells = cells_for([occurrence(10), occurrence(11), occurrence(3650)])
+
+        out = prepare_obis_cells_dataframe(cells)
+
+        # two runs: the consecutive pair, then the visit a decade later
+        assert out["day_ranges"].iloc[0] == [
+            (datetime.date(1970, 1, 11), datetime.date(1970, 1, 13)),
+            (datetime.date(1979, 12, 30), datetime.date(1979, 12, 31)),
+        ]
+
+    def test_float_split_cells_union_their_day_sets(self):
+        """Rows the dedup merges are the same cell, so the sets union."""
+        cells = pd.concat(
+            [
+                cells_for([occurrence(10, lat=44.6)]),
+                cells_for([occurrence(20, lat=44.600000000000001)]),
+            ],
+            ignore_index=True,
+        )
+
+        out = prepare_obis_cells_dataframe(cells)
+
+        assert len(out) == 1
+        assert out["day_ranges"].iloc[0] == [
+            (datetime.date(1970, 1, 11), datetime.date(1970, 1, 12)),
+            (datetime.date(1970, 1, 21), datetime.date(1970, 1, 22)),
+        ]
+
+    def test_missing_day_ranges_column_still_loads(self):
+        """A harvest folder predating day sets must not become unloadable."""
+        cells = cells_for([occurrence(10)]).drop(columns=["day_ranges"])
+
+        out = prepare_obis_cells_dataframe(cells)
+
+        assert "day_ranges" not in out.columns
+        assert out["days"].iloc[0] == 1
+
+    def test_days_reports_the_union_not_the_larger_half(self):
+        """days and day_ranges must agree about the same cell.
+
+        max() is right only while the merged rows overlap. Two float-noise
+        halves sampled on different days union to two days; max() says one.
+        """
+        cells = pd.concat(
+            [
+                cells_for([occurrence(10, lat=44.6)]),
+                cells_for([occurrence(20, lat=44.600000000000001)]),
+            ],
+            ignore_index=True,
+        )
+
+        out = prepare_obis_cells_dataframe(cells)
+
+        assert out["days"].iloc[0] == 2
+        assert out["days"].iloc[0] == total_days(out["day_ranges"].iloc[0])

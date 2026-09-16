@@ -63,7 +63,7 @@ def harvester(tmp_path, monkeypatch):
         geo_filter=AlwaysExemptGeoFilter(),
     )
     monkeypatch.setattr(h, "fetch_dataset_metadata", lambda dataset_id: {})
-    monkeypatch.setattr(h, "get_occurrences", lambda dataset_id: make_occurrences(3))
+    monkeypatch.setattr(h, "get_occurrences", lambda dataset_id, bbox=None: make_occurrences(3))
     return h
 
 
@@ -102,7 +102,7 @@ def test_final_result_is_identical_regardless_of_chunk_size(monkeypatch, tmp_pat
         )
         h.CELLS_FLUSH_EVERY = flush_every
         monkeypatch.setattr(h, "fetch_dataset_metadata", lambda dataset_id: {})
-        monkeypatch.setattr(h, "get_occurrences", lambda dataset_id: make_occurrences(3))
+        monkeypatch.setattr(h, "get_occurrences", lambda dataset_id, bbox=None: make_occurrences(3))
         return h.harvest()
 
     unchunked = build_result(1000)  # never flushes mid-run

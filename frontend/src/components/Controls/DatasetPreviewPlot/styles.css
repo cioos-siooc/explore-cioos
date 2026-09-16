@@ -35,9 +35,12 @@
   white-space: nowrap;
 }
 
+/* Sits in the menu where the options would be, so it takes their inset
+   (.dropdown-item, ui/dropdownStyles.css) — a shade less height, since there
+   is nothing here to click. */
 .dropdownEmptyNote {
   display: block;
-  padding: 6px 12px;
+  padding: 8px 16px;
   color: var(--cioos-text-muted, #666);
 }
 
@@ -200,13 +203,16 @@
   border-radius: 4px;
 }
 
+/* A row of the same menu, directly under the "Dataset default" item, so it
+   takes that item's inset (.dropdown-item, ui/dropdownStyles.css) — the two
+   labels are read as one column. */
 .colorSwatchCustom {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin: 0;
-  padding: 6px 12px;
+  padding: 8px 16px;
   font-size: var(--cioos-font-size-sm, 13px);
   cursor: pointer;
 }

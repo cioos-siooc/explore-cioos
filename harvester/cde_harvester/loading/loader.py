@@ -17,6 +17,7 @@ from cde_harvester.core.day_sets import (
     ranges_from_iso,
     ranges_to_pg_literal,
     ranges_to_psycopg,
+    total_days,
 )
 from cde_harvester.core.harvest_files import (
     DATASETS,
@@ -132,9 +133,9 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     obis_cells["latitude"] = obis_cells["latitude"].round(8)
     obis_cells["longitude"] = obis_cells["longitude"].round(8)
 
-    # A CSV written before day sets existed has no day_ranges column; the map
-    # falls back to the cell's span for those rows, so treat it as absent
-    # rather than requiring a re-harvest to load at all.
+    # A harvest folder written before day sets existed has no day_ranges
+    # column; the map falls back to the cell's span for those rows, so treat
+    # it as absent rather than requiring a re-harvest to load at all.
     has_day_ranges = "day_ranges" in obis_cells.columns
 
     # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
@@ -162,6 +163,13 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
         aggregations["day_ranges"] = ("day_ranges", merge_ranges)
 
     agg = obis_cells.groupby(key_cols, dropna=False).agg(**aggregations).reset_index()
+
+    if has_day_ranges:
+        # days has to report the union day_ranges now holds. max() is right
+        # only while the merged rows' day sets overlap; where they don't -- two
+        # float-noise halves of a cell sampled on different days -- it
+        # understates, and the two columns disagree about the same cell.
+        agg["days"] = agg["day_ranges"].apply(total_days)
 
     if name_to_aphia:
 
