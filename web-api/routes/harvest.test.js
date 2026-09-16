@@ -155,3 +155,58 @@ test("GET /harvest/reasons/:slug scopes the breakdown to one server", async () =
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, [{ reason_code: "HTTP_ERROR", n: 2 }]);
 });
+
+test("GET /harvest/coverage returns the summary and the per-source rows", async () => {
+  db.queueRaw([
+    {
+      n_app_total: 120,
+      n_app_erddap: 100,
+      n_app_obis: 20,
+      n_ckan_records: 300,
+      n_erddap_not_in_app: 7,
+      n_app_without_ckan: 3,
+      ckan_snapshot_at: "2026-09-15T00:00:00Z",
+    },
+  ]);
+  db.queueRaw([
+    {
+      erddap_url: "https://erddap.example.com/erddap",
+      source: "erddap",
+      n_advertised: 107,
+      n_not_in_app: 7,
+      n_without_ckan: 3,
+    },
+  ]);
+
+  const res = await agent.get("/harvest/coverage");
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.summary.n_app_total, 120);
+  assert.equal(res.body.summary.n_erddap_not_in_app, 7);
+  assert.equal(res.body.sources.length, 1);
+  assert.equal(res.body.sources[0].n_not_in_app, 7);
+});
+
+test("GET /harvest/coverage/:bucket returns the gap rows", async () => {
+  db.queueRaw([
+    {
+      erddap_url: "https://erddap.example.com/erddap",
+      dataset_id: "orphan_ds",
+      status: "error",
+      reason_code: "HTTP_ERROR",
+    },
+  ]);
+
+  const res = await agent.get("/harvest/coverage/erddap-not-in-app");
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.rows[0].dataset_id, "orphan_ds");
+  assert.equal(res.body.truncated, false);
+});
+
+test("GET /harvest/coverage/:bucket 404s an unknown bucket", async () => {
+  // Nothing is queued: an unknown bucket must be rejected before any db call.
+  const res = await agent.get("/harvest/coverage/made-up");
+
+  assert.equal(res.status, 404);
+});

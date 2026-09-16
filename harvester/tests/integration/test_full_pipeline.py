@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 from cde_harvester.__main__ import (
-    get_ckan_records,
+    fetch_ckan_catalogue,
     merge_and_write_csvs,
 )
 from cde_harvester.__main__ import (
@@ -159,7 +159,7 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     Patches:
       - harvest_erddap.submit → returns a synchronous mock future holding
         the pre-collected HarvestResult so main() doesn't re-harvest
-      - get_ckan_records.submit / merge_and_write_csvs.submit → run their
+      - fetch_ckan_catalogue.submit / merge_and_write_csvs.submit → run their
         wrapped fns synchronously (no flow context / task runner needed)
       - get_run_logger → stdlib logger (no Prefect context needed)
       - CKAN requests → fixture data
@@ -189,11 +189,13 @@ def written_csv_folder(tmp_path_factory, harvest_result):
         patch(
             "cde_harvester.__main__.harvest_erddap"
         ) as mock_harvest_task,
-        # get_ckan_records feeds a real DataFrame into merge; merge writes the
-        # CSVs the assertions read. Run both synchronously so the test drives the
-        # real merge + CSV-write logic without a flow context.
+        # fetch_ckan_catalogue feeds a real DataFrame into merge; merge writes
+        # the CSVs the assertions read. Run both synchronously so the test drives
+        # the real merge + CSV-write logic without a flow context.
         patch.object(
-            get_ckan_records, "submit", _submit_without_flow(get_ckan_records)
+            fetch_ckan_catalogue,
+            "submit",
+            _submit_without_flow(fetch_ckan_catalogue, as_future=True),
         ),
         patch.object(
             merge_and_write_csvs,
@@ -246,6 +248,23 @@ class TestCsvFilesWritten:
     def test_datasets_csv_array_columns_parse_correctly(self, written_csv_folder):
         df = pd.read_csv(os.path.join(written_csv_folder, "datasets.csv"))
         for col in ["eovs", "organizations", "profile_variables"]:
+            parsed = df[col].apply(ast.literal_eval)
+            assert all(isinstance(v, list) for v in parsed)
+
+    def test_ckan_records_csv_written(self, written_csv_folder):
+        """The catalogue snapshot the db-loader replaces cde.ckan_records with."""
+        path = os.path.join(written_csv_folder, "ckan_records.csv")
+        assert os.path.exists(path)
+        df = pd.read_csv(path)
+        assert not df.empty
+        for col in ["ckan_id", "erddap_url", "dataset_id", "obis_dataset_id",
+                    "n_resources", "snapshot_at"]:
+            assert col in df.columns
+
+    def test_ckan_records_array_columns_parse_correctly(self, written_csv_folder):
+        """The loader ast.literal_eval()s these back into PostgreSQL arrays."""
+        df = pd.read_csv(os.path.join(written_csv_folder, "ckan_records.csv"))
+        for col in ["organizations", "eovs"]:
             parsed = df[col].apply(ast.literal_eval)
             assert all(isinstance(v, list) for v in parsed)
 

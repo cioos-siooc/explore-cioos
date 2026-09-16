@@ -14,6 +14,7 @@ import translationFR from "./locales/fr/translation.json";
 import App from "./components/App.jsx";
 import HarvestOverview from "./components/Harvest/HarvestOverview.jsx";
 import HarvestServer from "./components/Harvest/HarvestServer.jsx";
+import HarvestCoverage from "./components/Harvest/HarvestCoverage.jsx";
 import HarvestDataset from "./components/Harvest/HarvestDataset.jsx";
 import HarvestRun from "./components/Harvest/HarvestRun.jsx";
 import HarvestDownloads from "./components/Harvest/HarvestDownloads.jsx";
@@ -64,6 +65,7 @@ createRoot(domContainer).render(
       <SentryRoutes>
         <Route path="/" element={<App />} />
         <Route path="/harvest" element={<HarvestOverview />} />
+        <Route path="/harvest/coverage" element={<HarvestCoverage />} />
         <Route path="/harvest/server/:slug" element={<HarvestServer />} />
         <Route
           path="/harvest/dataset/:slug/:datasetId"

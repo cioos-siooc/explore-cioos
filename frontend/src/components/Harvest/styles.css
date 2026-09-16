@@ -580,3 +580,70 @@ a.harvest-link:hover {
   text-align: center;
   color: var(--harvest-muted);
 }
+
+/* ── Coverage report ──────────────────────────────────────────────────────── */
+/* The headline "datasets served / CKAN records" figures. A plain wrapping row
+   rather than a grid, so it stays readable at phone width without a breakpoint. */
+.harvest-coverage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.harvest-coverage-stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.harvest-coverage-stat-label {
+  font-size: 0.8rem;
+  color: var(--harvest-muted-strong);
+}
+
+/* Gap-category selector. Buttons rather than links: the choice is a view
+   filter carried in ?bucket=, not a separate page. */
+.harvest-coverage-buckets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.harvest-coverage-bucket {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--harvest-input-border);
+  border-radius: 14px;
+  background: var(--cioos-white);
+  color: var(--cioos-ink);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.harvest-coverage-bucket:hover {
+  background: var(--harvest-row-hover);
+}
+.harvest-coverage-bucket.is-active {
+  background: var(--cioos-navy);
+  border-color: var(--cioos-navy);
+  color: var(--cioos-white);
+}
+.harvest-coverage-bucket-count {
+  font-weight: 700;
+}
+.harvest-coverage-bucket.is-active .harvest-coverage-bucket-count {
+  color: var(--cioos-white);
+}
+
+.harvest-coverage-search {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--harvest-input-border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  background: var(--cioos-white);
+  color: var(--cioos-ink);
+  min-width: 240px;
+  margin-bottom: 1rem;
+}

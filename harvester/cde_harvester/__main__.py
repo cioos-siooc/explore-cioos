@@ -22,7 +22,8 @@ from cde_harvester.core.observability import (
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources import resolve_source
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
-    get_ckan_records,
+    ckan_erddap_links,
+    fetch_ckan_catalogue,
     unescape_ascii,
     unescape_ascii_list,
 )
@@ -177,13 +178,14 @@ def _run_logger():
 def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skipped,
                          obis_datasets, obis_cells, obis_skipped, df_ckan,
                          erddap_verified=None, erddap_trajectory_days=None,
-                         erddap_trajectory_points=None):
+                         erddap_trajectory_points=None, ckan_catalogue=None):
     """Join CKAN metadata, merge all sources, and write the output CSVs (@task)."""
     logger = _run_logger()
     datasets_file = f"{folder}/datasets.csv"
     profiles_file = f"{folder}/profiles.csv"
     skipped_datasets_file = f"{folder}/skipped.csv"
     ckan_file = f"{folder}/ckan.csv"
+    ckan_records_file = f"{folder}/ckan_records.csv"
     obis_cells_file = f"{folder}/obis_cells.csv"
     trajectory_days_file = f"{folder}/trajectory_days.csv"
     trajectory_points_file = f"{folder}/trajectory_points.csv"
@@ -296,6 +298,17 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
         df_ckan.to_csv(ckan_file, index=False)
+
+    # The whole CKAN catalogue, which the db-loader replaces cde.ckan_records
+    # with. Written only when a catalogue was actually fetched: absent file
+    # means "no snapshot this run", and the loader then leaves the last known
+    # one in place rather than emptying the table.
+    if ckan_catalogue is not None and not ckan_catalogue.empty:
+        ckan_catalogue.to_csv(ckan_records_file, index=False)
+        logger.info(
+            "Wrote %s (%d CKAN records)", ckan_records_file, len(ckan_catalogue)
+        )
+
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
     if not obis_cells.empty:
@@ -403,6 +416,13 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             # Clear discovery too, so an ERDDAP-only run never calls the OBIS API.
             obis_discovery = None
 
+        # CKAN is a run-level metadata source, not an ERDDAP post-processing
+        # step: both ERDDAP and OBIS enrichment read this one catalogue, and the
+        # coverage report needs the snapshot refreshed even on a run that
+        # harvests no ERDDAP dataset at all (OBIS-only, or fully unchanged).
+        logger.info("Submitting CKAN catalogue fetch")
+        ckan_future = fetch_ckan_catalogue.submit(cache=cache_requests)
+
         for erddap_url in erddap_urls_list:
             logger.info("Submitting harvest task for %s", erddap_url)
             future = harvest_erddap.submit(
@@ -429,6 +449,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
                 geo_filter=obis_geo_filter,
                 run_id=run_id,
                 discovery=obis_discovery if obis_discovery_enabled else None,
+                ckan_catalogue=ckan_future,
             )
 
         # Wait for all tasks to complete
@@ -466,6 +487,17 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             erddap_verified = pd.concat([erddap_verified, result.verified])
             del result
         logger.info("All ERDDAP work completed")
+
+        # An empty catalogue is not a legitimate state — it would blank
+        # cde.ckan_records and rewrite every dataset's title with its ERDDAP
+        # fallback. Fail the run instead, in the same spirit as OBIS
+        # discovery's min_datasets floor.
+        ckan_catalogue = ckan_future.result()
+        if ckan_catalogue.empty:
+            raise RuntimeError(
+                "CKAN returned an empty catalogue; refusing to harvest with no "
+                "metadata (would blank cde.ckan_records and drop every CKAN title)"
+            )
 
         # Collect OBIS results
         obis_cells = pd.DataFrame()
@@ -536,7 +568,6 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         )
 
     # --- ERDDAP-specific post-processing ---
-    df_ckan = pd.DataFrame()
     if not erddap_datasets.empty:
         # see what standard names arent covered by our EOVs:
         standard_names_harvested = (
@@ -559,17 +590,12 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
                 standard_names_not_harvested_that_are_real,
             )
 
-        # query CKAN national for more metadata related to the ERDDAP datsets we have so far
-        logger.info("Gathering CKAN data")
-        # .submit() + wait_for (instead of a direct call) so the Prefect flow
-        # graph draws the real pipeline order: harvest -> fetch-ckan -> merge.
-        # The futures are already resolved, so this adds no waiting.
-        df_ckan = get_ckan_records.submit(
-            erddap_datasets["dataset_id"].to_list(), cache=cache_requests,
-            wait_for=erddap_futures,
-        )
+    # Derived from the one catalogue fetched above rather than re-queried per
+    # source. Every ERDDAP-linked CKAN record is present, including those whose
+    # dataset this run did not harvest — the left join below still keeps only
+    # the harvested rows.
+    df_ckan = ckan_erddap_links(ckan_catalogue)
 
-    # df_ckan may be a future; Prefect resolves it (and draws the edge) on submit.
     merge_and_write_csvs.submit(
         folder=folder,
         erddap_datasets=erddap_datasets,
@@ -581,6 +607,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         obis_cells=obis_cells,
         obis_skipped=obis_skipped,
         df_ckan=df_ckan,
+        ckan_catalogue=ckan_catalogue,
         erddap_verified=erddap_verified,
         wait_for=[f for f in [*erddap_futures, obis_future] if f is not None],
     ).result()

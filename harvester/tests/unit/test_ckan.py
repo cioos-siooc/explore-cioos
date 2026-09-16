@@ -9,16 +9,22 @@ offline and deterministically.
 import pandas as pd
 import pytest
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
-    get_ckan_records,
+    ckan_erddap_links,
+    ckan_obis_links,
+    fetch_ckan_catalogue,
+    obis_uuid_from_xml_location,
+    parse_ckan_package,
     split_erddap_url,
     unescape_ascii,
     unescape_ascii_list,
 )
 from conftest import (
-    CKAN_EMPTY_RESPONSE,
     CKAN_PACKAGE_SEARCH_RESPONSE,
     DATASET_ID,
 )
+
+OBIS_UUID = "3f8c1d2e-4b5a-6c7d-8e9f-0a1b2c3d4e5f"
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,9 +33,9 @@ from conftest import (
 def _make_ckan_get(mocker, pages):
     """
     Patch the CKAN session builder so session.get() yields the given page
-    responses. CKAN fetching now goes through a requests.Session built by
+    responses. CKAN fetching goes through a requests.Session built by
     _build_ckan_session() rather than the module-level requests.get.
-    Each call to list_ckan_records_with_erddap_urls paginates until results empty.
+    Paging stops once `count` records have been seen, or on an empty page.
     """
     responses = []
     for page in pages:
@@ -43,6 +49,25 @@ def _make_ckan_get(mocker, pages):
         "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
         return_value=mock_session,
     )
+    return mock_session
+
+
+def _package(**overrides):
+    """A minimal CKAN package, overridable per test."""
+    record = {
+        "id": "ckan-uuid-001",
+        "name": "test-dataset",
+        "title_translated": {"en": "English Title", "fr": "Titre français"},
+        "cited-responsible-party": [{"organisation-name": "CIOOS Test Organization"}],
+        "eov": ["seaSurfaceTemperature"],
+        "resources": [],
+    }
+    record.update(overrides)
+    return record
+
+
+def _tabledap(host, dataset_id):
+    return {"url": f"{host}/erddap/tabledap/{dataset_id}.html", "format": "ERDDAP tabledap"}
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +91,24 @@ class TestSplitErddapUrl:
     def test_invalid_url_raises_value_error(self):
         with pytest.raises(ValueError, match="Invalid URL format"):
             split_erddap_url("https://example.com/not/erddap")
+
+
+class TestObisUuidFromXmlLocation:
+    def test_extracts_uuid(self):
+        assert obis_uuid_from_xml_location(
+            f"https://example.org/xml/{OBIS_UUID}.xml"
+        ) == OBIS_UUID
+
+    def test_uppercase_uuid_normalised(self):
+        assert obis_uuid_from_xml_location(
+            f"https://example.org/{OBIS_UUID.upper()}.xml"
+        ) == OBIS_UUID
+
+    def test_no_match_returns_none(self):
+        assert obis_uuid_from_xml_location("https://example.org/record.html") is None
+
+    def test_non_string_returns_none(self):
+        assert obis_uuid_from_xml_location(None) is None
 
 
 # ---------------------------------------------------------------------------
@@ -100,34 +143,154 @@ class TestUnescapeAscii:
 
 
 # ---------------------------------------------------------------------------
-# Tests: get_ckan_records
+# Tests: parse_ckan_package
 # ---------------------------------------------------------------------------
 
-class TestGetCkanRecords:
-    def test_returns_dataframe(self, mocker):
-        _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE, CKAN_EMPTY_RESPONSE])
-        df = get_ckan_records([DATASET_ID])
-        assert isinstance(df, pd.DataFrame)
+class TestParseCkanPackage:
+    def test_single_tabledap_resource_yields_one_row(self):
+        rows = parse_ckan_package(
+            _package(resources=[_tabledap("https://erddap.example.com", "ds_a")])
+        )
+        assert len(rows) == 1
+        assert rows[0]["erddap_url"] == "https://erddap.example.com/erddap"
+        assert rows[0]["dataset_id"] == "ds_a"
 
-    def test_dataframe_has_expected_columns(self, mocker):
-        _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE, CKAN_EMPTY_RESPONSE])
-        df = get_ckan_records([DATASET_ID])
-        for col in ["erddap_url", "dataset_id", "ckan_id", "ckan_organizations", "ckan_title", "title_fr"]:
+    def test_two_tabledap_resources_yield_two_rows(self):
+        """The old loop kept only the last resource; both servers must appear."""
+        rows = parse_ckan_package(
+            _package(resources=[
+                _tabledap("https://erddap.one.ca", "shared_id"),
+                _tabledap("https://erddap.two.ca", "shared_id"),
+            ])
+        )
+        assert {r["erddap_url"] for r in rows} == {
+            "https://erddap.one.ca/erddap",
+            "https://erddap.two.ca/erddap",
+        }
+
+    def test_record_with_no_data_link_still_yields_a_row(self):
+        """A census of CKAN, not of the matches — the record must not vanish."""
+        rows = parse_ckan_package(_package(resources=[{"url": "https://example.org/a.pdf"}]))
+        assert len(rows) == 1
+        assert rows[0]["erddap_url"] is None
+        assert rows[0]["dataset_id"] is None
+        assert rows[0]["n_resources"] == 1
+
+    def test_obis_record_carries_its_uuid(self):
+        rows = parse_ckan_package(
+            _package(xml_location_url=f"https://example.org/{OBIS_UUID}.xml")
+        )
+        assert rows[0]["obis_dataset_id"] == OBIS_UUID
+        assert rows[0]["erddap_url"] is None
+
+    def test_unparseable_tabledap_url_does_not_raise(self):
+        rows = parse_ckan_package(
+            _package(resources=[{"url": "https://example.org/tabledap-brochure.pdf"}])
+        )
+        assert len(rows) == 1
+        assert rows[0]["erddap_url"] is None
+
+    def test_titles_and_organizations_extracted(self):
+        rows = parse_ckan_package(_package())
+        assert rows[0]["title"] == "English Title"
+        assert rows[0]["title_fr"] == "Titre français"
+        assert rows[0]["organizations"] == ["CIOOS Test Organization"]
+        assert rows[0]["eovs"] == ["seaSurfaceTemperature"]
+
+
+# ---------------------------------------------------------------------------
+# Tests: fetch_ckan_catalogue
+# ---------------------------------------------------------------------------
+
+class TestFetchCkanCatalogue:
+    def test_returns_dataframe_with_expected_columns(self, mocker):
+        _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE])
+        df = fetch_ckan_catalogue.fn()
+        assert isinstance(df, pd.DataFrame)
+        for col in [
+            "ckan_id", "ckan_name", "title", "title_fr", "organizations", "eovs",
+            "erddap_url", "dataset_id", "obis_dataset_id", "n_resources", "snapshot_at",
+        ]:
             assert col in df.columns
 
-    def test_dataset_id_matched(self, mocker):
-        _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE, CKAN_EMPTY_RESPONSE])
-        df = get_ckan_records([DATASET_ID])
+    def test_issues_no_search_filter(self, mocker):
+        """The catalogue is enumerated in full — a `q=` filter would hide records."""
+        session = _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE])
+        fetch_ckan_catalogue.fn()
+        requested = session.get.call_args[0][0]
+        assert "package_search" in requested
+        assert "q=" not in requested
+
+    def test_stops_once_count_is_reached(self, mocker):
+        """One page covers `count`, so no second request is made."""
+        session = _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE])
+        fetch_ckan_catalogue.fn()
+        assert session.get.call_count == 1
+
+    def test_pages_until_count_is_reached(self, mocker):
+        page1 = {"result": {"count": 2, "results": [_package(id="a")]}}
+        page2 = {"result": {"count": 2, "results": [_package(id="b")]}}
+        session = _make_ckan_get(mocker, [page1, page2])
+        df = fetch_ckan_catalogue.fn()
+        assert session.get.call_count == 2
+        assert set(df["ckan_id"]) == {"a", "b"}
+
+    def test_dataset_id_from_fixture_is_present(self, mocker):
+        _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE])
+        df = fetch_ckan_catalogue.fn()
         assert DATASET_ID in df["dataset_id"].values
 
-    def test_title_extracted(self, mocker):
-        _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE, CKAN_EMPTY_RESPONSE])
-        df = get_ckan_records([DATASET_ID])
-        row = df[df["dataset_id"] == DATASET_ID].iloc[0]
-        assert row["ckan_title"] == "Test Dataset English Title"
-        assert row["title_fr"] == "Test Dataset French Title"
+    def test_limit_stops_early(self, mocker):
+        page = {"result": {"count": 3, "results": [
+            _package(id="a"), _package(id="b"), _package(id="c"),
+        ]}}
+        _make_ckan_get(mocker, [page])
+        df = fetch_ckan_catalogue.fn(limit=2)
+        assert set(df["ckan_id"]) == {"a", "b"}
 
-    def test_no_matching_dataset_returns_empty(self, mocker):
-        _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE, CKAN_EMPTY_RESPONSE])
-        df = get_ckan_records(["non_existent_dataset"])
-        assert df.empty
+
+# ---------------------------------------------------------------------------
+# Tests: derived link frames
+# ---------------------------------------------------------------------------
+
+class TestCkanErddapLinks:
+    def test_drops_records_with_no_erddap_link(self, mocker):
+        _make_ckan_get(mocker, [{"result": {"count": 2, "results": [
+            _package(id="linked", resources=[_tabledap("https://erddap.one.ca", "ds_a")]),
+            _package(id="unlinked"),
+        ]}}])
+        links = ckan_erddap_links(fetch_ckan_catalogue.fn())
+        assert list(links["ckan_id"]) == ["linked"]
+
+    def test_same_dataset_id_on_two_servers_is_kept(self):
+        """Deduplicating on dataset_id alone silently dropped the second server."""
+        catalogue = pd.DataFrame([
+            {"ckan_id": "a", "title": "A", "title_fr": None, "organizations": [],
+             "eovs": [], "erddap_url": "https://one.ca/erddap", "dataset_id": "shared",
+             "obis_dataset_id": None, "n_resources": 1, "ckan_name": "a"},
+            {"ckan_id": "b", "title": "B", "title_fr": None, "organizations": [],
+             "eovs": [], "erddap_url": "https://two.ca/erddap", "dataset_id": "shared",
+             "obis_dataset_id": None, "n_resources": 1, "ckan_name": "b"},
+        ])
+        assert len(ckan_erddap_links(catalogue)) == 2
+
+    def test_empty_catalogue_returns_empty_frame_with_columns(self):
+        links = ckan_erddap_links(pd.DataFrame())
+        assert links.empty
+        assert "ckan_title" in links.columns
+
+
+class TestCkanObisLinks:
+    def test_keys_on_the_obis_uuid(self, mocker):
+        _make_ckan_get(mocker, [{"result": {"count": 2, "results": [
+            _package(id="obis-rec", xml_location_url=f"https://x/{OBIS_UUID}.xml"),
+            _package(id="erddap-rec", resources=[_tabledap("https://one.ca", "ds_a")]),
+        ]}}])
+        links = ckan_obis_links(fetch_ckan_catalogue.fn())
+        assert list(links["dataset_id"]) == [OBIS_UUID]
+        assert list(links["ckan_eovs"]) == [["seaSurfaceTemperature"]]
+
+    def test_empty_catalogue_returns_empty_frame_with_columns(self):
+        links = ckan_obis_links(pd.DataFrame())
+        assert links.empty
+        assert "ckan_eovs" in links.columns

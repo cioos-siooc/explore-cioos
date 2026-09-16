@@ -123,3 +123,109 @@ describe("GET /harvest/dataset/:slug/:datasetId", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// The coverage routes diff three sets that each spell erddap_url differently
+// and are each big enough to matter. Both properties are invisible from the
+// response, so they are asserted against the SQL.
+describe("GET /harvest/coverage", () => {
+  it("normalises the trailing slash on every set it joins", async () => {
+    respond = () => [];
+
+    const res = await request(app).get("/harvest/coverage");
+
+    expect(res.status).toBe(200);
+    const sql = sqlFor("erddap_advertised");
+    // harvest_config URLs carry a trailing slash, CKAN-derived ones do not, and
+    // cde.datasets holds whichever the harvester was handed. Without the rtrim
+    // on all three, a whole server reads as 100% uncovered.
+    expect(sql).toContain("rtrim(erddap_url, '/')");
+    expect(sql).toContain("FROM cde.datasets");
+    expect(sql).toContain("FROM cde.ckan_records");
+  });
+
+  it("takes the latest attempt with an index-friendly DISTINCT ON", async () => {
+    respond = () => [];
+
+    await request(app).get("/harvest/coverage");
+
+    const sql = sqlFor("erddap_advertised");
+    // Over the raw column, so harvest_attempts_dataset_idx still applies — the
+    // rtrim belongs in the projection, not the DISTINCT ON key.
+    expect(sql).toContain("DISTINCT ON (erddap_url, dataset_id)");
+    expect(sql).not.toContain("DISTINCT ON (rtrim(");
+  });
+
+  it("counts a hash-verified skip as present, not as a gap", async () => {
+    respond = () => [];
+
+    await request(app).get("/harvest/coverage");
+
+    const sql = sqlFor("erddap_advertised");
+    // UNCHANGED means "verified up to date"; reading it as a failure would
+    // report every incremental run as hundreds of missing datasets.
+    expect(sql).toContain("'UNCHANGED'");
+    expect(sql).toContain("THEN 'success'");
+  });
+
+  it("returns both the summary row and the per-source rows", async () => {
+    respond = (sql) =>
+      sql.includes("GROUP BY adv.erddap_url")
+        ? [{ erddap_url: "https://e.ca/erddap", source: "erddap", n_advertised: 9 }]
+        : [{ n_app_total: 5, n_erddap_not_in_app: 2 }];
+
+    const res = await request(app).get("/harvest/coverage");
+
+    expect(res.body.summary.n_app_total).toBe(5);
+    expect(res.body.sources).toHaveLength(1);
+    expect(res.body.bucketLimit).toBeGreaterThan(0);
+  });
+});
+
+describe("GET /harvest/coverage/:bucket", () => {
+  const runBucketOf = async (count, bucket = "erddap-not-in-app") => {
+    respond = () =>
+      Array.from({ length: count }, (_, i) => ({ dataset_id: `ds_${i}` }));
+    return request(app).get(`/harvest/coverage/${bucket}`);
+  };
+
+  it("bounds the bucket query", async () => {
+    await runBucketOf(3);
+
+    expect(sqlFor("erddap_advertised e")).toContain("LIMIT ?");
+  });
+
+  it("reports a short list as complete", async () => {
+    const res = await runBucketOf(3);
+
+    expect(res.status).toBe(200);
+    expect(res.body.rows).toHaveLength(3);
+    expect(res.body.truncated).toBe(false);
+  });
+
+  it("trims to the cap and says it did", async () => {
+    const res = await runBucketOf(5000);
+
+    expect(res.body.rows).toHaveLength(res.body.limit);
+    expect(res.body.truncated).toBe(true);
+  });
+
+  it("404s an unknown bucket instead of returning an empty list", async () => {
+    // An empty list would read as "no gaps here", which is the opposite of
+    // "no such report".
+    const res = await runBucketOf(0, "not-a-bucket");
+
+    expect(res.status).toBe(404);
+    expect(db.raw).not.toHaveBeenCalled();
+  });
+
+  it("classifies a CKAN record whose server CDE never harvests", async () => {
+    respond = () => [];
+
+    await request(app).get("/harvest/coverage/ckan-not-in-app");
+
+    const sql = sqlFor("classification");
+    expect(sql).toContain("'server_not_harvested'");
+    expect(sql).toContain("'not_advertised'");
+    expect(sql).toContain("'harvest_failed'");
+  });
+});

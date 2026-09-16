@@ -1,20 +1,73 @@
 #!/usr/bin/env python
 
+"""Enumerate the CIOOS CKAN catalogue and link its records to harvested data.
+
+CKAN is CDE's *metadata* source: one instance describes the datasets published
+by the *data* sources (ERDDAP servers, OBIS). This module pages that catalogue
+once per run and turns it into a flat inventory — one row per (record, data
+link) — which serves three consumers:
+
+  * ERDDAP enrichment  (:func:`ckan_erddap_links`)
+  * OBIS enrichment    (:func:`ckan_obis_links`)
+  * the persisted ``cde.ckan_records`` snapshot behind the harvest dashboard's
+    coverage report, which answers "what does CKAN describe that CDE does not
+    serve, and what does CDE serve that CKAN has no record of?"
+
+The catalogue is enumerated in FULL — there is deliberately no ``q=`` search
+filter. A record with no data link at all is still a row (with a null
+``erddap_url``/``obis_dataset_id``), because "CKAN describes this but nothing
+points at data we can read" is one of the answers the report exists to give.
+"""
 
 import re
+from datetime import datetime, timezone
 
 import diskcache as dc
 import pandas as pd
 import requests
+from cde_harvester.core.config import ckan_api_url
 from prefect import get_run_logger, task
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# National CKAN has all the regions' records
-CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
+# Columns of the flat catalogue inventory. Mirrors cde.ckan_records in
+# database/1_schema.sql (minus `pk`, which the DB supplies, and `snapshot_at`,
+# which fetch_ckan_catalogue stamps on) and CkanRecordSchema in core/schemas.py.
+CKAN_RECORD_COLUMNS = [
+    "ckan_id",
+    "ckan_name",
+    "title",
+    "title_fr",
+    "organizations",
+    "eovs",
+    "erddap_url",
+    "dataset_id",
+    "obis_dataset_id",
+    "n_resources",
+]
+
+# CKAN caps `rows` server-side; 1000 is the documented ceiling on cioos.ca.
+PAGE_SIZE = 1000
 
 # Transient statuses worth retrying (CKAN's Cloudflare/Caddy returns these intermittently).
 _RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
+
+# OBIS records carry their dataset UUID in xml_location_url (.../<uuid>.xml) —
+# the same field the per-dataset lookup this replaced searched on.
+_OBIS_XML_RE = re.compile(
+    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.xml",
+    re.IGNORECASE,
+)
+
+
+def _logger():
+    """Prefect's run logger inside a flow, a plain module logger outside one."""
+    try:
+        return get_run_logger()
+    except Exception:
+        import logging
+
+        return logging.getLogger(__name__)
 
 
 def _build_ckan_session() -> requests.Session:
@@ -81,149 +134,193 @@ def unescape_ascii(x):
         return x
 
 
-@task(task_run_name="fetch-ckan-metadata")
-def get_ckan_records(dataset_ids, limit=None, cache=False):
-    """Fetch the full CKAN record for each harvested dataset ID (@task)."""
-    records = list_ckan_records_with_erddap_urls(cache)
+def remove_newlines(s):
+    """Flatten a CKAN text field. Both real and literal escapes turn up in these."""
+    if not isinstance(s, str):
+        return s
+    for token in ("\r", "\n", "\\n", "\\r"):
+        s = s.replace(token, "")
+    return s
 
-    # just used for testing
-    if limit:
-        records = records[0:limit]
-    out = []
-    for record_full in records:
-        resources = record_full["resources"]
-        erddap_url = ""
-        for resource in resources:
-            if "tabledap" in resource["url"]:
-                erddap_url = resource["url"]
-                continue
-        if not erddap_url:
-            continue
 
-        (erddap_host, dataset_id) = split_erddap_url(erddap_url)
+def _clean_text(value):
+    return remove_newlines(unescape_ascii(value)) if value is not None else None
 
-        # dataset_ids could be None if user wants all
-        if dataset_ids and dataset_id not in dataset_ids:
-            continue
 
-        # retreive the data for each record
+def obis_uuid_from_xml_location(value):
+    """Extract the OBIS dataset UUID from a CKAN record's xml_location_url."""
+    if not isinstance(value, str):
+        return None
+    match = _OBIS_XML_RE.search(value)
+    return match.group(1).lower() if match else None
 
-        title_translated = record_full.get("title_translated")
-        # Kept for the commented-out ckan_summary fields below.
-        notes_translated = record_full.get("notes_translated")  # noqa: F841
 
-        def remove_newlines(s):
-            # not sure why all these are needed but they seem to be
-            s = s.replace("\r", "")
-            s = s.replace("\n", "")
-            s = s.replace("\\n", "")
-            s = s.replace("\\r", "")
-            return s
+def parse_ckan_package(record):
+    """Turn one CKAN package into zero or more inventory rows.
 
-        ckan_record_text = {
-            "title": title_translated.get("en"),
-            "title_fr": title_translated.get("fr"),
-            # "ckan_summary": notes_translated.get("en"),
-            # "ckan_summary_fr": notes_translated.get("fr"),
+    A record yields one row per ERDDAP ``tabledap`` resource, so a package
+    publishing the same data on two servers is represented twice rather than
+    collapsing to whichever resource happened to come last. A record with no
+    ERDDAP resource still yields exactly one row — with a null ``erddap_url``
+    — so the catalogue snapshot stays a complete census of CKAN.
+    """
+    title_translated = record.get("title_translated") or {}
+    organizations = sorted(
+        {
+            unescape_ascii(contact.get("organisation-name"))
+            for contact in record.get("cited-responsible-party") or []
+            if contact.get("organisation-name")
         }
+    )
+    resources = record.get("resources") or []
 
-        for k, v in ckan_record_text.items():
-            ckan_record_text[k] = remove_newlines(unescape_ascii(v))
-
-        organizations = []
-
-        for contact in record_full.get("cited-responsible-party", []):
-            organizations += [unescape_ascii(contact.get("organisation-name"))]
-
-        # remove duplicates, empty strings
-        organizations = list(filter(None, set(organizations)))
-
-        out.append(
-            [
-                erddap_host + "/erddap",
-                dataset_id,
-                record_full["id"],
-                organizations,
-                ckan_record_text,
-            ],
-        )
-        # compile a dataframe
-
-    line = {
-        "erddap_url": [x[0].strip("/") for x in out],
-        "dataset_id": [x[1] for x in out],
-        "ckan_id": [x[2] for x in out],
-        "ckan_organizations": [x[3] for x in out],
-        "ckan_title": [x[4]["title"] for x in out],
-        "title_fr": [x[4]["title_fr"] for x in out],
-        # "ckan_summary": [x[4]["ckan_summary"] for x in out],
-        # "ckan_summary_fr": [x[4]["ckan_summary_fr"] for x in out],
+    base = {
+        "ckan_id": record.get("id"),
+        "ckan_name": record.get("name"),
+        "title": _clean_text(title_translated.get("en") or record.get("title")),
+        "title_fr": _clean_text(title_translated.get("fr")),
+        "organizations": organizations,
+        "eovs": list(record.get("eov") or []),
+        "obis_dataset_id": obis_uuid_from_xml_location(record.get("xml_location_url")),
+        "n_resources": len(resources),
     }
 
-    df = pd.DataFrame(line)
+    rows = []
+    for resource in resources:
+        url = resource.get("url") or ""
+        if "tabledap" not in url:
+            continue
+        try:
+            erddap_host, dataset_id = split_erddap_url(url)
+        except ValueError:
+            # A malformed tabledap URL is a metadata defect, not a harvest
+            # failure — record the package without the link rather than drop it.
+            _logger().warning(
+                "CKAN record %s has an unparseable tabledap URL: %s",
+                record.get("id"), url,
+            )
+            continue
+        rows.append(
+            {**base, "erddap_url": f"{erddap_host}/erddap".strip("/"), "dataset_id": dataset_id}
+        )
 
-    if not df.empty:
-        df = df.drop_duplicates(subset="dataset_id")
+    if not rows:
+        rows.append({**base, "erddap_url": None, "dataset_id": None})
+    return rows
 
+
+def iter_ckan_packages(cache_requests=False, session=None):
+    """Yield every package in the CKAN catalogue, one page at a time.
+
+    A generator rather than a list: the previous implementation accumulated
+    every raw record before parsing, which is untenable now that the whole
+    catalogue is enumerated instead of the `q=erddap` subset. Callers keep the
+    parsed rows (a handful of fields) and the raw page is released each loop.
+    """
+    logger = _logger()
+    api_url = ckan_api_url()
+    session = session or _build_ckan_session()
+    cache = None
+    if cache_requests:
+        # limit cache to 10gb
+        cache = dc.Cache(
+            "ckan_harvester_cache",
+            eviction_policy="none",
+            size_limit=10000000000,
+            cull_limit=0,
+        )
+        logger.info("Using CKAN request cache (volume=%s, count=%s)", cache.volume(), cache.count)
+
+    start = 0
+    seen = 0
+    total = None
+    while True:
+        query = f"{api_url}/action/package_search?rows={PAGE_SIZE}&start={start}"
+        logger.info("Fetching CKAN packages: %s", query)
+        if cache is not None and query in cache:
+            result = cache[query]
+        else:
+            result = _ckan_get_result(session, query)
+            if cache is not None:
+                cache[query] = result
+
+        results = result.get("results") or []
+        if total is None:
+            total = result.get("count", 0)
+            logger.info("CKAN catalogue holds %d records", total)
+        if not results:
+            break
+
+        yield from results
+
+        seen += len(results)
+        start += PAGE_SIZE
+        if seen >= total:
+            break
+
+    logger.info("Read %d CKAN records", seen)
+
+
+@task(task_run_name="fetch-ckan-catalogue")
+def fetch_ckan_catalogue(cache=False, limit=None) -> pd.DataFrame:
+    """Page the whole CKAN catalogue into the flat inventory frame (@task)."""
+    rows = []
+    for n, record in enumerate(iter_ckan_packages(cache_requests=cache), 1):
+        rows.append(parse_ckan_package(record))
+        if limit and n >= limit:
+            break
+
+    flat = [row for group in rows for row in group]
+    df = pd.DataFrame(flat, columns=CKAN_RECORD_COLUMNS)
+    # When CKAN was read, not when the rows were loaded: the dashboard reports
+    # snapshot age, and a run that fetches no catalogue leaves the previous
+    # snapshot (and its timestamp) in place.
+    df["snapshot_at"] = datetime.now(timezone.utc)
+    _logger().info(
+        "CKAN catalogue: %d rows from %d records (%d linked to ERDDAP, %d to OBIS)",
+        len(df), len(rows),
+        int(df["erddap_url"].notna().sum()) if not df.empty else 0,
+        int(df["obis_dataset_id"].notna().sum()) if not df.empty else 0,
+    )
     return df
 
 
-def list_ckan_records_with_erddap_urls(cache_requests):
-    """Fetch all CKAN records with ERDDAP urls (paged)."""
-    try:
-        logger = get_run_logger()
-    except Exception:
-        import logging as _logging
-        logger = _logging.getLogger(__name__)
-    logger.info(f"cache_requests: {cache_requests}")
-    row_page_limit = 1000
-    row_start = 0
-    # count total records avaiable, but we will have to page queries to get all results
-    # 1000 records per query (or as defined on the server)
-    records_remaining = 1
-    records_total = []
-    session = _build_ckan_session()
-    while records_remaining:
-        erddap_datasets_query = (
-            CKAN_API_URL
-            + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
-        )
-        logger.info(erddap_datasets_query)
-        # print(erddap_datasets_query)
-        logger.info(f"erddap_dataset_query:\n{erddap_datasets_query}")
-        if cache_requests:
-            logger.info("checking for ckan cache")
-            # limit cache to 10gb
-            cache = dc.Cache(
-                "ckan_harvester_cache",
-                eviction_policy="none",
-                size_limit=10000000000,
-                cull_limit=0,
-            )
-            logger.info("Cache stats:")
-            logger.info(f"eviction_policy: {cache.eviction_policy}")
-            logger.info(f"count: {cache.count}")
-            logger.info(f"volume: {cache.volume()}")
-            logger.info(f"size_limit {cache.size_limit}")
-            if erddap_datasets_query in cache:
-                logger.info("Cached CKAN records found")
-                result = cache[erddap_datasets_query]
+def ckan_erddap_links(catalogue: pd.DataFrame) -> pd.DataFrame:
+    """Derive the ERDDAP enrichment frame from the catalogue snapshot.
 
-            else:
-                result = _ckan_get_result(session, erddap_datasets_query)
-                cache[erddap_datasets_query] = result
-                logger.info("Cached CKAN records")
-        else:
-            result = _ckan_get_result(session, erddap_datasets_query)
+    Deduplicated on (erddap_url, dataset_id) — the pair this is joined on in
+    merge_and_write_csvs. Deduplicating on dataset_id alone silently dropped
+    the same dataset ID published by a second ERDDAP server.
+    """
+    columns = ["erddap_url", "dataset_id", "ckan_id", "ckan_organizations", "ckan_title", "title_fr"]
+    if catalogue.empty:
+        return pd.DataFrame(columns=columns)
 
-        # count of total records, regardless of paging
-        count_total = result["count"]
-        # count of records in this page, eg < 1000
-        records_total += result["results"]
-        count_page = len(records_total)
-        records_remaining = count_total - count_page
-        row_start += row_page_limit
+    linked = catalogue[catalogue["erddap_url"].notna()]
+    if linked.empty:
+        return pd.DataFrame(columns=columns)
 
-    print("Found", len(records_total), " CKAN records")
+    df = linked.rename(columns={"organizations": "ckan_organizations", "title": "ckan_title"})[columns]
+    return df.drop_duplicates(subset=["erddap_url", "dataset_id"]).reset_index(drop=True)
 
-    return records_total
+
+def ckan_obis_links(catalogue: pd.DataFrame) -> pd.DataFrame:
+    """Derive the OBIS enrichment frame from the catalogue snapshot.
+
+    Keyed on the OBIS dataset UUID, which CKAN carries in xml_location_url.
+    """
+    columns = ["dataset_id", "ckan_id", "ckan_eovs", "ckan_title", "title_fr"]
+    if catalogue.empty:
+        return pd.DataFrame(columns=columns)
+
+    linked = catalogue[catalogue["obis_dataset_id"].notna()]
+    if linked.empty:
+        return pd.DataFrame(columns=columns)
+
+    # Drop the ERDDAP dataset_id first: renaming obis_dataset_id onto it would
+    # otherwise leave two columns of that name, and the selection below would
+    # return both.
+    df = linked.drop(columns=["dataset_id"]).rename(
+        columns={"obis_dataset_id": "dataset_id", "eovs": "ckan_eovs", "title": "ckan_title"}
+    )[columns]
+    return df.drop_duplicates(subset=["dataset_id"]).reset_index(drop=True)
