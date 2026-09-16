@@ -119,7 +119,7 @@ To manually trigger a run:
 
 For more details, see:
 - [Harvester Usage Guide](harvester/README.md)
-- [DB Loader README](db-loader/README.md)
+- [DB Loader README](harvester/cde_harvester/loading/README.md)
 
 ## Front End Development
 
@@ -151,13 +151,18 @@ Run the frontend locally while using Docker Compose for all backend services (re
 
 Run only the frontend locally and connect to a remote API (recommended for frontend-only development).
 
-1. Start the frontend with a custom API URL:
+1. Start the frontend pointed at a remote API:
 
    ```sh
    cd frontend
    npm install
-   REACT_APP_API_URL=https://your-remote-api.com/api npm start
+   API_URL=https://explore.cioos.ca/api npm start
    ```
+
+   The variable is `API_URL` (Vite reads it via `loadEnv`; see
+   `frontend/.env.development`). To keep calling the same-origin `/api` path but
+   proxy it to a stack on another port or host, set `DEV_API_PROXY_TARGET`
+   instead — e.g. `DEV_API_PROXY_TARGET=http://localhost:9000 npm start`.
 
 2. See website at <http://localhost:8000>
 
@@ -228,7 +233,22 @@ For complete local development with all services running outside Docker (advance
 
 ## CI/CD
 
-Pushes to `master` and `development` automatically deploy to the corresponding environment via the [Deploy workflow](.github/workflows/deploy.yml). The workflow connects to the remote server over WireGuard VPN, syncs the repository to the exact commit that triggered the run, injects secrets from 1Password, and brings up the Docker Compose stack.
+`master` and `development` deploy to the corresponding environment via the
+[Deploy workflow](.github/workflows/deploy.yml). It is **gated on tests**: it
+runs when the Integration Tests workflow *completes successfully* on one of
+those branches, not on push, so a red build no longer deploys. The workflow
+connects to the remote server over WireGuard VPN, checks out the exact commit
+that was tested, renders `.env.production` through 1Password into `.env` on the
+server, and brings the stack up with
+`docker-compose.yaml` + `docker-compose.production.yaml`.
+
+Because the deploy renders **`.env.production` from this repo**, that file is
+the production configuration: the `op://` references in it name the 1Password
+items, and everything else in it ships as written. Changing a production setting
+means editing `.env.production` and merging it, not editing `.env` on the box.
+
+`workflow_dispatch` is available for a deliberate manual deploy, which skips the
+test gate.
 
 ## Deploying with Coolify (dev/staging)
 
@@ -242,10 +262,36 @@ the Coolify "magic" variables:
 - `SERVICE_URL_NGINX`: injected by Coolify and used as the public URL that the
   scheduler's `DOWNLOAD_WAF_URL` and the API's `PUBLIC_BASE_URL` are built from
   (falls back to `APP_URL`, then to `http://localhost:${NGINX_PORT}`).
+- `SERVICE_FQDN_PREFECT_4200` / `SERVICE_URL_PREFECT`: the same pair for the
+  Prefect UI.
 
 Coolify ignores `docker-compose.override.yaml` (and only supports a single
 compose file per resource), so local-dev port publishing never leaks into a
 Coolify deploy.
+
+### Environment variables
+
+Paste `.env.coolify.sample` into the resource's Environment Variables (use
+"Developer view" to paste the whole block). It is deliberately short:
+
+| Variable | Why |
+|---|---|
+| `DB_PASSWORD` | **Required.** The only setting with no default — compose aborts without it. |
+| `HARVEST_CONFIG_B64` | The harvest config; see below. |
+| `ENVIRONMENT`, `SENTRY_DSN` | Observability, optional. |
+| `HARVESTER_CRON`, `INCREMENTAL_MODE`, `RUN_ON_DEPLOY` | Harvest scheduling, optional. |
+
+Everything else has a working default in `docker-compose.yaml`.
+
+**Do not set `APP_URL` or `API_URL` here.** Coolify injects `SERVICE_URL_NGINX`
+with the generated FQDN and it wins over `APP_URL`, so the public URL follows
+whatever domain Coolify assigns. The SPA calls `/api` relative to the host
+serving it, so a changed domain needs no frontend rebuild either.
+
+`DB_HOST`, `DB_HOST_EXTERNAL` and `REDIS_HOST` are pinned to the compose service
+names, so setting them here does nothing. `DB_NAME` (`cde`), `DB_USER`
+(`postgres`) and `DB_PORT` (`5432`) only need a value if you want something
+other than the default.
 
 **Harvest config under Coolify:** relative bind mounts of repo files don't work
 under Coolify (the source resolves to an empty persistent-storage dir), and the
@@ -282,9 +328,43 @@ message explaining the options.
 ## Production deployment
 
 Deploy CDE to production using Docker Compose with the production configuration
-file (no Coolify). Published host ports are configurable via `.env`:
-`NGINX_PORT` (default 8098), `PREFECT_PORT` (default 4200) and `DB_PORT`
-(default 5432 — also sets Postgres' internal `PGPORT`).
+file (no Coolify).
+
+### What a deployment actually configures
+
+Almost nothing. Every setting has a working default in `docker-compose.yaml`,
+and the ones that describe the site are derived from two values:
+
+| Variable | Default | What reads it |
+|---|---|---|
+| `APP_URL` | `http://localhost:${NGINX_PORT}` | Emailed download links (`DOWNLOAD_WAF_URL`) and the OpenAPI `servers` entry (`PUBLIC_BASE_URL`) |
+| `NGINX_PORT` | `8098` | The host port nginx is published on |
+
+The resolution order is `SERVICE_URL_NGINX` (Coolify only) → `APP_URL` →
+`http://localhost:${NGINX_PORT}`, so a self-hosted deployment sets `APP_URL` and
+everything downstream follows. The SPA calls `/api` relative to whatever host
+serves it, so changing `APP_URL` does **not** require a frontend rebuild.
+
+`DB_PASSWORD` is the one value with no default: the overlay publishes the
+database port on the host, so a default would be a real credential in git.
+Compose aborts with instructions if it is missing.
+
+Beyond those, production sets only what genuinely differs from the defaults —
+see `.env.production`:
+
+- `DB_PORT=5433` (also sets Postgres' internal `PGPORT`), `DB_HOST_EXTERNAL` and
+  `DB_BIND_ADDRESS` — the VPN address the database is published on, so the
+  external harvester can reach it and nothing else can. Unset,
+  `DB_BIND_ADDRESS` falls back to `127.0.0.1`, i.e. closed.
+- `CORS_ORIGINS`, `ENABLE_API_DOCS=false`, Gmail credentials, `SENTRY_DSN`,
+  `ENVIRONMENT`.
+- `PREFECT_PORT` (default 4200) if 4200 is taken.
+
+`DB_HOST` and `REDIS_HOST` are pinned to the compose service names (`db`,
+`redis`) for every service that connects, so a value in `.env` is ignored.
+`DB_HOST_EXTERNAL` is the exception: the base file pins it to `db`, but the
+production overlay honours `.env` because the harvester can run outside compose
+and reach Postgres across the VPN.
 
 ### Compose file layout
 
@@ -326,15 +406,43 @@ is inherited from `docker-compose.yaml`, so it only has to be maintained once.
    docker network create explore-cioos_default
    ```
 
-1. Rename `.env.sample` to `.env` and configure with production settings (docker compose only auto-loads `.env`). The deploy workflow renders these from `.env.production` via 1Password.
+1. Create `.env` (docker compose only auto-loads that name). On a
+   CI-deployed host this is done for you — the workflow renders
+   `.env.production` through 1Password into `.env`. To stand one up by hand,
+   start from `.env.production` rather than `.env.sample` (the sample is tuned
+   for local dev) and replace the `op://...` references with real values. The
+   minimum for a working stack is:
+
+   ```sh
+   APP_URL=https://explore.example.ca
+   NGINX_PORT=8098
+   DB_PASSWORD=<the db superuser password>
+   COMPOSE_FILE=docker-compose.yaml:docker-compose.production.yaml
+   ```
+
+   If the database is reached over a VPN by an external harvester, add
+   `DB_HOST_EXTERNAL` and `DB_BIND_ADDRESS` (both the VPN address) — otherwise
+   the db port stays bound to loopback.
 
 2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and configure the datasets to harvest. The file is bind-mounted into the worker (not baked into the image), so it can be edited on the host at any time — see [Harvest configuration](#harvest-configuration) for how changes are picked up.
 
-3. Delete old redis and postgres data (if needed):
+3. Wipe existing data (only for a genuinely fresh install). Prefer the
+   **`Rebuild Database`** deployment over deleting volumes — it drops and
+   re-applies the schema in one transaction, flushes the tile cache and
+   re-harvests, without a host shell (see
+   [Data Harvesting (Production)](#data-harvesting-production) step 2b).
+
+   If you do need to remove the volume, note it is named for the compose
+   project, not `cde` — the CI deploys use `explore-cioos-production` /
+   `explore-cioos-development`. Check before removing anything:
 
    ```sh
-   sudo docker volume rm cde_postgres-data cde_redis-data
+   docker volume ls | grep postgres-data
+   docker volume rm <project>_postgres-data
    ```
+
+   There is no redis volume: the cache is in-memory only, so restarting redis
+   clears it.
 
 4. Start all services using the base file plus the production overlay:
 
@@ -392,9 +500,11 @@ socket). Since we use Prefect for orchestration, you don't need a system cron jo
    transaction (a mid-way failure rolls back rather than half-migrating), flushes the
    redis tile cache, and triggers `Harvest All Sources` to repopulate.
 
-   Requires `DB_NAME`/`DB_USER`/`DB_PASSWORD` on the deployment — Coolify supplies none
-   of them (see `.env.coolify.sample`). The worker now refuses to start without them
-   rather than registering deployments that fail at connection time inside every run.
+   Requires database settings on the deployment. `DB_NAME` (`cde`) and `DB_USER`
+   (`postgres`) default in `docker-compose.yaml`; `DB_PASSWORD` has no default and
+   must be set (see `.env.coolify.sample`). The worker refuses to start without
+   them rather than registering deployments that fail at connection time inside
+   every run.
 
    **This destroys all harvested data**, exactly as deleting the Postgres volume would.
    `confirm` must equal `DB_NAME` or the flow aborts before touching anything, so the
