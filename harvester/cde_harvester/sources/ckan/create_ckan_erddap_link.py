@@ -10,6 +10,8 @@ from prefect import get_run_logger, task
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from cde_harvester.core.source_cache import source_cache_path
+
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
 
@@ -195,7 +197,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
             logger.info("checking for ckan cache")
             # limit cache to 10gb
             cache = dc.Cache(
-                "ckan_harvester_cache",
+                source_cache_path("ckan-erddap-v1", "ckan_harvester_cache"),
                 eviction_policy="none",
                 size_limit=10000000000,
                 cull_limit=0,

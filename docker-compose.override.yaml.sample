@@ -31,3 +31,17 @@ services:
     # to re-register the per-source deployments.
     volumes:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
+
+# Optional: make the base stack's `source_cache` volume host-wide instead of
+# Compose-project-scoped. This is useful when several local/dev instances run
+# on the same Docker host. Create it once first:
+#
+#   docker volume create cde-dev-source-cache
+#
+# Then set HARVEST_SOURCE_CACHE_VOLUME=cde-dev-source-cache in `.env` (or
+# export it before `docker compose up`). This sample is not loaded by Coolify;
+# set the same variable in each Coolify resource instead.
+#
+# volumes:
+#   source_cache:
+#     name: ${HARVEST_SOURCE_CACHE_VOLUME:-cde-dev-source-cache}

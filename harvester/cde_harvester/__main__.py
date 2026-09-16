@@ -20,6 +20,7 @@ from cde_harvester.core.observability import (
     setup_logging,
 )
 from cde_harvester.core.schemas import HarvestAttemptSchema
+from cde_harvester.core.source_cache import source_cache_path
 from cde_harvester.sources import resolve_source
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     get_ckan_records,
@@ -422,7 +423,9 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
                 logger.info("Submitting OBIS harvest task for %d configured datasets", len(obis_dataset_ids))
             else:
                 logger.info("Submitting OBIS harvest task; dataset list resolved by discovery")
-            obis_cache = obis_folder or os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
+            obis_cache = obis_folder or source_cache_path(
+                "obis-v1", os.path.join(os.path.dirname(os.path.abspath(folder)), "obis_cache")
+            )
             obis_future = harvest_obis.submit(
                 limit_dataset_ids=obis_dataset_ids,
                 folder=obis_cache,

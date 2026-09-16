@@ -238,9 +238,12 @@ services:
       # serves harvester_logs read-only at /harvester_logs.
       - harvest_data:/app/harvester/harvest          # resulting CSV files
       - harvester_logs:/app/harvester/logs           # log files
-      # Caches persisted across runs (cheap re-fetch if lost).
-      - harvester_cache:/app/harvester/harvester_cache
-      - obis_cache:/app/harvester/obis_cache
+      # Upstream-source caches (ERDDAP, OBIS and CKAN) live beneath one root.
+      # The default named volume is private to this Compose project. Coolify
+      # dev instances on the SAME Docker host can instead set
+      # HARVEST_SOURCE_CACHE_VOLUME to a pre-created external volume name; see
+      # README.md. Never point production and dev at the same cache.
+      - source_cache:/app/harvester/source_cache
     env_file: *env-file
     environment:
       PREFECT_API_URL: http://prefect:4200/api
@@ -267,6 +270,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: ${DB_PORT:-5432}
       HARVESTER_LOG_DIR: /app/harvester/logs
+      HARVEST_SOURCE_CACHE_DIR: /app/harvester/source_cache
       # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
       PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
       # This worker registers the pool + deployments on startup.
@@ -409,9 +413,12 @@ volumes:
   nginx_logrotate:
   harvester_logs:
   downloads:
-  harvester_cache:
   harvest_data:
-  obis_cache:
+  source_cache:
+    # `name` deliberately opts out of Compose's project-name prefix when the
+    # variable is set, which is what lets separate Coolify resources reuse one
+    # host-local Docker volume. The operator creates that shared volume first.
+    name: ${HARVEST_SOURCE_CACHE_VOLUME:-${COMPOSE_PROJECT_NAME:-cde}-source-cache}
 
 # Build-time only. Read from the deploy environment (Coolify's own env vars,
 # or .env via deploy.yml resolving it from 1Password), never written into an

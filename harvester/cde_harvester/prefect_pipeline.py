@@ -30,6 +30,7 @@ from cde_harvester.core.schema import (
     ensure_database,
     rebuild_schema,
 )
+from cde_harvester.core.source_cache import source_cache_path
 from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
@@ -281,7 +282,9 @@ class PrefectCDEPipeline:
                 obis_folder = (
                     Path(self.obis_folder)
                     if self.obis_folder
-                    else base_folder.resolve().parent / "obis_cache"
+                    else Path(source_cache_path(
+                        "obis-v1", str(base_folder.resolve().parent / "obis_cache")
+                    ))
                 )
                 abs_run, abs_obis = run_folder.resolve(), obis_folder.resolve()
                 assert abs_obis != abs_run and abs_run not in abs_obis.parents, (

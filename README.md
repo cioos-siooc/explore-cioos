@@ -274,6 +274,25 @@ is gone). Provide the config one of two ways:
 Without one of these the `prefect_worker` container exits at startup with a
 message explaining the options.
 
+### Shared source cache for Coolify dev instances
+
+The worker persists upstream ERDDAP, OBIS and CKAN responses below
+`/app/harvester/source_cache`. By default this is a Compose-project-local
+volume. To let Coolify **dev** resources on the same Docker host reuse it,
+create one Docker volume on that host:
+
+```sh
+docker volume create cde-dev-source-cache
+```
+
+Set `HARVEST_SOURCE_CACHE_VOLUME=cde-dev-source-cache` in each participating
+Coolify resource and redeploy them. Enable ERDDAP/ERDDAP-CKAN response caching
+with `cache: true` in each resource's harvest config; OBIS occurrence and
+OBIS-CKAN responses are cached automatically. Do not share the cache with
+production, and clear or rename the volume when intentionally refreshing
+upstream data. Docker volumes are local to one host; separate hosts require a
+shared filesystem or dedicated cache service.
+
 ## Production deployment
 
 Deploy CDE to production using Docker Compose with the production configuration
