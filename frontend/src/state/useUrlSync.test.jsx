@@ -57,8 +57,12 @@ describe("UrlSync", () => {
 
   it("keeps the search's dataset list out of the link — only the expression", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
+    // The results themselves, not `ready`: this is the one test here that
+    // reaches into pointsData, which SelectionProvider fills from its own
+    // /pointQuery — a different request from the catalogue fetches `ready`
+    // reports on, and not always the first one home.
     await waitFor(() =>
-      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+      expect(hooks.selection.pointsData.length).toBeGreaterThan(0),
     );
 
     // The search narrows what the map draws by naming the matching datasets
