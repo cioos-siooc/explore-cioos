@@ -25,10 +25,11 @@ from datetime import datetime, timezone
 import diskcache as dc
 import pandas as pd
 import requests
-from cde_harvester.core.config import ckan_api_url
 from prefect import get_run_logger, task
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+from cde_harvester.core.config import ckan_api_url
 
 # Columns of the flat catalogue inventory. Mirrors cde.ckan_records in
 # database/1_schema.sql (minus `pk`, which the DB supplies, and `snapshot_at`,
