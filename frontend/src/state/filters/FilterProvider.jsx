@@ -234,6 +234,20 @@ export default function FilterProvider({ children }) {
   const depthFilterActive =
     startDepth !== defaultStartDepth || endDepth !== defaultEndDepth;
 
+  // How many of the catalogue filters are doing something — the same tally
+  // the top bar's Filters button and the Filters modal header both show, so
+  // it is computed once here rather than twice.
+  const activeFilterCount = [
+    eovsSelected.some((o) => o.isSelected),
+    orgsSelected.some((o) => o.isSelected),
+    datasetsSelected.some((o) => o.isSelected),
+    platformsSelected.some((o) => o.isSelected),
+    anyServersSelected || anyObisNodesSelected,
+    scientificNamesSelected.length > 0,
+    timeFilterActive,
+    depthFilterActive,
+  ].filter(Boolean).length;
+
   // Set when any catalog fetch fails (e.g. API gateway timeouts) so the UI
   // can surface a retry instead of silently empty filters.
   const [catalogError, setCatalogError] = useState(false);
@@ -688,6 +702,7 @@ export default function FilterProvider({ children }) {
     timeFilterActive,
     timeExtent,
     depthFilterActive,
+    activeFilterCount,
     anyServersSelected,
     anyObisNodesSelected,
     allObisNodesSelected,

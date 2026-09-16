@@ -10,37 +10,86 @@
   height: min(72vh, 760px);
 }
 
-/* The title is a row now, not a line of text: at the narrow widths its leading
-   segment is a button (below). The filter name is what gives way when the row
-   runs short — never the heading or the close button beside it. */
+/* Branded like the download header below it: a bare icon (no tile) ahead of a
+   title/counter row stacked over a subtitle. */
+.filtersModal .modal-header {
+  align-items: flex-start;
+}
+
+/* Icon + text-stack as one row — kept together as Modal.Title's only content
+   so .modal-header's `justify-content: space-between` still just splits two
+   things (this title block and the close button) rather than spacing three
+   items apart and stranding the title in the middle of the row. */
 .filtersModal .modal-title {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
-/* The open filter's name, trailing "Filters" as a breadcrumb — the detail pane
-   fills most of the dialog, so the title is where you look to know what you are
-   editing. Lighter than the title itself: it is the subject, not the heading. */
-.filtersModal .filtersModalTitleCurrent {
+.filtersModal .filtersModalTitleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  color: var(--cioos-primary);
+}
+
+.filtersModal .filtersModalTitleText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.filtersModal .filtersModalTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filtersModal .filtersModalTitleHeading {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: var(--cioos-font-size-lg);
+  line-height: 1.2;
+  color: var(--cioos-navy);
+}
+
+/* Same pill as the datasets toggle's count and the top bar's filter count —
+   one visual for "how many" everywhere it shows up. */
+.filtersModal .filtersModalTitleCounter {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-navy);
+  color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* The open filter's name, or a static hint while none is open — the subject
+   of the dialog, not the heading. */
+.filtersModal .filtersModalTitleSubtitle {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 400;
   color: var(--cioos-ink-60);
-  font-weight: 500;
 }
 
-.filtersModal .filtersModalTitleCurrent::before {
-  content: "›";
-  margin: 0 8px;
-  color: var(--cioos-ink-40);
-}
-
-/* The breadcrumb's first segment, as a control, at the widths where the open
-   filter covers the list it was chosen from. Same pill as the datasets
-   sidebar's back button — it is the same gesture out of the same kind of
-   drill-in. */
+/* The way back to the list, at the widths where the open filter covers it.
+   Same pill as the datasets sidebar's back button — it is the same gesture
+   out of the same kind of drill-in. */
 .filtersModal .filtersModalBack {
   display: inline-flex;
   align-items: center;
@@ -74,16 +123,20 @@
   overflow: hidden;
 }
 
-/* Branded download header: icon tile + title stacked over a helper subtitle. */
+/* Branded download header: a bare icon ahead of a title/counter row stacked
+   over a helper subtitle — same pattern as the Filters header beside it. */
 .downloadModal .modal-header {
   background-color: var(--cioos-white);
   align-items: flex-start;
 }
 
+/* Icon + text-stack as one row — kept together as Modal.Title's only content,
+   same reasoning as the Filters header above. */
 .downloadModal .modal-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .downloadModalTitleIcon {
@@ -91,11 +144,9 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--cioos-radius);
-  background-color: var(--cioos-teal-light);
-  color: var(--cioos-primary-700);
+  width: 28px;
+  height: 28px;
+  color: var(--cioos-primary);
 }
 
 .downloadModalTitleText {
@@ -105,12 +156,33 @@
   min-width: 0;
 }
 
+.downloadModalTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .downloadModalTitleHeading {
   font-family: var(--cioos-font-display);
   font-weight: 700;
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
+}
+
+/* Same pill as the Filters header's counter and the datasets toggle's count. */
+.downloadModalTitleCounter {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-navy);
+  color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
 }
 
 .downloadModalTitleSubtitle {
@@ -167,14 +239,6 @@
      (DownloadDetails/styles.css). */
   .downloadModal .modal-body {
     overflow-y: auto;
-  }
-
-  /* The header is the surface's title bar now, so it gets the room to be one
-     — and the download title's icon tile comes off, its 40px square being the
-     first thing worth spending on a heading that has to share its row with a
-     close button. */
-  .downloadModalTitleIcon {
-    display: none;
   }
 
   /* Clear of the home indicator on a notched phone: this body scrolls to its

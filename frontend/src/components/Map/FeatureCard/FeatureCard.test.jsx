@@ -172,8 +172,7 @@ describe("FeatureCard", () => {
     });
     await user.click(screen.getByTitle("Select all 2 datasets here"));
     await waitFor(() => {
-      const updated = latestSelection.pointsData.find((p) => p.pk === rowA.pk);
-      expect(updated.selected).toBe(true);
+      expect(latestSelection.selectedPks.has(rowA.pk)).toBe(true);
     });
     expect(latestMap.featureQuery).toBeNull();
   });

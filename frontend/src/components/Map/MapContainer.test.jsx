@@ -108,6 +108,20 @@ describe("MapContainer", () => {
     );
   });
 
+  it("onMarkerClick pins its dataset in featureQuery, the same way a hex click does", async () => {
+    await renderReady();
+    const highlightQuery = {
+      datasetPks: [ROW.pk],
+      highlight: { type: "FeatureCollection", features: [] },
+      nonce: 1,
+      lngLat: [1, 2],
+    };
+    await latestMapProps.onMarkerClick(ROW.pk, 123, highlightQuery);
+    await waitFor(() =>
+      expect(latestMapState.featureQuery).toEqual(highlightQuery),
+    );
+  });
+
   it("onMarkerClick does nothing for a pk not in the current results", async () => {
     await renderReady();
     await latestMapProps.onMarkerClick(999999999, 123);

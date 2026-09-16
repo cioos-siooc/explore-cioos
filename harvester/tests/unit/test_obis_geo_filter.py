@@ -116,6 +116,28 @@ class TestExtentIntersects:
 
 
 # ---------------------------------------------------------------------------
+# bounds
+# ---------------------------------------------------------------------------
+
+class TestBounds:
+    def test_returns_polygon_bounding_box(self, geo_filter):
+        assert geo_filter.bounds() == (-130.0, 48.0, -120.0, 55.0)
+
+    def test_mode_none_returns_none(self):
+        gf = ObisGeoFilter(mode="none")
+        assert gf.bounds() is None
+
+    def test_inside_point_is_within_bounds(self, geo_filter):
+        lon_min, lat_min, lon_max, lat_max = geo_filter.bounds()
+        assert lon_min <= INSIDE_LON <= lon_max
+        assert lat_min <= INSIDE_LAT <= lat_max
+
+    def test_outside_point_is_outside_bounds(self, geo_filter):
+        lon_min, lat_min, lon_max, lat_max = geo_filter.bounds()
+        assert not (lon_min <= OUTSIDE_LON <= lon_max and lat_min <= OUTSIDE_LAT <= lat_max)
+
+
+# ---------------------------------------------------------------------------
 # filter_points
 # ---------------------------------------------------------------------------
 

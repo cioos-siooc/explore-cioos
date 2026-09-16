@@ -38,30 +38,42 @@
 
 .featureCardHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--cioos-space-sm);
   padding: var(--cioos-space-sm) var(--cioos-space-sm) var(--cioos-space-xs)
     var(--cioos-space-md);
   border-bottom: 1px solid var(--cioos-hairline);
 }
 
+/* Same bare, no-tile icon as the Filters/Download/Datasets headers, centered
+   against the title + subtitle stack beside it. */
+.featureCardHeadingIcon {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--cioos-primary);
+}
+
 .featureCardHeading {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
   flex: 1;
 }
 
-.featureCardHeadingTitle {
-  display: inline-flex;
+.featureCardHeadingTitleRow {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--cioos-ink-60);
+  gap: 8px;
+  min-width: 0;
+}
+
+.featureCardHeadingTitle {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: var(--cioos-font-size-lg);
+  line-height: 1.2;
+  color: var(--cioos-navy);
 }
 
 /* Names the goldenrod this card's own top border borrows from the map's
@@ -79,9 +91,24 @@
   filter: drop-shadow(0 0 2px var(--cioos-map-click-glow));
 }
 
+/* Same pill as the Filters/Download/Datasets headers' counters. */
+.featureCardHeadingCounter {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-navy);
+  color: var(--cioos-white);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
 .featureCardHeadingMeta {
   font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink);
+  color: var(--cioos-ink-60);
 }
 
 .featureCardClose {

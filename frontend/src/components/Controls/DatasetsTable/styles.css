@@ -10,10 +10,9 @@
   text-align: left;
 }
 
-/* --- Controls: two rows above the list — select-all and search, then how the
-   list is arranged (sort and grouping, both ui/SelectPill.jsx). Two, and not
-   the four they were, because this block sits between the panel header and the
-   first card: every row it takes is a row of results a phone doesn't show. --- */
+/* --- Controls: search, then how the list is arranged (sort and grouping, both
+   ui/SelectPill.jsx). The download modal also puts its local select-all beside
+   the sort control. --- */
 .datasetsCardControls {
   flex: 0 0 auto;
   display: flex;
@@ -48,41 +47,68 @@
 /* Keeps its label at every width, unlike the two pills below it: it is the one
    control here that commits the reader to something — every dataset in the
    results joins the download — and the search box beside it still has room to
-   be typed in without the row it would take to spell that out. */
+   be typed in without the row it would take to spell that out.
+
+   A label around the same checkbox the rows carry: what it does is tick every
+   box below, so it says so by being one. It used to be a pill that filled with
+   teal, which stated its own state in a second visual language and left the
+   boxes it controls to state theirs in the first. */
 .selectAllToggle {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   white-space: nowrap;
-  background: transparent;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  padding: 5px 10px;
+  margin: 0;
+  padding: 5px 10px 5px 4px;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   color: var(--cioos-ink-60);
   cursor: pointer;
-  transition:
-    background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast);
 }
 
-.selectAllToggle:focus-visible {
-  outline: none;
+/* Drawn rather than left to accent-color: the browser picks the checkmark's
+   own colour from the accent's luminance, and against this mid teal it chooses
+   near-black. The tick is the one part that has to stay legible, so the box
+   carries the teal and the tick is white on top of it. */
+.selectAllToggle input {
+  appearance: none;
+  display: grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--cioos-ink-40);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  cursor: pointer;
+}
+
+.selectAllToggle input:checked {
   border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
+  background-color: var(--cioos-primary);
+}
+
+/* place-content centres the tick's own box; the translate centres the ink
+   inside it. Rotating an L of two borders 45deg leaves its ink sitting
+   sqrt(2)/2 below the box it is drawn in, so centring the box alone hangs the
+   tick high — measured at 0.7px, which is what comes back off. */
+.selectAllToggle input:checked::after {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid var(--cioos-white);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-0.7px) rotate(45deg);
+}
+
+.selectAllToggle input:focus-visible {
+  outline: 2px solid var(--cioos-primary-700);
+  outline-offset: 2px;
 }
 
 .selectAllToggle:hover {
-  background-color: var(--cioos-teal-light);
   color: var(--cioos-ink);
-}
-
-.selectAllToggle.active {
-  background-color: var(--cioos-primary);
-  border-color: var(--cioos-primary);
-  color: var(--cioos-white);
 }
 
 .datasetsTableSearchWrap {
@@ -126,6 +152,69 @@
   gap: 6px;
 }
 
+/* --- Download modal: one row, not three.
+   The sidebar stacks its toolbar over its arrange row because both are full of
+   controls. The modal has two — select-all and sort — and the size legend, so
+   the three sit inline with the legend pushed to the right, and the rows saved
+   go to the cards. --- */
+.datasetsTable.downloadModal .datasetsCardControls {
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.datasetsTable.downloadModal .datasetsCardToolbar {
+  width: auto;
+}
+
+/* --- One dataset per row, full width. The card reflows to use that width
+   rather than stacking short rows down the middle of it — see
+   .datasetCard.downloadModal .datasetCardBody below. --- */
+
+/* Which datasets the CDE can deliver directly: the key to the size pill and
+   the tick/cross on every card below. margin-left rather than an order change
+   so that when the row is too narrow to hold all three it is the legend —
+   the only one of the three that is read once — that wraps away. */
+.downloadLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: auto;
+  gap: 4px 18px;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-sm);
+}
+
+.downloadLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.downloadLegendItem .legendIcon.success {
+  color: var(--cioos-success);
+}
+
+.downloadLegendItem .legendIcon.error {
+  color: var(--cioos-error);
+}
+
+.legendBadge {
+  border-radius: var(--cioos-radius-pill);
+  padding: 1px 8px;
+  font-weight: 600;
+}
+
+.legendBadge.success {
+  background-color: var(--cioos-success-bg);
+  color: var(--cioos-primary-700);
+}
+
+.legendBadge.error {
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-error);
+}
+
 /* --- Card list: the one scroll region --- */
 .datasetsCardList {
   flex: 1 1 auto;
@@ -138,6 +227,9 @@
 }
 
 .datasetsCardEmpty {
+  /* Spans the modal's grid: "no datasets" is about the list, not its first
+     cell. Inert in the sidebar's single column. */
+  grid-column: 1 / -1;
   padding: 24px 12px;
   text-align: center;
   color: var(--cioos-ink-60);
@@ -160,8 +252,61 @@
   height: 10px;
   border-radius: 3px;
   border: 2px solid var(--cioos-map-click);
-  background-color: var(--cioos-map-click-surface);
   box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
+}
+
+/* --- Add to download: the first thing on the title's line, ahead of the
+   platform dot. No pill, no ground of its own — the glyph carries the whole
+   control, and which glyph it is says which way the click goes: a download
+   sign while the dataset is out of the order, a ticked circle once it is in.
+   That reads straight down the left edge of the list, so "which of these have
+   I picked?" is one glance rather than one row at a time.
+
+   Height-matched to the title's first line, like the platform dot beside it,
+   so the three sit on one baseline however the title wraps.
+
+   min-height, not height: the figure is the title's line box, which is what
+   these slots line up against — but it is a floor, not a ceiling. A fixed
+   height leaves a 16px glyph 0.75px of slack in a 17.5px box and anything
+   taller (the size pill, which is 20.5px once its padding is counted) hanging
+   out of the bottom of a box that cannot grow, which is what cropped the
+   circles and the checkbox. --- */
+.datasetCardSelect {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+  transition: color var(--cioos-transition-fast);
+}
+
+/* In the order: the selection's own teal, the same state the card's border and
+   the sidebar's Download button are in. */
+.datasetCardSelect.checked {
+  color: var(--cioos-primary);
+}
+
+@media (hover: hover) {
+  .datasetCardSelect:not(:disabled):hover {
+    color: var(--cioos-primary-700);
+  }
+}
+
+.datasetCardSelect:focus-visible {
+  outline: 2px solid var(--cioos-primary-700);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Griddap is metadata-only, and in the modal a dataset over the 1 GB ceiling is
+   one the queue will refuse: neither can enter the download. */
+.datasetCardSelect:disabled {
+  color: var(--cioos-hairline);
+  cursor: not-allowed;
 }
 
 /* --- Card --- */
@@ -190,9 +335,9 @@
    border would grow the card by 2px and jostle its neighbours in the list every
    time a row's state changed; a shadow ring reads the same but costs no layout.
    The glow applies to selected rows too — it says where the row came from,
-   which is orthogonal to whether it is in the download — while the wash and the
-   border are left to `:not(.selected)`, the selection's own teal border and
-   background wash being the more important of the two facts about such a row. */
+   which is orthogonal to whether it is in the download — while the wash is
+   left to `:not(.selected)`, the selection's own teal border being the more
+   important of the two facts about such a row. */
 .datasetCard.fromMapClick {
   box-shadow:
     0 0 0 2px var(--cioos-map-click-glow),
@@ -202,7 +347,6 @@
 
 .datasetCard.fromMapClick:not(.selected) {
   border-color: var(--cioos-map-click);
-  background-color: var(--cioos-map-click-surface);
 }
 
 .datasetCard.clickable {
@@ -221,7 +365,6 @@
 }
 
 .datasetCard.selected {
-  background-color: rgb(198 227 223 / 35%);
   border-color: var(--cioos-primary);
 }
 
@@ -342,64 +485,6 @@
   text-align: center;
 }
 
-/* --- Add to download: a plus in the card's bottom-right corner that becomes a
-   tick once the dataset is in the download selection.
-
-   Always visible, at rest, on every device. The control it replaces was a
-   circle-and-label badge on the top-left that faded in only on hover, so on a
-   mouse the resting list showed nothing about what was in the download —
-   answering "which of these have I picked?" meant sweeping the cursor down the
-   column. A tick that is simply there costs one small glyph per row and answers
-   it at a glance.
-
-   Bottom-right because the meta row is the card's shortest line, so the button
-   sits in space the content was not using; top-left would have collided with
-   the platform dot and the title. --- */
-.datasetCardAdd {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-
-  /* No pill around it. The border and its inner padding took most of a small
-     box and left the glyph cramped; the icon is a complete shape on its own (a
-     plus, then a filled tick), so it carries the control unaided. */
-  border: none;
-  background: transparent;
-  color: var(--cioos-ink-40);
-  cursor: pointer;
-  transition: color var(--cioos-transition-fast);
-}
-
-@media (hover: hover) {
-  .datasetCardAdd:not(:disabled):hover {
-    color: var(--cioos-primary-700);
-  }
-}
-
-.datasetCardAdd:focus-visible {
-  border-radius: var(--cioos-radius-sm);
-  box-shadow: var(--cioos-focus);
-  outline: none;
-}
-
-/* In the selection. The filled tick in the brand teal reads from across the
-   list, which is the whole point of keeping this control visible at rest. */
-.datasetCardAdd.checked {
-  color: var(--cioos-primary);
-}
-
-/* Griddap: metadata-only, never downloadable through the CDE. */
-.datasetCardAdd:disabled {
-  color: var(--cioos-hairline);
-  cursor: not-allowed;
-}
-
 /* --- Card body --- */
 .datasetCardBody {
   flex: 1 1 auto;
@@ -407,6 +492,47 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Across the modal's full width the same four rows stacked would be four short
+   lines down the left of a wide white band. Two of them are short by nature —
+   what the dataset is, and where to get it — so they share a row, one pushed to
+   each end; the title and the query, the two that can run long, keep the whole
+   width. Grid rather than a wrapper element around the pair: the placement is
+   the only thing that differs between the two contexts the card renders in, and
+   the sidebar's single column is the same markup with no rule applied. */
+.datasetCard.downloadModal .datasetCardBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 16px;
+}
+
+.datasetCard.downloadModal .datasetCardHeadline {
+  grid-column: 1 / -1;
+}
+
+/* Sitting at the right end of the row the meta line opens is what tells the
+   two apart: what the dataset is at one end, how to get hold of it at the
+   other. */
+.datasetCard.downloadModal .datasetCardSources {
+  justify-content: flex-end;
+}
+
+/* Below the width where the dialog goes full-screen (Modals/styles.css) there
+   is no width to share: the `auto` track holds the links at full size and the
+   meta line is squeezed to its longest word. So the pair stops sharing a row
+   and the card is the stack it is in the sidebar. */
+@media (max-width: 700px) {
+  .datasetCard.downloadModal .datasetCardBody {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .datasetCard.downloadModal .datasetCardSources {
+    justify-content: flex-start;
+  }
 }
 
 .datasetCardHeadline {
@@ -421,10 +547,15 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  height: calc(var(--cioos-font-size-base) * 1.25);
+  min-height: calc(var(--cioos-font-size-base) * 1.25);
 }
 
 .datasetCardTitle {
+  /* Takes whatever the platform dot and the status slot leave, and no more:
+     without min-width a long unbroken title refuses to shrink and pushes the
+     slot off the card. */
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: var(--cioos-font-display);
   font-weight: 700;
   font-size: var(--cioos-font-size-base);
@@ -437,10 +568,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-
-  /* Clears the add-to-selection button in the bottom-right corner, which floats
-     over this row. */
-  padding-right: 26px;
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
 }
@@ -457,23 +584,22 @@
   color: var(--cioos-ink-40);
 }
 
-/* --- Download-modal extras: size + status --- */
+/* --- Download-modal extras: the size and status slot at the end of the title
+   line. Height-matched to the title's first line like the platform dot at the
+   other end, so the two sit on one baseline however the title wraps. --- */
 .datasetCardDownloadInfo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
-  padding-top: 4px;
-  margin-top: 2px;
-  border-top: 1px solid var(--cioos-hairline);
-  font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
-}
-
-.datasetCardSize {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+}
+
+.datasetCardSizeTotal {
+  color: var(--cioos-ink-40);
 }
 
 .datasetCardSizePill {
@@ -494,6 +620,85 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+.datasetCardStatus .datasetCardSizePill {
+  font-size: var(--cioos-font-size-xs);
+}
+
+/* --- Where the dataset lives, and how to fetch it: the publishing server's
+   page, the CIOOS catalogue record, and the direct download. Its own row
+   rather than the tail of the size/status line, because it is three links on
+   the narrowest card and one of them wraps there. --- */
+.datasetCardSources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-size: var(--cioos-font-size-sm);
+}
+
+.datasetCardSourceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--cioos-primary-700);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The one link that fetches data rather than opening a page. Its download
+   glyph is what says so — a filled pill here read as the card's primary
+   action, which it is not: the card's action is the checkbox at the other end
+   of the title, and three links in a row should look like three links. */
+.datasetCardSourceLink.download {
+  text-decoration: none;
+}
+
+.datasetCardSourceLink.download:hover {
+  text-decoration: underline;
+}
+
+/* The three parts of one offer. A tighter gap than .datasetCardSources' own,
+   so the warning and the copy read as belonging to the link between them
+   rather than as two more entries in the row of links. */
+.datasetCardDownloadGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The link fetches a bounding box rather than the shape that was drawn. Amber
+   on the card, spelled out on hover and to a screen reader: at this size the
+   glyph can only say "there is something to know about this link". */
+.datasetCardLinkWarning {
+  display: inline-flex;
+  align-items: center;
+  color: var(--cioos-warn);
+}
+
+.datasetCardCopyLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+  transition: color var(--cioos-transition-fast);
+}
+
+@media (hover: hover) {
+  .datasetCardCopyLink:hover {
+    color: var(--cioos-primary-700);
+    background-color: var(--cioos-surface-2);
+  }
+}
+
+.datasetCardCopyLink:focus-visible {
+  outline: 2px solid var(--cioos-primary-700);
+  outline-offset: 1px;
 }
 
 .downloadableIcon.success {

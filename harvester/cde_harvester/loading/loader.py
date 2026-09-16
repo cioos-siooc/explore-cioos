@@ -16,6 +16,7 @@ from cde_harvester.core.day_sets import (
     ranges_from_iso,
     ranges_to_pg_literal,
     ranges_to_psycopg,
+    total_days,
 )
 from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.observability import init_sentry
@@ -78,28 +79,36 @@ logger = logging.getLogger()
 init_sentry()
 
 
+def parse_day_ranges(value):
+    """A day_ranges cell -> list of (date, date) runs.
+
+    The value arrives as a repr'd list of ISO pairs from the CSV, or as the
+    live list when the harvester hands the frame over in-process. Both load
+    paths need this; only what they do with the result differs, so the
+    rendering stays with the caller (profiles bind parameters and need
+    psycopg2 ranges, obis_cells go through COPY and need a text literal).
+    """
+    # NaN is truthy, so `value or []` would let a missing cell through into
+    # ranges_from_iso; check the types explicitly instead.
+    if isinstance(value, str):
+        value = ast.literal_eval(value)
+    if not isinstance(value, (list, tuple)):
+        return []
+    return ranges_from_iso(value)
+
+
 def prepare_profiles_dataframe(profiles):
     """Clean and prepare profiles DataFrame for insertion."""
     profiles = profiles.replace("", np.NaN)
-    # day_ranges arrives as a repr'd list of ISO pairs from the CSV, or as the
-    # live list when the harvester hands the frame over in-process. to_sql
-    # binds parameters rather than running them through a column input
+    # to_sql binds parameters rather than running them through a column input
     # function, and psycopg2 adapts a list of strings as text[] — which
     # PostgreSQL refuses to assign to a daterange[] column. Its own DateRange
     # type adapts correctly, so convert here, at the one place both callers
     # pass through.
     if "day_ranges" in profiles.columns:
-
-        def _to_ranges(value):
-            # NaN is truthy, so `value or []` would let a missing cell through
-            # into ranges_from_iso; check the types explicitly instead.
-            if isinstance(value, str):
-                value = ast.literal_eval(value)
-            if not isinstance(value, (list, tuple)):
-                return []
-            return ranges_to_psycopg(ranges_from_iso(value))
-
-        profiles["day_ranges"] = profiles["day_ranges"].apply(_to_ranges)
+        profiles["day_ranges"] = profiles["day_ranges"].apply(
+            lambda value: ranges_to_psycopg(parse_day_ranges(value))
+        )
     # Both time bounds are NOT NULL in cde.profiles. Drop either-null rows here,
     # mirroring the harvester's filter (profiles.py): a time_max that passes the
     # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
@@ -137,6 +146,11 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     # falls back to the cell's span for those rows, so treat it as absent
     # rather than requiring a re-harvest to load at all.
     has_day_ranges = "day_ranges" in obis_cells.columns
+    if has_day_ranges:
+        # Parse before the groupby: merge_ranges unpacks each element as a
+        # (lo, hi) pair, so handing it the raw CSV string iterates it one
+        # character at a time and raises "not enough values to unpack".
+        obis_cells["day_ranges"] = obis_cells["day_ranges"].apply(parse_day_ranges)
 
     # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
     key_cols = ["dataset_id", "latitude", "longitude"]
@@ -167,6 +181,13 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
         .agg(**aggregations)
         .reset_index()
     )
+
+    if has_day_ranges:
+        # days has to report the union day_ranges now holds. max() is right
+        # only while the merged rows' day sets overlap; where they don't -- two
+        # float-noise halves of a cell sampled on different days -- it
+        # understates, and the two columns disagree about the same cell.
+        agg["days"] = agg["day_ranges"].apply(total_days)
 
     if name_to_aphia:
 
