@@ -12,6 +12,45 @@
 x-env-file: &env-file
   - .env
 
+# --- The public URL of the site ----------------------------------------------
+# Anything that has to produce a link usable from OUTSIDE the compose network
+# (download emails, the OpenAPI "servers" entry) resolves it from one chain:
+#
+#   ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}
+#
+#   1. SERVICE_URL_NGINX  injected by Coolify once nginx has an FQDN
+#   2. APP_URL            set it for any other public deployment; the ONLY
+#                         URL that ever needs configuring
+#   3. http://localhost:${NGINX_PORT:-8098}   local dev, derived from the one
+#                         port the override/production files publish
+#
+# So local dev needs nothing, and a self-hosted deployment needs APP_URL (plus
+# NGINX_PORT if 8098 is taken). YAML anchors hold whole values, not string
+# fragments, so the chain is spelled out at each use rather than shared.
+
+# Database connection, identical for every service that talks to Postgres.
+# Delivered by compose interpolation rather than only `env_file` below: Coolify
+# reliably populates variables for interpolation (that is why `db` and `prefect`
+# come up), but the .env that `env_file` reads can be absent or empty on a
+# deployment — which once left the harvester with no DB settings at all while
+# db/prefect ran on the same values. Delivering them both ways keeps every
+# service off that cliff. See harvester/core/db.py:REQUIRED_DB_SETTINGS and the
+# startup pre-flight in worker-entrypoint.sh.
+#
+# Name, user and port have defaults because they are not secrets and every
+# deployment has so far used these values. DB_PASSWORD deliberately has none:
+# the production overlay PUBLISHES this port on the host, so a default password
+# would be a real credential shipped in git. `:?` aborts the compose command
+# instead of handing Postgres an empty password. The guard is spelled out only
+# here and on the `db` service — every other DB_PASSWORD reference is reached
+# through one of the two, so a missing value can never get past them.
+x-db-env: &db-env
+  DB_HOST: db
+  DB_NAME: ${DB_NAME:-cde}
+  DB_USER: ${DB_USER:-postgres}
+  DB_PASSWORD: ${DB_PASSWORD:?required — run ./scripts/init-dev-env.sh, or set it in .env}
+  DB_PORT: ${DB_PORT:-5432}
+
 services:
   db:
     build: ./database
@@ -28,10 +67,12 @@ services:
     # straight from `docker logs` instead of reconstructing it after the fact.
     command: ["postgres", "-c", "log_lock_waits=on"]
     environment:
+      # Postgres' own variable names, so this service cannot use *db-env; the
+      # values behind them are the same, defaults included.
       - "PGPORT=${DB_PORT:-5432}"
-      - "POSTGRES_DB=$DB_NAME"
-      - "POSTGRES_PASSWORD=$DB_PASSWORD"
-      - "POSTGRES_USER=$DB_USER"
+      - "POSTGRES_DB=${DB_NAME:-cde}"
+      - "POSTGRES_PASSWORD=${DB_PASSWORD:?required — run ./scripts/init-dev-env.sh, or set it in .env}"
+      - "POSTGRES_USER=${DB_USER:-postgres}"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -42,7 +83,7 @@ services:
       # connections. Dependents (prefect, db_migrate, web-api) then connect over
       # TCP too early and crash with ConnectionRefused. Forcing TCP here keeps
       # service_healthy false until the real server is actually accepting TCP.
-      test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME}", "-U", "${DB_USER}", "-h", "127.0.0.1", "-p", "${DB_PORT:-5432}"]
+      test: ["CMD", "pg_isready", "-q", "-d", "${DB_NAME:-cde}", "-U", "${DB_USER:-postgres}", "-h", "127.0.0.1", "-p", "${DB_PORT:-5432}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -65,11 +106,13 @@ services:
         condition: service_healthy
     restart: "no"
     environment:
+      # psql's own variable names; same values as *db-env (whose `:?` guard has
+      # already run by the time this is reached).
       PGHOST: db
       PGPORT: ${DB_PORT:-5432}
-      PGUSER: $DB_USER
-      PGPASSWORD: $DB_PASSWORD
-      PGDATABASE: $DB_NAME
+      PGUSER: ${DB_USER:-postgres}
+      PGPASSWORD: ${DB_PASSWORD}
+      PGDATABASE: ${DB_NAME:-cde}
     volumes:
       - ./database:/database:ro
     command:
@@ -92,20 +135,13 @@ services:
     env_file: *env-file
     environment:
       # Docker-network service names so the API reaches Postgres/Redis without a
-      # repo .env. web-api/db.js reads DB_HOST and utils/redis.js reads REDIS_HOST;
-      # both default to localhost when unset. Mirrors the prefect_worker service.
-      DB_HOST: db
+      # repo .env, plus the credentials by interpolation — see *db-env above.
+      <<: *db-env
       REDIS_HOST: redis
-      # The credentials too, by interpolation rather than only `env_file` above.
-      # Same reasoning as prefect_worker: Coolify reliably populates variables for
-      # interpolation (that is why `db` and `prefect` come up), but the .env that
-      # `env_file` reads can be absent or empty on a deployment — which left the
-      # harvester with no DB settings at all while db/prefect ran on the same
-      # values. Delivering them both ways keeps this service off that cliff.
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_PORT: ${DB_PORT:-5432}
+      # Server URL shown in the Swagger UI and openapi.json. Derived from the
+      # public URL chain so the docs point at the deployment serving them
+      # instead of swagger.js's hardcoded localhost:8098 fallback.
+      PUBLIC_BASE_URL: ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/api
     expose:
       - "5000"
     depends_on:
@@ -149,27 +185,24 @@ services:
         condition: service_completed_successfully
     env_file: *env-file
     environment:
-      # Under Coolify, SERVICE_URL_NGINX is injected with nginx's public URL;
-      # elsewhere it is unset and APP_DOMAIN from .env is used.
-      - "DOWNLOAD_WAF_URL=${SERVICE_URL_NGINX:-${APP_DOMAIN}}/downloads"
-      # Same reason as web-api: Coolify supplies DB_NAME/USER/PASSWORD/PORT but
-      # not the host. download_scheduler.py reads envs["DB_HOST"] unconditionally
-      # at import, so without this the module raises KeyError before it can poll
-      # and the container crash-loops on restart: unless-stopped.
-      - "DB_HOST=db"
-      # As above: interpolation as well as `env_file`, so an empty .env cannot
-      # leave the scheduler unable to reach the queue.
-      - "DB_NAME=${DB_NAME}"
-      - "DB_USER=${DB_USER}"
-      - "DB_PASSWORD=${DB_PASSWORD}"
-      - "DB_PORT=${DB_PORT:-5432}"
+      # download_scheduler.py reads envs["DB_HOST"] unconditionally at import, so
+      # without *db-env the module raises KeyError before it can poll and the
+      # container crash-loops on restart: unless-stopped.
+      <<: *db-env
+      # Emailed download links must work from outside the compose network, so
+      # this is the one place the public URL chain matters most. It used to read
+      # ${SERVICE_URL_NGINX:-${APP_DOMAIN}} — but APP_DOMAIN was defined in no
+      # env template, so off Coolify every emailed link was a bare
+      # "/downloads/<file>.zip". `environment:` also beats `env_file:`, so the
+      # DOWNLOAD_WAF_URL people set in .env was silently discarded here.
+      DOWNLOAD_WAF_URL: ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/downloads
       # Makes each download a Prefect flow run in the same UI as the harvests
       # (download_scheduler.run_download_observed). Delete this line to turn
       # that off: the queue still drains, it just stops being visible.
       # Hardcoded, NOT ${PREFECT_API_URL}, for the same reason prefect_worker
       # hardcodes it: .env sets that var to localhost:4200 for host-side CLI
       # use, and interpolating it here points the container at itself.
-      - "PREFECT_API_URL=http://prefect:4200/api"
+      PREFECT_API_URL: http://prefect:4200/api
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
@@ -247,25 +280,11 @@ services:
       PREFECT_LOGGING_LEVEL: INFO
       HARVEST_CONFIG_FILE: /app/harvester/harvest_config.yaml
       # In-process flows inherit this container's env for DB / redis access.
+      # The harvester reads DB_HOST_EXTERNAL rather than DB_HOST (it also runs
+      # outside compose); the production overlay repoints it across the VPN.
+      <<: *db-env
       DB_HOST_EXTERNAL: db
       REDIS_HOST: redis
-      # The connection settings themselves, delivered by compose interpolation —
-      # the same way `db` (POSTGRES_DB=$DB_NAME) and `prefect`
-      # (PREFECT_API_DATABASE_CONNECTION_URL) already get them, rather than
-      # relying on `env_file: .env` above.
-      #
-      # These are the SAME values, not different ones. The two delivery paths are
-      # not equally reliable: Coolify always provides variables for interpolation
-      # (which is why db and prefect come up), but the `.env` that `env_file`
-      # reads can be absent or empty on a deployment. When that happened, this
-      # container started with no DB settings at all and every flow run died at
-      # connection time ("DB_NAME is not set") while db and prefect ran happily
-      # on the very same credentials — see harvester/core/db.py:REQUIRED_DB_SETTINGS
-      # and the startup pre-flight in worker-entrypoint.sh.
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_PORT: ${DB_PORT:-5432}
       HARVESTER_LOG_DIR: /app/harvester/logs
       # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
       PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
@@ -355,16 +374,21 @@ services:
         asyncio.run(ensure_db())
         PY
         exec prefect server start --host 0.0.0.0
-    # DB_USER / DB_PASSWORD / DB_NAME / DB_PORT for the connection URL.
     env_file: *env-file
     environment:
+      # The init script above reads DB_USER / DB_PASSWORD / DB_NAME directly, so
+      # it needs *db-env for the same reason web-api does: `env_file` alone can
+      # be empty on a deployment. (DB_HOST is inert here — the script hardcodes
+      # `db`, which is the same value.)
+      <<: *db-env
       # Under Coolify: declare a domain for the UI (port 4200) so the proxy
       # routes to it, mirroring SERVICE_FQDN_NGINX_4000 on nginx. Empty value =>
       # Coolify auto-generates an FQDN; set a value in the UI to pin it. Inert
       # outside Coolify (base compose still publishes no host ports).
       SERVICE_FQDN_PREFECT_4200:
       # Use the shared Postgres (db service), isolated in its own `prefect` DB.
-      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT:-5432}/prefect
+      # DB_PASSWORD is guarded by *db-env above.
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD}@db:${DB_PORT:-5432}/prefect
       PREFECT_API_URL: http://127.0.0.1:4200/api
       # Tell the UI's JavaScript to make API calls same-origin (i.e., through
       # whatever proxy/domain the user is reaching the UI from). Without this,
@@ -373,8 +397,9 @@ services:
       # path works on local + remote Coolify without knowing the FQDN.
       PREFECT_UI_API_URL: /api
       # Coolify injects SERVICE_URL_PREFECT (the public URL) once the FQDN above
-      # is declared; falls back to loopback for standalone local runs.
-      PREFECT_UI_URL: ${SERVICE_URL_PREFECT:-http://localhost:4200}
+      # is declared; falls back to the locally published port, which is the same
+      # PREFECT_PORT the override/production files map.
+      PREFECT_UI_URL: ${SERVICE_URL_PREFECT:-http://localhost:${PREFECT_PORT:-4200}}
       PREFECT_HOME: /root/.prefect
     volumes:
       - prefect_data:/root/.prefect
