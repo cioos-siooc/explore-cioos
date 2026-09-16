@@ -16,7 +16,11 @@ If you just want to see how a dataset is harvested by CDE:
 ## Starting using docker
 
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker compose`
-2. Rename file `.env.sample` to `.env` and change any settings if needed. If you are running on your local machine these settings don't need to change
+2. Rename file `.env.sample` to `.env`. For a local stack nothing in it needs to change — every setting has a working default in `docker-compose.yaml`, and the ones that describe the site are derived from two knobs:
+   - `APP_URL` — the public URL of the site, used wherever a link has to work from outside the compose network (emailed download links, the OpenAPI `servers` entry). Unset, it falls back to `http://localhost:${NGINX_PORT}`; under Coolify, `SERVICE_URL_NGINX` is injected and wins over it.
+   - `NGINX_PORT` — the host port nginx is published on (default 8098).
+
+   `DB_PASSWORD` is the one value with no default (the production overlay publishes the database port on the host, so a default would be a real credential in git). The SPA calls `/api` relative to whatever host serves it, so changing `APP_URL` needs no frontend rebuild.
 3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and modify if needed. This step is required — the config is not baked into the image, and the worker refuses to start without one (see [Harvest configuration](#harvest-configuration)).
 4. Copy `docker-compose.override.yaml.sample` to `docker-compose.override.yaml`. The base `docker-compose.yaml` publishes **no** host ports (so it can be deployed as-is behind a proxy such as Coolify); the override publishes nginx and Prefect locally. Ports are configurable via `NGINX_PORT` (default 8098) and `PREFECT_PORT` (default 4200) in `.env`.
    Shortcut for steps 2–4: `./scripts/init-dev-env.sh` creates all three files from their templates (skipping any that already exist; `--force` overwrites). It seeds `harvest_config.yaml` from `harvest_config.production.yaml` — the full source list — so use `harvest_config.sample.yaml` instead if you want a small, fast first harvest.
@@ -235,8 +239,9 @@ the Coolify "magic" variables:
 
 - `SERVICE_FQDN_NGINX_4000` (on `nginx`): Coolify generates a public FQDN and
   proxies it to nginx's container port 4000.
-- `SERVICE_URL_NGINX`: injected by Coolify and used as the scheduler's
-  `DOWNLOAD_WAF_URL` base (falls back to `APP_DOMAIN` outside Coolify).
+- `SERVICE_URL_NGINX`: injected by Coolify and used as the public URL that the
+  scheduler's `DOWNLOAD_WAF_URL` and the API's `PUBLIC_BASE_URL` are built from
+  (falls back to `APP_URL`, then to `http://localhost:${NGINX_PORT}`).
 
 Coolify ignores `docker-compose.override.yaml` (and only supports a single
 compose file per resource), so local-dev port publishing never leaks into a
@@ -308,8 +313,8 @@ ordinary service.
 
 What the overlay adds, and nothing else: host ports (nginx, Prefect, Postgres),
 the externally-managed `explore-cioos_default` network, the host-editable
-`harvest_config.yaml` bind mount, the capped redis config, and the two env vars
-whose base values assume Coolify (`DOWNLOAD_WAF_URL`, `DB_HOST_EXTERNAL`).
+`harvest_config.yaml` bind mount, the capped redis config, and `DB_HOST_EXTERNAL`
+(the base pins it to `db`; production may target a DB across the VPN).
 Everything else — images, healthchecks, named volumes, harvester memory limits —
 is inherited from `docker-compose.yaml`, so it only has to be maintained once.
 
