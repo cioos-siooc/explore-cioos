@@ -23,7 +23,6 @@ export default function DatasetsPanel() {
   } = useFilters();
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState();
   const {
-    setPointsData,
     filteredDatasets,
     inspectDataset,
     setInspectDataset,
@@ -31,9 +30,7 @@ export default function DatasetsPanel() {
     selectionLoading,
     initialPointsQueryComplete,
     setInspectRecordID,
-    selectAll,
     handleSelectDataset,
-    handleSelectAllDatasets,
     setHoveredDataset,
     combinedQueries,
     datasetsInViewPks,
@@ -94,12 +91,8 @@ export default function DatasetsPanel() {
       ) : (
         <div className="datasetsPanelView datasetsPanelList" key="list">
           <DatasetsTable
-            handleSelectAllDatasets={handleSelectAllDatasets}
             handleSelectDataset={handleSelectDataset}
             setInspectDataset={setInspectDataset}
-            filterSet={filterSet}
-            selectAll={selectAll}
-            setDatasets={setPointsData}
             datasets={filteredDatasets}
             setHoveredDataset={setHoveredDataset}
             datasetsInViewPks={datasetsInViewPks}

@@ -1,3 +1,4 @@
+import bytes from "bytes";
 import isEmpty from "lodash-es/isEmpty";
 import { scaleLinear, scaleLog } from "d3-scale";
 import React, { useState, useEffect } from "react";
@@ -12,6 +13,20 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
       };
     }),
   );
+}
+
+/*
+ * A download size as the modal shows it. Every byte figure there comes from
+ * /downloadEstimate, which counts rows against the filters and multiplies —
+ * it is never a measured file size, so the tilde travels with the number
+ * rather than being stated once in a legend: the figures are read one card at
+ * a time, and a bare "1.2GB" beside a dataset reads as a fact about that file.
+ *
+ * `bytes()` returns null for a null or NaN input, which is how a dataset the
+ * estimate response did not cover arrives here.
+ */
+export function formatSizeEstimate(size) {
+  return `~${bytes(size) || "0B"}`;
 }
 
 export function capitalizeFirstLetter(string) {
@@ -446,16 +461,6 @@ export function rangeLevelHasData(rangeLevel) {
   return Array.isArray(rangeLevel) && Number.isFinite(rangeLevel[1]);
 }
 
-export function getPointsDataSize(pointsData) {
-  let total = 0;
-  pointsData.forEach((point) => {
-    if (point.selected && point.size !== "NaN" && point.size !== null) {
-      total += point.size;
-    }
-  });
-  return total;
-}
-
 // returns true for rectangles, false for rotated rectangles
 // [[west, south], [east, north]] for any GeoJSON geometry (the coordinate
 // nesting differs per type, so just walk down to the [lng, lat] positions).
@@ -541,18 +546,31 @@ export function polygonIsRectangle(polygon) {
   return lons.length === 2 && lats.length === 2;
 }
 
-// translate a rectangular polygon to a bounding box query using lat/long min/max
-function polygonToMaxMins(polygon) {
-  const p = polygon.slice(0, 4);
-
-  const lons = unique(p.map((e) => e[0]));
-  const lats = unique(p.map((e) => e[1]));
+// The envelope of any polygon ring — a rectangle's own four corners, or the
+// enclosing box of a freeform shape's. Numbers, not display strings: callers
+// round or label as their own context needs (a query string wants
+// .toFixed(4) keys, a readout wants labelled, unrounded figures).
+export function polygonBounds(polygon) {
+  const lons = polygon.map((e) => e[0]);
+  const lats = polygon.map((e) => e[1]);
 
   return {
-    latMin: Math.min(...lats).toFixed(4),
-    lonMin: Math.min(...lons).toFixed(4),
-    latMax: Math.max(...lats).toFixed(4),
-    lonMax: Math.max(...lons).toFixed(4),
+    west: Math.min(...lons),
+    south: Math.min(...lats),
+    east: Math.max(...lons),
+    north: Math.max(...lats),
+  };
+}
+
+// translate a rectangular polygon to a bounding box query using lat/long min/max
+function polygonToMaxMins(polygon) {
+  const { west, south, east, north } = polygonBounds(polygon);
+
+  return {
+    latMin: south.toFixed(4),
+    lonMin: west.toFixed(4),
+    latMax: north.toFixed(4),
+    lonMax: east.toFixed(4),
   };
 }
 

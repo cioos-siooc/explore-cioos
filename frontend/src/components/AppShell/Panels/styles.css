@@ -378,11 +378,33 @@
   color: var(--cioos-ink-60);
 }
 
+/* The settings band (applied filters, link format) keeps its place while the
+   dataset list under it scrolls — that list is the panel's one scroll region,
+   which is what lets the order bar stay on screen at the foot of the modal. */
+.downloadPanel > .downloadBandRow {
+  flex: 0 0 auto;
+}
+
+.downloadPanel > .downloadDetails {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* ------------------------------------------------------------------
  * Mobile: the filters master and detail become two screens, one filter
  * at a time, and everything in them becomes a touch target.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
+  /* The download panel scrolls as one column here — see the note in
+     DownloadDetails/styles.css. */
+  .downloadPanel {
+    height: auto;
+  }
+
+  .downloadPanel > .downloadDetails {
+    flex: 0 0 auto;
+  }
+
   /* One column: the list is the whole surface, and so is the open filter. */
   .filtersPanelList {
     flex: 1 1 auto;

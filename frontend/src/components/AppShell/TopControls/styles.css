@@ -25,29 +25,25 @@
 
 /* Merged tabs, pulled out full-bleed from below the brand row: Datasets and
    Filters share the row equally (1fr each — the columns grow to fit the
-   widest label, so both stay the same width); the spatial filter button
-   between them is icon-only and takes only what its icon needs (auto). All
-   three bleed 1px past the card on the left, right and bottom to cover its
-   border, leaving no line around them. The middle segment
-   (SpatialFilterButton) is a DropdownButton, whose own wrapper div would
-   otherwise be the grid item instead of the button inside it —
-   display:contents lifts the button itself into the grid so it sizes to its
-   own content instead of an empty wrapper's. */
+   widest label, so both stay the same width); the search, Time distribution
+   and spatial filter buttons between them are icon-only and take only what
+   their icon needs (auto). All five bleed 1px past the card on the left,
+   right and bottom to cover its border, leaving no line around them. Two of
+   the middle segments (SearchButton, SpatialFilterButton) are each a
+   DropdownButton, whose own wrapper div would otherwise be the grid item
+   instead of the button inside it — display:contents lifts the button itself
+   into the grid so it sizes to its own content instead of an empty
+   wrapper's. */
 .topBarActions {
   display: grid;
 
-  /* One column per segment: Datasets, the icon-only draw button (auto — it has
-     no label to size to), Filters, Time distribution. The count is explicit,
-     so adding a segment without widening this list drops it onto an implicit
-     SECOND grid row instead of into the strip. */
-
-  /* One column per segment, in DOM order: Datasets, Time distribution, the
-     draw button, Filters. The two middle ones are icon-only, so they take
-     `auto` — the width of their icon — and the two worded ones share what is
-     left. The count is explicit, so adding a segment without widening this
-     list drops it onto an implicit SECOND grid row instead of into the
-     strip. */
-  grid-template-columns: 1fr auto auto 1fr;
+  /* One column per segment, in DOM order: Datasets, search, Time
+     distribution, the draw button, Filters. The three middle ones are
+     icon-only, so they take `auto` — the width of their icon — and the two
+     worded ones share what is left. The count is explicit, so adding a
+     segment without widening this list drops it onto an implicit SECOND grid
+     row instead of into the strip. */
+  grid-template-columns: 1fr auto auto auto 1fr;
   align-items: stretch;
   margin: 0 -1px -1px;
   border-top: 1px solid var(--cioos-hairline);
@@ -75,7 +71,7 @@
 
   /* min-height, not height: the Datasets segment stacks a label over its
      counts, and a long label can take a second line on a narrow viewport.
-     All four segments stretch together (the grid's align-items), so the
+     All five segments stretch together (the grid's align-items), so the
      strip stays a single even band whatever the tallest one needs. */
   min-height: 40px;
   padding: 4px 10px;
@@ -86,7 +82,7 @@
      corners. */
   border-radius: 0;
 
-  /* Dimmed primary: a translucent teal wash that highlights the four entry
+  /* Dimmed primary: a translucent teal wash that highlights the five entry
      points without competing with the white brand row above them. */
   background-color: rgb(82 167 155 / 14%);
   font: inherit;
@@ -98,20 +94,79 @@
     color var(--cioos-transition-fast);
 }
 
-/* Spatial filter toggle: icon-only, so it takes only the width its icon
-   needs (grid-template-columns above) rather than sharing the row equally
-   with Datasets/Filters. No dropdown caret either — the icon alone is the
-   affordance. */
-
-/* Icon-only segments: no label to keep clear of, so they sit tighter than a
-   worded one and claim only their icon's width. Shared by the draw button and
-   Time distribution. */
+/* Icon-only segments — search, Time distribution and the draw button: no
+   label to keep clear of, so they sit tighter than a worded one and take only
+   the width their icon needs (grid-template-columns above) rather than
+   sharing the row equally with Datasets/Filters. */
 .topBar .topBarActions .topBarIconButton {
   padding: 4px 8px;
 }
 
-.topBar .topBarActions .topBarSpatialFilterToggle::after {
+.topBar .topBarActions .topBarSpatialFilterToggle::after,
+.topBar .topBarActions .topBarSearchToggle::after {
   display: none;
+}
+
+/* The generic dropdown chrome (dropdownStyles.css: white background, border,
+   shadow, padding) would otherwise double up with .topBarSearchPopover's own
+   card below it — nested white-on-white. Stripped to nothing here, reached
+   via menuClassName since the menu portals to document.body and can't be
+   styled through a descendant selector off the toggle, leaving the popover
+   itself as the only visible card. */
+.topBarSearchMenu {
+  margin-top: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.topBarSearchPopover {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  /* A hair narrower than the brand card above it (--cioos-brand-width,
+     defined in TopLeft/styles.css) rather than matching it exactly, so the
+     popover still reads as its own floating control and not a mask over the
+     card's width. Scales down with it below that on narrow viewports too. */
+  width: calc(min(var(--cioos-brand-width), calc(100vw - 24px)) - 24px);
+  padding: 4px 12px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  color: var(--cioos-ink-40);
+  box-shadow: var(--cioos-shadow-float);
+}
+
+.topBarSearchPopover > svg {
+  flex: 0 0 auto;
+}
+
+.topBarSearchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  padding: 6px 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-md);
+  color: var(--cioos-ink);
+}
+
+.topBarSearchClear {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.topBarSearchClear:hover {
+  color: var(--cioos-ink);
 }
 
 /* The icon and the filters badge hold their size; only text gives way. */

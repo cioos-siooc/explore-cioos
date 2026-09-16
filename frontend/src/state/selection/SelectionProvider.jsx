@@ -50,11 +50,29 @@ const isPlatformlessDataset = (row) =>
   PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) ||
   row.source_type === "obis";
 
+// What the free-text search matches a dataset on: its title, its dataset type,
+// and the name of the data portal it came from. `query` is already lowercased.
+// Shared by the datasets list and the map narrowing below, so the two always
+// agree on what a search term keeps.
+function datasetMatchesSearch(row, query, language) {
+  return [
+    row.title,
+    row.cdm_data_type,
+    formatErddapServerName(
+      row.erddap_server_url || row.erddap_url,
+      language,
+      erddapServersJSONfile,
+    ),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
 function datasetInLanguage(point, language) {
   return {
     ...point,
     title: point.title_translated?.[language] || point.title,
-    selected: false,
   };
 }
 
@@ -95,7 +113,6 @@ export default function SelectionProvider({ children }) {
   const [polygon, setPolygon] = useState(() =>
     selectionFromSearchParams(initialParams),
   );
-  const [pointsToReview, setPointsToReview] = useState();
   const [pointsToDownload, setPointsToDownload] = useState();
   // Hovering the dataset list drives a map highlight (see Map.jsx). Sweeping
   // the cursor across the list would otherwise repaint the highlight once per
@@ -135,8 +152,8 @@ export default function SelectionProvider({ children }) {
       : undefined;
   });
 
-  const [selectAll, setSelectAll] = useState(false);
   const [pointsData, setPointsData] = useState([]);
+  const [shortlist, setShortlist] = useState([]);
   const [selectionLoading, setSelectionLoading] = useState(true);
   const [initialPointsQueryComplete, setInitialPointsQueryComplete] =
     useState(false);
@@ -153,7 +170,6 @@ export default function SelectionProvider({ children }) {
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
     () => initialParams.get("search") || "",
   );
-  const [datasetsSelectedCount, setDatasetsSelectedCount] = useState();
   const [combinedQueries, setCombinedQueries] = useState([]);
   // "Only in view": restrict the list to datasets whose extent overlaps the
   // current map viewport. Lifted here (like the title search) so it also drives
@@ -166,9 +182,12 @@ export default function SelectionProvider({ children }) {
   // map. Both live here rather than in DatasetsTable: the hidden groups decide
   // what the map draws (see mapDatasetPKs below), and both are shareable — the
   // list can unmount (the inspector takes over the panel) without losing them.
-  const [groupBy, setGroupByState] = useState(
-    () => initialParams.get("groupBy") || GROUP_NONE,
-  );
+  const [groupBy, setGroupByState] = useState(() => {
+    const initialGroupBy = initialParams.get("groupBy");
+    return !initialGroupBy || initialGroupBy === "selected"
+      ? GROUP_NONE
+      : initialGroupBy;
+  });
   const [hiddenGroups, setHiddenGroups] = useState(
     () =>
       new Set(
@@ -249,18 +268,7 @@ export default function SelectionProvider({ children }) {
       if (layersNarrowed && !datasetInDataLayers(row, dataLayers)) return false;
       if (onlyInView && !datasetsInViewPks.has(row.pk)) return false;
       if (!hasSearch) return true;
-      return [
-        row.title,
-        row.cdm_data_type,
-        formatErddapServerName(
-          row.erddap_server_url || row.erddap_url,
-          i18n.language,
-          erddapServersJSONfile,
-        ),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
+      return datasetMatchesSearch(row, query, i18n.language);
     });
   }, [
     pointsData,
@@ -270,6 +278,21 @@ export default function SelectionProvider({ children }) {
     dataLayers,
     i18n.language,
   ]);
+
+  const selectedPks = useMemo(
+    () =>
+      new Set(
+        shortlist.filter((entry) => entry.selected).map((entry) => entry.pk),
+      ),
+    [shortlist],
+  );
+  const pointsToReview = useMemo(
+    () =>
+      shortlist
+        .filter((entry) => entry.selected)
+        .map((entry) => ({ ...entry.row, selected: true })),
+    [shortlist],
+  );
 
   // Group keys are only meaningful within one dimension, so switching
   // dimensions drops whatever was hidden under the old one.
@@ -293,23 +316,51 @@ export default function SelectionProvider({ children }) {
   // this is a visibility toggle, not a filter.
   const hiddenDatasetPks = useMemo(
     () =>
-      hiddenDatasetPksFor(pointsData, groupBy, hiddenGroups, datasetsInViewPks),
-    [pointsData, groupBy, hiddenGroups, datasetsInViewPks],
+      hiddenDatasetPksFor(
+        pointsData,
+        groupBy,
+        hiddenGroups,
+        datasetsInViewPks,
+        selectedPks,
+      ),
+    [pointsData, groupBy, hiddenGroups, datasetsInViewPks, selectedPks],
   );
 
   // Hand the map the datasets it may draw. The tile/legend/coverage queries
-  // take an include list (datasetPKs), so the exclusion is expressed as its
-  // complement over the current results; undefined while nothing is hidden
-  // leaves those queries as the filters wrote them.
+  // take an include list (datasetPKs), so the narrowing is expressed as a pk
+  // list over the current results; undefined while nothing narrows them leaves
+  // those queries as the filters wrote them.
+  //
+  // Two things narrow it: the groups hidden in the list, and the free-text
+  // search. The search is a filter rather than a display choice, so the map
+  // has to honour it — drawing markers and hexes for datasets the search has
+  // taken out of the list is the map disagreeing with its own sidebar. The
+  // other two narrowings filteredDatasets applies stay out of it: the
+  // data-layer switches already reach the map through the tile query (see
+  // Map/tileQuery.js), and "only in view" is the viewport itself, so feeding
+  // it back would rewrite every map query on every pan for no visible change.
+  //
+  // The search text is debounced here — the list filters in memory on every
+  // keystroke, but each distinct value here is a fresh set of tile, legend and
+  // coverage URLs, so typing a word uncached would otherwise cost a round of
+  // map requests per character.
+  const debouncedSearchText = useDebounce(datasetTitleSearchText, 300);
+  const mapDatasetPks = useMemo(() => {
+    const query = debouncedSearchText.toLowerCase();
+    const hasSearch = !isEmpty(debouncedSearchText);
+    if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
+    return pointsData
+      .filter(
+        (row) =>
+          !hiddenDatasetPks.has(row.pk) &&
+          (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
+      )
+      .map((row) => row.pk);
+  }, [hiddenDatasetPks, pointsData, debouncedSearchText, i18n.language]);
+
   useEffect(() => {
-    setMapDatasetPKs(
-      hiddenDatasetPks.size === 0
-        ? undefined
-        : pointsData
-            .filter((row) => !hiddenDatasetPks.has(row.pk))
-            .map((row) => row.pk),
-    );
-  }, [hiddenDatasetPks, pointsData, setMapDatasetPKs]);
+    setMapDatasetPKs(mapDatasetPks);
+  }, [mapDatasetPks, setMapDatasetPKs]);
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
@@ -477,19 +528,36 @@ export default function SelectionProvider({ children }) {
   // Griddap datasets are metadata-only and never enter pointsToReview (see
   // handleSelectDataset), so they are skipped here too rather than silently
   // added and dropped later.
-  const addDatasetsToSelection = useCallback((pks) => {
-    const wanted = new Set(pks.map(Number));
-    if (wanted.size === 0) return;
-    setPointsData((previous) =>
-      previous.map((point) =>
-        wanted.has(Number(point.pk)) &&
-        !point.selected &&
-        point.cdm_data_type !== "Grid"
-          ? { ...point, selected: true }
-          : point,
-      ),
-    );
-  }, []);
+  const addDatasetsToSelection = useCallback(
+    (pks) => {
+      const wanted = new Set(pks.map(Number));
+      if (wanted.size === 0) return;
+      setShortlist((previous) => {
+        let changed = false;
+        const existingPks = new Set(previous.map((entry) => Number(entry.pk)));
+        const next = previous.map((entry) => {
+          if (!wanted.has(Number(entry.pk)) || entry.selected) return entry;
+          changed = true;
+          return { ...entry, selected: true };
+        });
+
+        for (const row of pointsData) {
+          const pk = Number(row.pk);
+          if (
+            wanted.has(pk) &&
+            !existingPks.has(pk) &&
+            row.cdm_data_type !== "Grid"
+          ) {
+            next.push({ pk: row.pk, row, selected: true, inResults: true });
+            existingPks.add(pk);
+            changed = true;
+          }
+        }
+        return changed ? next : previous;
+      });
+    },
+    [pointsData],
+  );
 
   useEffect(() => {
     if (isEmpty(pointsToReview)) {
@@ -499,15 +567,7 @@ export default function SelectionProvider({ children }) {
   }, [pointsToReview]);
 
   useEffect(() => {
-    if (!isEmpty(pointsData)) {
-      let count = 0;
-      pointsData.forEach((point) => {
-        if (point.selected) count++;
-      });
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
-      setDatasetsSelectedCount(count);
-      setPointsToReview(pointsData.filter((point) => point.selected));
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setSelectionLoading(false);
     // A single remaining result used to open its own dataset page. That made
     // the outcome of a map click depend on how dense the data happened to be —
@@ -536,6 +596,26 @@ export default function SelectionProvider({ children }) {
       );
     }
   }, [pointsData, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const resultByPk = new Map(pointsData.map((row) => [row.pk, row]));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShortlist((previous) => {
+      let changed = false;
+      const next = previous.map((entry) => {
+        const row = resultByPk.get(entry.pk);
+        if (row) {
+          if (entry.row === row && entry.inResults) return entry;
+          changed = true;
+          return { ...entry, row, inResults: true };
+        }
+        if (!entry.inResults) return entry;
+        changed = true;
+        return { ...entry, inResults: false };
+      });
+      return changed ? next : previous;
+    });
+  }, [pointsData]);
 
   // The pointQuery waits for the catalog so the filters it sends are hydrated
   // from the URL first. It must not wait for a non-empty EOV list: OBIS
@@ -597,34 +677,31 @@ export default function SelectionProvider({ children }) {
     setPointsData((previous) =>
       previous.map((point) => datasetInLanguage(point, i18n.language)),
     );
+    setShortlist((previous) =>
+      previous.map((entry) => ({
+        ...entry,
+        row: datasetInLanguage(entry.row, i18n.language),
+      })),
+    );
   }, [i18n.language]);
 
   function handleSelectDataset(point) {
     // Griddap datasets are metadata-only: they never enter the download
     // selection (pointsToReview) — data access is on ERDDAP directly.
     if (point.cdm_data_type === "Grid") return;
-    const dataset = pointsData.filter((p) => p.pk === point.pk)[0];
-    dataset.selected = !point.selected;
-    const result = pointsData.map((p) => {
-      if (p.pk === point.pk) {
-        return dataset;
-      } else {
-        return p;
+    setShortlist((previous) => {
+      const index = previous.findIndex((entry) => entry.pk === point.pk);
+      if (index === -1) {
+        return [
+          ...previous,
+          { pk: point.pk, row: point, selected: true, inResults: true },
+        ];
       }
+      return previous.map((entry, entryIndex) => {
+        if (entryIndex !== index) return entry;
+        return { ...entry, selected: !entry.selected };
+      });
     });
-    setPointsData(result);
-  }
-
-  function handleSelectAllDatasets() {
-    setPointsData(
-      pointsData.map((p) => {
-        return {
-          ...p,
-          selected: p.cdm_data_type === "Grid" ? false : !selectAll,
-        };
-      }),
-    );
-    setSelectAll(!selectAll);
   }
 
   // The WMS overlay lives only while its dataset is inspected: navigating
@@ -724,7 +801,6 @@ export default function SelectionProvider({ children }) {
     polygon,
     setPolygon,
     pointsToReview,
-    setPointsToReview,
     pointsToDownload,
     setPointsToDownload,
     hoveredDataset,
@@ -734,13 +810,12 @@ export default function SelectionProvider({ children }) {
     selectTrajectoryFromMap,
     highlightedRecord,
     setHighlightedRecord,
-    selectAll,
     pointsData,
-    setPointsData,
     inspectDataset,
     setInspectDataset,
     returnToDatasetList,
     addDatasetsToSelection,
+    selectedPks,
     selectionLoading,
     initialPointsQueryComplete,
     inspectRecordID,
@@ -773,10 +848,8 @@ export default function SelectionProvider({ children }) {
     toggleGroupHidden,
     showAllGroups,
     hiddenDatasetPks,
-    datasetsSelectedCount,
     combinedQueries,
     handleSelectDataset,
-    handleSelectAllDatasets,
   };
 
   return (
