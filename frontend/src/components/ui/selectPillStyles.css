@@ -65,9 +65,9 @@
   overflow: hidden;
   white-space: nowrap;
 
-  /* Trailing room for the caret, plus slack for the width a browser gives a
-     select's text over the span's. */
-  padding: 4px 18px 4px 0;
+  /* Internal breathing room around the selected value, with extra trailing
+     room for the caret and the width a browser gives select text. */
+  padding: 4px 26px 4px 8px;
 }
 
 .selectPillField > select {
@@ -75,7 +75,7 @@
   inset: 0;
   width: 100%;
   appearance: none;
-  padding: 0 18px 0 0;
+  padding: 4px 26px 4px 8px;
   border: none;
   background: transparent;
   font: inherit;
@@ -92,7 +92,7 @@
 .selectPillCaret {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 8px;
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--cioos-ink-40);

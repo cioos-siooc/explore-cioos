@@ -8,10 +8,11 @@ import React, {
 import {
   CaretDownFill,
   CaretRightFill,
-  CheckSquare,
+  Check2Circle,
   Eye,
   EyeSlash,
   Search,
+  XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -50,10 +51,11 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  // Direct download URL per dataset pk, in the download modal only. Built by
-  // DownloadPanel from the whole selection, so a row the packager refuses
-  // still has one.
-  linksByPk,
+  // The built direct-download link per dataset pk (download modal only), so a
+  // card can show the query its own dataset would be fetched with. Built by
+  // DownloadDetails, which owns the format choice the strip below shares.
+  downloadLinksByPk,
+  downloadFormatControls,
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
@@ -69,6 +71,7 @@ export default function DatasetsTable({
     hiddenGroups,
     toggleGroupHidden,
     showAllGroups,
+    selectedPks,
   } = useSelection();
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
@@ -190,7 +193,12 @@ export default function DatasetsTable({
     if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
     const byGroup = new Map();
     for (const row of visibleRows) {
-      for (const key of groupKeysFor(row, groupBy, datasetsInViewPks)) {
+      for (const key of groupKeysFor(
+        row,
+        groupBy,
+        datasetsInViewPks,
+        selectedPks,
+      )) {
         if (!byGroup.has(key)) byGroup.set(key, []);
         byGroup.get(key).push(row);
       }
@@ -214,6 +222,7 @@ export default function DatasetsTable({
     groupBy,
     collapsedGroups,
     datasetsInViewPks,
+    selectedPks,
     i18n.language,
     t,
   ]);
@@ -288,10 +297,8 @@ export default function DatasetsTable({
   };
 
   // Which datasets are in the results, as a value rather than an array
-  // identity. Adding one to the selection rewrites every row object (the
-  // provider maps over pointsData), so keying the reset below on `datasets`
-  // itself sent the reader back to page 1 on every "+" — which is exactly the
-  // action they are most likely to repeat.
+  // identity. Snapshot refreshes can replace every row object without changing
+  // the result set, which should not send the reader back to page 1.
   const datasetsKey = useMemo(
     () => (datasets || []).map((row) => row.pk).join(","),
     [datasets],
@@ -317,16 +324,21 @@ export default function DatasetsTable({
   const controls = (
     <div className="datasetsCardControls" data-testid="datasets-controls">
       <div className="datasetsCardToolbar">
-        <button
-          type="button"
-          className={classNames("selectAllToggle", { active: selectAll })}
-          onClick={handleSelectAllDatasets}
-          aria-pressed={selectAll}
-          title={t("datasetsTableHeaderSelectAllTitle")}
-        >
-          <CheckSquare size={13} aria-hidden="true" />
-          {t("datasetsTableHeaderSelectAllTitle")}
-        </button>
+        {isDownloadModal && (
+          // The same checkbox the rows below carry, so the control that ticks
+          // them all reads as one of them rather than as a pill that lights up.
+          <label
+            className="selectAllToggle"
+            title={t("datasetsTableHeaderSelectAllTitle")}
+          >
+            <input
+              type="checkbox"
+              checked={selectAll}
+              onChange={handleSelectAllDatasets}
+            />
+            {t("datasetsTableHeaderSelectAllTitle")}
+          </label>
+        )}
         {!isDownloadModal && (
           <div className="datasetsTableSearchWrap">
             <Search size={13} aria-hidden="true" />
@@ -342,9 +354,13 @@ export default function DatasetsTable({
       </div>
 
       {/* How the list is arranged: what it is sorted on and what it is grouped
-          by, as the same pill so the pair reads as one row of settings. */}
+          by, as the same pill so the pair reads as one row of settings. The
+          download modal adds its format pickers here (DownloadFormats), which
+          are settings of the same kind: they change what every Download button
+          on the cards below asks the server for. */}
       <div className="datasetsCardArrange">
         <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
+        {isDownloadModal && downloadFormatControls}
         {!isDownloadModal && (
           <>
             <SelectPill
@@ -372,6 +388,37 @@ export default function DatasetsTable({
           </>
         )}
       </div>
+
+      {/* What the size pill and the tick/cross on each card below mean. It
+          belongs on this row rather than under the list: it is a key to the
+          cards, and read before them it saves the reader working out what the
+          colours meant after the fact. */}
+      {isDownloadModal && (
+        <div className="downloadLegend">
+          <span className="downloadLegendItem">
+            <Check2Circle
+              className="legendIcon success"
+              size={16}
+              aria-hidden="true"
+            />
+            <span className="legendBadge success">
+              {t("downloadDetailsDownloadLimitsDownloadableMessagePart2")}
+            </span>
+            {t("downloadDetailsDownloadLimitsDownloadableMessagePart3")}
+          </span>
+          <span className="downloadLegendItem">
+            <XCircle
+              className="legendIcon error"
+              size={16}
+              aria-hidden="true"
+            />
+            <span className="legendBadge error">
+              {t("downloadDetailsDownloadLimitsNotDownloadableMessagePart2")}
+            </span>
+            {t("downloadDetailsDownloadLimitsNotDownloadableMessagePart3")}
+          </span>
+        </div>
+      )}
     </div>
   );
 
@@ -405,10 +452,15 @@ export default function DatasetsTable({
                 <DatasetCard
                   key={`${item.group ?? ""}:${item.row.pk ?? item.row.dataset_id ?? item.row.title}`}
                   row={item.row}
+                  selected={
+                    isDownloadModal
+                      ? item.row.selected
+                      : selectedPks.has(item.row.pk)
+                  }
                   isDownloadModal={isDownloadModal}
-                  link={linksByPk?.get(item.row.pk)}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
+                  downloadLink={downloadLinksByPk?.get(item.row.pk)}
                   onSelect={handleSelectDataset}
                   onInspect={isDownloadModal ? undefined : setInspectDataset}
                   onHover={setHoveredDataset}

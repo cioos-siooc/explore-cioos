@@ -1,22 +1,12 @@
 import * as React from "react";
-import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
 import DownloadDetails from "../../Controls/DownloadDetails/DownloadDetails.jsx";
-import DownloadExports from "../../Controls/DownloadDetails/DownloadExports.jsx";
-import DownloadFormats from "../../Controls/DownloadDetails/DownloadFormats.jsx";
-import FilterDownloadToggles from "../../Controls/DownloadDetails/FilterDownloadToggles.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useDownload } from "../../../state/download/DownloadProvider.jsx";
-import {
-  buildDownloadLinks,
-  defaultErddapFormat,
-  defaultObisFormat,
-  downloadConstraints,
-} from "../../../downloadLinks.js";
 import "./styles.css";
 
 /*
@@ -36,9 +26,10 @@ import "./styles.css";
  * both: its size, whether the packager will take it, and its own URL — so the
  * dataset the archive refuses is the one showing you how to fetch it anyway.
  *
- * The page is a band of settings (which filters apply, what format the links
- * return), the list they both answer to, and an order bar: totals, the email
- * the archive goes to, and the links as a file.
+ * The band of settings (which filters apply, what format the links return)
+ * and the direct-link machinery live in DownloadDetails, which also hands the
+ * list its own toolbar picker — this panel only owns the queue's email/submit
+ * column.
  */
 export default function DownloadPanel() {
   const { t } = useTranslation();
@@ -67,44 +58,6 @@ export default function DownloadPanel() {
     handleSubmission,
   } = useDownload();
 
-  const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
-  const [obisFormat, setObisFormat] = useState(defaultObisFormat);
-
-  const constraints = useMemo(
-    () =>
-      downloadConstraints({
-        query,
-        polygon,
-        byTime: filterDownloadByTime,
-        byDepth: filterDownloadByDepth,
-        byPolygon: filterDownloadByPolygon,
-      }),
-    [
-      query,
-      polygon,
-      filterDownloadByTime,
-      filterDownloadByDepth,
-      filterDownloadByPolygon,
-    ],
-  );
-
-  // Built from the whole selection rather than from the ticked subset: the
-  // ticks are the packager's business (see DownloadExports), and every dataset
-  // that can be linked to gets its link.
-  const links = useMemo(
-    () =>
-      buildDownloadLinks(
-        pointsToReview,
-        { erddapFormat, obisFormat },
-        constraints,
-      ),
-    [pointsToReview, erddapFormat, obisFormat, constraints],
-  );
-  const linksByPk = useMemo(
-    () => new Map(links.map((link) => [link.pk, link])),
-    [links],
-  );
-
   if (isEmpty(pointsToReview)) {
     return (
       <div
@@ -118,46 +71,29 @@ export default function DownloadPanel() {
 
   return (
     <div className="downloadPanel" data-testid="download-panel">
-      {/* One row of chrome: what the order narrows by, and what its links
-          return. Every row spent here is a row of datasets the list below
-          does not show. */}
-      <div className="downloadBandRow">
-        <FilterDownloadToggles
-          query={query}
-          polygon={polygon}
-          timeFilterActive={timeFilterActive}
-          filterDownloadByTime={filterDownloadByTime}
-          setFilterDownloadByTime={setFilterDownloadByTime}
-          depthFilterActive={depthFilterActive}
-          filterDownloadByDepth={filterDownloadByDepth}
-          setFilterDownloadByDepth={setFilterDownloadByDepth}
-          polygonFilterActive={polygonFilterActive}
-          filterDownloadByPolygon={filterDownloadByPolygon}
-          setFilterDownloadByPolygon={setFilterDownloadByPolygon}
-        />
-        <DownloadFormats
-          links={links}
-          erddapFormat={erddapFormat}
-          setErddapFormat={setErddapFormat}
-          obisFormat={obisFormat}
-          setObisFormat={setObisFormat}
-        />
-      </div>
-
       <DownloadDetails
         pointsToReview={pointsToReview}
         setPointsToDownload={setPointsToDownload}
         setHoveredDataset={setHoveredDataset}
-        linksByPk={linksByPk}
         query={query}
         polygon={polygon}
+        timeFilterActive={timeFilterActive}
         filterDownloadByTime={filterDownloadByTime}
+        setFilterDownloadByTime={setFilterDownloadByTime}
+        depthFilterActive={depthFilterActive}
         filterDownloadByDepth={filterDownloadByDepth}
+        setFilterDownloadByDepth={setFilterDownloadByDepth}
+        polygonFilterActive={polygonFilterActive}
         filterDownloadByPolygon={filterDownloadByPolygon}
+        setFilterDownloadByPolygon={setFilterDownloadByPolygon}
         setSubmissionState={setSubmissionState}
       >
-        <div className="downloadSubmit">
-          <label className="downloadSubmitLabel" htmlFor="downloadEmailInput">
+        {/* The queue column of DownloadDetails' order footer. Passed as
+            children rather than rendered there because the submission state it
+            drives lives in this panel's providers; the class is what places it
+            in the footer's grid, beside the summary and the direct links. */}
+        <div className="downloadFooterSection downloadSubmit">
+          <label className="downloadFooterTitle" htmlFor="downloadEmailInput">
             {t("downloadEmailLabelText")}
           </label>
           <div className="downloadSubmitRow">
@@ -208,8 +144,6 @@ export default function DownloadPanel() {
             )}
           </div>
         </div>
-
-        <DownloadExports links={links} constraints={constraints} />
       </DownloadDetails>
     </div>
   );

@@ -291,9 +291,13 @@ export default function CreateMap({
   sharedFeatureQueryAt,
   // A click that landed on exactly one individual marker naming exactly one
   // dataset — nothing else under the cursor, no ambiguity about which station
-  // the user meant. Called with (datasetPk, pointPk) instead of building a
-  // featureQuery, so the caller can jump straight to that station's record
-  // rather than making the user open a card and pick a row. See handleMapClick.
+  // the user meant. Called with (datasetPk, pointPk, highlightQuery) instead of
+  // building a featureQuery the usual way, so the caller can jump straight to
+  // that station's record rather than making the user open a card and pick a
+  // row. highlightQuery is still a real (if minimal) featureQuery — just the
+  // marker's own dataset and ring, not a card's worth of items — so the caller
+  // can pin that dataset in the datasets list the same way a hex click does.
+  // See handleMapClick.
   onMarkerClick = () => {},
   // A click that landed on exactly one track and nothing else — no ambiguity
   // about which voyage the user meant. Called with (datasetPk, trajectoryId,
@@ -3794,14 +3798,12 @@ export default function CreateMap({
         const markerDatasetPks = datasetPksOf(nearestMarker);
         if (markerDatasetPks.length === 1) {
           popup.remove();
-          // This path skips onFeatureQueryRef (see below) — it opens the
-          // dataset page directly rather than building a card query — so the
-          // usual featureQuery-driven click-highlight effect never runs for
-          // it. Ring the clicked marker here instead, the same way
-          // buildFeatureQuery would have: same source, same Point-with-count
-          // shape, so click-highlight-point sizes the ring to match the
-          // marker exactly.
-          map.current.getSource("click-highlight")?.setData({
+          // This path skips onFeatureQueryRef — it opens the dataset page
+          // directly rather than building a card query — so the ring is set
+          // here instead, the same way buildFeatureQuery would have: same
+          // source, same Point-with-count shape, so click-highlight-point
+          // sizes the ring to match the marker exactly.
+          const highlight = {
             type: "FeatureCollection",
             features: [
               {
@@ -3812,10 +3814,28 @@ export default function CreateMap({
                 },
               },
             ],
-          });
+          };
+          map.current.getSource("click-highlight")?.setData(highlight);
+          // The dataset still deserves the same "found under your last map
+          // click" pin the datasets list gives a hex — it just can't go
+          // through onFeatureQueryRef/handleFeatureQuery: that helper also
+          // returns to the datasets list when a different dataset is already
+          // open, and running that in the same tick as the record jump below
+          // races two navigations over the same stale search-params snapshot
+          // (see setInspectRecordID's comment in SelectionProvider). Handing
+          // it to onMarkerClick instead lets that one navigation own both.
           onMarkerClickRef.current(
             markerDatasetPks[0],
             Number(nearestMarker.properties.pk),
+            {
+              datasetPks: markerDatasetPks,
+              highlight,
+              nonce: Date.now(),
+              // useUrlSync's ?at= reads this off every featureQuery, hex or
+              // marker alike — the marker's own position stands in for the
+              // click point here.
+              lngLat: nearestMarker.geometry.coordinates,
+            },
           );
           return;
         }

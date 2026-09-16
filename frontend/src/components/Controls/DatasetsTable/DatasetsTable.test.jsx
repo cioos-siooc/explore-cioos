@@ -96,23 +96,11 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).toBeInTheDocument();
   });
 
-  it("selecting all calls handleSelectAllDatasets", async () => {
-    const handleSelectAllDatasets = vi.fn();
-    const { user } = renderWithProviders(
-      <DatasetsTable
-        datasets={ROWS}
-        selectAll={false}
-        handleSelectAllDatasets={handleSelectAllDatasets}
-        handleSelectDataset={() => {}}
-      />,
-      { providers: "app" },
-    );
-    await screen.findAllByTestId("dataset-card");
-    await user.click(screen.getByTitle("Select all"));
-    expect(handleSelectAllDatasets).toHaveBeenCalled();
-  });
-
-  it("clicking a card's own select button calls handleSelectDataset with that row", async () => {
+  // Sidebar selection persists through SelectionProvider's own selectedPks
+  // rather than a bulk toggle — a row selects itself into the shortlist, and
+  // there is no sidebar-wide "select all" (that control is download-modal
+  // only, where handleSelectAllDatasets/selectAll still apply).
+  it("clicking a card's own select checkbox calls handleSelectDataset with that row", async () => {
     const handleSelectDataset = vi.fn();
     const { user } = renderWithProviders(
       <DatasetsTable
@@ -127,7 +115,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     const betaCard = cards.find((c) => c.textContent.includes("Beta station"));
     await user.click(
       screen
-        .getAllByRole("button", { name: "Add to selection" })
+        .getAllByRole("checkbox", { name: "Add to selection" })
         .find((b) => betaCard.contains(b)),
     );
     expect(handleSelectDataset).toHaveBeenCalledWith(

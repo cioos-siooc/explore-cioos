@@ -74,14 +74,14 @@ export const OBIS_FORMATS = [
     ext: "json",
     label: "JSON",
     filtered: true,
-    noteKey: "directLinksObisApiNote",
+    noteKey: "downloadFormatObisApiNote",
   },
   {
     id: "obisParquet",
     ext: "parquet",
     label: "Parquet",
     filtered: false,
-    noteKey: "directLinksObisSnapshotNote",
+    noteKey: "downloadFormatObisSnapshotNote",
   },
 ];
 
@@ -210,6 +210,27 @@ export function obisDownloadUrl(row, formatId, constraints = {}) {
   return `https://api.obis.org/v3/occurrence?${params}`;
 }
 
+/*
+ * The dataset's record in the CIOOS catalogue, as something a script can
+ * fetch. `ckan_url` (built by shapeQuery from the harvested ckan_id) is the
+ * human page — catalogue.cioos.ca/dataset/<id> — and that is what the UI
+ * links to; the same record read through CKAN's package_show API is the same
+ * page's content as JSON: licence, citation, contacts, attributes. A download
+ * that keeps its metadata alongside its data wants the record, not the markup
+ * that renders it, so the script and the URL list carry this form.
+ *
+ * Returns null for a dataset the harvest never matched to a catalogue entry
+ * (ckan_id NULL makes the whole concatenation NULL upstream).
+ */
+const CKAN_DATASET_PATH = "/dataset/";
+
+export function ckanRecordUrl(ckanUrl) {
+  if (!ckanUrl) return null;
+  const [origin, id] = ckanUrl.split(CKAN_DATASET_PATH);
+  if (!id) return null;
+  return `${origin}/api/3/action/package_show?id=${encodeURIComponent(id)}`;
+}
+
 // The server a dataset is served from. `erddap_server_url` is the base; older
 // rows (and the download panel's own reshaping) may only carry the landing
 // page, which is the base with /tabledap/<id>.html on the end.
@@ -253,6 +274,8 @@ export function buildDownloadLinks(
         : erddapDownloadUrl(row, formatId, constraints);
       if (!url) return null;
 
+      const filename = uniqueFilename(row, format, used);
+
       return {
         pk: row.pk,
         datasetId: row.dataset_id,
@@ -260,13 +283,29 @@ export function buildDownloadLinks(
         source: obis ? "obis" : "erddap",
         format,
         url,
-        filename: uniqueFilename(row, format, used),
+        filename,
+        // The catalogue record, in both the form a person opens and the form
+        // a script saves. Null together when the dataset has no CKAN entry.
+        ckanUrl: row.ckan_url || null,
+        ckanRecordUrl: ckanRecordUrl(row.ckan_url),
+        // Alongside the data file rather than replacing its extension's
+        // meaning: profiles.csv and profiles.ckan.json read as one pair.
+        ckanFilename: `${filename.replace(/\.[^.]+$/, "")}.ckan.json`,
         // What this particular link could not carry, for the row to say so.
         // A depth filter is set but the dataset has no depth variable; an
         // ERDDAP link had to square off a polygon; the snapshot ignores
         // filters altogether.
         depthDropped:
           !obis && !row.has_depth && constraints?.startDepth != null,
+        // Every spatially-filtered ERDDAP link, not only the ones that lost
+        // area to the squaring. Gating this on the shape not already being a
+        // rectangle is defensible — a rectangle IS its own bounding box, so
+        // nothing is returned that was not selected — but it puts the sign
+        // where the user is least likely to be and takes it away from the
+        // commonest selection there is. What the reader needs to know is what
+        // the link constrains by, which is a latitude/longitude box in both
+        // cases; the wording carries the part that only applies to a drawn
+        // polygon.
         polygonSquared: !obis && Boolean(constraints?.bounds),
         unfiltered: obis && format.filtered === false,
       };
@@ -291,23 +330,58 @@ function uniqueFilename(row, format, used) {
 // ---------------------------------------------------------------------------
 // The list, as a file
 
+const csvCell = (value) => `"${String(value).replace(/"/g, '""')}"`;
+
+// Single quotes, with the one escape sequence that can end a single-quoted
+// bash word and start it again around a literal quote.
+const shellQuote = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
+
+/*
+ * What the header line says the links were filtered by. Written here rather
+ * than in the panel because it describes the same constraints the URLs were
+ * built from — a file claiming "Filters: none" over URLs carrying a date range
+ * is worse than no header at all. Plain technical notation rather than
+ * translated prose: it is read beside the URLs, which are in that notation.
+ */
+export function filterSummaryText(constraints = {}) {
+  const { startDate, endDate, startDepth, endDepth, bounds } = constraints;
+  const parts = [];
+  if (startDate || endDate) {
+    parts.push(`time ${startDate || "…"} to ${endDate || "…"}`);
+  }
+  if (startDepth != null || endDepth != null) {
+    parts.push(`depth ${startDepth ?? "…"} to ${endDepth ?? "…"} m`);
+  }
+  if (bounds) {
+    const [[west, south], [east, north]] = bounds;
+    parts.push(`bbox ${west}, ${south}, ${east}, ${north}`);
+  }
+  return parts.join("; ");
+}
+
 const header = (generatedAt, filterSummary) => [
   "# CIOOS Data Explorer — direct download URLs",
   `# Generated ${generatedAt}`,
   `# Filters: ${filterSummary || "none"}`,
 ];
 
+/*
+ * Every export carries the catalogue record of every dataset that has one:
+ * licence, citation and contacts are what make a downloaded file usable
+ * later, and a download that arrives without them is the thing this panel
+ * exists to avoid. Only a dataset the harvest never matched to a CKAN entry
+ * contributes nothing.
+ */
 export function linksToText(links, { generatedAt, filterSummary } = {}) {
   return [
     ...(generatedAt ? header(generatedAt, filterSummary) : []),
-    ...links.map((link) => link.url),
+    // Each catalogue record directly under the data URL it describes: read top
+    // to bottom the pair stays together, and piped to xargs they are fetched
+    // in that order.
+    ...links.flatMap((link) => [link.url, link.ckanRecordUrl].filter(Boolean)),
     "",
   ].join("\n");
 }
-
-// Single quotes, with the one escape sequence that can end a single-quoted
-// bash word and start it again around a literal quote.
-const shellQuote = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
 
 /*
  * The same list as a runnable script, which is what the URLs are usually for.
@@ -338,22 +412,42 @@ export function linksToCurlScript(links, { generatedAt, filterSummary } = {}) {
       : []),
     "set -euo pipefail",
     "",
-    ...links.flatMap((link) => [
-      `# ${link.title || link.datasetId}`,
-      `curl --fail --location --retry 3 --continue-at - --output ${shellQuote(
-        link.filename,
-      )} ${shellQuote(link.url)}`,
-    ]),
+    ...links.flatMap((link) => {
+      const record = link.ckanRecordUrl;
+      return [
+        `# ${link.title || link.datasetId}`,
+        `curl --fail --location --retry 3 --continue-at - --output ${shellQuote(
+          link.filename,
+        )} ${shellQuote(link.url)}`,
+        // No --continue-at on the record: it is a few kilobytes, and asking to
+        // resume a file already complete from an earlier run requests a range
+        // the server answers 416, which --fail then turns into an exit 22.
+        ...(record
+          ? [
+              `curl --fail --location --retry 3 --output ${shellQuote(
+                link.ckanFilename,
+              )} ${shellQuote(record)}`,
+            ]
+          : []),
+      ];
+    }),
     "",
   ].join("\n");
 }
 
-// A cell any spreadsheet reads back whole, commas and quotes included.
-const csvCell = (value) => `"${String(value).replace(/"/g, '""')}"`;
-
 export function linksToCsv(links) {
   const rows = [
-    ["dataset_id", "title", "source", "format", "filename", "url"],
+    [
+      "dataset_id",
+      "title",
+      "source",
+      "format",
+      "filename",
+      "url",
+      // The human catalogue page here, not the API record: a CSV is read in a
+      // spreadsheet, where the useful cell is the one you click.
+      "catalogue_url",
+    ],
     ...links.map((link) => [
       link.datasetId,
       link.title || "",
@@ -361,6 +455,7 @@ export function linksToCsv(links) {
       link.format.id,
       link.filename,
       link.url,
+      link.ckanUrl || "",
     ]),
   ];
   return `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;

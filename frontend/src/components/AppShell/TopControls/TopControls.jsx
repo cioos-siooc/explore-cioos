@@ -49,35 +49,13 @@ function measureTopBarSpace(rect) {
 // beneath, staying centered.
 export default function TopControls() {
   const { t } = useTranslation();
-  const {
-    eovsSelected,
-    orgsSelected,
-    datasetsSelected,
-    platformsSelected,
-    erddapServersSelected,
-    obisNodesSelected,
-    scientificNamesSelected,
-    timeFilterActive,
-    depthFilterActive,
-  } = useFilters();
+  const { activeFilterCount } = useFilters();
   const { showFiltersModal, setShowFiltersModal, sidebarOpen, setSidebarOpen } =
     useUI();
   const { inspectDataset, returnToDatasetList } = useSelection();
 
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-top-bar-space", measureTopBarSpace);
-
-  const activeFilterCount = [
-    eovsSelected.some((o) => o.isSelected),
-    orgsSelected.some((o) => o.isSelected),
-    datasetsSelected.some((o) => o.isSelected),
-    platformsSelected.some((o) => o.isSelected),
-    erddapServersSelected.some((o) => o.isSelected) ||
-      obisNodesSelected.some((o) => o.isSelected),
-    scientificNamesSelected.length > 0,
-    timeFilterActive,
-    depthFilterActive,
-  ].filter(Boolean).length;
 
   return (
     <div className="topBar" ref={barRef} data-testid="top-bar">

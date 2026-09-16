@@ -116,7 +116,7 @@
 
 .datasetsToggle {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   flex-shrink: 0;
   width: 100%;
@@ -124,7 +124,6 @@
   border: none;
   background: transparent;
   font: inherit;
-  font-weight: 700;
   color: var(--cioos-ink);
   cursor: pointer;
   text-align: left;
@@ -135,13 +134,42 @@
   background-color: var(--cioos-surface-2);
 }
 
-.datasetsToggle > svg:first-child {
+.datasetsToggleIcon {
+  flex: 0 0 auto;
+  align-self: center;
   color: var(--cioos-primary);
-  flex-shrink: 0;
+}
+
+/* Title row + subtitle, same stack as the Filters/Download modal headers. */
+.datasetsToggleText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.datasetsToggleTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .datasetsToggleLabel {
   flex-shrink: 0;
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: var(--cioos-font-size-lg);
+  line-height: 1.2;
+  color: var(--cioos-navy);
+}
+
+.datasetsToggleSubtitle {
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 400;
+  color: var(--cioos-ink-80);
 }
 
 .datasetsToggleCount {
@@ -160,6 +188,7 @@
 /* Chevron pushed to the far edge; points down when collapsed, flips up
    once the list is open. */
 .datasetsToggleChevron {
+  align-self: center;
   margin-left: auto;
   flex-shrink: 0;
   color: var(--cioos-ink-60);
