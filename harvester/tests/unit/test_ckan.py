@@ -8,10 +8,12 @@ offline and deterministically.
 
 import pandas as pd
 import pytest
+import requests
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     ckan_erddap_links,
     ckan_obis_links,
     fetch_ckan_catalogue,
+    fetch_obis_record_ids,
     obis_uuid_from_xml_location,
     parse_ckan_package,
     split_erddap_url,
@@ -30,15 +32,21 @@ OBIS_UUID = "3f8c1d2e-4b5a-6c7d-8e9f-0a1b2c3d4e5f"
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_ckan_get(mocker, pages):
+def _make_ckan_get(mocker, pages, obis_records=()):
     """
     Patch the CKAN session builder so session.get() yields the given page
     responses. CKAN fetching goes through a requests.Session built by
     _build_ckan_session() rather than the module-level requests.get.
     Paging stops once `count` records have been seen, or on an empty page.
+
+    fetch_ckan_catalogue asks for the OBIS harvest source's record ids FIRST,
+    so that response is prepended here. It defaults to empty, which is what the
+    national catalogue actually returns today.
     """
+    obis_page = {"result": {"count": len(obis_records),
+                            "results": [{"id": i} for i in obis_records]}}
     responses = []
-    for page in pages:
+    for page in [obis_page, *pages]:
         mock_resp = mocker.MagicMock()
         mock_resp.json.return_value = page
         responses.append(mock_resp)
@@ -178,10 +186,23 @@ class TestParseCkanPackage:
 
     def test_obis_record_carries_its_uuid(self):
         rows = parse_ckan_package(
-            _package(xml_location_url=f"https://example.org/{OBIS_UUID}.xml")
+            _package(xml_location_url=f"https://example.org/{OBIS_UUID}.xml"),
+            obis_record_ids={"ckan-uuid-001"},
         )
         assert rows[0]["obis_dataset_id"] == OBIS_UUID
         assert rows[0]["erddap_url"] is None
+
+    def test_uuid_alone_does_not_make_a_record_obis(self):
+        """Every CIOOS record's xml_location_url names its own metadata file.
+
+        Matching the UUID pattern alone tagged 488 ordinary records (geology
+        and friends) as OBIS datasets against the live catalogue.
+        """
+        rows = parse_ckan_package(
+            _package(xml_location_url=f"https://catalogue-waf.ogsl.ca/cgc/{OBIS_UUID}.xml"),
+            obis_record_ids=frozenset(),
+        )
+        assert rows[0]["obis_dataset_id"] is None
 
     def test_unparseable_tabledap_url_does_not_raise(self):
         rows = parse_ckan_package(
@@ -217,7 +238,8 @@ class TestFetchCkanCatalogue:
         """The catalogue is enumerated in full — a `q=` filter would hide records."""
         session = _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE])
         fetch_ckan_catalogue.fn()
-        requested = session.get.call_args[0][0]
+        # call 0 is the OBIS harvest-source lookup; the catalogue walk follows.
+        requested = session.get.call_args_list[1][0][0]
         assert "package_search" in requested
         assert "q=" not in requested
 
@@ -225,14 +247,15 @@ class TestFetchCkanCatalogue:
         """One page covers `count`, so no second request is made."""
         session = _make_ckan_get(mocker, [CKAN_PACKAGE_SEARCH_RESPONSE])
         fetch_ckan_catalogue.fn()
-        assert session.get.call_count == 1
+        # One OBIS-source lookup + one catalogue page covering `count`.
+        assert session.get.call_count == 2
 
     def test_pages_until_count_is_reached(self, mocker):
         page1 = {"result": {"count": 2, "results": [_package(id="a")]}}
         page2 = {"result": {"count": 2, "results": [_package(id="b")]}}
         session = _make_ckan_get(mocker, [page1, page2])
         df = fetch_ckan_catalogue.fn()
-        assert session.get.call_count == 2
+        assert session.get.call_count == 3  # OBIS lookup + two catalogue pages
         assert set(df["ckan_id"]) == {"a", "b"}
 
     def test_dataset_id_from_fixture_is_present(self, mocker):
@@ -285,7 +308,7 @@ class TestCkanObisLinks:
         _make_ckan_get(mocker, [{"result": {"count": 2, "results": [
             _package(id="obis-rec", xml_location_url=f"https://x/{OBIS_UUID}.xml"),
             _package(id="erddap-rec", resources=[_tabledap("https://one.ca", "ds_a")]),
-        ]}}])
+        ]}}], obis_records=["obis-rec"])
         links = ckan_obis_links(fetch_ckan_catalogue.fn())
         assert list(links["dataset_id"]) == [OBIS_UUID]
         assert list(links["ckan_eovs"]) == [["seaSurfaceTemperature"]]
@@ -294,3 +317,30 @@ class TestCkanObisLinks:
         links = ckan_obis_links(pd.DataFrame())
         assert links.empty
         assert "ckan_eovs" in links.columns
+
+
+class TestFetchObisRecordIds:
+    def test_returns_the_ids_the_harvest_source_produced(self, mocker):
+        session = mocker.MagicMock()
+        resp = mocker.MagicMock()
+        resp.json.return_value = {
+            "result": {"count": 2, "results": [{"id": "a"}, {"id": "b"}]}
+        }
+        session.get.return_value = resp
+        assert fetch_obis_record_ids(session) == {"a", "b"}
+        assert "harvest_source_title" in session.get.call_args[0][0]
+
+    def test_absent_source_is_an_empty_set_not_an_error(self, mocker):
+        """catalogue.cioos.ca returns count=0 for this source today."""
+        session = mocker.MagicMock()
+        resp = mocker.MagicMock()
+        resp.json.return_value = {"result": {"count": 0, "results": []}}
+        session.get.return_value = resp
+        assert fetch_obis_record_ids(session) == frozenset()
+
+    def test_a_failed_lookup_does_not_fail_the_harvest(self, mocker):
+        # Without the OBIS link, OBIS datasets keep their own titles — which is
+        # what they do anyway. Not worth failing a harvest over.
+        session = mocker.MagicMock()
+        session.get.side_effect = requests.ConnectionError("boom")
+        assert fetch_obis_record_ids(session) == frozenset()

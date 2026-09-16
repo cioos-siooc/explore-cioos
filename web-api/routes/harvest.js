@@ -394,10 +394,29 @@ const COVERAGE_CTES = `
         FROM advertised WHERE source <> 'obis'
     ),
     app_erddap AS (
-        SELECT erddap_url, dataset_id, title FROM app WHERE source_type <> 'obis'
+        -- IS DISTINCT FROM, not <>: source_type is nullable and real databases
+        -- carry NULL on ERDDAP rows (it arrives via a concat with the OBIS
+        -- frame, which is the only side that sets it). A plain <> yields NULL
+        -- for those, dropping every ERDDAP dataset out of this CTE and
+        -- reporting the whole catalogue as missing from CDE. Matches the form
+        -- routes/erddapServers.js already uses.
+        SELECT erddap_url, dataset_id, title
+        FROM app WHERE source_type IS DISTINCT FROM 'obis'
     ),
     ckan_erddap AS (
         SELECT DISTINCT erddap_url, dataset_id FROM ckan WHERE erddap_url IS NOT NULL
+    ),
+    -- One CKAN record per (server, dataset), for joins that only want a label.
+    -- Several records can describe the same ERDDAP dataset; joining the raw
+    -- ckan set fanned a dataset out into one row per record, so a list showed
+    -- 113 rows under a count that said 94. (No backticks in here: this string
+    -- is a JS template literal.)
+    ckan_erddap_one AS (
+        SELECT DISTINCT ON (erddap_url, dataset_id)
+               erddap_url, dataset_id, ckan_id, ckan_name, title
+        FROM ckan
+        WHERE erddap_url IS NOT NULL
+        ORDER BY erddap_url, dataset_id, ckan_id
     )
 `;
 
@@ -406,7 +425,8 @@ async function coverageSummary() {
     ${COVERAGE_CTES}
     SELECT
       (SELECT count(*) FROM app)                                     AS n_app_total,
-      (SELECT count(*) FROM app WHERE source_type <> 'obis')         AS n_app_erddap,
+      (SELECT count(*) FROM app
+        WHERE source_type IS DISTINCT FROM 'obis')                   AS n_app_erddap,
       (SELECT count(*) FROM app WHERE source_type =  'obis')         AS n_app_obis,
       (SELECT count(DISTINCT ckan_id) FROM ckan)                     AS n_ckan_records,
       (SELECT count(*) FROM ckan_erddap)                             AS n_ckan_erddap_links,
@@ -418,8 +438,9 @@ async function coverageSummary() {
         WHERE NOT EXISTS (SELECT 1 FROM app_erddap a
                            WHERE a.erddap_url = e.erddap_url
                              AND a.dataset_id = e.dataset_id))       AS n_erddap_not_in_app,
-      (SELECT count(*) FROM ckan_erddap c
-        WHERE NOT EXISTS (SELECT 1 FROM app_erddap a
+      (SELECT count(*) FROM ckan c
+        WHERE c.erddap_url IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM app_erddap a
                            WHERE a.erddap_url = c.erddap_url
                              AND a.dataset_id = c.dataset_id))       AS n_ckan_not_in_app,
       (SELECT count(*) FROM app_erddap a
@@ -499,7 +520,7 @@ const COVERAGE_BUCKETS = {
            c.ckan_id,
            c.title
     FROM erddap_advertised e
-    LEFT JOIN ckan c
+    LEFT JOIN ckan_erddap_one c
            ON c.erddap_url = e.erddap_url AND c.dataset_id = e.dataset_id
     WHERE NOT EXISTS (SELECT 1 FROM app_erddap a
                        WHERE a.erddap_url = e.erddap_url

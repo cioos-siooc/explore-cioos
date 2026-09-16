@@ -76,12 +76,20 @@ CKAN_UNRELATED_RESPONSE = {
 }
 
 
+# fetch_ckan_catalogue asks the OBIS harvest source for its record ids before
+# walking the catalogue, so that response comes first. Empty is what the
+# national catalogue actually returns: it holds no OBIS records.
+CKAN_NO_OBIS_RECORDS = {"result": {"count": 0, "results": []}}
+
+
 def _ckan_side_effects():
+    obis = MagicMock()
+    obis.json.return_value = CKAN_NO_OBIS_RECORDS
     page1 = MagicMock()
     page1.json.return_value = CKAN_PACKAGE_SEARCH_RESPONSE
     page2 = MagicMock()
     page2.json.return_value = CKAN_EMPTY_RESPONSE
-    return [page1, page2]
+    return [obis, page1, page2]
 
 
 # ---------------------------------------------------------------------------
@@ -297,10 +305,12 @@ def written_csv_folder_unmatched_ckan(tmp_path_factory, harvest_result):
         mock_session.get.side_effect = _erddap_session_get
         mock_session_cls.return_value = mock_session
 
+        obis = MagicMock()
+        obis.json.return_value = CKAN_NO_OBIS_RECORDS
         unrelated = MagicMock()
         unrelated.json.return_value = CKAN_UNRELATED_RESPONSE
         ckan_session = MagicMock()
-        ckan_session.get.side_effect = [unrelated]
+        ckan_session.get.side_effect = [obis, unrelated]
         mock_ckan_session_builder.return_value = ckan_session
 
         mock_harvest_task.submit.return_value = mock_future

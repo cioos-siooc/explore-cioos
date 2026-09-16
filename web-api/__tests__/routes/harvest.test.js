@@ -229,3 +229,45 @@ describe("GET /harvest/coverage/:bucket", () => {
     expect(sql).toContain("'harvest_failed'");
   });
 });
+
+describe("coverage source_type handling", () => {
+  it("treats a NULL source_type as ERDDAP, not as neither", async () => {
+    respond = () => [];
+
+    await request(app).get("/harvest/coverage");
+
+    const sql = sqlFor("erddap_advertised");
+    // cde.datasets.source_type is nullable and real databases carry NULL on
+    // ERDDAP rows. `source_type <> 'obis'` yields NULL for those, silently
+    // dropping every ERDDAP dataset and reporting the whole catalogue as
+    // missing from CDE — observed against a live database before this guard.
+    expect(sql).not.toMatch(/source_type\s*<>\s*'obis'/);
+    expect(sql).toMatch(/source_type IS DISTINCT FROM 'obis'/);
+  });
+});
+
+describe("coverage list/count agreement", () => {
+  it("joins one CKAN record per dataset so a list cannot outgrow its count", async () => {
+    respond = () => [];
+
+    await request(app).get("/harvest/coverage/erddap-not-in-app");
+
+    const sql = sqlFor("erddap_advertised e");
+    // Several CKAN records can describe the same ERDDAP dataset. Joining the
+    // raw ckan set fanned one dataset into one row per record — observed as a
+    // 113-row list under a count that said 94.
+    expect(sql).toContain("LEFT JOIN ckan_erddap_one");
+    expect(sql).toMatch(/DISTINCT ON \(erddap_url, dataset_id\)[\s\S]*ckan_id/);
+  });
+
+  it("counts CKAN-not-in-CDE over records, matching what that bucket lists", async () => {
+    respond = () => [];
+
+    await request(app).get("/harvest/coverage");
+
+    const sql = sqlFor("n_ckan_not_in_app");
+    // The bucket is record-centric (it shows ckan_id/ckan_name), so counting
+    // distinct datasets there understated the list it heads.
+    expect(sql).toMatch(/FROM ckan c\s+WHERE c\.erddap_url IS NOT NULL/);
+  });
+});

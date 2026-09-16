@@ -52,12 +52,20 @@ PAGE_SIZE = 1000
 # Transient statuses worth retrying (CKAN's Cloudflare/Caddy returns these intermittently).
 _RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
 
-# OBIS records carry their dataset UUID in xml_location_url (.../<uuid>.xml) —
-# the same field the per-dataset lookup this replaced searched on.
+# OBIS records carry their dataset UUID in xml_location_url (.../<uuid>.xml).
+# The UUID alone is NOT a discriminator: every CIOOS record has an
+# xml_location_url naming its own metadata file, so matching on the pattern
+# alone tagged 488 ordinary records (geology, etc.) as OBIS datasets. The
+# harvest source is the real discriminator — the same one the per-dataset
+# lookup this replaced filtered on — and it is a Solr index field rather than a
+# package field, so it takes its own query (see fetch_obis_record_ids).
 _OBIS_XML_RE = re.compile(
     r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.xml",
     re.IGNORECASE,
 )
+
+# CKAN harvest source carrying the OBIS metadata records.
+OBIS_HARVEST_SOURCE = "obis-xml-harvest-demo"
 
 
 def _logger():
@@ -155,7 +163,7 @@ def obis_uuid_from_xml_location(value):
     return match.group(1).lower() if match else None
 
 
-def parse_ckan_package(record):
+def parse_ckan_package(record, obis_record_ids=frozenset()):
     """Turn one CKAN package into zero or more inventory rows.
 
     A record yields one row per ERDDAP ``tabledap`` resource, so a package
@@ -181,7 +189,13 @@ def parse_ckan_package(record):
         "title_fr": _clean_text(title_translated.get("fr")),
         "organizations": organizations,
         "eovs": list(record.get("eov") or []),
-        "obis_dataset_id": obis_uuid_from_xml_location(record.get("xml_location_url")),
+        # Only for records the OBIS harvest source actually produced; every
+        # other record's xml_location_url names its own metadata file.
+        "obis_dataset_id": (
+            obis_uuid_from_xml_location(record.get("xml_location_url"))
+            if record.get("id") in obis_record_ids
+            else None
+        ),
         "n_resources": len(resources),
     }
 
@@ -261,12 +275,44 @@ def iter_ckan_packages(cache_requests=False, session=None):
     logger.info("Read %d CKAN records", seen)
 
 
+def fetch_obis_record_ids(session=None):
+    """CKAN package ids produced by the OBIS harvest source.
+
+    One extra request, because harvest_source_title is a Solr filter field and
+    not part of the package body — there is no way to tell an OBIS record from
+    the enumerated records alone. Returns an empty set when the source does not
+    exist on this CKAN, which is the honest answer: no OBIS records to link.
+    """
+    logger = _logger()
+    session = session or _build_ckan_session()
+    url = (
+        f"{ckan_api_url()}/action/package_search"
+        f"?fq=harvest_source_title:{OBIS_HARVEST_SOURCE}&rows=1000&fl=id"
+    )
+    try:
+        result = _ckan_get_result(session, url)
+    except (requests.RequestException, RuntimeError, KeyError) as e:
+        # Never fail the harvest over the OBIS link: without it OBIS datasets
+        # simply keep their own titles, which they are expected to do anyway.
+        logger.warning("Could not list OBIS CKAN records (%s); treating as none", e)
+        return frozenset()
+
+    ids = frozenset(r["id"] for r in result.get("results") or [] if r.get("id"))
+    logger.info(
+        "CKAN harvest source %r holds %d OBIS record(s)", OBIS_HARVEST_SOURCE, len(ids)
+    )
+    return ids
+
+
 @task(task_run_name="fetch-ckan-catalogue")
 def fetch_ckan_catalogue(cache=False, limit=None) -> pd.DataFrame:
     """Page the whole CKAN catalogue into the flat inventory frame (@task)."""
+    session = _build_ckan_session()
+    obis_record_ids = fetch_obis_record_ids(session)
+
     rows = []
-    for n, record in enumerate(iter_ckan_packages(cache_requests=cache), 1):
-        rows.append(parse_ckan_package(record))
+    for n, record in enumerate(iter_ckan_packages(cache_requests=cache, session=session), 1):
+        rows.append(parse_ckan_package(record, obis_record_ids))
         if limit and n >= limit:
             break
 
