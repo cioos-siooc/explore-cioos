@@ -1,0 +1,52 @@
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'frontend/**'
+
+web-api:
+  - changed-files:
+      - any-glob-to-any-file: 'web-api/**'
+
+harvester:
+  - changed-files:
+      - any-glob-to-any-file: 'harvester/**'
+
+downloader:
+  - changed-files:
+      - any-glob-to-any-file: 'downloader/**'
+
+download-scheduler:
+  - changed-files:
+      - any-glob-to-any-file: 'download_scheduler/**'
+
+database:
+  - changed-files:
+      - any-glob-to-any-file: 'database/**'
+
+nginx:
+  - changed-files:
+      - any-glob-to-any-file: 'nginx/**'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/tests/**'
+          - '**/*.test.js'
+          - '**/*.test.jsx'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '**/*.md'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/package.json'
+          - '**/package-lock.json'
+          - '**/pyproject.toml'
+          - '**/uv.lock'
