@@ -6,6 +6,7 @@ import {
   Building,
   CalendarWeek,
   FileEarmarkSpreadsheet,
+  Pentagon,
   Search,
   Stack,
   Tag,
@@ -23,6 +24,7 @@ import DataLayersFilter from "../../Controls/Filter/DataLayersFilter/DataLayersF
 import MultiCheckboxFilter from "../../Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx";
 import SourceFilter from "../../Controls/Filter/SourceFilter/SourceFilter.jsx";
 import ScientificNameFilter from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
+import SpatialFilter from "../../Controls/Filter/SpatialFilter/SpatialFilter.jsx";
 import TimeSelector from "../../Controls/Filter/TimeSelector/TimeSelector.jsx";
 import DepthSelector from "../../Controls/Filter/DepthSelector/DepthSelector.jsx";
 import {
@@ -35,6 +37,7 @@ import {
   capitalizeFirstLetter,
   generateMultipleSelectBadgeTitle,
   generateRangeSelectBadgeTitle,
+  polygonIsRectangle,
   setAllOptionsIsSelectedTo,
 } from "../../../utilities.jsx";
 import {
@@ -112,6 +115,7 @@ export default function FiltersPanel() {
     onlyInView,
     setOnlyInView,
     inViewCount,
+    polygon,
   } = useSelection();
   const { openFilter, setOpenFilter } = useUI();
   const {
@@ -213,6 +217,17 @@ export default function FiltersPanel() {
     [defaultStartDepth, defaultEndDepth],
     "(m)",
   );
+
+  // Like the scientific name search above, not a facet with an options list —
+  // idle it reads as the bare filter name, drawn it names the shape itself
+  // (the same two labels SpatialFilterButton's own menu uses).
+  const spatialFilterTranslationKey = "spatialFilterFilterName";
+  const hasSpatialFilter = Boolean(polygon);
+  const spatialFilterBadgeTitle = hasSpatialFilter
+    ? t(polygonIsRectangle(polygon) ? "drawBoundingBoxOption" : "drawPolygonOption")
+    : t(spatialFilterTranslationKey);
+  const SpatialFilterIcon =
+    hasSpatialFilter && !polygonIsRectangle(polygon) ? Pentagon : BoundingBox;
 
   // A failed /datasets leaves no catalogue total; what came back filtered is
   // then all we know it to be (same fallback as the top bar's counter).
@@ -441,6 +456,26 @@ export default function FiltersPanel() {
             </Filter>
           </FilterSection>
           <FilterSection title={t("filterGroupWhenWhere")}>
+            {/* First in the section: the drawn shape is the primary "where"
+                constraint, ahead of the derived "in view" toggle below it.
+                Picking a shape closes the modal (see SpatialFilter) so the
+                map — hidden behind the dialog otherwise — is there to draw
+                on. */}
+            <Filter
+              active={hasSpatialFilter}
+              badgeTitle={spatialFilterBadgeTitle}
+              tooltip={t("spatialFilterMenuTitle")}
+              icon={<SpatialFilterIcon />}
+              controlled
+              filterName={spatialFilterTranslationKey}
+              openFilter={openFilter === spatialFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                hasSpatialFilter ? () => requestDraw("clear") : undefined
+              }
+            >
+              <SpatialFilter />
+            </Filter>
             <Filter
               active={timeFilterActive}
               badgeTitle={timeframesBadgeTitle}

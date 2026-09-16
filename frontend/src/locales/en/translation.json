@@ -61,6 +61,7 @@
   "timeframeFilterName": "Time",
   "depthRangeFilterName": "Depth",
   "filtersMenuButton": "Filters",
+  "spatialFilterFilterName": "Area",
   "spatialFilterMenuTitle": "Select an area on the map",
   "drawBoundingBoxOption": "Bounding box",
   "drawPolygonOption": "Polygon",

@@ -61,6 +61,7 @@
   "timeframeFilterName": "Période",
   "depthRangeFilterName": "Profondeur",
   "filtersMenuButton": "Filtres",
+  "spatialFilterFilterName": "Zone",
   "spatialFilterMenuTitle": "Sélectionner une zone sur la carte",
   "drawBoundingBoxOption": "Rectangle",
   "drawPolygonOption": "Polygone",

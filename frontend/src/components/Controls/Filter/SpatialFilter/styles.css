@@ -1,0 +1,37 @@
+/* The two draw-mode rows reuse .multiCheckboxFilter/.optionButton (see
+   DataLayersFilter) — a pick-one action list rather than a set of
+   checkboxes, so .selected marks whichever shape is currently drawn instead
+   of toggling independently. */
+.spatialFilterOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Small pill button, same visual family as .filterOptionsActions button
+   (Reset) but living inside the pane's own body rather than the footer
+   actions row — it only makes sense once a shape is drawn, unlike Reset
+   which the Filter component always places outside the scrolling body. */
+.spatialFilterCopyWkt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 0 14px;
+  height: 30px;
+  background-color: var(--cioos-teal-light);
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  color: var(--cioos-ink);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.spatialFilterCopyWkt:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
