@@ -20,7 +20,7 @@ const COVERAGE = {
     n_erddap_not_in_app: 7,
     n_ckan_not_in_app: 4,
     n_ckan_not_integrated: 4,
-    n_app_without_ckan: 2,
+    n_erddap_without_ckan: 2,
     n_ckan_no_data_source: 30,
     n_ckan_only_datasets: 12,
     n_obis_without_ckan: 5,
@@ -332,11 +332,11 @@ describe("HarvestCoverage", () => {
     expect(screen.queryByText(/No CKAN snapshot yet/)).not.toBeInTheDocument();
   });
 
-  it("frames the CDE-without-CKAN bucket as a review list, not a fault", async () => {
+  it("frames the ERDDAP-without-CKAN bucket as a review list, not a fault", async () => {
     // CKAN does not describe every ERDDAP dataset either, and those datasets
     // stay in Explorer — so this bucket must not read as a set of breakages.
     stubRoutes({
-      "/coverage/app-without-ckan": {
+      "/coverage/erddap-without-ckan": {
         rows: [],
         total: 0,
         offset: 0,
@@ -347,7 +347,7 @@ describe("HarvestCoverage", () => {
     await screen.findByText("orphan_ds");
 
     await userEvent.click(
-      screen.getByRole("button", { name: /^In CDE, not in CKAN\d+$/i }),
+      screen.getByRole("button", { name: /^ERDDAP, no CKAN record\d+$/i }),
     );
 
     expect(await screen.findByText(/not a fault/)).toBeInTheDocument();

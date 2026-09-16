@@ -107,7 +107,7 @@ export default function HarvestOverview() {
               {t("harvest.coverage.overviewCkanGap")}
             </span>
             <span className="harvest-count-pill harvest-count-unchanged">
-              {coverage.summary.n_app_without_ckan}{" "}
+              {coverage.summary.n_erddap_without_ckan}{" "}
               {t("harvest.coverage.overviewNoCkan")}
             </span>
           </div>

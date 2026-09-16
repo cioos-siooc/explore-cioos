@@ -450,7 +450,7 @@ async function coverageSummary() {
       (SELECT count(*) FROM app_erddap a
         WHERE NOT EXISTS (SELECT 1 FROM ckan_erddap c
                            WHERE c.erddap_url = a.erddap_url
-                             AND c.dataset_id = a.dataset_id))       AS n_app_without_ckan,
+                             AND c.dataset_id = a.dataset_id))       AS n_erddap_without_ckan,
       (SELECT count(DISTINCT ckan_id) FROM ckan
         WHERE erddap_url IS NULL AND obis_dataset_id IS NULL)        AS n_ckan_no_data_source,
       -- Datasets CKAN describes that NO configured source advertises and CDE
@@ -682,8 +682,9 @@ const COVERAGE_BUCKETS = {
     ORDER BY c.erddap_url, c.dataset_id
   `,
 
-  // Served by CDE, with no CKAN record describing it — the metadata gap.
-  "app-without-ckan": `
+  // Served by CDE from an ERDDAP server, with no CKAN record describing it:
+  // the ERDDAP half of the metadata gap, obis-without-ckan being the other.
+  "erddap-without-ckan": `
     ${COVERAGE_CTES}
     SELECT a.erddap_url,
            a.dataset_id,

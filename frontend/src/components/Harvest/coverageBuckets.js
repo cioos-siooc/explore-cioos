@@ -22,8 +22,8 @@ const BUCKETS = [
     exportable: true,
   },
   {
-    key: "app-without-ckan",
-    countKey: "n_app_without_ckan",
+    key: "erddap-without-ckan",
+    countKey: "n_erddap_without_ckan",
     columns: ["erddap_url", "dataset_id", "title"],
   },
   {

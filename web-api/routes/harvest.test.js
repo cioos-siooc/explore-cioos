@@ -164,7 +164,7 @@ test("GET /harvest/coverage returns the summary and the per-source rows", async 
       n_app_obis: 20,
       n_ckan_records: 300,
       n_erddap_not_in_app: 7,
-      n_app_without_ckan: 3,
+      n_erddap_without_ckan: 3,
       ckan_snapshot_at: "2026-09-15T00:00:00Z",
     },
   ]);

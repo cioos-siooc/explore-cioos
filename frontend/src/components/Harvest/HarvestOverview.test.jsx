@@ -48,7 +48,7 @@ const COVERAGE = {
     n_app_total: 120,
     n_erddap_not_in_app: 7,
     n_ckan_not_in_app: 4,
-    n_app_without_ckan: 2,
+    n_erddap_without_ckan: 2,
   },
   sources: [],
   ckanUrl: "https://catalogue.example.ca",
@@ -142,7 +142,7 @@ describe("HarvestOverview", () => {
       await screen.findByText(/7.*in ERDDAP, not in CDE/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/2.*served with no CKAN record/),
+      screen.getByText(/2.*served from ERDDAP with no CKAN record/),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /coverage report/i }),
