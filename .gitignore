@@ -68,6 +68,16 @@ harvester_logs
 # Harvest and download outputs. harvest-prod/ (96 MB) was invisible only
 # because the blanket `*.csv` above swallowed its contents.
 harvest-prod/
+harvest_obis*/
+
+# The OBIS occurrence cache written by a local harvest — 1 GB after one full
+# discovery run, and `obis_cache` is the DEFAULT folder name, so it lands
+# wherever the harvester is invoked from rather than at a fixed path.
+obis_cache/
+
+# memory_profiler output from a profiled harvest (see harvester/README).
+*.dat
+*.mprof
 
 # downloads/ is a tracked mount point (README.md explains it); ignore only the
 # generated archives inside it.
