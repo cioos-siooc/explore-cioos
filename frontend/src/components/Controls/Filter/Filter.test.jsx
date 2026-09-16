@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -127,7 +127,49 @@ describe("Filter (controlled)", () => {
 });
 
 describe("Filter search / reset / info", () => {
-  it("the search box calls setSearchTerms as the user types, and Clear resets it", async () => {
+  // The box publishes what is typed once typing pauses, never per keystroke:
+  // in the Text Search row the value behind it re-queries the map, and in the
+  // facet rows it re-filters and re-renders a list thousands of options long.
+  // Typing a word used to do either of those once per character.
+  function SearchHarness({ onPublish }) {
+    const [terms, setTerms] = useState("");
+    return (
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        searchable
+        searchTerms={terms}
+        setSearchTerms={(next) => {
+          onPublish(next);
+          setTerms(next);
+        }}
+        searchPlaceholder="Search"
+      >
+        <div>options</div>
+      </Filter>
+    );
+  }
+
+  it("publishes the typed text once, after typing pauses — not per keystroke", async () => {
+    // No inter-keystroke delay, so the whole word is typed well inside the
+    // debounce however loaded the machine running this is.
+    const user = userEvent.setup({ delay: null });
+    const onPublish = vi.fn();
+    render(<SearchHarness onPublish={onPublish} />);
+
+    await user.click(screen.getByTestId("filter-header"));
+    await user.type(screen.getByPlaceholderText("Search"), "oxy");
+
+    expect(screen.getByPlaceholderText("Search")).toHaveValue("oxy");
+    expect(onPublish).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(onPublish).toHaveBeenCalledWith("oxy"));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  // Clearing is the exception to the pause: it publishes there and then, which
+  // is what this asserts by never waiting.
+  it("Clear empties the search immediately", async () => {
     const user = userEvent.setup();
     const setSearchTerms = vi.fn();
     render(

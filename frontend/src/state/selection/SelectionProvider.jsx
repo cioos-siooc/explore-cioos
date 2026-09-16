@@ -340,14 +340,15 @@ export default function SelectionProvider({ children }) {
   // Map/tileQuery.js), and "only in view" is the viewport itself, so feeding
   // it back would rewrite every map query on every pan for no visible change.
   //
-  // The search text is debounced here — the list filters in memory on every
-  // keystroke, but each distinct value here is a fresh set of tile, legend and
-  // coverage URLs, so typing a word uncached would otherwise cost a round of
-  // map requests per character.
-  const debouncedSearchText = useDebounce(datasetTitleSearchText, 300);
+  // Each distinct search text here is a fresh set of tile, legend and coverage
+  // URLs, so typing a word uncached would cost a round of map requests per
+  // character — which is why every box that writes this state publishes on a
+  // pause rather than per keystroke (useDebouncedSearchInput). Debouncing it a
+  // second time here would only delay the map behind the list it has to agree
+  // with.
   const mapDatasetPks = useMemo(() => {
-    const query = debouncedSearchText.toLowerCase();
-    const hasSearch = !isEmpty(debouncedSearchText);
+    const query = datasetTitleSearchText.toLowerCase();
+    const hasSearch = !isEmpty(datasetTitleSearchText);
     if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
     return pointsData
       .filter(
@@ -356,7 +357,7 @@ export default function SelectionProvider({ children }) {
           (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
       )
       .map((row) => row.pk);
-  }, [hiddenDatasetPks, pointsData, debouncedSearchText, i18n.language]);
+  }, [hiddenDatasetPks, pointsData, datasetTitleSearchText, i18n.language]);
 
   useEffect(() => {
     setMapDatasetPKs(mapDatasetPks);

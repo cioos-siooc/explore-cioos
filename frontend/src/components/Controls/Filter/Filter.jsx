@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import {
   abbreviateString,
   useChanged,
+  useDebouncedSearchInput,
   useOutsideAlerter,
 } from "../../../utilities";
 
@@ -50,6 +51,14 @@ export default function Filter({
   // prop during render rather than in an effect keeps the two from disagreeing
   // for a frame.
   if (useChanged(openFilter) && controlled) setFilterOpen(openFilter);
+
+  // What the search box narrows is never just itself: an options list here,
+  // the map and the datasets list in the Text Search row. So the box shows
+  // what is typed and publishes it on a pause — see useDebouncedSearchInput.
+  const [searchText, setSearchText] = useDebouncedSearchInput(
+    searchTerms ?? "",
+    setSearchTerms,
+  );
 
   // This is the filter being edited. Controlled, that also takes the panel
   // agreeing it is the open one; either way a disabled row never opens.
@@ -116,15 +125,15 @@ export default function Filter({
                 autoFocus
                 className="filterSearch"
                 type="text"
-                value={searchTerms}
-                onChange={(e) => setSearchTerms(e.target.value)}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
                 placeholder={searchPlaceholder}
               />
-              {searchTerms && (
+              {searchText && (
                 <button
                   type="button"
                   className="clearFilter"
-                  onClick={() => setSearchTerms("")}
+                  onClick={() => setSearchText("")}
                   title={t("filterClearSearchTitle")} // 'Clear search terms'
                   aria-label={t("filterClearSearchTitle")}
                 >
