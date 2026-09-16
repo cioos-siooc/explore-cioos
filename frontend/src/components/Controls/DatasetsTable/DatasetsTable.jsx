@@ -28,6 +28,7 @@ import {
   isGroupDimension,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
+import { useDebouncedSearchInput } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
@@ -64,8 +65,8 @@ export default function DatasetsTable({
   // lives there too: the hidden groups decide what the map draws, and both are
   // carried in the URL.
   const {
-    datasetTitleSearchText: searchText,
-    setDatasetTitleSearchText: setSearchText,
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
     groupBy: selectedGroupBy,
     setGroupBy,
     hiddenGroups,
@@ -73,6 +74,13 @@ export default function DatasetsTable({
     showAllGroups,
     selectedPks,
   } = useSelection();
+  // The same free-text search the top bar and the Filters modal write, and
+  // it narrows the map as well as this list — so the box below publishes what
+  // is typed on a pause (useDebouncedSearchInput) rather than per keystroke.
+  const [searchText, setSearchText] = useDebouncedSearchInput(
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
+  );
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
   // card named datasets that could be on page 6 of 8, and there was no way to

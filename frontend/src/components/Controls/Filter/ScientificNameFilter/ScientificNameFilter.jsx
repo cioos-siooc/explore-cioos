@@ -4,7 +4,6 @@ import { CheckSquare, Square } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import Spinner from "../../../ui/Spinner.jsx";
-import { useDebounce } from "../../../../utilities";
 import { server } from "../../../../config.js";
 import reportError from "../../../../state/reportError.js";
 
@@ -66,7 +65,10 @@ export default function ScientificNameFilter({
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language && i18n.language.startsWith("fr") ? "fr" : "en";
-  const debouncedSearchTerms = useDebounce(searchTerms || "", 250);
+  // Already published on a pause by the pane's search box (see
+  // useDebouncedSearchInput), so each value that arrives here is one the user
+  // stopped typing on — a second debounce would only delay the typeahead.
+  const searchQuery = searchTerms || "";
   const [suggestions, setSuggestions] = useState([]);
   // Rank and common name for every name we have seen, kept so a picked name
   // reads the same pinned at the top of the list as it did in the suggestions
@@ -95,7 +97,7 @@ export default function ScientificNameFilter({
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    const q = encodeURIComponent(debouncedSearchTerms);
+    const q = encodeURIComponent(searchQuery);
     fetch(`${server}/scientificNames?q=${q}&lang=${lang}&limit=200`, {
       signal: controller.signal,
     })
@@ -112,7 +114,7 @@ export default function ScientificNameFilter({
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [debouncedSearchTerms, lang]);
+  }, [searchQuery, lang]);
 
   // Hydrate details for selections we don't yet know about (e.g. on page load
   // when the names were restored from the URL). Re-runs when the locale changes so

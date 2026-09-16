@@ -5,6 +5,7 @@ import classNames from "classnames";
 
 import { DropdownButton } from "../../ui/Dropdown.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useDebouncedSearchInput } from "../../../utilities.jsx";
 
 // Fourth segment of the top bar's Datasets/Filters pill: a quick way into the
 // same free-text search the datasets list and the Filters modal's Text Search
@@ -17,6 +18,13 @@ export default function SearchButton() {
   const { t } = useTranslation();
   const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // The search behind it reaches the map, the datasets list and the counters,
+  // so it is published on a pause rather than per keystroke — the hook lives
+  // here rather than in the popover below, which unmounts when the menu closes.
+  const [searchText, setSearchText] = useDebouncedSearchInput(
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
+  );
 
   return (
     <DropdownButton
@@ -44,15 +52,15 @@ export default function SearchButton() {
           autoFocus
           type="text"
           className="topBarSearchInput"
-          value={datasetTitleSearchText}
-          onChange={(e) => setDatasetTitleSearchText(e.target.value)}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
           placeholder={t("textSearchFilterPlaceholder")}
         />
-        {datasetTitleSearchText && (
+        {searchText && (
           <button
             type="button"
             className="topBarSearchClear"
-            onClick={() => setDatasetTitleSearchText("")}
+            onClick={() => setSearchText("")}
             title={t("filterClearSearchTitle")}
             aria-label={t("filterClearSearchTitle")}
           >
