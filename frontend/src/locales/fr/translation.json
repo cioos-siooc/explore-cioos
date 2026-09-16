@@ -632,7 +632,7 @@
   "harvest.coverage.bucket.ckan-not-in-app.label": "Dans CKAN, absent de CDE",
   "harvest.coverage.bucket.ckan-not-in-app.help": "CKAN décrit un jeu de données ERDDAP que CDE ne diffuse pas : la moisson a échoué, le serveur a cessé de l'annoncer, ou CDE ne moissonne pas ce serveur.",
   "harvest.coverage.bucket.app-without-ckan.label": "Dans CDE, absent de CKAN",
-  "harvest.coverage.bucket.app-without-ckan.help": "CDE diffuse ces jeux de données, mais le catalogue n'a aucune fiche les décrivant.",
+  "harvest.coverage.bucket.app-without-ckan.help": "CDE diffuse ces jeux de données, mais le catalogue n'a aucune fiche les décrivant. CKAN ne décrit pas tous les jeux de données ERDDAP, et ceux-ci restent disponibles dans Explorer — une liste à examiner avec le diffuseur, pas une anomalie.",
   "harvest.coverage.bucket.ckan-no-data-source.label": "CKAN, sans source de données",
   "harvest.coverage.bucket.ckan-no-data-source.help": "Fiches sans ressource ERDDAP ni jeu de données OBIS : CDE n'a rien à lire.",
   "harvest.coverage.bucket.obis-not-in-app.label": "Dans CKAN, absent de CDE (OBIS)",

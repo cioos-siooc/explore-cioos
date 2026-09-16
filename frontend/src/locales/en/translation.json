@@ -631,7 +631,7 @@
   "harvest.coverage.bucket.ckan-not-in-app.label": "In CKAN, not in CDE",
   "harvest.coverage.bucket.ckan-not-in-app.help": "CKAN describes an ERDDAP dataset CDE does not serve — because the harvest failed, because the server stopped listing it, or because CDE never harvests that server at all.",
   "harvest.coverage.bucket.app-without-ckan.label": "In CDE, not in CKAN",
-  "harvest.coverage.bucket.app-without-ckan.help": "CDE serves these, but the catalogue has no record describing them.",
+  "harvest.coverage.bucket.app-without-ckan.help": "CDE serves these, but the catalogue has no record describing them. CKAN does not describe every ERDDAP dataset, and these stay available in Explorer — a list to review with the publisher, not a fault.",
   "harvest.coverage.bucket.ckan-no-data-source.label": "CKAN, no data source",
   "harvest.coverage.bucket.ckan-no-data-source.help": "Records with neither an ERDDAP resource nor an OBIS dataset behind them, so there is nothing for CDE to read.",
   "harvest.coverage.bucket.obis-not-in-app.label": "In CKAN, not in CDE (OBIS)",

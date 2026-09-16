@@ -159,6 +159,23 @@ describe("HarvestCoverage", () => {
     expect(screen.queryByText(/No CKAN snapshot yet/)).not.toBeInTheDocument();
   });
 
+  it("frames the CDE-without-CKAN bucket as a review list, not a fault", async () => {
+    // CKAN does not describe every ERDDAP dataset either, and those datasets
+    // stay in Explorer — so this bucket must not read as a set of breakages.
+    stubRoutes({
+      "/coverage/app-without-ckan": { rows: [], truncated: false, limit: 500 },
+    });
+    renderWithProviders(<HarvestCoverage />);
+    await screen.findByText("orphan_ds");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /^In CDE, not in CKAN\d+$/i }),
+    );
+
+    expect(await screen.findByText(/not a fault/)).toBeInTheDocument();
+    expect(screen.getByText(/stay available\s+in Explorer/)).toBeInTheDocument();
+  });
+
   it("labels the OBIS-without-CKAN bucket as expected, not as a defect", async () => {
     stubRoutes({
       "/coverage/obis-without-ckan": { rows: [], truncated: false, limit: 500 },
