@@ -21,6 +21,10 @@
 
   /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
   --cioos-ink: #152f37; /* body + heading text */
+
+  /* secondary text at normal weight and small (12-14px) size — ink-60 only
+     clears WCAG AA contrast at larger or bolder sizes. */
+  --cioos-ink-80: rgb(21 47 55 / 82%);
   --cioos-ink-60: rgb(21 47 55 / 62%); /* secondary text */
   --cioos-ink-40: rgb(21 47 55 / 40%); /* muted text / icons */
   --cioos-hairline: #dce8e5; /* hairline borders between sand & teal-light */
@@ -42,6 +46,7 @@
   --cioos-error: #e25563; /* Atlantic red-coral, reused for errors */
   --cioos-error-bg: #fbe3e6;
   --cioos-warn: #b07a00;
+  --cioos-warn-bg: #fdf3da; /* the tinted ground --cioos-warn sits on */
   --cioos-info: #0f6d8e;
 
   /* --- Map data keys --- */
@@ -334,6 +339,11 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+::placeholder {
+  color: var(--cioos-ink-60);
+  opacity: 1;
 }
 
 button {

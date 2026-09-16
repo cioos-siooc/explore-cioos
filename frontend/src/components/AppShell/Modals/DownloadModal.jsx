@@ -1,9 +1,11 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { CloudArrowDownFill } from "react-bootstrap-icons";
+import { CloudArrowDown } from "react-bootstrap-icons";
+import isEmpty from "lodash-es/isEmpty";
 
 import Modal from "../../ui/Modal.jsx";
 import DownloadPanel from "../Panels/DownloadPanel.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
@@ -12,6 +14,8 @@ import "./styles.css";
 export default function DownloadModal() {
   const { t } = useTranslation();
   const { showDownloadModal, setShowDownloadModal } = useUI();
+  const { pointsToReview } = useSelection();
+  const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
 
   return (
     <Modal
@@ -25,11 +29,21 @@ export default function DownloadModal() {
       <Modal.Header closeButton>
         <Modal.Title id="downloadModalTitle">
           <span className="downloadModalTitleIcon" aria-hidden="true">
-            <CloudArrowDownFill size={20} />
+            <CloudArrowDown size={20} />
           </span>
           <span className="downloadModalTitleText">
-            <span className="downloadModalTitleHeading">
-              {t("downloadModalTitleText")}
+            <span className="downloadModalTitleRow">
+              <span className="downloadModalTitleHeading">
+                {t("downloadModalTitleText")}
+              </span>
+              {selectedCount > 0 && (
+                <span
+                  className="downloadModalTitleCounter"
+                  title={t("dockDownloadCountTitle", { count: selectedCount })}
+                >
+                  {selectedCount}
+                </span>
+              )}
             </span>
             <span className="downloadModalTitleSubtitle">
               {t("downloadModalSubtitleText")}

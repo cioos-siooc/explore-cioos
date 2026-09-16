@@ -156,6 +156,10 @@ describe("DownloadDetails", () => {
         document.querySelector(".datasetSizeTotalSpinner"),
       ).not.toBeInTheDocument();
     });
-    expect(screen.getByTitle("Size estimate unavailable")).toBeInTheDocument();
+    // Every card without an estimate carries the same title, so scope to the
+    // order summary's own figure rather than asserting a single match.
+    expect(
+      document.querySelector(".downloadSummaryValue[title]"),
+    ).toHaveAttribute("title", "Size estimate unavailable");
   });
 });

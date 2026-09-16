@@ -2,19 +2,22 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 
 import SelectPill from "../../ui/SelectPill.jsx";
-import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import { ERDDAP_FORMATS, OBIS_FORMATS } from "../../../downloadLinks.js";
+import "./styles.css";
 
 /*
- * What the direct links on the cards below return: one picker per catalogue in
- * the selection, because ERDDAP and OBIS do not serve the same formats and the
- * OBIS choice is not even a format choice (see OBIS_FORMATS — the two options
- * trade filtering against completeness).
+ * What file every link in this modal asks for — one setting per source.
  *
- * A picker only appears while the selection actually holds data from that
- * catalogue, and the group goes away when nothing in the selection can be
- * linked to. It shares the settings band with FilterDownloadToggles: both are
- * settings the list below answers to, so they sit on one row of chrome.
+ * It sits on the datasets toolbar rather than in the direct-links column
+ * because it governs more than that column: DownloadDetails builds one set of
+ * links from it and hands them both to the export buttons below and to the
+ * "Download CSV" button on every card in the list. Set to Parquet inside a
+ * panel labelled "Direct links", it silently relabelled forty buttons
+ * elsewhere on the screen; above the list, it reads as what it is — a setting
+ * for everything under it.
+ *
+ * Which pickers appear at all follows the selection: a basket of only OBIS
+ * occurrences has no use for a tabledap format, and vice versa.
  */
 export default function DownloadFormats({
   links,
@@ -29,36 +32,35 @@ export default function DownloadFormats({
   const hasObis = links.some((link) => link.source === "obis");
   if (!hasErddap && !hasObis) return null;
 
+  const obisNoteKey = OBIS_FORMATS.find(
+    (format) => format.id === obisFormat,
+  )?.noteKey;
+
   return (
-    <div className="downloadBandGroup downloadFormats">
-      <span className="downloadBandLabel">
-        {t("downloadFormatsSectionTitle")}
-        <QuestionIconTooltip
-          tooltipText={t("downloadFormatsQuestionTooltipText")}
-          tooltipPlacement={"right"}
-          size={16}
+    <div className="downloadFormats" data-testid="download-formats">
+      {hasErddap && (
+        <SelectPill
+          label={t("downloadFormatErddapLabel")}
+          value={erddapFormat}
+          options={ERDDAP_FORMATS}
+          onChange={setErddapFormat}
+          data-testid="direct-links-erddap-format"
         />
-      </span>
-      <div className="downloadBandContent">
-        {hasErddap && (
+      )}
+      {hasObis && (
+        <span className="downloadFormatsObis">
           <SelectPill
-            label={t("directLinksErddapFormatLabel")}
-            value={erddapFormat}
-            options={ERDDAP_FORMATS}
-            onChange={setErddapFormat}
-            data-testid="direct-links-erddap-format"
-          />
-        )}
-        {hasObis && (
-          <SelectPill
-            label={t("directLinksObisFormatLabel")}
+            label={t("downloadFormatObisLabel")}
             value={obisFormat}
             options={OBIS_FORMATS}
             onChange={setObisFormat}
             data-testid="direct-links-obis-format"
           />
-        )}
-      </div>
+          {obisNoteKey && (
+            <span className="downloadFormatsObisNote">{t(obisNoteKey)}</span>
+          )}
+        </span>
+      )}
     </div>
   );
 }
