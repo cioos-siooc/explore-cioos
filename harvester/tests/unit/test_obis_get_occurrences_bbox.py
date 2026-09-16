@@ -11,7 +11,6 @@ occurrences end up kept -- see geo_filter.py's bounds() docstring.
 import duckdb
 import pandas as pd
 import pytest
-
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 RESULT_COLUMNS = [

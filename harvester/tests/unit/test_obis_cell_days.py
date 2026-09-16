@@ -13,7 +13,6 @@ import ast
 import datetime
 
 import pandas as pd
-
 from cde_harvester.core.day_sets import ranges_to_csv_cell, total_days
 from cde_harvester.loading.loader import prepare_obis_cells_dataframe
 from cde_harvester.sources.obis.harvester import OBISHarvester
