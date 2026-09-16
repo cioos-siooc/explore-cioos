@@ -1,6 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const apicache = require("apicache");
+const express = require("express");
+const http = require("node:http");
 
 const { createCache, _resetAdapterForTests } = require("./cache");
 
@@ -150,4 +152,105 @@ test("route() is a middleware factory that resolves the backend per request", as
     0,
     "building the middleware must not touch redis — routes call this at import",
   );
+});
+
+/*
+ * The store path, end to end through real apicache.
+ *
+ * apicache writes an entry only when the response it sees has a body
+ * (`res._apicache.content` in its res.end patch). Express answers a
+ * conditional request by stripping the body and sending 304, so a browser
+ * holding an ETag could revalidate forever against an empty cache: each
+ * request ran the full query, returned 304, and stored nothing, so the entry
+ * was never written and the next request missed too. On prod that was ~3 s of
+ * Postgres per map tile per revalidation, permanently — the cache could not
+ * warm up for anyone who had visited before.
+ *
+ * routePipeline's fullResponseForCacheMiss closes it; this pins the
+ * consequence that matters, which the pipeline's own unit test cannot see:
+ * whether an entry actually lands.
+ */
+/*
+ * apicache.clear() with no target only empties its memory store — the
+ * clear-by-key branch is the one that calls clearTimeout, so a bare clear()
+ * leaves the entry's expiry timer (here 24 h) armed and the test runner hangs
+ * on an open handle. The unit-test script runs without --test-force-exit, so
+ * clearing has to go key by key.
+ */
+function clearAll() {
+  apicache.getIndex().all.forEach((key) => apicache.clear(key));
+}
+
+function countingApp(stages) {
+  let handlerRuns = 0;
+  const app = express();
+  app.get("/t", ...stages, (req, res) => {
+    handlerRuns += 1; // stands in for the tile query
+    res.json({ tile: "payload" });
+  });
+  const server = app.listen(0);
+  const get = (headers) =>
+    new Promise((resolve, reject) => {
+      http
+        .get({ port: server.address().port, path: "/t", headers }, (r) => {
+          r.resume();
+          r.on("end", () =>
+            resolve({ status: r.statusCode, etag: r.headers.etag }),
+          );
+        })
+        .on("error", reject);
+    });
+  return { get, runs: () => handlerRuns, close: () => server.close() };
+}
+
+// A browser that already holds an ETag, revalidating against a cold cache —
+// the state every returning visitor is in after a deploy or a harvest flush.
+async function revalidateTwiceAgainstColdCache(stages) {
+  clearAll();
+  const app = countingApp(stages);
+  try {
+    const { etag } = await app.get();
+    clearAll(); // redis wiped: a deploy, or the 24h TTL lapsing
+    const first = await app.get({ "If-None-Match": etag });
+    const second = await app.get({ "If-None-Match": etag });
+    return {
+      runs: app.runs(),
+      statuses: [first.status, second.status],
+      entries: apicache.getIndex().all.length,
+    };
+  } finally {
+    app.close();
+    clearAll();
+  }
+}
+
+test("a conditional request that misses the cache still fills it", async () => {
+  const { runs, statuses, entries } = await revalidateTwiceAgainstColdCache([
+    apicache.middleware("24 hours"),
+    require("./routePipeline").fullResponseForCacheMiss,
+  ]);
+
+  assert.equal(entries, 1, "the miss must leave an entry behind");
+  assert.deepEqual(
+    statuses,
+    [200, 304],
+    "the miss returns a storable body; the next revalidation is a cheap 304 off that entry",
+  );
+  assert.equal(
+    runs,
+    2,
+    "one run to mint the ETag, one to refill the cache — the second revalidation is served by apicache",
+  );
+});
+
+test("without the stage the cache can never fill from a revalidation", async () => {
+  // The regression itself. Kept executable so the fix above cannot be dropped
+  // silently: every repeat re-runs the query and nothing is ever stored.
+  const { runs, statuses, entries } = await revalidateTwiceAgainstColdCache([
+    apicache.middleware("24 hours"),
+  ]);
+
+  assert.equal(entries, 0);
+  assert.deepEqual(statuses, [304, 304]);
+  assert.equal(runs, 3, "every revalidation pays the query again");
 });
