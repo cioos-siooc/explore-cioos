@@ -118,7 +118,8 @@ class OBISHarvester(BaseHarvester):
                                 )
                                 break
 
-                        occurrences = self.get_occurrences(dataset_id)
+                        bbox = None if exempt else self.geo_filter.bounds()
+                        occurrences = self.get_occurrences(dataset_id, bbox=bbox)
                         results = occurrences.get("results", [])
 
                         if not results:
@@ -432,8 +433,17 @@ class OBISHarvester(BaseHarvester):
         self._write_cache(cache_file, metadata)
         return metadata
 
-    def get_occurrences(self, dataset_id):
-        """Fetch occurrences for a dataset via OBIS S3 parquet, with REST API fallback."""
+    def get_occurrences(self, dataset_id, bbox=None):
+        """Fetch occurrences for a dataset via OBIS S3 parquet, with REST API fallback.
+
+        ``bbox``, when given, is (lon_min, lat_min, lon_max, lat_max) -- the
+        geo filter's polygon bounds. It's a superset pre-filter: points
+        outside it are guaranteed to fail the polygon test that runs later in
+        aggregate_cells, so applying it here changes nothing about which rows
+        end up kept, it just stops the parquet reader materializing rows for
+        clearly-out-of-region datasets (e.g. global occurrence dumps) before
+        they're ever boxed into Python objects.
+        """
         os.makedirs(self.folder, exist_ok=True)
         cache_file = os.path.join(self.folder, f"{dataset_id}.json")
 
@@ -444,6 +454,14 @@ class OBISHarvester(BaseHarvester):
 
         import duckdb
         url = f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+
+        lat_min, lat_max = -85.06, 85.06
+        lon_min, lon_max = -180, 180
+        if bbox is not None:
+            b_lon_min, b_lat_min, b_lon_max, b_lat_max = bbox
+            lat_min, lat_max = max(lat_min, b_lat_min), min(lat_max, b_lat_max)
+            lon_min, lon_max = max(lon_min, b_lon_min), min(lon_max, b_lon_max)
+
         query = f"""
             SELECT
                 interpreted.decimalLatitude    AS decimalLatitude,
@@ -455,8 +473,8 @@ class OBISHarvester(BaseHarvester):
                 interpreted.scientificName     AS scientificName,
                 _id                            AS id
             FROM read_parquet('{url}')
-            WHERE interpreted.decimalLatitude  BETWEEN -85.06 AND 85.06
-              AND interpreted.decimalLongitude BETWEEN -180   AND 180
+            WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
+              AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
         """
         try:
             df = duckdb.sql(query).df()
