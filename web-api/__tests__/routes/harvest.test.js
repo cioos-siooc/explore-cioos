@@ -39,6 +39,21 @@ beforeEach(() => {
 const sqlFor = (fragment) =>
   db.raw.mock.calls.find(([sql]) => sql.includes(fragment))?.[0];
 
+// A bucket request issues two queries: the page, and a COUNT wrapped around
+// the same template. Even a test that only reads the SQL has to answer the
+// count with a row, or the route 500s reading `n` off an empty result.
+// The count wrapper embeds the whole template, so a fragment search matches it
+// too — and it is issued first. This picks the slicing query out of the pair.
+const pageSqlFor = (fragment) =>
+  db.raw.mock.calls.find(
+    ([sql]) => sql.includes(fragment) && !sql.startsWith("SELECT count(*)"),
+  )?.[0];
+
+const bucketRows =
+  (rows, total = rows.length) =>
+  (sql) =>
+    sql.startsWith("SELECT count(*)") ? [{ n: total }] : rows;
+
 describe("GET /harvest/servers/:slug", () => {
   it("resolves the slug with an indexable predicate, not a table-wide DISTINCT", async () => {
     respond = (sql) =>
@@ -170,43 +185,70 @@ describe("GET /harvest/coverage", () => {
   it("returns both the summary row and the per-source rows", async () => {
     respond = (sql) =>
       sql.includes("GROUP BY adv.erddap_url")
-        ? [{ erddap_url: "https://e.ca/erddap", source: "erddap", n_advertised: 9 }]
+        ? [
+            {
+              erddap_url: "https://e.ca/erddap",
+              source: "erddap",
+              n_advertised: 9,
+            },
+          ]
         : [{ n_app_total: 5, n_erddap_not_in_app: 2 }];
 
     const res = await request(app).get("/harvest/coverage");
 
     expect(res.body.summary.n_app_total).toBe(5);
     expect(res.body.sources).toHaveLength(1);
-    expect(res.body.bucketLimit).toBeGreaterThan(0);
   });
 });
 
 describe("GET /harvest/coverage/:bucket", () => {
-  const runBucketOf = async (count, bucket = "erddap-not-in-app") => {
-    respond = () =>
-      Array.from({ length: count }, (_, i) => ({ dataset_id: `ds_${i}` }));
-    return request(app).get(`/harvest/coverage/${bucket}`);
+  const runBucketOf = async (
+    count,
+    bucket = "erddap-not-in-app",
+    query = "",
+  ) => {
+    respond = bucketRows(
+      Array.from({ length: count }, (_, i) => ({ dataset_id: `ds_${i}` })),
+      3533,
+    );
+    return request(app).get(`/harvest/coverage/${bucket}${query}`);
   };
 
-  it("bounds the bucket query", async () => {
+  it("bounds the bucket query to one page", async () => {
     await runBucketOf(3);
 
-    expect(sqlFor("erddap_advertised e")).toContain("LIMIT ?");
+    expect(pageSqlFor("erddap_advertised e")).toContain("LIMIT ? OFFSET ?");
   });
 
-  it("reports a short list as complete", async () => {
+  it("returns the page beside the total the list runs to", async () => {
     const res = await runBucketOf(3);
 
     expect(res.status).toBe(200);
     expect(res.body.rows).toHaveLength(3);
-    expect(res.body.truncated).toBe(false);
+    expect(res.body.total).toBe(3533);
+    expect(res.body.offset).toBe(0);
   });
 
-  it("trims to the cap and says it did", async () => {
-    const res = await runBucketOf(5000);
+  it("counts the whole set, not the page", async () => {
+    await runBucketOf(3, "erddap-not-in-app", "?page=4");
 
-    expect(res.body.rows).toHaveLength(res.body.limit);
-    expect(res.body.truncated).toBe(true);
+    const countSql = sqlFor("SELECT count(*)");
+    // The wrapper must carry the template's own filtering but none of the
+    // page's slicing, or the total would come back equal to the page size and
+    // the pager would stop after one step.
+    expect(countSql).toContain("erddap_advertised e");
+    expect(countSql).not.toContain("LIMIT");
+  });
+
+  it("keeps the search term on both the page and its count", async () => {
+    // A search that narrowed the rows but not the total would leave the pager
+    // offering pages that come back empty.
+    await runBucketOf(3, "erddap-not-in-app", "?q=orphan");
+
+    for (const [sql, bindings] of db.raw.mock.calls) {
+      if (!sql.includes("erddap_advertised e")) continue;
+      expect(bindings.slice(0, 2)).toEqual(["orphan", "orphan"]);
+    }
   });
 
   it("404s an unknown bucket instead of returning an empty list", async () => {
@@ -219,7 +261,7 @@ describe("GET /harvest/coverage/:bucket", () => {
   });
 
   it("classifies a CKAN record whose server CDE never harvests", async () => {
-    respond = () => [];
+    respond = bucketRows([]);
 
     await request(app).get("/harvest/coverage/ckan-not-in-app");
 
@@ -248,7 +290,7 @@ describe("coverage source_type handling", () => {
 
 describe("coverage list/count agreement", () => {
   it("joins one CKAN record per dataset so a list cannot outgrow its count", async () => {
-    respond = () => [];
+    respond = bucketRows([]);
 
     await request(app).get("/harvest/coverage/erddap-not-in-app");
 

@@ -187,7 +187,8 @@ test("GET /harvest/coverage returns the summary and the per-source rows", async 
   assert.equal(res.body.sources[0].n_not_in_app, 7);
 });
 
-test("GET /harvest/coverage/:bucket returns the gap rows", async () => {
+test("GET /harvest/coverage/:bucket returns one page and the total", async () => {
+  db.queueRaw([{ n: 3533 }]);
   db.queueRaw([
     {
       erddap_url: "https://erddap.example.com/erddap",
@@ -201,7 +202,70 @@ test("GET /harvest/coverage/:bucket returns the gap rows", async () => {
 
   assert.equal(res.status, 200);
   assert.equal(res.body.rows[0].dataset_id, "orphan_ds");
-  assert.equal(res.body.truncated, false);
+  // The total comes from a COUNT over the same set, so the page can say how
+  // far the list runs rather than only whether it was cut off.
+  assert.equal(res.body.total, 3533);
+  assert.equal(res.body.offset, 0);
+});
+
+test("GET /harvest/coverage/:bucket offsets by page", async () => {
+  db.queueRaw([{ n: 3533 }]);
+  db.queueRaw([]);
+
+  const res = await agent
+    .get("/harvest/coverage/erddap-not-in-app")
+    .query({ page: 3 });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.offset, 100);
+  // The count must not carry the page's LIMIT, or it would report the page
+  // size back as the total and the pager would stop after one step.
+  assert.doesNotMatch(db.queries[0], /LIMIT/);
+  assert.match(db.queries[1], /LIMIT 50 OFFSET 100/);
+});
+
+test("GET /harvest/coverage/:bucket clamps a page past the end of the list", async () => {
+  // A stale bookmark on a bucket that has since shrunk. An empty slice would
+  // render as "nothing in this category", which is a different claim.
+  db.queueRaw([{ n: 120 }]);
+  db.queueRaw([]);
+
+  const res = await agent
+    .get("/harvest/coverage/erddap-not-in-app")
+    .query({ page: 90 });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.offset, 100);
+  assert.match(db.queries[1], /OFFSET 100/);
+});
+
+test("GET /harvest/coverage/:bucket lands a junk page number on page one", async () => {
+  // The page number arrives from a URL a person can edit; a negative offset is
+  // a Postgres error, not an empty list.
+  db.queueRaw([{ n: 0 }]);
+  db.queueRaw([]);
+
+  const res = await agent
+    .get("/harvest/coverage/erddap-not-in-app")
+    .query({ page: "-4" });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.offset, 0);
+});
+
+test("GET /harvest/coverage/:bucket?format=csv exports without counting", async () => {
+  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]);
+
+  const res = await agent
+    .get("/harvest/coverage/erddap-not-in-app")
+    .query({ format: "csv" });
+
+  assert.equal(res.status, 200);
+  assert.match(res.headers["content-type"], /text\/csv/);
+  // One query only: the export takes every row, so there is nothing a total
+  // would tell it. Queuing a single result is what pins that.
+  assert.equal(db.queries.length, 1);
+  assert.match(db.queries[0], /LIMIT 20000 OFFSET 0/);
 });
 
 test("GET /harvest/coverage/:bucket 404s an unknown bucket", async () => {

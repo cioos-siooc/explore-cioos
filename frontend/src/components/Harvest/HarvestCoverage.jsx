@@ -18,6 +18,53 @@ function sourceLabel(row, t) {
     : hostname(row.erddap_url);
 }
 
+// A section heading with the one-line definition of what that section counts.
+// The four groups each measure a different set over the same catalogue, and a
+// count only means something once you know which set it is counting.
+function Section({ title, definition }) {
+  return (
+    <>
+      <h2 className="harvest-section-title">{title}</h2>
+      <p className="harvest-section-def">{definition}</p>
+    </>
+  );
+}
+
+// Page controls for a gap list. Previous/next only: the largest bucket is
+// thousands of rows ordered by title, so a numbered strip would offer seventy
+// destinations nobody can aim at — the search box is how you jump.
+function Pager({ offset, limit, total, onPage, t }) {
+  const pages = Math.ceil(total / limit);
+  const page = Math.floor(offset / limit) + 1;
+  return (
+    <div className="harvest-pager">
+      <button
+        type="button"
+        className="harvest-pager-step"
+        disabled={page <= 1}
+        onClick={() => onPage(page - 1)}
+      >
+        {t("harvest.coverage.prevPage")}
+      </button>
+      <span className="harvest-pager-range">
+        {t("harvest.coverage.pageRange", {
+          first: (offset + 1).toLocaleString(),
+          last: Math.min(offset + limit, total).toLocaleString(),
+          total: total.toLocaleString(),
+        })}
+      </span>
+      <button
+        type="button"
+        className="harvest-pager-step"
+        disabled={page >= pages}
+        onClick={() => onPage(page + 1)}
+      >
+        {t("harvest.coverage.nextPage")}
+      </button>
+    </div>
+  );
+}
+
 function Stat({ label, value, tone }) {
   return (
     <div className="harvest-coverage-stat">
@@ -256,12 +303,18 @@ export default function HarvestCoverage() {
   const bucketKey = searchParams.get("bucket") || BUCKETS[0].key;
   const bucket = bucketByKey(bucketKey) || BUCKETS[0];
   const q = searchParams.get("q") || "";
+  const page = Math.max(1, Math.floor(Number(searchParams.get("page"))) || 1);
 
   const { data: coverage, loading } = useHarvestFetch("/coverage");
-  // The path is the whole cache key, so the bucket and search term belong in
-  // it — changing either refetches.
+  // The path is the whole cache key, so the bucket, search term and page all
+  // belong in it — changing any of them refetches. Defaults are left out so
+  // the first page of an unsearched bucket is one path, not two.
+  const bucketQuery = new URLSearchParams();
+  if (q) bucketQuery.set("q", q);
+  if (page > 1) bucketQuery.set("page", String(page));
+  const bucketQs = bucketQuery.toString();
   const { data: bucketData, loading: loadingBucket } = useHarvestFetch(
-    `/coverage/${bucket.key}${q ? `?q=${encodeURIComponent(q)}` : ""}`,
+    `/coverage/${bucket.key}${bucketQs ? `?${bucketQs}` : ""}`,
   );
 
   const summary = coverage?.summary;
@@ -280,6 +333,9 @@ export default function HarvestCoverage() {
     const p = new URLSearchParams(searchParams);
     if (value) p.set(name, value);
     else p.delete(name);
+    // A page number only means something within one bucket and one search:
+    // page 7 of a 3500-row list is past the end of a 12-row one.
+    if (name !== "page") p.delete("page");
     setSearchParams(p);
   }
 
@@ -299,9 +355,10 @@ export default function HarvestCoverage() {
         <div className="harvest-loading">{t("harvest.coverage.loading")}</div>
       ) : (
         <>
-          <h2 className="harvest-section-title">
-            {t("harvest.coverage.served")}
-          </h2>
+          <Section
+            title={t("harvest.coverage.served")}
+            definition={t("harvest.coverage.def.served")}
+          />
           <div className="harvest-coverage-stats">
             <Stat
               label={t("harvest.coverage.servedTotal")}
@@ -328,9 +385,10 @@ export default function HarvestCoverage() {
 
           {integration && (
             <>
-              <h2 className="harvest-section-title">
-                {t("harvest.coverage.integrationTitle")}
-              </h2>
+              <Section
+                title={t("harvest.coverage.integrationTitle")}
+                definition={t("harvest.coverage.def.integration")}
+              />
               <CoverageDonut
                 rings={integration.rings}
                 total={integration.total}
@@ -350,10 +408,14 @@ export default function HarvestCoverage() {
             </div>
           )}
 
-          <h2 className="harvest-section-title">
-            {t("harvest.coverage.sources")}
-          </h2>
-          <table className="harvest-table">
+          <Section
+            title={t("harvest.coverage.sources")}
+            definition={t("harvest.coverage.def.sources")}
+          />
+          {/* Its numeric columns are counts of whole datasets read straight
+              down the column, so they centre under their heading rather than
+              taking the right alignment used where decimals must line up. */}
+          <table className="harvest-table harvest-coverage-sources">
             <thead>
               <tr>
                 <th>{t("harvest.coverage.col.source")}</th>
@@ -434,7 +496,10 @@ export default function HarvestCoverage() {
         </>
       )}
 
-      <h2 className="harvest-section-title">{t("harvest.coverage.gaps")}</h2>
+      <Section
+        title={t("harvest.coverage.gaps")}
+        definition={t("harvest.coverage.def.gaps")}
+      />
       <div className="harvest-coverage-buckets">
         {BUCKETS.map((b) => (
           <button
@@ -464,8 +529,9 @@ export default function HarvestCoverage() {
           onChange={(e) => setParam("q", e.target.value)}
         />
         {bucket.exportable && (
-          // The table is capped, so "the whole list" has to leave by another
-          // door — and these get worked through in a spreadsheet anyway.
+          // The table is walked a page at a time, so "the whole list at
+          // once" leaves by another door — and these get worked through in a
+          // spreadsheet anyway.
           <a
             className="harvest-link harvest-text-sm"
             href={`${server}/harvest/coverage/${bucket.key}?format=csv${
@@ -514,11 +580,13 @@ export default function HarvestCoverage() {
               ))}
             </tbody>
           </table>
-          {bucketData.truncated && (
-            <p className="harvest-muted harvest-text-sm">
-              {t("harvest.coverage.truncated", { count: bucketData.limit })}
-            </p>
-          )}
+          <Pager
+            offset={bucketData.offset}
+            limit={bucketData.limit}
+            total={bucketData.total}
+            onPage={(n) => setParam("page", n > 1 ? String(n) : "")}
+            t={t}
+          />
         </>
       )}
     </HarvestLayout>

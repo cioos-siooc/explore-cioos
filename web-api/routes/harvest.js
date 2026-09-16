@@ -360,7 +360,11 @@ async function reasonBreakdown(erddapUrl = null) {
 // erddap_url is rtrim'd on every side: harvest_config URLs carry a trailing
 // slash, the URLs parsed out of CKAN resources do not, and cde.datasets holds
 // whichever the harvester was given.
-const COVERAGE_MAX_ROWS = 500;
+
+// One page of a gap list. The lists run to thousands of rows, so the page
+// walks them rather than capping them: the API answers with one page plus the
+// total, and the caller asks for the next by offset.
+const COVERAGE_PAGE_SIZE = 50;
 
 // Shared CTE header. `advertised` does its DISTINCT ON over the raw column so
 // the (erddap_url, dataset_id, attempted_at DESC) index still applies; the
@@ -555,12 +559,12 @@ async function coverageSources() {
 
 // Drill-down lists behind the summary counts. Each is keyed by the bucket name
 // the route takes, so an unknown name is a 404 rather than an injected table.
-// Every query takes the same three bindings — the search term twice, then the
-// row cap — so one helper can run any of them. The search matches a concat of
-// whichever columns identify a row in that bucket; none of these can use an
-// index for ILIKE anyway, so folding them into one haystack costs nothing.
-// One row over the cap is fetched, so "there is more" is answered without a
-// second COUNT over the same sets.
+// Every query takes the same two bindings — the search term twice — so one
+// helper can run any of them, and each ends at its ORDER BY so the caller can
+// bolt a LIMIT/OFFSET on for one page or wrap the whole thing in a COUNT for
+// the total. The search matches a concat of whichever columns identify a row
+// in that bucket; none of these can use an index for ILIKE anyway, so folding
+// them into one haystack costs nothing.
 const COVERAGE_BUCKETS = {
   // Advertised by an ERDDAP server, absent from cde.datasets. reason_code says
   // why the harvester passed on it; NULL means it reported success but the row
@@ -584,7 +588,6 @@ const COVERAGE_BUCKETS = {
            OR concat_ws(' ', e.dataset_id, e.erddap_url, e.reason_code)
               ILIKE '%' || ? || '%')
     ORDER BY e.erddap_url, e.dataset_id
-    LIMIT ?
   `,
 
   // Every CKAN record with nothing CDE serves behind it — the whole metadata
@@ -645,7 +648,6 @@ const COVERAGE_BUCKETS = {
                              rep.erddap_url, rep.obis_dataset_id, rep.classification)
               ILIKE '%' || ? || '%')
     ORDER BY rep.classification, rep.title
-    LIMIT ?
   `,
 
   // CKAN describes an ERDDAP dataset the app does not serve. The three
@@ -678,7 +680,6 @@ const COVERAGE_BUCKETS = {
            OR concat_ws(' ', c.dataset_id, c.erddap_url, c.title)
               ILIKE '%' || ? || '%')
     ORDER BY c.erddap_url, c.dataset_id
-    LIMIT ?
   `,
 
   // Served by CDE, with no CKAN record describing it — the metadata gap.
@@ -699,7 +700,6 @@ const COVERAGE_BUCKETS = {
            OR concat_ws(' ', a.dataset_id, a.erddap_url, a.title)
               ILIKE '%' || ? || '%')
     ORDER BY a.erddap_url, a.dataset_id
-    LIMIT ?
   `,
 
   // A CKAN record pointing at neither a tabledap resource nor an OBIS UUID:
@@ -714,7 +714,6 @@ const COVERAGE_BUCKETS = {
            OR concat_ws(' ', c.ckan_name, c.title, c.ckan_id)
               ILIKE '%' || ? || '%')
     ORDER BY c.title
-    LIMIT ?
   `,
 
   // OBIS datasets CDE serves that CKAN has no record of. Informational, not a
@@ -730,7 +729,6 @@ const COVERAGE_BUCKETS = {
       AND (CAST(? AS text) IS NULL
            OR concat_ws(' ', o.dataset_id, o.title) ILIKE '%' || ? || '%')
     ORDER BY o.title
-    LIMIT ?
   `,
 
   // CKAN describes an OBIS dataset CDE does not serve — either outside the
@@ -747,13 +745,12 @@ const COVERAGE_BUCKETS = {
            OR concat_ws(' ', c.obis_dataset_id, c.title, c.ckan_name)
               ILIKE '%' || ? || '%')
     ORDER BY c.title
-    LIMIT ?
   `,
 };
 
-// Ceiling for the CSV export. The in-page table stays at COVERAGE_MAX_ROWS —
-// a browser does not want 3000 rows of DOM — but "the full list" has to be
-// obtainable, and a data manager acts on these in a spreadsheet anyway.
+// Ceiling for the CSV export. The page walks a bucket COVERAGE_PAGE_SIZE rows
+// at a time, but "the whole list at once" has to be obtainable too, and a data
+// manager acts on these in a spreadsheet anyway.
 const COVERAGE_EXPORT_MAX_ROWS = 20000;
 
 // RFC 4180: quote every field, double any embedded quote. Postgres arrays and
@@ -769,12 +766,33 @@ function toCsv(rows) {
   ].join("\n");
 }
 
-async function coverageBucket(bucket, q = null, limit = COVERAGE_MAX_ROWS) {
-  const sql = COVERAGE_BUCKETS[bucket];
-  if (!sql) return null;
-  const result = await db.raw(sql, [q, q, limit + 1]);
-  const truncated = result.rows.length > limit;
-  return { rows: result.rows.slice(0, limit), truncated };
+// Split in two because the two callers want different things: the CSV export
+// wants every row and no count, the page wants one slice and the total to
+// build a pager from. Both start from the same template, which the route looks
+// up once so an unknown bucket is rejected before either runs.
+function coverageSql(bucket) {
+  return COVERAGE_BUCKETS[bucket] || null;
+}
+
+async function coverageRows(sql, q, limit, offset) {
+  const result = await db.raw(`${sql}\n    LIMIT ? OFFSET ?`, [
+    q,
+    q,
+    limit,
+    offset,
+  ]);
+  return result.rows;
+}
+
+// Wrapped rather than a count(*) OVER () inside each template: several of them
+// SELECT DISTINCT, and a window function runs before the de-duplication, so an
+// inlined count would report the pre-DISTINCT row count.
+async function coverageTotal(sql, q) {
+  const result = await db.raw(
+    `SELECT count(*)::int AS n FROM (${sql}) bucket_rows`,
+    [q, q],
+  );
+  return result.rows[0].n;
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -878,7 +896,6 @@ router.get(
       summary,
       sources,
       ckanUrl: CKAN_URL,
-      bucketLimit: COVERAGE_MAX_ROWS,
     });
   },
 );
@@ -887,30 +904,42 @@ router.get(
   "/coverage/:bucket",
   ...pipeline({ filters: false, cacheFor: "5 minutes" }),
   async (req, res) => {
-    const wantsCsv = req.query.format === "csv";
-    const result = await coverageBucket(
-      req.params.bucket,
-      req.query.q || null,
-      wantsCsv ? COVERAGE_EXPORT_MAX_ROWS : COVERAGE_MAX_ROWS,
-    );
-    if (result && wantsCsv) {
+    const sql = coverageSql(req.params.bucket);
+    // Unknown bucket names are a 404 rather than an empty list: an empty list
+    // would read as "no gaps here", which is the opposite of "no such report".
+    if (!sql) return res.status(404).json({ error: "Unknown coverage bucket" });
+
+    const q = req.query.q || null;
+
+    if (req.query.format === "csv") {
       res
         .type("text/csv")
         .set(
           "Content-Disposition",
           `attachment; filename="cde-${req.params.bucket}.csv"`,
         );
-      return res.send(toCsv(result.rows));
+      return res.send(
+        toCsv(await coverageRows(sql, q, COVERAGE_EXPORT_MAX_ROWS, 0)),
+      );
     }
-    // Unknown bucket names are a 404 rather than an empty list: an empty list
-    // would read as "no gaps here", which is the opposite of "no such report".
-    if (!result)
-      return res.status(404).json({ error: "Unknown coverage bucket" });
-    res.json({
-      rows: result.rows,
-      truncated: result.truncated,
-      limit: COVERAGE_MAX_ROWS,
-    });
+
+    // Anything unparseable, negative or fractional lands on page 1 rather than
+    // erroring: the page number arrives from a URL a person can edit.
+    const page = Math.max(1, Math.floor(Number(req.query.page)) || 1);
+    // The count runs first so the page can be clamped to the last one that
+    // holds rows. Asking for page 90 of a 12-row bucket — a stale bookmark, or
+    // a hand-edited URL — would otherwise answer with an empty slice, which
+    // the page can only render as "nothing in this category": a different
+    // claim from "you are past the end". It costs one query's latency on a
+    // route cached for five minutes.
+    const total = await coverageTotal(sql, q);
+    const lastOffset = Math.max(
+      0,
+      (Math.ceil(total / COVERAGE_PAGE_SIZE) - 1) * COVERAGE_PAGE_SIZE,
+    );
+    const offset = Math.min((page - 1) * COVERAGE_PAGE_SIZE, lastOffset);
+    const rows = await coverageRows(sql, q, COVERAGE_PAGE_SIZE, offset);
+    res.json({ rows, total, offset, limit: COVERAGE_PAGE_SIZE });
   },
 );
 

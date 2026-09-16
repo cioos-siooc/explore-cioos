@@ -323,6 +323,17 @@
   border-bottom: 2px solid var(--cioos-teal-light);
 }
 
+/* The one-line definition under a section heading: what that group counts.
+   Narrow on purpose — a definition read in one line is worth more than one
+   that stretches the full width of a 1600px table. */
+.harvest-section-def {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--harvest-muted-strong);
+  max-width: 78ch;
+  margin: -0.35rem 0 0.9rem;
+}
+
 /* A "view all" link sitting on the right of a section heading. */
 .harvest-section-link {
   float: right;
@@ -656,6 +667,13 @@ a.harvest-link:hover {
   color: var(--cioos-white);
 }
 
+/* The sources table's numbers are counts of whole datasets — no decimals to
+   line up — so they sit under the middle of their heading instead of being
+   pushed to the right edge of a wide column. */
+.harvest-coverage-sources .harvest-num {
+  text-align: center;
+}
+
 .harvest-coverage-search {
   padding: 0.35rem 0.6rem;
   border: 1px solid var(--harvest-input-border);
@@ -754,4 +772,39 @@ a.harvest-link:hover {
 }
 .harvest-coverage-toolbar .harvest-coverage-search {
   margin-bottom: 0;
+}
+
+/* ── Pager (coverage gap lists) ───────────────────────────────────────────── */
+.harvest-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.9rem 0 1.5rem;
+}
+
+.harvest-pager-step {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--harvest-input-border);
+  border-radius: 4px;
+  background: var(--cioos-white);
+  color: var(--cioos-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.harvest-pager-step:hover:not(:disabled) {
+  background: var(--harvest-row-hover);
+}
+
+.harvest-pager-step:disabled {
+  color: var(--harvest-muted);
+  cursor: default;
+}
+
+.harvest-pager-range {
+  font-size: 0.82rem;
+  color: var(--harvest-muted-strong);
+  font-variant-numeric: tabular-nums;
 }

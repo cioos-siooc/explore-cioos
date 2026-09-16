@@ -38,7 +38,6 @@ const COVERAGE = {
     },
   ],
   ckanUrl: "https://catalogue.example.ca",
-  bucketLimit: 500,
 };
 
 const ERDDAP_GAP = {
@@ -51,8 +50,9 @@ const ERDDAP_GAP = {
       attempted_at: "2026-09-14T00:00:00Z",
     },
   ],
-  truncated: false,
-  limit: 500,
+  total: 1,
+  offset: 0,
+  limit: 50,
 };
 
 const CKAN_GAP = {
@@ -80,8 +80,9 @@ const CKAN_GAP = {
       reason_code: null,
     },
   ],
-  truncated: false,
-  limit: 500,
+  total: 2,
+  offset: 0,
+  limit: 50,
 };
 
 function stubRoutes(overrides = {}) {
@@ -234,7 +235,12 @@ describe("HarvestCoverage", () => {
 
   it("says when a bucket is empty rather than rendering a bare table", async () => {
     stubRoutes({
-      "/coverage/erddap-not-in-app": { rows: [], truncated: false, limit: 500 },
+      "/coverage/erddap-not-in-app": {
+        rows: [],
+        total: 0,
+        offset: 0,
+        limit: 50,
+      },
     });
     renderWithProviders(<HarvestCoverage />);
     expect(
@@ -242,13 +248,67 @@ describe("HarvestCoverage", () => {
     ).toBeInTheDocument();
   });
 
-  it("admits when the list was cut off", async () => {
+  it("walks a long bucket a page at a time", async () => {
+    const page1 = { ...ERDDAP_GAP, total: 120, offset: 0, limit: 50 };
+    const page2 = {
+      rows: [{ ...ERDDAP_GAP.rows[0], dataset_id: "second_page_ds" }],
+      total: 120,
+      offset: 50,
+      limit: 50,
+    };
     stubRoutes({
-      "/coverage/erddap-not-in-app": { ...ERDDAP_GAP, truncated: true },
+      "/coverage/erddap-not-in-app": page1,
+      "/coverage/erddap-not-in-app?page=2": page2,
     });
     renderWithProviders(<HarvestCoverage />);
+    await screen.findByText("orphan_ds");
+
+    // The range is the count the page can state honestly: the table holds one
+    // slice, not "the first 50 of however many there are".
+    expect(screen.getByText("1–50 of 120")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: /Next/ }));
+
+    expect(await screen.findByText("second_page_ds")).toBeInTheDocument();
+    expect(screen.getByText("51–100 of 120")).toBeInTheDocument();
+  });
+
+  it("returns to page one when the bucket changes", async () => {
+    // Page 7 of a 3500-row bucket is past the end of a 12-row one, so the
+    // page number cannot survive a switch — it would fetch an empty slice.
+    stubRoutes({
+      "/coverage/erddap-not-in-app": { ...ERDDAP_GAP, total: 120 },
+      "/coverage/erddap-not-in-app?page=2": {
+        rows: [{ ...ERDDAP_GAP.rows[0], dataset_id: "second_page_ds" }],
+        total: 120,
+        offset: 50,
+        limit: 50,
+      },
+    });
+    renderWithProviders(<HarvestCoverage />);
+    await screen.findByText("orphan_ds");
+    await userEvent.click(screen.getByRole("button", { name: /Next/ }));
+    await screen.findByText("second_page_ds");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /^In CKAN, not in CDE\d+$/i }),
+    );
+
+    // The unsuffixed path is page one; a leftover ?page=2 would 404 the stub.
+    expect(await screen.findByText("unharvested_ds")).toBeInTheDocument();
+  });
+
+  it("defines each group of the report, not just names it", async () => {
+    renderWithProviders(<HarvestCoverage />);
+    await screen.findByRole("heading", { name: "Sources" });
+
     expect(
-      await screen.findByText(/Showing the first 500 rows/),
+      screen.getByText(/counted as datasets, beside the number of records/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Every place CDE reads from/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/appear on one side of that comparison/),
     ).toBeInTheDocument();
   });
 
@@ -276,7 +336,12 @@ describe("HarvestCoverage", () => {
     // CKAN does not describe every ERDDAP dataset either, and those datasets
     // stay in Explorer — so this bucket must not read as a set of breakages.
     stubRoutes({
-      "/coverage/app-without-ckan": { rows: [], truncated: false, limit: 500 },
+      "/coverage/app-without-ckan": {
+        rows: [],
+        total: 0,
+        offset: 0,
+        limit: 50,
+      },
     });
     renderWithProviders(<HarvestCoverage />);
     await screen.findByText("orphan_ds");
@@ -293,7 +358,12 @@ describe("HarvestCoverage", () => {
 
   it("labels the OBIS-without-CKAN bucket as expected, not as a defect", async () => {
     stubRoutes({
-      "/coverage/obis-without-ckan": { rows: [], truncated: false, limit: 500 },
+      "/coverage/obis-without-ckan": {
+        rows: [],
+        total: 0,
+        offset: 0,
+        limit: 50,
+      },
     });
     renderWithProviders(<HarvestCoverage />);
     await screen.findByText("orphan_ds");
