@@ -5,13 +5,18 @@ import { act, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
 import { useSelection } from "./SelectionProvider.jsx";
+import { useMapState } from "../map/MapStateProvider.jsx";
 import { erddapServerSlug } from "../../utilities.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 
 let latest;
+// The map side of the same render, so the suite can assert that a narrowing
+// made here actually reaches the queries the map draws from.
+let latestMapState;
 
 function Probe() {
   latest = useSelection();
+  latestMapState = useMapState();
   return (
     <span data-testid="state">
       {latest.initialPointsQueryComplete ? "loaded" : "loading"}
@@ -95,6 +100,43 @@ describe("SelectionProvider", () => {
         ),
       ).toBe(true);
     });
+  });
+
+  it("datasetTitleSearchText narrows the map's queries too, not just the list", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const needle = target.title.slice(0, 6);
+    const excluded = latest.pointsData.find(
+      (row) => !row.title.toLowerCase().includes(needle.toLowerCase()),
+    );
+    expect(
+      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
+    ).toBeNull();
+
+    act(() => latest.setDatasetTitleSearchText(needle));
+    await waitFor(() => {
+      const drawn = new URLSearchParams(latestMapState.mapQueryString)
+        .get("datasetPKs")
+        ?.split(",");
+      expect(drawn).toContain(String(target.pk));
+      expect(drawn).toEqual(
+        latest.filteredDatasets.map((row) => String(row.pk)),
+      );
+    });
+    if (excluded) {
+      expect(
+        new URLSearchParams(latestMapState.mapQueryString)
+          .get("datasetPKs")
+          .split(","),
+      ).not.toContain(String(excluded.pk));
+    }
+
+    act(() => latest.setDatasetTitleSearchText(""));
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
+      ).toBeNull(),
+    );
   });
 
   it("fetches a record preview once inspectRecordID is set on an inspected dataset", async () => {
