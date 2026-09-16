@@ -4,9 +4,9 @@
 
 ## Requirements
 
-**Every filter and UI-window element must be parametrizable via the URL** — a link reproduces the view. `src/state/useUrlSync.js` owns the format and is its only writer; each provider seeds back from the address on load; `useUrlSeededPersistentState` for state that is also a stored preference (the param beats localStorage); serialize only non-default values. `useUrlSync` rebuilds the whole search string on every map pan, so a param it neither derives nor names in `PRESERVED_PARAMS` is dropped. The modal and sidebar flags in `src/state/ui/UIProvider.jsx` don't meet this yet.
+**Every filter and UI-window element must be parametrizable via the URL** — a link reproduces the view; `src/state/useUrlSync.js` owns and writes the format (rebuilt on every map pan, so a param it doesn't derive must be named in `PRESERVED_PARAMS` to survive one), each provider seeds back from the address on load, and the modal and sidebar flags in `src/state/ui/UIProvider.jsx` don't meet this yet.
 
-**Never build from scratch what a dependency already does.** Reach for what is installed before writing custom code — geometry from `@turf/*`, collections from `lodash-es`, scales from `d3-scale`, map and draw from `maplibre-gl` / `@mapbox/mapbox-gl-draw`, tables from `react-data-table-component`, plots from `react-plotly.js`, icons from `react-bootstrap-icons`, i18n from `react-i18next`, routing from `react-router-dom`. A well-scoped new dependency beats a hand-rolled equivalent; prefer both to a fourth variant of something the repo already solves.
+**Never build from scratch what a dependency already does** — reach for what is installed (`@turf/*`, `lodash-es`, `d3-scale`, `maplibre-gl`, `@mapbox/mapbox-gl-draw`, `react-data-table-component`, `react-plotly.js`, `react-bootstrap-icons`, `react-i18next`, `react-router-dom`), or a well-scoped new dependency, before writing custom code.
 
 ## Frontend-only dev
 
