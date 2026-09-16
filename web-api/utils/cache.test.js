@@ -254,3 +254,127 @@ test("without the stage the cache can never fill from a revalidation", async () 
   assert.deepEqual(statuses, [304, 304]);
   assert.equal(runs, 3, "every revalidation pays the query again");
 });
+
+/*
+ * Compression of the stored body (see the header comment in cache.js). The
+ * adapter is the only thing that touches the bytes, so these drive it directly
+ * rather than through a route.
+ */
+function storingClient() {
+  const hashes = new Map();
+  return {
+    hashes,
+    isReady: true,
+    hSet: async (key, field, value) => {
+      if (!hashes.has(key)) hashes.set(key, {});
+      hashes.get(key)[field] = value;
+      return 1;
+    },
+    hGetAll: async (key) => hashes.get(key) || {},
+    expire: async () => 1,
+    del: async (key) => (hashes.delete(key), 1),
+  };
+}
+
+async function adapterOver(client) {
+  _resetAdapterForTests();
+  const cache = createCache({ redis: fakeRedis({ client }) });
+  await cache.ensureReady();
+  return apicache.options().redisClient;
+}
+
+const roundTrip = (adapter, key) =>
+  new Promise((resolve) => adapter.hgetall(key, (_e, obj) => resolve(obj)));
+
+test("the response body is stored compressed, and only the body", async () => {
+  const client = storingClient();
+  const adapter = await adapterOver(client);
+
+  // What apicache actually writes: the whole cache object as one JSON string.
+  const body = JSON.stringify({ status: 200, data: "x".repeat(5000) });
+  await new Promise((r) => adapter.hset("k", "response", body, r));
+  await new Promise((r) => adapter.hset("k", "duration", 86400000, r));
+
+  const stored = client.hashes.get("k");
+  assert.ok(
+    stored.response.startsWith("gz:"),
+    "the body must be marked and compressed",
+  );
+  assert.ok(
+    stored.response.length < body.length / 4,
+    `expected a real saving, got ${stored.response.length} from ${body.length}`,
+  );
+  assert.equal(
+    stored.duration,
+    "86400000",
+    "only `response` is compressed — duration stays a plain string",
+  );
+});
+
+test("a Buffer body survives the round trip byte for byte", async () => {
+  // Every .mvt tile is a Buffer, and it is Buffer-ness that makes the stored
+  // JSON balloon (one byte becomes 3-4 ASCII chars), so it is the case that
+  // matters most. apicache JSON-serializes it and rebuilds it on the way out.
+  const client = storingClient();
+  const adapter = await adapterOver(client);
+
+  const tile = Buffer.from(
+    Array.from({ length: 2048 }, (_, i) => (i * 7 + 13) % 256),
+  );
+  const cacheObject = { status: 200, headers: {}, data: tile, timestamp: 1 };
+  await new Promise((r) =>
+    adapter.hset("t", "response", JSON.stringify(cacheObject), r),
+  );
+
+  const { response } = await roundTrip(adapter, "t");
+  const parsed = JSON.parse(response);
+  assert.deepEqual(
+    Buffer.from(parsed.data.data),
+    tile,
+    "the tile bytes must come back unchanged",
+  );
+  assert.equal(parsed.status, 200);
+});
+
+test("an entry written before compression still reads", async () => {
+  // A rolling deploy, or a rollback, leaves unmarked values in redis. They
+  // must not read as garbage.
+  const client = storingClient();
+  const adapter = await adapterOver(client);
+  client.hashes.set("legacy", { response: '{"status":200}', duration: "1000" });
+
+  const { response } = await roundTrip(adapter, "legacy");
+  assert.equal(response, '{"status":200}');
+});
+
+test("an unreadable body reads as a miss instead of throwing", async () => {
+  // apicache parses this inside its own callback, where a throw would escape
+  // as an unhandled exception and take the process down. A miss regenerates.
+  const client = storingClient();
+  const adapter = await adapterOver(client);
+  client.hashes.set("bad", {
+    response: "gz:not-base64-gzip",
+    duration: "1000",
+  });
+
+  const obj = await roundTrip(adapter, "bad");
+  assert.deepEqual(obj, {}, "apicache reads a bodiless object as a miss");
+});
+
+test("the store is queued synchronously, so EXPIRE cannot beat the key", async () => {
+  /*
+   * apicache issues hset(response) -> hset(duration) -> expire(key) back to
+   * back without awaiting. If compression deferred the hSet to a later tick,
+   * EXPIRE would reach redis before the key existed, return 0, and the entry
+   * would sit there with no TTL until eviction. Pins the ordering, which is
+   * why packResponse is the sync zlib call.
+   */
+  const client = storingClient();
+  const adapter = await adapterOver(client);
+
+  adapter.hset("k", "response", JSON.stringify({ data: "y".repeat(3000) }));
+  assert.ok(
+    client.hashes.has("k"),
+    "hSet must be issued before hset() returns, not on a later tick",
+  );
+});
