@@ -79,22 +79,25 @@ export default function SpatialFilter() {
       </div>
       {hasSelection && (
         <div className="spatialFilterDetails">
+          {/* Compass layout — N over W/E over S — rather than a plain list,
+              so the four figures read as the shape's envelope, not four
+              unrelated values. */}
           <dl className="spatialFilterBounds">
-            <div>
+            <div className="spatialFilterBoundsNorth">
               <dt>{t("spatialFilterNorth")}</dt>
               <dd>{bounds.north.toFixed(4)}</dd>
             </div>
-            <div>
-              <dt>{t("spatialFilterSouth")}</dt>
-              <dd>{bounds.south.toFixed(4)}</dd>
+            <div className="spatialFilterBoundsWest">
+              <dt>{t("spatialFilterWest")}</dt>
+              <dd>{bounds.west.toFixed(4)}</dd>
             </div>
-            <div>
+            <div className="spatialFilterBoundsEast">
               <dt>{t("spatialFilterEast")}</dt>
               <dd>{bounds.east.toFixed(4)}</dd>
             </div>
-            <div>
-              <dt>{t("spatialFilterWest")}</dt>
-              <dd>{bounds.west.toFixed(4)}</dd>
+            <div className="spatialFilterBoundsSouth">
+              <dt>{t("spatialFilterSouth")}</dt>
+              <dd>{bounds.south.toFixed(4)}</dd>
             </div>
           </dl>
           <label className="spatialFilterWktLabel">

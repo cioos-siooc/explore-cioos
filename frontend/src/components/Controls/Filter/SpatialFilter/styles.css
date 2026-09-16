@@ -17,11 +17,40 @@
   border-top: 1px solid var(--cioos-hairline);
 }
 
+/* Compass layout — N over W · E over S — rather than a plain list, so the
+   four figures read as the shape's envelope rather than four unrelated
+   values. The two side cells (W/E) share their row with the empty centre
+   column standing in for the shape itself. */
 .spatialFilterBounds {
   display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 4px 16px;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas:
+    ".    north .   "
+    "west .     east"
+    ".    south .   ";
+  justify-items: center;
+  gap: 2px 20px;
   margin: 0;
+}
+
+.spatialFilterBoundsNorth {
+  grid-area: north;
+}
+
+.spatialFilterBoundsWest {
+  grid-area: west;
+}
+
+.spatialFilterBoundsEast {
+  grid-area: east;
+}
+
+.spatialFilterBoundsSouth {
+  grid-area: south;
+}
+
+.spatialFilterBounds > * {
+  text-align: center;
 }
 
 .spatialFilterBounds dt {
@@ -38,7 +67,7 @@
 
 .spatialFilterWktLabel {
   display: block;
-  margin-top: 10px;
+  margin-top: 16px;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-40);
 }
@@ -46,15 +75,16 @@
 .spatialFilterWkt {
   display: block;
   width: 100%;
-  min-height: 4.2em;
-  margin-top: 4px;
-  padding: 8px;
+  min-height: 8em;
+  margin-top: 6px;
+  padding: 10px;
   resize: vertical;
   background-color: var(--cioos-surface-2);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
   font-family: var(--cioos-font-mono, monospace);
   font-size: var(--cioos-font-size-xs);
+  line-height: 1.5;
   color: var(--cioos-ink);
 }
 
