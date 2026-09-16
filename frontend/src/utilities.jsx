@@ -1,7 +1,7 @@
 import bytes from "bytes";
 import isEmpty from "lodash-es/isEmpty";
 import { scaleLinear, scaleLog } from "d3-scale";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { defaultQuery } from "./components/config.js";
 
 export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
@@ -394,6 +394,88 @@ export function useDebounce(value, delay) {
     [value, delay], // Only re-call effect if value or delay changes
   );
   return debouncedValue;
+}
+
+// A search box that doesn't set the whole app to work on every keystroke: the
+// typed text is local, so the field itself stays instant, and it is published
+// to the state the rest of the app reacts to — an options list's search terms,
+// or the free-text dataset search behind the map, the list and the counters —
+// only once typing pauses for `delay`.
+//
+// Returns the pair an input needs, the text to show and the setter its
+// onChange calls, so the markup, the placeholder and the clear button stay
+// with whichever component owns them.
+//
+// Two rules on top of the plain debounce, both about never losing what was
+// asked for:
+//   - Emptying the box publishes at once. Undoing a search has to read as the
+//     clear button working, and an empty search is the cheapest query there is.
+//   - A box that goes away with keystrokes still due publishes them on the way
+//     out, so typing into a filter pane and closing it straight after searches
+//     for what was typed rather than for nothing.
+//
+// A change to `value` from anywhere else — Reset, a chip removed, a share link
+// — is adopted into the box; this hook's own published value arriving back is
+// not, or every keystroke after a publish would be overwritten by it.
+export function useDebouncedSearchInput(value, onChange, delay = 300) {
+  const [text, setText] = useState(value);
+  // The value last published from here. State rather than a ref because it is
+  // read during render, to tell our own value coming back around from a change
+  // made anywhere else.
+  const [published, setPublished] = useState(value);
+  const timer = useRef(undefined);
+  // What the timer and the unmount flush read, both of them outliving the
+  // render that scheduled them. Written in a layout effect: refs must not be
+  // written during render, and a passive effect can still be pending when a
+  // timer armed before it fires.
+  const latest = useRef({ text, published, onChange });
+  useLayoutEffect(() => {
+    latest.current = { text, published, onChange };
+  });
+
+  // A change made anywhere else — Reset, a chip removed, a share link — replaces
+  // what is in the box. Mirrored during render rather than in an effect (see
+  // useChanged) so the box never paints a frame of the text it has been told to
+  // drop.
+  if (useChanged(value) && value !== published) {
+    setPublished(value);
+    setText(value);
+  }
+
+  // Typing that hadn't landed by the time the box went away — a filter pane
+  // closed right after a word was typed into it — is published on the way out
+  // rather than lost.
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      const { text: typed, published: sent, onChange: send } = latest.current;
+      if (typed !== sent) send(typed);
+    },
+    [],
+  );
+
+  function publish(next) {
+    setPublished(next);
+    latest.current.onChange(next);
+  }
+
+  function change(next) {
+    setText(next);
+    clearTimeout(timer.current);
+    // Emptied, it publishes there and then — see above.
+    if (next === "") {
+      publish(next);
+      return;
+    }
+    timer.current = setTimeout(() => {
+      // Only while the box still holds what was typed — a value taken from
+      // outside since then has already replaced it, and publishing this would
+      // undo that.
+      if (latest.current.text === next) publish(next);
+    }, delay);
+  }
+
+  return [text, change];
 }
 
 // Which of the three tiers the ramp is drawn from, for a zoom. Every zoom maps

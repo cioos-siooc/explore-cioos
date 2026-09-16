@@ -1,9 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const express = require("express");
+const http = require("node:http");
 
 require("express-async-errors");
-const { pipeline, errorHandler } = require("./routePipeline");
+const {
+  pipeline,
+  errorHandler,
+  fullResponseForCacheMiss,
+} = require("./routePipeline");
 
 /*
  * The pipeline is exercised through a real express app rather than by calling
@@ -160,9 +165,85 @@ test("a handler error carries its own status out", async () => {
 test("the cache is the last stage before the handler", () => {
   // Order is the whole point of this module: /legend and /timeExtent used to
   // register the cache FIRST, which let apicache store a 400 under the
-  // request's key. Nothing after errorHandler but the cache.
+  // request's key. After errorHandler come the cache and its miss companion,
+  // and nothing else.
   const stages = pipeline();
-  assert.strictEqual(stages.length, pipeline({ cacheFor: null }).length + 1);
-  assert.strictEqual(stages[stages.length - 2], errorHandler);
-  assert.strictEqual(typeof stages[stages.length - 1], "function");
+  assert.strictEqual(stages.length, pipeline({ cacheFor: null }).length + 2);
+  assert.strictEqual(stages[stages.length - 3], errorHandler);
+  assert.strictEqual(typeof stages[stages.length - 2], "function");
+  assert.strictEqual(stages[stages.length - 1], fullResponseForCacheMiss);
+});
+
+test("the cache-miss stage is registered only when caching is on", () => {
+  // Without a cache there is nothing to fill, so a 304 is pure win and the
+  // conditional headers must survive.
+  assert.ok(!pipeline({ cacheFor: null }).includes(fullResponseForCacheMiss));
+});
+
+/*
+ * A browser revalidating a stale-but-ETagged response, which node:fetch cannot
+ * model: undici attaches `cache-control: no-cache` to every request it makes,
+ * and express's `req.fresh` returns false the moment it sees that — so a
+ * conditional GET over fetch comes back 200 no matter what the server does.
+ * The raw client sends exactly the two headers a browser would.
+ */
+function revalidate(stagesBeforeHandler) {
+  const app = express();
+  app.get("/probe", ...stagesBeforeHandler, (req, res) =>
+    res.json({ ok: true }),
+  );
+  const server = app.listen(0);
+  const request = (headers) =>
+    new Promise((resolve, reject) => {
+      http
+        .get(
+          { port: server.address().port, path: "/probe", headers },
+          (res) => {
+            let body = "";
+            res.on("data", (c) => (body += c));
+            res.on("end", () =>
+              resolve({ status: res.statusCode, etag: res.headers.etag, body }),
+            );
+          },
+        )
+        .on("error", reject);
+    });
+  return { request, close: () => server.close() };
+}
+
+test("a cache miss answers a conditional request with a full body", async () => {
+  /*
+   * The regression this stage exists to prevent: apicache only stores a
+   * response that HAS a body, and Express answers If-None-Match by stripping
+   * the body and sending 304. A revalidation that missed the cache therefore
+   * ran the whole query and stored nothing, so the entry was never written and
+   * the next revalidation missed too — measured at ~3 s per repeat on prod,
+   * indefinitely. Past the cache stage a request is a miss by construction, so
+   * it has to come back as something the cache can keep.
+   */
+  const client = revalidate([fullResponseForCacheMiss]);
+  try {
+    const { etag } = await client.request();
+    assert.ok(etag, "express must offer an ETag for this to be a real test");
+
+    const revalidated = await client.request({ "If-None-Match": etag });
+    assert.strictEqual(revalidated.status, 200);
+    assert.deepStrictEqual(JSON.parse(revalidated.body), { ok: true });
+  } finally {
+    client.close();
+  }
+});
+
+test("without the stage express downgrades the same request to 304", async () => {
+  // Pins the cause, so the test above cannot quietly stop testing anything if
+  // Express's conditional handling changes.
+  const client = revalidate([]);
+  try {
+    const { etag } = await client.request();
+    const revalidated = await client.request({ "If-None-Match": etag });
+    assert.strictEqual(revalidated.status, 304);
+    assert.strictEqual(revalidated.body, "");
+  } finally {
+    client.close();
+  }
 });

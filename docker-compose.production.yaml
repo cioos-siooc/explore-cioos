@@ -40,7 +40,7 @@ services:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
 
   redis:
-    # Bound the cache (100mb, allkeys-lfu) so it can't compete with Postgres.
+    # Bound the cache (see redis-config/redis.conf) so it can't compete with Postgres.
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf:ro

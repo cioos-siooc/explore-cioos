@@ -56,9 +56,11 @@ harvester_logs
 /obis/
 /harvester/obis/
 
-# Agent worktrees and local agent settings. `.claude/` has held full checkouts
-# of this repo before now; a `git add -A` then commits broken gitlinks.
-.claude/
+# Claude Code config. `settings.json` and `hooks/` are shared with the team;
+# these two are not. `.claude/worktrees/` holds full checkouts created by the
+# worktree tool, so leaving it trackable makes `git add -A` commit gitlinks.
+.claude/worktrees/
+.claude/settings.local.json
 
 # Tool caches. Each of these ships its own generated `.gitignore`, which is not
 # ours to rely on — a cache created by an older tool version has none.
