@@ -32,6 +32,11 @@
   --harvest-viz-erddap-soft: #9ec5f4;
   --harvest-viz-obis: #eb6834;
   --harvest-viz-obis-soft: #f7bfa6;
+  /* Third source hue, added when the figure grew to cover datasets CKAN knows
+     about that no data source advertises. Worst pair against the other two:
+     ΔE 16.3 normal / 13.0 deutan. */
+  --harvest-viz-ckan: #4a3aa7;
+  --harvest-viz-ckan-soft: #bfb7e8;
 }
 
 /* ── Harvest section root layout ──────────────────────────────────────────── */

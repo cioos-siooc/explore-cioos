@@ -68,7 +68,12 @@ function layout(segments, total, ring) {
     // Never let the gap eat a thin segment entirely — a 1-dataset slice must
     // still be visible and hoverable.
     const trim = Math.min(gapDeg, sweep / 3);
-    return { ...seg, start: start + trim / 2, end: start + sweep - trim / 2, sweep };
+    return {
+      ...seg,
+      start: start + trim / 2,
+      end: start + sweep - trim / 2,
+      sweep,
+    };
   });
 }
 
@@ -78,7 +83,13 @@ function pct(value, total) {
   return `${p >= 10 || p === 0 ? Math.round(p) : p.toFixed(1)}%`;
 }
 
-export default function CoverageDonut({ rings, total, caption, hint, centerLabel }) {
+export default function CoverageDonut({
+  rings,
+  total,
+  caption,
+  hint,
+  centerLabel,
+}) {
   const [hovered, setHovered] = useState(null);
 
   const laid = rings.map((segments, i) => layout(segments, total, RINGS[i]));
@@ -98,7 +109,12 @@ export default function CoverageDonut({ rings, total, caption, hint, centerLabel
             segments.map((seg) => (
               <path
                 key={`${ringIndex}-${seg.key}`}
-                d={arcPath(seg.start, seg.end, RINGS[ringIndex].inner, RINGS[ringIndex].outer)}
+                d={arcPath(
+                  seg.start,
+                  seg.end,
+                  RINGS[ringIndex].inner,
+                  RINGS[ringIndex].outer,
+                )}
                 fill={`var(${seg.color})`}
                 className={
                   "harvest-viz-arc" +

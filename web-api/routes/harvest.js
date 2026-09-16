@@ -449,6 +449,34 @@ async function coverageSummary() {
                              AND c.dataset_id = a.dataset_id))       AS n_app_without_ckan,
       (SELECT count(DISTINCT ckan_id) FROM ckan
         WHERE erddap_url IS NULL AND obis_dataset_id IS NULL)        AS n_ckan_no_data_source,
+      -- Datasets CKAN describes that NO configured source advertises and CDE
+      -- does not serve. Disjoint from n_erddap_not_in_app / n_obis_not_harvested
+      -- by construction (both of those require the dataset to be advertised),
+      -- so the integration chart can add the three without double counting —
+      -- which a naive "records not integrated" figure would, since a CKAN
+      -- record pointing at a failed harvest names a dataset already counted.
+      -- Counted as DATASETS, not records: several records can name one dataset.
+      (SELECT count(*) FROM (
+          SELECT DISTINCT c.erddap_url AS a, c.dataset_id AS b
+          FROM ckan c
+          WHERE c.erddap_url IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM erddap_advertised e
+                             WHERE e.erddap_url = c.erddap_url
+                               AND e.dataset_id = c.dataset_id)
+            AND NOT EXISTS (SELECT 1 FROM app_erddap ap
+                             WHERE ap.erddap_url = c.erddap_url
+                               AND ap.dataset_id = c.dataset_id)
+          UNION
+          SELECT DISTINCT NULL AS a, c.obis_dataset_id AS b
+          FROM ckan c
+          WHERE c.obis_dataset_id IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM advertised adv
+                             WHERE adv.source = 'obis'
+                               AND adv.dataset_id = c.obis_dataset_id)
+            AND NOT EXISTS (SELECT 1 FROM app ap
+                             WHERE ap.source_type = 'obis'
+                               AND ap.dataset_id = c.obis_dataset_id)
+       ) q)                                                          AS n_ckan_only_datasets,
       -- Records, not links: one served link is enough to call a record
       -- integrated, so this cannot be a sum of the narrower buckets.
       (SELECT count(*) FROM (

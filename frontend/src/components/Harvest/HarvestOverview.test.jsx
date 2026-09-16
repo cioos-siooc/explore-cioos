@@ -141,7 +141,9 @@ describe("HarvestOverview", () => {
     expect(
       await screen.findByText(/7.*in ERDDAP, not in CDE/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/2.*served with no CKAN record/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/2.*served with no CKAN record/),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /coverage report/i }),
     ).toHaveAttribute("href", "/harvest/coverage");

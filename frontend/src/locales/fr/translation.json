@@ -641,7 +641,7 @@
   "harvest.coverage.noSnapshot": "Aucun instantané CKAN pour l'instant — le catalogue est lu pendant une moisson; toutes les comparaisons CKAN ci-dessous resteront vides jusqu'à la prochaine exécution.",
   "harvest.coverage.integrationTitle": "Intégration",
   "harvest.coverage.integratedCenter": "intégrés",
-  "harvest.coverage.integrationCaption": "{{integrated}} des {{total}} jeux de données offerts par les sources de CDE sont diffusés. Les fiches CKAN décrivant des serveurs non moissonnés par CDE sont exclues.",
+  "harvest.coverage.integrationCaption": "{{integrated}} des {{total}} jeux de données connus de CDE sont diffusés. Comptés en jeux de données, pas en fiches CKAN, afin qu'une fiche nommant un jeu déjà compté ne le soit pas deux fois. CKAN n'a pas de part « intégrés » : une fiche dont le jeu est diffusé compte sous la source qui le diffuse.",
   "harvest.coverage.viz.integrated": "Intégrés",
   "harvest.coverage.viz.missing": "Non intégrés",
   "harvest.coverage.viz.erddapIn": "ERDDAP · intégrés",
@@ -655,5 +655,7 @@
   "harvest.coverage.noLink": "Aucun lien ERDDAP ou OBIS ({{count}} ressources)",
   "harvest.coverage.downloadCsv": "Télécharger la liste complète (CSV) ↓",
   "harvest.coverage.classification.no_data_source": "Aucune source de données lisible par CDE",
-  "harvest.coverage.classification.obis_not_served": "Jeu de données OBIS non diffusé"
+  "harvest.coverage.classification.obis_not_served": "Jeu de données OBIS non diffusé",
+  "harvest.coverage.viz.ckanOnly": "CKAN seulement · annoncé par aucune source",
+  "harvest.coverage.viz.ckanNoData": "CKAN seulement · sans source de données"
 }

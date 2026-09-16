@@ -22,6 +22,7 @@ const COVERAGE = {
     n_ckan_not_integrated: 4,
     n_app_without_ckan: 2,
     n_ckan_no_data_source: 30,
+    n_ckan_only_datasets: 12,
     n_obis_without_ckan: 5,
     n_obis_not_harvested: 290,
     n_obis_not_in_app: 6,
@@ -116,14 +117,22 @@ describe("HarvestCoverage", () => {
     await screen.findByRole("heading", { name: "Sources" });
 
     // Ring 1 is integrated vs not; ring 2 splits each by source. 100 + 20
-    // integrated against 7 + 290 missing = 417 known, 120 of them served.
-    expect(container.querySelector(".harvest-viz-center-value").textContent).toBe(
-      "29%",
-    );
-    expect(container.querySelectorAll(".harvest-viz-arc")).toHaveLength(6);
+    // served against 7 + 290 advertised-but-missing, plus 12 datasets only
+    // CKAN knows of and 30 records backing no data at all = 459 known.
     expect(
-      screen.getByText("ERDDAP · not integrated"),
-    ).toBeInTheDocument();
+      container.querySelector(".harvest-viz-center-value").textContent,
+    ).toBe("26%");
+    expect(container.querySelectorAll(".harvest-viz-arc")).toHaveLength(8);
+
+    // The CKAN slices must not swallow datasets the source gaps already count:
+    // ring 2 has to sum to the whole, and ring 1's halves to the same total.
+    const values = [
+      ...container.querySelectorAll(".harvest-viz-legend-value"),
+    ].map((n) => Number(n.textContent.replace(/,/g, "")));
+    const [integrated, missing, ...outer] = values;
+    expect(integrated + missing).toBe(459);
+    expect(outer.reduce((a, b) => a + b, 0)).toBe(459);
+    expect(screen.getByText("ERDDAP · not integrated")).toBeInTheDocument();
     expect(screen.getByText("OBIS · not integrated")).toBeInTheDocument();
   });
 
@@ -132,7 +141,9 @@ describe("HarvestCoverage", () => {
     await screen.findByRole("heading", { name: "Sources" });
 
     const arcs = container.querySelectorAll(".harvest-viz-arc").length;
-    const legend = container.querySelectorAll(".harvest-viz-legend-item").length;
+    const legend = container.querySelectorAll(
+      ".harvest-viz-legend-item",
+    ).length;
     expect(legend).toBe(arcs);
   });
 
@@ -145,7 +156,9 @@ describe("HarvestCoverage", () => {
     const ckanRow = [...container.querySelectorAll("tbody tr")].find((tr) =>
       tr.textContent.includes("catalogue.example.ca"),
     );
-    const chip = screen.getByRole("button", { name: /^In CKAN, not in CDE\d+$/i });
+    const chip = screen.getByRole("button", {
+      name: /^In CKAN, not in CDE\d+$/i,
+    });
     expect(chip.textContent).toContain(
       ckanRow.querySelectorAll("td")[3].textContent,
     );
@@ -184,9 +197,7 @@ describe("HarvestCoverage", () => {
       screen.getByText("A record with nothing behind it"),
     ).toBeInTheDocument();
     expect(screen.getByText(/No ERDDAP or OBIS link/)).toBeInTheDocument();
-    expect(
-      screen.getByText("No data source CDE can read"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No data source CDE can read")).toBeInTheDocument();
   });
 
   it("offers the full list as CSV, since the table is capped", async () => {
@@ -197,7 +208,9 @@ describe("HarvestCoverage", () => {
       screen.getByRole("button", { name: /^In CKAN, not in CDE\d+$/i }),
     );
 
-    const link = await screen.findByRole("link", { name: /full list \(CSV\)/i });
+    const link = await screen.findByRole("link", {
+      name: /full list \(CSV\)/i,
+    });
     expect(link.getAttribute("href")).toContain(
       "/harvest/coverage/ckan-not-integrated?format=csv",
     );
@@ -216,13 +229,13 @@ describe("HarvestCoverage", () => {
     });
     // The classification is the actionable part: this server is not in
     // harvest_config at all, which is a different fix from a failed harvest.
-    expect(
-      screen.getByText("Server not harvested by CDE"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Server not harvested by CDE")).toBeInTheDocument();
   });
 
   it("says when a bucket is empty rather than rendering a bare table", async () => {
-    stubRoutes({ "/coverage/erddap-not-in-app": { rows: [], truncated: false, limit: 500 } });
+    stubRoutes({
+      "/coverage/erddap-not-in-app": { rows: [], truncated: false, limit: 500 },
+    });
     renderWithProviders(<HarvestCoverage />);
     expect(
       await screen.findByText("Nothing in this category."),
@@ -244,7 +257,10 @@ describe("HarvestCoverage", () => {
     // CKAN comparison is empty. Without this the page reads as "the catalogue
     // describes none of our datasets".
     stubRoutes({
-      "/coverage": { ...COVERAGE, summary: { ...COVERAGE.summary, n_ckan_records: 0 } },
+      "/coverage": {
+        ...COVERAGE,
+        summary: { ...COVERAGE.summary, n_ckan_records: 0 },
+      },
     });
     renderWithProviders(<HarvestCoverage />);
     expect(await screen.findByText(/No CKAN snapshot yet/)).toBeInTheDocument();
@@ -270,7 +286,9 @@ describe("HarvestCoverage", () => {
     );
 
     expect(await screen.findByText(/not a fault/)).toBeInTheDocument();
-    expect(screen.getByText(/stay available\s+in Explorer/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/stay available\s+in Explorer/),
+    ).toBeInTheDocument();
   });
 
   it("labels the OBIS-without-CKAN bucket as expected, not as a defect", async () => {

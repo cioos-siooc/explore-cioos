@@ -13,13 +13,17 @@ import { server } from "../../config.js";
 const OBIS_SENTINEL = "https://obis.org";
 
 function sourceLabel(row, t) {
-  return row.source === "obis" ? t("harvest.coverage.obisSource") : hostname(row.erddap_url);
+  return row.source === "obis"
+    ? t("harvest.coverage.obisSource")
+    : hostname(row.erddap_url);
 }
 
 function Stat({ label, value, tone }) {
   return (
     <div className="harvest-coverage-stat">
-      <div className={`harvest-coverage-stat-value ${tone || ""}`}>{value ?? "—"}</div>
+      <div className={`harvest-coverage-stat-value ${tone || ""}`}>
+        {value ?? "—"}
+      </div>
       <div className="harvest-coverage-stat-label">{label}</div>
     </div>
   );
@@ -75,7 +79,9 @@ function Cell({ column, row, t, ckanUrl }) {
     case "reason":
       return (
         <td className="harvest-text-sm">
-          {row.reason_code ? reasonLabel(t, row.reason_code) : t("harvest.coverage.noReason")}
+          {row.reason_code
+            ? reasonLabel(t, row.reason_code)
+            : t("harvest.coverage.noReason")}
         </td>
       );
     case "classification":
@@ -151,7 +157,9 @@ function Cell({ column, row, t, ckanUrl }) {
       return <td className="harvest-num">{row.n_resources ?? 0}</td>;
     case "attempted_at":
       return (
-        <td className="harvest-muted harvest-text-sm">{fmtDt(row.attempted_at)}</td>
+        <td className="harvest-muted harvest-text-sm">
+          {fmtDt(row.attempted_at)}
+        </td>
       );
     default:
       return <td>{row[column] ?? "—"}</td>;
@@ -164,9 +172,16 @@ function buildIntegration(summary, t) {
   const erddapOut = n("n_erddap_not_in_app");
   const obisIn = n("n_app_obis");
   const obisOut = n("n_obis_not_harvested");
+  // Datasets CKAN describes that no configured source advertises, plus the
+  // records that point at nothing CDE can read. Both are computed to be
+  // disjoint from the two gaps above — a CKAN record naming a dataset whose
+  // harvest failed describes a dataset already counted in erddapOut, so
+  // counting "CKAN records not integrated" here would double it.
+  const ckanOnly = n("n_ckan_only_datasets");
+  const ckanNoData = n("n_ckan_no_data_source");
 
   const integrated = erddapIn + obisIn;
-  const missing = erddapOut + obisOut;
+  const missing = erddapOut + obisOut + ckanOnly + ckanNoData;
   const total = integrated + missing;
   if (!total) return null;
 
@@ -215,6 +230,20 @@ function buildIntegration(summary, t) {
           value: obisOut,
           color: "--harvest-viz-obis-soft",
         },
+        // CKAN has no "integrated" segment: a record whose dataset IS served is
+        // already counted under the source that serves it.
+        {
+          key: "ckan-only",
+          label: t("harvest.coverage.viz.ckanOnly"),
+          value: ckanOnly,
+          color: "--harvest-viz-ckan",
+        },
+        {
+          key: "ckan-nodata",
+          label: t("harvest.coverage.viz.ckanNoData"),
+          value: ckanNoData,
+          color: "--harvest-viz-ckan-soft",
+        },
       ],
     ],
   };
@@ -256,7 +285,8 @@ export default function HarvestCoverage() {
 
   const breadcrumbs = (
     <>
-      <Link to="/harvest">{t("harvest.title")}</Link> / {t("harvest.coverage.title")}
+      <Link to="/harvest">{t("harvest.title")}</Link> /{" "}
+      {t("harvest.coverage.title")}
     </>
   );
 
@@ -269,11 +299,22 @@ export default function HarvestCoverage() {
         <div className="harvest-loading">{t("harvest.coverage.loading")}</div>
       ) : (
         <>
-          <h2 className="harvest-section-title">{t("harvest.coverage.served")}</h2>
+          <h2 className="harvest-section-title">
+            {t("harvest.coverage.served")}
+          </h2>
           <div className="harvest-coverage-stats">
-            <Stat label={t("harvest.coverage.servedTotal")} value={summary?.n_app_total} />
-            <Stat label={t("harvest.coverage.servedErddap")} value={summary?.n_app_erddap} />
-            <Stat label={t("harvest.coverage.servedObis")} value={summary?.n_app_obis} />
+            <Stat
+              label={t("harvest.coverage.servedTotal")}
+              value={summary?.n_app_total}
+            />
+            <Stat
+              label={t("harvest.coverage.servedErddap")}
+              value={summary?.n_app_erddap}
+            />
+            <Stat
+              label={t("harvest.coverage.servedObis")}
+              value={summary?.n_app_obis}
+            />
             <Stat
               label={t("harvest.coverage.ckanRecords")}
               value={summary?.n_ckan_records}
@@ -309,15 +350,23 @@ export default function HarvestCoverage() {
             </div>
           )}
 
-          <h2 className="harvest-section-title">{t("harvest.coverage.sources")}</h2>
+          <h2 className="harvest-section-title">
+            {t("harvest.coverage.sources")}
+          </h2>
           <table className="harvest-table">
             <thead>
               <tr>
                 <th>{t("harvest.coverage.col.source")}</th>
                 <th>{t("harvest.coverage.col.kind")}</th>
-                <th className="harvest-num">{t("harvest.coverage.col.advertised")}</th>
-                <th className="harvest-num">{t("harvest.coverage.col.notInApp")}</th>
-                <th className="harvest-num">{t("harvest.coverage.col.withoutCkan")}</th>
+                <th className="harvest-num">
+                  {t("harvest.coverage.col.advertised")}
+                </th>
+                <th className="harvest-num">
+                  {t("harvest.coverage.col.notInApp")}
+                </th>
+                <th className="harvest-num">
+                  {t("harvest.coverage.col.withoutCkan")}
+                </th>
                 <th>{t("harvest.coverage.col.lastAttempt")}</th>
               </tr>
             </thead>
@@ -449,9 +498,17 @@ export default function HarvestCoverage() {
             </thead>
             <tbody>
               {bucketData.rows.map((row, i) => (
-                <tr key={`${row.ckan_id || row.erddap_url}-${row.dataset_id || row.obis_dataset_id}-${i}`}>
+                <tr
+                  key={`${row.ckan_id || row.erddap_url}-${row.dataset_id || row.obis_dataset_id}-${i}`}
+                >
                   {bucket.columns.map((c) => (
-                    <Cell key={c} column={c} row={row} t={t} ckanUrl={ckanUrl} />
+                    <Cell
+                      key={c}
+                      column={c}
+                      row={row}
+                      t={t}
+                      ckanUrl={ckanUrl}
+                    />
                   ))}
                 </tr>
               ))}

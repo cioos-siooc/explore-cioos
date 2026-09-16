@@ -640,7 +640,7 @@
   "harvest.coverage.noSnapshot": "No CKAN snapshot yet — the catalogue is read during a harvest, so every CKAN comparison below reads as empty until the next run completes.",
   "harvest.coverage.integrationTitle": "Integrated",
   "harvest.coverage.integratedCenter": "integrated",
-  "harvest.coverage.integrationCaption": "{{integrated}} of {{total}} datasets offered by CDE's own sources are served. CKAN records describing servers CDE does not harvest are excluded.",
+  "harvest.coverage.integrationCaption": "{{integrated}} of {{total}} datasets CDE knows about are served. Counted as datasets, not CKAN records, so a record naming an already-counted dataset is not double counted. CKAN has no integrated slice: a record whose dataset is served counts under the source serving it.",
   "harvest.coverage.viz.integrated": "Integrated",
   "harvest.coverage.viz.missing": "Not integrated",
   "harvest.coverage.viz.erddapIn": "ERDDAP · integrated",
@@ -654,5 +654,7 @@
   "harvest.coverage.noLink": "No ERDDAP or OBIS link ({{count}} resources)",
   "harvest.coverage.downloadCsv": "Download the full list (CSV) ↓",
   "harvest.coverage.classification.no_data_source": "No data source CDE can read",
-  "harvest.coverage.classification.obis_not_served": "OBIS dataset not served"
+  "harvest.coverage.classification.obis_not_served": "OBIS dataset not served",
+  "harvest.coverage.viz.ckanOnly": "CKAN only · no source advertises it",
+  "harvest.coverage.viz.ckanNoData": "CKAN only · no data source"
 }
