@@ -98,6 +98,7 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
     "adder",
     "depthMax",
     "depthMin",
+    "depthVariableProbe",
     "filters",
     "multiplier",
     "obisFilters",
@@ -111,6 +112,7 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
   // The estimate's bindings must not linger: knex rejects a named binding the
   // SQL does not reference.
   assert.deepEqual(Object.keys(plain.params).sort(), [
+    "depthVariableProbe",
     "filters",
     "obisFilters",
     "profileFilters",
@@ -184,4 +186,16 @@ test("the dataset payload carries the freshness fields the frontend reads", asyn
   // Stamped in UTC with a Z, like the record extents — these reach the browser
   // as strings and are parsed there.
   assert.match(sql, /to_char\(d\.coverage_time_max AT TIME ZONE 'UTC'/);
+});
+
+test("has_depth is projected, and its probe is bound rather than inlined", async () => {
+  // The frontend's direct-download links carry the depth filter only for
+  // datasets that expose a `depth` variable — tabledap 400s on the rest.
+  const { sql, params } = await build({}, { doEstimate: false });
+  assert.match(sql, /AS has_depth/);
+  assert.match(sql, /table_variables @> :depthVariableProbe::jsonb/);
+  assert.deepEqual(JSON.parse(params.depthVariableProbe), [{ name: "depth" }]);
+  // Bound, not inlined: an inlined probe would put a JSON object literal
+  // straight into the SQL text.
+  assert.doesNotMatch(sql, /@> '\[/);
 });

@@ -1,10 +1,18 @@
 const { createClient } = require("redis");
 
+// REDIS_URL / REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_TLS are one
+// contract, shared with the harvester's invalidator
+// (cde_harvester/redisFunctions.py) — both halves of the cache have to land on
+// the same instance, so neither side may grow a variable the other ignores.
+//
+// The fallback host is the compose service name, matching the harvester's. It
+// is only reached when REDIS_HOST is unset, which in compose it never is, so
+// this is about the case that does come up: running web-api directly. Point it
+// at a redis on the host with REDIS_HOST=localhost in web-api/.env.
+const port = process.env.REDIS_PORT || "6379";
 const url =
   process.env.REDIS_URL ||
-  (process.env.REDIS_HOST
-    ? `redis://${process.env.REDIS_HOST}:6379`
-    : "redis://localhost:6379");
+  `redis://${process.env.REDIS_HOST || "redis"}:${port}`;
 
 const socket = {};
 if (String(process.env.REDIS_TLS).toLowerCase() === "true") socket.tls = true;

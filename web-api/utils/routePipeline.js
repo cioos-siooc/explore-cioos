@@ -168,7 +168,24 @@ async function errorHandler(req, res, next) {
   await next();
 }
 
-const DEFAULT_CACHE_DURATION = "5 minutes";
+// Everything this default covers — tiles, legend, timeExtent, pointQuery,
+// datasetRecordsList, griddapCoverage, downloadEstimate, scientificNames,
+// trajectories, and the six catalog routes the app fetches on boot (datasets,
+// organizations, platforms, oceanVariables, obisNodes, erddapServers, which
+// used to pin their own 5 minutes) — is derived from the harvest, so it only
+// changes when a harvest load changes it, and the pipeline flushes redis then
+// (harvester/cde_harvester/prefect_pipeline.py). The TTL is a safety net, not
+// the invalidation mechanism: at the previous 5 minutes, a tile key (z/x/y ×
+// filter combination) almost never saw a second hit before expiring, so redis
+// was cold for practically every visitor and the harvest-time cache warm-up
+// had evaporated long before anyone arrived.
+//
+// This does NOT set how long a browser may hold the response: apicache derives
+// its cache-control max-age from this same duration, so nginx overrides the
+// browser's half at the edge (see $api_browser_cache in nginx/nginx.conf) —
+// a server-side flush cannot reach a browser cache, so the two need different
+// lifetimes.
+const DEFAULT_CACHE_DURATION = "24 hours";
 
 /**
  * The middleware chain every route registers, in one order:

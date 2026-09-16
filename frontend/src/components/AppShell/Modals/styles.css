@@ -162,6 +162,13 @@
     border-radius: 0;
   }
 
+  /* The download panel is one scrolling column at this width rather than a
+     fixed frame with a scrolling list inside it, so the body is what scrolls
+     (DownloadDetails/styles.css). */
+  .downloadModal .modal-body {
+    overflow-y: auto;
+  }
+
   /* The header is the surface's title bar now, so it gets the room to be one
      — and the download title's icon tile comes off, its 40px square being the
      first thing worth spending on a heading that has to share its row with a
