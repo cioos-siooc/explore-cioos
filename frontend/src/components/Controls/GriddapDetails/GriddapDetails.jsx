@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Switch from "../../ui/Switch.jsx";
 
-import { buildWmsOverlay } from "../../../wmsUtilities";
+import { buildWmsOverlay, fetchGriddapTimeRange } from "../../../wmsUtilities";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -32,24 +32,59 @@ export default function GriddapDetails({
     .filter((eov) => eov.isSelected)
     .map((eov) => eov.title);
 
+  // The grid's time axis as the server reports it now, read once per dataset.
+  // A rolling product moves both ends of that axis between harvests, so the
+  // harvested copy would cap the time slider short of the newest slice; reading
+  // it here is what lets the catalogue harvest stay infrequent.
+  //
+  // Tagged with the pk it belongs to, so a dataset switch cannot be mistaken for
+  // a resolved fetch: the tag is what the effect below waits on, and comparing
+  // it to the current pk is the only way to tell "still loading" from "loaded,
+  // and there is no live axis" (both carry an undefined `time`).
+  const [liveTime, setLiveTime] = useState({ pk: undefined, time: undefined });
+  // Without a WMS endpoint nothing reads the axis and no request is made, so
+  // there is nothing to wait for.
+  const liveTimeReady = !dataset.wms_url || liveTime.pk === dataset.pk;
+
+  useEffect(() => {
+    if (!dataset.wms_url) return undefined;
+    let cancelled = false;
+    // Never rejects; a failure or a static grid resolves to null and the
+    // harvested dimensions stand.
+    fetchGriddapTimeRange(dataset.dataset_id).then((time) => {
+      if (!cancelled) setLiveTime({ pk: dataset.pk, time });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dataset.pk, dataset.dataset_id, dataset.wms_url]);
+
   // The share link's slice, if this is the overlay it was written for, applies
   // to the first overlay built and then gets out of the way — turning the
   // overlay off and back on is a fresh start, not a return to the link.
   function showOverlay() {
     setActiveWmsOverlay(
-      buildWmsOverlay(dataset, selectedEovTitles, pendingWmsSlice),
+      buildWmsOverlay(
+        dataset,
+        selectedEovTitles,
+        pendingWmsSlice,
+        liveTime.time,
+      ),
     );
     if (pendingWmsSlice) setPendingWmsSlice(undefined);
   }
 
   // Auto-show the WMS overlay when a griddap dataset with a WMS endpoint is
-  // inspected. Deliberately keyed on the dataset pk alone: toggling the overlay
-  // off must not immediately re-show it, so the effect only re-runs when a
-  // different dataset is inspected.
+  // inspected. Deliberately keyed on the dataset pk alone (plus the one-shot
+  // flip of liveTimeReady): toggling the overlay off must not immediately
+  // re-show it, so the effect only re-runs when a different dataset is
+  // inspected. Waiting for the live axis rather than showing the overlay twice
+  // keeps the slider from jumping under a user who has already moved it.
   useEffect(() => {
+    if (!liveTimeReady) return;
     if (dataset.wms_url && variables.length) showOverlay();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset.pk]);
+  }, [dataset.pk, liveTimeReady]);
 
   function formatDimensionValue(value) {
     if (value === null || value === undefined) return "—";

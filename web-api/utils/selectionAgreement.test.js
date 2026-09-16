@@ -260,3 +260,32 @@ test("a selection containing no source still yields runnable SQL", async () => {
   }
   assert.match(await shapeSql(nothing), /empty_combined WHERE FALSE/);
 });
+
+test("every selection route inherits the realtimeOnly dataset filter", async () => {
+  // realtimeOnly lives in dbFilter's *shared* fragment, so each branch site
+  // should get it for free. This is the test that catches a site that builds
+  // its own WHERE and forgets one -- the map would then show hexes for
+  // datasets the dataset list has filtered out.
+  const query = { realtimeOnly: "true" };
+  const statements = [
+    ...(await sqlFrom("tiles", query)),
+    ...(await sqlFrom("tiles/cells", query)),
+    ...(await sqlFrom("legend", query)),
+    ...(await sqlFrom("timeExtent", query)),
+    ...(await sqlFrom("download", query)),
+    ...(await sqlFrom("griddapCoverage", query)),
+    await shapeSql(query),
+    // sqlFrom captures every db.raw() call, including dbFilter's own fragments
+    // (one of which is the bare "TRUE" placeholder), so keep only statements
+    // that actually select from a table.
+  ].filter((sql) => /FROM cde\./.test(sql));
+
+  assert.ok(statements.length >= 6, "expected at least one statement per route");
+  for (const sql of statements) {
+    assert.match(
+      sql,
+      /dataset_is_realtime\(/,
+      `a selection statement omits the realtime filter: ${sql.slice(0, 160)}`,
+    );
+  }
+});

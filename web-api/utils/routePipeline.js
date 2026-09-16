@@ -60,7 +60,7 @@ function filterValidators() {
     // Source and layer switches. Only "false" is ever meaningful (the routes
     // read `!== "false"`), but accepting exactly the two spellings keeps a
     // typo'd flag from silently reading as "on".
-    check(["includeObis", "includeTrajectory"])
+    check(["includeObis", "includeTrajectory", "realtimeOnly"])
       .isIn(["true", "false"])
       .optional(),
     // Which number the hex ramp counts. utils/hexMetric.js defaults an absent

@@ -47,6 +47,26 @@ describe("ActiveFilterChips", () => {
     );
   });
 
+  it("announces the realtime filter carried in the link", async () => {
+    open("realtimeOnly=true");
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const realtime = group("realtimeOnly");
+    expect(realtime).toBeInTheDocument();
+    expect(within(realtime).getByTestId("filter-chip-item")).toHaveTextContent(
+      "Real-time only",
+    );
+  });
+
+  it("ignores realtimeOnly=false, so the default link shows no chip", async () => {
+    // The param is only ever written when the toggle is on; an explicit false
+    // must read as "not filtering", not as a second state to announce.
+    open("realtimeOnly=false");
+    await waitFor(() =>
+      expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
+    );
+  });
+
   it("gives one group per filter and one item per chosen value", async () => {
     open("eovs=oxygen,subSurfaceTemperature&platforms=mooring");
     await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));

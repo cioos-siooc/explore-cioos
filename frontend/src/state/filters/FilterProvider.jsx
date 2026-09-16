@@ -37,6 +37,7 @@ import {
   defaultScientificNamesSelected,
   defaultObisNodesSelected,
   defaultErddapServersSelected,
+  defaultRealtimeOnly,
 } from "../../components/config.js";
 import {
   capitalizeFirstLetter,
@@ -63,6 +64,7 @@ export const defaultQuery = {
   scientificNamesSelected: defaultScientificNamesSelected,
   obisNodesSelected: defaultObisNodesSelected,
   erddapServersSelected: defaultErddapServersSelected,
+  realtimeOnly: defaultRealtimeOnly,
 };
 
 export default function FilterProvider({ children }) {
@@ -114,6 +116,10 @@ export default function FilterProvider({ children }) {
   );
   const debouncedObisNodesSelected = useDebounce(obisNodesSelected, 500);
   const [sourcesSearchTerms, setSourcesSearchTerms] = useState("");
+
+  // Not debounced: a single toggle, unlike the list filters where a burst of
+  // clicks would otherwise fire a request each.
+  const [realtimeOnly, setRealtimeOnly] = useState(defaultRealtimeOnly);
 
   const [startDate, setStartDate] = useState(defaultStartDate);
   const debouncedStartDate = useDebounce(startDate, 500);
@@ -169,6 +175,7 @@ export default function FilterProvider({ children }) {
       scientificNamesSelected: showObis ? debouncedScientificNamesSelected : [],
       obisNodesSelected: debouncedObisNodesSelected,
       erddapServersSelected: debouncedErddapServersSelected,
+      realtimeOnly,
     }),
     [
       debouncedStartDate,
@@ -182,6 +189,7 @@ export default function FilterProvider({ children }) {
       debouncedScientificNamesSelected,
       debouncedObisNodesSelected,
       debouncedErddapServersSelected,
+      realtimeOnly,
       showObis,
     ],
   );
@@ -246,6 +254,7 @@ export default function FilterProvider({ children }) {
     scientificNamesSelected.length > 0,
     timeFilterActive,
     depthFilterActive,
+    realtimeOnly,
   ].filter(Boolean).length;
 
   // Set when any catalog fetch fails (e.g. API gateway timeouts) so the UI
@@ -275,6 +284,7 @@ export default function FilterProvider({ children }) {
       includeObis,
       scientificNames,
       obisNodes,
+      realtimeOnly: realtimeOnlyFromURL,
     } = filtersFromURL;
 
     if (scientificNames) {
@@ -285,6 +295,7 @@ export default function FilterProvider({ children }) {
           .filter(Boolean),
       );
     }
+    if (realtimeOnlyFromURL === "true") setRealtimeOnly(true);
     if (timeMin) setStartDate(timeMin);
     if (timeMax) setEndDate(timeMax);
     if (depthMin && Number.parseInt(depthMin) > 0) {
@@ -447,6 +458,7 @@ export default function FilterProvider({ children }) {
   }, [loadCatalog]);
 
   function resetFilters() {
+    setRealtimeOnly(defaultRealtimeOnly);
     setStartDate(defaultStartDate);
     setEndDate(defaultEndDate);
     setStartDepth(defaultStartDepth);
@@ -689,6 +701,8 @@ export default function FilterProvider({ children }) {
     setObisNodesSelected,
     sourcesSearchTerms,
     setSourcesSearchTerms,
+    realtimeOnly,
+    setRealtimeOnly,
     startDate,
     setStartDate,
     endDate,

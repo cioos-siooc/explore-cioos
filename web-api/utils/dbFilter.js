@@ -135,6 +135,7 @@ async function createDBFilter(
     lonMax,
     polygon,
     platforms,
+    realtimeOnly,
 
     // These are comma separated lists
     eovs,
@@ -242,6 +243,23 @@ async function createDBFilter(
   if (organizations) {
     parameters.organizationsString = organizations.split(",");
     filters.push("organization_pks && :organizationsString");
+  }
+
+  // Dataset-level, so it belongs in `filters` (the shared fragment) rather than
+  // profileFilters, which only ever sees cde.profiles. Being shared means the
+  // tile, legend, timeExtent, download and griddap branches all inherit it
+  // without a per-site edit -- selectionAgreement.test.js is what proves that.
+  //
+  // The predicate reads two stored columns (see dataset_is_realtime in
+  // database/8_range_functions.sql), so it is IMMUTABLE and cannot return NULL,
+  // which is why a plain boolean test is safe here: `NOT f(...)` over a
+  // three-valued result would drop rows from both sides of the facet.
+  //
+  // verified_at, not last_updated_at: the latter only moves when the dataset's
+  // content changed, so a dead feed skipped as unchanged by an incremental
+  // harvest would keep its badge forever.
+  if (realtimeOnly === "true") {
+    filters.push("dataset_is_realtime(d.coverage_time_max, d.verified_at)");
   }
 
   // Both live on cde.datasets; the join alias `d` is present in tile, legend
