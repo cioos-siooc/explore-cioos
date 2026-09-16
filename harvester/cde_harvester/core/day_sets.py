@@ -151,6 +151,18 @@ def ranges_to_iso(ranges):
     return [[lo.isoformat(), hi.isoformat()] for lo, hi in ranges or []]
 
 
+def ranges_to_csv_cell(value):
+    """A day_ranges cell as it goes into the CSV: the repr of ISO pairs.
+
+    Every frame that carries day_ranges to a CSV needs this, and the loader's
+    parse_day_ranges is its inverse. It lives here so the two sides stay
+    together: obis_cells once went to CSV without it, and the datetime.date
+    reprs that produced could not be read back at all (ast.literal_eval only
+    accepts literals, and repr(date) is a constructor call).
+    """
+    return repr(ranges_to_iso(value)) if isinstance(value, (list, tuple)) else value
+
+
 def ranges_from_iso(pairs):
     """Inverse of ranges_to_iso. Tolerates already-parsed dates."""
     return [

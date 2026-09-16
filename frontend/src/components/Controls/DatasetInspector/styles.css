@@ -30,6 +30,15 @@
   background-color: var(--cioos-white);
 }
 
+/* Same bare, no-tile icon treatment as the Filters/Download/Datasets headers —
+   centered on the title's own line rather than the block's full (wrapped)
+   height. */
+.datasetTitleIcon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--cioos-primary);
+}
+
 .datasetTitle {
   flex: 1 1 auto;
   min-width: 0;
@@ -459,7 +468,6 @@
    card costs it no layout. */
 .listCard.pinned {
   border-color: var(--cioos-map-click);
-  background-color: var(--cioos-map-click-surface);
   box-shadow:
     0 0 0 2px var(--cioos-map-click-glow),
     0 0 10px 1px var(--cioos-map-click-glow),

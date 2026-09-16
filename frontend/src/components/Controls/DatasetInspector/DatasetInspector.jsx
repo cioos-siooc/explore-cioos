@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
-import { Funnel, FunnelFill } from "react-bootstrap-icons";
+import { FileEarmarkText, Funnel, FunnelFill } from "react-bootstrap-icons";
 // import platformColors from '../../platformColors'
 import Loading from "../Loading/Loading.jsx";
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
@@ -444,6 +444,11 @@ export default function DatasetInspector({
           control, in the one place that marks the panel as being on a dataset
           rather than the list. */}
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
+        <FileEarmarkText
+          className="datasetTitleIcon"
+          size={20}
+          aria-hidden="true"
+        />
         {/* A heading, and only a heading. Filtering the map to this dataset
             used to be a click on the title itself, which no reader expects of
             a page's title — it is the button beside the zoom one now. */}
