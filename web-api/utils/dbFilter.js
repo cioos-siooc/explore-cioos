@@ -254,8 +254,12 @@ async function createDBFilter(
   // database/8_range_functions.sql), so it is IMMUTABLE and cannot return NULL,
   // which is why a plain boolean test is safe here: `NOT f(...)` over a
   // three-valued result would drop rows from both sides of the facet.
+  //
+  // verified_at, not last_updated_at: the latter only moves when the dataset's
+  // content changed, so a dead feed skipped as unchanged by an incremental
+  // harvest would keep its badge forever.
   if (realtimeOnly === "true") {
-    filters.push("dataset_is_realtime(d.coverage_time_max, d.last_updated_at)");
+    filters.push("dataset_is_realtime(d.coverage_time_max, d.verified_at)");
   }
 
   // Both live on cde.datasets; the join alias `d` is present in tile, legend

@@ -232,7 +232,7 @@ class TestDatasetLevelTimeCoverage:
     Populated from the allDatasets listing, which the harvest already fetches --
     so every dataset type gets dataset-level time coverage for no extra request,
     and dataset_is_realtime() (database/8_range_functions.sql) has something to
-    compare against last_updated_at.
+    compare against verified_at.
     """
 
     def test_listing_coverage_reaches_the_datasets_row(self, mock_erddap_server):

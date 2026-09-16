@@ -217,9 +217,9 @@ async function buildShapeSql(
                   -- database/8_range_functions.sql).
                   to_char(d.coverage_time_max AT TIME ZONE 'UTC',
                           'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS coverage_time_max,
-                  d.last_updated_at,
+                  d.verified_at,
                   dataset_is_realtime(d.coverage_time_max,
-                                      d.last_updated_at) AS is_realtime,
+                                      d.verified_at) AS is_realtime,
                   -- griddap footprint for the frontend bbox highlight; NULL
                   -- for every other type
                   CASE WHEN d.cdm_data_type = 'Grid'

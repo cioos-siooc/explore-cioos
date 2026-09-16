@@ -212,9 +212,15 @@ test("realtimeOnly adds a dataset-level freshness predicate", async () => {
   const sql = f.shared.toString();
   // Qualified with `d.`, because the bare column names would be ambiguous
   // against the feature tables the branches union together.
+  //
+  // verified_at and not last_updated_at: last_updated_at only advances when the
+  // dataset's content changed, so an incremental harvest that skips a dead feed
+  // as unchanged freezes coverage_time_max and last_updated_at together and the
+  // dataset reads realtime forever. verified_at advances on every harvest that
+  // reached the dataset, so the gap widens and the flag expires on its own.
   assert.match(
     sql,
-    /dataset_is_realtime\(d\.coverage_time_max, d\.last_updated_at\)/,
+    /dataset_is_realtime\(d\.coverage_time_max, d\.verified_at\)/,
   );
   // A plain boolean test, never `NOT dataset_is_realtime(...)`: the function is
   // IMMUTABLE over two stored columns and cannot return NULL, and a negation
