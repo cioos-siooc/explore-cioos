@@ -15,8 +15,7 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 // without extra wiring.
 export default function SearchButton() {
   const { t } = useTranslation();
-  const { datasetTitleSearchText, setDatasetTitleSearchText } =
-    useSelection();
+  const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection();
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   return (

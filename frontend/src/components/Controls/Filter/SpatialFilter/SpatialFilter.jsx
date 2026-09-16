@@ -1,6 +1,11 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { BoundingBox, Check2, Clipboard, Pentagon } from "react-bootstrap-icons";
+import {
+  BoundingBox,
+  Check2,
+  Clipboard,
+  Pentagon,
+} from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import {

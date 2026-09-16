@@ -224,7 +224,11 @@ export default function FiltersPanel() {
   const spatialFilterTranslationKey = "spatialFilterFilterName";
   const hasSpatialFilter = Boolean(polygon);
   const spatialFilterBadgeTitle = hasSpatialFilter
-    ? t(polygonIsRectangle(polygon) ? "drawBoundingBoxOption" : "drawPolygonOption")
+    ? t(
+        polygonIsRectangle(polygon)
+          ? "drawBoundingBoxOption"
+          : "drawPolygonOption",
+      )
     : t(spatialFilterTranslationKey);
   const SpatialFilterIcon =
     hasSpatialFilter && !polygonIsRectangle(polygon) ? Pentagon : BoundingBox;

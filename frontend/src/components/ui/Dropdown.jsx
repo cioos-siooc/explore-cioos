@@ -81,7 +81,10 @@ export function DropdownButton({
           ? {
               position: "fixed",
               top: rect.bottom + 2,
-              left: align === "viewport-center" ? "50%" : rect.left + rect.width / 2,
+              left:
+                align === "viewport-center"
+                  ? "50%"
+                  : rect.left + rect.width / 2,
               minWidth: rect.width,
               transform: "translateX(-50%)",
             }
