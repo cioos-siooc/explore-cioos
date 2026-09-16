@@ -643,5 +643,15 @@
   "harvest.coverage.overviewErddapGap": "in ERDDAP, not in CDE",
   "harvest.coverage.overviewCkanGap": "in CKAN, not in CDE",
   "harvest.coverage.overviewNoCkan": "served with no CKAN record",
-  "harvest.coverage.noSnapshot": "No CKAN snapshot yet — the catalogue is read during a harvest, so every CKAN comparison below reads as empty until the next run completes."
+  "harvest.coverage.noSnapshot": "No CKAN snapshot yet — the catalogue is read during a harvest, so every CKAN comparison below reads as empty until the next run completes.",
+  "harvest.coverage.integrationTitle": "Integrated",
+  "harvest.coverage.integratedCenter": "integrated",
+  "harvest.coverage.integrationCaption": "{{integrated}} of {{total}} datasets offered by CDE's own sources are served. CKAN records describing servers CDE does not harvest are excluded.",
+  "harvest.coverage.viz.integrated": "Integrated",
+  "harvest.coverage.viz.missing": "Not integrated",
+  "harvest.coverage.viz.erddapIn": "ERDDAP · integrated",
+  "harvest.coverage.viz.obisIn": "OBIS · integrated",
+  "harvest.coverage.viz.erddapOut": "ERDDAP · not integrated",
+  "harvest.coverage.viz.obisOut": "OBIS · not integrated",
+  "harvest.coverage.vizHint": "Hover a segment for its share."
 }

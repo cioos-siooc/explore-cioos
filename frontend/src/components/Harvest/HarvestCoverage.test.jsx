@@ -22,6 +22,7 @@ const COVERAGE = {
     n_app_without_ckan: 2,
     n_ckan_no_data_source: 30,
     n_obis_without_ckan: 5,
+    n_obis_not_harvested: 290,
     n_obis_not_in_app: 6,
   },
   sources: [
@@ -83,10 +84,42 @@ describe("HarvestCoverage", () => {
   });
 
   it("shows how many datasets are served, split by source", async () => {
-    renderWithProviders(<HarvestCoverage />);
-    expect(await screen.findByText("120")).toBeInTheDocument();
-    expect(screen.getByText("100")).toBeInTheDocument();
-    expect(screen.getByText("20")).toBeInTheDocument();
+    const { container } = renderWithProviders(<HarvestCoverage />);
+    await screen.findByRole("heading", { name: "Sources" });
+    // Scoped to the stat row: the donut legend repeats these same counts, so a
+    // bare getByText would match more than one node.
+    const stats = container.querySelectorAll(".harvest-coverage-stat-value");
+    expect([...stats].map((n) => n.textContent)).toEqual([
+      "120",
+      "100",
+      "20",
+      "300",
+    ]);
+  });
+
+  it("charts the integrated fraction over both levels", async () => {
+    const { container } = renderWithProviders(<HarvestCoverage />);
+    await screen.findByRole("heading", { name: "Sources" });
+
+    // Ring 1 is integrated vs not; ring 2 splits each by source. 100 + 20
+    // integrated against 7 + 290 missing = 417 known, 120 of them served.
+    expect(container.querySelector(".harvest-viz-center-value").textContent).toBe(
+      "29%",
+    );
+    expect(container.querySelectorAll(".harvest-viz-arc")).toHaveLength(6);
+    expect(
+      screen.getByText("ERDDAP · not integrated"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("OBIS · not integrated")).toBeInTheDocument();
+  });
+
+  it("names every segment, so identity never rests on colour alone", async () => {
+    const { container } = renderWithProviders(<HarvestCoverage />);
+    await screen.findByRole("heading", { name: "Sources" });
+
+    const arcs = container.querySelectorAll(".harvest-viz-arc").length;
+    const legend = container.querySelectorAll(".harvest-viz-legend-item").length;
+    expect(legend).toBe(arcs);
   });
 
   it("lists each data source alongside the metadata catalogue", async () => {

@@ -644,5 +644,15 @@
   "harvest.coverage.overviewErddapGap": "dans ERDDAP, absents de CDE",
   "harvest.coverage.overviewCkanGap": "dans CKAN, absents de CDE",
   "harvest.coverage.overviewNoCkan": "diffusés sans fiche CKAN",
-  "harvest.coverage.noSnapshot": "Aucun instantané CKAN pour l'instant — le catalogue est lu pendant une moisson; toutes les comparaisons CKAN ci-dessous resteront vides jusqu'à la prochaine exécution."
+  "harvest.coverage.noSnapshot": "Aucun instantané CKAN pour l'instant — le catalogue est lu pendant une moisson; toutes les comparaisons CKAN ci-dessous resteront vides jusqu'à la prochaine exécution.",
+  "harvest.coverage.integrationTitle": "Intégration",
+  "harvest.coverage.integratedCenter": "intégrés",
+  "harvest.coverage.integrationCaption": "{{integrated}} des {{total}} jeux de données offerts par les sources de CDE sont diffusés. Les fiches CKAN décrivant des serveurs non moissonnés par CDE sont exclues.",
+  "harvest.coverage.viz.integrated": "Intégrés",
+  "harvest.coverage.viz.missing": "Non intégrés",
+  "harvest.coverage.viz.erddapIn": "ERDDAP · intégrés",
+  "harvest.coverage.viz.obisIn": "OBIS · intégrés",
+  "harvest.coverage.viz.erddapOut": "ERDDAP · non intégrés",
+  "harvest.coverage.viz.obisOut": "OBIS · non intégrés",
+  "harvest.coverage.vizHint": "Survolez un segment pour voir sa part."
 }

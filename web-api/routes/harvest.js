@@ -453,6 +453,14 @@ async function coverageSummary() {
         WHERE o.source_type = 'obis'
           AND NOT EXISTS (SELECT 1 FROM ckan c
                            WHERE c.obis_dataset_id = o.dataset_id))  AS n_obis_without_ckan,
+      -- OBIS datasets discovery advertised that CDE does not serve. The
+      -- integration chart needs both halves of each source to sum to that
+      -- source's universe; the ERDDAP half is n_erddap_not_in_app above.
+      (SELECT count(*) FROM advertised adv
+        WHERE adv.source = 'obis'
+          AND NOT EXISTS (SELECT 1 FROM app a
+                           WHERE a.source_type = 'obis'
+                             AND a.dataset_id = adv.dataset_id))      AS n_obis_not_harvested,
       (SELECT count(DISTINCT c.obis_dataset_id) FROM ckan c
         WHERE c.obis_dataset_id IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM app a

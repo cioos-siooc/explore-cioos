@@ -17,6 +17,21 @@
   --harvest-row-hover: #f8f6f3;
   --harvest-input-border: #c6d8db;
   --harvest-spark-empty: #aaa;
+
+  /* Coverage donut. Validated with the dataviz palette checker against the
+     sand surface (#f3f0ec), --pairs all:
+       ring 1  integrated vs gap   ΔE 31.7 normal / 29.0 protan
+       ring 2  ERDDAP vs OBIS hue  ΔE 33.6 normal / 24.7 protan
+     The -soft steps are sequential steps WITHIN each hue (not categorical
+     classes), so they always travel with a legend entry and a direct label.
+     Both fall below 3:1 on the surface, which is why the chart ships visible
+     labels and the numbers are repeated in the table beneath it. */
+  --harvest-viz-integrated: #1f6f7a;
+  --harvest-viz-gap: #b8c4c2;
+  --harvest-viz-erddap: #2a78d6;
+  --harvest-viz-erddap-soft: #9ec5f4;
+  --harvest-viz-obis: #eb6834;
+  --harvest-viz-obis-soft: #f7bfa6;
 }
 
 /* ── Harvest section root layout ──────────────────────────────────────────── */
@@ -646,4 +661,82 @@ a.harvest-link:hover {
   color: var(--cioos-ink);
   min-width: 240px;
   margin-bottom: 1rem;
+}
+
+/* ── Coverage donut ───────────────────────────────────────────────────────── */
+.harvest-viz {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.harvest-viz-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+/* Recessive by default; hovering one segment pushes the others back rather
+   than lighting the hovered one up, so the colours never shift meaning. */
+.harvest-viz-arc {
+  stroke: none;
+  transition: opacity 120ms ease;
+  cursor: default;
+}
+.harvest-viz-arc.is-dimmed {
+  opacity: 0.35;
+}
+.harvest-viz-center-value {
+  text-anchor: middle;
+  font-size: 2rem;
+  font-weight: 700;
+  fill: var(--cioos-ink);
+}
+.harvest-viz-center-label {
+  text-anchor: middle;
+  font-size: 0.72rem;
+  fill: var(--harvest-muted-strong);
+}
+/* Fixed min-height so the row does not reflow as the tooltip text changes. */
+.harvest-viz-readout {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.4rem;
+  font-size: 0.82rem;
+  max-width: 260px;
+  text-align: center;
+}
+.harvest-viz-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+.harvest-viz-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem 1rem;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.harvest-viz-legend-item {
+  display: contents;
+}
+.harvest-viz-legend-label {
+  color: var(--cioos-ink);
+}
+.harvest-viz-legend-value {
+  font-weight: 700;
+  text-align: right;
+}
+.harvest-viz-caption {
+  flex-basis: 100%;
+  margin: 0;
+  max-width: 62ch;
 }

@@ -5,6 +5,7 @@ import HarvestLayout from "./HarvestLayout.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
 import BUCKETS, { bucketByKey } from "./coverageBuckets.js";
+import CoverageDonut from "./CoverageDonut.jsx";
 import { slugify } from "./slug.js";
 import { hostname, fmtDt, datasetLink } from "./format.js";
 
@@ -118,6 +119,68 @@ function Cell({ column, row, t, ckanUrl }) {
   }
 }
 
+function buildIntegration(summary, t) {
+  const n = (key) => Number(summary[key] || 0);
+  const erddapIn = n("n_app_erddap");
+  const erddapOut = n("n_erddap_not_in_app");
+  const obisIn = n("n_app_obis");
+  const obisOut = n("n_obis_not_harvested");
+
+  const integrated = erddapIn + obisIn;
+  const missing = erddapOut + obisOut;
+  const total = integrated + missing;
+  if (!total) return null;
+
+  // Ring 2's order matches ring 1's so the two levels line up radially: the
+  // integrated sources sweep first, then the missing ones.
+  return {
+    total,
+    integrated,
+    rings: [
+      [
+        {
+          key: "integrated",
+          label: t("harvest.coverage.viz.integrated"),
+          value: integrated,
+          color: "--harvest-viz-integrated",
+        },
+        {
+          key: "missing",
+          label: t("harvest.coverage.viz.missing"),
+          value: missing,
+          color: "--harvest-viz-gap",
+        },
+      ],
+      [
+        {
+          key: "erddap-in",
+          label: t("harvest.coverage.viz.erddapIn"),
+          value: erddapIn,
+          color: "--harvest-viz-erddap",
+        },
+        {
+          key: "obis-in",
+          label: t("harvest.coverage.viz.obisIn"),
+          value: obisIn,
+          color: "--harvest-viz-obis",
+        },
+        {
+          key: "erddap-out",
+          label: t("harvest.coverage.viz.erddapOut"),
+          value: erddapOut,
+          color: "--harvest-viz-erddap-soft",
+        },
+        {
+          key: "obis-out",
+          label: t("harvest.coverage.viz.obisOut"),
+          value: obisOut,
+          color: "--harvest-viz-obis-soft",
+        },
+      ],
+    ],
+  };
+}
+
 export default function HarvestCoverage() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -136,6 +199,14 @@ export default function HarvestCoverage() {
   const summary = coverage?.summary;
   const sources = coverage?.sources || [];
   const ckanUrl = coverage?.ckanUrl || "https://catalogue.cioos.ca";
+
+  // The donut's universe is what CDE's OWN configured sources offer: every
+  // dataset an ERDDAP server advertises plus every dataset OBIS discovery
+  // selected, united with what the app already serves. Deliberately NOT the
+  // whole CKAN catalogue — most of those records describe servers CDE was
+  // never asked to harvest, and folding them in would swamp the fraction with
+  // datasets nobody expected to be integrated.
+  const integration = summary && buildIntegration(summary, t);
 
   function setParam(name, value) {
     const p = new URLSearchParams(searchParams);
@@ -174,6 +245,24 @@ export default function HarvestCoverage() {
               date: fmtDt(summary?.ckan_snapshot_at),
             })}
           </p>
+
+          {integration && (
+            <>
+              <h2 className="harvest-section-title">
+                {t("harvest.coverage.integrationTitle")}
+              </h2>
+              <CoverageDonut
+                rings={integration.rings}
+                total={integration.total}
+                centerLabel={t("harvest.coverage.integratedCenter")}
+                caption={t("harvest.coverage.integrationCaption", {
+                  integrated: integration.integrated.toLocaleString(),
+                  total: integration.total.toLocaleString(),
+                })}
+                hint={t("harvest.coverage.vizHint")}
+              />
+            </>
+          )}
 
           {!summary?.n_ckan_records && (
             <div className="harvest-queue-warning">
