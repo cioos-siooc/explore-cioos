@@ -3,7 +3,11 @@ import { useEffect, useState } from "react";
 import { BoundingBox, Check2, Clipboard, Pentagon } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
-import { polygonIsRectangle, polygonToWkt } from "../../../../utilities.jsx";
+import {
+  polygonBounds,
+  polygonIsRectangle,
+  polygonToWkt,
+} from "../../../../utilities.jsx";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../../state/ui/UIProvider.jsx";
@@ -43,6 +47,12 @@ export default function SpatialFilter() {
       ? "box"
       : "polygon"
     : undefined;
+  // The envelope, not just the drawn ring: for a box it's the same four
+  // corners, but a freeform polygon has no single "bounding box" of its own
+  // — this is its enclosing one, the same figures a WMS/ERDDAP bbox query
+  // would need.
+  const bounds = hasSelection ? polygonBounds(polygon) : undefined;
+  const wkt = hasSelection ? polygonToWkt(polygon) : "";
 
   function startDraw(mode) {
     setShowFiltersModal(false);
@@ -50,37 +60,68 @@ export default function SpatialFilter() {
   }
 
   return (
-    <div className="multiCheckboxFilter spatialFilterOptions">
-      <div
-        className={`optionButton ${activeMode === "box" ? "selected" : ""}`}
-        onClick={() => startDraw("box")}
-      >
-        <BoundingBox />
-        <span className="optionName">{t("drawBoundingBoxOption")}</span>
-      </div>
-      <div
-        className={`optionButton ${activeMode === "polygon" ? "selected" : ""}`}
-        onClick={() => startDraw("polygon")}
-      >
-        <Pentagon />
-        <span className="optionName">{t("drawPolygonOption")}</span>
+    <div className="spatialFilterOptions">
+      <div className="multiCheckboxFilter">
+        <div
+          className={`optionButton ${activeMode === "box" ? "selected" : ""}`}
+          onClick={() => startDraw("box")}
+        >
+          <BoundingBox />
+          <span className="optionName">{t("drawBoundingBoxOption")}</span>
+        </div>
+        <div
+          className={`optionButton ${activeMode === "polygon" ? "selected" : ""}`}
+          onClick={() => startDraw("polygon")}
+        >
+          <Pentagon />
+          <span className="optionName">{t("drawPolygonOption")}</span>
+        </div>
       </div>
       {hasSelection && (
-        <button
-          type="button"
-          className="spatialFilterCopyWkt"
-          onClick={() => {
-            navigator.clipboard.writeText(polygonToWkt(polygon));
-            setWktCopied(true);
-          }}
-        >
-          {wktCopied ? (
-            <Check2 size={14} aria-hidden="true" />
-          ) : (
-            <Clipboard size={14} aria-hidden="true" />
-          )}
-          {t(wktCopied ? "copiedSelectionWktTitle" : "copySelectionWktTitle")}
-        </button>
+        <div className="spatialFilterDetails">
+          <dl className="spatialFilterBounds">
+            <div>
+              <dt>{t("spatialFilterNorth")}</dt>
+              <dd>{bounds.north.toFixed(4)}</dd>
+            </div>
+            <div>
+              <dt>{t("spatialFilterSouth")}</dt>
+              <dd>{bounds.south.toFixed(4)}</dd>
+            </div>
+            <div>
+              <dt>{t("spatialFilterEast")}</dt>
+              <dd>{bounds.east.toFixed(4)}</dd>
+            </div>
+            <div>
+              <dt>{t("spatialFilterWest")}</dt>
+              <dd>{bounds.west.toFixed(4)}</dd>
+            </div>
+          </dl>
+          <label className="spatialFilterWktLabel">
+            WKT
+            <textarea
+              className="spatialFilterWkt"
+              readOnly
+              value={wkt}
+              onFocus={(e) => e.target.select()}
+            />
+          </label>
+          <button
+            type="button"
+            className="spatialFilterCopyWkt"
+            onClick={() => {
+              navigator.clipboard.writeText(wkt);
+              setWktCopied(true);
+            }}
+          >
+            {wktCopied ? (
+              <Check2 size={14} aria-hidden="true" />
+            ) : (
+              <Clipboard size={14} aria-hidden="true" />
+            )}
+            {t(wktCopied ? "copiedSelectionWktTitle" : "copySelectionWktTitle")}
+          </button>
+        </div>
       )}
     </div>
   );

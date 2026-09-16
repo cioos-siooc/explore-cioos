@@ -8,6 +8,56 @@
   gap: 2px;
 }
 
+/* Once a shape is drawn: its envelope (the same four figures a WMS/ERDDAP
+   bbox query would take) and its raw WKT, both readable in place rather than
+   only reachable through the copy button below them. */
+.spatialFilterDetails {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.spatialFilterBounds {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.spatialFilterBounds dt {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-40);
+}
+
+.spatialFilterBounds dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.spatialFilterWktLabel {
+  display: block;
+  margin-top: 10px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-40);
+}
+
+.spatialFilterWkt {
+  display: block;
+  width: 100%;
+  min-height: 4.2em;
+  margin-top: 4px;
+  padding: 8px;
+  resize: vertical;
+  background-color: var(--cioos-surface-2);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  font-family: var(--cioos-font-mono, monospace);
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink);
+}
+
 /* Small pill button, same visual family as .filterOptionsActions button
    (Reset) but living inside the pane's own body rather than the footer
    actions row — it only makes sense once a shape is drawn, unlike Reset

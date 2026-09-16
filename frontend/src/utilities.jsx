@@ -541,18 +541,31 @@ export function polygonIsRectangle(polygon) {
   return lons.length === 2 && lats.length === 2;
 }
 
-// translate a rectangular polygon to a bounding box query using lat/long min/max
-function polygonToMaxMins(polygon) {
-  const p = polygon.slice(0, 4);
-
-  const lons = unique(p.map((e) => e[0]));
-  const lats = unique(p.map((e) => e[1]));
+// The envelope of any polygon ring — a rectangle's own four corners, or the
+// enclosing box of a freeform shape's. Numbers, not display strings: callers
+// round or label as their own context needs (a query string wants
+// .toFixed(4) keys, a readout wants labelled, unrounded figures).
+export function polygonBounds(polygon) {
+  const lons = polygon.map((e) => e[0]);
+  const lats = polygon.map((e) => e[1]);
 
   return {
-    latMin: Math.min(...lats).toFixed(4),
-    lonMin: Math.min(...lons).toFixed(4),
-    latMax: Math.max(...lats).toFixed(4),
-    lonMax: Math.max(...lons).toFixed(4),
+    west: Math.min(...lons),
+    south: Math.min(...lats),
+    east: Math.max(...lons),
+    north: Math.max(...lats),
+  };
+}
+
+// translate a rectangular polygon to a bounding box query using lat/long min/max
+function polygonToMaxMins(polygon) {
+  const { west, south, east, north } = polygonBounds(polygon);
+
+  return {
+    latMin: south.toFixed(4),
+    lonMin: west.toFixed(4),
+    latMax: north.toFixed(4),
+    lonMax: east.toFixed(4),
   };
 }
 
