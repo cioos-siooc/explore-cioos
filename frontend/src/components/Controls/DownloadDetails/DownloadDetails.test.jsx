@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -78,26 +78,15 @@ describe("DownloadDetails", () => {
     expect(screen.queryByText("A grid")).not.toBeInTheDocument();
   });
 
-  it("shows the no-filters-active message when nothing is filtering the download", async () => {
-    renderDetails();
-    expect(
-      screen.getByText("No Time, Depth, or Space filters currently active"),
-    ).toBeInTheDocument();
-  });
-
-  it("shows a time filter chip when the time filter is active, and toggling it calls back", async () => {
-    const setFilterDownloadByTime = vi.fn();
-    const { user } = renderDetails({
-      timeFilterActive: true,
-      filterDownloadByTime: true,
-      setFilterDownloadByTime,
-    });
-    const chip = await screen.findByText(
-      `${QUERY.startDate} – ${QUERY.endDate}`,
-    );
-    await user.click(chip);
-    expect(setFilterDownloadByTime).toHaveBeenCalledWith(false);
-  });
+  // The no-filters message and the per-filter toggle chips (time/depth/area)
+  // used to render inside DownloadDetails itself, but that UI has since moved
+  // up to DownloadPanel (see FilterDownloadToggles, rendered there) — this
+  // component only receives the filter values now, not the setters that
+  // would drive a toggle chip. DownloadDetails.jsx no longer references
+  // timeFilterActive/depthFilterActive/polygonFilterActive or any of the
+  // setFilterDownloadBy* callbacks at all, so the two tests that used to
+  // cover this here were left asserting on markup this component doesn't
+  // render, unrelated to this PR's own changes.
 
   it("resolves size estimates from /downloadEstimate and shows the total once loaded", async () => {
     renderDetails();
