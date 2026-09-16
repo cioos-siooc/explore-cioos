@@ -55,6 +55,28 @@ describe("UrlSync", () => {
     await waitFor(() => expect(params().has("search")).toBe(false));
   });
 
+  it("keeps the search's dataset list out of the link — only the expression", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+
+    // The search narrows what the map draws by naming the matching datasets
+    // (mapQueryString's datasetPKs, see SelectionProvider). That list is a
+    // derived, map-only thing: it belongs in the map's own requests, never in
+    // the link — a shared URL carries the expression and re-derives the rest.
+    const needle = hooks.selection.pointsData[0].title.slice(0, 6);
+    act(() => hooks.selection.setDatasetTitleSearchText(needle));
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(hooks.mapState.mapQueryString).has("datasetPKs"),
+      ).toBe(true),
+    );
+
+    expect(params().get("search")).toBe(needle);
+    expect(params().has("datasetPKs")).toBe(false);
+  });
+
   it("writes onlyInView only when true (the unfiltered state carries no param)", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
     await waitFor(() =>

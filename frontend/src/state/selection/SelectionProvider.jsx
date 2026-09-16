@@ -50,6 +50,25 @@ const isPlatformlessDataset = (row) =>
   PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) ||
   row.source_type === "obis";
 
+// What the free-text search matches a dataset on: its title, its dataset type,
+// and the name of the data portal it came from. `query` is already lowercased.
+// Shared by the datasets list and the map narrowing below, so the two always
+// agree on what a search term keeps.
+function datasetMatchesSearch(row, query, language) {
+  return [
+    row.title,
+    row.cdm_data_type,
+    formatErddapServerName(
+      row.erddap_server_url || row.erddap_url,
+      language,
+      erddapServersJSONfile,
+    ),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
 function datasetInLanguage(point, language) {
   return {
     ...point,
@@ -249,18 +268,7 @@ export default function SelectionProvider({ children }) {
       if (layersNarrowed && !datasetInDataLayers(row, dataLayers)) return false;
       if (onlyInView && !datasetsInViewPks.has(row.pk)) return false;
       if (!hasSearch) return true;
-      return [
-        row.title,
-        row.cdm_data_type,
-        formatErddapServerName(
-          row.erddap_server_url || row.erddap_url,
-          i18n.language,
-          erddapServersJSONfile,
-        ),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
+      return datasetMatchesSearch(row, query, i18n.language);
     });
   }, [
     pointsData,
@@ -319,18 +327,40 @@ export default function SelectionProvider({ children }) {
   );
 
   // Hand the map the datasets it may draw. The tile/legend/coverage queries
-  // take an include list (datasetPKs), so the exclusion is expressed as its
-  // complement over the current results; undefined while nothing is hidden
-  // leaves those queries as the filters wrote them.
+  // take an include list (datasetPKs), so the narrowing is expressed as a pk
+  // list over the current results; undefined while nothing narrows them leaves
+  // those queries as the filters wrote them.
+  //
+  // Two things narrow it: the groups hidden in the list, and the free-text
+  // search. The search is a filter rather than a display choice, so the map
+  // has to honour it — drawing markers and hexes for datasets the search has
+  // taken out of the list is the map disagreeing with its own sidebar. The
+  // other two narrowings filteredDatasets applies stay out of it: the
+  // data-layer switches already reach the map through the tile query (see
+  // Map/tileQuery.js), and "only in view" is the viewport itself, so feeding
+  // it back would rewrite every map query on every pan for no visible change.
+  //
+  // The search text is debounced here — the list filters in memory on every
+  // keystroke, but each distinct value here is a fresh set of tile, legend and
+  // coverage URLs, so typing a word uncached would otherwise cost a round of
+  // map requests per character.
+  const debouncedSearchText = useDebounce(datasetTitleSearchText, 300);
+  const mapDatasetPks = useMemo(() => {
+    const query = debouncedSearchText.toLowerCase();
+    const hasSearch = !isEmpty(debouncedSearchText);
+    if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
+    return pointsData
+      .filter(
+        (row) =>
+          !hiddenDatasetPks.has(row.pk) &&
+          (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
+      )
+      .map((row) => row.pk);
+  }, [hiddenDatasetPks, pointsData, debouncedSearchText, i18n.language]);
+
   useEffect(() => {
-    setMapDatasetPKs(
-      hiddenDatasetPks.size === 0
-        ? undefined
-        : pointsData
-            .filter((row) => !hiddenDatasetPks.has(row.pk))
-            .map((row) => row.pk),
-    );
-  }, [hiddenDatasetPks, pointsData, setMapDatasetPKs]);
+    setMapDatasetPKs(mapDatasetPks);
+  }, [mapDatasetPks, setMapDatasetPKs]);
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
