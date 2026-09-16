@@ -629,14 +629,8 @@
   "harvest.coverage.classification.server_not_harvested": "Serveur non moissonné par CDE",
   "harvest.coverage.bucket.erddap-not-in-app.label": "Dans ERDDAP, absent de CDE",
   "harvest.coverage.bucket.erddap-not-in-app.help": "Le serveur publie ces jeux de données, mais CDE ne les diffuse pas. La raison provient de la dernière tentative de moisson.",
-  "harvest.coverage.bucket.ckan-not-in-app.label": "Dans CKAN, absent de CDE",
-  "harvest.coverage.bucket.ckan-not-in-app.help": "CKAN décrit un jeu de données ERDDAP que CDE ne diffuse pas : la moisson a échoué, le serveur a cessé de l'annoncer, ou CDE ne moissonne pas ce serveur.",
   "harvest.coverage.bucket.app-without-ckan.label": "Dans CDE, absent de CKAN",
   "harvest.coverage.bucket.app-without-ckan.help": "CDE diffuse ces jeux de données, mais le catalogue n'a aucune fiche les décrivant. CKAN ne décrit pas tous les jeux de données ERDDAP, et ceux-ci restent disponibles dans Explorer — une liste à examiner avec le diffuseur, pas une anomalie.",
-  "harvest.coverage.bucket.ckan-no-data-source.label": "CKAN, sans source de données",
-  "harvest.coverage.bucket.ckan-no-data-source.help": "Fiches sans ressource ERDDAP ni jeu de données OBIS : CDE n'a rien à lire.",
-  "harvest.coverage.bucket.obis-not-in-app.label": "Dans CKAN, absent de CDE (OBIS)",
-  "harvest.coverage.bucket.obis-not-in-app.help": "CKAN décrit un jeu de données OBIS que CDE ne diffuse pas, généralement hors de la sélection de découverte configurée.",
   "harvest.coverage.bucket.obis-without-ckan.label": "OBIS, sans fiche CKAN",
   "harvest.coverage.bucket.obis-without-ckan.help": "CDE diffuse ces jeux de données OBIS bien que le catalogue ne les décrive pas. Attendu, pas un défaut : ils restent disponibles dans Explorer.",
   "harvest.coverage.overviewTitle": "Couverture",
@@ -654,5 +648,12 @@
   "harvest.coverage.viz.obisIn": "OBIS · intégrés",
   "harvest.coverage.viz.erddapOut": "ERDDAP · non intégrés",
   "harvest.coverage.viz.obisOut": "OBIS · non intégrés",
-  "harvest.coverage.vizHint": "Survolez un segment pour voir sa part."
+  "harvest.coverage.vizHint": "Survolez un segment pour voir sa part.",
+  "harvest.coverage.bucket.ckan-not-integrated.label": "Dans CKAN, absent de CDE",
+  "harvest.coverage.bucket.ckan-not-integrated.help": "Toutes les fiches CKAN derrière lesquelles CDE ne diffuse rien. La colonne « Pourquoi » distingue les cas : la fiche ne pointe vers aucune donnée lisible par CDE, vers un serveur non moissonné, ou vers un jeu de données que la moisson n'a pu prendre.",
+  "harvest.coverage.col.linkTarget": "Pointe vers",
+  "harvest.coverage.noLink": "Aucun lien ERDDAP ou OBIS ({{count}} ressources)",
+  "harvest.coverage.downloadCsv": "Télécharger la liste complète (CSV) ↓",
+  "harvest.coverage.classification.no_data_source": "Aucune source de données lisible par CDE",
+  "harvest.coverage.classification.obis_not_served": "Jeu de données OBIS non diffusé"
 }

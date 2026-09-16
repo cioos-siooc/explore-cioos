@@ -8,6 +8,7 @@ import BUCKETS, { bucketByKey } from "./coverageBuckets.js";
 import CoverageDonut from "./CoverageDonut.jsx";
 import { slugify } from "./slug.js";
 import { hostname, fmtDt, datasetLink } from "./format.js";
+import { server } from "../../config.js";
 
 const OBIS_SENTINEL = "https://obis.org";
 
@@ -106,6 +107,44 @@ function Cell({ column, row, t, ckanUrl }) {
           ) : (
             "—"
           )}
+        </td>
+      );
+    case "linkTarget":
+      if (row.erddap_url) {
+        return (
+          <td className="harvest-text-sm">
+            <a
+              href={datasetLink(row.erddap_url, row.dataset_id, "erddap")}
+              target="_blank"
+              rel="noreferrer"
+              className="harvest-link harvest-mono"
+            >
+              {row.dataset_id}
+            </a>
+            <div className="harvest-muted harvest-text-xs">
+              {hostname(row.erddap_url)}
+            </div>
+          </td>
+        );
+      }
+      if (row.obis_dataset_id) {
+        return (
+          <td className="harvest-text-sm">
+            <a
+              href={`${OBIS_SENTINEL}/dataset/${row.obis_dataset_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="harvest-link harvest-mono"
+            >
+              {row.obis_dataset_id}
+            </a>
+            <div className="harvest-muted harvest-text-xs">OBIS</div>
+          </td>
+        );
+      }
+      return (
+        <td className="harvest-muted harvest-text-sm">
+          {t("harvest.coverage.noLink", { count: row.n_resources ?? 0 })}
         </td>
       );
     case "n_resources":
@@ -323,7 +362,13 @@ export default function HarvestCoverage() {
                   {t("harvest.coverage.kind.metadata")}
                 </td>
                 <td className="harvest-num">{summary?.n_ckan_records}</td>
-                <td className="harvest-num">{summary?.n_ckan_not_in_app}</td>
+                {/* The same measure the bucket below counts: records with
+                    nothing CDE serves behind them. n_ckan_not_in_app counts
+                    only the ERDDAP-linked subset, which read as a different
+                    number under an identical column heading. */}
+                <td className="harvest-num">
+                  {summary?.n_ckan_not_integrated}
+                </td>
                 <td className="harvest-num">—</td>
                 <td className="harvest-muted harvest-text-sm">
                   {fmtDt(summary?.ckan_snapshot_at)}
@@ -361,13 +406,27 @@ export default function HarvestCoverage() {
         {t(`harvest.coverage.bucket.${bucket.key}.help`)}
       </p>
 
-      <input
-        className="harvest-coverage-search"
-        type="search"
-        value={q}
-        placeholder={t("harvest.coverage.searchPlaceholder")}
-        onChange={(e) => setParam("q", e.target.value)}
-      />
+      <div className="harvest-coverage-toolbar">
+        <input
+          className="harvest-coverage-search"
+          type="search"
+          value={q}
+          placeholder={t("harvest.coverage.searchPlaceholder")}
+          onChange={(e) => setParam("q", e.target.value)}
+        />
+        {bucket.exportable && (
+          // The table is capped, so "the whole list" has to leave by another
+          // door — and these get worked through in a spreadsheet anyway.
+          <a
+            className="harvest-link harvest-text-sm"
+            href={`${server}/harvest/coverage/${bucket.key}?format=csv${
+              q ? `&q=${encodeURIComponent(q)}` : ""
+            }`}
+          >
+            {t("harvest.coverage.downloadCsv")}
+          </a>
+        )}
+      </div>
 
       {loadingBucket ? (
         <div className="harvest-loading">{t("harvest.coverage.loading")}</div>

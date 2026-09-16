@@ -628,14 +628,8 @@
   "harvest.coverage.classification.server_not_harvested": "Server not harvested by CDE",
   "harvest.coverage.bucket.erddap-not-in-app.label": "In ERDDAP, not in CDE",
   "harvest.coverage.bucket.erddap-not-in-app.help": "The server publishes these, but CDE does not serve them. The reason comes from the most recent harvest attempt.",
-  "harvest.coverage.bucket.ckan-not-in-app.label": "In CKAN, not in CDE",
-  "harvest.coverage.bucket.ckan-not-in-app.help": "CKAN describes an ERDDAP dataset CDE does not serve — because the harvest failed, because the server stopped listing it, or because CDE never harvests that server at all.",
   "harvest.coverage.bucket.app-without-ckan.label": "In CDE, not in CKAN",
   "harvest.coverage.bucket.app-without-ckan.help": "CDE serves these, but the catalogue has no record describing them. CKAN does not describe every ERDDAP dataset, and these stay available in Explorer — a list to review with the publisher, not a fault.",
-  "harvest.coverage.bucket.ckan-no-data-source.label": "CKAN, no data source",
-  "harvest.coverage.bucket.ckan-no-data-source.help": "Records with neither an ERDDAP resource nor an OBIS dataset behind them, so there is nothing for CDE to read.",
-  "harvest.coverage.bucket.obis-not-in-app.label": "In CKAN, not in CDE (OBIS)",
-  "harvest.coverage.bucket.obis-not-in-app.help": "CKAN describes an OBIS dataset CDE does not serve — usually outside the configured discovery selection.",
   "harvest.coverage.bucket.obis-without-ckan.label": "OBIS, no CKAN record",
   "harvest.coverage.bucket.obis-without-ckan.help": "CDE serves these OBIS datasets although the catalogue does not describe them. Expected, not a defect — they stay available in Explorer.",
   "harvest.coverage.overviewTitle": "Coverage",
@@ -653,5 +647,12 @@
   "harvest.coverage.viz.obisIn": "OBIS · integrated",
   "harvest.coverage.viz.erddapOut": "ERDDAP · not integrated",
   "harvest.coverage.viz.obisOut": "OBIS · not integrated",
-  "harvest.coverage.vizHint": "Hover a segment for its share."
+  "harvest.coverage.vizHint": "Hover a segment for its share.",
+  "harvest.coverage.bucket.ckan-not-integrated.label": "In CKAN, not in CDE",
+  "harvest.coverage.bucket.ckan-not-integrated.help": "Every CKAN record with nothing CDE serves behind it. The reason column separates the cases: the record points at no data CDE can read, at a server CDE does not harvest, or at a dataset the harvest could not take.",
+  "harvest.coverage.col.linkTarget": "Points at",
+  "harvest.coverage.noLink": "No ERDDAP or OBIS link ({{count}} resources)",
+  "harvest.coverage.downloadCsv": "Download the full list (CSV) ↓",
+  "harvest.coverage.classification.no_data_source": "No data source CDE can read",
+  "harvest.coverage.classification.obis_not_served": "OBIS dataset not served"
 }

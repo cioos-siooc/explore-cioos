@@ -12,24 +12,19 @@ const BUCKETS = [
     columns: ["erddap_url", "dataset_id", "reason", "attempted_at"],
   },
   {
-    key: "ckan-not-in-app",
-    countKey: "n_ckan_not_in_app",
-    columns: ["erddap_url", "dataset_id", "ckanTitle", "classification"],
+    // The whole metadata-side gap in one list: every CKAN record with nothing
+    // CDE serves behind it, whatever the reason. Replaces three narrower
+    // buckets (ERDDAP-linked, OBIS-linked, and no-data-source) that split the
+    // same question three ways; the reason is now a column you can search.
+    key: "ckan-not-integrated",
+    countKey: "n_ckan_not_integrated",
+    columns: ["ckanTitle", "linkTarget", "classification", "ckanRecord"],
+    exportable: true,
   },
   {
     key: "app-without-ckan",
     countKey: "n_app_without_ckan",
     columns: ["erddap_url", "dataset_id", "title"],
-  },
-  {
-    key: "ckan-no-data-source",
-    countKey: "n_ckan_no_data_source",
-    columns: ["ckanTitle", "ckanRecord", "n_resources"],
-  },
-  {
-    key: "obis-not-in-app",
-    countKey: "n_obis_not_in_app",
-    columns: ["obis_dataset_id", "ckanTitle", "ckanRecord"],
   },
   {
     key: "obis-without-ckan",

@@ -449,6 +449,25 @@ async function coverageSummary() {
                              AND c.dataset_id = a.dataset_id))       AS n_app_without_ckan,
       (SELECT count(DISTINCT ckan_id) FROM ckan
         WHERE erddap_url IS NULL AND obis_dataset_id IS NULL)        AS n_ckan_no_data_source,
+      -- Records, not links: one served link is enough to call a record
+      -- integrated, so this cannot be a sum of the narrower buckets.
+      (SELECT count(*) FROM (
+          SELECT c.ckan_id
+          FROM ckan c
+          GROUP BY c.ckan_id
+          HAVING bool_or(
+            CASE
+              WHEN c.erddap_url IS NOT NULL THEN EXISTS (
+                     SELECT 1 FROM app_erddap a
+                      WHERE a.erddap_url = c.erddap_url
+                        AND a.dataset_id = c.dataset_id)
+              WHEN c.obis_dataset_id IS NOT NULL THEN EXISTS (
+                     SELECT 1 FROM app a
+                      WHERE a.source_type = 'obis'
+                        AND a.dataset_id = c.obis_dataset_id)
+              ELSE false
+            END) = false
+       ) q)                                                          AS n_ckan_not_integrated,
       (SELECT count(*) FROM app o
         WHERE o.source_type = 'obis'
           AND NOT EXISTS (SELECT 1 FROM ckan c
@@ -537,6 +556,67 @@ const COVERAGE_BUCKETS = {
            OR concat_ws(' ', e.dataset_id, e.erddap_url, e.reason_code)
               ILIKE '%' || ? || '%')
     ORDER BY e.erddap_url, e.dataset_id
+    LIMIT ?
+  `,
+
+  // Every CKAN record with nothing CDE serves behind it — the whole metadata
+  // side of the gap in one list, whatever the reason. A record can carry
+  // several links, and one served link is enough to call it integrated, so the
+  // state is aggregated per record and then one representative link is shown
+  // (an ERDDAP link in preference to an OBIS one, then the no-link case).
+  "ckan-not-integrated": `
+    ${COVERAGE_CTES},
+    ckan_rows AS (
+        SELECT c.*,
+               CASE
+                 WHEN c.erddap_url IS NOT NULL THEN EXISTS (
+                        SELECT 1 FROM app_erddap a
+                         WHERE a.erddap_url = c.erddap_url
+                           AND a.dataset_id = c.dataset_id)
+                 WHEN c.obis_dataset_id IS NOT NULL THEN EXISTS (
+                        SELECT 1 FROM app a
+                         WHERE a.source_type = 'obis'
+                           AND a.dataset_id = c.obis_dataset_id)
+                 ELSE false
+               END AS served,
+               CASE
+                 WHEN c.erddap_url IS NULL AND c.obis_dataset_id IS NULL
+                   THEN 'no_data_source'
+                 WHEN c.obis_dataset_id IS NOT NULL THEN 'obis_not_served'
+                 WHEN EXISTS (SELECT 1 FROM erddap_advertised e
+                               WHERE e.erddap_url = c.erddap_url
+                                 AND e.dataset_id = c.dataset_id)
+                   THEN 'harvest_failed'
+                 WHEN EXISTS (SELECT 1 FROM erddap_advertised s
+                               WHERE s.erddap_url = c.erddap_url)
+                   THEN 'not_advertised'
+                 ELSE 'server_not_harvested'
+               END AS classification,
+               CASE WHEN c.erddap_url IS NOT NULL THEN 0
+                    WHEN c.obis_dataset_id IS NOT NULL THEN 1
+                    ELSE 2 END AS link_rank
+        FROM ckan c
+    ),
+    unserved AS (
+        SELECT ckan_id FROM ckan_rows GROUP BY ckan_id HAVING bool_or(served) = false
+    ),
+    representative AS (
+        SELECT DISTINCT ON (r.ckan_id)
+               r.ckan_id, r.ckan_name, r.title, r.erddap_url, r.dataset_id,
+               r.obis_dataset_id, r.n_resources, r.classification
+        FROM ckan_rows r
+        JOIN unserved u ON u.ckan_id = r.ckan_id
+        ORDER BY r.ckan_id, r.link_rank
+    )
+    SELECT rep.*, e.reason_code
+    FROM representative rep
+    LEFT JOIN erddap_advertised e
+           ON e.erddap_url = rep.erddap_url AND e.dataset_id = rep.dataset_id
+    WHERE (CAST(? AS text) IS NULL
+           OR concat_ws(' ', rep.title, rep.ckan_name, rep.dataset_id,
+                             rep.erddap_url, rep.obis_dataset_id, rep.classification)
+              ILIKE '%' || ? || '%')
+    ORDER BY rep.classification, rep.title
     LIMIT ?
   `,
 
@@ -642,6 +722,24 @@ const COVERAGE_BUCKETS = {
     LIMIT ?
   `,
 };
+
+// Ceiling for the CSV export. The in-page table stays at COVERAGE_MAX_ROWS —
+// a browser does not want 3000 rows of DOM — but "the full list" has to be
+// obtainable, and a data manager acts on these in a spreadsheet anyway.
+const COVERAGE_EXPORT_MAX_ROWS = 20000;
+
+// RFC 4180: quote every field, double any embedded quote. Postgres arrays and
+// titles carry commas and quotes routinely.
+function toCsv(rows) {
+  if (!rows.length) return "";
+  const columns = Object.keys(rows[0]);
+  const cell = (v) =>
+    v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`;
+  return [
+    columns.join(","),
+    ...rows.map((r) => columns.map((c) => cell(r[c])).join(",")),
+  ].join("\n");
+}
 
 async function coverageBucket(bucket, q = null, limit = COVERAGE_MAX_ROWS) {
   const sql = COVERAGE_BUCKETS[bucket];
@@ -761,13 +859,25 @@ router.get(
   "/coverage/:bucket",
   ...pipeline({ filters: false, cacheFor: "5 minutes" }),
   async (req, res) => {
+    const wantsCsv = req.query.format === "csv";
     const result = await coverageBucket(
       req.params.bucket,
       req.query.q || null,
+      wantsCsv ? COVERAGE_EXPORT_MAX_ROWS : COVERAGE_MAX_ROWS,
     );
+    if (result && wantsCsv) {
+      res
+        .type("text/csv")
+        .set(
+          "Content-Disposition",
+          `attachment; filename="cde-${req.params.bucket}.csv"`,
+        );
+      return res.send(toCsv(result.rows));
+    }
     // Unknown bucket names are a 404 rather than an empty list: an empty list
     // would read as "no gaps here", which is the opposite of "no such report".
-    if (!result) return res.status(404).json({ error: "Unknown coverage bucket" });
+    if (!result)
+      return res.status(404).json({ error: "Unknown coverage bucket" });
     res.json({
       rows: result.rows,
       truncated: result.truncated,

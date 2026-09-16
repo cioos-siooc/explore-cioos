@@ -740,3 +740,13 @@ a.harvest-link:hover {
   margin: 0;
   max-width: 62ch;
 }
+.harvest-coverage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.harvest-coverage-toolbar .harvest-coverage-search {
+  margin-bottom: 0;
+}
