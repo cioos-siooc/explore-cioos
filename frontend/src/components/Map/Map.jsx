@@ -4302,6 +4302,7 @@ export default function CreateMap({
       ref={mapContainer}
       className="map"
       data-testid="map-container"
+      data-projection={projection}
       data-map-ready={firstPainted || undefined}
     />
   );
