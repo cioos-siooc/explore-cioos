@@ -7,13 +7,26 @@
 }
 
 .filtersModal .modal-content {
-  height: min(72vh, 760px);
+  /* Sized to the filter list's own height (the list is what forces the
+     modal's height — see .filtersPanel below) rather than forced to a fixed
+     height: a fixed height shorter than the list left it scrolling even
+     when the dialog had room to grow. The cap is only a fallback for short
+     viewports. */
+  max-height: min(84vh, 820px);
+
+  /* Clip the footer's flat background to the dialog's rounded corners — same
+     reasoning as the download and coverage modals below. Without it the
+     footer bar squares off the two bottom corners. */
+  overflow: hidden;
 }
 
 /* Branded like the download header below it: a bare icon (no tile) ahead of a
-   title/counter row stacked over a subtitle. */
+   title/counter row stacked over a subtitle. Pinned to its own height so a
+   short viewport shrinks the list (which already scrolls internally) rather
+   than the header. */
 .filtersModal .modal-header {
   align-items: flex-start;
+  flex-shrink: 0;
 }
 
 /* Icon + text-stack as one row — kept together as Modal.Title's only content
