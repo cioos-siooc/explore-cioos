@@ -28,7 +28,8 @@ const SERIES_COLORS = [
 ];
 const OTHER_COLOR = "#9a9a92";
 
-const YEAR_MS = 365.25 * 24 * 3600 * 1000;
+const DAY_MS = 24 * 3600 * 1000;
+const YEAR_MS = 365.25 * DAY_MS;
 const MONTH_MS = YEAR_MS / 12;
 
 const erddapLabels = new Map(
@@ -57,9 +58,14 @@ function formatPeriod(startMs, endMs, locale) {
   const start = new Date(startMs);
   const endInclusive = new Date(endMs - 1);
   const width = endMs - startMs;
-  if (width >= YEAR_MS - 24 * 3600 * 1000) {
-    const y0 = start.getUTCFullYear();
-    const y1 = endInclusive.getUTCFullYear();
+  if (width >= YEAR_MS - DAY_MS) {
+    // Bins are whole 365.25-day years, so an edge drifts hours either side of
+    // Jan 1. Nudge past that before reading the opening year, then count the
+    // years the bin spans — naming its far edge instead reads the year the
+    // drift spills into, which overstated every span by one.
+    const years = Math.max(1, Math.round(width / YEAR_MS));
+    const y0 = new Date(startMs + DAY_MS).getUTCFullYear();
+    const y1 = y0 + years - 1;
     return y0 === y1 ? `${y0}` : `${y0}–${y1}`;
   }
   const monthFormat = { month: "short", year: "numeric", timeZone: "UTC" };
@@ -91,62 +97,79 @@ export default function CoverageHistogramPlot({ histogram }) {
   };
   const countLabel = t(COUNT_LABELS[histogram.count] || COUNT_LABELS.datasets);
 
-  const { traces, periodLabels, binCenters, binWidths } = useMemo(() => {
-    const { timeBinEdges, series, cells } = histogram;
-    const edgesMs = timeBinEdges.map((edge) => Date.parse(edge));
-    const numBins = edgesMs.length - 1;
+  const { traces, periodLabels, binCenters, binWidths, legendSide } =
+    useMemo(() => {
+      const { timeBinEdges, series, cells } = histogram;
+      const edgesMs = timeBinEdges.map((edge) => Date.parse(edge));
+      const numBins = edgesMs.length - 1;
 
-    const centers = Array.from(
-      { length: numBins },
-      (_, i) => new Date((edgesMs[i] + edgesMs[i + 1]) / 2),
-    );
-    // Bar width per bin (ms), so contiguous bins tile the time axis.
-    const widths = Array.from(
-      { length: numBins },
-      (_, i) => edgesMs[i + 1] - edgesMs[i],
-    );
-    const labels = Array.from({ length: numBins }, (_, i) =>
-      formatPeriod(edgesMs[i], edgesMs[i + 1], locale),
-    );
+      const centers = Array.from(
+        { length: numBins },
+        (_, i) => new Date((edgesMs[i] + edgesMs[i + 1]) / 2),
+      );
+      // Bar width per bin (ms), so contiguous bins tile the time axis.
+      const widths = Array.from(
+        { length: numBins },
+        (_, i) => edgesMs[i + 1] - edgesMs[i],
+      );
+      const labels = Array.from({ length: numBins }, (_, i) =>
+        formatPeriod(edgesMs[i], edgesMs[i + 1], locale),
+      );
 
-    // Top series keep their identity; everything past MAX_SERIES sums into a
-    // single "Other" stack segment.
-    const top = series.slice(0, MAX_SERIES);
-    const counts = new Map(top.map((s) => [s.key, new Array(numBins).fill(0)]));
-    const other = new Array(numBins).fill(0);
-    let hasOther = series.length > MAX_SERIES;
+      // Top series keep their identity; everything past MAX_SERIES sums into a
+      // single "Other" stack segment.
+      const top = series.slice(0, MAX_SERIES);
+      const counts = new Map(
+        top.map((s) => [s.key, new Array(numBins).fill(0)]),
+      );
+      const other = new Array(numBins).fill(0);
+      let hasOther = series.length > MAX_SERIES;
 
-    cells.forEach(([binIndex, key, count]) => {
-      const bucket = counts.get(key);
-      if (bucket) bucket[binIndex - 1] += count;
-      else {
-        other[binIndex - 1] += count;
-        hasOther = true;
-      }
-    });
-
-    // Stacking order = trace order; the largest series (first) sits at the
-    // bottom of every bar.
-    const built = top.map((s, index) => ({
-      name: seriesLabel(s.key, s.kind, i18n.language),
-      color: SERIES_COLORS[index % SERIES_COLORS.length],
-      y: counts.get(s.key),
-    }));
-    if (hasOther) {
-      built.push({
-        name: t("coverageOtherSeries"),
-        color: OTHER_COLOR,
-        y: other,
+      cells.forEach(([binIndex, key, count]) => {
+        const bucket = counts.get(key);
+        if (bucket) bucket[binIndex - 1] += count;
+        else {
+          other[binIndex - 1] += count;
+          hasOther = true;
+        }
       });
-    }
 
-    return {
-      traces: built,
-      periodLabels: labels,
-      binCenters: centers,
-      binWidths: widths,
-    };
-  }, [histogram, locale, i18n.language, t]);
+      // Stacking order = trace order; the largest series (first) sits at the
+      // bottom of every bar.
+      const built = top.map((s, index) => ({
+        name: seriesLabel(s.key, s.kind, i18n.language),
+        color: SERIES_COLORS[index % SERIES_COLORS.length],
+        y: counts.get(s.key),
+      }));
+      if (hasOther) {
+        built.push({
+          name: t("coverageOtherSeries"),
+          color: OTHER_COLOR,
+          y: other,
+        });
+      }
+
+      // The legend floats over the plot, so seat it on whichever end the bars
+      // leave emptiest. Only the outer third of each end matters: that is the
+      // width the keys occupy, and a stacked time histogram is nearly always
+      // lopsided (recent bins dwarf old ones).
+      const totals = new Array(numBins).fill(0);
+      built.forEach(({ y }) => y.forEach((value, i) => (totals[i] += value)));
+      const peak = (values) => values.reduce((max, v) => Math.max(max, v), 0);
+      const end = Math.max(1, Math.round(numBins / 3));
+      const side =
+        peak(totals.slice(0, end)) <= peak(totals.slice(-end))
+          ? "left"
+          : "right";
+
+      return {
+        traces: built,
+        periodLabels: labels,
+        binCenters: centers,
+        binWidths: widths,
+        legendSide: side,
+      };
+    }, [histogram, locale, i18n.language, t]);
 
   return (
     <div className="coverageHistogramPlot">
@@ -182,6 +205,11 @@ export default function CoverageHistogramPlot({ histogram }) {
             automargin: true,
             showgrid: false,
             zeroline: false,
+            // Baseline the bars sit on: ink-40, so it reads as structure
+            // rather than dissolving into the gridlines behind it.
+            showline: true,
+            linecolor: "rgba(21, 47, 55, 0.4)",
+            linewidth: 1,
           },
           yaxis: {
             automargin: true,
@@ -190,15 +218,17 @@ export default function CoverageHistogramPlot({ histogram }) {
             zeroline: false,
             rangemode: "tozero",
           },
-          // Horizontal legend beneath the plot: robust to the variable-length
-          // series labels (e.g. platform names) and lets auto-margin reserve
-          // its own row rather than overflowing a fixed right gutter.
+          // Floated in whichever top corner the bars leave emptiest, inset off
+          // the axes, so the plot keeps the whole container. Draggable from
+          // there (see config.edits) when the guess lands badly.
           legend: {
-            orientation: "h",
-            x: 0.5,
-            xanchor: "center",
-            y: -0.14,
+            x: legendSide === "left" ? 0.02 : 0.98,
+            xanchor: legendSide === "left" ? "left" : "right",
+            y: 0.98,
             yanchor: "top",
+            bgcolor: "#ffffff",
+            bordercolor: "#DCE8E5",
+            borderwidth: 1,
             font: { size: 11 },
             title: { text: "" },
           },
@@ -209,6 +239,9 @@ export default function CoverageHistogramPlot({ histogram }) {
         }}
         config={{
           displaylogo: false,
+          // Legend dragging only — not Plotly's full editable mode, which
+          // would also make titles and axis labels click-to-edit.
+          edits: { legendPosition: true },
           modeBarButtonsToRemove: [
             "select2d",
             "lasso2d",

@@ -143,7 +143,7 @@ export default function CoverageModal() {
         <div className="coveragePlotArea">
           {loading && (
             <div className="coverageModalStatus">
-              <Spinner />
+              <Spinner size="lg" />
             </div>
           )}
           {!loading && error && (
@@ -160,7 +160,7 @@ export default function CoverageModal() {
             <Suspense
               fallback={
                 <div className="coverageModalStatus">
-                  <Spinner />
+                  <Spinner size="lg" />
                 </div>
               }
             >
