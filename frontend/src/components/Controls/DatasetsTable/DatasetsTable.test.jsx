@@ -59,10 +59,10 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
   // is what feeds `datasets` in the real app. This just sorts/pages whatever
   // it's handed (see the component's own comment), so exercise that wiring
   // directly rather than pretending typing narrows the static rows below.
-  // …and it writes it on a pause, not per keystroke: that state narrows the
-  // map as well as this list, so a keystroke's worth of it is a round of tile,
-  // legend and coverage requests.
-  it("the search box writes to the shared datasetTitleSearchText state, once typing pauses", async () => {
+  // …and it writes it when the search is submitted, not while it is typed:
+  // that state narrows the map as well as this list, so a keystroke's worth of
+  // it is a round of tile, legend and coverage requests.
+  it("the search box writes to the shared datasetTitleSearchText state, on submit", async () => {
     let latest;
     const published = [];
     function Probe() {
@@ -70,8 +70,6 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       published.push(latest.datasetTitleSearchText);
       return null;
     }
-    // No inter-keystroke delay, so the whole word is typed well inside the
-    // debounce however loaded the machine running this is.
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
@@ -88,6 +86,9 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     await screen.findAllByTestId("dataset-card");
     await user.type(screen.getByPlaceholderText("Search table"), "beta");
     expect(screen.getByPlaceholderText("Search table")).toHaveValue("beta");
+    expect(latest.datasetTitleSearchText).toBe("");
+
+    await user.type(screen.getByPlaceholderText("Search table"), "{Enter}");
 
     await waitFor(() => expect(latest.datasetTitleSearchText).toBe("beta"));
     // "bet", "be", "b" never reached the state the map reads.

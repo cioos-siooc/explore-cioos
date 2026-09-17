@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import {
   ChevronCompactDown,
   ChevronCompactUp,
+  Search,
   X,
   BoxArrowUpRight,
 } from "react-bootstrap-icons";
@@ -11,8 +12,8 @@ import { useTranslation } from "react-i18next";
 import {
   abbreviateString,
   useChanged,
-  useDebouncedSearchInput,
   useOutsideAlerter,
+  useSearchInput,
 } from "../../../utilities";
 
 import "./styles.css";
@@ -35,6 +36,11 @@ export default function Filter({
   searchTerms,
   setSearchTerms,
   searchPlaceholder,
+  // Whether this row's box waits to be submitted. Set only by Text Search,
+  // whose value re-queries the map — the facet rows below it publish on a
+  // pause, because all their search does is filter options already in memory
+  // (see useSearchInput).
+  searchOnSubmit,
   resetButton,
   infoButton,
   children,
@@ -54,10 +60,11 @@ export default function Filter({
 
   // What the search box narrows is never just itself: an options list here,
   // the map and the datasets list in the Text Search row. So the box shows
-  // what is typed and publishes it on a pause — see useDebouncedSearchInput.
-  const [searchText, setSearchText] = useDebouncedSearchInput(
+  // what is typed and publishes it on its own trigger — see useSearchInput.
+  const [searchText, setSearchText, submitSearch] = useSearchInput(
     searchTerms ?? "",
     setSearchTerms,
+    { trigger: searchOnSubmit ? "submit" : "pause" },
   );
 
   // This is the filter being edited. Controlled, that also takes the panel
@@ -120,7 +127,17 @@ export default function Filter({
               what used to leave the button sitting on the caption instead of
               in the field. */}
           {searchable && (
-            <div className="filterSearchRow">
+            // A form, so Enter reaches the search the same way the magnifier
+            // does without a key handler of its own. Rows that publish on a
+            // pause are forms too — there Enter just means "don't wait out the
+            // delay" — but only a submitted row shows the button.
+            <form
+              className={`filterSearchRow ${searchOnSubmit ? "withSubmit" : ""}`}
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitSearch();
+              }}
+            >
               <input
                 autoFocus
                 className="filterSearch"
@@ -129,6 +146,16 @@ export default function Filter({
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder={searchPlaceholder}
               />
+              {searchOnSubmit && (
+                <button
+                  type="submit"
+                  className="filterSearchSubmit"
+                  title={t("filterSearchSubmitTitle")} // 'Search'
+                  aria-label={t("filterSearchSubmitTitle")}
+                >
+                  <Search size={16} aria-hidden="true" />
+                </button>
+              )}
               {searchText && (
                 <button
                   type="button"
@@ -140,7 +167,7 @@ export default function Filter({
                   <X size={20} aria-hidden="true" />
                 </button>
               )}
-            </div>
+            </form>
           )}
           {/* The options themselves are the one scrolling region: the pane
               fills the modal, so the list grows into it and the actions below

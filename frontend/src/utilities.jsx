@@ -400,24 +400,40 @@ export function useDebounce(value, delay) {
 // typed text is local, so the field itself stays instant, and it is published
 // to the state the rest of the app reacts to — an options list's search terms,
 // or the free-text dataset search behind the map, the list and the counters —
-// only once typing pauses for `delay`.
+// on whichever trigger suits what that search costs.
 //
-// Returns the pair an input needs, the text to show and the setter its
-// onChange calls, so the markup, the placeholder and the clear button stay
-// with whichever component owns them.
+// `trigger` is what publishes a non-empty box:
+//   - "pause" (the default) publishes once typing stops for `delay`. Right for
+//     a box narrowing an options list already in memory, where publishing is
+//     an array filter, and for the scientific-name typeahead, whose whole job
+//     is to offer names as they are typed.
+//   - "submit" publishes nothing until `submit()` — Enter, or the magnifier
+//     beside the field. Right for the free-text dataset search, where each
+//     distinct value is a fresh round of tile, legend and coverage requests
+//     (see SelectionProvider): a pause is only a guess at when the word is
+//     finished, and it guesses wrong often enough to spend a whole round of
+//     those on "temperat" on the way to "temperature".
 //
-// Two rules on top of the plain debounce, both about never losing what was
-// asked for:
+// Returns the text to show, the setter its onChange calls, and submit, so the
+// markup, the placeholder and the clear button stay with whichever component
+// owns them.
+//
+// Two rules hold on either trigger, both about never losing what was asked for:
 //   - Emptying the box publishes at once. Undoing a search has to read as the
 //     clear button working, and an empty search is the cheapest query there is.
-//   - A box that goes away with keystrokes still due publishes them on the way
-//     out, so typing into a filter pane and closing it straight after searches
-//     for what was typed rather than for nothing.
+//   - A box that goes away with typing unpublished publishes it on the way out,
+//     so typing into a filter pane and closing it straight after searches for
+//     what was typed rather than for nothing. That holds under "submit" too:
+//     not having pressed Enter is a weaker signal than having typed the word.
 //
 // A change to `value` from anywhere else — Reset, a chip removed, a share link
 // — is adopted into the box; this hook's own published value arriving back is
 // not, or every keystroke after a publish would be overwritten by it.
-export function useDebouncedSearchInput(value, onChange, delay = 300) {
+export function useSearchInput(
+  value,
+  onChange,
+  { trigger = "pause", delay = 300 } = {},
+) {
   const [text, setText] = useState(value);
   // The value last published from here. State rather than a ref because it is
   // read during render, to tell our own value coming back around from a change
@@ -467,6 +483,7 @@ export function useDebouncedSearchInput(value, onChange, delay = 300) {
       publish(next);
       return;
     }
+    if (trigger !== "pause") return;
     timer.current = setTimeout(() => {
       // Only while the box still holds what was typed — a value taken from
       // outside since then has already replaced it, and publishing this would
@@ -475,7 +492,15 @@ export function useDebouncedSearchInput(value, onChange, delay = 300) {
     }, delay);
   }
 
-  return [text, change];
+  // Enter, or the magnifier. Publishes the box as it stands whatever the
+  // trigger: a pause-triggered box told to search now has no reason to sit out
+  // the rest of its delay.
+  function submit() {
+    clearTimeout(timer.current);
+    if (text !== published) publish(text);
+  }
+
+  return [text, change, submit];
 }
 
 // Which of the three tiers the ramp is drawn from, for a zoom. Every zoom maps

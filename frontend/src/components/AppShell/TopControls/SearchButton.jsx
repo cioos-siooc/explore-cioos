@@ -5,7 +5,7 @@ import classNames from "classnames";
 
 import { DropdownButton } from "../../ui/Dropdown.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import { useDebouncedSearchInput } from "../../../utilities.jsx";
+import { useSearchInput } from "../../../utilities.jsx";
 
 // Fourth segment of the top bar's Datasets/Filters pill: a quick way into the
 // same free-text search the datasets list and the Filters modal's Text Search
@@ -19,11 +19,13 @@ export default function SearchButton() {
   const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection();
   const [menuOpen, setMenuOpen] = React.useState(false);
   // The search behind it reaches the map, the datasets list and the counters,
-  // so it is published on a pause rather than per keystroke — the hook lives
-  // here rather than in the popover below, which unmounts when the menu closes.
-  const [searchText, setSearchText] = useDebouncedSearchInput(
+  // so it goes when it is asked for — Enter or the magnifier — rather than on
+  // a pause between keystrokes. The hook lives here rather than in the popover
+  // below, which unmounts when the menu closes.
+  const [searchText, setSearchText, submitSearch] = useSearchInput(
     datasetTitleSearchText,
     setDatasetTitleSearchText,
+    { trigger: "submit" },
   );
 
   return (
@@ -46,8 +48,23 @@ export default function SearchButton() {
       // in the pill the button sits.
       align="viewport-center"
     >
-      <div className="topBarSearchPopover">
-        <Search size={16} aria-hidden="true" />
+      {/* A form, so Enter searches natively and the magnifier beside the field
+          is the same submit rather than a second code path. */}
+      <form
+        className="topBarSearchPopover"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submitSearch();
+        }}
+      >
+        <button
+          type="submit"
+          className="topBarSearchSubmit"
+          title={t("filterSearchSubmitTitle")}
+          aria-label={t("filterSearchSubmitTitle")}
+        >
+          <Search size={16} aria-hidden="true" />
+        </button>
         <input
           autoFocus
           type="text"
@@ -67,7 +84,7 @@ export default function SearchButton() {
             <X size={16} aria-hidden="true" />
           </button>
         )}
-      </div>
+      </form>
     </DropdownButton>
   );
 }

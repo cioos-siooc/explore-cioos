@@ -127,11 +127,12 @@ describe("Filter (controlled)", () => {
 });
 
 describe("Filter search / reset / info", () => {
-  // The box publishes what is typed once typing pauses, never per keystroke:
-  // in the Text Search row the value behind it re-queries the map, and in the
-  // facet rows it re-filters and re-renders a list thousands of options long.
-  // Typing a word used to do either of those once per character.
-  function SearchHarness({ onPublish }) {
+  // A facet row: its search re-filters and re-renders a list thousands of
+  // options long, so the box publishes once typing pauses rather than per
+  // keystroke — typing a word used to do that once per character. The Text
+  // Search row is the one that waits to be submitted (searchOnSubmit, below),
+  // because its value re-queries the map.
+  function SearchHarness({ onPublish, ...props }) {
     const [terms, setTerms] = useState("");
     return (
       <Filter
@@ -144,6 +145,7 @@ describe("Filter search / reset / info", () => {
           setTerms(next);
         }}
         searchPlaceholder="Search"
+        {...props}
       >
         <div>options</div>
       </Filter>
@@ -165,6 +167,26 @@ describe("Filter search / reset / info", () => {
 
     await waitFor(() => expect(onPublish).toHaveBeenCalledWith("oxy"));
     expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  // searchOnSubmit — the Text Search row. Nothing is published until the
+  // search is asked for, so a half-typed word never reaches the map.
+  it("with searchOnSubmit, publishes on the magnifier and not on a pause", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onPublish = vi.fn();
+    render(<SearchHarness onPublish={onPublish} searchOnSubmit />);
+
+    await user.click(screen.getByTestId("filter-header"));
+    await user.type(screen.getByPlaceholderText("Search"), "oxy");
+
+    expect(screen.getByPlaceholderText("Search")).toHaveValue("oxy");
+    // Long enough that a pause-triggered box would have published by now.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(onPublish).not.toHaveBeenCalled();
+
+    await user.click(screen.getByLabelText("Search"));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    expect(onPublish).toHaveBeenCalledWith("oxy");
   });
 
   // Clearing is the exception to the pause: it publishes there and then, which

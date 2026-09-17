@@ -87,6 +87,31 @@ describe("Modal", () => {
     expect(opener).toHaveFocus();
   });
 
+  // Every caller passes `onHide` as an inline arrow, so it is a new function
+  // on each render. Taking focus into the dialog is what *opening* does, and a
+  // re-render is not an opening: a search box inside publishing what was typed
+  // (useSearchInput) re-renders the app underneath this, and used to
+  // have the caret taken off it mid-word.
+  it("leaves focus where it is when the app re-renders underneath it", async () => {
+    function Harness() {
+      const [, setTick] = React.useState(0);
+      return (
+        <Modal show onHide={() => {}}>
+          <Modal.Body>
+            <input aria-label="search" onChange={() => setTick((n) => n + 1)} />
+          </Modal.Body>
+        </Modal>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+    const box = screen.getByLabelText("search");
+    await user.click(box);
+    await user.type(box, "temp");
+    expect(box).toHaveFocus();
+    expect(box).toHaveValue("temp");
+  });
+
   it("applies a data-testid when given one", () => {
     render(
       <Modal show data-testid="filters-modal">
