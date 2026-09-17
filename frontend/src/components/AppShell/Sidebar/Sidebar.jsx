@@ -1,44 +1,35 @@
 import * as React from "react";
 import {
-  ChevronDown,
   ChevronLeft,
   Download,
   FileEarmarkText,
   ListUl,
-  X,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
+import CloseButton from "../../ui/CloseButton.jsx";
 import DatasetsPanel from "../Panels/DatasetsPanel.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
-import useMediaQuery, {
-  MOBILE_QUERY,
-} from "../../../state/ui/useMediaQuery.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
-// The left column: the datasets card — a toggle header that shows/hides the
-// dataset list and the counts + Download footer. (The brand and the
-// Datasets/Filters entry points now live in the centered top bar.) On phones
-// the same card takes the whole screen, but only once the top bar's Datasets
-// button asks for it — nothing of it is left at any edge otherwise.
+// The left column: the datasets card — a header naming the list, the list
+// itself, and the counts + Download footer. (The brand and the
+// Datasets/Filters entry points live in the centered top bar, which is also
+// what asks for this card.) On phones the same card takes the whole screen;
+// closed, nothing of it is left at any edge.
 // Drilling into a single dataset swaps that header for a back banner: the card
 // hosts two different surfaces, and the header is what names the one in view.
+// Either way the way out is the app's one close button, in the corner.
 export default function Sidebar() {
   const { t } = useTranslation();
   const { pointsToReview, inspectDataset, returnToDatasetList } =
     useSelection();
   const { sidebarOpen, setSidebarOpen, setShowDownloadModal } = useUI();
-  // On a phone the card is the whole screen rather than a column beside the
-  // map, so the control that dismisses it is a close button in the corner
-  // rather than a chevron that collapses a card back into the layout. Same
-  // button, same handler — only the icon says which of the two it is.
-  const isMobile = useMediaQuery(MOBILE_QUERY);
-  const DismissIcon = isMobile ? X : ChevronDown;
   // Until `ready`, there is no dataset count to show — not even a zero. See
   // useDatasetCounts.
   const {
@@ -66,9 +57,17 @@ export default function Sidebar() {
       })
     : t("datasetsCountLoadingTitle");
 
+  const collapseButton = (
+    <CloseButton
+      label={t("sidebarCollapseTitle")}
+      onClick={() => setSidebarOpen(false)}
+      testId="sidebar-collapse"
+    />
+  );
+
   return (
     <aside
-      className={classNames("sidebar", { sheetExpanded: expanded })}
+      className="sidebar"
       aria-label={t("datasetsFilterName")}
       data-testid="sidebar"
     >
@@ -93,35 +92,20 @@ export default function Sidebar() {
               <FileEarmarkText size={13} aria-hidden="true" />
               {t("sidebarDatasetPageLabel")}
             </span>
-            <button
-              type="button"
-              className="datasetsBannerCollapse"
-              onClick={() => setSidebarOpen(false)}
-              title={t("sidebarCollapseTitle")}
-              aria-label={t("sidebarCollapseTitle")}
-            >
-              <DismissIcon size={isMobile ? 22 : 16} aria-hidden="true" />
-            </button>
+            {collapseButton}
           </div>
         ) : (
-          <button
-            type="button"
-            className="datasetsToggle"
-            data-testid="sidebar-toggle"
-            onClick={() => setSidebarOpen(!expanded)}
-            aria-expanded={expanded}
-            title={expanded ? t("sidebarCollapseTitle") : t("sidebarShowTitle")}
-          >
-            <span className="datasetsToggleIcon" aria-hidden="true">
+          <div className="datasetsHeader">
+            <span className="datasetsHeaderIcon" aria-hidden="true">
               <ListUl size={20} />
             </span>
-            <span className="datasetsToggleText">
-              <span className="datasetsToggleTitleRow">
-                <span className="datasetsToggleLabel">
+            <span className="datasetsHeaderText">
+              <span className="datasetsHeaderTitleRow">
+                <span className="datasetsHeaderLabel">
                   {t("datasetsFilterName")}
                 </span>
                 <span
-                  className={classNames("datasetsToggleCount", {
+                  className={classNames("datasetsHeaderCount", {
                     updating: countsUpdating,
                   })}
                   data-testid="sidebar-toggle-count"
@@ -134,16 +118,12 @@ export default function Sidebar() {
                   )}
                 </span>
               </span>
-              <span className="datasetsToggleSubtitle">
+              <span className="datasetsHeaderSubtitle">
                 {t("datasetsToggleSubtitleText")}
               </span>
             </span>
-            <DismissIcon
-              className="datasetsToggleChevron"
-              size={isMobile ? 22 : 16}
-              aria-hidden="true"
-            />
-          </button>
+            {collapseButton}
+          </div>
         )}
         <div className="sidebarBody" data-testid="sidebar-body">
           <DatasetsPanel />

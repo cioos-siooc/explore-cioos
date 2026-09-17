@@ -2,14 +2,18 @@ import * as React from "react";
 import { createContext, useContext, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import CloseButton from "./CloseButton.jsx";
+
 import "./modalStyles.css";
 
 const ModalContext = createContext({ onHide: () => {} });
 
 // Drop-in replacement for the react-bootstrap Modal subset this app uses.
 // Emits Bootstrap-compatible class names (.modal, .modal-dialog,
-// .modal-content, .modal-header, .modal-title, .modal-body, .btn-close) so
-// the existing per-component CSS keeps applying.
+// .modal-content, .modal-header, .modal-title, .modal-body) so the existing
+// per-component CSS keeps applying. The header's close button is the app's
+// shared one, not Bootstrap's .btn-close — a modal is dismissed with the same
+// control as every other surface here.
 export default function Modal({
   show,
   onHide = () => {},
@@ -105,14 +109,7 @@ function ModalHeader({ closeButton, className = "", children }) {
   return (
     <div className={`modal-header ${className}`}>
       {children}
-      {closeButton && (
-        <button
-          type="button"
-          className="btn-close"
-          aria-label="Close"
-          onClick={onHide}
-        />
-      )}
+      {closeButton && <CloseButton label="Close" onClick={onHide} />}
     </div>
   );
 }

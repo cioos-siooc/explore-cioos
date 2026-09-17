@@ -6,7 +6,11 @@
    because it is the direct answer to something the user just did and can be
    dismissed in a click.
    Phones: a half-height bottom sheet instead, so the map stays visible above
-   it. Hidden entirely while the datasets sidebar is open — see FeatureCard.jsx. */
+   it. Hidden entirely while the datasets sidebar is open — see FeatureCard.jsx.
+
+   Either way it arrives and leaves the way the datasets card does, and in the
+   same direction: out past the left edge of the column they share, down off
+   the bottom edge on a phone. */
 .featureCard {
   position: fixed;
   left: 12px;
@@ -32,6 +36,23 @@
   font-family: var(--cioos-font-body);
   color: var(--cioos-ink);
   overflow: hidden;
+
+  /* Parked off screen, and inert while it is there: `visibility` is what keeps
+     the last answer out of the tab order, out of the a11y tree and deaf to
+     clicks meant for the map. Being a discrete property it flips only at the
+     far end of the transition, so the card is visible for the whole exit and
+     hidden the moment it lands. (Sidebar/styles.css does the same, on the same
+     curve — the two cards take turns in this corner.) */
+  transform: translateX(calc(-100% - 16px));
+  visibility: hidden;
+  transition:
+    transform 0.32s cubic-bezier(0.22, 0.8, 0.3, 1),
+    visibility 0.32s;
+}
+
+.featureCard.open {
+  transform: translateX(0);
+  visibility: visible;
 }
 
 .featureCardHeader {
@@ -112,34 +133,6 @@
 .featureCardHeadingMeta {
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
-}
-
-.featureCardClose {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  background: transparent;
-  color: var(--cioos-ink-40);
-  cursor: pointer;
-}
-
-.featureCardClose:focus-visible {
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-ink);
-  outline: none;
-}
-
-@media (hover: hover) {
-  .featureCardClose:hover {
-    background-color: var(--cioos-surface-2);
-    color: var(--cioos-ink);
-    outline: none;
-  }
 }
 
 /* Five rows before the list — not the card — starts scrolling, so a stack of
@@ -304,13 +297,18 @@
     inset: auto 0 0;
     width: auto;
     max-width: none;
-    transform: none;
     max-height: 45vh;
     display: flex;
     flex-direction: column;
     border-radius: var(--cioos-radius-lg) var(--cioos-radius-lg) 0 0;
     border-bottom: none;
-    animation: featureCardRise var(--cioos-transition-normal);
+
+    /* A sheet on the bottom edge rises from it and drops back behind it. */
+    transform: translateY(100%);
+  }
+
+  .featureCard.open {
+    transform: translateY(0);
   }
 
   .featureCardList {
@@ -327,25 +325,10 @@
   .featureCardRowAdd {
     width: 44px;
   }
-
-  .featureCardClose {
-    width: 40px;
-    height: 40px;
-  }
-}
-
-@keyframes featureCardRise {
-  from {
-    transform: translateY(100%);
-  }
-
-  to {
-    transform: translateY(0);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .featureCard {
-    animation: none;
+    transition: none;
   }
 }

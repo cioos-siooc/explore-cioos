@@ -7,11 +7,11 @@ import {
   GeoAlt,
   Grid3x3Gap,
   Plus,
-  X,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
+import CloseButton from "../../ui/CloseButton.jsx";
 import platformColors from "../../platformColors";
 import { useChanged } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
@@ -57,11 +57,22 @@ export default function FeatureCard() {
 
   const [expanded, setExpanded] = useState(false);
 
+  // The card travels on and off screen rather than appearing and vanishing
+  // (see styles.css), so it outlives the query that filled it: dismissing it
+  // clears `featureQuery` at once — that is also what un-rings the region on
+  // the map — and a card that blanked halfway out would be a worse exit than
+  // none. This holds the last answer so it is still the one on screen while it
+  // leaves. Adjusted during render rather than in an effect, the same shape
+  // useChanged is built on.
+  const [held, setHeld] = useState(featureQuery);
+  if (featureQuery && featureQuery !== held) setHeld(featureQuery);
+  const query = featureQuery ?? held;
+
   const close = useCallback(() => setFeatureQuery(null), [setFeatureQuery]);
 
   // A fresh query is a fresh card: collapse any "show all" the last one was
   // left in.
-  if (useChanged(featureQuery?.nonce)) setExpanded(false);
+  if (useChanged(query?.nonce)) setExpanded(false);
 
   // Escape closes, like every other dismissable surface in the app.
   useEffect(() => {
@@ -76,7 +87,9 @@ export default function FeatureCard() {
   // The datasets sidebar already answers "what did that click find?" once it's
   // open — see the comment up top. The query itself is left alone so the card
   // picks back up where it left off if the sidebar closes again.
-  if (!featureQuery || sidebarOpen) return null;
+  const open = Boolean(featureQuery) && !sidebarOpen;
+  // Nothing has been clicked yet in this session: there is no card to park.
+  if (!query) return null;
 
   // The hex and point tiles carry dataset pks but no titles, so an observation
   // row has to resolve against the current results to have anything to say —
@@ -91,7 +104,7 @@ export default function FeatureCard() {
   // the actions that genuinely need a result row are withheld.
   const byPk = new Map(pointsData.map((row) => [Number(row.pk), row]));
 
-  const rows = featureQuery.items
+  const rows = query.items
     .map((item) => {
       const row = byPk.get(item.pk);
       if (!row && item.kind === "observation") return null;
@@ -171,13 +184,16 @@ export default function FeatureCard() {
       total: Number(value || 0).toLocaleString(i18n.language),
     });
 
-  // Pinned to the top-left corner of the map on desktop and to the bottom
+  // Pinned to the bottom-left corner of the map on desktop and to the bottom
   // edge on phones — see styles.css, where the media query overrides `left`,
-  // `top` and friends wholesale.
+  // `inset` and friends wholesale, the direction it travels in included.
   return (
     <div
       data-testid="feature-card"
-      className={classNames("featureCard", { featureCardEmpty: empty })}
+      className={classNames("featureCard", {
+        open,
+        featureCardEmpty: empty,
+      })}
       role="dialog"
       aria-label={t("featureCardTitle")}
     >
@@ -203,20 +219,13 @@ export default function FeatureCard() {
               </span>
             )}
           </span>
-          {!empty && featureQuery.observationCount > 0 && (
+          {!empty && query.observationCount > 0 && (
             <span className="featureCardHeadingMeta">
-              {countLabel(featureQuery.observationCount)}
+              {countLabel(query.observationCount)}
             </span>
           )}
         </div>
-        <button
-          type="button"
-          className="featureCardClose"
-          onClick={close}
-          title={t("featureCardClose")}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        <CloseButton label={t("featureCardClose")} onClick={close} />
       </div>
 
       {empty ? (
