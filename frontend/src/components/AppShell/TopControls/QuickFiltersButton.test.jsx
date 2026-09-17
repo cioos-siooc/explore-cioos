@@ -28,8 +28,6 @@ describe("QuickFiltersButton", () => {
       seen.draw.push(drawRequest?.mode);
       return null;
     }
-    // No inter-keystroke delay, so a whole word is typed well inside the
-    // debounce however loaded the machine running this is.
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
@@ -41,24 +39,35 @@ describe("QuickFiltersButton", () => {
     return { user, seen };
   }
 
-  it("publishes the typed text once, after typing pauses", async () => {
+  // The search reaches the map, the counts and the datasets list, so it
+  // publishes when asked for — Enter — never on a pause mid-word.
+  it("publishes the typed text on Enter, and nothing before it", async () => {
+    const { user, seen } = renderMenu();
+
+    await user.click(screen.getByTestId("topbar-quick-filters-toggle"));
+    const box = screen.getByPlaceholderText("Search dataset titles");
+    await user.type(box, "temp");
+    expect(seen.search.at(-1)).toBe("");
+
+    await user.type(box, "{Enter}");
+
+    await waitFor(() => expect(seen.search.at(-1)).toBe("temp"));
+    expect([...new Set(seen.search)]).toEqual(["", "temp"]);
+  });
+
+  it("publishes on the magnifier too — the button is the same submit", async () => {
     const { user, seen } = renderMenu();
 
     await user.click(screen.getByTestId("topbar-quick-filters-toggle"));
     await user.type(
       screen.getByPlaceholderText("Search dataset titles"),
-      "temp",
+      "orca",
     );
+    await user.click(screen.getByLabelText("Search"));
 
-    await waitFor(() => expect(seen.search.at(-1)).toBe("temp"));
-    // The whole word published in one go, not one publish per keystroke — the
-    // search reaches the map, the counts and the datasets list, so no
-    // intermediate "t"/"te"/"tem" may ever have been seen.
-    expect([...new Set(seen.search)]).toEqual(["", "temp"]);
+    await waitFor(() => expect(seen.search.at(-1)).toBe("orca"));
   });
 
-  // The other half of the debounce: clearing is not a pause to wait out, it
-  // is the user asking for the unfiltered view back now.
   it("clears the search immediately, without waiting on the pause", async () => {
     const { user, seen } = renderMenu("/?search=temp");
 

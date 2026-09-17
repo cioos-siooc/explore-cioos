@@ -81,6 +81,11 @@
   --cioos-map-click-glow: rgb(218 165 32 / 35%); /* the ring/glow shadows */
   --cioos-map-click-surface: #fbf1d9; /* opaque tint, the map fill's counterpart */
 
+  /* The space the globe hangs in. Navy-tinted rather than pure black, like
+     every other neutral here, so the sphere's edge meets a colour from the
+     same family instead of an absolute. */
+  --cioos-globe-space: #050f14;
+
   /* --- Elevation --- */
   --cioos-shadow-card: 0 2px 8px rgb(21 47 55 / 8%);
   --cioos-shadow-float: 0 4px 16px rgb(21 47 55 / 16%);

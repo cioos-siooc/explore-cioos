@@ -364,10 +364,10 @@ export default function SelectionProvider({ children }) {
   //
   // Each distinct search text here is a fresh set of tile, legend and coverage
   // URLs, so typing a word uncached would cost a round of map requests per
-  // character — which is why every box that writes this state publishes on a
-  // pause rather than per keystroke (useDebouncedSearchInput). Debouncing it a
-  // second time here would only delay the map behind the list it has to agree
-  // with.
+  // character — which is why every box that writes this state waits to be
+  // submitted, on Enter or on its magnifier, rather than publishing as it is
+  // typed (useSearchInput's "submit" trigger). Debouncing it here on top of
+  // that would only delay the map behind the list it has to agree with.
   const mapDatasetPks = useMemo(() => {
     const query = datasetTitleSearchText.toLowerCase();
     const hasSearch = !isEmpty(datasetTitleSearchText);

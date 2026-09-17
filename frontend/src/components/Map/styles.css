@@ -4,6 +4,20 @@
   height: 100%;
 }
 
+/* The space the globe hangs in. Outside the sphere MapLibre draws nothing and
+   leaves the canvas transparent, so this element shows through — it is the
+   only way to colour that area, as MapLibre has no sky or star field of its
+   own here.
+
+   Keyed on the projection rather than set unconditionally. In mercator the
+   canvas covers the element, so this would be invisible either way in the real
+   app — but visual.spec.js hides the canvas to take its screenshots, and an
+   unconditional dark ground would recolour every one of those baselines for a
+   view they don't cover. */
+.map[data-projection="globe"] {
+  background-color: var(--cioos-globe-space);
+}
+
 .maplibregl-canvas {
   width: 100%;
 }

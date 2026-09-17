@@ -16,7 +16,7 @@ import { DropdownButton, Dropdown } from "../../ui/Dropdown.jsx";
 import {
   polygonIsRectangle,
   polygonToWkt,
-  useDebouncedSearchInput,
+  useSearchInput,
 } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -45,13 +45,14 @@ export default function QuickFiltersButton() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // The search behind it reaches the map, the datasets list and the counters,
-  // so it is published on a pause rather than per keystroke. The hook lives
-  // here rather than in the menu below, which only exists while the menu is
-  // open — inside it, closing the menu would drop whatever was still in
-  // flight.
-  const [searchText, setSearchText] = useDebouncedSearchInput(
+  // so it goes when it is asked for — Enter or the magnifier — rather than on
+  // a pause between keystrokes (see useSearchInput). The hook lives here
+  // rather than in the menu below, which only exists while the menu is open —
+  // inside it, closing the menu would drop whatever was still in flight.
+  const [searchText, setSearchText, submitSearch] = useSearchInput(
     datasetTitleSearchText,
     setDatasetTitleSearchText,
+    { trigger: "submit" },
   );
 
   // Briefly swaps the copy button's icon to a checkmark after a successful
@@ -103,8 +104,23 @@ export default function QuickFiltersButton() {
           for the draw rows below but would shut the menu on the first
           keystroke here. Clicks inside it are safe — DropdownButton's
           click-outside check treats the whole menu as inside. */}
-      <div className="topBarSearchRow">
-        <Search size={16} aria-hidden="true" />
+      {/* A form, so Enter searches natively and the magnifier beside the field
+          is the same submit rather than a second code path. */}
+      <form
+        className="topBarSearchRow"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submitSearch();
+        }}
+      >
+        <button
+          type="submit"
+          className="topBarSearchSubmit"
+          title={t("filterSearchSubmitTitle")}
+          aria-label={t("filterSearchSubmitTitle")}
+        >
+          <Search size={16} aria-hidden="true" />
+        </button>
         <input
           type="text"
           className="topBarSearchInput"
@@ -124,7 +140,7 @@ export default function QuickFiltersButton() {
             <X size={16} aria-hidden="true" />
           </button>
         )}
-      </div>
+      </form>
       <Dropdown.Item
         onClick={() => requestDraw("box")}
         active={activeMode === "box"}

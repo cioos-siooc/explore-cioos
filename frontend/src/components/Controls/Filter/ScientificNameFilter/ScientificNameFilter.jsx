@@ -66,7 +66,7 @@ export default function ScientificNameFilter({
   const { t, i18n } = useTranslation();
   const lang = i18n.language && i18n.language.startsWith("fr") ? "fr" : "en";
   // Already published on a pause by the pane's search box (see
-  // useDebouncedSearchInput), so each value that arrives here is one the user
+  // useSearchInput), so each value that arrives here is one the user
   // stopped typing on — a second debounce would only delay the typeahead.
   const searchQuery = searchTerms || "";
   const [suggestions, setSuggestions] = useState([]);

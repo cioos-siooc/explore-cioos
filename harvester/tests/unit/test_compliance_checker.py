@@ -82,6 +82,16 @@ class TestSupportedCFName:
         assert checker.check_supported_cf_name() is False
         assert checker.failure_reason_code == NO_SUPPORTED_VARIABLES
 
+    def test_modifier_is_valid_but_not_an_eov_measurement(self, caplog):
+        checker = _checker()
+        checker.dataset.df_variables.loc["temperature", "standard_name"] = (
+            "sea_water_temperature status_flag"
+        )
+
+        assert checker.check_supported_cf_name() is False
+        assert checker.failure_reason_code == NO_SUPPORTED_VARIABLES
+        assert "Found unstandard standard_name" not in caplog.text
+
 
 class TestIngestFlag:
     def test_no_cde_ingest_flag_passes(self):
