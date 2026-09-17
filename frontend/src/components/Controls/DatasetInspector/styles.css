@@ -23,11 +23,19 @@
 .datasetTitleBlock {
   flex: 0 0 auto;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 8px;
   padding: 9px 12px;
   border-bottom: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
+}
+
+/* The heading's own row: icon and title, with the full width to wrap into. */
+.datasetTitleHeading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
 }
 
 /* Same bare, no-tile icon treatment as the Filters/Download/Datasets headers —
@@ -52,29 +60,33 @@
   color: var(--cioos-ink);
 }
 
-/* Stacked, not side by side: the title takes the width it needs and the two
-   actions sit in a narrow column against the right edge. */
+/* A row of their own under the heading. Beside the title they had room for an
+   icon and nothing else; across the full width each one can say what it does,
+   which is the whole point of them being here. */
 .datasetTitleActions {
   display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 
-/* Both title-bar actions, including the zoom button ZoomToDataset renders into
-   this row: a small bordered icon button, the same treatment the page's other
-   controls wear. Defined here because this row is the only place either one
-   appears. */
+/* Every action in this row, including the zoom button ZoomToDataset renders
+   into it: a small bordered button carrying its icon and its name. Defined
+   here because this row is the only place any of them appears. */
 .datasetTitleAction,
 .datasetTitleActions .zoomToDatasetButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  padding: 0;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
@@ -105,6 +117,20 @@
   transform: translateY(1px);
 }
 
+/* Griddap: no download to add to a selection. The button stays in place and
+   its tooltip says why, rather than the row losing a control from one dataset
+   to the next. */
+.datasetTitleAction:disabled {
+  color: var(--cioos-ink-60);
+  background-color: var(--cioos-surface-2);
+  cursor: not-allowed;
+}
+
+.datasetTitleAction:disabled:hover {
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+}
+
 /* Filtering is a state, not a one-shot action: while the map is narrowed to
    this dataset the button stays filled, and its icon is the solid funnel. */
 .datasetTitleAction.active {
@@ -118,26 +144,6 @@
   background-color: var(--cioos-primary-700);
   border-color: var(--cioos-primary-700);
   color: var(--cioos-white);
-}
-
-/* Metadata chips read as informational values that can wrap to two lines
-   (long organization / variable names). Give the wrapped text room to breathe
-   and use a tighter corner so a taller, multi-line chip reads as a neat
-   rounded rectangle rather than an oversized lozenge. */
-.datasetInspector .filterButton {
-  padding: 2px 8px;
-  border-radius: var(--cioos-radius-sm);
-  white-space: normal;
-  text-align: left;
-  line-height: 1.3;
-}
-
-/* These chips double as filter toggles, but here they read as informational
-   metadata values. Hide the inherited "deselect" X (shown on selected chips
-   in the filter sidebar) so a selected platform/EOV/org value stays clean —
-   selection is still conveyed by the chip's .selected fill. */
-.datasetInspector .filterButton > svg {
-  display: none;
 }
 
 /* Shared eyebrow label for every metadata field. */
@@ -207,9 +213,8 @@
 }
 
 /* Chips sit flush inside their field; the field's gap handles spacing. */
-.datasetMetaSheet .filterButton {
+.datasetMetaSheet .metadataChip {
   margin: 0;
-  font-size: 0.78rem;
 }
 
 /* Grid node count: the axis factors read as small stacked value/name pairs,
@@ -271,6 +276,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 12px;
+  text-align: left;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
@@ -281,6 +287,14 @@
 .datasetMetaSheet .metadataChip {
   font-weight: 500;
   color: var(--cioos-ink);
+}
+
+/* A field the harvest left empty (an OBIS dataset's ocean variables, a
+   dataset with no platform code): the dash holds the row's shape without
+   pretending there is a value to read. */
+.datasetMetaSheet .metadataEmpty {
+  font-size: 0.78rem;
+  color: var(--cioos-ink-60);
 }
 
 /* Source links (ERDDAP / CKAN / OBIS): the same badge, coloured and weighted
