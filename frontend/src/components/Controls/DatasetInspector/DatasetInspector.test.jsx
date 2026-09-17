@@ -117,9 +117,7 @@ describe("DatasetInspector", () => {
     const button = screen.getByRole("button", { name: /Download/ });
 
     await user.click(button);
-    await waitFor(() =>
-      expect(button).toHaveAttribute("aria-pressed", "true"),
-    );
+    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
 
     await user.click(button);
     await waitFor(() =>

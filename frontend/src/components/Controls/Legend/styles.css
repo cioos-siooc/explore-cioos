@@ -28,6 +28,7 @@
   flex-direction: column;
   min-width: 124px;
   max-width: 190px;
+
   /* Two ceilings, whichever is lower: the reserve above, and the foot of the
      depth strip down the right edge when one is up — this card sits under that
      strip now that it holds the bottom of the same edge. DepthBar publishes the
