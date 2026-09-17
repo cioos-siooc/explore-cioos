@@ -484,118 +484,210 @@
 }
 
 /* ------------------------------------------------------------------
- * Active-filter chips, flowing after the Filters button.
- * One group per active filter category; the label opens that filter's page,
- * each value chip clears just that value, and the trailing x clears the
- * whole group.
+ * Active-filter chips, flowing after the Filters button. A white card holds
+ * a prominent, centered heading and, below it, a legend explaining its two
+ * kinds of pill — with the Show/Hide and Clear-all actions as symbols
+ * inline with that legend, rather than a worded row of their own. Under the
+ * card, one row per active filter category, laid out in a shared three-column
+ * grid — family bubble, bracket, values — so every row's bracket lands on
+ * the same central column as the next one, lined up with the title card
+ * above rather than drifting with how wide each row's own label happens to
+ * be.
  * ------------------------------------------------------------------ */
-.activeFilterBullets {
+.activeFiltersPanel {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 6px;
 
   /* The same width as the brand card above (see TopLeft/styles.css, which
      defines the token and the viewport cap): the chips read as that card's
      own footer rather than a row of loose pills spilling wider than it. */
   width: min(var(--cioos-brand-width), calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.activeFiltersHeader {
+  pointer-events: all;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+/* Backs the title and its legend with the same white-card treatment as the
+   filter bubbles below, so the row reads as chrome floating over the map
+   rather than bare text on top of it. The Show/Hide and Clear-all actions
+   live inside it too, as symbols on the legend's own row. */
+.activeFiltersTitleCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  padding: 6px 16px;
+  box-shadow: var(--cioos-shadow-sm);
+}
+
+/* The row's title: sized and weighted to read as a heading, not a caption. */
+.activeFiltersHeading {
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink);
+  text-align: center;
+}
+
+/* What the two pill colours below mean, spelled out once instead of left for
+   the user to guess from the map. */
+.activeFiltersLegend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.activeFiltersLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.activeFiltersLegendSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--cioos-radius-pill);
+}
+
+.activeFiltersLegendSwatchFamily {
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+}
+
+.activeFiltersLegendSwatchValue {
+  background-color: var(--cioos-teal-light);
+}
+
+/* Separates the legend from the two action symbols trailing it, on the same
+   row. */
+.activeFiltersLegendDivider {
+  align-self: stretch;
+  width: 1px;
+  min-height: 14px;
+  background-color: var(--cioos-hairline);
+}
+
+/* Show/Hide and Clear-all, as symbols inline with the legend rather than a
+   worded row of their own. */
+.activeFiltersToggleButton,
+.activeFiltersClearButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.activeFiltersToggleButton {
+  width: 22px;
+  height: 22px;
+}
+
+/* A step smaller than the toggle next to it: it's the more consequential of
+   the two (drops every filter at once), so it earns a lighter touch rather
+   than a bigger target. */
+.activeFiltersClearButton {
+  width: 22px;
+  height: 22px;
+}
+
+.activeFiltersToggleButton:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-primary);
+}
+
+.activeFiltersClearButton:hover {
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+/* One shared grid for every row: family bubbles (col 1) sit flush against
+   the bracket column (col 2), which is therefore the same width and the
+   same central position for every row — and, since this grid spans the same
+   width as .activeFiltersPanel, that centre lines up with the title card
+   above. Values (col 3) get the other half. */
+.activeFilterBullets {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 6px;
+  width: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
   pointer-events: none;
 }
 
+/* Each <li> is one grid row's worth of cells, not a box of its own — its
+   bubble/bracket/items children become the grid's actual items, so they land
+   in the shared columns above instead of a row-local layout that would let
+   each group's bracket drift to wherever its own label happens to end. */
 .activeFilterGroup {
+  display: contents;
+}
+
+/* The group's own name and its clear-all, paired in one white bubble — a tag
+   naming the values it's attached to, rather than another chip among them.
+   Right-aligned so it sits flush against the bracket regardless of how much
+   of column 1 its own label needs. */
+.activeFilterGroupBubble {
   pointer-events: all;
+  grid-column: 1;
+  place-self: center end;
   display: inline-flex;
-
-  /* The label (left) and clear-all (right) are fixed rails that stretch to
-     the group's full height; only the value chips in the middle wrap, so the
-     group grows taller with the rails following suit. */
-  align-items: stretch;
-  flex-wrap: nowrap;
-  gap: 4px;
-
-  /* A group never reaches past the row it sits in — which is the brand card's
-     width; past that the value chips wrap in the middle lane (below). */
+  align-items: center;
+  gap: 2px;
   max-width: 100%;
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  padding: 3px;
+  border-radius: var(--cioos-radius-pill);
+  padding: 2px;
 
-  /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder.
-     preserve-3d floats the inner value chips above the pill face. */
+  /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder. */
   transform: var(--cioos-perspective);
-  transform-style: preserve-3d;
   box-shadow: var(--cioos-shadow-3d-sm);
 }
 
-/* Float the inner value chips above the pill face for layered depth. */
-.activeFilterGroup > * {
-  transform: translateZ(10px);
-}
-
-.activeFilterGroupLabel {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  padding: 2px 6px 2px 8px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--cioos-ink);
-  cursor: pointer;
-}
-
-/* Middle lane: the value chips live here and are the only part of the group
-   that wraps, flowing onto new lines between the two full-height rails. */
-.activeFilterItems {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-
-  /* Centre the chips both ways while they fit. The `safe` keyword is load-bearing:
-     plain `center` alignment centres the overflow too, pushing the first rows above
-     the scroll origin where they can't be reached. `safe` falls back to flex-start
-     once the content overflows so every row stays scrollable. */
-  place-content: safe center safe center;
-  gap: 4px;
-
-  /* Cap the lane at ~three rows of chips; anything beyond scrolls vertically
-     so the group stays compact while the two rails hold their full height. */
-  max-height: 78px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  overscroll-behavior: contain;
-}
-
-.activeFilterGroupLabel:hover {
-  color: var(--cioos-primary);
-  text-decoration: underline;
-}
-
-/* Group-level clear-all, trailing the value chips. Visually paired with the
-   per-item remove buttons, but a step more prominent (solid on hover) since
-   it drops the whole group in one click. */
+/* The clear-all sits first in the bubble, at its left. Visually paired with
+   the per-item remove buttons, but a step more prominent (solid on hover)
+   since it drops the whole group in one click. */
 .activeFilterGroupRemove {
   flex: 0 0 auto;
-  align-self: stretch;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
+  height: 18px;
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: var(--cioos-radius-sm);
+  border-radius: 50%;
   color: var(--cioos-ink-60);
   cursor: pointer;
   transition:
@@ -606,6 +698,71 @@
 .activeFilterGroupRemove:hover {
   background-color: var(--cioos-error);
   color: var(--cioos-white);
+}
+
+.activeFilterGroupLabel {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--cioos-radius-pill);
+  padding: 2px 10px 2px 4px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.activeFilterGroupLabel:hover {
+  color: var(--cioos-primary);
+  text-decoration: underline;
+}
+
+/* The bracket linking the family bubble to its values — set notation's own
+   way of saying "here's what's inside this group". A plain squared-off "["
+   drawn from three borders rather than a hand-tuned curve: its height is
+   just its grid cell's height, so align-self: stretch always draws it exactly
+   as tall as the row (however many lines the values wrapped onto) with no
+   risk of a curve pointing the wrong way. Its open side (no right border)
+   faces column 3, embracing the values sitting there. */
+.activeFilterGroupBrace {
+  grid-column: 2;
+  place-self: stretch center;
+  width: 6px;
+  min-height: 20px;
+  border-top: 1.5px solid var(--cioos-ink-40);
+  border-bottom: 1.5px solid var(--cioos-ink-40);
+  border-left: 1.5px solid var(--cioos-ink-40);
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+
+/* Column 3: the value chips, in the primary-light teal that marks a chosen
+   value everywhere else in the app (see .activeFilterItem below). Wraps
+   within its own lane, capped and scrollable so one very long group never
+   grows its row far past the others. align-content: flex-start keeps wrapped
+   lines packed against the top at exactly the 4px gap rather than spread out
+   to fill the cell — the default `normal` would otherwise stretch that
+   spacing once align-items: center (below) leaves this cell taller than its
+   own content. */
+.activeFilterItems {
+  grid-column: 3;
+  place-self: center start;
+  pointer-events: all;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 4px;
+  max-height: 78px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 
 .activeFilterItem {
@@ -648,39 +805,6 @@
 .activeFilterItemRemove:hover {
   background-color: var(--cioos-primary);
   color: var(--cioos-white);
-}
-
-/* Reset-all drops onto its own full-width row, centered below the applied
-   filter chips. */
-.activeFilterResetItem {
-  pointer-events: all;
-  flex-basis: 100%;
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-}
-
-/* Reset-all: a subtle text link (shared with the filters modal). */
-.filterMenuReset {
-  pointer-events: all;
-  display: inline-flex;
-  align-items: center;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 2px 6px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color var(--cioos-transition-fast);
-}
-
-.filterMenuReset:hover:not(:disabled) {
-  color: var(--cioos-error);
 }
 
 /* Copy-as-WKT, appended to the spatial filter dropdown once a shape is

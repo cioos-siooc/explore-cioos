@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState } from "react";
-import { X } from "react-bootstrap-icons";
+import { Eye, EyeSlash, X } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import { generateRangeSelectBadgeTitle } from "../../../utilities.jsx";
@@ -49,11 +49,13 @@ function filterNameForKey(key, t) {
 }
 
 // Removable chips for every filter currently constraining the map, flowing
-// after the Filters button. Clicking a group's label jumps to that filter's
-// page (the Filters modal, or the datasets sidebar for the text search);
-// the trailing x on each chip clears the whole group, and each value can
-// still be dropped on its own. A final link resets everything including the
-// polygon.
+// after the Filters button, under a centered heading, a small legend for its
+// two pill colours, and the Show/Hide and Clear-all actions. Each group shows
+// its own name in a white bubble on the left — paired with the button that
+// clears the whole group — braced against its chosen values in primary-light
+// chips wrapping on the right. Clicking the name jumps to that filter's page
+// (the Filters modal, or the datasets sidebar for the text search), and each
+// value can still be dropped on its own.
 export default function ActiveFilterChips() {
   const { t } = useTranslation();
   const {
@@ -158,116 +160,169 @@ export default function ActiveFilterChips() {
   if (activeFilters.length === 0 && !polygon) return null;
 
   return (
-    <ul
-      className="activeFilterBullets"
-      aria-label={t("activeFiltersLabel")}
-      data-testid="active-filter-chips"
-    >
-      {!collapsed &&
-        activeFilters.map((f) => (
+    <div className="activeFiltersPanel" data-testid="active-filter-chips">
+      <div className="activeFiltersHeader">
+        <div className="activeFiltersTitleCard">
+          <span className="activeFiltersHeading" id="activeFiltersHeading">
+            {t("activeFiltersLabel")}
+          </span>
+          <div className="activeFiltersLegend">
+            <span className="activeFiltersLegendItem">
+              <span
+                className="activeFiltersLegendSwatch activeFiltersLegendSwatchFamily"
+                aria-hidden="true"
+              />
+              {t("activeFiltersLegendFamily")}
+            </span>
+            <span className="activeFiltersLegendItem">
+              <span
+                className="activeFiltersLegendSwatch activeFiltersLegendSwatchValue"
+                aria-hidden="true"
+              />
+              {t("activeFiltersLegendValue")}
+            </span>
+            <span className="activeFiltersLegendDivider" aria-hidden="true" />
+            {/* Show/Hide and Clear-all, as symbols inline with the legend
+                rather than a worded row of their own — icon-only, so each
+                carries its accessible name on the button itself. */}
+            <button
+              type="button"
+              className="activeFiltersToggleButton"
+              data-testid="filter-chips-toggle"
+              onClick={() => setCollapsed((c) => !c)}
+              aria-expanded={!collapsed}
+              aria-label={
+                collapsed ? t("activeFiltersShow") : t("activeFiltersHide")
+              }
+              title={
+                collapsed ? t("activeFiltersShow") : t("activeFiltersHide")
+              }
+            >
+              {collapsed ? (
+                <Eye size={16} aria-hidden="true" />
+              ) : (
+                <EyeSlash size={16} aria-hidden="true" />
+              )}
+            </button>
+            <button
+              type="button"
+              className="activeFiltersClearButton"
+              data-testid="filter-chips-reset"
+              onClick={() => {
+                resetFilters();
+                resetDataLayers();
+                requestDraw("clear");
+                setDatasetTitleSearchText("");
+              }}
+              aria-label={t("resetFiltersButtonTooltipText")}
+              title={t("resetFiltersButtonTooltipText")}
+            >
+              <X size={20} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+      <ul
+        className="activeFilterBullets"
+        aria-labelledby="activeFiltersHeading"
+      >
+        {!collapsed &&
+          activeFilters.map((f) => (
+            <li
+              key={f.key}
+              className="activeFilterGroup"
+              data-testid="filter-chip-group"
+              data-filter-key={f.key}
+            >
+              {/* The group's own name, and the button that clears all of it —
+                  paired in one white bubble so the type reads as a tag rather
+                  than another chip among the values. Anchored on the left; a
+                  brace links it to the values wrapping on the right, the way
+                  set notation writes "family { values }". */}
+              <div className="activeFilterGroupBubble">
+                <button
+                  type="button"
+                  className="activeFilterGroupRemove"
+                  data-testid="filter-chip-group-remove"
+                  aria-label={t("activeFilterRemoveAllTitle", {
+                    filter: f.label,
+                  })}
+                  onClick={f.removeAll}
+                  title={t("activeFilterRemoveAllTitle", { filter: f.label })}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="activeFilterGroupLabel"
+                  data-testid="filter-chip-label"
+                  onClick={f.goToFilter}
+                  title={t("activeFilterGoToFilterTitle", { filter: f.label })}
+                >
+                  {f.label}
+                </button>
+              </div>
+              {/* A crisp square bracket, drawn in CSS rather than a hand-tuned
+                  curve: its height is just its box's height (see styles.css),
+                  so it always spans exactly as tall as the values wrap to,
+                  with no risk of the curve pointing the wrong way. */}
+              <span className="activeFilterGroupBrace" aria-hidden="true" />
+              <div className="activeFilterItems">
+                {f.items.map((item) => (
+                  <span
+                    key={item.id}
+                    className="activeFilterItem"
+                    data-testid="filter-chip-item"
+                    data-item-id={item.id}
+                  >
+                    <span className="activeFilterItemLabel" title={item.label}>
+                      {item.label}
+                    </span>
+                    <button
+                      type="button"
+                      className="activeFilterItemRemove"
+                      data-testid="filter-chip-item-remove"
+                      onClick={item.remove}
+                      title={t("activeFilterRemoveItemTitle")}
+                      // Every chip's X carried the same accessible name, so
+                      // "Remove filter" matched all of them at once — ambiguous for
+                      // a test and useless to a screen reader reading the page's
+                      // buttons. Composed here rather than as a new i18n key.
+                      aria-label={`${t("activeFilterRemoveItemTitle")}: ${item.label}`}
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </li>
+          ))}
+        {!collapsed && polygon && (
           <li
-            key={f.key}
             className="activeFilterGroup"
             data-testid="filter-chip-group"
-            data-filter-key={f.key}
+            data-filter-key="polygon"
           >
-            <button
-              type="button"
-              className="activeFilterGroupLabel"
-              data-testid="filter-chip-label"
-              onClick={f.goToFilter}
-              title={t("activeFilterGoToFilterTitle", { filter: f.label })}
-            >
-              {f.label}
-            </button>
             <div className="activeFilterItems">
-              {f.items.map((item) => (
-                <span
-                  key={item.id}
-                  className="activeFilterItem"
-                  data-testid="filter-chip-item"
-                  data-item-id={item.id}
-                >
-                  <span className="activeFilterItemLabel" title={item.label}>
-                    {item.label}
-                  </span>
-                  <button
-                    type="button"
-                    className="activeFilterItemRemove"
-                    data-testid="filter-chip-item-remove"
-                    onClick={item.remove}
-                    title={t("activeFilterRemoveItemTitle")}
-                    // Every chip's X carried the same accessible name, so
-                    // "Remove filter" matched all of them at once — ambiguous for
-                    // a test and useless to a screen reader reading the page's
-                    // buttons. Composed here rather than as a new i18n key.
-                    aria-label={`${t("activeFilterRemoveItemTitle")}: ${item.label}`}
-                  >
-                    <X size={14} aria-hidden="true" />
-                  </button>
+              <span className="activeFilterItem" data-testid="filter-chip-item">
+                <span className="activeFilterItemLabel">
+                  {t("chipMapSelectionLabel")}
                 </span>
-              ))}
+                <button
+                  type="button"
+                  className="activeFilterItemRemove"
+                  data-testid="filter-chip-item-remove"
+                  onClick={() => requestDraw("clear")}
+                  title={t("activeFilterRemoveItemTitle")}
+                  aria-label={`${t("activeFilterRemoveItemTitle")}: ${t("chipMapSelectionLabel")}`}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </span>
             </div>
-            <button
-              type="button"
-              className="activeFilterGroupRemove"
-              data-testid="filter-chip-group-remove"
-              aria-label={t("activeFilterRemoveAllTitle", { filter: f.label })}
-              onClick={f.removeAll}
-              title={t("activeFilterRemoveAllTitle", { filter: f.label })}
-            >
-              <X size={14} aria-hidden="true" />
-            </button>
           </li>
-        ))}
-      {!collapsed && polygon && (
-        <li
-          className="activeFilterGroup"
-          data-testid="filter-chip-group"
-          data-filter-key="polygon"
-        >
-          <span className="activeFilterItem" data-testid="filter-chip-item">
-            <span className="activeFilterItemLabel">
-              {t("chipMapSelectionLabel")}
-            </span>
-            <button
-              type="button"
-              className="activeFilterItemRemove"
-              data-testid="filter-chip-item-remove"
-              onClick={() => requestDraw("clear")}
-              title={t("activeFilterRemoveItemTitle")}
-              aria-label={`${t("activeFilterRemoveItemTitle")}: ${t("chipMapSelectionLabel")}`}
-            >
-              <X size={14} aria-hidden="true" />
-            </button>
-          </span>
-        </li>
-      )}
-      <li className="activeFilterResetItem">
-        <button
-          type="button"
-          className="filterMenuReset"
-          data-testid="filter-chips-toggle"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-        >
-          {collapsed ? t("activeFiltersShow") : t("activeFiltersHide")}
-        </button>
-        <button
-          type="button"
-          className="filterMenuReset"
-          data-testid="filter-chips-reset"
-          onClick={() => {
-            resetFilters();
-            resetDataLayers();
-            requestDraw("clear");
-            setDatasetTitleSearchText("");
-          }}
-          title={t("resetFiltersButtonTooltipText")}
-        >
-          {t("resetButtonText")}
-        </button>
-      </li>
-    </ul>
+        )}
+      </ul>
+    </div>
   );
 }

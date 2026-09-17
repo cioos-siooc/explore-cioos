@@ -202,7 +202,7 @@ describe("Filter search / reset / info", () => {
       </Filter>,
     );
     await user.click(screen.getByTestId("filter-header"));
-    await user.click(screen.getByText("Reset"));
+    await user.click(screen.getByText("Clear"));
     expect(resetButton).toHaveBeenCalled();
   });
 
