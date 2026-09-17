@@ -42,7 +42,7 @@ function filterValidators() {
       .isInt({ min: -999999, max: 999999 })
       .optional(),
     // comma separated list of pks, eg pointPKs=12342,34534,456456
-    check(["organizations", "datasetPKs", "pointPKs"])
+    check(["organizations", "datasetPKs", "excludeDatasetPKs", "pointPKs"])
       .matches(/^[0-9,]*$/)
       .optional(),
     check("eovs")

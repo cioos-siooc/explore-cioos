@@ -1,5 +1,5 @@
 import * as React from "react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BarChartLine } from "react-bootstrap-icons";
 
@@ -7,8 +7,8 @@ import Modal from "../../ui/Modal.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
-import { useFilters } from "../../../state/filters/FilterProvider.jsx";
-import { createDataFilterQueryString } from "../../../utilities.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { applyDatasetPKs } from "../../../utilities.jsx";
 import { server } from "../../../config.js";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
@@ -33,12 +33,23 @@ const COUNT_OPTIONS = ["datasets", "features", "days"];
 export default function CoverageModal() {
   const { t } = useTranslation();
   const { showCoverageModal, setShowCoverageModal } = useUI();
-  const { query } = useFilters();
+  // The same selection the datasets list shows: the filter query plus the
+  // drawn polygon (combinedQueries, what /pointQuery was asked), narrowed to
+  // the datasets the list's own client-side filters left standing. Reading
+  // the filter query alone is how the figure went on counting datasets the
+  // search box, "only in view" and the geometry switches had removed.
+  const { combinedQueries, filteredDatasetPks, pointsData } = useSelection();
   const [groupBy, setGroupBy] = useState("source");
   const [count, setCount] = useState("datasets");
   const [histogram, setHistogram] = useState();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  // The set the narrowing was made from, so a mild one travels as the datasets
+  // it dropped rather than the two thousand it kept (see applyDatasetPKs).
+  const allDatasetPks = useMemo(
+    () => pointsData.map((row) => row.pk),
+    [pointsData],
+  );
 
   // Fetch only while the modal is open; refetch when the applied filters or
   // the chosen grouping change so the figure always matches the map + control.
@@ -48,7 +59,11 @@ export default function CoverageModal() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(false);
-    const filterString = createDataFilterQueryString(query);
+    const filterString = applyDatasetPKs(
+      combinedQueries,
+      filteredDatasetPks,
+      allDatasetPks,
+    );
     fetch(
       `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&${filterString}`,
       { signal: controller.signal },
@@ -68,7 +83,14 @@ export default function CoverageModal() {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [showCoverageModal, query, groupBy, count]);
+  }, [
+    showCoverageModal,
+    combinedQueries,
+    filteredDatasetPks,
+    allDatasetPks,
+    groupBy,
+    count,
+  ]);
 
   const isEmpty = histogram && histogram.cells.length === 0;
 

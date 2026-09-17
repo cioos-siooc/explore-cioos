@@ -19,7 +19,7 @@ import {
   TRAIL_ALL,
 } from "../../components/config.js";
 import {
-  applyMapDatasetPKs,
+  applyDatasetPKs,
   createDataFilterQueryString,
   getCurrentRangeLevel,
   rangesEqual,
@@ -133,7 +133,7 @@ export default function MapStateProvider({ children }) {
   // filter array — recomputing it per interaction was wasted work and produced
   // a new string identity that could churn downstream effects.
   const mapQueryString = useMemo(
-    () => applyMapDatasetPKs(createDataFilterQueryString(query), mapDatasetPKs),
+    () => applyDatasetPKs(createDataFilterQueryString(query), mapDatasetPKs),
     [query, mapDatasetPKs],
   );
   const [rangeLevels, setRangeLevels] = useState();
