@@ -7,6 +7,7 @@ import {
   Calendar3,
   CalendarCheck,
   CircleFill,
+  CursorFill,
   Grid3x3Gap,
   HexagonFill,
   Palette,
@@ -45,7 +46,14 @@ export const LEGEND_HELP_SECTIONS = {
       ["why", Rulers],
     ],
   },
-  hexes: { Icon: HexagonFill, lead: true },
+  hexes: {
+    Icon: HexagonFill,
+    lead: true,
+    items: [
+      ["hover", CursorFill],
+      ["scale", Palette],
+    ],
+  },
   markers: {
     Icon: CircleFill,
     lead: true,

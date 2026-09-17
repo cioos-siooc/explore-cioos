@@ -216,8 +216,10 @@ export default function Legend({
   // group's title — and its contents. The label row is never dimmed; it holds
   // the control that turns the group back on.
   //
-  // `label` may be absent, for a group whose rows are already self-describing
-  // switches — a label there would only name the leftovers.
+  // `label` is the group's name, or any node standing in for one — a group
+  // whose rows are already self-describing switches passes those rows here
+  // instead, since a name for them would only name the leftovers and the ⓘ
+  // has to sit beside something.
   //
   // `idSuffix` distinguishes the switch from a second copy of the same control
   // elsewhere on screen: in compact mode the observations group is rendered both
@@ -229,8 +231,8 @@ export default function Legend({
     { control, tooltip, idSuffix = "" } = {},
     children,
   ) {
-    // Every group has a long form, so the ⓘ is what makes the label row worth
-    // drawing even where the group has no name and no switch of its own.
+    // Every group has a long form, so the ⓘ closes the label row whatever the
+    // group put in it.
     const help = renderHelpButton(key);
     return (
       <div className="legendGroup" key={key}>
@@ -642,8 +644,10 @@ export default function Legend({
   // reader's question outwards — "what am I looking at" before "what is under
   // it" — rather than by which entries happen to be colour ramps.
   //
-  // The last group has no label: its rows are labelled switches already, and any
-  // name for them would be a name for "the rest".
+  // The last group has no label of its own: its rows are labelled switches
+  // already, and any name for them would be a name for "the rest". They stand
+  // in the label row itself rather than under an empty one, which is what puts
+  // the group's ⓘ beside the words it explains instead of alone above them.
   const groups = [
     (countStatus || hexEntry || markerKeys) &&
       renderGroup(
@@ -673,7 +677,7 @@ export default function Legend({
         { control: controls.bathymetry, tooltip: t("legendBathymetryTitle") },
         bathymetryBar,
       ),
-    layerSwitches && renderGroup("layers", null, {}, layerSwitches),
+    layerSwitches && renderGroup("layers", layerSwitches),
   ].filter(Boolean);
 
   // Compact is the same card with its body cut down to the hex ramp: the header

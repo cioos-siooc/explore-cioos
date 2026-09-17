@@ -642,7 +642,7 @@
   "legendHelp_observations_title": "Jours de données",
   "legendHelp_observations_body": "La couleur des hexagones et la taille des marqueurs comptent la même chose : des jours de données — les jours distincts où quelque chose a été mesuré à cet endroit.",
   "legendHelp_hexes_title": "Hexagones",
-  "legendHelp_hexes_body": "En vue élargie, tous les jeux de données affichés sont regroupés en cellules hexagonales, quel que soit leur type — survolez-en une pour voir ce qu'elle contient. L'échelle est recalculée pour les hexagones à l'écran : un même vert représente donc des quantités différentes selon le zoom.",
+  "legendHelp_hexes_body": "En vue élargie, tous les jeux de données affichés sont regroupés en cellules hexagonales, quel que soit leur type.",
   "legendHelp_markers_title": "Marqueurs",
   "legendHelp_markers_body": "Une fois zoomé au-delà du niveau 7, les jeux de type profil et série temporelle ne sont plus agrégés en cellules : ils sont dessinés là où ils ont été recueillis.",
   "legendHelp_trajectories_title": "Trajectoires",
@@ -674,5 +674,9 @@
   "legendHelp_markers_colour_body": "Mouillage, navire, planeur, etc. Seuls les types présents dans vos résultats actuels sont listés : la légende ne promet donc jamais une couleur absente de la carte.",
   "legendHelp_markers_cells_title": "Certaines données restent en cellules",
   "legendHelp_markers_cells_body": "Les trajets et les occurrences OBIS sont balayés en hexagones de couverture à tous les zooms : ces hexagones restent donc affichés sous les marqueurs.",
+  "legendHelp_hexes_hover_title": "Survolez pour voir le contenu",
+  "legendHelp_hexes_hover_body": "La couleur d'une cellule est un total. Survolez-en une : l'infobulle nomme ce qui compose ce total.",
+  "legendHelp_hexes_scale_title": "Échelle ajustée à l'écran",
+  "legendHelp_hexes_scale_body": "L'échelle est recalculée pour les hexagones affichés : un même vert représente donc des quantités différentes selon le zoom.",
   "legendHelp_seafloor_source_link": "Les données NONNA du SHC"
 }

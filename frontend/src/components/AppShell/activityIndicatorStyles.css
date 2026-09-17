@@ -1,7 +1,12 @@
-/* The activity status panel, in the corner the app leaves free-est. It shares
-   that corner with the griddap card and MapLibre's own controls, which step
-   above it: see WmsLegend's stylesheet, where all the bottom-right clearances
-   live together so they can't disagree about which wins.
+/* The activity status panel, on the bottom edge and centred: the app's report
+   of what it is working on, put where the eye already is rather than off in a
+   corner it has to be found in.
+
+   It shares that edge with the time bar, which owns the bottom centre and
+   publishes its reach, and with the API error banner, which sits on the bar and
+   publishes its own — a figure that already includes the bar's clearance, so
+   the two are alternatives rather than a sum. Each is 0 while its surface is
+   absent.
 
    Above the modal rung deliberately. Work goes on behind a modal — the
    download modal's size estimates, a filter change still redrawing the map —
@@ -9,20 +14,30 @@
    part of the app. */
 .activityIndicator {
   position: fixed;
-  right: 12px;
-  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  left: 50%;
+  bottom: max(
+    calc(12px + var(--cioos-time-bar-space, 0px)),
+    var(--cioos-api-error-space, 0px)
+  );
+  transform: translateX(-50%);
   z-index: calc(var(--cioos-z-modal, 1055) + 1);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
 
   /* The wrapper is as tall as the open panel, so it must not swallow clicks on
      the map around it — only the panel itself takes pointer events. */
   pointer-events: none;
 }
 
+/* Heading, then one mark, then the rows — a single centred column, read
+   straight down. */
 .activityStatus {
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   max-width: min(280px, calc(100vw - 24px));
   padding: 10px 12px;
   border: 1px solid var(--cioos-hairline);
@@ -34,10 +49,15 @@
 }
 
 .activityStatusHeading {
-  margin: 0 0 6px;
+  /* The column owns the spacing between the three blocks. */
+  margin: 0;
   font-size: var(--cioos-font-size-2xs, 10px);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cioos-ink-40);
+}
+
+.activityStatus .cioosSpinner {
+  color: var(--cioos-primary);
 }

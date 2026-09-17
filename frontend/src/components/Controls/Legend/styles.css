@@ -333,8 +333,15 @@
 }
 
 /* Map-layer switches, integrated into the legend card. Scoped-down switch
-   chrome keeps the section compact alongside the color bar. */
+   chrome keeps the section compact alongside the color bar.
+
+   These stand in their group's label row rather than under it (see
+   renderGroup), so they shrink to their words the way a group label does — the
+   ⓘ that follows reads as belonging to the switch it names, and a long label
+   wraps inside the card instead of pushing the button off the end. */
 .legendLayerItems {
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
