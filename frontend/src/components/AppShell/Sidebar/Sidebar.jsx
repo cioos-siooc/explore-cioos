@@ -23,8 +23,9 @@ import "./styles.css";
 // Datasets/Filters entry points live in the centered top bar, which is also
 // what asks for this card.) On phones the same card takes the whole screen;
 // closed, nothing of it is left at any edge.
-// Drilling into a single dataset swaps that header for a back banner: the card
-// hosts two different surfaces, and the header is what names the one in view.
+// Drilling into a single dataset swaps that header for a banner naming the way
+// back and the surface in view: the card hosts two different surfaces, and the
+// header is what tells them apart.
 // Either way the way out is the app's one close button, in the corner.
 export default function Sidebar() {
   const { t } = useTranslation();
@@ -51,7 +52,7 @@ export default function Sidebar() {
   // The panel is on a single dataset rather than the list. The banner swaps
   // with it, so the card never leaves the user guessing which of the two
   // surfaces they are on — and the way back is in the banner, not buried in
-  // the page's own title block.
+  // the dataset's own title block.
   const inspecting = Boolean(inspectDataset);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
   const countsTitle = countsReady
@@ -84,19 +85,24 @@ export default function Sidebar() {
       >
         {inspecting ? (
           <div className="datasetsBanner">
+            {/* The label names the destination rather than the surface it
+                leaves, so it needs no tooltip to say where it goes. */}
             <button
               type="button"
               className="datasetsBackButton"
               data-testid="sidebar-back"
               onClick={returnToDatasetList}
-              title={t("datasetInspectorBackButtonTitle")}
             >
-              <ChevronLeft size={14} aria-hidden="true" />
-              <span>{t("datasetsFilterName")}</span>
+              <ChevronLeft
+                className="datasetsBackButtonIcon"
+                size={14}
+                aria-hidden="true"
+              />
+              <span>{t("sidebarBackToDatasetsText")}</span>
             </button>
             <span className="datasetsBannerMode">
               <FileEarmarkText size={13} aria-hidden="true" />
-              {t("sidebarDatasetPageLabel")}
+              {t("sidebarDatasetDetailsLabel")}
             </span>
             {collapseButton}
           </div>

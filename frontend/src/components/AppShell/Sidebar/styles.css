@@ -174,11 +174,11 @@
 }
 
 /* ------------------------------------------------------------------
- * Dataset-page banner: replaces the datasets header while a single
+ * Dataset-details banner: replaces the datasets header while a single
  * dataset is open. Reads differently on purpose — tinted — so the card
- * is never mistaken for the list it drilled in from. Back on the left,
- * what-you-are-looking-at on the right, and the collapse chevron kept
- * where the header's is.
+ * is never mistaken for the list it drilled in from. The way back on the
+ * left, what-you-are-looking-at on the right, and the collapse chevron
+ * kept where the header's is.
  * ------------------------------------------------------------------ */
 .datasetsBanner {
   display: flex;
@@ -189,10 +189,13 @@
   background-color: var(--cioos-teal-light);
 }
 
+/* The row's primary control, so it is the last thing allowed to give up
+   room: the mode label beside it shrinks first (and is dropped outright at
+   phone width, below). */
 .datasetsBackButton {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   flex: 0 0 auto;
   padding: 5px 12px 5px 8px;
   border: 1px solid var(--cioos-primary);
@@ -202,12 +205,35 @@
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
   color: var(--cioos-primary-700);
+  white-space: nowrap;
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast);
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast);
 }
 
 .datasetsBackButton:hover {
-  background-color: var(--cioos-surface-2);
+  background-color: var(--cioos-white);
+  border-color: var(--cioos-primary-700);
+}
+
+/* The chevron leads the way the button goes — a short travel on hover, so
+   the control reads as a departure rather than a toggle. */
+.datasetsBackButtonIcon {
+  flex: 0 0 auto;
+  transition: transform var(--cioos-transition-fast);
+}
+
+.datasetsBackButton:hover .datasetsBackButtonIcon,
+.datasetsBackButton:focus-visible .datasetsBackButtonIcon {
+  transform: translateX(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .datasetsBackButtonIcon {
+    transition: none;
+    transform: none;
+  }
 }
 
 .datasetsBackButton:focus-visible {
@@ -216,13 +242,17 @@
 }
 
 /* Names the surface, not the dataset — the dataset's own title is the
-   heading directly below, and repeating it here would just crowd the row. */
+   heading directly below, and repeating it here would just crowd the row.
+   Shrinks before the back button does, and clips rather than pushing the
+   collapse chevron off the end. */
 .datasetsBannerMode {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   min-width: 0;
+  flex: 0 1 auto;
   margin-left: auto;
+  overflow: hidden;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-2xs);
   font-weight: 700;
@@ -239,7 +269,7 @@
   min-height: 0;
   overflow: hidden auto;
 
-  /* The list and the dataset page slide in horizontally (Panels/styles.css);
+  /* The list and a dataset's details slide in horizontally (Panels/styles.css);
      clipped rather than scrolled, so those few frames can't flash a horizontal
      scrollbar (a scroll box with overflow-y: auto resolves overflow-x to auto
      unless it is set). Nothing in this column is meant to reach past its edge. */
@@ -430,6 +460,17 @@
      it is sized like one — a taller row. */
   .datasetsHeader {
     padding: var(--cioos-space-md) var(--cioos-space-lg);
+  }
+
+  .datasetsBanner {
+    padding: var(--cioos-space-md) var(--cioos-space-lg);
+  }
+
+  /* Type is a step larger down here and the row is no wider, so the label
+     naming the surface is dropped rather than clipped: the dataset's title is
+     the next line on screen and says the same thing in full. */
+  .datasetsBannerMode {
+    display: none;
   }
 
   /* The footer is the surface's action bar: the Download button gets a full
