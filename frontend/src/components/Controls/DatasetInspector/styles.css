@@ -528,6 +528,25 @@
   overflow-wrap: anywhere;
 }
 
+/* A field whose value is one atomic token — a timestamp range — rather than
+   prose. Label and value hold one line together: the value is sized to its
+   content (not the 140px basis above) and never breaks mid-date, and the
+   label gives up the 96px gutter that aligns the other fields' values. That
+   gutter is what costs the row its line — the widest range formatInstantRange
+   produces is 230px, and 96 + 230 leaves too little for the scrollbar this
+   column carries. Below 700px the label still takes a line of its own (see
+   the media query at the end of this file): the range is 266px at that type
+   size against a card narrower than that, so one line isn't on offer. */
+.listCardFieldNowrap .listCardFieldLabel {
+  min-width: 0;
+}
+
+.listCardFieldNowrap .listCardFieldValue {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 /* Ocean variables: quiet tags, not the filter chips the metadata sheet uses —
    these say what one record measured, they don't filter anything. Only the
    first few are shown (see CardTags) — the rest are behind the "+n" beside
@@ -593,5 +612,19 @@
   /* No room for a label gutter: the value takes the line under its label. */
   .listCardFieldLabel {
     min-width: 100%;
+  }
+
+  /* Matches the specificity of .listCardFieldNowrap's desktop rule above, so
+     a timeframe label stacks over its value here like every other field. */
+  .listCardFieldNowrap .listCardFieldLabel {
+    min-width: 100%;
+  }
+
+  /* One line isn't on offer at this type size, so let the range wrap rather
+     than run past the card on the narrowest phones. overflow-wrap stays
+     normal, so a break can only land beside the arrow, never inside a date. */
+  .listCardFieldNowrap .listCardFieldValue {
+    flex: 1 1 140px;
+    white-space: normal;
   }
 }

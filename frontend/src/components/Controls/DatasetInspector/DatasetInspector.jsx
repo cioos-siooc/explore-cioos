@@ -679,7 +679,7 @@ export default function DatasetInspector({
                     )
                   }
                 >
-                  <CardField label={t("datasetInspectorTimeframeText")}>
+                  <CardField label={t("datasetInspectorTimeframeText")} nowrap>
                     {formatInstantRange(row.time_min, row.time_max)}
                   </CardField>
                   <CardField label={t("trajectoryPlatformFixesText")}>
@@ -747,7 +747,10 @@ export default function DatasetInspector({
                       }
                       onClick={() => setInspectRecordID(row.profile_id)}
                     >
-                      <CardField label={t("datasetInspectorTimeframeText")}>
+                      <CardField
+                        label={t("datasetInspectorTimeframeText")}
+                        nowrap
+                      >
                         {formatInstantRange(row.time_min, row.time_max)}
                       </CardField>
                       <CardField label={t("datasetInspectorDepthRangeText")}>

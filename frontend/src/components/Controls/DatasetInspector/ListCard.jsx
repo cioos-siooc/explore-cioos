@@ -49,7 +49,11 @@ export default function ListCard({
 // One field of a card: its name, and its value under or beside it. Renders
 // nothing when the dataset has no value for the field, so a card carries only
 // the lines it can actually fill.
-export function CardField({ label, children }) {
+//
+// `nowrap` is for a value that reads as one atomic token rather than prose —
+// a timestamp range — which keeps label and value on one line instead of
+// breaking mid-date.
+export function CardField({ label, nowrap, children }) {
   const empty =
     children === null ||
     children === undefined ||
@@ -57,7 +61,9 @@ export function CardField({ label, children }) {
     (Array.isArray(children) && children.length === 0);
   if (empty) return null;
   return (
-    <div className="listCardField">
+    <div
+      className={classNames("listCardField", { listCardFieldNowrap: nowrap })}
+    >
       <dt className="listCardFieldLabel">{label}</dt>
       <dd className="listCardFieldValue">{children}</dd>
     </div>
