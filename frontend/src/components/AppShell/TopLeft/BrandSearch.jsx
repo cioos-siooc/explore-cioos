@@ -46,9 +46,9 @@ export default function BrandSearch({ children }) {
               title={t("dockIntroButtonTitle")}
               aria-label={t("dockIntroButtonTitle")}
             >
-              <InfoCircle size={16} aria-hidden="true" />
+              <InfoCircle size={20} aria-hidden="true" />
             </button>
-            <FeedbackButton className="brandMinorItem" size={16} />
+            <FeedbackButton className="brandMinorItem" size={20} />
             <LanguageSelector className="brandMinorItem brandLanguage" />
           </div>
         </div>
