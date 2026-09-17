@@ -655,7 +655,7 @@ export default function Legend({
   // credits stay exactly one tap away, mounted once — LegendFooter adopts
   // MapLibre's own controls, so a second copy would fight this one for them.
   return (
-    <div className={classNames("legend", { legendCompact: compact })}>
+    <div className={classNames("mapLegend", { legendCompact: compact })}>
       <button
         className="legendHeader"
         onClick={() =>

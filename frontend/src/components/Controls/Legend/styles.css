@@ -1,5 +1,5 @@
 /* Compact floating legend card, top-right corner of the map. */
-.legend {
+.mapLegend {
   position: fixed;
   top: 12px;
   right: 12px;
@@ -286,25 +286,25 @@
 /* Scoped to the whole card, not just .legendLayerItems: the hex/point
    visibility switch now sits up in the ramp title row and has to match the
    switches further down. */
-.legend .form-check.form-switch {
+.mapLegend .form-check.form-switch {
   gap: 6px;
 }
 
-.legend .form-switch .form-check-input {
+.mapLegend .form-switch .form-check-input {
   width: 28px;
   height: 16px;
 }
 
-.legend .form-switch .form-check-input::before {
+.mapLegend .form-switch .form-check-input::before {
   width: 12px;
   height: 12px;
 }
 
-.legend .form-switch .form-check-input:checked::before {
+.mapLegend .form-switch .form-check-input:checked::before {
   transform: translateX(12px);
 }
 
-.legend .form-check-label {
+.mapLegend .form-check-label {
   font-size: var(--cioos-font-size-xs);
   line-height: 1.15;
   color: var(--cioos-ink);
@@ -417,7 +417,7 @@
    top-right legend, so move the legend to the bottom-left corner — clear of
    the brand section — instead of leaving it beside the bar. */
 @media (max-width: 900px) {
-  .legend {
+  .mapLegend {
     inset: auto auto calc(12px + var(--cioos-time-bar-space, 0px)) 8px;
 
     /* Stacked directly above the tracks-mode time bar, which owns the bottom
@@ -429,7 +429,7 @@
 }
 
 @media (max-height: 500px) {
-  .legend {
+  .mapLegend {
     max-height: calc(100vh - 80px - var(--cioos-time-bar-space, 0px));
   }
 }
@@ -490,7 +490,7 @@
 
 /* The card's own scroll box and 9px gutter were the price of sitting beside the
    map; centred over it, the dialog body owns both. (The 190px cap and the
-   shrunken switch chrome are scoped to `.legend`, which is not an ancestor
+   shrunken switch chrome are scoped to `.mapLegend`, which is not an ancestor
    here, so the keys get their full width and the switches their full size back
    without anything having to undo them.) */
 .legendModal .legendBody {
