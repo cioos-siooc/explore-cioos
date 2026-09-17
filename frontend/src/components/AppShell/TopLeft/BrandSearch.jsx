@@ -1,5 +1,5 @@
 import * as React from "react";
-import { InfoSquare } from "react-bootstrap-icons";
+import { InfoCircle } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import CioosLogo from "../../ui/CioosLogo.jsx";
@@ -46,7 +46,7 @@ export default function BrandSearch({ children }) {
               title={t("dockIntroButtonTitle")}
               aria-label={t("dockIntroButtonTitle")}
             >
-              <InfoSquare size={16} aria-hidden="true" />
+              <InfoCircle size={16} aria-hidden="true" />
             </button>
             <FeedbackButton className="brandMinorItem" size={16} />
             <LanguageSelector className="brandMinorItem brandLanguage" />
