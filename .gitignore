@@ -73,11 +73,13 @@ harvest_obis*/
 # The OBIS occurrence cache written by a local harvest — 1 GB after one full
 # discovery run, and `obis_cache` is the DEFAULT folder name, so it lands
 # wherever the harvester is invoked from rather than at a fixed path.
-obis_cache/
+obis_cache*/
 
-# memory_profiler output from a profiled harvest (see harvester/README).
+# memory_profiler output and harvest logs from a profiled run.
 *.dat
 *.mprof
+obis_harvest*.log
+obis_harvest*.png
 
 # downloads/ is a tracked mount point (README.md explains it); ignore only the
 # generated archives inside it.
