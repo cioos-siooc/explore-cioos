@@ -44,8 +44,10 @@ def captured_queries(monkeypatch):
             return pd.DataFrame(columns=RESULT_COLUMNS)
 
     class FakeConnection:
+        def execute(self, query):
+            captured.append(query)   # the COPY, which wraps the SELECT verbatim
+
         def sql(self, query):
-            captured.append(query)
             return FakeRelation()
 
         def close(self):
@@ -174,6 +176,9 @@ class TestChunkedFetch:
                 return pages.pop(0)
 
         class FakeConnection:
+            def execute(self, query):
+                pass
+
             def sql(self, query):
                 return FakeRelation()
 
@@ -190,7 +195,7 @@ class TestChunkedFetch:
         closed = []
 
         class FakeConnection:
-            def sql(self, query):
+            def execute(self, query):
                 raise RuntimeError("parquet unavailable")
 
             def close(self):
@@ -210,7 +215,7 @@ class TestChunkedFetch:
 
     def test_failure_before_any_chunk_falls_back_to_the_rest_api(self, harvester, monkeypatch):
         class FakeConnection:
-            def sql(self, query):
+            def execute(self, query):
                 raise RuntimeError("404 parquet not found")
 
             def close(self):
@@ -240,6 +245,9 @@ class TestChunkedFetch:
                 raise RuntimeError("connection reset mid-stream")
 
         class FakeConnection:
+            def execute(self, query):
+                pass
+
             def sql(self, query):
                 return FakeRelation()
 
@@ -268,6 +276,9 @@ class TestChunkedFetch:
                 raise RuntimeError("boom")
 
         class FakeConnection:
+            def execute(self, query):
+                pass
+
             def sql(self, query):
                 return FakeRelation()
 

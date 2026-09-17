@@ -2,6 +2,8 @@ import gzip
 import json
 import logging
 import os
+import shutil
+import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -46,7 +48,7 @@ FETCH_VECTORS_PER_CHUNK = 100
 # Ceiling for duckdb's own buffer pool while streaming one dataset's parquet.
 # Left to itself duckdb takes 80% of host RAM, which inside a 6GB container is
 # not a limit at all; this keeps its share well clear of the harvester's.
-OBIS_DUCKDB_MEMORY_LIMIT = os.environ.get("OBIS_DUCKDB_MEMORY_LIMIT", "1GB")
+OBIS_DUCKDB_MEMORY_LIMIT = os.environ.get("OBIS_DUCKDB_MEMORY_LIMIT", "512MB")
 
 
 # The epoch-millisecond range datetime64[ns] can represent (1677-09-21 to
@@ -701,11 +703,28 @@ class OBISHarvester(BaseHarvester):
         # keeps whatever it read for the life of the process and its memory
         # limit defaults to 80% of RAM (24.3 GiB on the machine this was
         # profiled on) -- which is not a limit at all inside a 6GB container.
-        con = duckdb.connect(config={"memory_limit": OBIS_DUCKDB_MEMORY_LIMIT})
+        spill_dir = tempfile.mkdtemp(prefix="obis_parquet_", dir=self.folder)
+        con = duckdb.connect(config={
+            "memory_limit": OBIS_DUCKDB_MEMORY_LIMIT,
+            # Spill duckdb's own intermediates here rather than growing the
+            # heap past memory_limit.
+            "temp_directory": spill_dir,
+        })
         writer = None
         yielded_any = False
         try:
-            relation = con.sql(query)
+            # Land the remote parquet locally in ONE statement, then chunk the
+            # local copy. Chunking the REMOTE file directly is 8.8x slower
+            # (measured, 833k rows: 2.7s -> 23.7s): fetch_df_chunk pulls in
+            # lock-step with the consumer, which serializes what duckdb would
+            # otherwise read from S3 in parallel. The local file is transient,
+            # deleted below, and tiny next to the JSON cache (1.9 MB vs 100 MB
+            # for the same dataset) -- it is not a second cache.
+            local_parquet = os.path.join(spill_dir, "occurrences.parquet")
+            con.execute(
+                f"COPY ({query}) TO '{local_parquet}' (FORMAT PARQUET, COMPRESSION zstd)"
+            )
+            relation = con.sql(f"SELECT * FROM read_parquet('{local_parquet}')")
             writer = _OccurrenceCacheWriter(cache_file)
             while True:
                 chunk = relation.fetch_df_chunk(FETCH_VECTORS_PER_CHUNK)
@@ -737,6 +756,7 @@ class OBISHarvester(BaseHarvester):
             if writer is not None:
                 writer.abort()
             con.close()
+            shutil.rmtree(spill_dir, ignore_errors=True)
 
     def _iter_occurrences_api(self, dataset_id):
         """Yield occurrences from the OBIS REST API (fallback), a page at a time."""
