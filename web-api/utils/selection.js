@@ -90,20 +90,31 @@ const TRAJECTORY_COVERAGE_FROM = `FROM cde.trajectory_hexes t
  * Griddap datasets are metadata-only: no feature rows at all, their coverage
  * lives on cde.datasets under coverage_* columns.
  *
- * Both callers — the shape query's griddap arm and /griddapCoverage — have to
- * alias those columns to the names dbFilter's predicates are written in
- * (time_min, time_max, depth_min, depth_max, point_pk, search_geom), because
- * those predicates are UNQUALIFIED: a row set missing one of the names makes
- * the whole statement fail to parse. point_pk (NULL::integer, which keeps
+ * Every caller — the shape query's griddap arm, /griddapCoverage and
+ * /coverageHistogram — has to alias those columns to the names dbFilter's
+ * predicates are written in (time_min, time_max, depth_min, depth_max,
+ * point_pk, search_geom), because those predicates are UNQUALIFIED: a row set
+ * missing one of the names makes the whole statement fail to parse. point_pk (NULL::integer, which keeps
  * grids out of map-click queries) and search_geom (d.coverage_bbox) are one
  * self-evident expression each and sit at whichever position the caller's
  * column order needs. The time and depth bounds carry a decision instead —
  * a timeless (static) grid coalesces to +-infinity so that any time filter
  * matches it, and a depthless one to zero — so they are shared, and they are
- * contiguous in both callers.
+ * contiguous in every caller.
  */
 const GRIDDAP_TIME_DEPTH_COLUMNS = `coalesce(d.coverage_time_min, '-infinity'::timestamptz) AS time_min,
                coalesce(d.coverage_time_max, 'infinity'::timestamptz) AS time_max,
+               coalesce(d.coverage_depth_min, 0) AS depth_min,
+               coalesce(d.coverage_depth_max, 0) AS depth_max`;
+
+/*
+ * The same four columns without the static-grid coalesce above, for callers
+ * that bin a grid by time rather than test it against a filter. A grid with no
+ * time coverage belongs in no bin rather than in every one of them, and NULL
+ * bounds fail the caller's window comparison, so the row drops out on its own.
+ */
+const GRIDDAP_EXACT_TIME_DEPTH_COLUMNS = `d.coverage_time_min AS time_min,
+               d.coverage_time_max AS time_max,
                coalesce(d.coverage_depth_min, 0) AS depth_min,
                coalesce(d.coverage_depth_max, 0) AS depth_max`;
 
@@ -140,6 +151,7 @@ module.exports = {
   DRAWN_AS_POINT,
   TRAJECTORY_COVERAGE_FROM,
   GRIDDAP_TIME_DEPTH_COLUMNS,
+  GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
   GRIDDAP_FROM,
   unionBranches,
 };

@@ -77,7 +77,12 @@ export function DropdownButton({
       const base = {
         position: "fixed",
         top: rect.bottom + 2,
-        minWidth: rect.width,
+        // Floor the menu at its toggle's width so a text button's menu never
+        // looks narrower than the thing it hangs off. Skipped when the caller
+        // passed menuClassName, because this is an inline style and would beat
+        // the width that class was added to set — an icon-only toggle wants
+        // its menu far wider than the toggle, not as narrow.
+        ...(menuClassName ? {} : { minWidth: rect.width }),
       };
       if (align === "center")
         setMenuStyle({
@@ -96,7 +101,7 @@ export function DropdownButton({
     updateMenuStyle();
     window.addEventListener("resize", updateMenuStyle);
     return () => window.removeEventListener("resize", updateMenuStyle);
-  }, [open, align]);
+  }, [open, align, menuClassName]);
 
   useLayoutEffect(() => {
     if (!open) return;

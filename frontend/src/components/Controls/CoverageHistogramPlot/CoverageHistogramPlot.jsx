@@ -7,6 +7,7 @@ import createPlotlyComponent from "react-plotly.js/factory";
 import frLocale from "plotly.js-locales/fr";
 
 import erddapServers from "../../../erddapServers.json";
+import { escapeHtml, formatErddapServerName } from "../../../utilities";
 
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
@@ -32,22 +33,13 @@ const DAY_MS = 24 * 3600 * 1000;
 const YEAR_MS = 365.25 * DAY_MS;
 const MONTH_MS = YEAR_MS / 12;
 
-const erddapLabels = new Map(
-  erddapServers.map((s) => [s.url, { en: s.label_en, fr: s.label_fr }]),
-);
-
-// Human label for a series key, by the kind the API tagged it with.
+// Human label for a series key, by the kind the API tagged it with. An erddap
+// key is a server URL, which the rest of the app already knows how to name —
+// and which can arrive null for a dataset with no erddap_url, so the shared
+// helper's own null handling matters here.
 function seriesLabel(key, kind, language) {
-  if (kind === "erddap") {
-    const entry = erddapLabels.get(key);
-    if (entry) return language === "fr" ? entry.fr : entry.en;
-    // Unknown server: show the host rather than the full URL.
-    try {
-      return new URL(key).hostname.replace(/^www\./, "");
-    } catch {
-      return key;
-    }
-  }
+  if (kind === "erddap")
+    return formatErddapServerName(key, language, erddapServers);
   // OBIS nodes, platforms, data types and organization names are already
   // display-ready.
   return key;
@@ -186,8 +178,13 @@ export default function CoverageHistogramPlot({ histogram }) {
             // 1px surface-colored separator between stacked segments.
             line: { color: "#ffffff", width: 1 },
           },
+          // Plotly renders a hover label through its own HTML parser, and
+          // these names are harvested strings (organization, platform,
+          // cdm_data_type, OBIS node titles), so one holding a < would inject
+          // markup. The %{...} tokens need no such care: substitution is a
+          // single pass and never rescans what it wrote.
           hovertemplate:
-            `<b>${trace.name}</b><br>` +
+            `<b>${escapeHtml(trace.name)}</b><br>` +
             "%{customdata}<br>" +
             `${countLabel}: %{y}<extra></extra>`,
         }))}

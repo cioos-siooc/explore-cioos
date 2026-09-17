@@ -244,7 +244,11 @@ async function createDBFilter(
   // frontend's utilities.
   if (excludeDatasetPKs) {
     parameters.excludeDatasetPKs = excludeDatasetPKs.split(",");
-    filters.push("d.pk_url <> ALL (:excludeDatasetPKs)");
+    // pk_url is nullable until 5_profile_process.sql back-fills it, and
+    // `NULL <> ALL (...)` is NULL rather than TRUE — so without the guard,
+    // naming one dataset to drop would also drop every dataset that has not
+    // been back-filled yet, which sending no list at all would have kept.
+    filters.push("(d.pk_url IS NULL OR d.pk_url <> ALL (:excludeDatasetPKs))");
   }
 
   if (pointPKs) {

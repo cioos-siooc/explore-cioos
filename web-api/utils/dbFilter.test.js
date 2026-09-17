@@ -72,6 +72,14 @@ test("excludeDatasetPKs is the same narrowing written the shorter way", async ()
   assert.match(f.shared.toString(), /d\.pk_url <> ALL \('\{"4","5"\}'\)/);
 });
 
+test("excluding datasets does not drop the ones with no pk_url yet", async () => {
+  // pk_url is nullable, and `NULL <> ALL (...)` is NULL, not TRUE. Without the
+  // guard a single exclusion silently drops every dataset that
+  // 5_profile_process.sql has not back-filled — the opposite of narrowing.
+  const f = await createDBFilter({ excludeDatasetPKs: "4" });
+  assert.match(f.shared.toString(), /d\.pk_url IS NULL OR d\.pk_url <> ALL/);
+});
+
 test("latitude is clamped to the Mercator-valid range", async () => {
   // Transforming a ±90° envelope throws "transform: tolerance condition
   // error" in PostGIS and 500s the request.

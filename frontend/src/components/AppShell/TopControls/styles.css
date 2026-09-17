@@ -124,9 +124,10 @@
    to hang off this toggle was a bare search popover bringing its own card,
    and the two cards would have nested white-on-white. Only a width is set,
    and via menuClassName rather than a descendant selector off the toggle,
-   since the menu portals to document.body: DropdownButton floors a menu at
-   its toggle's width, which for a lone chevron is nothing like enough for the
-   search row below. */
+   since the menu portals to document.body. Passing menuClassName is also what
+   stands DropdownButton's own floor down: it would otherwise pin the menu
+   inline at its toggle's width, which for a lone chevron is nothing like
+   enough for the search row below. */
 .topBarQuickFiltersMenu {
   min-width: 280px;
   max-width: calc(100vw - 24px);

@@ -10,7 +10,7 @@ const {
   erddapVisible,
   obisVisible,
   TRAJECTORY_COVERAGE_FROM,
-  GRIDDAP_TIME_DEPTH_COLUMNS,
+  GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
   GRIDDAP_FROM,
   unionBranches,
 } = require("../utils/selection");
@@ -277,7 +277,7 @@ router.get(
         FROM cde.obis_cells
         WHERE :obisFilters`;
     const griddapBranch = `SELECT d.pk AS dataset_pk,
-               ${GRIDDAP_TIME_DEPTH_COLUMNS},
+               ${GRIDDAP_EXACT_TIME_DEPTH_COLUMNS},
                NULL::text AS feature_key,
                NULL::integer AS point_pk,
                d.coverage_bbox AS search_geom,
@@ -325,8 +325,10 @@ router.get(
     /* For the days count: one row per entity carrying every day range it
        holds, plus the extent to pair it against bins cheaply. Rows whose day
        set is unknown contribute their span clamped to the query window, which
-       is also what keeps a static grid (time bounds coalesced to infinity in
-       selection.js) finite here. day_range_overlap_days unions the array
+       is what bounds a griddap row: it has no day_ranges at all, only the
+       coverage extent. A grid with no time coverage never reaches this far,
+       since the exact columns leave its bounds NULL and the window comparison
+       in the filtered CTE drops it. day_range_overlap_days unions the array
        before measuring, so ranges arriving from several hexes or cells for the
        same entity overlap harmlessly instead of adding up. */
     row_ranges AS (
