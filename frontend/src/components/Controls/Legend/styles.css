@@ -1,8 +1,11 @@
-/* Compact floating legend card, top-right corner of the map. */
+/* Compact floating legend card, bottom-right corner of the map. */
 .mapLegend {
   position: fixed;
-  top: 12px;
   right: 12px;
+  bottom: max(
+    calc(12px + var(--cioos-time-bar-space, 0px)),
+    var(--cioos-wms-legend-space, 0px)
+  );
   z-index: var(--cioos-z-map-controls, 2);
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
@@ -11,7 +14,13 @@
   flex-direction: column;
   min-width: 124px;
   max-width: 190px;
-  max-height: calc(100vh - 120px);
+  max-height: calc(
+    100vh - 12px -
+      max(
+        calc(12px + var(--cioos-time-bar-space, 0px)),
+        var(--cioos-wms-legend-space, 0px)
+      )
+  );
 
   /* The card no longer scrolls as a whole: its body does (below), so the
      header stays reachable and the footer's scale bar stays on screen however
@@ -412,11 +421,8 @@
   text-decoration: underline;
 }
 
-/* On narrower viewports the centered top bar (brand + merged
-   Datasets/Filters pill) reaches far enough right to collide with the
-   top-right legend, so move the legend to the bottom-left corner — clear of
-   the brand section — instead of leaving it beside the bar. */
-@media (max-width: 900px) {
+/* Phones keep the established bottom-left layout. */
+@media (max-width: 700px) {
   .mapLegend {
     inset: auto auto calc(12px + var(--cioos-time-bar-space, 0px)) 8px;
 
@@ -445,7 +451,7 @@
  * and renders the dialog only in compact mode, and gating them again here
  * would be a second copy of that breakpoint to keep in step with the
  * first. The card's own corner and offsets are already right — they come
- * from the 900px rule above, which this width is inside.
+ * from the 700px rule above, which this width is inside.
  * ------------------------------------------------------------------ */
 
 /* The header is the control that opens the rest now, so it is sized as one

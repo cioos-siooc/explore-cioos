@@ -10,9 +10,6 @@
  * rather than stacking inside it (see the WmsLegend stylesheet), so the
  * column is a single card again.
  * ------------------------------------------------------------------ */
-:root {
-  --cioos-sidebar-width: 420px;
-}
 
 /* Transparent positioning shell: the two cards inside carry the chrome,
    and the empty space between/below them stays click-through to the map. */

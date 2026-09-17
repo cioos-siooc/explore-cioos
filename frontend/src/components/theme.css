@@ -162,6 +162,12 @@
   --cioos-depth-bar-space: 0px;
   --cioos-wms-legend-space: 0px;
 
+  /* --- Layout: the left column's width ---
+     The datasets sidebar's, and the "what's here" card's, which stands in that
+     same corner while the sidebar is closed and is hidden the moment it opens.
+     One number so the two never disagree about how wide that column is. */
+  --cioos-sidebar-width: 420px;
+
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;
   --cioos-header-height-mobile: 60px;
