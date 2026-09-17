@@ -4,6 +4,7 @@ import {
   Download,
   FileEarmarkText,
   ListUl,
+  QuestionCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -29,7 +30,12 @@ export default function Sidebar() {
   const { t } = useTranslation();
   const { pointsToReview, inspectDataset, returnToDatasetList } =
     useSelection();
-  const { sidebarOpen, setSidebarOpen, setShowDownloadModal } = useUI();
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    setShowDownloadModal,
+    setShowSelectionHelpModal,
+  } = useUI();
   // Until `ready`, there is no dataset count to show — not even a zero. See
   // useDatasetCounts.
   const {
@@ -129,46 +135,69 @@ export default function Sidebar() {
           <DatasetsPanel />
         </div>
         <footer className="sidebarFooter" data-testid="sidebar-footer">
-          <div className="sidebarCounts">
-            <span
-              className={classNames("sidebarCountsDatasets", {
-                updating: countsUpdating,
-              })}
-              title={countsTitle}
+          {/* What the Download button below is fed by. The per-card control is
+              a bare icon, so the one sentence that says which icon and where
+              the picks end up lives here, against the count it changes —
+              rather than only inside a modal nobody opens. */}
+          <p className="sidebarFooterHint">
+            <Download
+              className="sidebarFooterHintIcon"
+              size={13}
+              aria-hidden="true"
+            />
+            <span>{t("sidebarSelectionHintText")}</span>
+            <button
+              type="button"
+              className="sidebarFooterHintMore"
+              data-testid="sidebar-selection-help"
+              onClick={() => setShowSelectionHelpModal(true)}
             >
-              {!countsReady ? (
-                <Spinner size="xs" className="countSpinner" />
-              ) : allDatasetsShown ? (
-                t("sidebarCountsDatasetsAll", {
-                  total: total ?? filteredCount,
-                })
-              ) : (
-                t("sidebarCountsDatasets", {
-                  filtered: filteredCount,
-                  total,
-                })
-              )}
-            </span>
-            <span
-              className="sidebarCountsSelected"
+              <QuestionCircle size={12} aria-hidden="true" />
+              {t("sidebarSelectionHintMoreText")}
+            </button>
+          </p>
+          <div className="sidebarFooterActions">
+            <div className="sidebarCounts">
+              <span
+                className={classNames("sidebarCountsDatasets", {
+                  updating: countsUpdating,
+                })}
+                title={countsTitle}
+              >
+                {!countsReady ? (
+                  <Spinner size="xs" className="countSpinner" />
+                ) : allDatasetsShown ? (
+                  t("sidebarCountsDatasetsAll", {
+                    total: total ?? filteredCount,
+                  })
+                ) : (
+                  t("sidebarCountsDatasets", {
+                    filtered: filteredCount,
+                    total,
+                  })
+                )}
+              </span>
+              <span
+                className="sidebarCountsSelected"
+                title={t("dockDownloadCountTitle", { count: selectedCount })}
+              >
+                {t("sidebarCountsSelected", { count: selectedCount })}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="sidebarDownloadButton"
+              disabled={selectedCount === 0}
+              onClick={() => setShowDownloadModal(true)}
               title={t("dockDownloadCountTitle", { count: selectedCount })}
             >
-              {t("sidebarCountsSelected", { count: selectedCount })}
-            </span>
+              <Download size={16} aria-hidden="true" />
+              {t("downloadModalButtonText")}
+              {selectedCount > 0 && (
+                <span className="sidebarDownloadCount">{selectedCount}</span>
+              )}
+            </button>
           </div>
-          <button
-            type="button"
-            className="sidebarDownloadButton"
-            disabled={selectedCount === 0}
-            onClick={() => setShowDownloadModal(true)}
-            title={t("dockDownloadCountTitle", { count: selectedCount })}
-          >
-            <Download size={16} aria-hidden="true" />
-            {t("downloadModalButtonText")}
-            {selectedCount > 0 && (
-              <span className="sidebarDownloadCount">{selectedCount}</span>
-            )}
-          </button>
         </footer>
       </section>
     </aside>

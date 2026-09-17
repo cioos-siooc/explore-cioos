@@ -359,3 +359,94 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ------------------------------------------------------------------
+ * SelectionHelpModal — how datasets get into a download, and what stops
+ * them. A narrow read-only column: no controls, so it is sized to the
+ * prose rather than to the two wide working dialogs above. The header
+ * reuses the download modal's icon + title/subtitle treatment.
+ * ------------------------------------------------------------------ */
+.selectionHelpModal .selectionHelpModalDialog {
+  max-width: min(560px, calc(100vw - 24px));
+}
+
+/* Clip the header's own background to the modal's rounded corners, as the
+   working dialogs above do — without it the header paints square over them. */
+.selectionHelpModal .modal-content {
+  overflow: hidden;
+}
+
+.selectionHelpModal .modal-header {
+  background-color: var(--cioos-white);
+  align-items: flex-start;
+}
+
+.selectionHelpModal .modal-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.selectionHelpModal .modal-body {
+  /* Now that .modal-content clips, the body is what scrolls when the prose is
+     taller than the viewport — and a column flex item only shrinks to that
+     point once its automatic minimum is lifted. */
+  min-height: 0;
+  padding: var(--cioos-space-md) var(--cioos-space-lg) var(--cioos-space-lg);
+  overflow-y: auto;
+}
+
+.selectionHelpList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cioos-space-md);
+  margin: 0;
+}
+
+/* Glyph in its own column so both lines of text share one left edge. */
+.selectionHelpItem {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 2px 10px;
+}
+
+.selectionHelpIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  grid-row: 1 / span 2;
+
+  /* The heading's line box, so the glyph sits on the title line. */
+  height: calc(var(--cioos-font-size-md) * 1.3);
+  color: var(--cioos-primary);
+}
+
+.selectionHelpItem dt {
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: var(--cioos-font-size-md);
+  line-height: 1.3;
+  color: var(--cioos-navy);
+}
+
+.selectionHelpItem dd {
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.5;
+  color: var(--cioos-ink-80);
+}
+
+@media (max-width: 600px) {
+  .selectionHelpModal .selectionHelpModalDialog {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100dvh;
+    margin: 0;
+  }
+
+  .selectionHelpModal .modal-content {
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+}

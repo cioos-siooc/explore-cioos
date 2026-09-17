@@ -251,13 +251,62 @@
  * ------------------------------------------------------------------ */
 .sidebarFooter {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+
+  /* Two stacked rows: the sentence that says how the selection is made, then
+     the counts + Download it is about. */
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   flex-shrink: 0;
   padding: 10px 12px;
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-sand, var(--cioos-surface-2));
+}
+
+.sidebarFooterActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sidebarFooterHint {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.4;
+  color: var(--cioos-ink-60);
+}
+
+/* The same glyph the dataset cards are ticked with, so the sentence names the
+   control by showing it rather than describing it. */
+.sidebarFooterHintIcon {
+  flex: 0 0 auto;
+
+  /* Baseline alignment puts an inline SVG on the text's descender line. */
+  align-self: center;
+  color: var(--cioos-primary);
+}
+
+.sidebarFooterHintMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sidebarFooterHintMore:hover {
+  color: var(--cioos-navy);
 }
 
 .sidebarCounts {

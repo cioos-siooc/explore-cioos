@@ -96,6 +96,20 @@ describe("AppShell (composition)", () => {
     });
   });
 
+  it("opens the selection help modal from the sidebar footer's hint", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AppShell />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
+    );
+
+    expect(screen.queryByTestId("selection-help-modal")).toBeNull();
+    await user.click(screen.getByTestId("sidebar-selection-help"));
+    expect(
+      await screen.findByTestId("selection-help-modal"),
+    ).toBeInTheDocument();
+  });
+
   it("shows the API error banner when a catalog fetch fails", async () => {
     installMockFetch();
     const realFetch = global.fetch;
