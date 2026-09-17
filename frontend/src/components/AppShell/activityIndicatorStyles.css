@@ -42,7 +42,11 @@
   padding: 10px 12px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius, 8px);
-  background-color: var(--cioos-white);
+
+  /* Translucent rather than the opaque white other floating cards use: this
+     one sits directly over the map's own centre of attention, and a solid
+     card there blocks more of it than a status report needs to. */
+  background-color: rgb(255 255 255 / 78%);
   box-shadow: var(--cioos-shadow-float);
   font-size: var(--cioos-font-size-sm, 12px);
   color: var(--cioos-ink-60);

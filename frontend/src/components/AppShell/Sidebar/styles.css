@@ -270,11 +270,13 @@
   gap: 10px;
 }
 
+/* A plain paragraph rather than a flex row: the icon is meant to read as the
+   sentence's first glyph, and flex's line-wrapping moves a whole item to the
+   next row rather than letting text flow around it — which, on the longer
+   translations, stranded the icon alone above the sentence instead of beside
+   it. Normal inline flow wraps the way running text always does, with the
+   icon staying attached to the words that follow it on every line. */
 .sidebarFooterHint {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px;
   margin: 0;
   font-size: var(--cioos-font-size-xs);
   line-height: 1.4;
@@ -282,12 +284,12 @@
 }
 
 /* The same glyph the dataset cards are ticked with, so the sentence names the
-   control by showing it rather than describing it. */
+   control by showing it rather than describing it. Inline before the text it
+   introduces, on the text's own baseline. */
 .sidebarFooterHintIcon {
-  flex: 0 0 auto;
-
-  /* Baseline alignment puts an inline SVG on the text's descender line. */
-  align-self: center;
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 4px;
   color: var(--cioos-primary);
 }
 
@@ -295,6 +297,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  margin-left: 4px;
   padding: 0;
   border: 0;
   background: none;
