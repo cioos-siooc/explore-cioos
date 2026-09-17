@@ -43,11 +43,17 @@
   border-bottom: 1px solid var(--cioos-hairline);
 }
 
-/* Same bare, no-tile icon as the Filters/Download/Datasets headers, centered
-   against the title + subtitle stack beside it. */
+/* Same bare, no-tile icon as the Filters/Download/Datasets headers, on the
+   title's line rather than centered against the title + meta stack beside it. */
 .featureCardHeadingIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  align-self: center;
+  align-self: flex-start;
+
+  /* The title's line box (font-size-lg at line-height 1.2). */
+  height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
 
@@ -93,7 +99,6 @@
 .featureCardHeadingCounter {
   display: inline-flex;
   align-items: center;
-  margin-left: auto;
   padding: 1px 8px;
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-navy);

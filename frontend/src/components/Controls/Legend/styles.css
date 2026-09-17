@@ -1,11 +1,25 @@
-/* Compact floating legend card, bottom-right corner of the map. */
+/* Compact floating legend card, bottom-right corner of the map — the keys on
+   the right, the "what's here" card on the left, both down on the bottom edge
+   where they are read against the map rather than over the top bar. */
 .mapLegend {
-  position: fixed;
-  right: 12px;
-  bottom: max(
+  /* How far up this corner the card starts, against whichever of the two
+     surfaces that stand in it reaches higher: the time bar, which owns the
+     bottom edge and publishes its reach, and the griddap colorbar, which takes
+     this corner itself while an overlay is on and publishes its own — a figure
+     that already includes that card's clearance of the bar, so the two are
+     alternatives rather than a sum. Each is 0 while its surface is absent. */
+  --legend-corner-offset: max(
     calc(12px + var(--cioos-time-bar-space, 0px)),
     var(--cioos-wms-legend-space, 0px)
   );
+
+  /* Viewport held clear above the card, so a long list of keys stops short of
+     the centered top bar instead of running the height of the screen. */
+  --legend-top-reserve: 108px;
+
+  position: fixed;
+  right: 12px;
+  bottom: var(--legend-corner-offset);
   z-index: var(--cioos-z-map-controls, 2);
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
@@ -14,12 +28,16 @@
   flex-direction: column;
   min-width: 124px;
   max-width: 190px;
-  max-height: calc(
-    100vh - 12px -
-      max(
-        calc(12px + var(--cioos-time-bar-space, 0px)),
-        var(--cioos-wms-legend-space, 0px)
-      )
+  /* Two ceilings, whichever is lower: the reserve above, and the foot of the
+     depth strip down the right edge when one is up — this card sits under that
+     strip now that it holds the bottom of the same edge. DepthBar publishes the
+     foot; the term is 0, and so never the lower of the two, while the strip
+     isn't mounted. */
+  max-height: min(
+    calc(100vh - var(--legend-top-reserve) - var(--legend-corner-offset)),
+    calc(
+      100vh - var(--cioos-depth-bar-space, 0px) - var(--legend-corner-offset)
+    )
   );
 
   /* The card no longer scrolls as a whole: its body does (below), so the
@@ -421,22 +439,27 @@
   text-decoration: underline;
 }
 
-/* Phones keep the established bottom-left layout. */
+/* Phones keep the bottom-left corner: the bottom-right is the griddap
+   colorbar's here — it stands down to a button in it (WmsLegend's
+   COMPACT_QUERY) and there is no room on this width for the two side by side.
+   700px is the app's own mobile rung (MOBILE_QUERY in useMediaQuery), the same
+   one Legend.jsx branches on to render the keys as a dialog, so the corner and
+   the markup move together rather than at two numbers that can drift. */
 @media (max-width: 700px) {
   .mapLegend {
-    inset: auto auto calc(12px + var(--cioos-time-bar-space, 0px)) 8px;
+    /* The griddap card holds the other corner here, so the only thing to clear
+       is the tracks-mode time bar, which owns the whole bottom edge. */
+    --legend-corner-offset: calc(12px + var(--cioos-time-bar-space, 0px));
+    --legend-top-reserve: 136px;
 
-    /* Stacked directly above the tracks-mode time bar, which owns the bottom
-       edge of the screen here. --cioos-time-bar-space is 0 while the bar isn't
-       shown (TimeBar publishes its measured footprint), leaving the plain
-       bottom-corner offset. */
-    max-height: calc(100vh - 148px - var(--cioos-time-bar-space, 0px));
+    right: auto;
+    left: 8px;
   }
 }
 
 @media (max-height: 500px) {
   .mapLegend {
-    max-height: calc(100vh - 80px - var(--cioos-time-bar-space, 0px));
+    --legend-top-reserve: 68px;
   }
 }
 

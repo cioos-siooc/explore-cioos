@@ -22,7 +22,7 @@
    items apart and stranding the title in the middle of the row. */
 .filtersModal .modal-title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
 }
@@ -33,7 +33,10 @@
   justify-content: center;
   flex: 0 0 auto;
   width: 28px;
-  height: 28px;
+
+  /* The heading's line box (font-size-lg at line-height 1.2), so the glyph
+     sits on the title line and not between title and subtitle. */
+  height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
 
@@ -134,7 +137,7 @@
    same reasoning as the Filters header above. */
 .downloadModal .modal-title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
 }
@@ -145,7 +148,10 @@
   justify-content: center;
   flex: 0 0 auto;
   width: 28px;
-  height: 28px;
+
+  /* The heading's line box (font-size-lg at line-height 1.2), so the glyph
+     sits on the title line and not between title and subtitle. */
+  height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
 
@@ -212,7 +218,7 @@
 
 .coverageModal .modal-title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
 }
 

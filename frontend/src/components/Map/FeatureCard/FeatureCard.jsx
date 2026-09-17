@@ -217,11 +217,9 @@ export default function FeatureCard() {
       aria-label={t("featureCardTitle")}
     >
       <div className="featureCardHeader">
-        <GeoAlt
-          className="featureCardHeadingIcon"
-          size={20}
-          aria-hidden="true"
-        />
+        <span className="featureCardHeadingIcon" aria-hidden="true">
+          <GeoAlt size={20} />
+        </span>
         <div className="featureCardHeading">
           <span className="featureCardHeadingTitleRow">
             <span className="featureCardHeadingTitle">

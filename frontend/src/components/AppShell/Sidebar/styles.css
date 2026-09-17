@@ -132,8 +132,14 @@
 }
 
 .datasetsToggleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  align-self: center;
+
+  /* The label's line box (font-size-lg at line-height 1.2), so the glyph sits
+     on the title line and not between title and subtitle. */
+  height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
 
