@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Globe, InfoCircle, Map } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
+import classNames from "classnames";
 
 import CioosLogo from "../../ui/CioosLogo.jsx";
 import FeedbackButton from "../../Controls/FeedbackButton/FeedbackButton.jsx";
@@ -17,10 +18,15 @@ import "./styles.css";
 // so it renders as a second row welded into this same card.
 export default function BrandSearch({ children }) {
   const { t, i18n } = useTranslation();
-  const { setShowIntroModal } = useUI();
+  const { showIntroModal, setShowIntroModal } = useUI();
   const { projection, setProjection } = useMapState();
 
   const isFrench = i18n.language === "fr";
+  // The org's own site, one per language — CIOOS at the English domain, SIOOC
+  // (its French name) at its own. IntroModal's own logo link (see
+  // CIOOSLogoButtonTitle there) sends both languages to the English domain;
+  // this one splits them since the French domain exists and works.
+  const websiteUrl = isFrench ? "https://siooc.ca/" : "https://cioos.ca/";
   const globeOn = projection === "globe";
   // Named by what pressing it does, and drawn as where it takes you — the icon
   // is the other projection, not the current one.
@@ -32,7 +38,15 @@ export default function BrandSearch({ children }) {
     <div className="brandSearch">
       <div className="brandCard">
         <div className="brandCardTop">
-          <CioosLogo className="brandLogo" />
+          <a
+            className="brandLogo"
+            href={websiteUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={t("CIOOSLogoButtonTitle")}
+          >
+            <CioosLogo />
+          </a>
           {/* Two-line wordmark; the em word gets the large treatment. */}
           <h1 className="brandTitle" lang={isFrench ? "fr" : "en"}>
             {isFrench ? (
@@ -50,8 +64,11 @@ export default function BrandSearch({ children }) {
           <div className="brandMinorItems">
             <button
               type="button"
-              className="brandMinorItem"
+              className={classNames("brandMinorItem", {
+                active: showIntroModal,
+              })}
               onClick={() => setShowIntroModal(true)}
+              aria-pressed={showIntroModal}
               title={t("dockIntroButtonTitle")}
               aria-label={t("dockIntroButtonTitle")}
             >

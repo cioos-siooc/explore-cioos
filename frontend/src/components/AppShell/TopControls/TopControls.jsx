@@ -55,6 +55,7 @@ export default function TopControls() {
   const {
     showFiltersModal,
     setShowFiltersModal,
+    showCoverageModal,
     setShowCoverageModal,
     sidebarOpen,
     setSidebarOpen,
@@ -89,9 +90,12 @@ export default function TopControls() {
           </button>
           <button
             type="button"
-            className="topBarButton"
+            className={classNames("topBarButton", {
+              active: showCoverageModal,
+            })}
             data-testid="topbar-coverage-button"
             onClick={() => setShowCoverageModal(true)}
+            aria-pressed={showCoverageModal}
             // "Time coverage", not the "Time" the label would otherwise want
             // to be: that is already the time *filter's* own name
             // (timeframeFilterName), and it names a chip that can be on screen
