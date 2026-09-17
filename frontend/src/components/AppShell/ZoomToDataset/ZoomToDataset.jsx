@@ -56,14 +56,13 @@ export default function ZoomToDataset() {
   const { t } = useTranslation();
   const { zoomToDataset, canZoom, framed } = useZoomToDataset();
 
-  if (!canZoom || framed) return null;
-
   return (
     <button
       type="button"
       className="zoomToDatasetButton"
       onClick={zoomToDataset}
       title={t("zoomToDatasetTitle")}
+      disabled={canZoom || !framed}
     >
       <ZoomIn size={15} aria-hidden="true" />
       {t("zoomToDatasetText")}

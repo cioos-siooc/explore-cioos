@@ -521,9 +521,7 @@ export default function DatasetInspector({
               <Funnel size={15} aria-hidden="true" />
             )}
             {t(
-              datasetIsFiltered
-                ? "datasetFilterButtonRemoveText"
-                : "datasetFilterButtonApplyText",
+              "datasetFilterButtonApplyText",
             )}
           </button>
           {/* Frames the map on this dataset; vanishes once it already is. */}
@@ -577,8 +575,8 @@ export default function DatasetInspector({
                     eovsExpanded
                       ? t("listCardTagsFewerText")
                       : t("listCardTagsMoreTitle", {
-                          total: dataset.eovs.length,
-                        })
+                        total: dataset.eovs.length,
+                      })
                   }
                 >
                   {eovsExpanded
@@ -727,15 +725,15 @@ export default function DatasetInspector({
                       selectedTrajectory?.trajectoryId === row.trajectory_id
                         ? undefined // click the drawn platform again to clear
                         : {
-                            datasetPk: dataset.pk,
-                            datasetTitle: dataset.title,
-                            trajectoryId: row.trajectory_id,
-                            // A row in this list gives no clue where its
-                            // platform sailed, so the map has to go there —
-                            // unlike a track clicked on the map, which is
-                            // already in view (see selectTrajectoryFromMap).
-                            frameView: true,
-                          },
+                          datasetPk: dataset.pk,
+                          datasetTitle: dataset.title,
+                          trajectoryId: row.trajectory_id,
+                          // A row in this list gives no clue where its
+                          // platform sailed, so the map has to go there —
+                          // unlike a track clicked on the map, which is
+                          // already in view (see selectTrajectoryFromMap).
+                          frameView: true,
+                        },
                     )
                   }
                 >

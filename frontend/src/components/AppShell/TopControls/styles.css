@@ -496,14 +496,13 @@
 
 /* ------------------------------------------------------------------
  * Active-filter chips, flowing after the Filters button. A white card holds
- * a prominent, centered heading and, below it, a legend explaining its two
- * kinds of pill — with the Show/Hide and Clear-all actions as symbols
- * inline with that legend, rather than a worded row of their own. Under the
- * card, one row per active filter category, laid out in a shared three-column
- * grid — family bubble, bracket, values — so every row's bracket lands on
- * the same central column as the next one, lined up with the title card
- * above rather than drifting with how wide each row's own label happens to
- * be.
+ * one header row: the legend explaining its two kinds of pill on the left,
+ * the heading centered, and the Show/Hide and Clear-all actions as symbols
+ * on the right. Under the card, one row per active filter category, laid out
+ * in a shared three-column grid — family bubble, bracket, values — so every
+ * row's bracket lands on the same central column as the next one, lined up
+ * with the title card above rather than drifting with how wide each row's own
+ * label happens to be.
  * ------------------------------------------------------------------ */
 .activeFiltersPanel {
   display: flex;
@@ -511,40 +510,54 @@
   align-items: center;
   gap: 6px;
 
-  /* The same width as the brand card above (see TopLeft/styles.css, which
-     defines the token and the viewport cap): the chips read as that card's
-     own footer rather than a row of loose pills spilling wider than it. */
-  width: min(var(--cioos-brand-width), calc(100vw - 24px));
+  /* Stepped in from the brand card above (see TopLeft/styles.css, which
+     defines the token and the viewport cap) by the shell's 12px gutter twice
+     over: the chips are subordinate to that card — what the filters it names
+     are currently doing — so they read as a narrower layer tucked under it
+     rather than a second card of equal standing. The viewport cap keeps that
+     same 24px of map either side once the brand card has gone full-bleed. */
+  width: min(calc(var(--cioos-brand-width) - 48px), calc(100vw - 48px));
+
+  /* The top bar centres its children at desktop widths but stretches them on
+     a phone, where the brand card wants both screen edges. This panel is the
+     one child that stays a floating card at every width, so it centres
+     itself rather than inheriting either rule. */
+  align-self: center;
   pointer-events: none;
 }
 
-.activeFiltersHeader {
-  pointer-events: all;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-}
+/* Backs the title, its legend and the two actions with the same white-card
+   treatment as the filter bubbles below, so the row reads as chrome floating
+   over the map rather than bare text on top of it.
 
-/* Backs the title and its legend with the same white-card treatment as the
-   filter bubbles below, so the row reads as chrome floating over the map
-   rather than bare text on top of it. The Show/Hide and Clear-all actions
-   live inside it too, as symbols on the legend's own row. */
+   One row, three cells: legend, heading, actions. The two outer columns are
+   equal fractions rather than auto, so the heading stays on the card's centre
+   line — and therefore over the bracket column of the grid below — however
+   much width the legend or the actions happen to need.
+
+   The heading comes first in the DOM (it is what the chip list is labelled
+   by) and is placed into the middle column, so every cell must name its row
+   as well: auto-placement never walks the cursor backwards, and the legend
+   asking for column 1 after the heading took column 2 would otherwise start a
+   second row. */
 .activeFiltersTitleCard {
-  display: flex;
-  flex-direction: column;
+  pointer-events: all;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 4px;
+  gap: 10px;
+  width: 100%;
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
-  padding: 6px 16px;
+  padding: 6px 12px;
   box-shadow: var(--cioos-shadow-sm);
 }
 
 /* The row's title: sized and weighted to read as a heading, not a caption. */
 .activeFiltersHeading {
+  grid-row: 1;
+  grid-column: 2;
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -556,17 +569,30 @@
 /* What the two pill colours below mean, spelled out once instead of left for
    the user to guess from the map. */
 .activeFiltersLegend {
+  grid-row: 1;
+  grid-column: 1;
+  justify-self: start;
   display: flex;
   align-items: center;
-  justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 4px 10px;
+}
+
+/* Show/Hide and Clear-all, closing the row off on the right. */
+.activeFiltersActions {
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .activeFiltersLegendItem {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
 }
@@ -587,17 +613,6 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* Separates the legend from the two action symbols trailing it, on the same
-   row. */
-.activeFiltersLegendDivider {
-  align-self: stretch;
-  width: 1px;
-  min-height: 14px;
-  background-color: var(--cioos-hairline);
-}
-
-/* Show/Hide and Clear-all, as symbols inline with the legend rather than a
-   worded row of their own. */
 .activeFiltersToggleButton,
 .activeFiltersClearButton {
   flex: 0 0 auto;

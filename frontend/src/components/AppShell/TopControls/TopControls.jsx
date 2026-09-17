@@ -10,7 +10,7 @@ import SingleDatasetView from "./SingleDatasetView.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
 import QuickFiltersButton from "./QuickFiltersButton.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
-import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
@@ -49,7 +49,9 @@ function measureTopBarSpace(rect) {
 // active-filter chips flow beneath, staying centered.
 export default function TopControls() {
   const { t } = useTranslation();
-  const { activeFilterCount } = useFilters();
+  // The same list the chips below render, so the badge can never report a
+  // different number of filters than the row under it names.
+  const activeFilterCount = useActiveFilters().length;
   const {
     showFiltersModal,
     setShowFiltersModal,
