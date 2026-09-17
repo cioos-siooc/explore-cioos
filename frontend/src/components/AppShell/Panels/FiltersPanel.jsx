@@ -262,6 +262,9 @@ export default function FiltersPanel() {
               icon={<Search />}
               controlled
               searchable
+              // Unlike the facet rows, this one's value re-queries the map, so
+              // it goes on Enter or the magnifier rather than on a pause.
+              searchOnSubmit
               searchTerms={datasetTitleSearchText}
               setSearchTerms={setDatasetTitleSearchText}
               searchPlaceholder={t("textSearchFilterPlaceholder")}

@@ -90,7 +90,7 @@ describe("Modal", () => {
   // Every caller passes `onHide` as an inline arrow, so it is a new function
   // on each render. Taking focus into the dialog is what *opening* does, and a
   // re-render is not an opening: a search box inside publishing what was typed
-  // (useDebouncedSearchInput) re-renders the app underneath this, and used to
+  // (useSearchInput) re-renders the app underneath this, and used to
   // have the caret taken off it mid-word.
   it("leaves focus where it is when the app re-renders underneath it", async () => {
     function Harness() {

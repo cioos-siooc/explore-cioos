@@ -15,8 +15,8 @@ describe("SearchButton", () => {
 
   // The popover writes the same datasetTitleSearchText the datasets list and
   // the Filters modal do, and that state re-queries the map — so it publishes
-  // what is typed on a pause rather than per keystroke.
-  it("publishes the typed text once, after typing pauses", async () => {
+  // when the search is asked for, never on the way there.
+  it("publishes the typed text on Enter, and nothing before it", async () => {
     let latest;
     const published = [];
     function Probe() {
@@ -24,8 +24,6 @@ describe("SearchButton", () => {
       published.push(latest.datasetTitleSearchText);
       return null;
     }
-    // No inter-keystroke delay, so the whole word is typed well inside the
-    // debounce however loaded the machine running this is.
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
@@ -39,9 +37,37 @@ describe("SearchButton", () => {
     const box = screen.getByPlaceholderText("Search dataset titles");
     await user.type(box, "temp");
     expect(box).toHaveValue("temp");
+    expect(latest.datasetTitleSearchText).toBe("");
+
+    await user.type(box, "{Enter}");
 
     await waitFor(() => expect(latest.datasetTitleSearchText).toBe("temp"));
     expect([...new Set(published)]).toEqual(["", "temp"]);
+  });
+
+  it("publishes on the magnifier too — the button is the same submit", async () => {
+    let latest;
+    function Probe() {
+      latest = useSelection();
+      return null;
+    }
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <SearchButton />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+
+    await user.click(screen.getByTestId("topbar-search-toggle"));
+    await user.type(
+      screen.getByPlaceholderText("Search dataset titles"),
+      "orca",
+    );
+    await user.click(screen.getByLabelText("Search"));
+
+    await waitFor(() => expect(latest.datasetTitleSearchText).toBe("orca"));
   });
 
   it("clears the search immediately, without waiting on the pause", async () => {
