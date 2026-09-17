@@ -30,7 +30,11 @@ from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
 from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
 from cde_harvester.sources.obis.harvester import harvest_obis
-from cde_harvester.utils import cf_standard_names, supported_standard_names
+from cde_harvester.utils import (
+    cf_standard_name_base,
+    cf_standard_names,
+    supported_standard_names,
+)
 
 load_dotenv()
 
@@ -547,10 +551,14 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         standard_names_harvested = (
             variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
         )
+        standard_name_bases_harvested = {
+            cf_standard_name_base(name) for name in standard_names_harvested
+        }
+        standard_name_bases_harvested.discard(None)
 
         standard_names_not_harvested = [
             x
-            for x in standard_names_harvested
+            for x in standard_name_bases_harvested
             if (x not in supported_standard_names + IGNORED_STANDARD_NAMES) and (not x.startswith("platform_"))
         ]
 
