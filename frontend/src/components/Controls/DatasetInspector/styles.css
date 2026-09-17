@@ -152,20 +152,19 @@
 }
 
 /* --- Metadata record sheet ---
-   The front matter of a journal article, compressed: each field is a tiny
-   eyebrow label with its value beside it on the same line — the same
-   label/value baseline pairing the record cards use (.listCardField) — and
-   the fields flow two to a row. The narrow ones (platform, record count) pair
-   up; the ones carrying chips or links take a full row. Whitespace does the
-   dividing, so there are no rules and no 86px label gutter eating the width. */
+   The front matter of a journal article, compressed: one field per line, each
+   a tiny eyebrow label with its value beside it on the same line — the same
+   label/value baseline pairing the record cards use (.listCardField). Rows
+   stack in a single column so every field reads label-left/value-right down
+   one edge; whitespace does the dividing, so there are no rules and no label
+   gutter eating the width. */
 
 /* No top rule of its own: the pinned title block above already draws one. */
 .datasetMetaSheet {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 14px;
+  gap: 3px;
   margin: 0 0 10px;
-  padding: 9px 11px;
+  padding: 7px 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
@@ -180,11 +179,6 @@
   align-items: baseline;
   gap: 2px 8px;
   min-width: 0;
-}
-
-/* Chips, link lists and a grid's node product need the whole width. */
-.datasetMetaSheet .metaCellWide {
-  grid-column: 1 / -1;
 }
 
 .datasetMetaSheet .metadataLabel {

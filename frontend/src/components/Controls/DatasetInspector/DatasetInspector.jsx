@@ -148,12 +148,6 @@ export default function DatasetInspector({
   const hasSources =
     dataset.source_type === "obis" ||
     Boolean(dataset.erddap_url || dataset.ckan_url);
-  // OBIS is always the one link; ERDDAP + CKAN can both be present, at which
-  // point the row needs the full width to hold two chips.
-  const hasMultipleSources =
-    dataset.source_type !== "obis" &&
-    Boolean(dataset.erddap_url) &&
-    Boolean(dataset.ckan_url);
   // Start loading rather than false: the fetch below is fired from an effect,
   // so an initial false would paint one frame of an empty record table before
   // the spinner appears.
@@ -474,14 +468,12 @@ export default function DatasetInspector({
         </div>
       </div>
       <div className="datasetInspectorBody">
-        {/* The front matter, as compact as it can be read: each field is a
-            small eyebrow label with its value beside it on the same line
-            (wrapping under only when the row is too narrow for both), and the
-            fields flow two-up across the sheet, the chip-carrying ones taking
-            a full row of their own. No row rules — the whitespace separates
-            them. */}
+        {/* The front matter, as compact as it can be read: one field per
+            line, each a small eyebrow label with its value beside it on the
+            same line (wrapping under only when the row is too narrow for
+            both). No row rules — the whitespace separates them. */}
         <dl className="datasetMetaSheet">
-          <div className="metaCell metaCellWide">
+          <div className="metaCell">
             <dt className="metadataLabel">
               {t("datasetInspectorOrganizationText")}
             </dt>
@@ -500,7 +492,7 @@ export default function DatasetInspector({
               })}
             </dd>
           </div>
-          <div className="metaCell metaCellWide">
+          <div className="metaCell">
             <dt className="metadataLabel">
               {t("datasetInspectorOceanVariablesText")}
             </dt>
@@ -563,9 +555,7 @@ export default function DatasetInspector({
               />
             </dd>
           </div>
-          {/* A grid spells its node count out as a product of its axes, which
-              needs the full width; a plain record count shares its row. */}
-          <div className={isGrid ? "metaCell metaCellWide" : "metaCell"}>
+          <div className="metaCell">
             <dt className="metadataLabel">
               {isGrid
                 ? t("griddapNodesText")
@@ -585,15 +575,9 @@ export default function DatasetInspector({
           </div>
           {/* The outbound links used to be a labelled row each; they say what
               they are in their own text, so one "Sources" line holds them
-              all — narrow like Locations before it so the two pair up on one
-              row, unless there's more than one link (ERDDAP + CKAN both), in
-              which case the row needs the full width to hold both badges. */}
+              all. */}
           {hasSources && (
-            <div
-              className={classNames("metaCell", {
-                metaCellWide: hasMultipleSources,
-              })}
-            >
+            <div className="metaCell">
               <dt className="metadataLabel">
                 {t("datasetInspectorSourcesText")}
               </dt>
