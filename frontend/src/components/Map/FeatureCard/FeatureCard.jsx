@@ -7,7 +7,6 @@ import {
   GeoAlt,
   Grid3x3Gap,
   Plus,
-  Search,
   X,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -46,7 +45,7 @@ const KIND_ORDER = ["track", "observation", "grid"];
 
 export default function FeatureCard() {
   const { t, i18n } = useTranslation();
-  const { featureQuery, setFeatureQuery, zoomToGeometry } = useMapState();
+  const { featureQuery, setFeatureQuery } = useMapState();
   const {
     pointsData,
     setInspectDataset,
@@ -126,16 +125,6 @@ export default function FeatureCard() {
   const shown = expanded ? rows : rows.slice(0, VISIBLE_ROWS);
   const hidden = rows.length - shown.length;
 
-  // Deduped: the same dataset can appear as both a track and an observation
-  // under one click, and "Add all 5" should not claim five when it means four.
-  const addablePks = [
-    ...new Set(
-      rows
-        .filter((entry) => entry.selectable && !entry.inSelection)
-        .map((entry) => entry.pk),
-    ),
-  ];
-
   const openDataset = (entry) => {
     if (entry.kind === "track") {
       // Same call the inspector's platform table makes: open the page and draw
@@ -150,37 +139,13 @@ export default function FeatureCard() {
     }
   };
 
-  // Adding a single row keeps the card open: picking two of the five datasets
-  // under one click is the normal case, and closing after the first would make
-  // the user click the same hex again for the second. "Add all" is the end of
-  // the interaction, so that one closes.
+  // Adding a row keeps the card open: picking two of the five datasets under
+  // one click is the normal case, and closing after the first would make the
+  // user click the same hex again for the second.
   //
   // "Selection", not "download": these datasets are being set aside. Downloading
   // is one thing you can then do with them, from the list's footer.
   const addOne = (pk) => addDatasetsToSelection([pk]);
-
-  const addAll = (pks) => {
-    addDatasetsToSelection(pks);
-    close();
-  };
-
-  const zoomHere = () => {
-    if (!featureQuery.bounds) return;
-    const [[west, south], [east, north]] = featureQuery.bounds;
-    zoomToGeometry({
-      type: "Polygon",
-      coordinates: [
-        [
-          [west, south],
-          [east, south],
-          [east, north],
-          [west, north],
-          [west, south],
-        ],
-      ],
-    });
-    close();
-  };
 
   const kindIcon = (entry) => {
     if (entry.kind === "grid") {
@@ -334,30 +299,6 @@ export default function FeatureCard() {
               {t("featureCardShowMore", { n: hidden })}
             </button>
           )}
-
-          <div className="featureCardActions">
-            {addablePks.length > 0 && (
-              <button
-                type="button"
-                className="featureCardAction primary"
-                onClick={() => addAll(addablePks)}
-                title={t("featureCardAddAllTitle", { n: addablePks.length })}
-              >
-                <Plus size={15} aria-hidden="true" />
-                {t("featureCardAddAll")}
-              </button>
-            )}
-            {featureQuery.bounds && (
-              <button
-                type="button"
-                className="featureCardAction"
-                onClick={zoomHere}
-              >
-                <Search size={14} aria-hidden="true" />
-                {t("featureCardZoomHere")}
-              </button>
-            )}
-          </div>
         </>
       )}
     </div>

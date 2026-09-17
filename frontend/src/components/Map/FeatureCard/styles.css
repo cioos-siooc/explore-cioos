@@ -284,73 +284,6 @@
   }
 }
 
-.featureCardActions {
-  display: flex;
-  gap: var(--cioos-space-xs);
-  padding: var(--cioos-space-sm);
-  border-top: 1px solid var(--cioos-hairline);
-  background-color: var(--cioos-sand);
-}
-
-/* Pill-shaped, like every other toggle/CTA pair in the app (DatasetsTable's
-   selectAllToggle, Filter's filterDownloadToggle) — this card's own bordered,
-   square-cornered version was the odd one out. */
-.featureCardAction {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  flex: 1;
-  min-height: 34px;
-  padding: 0 var(--cioos-space-sm);
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  color: var(--cioos-ink);
-  font-family: inherit;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background-color var(--cioos-transition-fast),
-    border-color var(--cioos-transition-fast);
-}
-
-.featureCardAction:focus-visible {
-  background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-primary);
-  outline: none;
-}
-
-@media (hover: hover) {
-  .featureCardAction:hover {
-    background-color: var(--cioos-surface-2);
-    border-color: var(--cioos-primary);
-    outline: none;
-  }
-}
-
-/* Solid brand teal, white text — the same CTA treatment as the download
-   modal's submit button and selectAllToggle's active state, rather than this
-   card's old lighter tint-and-outline look. */
-.featureCardAction.primary {
-  background-color: var(--cioos-primary);
-  border-color: var(--cioos-primary);
-  color: var(--cioos-white);
-}
-
-.featureCardAction.primary:focus-visible {
-  background-color: var(--cioos-primary-700);
-  border-color: var(--cioos-primary-700);
-}
-
-@media (hover: hover) {
-  .featureCardAction.primary:hover {
-    background-color: var(--cioos-primary-700);
-    border-color: var(--cioos-primary-700);
-  }
-}
-
 .featureCardEmptyText {
   margin: 0;
   padding: var(--cioos-space-md);
@@ -393,11 +326,6 @@
 
   .featureCardRowAdd {
     width: 44px;
-  }
-
-  .featureCardAction {
-    min-height: 44px;
-    font-size: var(--cioos-font-size-sm);
   }
 
   .featureCardClose {
