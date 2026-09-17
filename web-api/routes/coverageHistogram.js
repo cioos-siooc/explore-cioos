@@ -48,7 +48,10 @@ const TIME_BIN_WIDTHS_MS = [
   10 * YEAR_MS,
   25 * YEAR_MS,
 ];
-const TARGET_TIME_BINS = 60;
+// Bars to aim for. High enough that the default 1900-to-now window lands on
+// the one-year rung rather than the five-year one; a zoomed-in time filter
+// still walks down the ladder to weeks or days, so there is no floor.
+const TARGET_TIME_BINS = 150;
 
 // What each bar counts. Deliberately NOT the `metric` query parameter: that
 // name belongs to the hex ramp (utils/hexMetric.js METRICS = records/days/
