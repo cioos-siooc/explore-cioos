@@ -49,6 +49,32 @@ FETCH_VECTORS_PER_CHUNK = 100
 OBIS_DUCKDB_MEMORY_LIMIT = os.environ.get("OBIS_DUCKDB_MEMORY_LIMIT", "1GB")
 
 
+# The epoch-millisecond range datetime64[ns] can represent (1677-09-21 to
+# 2262-04-11). OBIS carries dates well outside it -- fossil and historical
+# records like 200-10-02 and 1626-01-01 are real in the corpus.
+_REPRESENTABLE_MS = (
+    pd.Timestamp.min.value // 1_000_000 + 1,
+    pd.Timestamp.max.value // 1_000_000 - 1,
+)
+
+
+def _epoch_ms_to_utc(series):
+    """Parse OBIS epoch-millisecond dates, out-of-range values becoming NaT.
+
+    The out-of-range mask is applied BEFORE `to_datetime` because
+    `errors="coerce"` does not actually hold for the nullable Int64 dtype in
+    pandas 1.5.3 -- it raises OutOfBoundsDatetime from astype_overflowsafe
+    instead of coercing (int64, float64 and object all coerce correctly). That
+    matters here because duckdb picks the pandas dtype per chunk from whether
+    that chunk contained a NULL, so the same column arrives as int64 or Int64
+    depending on the data, and only the Int64 case raises.
+    """
+    values = pd.to_numeric(series, errors="coerce")
+    low, high = _REPRESENTABLE_MS
+    values = values.where((values >= low) & (values <= high))
+    return pd.to_datetime(values, unit="ms", errors="coerce", utc=True)
+
+
 class _OccurrenceCacheWriter:
     """Streams occurrence frames into one {"results": [...], "total": n} gzip
     JSON file -- the format the cache has always used, so files written before
@@ -438,7 +464,7 @@ class OBISHarvester(BaseHarvester):
         # Parse dates from OBIS unix timestamps (milliseconds)
         for col in ["date_start", "date_end"]:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col], unit="ms", errors="coerce", utc=True)
+                df[col] = _epoch_ms_to_utc(df[col])
 
         # Ensure optional columns exist (not all OBIS datasets have them)
         for col in ["date_start", "date_end", "minimumDepthInMeters", "maximumDepthInMeters"]:

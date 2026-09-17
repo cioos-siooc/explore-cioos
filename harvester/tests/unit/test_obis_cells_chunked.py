@@ -135,3 +135,46 @@ class TestEmptyInputs:
         want = single(harvester, a + b)
         got = chunked(harvester, [a, [], b])
         assert got["days"].iloc[0] == want["days"].iloc[0] == 2
+
+
+class TestOutOfRangeDates:
+    """OBIS carries dates outside datetime64[ns] (fossil/historical records).
+
+    They must become NaT, as they always did. The hazard is that pandas 1.5.3
+    does not honour errors="coerce" for the nullable Int64 dtype, and duckdb
+    hands back Int64 for exactly those chunks that contain a NULL -- so this
+    only fires on a chunk carrying both a null date and an ancient one.
+    """
+
+    ANCIENT_MS = -10_849_593_600_000  # 1626-01-01, below the 1677 floor
+
+    @pytest.mark.parametrize("dtype", ["int64", "Int64", "float64", "object"])
+    def test_ancient_dates_become_nat_for_every_dtype_duckdb_may_hand_back(self, harvester, dtype):
+        rows = pd.DataFrame({
+            "decimalLatitude": [50.0, 50.0],
+            "decimalLongitude": [-60.0, -60.0],
+            "minimumDepthInMeters": [1.0, 2.0],
+            "maximumDepthInMeters": [3.0, 4.0],
+            "date_start": pd.Series([BASE_MS, self.ANCIENT_MS], dtype=dtype),
+            "date_end": pd.Series([BASE_MS, self.ANCIENT_MS], dtype=dtype),
+            "scientificName": ["sp", "sp"],
+        })
+        cells = harvester.aggregate_cells("ds-1", rows, apply_filter=False)
+        assert cells["n_records"].iloc[0] == 2, "the ancient row is kept, only its date is dropped"
+        assert cells["days"].iloc[0] == 1, "only the in-range date contributes a day"
+
+    def test_a_null_alongside_an_ancient_date_does_not_raise(self, harvester):
+        # The real-world shape: duckdb returns Int64 because of the null, and
+        # errors="coerce" silently stops working for that dtype.
+        rows = pd.DataFrame({
+            "decimalLatitude": [50.0, 50.0, 50.0],
+            "decimalLongitude": [-60.0, -60.0, -60.0],
+            "minimumDepthInMeters": [1.0, 2.0, 3.0],
+            "maximumDepthInMeters": [3.0, 4.0, 5.0],
+            "date_start": pd.array([BASE_MS, self.ANCIENT_MS, None], dtype="Int64"),
+            "date_end": pd.array([BASE_MS, self.ANCIENT_MS, None], dtype="Int64"),
+            "scientificName": ["sp", "sp", "sp"],
+        })
+        cells = harvester.aggregate_cells("ds-1", rows, apply_filter=False)
+        assert cells["n_records"].iloc[0] == 3
+        assert cells["days"].iloc[0] == 1
