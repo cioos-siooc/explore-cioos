@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -172,5 +172,52 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
         document.querySelector(".datasetsCardGroupHeader"),
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe("DatasetsTable (download modal)", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
+  // The modal's own checkbox (handleSelectDataset prop) only ticks a dataset
+  // in or out of this particular batch — it never takes the row off the
+  // list. Removing it from the order outright goes through SelectionProvider
+  // instead, the same state the sidebar's checkbox writes to.
+  it("a card's remove button drops the dataset from the selection entirely, without touching the batch checkbox", async () => {
+    const row = makeRow({ pk: 1, title: "Beta station", selected: true });
+    let selection;
+    function Probe() {
+      selection = useSelection();
+      return null;
+    }
+    const handleSelectDataset = vi.fn();
+    const { user } = renderWithProviders(
+      <>
+        <DatasetsTable
+          isDownloadModal
+          datasets={[row]}
+          selectAll
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={handleSelectDataset}
+        />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+
+    // Seed the shortlist so the dataset actually starts out selected.
+    act(() => selection.handleSelectDataset(row));
+    await waitFor(() => expect(selection.selectedPks.has(1)).toBe(true));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Remove from the download selection: Beta station",
+      }),
+    );
+
+    await waitFor(() => expect(selection.selectedPks.has(1)).toBe(false));
+    expect(handleSelectDataset).not.toHaveBeenCalled();
   });
 });

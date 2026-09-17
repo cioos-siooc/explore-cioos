@@ -73,6 +73,11 @@ export default function DatasetsTable({
     toggleGroupHidden,
     showAllGroups,
     selectedPks,
+    // Drops a dataset from the selection outright — aliased because the
+    // download modal's own `handleSelectDataset` prop means something
+    // narrower: whether this batch includes a dataset already in the order,
+    // not whether it is in the order at all.
+    handleSelectDataset: removeFromSelection,
   } = useSelection();
   // The same free-text search the top bar and the Filters modal write, and it
   // narrows the map as well as this list — so the box below goes on Enter or
@@ -486,6 +491,7 @@ export default function DatasetsTable({
                   estimatesLoading={estimatesLoading}
                   downloadLink={downloadLinksByPk?.get(item.row.pk)}
                   onSelect={handleSelectDataset}
+                  onRemove={isDownloadModal ? removeFromSelection : undefined}
                   onInspect={isDownloadModal ? undefined : setInspectDataset}
                   onHover={setHoveredDataset}
                   onHoverEnd={() => setHoveredDataset()}

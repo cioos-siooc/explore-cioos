@@ -439,9 +439,14 @@ export default function DatasetInspector({
   // (handleSelectDataset drops it), so the button says why rather than
   // failing silently on click.
   const inDownloadSelection = selectedPks.has(dataset.pk);
-  const addToDownload = () => {
-    if (!inDownloadSelection) handleSelectDataset(dataset);
-    setShowDownloadModal(true);
+  // A real toggle, both ways: picking it up opens the download modal (there
+  // is nothing else to review it in from this page), dropping it just
+  // updates the selection — the modal is already open if that is where the
+  // click came from, and there is no order left to show for a dataset just
+  // taken out of it.
+  const toggleDownloadSelection = () => {
+    handleSelectDataset(dataset);
+    if (!inDownloadSelection) setShowDownloadModal(true);
   };
 
   return (
@@ -485,8 +490,9 @@ export default function DatasetInspector({
             className={classNames("datasetTitleAction", {
               active: inDownloadSelection,
             })}
-            onClick={addToDownload}
+            onClick={toggleDownloadSelection}
             disabled={isGrid}
+            aria-pressed={inDownloadSelection}
             title={t(
               isGrid
                 ? "griddapNotDownloadableTooltip"

@@ -112,6 +112,21 @@ describe("DatasetInspector", () => {
     );
   });
 
+  it("clicking Download again unchecks the dataset from the selection", async () => {
+    const { user } = await renderReady();
+    const button = screen.getByRole("button", { name: /Download/ });
+
+    await user.click(button);
+    await waitFor(() =>
+      expect(button).toHaveAttribute("aria-pressed", "true"),
+    );
+
+    await user.click(button);
+    await waitFor(() =>
+      expect(button).toHaveAttribute("aria-pressed", "false"),
+    );
+  });
+
   it("disables Download for a griddap dataset, which has none", async () => {
     await renderReady({
       dataset: { ...DATASET, cdm_data_type: "Grid" },

@@ -620,6 +620,34 @@
   white-space: nowrap;
 }
 
+/* Takes the dataset out of the order outright — the one destructive control
+   on the card, so it gets the error colour on hover rather than the teal
+   every other affordance here uses. */
+.datasetCardRemove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(var(--cioos-font-size-base) * 1.25);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+  transition: color var(--cioos-transition-fast);
+}
+
+@media (hover: hover) {
+  .datasetCardRemove:hover {
+    color: var(--cioos-error);
+  }
+}
+
+.datasetCardRemove:focus-visible {
+  outline: 2px solid var(--cioos-primary-700);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
 .datasetCardSizeTotal {
   color: var(--cioos-ink-40);
 }

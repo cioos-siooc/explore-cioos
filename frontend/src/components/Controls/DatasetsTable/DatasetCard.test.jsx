@@ -230,5 +230,35 @@ describe("DatasetCard", () => {
       );
       expect(await navigator.clipboard.readText()).toBe(downloadLink.url);
     });
+
+    it("the remove button calls onRemove without also triggering onInspect", async () => {
+      const user = userEvent.setup();
+      const onRemove = vi.fn();
+      const onInspect = vi.fn();
+      render(
+        <DatasetCard
+          row={ROW}
+          t={t}
+          i18n={i18n}
+          isDownloadModal
+          onRemove={onRemove}
+          onInspect={onInspect}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: "datasetCardRemoveFromSelectionTitle: Green Bay LoRaWAN Buoy 4",
+        }),
+      );
+      expect(onRemove).toHaveBeenCalledWith(ROW);
+      expect(onInspect).not.toHaveBeenCalled();
+    });
+
+    it("shows no remove button without an onRemove handler", () => {
+      render(<DatasetCard row={ROW} t={t} i18n={i18n} isDownloadModal />);
+      expect(
+        screen.queryByTitle("datasetCardRemoveFromSelectionTitle"),
+      ).not.toBeInTheDocument();
+    });
   });
 });
