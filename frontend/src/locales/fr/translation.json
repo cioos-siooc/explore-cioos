@@ -49,6 +49,8 @@
   "organizationMulti": " organisations",
   "datasetsFilterName": "Jeux de données",
   "topBarDatasetsLabel": "Jeux de données",
+  "topBarCoverageLabel": "Couverture temporelle",
+  "topBarQuickFiltersLabel": "Filtres rapides",
   "topBarCountsSummary": "{{filtered}}/{{total}} jeux de données",
   "topBarCountsInViewLink": "{{count}} visibles",
   "topBarCountsInViewOffTitle": "Ne plus afficher uniquement les jeux de données dans la vue actuelle de la carte",

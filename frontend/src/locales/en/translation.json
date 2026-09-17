@@ -49,6 +49,8 @@
   "organizationMulti": " organizations",
   "datasetsFilterName": "Datasets",
   "topBarDatasetsLabel": "Datasets",
+  "topBarCoverageLabel": "Time coverage",
+  "topBarQuickFiltersLabel": "Quick filters",
   "topBarCountsSummary": "{{filtered}}/{{total}} datasets",
   "topBarCountsInViewLink": "{{count}} in view",
   "topBarCountsInViewOffTitle": "Stop showing only the datasets within the current map view",

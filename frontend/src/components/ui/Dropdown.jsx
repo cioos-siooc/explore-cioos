@@ -41,16 +41,14 @@ export function DropdownButton({
   // the toggle's midpoint instead via transform: translateX(-50%) — needed
   // once the toggle is much narrower than its menu (an icon-only button, say),
   // where left-alignment leaves the menu looking like it belongs to whatever
-  // sits to the toggle's right instead. 'viewport-center' anchors it to the
-  // viewport's own midline rather than the toggle's — for a toggle that sits
-  // off-centre inside a row that is itself centred (the top bar's search
-  // button, one segment among several in a centred pill), where centring on
-  // the toggle would leave the menu visibly off-centre under the row/card it
-  // reads as belonging to.
+  // sits to the toggle's right instead. 'end' lines the menu's right edge up
+  // with the toggle's — for a toggle sitting at the right edge of its row (the
+  // top bar's quick-filters caret), where either of the other two would hang a
+  // menu wider than the toggle out past the row it belongs to.
   align = "start",
   // Fires whenever the menu opens/closes. The toggle's own open/closed state
   // otherwise stays private to this component — callers that need to style
-  // the toggle differently while its menu is up (see topBarSpatialFilterToggle)
+  // the toggle differently while its menu is up (see topBarQuickFiltersToggle)
   // use this to mirror it into their own state.
   onOpenChange,
   children,
@@ -76,25 +74,24 @@ export function DropdownButton({
     if (!open || !buttonRef.current) return;
     function updateMenuStyle() {
       const rect = buttonRef.current.getBoundingClientRect();
-      setMenuStyle(
-        align === "center" || align === "viewport-center"
-          ? {
-              position: "fixed",
-              top: rect.bottom + 2,
-              left:
-                align === "viewport-center"
-                  ? "50%"
-                  : rect.left + rect.width / 2,
-              minWidth: rect.width,
-              transform: "translateX(-50%)",
-            }
-          : {
-              position: "fixed",
-              top: rect.bottom + 2,
-              left: rect.left,
-              minWidth: rect.width,
-            },
-      );
+      const base = {
+        position: "fixed",
+        top: rect.bottom + 2,
+        minWidth: rect.width,
+      };
+      if (align === "center")
+        setMenuStyle({
+          ...base,
+          left: rect.left + rect.width / 2,
+          transform: "translateX(-50%)",
+        });
+      else if (align === "end")
+        setMenuStyle({
+          ...base,
+          left: rect.right,
+          transform: "translateX(-100%)",
+        });
+      else setMenuStyle({ ...base, left: rect.left });
     }
     updateMenuStyle();
     window.addEventListener("resize", updateMenuStyle);
