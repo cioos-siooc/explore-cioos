@@ -39,8 +39,6 @@ dev = [
     "pytest>=9.0.3",
     "pytest-mock>=3.15.1",
     "pytest-cov>=5.0",
-    "memory-profiler>=0.61.0",
-    "matplotlib>=3.10.9",
 ]
 
 [tool.pytest.ini_options]

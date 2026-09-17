@@ -1,4 +1,5 @@
 import gzip
+import itertools
 import json
 import logging
 import os
@@ -86,19 +87,36 @@ class _OccurrenceCacheWriter:
     because serializing one costs a dict per occurrence (540 bytes/row
     measured, ~1.1 GiB on the largest dataset) all live at once.
 
-    Writes to a temp file and renames on commit: a crash mid-write otherwise
-    leaves a truncated .gz that the next run reads as a real cache, because
-    gzip raises EOFError on a short read and EOFError is not an OSError, so it
-    escapes the handler in `_read_cache`.
+    Used as a context manager: leaving the block normally commits, and leaving
+    it by ANY exception discards. Writes to a temp file and renames on commit,
+    because a crash mid-write otherwise leaves a truncated .gz that the next
+    run reads as a real cache -- gzip raises EOFError on a short read, and
+    EOFError is not an OSError, so it escapes the handler in `_read_cache`.
     """
 
     def __init__(self, path):
         self.gz_path = path + ".gz"
         self.tmp_path = f"{self.gz_path}.{os.getpid()}.tmp"
+        self._file = None
+        self.rows_written = 0
+
+    def __enter__(self):
         os.makedirs(os.path.dirname(self.gz_path) or ".", exist_ok=True)
         self._file = gzip.open(self.tmp_path, "wt")
         self._file.write('{"results": [')
-        self.rows_written = 0
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            if exc_type is None:
+                self._file.write(f'], "total": {self.rows_written}}}')
+        finally:
+            self._file.close()
+        if exc_type is None:
+            os.replace(self.tmp_path, self.gz_path)
+        elif os.path.isfile(self.tmp_path):
+            os.remove(self.tmp_path)
+        return False
 
     def write(self, df):
         for row in df.to_dict(orient="records"):
@@ -110,16 +128,6 @@ class _OccurrenceCacheWriter:
             # a nullable-dtype column.
             json.dump({k: None if v is pd.NA else v for k, v in row.items()}, self._file)
             self.rows_written += 1
-
-    def commit(self):
-        self._file.write(f'], "total": {self.rows_written}}}')
-        self._file.close()
-        os.replace(self.tmp_path, self.gz_path)
-
-    def abort(self):
-        self._file.close()
-        if os.path.isfile(self.tmp_path):
-            os.remove(self.tmp_path)
 
 
 class OBISHarvester(BaseHarvester):
@@ -603,14 +611,9 @@ class OBISHarvester(BaseHarvester):
 
     def _write_occurrence_cache(self, path, df, slice_rows=OCCURRENCE_CACHE_SLICE_ROWS):
         """Write a whole occurrence frame to the cache, `slice_rows` at a time."""
-        writer = _OccurrenceCacheWriter(path)
-        try:
+        with _OccurrenceCacheWriter(path) as writer:
             for start in range(0, len(df), slice_rows):
                 writer.write(df.iloc[start:start + slice_rows])
-            writer.commit()
-        except BaseException:
-            writer.abort()
-            raise
 
     def fetch_dataset_metadata(self, dataset_id):
         """Fetch dataset metadata from the OBIS dataset API."""
@@ -710,7 +713,6 @@ class OBISHarvester(BaseHarvester):
             # heap past memory_limit.
             "temp_directory": spill_dir,
         })
-        writer = None
         yielded_any = False
         try:
             # Land the remote parquet locally in ONE statement, then chunk the
@@ -725,24 +727,19 @@ class OBISHarvester(BaseHarvester):
                 f"COPY ({query}) TO '{local_parquet}' (FORMAT PARQUET, COMPRESSION zstd)"
             )
             relation = con.sql(f"SELECT * FROM read_parquet('{local_parquet}')")
-            writer = _OccurrenceCacheWriter(cache_file)
-            while True:
-                chunk = relation.fetch_df_chunk(FETCH_VECTORS_PER_CHUNK)
-                if chunk.empty:
-                    break
-                writer.write(chunk)
-                yielded_any = True
-                yield chunk
-                del chunk
-            self.logger.info(
-                "Loaded %d occurrences from parquet for %s", writer.rows_written, dataset_id,
-            )
-            writer.commit()
-            writer = None
+            with _OccurrenceCacheWriter(cache_file) as writer:
+                while True:
+                    chunk = relation.fetch_df_chunk(FETCH_VECTORS_PER_CHUNK)
+                    if chunk.empty:
+                        break
+                    writer.write(chunk)
+                    yielded_any = True
+                    yield chunk
+                    del chunk
+                self.logger.info(
+                    "Loaded %d occurrences from parquet for %s", writer.rows_written, dataset_id,
+                )
         except Exception as e:
-            if writer is not None:
-                writer.abort()
-                writer = None
             if yielded_any:
                 # Past the first chunk the caller has already aggregated part
                 # of this dataset, so re-reading it from the REST API would
@@ -753,34 +750,29 @@ class OBISHarvester(BaseHarvester):
             self.logger.warning("Parquet fetch failed for %s, falling back to API: %s", dataset_id, e)
             yield from self._iter_occurrences_api(dataset_id)
         finally:
-            if writer is not None:
-                writer.abort()
             con.close()
             shutil.rmtree(spill_dir, ignore_errors=True)
 
     def _iter_occurrences_api(self, dataset_id):
         """Yield occurrences from the OBIS REST API (fallback), a page at a time."""
-        writer = None
-        try:
-            for page in self._paginate_occurrences_api(dataset_id):
-                if writer is None:
-                    writer = _OccurrenceCacheWriter(
-                        os.path.join(self.folder, f"{dataset_id}.json")
-                    )
+        pages = self._paginate_occurrences_api(dataset_id)
+        first = next(pages, None)
+        if first is None:
+            # No pages at all: write no cache, so the next run retries rather
+            # than trusting an empty one.
+            return
+
+        cache_file = os.path.join(self.folder, f"{dataset_id}.json")
+        with _OccurrenceCacheWriter(cache_file) as writer:
+            for page in itertools.chain([first], pages):
                 df = pd.DataFrame(page)
                 del page
                 writer.write(df)
                 yield df
                 del df
-            if writer is not None:
-                self.logger.info(
-                    "Loaded %d occurrences from OBIS for %s", writer.rows_written, dataset_id,
-                )
-                writer.commit()
-                writer = None
-        finally:
-            if writer is not None:
-                writer.abort()
+            self.logger.info(
+                "Loaded %d occurrences from OBIS for %s", writer.rows_written, dataset_id,
+            )
 
     def _paginate_occurrences_api(self, dataset_id):
         """Yield pages of occurrence records from the OBIS REST API.

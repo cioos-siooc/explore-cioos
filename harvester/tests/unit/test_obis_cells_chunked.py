@@ -12,7 +12,6 @@ deliberately:
 """
 import pandas as pd
 import pytest
-
 from cde_harvester.core.obis_cells import merge_cell_partials
 from cde_harvester.sources.obis.harvester import OBISHarvester
 

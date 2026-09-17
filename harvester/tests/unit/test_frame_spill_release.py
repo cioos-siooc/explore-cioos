@@ -5,7 +5,6 @@ free lists, so RSS ratchets across flushes. Measured over one OBIS run's flush
 cadence: +272 MiB with gc.collect() alone, +35 MiB with malloc_trim as well.
 """
 import pandas as pd
-
 from cde_harvester.core import frame_spill
 from cde_harvester.core.frame_spill import SpillSet
 
