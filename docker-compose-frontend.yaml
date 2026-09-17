@@ -1,15 +1,19 @@
-version: "3.3"
+# Frontend + nginx only, against an API that is already running elsewhere.
+# The full stack is docker-compose.yaml; this file exists for working on the
+# SPA without building the harvester/database images.
 services:
   nginx:
     image: nginx:latest
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "8098:4000"
+      - "${NGINX_PORT:-8098}:4000"
   frontend:
     build:
       context: ./frontend
       args:
-        API_URL: $API_URL
+        # Same-origin relative path, as in docker-compose.yaml: nginx proxies
+        # /api/ to the web-api upstream, so nothing needs the public hostname.
+        API_URL: ${API_URL:-/api}
     expose:
       - "80"

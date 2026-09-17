@@ -133,6 +133,28 @@
   flex: 0 0 auto;
 }
 
+/* The magnifier submits the search (the field never publishes on a pause), so
+   it is a button — stripped back to the icon it already looked like. */
+.datasetsTableSearchSubmit {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.datasetsTableSearchSubmit:hover {
+  color: var(--cioos-ink);
+}
+
+.datasetsTableSearchSubmit:focus-visible {
+  outline: none;
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-focus);
+}
+
 .datasetsTableSearch {
   flex: 1 1 auto;
   min-width: 0;

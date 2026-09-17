@@ -175,6 +175,44 @@
   box-shadow: var(--cioos-focus);
 }
 
+/* Text Search only (see Filter's searchOnSubmit): the trailing edge is the
+   submit button, and Clear moves inboard of it so the two sit side by side
+   rather than on top of each other. */
+.filterSearchSubmit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.filterSearchSubmit:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+}
+
+.filterSearchSubmit:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.filterSearchRow.withSubmit .clearFilter {
+  right: 38px;
+}
+
+.filterSearchRow.withSubmit .filterSearch {
+  padding-right: 80px;
+}
+
 .filterInfoButton {
   position: absolute;
   border-radius: var(--cioos-radius-sm);

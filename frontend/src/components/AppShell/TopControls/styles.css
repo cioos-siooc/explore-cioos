@@ -148,6 +148,10 @@
   color: var(--cioos-ink);
 }
 
+/* The magnifier is the submit button (the field publishes on Enter or on it,
+   never on a pause), so it carries the same reset as the clear button beside
+   the field rather than reading as a decorative icon. */
+.topBarSearchSubmit,
 .topBarSearchClear {
   display: inline-flex;
   flex: 0 0 auto;
@@ -158,8 +162,15 @@
   cursor: pointer;
 }
 
+.topBarSearchSubmit:hover,
 .topBarSearchClear:hover {
   color: var(--cioos-ink);
+}
+
+.topBarSearchSubmit:focus-visible {
+  outline: none;
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-focus);
 }
 
 /* The icon and the filters badge hold their size; only text gives way. */

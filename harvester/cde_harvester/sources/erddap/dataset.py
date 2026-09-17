@@ -10,8 +10,8 @@ from cde_harvester.core.observability import run_logger
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import (
+    eov_standard_name,
     eov_to_standard_name,
-    intersection,
     standard_name_to_eovs,
 )
 
@@ -310,22 +310,17 @@ class Dataset:
 
     def get_eovs(self):
         eovs = []
-        dataset_standard_names = self.df_variables["standard_name"].to_list()
+        eov_names = self.df_variables["standard_name"].map(eov_standard_name)
 
         for eov in eov_to_standard_name:
-            overlap = intersection(
-                dataset_standard_names, eov_to_standard_name[eov]
-            )
-            if overlap:
+            eov_columns = self.df_variables.loc[
+                eov_names.isin(eov_to_standard_name[eov])
+            ]
+            if not eov_columns.empty:
                 # check if list of standard names in this EOV overlaps with list of standard names in this dataset
 
                 # set first_eov_column, which is used to set default column in preview
-                first_standard_name = overlap[0]
-                self.first_eov_column = (
-                    self.df_variables.query(f"standard_name=='{first_standard_name}'")
-                    .head(1)["name"]
-                    .item()
-                )
+                self.first_eov_column = eov_columns.iloc[0]["name"]
                 eovs.append(eov)
         return eovs
 
@@ -339,7 +334,7 @@ class Dataset:
         """
         eov_variables = {}
         for name, row in self.df_variables.iterrows():
-            eovs = standard_name_to_eovs.get(row.get("standard_name"))
+            eovs = standard_name_to_eovs.get(eov_standard_name(row.get("standard_name")))
             if eovs:
                 eov_variables[name] = eovs
         return eov_variables

@@ -29,12 +29,6 @@ services:
     ports:
       - "${PREFECT_PORT:-4200}:4200"
 
-  scheduler:
-    environment:
-      # Base derives this from Coolify's SERVICE_URL_NGINX; here that would
-      # expand to a bare "/downloads".
-      - "DOWNLOAD_WAF_URL=${DOWNLOAD_WAF_URL}"
-
   prefect_worker:
     # Name it for `docker save` to a second harvest host (docker-compose.worker.yaml).
     image: cde-harvester:latest
@@ -46,7 +40,7 @@ services:
       - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
 
   redis:
-    # Bound the cache (100mb, allkeys-lfu) so it can't compete with Postgres.
+    # Bound the cache (see redis-config/redis.conf) so it can't compete with Postgres.
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf:ro
