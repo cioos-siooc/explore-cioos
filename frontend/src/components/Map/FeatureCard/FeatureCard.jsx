@@ -104,7 +104,10 @@ export default function FeatureCard() {
   // the actions that genuinely need a result row are withheld.
   const byPk = new Map(pointsData.map((row) => [Number(row.pk), row]));
 
-  const rows = query.items
+  // A marker click's featureQuery is deliberately item-less (see Map.jsx's
+  // handleMapClick): it opens the dataset page directly and only sets this to
+  // pin the dataset in the list, so the card itself has nothing to list.
+  const rows = (query.items || [])
     .map((item) => {
       const row = byPk.get(item.pk);
       if (!row && item.kind === "observation") return null;
