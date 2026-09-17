@@ -18,7 +18,7 @@ import pandas as pd
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 from cde_harvester.dataset_types.tabledap_features import _axis_bounds_from_metadata
-from cde_harvester.utils import standard_name_to_eovs
+from cde_harvester.utils import eov_standard_name, standard_name_to_eovs
 
 _N_VALUES_RE = re.compile(r"nValues=(\d+)")
 _EVENLY_SPACED_RE = re.compile(r"evenlySpaced=(true|false)")
@@ -153,7 +153,9 @@ def _extract_variables(dataset):
             "standard_name": variable["standard_name"],
             "long_name": variable["long_name"],
             "units": variable["units"],
-            "eovs": standard_name_to_eovs.get(variable["standard_name"], []),
+            "eovs": standard_name_to_eovs.get(
+                eov_standard_name(variable["standard_name"]), []
+            ),
         }
         for variable in extract_variables(dataset.df_variables, names=names)
     ]

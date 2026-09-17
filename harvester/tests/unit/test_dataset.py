@@ -257,6 +257,14 @@ class TestDatasetEOVMapping:
         ds = _make_dataset(mock_erddap_server, info_csv=ERDDAP_INFO_NO_EOVS_CSV)
         assert ds.eovs == []
 
+    def test_modified_standard_name_is_not_an_eov_measurement(self, mock_erddap_server):
+        info_csv = ERDDAP_INFO_CSV.replace(
+            "sea_water_temperature", "sea_water_temperature status_flag"
+        )
+        ds = _make_dataset(mock_erddap_server, info_csv=info_csv)
+        assert ds.eovs == []
+        assert ds.get_eov_variables() == {}
+
     def test_first_eov_column_set(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)
         assert ds.first_eov_column == "temperature"
