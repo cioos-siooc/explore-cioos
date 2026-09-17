@@ -97,6 +97,7 @@
   "scientificNameFilterDisabledTooltip": "Incluez OBIS dans le filtre Portail de données pour filtrer par nom scientifique",
   "scientificNameFilterNoResults": "Aucun nom scientifique ou commun correspondant",
   "scientificNameFilterLoading": "Recherche…",
+  "filterSearchSubmitTitle": "Rechercher",
   "filterClearSearchTitle": "Effacer les termes de recherche",
   "resetButtonText": "Réinitialiser",
   "closeButtonText": "Fermer",

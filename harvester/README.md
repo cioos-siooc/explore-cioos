@@ -191,9 +191,6 @@ DB_NAME=cde
 SENTRY_DSN=your_sentry_dsn_here
 ENVIRONMENT=development  # or production
 
-# Path to your project root on the host machine (required for Docker volume mounting)
-HOST_ROOT=/path/to/your/workspace/explore-cioos
-
 # Optional: Harvester schedule (defaults to None unset)
 HARVESTER_CRON=10 0 */3 * *
 # Optional: WoRMS vernaculars backfill schedule (unset = none)

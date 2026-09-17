@@ -1,5 +1,49 @@
+const zlib = require("node:zlib");
+
 const apicache = require("apicache");
 const redis = require("./redis");
+
+/*
+ * Cached bodies are stored compressed.
+ *
+ * apicache hands us the whole cache object as one JSON string under the
+ * `response` field, and JSON.stringify turns a Buffer body — every .mvt tile —
+ * into {"type":"Buffer","data":[12,34,...]}, one byte per 3-4 ASCII chars. A
+ * z3 tile measured 42 KB raw and 123 KB stored; /api/datasets, 717 KB of JSON,
+ * stored as 2.5 MB, i.e. one key for 2.5% of a 100mb cache. Measured against
+ * prod payloads, gzip+base64 gives ~6x on tiles and ~29x on the JSON catalog
+ * routes, which is what makes the warm set fit (see redis-config/redis.conf).
+ *
+ * Nothing on the wire changes: nginx does the client-facing gzip (nginx.conf),
+ * express runs no compression middleware, so this is purely how the bytes sit
+ * in redis.
+ *
+ * base64 rather than raw deflate bytes because the adapter's contract with
+ * redis@5 here is string-valued; it costs 33% back and keeps the client's
+ * default encoding binary-safe with no reconfiguration.
+ *
+ * SYNCHRONOUS on purpose. apicache issues hset(response) -> hset(duration) ->
+ * expire(key) back to back, relying on each having queued its command before
+ * the next runs. Deferring the compression to a callback would let EXPIRE
+ * reach redis before the key existed — it would return 0, the TTL would never
+ * be set, and the entry would sit there until eviction. The cost lands on the
+ * miss path, which has just spent seconds in Postgres.
+ */
+const COMPRESSED_PREFIX = "gz:";
+
+function packResponse(value) {
+  return COMPRESSED_PREFIX + zlib.gzipSync(value).toString("base64");
+}
+
+// Anything without the marker is passed through: an entry written before this
+// landed, or by a rolled-back build, still reads.
+function unpackResponse(value) {
+  if (typeof value !== "string" || !value.startsWith(COMPRESSED_PREFIX)) {
+    return value;
+  }
+  const payload = Buffer.from(value.slice(COMPRESSED_PREFIX.length), "base64");
+  return zlib.gunzipSync(payload).toString();
+}
 
 // apicache 1.6.3 speaks the node_redis v2/v3 client API: it gates every cache
 // read AND write on `redis.connected` and calls callback-style
@@ -19,8 +63,9 @@ function apicacheRedisAdapter(client) {
     // Fire-and-forget in apicache (no callback passed for the stores); accept an
     // optional cb anyway. Values must be strings for redis@5's hSet.
     hset(key, field, value, cb) {
+      const stored = typeof value === "string" ? value : String(value);
       client
-        .hSet(key, field, typeof value === "string" ? value : String(value))
+        .hSet(key, field, field === "response" ? packResponse(stored) : stored)
         .then((res) => cb && cb(null, res))
         .catch((err) => cb && cb(err));
     },
@@ -29,7 +74,18 @@ function apicacheRedisAdapter(client) {
       // so an empty object correctly reads as a miss.
       client
         .hGetAll(key)
-        .then((obj) => cb(null, obj))
+        .then((obj) => {
+          if (!obj || !obj.response) return cb(null, obj);
+          // A body we cannot unpack is reported as a miss rather than thrown:
+          // apicache parses this inside its own callback, where a throw would
+          // escape as an unhandled exception. A miss just regenerates it.
+          try {
+            cb(null, { ...obj, response: unpackResponse(obj.response) });
+          } catch (err) {
+            console.warn(`Cache: dropping unreadable entry for ${key}`, err);
+            cb(null, {});
+          }
+        })
         .catch((err) => cb(err));
     },
     expire(key, seconds, cb) {

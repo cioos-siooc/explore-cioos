@@ -28,6 +28,7 @@ import {
   isGroupDimension,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
+import { useSearchInput } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
@@ -64,8 +65,8 @@ export default function DatasetsTable({
   // lives there too: the hidden groups decide what the map draws, and both are
   // carried in the URL.
   const {
-    datasetTitleSearchText: searchText,
-    setDatasetTitleSearchText: setSearchText,
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
     groupBy: selectedGroupBy,
     setGroupBy,
     hiddenGroups,
@@ -73,6 +74,14 @@ export default function DatasetsTable({
     showAllGroups,
     selectedPks,
   } = useSelection();
+  // The same free-text search the top bar and the Filters modal write, and it
+  // narrows the map as well as this list — so the box below goes on Enter or
+  // on its magnifier (useSearchInput) rather than on a pause mid-word.
+  const [searchText, setSearchText, submitSearch] = useSearchInput(
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
+    { trigger: "submit" },
+  );
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
   // card named datasets that could be on page 6 of 8, and there was no way to
@@ -340,8 +349,23 @@ export default function DatasetsTable({
           </label>
         )}
         {!isDownloadModal && (
-          <div className="datasetsTableSearchWrap">
-            <Search size={13} aria-hidden="true" />
+          // A form, so Enter searches natively and the magnifier is that same
+          // submit rather than a decorative icon with a handler bolted on.
+          <form
+            className="datasetsTableSearchWrap"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitSearch();
+            }}
+          >
+            <button
+              type="submit"
+              className="datasetsTableSearchSubmit"
+              title={t("filterSearchSubmitTitle")}
+              aria-label={t("filterSearchSubmitTitle")}
+            >
+              <Search size={13} aria-hidden="true" />
+            </button>
             <input
               className="datasetsTableSearch"
               type="text"
@@ -349,7 +373,7 @@ export default function DatasetsTable({
               placeholder={t("datasetInspectorFilterText")}
               onChange={(e) => setSearchText(e.target.value)}
             />
-          </div>
+          </form>
         )}
       </div>
 
