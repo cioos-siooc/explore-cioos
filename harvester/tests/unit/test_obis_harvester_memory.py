@@ -36,8 +36,9 @@ class AlwaysExemptGeoFilter:
 
 
 def make_occurrences(n, lat=44.6, lon=-63.6):
-    return {
-        "results": [
+    """get_occurrences returns a DataFrame, not a {"results": [...]} dict."""
+    return pd.DataFrame(
+        [
             {
                 "decimalLatitude": lat,
                 "decimalLongitude": lon,
@@ -48,9 +49,8 @@ def make_occurrences(n, lat=44.6, lon=-63.6):
                 "maximumDepthInMeters": 0,
             }
             for _ in range(n)
-        ],
-        "total": n,
-    }
+        ]
+    )
 
 
 @pytest.fixture

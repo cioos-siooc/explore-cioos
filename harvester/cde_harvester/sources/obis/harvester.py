@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 
 OBIS_SOURCE_URL = "https://obis.org"
 
+# Rows per slice when serializing an occurrence frame to the JSON cache. Bounds
+# the dicts `to_dict` builds, which are otherwise one per occurrence, all live
+# at once (540 bytes/row measured, ~1.1 GiB on the largest OBIS dataset).
+OCCURRENCE_CACHE_SLICE_ROWS = 100_000
+
 
 class OBISHarvester(BaseHarvester):
     """Harvester for OBIS datasets.
@@ -118,9 +123,9 @@ class OBISHarvester(BaseHarvester):
 
                         bbox = None if exempt else self.geo_filter.bounds()
                         occurrences = self.get_occurrences(dataset_id, bbox=bbox)
-                        results = occurrences.get("results", [])
 
-                        if not results:
+                        # .empty, not falsiness: bool(DataFrame) raises.
+                        if occurrences.empty:
                             self.logger.warning("No occurrences for dataset %s", dataset_id)
                             all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_OCCURRENCES"])
                             record_attempt(
@@ -131,7 +136,8 @@ class OBISHarvester(BaseHarvester):
                             )
                             break
 
-                        cells = self.aggregate_cells(dataset_id, results, apply_filter=not exempt)
+                        cells = self.aggregate_cells(dataset_id, occurrences, apply_filter=not exempt)
+                        del occurrences
                         if cells.empty:
                             all_skipped.append([OBIS_SOURCE_URL, dataset_id, "NO_VALID_COORDINATES"])
                             record_attempt(
@@ -142,7 +148,7 @@ class OBISHarvester(BaseHarvester):
                             )
                             break
 
-                        dataset_row = self.build_dataset_row(dataset_id, metadata, results, cells)
+                        dataset_row = self.build_dataset_row(dataset_id, metadata, cells)
 
                         spills.append("cells", cells)
                         all_datasets.append(dataset_row)
@@ -153,7 +159,11 @@ class OBISHarvester(BaseHarvester):
                         break
 
                     except Exception as e:
-                        last_error = e
+                        # Formatted now rather than kept as the exception: an
+                        # exception object holds its traceback, whose frames pin
+                        # that attempt's occurrence frame alive through the NEXT
+                        # dataset's fetch.
+                        last_error = f"{type(e).__name__}: {e}"
                         self.logger.error(
                             "Error processing OBIS dataset %s (attempt %d/%d): %s",
                             dataset_id, attempt, self.MAX_RETRIES, e, exc_info=True,
@@ -172,8 +182,7 @@ class OBISHarvester(BaseHarvester):
                         dataset_id, status="error",
                         reason_code="UNKNOWN_ERROR",
                         error_message=(
-                            f"All {self.MAX_RETRIES} attempts failed: "
-                            f"{type(last_error).__name__}: {last_error}"
+                            f"All {self.MAX_RETRIES} attempts failed: {last_error}"
                             if last_error else f"All {self.MAX_RETRIES} attempts failed"
                         ),
                         duration_ms=int((time.monotonic() - t0) * 1000),
@@ -239,8 +248,49 @@ class OBISHarvester(BaseHarvester):
         return df_datasets
 
     def aggregate_cells(self, dataset_id, results, apply_filter=False):
-        """Aggregate occurrences by unique lat/lon grid cell into obis_cells rows."""
+        """Aggregate occurrences by unique lat/lon grid cell into obis_cells rows.
+
+        Single-pass entry point: aggregate everything, then finalize. Callers
+        that feed occurrences in chunks must instead call `_aggregate_chunk`
+        per chunk, merge the partials, and call `_finalize_cells` ONCE at the
+        end -- see `_finalize_cells` for why that order is load-bearing.
+        """
+        return self._finalize_cells(
+            self._aggregate_chunk(dataset_id, results, apply_filter=apply_filter)
+        )
+
+    def _finalize_cells(self, cells):
+        """Apply the aggregations that are NOT associative, once, at the end.
+
+        `fillna(0)` must not run per chunk. A cell whose depths are all null in
+        one chunk would yield 0.0 there, and merging that with a real 15.0 from
+        another chunk gives min(0.0, 15.0) = 0.0 -- silently wrong, and null
+        depth is normal in OBIS. depth_max is wrong symmetrically wherever the
+        real depth is negative (intertidal / above-datum records): max(0.0,
+        -2.0) = 0.0 instead of -2.0.
+        """
+        if cells.empty:
+            return cells
+        cells["depth_min"] = cells["depth_min"].fillna(0)
+        cells["depth_max"] = cells["depth_max"].fillna(0)
+        return cells
+
+    def _aggregate_chunk(self, dataset_id, results, apply_filter=False):
+        """Aggregate one chunk of occurrences into partial obis_cells rows.
+
+        Every aggregation here is associative and commutative, so partials from
+        disjoint chunks can be merged and the result equals a single pass over
+        the concatenation. `days` is the exception and is not carried directly:
+        it is recomputed from the merged `day_ranges` by the combiner.
+        """
         df = pd.DataFrame(results)
+
+        # A chunk with no rows at all carries no columns either, so the dropna
+        # below would raise KeyError rather than return empty. duckdb's
+        # end-of-stream frame does carry the columns, but an empty REST page or
+        # a dataset with no occurrences arrives here as a bare empty list.
+        if df.empty:
+            return df
 
         # Filter records missing coordinates
         df = df.dropna(subset=["decimalLatitude", "decimalLongitude"])
@@ -335,16 +385,15 @@ class OBISHarvester(BaseHarvester):
 
         cells["dataset_id"] = dataset_id
 
+        # Normalize here, not in _finalize_cells: duckdb's pandas dtype for a
+        # chunk depends on whether that chunk happened to contain a NULL
+        # (int64 vs Int64), so partials must be made uniform before they meet.
         cells["time_min"] = pd.to_datetime(cells["time_min"], errors="coerce", utc=True)
         cells["time_max"] = pd.to_datetime(cells["time_max"], errors="coerce", utc=True)
 
-        # Fill missing depths
-        cells["depth_min"] = cells["depth_min"].fillna(0)
-        cells["depth_max"] = cells["depth_max"].fillna(0)
-
         return cells
 
-    def build_dataset_row(self, dataset_id, metadata, results, cells):
+    def build_dataset_row(self, dataset_id, metadata, cells):
         """Build a single-row dataset DataFrame from OBIS dataset metadata."""
         institutes = metadata.get("institutes") or []
         organizations = [inst.get("name") for inst in institutes if inst.get("name")]
@@ -414,6 +463,45 @@ class OBISHarvester(BaseHarvester):
         with gzip.open(gz_path, "wt") as f:
             json.dump(data, f)
 
+    def _write_occurrence_cache(self, path, df, slice_rows=OCCURRENCE_CACHE_SLICE_ROWS):
+        """Write an occurrence frame as the same {"results": [...], "total": n}
+        gzip JSON the cache has always held, `slice_rows` rows at a time.
+
+        Serializing in one go means `to_dict` building a dict per occurrence --
+        measured at 540 bytes/row, ~1.1 GiB on the largest dataset -- all live
+        at once purely to be written out and discarded. Slicing caps that at
+        `slice_rows` regardless of how big the dataset is; the bytes on disk are
+        unchanged, so caches written before and after this are interchangeable.
+
+        Written to a temp file and renamed, because a crash mid-write otherwise
+        leaves a truncated .gz that the next run reads as a real cache: gzip
+        raises EOFError on a short read, and EOFError is not an OSError, so it
+        escapes the handler in `_read_cache`.
+        """
+        gz_path = path + ".gz"
+        os.makedirs(os.path.dirname(gz_path) or ".", exist_ok=True)
+        tmp_path = f"{gz_path}.{os.getpid()}.tmp"
+        try:
+            with gzip.open(tmp_path, "wt") as f:
+                f.write('{"results": [')
+                for start in range(0, len(df), slice_rows):
+                    rows = df.iloc[start:start + slice_rows].to_dict(orient="records")
+                    for i, row in enumerate(rows):
+                        if start or i:
+                            # json.dump's own default item separator, so the
+                            # bytes match a single-shot dump exactly.
+                            f.write(", ")
+                        # json cannot serialize pd.NA, which duckdb produces for
+                        # a null in a nullable-dtype column.
+                        json.dump({k: None if v is pd.NA else v for k, v in row.items()}, f)
+                    del rows
+                f.write(f'], "total": {len(df)}}}')
+            os.replace(tmp_path, gz_path)
+        except BaseException:
+            if os.path.isfile(tmp_path):
+                os.remove(tmp_path)
+            raise
+
     def fetch_dataset_metadata(self, dataset_id):
         """Fetch dataset metadata from the OBIS dataset API."""
         cache_file = os.path.join(self.folder, f"{dataset_id}_metadata.json")
@@ -437,7 +525,16 @@ class OBISHarvester(BaseHarvester):
         return metadata
 
     def get_occurrences(self, dataset_id, bbox=None):
-        """Fetch occurrences for a dataset via OBIS S3 parquet, with REST API fallback.
+        """Fetch a dataset's occurrences as a DataFrame, via OBIS S3 parquet
+        with a REST API fallback.
+
+        Returns a frame, not a list of dicts: `aggregate_cells` builds a frame
+        from whatever it is handed, so the dicts existed only to be converted
+        straight back. They were expensive -- measured at 896 of the 1108
+        bytes/row this path held at peak, i.e. ~1.9 GiB on the largest dataset
+        -- because `to_dict` and the pd.NA scrub each built a full second copy
+        that coexisted with the frame. The scrub now happens only where it was
+        ever needed: in the cache writer, because json cannot serialize pd.NA.
 
         ``bbox``, when given, is (lon_min, lat_min, lon_max, lat_max) -- the
         geo filter's polygon bounds. It's a superset pre-filter: points
@@ -453,7 +550,10 @@ class OBISHarvester(BaseHarvester):
         cached = self._read_cache(cache_file)
         if cached is not None:
             self.logger.info("Loaded %s occurrences from cache", dataset_id)
-            return cached
+            # pop, not get: drops the dict's reference to the list so it can be
+            # freed as soon as the frame is built, rather than staying alive
+            # alongside it for the whole aggregation.
+            return pd.DataFrame(cached.pop("results", []))
 
         import duckdb
         url = f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
@@ -473,22 +573,16 @@ class OBISHarvester(BaseHarvester):
                 interpreted.date_end           AS date_end,
                 interpreted.minimumDepthInMeters AS minimumDepthInMeters,
                 interpreted.maximumDepthInMeters AS maximumDepthInMeters,
-                interpreted.scientificName     AS scientificName,
-                _id                            AS id
+                interpreted.scientificName     AS scientificName
             FROM read_parquet('{url}')
             WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
               AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
         """
         try:
             df = duckdb.sql(query).df()
-            results = [
-                {k: None if v is pd.NA else v for k, v in row.items()}
-                for row in df.to_dict(orient="records")
-            ]
-            occurrences_data = {"results": results, "total": len(results)}
-            self.logger.info("Loaded %d occurrences from parquet for %s", len(results), dataset_id)
-            self._write_cache(cache_file, occurrences_data)
-            return occurrences_data
+            self.logger.info("Loaded %d occurrences from parquet for %s", len(df), dataset_id)
+            self._write_occurrence_cache(cache_file, df)
+            return df
         except Exception as e:
             self.logger.warning("Parquet fetch failed for %s, falling back to API: %s", dataset_id, e)
             return self._get_occurrences_api(dataset_id)
@@ -525,11 +619,12 @@ class OBISHarvester(BaseHarvester):
             page += 1
             time.sleep(0.1)
 
-        occurrences_data = {"results": all_results, "total": len(all_results)}
         self.logger.info("Loaded %d occurrences from OBIS for %s", len(all_results), dataset_id)
 
-        self._write_cache(cache_file, occurrences_data)
-        return occurrences_data
+        df = pd.DataFrame(all_results)
+        del all_results
+        self._write_occurrence_cache(cache_file, df)
+        return df
 
 
 @task(task_run_name="harvest-obis")

@@ -93,14 +93,11 @@ class StubGeoFilter:
 
 
 def _make_occurrences():
-    return {
-        "results": [{
-            "decimalLatitude": 51.0, "decimalLongitude": -125.0,
-            "scientificName": "Gadus morhua", "date_start": 0, "date_end": 0,
-            "minimumDepthInMeters": 0, "maximumDepthInMeters": 0,
-        }],
-        "total": 1,
-    }
+    return pd.DataFrame([{
+        "decimalLatitude": 51.0, "decimalLongitude": -125.0,
+        "scientificName": "Gadus morhua", "date_start": 0, "date_end": 0,
+        "minimumDepthInMeters": 0, "maximumDepthInMeters": 0,
+    }])
 
 
 class TestHarvestBboxWiring:

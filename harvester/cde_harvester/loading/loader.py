@@ -12,13 +12,12 @@ from prefect import get_run_logger, task
 from sqlalchemy import text
 
 from cde_harvester.core.day_sets import (
-    merge_ranges,
     ranges_from_iso,
     ranges_to_pg_literal,
     ranges_to_psycopg,
-    total_days,
 )
 from cde_harvester.core.db import create_db_engine, db_host
+from cde_harvester.core.obis_cells import merge_cells
 from cde_harvester.core.observability import init_sentry
 from cde_harvester.core.schemas import (
     DATASET_ARRAY_DTYPES,
@@ -146,47 +145,16 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     # rather than requiring a re-harvest to load at all.
     has_day_ranges = "day_ranges" in obis_cells.columns
     if has_day_ranges:
-        # Parse before the groupby: merge_ranges unpacks each element as a
+        # Parse before the merge: merge_ranges unpacks each element as a
         # (lo, hi) pair, so handing it the raw CSV string iterates it one
         # character at a time and raises "not enough values to unpack".
         obis_cells["day_ranges"] = obis_cells["day_ranges"].apply(parse_day_ranges)
 
-    # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
-    key_cols = ["dataset_id", "latitude", "longitude"]
-    aggregations = {
-        "scientific_names": (
-            "scientific_names",
-            lambda lists: sorted({name for lst in lists for name in lst}),
-        ),
-        "n_records": ("n_records", "sum"),
-        # max, not sum: this dedup merges rows that are the SAME cell split by
-        # float noise, so their day sets overlap and summing would inflate —
-        # the defect this column exists to remove. n_records sums because its
-        # occurrence subsets really are disjoint.
-        "days": ("days", "max"),
-        "time_min": ("time_min", "min"),
-        "time_max": ("time_max", "max"),
-        "depth_min": ("depth_min", "min"),
-        "depth_max": ("depth_max", "max"),
-    }
-    if has_day_ranges:
-        # Union, not max or concat: these rows are the SAME cell split by float
-        # noise, so their day sets overlap. merge_ranges is the Python twin of
-        # day_union_days, keeping `days` and `day_ranges` consistent.
-        aggregations["day_ranges"] = ("day_ranges", merge_ranges)
-
-    agg = (
-        obis_cells.groupby(key_cols, dropna=False)
-        .agg(**aggregations)
-        .reset_index()
-    )
-
-    if has_day_ranges:
-        # days has to report the union day_ranges now holds. max() is right
-        # only while the merged rows' day sets overlap; where they don't -- two
-        # float-noise halves of a cell sampled on different days -- it
-        # understates, and the two columns disagree about the same cell.
-        agg["days"] = agg["day_ranges"].apply(total_days)
+    # Deduplicate rows that are the SAME cell split by float noise. Shared with
+    # the harvester, which runs the identical merge over the partial cells it
+    # produces per occurrence chunk -- both are merging disjoint occurrence
+    # subsets of one cell, so one implementation serves both.
+    agg = merge_cells(obis_cells, has_day_ranges=has_day_ranges)
 
     if name_to_aphia:
 
