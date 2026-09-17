@@ -119,7 +119,9 @@
    are sentence case and lighter, which is the whole of the hierarchy at 10px —
    two uppercase levels would have looked like one. */
 .legendGroupLabel {
-  flex: 1 1 auto;
+  /* Shrinks to its words rather than taking the row: the ⓘ that follows reads
+     as belonging to this label, not as a control parked in the corner. */
+  flex: 0 1 auto;
   min-width: 0;
   font-size: var(--cioos-font-size-2xs);
   font-weight: 700;
@@ -130,6 +132,34 @@
   /* Wraps rather than nowrap: the card is capped at 190px and the longer French
      labels ran past it, where the card's overflow simply cut them off. */
   line-height: 1.25;
+}
+
+/* The ⓘ that opens a caption's long form (see LegendHelpModal). It follows the
+   words it explains — group label or sub-caption — rather than sitting at the
+   end of the row, so what it is about is read off its position. Sized as a
+   footnote marker like the credits button in the card's foot, not as a control
+   competing with the switches. */
+.legendInfoButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+}
+
+.legendInfoButton:hover {
+  color: var(--cioos-ink);
+  background-color: var(--cioos-surface-2);
+}
+
+.legendInfoButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* One entry inside a group: its caption, then its swatches or bar. */

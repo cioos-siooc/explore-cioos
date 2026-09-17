@@ -149,6 +149,17 @@ export const bathymetryFullZoom = basemapHandoffEndZoom;
 export const bathymetryLegendMinZoom =
   (bathymetryFadeInZoom + bathymetryFullZoom) / 2;
 
+// The CHS page describing the NONNA products these rasters are drawn from,
+// which the legend's depth entry links out to. Kept here beside the ramp and
+// the zoom gates for the same reason they are: everything the legend says about
+// this basemap layer is written in one place. The Government of Canada serves
+// every page as an -eng/-fra pair, so the link follows the UI language rather
+// than sending a French reader to an English page.
+export const bathymetrySourceUrl = {
+  en: "https://charts.gc.ca/data-gestion/nonna/index-eng.html",
+  fr: "https://charts.gc.ca/data-gestion/nonna/index-fra.html",
+};
+
 // The NONNA depth ramp, as (metres, colour) anchors.
 //
 // CHS publishes NONNA as pre-rendered RGB — the GeoServer style is a plain

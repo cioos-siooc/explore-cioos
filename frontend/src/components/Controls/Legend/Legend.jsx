@@ -7,6 +7,7 @@ import {
   Circle,
   CircleFill,
   HexagonFill,
+  InfoCircle,
 } from "react-bootstrap-icons";
 
 import {
@@ -32,6 +33,7 @@ import Modal from "../../ui/Modal.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Switch from "../../ui/Switch.jsx";
 import LegendFooter from "./LegendFooter.jsx";
+import LegendHelpModal, { LEGEND_HELP_SECTIONS } from "./LegendHelpModal.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
@@ -151,6 +153,10 @@ export default function Legend({
   // That is the right trade for a legend: it is read in glances, not kept open.
   const compact = useMediaQuery(MOBILE_QUERY);
   const [detailOpen, setDetailOpen] = useState(false);
+  // Which explanation is open, by its LEGEND_HELP_SECTIONS key — one dialog for
+  // every ⓘ on the card, whether it sits on a group label or on one of the
+  // shapes inside it (see LegendHelpModal).
+  const [helpSection, setHelpSection] = useState();
 
   // Fall back to the default selection when the prop is absent (older callers /
   // initial render) — all-on would claim legend entries the map isn't drawing.
@@ -185,6 +191,27 @@ export default function Legend({
   // The marker keys (size, platform colours) describe the point tier only.
   const pointsOnMap = markerTier && profileFamilyOn;
 
+  // The ⓘ that opens a caption's long form, sitting immediately after the words
+  // it belongs to. Null for a caption with no entry in LEGEND_HELP_SECTIONS, so
+  // a caption and its explanation are wired together in one place.
+  function renderHelpButton(key) {
+    if (!LEGEND_HELP_SECTIONS[key]) return null;
+    const label = t("legendHelpOpen", {
+      section: t(`legendHelp_${key}_title`),
+    });
+    return (
+      <button
+        type="button"
+        className="legendInfoButton"
+        onClick={() => setHelpSection(key)}
+        title={label}
+        aria-label={label}
+      >
+        <InfoCircle size={11} aria-hidden="true" />
+      </button>
+    );
+  }
+
   // One group: its label row — the switch for everything in the group, then the
   // group's title — and its contents. The label row is never dimmed; it holds
   // the control that turns the group back on.
@@ -202,9 +229,12 @@ export default function Legend({
     { control, tooltip, idSuffix = "" } = {},
     children,
   ) {
+    // Every group has a long form, so the ⓘ is what makes the label row worth
+    // drawing even where the group has no name and no switch of its own.
+    const help = renderHelpButton(key);
     return (
       <div className="legendGroup" key={key}>
-        {(label || control) && (
+        {(label || control || help) && (
           <div className="legendGroupLabelRow">
             {control && (
               <Switch
@@ -221,6 +251,7 @@ export default function Legend({
             ) : (
               label
             )}
+            {help}
           </div>
         )}
         {children}
@@ -233,11 +264,17 @@ export default function Legend({
   // against the group labels' upper case, which is what keeps the two levels
   // apart at this size; the icon is what tells the entries apart at a glance,
   // since "Hexes" and "Markers" are the same length and weight.
-  function renderSubCaption(caption, { icon, tooltip } = {}) {
+  //
+  // `help` is the LEGEND_HELP_SECTIONS key for this entry, when it has an
+  // explanation of its own: the hexes and the markers are the same count drawn
+  // two ways, and what each of them is doing is not something the group's label
+  // — the metric they share — can say for them.
+  function renderSubCaption(caption, { icon, tooltip, help } = {}) {
     return (
       <div className="legendSubCaption" title={tooltip}>
         {icon}
         <span>{caption}</span>
+        {help && renderHelpButton(help)}
       </div>
     );
   }
@@ -364,13 +401,12 @@ export default function Legend({
   // so there is simply no bar to draw (see renderCountStatus for the case where
   // the tier has no counts at all).
   //
-  // `labelled` is false when the markers are not on screen: the bar is then the
-  // only thing in the group, the group's own title already says what its colours
-  // count, and a caption naming the one entry present is a line spent saying
-  // nothing. The label earns its place only where there is a second entry — the
-  // markers — for it to tell the bar apart from. That is also why the compact
-  // card passes false: it shows the bar under the same group label row and
-  // nothing else (see compactRamp).
+  // `labelled` is false only on the compact card, which shows the bar under the
+  // group's label row and nothing else (see compactRamp). It used to be false
+  // whenever the markers were away too — a caption naming the one entry present
+  // was a line spent saying nothing — but the caption now carries the ⓘ that
+  // explains what a hexagon is, and the zooms where the markers are away are
+  // exactly the zooms where that question gets asked.
   function renderHexEntry(labelled, maxTicks) {
     if (!hexesOnMap || isEmpty(hexRangeLevel)) return null;
     return (
@@ -385,6 +421,7 @@ export default function Legend({
                 aria-hidden="true"
               />
             ),
+            help: "hexes",
           })}
         {renderColorBar(
           colorScale,
@@ -476,6 +513,7 @@ export default function Legend({
               <Circle className="legendSubIcon" size={8} aria-hidden="true" />
             ),
             tooltip: t("legendMarkerDaysPinned"),
+            help: "markers",
           })}
           <div className="legendSizeKey">
             <span className="legendSwatch">
@@ -566,10 +604,8 @@ export default function Legend({
   // Built up front so a group can be left out entirely when it would be empty —
   // a label with nothing under it is worse than no label.
   const countStatus = renderCountStatus();
-  // Markers first: whether they are on screen decides whether the hex bar needs
-  // naming (see renderHexEntry).
   const markerKeys = renderMarkerKeys();
-  const hexEntry = renderHexEntry(Boolean(markerKeys));
+  const hexEntry = renderHexEntry(true);
   // The one key the compact card keeps on the map. Everything else in the body
   // names a shape or a colour the map is already showing — a track line looks
   // like a track line — but what a hexagon's green is worth in days of data is
@@ -687,6 +723,14 @@ export default function Legend({
           keys, so it is as useful with the card shut as open — closed, the card
           is its header row and the scale row, and nothing more. */}
       <LegendFooter />
+      {/* The long form of whichever caption's ⓘ was pressed. Outside the
+          compact dialog rather than inside it: the same ⓘ are on the standing
+          card, and one mount is what keeps the two from drifting into two
+          different explanations. */}
+      <LegendHelpModal
+        section={helpSection}
+        onHide={() => setHelpSection(undefined)}
+      />
       {compact && (
         <Modal
           show={detailOpen}
