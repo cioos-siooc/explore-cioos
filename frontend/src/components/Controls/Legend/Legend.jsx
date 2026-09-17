@@ -542,8 +542,8 @@ export default function Legend({
     );
   }
 
-  // The switches with nothing on the map keyed to them (gridded coverage, the
-  // globe view). They are a group like the rest, labelled as what they are —
+  // The switches with nothing on the map keyed to them (gridded coverage).
+  // They are a group like the rest, labelled as what they are —
   // layers with no key — rather than left as loose rows at the foot of the card
   // where they read as trailing off the group above them.
   function renderLayerSwitches() {

@@ -228,7 +228,7 @@
     font-size: min(var(--cioos-font-size-xl), 5.5vw);
   }
 
-  /* Touch targets for the three icon actions, the smallest things on the
+  /* Touch targets for the icon actions, the smallest things on the
      header — and no larger, the row's width being spoken for. */
   .brandMinorItem {
     width: 32px;

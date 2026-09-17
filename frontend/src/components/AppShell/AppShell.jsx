@@ -46,8 +46,6 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
-    projection,
-    setProjection,
     activeWmsOverlay,
     setActiveWmsOverlay,
     tracksMode,
@@ -112,13 +110,6 @@ export default function AppShell() {
       label: t("layersGriddedCoverage"),
       checked: griddapCoverageVisible,
       onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible),
-    },
-    {
-      key: "globe",
-      label: t("layersGlobeView"),
-      checked: projection === "globe",
-      onChange: () =>
-        setProjection(projection === "globe" ? "mercator" : "globe"),
     },
   ];
 

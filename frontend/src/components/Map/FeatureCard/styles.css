@@ -15,7 +15,7 @@
   position: fixed;
   left: 12px;
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
-  z-index: calc(var(--cioos-z-dock, 35) + 2);
+  z-index: calc(var(--cioos-z-shell, 30) - 2);
 
   /* The same goldenrod the map rings the clicked region in and the pinned
      rows in the datasets list and the inspector's table wear too
