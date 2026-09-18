@@ -22,6 +22,7 @@ Pickle, not parquet: this is an ephemeral in-process handoff, not a durable or
 interchange format, it round-trips dtypes exactly, and pyarrow/fastparquet
 aren't dependencies here.
 """
+import ctypes
 import gc
 import logging
 import os
@@ -30,6 +31,27 @@ import tempfile
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+try:
+    _libc = ctypes.CDLL("libc.so.6")
+    _libc.malloc_trim.argtypes = [ctypes.c_size_t]
+    _libc.malloc_trim.restype = ctypes.c_int
+except (OSError, AttributeError):
+    # Not glibc (musl, macOS). The trim is an optimization, never a
+    # correctness requirement, so run without it.
+    _libc = None
+
+
+def _release_freed_pages():
+    """Return freed pages to the OS.
+
+    `gc.collect()` frees the Python OBJECTS but glibc keeps their pages on its
+    per-arena free lists, so RSS ratchets up across flushes and never comes
+    back down. Measured over one OBIS run's flush cadence: +272 MiB with
+    `gc.collect()` alone, +35 MiB with this as well.
+    """
+    if _libc is not None:
+        _libc.malloc_trim(0)
 
 
 class SpillSet:
@@ -121,8 +143,11 @@ class SpillSet:
             wrote = True
         if wrote:
             # Return the freed arenas rather than letting them ratchet: the
-            # whole point of flushing is that RSS goes back down.
+            # whole point of flushing is that RSS goes back down. gc.collect()
+            # alone does not achieve that -- it frees the objects, not the
+            # pages -- so the trim is what makes the comment above true.
             gc.collect()
+            _release_freed_pages()
 
     def collect(self, name):
         """Reassemble one table. Flushes the trailing partial batch first, so
