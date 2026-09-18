@@ -74,11 +74,7 @@ export default function Loading({
         {/* What the wait is actually made of. The splash is the longest wait in
             the app, so it names its parts rather than leaving the user to
             guess. */}
-        <ActivityList
-          labelKeys={labelKeys}
-          className="loadingActivity"
-          marks={false}
-        />
+        <ActivityList labelKeys={labelKeys} className="loadingActivity" />
       </div>
     </div>
   );

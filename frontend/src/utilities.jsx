@@ -729,22 +729,40 @@ export function selectionFromSearchParams(searchParams) {
   ];
 }
 
-// No dataset carries pk 0, so this is how the map asks for nothing at all —
-// an empty datasetPKs would read as "no dataset filter" and draw everything.
+// No dataset carries pk 0, so this is how a caller asks for nothing at all —
+// an empty datasetPKs would read as "no dataset filter" and return everything.
 const NO_DATASETS_PK = "0";
 
-// Map-only narrowing of a filter query string (tiles, legend, griddap
-// coverage) to the datasets whose group is still shown. The datasets list
-// keeps the hidden groups — this is a map visibility toggle, not a filter — so
-// the narrowing is applied to the map's queries alone. mapDatasetPKs is
-// undefined while nothing is hidden, which leaves the query untouched.
-export function applyMapDatasetPKs(queryString, mapDatasetPKs) {
-  if (!mapDatasetPKs) return queryString;
+// Narrows a filter query string to an explicit dataset list, for the narrowings
+// the API has no parameter of its own for. Each caller brings its own list,
+// because they narrow by different things: the map draws the shown groups
+// (SelectionProvider's mapDatasetPks), the coverage figure covers the datasets
+// the list is showing (filteredDatasetPks). `datasetPKs` is undefined while
+// nothing narrows, which leaves the query untouched.
+//
+// `allDatasetPKs` — the result set the list was narrowed FROM — is what keeps
+// the URL inside the request-line limit. A pk costs ~5 bytes and a comma
+// another three once encoded, so naming much over 2000 datasets is a 431 from
+// the server rather than a query; a narrowing that drops few datasets is sent
+// as the ones it dropped instead (excludeDatasetPKs), which is the same filter
+// written the shorter way. Without it the caller always names what it kept,
+// which is fine for a narrowing that keeps little (a title search) and breaks
+// for one that keeps nearly everything ("only in view", zoomed out).
+export function applyDatasetPKs(queryString, datasetPKs, allDatasetPKs) {
+  if (!datasetPKs) return queryString;
   const params = new URLSearchParams(queryString);
-  params.set(
-    "datasetPKs",
-    mapDatasetPKs.length > 0 ? mapDatasetPKs.join(",") : NO_DATASETS_PK,
-  );
+  const kept = new Set(datasetPKs);
+  const dropped = (allDatasetPKs || []).filter((pk) => !kept.has(pk));
+  if (allDatasetPKs && dropped.length < datasetPKs.length) {
+    // Nothing dropped is no narrowing at all — say nothing rather than send an
+    // empty param the API would have to decide the meaning of.
+    if (dropped.length > 0) params.set("excludeDatasetPKs", dropped.join(","));
+  } else {
+    params.set(
+      "datasetPKs",
+      datasetPKs.length > 0 ? datasetPKs.join(",") : NO_DATASETS_PK,
+    );
+  }
   return params.toString();
 }
 

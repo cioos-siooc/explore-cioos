@@ -279,6 +279,28 @@ export default function SelectionProvider({ children }) {
     i18n.language,
   ]);
 
+  // filteredDatasets as a pk list, for the queries that ask a question about
+  // the filtered data rather than draw it (the coverage figure). Everything
+  // the list narrows by — the search box, "only in view", the data-layer
+  // switches — is client-side, so a route that only ever sees the filter query
+  // string answers for datasets the user has already filtered out; handing it
+  // this list is how those three reach the API at all.
+  //
+  // Identity, not a flag, decides whether anything narrows: filteredDatasets
+  // returns pointsData itself when none of the three is active, and undefined
+  // here leaves the query as the filters wrote it (see applyDatasetPKs).
+  //
+  // Deliberately NOT mapDatasetPks: that one carries the hidden groups (a map
+  // visibility toggle the list ignores) and deliberately drops "only in view",
+  // which would rewrite every tile URL on every pan. This one is the list.
+  const filteredDatasetPks = useMemo(
+    () =>
+      filteredDatasets === pointsData
+        ? undefined
+        : filteredDatasets.map((row) => row.pk),
+    [filteredDatasets, pointsData],
+  );
+
   const selectedPks = useMemo(
     () =>
       new Set(
@@ -838,6 +860,7 @@ export default function SelectionProvider({ children }) {
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     filteredDatasets,
+    filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,
     inViewCount: datasetsInViewPks.size,

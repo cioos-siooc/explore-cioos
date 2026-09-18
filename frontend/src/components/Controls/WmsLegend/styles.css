@@ -132,35 +132,6 @@
   justify-content: flex-end;
 }
 
-/* Written with every box property it needs and one level deeper than it looks
-   like it should be: this card also renders inside the datasets sidebar's
-   dataset page, which gives every button in it a padded pill. */
-.wmsLegend .wmsLegendCloseButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: var(--cioos-radius-pill);
-  background: transparent;
-  background-image: none;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-}
-
-.wmsLegend .wmsLegendCloseButton:hover {
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-ink);
-}
-
-.wmsLegend .wmsLegendCloseButton:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
 /* The image is the card's title, so it is also its link to ERDDAP. */
 .wmsLegendFigure {
   display: block;

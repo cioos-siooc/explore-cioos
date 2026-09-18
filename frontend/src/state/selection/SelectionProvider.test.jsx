@@ -139,6 +139,25 @@ describe("SelectionProvider", () => {
     );
   });
 
+  it("\"only in view\" narrows the coverage figure's dataset list, not the map's", async () => {
+    await renderLoaded();
+    expect(latest.filteredDatasetPks).toBeUndefined();
+
+    act(() => latest.setOnlyInView(true));
+    // No fixture row carries a bbox, so nothing is in view: the figure is
+    // asked for an empty dataset list rather than left unnarrowed, which is
+    // what stops it answering for the datasets the filter just removed.
+    await waitFor(() => expect(latest.filteredDatasetPks).toEqual([]));
+    // The map deliberately ignores this one — feeding the viewport back into
+    // the tile queries would rewrite every one of them on every pan.
+    expect(
+      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
+    ).toBeNull();
+
+    act(() => latest.setOnlyInView(false));
+    await waitFor(() => expect(latest.filteredDatasetPks).toBeUndefined());
+  });
+
   it("fetches a record preview once inspectRecordID is set on an inspected dataset", async () => {
     const fixtureRow = pointQueryFixture[0];
     await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });

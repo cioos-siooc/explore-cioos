@@ -1,8 +1,25 @@
-/* Compact floating legend card, top-right corner of the map. */
-.legend {
+/* Compact floating legend card, bottom-right corner of the map — the keys on
+   the right, the "what's here" card on the left, both down on the bottom edge
+   where they are read against the map rather than over the top bar. */
+.mapLegend {
+  /* How far up this corner the card starts, against whichever of the two
+     surfaces that stand in it reaches higher: the time bar, which owns the
+     bottom edge and publishes its reach, and the griddap colorbar, which takes
+     this corner itself while an overlay is on and publishes its own — a figure
+     that already includes that card's clearance of the bar, so the two are
+     alternatives rather than a sum. Each is 0 while its surface is absent. */
+  --legend-corner-offset: max(
+    calc(12px + var(--cioos-time-bar-space, 0px)),
+    var(--cioos-wms-legend-space, 0px)
+  );
+
+  /* Viewport held clear above the card, so a long list of keys stops short of
+     the centered top bar instead of running the height of the screen. */
+  --legend-top-reserve: 108px;
+
   position: fixed;
-  top: 12px;
   right: 12px;
+  bottom: var(--legend-corner-offset);
   z-index: var(--cioos-z-map-controls, 2);
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
@@ -11,7 +28,18 @@
   flex-direction: column;
   min-width: 124px;
   max-width: 190px;
-  max-height: calc(100vh - 120px);
+
+  /* Two ceilings, whichever is lower: the reserve above, and the foot of the
+     depth strip down the right edge when one is up — this card sits under that
+     strip now that it holds the bottom of the same edge. DepthBar publishes the
+     foot; the term is 0, and so never the lower of the two, while the strip
+     isn't mounted. */
+  max-height: min(
+    calc(100vh - var(--legend-top-reserve) - var(--legend-corner-offset)),
+    calc(
+      100vh - var(--cioos-depth-bar-space, 0px) - var(--legend-corner-offset)
+    )
+  );
 
   /* The card no longer scrolls as a whole: its body does (below), so the
      header stays reachable and the footer's scale bar stays on screen however
@@ -92,7 +120,9 @@
    are sentence case and lighter, which is the whole of the hierarchy at 10px —
    two uppercase levels would have looked like one. */
 .legendGroupLabel {
-  flex: 1 1 auto;
+  /* Shrinks to its words rather than taking the row: the ⓘ that follows reads
+     as belonging to this label, not as a control parked in the corner. */
+  flex: 0 1 auto;
   min-width: 0;
   font-size: var(--cioos-font-size-2xs);
   font-weight: 700;
@@ -103,6 +133,34 @@
   /* Wraps rather than nowrap: the card is capped at 190px and the longer French
      labels ran past it, where the card's overflow simply cut them off. */
   line-height: 1.25;
+}
+
+/* The ⓘ that opens a caption's long form (see LegendHelpModal). It follows the
+   words it explains — group label or sub-caption — rather than sitting at the
+   end of the row, so what it is about is read off its position. Sized as a
+   footnote marker like the credits button in the card's foot, not as a control
+   competing with the switches. */
+.legendInfoButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+}
+
+.legendInfoButton:hover {
+  color: var(--cioos-ink);
+  background-color: var(--cioos-surface-2);
+}
+
+.legendInfoButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* One entry inside a group: its caption, then its swatches or bar. */
@@ -276,8 +334,15 @@
 }
 
 /* Map-layer switches, integrated into the legend card. Scoped-down switch
-   chrome keeps the section compact alongside the color bar. */
+   chrome keeps the section compact alongside the color bar.
+
+   These stand in their group's label row rather than under it (see
+   renderGroup), so they shrink to their words the way a group label does — the
+   ⓘ that follows reads as belonging to the switch it names, and a long label
+   wraps inside the card instead of pushing the button off the end. */
 .legendLayerItems {
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -286,25 +351,25 @@
 /* Scoped to the whole card, not just .legendLayerItems: the hex/point
    visibility switch now sits up in the ramp title row and has to match the
    switches further down. */
-.legend .form-check.form-switch {
+.mapLegend .form-check.form-switch {
   gap: 6px;
 }
 
-.legend .form-switch .form-check-input {
+.mapLegend .form-switch .form-check-input {
   width: 28px;
   height: 16px;
 }
 
-.legend .form-switch .form-check-input::before {
+.mapLegend .form-switch .form-check-input::before {
   width: 12px;
   height: 12px;
 }
 
-.legend .form-switch .form-check-input:checked::before {
+.mapLegend .form-switch .form-check-input:checked::before {
   transform: translateX(12px);
 }
 
-.legend .form-check-label {
+.mapLegend .form-check-label {
   font-size: var(--cioos-font-size-xs);
   line-height: 1.15;
   color: var(--cioos-ink);
@@ -412,25 +477,27 @@
   text-decoration: underline;
 }
 
-/* On narrower viewports the centered top bar (brand + merged
-   Datasets/Filters pill) reaches far enough right to collide with the
-   top-right legend, so move the legend to the bottom-left corner — clear of
-   the brand section — instead of leaving it beside the bar. */
-@media (max-width: 900px) {
-  .legend {
-    inset: auto auto calc(12px + var(--cioos-time-bar-space, 0px)) 8px;
+/* Phones keep the bottom-left corner: the bottom-right is the griddap
+   colorbar's here — it stands down to a button in it (WmsLegend's
+   COMPACT_QUERY) and there is no room on this width for the two side by side.
+   700px is the app's own mobile rung (MOBILE_QUERY in useMediaQuery), the same
+   one Legend.jsx branches on to render the keys as a dialog, so the corner and
+   the markup move together rather than at two numbers that can drift. */
+@media (max-width: 700px) {
+  .mapLegend {
+    /* The griddap card holds the other corner here, so the only thing to clear
+       is the tracks-mode time bar, which owns the whole bottom edge. */
+    --legend-corner-offset: calc(12px + var(--cioos-time-bar-space, 0px));
+    --legend-top-reserve: 136px;
 
-    /* Stacked directly above the tracks-mode time bar, which owns the bottom
-       edge of the screen here. --cioos-time-bar-space is 0 while the bar isn't
-       shown (TimeBar publishes its measured footprint), leaving the plain
-       bottom-corner offset. */
-    max-height: calc(100vh - 148px - var(--cioos-time-bar-space, 0px));
+    right: auto;
+    left: 8px;
   }
 }
 
 @media (max-height: 500px) {
-  .legend {
-    max-height: calc(100vh - 80px - var(--cioos-time-bar-space, 0px));
+  .mapLegend {
+    --legend-top-reserve: 68px;
   }
 }
 
@@ -445,7 +512,7 @@
  * and renders the dialog only in compact mode, and gating them again here
  * would be a second copy of that breakpoint to keep in step with the
  * first. The card's own corner and offsets are already right — they come
- * from the 900px rule above, which this width is inside.
+ * from the 700px rule above, which this width is inside.
  * ------------------------------------------------------------------ */
 
 /* The header is the control that opens the rest now, so it is sized as one
@@ -490,7 +557,7 @@
 
 /* The card's own scroll box and 9px gutter were the price of sitting beside the
    map; centred over it, the dialog body owns both. (The 190px cap and the
-   shrunken switch chrome are scoped to `.legend`, which is not an ancestor
+   shrunken switch chrome are scoped to `.mapLegend`, which is not an ancestor
    here, so the keys get their full width and the switches their full size back
    without anything having to undo them.) */
 .legendModal .legendBody {
