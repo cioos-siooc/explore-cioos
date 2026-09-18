@@ -99,6 +99,7 @@ export default function CoverageModal() {
       show={showCoverageModal}
       onHide={() => setShowCoverageModal(false)}
       className="coverageModal"
+      data-testid="coverage-modal"
       dialogClassName="coverageModalDialog"
       aria-labelledby="coverageModalTitle"
     >
@@ -122,10 +123,14 @@ export default function CoverageModal() {
           <span className="coverageToolbarLabel">
             {t("coverageCountByLabel")}
           </span>
-          <DropdownButton title={t(`coverageMetric_${count}`)}>
+          <DropdownButton
+            data-testid="coverage-count-dropdown"
+            title={t(`coverageMetric_${count}`)}
+          >
             {COUNT_OPTIONS.map((option) => (
               <Dropdown.Item
                 key={option}
+                data-testid="coverage-count-option"
                 active={option === count}
                 onClick={() => setCount(option)}
               >
@@ -136,10 +141,14 @@ export default function CoverageModal() {
           <span className="coverageToolbarLabel">
             {t("coverageColorByLabel")}
           </span>
-          <DropdownButton title={t(`coverageGroup_${groupBy}`)}>
+          <DropdownButton
+            data-testid="coverage-group-dropdown"
+            title={t(`coverageGroup_${groupBy}`)}
+          >
             {GROUP_OPTIONS.map((option) => (
               <Dropdown.Item
                 key={option}
+                data-testid="coverage-group-option"
                 active={option === groupBy}
                 onClick={() => setGroupBy(option)}
               >
