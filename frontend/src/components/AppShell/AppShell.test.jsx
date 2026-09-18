@@ -39,19 +39,19 @@ describe("AppShell (composition)", () => {
   it("opens the dataset list and, from it, a dataset's own page — Sidebar, DatasetsTable, SelectionProvider and DatasetInspector working together", async () => {
     const user = userEvent.setup();
     // Phone-width default (UIProvider's breakpoint): sidebar starts collapsed,
-    // so opening it here is itself part of what this test exercises.
+    // so opening it here — from the top bar, the only control that opens it;
+    // the card's own chevron just dismisses it — is itself part of what this
+    // test exercises.
     setViewportWidth(MOBILE_WIDTH);
     renderWithProviders(<AppShell />, { providers: "app" });
     await waitFor(() =>
       expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
     );
 
-    const toggle = screen.getByTestId("sidebar-toggle");
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await user.click(toggle);
-    await waitFor(() =>
-      expect(toggle).toHaveAttribute("aria-expanded", "true"),
-    );
+    const panel = screen.getByTestId("sidebar-datasets");
+    expect(panel).toHaveAttribute("data-expanded", "false");
+    await user.click(screen.getByTestId("topbar-datasets-button"));
+    await waitFor(() => expect(panel).toHaveAttribute("data-expanded", "true"));
 
     const cards = await screen.findAllByTestId(
       "dataset-card",
@@ -94,6 +94,20 @@ describe("AppShell (composition)", () => {
         document.querySelector(".filtersPanel, .filtersPanelBody"),
       ).toBeTruthy();
     });
+  });
+
+  it("opens the selection help modal from the sidebar footer's hint", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AppShell />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
+    );
+
+    expect(screen.queryByTestId("selection-help-modal")).toBeNull();
+    await user.click(screen.getByTestId("sidebar-selection-help"));
+    expect(
+      await screen.findByTestId("selection-help-modal"),
+    ).toBeInTheDocument();
   });
 
   it("shows the API error banner when a catalog fetch fails", async () => {

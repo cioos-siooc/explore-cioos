@@ -56,9 +56,11 @@ harvester_logs
 /obis/
 /harvester/obis/
 
-# Agent worktrees and local agent settings. `.claude/` has held full checkouts
-# of this repo before now; a `git add -A` then commits broken gitlinks.
-.claude/
+# Claude Code config. `settings.json` and `hooks/` are shared with the team;
+# these two are not. `.claude/worktrees/` holds full checkouts created by the
+# worktree tool, so leaving it trackable makes `git add -A` commit gitlinks.
+.claude/worktrees/
+.claude/settings.local.json
 
 # Tool caches. Each of these ships its own generated `.gitignore`, which is not
 # ours to rely on — a cache created by an older tool version has none.
@@ -68,6 +70,18 @@ harvester_logs
 # Harvest and download outputs. harvest-prod/ (96 MB) was invisible only
 # because the blanket `*.csv` above swallowed its contents.
 harvest-prod/
+harvest_obis*/
+
+# The OBIS occurrence cache written by a local harvest — 1 GB after one full
+# discovery run, and `obis_cache` is the DEFAULT folder name, so it lands
+# wherever the harvester is invoked from rather than at a fixed path.
+obis_cache*/
+
+# memory_profiler output and harvest logs from a profiled run.
+*.dat
+*.mprof
+obis_harvest*.log
+obis_harvest*.png
 
 # downloads/ is a tracked mount point (README.md explains it); ignore only the
 # generated archives inside it.

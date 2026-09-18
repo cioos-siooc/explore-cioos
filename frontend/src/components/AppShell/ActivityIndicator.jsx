@@ -2,14 +2,15 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 
 import ActivityList from "../ui/ActivityList.jsx";
+import Spinner from "../ui/Spinner.jsx";
 import { useActivity } from "../../state/activity/ActivityProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import "./activityIndicatorStyles.css";
 
-// The app's single report of background work: one panel in the bottom-right
-// corner naming everything currently loading, the map's layers individually.
-// It replaced a bottom-centre pill that only knew about the map, and left the
-// other loading flags to fend for themselves.
+// The app's single report of background work: one panel on the bottom edge,
+// centred, naming everything currently loading — the map's layers
+// individually. It replaced a pill that stood in the same place but only knew
+// about the map, and left the other loading flags to fend for themselves.
 //
 // It comes and goes with the work rather than being opened: nothing to click,
 // and nothing on screen once there is nothing left to say. The brand logo's
@@ -32,6 +33,12 @@ export default function ActivityIndicator() {
       {announced && !firstPaintPending && (
         <div className="activityStatus">
           <p className="activityStatusHeading">{t("activityStatusHeading")}</p>
+          {/* One mark for the whole panel, under the word it qualifies: the
+              rows below name the waits, and a spinner on each of them was the
+              same animation five times over. `presentation` because the
+              heading and the rows are the status; this is decoration on
+              them. */}
+          <Spinner size="sm" role="presentation" />
           <ActivityList labelKeys={labelKeys} />
         </div>
       )}

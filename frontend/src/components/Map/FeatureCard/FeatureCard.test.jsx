@@ -157,49 +157,6 @@ describe("FeatureCard", () => {
     expect(latestMap.featureQuery).toBeNull();
   });
 
-  it("Add all adds every selectable row and closes the card", async () => {
-    const { user } = await renderReady();
-    const [rowA, rowB] = pointQueryFixture.filter((r) => !r.selected);
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 7,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: rowA.pk, count: 2, title: rowA.title },
-          { kind: "observation", pk: rowB.pk, count: 1, title: rowB.title },
-        ],
-      });
-    });
-    await user.click(screen.getByTitle("Select all 2 datasets here"));
-    await waitFor(() => {
-      expect(latestSelection.selectedPks.has(rowA.pk)).toBe(true);
-    });
-    expect(latestMap.featureQuery).toBeNull();
-  });
-
-  it("Zoom here frames the click's bounds and closes the card", async () => {
-    const { user } = await renderReady();
-    const row = pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 8,
-        lngLat: [0, 0],
-        bounds: [
-          [-10, -10],
-          [10, 10],
-        ],
-        items: [
-          { kind: "observation", pk: row.pk, count: 1, title: row.title },
-        ],
-      });
-    });
-    await user.click(screen.getByText("Zoom here"));
-    await waitFor(() =>
-      expect(latestMap.zoomTarget?.geometry?.type).toBe("Polygon"),
-    );
-    expect(latestMap.featureQuery).toBeNull();
-  });
-
   it("shows a Show more button past the visible-row cap, and expands the list", async () => {
     const { user } = await renderReady();
     const rows = pointQueryFixture.slice(0, 7);

@@ -36,7 +36,7 @@ test.describe("the datasets sidebar", () => {
     // Closing is the list's own control, not the top bar's: once open it is a
     // sheet over the map, and on a phone it covers the top bar entirely — which
     // is why reaching back up there would be the wrong gesture to assert.
-    await page.getByTestId("sidebar-toggle").click();
+    await page.getByTestId("sidebar-collapse").click();
     await expect(panel).toHaveAttribute("data-expanded", "false");
   });
 
@@ -67,7 +67,7 @@ test.describe("the datasets sidebar", () => {
     await card.getByRole("checkbox", { name: "Add to selection" }).click();
     await expect(card).toHaveAttribute("data-selected", "true");
 
-    await page.getByTestId("sidebar-toggle").click();
+    await page.getByTestId("sidebar-collapse").click();
     await page.getByTestId("topbar-filters-button").click();
     await page.locator('[data-filter-name="oceanVariablesFiltername"]').click();
     const filteredResults = page.waitForResponse((response) =>

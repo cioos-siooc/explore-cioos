@@ -1,11 +1,17 @@
 import * as React from "react";
 import { useState } from "react";
 import {
+  ArrowCounterclockwise,
   ArrowsExpand,
   BoundingBox,
   Building,
   CalendarWeek,
+  ChevronDown,
   FileEarmarkSpreadsheet,
+  Funnel,
+  HandIndex,
+  Intersect,
+  Map as MapIcon,
   Pentagon,
   Search,
   Stack,
@@ -51,6 +57,20 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
+
+// The how-to shown in the detail pane before any filter is open (below) —
+// one step per glyph, in the order a first-time visitor would do them.
+const PLACEHOLDER_STEPS = [
+  { key: "select", Icon: HandIndex },
+  { key: "combine", Icon: Intersect },
+  { key: "live", Icon: MapIcon },
+  // The one shortcut that skips this dialog entirely: the same ▾ caret icon
+  // QuickFiltersButton itself renders, welded onto the Filters segment on the
+  // map (see TopControls.jsx), for the two filters — text search and area
+  // draw — that act on the map directly rather than an options list here.
+  { key: "quickMenu", Icon: ChevronDown },
+  { key: "reset", Icon: ArrowCounterclockwise },
+];
 
 function createOptionSubset(searchTerms, allOptions) {
   if (searchTerms) {
@@ -266,6 +286,9 @@ export default function FiltersPanel() {
               icon={<Search />}
               controlled
               searchable
+              // Unlike the facet rows, this one's value re-queries the map, so
+              // it goes on Enter or the magnifier rather than on a pause.
+              searchOnSubmit
               searchTerms={datasetTitleSearchText}
               setSearchTerms={setDatasetTitleSearchText}
               searchPlaceholder={t("textSearchFilterPlaceholder")}
@@ -616,7 +639,25 @@ export default function FiltersPanel() {
           )}
         </div>
         {!openFilter && (
-          <div className="filtersPanelPlaceholder">{t("filtersPanelHint")}</div>
+          <div className="filtersPanelPlaceholder">
+            <span className="filtersPanelPlaceholderIcon" aria-hidden="true">
+              <Funnel size={22} />
+            </span>
+            <p className="filtersPanelPlaceholderTitle">
+              {t("filtersPanelHintTitle")}
+            </p>
+            <p className="filtersPanelPlaceholderText">
+              {t("filtersPanelHint")}
+            </p>
+            <ul className="filtersPanelPlaceholderSteps">
+              {PLACEHOLDER_STEPS.map(({ key, Icon }) => (
+                <li key={key}>
+                  <Icon size={16} aria-hidden="true" />
+                  <span>{t(`filtersPanelHintStep_${key}`)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
       {/* Filters apply live, so there is nothing to confirm here — but the

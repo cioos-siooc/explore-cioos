@@ -63,11 +63,13 @@
   padding: 10px 14px;
 }
 
-/* The logo: nothing to do with it, so it carries no control affordance — its
-   mark simply pulses while the app is loading (see CioosLogo). Placement only
-   here; the lockup styles itself. */
+/* The logo: links out to the org's own site, but carries none of the usual
+   link chrome — no underline, no visited/link color — so it still reads as
+   the mark, not a text link; the lockup styles itself. */
 .brandLogo {
   justify-self: start;
+  color: inherit;
+  text-decoration: none;
 }
 
 /* Two-line wordmark lockup, lines centered on each other: the secondary
@@ -144,8 +146,23 @@
   text-decoration: none;
 }
 
+/* Pressed/open state (the intro modal up): same solid-primary fill the top
+   bar's own segments use for "the thing this button opens is on screen" (see
+   .topBarButton.active in AppShell/TopControls/styles.css). Icons here draw
+   with currentColor, so the fill alone recolors them — no separate svg rule
+   needed. */
+.brandMinorItem.active {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.brandMinorItem.active:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
 .brandLanguage {
-  font-size: var(--cioos-font-size-sm);
+  font-size: var(--cioos-font-size-md);
   font-weight: 700;
 }
 
@@ -228,7 +245,7 @@
     font-size: min(var(--cioos-font-size-xl), 5.5vw);
   }
 
-  /* Touch targets for the three icon actions, the smallest things on the
+  /* Touch targets for the icon actions, the smallest things on the
      header — and no larger, the row's width being spoken for. */
   .brandMinorItem {
     width: 32px;

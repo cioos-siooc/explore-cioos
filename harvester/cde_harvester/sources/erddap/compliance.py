@@ -5,8 +5,9 @@ from cde_harvester.core.errors import (
     NO_SUPPORTED_VARIABLES,
 )
 from cde_harvester.utils import (
-    cf_standard_names,
+    eov_standard_name,
     intersection,
+    is_cf_standard_name,
     supported_standard_names,
 )
 
@@ -55,7 +56,7 @@ class CDEComplianceChecker:
 
         #  List non-CF standard names
         non_standard_names = [
-            x for x in standard_names_in_dataset if x not in cf_standard_names
+            x for x in standard_names_in_dataset if not is_cf_standard_name(x)
         ]
         if non_standard_names:
             self.logger.warn(
@@ -65,7 +66,7 @@ class CDEComplianceChecker:
         #  This dataset has at least one standard name mapped to GOOS
         supported_variables = intersection(
             supported_standard_names,
-            standard_names_in_dataset,
+            [eov_standard_name(x) for x in standard_names_in_dataset],
         )
         if not supported_variables:
             self.failed_error("No supported variables found", NO_SUPPORTED_VARIABLES)

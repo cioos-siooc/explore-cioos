@@ -89,6 +89,14 @@ def flatten(t):
 CF_STANDARD_NAMES_CSV = Path(__file__).parent / "data" / "cf_standard_names.csv"
 CF_STANDARD_NAMES_VERSION_FILE = Path(__file__).parent / "data" / "cf_standard_names_version.txt"
 CF_NAMES_XML_URL = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
+CF_STANDARD_NAME_MODIFIERS = frozenset(
+    {
+        "detection_minimum",
+        "number_of_observations",
+        "standard_error",
+        "status_flag",
+    }
+)
 
 
 def get_cf_version_from_xml(url):
@@ -133,6 +141,38 @@ def get_cf_names():
 
 
 cf_standard_names = get_cf_names()
+
+
+def split_cf_standard_name(value):
+    """Return a CF standard name and optional Appendix C modifier, if well formed."""
+    if not isinstance(value, str):
+        return None
+    parts = value.split()
+    if len(parts) == 1:
+        return parts[0], None
+    if len(parts) == 2 and parts[1] in CF_STANDARD_NAME_MODIFIERS:
+        return parts[0], parts[1]
+    return None
+
+
+def is_cf_standard_name(value):
+    """Whether value is a table name optionally followed by a valid CF modifier."""
+    parsed = split_cf_standard_name(value)
+    return parsed is not None and parsed[0] in cf_standard_names
+
+
+def cf_standard_name_base(value):
+    """Return a well-formed standard name's unmodified base, or None."""
+    parsed = split_cf_standard_name(value)
+    return parsed[0] if parsed else None
+
+
+def eov_standard_name(value):
+    """Return an unmodified name eligible to represent an EOV measurement."""
+    parsed = split_cf_standard_name(value)
+    if parsed is None or parsed[1] is not None:
+        return None
+    return parsed[0]
 
 
 if __name__ == "__main__":

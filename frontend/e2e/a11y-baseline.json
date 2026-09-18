@@ -1,12 +1,12 @@
 {
   "default view": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 39,
+    "color-contrast": 42,
     "nested-interactive": 25
   },
   "datasets list open": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 39,
+    "color-contrast": 42,
     "nested-interactive": 25
   },
   "filters modal": {
@@ -19,7 +19,7 @@
   },
   "active filter chips": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 39,
+    "color-contrast": 44,
     "nested-interactive": 25
   },
   "intro modal": {
@@ -28,7 +28,7 @@
     "nested-interactive": 25
   },
   "mobile datasets sheet": {
-    "color-contrast": 31,
+    "color-contrast": 30,
     "nested-interactive": 25
   }
 }

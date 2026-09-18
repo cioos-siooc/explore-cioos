@@ -64,6 +64,22 @@ test("comma-separated keys bind as arrays, not as the raw string", async () => {
   assert.match(sql, /organization_pks && '\{"7"\}'/);
 });
 
+test("excludeDatasetPKs is the same narrowing written the shorter way", async () => {
+  // A client that narrows the catalogue itself can name what it kept or what
+  // it dropped; both have to reach the same predicate column, or the mild
+  // narrowings that can only be sent as a drop list would filter nothing.
+  const f = await createDBFilter({ excludeDatasetPKs: "4,5" });
+  assert.match(f.shared.toString(), /d\.pk_url <> ALL \('\{"4","5"\}'\)/);
+});
+
+test("excluding datasets does not drop the ones with no pk_url yet", async () => {
+  // pk_url is nullable, and `NULL <> ALL (...)` is NULL, not TRUE. Without the
+  // guard a single exclusion silently drops every dataset that
+  // 5_profile_process.sql has not back-filled — the opposite of narrowing.
+  const f = await createDBFilter({ excludeDatasetPKs: "4" });
+  assert.match(f.shared.toString(), /d\.pk_url IS NULL OR d\.pk_url <> ALL/);
+});
+
 test("latitude is clamped to the Mercator-valid range", async () => {
   // Transforming a ±90° envelope throws "transform: tolerance condition
   // error" in PostGIS and 500s the request.

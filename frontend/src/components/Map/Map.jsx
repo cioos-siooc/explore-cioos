@@ -3691,27 +3691,6 @@ export default function CreateMap({
         ],
       };
 
-      // "Zoom here" frames the cell that was clicked where there is one, so the
-      // old hex click's zoom-to-7 is still reachable — as a button, and framing
-      // the actual cell instead of a fixed zoom level. A lone marker has no
-      // area to frame, so it gets no button rather than one that jumps the
-      // camera to nothing.
-      let bounds = null;
-      if (areaHighlights.length > 0) {
-        try {
-          const box = turfBbox({
-            type: "FeatureCollection",
-            features: areaHighlights,
-          });
-          bounds = [
-            [box[0], box[1]],
-            [box[2], box[3]],
-          ];
-        } catch {
-          bounds = null;
-        }
-      }
-
       return {
         // A nonce, so clicking the same spot twice re-opens a card the user
         // dismissed rather than being deduped away by React.
@@ -3719,9 +3698,9 @@ export default function CreateMap({
         lngLat: [e.lngLat.lng, e.lngLat.lat],
         items,
         observationCount,
-        bounds,
         highlight,
-        // Every dataset under the click, for the card's "add all" action.
+        // Every dataset under the click, which the datasets list reads to pin
+        // and outline them (DatasetsTable's pinnedPks).
         datasetPks: [...new Set(items.map((item) => item.pk))],
       };
     };
@@ -4302,6 +4281,7 @@ export default function CreateMap({
       ref={mapContainer}
       className="map"
       data-testid="map-container"
+      data-projection={projection}
       data-map-ready={firstPainted || undefined}
     />
   );

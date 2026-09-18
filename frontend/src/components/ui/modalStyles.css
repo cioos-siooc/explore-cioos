@@ -78,27 +78,6 @@ body.cioos-modal-open {
   padding: var(--cioos-space-lg, 16px);
 }
 
-.btn-close {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--cioos-radius-sm, 6px);
-  background: transparent;
-  color: var(--cioos-ink, #152f37);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.btn-close::before {
-  content: "\00d7";
-}
-
-.btn-close:hover {
-  background-color: var(--cioos-surface-2, #eef6f4);
-}
-
 /* fullscreen variants */
 .modal-fullscreen {
   width: 100vw;
@@ -113,17 +92,9 @@ body.cioos-modal-open {
   border-radius: 0;
 }
 
-/* Mobile: the close button is the way out of every full-screen dialog (see the
-   shell modals' stylesheet and the datasets surface), so it is sized as a real
-   touch target rather than as a corner glyph. */
+/* Mobile: the close button — shared with every other dismissable surface, and
+   grown to a touch target by its own stylesheet — takes more of the row. */
 @media (max-width: 700px) {
-  .btn-close {
-    width: 44px;
-    height: 44px;
-    margin-right: -8px;
-    font-size: 30px;
-  }
-
   .modal-header {
     /* The title and the button both grew; the row gives back the padding it
        no longer needs to look like a header. */

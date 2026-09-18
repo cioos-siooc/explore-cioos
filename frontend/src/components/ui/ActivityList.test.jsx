@@ -16,19 +16,12 @@ describe("ActivityList", () => {
     expect(screen.getByRole("listitem")).toBeInTheDocument();
   });
 
-  it("shows a spinner per row by default, and omits it when marks is false", () => {
-    const { rerender } = renderWithProviders(
-      <ActivityList labelKeys={["activityCatalogText"]} />,
+  it("leaves the mark to its caller rather than repeating it per row", () => {
+    renderWithProviders(
+      <ActivityList
+        labelKeys={["activityCatalogText", "activityDatasetsText"]}
+      />,
     );
-    expect(
-      document.querySelector(".activityList li .cioosSpinner"),
-    ).toBeTruthy();
-
-    rerender(
-      <ActivityList labelKeys={["activityCatalogText"]} marks={false} />,
-    );
-    expect(
-      document.querySelector(".activityList li .cioosSpinner"),
-    ).toBeFalsy();
+    expect(document.querySelector(".activityList .cioosSpinner")).toBeFalsy();
   });
 });

@@ -4,11 +4,15 @@ Unit tests for cde_harvester.utils — EOV/CF standard name mappings and helpers
 
 
 from cde_harvester.utils import (
+    cf_standard_name_base,
     df_eov_to_standard_name,
-    erddap_time_to_iso,
+    eov_standard_name,
     eov_to_standard_name,
+    erddap_time_to_iso,
     get_eov_to_standard_name,
     intersection,
+    is_cf_standard_name,
+    split_cf_standard_name,
     supported_standard_names,
 )
 
@@ -93,3 +97,23 @@ class TestErddapTimeToIso:
         # The trap this function exists to avoid: pd.to_datetime on a float
         # without unit="s" reads it as nanoseconds and silently yields 1970.
         assert erddap_time_to_iso("1.5778368E9").startswith("2020-")
+
+
+class TestCFStandardNameModifiers:
+    def test_valid_modifier_is_recognized(self):
+        standard_name = "sea_water_temperature standard_error"
+        assert split_cf_standard_name(standard_name) == (
+            "sea_water_temperature",
+            "standard_error",
+        )
+        assert is_cf_standard_name(standard_name) is True
+        assert cf_standard_name_base(standard_name) == "sea_water_temperature"
+
+    def test_modifier_is_not_an_eov_measurement(self):
+        assert eov_standard_name("sea_water_temperature status_flag") is None
+
+    def test_invalid_modifier_is_rejected(self):
+        assert is_cf_standard_name("sea_water_temperature estimated") is False
+
+    def test_multiple_modifiers_are_rejected(self):
+        assert is_cf_standard_name("sea_water_temperature standard_error status_flag") is False

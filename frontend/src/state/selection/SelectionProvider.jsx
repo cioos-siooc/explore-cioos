@@ -50,6 +50,25 @@ const isPlatformlessDataset = (row) =>
   PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) ||
   row.source_type === "obis";
 
+// What the free-text search matches a dataset on: its title, its dataset type,
+// and the name of the data portal it came from. `query` is already lowercased.
+// Shared by the datasets list and the map narrowing below, so the two always
+// agree on what a search term keeps.
+function datasetMatchesSearch(row, query, language) {
+  return [
+    row.title,
+    row.cdm_data_type,
+    formatErddapServerName(
+      row.erddap_server_url || row.erddap_url,
+      language,
+      erddapServersJSONfile,
+    ),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
 function datasetInLanguage(point, language) {
   return {
     ...point,
@@ -249,18 +268,7 @@ export default function SelectionProvider({ children }) {
       if (layersNarrowed && !datasetInDataLayers(row, dataLayers)) return false;
       if (onlyInView && !datasetsInViewPks.has(row.pk)) return false;
       if (!hasSearch) return true;
-      return [
-        row.title,
-        row.cdm_data_type,
-        formatErddapServerName(
-          row.erddap_server_url || row.erddap_url,
-          i18n.language,
-          erddapServersJSONfile,
-        ),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
+      return datasetMatchesSearch(row, query, i18n.language);
     });
   }, [
     pointsData,
@@ -270,6 +278,28 @@ export default function SelectionProvider({ children }) {
     dataLayers,
     i18n.language,
   ]);
+
+  // filteredDatasets as a pk list, for the queries that ask a question about
+  // the filtered data rather than draw it (the coverage figure). Everything
+  // the list narrows by — the search box, "only in view", the data-layer
+  // switches — is client-side, so a route that only ever sees the filter query
+  // string answers for datasets the user has already filtered out; handing it
+  // this list is how those three reach the API at all.
+  //
+  // Identity, not a flag, decides whether anything narrows: filteredDatasets
+  // returns pointsData itself when none of the three is active, and undefined
+  // here leaves the query as the filters wrote it (see applyDatasetPKs).
+  //
+  // Deliberately NOT mapDatasetPks: that one carries the hidden groups (a map
+  // visibility toggle the list ignores) and deliberately drops "only in view",
+  // which would rewrite every tile URL on every pan. This one is the list.
+  const filteredDatasetPks = useMemo(
+    () =>
+      filteredDatasets === pointsData
+        ? undefined
+        : filteredDatasets.map((row) => row.pk),
+    [filteredDatasets, pointsData],
+  );
 
   const selectedPks = useMemo(
     () =>
@@ -319,18 +349,41 @@ export default function SelectionProvider({ children }) {
   );
 
   // Hand the map the datasets it may draw. The tile/legend/coverage queries
-  // take an include list (datasetPKs), so the exclusion is expressed as its
-  // complement over the current results; undefined while nothing is hidden
-  // leaves those queries as the filters wrote them.
+  // take an include list (datasetPKs), so the narrowing is expressed as a pk
+  // list over the current results; undefined while nothing narrows them leaves
+  // those queries as the filters wrote them.
+  //
+  // Two things narrow it: the groups hidden in the list, and the free-text
+  // search. The search is a filter rather than a display choice, so the map
+  // has to honour it — drawing markers and hexes for datasets the search has
+  // taken out of the list is the map disagreeing with its own sidebar. The
+  // other two narrowings filteredDatasets applies stay out of it: the
+  // data-layer switches already reach the map through the tile query (see
+  // Map/tileQuery.js), and "only in view" is the viewport itself, so feeding
+  // it back would rewrite every map query on every pan for no visible change.
+  //
+  // Each distinct search text here is a fresh set of tile, legend and coverage
+  // URLs, so typing a word uncached would cost a round of map requests per
+  // character — which is why every box that writes this state waits to be
+  // submitted, on Enter or on its magnifier, rather than publishing as it is
+  // typed (useSearchInput's "submit" trigger). Debouncing it here on top of
+  // that would only delay the map behind the list it has to agree with.
+  const mapDatasetPks = useMemo(() => {
+    const query = datasetTitleSearchText.toLowerCase();
+    const hasSearch = !isEmpty(datasetTitleSearchText);
+    if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
+    return pointsData
+      .filter(
+        (row) =>
+          !hiddenDatasetPks.has(row.pk) &&
+          (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
+      )
+      .map((row) => row.pk);
+  }, [hiddenDatasetPks, pointsData, datasetTitleSearchText, i18n.language]);
+
   useEffect(() => {
-    setMapDatasetPKs(
-      hiddenDatasetPks.size === 0
-        ? undefined
-        : pointsData
-            .filter((row) => !hiddenDatasetPks.has(row.pk))
-            .map((row) => row.pk),
-    );
-  }, [hiddenDatasetPks, pointsData, setMapDatasetPKs]);
+    setMapDatasetPKs(mapDatasetPks);
+  }, [mapDatasetPks, setMapDatasetPKs]);
 
   // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
   // component state, so Back/Forward move through it natively and the page can
@@ -807,6 +860,7 @@ export default function SelectionProvider({ children }) {
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     filteredDatasets,
+    filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,
     inViewCount: datasetsInViewPks.size,
