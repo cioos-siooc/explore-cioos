@@ -96,6 +96,7 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
   assert.match(est.sql, /records_count \* num_columns \* :multiplier/);
   assert.deepEqual(Object.keys(est.params).sort(), [
     "adder",
+    "ckanDatasetUrlPrefix",
     "depthMax",
     "depthMin",
     "depthVariableProbe",
@@ -112,6 +113,7 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
   // The estimate's bindings must not linger: knex rejects a named binding the
   // SQL does not reference.
   assert.deepEqual(Object.keys(plain.params).sort(), [
+    "ckanDatasetUrlPrefix",
     "depthVariableProbe",
     "filters",
     "obisFilters",

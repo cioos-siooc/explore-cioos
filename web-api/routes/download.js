@@ -10,6 +10,7 @@ const createDBFilter = require("../utils/dbFilter");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const { polygonJSONToWKT } = require("../utils/polygon");
 const { pipeline } = require("../utils/routePipeline");
+const { CKAN_DATASET_URL_PREFIX } = require("../utils/ckan");
 const {
   erddapVisible,
   obisVisible,
@@ -159,7 +160,7 @@ router.get(
                d.cdm_data_type,
                d.source_type,
                d.ckan_id ckan_id,
-               'https://catalogue.cioos.ca/dataset/' || d.ckan_id AS ckan_url
+               :ckanDatasetUrlPrefix || d.ckan_id AS ckan_url
         FROM combined p
         JOIN cde.datasets d ON p.dataset_pk = d.pk
         ${filters.hasShared ? "WHERE :filters" : ""}
@@ -172,6 +173,7 @@ router.get(
       filters: filters.shared,
       obisFilters: filters.obisOnly,
       profileFilters: filters.profileOnly,
+      ckanDatasetUrlPrefix: CKAN_DATASET_URL_PREFIX,
     });
     const tile = tileRaw.rows[0];
     if (tile.json_agg && tile.json_agg.length) {

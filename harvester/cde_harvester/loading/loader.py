@@ -20,6 +20,7 @@ from cde_harvester.core.db import create_db_engine, db_host
 from cde_harvester.core.obis_cells import merge_cells
 from cde_harvester.core.observability import init_sentry
 from cde_harvester.core.schemas import (
+    CKAN_RECORD_ARRAY_DTYPES,
     DATASET_ARRAY_DTYPES,
     PROFILE_ARRAY_DTYPES,
 )
@@ -392,6 +393,7 @@ def main(folder, incremental=False):
     verified_file = f"{folder}/verified.csv"
     harvest_runs_file = f"{folder}/harvest_runs.csv"
     harvest_attempts_file = f"{folder}/harvest_attempts.csv"
+    ckan_records_file = f"{folder}/ckan_records.csv"
 
     logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
 
@@ -438,6 +440,18 @@ def main(folder, incremental=False):
         harvest_attempts_df = pd.read_csv(
             harvest_attempts_file, parse_dates=["attempted_at"]
         )
+
+    # The CKAN catalogue snapshot behind the dashboard's coverage report.
+    # Absent when this run did not fetch a catalogue, in which case the table
+    # is left alone rather than emptied — a stale snapshot beats none.
+    ckan_records_df = None
+    if os.path.isfile(ckan_records_file):
+        logger.info("Reading %s", ckan_records_file)
+        ckan_records_df = pd.read_csv(ckan_records_file, parse_dates=["snapshot_at"])
+        for column in CKAN_RECORD_ARRAY_DTYPES:
+            ckan_records_df[column] = ckan_records_df[column].apply(
+                lambda x: ast.literal_eval(x) if isinstance(x, str) else []
+            )
 
     if "eovs" in profiles.columns:
         profiles["eovs"] = profiles["eovs"].apply(
@@ -999,6 +1013,26 @@ def main(folder, incremental=False):
                     chunksize=SQL_INSERT_CHUNKSIZE,
                 )
 
+        # CKAN catalogue: a snapshot, not an audit log — replaced wholesale so
+        # a record deleted upstream stops being reported as a gap. DELETE +
+        # append rather than if_exists="replace", which would drop the table and
+        # let pandas recreate it with inferred types, losing the DDL and the
+        # indexes the coverage queries join on.
+        if ckan_records_df is not None and not ckan_records_df.empty:
+            with _timed("ckan_records to_sql", logger):
+                logger.info("Writing ckan_records (%d rows)", len(ckan_records_df))
+                transaction.execute(text(f"DELETE FROM {schema}.ckan_records"))
+                ckan_records_df.to_sql(
+                    "ckan_records",
+                    con=transaction,
+                    if_exists="append",
+                    schema=schema,
+                    index=False,
+                    method="multi",
+                    dtype=CKAN_RECORD_ARRAY_DTYPES,
+                    chunksize=SQL_INSERT_CHUNKSIZE,
+                )
+
         # Commit the locked phase (engine.connect() does not auto-commit the
         # way engine.begin() did); this also releases the advisory lock.
         if transaction.in_transaction():
@@ -1011,6 +1045,8 @@ def main(folder, incremental=False):
             logger.info("Wrote to db: %s", f"{schema}.harvest_runs")
         if harvest_attempts_df is not None:
             logger.info("Wrote to db: %s", f"{schema}.harvest_attempts")
+        if ckan_records_df is not None:
+            logger.info("Wrote to db: %s", f"{schema}.ckan_records")
 
     # Post-commit maintenance, part 1: GC of orphaned points/hex cells.
     # cde.points and hexes_zoom_* are append-only during loads (stable pks);

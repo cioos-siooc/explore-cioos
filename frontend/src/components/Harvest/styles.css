@@ -17,6 +17,27 @@
   --harvest-row-hover: #f8f6f3;
   --harvest-input-border: #c6d8db;
   --harvest-spark-empty: #aaa;
+
+  /* Coverage donut. Validated with the dataviz palette checker against the
+     sand surface (#f3f0ec), --pairs all:
+       ring 1  integrated vs gap   ΔE 31.7 normal / 29.0 protan
+       ring 2  ERDDAP vs OBIS hue  ΔE 33.6 normal / 24.7 protan
+     The -soft steps are sequential steps WITHIN each hue (not categorical
+     classes), so they always travel with a legend entry and a direct label.
+     Both fall below 3:1 on the surface, which is why the chart ships visible
+     labels and the numbers are repeated in the table beneath it. */
+  --harvest-viz-integrated: #1f6f7a;
+  --harvest-viz-gap: #b8c4c2;
+  --harvest-viz-erddap: #2a78d6;
+  --harvest-viz-erddap-soft: #9ec5f4;
+  --harvest-viz-obis: #eb6834;
+  --harvest-viz-obis-soft: #f7bfa6;
+
+  /* Third source hue, added when the figure grew to cover datasets CKAN knows
+     about that no data source advertises. Worst pair against the other two:
+     ΔE 16.3 normal / 13.0 deutan. */
+  --harvest-viz-ckan: #4a3aa7;
+  --harvest-viz-ckan-soft: #bfb7e8;
 }
 
 /* ── Harvest section root layout ──────────────────────────────────────────── */
@@ -303,6 +324,17 @@
   border-bottom: 2px solid var(--cioos-teal-light);
 }
 
+/* The one-line definition under a section heading: what that group counts.
+   Narrow on purpose — a definition read in one line is worth more than one
+   that stretches the full width of a 1600px table. */
+.harvest-section-def {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--harvest-muted-strong);
+  max-width: 78ch;
+  margin: -0.35rem 0 0.9rem;
+}
+
 /* A "view all" link sitting on the right of a section heading. */
 .harvest-section-link {
   float: right;
@@ -579,4 +611,223 @@ a.harvest-link:hover {
   padding: 1.5rem;
   text-align: center;
   color: var(--harvest-muted);
+}
+
+/* ── Coverage report ──────────────────────────────────────────────────────── */
+
+/* The headline "datasets served / CKAN records" figures. A plain wrapping row
+   rather than a grid, so it stays readable at phone width without a breakpoint. */
+.harvest-coverage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.harvest-coverage-stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.harvest-coverage-stat-label {
+  font-size: 0.8rem;
+  color: var(--harvest-muted-strong);
+}
+
+/* Gap-category selector. Buttons rather than links: the choice is a view
+   filter carried in ?bucket=, not a separate page. */
+.harvest-coverage-buckets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.harvest-coverage-bucket {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--harvest-input-border);
+  border-radius: 14px;
+  background: var(--cioos-white);
+  color: var(--cioos-ink);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.harvest-coverage-bucket:hover {
+  background: var(--harvest-row-hover);
+}
+
+.harvest-coverage-bucket.is-active {
+  background: var(--cioos-navy);
+  border-color: var(--cioos-navy);
+  color: var(--cioos-white);
+}
+
+.harvest-coverage-bucket-count {
+  font-weight: 700;
+}
+
+.harvest-coverage-bucket.is-active .harvest-coverage-bucket-count {
+  color: var(--cioos-white);
+}
+
+/* The sources table's numbers are counts of whole datasets — no decimals to
+   line up — so they sit under the middle of their heading instead of being
+   pushed to the right edge of a wide column. */
+.harvest-coverage-sources .harvest-num {
+  text-align: center;
+}
+
+.harvest-coverage-search {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--harvest-input-border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  background: var(--cioos-white);
+  color: var(--cioos-ink);
+  min-width: 240px;
+  margin-bottom: 1rem;
+}
+
+/* ── Coverage donut ───────────────────────────────────────────────────────── */
+.harvest-viz {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.harvest-viz-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Recessive by default; hovering one segment pushes the others back rather
+   than lighting the hovered one up, so the colours never shift meaning. */
+.harvest-viz-arc {
+  stroke: none;
+  transition: opacity 120ms ease;
+  cursor: default;
+}
+
+.harvest-viz-arc.is-dimmed {
+  opacity: 0.35;
+}
+
+.harvest-viz-center-value {
+  text-anchor: middle;
+  font-size: 2rem;
+  font-weight: 700;
+  fill: var(--cioos-ink);
+}
+
+.harvest-viz-center-label {
+  text-anchor: middle;
+  font-size: 0.72rem;
+  fill: var(--harvest-muted-strong);
+}
+
+/* Fixed min-height so the row does not reflow as the tooltip text changes. */
+.harvest-viz-readout {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.4rem;
+  font-size: 0.82rem;
+  max-width: 260px;
+  text-align: center;
+}
+
+.harvest-viz-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.harvest-viz-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem 1rem;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.harvest-viz-legend-item {
+  display: contents;
+}
+
+.harvest-viz-legend-label {
+  color: var(--cioos-ink);
+}
+
+.harvest-viz-legend-value {
+  font-weight: 700;
+  text-align: right;
+}
+
+.harvest-viz-caption {
+  flex-basis: 100%;
+  margin: 0;
+  max-width: 62ch;
+}
+
+.harvest-coverage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.harvest-coverage-toolbar .harvest-coverage-search {
+  margin-bottom: 0;
+}
+
+/* ── Pager (coverage gap lists) ───────────────────────────────────────────── */
+.harvest-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.9rem 0 1.5rem;
+}
+
+.harvest-pager-step {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--harvest-input-border);
+  border-radius: 4px;
+  background: var(--cioos-white);
+  color: var(--cioos-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.harvest-pager-step:hover:not(:disabled) {
+  background: var(--harvest-row-hover);
+}
+
+.harvest-pager-step:disabled {
+  color: var(--harvest-muted);
+  cursor: default;
+}
+
+.harvest-pager-range {
+  font-size: 0.82rem;
+  color: var(--harvest-muted-strong);
+  font-variant-numeric: tabular-nums;
 }

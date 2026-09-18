@@ -53,6 +53,7 @@ export default function HarvestOverview() {
   const { data: reasons, loading: loadingReasons } =
     useHarvestFetch("/reasons");
   const { data: downloads } = useHarvestFetch("/downloads/summary");
+  const { data: coverage } = useHarvestFetch("/coverage");
 
   const stuckDownloads = downloads
     ? Number(downloads.n_stuck || 0) + Number(downloads.n_stalled || 0)
@@ -83,6 +84,34 @@ export default function HarvestOverview() {
             {t("harvest.downloads.queueStalled", { count: stuckDownloads })}
           </Link>
         </div>
+      )}
+
+      {coverage && coverage.summary && (
+        <>
+          <h2 className="harvest-section-title">
+            {t("harvest.coverage.overviewTitle")}
+            <Link
+              to="/harvest/coverage"
+              className="harvest-link harvest-section-link"
+            >
+              {t("harvest.coverage.overviewLink")}
+            </Link>
+          </h2>
+          <div className="harvest-card-counts">
+            <span className="harvest-count-pill harvest-count-error">
+              {coverage.summary.n_erddap_not_in_app}{" "}
+              {t("harvest.coverage.overviewErddapGap")}
+            </span>
+            <span className="harvest-count-pill harvest-count-skipped">
+              {coverage.summary.n_ckan_not_in_app}{" "}
+              {t("harvest.coverage.overviewCkanGap")}
+            </span>
+            <span className="harvest-count-pill harvest-count-unchanged">
+              {coverage.summary.n_erddap_without_ckan}{" "}
+              {t("harvest.coverage.overviewNoCkan")}
+            </span>
+          </div>
+        </>
       )}
 
       <h2 className="harvest-section-title">

@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { pipeline } = require("../utils/routePipeline");
+const { CKAN_URL } = require("../utils/ckan");
 
 const SPARKLINE_DEPTH = 10;
 
@@ -342,6 +343,459 @@ async function reasonBreakdown(erddapUrl = null) {
   return result.rows;
 }
 
+// ── Coverage: metadata (CKAN) vs data sources (ERDDAP, OBIS) ─────────────────
+// The rest of this file reports what the harvester DID. These routes report
+// what it did not: datasets a source advertises that the app does not serve,
+// and datasets the app serves that the metadata catalogue has no record of.
+//
+// Three sets feed every query below:
+//   advertised — the latest attempt per (server, dataset) in cde.harvest_attempts.
+//                Every dataset an ERDDAP server publishes gets a row each run
+//                (including ones rejected before any HTTP request), so this IS
+//                the ERDDAP inventory. For OBIS it is the discovered list.
+//   app        — cde.datasets, i.e. what CDE actually serves.
+//   ckan       — cde.ckan_records, the catalogue snapshot from the last run
+//                that fetched one.
+//
+// erddap_url is rtrim'd on every side: harvest_config URLs carry a trailing
+// slash, the URLs parsed out of CKAN resources do not, and cde.datasets holds
+// whichever the harvester was given.
+
+// One page of a gap list. The lists run to thousands of rows, so the page
+// walks them rather than capping them: the API answers with one page plus the
+// total, and the caller asks for the next by offset.
+const COVERAGE_PAGE_SIZE = 50;
+
+// Shared CTE header. `advertised` does its DISTINCT ON over the raw column so
+// the (erddap_url, dataset_id, attempted_at DESC) index still applies; the
+// rtrim happens in the projections that join on it.
+const COVERAGE_CTES = `
+    WITH advertised AS (
+        SELECT DISTINCT ON (erddap_url, dataset_id)
+               rtrim(erddap_url, '/') AS erddap_url,
+               dataset_id,
+               source,
+               ${NORM_STATUS("ha")} AS status,
+               ${NORM_REASON("ha")} AS reason_code,
+               attempted_at
+        FROM cde.harvest_attempts ha
+        ORDER BY erddap_url, dataset_id, attempted_at DESC
+    ),
+    app AS (
+        SELECT rtrim(erddap_url, '/') AS erddap_url,
+               dataset_id, source_type, ckan_id, title
+        FROM cde.datasets
+    ),
+    ckan AS (
+        SELECT ckan_id, ckan_name, title, title_fr, n_resources, snapshot_at,
+               obis_dataset_id,
+               rtrim(erddap_url, '/') AS erddap_url,
+               dataset_id
+        FROM cde.ckan_records
+    ),
+    erddap_advertised AS (
+        SELECT erddap_url, dataset_id, status, reason_code, attempted_at
+        FROM advertised WHERE source <> 'obis'
+    ),
+    app_erddap AS (
+        -- IS DISTINCT FROM, not <>: source_type is nullable and real databases
+        -- carry NULL on ERDDAP rows (it arrives via a concat with the OBIS
+        -- frame, which is the only side that sets it). A plain <> yields NULL
+        -- for those, dropping every ERDDAP dataset out of this CTE and
+        -- reporting the whole catalogue as missing from CDE. Matches the form
+        -- routes/erddapServers.js already uses.
+        SELECT erddap_url, dataset_id, title
+        FROM app WHERE source_type IS DISTINCT FROM 'obis'
+    ),
+    ckan_erddap AS (
+        SELECT DISTINCT erddap_url, dataset_id FROM ckan WHERE erddap_url IS NOT NULL
+    ),
+    -- One CKAN record per (server, dataset), for joins that only want a label.
+    -- Several records can describe the same ERDDAP dataset; joining the raw
+    -- ckan set fanned a dataset out into one row per record, so a list showed
+    -- 113 rows under a count that said 94. (No backticks in here: this string
+    -- is a JS template literal.)
+    ckan_erddap_one AS (
+        SELECT DISTINCT ON (erddap_url, dataset_id)
+               erddap_url, dataset_id, ckan_id, ckan_name, title
+        FROM ckan
+        WHERE erddap_url IS NOT NULL
+        ORDER BY erddap_url, dataset_id, ckan_id
+    )
+`;
+
+async function coverageSummary() {
+  const sql = `
+    ${COVERAGE_CTES}
+    SELECT
+      (SELECT count(*) FROM app)                                     AS n_app_total,
+      (SELECT count(*) FROM app
+        WHERE source_type IS DISTINCT FROM 'obis')                   AS n_app_erddap,
+      (SELECT count(*) FROM app WHERE source_type =  'obis')         AS n_app_obis,
+      (SELECT count(DISTINCT ckan_id) FROM ckan)                     AS n_ckan_records,
+      (SELECT count(*) FROM ckan_erddap)                             AS n_ckan_erddap_links,
+      (SELECT count(DISTINCT obis_dataset_id) FROM ckan
+        WHERE obis_dataset_id IS NOT NULL)                           AS n_ckan_obis_links,
+      (SELECT max(snapshot_at) FROM ckan)                            AS ckan_snapshot_at,
+      (SELECT count(*) FROM erddap_advertised)                       AS n_erddap_advertised,
+      (SELECT count(*) FROM erddap_advertised e
+        WHERE NOT EXISTS (SELECT 1 FROM app_erddap a
+                           WHERE a.erddap_url = e.erddap_url
+                             AND a.dataset_id = e.dataset_id))       AS n_erddap_not_in_app,
+      (SELECT count(*) FROM ckan c
+        WHERE c.erddap_url IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM app_erddap a
+                           WHERE a.erddap_url = c.erddap_url
+                             AND a.dataset_id = c.dataset_id))       AS n_ckan_not_in_app,
+      (SELECT count(*) FROM app_erddap a
+        WHERE NOT EXISTS (SELECT 1 FROM ckan_erddap c
+                           WHERE c.erddap_url = a.erddap_url
+                             AND c.dataset_id = a.dataset_id))       AS n_erddap_without_ckan,
+      (SELECT count(DISTINCT ckan_id) FROM ckan
+        WHERE erddap_url IS NULL AND obis_dataset_id IS NULL)        AS n_ckan_no_data_source,
+      -- Datasets CKAN describes that NO configured source advertises and CDE
+      -- does not serve. Disjoint from n_erddap_not_in_app / n_obis_not_harvested
+      -- by construction (both of those require the dataset to be advertised),
+      -- so the integration chart can add the three without double counting —
+      -- which a naive "records not integrated" figure would, since a CKAN
+      -- record pointing at a failed harvest names a dataset already counted.
+      -- Counted as DATASETS, not records: several records can name one dataset.
+      (SELECT count(*) FROM (
+          SELECT DISTINCT c.erddap_url AS a, c.dataset_id AS b
+          FROM ckan c
+          WHERE c.erddap_url IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM erddap_advertised e
+                             WHERE e.erddap_url = c.erddap_url
+                               AND e.dataset_id = c.dataset_id)
+            AND NOT EXISTS (SELECT 1 FROM app_erddap ap
+                             WHERE ap.erddap_url = c.erddap_url
+                               AND ap.dataset_id = c.dataset_id)
+          UNION
+          SELECT DISTINCT NULL AS a, c.obis_dataset_id AS b
+          FROM ckan c
+          WHERE c.obis_dataset_id IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM advertised adv
+                             WHERE adv.source = 'obis'
+                               AND adv.dataset_id = c.obis_dataset_id)
+            AND NOT EXISTS (SELECT 1 FROM app ap
+                             WHERE ap.source_type = 'obis'
+                               AND ap.dataset_id = c.obis_dataset_id)
+       ) q)                                                          AS n_ckan_only_datasets,
+      -- Records, not links: one served link is enough to call a record
+      -- integrated, so this cannot be a sum of the narrower buckets.
+      (SELECT count(*) FROM (
+          SELECT c.ckan_id
+          FROM ckan c
+          GROUP BY c.ckan_id
+          HAVING bool_or(
+            CASE
+              WHEN c.erddap_url IS NOT NULL THEN EXISTS (
+                     SELECT 1 FROM app_erddap a
+                      WHERE a.erddap_url = c.erddap_url
+                        AND a.dataset_id = c.dataset_id)
+              WHEN c.obis_dataset_id IS NOT NULL THEN EXISTS (
+                     SELECT 1 FROM app a
+                      WHERE a.source_type = 'obis'
+                        AND a.dataset_id = c.obis_dataset_id)
+              ELSE false
+            END) = false
+       ) q)                                                          AS n_ckan_not_integrated,
+      (SELECT count(*) FROM app o
+        WHERE o.source_type = 'obis'
+          AND NOT EXISTS (SELECT 1 FROM ckan c
+                           WHERE c.obis_dataset_id = o.dataset_id))  AS n_obis_without_ckan,
+      -- OBIS datasets discovery advertised that CDE does not serve. The
+      -- integration chart needs both halves of each source to sum to that
+      -- source's universe; the ERDDAP half is n_erddap_not_in_app above.
+      (SELECT count(*) FROM advertised adv
+        WHERE adv.source = 'obis'
+          AND NOT EXISTS (SELECT 1 FROM app a
+                           WHERE a.source_type = 'obis'
+                             AND a.dataset_id = adv.dataset_id))      AS n_obis_not_harvested,
+      (SELECT count(DISTINCT c.obis_dataset_id) FROM ckan c
+        WHERE c.obis_dataset_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM app a
+                           WHERE a.source_type = 'obis'
+                             AND a.dataset_id = c.obis_dataset_id))  AS n_obis_not_in_app
+  `;
+  const result = await db.raw(sql);
+  return result.rows[0];
+}
+
+// One row per data source: what it advertises, what the app kept, and how much
+// of that the catalogue describes. OBIS rows carry the obis.org sentinel as
+// their erddap_url, exactly as they do in harvest_attempts and cde.datasets.
+async function coverageSources() {
+  const sql = `
+    ${COVERAGE_CTES}
+    SELECT adv.erddap_url,
+           adv.source,
+           max(adv.attempted_at) AS last_attempted_at,
+           count(*) AS n_advertised,
+           count(*) FILTER (
+             WHERE NOT EXISTS (SELECT 1 FROM app a
+                                WHERE a.erddap_url = adv.erddap_url
+                                  AND a.dataset_id = adv.dataset_id)
+           ) AS n_not_in_app,
+           count(*) FILTER (
+             WHERE EXISTS (SELECT 1 FROM app a
+                            WHERE a.erddap_url = adv.erddap_url
+                              AND a.dataset_id = adv.dataset_id)
+               AND NOT EXISTS (
+                     SELECT 1 FROM ckan c
+                      WHERE CASE WHEN adv.source = 'obis'
+                                 THEN c.obis_dataset_id = adv.dataset_id
+                                 ELSE c.erddap_url = adv.erddap_url
+                                  AND c.dataset_id = adv.dataset_id
+                            END)
+           ) AS n_without_ckan
+    FROM advertised adv
+    GROUP BY adv.erddap_url, adv.source
+    ORDER BY adv.erddap_url
+  `;
+  const result = await db.raw(sql);
+  return result.rows;
+}
+
+// Drill-down lists behind the summary counts. Each is keyed by the bucket name
+// the route takes, so an unknown name is a 404 rather than an injected table.
+// Every query takes the same two bindings — the search term twice — so one
+// helper can run any of them, and each ends at its ORDER BY so the caller can
+// bolt a LIMIT/OFFSET on for one page or wrap the whole thing in a COUNT for
+// the total. The search matches a concat of whichever columns identify a row
+// in that bucket; none of these can use an index for ILIKE anyway, so folding
+// them into one haystack costs nothing.
+const COVERAGE_BUCKETS = {
+  // Advertised by an ERDDAP server, absent from cde.datasets. reason_code says
+  // why the harvester passed on it; NULL means it reported success but the row
+  // is gone anyway (pruned, or renamed upstream).
+  "erddap-not-in-app": `
+    ${COVERAGE_CTES}
+    SELECT e.erddap_url,
+           e.dataset_id,
+           e.status,
+           e.reason_code,
+           e.attempted_at,
+           c.ckan_id,
+           c.title
+    FROM erddap_advertised e
+    LEFT JOIN ckan_erddap_one c
+           ON c.erddap_url = e.erddap_url AND c.dataset_id = e.dataset_id
+    WHERE NOT EXISTS (SELECT 1 FROM app_erddap a
+                       WHERE a.erddap_url = e.erddap_url
+                         AND a.dataset_id = e.dataset_id)
+      AND (CAST(? AS text) IS NULL
+           OR concat_ws(' ', e.dataset_id, e.erddap_url, e.reason_code)
+              ILIKE '%' || ? || '%')
+    ORDER BY e.erddap_url, e.dataset_id
+  `,
+
+  // Every CKAN record with nothing CDE serves behind it — the whole metadata
+  // side of the gap in one list, whatever the reason. A record can carry
+  // several links, and one served link is enough to call it integrated, so the
+  // state is aggregated per record and then one representative link is shown
+  // (an ERDDAP link in preference to an OBIS one, then the no-link case).
+  "ckan-not-integrated": `
+    ${COVERAGE_CTES},
+    ckan_rows AS (
+        SELECT c.*,
+               CASE
+                 WHEN c.erddap_url IS NOT NULL THEN EXISTS (
+                        SELECT 1 FROM app_erddap a
+                         WHERE a.erddap_url = c.erddap_url
+                           AND a.dataset_id = c.dataset_id)
+                 WHEN c.obis_dataset_id IS NOT NULL THEN EXISTS (
+                        SELECT 1 FROM app a
+                         WHERE a.source_type = 'obis'
+                           AND a.dataset_id = c.obis_dataset_id)
+                 ELSE false
+               END AS served,
+               CASE
+                 WHEN c.erddap_url IS NULL AND c.obis_dataset_id IS NULL
+                   THEN 'no_data_source'
+                 WHEN c.obis_dataset_id IS NOT NULL THEN 'obis_not_served'
+                 WHEN EXISTS (SELECT 1 FROM erddap_advertised e
+                               WHERE e.erddap_url = c.erddap_url
+                                 AND e.dataset_id = c.dataset_id)
+                   THEN 'harvest_failed'
+                 WHEN EXISTS (SELECT 1 FROM erddap_advertised s
+                               WHERE s.erddap_url = c.erddap_url)
+                   THEN 'not_advertised'
+                 ELSE 'server_not_harvested'
+               END AS classification,
+               CASE WHEN c.erddap_url IS NOT NULL THEN 0
+                    WHEN c.obis_dataset_id IS NOT NULL THEN 1
+                    ELSE 2 END AS link_rank
+        FROM ckan c
+    ),
+    unserved AS (
+        SELECT ckan_id FROM ckan_rows GROUP BY ckan_id HAVING bool_or(served) = false
+    ),
+    representative AS (
+        SELECT DISTINCT ON (r.ckan_id)
+               r.ckan_id, r.ckan_name, r.title, r.erddap_url, r.dataset_id,
+               r.obis_dataset_id, r.n_resources, r.classification
+        FROM ckan_rows r
+        JOIN unserved u ON u.ckan_id = r.ckan_id
+        ORDER BY r.ckan_id, r.link_rank
+    )
+    SELECT rep.*, e.reason_code
+    FROM representative rep
+    LEFT JOIN erddap_advertised e
+           ON e.erddap_url = rep.erddap_url AND e.dataset_id = rep.dataset_id
+    WHERE (CAST(? AS text) IS NULL
+           OR concat_ws(' ', rep.title, rep.ckan_name, rep.dataset_id,
+                             rep.erddap_url, rep.obis_dataset_id, rep.classification)
+              ILIKE '%' || ? || '%')
+    ORDER BY rep.classification, rep.title
+  `,
+
+  // CKAN describes an ERDDAP dataset the app does not serve. The three
+  // classifications are different problems with different owners: the harvest
+  // tried and failed, the server no longer advertises it (delisted or made
+  // private), or CDE has never harvested that server at all.
+  "ckan-not-in-app": `
+    ${COVERAGE_CTES}
+    SELECT c.ckan_id,
+           c.ckan_name,
+           c.title,
+           c.erddap_url,
+           c.dataset_id,
+           e.status,
+           e.reason_code,
+           CASE
+             WHEN e.dataset_id IS NOT NULL THEN 'harvest_failed'
+             WHEN EXISTS (SELECT 1 FROM erddap_advertised s
+                           WHERE s.erddap_url = c.erddap_url) THEN 'not_advertised'
+             ELSE 'server_not_harvested'
+           END AS classification
+    FROM ckan c
+    LEFT JOIN erddap_advertised e
+           ON e.erddap_url = c.erddap_url AND e.dataset_id = c.dataset_id
+    WHERE c.erddap_url IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM app_erddap a
+                       WHERE a.erddap_url = c.erddap_url
+                         AND a.dataset_id = c.dataset_id)
+      AND (CAST(? AS text) IS NULL
+           OR concat_ws(' ', c.dataset_id, c.erddap_url, c.title)
+              ILIKE '%' || ? || '%')
+    ORDER BY c.erddap_url, c.dataset_id
+  `,
+
+  // Served by CDE from an ERDDAP server, with no CKAN record describing it:
+  // the ERDDAP half of the metadata gap, obis-without-ckan being the other.
+  "erddap-without-ckan": `
+    ${COVERAGE_CTES}
+    SELECT a.erddap_url,
+           a.dataset_id,
+           a.title,
+           adv.status,
+           adv.attempted_at
+    FROM app_erddap a
+    LEFT JOIN advertised adv
+           ON adv.erddap_url = a.erddap_url AND adv.dataset_id = a.dataset_id
+    WHERE NOT EXISTS (SELECT 1 FROM ckan_erddap c
+                       WHERE c.erddap_url = a.erddap_url
+                         AND c.dataset_id = a.dataset_id)
+      AND (CAST(? AS text) IS NULL
+           OR concat_ws(' ', a.dataset_id, a.erddap_url, a.title)
+              ILIKE '%' || ? || '%')
+    ORDER BY a.erddap_url, a.dataset_id
+  `,
+
+  // A CKAN record pointing at neither a tabledap resource nor an OBIS UUID:
+  // metadata with nothing behind it that CDE knows how to read.
+  "ckan-no-data-source": `
+    ${COVERAGE_CTES}
+    SELECT DISTINCT c.ckan_id, c.ckan_name, c.title, c.n_resources
+    FROM ckan c
+    WHERE c.erddap_url IS NULL
+      AND c.obis_dataset_id IS NULL
+      AND (CAST(? AS text) IS NULL
+           OR concat_ws(' ', c.ckan_name, c.title, c.ckan_id)
+              ILIKE '%' || ? || '%')
+    ORDER BY c.title
+  `,
+
+  // OBIS datasets CDE serves that CKAN has no record of. Informational, not a
+  // defect: CDE deliberately serves OBIS data the catalogue does not describe.
+  "obis-without-ckan": `
+    ${COVERAGE_CTES}
+    SELECT o.dataset_id, o.title, adv.status, adv.attempted_at
+    FROM app o
+    LEFT JOIN advertised adv
+           ON adv.dataset_id = o.dataset_id AND adv.source = 'obis'
+    WHERE o.source_type = 'obis'
+      AND NOT EXISTS (SELECT 1 FROM ckan c WHERE c.obis_dataset_id = o.dataset_id)
+      AND (CAST(? AS text) IS NULL
+           OR concat_ws(' ', o.dataset_id, o.title) ILIKE '%' || ? || '%')
+    ORDER BY o.title
+  `,
+
+  // CKAN describes an OBIS dataset CDE does not serve — either outside the
+  // configured discovery selection, or dropped during harvest.
+  "obis-not-in-app": `
+    ${COVERAGE_CTES}
+    SELECT DISTINCT c.ckan_id, c.ckan_name, c.title, c.obis_dataset_id
+    FROM ckan c
+    WHERE c.obis_dataset_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM app a
+                       WHERE a.source_type = 'obis'
+                         AND a.dataset_id = c.obis_dataset_id)
+      AND (CAST(? AS text) IS NULL
+           OR concat_ws(' ', c.obis_dataset_id, c.title, c.ckan_name)
+              ILIKE '%' || ? || '%')
+    ORDER BY c.title
+  `,
+};
+
+// Ceiling for the CSV export. The page walks a bucket COVERAGE_PAGE_SIZE rows
+// at a time, but "the whole list at once" has to be obtainable too, and a data
+// manager acts on these in a spreadsheet anyway.
+const COVERAGE_EXPORT_MAX_ROWS = 20000;
+
+// RFC 4180: quote every field, double any embedded quote. Postgres arrays and
+// titles carry commas and quotes routinely.
+function toCsv(rows) {
+  if (!rows.length) return "";
+  const columns = Object.keys(rows[0]);
+  const cell = (v) =>
+    v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`;
+  return [
+    columns.join(","),
+    ...rows.map((r) => columns.map((c) => cell(r[c])).join(",")),
+  ].join("\n");
+}
+
+// Split in two because the two callers want different things: the CSV export
+// wants every row and no count, the page wants one slice and the total to
+// build a pager from. Both start from the same template, which the route looks
+// up once so an unknown bucket is rejected before either runs.
+function coverageSql(bucket) {
+  return COVERAGE_BUCKETS[bucket] || null;
+}
+
+async function coverageRows(sql, q, limit, offset) {
+  const result = await db.raw(`${sql}\n    LIMIT ? OFFSET ?`, [
+    q,
+    q,
+    limit,
+    offset,
+  ]);
+  return result.rows;
+}
+
+// Wrapped rather than a count(*) OVER () inside each template: several of them
+// SELECT DISTINCT, and a window function runs before the de-duplication, so an
+// inlined count would report the pre-DISTINCT row count.
+async function coverageTotal(sql, q) {
+  const result = await db.raw(
+    `SELECT count(*)::int AS n FROM (${sql}) bucket_rows`,
+    [q, q],
+  );
+  return result.rows[0].n;
+}
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 router.get(
@@ -422,6 +876,71 @@ router.get(
   async (req, res) => {
     const erddapUrl = await resolveErddapUrl(req.params.slug);
     res.json(await reasonBreakdown(erddapUrl));
+  },
+);
+
+// Coverage: how the metadata catalogue and the data sources line up. Cached
+// longer than the run-centric routes — the answer only moves when a harvest
+// lands, and both queries sweep the whole attempt/catalogue sets.
+router.get(
+  "/coverage",
+  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
+  async (req, res) => {
+    const [summary, sources] = await Promise.all([
+      coverageSummary(),
+      coverageSources(),
+    ]);
+    // ckanUrl travels with the payload so the page can link to a record
+    // without a second config channel into the browser bundle — the catalogue
+    // is a deploy-time setting, and this response already describes it.
+    res.json({
+      summary,
+      sources,
+      ckanUrl: CKAN_URL,
+    });
+  },
+);
+
+router.get(
+  "/coverage/:bucket",
+  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
+  async (req, res) => {
+    const sql = coverageSql(req.params.bucket);
+    // Unknown bucket names are a 404 rather than an empty list: an empty list
+    // would read as "no gaps here", which is the opposite of "no such report".
+    if (!sql) return res.status(404).json({ error: "Unknown coverage bucket" });
+
+    const q = req.query.q || null;
+
+    if (req.query.format === "csv") {
+      res
+        .type("text/csv")
+        .set(
+          "Content-Disposition",
+          `attachment; filename="cde-${req.params.bucket}.csv"`,
+        );
+      return res.send(
+        toCsv(await coverageRows(sql, q, COVERAGE_EXPORT_MAX_ROWS, 0)),
+      );
+    }
+
+    // Anything unparseable, negative or fractional lands on page 1 rather than
+    // erroring: the page number arrives from a URL a person can edit.
+    const page = Math.max(1, Math.floor(Number(req.query.page)) || 1);
+    // The count runs first so the page can be clamped to the last one that
+    // holds rows. Asking for page 90 of a 12-row bucket — a stale bookmark, or
+    // a hand-edited URL — would otherwise answer with an empty slice, which
+    // the page can only render as "nothing in this category": a different
+    // claim from "you are past the end". It costs one query's latency on a
+    // route cached for five minutes.
+    const total = await coverageTotal(sql, q);
+    const lastOffset = Math.max(
+      0,
+      (Math.ceil(total / COVERAGE_PAGE_SIZE) - 1) * COVERAGE_PAGE_SIZE,
+    );
+    const offset = Math.min((page - 1) * COVERAGE_PAGE_SIZE, lastOffset);
+    const rows = await coverageRows(sql, q, COVERAGE_PAGE_SIZE, offset);
+    res.json({ rows, total, offset, limit: COVERAGE_PAGE_SIZE });
   },
 );
 
