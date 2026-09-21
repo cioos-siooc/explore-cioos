@@ -797,7 +797,7 @@
   gap: 2px;
   max-width: 170px;
   background-color: var(--cioos-teal-light);
-  border-radius: var(--cioos-radius-sm);
+  border-radius: var(--cioos-radius-lg);
   padding: 2px 2px 2px 9px;
   font-size: 12px;
   font-weight: 600;
