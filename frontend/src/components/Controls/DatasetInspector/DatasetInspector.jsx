@@ -484,6 +484,18 @@ export default function DatasetInspector({
               used to be a click on the title itself, which no reader expects of
               a page's title — it is a named button in the row below now. */}
           <h2 className="datasetTitle">{dataset.title}</h2>
+
+          {/* Same badge and same spot relative to the title as the dataset
+              card's (DatasetCard.jsx) — the freshness signal now reads
+              identically wherever a dataset's title appears. */}
+          {dataset.is_realtime && (
+            <span
+              className="datasetTitleLive"
+              title={t("datasetRealtimeBadgeTitle")}
+            >
+              {t("datasetRealtimeBadgeText")}
+            </span>
+          )}
         </div>
         {/* Every action on this page, named. These are the only things here
             that change anything: the values in the sheet below are read, not
@@ -653,14 +665,6 @@ export default function DatasetInspector({
                 <span className="metadataChip">
                   {formatInstant(dataset.coverage_time_max)}
                 </span>
-                {dataset.is_realtime && (
-                  <span
-                    className="metadataChip metadataChipLive"
-                    title={t("datasetRealtimeBadgeTitle")}
-                  >
-                    {t("datasetRealtimeBadgeText")}
-                  </span>
-                )}
               </dd>
             </div>
           )}

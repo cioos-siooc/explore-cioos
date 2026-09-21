@@ -7,6 +7,7 @@ import {
   Building,
   CalendarWeek,
   ChevronDown,
+  Cursor,
   FileEarmarkSpreadsheet,
   Funnel,
   HandIndex,
@@ -17,7 +18,6 @@ import {
   Stack,
   Tag,
   Water,
-  Broadcast,
   BroadcastPin,
   Server,
 } from "react-bootstrap-icons";
@@ -354,7 +354,7 @@ export default function FiltersPanel() {
               badgeTitle={platformsBadgeTitle}
               setOptionsSelected={setPlatformsSelected}
               tooltip={t("platformFilterTooltip")}
-              icon={<BroadcastPin />}
+              icon={<Cursor />}
               controlled
               searchable
               searchTerms={platformsSearchTerms}
@@ -561,7 +561,7 @@ export default function FiltersPanel() {
               active={realtimeOnly}
               badgeTitle={t("realtimeFilterName")}
               tooltip={t("realtimeFilterTooltip")}
-              icon={<Broadcast />}
+              icon={<BroadcastPin />}
               controlled
               filterName={realtimeFilterName}
               openFilter={openFilter === realtimeFilterName}

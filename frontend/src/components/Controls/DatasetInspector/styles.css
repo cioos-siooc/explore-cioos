@@ -60,6 +60,26 @@
   color: var(--cioos-ink);
 }
 
+/* "Live": same solid orange badge as the dataset card's (.datasetCardLive),
+   sized to this page's larger title. flex: 0 0 auto so it keeps its shape
+   next to the title's flex: 1 1 auto instead of stretching with it; margin-top
+   nudges it back down to the title's own baseline since it sits in a
+   flex-start row. */
+.datasetTitleLive {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  padding: 1px 9px;
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-live);
+  color: var(--cioos-white);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 /* A row of their own under the heading. Beside the title they had room for an
    icon and nothing else; across the full width each one can say what it does,
    which is the whole point of them being here. */
@@ -287,18 +307,6 @@
 .datasetMetaSheet .metadataChip {
   font-weight: 500;
   color: var(--cioos-ink);
-}
-
-/* "Live": the dataset was still producing data when it was last harvested.
-   Same badge shape as its neighbours, filled solid so it reads as an active
-   state rather than another value — orange is used nowhere else on the page,
-   so this badge stays the only "something is happening now" signal. */
-.datasetMetaSheet .metadataChipLive {
-  margin-left: 0.35rem;
-  background: var(--cioos-live);
-  border-color: var(--cioos-live);
-  color: var(--cioos-white);
-  font-weight: 600;
 }
 
 /* A field the harvest left empty (an OBIS dataset's ocean variables, a
