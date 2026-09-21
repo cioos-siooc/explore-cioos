@@ -6,7 +6,6 @@ import {
   BoundingBox,
   Building,
   CalendarWeek,
-  ChevronDown,
   Cursor,
   Eye,
   FileEarmarkSpreadsheet,
