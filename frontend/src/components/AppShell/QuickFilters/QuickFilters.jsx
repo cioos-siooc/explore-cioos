@@ -14,9 +14,7 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { polygonIsRectangle, useSearchInput } from "../../../utilities.jsx";
-import useActiveFilters, {
-  countActiveFilterValues,
-} from "../../../state/useActiveFilters.js";
+import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -54,7 +52,7 @@ export default function QuickFilters() {
     onlyInView,
     setOnlyInView,
   } = useSelection();
-  const activeFilterCount = countActiveFilterValues(useActiveFilters());
+  const activeFilterCount = useActiveFilters().length;
   const { resetFilters } = useFilters();
   const { filterChipsCollapsed, setFilterChipsCollapsed } = useUI();
 

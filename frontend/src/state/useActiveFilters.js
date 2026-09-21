@@ -51,10 +51,8 @@ function filterNameForKey(key, t) {
 // Filters badge report fewer filters than the chips directly under it
 // listed.
 //
-// The chips render this list one row per group; the Filters button and modal
-// badge count every value within it instead (see countActiveFilterValues
-// below), since a group can hold several — five chosen EOVs are five active
-// filters to the person looking at the badge, not one.
+// The chips render this list and the Filters button and modal count it, so the
+// number and the list it labels cannot disagree.
 //
 // The quick filters — the title search, the drawn area and the "only in view"
 // narrowing — are deliberately not here, even though FiltersPanel also has a
@@ -134,11 +132,4 @@ export default function useActiveFilters() {
           setShowFiltersModal(true);
         }),
     }));
-}
-
-// How many filters are actually narrowing the map, for the Filters button's
-// badge and the modal's own title — every chosen value across every group,
-// not the number of groups useActiveFilters returns (one row can hold many).
-export function countActiveFilterValues(filters) {
-  return filters.reduce((total, f) => total + f.items.length, 0);
 }
