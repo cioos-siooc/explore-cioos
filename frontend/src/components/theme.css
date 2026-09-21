@@ -49,8 +49,8 @@
   --cioos-warn-bg: #fdf3da; /* the tinted ground --cioos-warn sits on */
   --cioos-info: #0f6d8e;
 
-  /* Solid orange, reserved for the dataset inspector's "Live" badge — darker
-     than the map's grid amber so white text on it still clears 4.5:1. */
+  /* Solid orange, reserved for the dataset inspector's "Realtime" badge —
+     darker than the map's grid amber so white text on it still clears 4.5:1. */
   --cioos-live: #c2410c;
 
   /* --- Map data keys --- */

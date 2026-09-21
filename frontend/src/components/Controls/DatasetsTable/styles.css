@@ -586,9 +586,9 @@
   overflow-wrap: anywhere;
 }
 
-/* "Live": same solid orange badge as the dataset inspector's, sized down to
-   the card's smaller type scale. flex: 0 0 auto so it keeps its shape next to
-   the title's flex: 1 1 auto instead of stretching with it. */
+/* "Realtime": same solid orange badge as the dataset inspector's, sized down
+   to the card's smaller type scale. flex: 0 0 auto so it keeps its shape next
+   to the title's flex: 1 1 auto instead of stretching with it. */
 .datasetCardLive {
   flex: 0 0 auto;
   display: inline-flex;

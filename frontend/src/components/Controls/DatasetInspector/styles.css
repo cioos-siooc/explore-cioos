@@ -60,7 +60,7 @@
   color: var(--cioos-ink);
 }
 
-/* "Live": same solid orange badge as the dataset card's (.datasetCardLive),
+/* "Realtime": same solid orange badge as the dataset card's (.datasetCardLive),
    sized to this page's larger title. flex: 0 0 auto so it keeps its shape
    next to the title's flex: 1 1 auto instead of stretching with it; margin-top
    nudges it back down to the title's own baseline since it sits in a
