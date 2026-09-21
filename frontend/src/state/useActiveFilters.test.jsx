@@ -44,32 +44,30 @@ describe("useActiveFilters", () => {
     );
   });
 
-  // The four below live outside FilterProvider — the geometry layers in
-  // MapState, the rest in Selection — which is why the count the Filters badge
-  // shows used to come up short whenever one of them was on.
-  it("counts the drawn area, which is not a catalogue facet", async () => {
-    open("latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000");
-    await waitFor(() => expect(keys()).toContain("polygon"));
-  });
-
-  it("counts the title search and the in-view narrowing", async () => {
-    open("search=temperature&onlyInView=true");
-    await waitFor(() => expect(keys()).toContain("search"));
-    expect(keys()).toContain("onlyInView");
-  });
-
+  // The geometry layers live in MapState rather than FilterProvider, which is
+  // why the count the Filters badge shows used to come up short when one was
+  // on.
   it("counts a narrowed geometry selection", async () => {
     open("layers=profile");
     await waitFor(() => expect(keys()).toContain("dataLayers"));
   });
 
-  it("counts every one of them together", async () => {
+  // The quick filters have their own buttons on the map and no rows in the
+  // Filters modal, so the badge that sits on that modal must not count them —
+  // it would be reporting filters the dialog it opens cannot change.
+  it("ignores the quick filters, which the Filters modal does not own", async () => {
+    open(
+      "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
+    );
+    await waitFor(() => expect(screen.getByTestId("keys")).toBeInTheDocument());
+    expect(keys()).toEqual([]);
+  });
+
+  it("counts every one it does own together", async () => {
     open(
       "eovs=oxygen&layers=profile&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
     );
-    await waitFor(() => expect(keys()).toHaveLength(4));
-    expect(keys().sort()).toEqual(
-      ["dataLayers", "eovs", "onlyInView", "polygon"].sort(),
-    );
+    await waitFor(() => expect(keys()).toHaveLength(2));
+    expect(keys().sort()).toEqual(["dataLayers", "eovs"].sort());
   });
 });

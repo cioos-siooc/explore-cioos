@@ -323,31 +323,6 @@
   padding: 0 20px 2px;
 }
 
-/* --- "In view" filter flyout: a single labelled checkbox plus a live count
-   of datasets in the current map view. --- */
-.inViewFilterToggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 4px 2px;
-  cursor: pointer;
-  color: var(--cioos-ink);
-  font-weight: 600;
-}
-
-.inViewFilterToggle input {
-  margin-top: 2px;
-  flex: 0 0 auto;
-  accent-color: var(--cioos-primary);
-  cursor: pointer;
-}
-
-.inViewFilterCount {
-  padding: 4px 2px 2px;
-  color: var(--cioos-ink-60);
-  font-size: var(--cioos-font-size-sm);
-}
-
 /* ------------------------------------------------------------------
  * Phones. The filters surface is full-screen here, so everything in it
  * is a touch target rather than a pointer target: 44px minimum, and the
@@ -395,16 +370,5 @@
     flex-basis: auto;
     min-height: 44px;
     font-size: 16px;
-  }
-
-  .inViewFilterToggle {
-    align-items: center;
-    min-height: 44px;
-  }
-
-  .inViewFilterToggle input {
-    width: 22px;
-    height: 22px;
-    margin-top: 0;
   }
 }

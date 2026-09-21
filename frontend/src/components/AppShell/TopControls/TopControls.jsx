@@ -8,7 +8,7 @@ import BrandSearch from "../TopLeft/BrandSearch.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 import SingleDatasetView from "./SingleDatasetView.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
-import QuickFiltersButton from "./QuickFiltersButton.jsx";
+import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -38,15 +38,16 @@ function measureTopBarSpace(rect) {
 
 // Centered top header. First layer: the brand bar. Second layer: the dataset
 // tally (shown / in view / total), which is what the layer below acts on.
-// Third layer, merged into a single segmented pill: three equal-width peers —
-// Datasets (opens/closes the left datasets sidebar) and Coverage (opens the
+// Third layer, a single segmented pill of three equal-width peers — Datasets
+// (opens/closes the left datasets sidebar) and Coverage (opens the
 // time-distribution histogram) are the two ways to look at the current
 // selection, and Filters (opens the filters modal) is the one way to change
-// it. Welded onto the end of Filters, and narrow enough to read as part of
-// it, is the quick-filters caret: the two filters that act on the map rather
-// than on a list of options (see QuickFiltersButton). Every segment carries a
-// dimmed-primary wash so they read as the map's primary entry points. The
-// active-filter chips flow beneath, staying centered.
+// it. Every segment carries a dimmed-primary wash so they read as the map's
+// primary entry points.
+//
+// Under the card, on the map rather than in it, the quick filters (see
+// QuickFilters) — the ones that act on the map instead of on a list of
+// options. The active-filter chips flow beneath those, staying centered.
 export default function TopControls() {
   const { t } = useTranslation();
   // The same list the chips below render, so the badge can never report a
@@ -109,39 +110,31 @@ export default function TopControls() {
               {t("topBarCoverageLabel")}
             </span>
           </button>
-          {/* Filters and its caret share the third of the row's three equal
-              columns, rather than the caret taking a fourth column of its own
-              — so the three peers stay the same width as each other and the
-              caret comes out of Filters' own share. */}
-          <div className="topBarFiltersGroup">
-            <button
-              type="button"
-              className={classNames("topBarButton", {
-                // Solid while the modal itself is open; once it's closed, any
-                // applied filters keep the button in the lighter "applied"
-                // wash instead of dropping all the way back to baseline.
-                active: showFiltersModal,
-                applied: !showFiltersModal && activeFilterCount > 0,
-              })}
-              data-testid="topbar-filters-button"
-              onClick={() => setShowFiltersModal(true)}
-              aria-pressed={showFiltersModal}
-              title={t("dockFiltersCountTitle", { count: activeFilterCount })}
-            >
-              <Filter size={18} aria-hidden="true" />
-              <span className="topBarButtonLabel">
-                {t("filtersMenuButton")}
+          <button
+            type="button"
+            className={classNames("topBarButton", {
+              // Solid while the modal itself is open; once it's closed, any
+              // applied filters keep the button in the lighter "applied"
+              // wash instead of dropping all the way back to baseline.
+              active: showFiltersModal,
+              applied: !showFiltersModal && activeFilterCount > 0,
+            })}
+            data-testid="topbar-filters-button"
+            onClick={() => setShowFiltersModal(true)}
+            aria-pressed={showFiltersModal}
+            title={t("dockFiltersCountTitle", { count: activeFilterCount })}
+          >
+            <Filter size={18} aria-hidden="true" />
+            <span className="topBarButtonLabel">{t("filtersMenuButton")}</span>
+            {activeFilterCount > 0 && (
+              <span className="topBarCount" data-testid="topbar-filter-count">
+                {activeFilterCount}
               </span>
-              {activeFilterCount > 0 && (
-                <span className="topBarCount" data-testid="topbar-filter-count">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            <QuickFiltersButton />
-          </div>
+            )}
+          </button>
         </div>
       </BrandSearch>
+      <QuickFilters />
       <ActiveFilterChips />
       {/* Last in the stack: the dataset the map is keyed to, and the way out
           of it. Only up while the datasets card — whose banner otherwise says

@@ -10,7 +10,6 @@ import {
 import { DATA_LAYER_LABEL_KEYS, selectedDataLayerKeys } from "./dataLayers.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
-import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 
 // Maps each group key to the filterName FiltersPanel opens it under (see
@@ -37,26 +36,28 @@ function filterNameForKey(key, t) {
       return "scientificNameFilterName";
     case "dataLayers":
       return "layerSelectorLabel";
-    case "polygon":
-      return "spatialFilterFilterName";
     default:
       return undefined;
   }
 }
 
-// Every filter currently constraining the map, as one list of groups:
+// Every filter the Filters modal owns, as one list of groups:
 // `{ key, label, goToFilter, removeAll, items }`, one item per chosen value.
 //
-// Four of them are not the catalogue facets FilterProvider owns — the geometry
-// layers live in MapState, the title search, the "only in view" narrowing and
-// the drawn area in Selection — so the list can only be assembled above all
-// three providers. That is the whole reason this is a hook and not another
-// field on FilterProvider: counting only the facets it could see was what made
-// the Filters badge report fewer filters than the chips directly under it
+// One of them is not a catalogue facet FilterProvider owns — the geometry
+// layers live in MapState — so the list can only be assembled above both
+// providers. That is the whole reason this is a hook and not another field on
+// FilterProvider: counting only the facets it could see was what made the
+// Filters badge report fewer filters than the chips directly under it
 // listed.
 //
 // The chips render this list and the Filters button and modal count it, so the
 // number and the list it labels cannot disagree.
+//
+// The quick filters — the title search, the drawn area and the "only in view"
+// narrowing — are deliberately not here. They have their own buttons on the map
+// (see QuickFilters) and no rows in the modal, so counting them would have the
+// Filters badge reporting filters that the dialog it sits on cannot change.
 export default function useActiveFilters() {
   const { t } = useTranslation();
   const {
@@ -68,16 +69,8 @@ export default function useActiveFilters() {
     realtimeOnly,
     setRealtimeOnly,
   } = useFilters();
-  const {
-    polygon,
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
-    onlyInView,
-    setOnlyInView,
-  } = useSelection();
-  const { dataLayers, toggleDataLayer, resetDataLayers, requestDraw } =
-    useMapState();
-  const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI();
+  const { dataLayers, toggleDataLayer, resetDataLayers } = useMapState();
+  const { setShowFiltersModal, setOpenFilter } = useUI();
 
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
     t("timeframeFilterName"),
@@ -109,19 +102,6 @@ export default function useActiveFilters() {
       })),
     },
     ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),
-    datasetTitleSearchText && {
-      key: "search",
-      label: t("textSearchFilterName"),
-      goToFilter: () => setSidebarOpen(true),
-      removeAll: () => setDatasetTitleSearchText(""),
-      items: [
-        {
-          id: "search",
-          label: datasetTitleSearchText,
-          remove: () => setDatasetTitleSearchText(""),
-        },
-      ],
-    },
     realtimeOnly && {
       key: "realtimeOnly",
       label: t("realtimeFilterName"),
@@ -135,37 +115,6 @@ export default function useActiveFilters() {
           id: "realtimeOnly",
           label: t("realtimeFilterChipText"),
           remove: () => setRealtimeOnly(false),
-        },
-      ],
-    },
-    onlyInView && {
-      key: "onlyInView",
-      label: t("datasetsCardOnlyInViewText"),
-      goToFilter: () => {
-        setOpenFilter(t("datasetsCardOnlyInViewText"));
-        setShowFiltersModal(true);
-      },
-      removeAll: () => setOnlyInView(false),
-      items: [
-        {
-          id: "onlyInView",
-          label: t("datasetsCardOnlyInViewChipText"),
-          remove: () => setOnlyInView(false),
-        },
-      ],
-    },
-    // The drawn shape narrows the map exactly as the facets above do, so it is
-    // a group like any other rather than a chip on its own terms — which is
-    // also what lets the badge count it.
-    Boolean(polygon) && {
-      key: "polygon",
-      label: t("spatialFilterFilterName"),
-      removeAll: () => requestDraw("clear"),
-      items: [
-        {
-          id: "polygon",
-          label: t("chipMapSelectionLabel"),
-          remove: () => requestDraw("clear"),
         },
       ],
     },

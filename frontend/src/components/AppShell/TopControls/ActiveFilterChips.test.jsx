@@ -134,13 +134,15 @@ describe("ActiveFilterChips", () => {
     expect(groups()).toHaveLength(1);
   });
 
-  it("announces the drawn selection as its own chip", async () => {
-    open("latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000");
-    await waitFor(() =>
-      expect(screen.getByTestId("active-filter-chips")).toBeInTheDocument(),
+  // The quick filters are named by their own buttons on the map, which carry
+  // both their state and the way to drop them (see QuickFilters), so repeating
+  // them here would be the same filter in two places.
+  it("leaves the quick filters to their own row", async () => {
+    open(
+      "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
     );
-    expect(
-      screen.getAllByTestId("filter-chip-item-remove").length,
-    ).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
+    );
   });
 });
