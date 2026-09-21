@@ -7,6 +7,7 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
 import QuickFilters from "./QuickFilters.jsx";
 
 // A rectangle and a free shape, as a share link delivers them: the two draw
@@ -228,6 +229,60 @@ describe("QuickFilters", () => {
       expect(seen.search.at(-1)).toBe("");
       expect(seen.onlyInView.at(-1)).toBe(false);
       expect(seen.draw.at(-1)).toBe("clear");
+    });
+  });
+
+  // Show/Hide acts on the active-filter chips (see ActiveFilterChips), so it
+  // only means something once both rows are on screen together — mounted
+  // here rather than in ActiveFilterChips' own tests, since that component no
+  // longer renders it itself. The reset button is the same one tested above
+  // (quick-filter-reset): there is only the one, for both rows together.
+  describe("the active-filter chips' Show/Hide toggle", () => {
+    function renderBoth(url = "/") {
+      const user = userEvent.setup({ delay: null });
+      renderWithProviders(
+        <>
+          <QuickFilters />
+          <ActiveFilterChips />
+        </>,
+        { url, providers: "app" },
+      );
+      return { user };
+    }
+
+    const groups = () => screen.queryAllByTestId("filter-chip-group");
+
+    it("stays off the row until there is a chip list to act on", () => {
+      renderBoth();
+      expect(screen.queryByTestId("filter-chips-toggle")).toBeNull();
+    });
+
+    it("hides and shows the chips without clearing them", async () => {
+      const { user } = renderBoth("/?eovs=oxygen");
+      await waitFor(() => expect(groups()).toHaveLength(1));
+
+      const toggle = screen.getByTestId("filter-chips-toggle");
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(groups()).toHaveLength(0);
+
+      await user.click(toggle);
+      expect(groups()).toHaveLength(1);
+    });
+
+    it("the single reset clears the modal filter along with the quick ones", async () => {
+      const { user } = renderBoth("/?eovs=oxygen&onlyInView=true");
+      await waitFor(() => expect(groups()).toHaveLength(1));
+
+      await user.click(screen.getByTestId("quick-filter-reset"));
+
+      await waitFor(() => expect(groups()).toHaveLength(0));
+      expect(screen.getByTestId("quick-filter-in-view")).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
     });
   });
 });

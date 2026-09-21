@@ -10,7 +10,9 @@ import SingleDatasetView from "./SingleDatasetView.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
 import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
-import useActiveFilters from "../../../state/useActiveFilters.js";
+import useActiveFilters, {
+  countActiveFilterValues,
+} from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
@@ -50,9 +52,10 @@ function measureTopBarSpace(rect) {
 // options. The active-filter chips flow beneath those, staying centered.
 export default function TopControls() {
   const { t } = useTranslation();
-  // The same list the chips below render, so the badge can never report a
-  // different number of filters than the row under it names.
-  const activeFilterCount = useActiveFilters().length;
+  // Every value across the same groups the chips below render (see
+  // countActiveFilterValues) — not the number of groups, which would report
+  // one filter for a row holding five chosen EOVs.
+  const activeFilterCount = countActiveFilterValues(useActiveFilters());
   const {
     showFiltersModal,
     setShowFiltersModal,

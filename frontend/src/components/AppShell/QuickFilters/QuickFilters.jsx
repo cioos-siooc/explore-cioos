@@ -3,6 +3,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowCounterclockwise,
   BoundingBox,
+  ChevronCompactDown,
+  ChevronCompactUp,
   Eye,
   Pentagon,
   Search,
@@ -12,8 +14,13 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { polygonIsRectangle, useSearchInput } from "../../../utilities.jsx";
+import useActiveFilters, {
+  countActiveFilterValues,
+} from "../../../state/useActiveFilters.js";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 // The quick filters: the four that act on the map rather than on a list of
@@ -30,9 +37,16 @@ import "./styles.css";
 // one (see MapStateProvider), so like every other UI here the draw buttons read
 // their pressed state off the shape on the map instead. Between arming a draw
 // and closing the shape, neither is lit.
+//
+// Show/Hide for the active-filter chips (see ActiveFilterChips) closes the
+// row off, when there is a chip list to act on: it reads more naturally next
+// to the tools that already narrow the map than above a card of its own. The
+// reset button is one for both rows — quick filters and the modal ones the
+// chips show alike — rather than a second button next to it clearing only
+// half of what is set.
 export default function QuickFilters() {
   const { t } = useTranslation();
-  const { requestDraw } = useMapState();
+  const { requestDraw, resetDataLayers } = useMapState();
   const {
     polygon,
     datasetTitleSearchText,
@@ -40,6 +54,9 @@ export default function QuickFilters() {
     onlyInView,
     setOnlyInView,
   } = useSelection();
+  const activeFilterCount = countActiveFilterValues(useActiveFilters());
+  const { resetFilters } = useFilters();
+  const { filterChipsCollapsed, setFilterChipsCollapsed } = useUI();
 
   const searchInputId = useId();
   const inputRef = useRef(null);
@@ -211,23 +228,51 @@ export default function QuickFilters() {
       >
         <Eye size={18} aria-hidden="true" />
       </button>
-      {/* Only these four. The chips panel's own Clear-all still resets
-          everything, but it is only on screen while a modal filter is set — so
-          with nothing but quick filters on, this is the one gesture that
-          drops them all. */}
-      {anySet && (
+      {/* Show/Hide for the active-filter chips underneath — only worth
+          showing once there is a chip list for it to act on. */}
+      {activeFilterCount > 0 && (
+        <button
+          type="button"
+          className="quickFilterButton"
+          data-testid="filter-chips-toggle"
+          onClick={() => setFilterChipsCollapsed((c) => !c)}
+          aria-expanded={!filterChipsCollapsed}
+          aria-label={
+            filterChipsCollapsed
+              ? t("activeFiltersShow")
+              : t("activeFiltersHide")
+          }
+          title={
+            filterChipsCollapsed
+              ? t("activeFiltersShow")
+              : t("activeFiltersHide")
+          }
+        >
+          {filterChipsCollapsed ? (
+            <ChevronCompactDown size={18} aria-hidden="true" />
+          ) : (
+            <ChevronCompactUp size={18} aria-hidden="true" />
+          )}
+        </button>
+      )}
+      {/* One reset for everything this row and the chips below can set —
+          quick filters and the modal ones alike — rather than two buttons
+          each clearing half of it. */}
+      {(anySet || activeFilterCount > 0) && (
         <button
           type="button"
           className="quickFilterButton quickFilterReset"
           data-testid="quick-filter-reset"
           onClick={() => {
+            resetFilters();
+            resetDataLayers();
             requestDraw("clear");
             setDatasetTitleSearchText("");
             setOnlyInView(false);
             setSearchOpen(false);
           }}
-          title={t("quickFiltersResetTitle")}
-          aria-label={t("quickFiltersResetTitle")}
+          title={t("resetFiltersButtonTooltipText")}
+          aria-label={t("resetFiltersButtonTooltipText")}
         >
           <ArrowCounterclockwise size={18} aria-hidden="true" />
         </button>

@@ -79,6 +79,32 @@ describe("ActiveFilterChips", () => {
     ).toHaveLength(1);
   });
 
+  it("folds a group's values beyond the visible cap behind a +N chip", async () => {
+    open("eovs=oxygen,subSurfaceTemperature,seaState,nutrients");
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const eovs = group("eovs");
+    expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(3);
+    expect(within(eovs).getByTestId("filter-chip-more")).toHaveTextContent(
+      "+1",
+    );
+  });
+
+  it("reveals a group's folded values when its +N chip is clicked", async () => {
+    const { user } = open(
+      "eovs=oxygen,subSurfaceTemperature,seaState,nutrients",
+    );
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const eovs = group("eovs");
+    await user.click(within(eovs).getByTestId("filter-chip-more"));
+
+    await waitFor(() =>
+      expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(4),
+    );
+    expect(within(eovs).queryByTestId("filter-chip-more")).toBeNull();
+  });
+
   it("drops one value without touching the rest of its group", async () => {
     const { user } = open("eovs=oxygen,subSurfaceTemperature");
     await waitFor(() => expect(groups()).toHaveLength(1));
@@ -119,20 +145,9 @@ describe("ActiveFilterChips", () => {
     expect(names.some((name) => name.includes("Oxygen"))).toBe(true);
   });
 
-  it("hides and shows the chips without clearing them", async () => {
-    const { user } = open("eovs=oxygen");
-    await waitFor(() => expect(groups()).toHaveLength(1));
-
-    const toggle = screen.getByTestId("filter-chips-toggle");
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(groups()).toHaveLength(0);
-
-    await user.click(toggle);
-    expect(groups()).toHaveLength(1);
-  });
+  // Show/Hide and Clear-all now live with the quick filters (see
+  // QuickFilters.test.jsx) — one toggle for both rows — so this component no
+  // longer renders them itself; it only reacts to filterChipsCollapsed.
 
   // The quick filters are named by their own buttons on the map (and a row in
   // the Filters modal), which carry both their state and the way to drop them

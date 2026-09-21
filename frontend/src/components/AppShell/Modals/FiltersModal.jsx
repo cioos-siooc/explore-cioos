@@ -7,7 +7,9 @@ import FiltersPanel from "../Panels/FiltersPanel.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
-import useActiveFilters from "../../../state/useActiveFilters.js";
+import useActiveFilters, {
+  countActiveFilterValues,
+} from "../../../state/useActiveFilters.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
@@ -16,7 +18,7 @@ import "./styles.css";
 // live, so closing is just dismissal — there is no confirm step.
 export default function FiltersModal() {
   const { t } = useTranslation();
-  const activeFilterCount = useActiveFilters().length;
+  const activeFilterCount = countActiveFilterValues(useActiveFilters());
   const { showFiltersModal, setShowFiltersModal, openFilter, setOpenFilter } =
     useUI();
   const isMobile = useMediaQuery(MOBILE_QUERY);

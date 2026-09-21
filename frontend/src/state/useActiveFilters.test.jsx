@@ -4,11 +4,19 @@ import { screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../test/renderWithProviders.jsx";
 import { installMockFetch } from "../test/mockFetch.js";
-import useActiveFilters from "./useActiveFilters.js";
+import useActiveFilters, {
+  countActiveFilterValues,
+} from "./useActiveFilters.js";
 
 function Probe() {
-  const keys = useActiveFilters().map((f) => f.key);
-  return <span data-testid="keys">{keys.join(",")}</span>;
+  const filters = useActiveFilters();
+  const keys = filters.map((f) => f.key);
+  return (
+    <>
+      <span data-testid="keys">{keys.join(",")}</span>
+      <span data-testid="count">{countActiveFilterValues(filters)}</span>
+    </>
+  );
 }
 
 // Seeded through the address, the way a share link arrives: one URL sets up
@@ -70,5 +78,14 @@ describe("useActiveFilters", () => {
     );
     await waitFor(() => expect(keys()).toHaveLength(2));
     expect(keys().sort()).toEqual(["dataLayers", "eovs"].sort());
+  });
+
+  // The badge counts values, not rows: a group holding several chosen options
+  // is several active filters to whoever reads the number, not one.
+  it("counts every chosen value, not just the groups holding them", async () => {
+    open("eovs=oxygen,subSurfaceTemperature,seaState&platforms=mooring");
+    await waitFor(() =>
+      expect(screen.getByTestId("count")).toHaveTextContent("4"),
+    );
   });
 });

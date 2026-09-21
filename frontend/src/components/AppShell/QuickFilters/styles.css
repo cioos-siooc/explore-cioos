@@ -72,10 +72,19 @@
 }
 
 /* The reset is not a filter and never lights up; held apart from the four it
-   clears so it doesn't read as a fifth of them. */
+   clears so it doesn't read as a fifth of them. It drops everything this row
+   and the active-filter chips below can set, so its hover earns the app's
+   destructive-action colour rather than the shared teal wash every other
+   button here gets. */
 .quickFilterReset {
   margin-left: 4px;
   color: var(--cioos-ink-60);
+}
+
+.quickFilterReset:hover {
+  background-color: var(--cioos-error);
+  border-color: transparent;
+  color: var(--cioos-white);
 }
 
 /* ------------------------------------------------------------------
