@@ -86,6 +86,7 @@ export default function ActiveFilterChips() {
                 onClick={f.goToFilter}
                 title={t("activeFilterGoToFilterTitle", { filter: f.label })}
               >
+                {f.icon}
                 {f.label}
               </button>
             </span>

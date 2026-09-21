@@ -1,4 +1,16 @@
+import * as React from "react";
 import { useTranslation } from "react-i18next";
+import {
+  ArrowsExpand,
+  BroadcastPin,
+  Building,
+  CalendarWeek,
+  FileEarmarkSpreadsheet,
+  Server,
+  Stack,
+  Tag,
+  Water,
+} from "react-bootstrap-icons";
 
 import { generateRangeSelectBadgeTitle } from "../utilities.jsx";
 import {
@@ -39,6 +51,31 @@ function filterNameForKey(key, t) {
     default:
       return undefined;
   }
+}
+
+// The same icon FiltersPanel shows on that filter's own row (see
+// FiltersPanel.jsx's `icon` prop per <Filter>), so a chip and the row it came
+// from read as the same filter at a glance.
+const ICON_FOR_KEY = {
+  eovs: Water,
+  platforms: BroadcastPin,
+  orgs: Building,
+  datasets: FileEarmarkSpreadsheet,
+  sources: Server,
+  time: CalendarWeek,
+  depth: ArrowsExpand,
+  scientificName: Tag,
+  dataLayers: Stack,
+};
+
+// createElement, not JSX: this is a plain .js module (no esbuild JSX loader
+// configured for that extension — see vite.config.mjs), and renaming it to
+// .jsx isn't worth doing for the one element this hook returns.
+function iconForKey(key) {
+  const Icon = ICON_FOR_KEY[key];
+  return Icon
+    ? React.createElement(Icon, { size: 12, "aria-hidden": true })
+    : null;
 }
 
 // Every filter the Filters modal counts, as one list of groups:
@@ -125,6 +162,7 @@ export default function useActiveFilters() {
     .filter(Boolean)
     .map((f) => ({
       ...f,
+      icon: iconForKey(f.key),
       goToFilter:
         f.goToFilter ||
         (() => {

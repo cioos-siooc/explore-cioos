@@ -2,8 +2,8 @@ import * as React from "react";
 import { useRef } from "react";
 import {
   BarChartLine,
-  ChevronCompactDown,
-  ChevronCompactUp,
+  ChevronDown,
+  ChevronUp,
   Filter,
   ListUl,
 } from "react-bootstrap-icons";
@@ -173,9 +173,9 @@ export default function TopControls() {
               }
             >
               {quickFiltersCollapsed ? (
-                <ChevronCompactDown size={16} aria-hidden="true" />
+                <ChevronDown size={16} aria-hidden="true" />
               ) : (
-                <ChevronCompactUp size={16} aria-hidden="true" />
+                <ChevronUp size={16} aria-hidden="true" />
               )}
             </button>
           </div>

@@ -410,13 +410,14 @@
   padding: 0;
   list-style: none;
 
-  /* Stepped in from the brand card above (see TopLeft/styles.css, which
-     defines the token and the viewport cap) by the shell's 12px gutter twice
-     over: the chips are subordinate to that card — what the filters it names
-     are currently doing — so they read as a narrower layer tucked under it
-     rather than a second card of equal standing. The viewport cap keeps that
-     same 24px of map either side once the brand card has gone full-bleed. */
-  width: min(calc(var(--cioos-brand-width) - 48px), calc(100vw - 48px));
+  /* Sized to its own content, not pinned to the brand card's width above it —
+     a handful of chips reads as one line rather than wrapping inside a column
+     narrower than the space actually available. max-width is the real limit:
+     the viewport itself (with the shell's 24px gutter either side), so
+     flex-wrap only fires once the row genuinely runs out of room, same as
+     the mobile block below does for its own narrower width. */
+  width: fit-content;
+  max-width: calc(100vw - 48px);
   align-self: center;
 }
 
