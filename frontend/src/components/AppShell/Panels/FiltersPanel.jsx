@@ -17,9 +17,9 @@ import {
   Stack,
   Tag,
   Water,
+  Broadcast,
   BroadcastPin,
   Server,
-  Reception4,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -561,7 +561,7 @@ export default function FiltersPanel() {
               active={realtimeOnly}
               badgeTitle={t("realtimeFilterName")}
               tooltip={t("realtimeFilterTooltip")}
-              icon={<Reception4 />}
+              icon={<Broadcast />}
               controlled
               filterName={realtimeFilterName}
               openFilter={openFilter === realtimeFilterName}
