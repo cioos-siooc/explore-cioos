@@ -13,12 +13,12 @@ describe("HarvestRealtimeBadge", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows 'Realtime' with its explanatory tooltip when the dataset is realtime", () => {
+  it("shows 'Real-time' with its explanatory tooltip when the dataset is realtime", () => {
     renderWithProviders(<HarvestRealtimeBadge isRealtime />);
-    const badge = screen.getByText("Realtime");
+    const badge = screen.getByText("Real-time");
     expect(badge).toHaveAttribute(
       "title",
-      "This dataset was still producing data as of its last harvest — the same signal as the map's Realtime badge.",
+      "This dataset was still producing data as of its last harvest — the same signal as the map's Real-time badge.",
     );
   });
 });

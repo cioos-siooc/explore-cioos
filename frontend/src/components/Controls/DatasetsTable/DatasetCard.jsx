@@ -181,18 +181,6 @@ export default function DatasetCard({
             {row.title}
           </span>
 
-          {/* Same "still producing data" signal as the dataset inspector's
-              Latest data / Last update row — on the title line here since the
-              card has no field of its own for it. */}
-          {row.is_realtime && (
-            <span
-              className="datasetCardLive"
-              title={t("datasetRealtimeBadgeTitle")}
-            >
-              {t("datasetRealtimeBadgeText")}
-            </span>
-          )}
-
           {/* Size and CDE-downloadable status, on the title's line rather than
               a row of their own. Both are a glyph and a few characters wide,
               and the ragged right of a wrapped title is the space they fit
@@ -310,6 +298,18 @@ export default function DatasetCard({
             <PinMapFill size={13} aria-hidden="true" />
             {locationsLabel}
           </span>
+
+          {/* Same "still producing data" signal as the dataset inspector's
+              Last update row — on this row here since it is the card's other
+              home for small dataset-level facts. */}
+          {row.is_realtime && (
+            <span
+              className="datasetCardLive"
+              title={t("datasetRealtimeBadgeTitle")}
+            >
+              {t("datasetRealtimeBadgeText")}
+            </span>
+          )}
         </div>
 
         {/* Where this dataset lives and how to fetch it, outside the estimates
