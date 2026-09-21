@@ -244,7 +244,7 @@ function pipeline({
   tileParams = null,
   checks = [],
   cacheFor = DEFAULT_CACHE_DURATION,
-  cacheToggle = undefined,
+  cacheToggle = cache.onlyOk,
 } = {}) {
   return [
     ...(tileParams ? tileParamValidators(tileParams) : []),
@@ -252,8 +252,8 @@ function pipeline({
     ...(shape ? shapeValidators() : []),
     ...checks,
     errorHandler,
-    // `cacheToggle` decides per response whether it may be stored/served —
-    // see cache.onlyOk, for a route whose upstream can fail.
+    // `cacheToggle` decides per response whether it may be stored/served.
+    // Defaulting to 200 keeps a transient handler error from becoming a cache hit.
     ...(cacheFor === null
       ? []
       : [cache.route(cacheFor, cacheToggle), fullResponseForCacheMiss]),
