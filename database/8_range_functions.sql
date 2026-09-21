@@ -152,17 +152,18 @@ $$;
 
 /*
 
-dataset_is_realtime( coverage_time_max, harvested_at )
+dataset_is_realtime( coverage_time_max, harvested_at, cdm_data_type )
 
 "Was this dataset still producing data at the moment we harvested it?"
 
-Both arguments are stored columns on cde.datasets, so this is IMMUTABLE: the
-answer is fixed at harvest time and does not drift as the clock moves. That is
-deliberate. A now()-relative test would need the catalogue refreshed on a timer
-to stay honest, and would flip a dataset's badge between page loads; "this
-dataset is updated in real time" is a property of the dataset, not of this
-instant. The cost is that the flag ages with the harvest: a feed that died
-yesterday keeps its badge until the next harvest re-measures it.
+The first two arguments are stored columns on cde.datasets, so this is
+IMMUTABLE: the answer is fixed at harvest time and does not drift as the clock
+moves. That is deliberate. A now()-relative test would need the catalogue
+refreshed on a timer to stay honest, and would flip a dataset's badge between
+page loads; "this dataset is updated in real time" is a property of the
+dataset, not of this instant. The cost is that the flag ages with the harvest:
+a feed that died yesterday keeps its badge until the next harvest re-measures
+it.
 
 coverage_time_max is the dataset's newest data as the server itself reported it
 (from the allDatasets listing, or the time dimension for grids); harvested_at is
@@ -182,23 +183,34 @@ turns false one day after the data stops.
 Forecast grids have a coverage_time_max in the future and so are realtime,
 which is correct -- they are continuously reissued.
 
+cdm_data_type gates the shape of dataset this even makes sense for: grids
+(cdm_data_type='Grid', ERDDAP's griddap) and the TimeSeries*/Trajectory*
+family are continuously-updated feeds, but a Profile (a one-off vertical cast,
+possibly grouped into TimeSeriesProfile/TrajectoryProfile -- those match the
+prefix, not this) or a bare Point (OBIS occurrence records) is not something a
+server "keeps producing"; recent coverage there means recent data entry, not a
+live feed. Prefix-matched rather than an exact IN-list so TimeSeries/Trajectory
+subtypes stay covered without editing this function.
+
 NULL on either side means "unknown", which is not evidence of being live, so
 the answer is false rather than NULL. That keeps callers from needing IS TRUE /
 IS NOT TRUE to avoid three-valued logic dropping rows from both sides of the
 filter.
 
-  SELECT dataset_is_realtime(coverage_time_max, verified_at)
+  SELECT dataset_is_realtime(coverage_time_max, verified_at, cdm_data_type)
     FROM cde.datasets;
 
 */
 
 -- Dropped first, like the functions above: CREATE OR REPLACE refuses to rename
 -- an existing function's parameters, so re-applying this file over a database
--- that still has the last_updated_at signature would error out mid-migration.
+-- that still has an older signature would error out mid-migration.
 DROP FUNCTION IF EXISTS dataset_is_realtime( timestamptz, timestamptz );
+DROP FUNCTION IF EXISTS dataset_is_realtime( timestamptz, timestamptz, text );
 CREATE OR REPLACE FUNCTION dataset_is_realtime(
     coverage_time_max timestamptz,
-    harvested_at timestamptz
+    harvested_at timestamptz,
+    cdm_data_type text
   )
   RETURNS boolean
   LANGUAGE sql IMMUTABLE PARALLEL SAFE
@@ -206,5 +218,8 @@ AS
 $$
   SELECT coverage_time_max IS NOT NULL
      AND harvested_at IS NOT NULL
-     AND coverage_time_max >= harvested_at - interval '1 day';
+     AND coverage_time_max >= harvested_at - interval '1 day'
+     AND (cdm_data_type = 'Grid'
+          OR cdm_data_type ILIKE 'TimeSeries%'
+          OR cdm_data_type ILIKE 'Trajectory%');
 $$;

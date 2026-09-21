@@ -270,16 +270,20 @@ async function createDBFilter(
   // tile, legend, timeExtent, download and griddap branches all inherit it
   // without a per-site edit -- selectionAgreement.test.js is what proves that.
   //
-  // The predicate reads two stored columns (see dataset_is_realtime in
+  // The predicate reads stored columns only (see dataset_is_realtime in
   // database/8_range_functions.sql), so it is IMMUTABLE and cannot return NULL,
   // which is why a plain boolean test is safe here: `NOT f(...)` over a
   // three-valued result would drop rows from both sides of the facet.
+  // cdm_data_type restricts it to griddap/timeseries*/trajectory* datasets --
+  // a Profile or a bare OBIS Point is a one-off, not a live feed.
   //
   // verified_at, not last_updated_at: the latter only moves when the dataset's
   // content changed, so a dead feed skipped as unchanged by an incremental
   // harvest would keep its badge forever.
   if (realtimeOnly === "true") {
-    filters.push("dataset_is_realtime(d.coverage_time_max, d.verified_at)");
+    filters.push(
+      "dataset_is_realtime(d.coverage_time_max, d.verified_at, d.cdm_data_type)",
+    );
   }
 
   // Both live on cde.datasets; the join alias `d` is present in tile, legend

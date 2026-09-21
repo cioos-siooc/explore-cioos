@@ -236,7 +236,7 @@ test("realtimeOnly adds a dataset-level freshness predicate", async () => {
   // reached the dataset, so the gap widens and the flag expires on its own.
   assert.match(
     sql,
-    /dataset_is_realtime\(d\.coverage_time_max, d\.verified_at\)/,
+    /dataset_is_realtime\(d\.coverage_time_max, d\.verified_at, d\.cdm_data_type\)/,
   );
   // A plain boolean test, never `NOT dataset_is_realtime(...)`: the function is
   // IMMUTABLE over two stored columns and cannot return NULL, and a negation

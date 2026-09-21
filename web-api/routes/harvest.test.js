@@ -51,7 +51,7 @@ test("GET /harvest/servers/:slug selects dataset_is_realtime for each dataset", 
   assert.equal(res.body[0].is_realtime, true);
   assert.match(
     db.queries[1],
-    /dataset_is_realtime\(ds\.coverage_time_max, ds\.verified_at\)/,
+    /dataset_is_realtime\(ds\.coverage_time_max, ds\.verified_at,\s*ds\.cdm_data_type\)/,
   );
 });
 
