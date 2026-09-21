@@ -8,6 +8,7 @@ import {
   CalendarWeek,
   ChevronDown,
   Cursor,
+  Eye,
   FileEarmarkSpreadsheet,
   Funnel,
   HandIndex,
@@ -581,7 +582,7 @@ export default function FiltersPanel() {
               active={onlyInView}
               badgeTitle={t("datasetsCardOnlyInViewText")}
               tooltip={t("datasetsCardOnlyInViewTitle")}
-              icon={<BoundingBox />}
+              icon={<Eye />}
               controlled
               filterName={inViewFilterName}
               openFilter={openFilter === inViewFilterName}

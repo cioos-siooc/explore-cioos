@@ -84,9 +84,9 @@ describe("ActiveFilterChips", () => {
     await waitFor(() => expect(groups()).toHaveLength(1));
 
     const eovs = group("eovs");
-    expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(3);
+    expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(2);
     expect(within(eovs).getByTestId("filter-chip-more")).toHaveTextContent(
-      "+1",
+      "+2",
     );
   });
 
@@ -103,6 +103,29 @@ describe("ActiveFilterChips", () => {
       expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(4),
     );
     expect(within(eovs).queryByTestId("filter-chip-more")).toBeNull();
+  });
+
+  it("folds a group's values back when its −N chip is clicked", async () => {
+    const { user } = open(
+      "eovs=oxygen,subSurfaceTemperature,seaState,nutrients",
+    );
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const eovs = group("eovs");
+    await user.click(within(eovs).getByTestId("filter-chip-more"));
+    await waitFor(() =>
+      expect(within(eovs).getByTestId("filter-chip-less")).toBeInTheDocument(),
+    );
+
+    await user.click(within(eovs).getByTestId("filter-chip-less"));
+
+    await waitFor(() =>
+      expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(2),
+    );
+    expect(within(eovs).getByTestId("filter-chip-more")).toHaveTextContent(
+      "+2",
+    );
+    expect(within(eovs).queryByTestId("filter-chip-less")).toBeNull();
   });
 
   it("drops one value without touching the rest of its group", async () => {

@@ -78,6 +78,7 @@
   "activeFilterRemoveAllTitle": "Supprimer tous les filtres {{filter}}",
   "activeFilterRemoveItemTitle": "Supprimer",
   "activeFilterShowMoreTitle": "Afficher {{count}} de plus",
+  "activeFilterShowLessTitle": "Afficher {{count}} de moins",
   "oceanVariableFilterTooltip": "Filtrer les données par nom de variable océanique. La sélection fonctionne comme une opération logique OU.",
   "oceanVariableFilterSeachPlaceholder": "Rechercher le nom de la variable océanique...",
   "platformFilterTooltip": "Filtrer les données par plateforme. La sélection fonctionne comme une opération logique OU.",

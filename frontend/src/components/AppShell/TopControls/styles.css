@@ -362,10 +362,18 @@
 
 /* One group: its name pill immediately followed by its own value chips,
    packed as one flex chunk so they wrap together rather than the label
-   landing on a different line than its first value. */
+   landing on a different line than its first value.
+   A group wide enough to wrap on its own — its label plus a few chips already
+   fills the row — is forced by that wrap to the row's full width, so
+   .activeFiltersPanel's own justify-content: center has nothing left to
+   center: this element IS the row at that point. justify-content: center
+   here does for a group's own wrapped lines what the panel does for several
+   short groups sharing a line, so either way the pills read as centered
+   rather than the group's first line pinning everything to the left. */
 .activeFilterGroup {
   display: inline-flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 4px;
   max-width: 100%;

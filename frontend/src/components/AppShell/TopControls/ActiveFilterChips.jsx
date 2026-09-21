@@ -9,10 +9,9 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 // How many values a group shows before folding the rest behind a "+N" chip —
 // short enough that a group's own values stay on the one row its label pill
 // sits on, rather than sprawling the row over several lines. Clicking the
-// chip reveals the rest of that group (and only that group); there is no way
-// back short of the row's own Show/Hide, since collapsing one group again is
-// not something the map state needs to remember.
-const MAX_VISIBLE_VALUES = 3;
+// chip reveals the rest of that group (and only that group); a second click
+// on the button that replaces it (now reading "show fewer") folds it back.
+const MAX_VISIBLE_VALUES = 2;
 
 // Removable chips for every filter currently constraining the map (see
 // useActiveFilters — the same list the Filters badge counts), flowing under
@@ -30,12 +29,17 @@ export default function ActiveFilterChips() {
   const activeFilters = useActiveFilters();
   const { filterChipsCollapsed } = useUI();
 
-  // Which groups have had their "+N" chip clicked already — a group's key
-  // stays in here even if its values change afterwards, since re-folding a
-  // group the user already opened would be a surprise, not a convenience.
+  // Which groups currently show every value rather than the folded MAX_VISIBLE_VALUES —
+  // toggled by the button at the end of the group's own row, so opening one
+  // is exactly as reversible as closing it again.
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
-  const expandGroup = (key) =>
-    setExpandedGroups((prev) => new Set(prev).add(key));
+  const toggleGroup = (key) =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   if (activeFilters.length === 0 || filterChipsCollapsed) return null;
 
@@ -117,13 +121,29 @@ export default function ActiveFilterChips() {
                 type="button"
                 className="activeFilterMoreButton"
                 data-testid="filter-chip-more"
-                onClick={() => expandGroup(f.key)}
+                onClick={() => toggleGroup(f.key)}
                 title={t("activeFilterShowMoreTitle", { count: hiddenCount })}
                 aria-label={t("activeFilterShowMoreTitle", {
                   count: hiddenCount,
                 })}
               >
                 +{hiddenCount}
+              </button>
+            )}
+            {expanded && f.items.length > MAX_VISIBLE_VALUES && (
+              <button
+                type="button"
+                className="activeFilterMoreButton"
+                data-testid="filter-chip-less"
+                onClick={() => toggleGroup(f.key)}
+                title={t("activeFilterShowLessTitle", {
+                  count: f.items.length - MAX_VISIBLE_VALUES,
+                })}
+                aria-label={t("activeFilterShowLessTitle", {
+                  count: f.items.length - MAX_VISIBLE_VALUES,
+                })}
+              >
+                &minus;{f.items.length - MAX_VISIBLE_VALUES}
               </button>
             )}
           </li>
