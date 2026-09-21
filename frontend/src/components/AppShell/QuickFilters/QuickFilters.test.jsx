@@ -109,6 +109,37 @@ describe("QuickFilters", () => {
     expect(screen.getByTestId("quick-filter-search-input")).toHaveValue("temp");
   });
 
+  it("closes the empty field when focus leaves it", async () => {
+    const { user } = renderRow();
+    await openSearch(user);
+
+    await user.click(document.body);
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("quick-filter-search-input")).toBeNull(),
+    );
+  });
+
+  it("keeps the field open on blur while a draft is still in it", async () => {
+    const { user } = renderRow();
+    await openSearch(user);
+
+    await user.type(screen.getByTestId("quick-filter-search-input"), "temp");
+    await user.click(document.body);
+
+    expect(screen.getByTestId("quick-filter-search-input")).toBeInTheDocument();
+  });
+
+  it("does not close moving focus to its own clear button", async () => {
+    const { user } = renderRow("/?search=temperature");
+
+    screen.getByTestId("quick-filter-search-input").focus();
+    await user.tab();
+
+    expect(screen.getByTestId("quick-filter-search-clear")).toHaveFocus();
+    expect(screen.getByTestId("quick-filter-search-input")).toBeInTheDocument();
+  });
+
   it("holds the field open for a term carried in the link", async () => {
     renderRow("/?search=temperature");
     const box = screen.getByTestId("quick-filter-search-input");

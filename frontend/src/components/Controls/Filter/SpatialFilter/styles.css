@@ -1,0 +1,117 @@
+/* The two draw-mode rows reuse .multiCheckboxFilter/.optionButton (see
+   DataLayersFilter) — a pick-one action list rather than a set of
+   checkboxes, so .selected marks whichever shape is currently drawn instead
+   of toggling independently. */
+.spatialFilterOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Once a shape is drawn: its envelope (the same four figures a WMS/ERDDAP
+   bbox query would take) and its raw WKT, both readable in place rather than
+   only reachable through the copy button below them. */
+.spatialFilterDetails {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+/* Compass layout — N over W · E over S — rather than a plain list, so the
+   four figures read as the shape's envelope rather than four unrelated
+   values. The two side cells (W/E) share their row with the empty centre
+   column standing in for the shape itself. */
+.spatialFilterBounds {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas:
+    ".    north .   "
+    "west .     east"
+    ".    south .   ";
+  justify-items: center;
+  gap: 2px 20px;
+  margin: 0;
+}
+
+.spatialFilterBoundsNorth {
+  grid-area: north;
+}
+
+.spatialFilterBoundsWest {
+  grid-area: west;
+}
+
+.spatialFilterBoundsEast {
+  grid-area: east;
+}
+
+.spatialFilterBoundsSouth {
+  grid-area: south;
+}
+
+.spatialFilterBounds > * {
+  text-align: center;
+}
+
+.spatialFilterBounds dt {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-40);
+}
+
+.spatialFilterBounds dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.spatialFilterWktLabel {
+  display: block;
+  margin-top: 16px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-40);
+}
+
+.spatialFilterWkt {
+  display: block;
+  width: 100%;
+  min-height: 8em;
+  margin-top: 6px;
+  padding: 10px;
+  resize: vertical;
+  background-color: var(--cioos-surface-2);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  font-family: var(--cioos-font-mono, monospace);
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.5;
+  color: var(--cioos-ink);
+}
+
+/* Small pill button, same visual family as .filterOptionsActions button
+   (Reset) but living inside the pane's own body rather than the footer
+   actions row — it only makes sense once a shape is drawn, unlike Reset
+   which the Filter component always places outside the scrolling body. */
+.spatialFilterCopyWkt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 0 14px;
+  height: 30px;
+  background-color: var(--cioos-teal-light);
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  color: var(--cioos-ink);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.spatialFilterCopyWkt:hover {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+}

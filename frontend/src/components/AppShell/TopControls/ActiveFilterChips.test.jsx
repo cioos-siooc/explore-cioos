@@ -134,9 +134,10 @@ describe("ActiveFilterChips", () => {
     expect(groups()).toHaveLength(1);
   });
 
-  // The quick filters are named by their own buttons on the map, which carry
-  // both their state and the way to drop them (see QuickFilters), so repeating
-  // them here would be the same filter in two places.
+  // The quick filters are named by their own buttons on the map (and a row in
+  // the Filters modal), which carry both their state and the way to drop them
+  // (see QuickFilters), so repeating them here would be the same filter
+  // announced twice.
   it("leaves the quick filters to their own row", async () => {
     open(
       "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",

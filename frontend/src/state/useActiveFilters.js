@@ -41,7 +41,7 @@ function filterNameForKey(key, t) {
   }
 }
 
-// Every filter the Filters modal owns, as one list of groups:
+// Every filter the Filters modal counts, as one list of groups:
 // `{ key, label, goToFilter, removeAll, items }`, one item per chosen value.
 //
 // One of them is not a catalogue facet FilterProvider owns — the geometry
@@ -55,9 +55,12 @@ function filterNameForKey(key, t) {
 // number and the list it labels cannot disagree.
 //
 // The quick filters — the title search, the drawn area and the "only in view"
-// narrowing — are deliberately not here. They have their own buttons on the map
-// (see QuickFilters) and no rows in the modal, so counting them would have the
-// Filters badge reporting filters that the dialog it sits on cannot change.
+// narrowing — are deliberately not here, even though FiltersPanel also has a
+// row for each of them: they have their own buttons on the map (see
+// QuickFilters), so a chip and a badge tick for something that already has a
+// lit button next to it would be the same state announced twice. Both write
+// the same underlying state (Selection), so the modal row and the map button
+// always agree with each other.
 export default function useActiveFilters() {
   const { t } = useTranslation();
   const {

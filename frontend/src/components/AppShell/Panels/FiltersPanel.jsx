@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   ArrowCounterclockwise,
   ArrowsExpand,
+  BoundingBox,
   Building,
   CalendarWeek,
   ChevronDown,
@@ -12,6 +13,8 @@ import {
   HandIndex,
   Intersect,
   Map as MapIcon,
+  Pentagon,
+  Search,
   Stack,
   Tag,
   Water,
@@ -28,6 +31,7 @@ import DataLayersFilter from "../../Controls/Filter/DataLayersFilter/DataLayersF
 import MultiCheckboxFilter from "../../Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx";
 import SourceFilter from "../../Controls/Filter/SourceFilter/SourceFilter.jsx";
 import ScientificNameFilter from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
+import SpatialFilter from "../../Controls/Filter/SpatialFilter/SpatialFilter.jsx";
 import TimeSelector from "../../Controls/Filter/TimeSelector/TimeSelector.jsx";
 import DepthSelector from "../../Controls/Filter/DepthSelector/DepthSelector.jsx";
 import {
@@ -40,6 +44,7 @@ import {
   capitalizeFirstLetter,
   generateMultipleSelectBadgeTitle,
   generateRangeSelectBadgeTitle,
+  polygonIsRectangle,
   setAllOptionsIsSelectedTo,
 } from "../../../utilities.jsx";
 import {
@@ -122,7 +127,14 @@ export default function FiltersPanel() {
     obisDataAvailable,
     resetFilters,
   } = useFilters();
-  const { setDatasetTitleSearchText, setOnlyInView } = useSelection();
+  const {
+    datasetTitleSearchText,
+    setDatasetTitleSearchText,
+    onlyInView,
+    setOnlyInView,
+    inViewCount,
+    polygon,
+  } = useSelection();
   const { openFilter, setOpenFilter } = useUI();
   const {
     ready: countsReady,
@@ -139,6 +151,7 @@ export default function FiltersPanel() {
     useState("");
 
   const realtimeFilterName = t("realtimeFilterName");
+  const inViewFilterName = t("datasetsCardOnlyInViewText");
 
   // Same badge rule as the catalogue filters: the bare filter name while the
   // filter is doing nothing, the chosen value(s) once it is.
@@ -150,6 +163,14 @@ export default function FiltersPanel() {
       : dataLayersChosen.length === 1
         ? t(DATA_LAYER_LABEL_KEYS[dataLayersChosen[0]])
         : dataLayersChosen.length + t("dataLayersMulti");
+
+  // No options list of its own (it matches free text against dataset titles),
+  // so it skips generateMultipleSelectBadgeTitle: idle it reads as a bare
+  // filter name, active it shows the typed text itself — same rule as the
+  // scientific name search below.
+  const textSearchFilterTranslationKey = "textSearchFilterName";
+  const textSearchBadgeTitle =
+    datasetTitleSearchText || t(textSearchFilterTranslationKey);
 
   const eovsFilterTranslationKey = "oceanVariablesFiltername";
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -216,6 +237,21 @@ export default function FiltersPanel() {
     "(m)",
   );
 
+  // Like the scientific name search above, not a facet with an options list —
+  // idle it reads as the bare filter name, drawn it names the shape itself
+  // (the same two labels SpatialFilterButton's own menu uses).
+  const spatialFilterTranslationKey = "spatialFilterFilterName";
+  const hasSpatialFilter = Boolean(polygon);
+  const spatialFilterBadgeTitle = hasSpatialFilter
+    ? t(
+        polygonIsRectangle(polygon)
+          ? "drawBoundingBoxOption"
+          : "drawPolygonOption",
+      )
+    : t(spatialFilterTranslationKey);
+  const SpatialFilterIcon =
+    hasSpatialFilter && !polygonIsRectangle(polygon) ? Pentagon : BoundingBox;
+
   // A failed /datasets leaves no catalogue total; what came back filtered is
   // then all we know it to be (same fallback as the top bar's counter).
   const totalCount = total ?? filteredCount;
@@ -233,6 +269,33 @@ export default function FiltersPanel() {
       <div className="filtersPanelBody">
         <div className="filtersPanelList" data-testid="filters-panel-list">
           <FilterSection title={t("filterGroupWhat")}>
+            {/* Ahead of Data Layers: it matches free text against dataset
+                titles directly, rather than narrowing by facet, so it is the
+                one row here that isn't picking from an options list — the
+                same state the map's own search button and the datasets list
+                search box read and write (SelectionProvider). */}
+            <Filter
+              active={Boolean(datasetTitleSearchText)}
+              badgeTitle={textSearchBadgeTitle}
+              tooltip={t("textSearchFilterTooltip")}
+              icon={<Search />}
+              controlled
+              searchable
+              // Unlike the facet rows, this one's value re-queries the map, so
+              // it goes on Enter or the magnifier rather than on a pause.
+              searchOnSubmit
+              searchTerms={datasetTitleSearchText}
+              setSearchTerms={setDatasetTitleSearchText}
+              searchPlaceholder={t("textSearchFilterPlaceholder")}
+              filterName={textSearchFilterTranslationKey}
+              openFilter={openFilter === textSearchFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                datasetTitleSearchText
+                  ? () => setDatasetTitleSearchText("")
+                  : undefined
+              }
+            />
             {/* First of the facet rows: this is the coarsest "what" there is —
                 it decides which families of data exist for the filters below
                 to narrow. */}
@@ -419,6 +482,26 @@ export default function FiltersPanel() {
             </Filter>
           </FilterSection>
           <FilterSection title={t("filterGroupWhenWhere")}>
+            {/* First in the section: the drawn shape is the primary "where"
+                constraint, ahead of the derived "in view" toggle below it.
+                Picking a shape closes the modal (see SpatialFilter) so the
+                map — hidden behind the dialog otherwise — is there to draw
+                on. */}
+            <Filter
+              active={hasSpatialFilter}
+              badgeTitle={spatialFilterBadgeTitle}
+              tooltip={t("spatialFilterMenuTitle")}
+              icon={<SpatialFilterIcon />}
+              controlled
+              filterName={spatialFilterTranslationKey}
+              openFilter={openFilter === spatialFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                hasSpatialFilter ? () => requestDraw("clear") : undefined
+              }
+            >
+              <SpatialFilter />
+            </Filter>
             <Filter
               active={timeFilterActive}
               badgeTitle={timeframesBadgeTitle}
@@ -492,6 +575,29 @@ export default function FiltersPanel() {
               </label>
               <div className="inViewFilterCount">
                 {t("realtimeFilterHelpText")}
+              </div>
+            </Filter>
+            <Filter
+              active={onlyInView}
+              badgeTitle={t("datasetsCardOnlyInViewText")}
+              tooltip={t("datasetsCardOnlyInViewTitle")}
+              icon={<BoundingBox />}
+              controlled
+              filterName={inViewFilterName}
+              openFilter={openFilter === inViewFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={onlyInView ? () => setOnlyInView(false) : undefined}
+            >
+              <label className="inViewFilterToggle">
+                <input
+                  type="checkbox"
+                  checked={onlyInView}
+                  onChange={(e) => setOnlyInView(e.target.checked)}
+                />
+                <span>{t("datasetsCardOnlyInViewTitle")}</span>
+              </label>
+              <div className="inViewFilterCount">
+                {t("datasetsCardInViewCountText", { count: inViewCount })}
               </div>
             </Filter>
           </FilterSection>

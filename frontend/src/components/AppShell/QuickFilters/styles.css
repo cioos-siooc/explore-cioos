@@ -107,7 +107,12 @@
 .quickFilterSearch.expanded .quickFilterButton {
   border-color: transparent;
   background: transparent;
+  color: var(--cioos-primary-700);
   box-shadow: none;
+}
+
+.quickFilterSearch.expanded .quickFilterButton:hover {
+  color: var(--cioos-primary);
 }
 
 .quickFilterSearch.expanded .quickFilterButton:focus-visible {

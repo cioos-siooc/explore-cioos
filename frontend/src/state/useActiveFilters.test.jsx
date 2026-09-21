@@ -52,10 +52,11 @@ describe("useActiveFilters", () => {
     await waitFor(() => expect(keys()).toContain("dataLayers"));
   });
 
-  // The quick filters have their own buttons on the map and no rows in the
-  // Filters modal, so the badge that sits on that modal must not count them —
-  // it would be reporting filters the dialog it opens cannot change.
-  it("ignores the quick filters, which the Filters modal does not own", async () => {
+  // The quick filters have their own buttons on the map (and a row in the
+  // Filters modal that writes the same state), so the badge that sits on that
+  // modal must not double-count them — a chip and a lit map button for the
+  // same thing would be the same state announced twice.
+  it("ignores the quick filters, which already have their own indicator", async () => {
     open(
       "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
     );

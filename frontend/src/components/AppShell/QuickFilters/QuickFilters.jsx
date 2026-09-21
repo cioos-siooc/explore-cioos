@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowCounterclockwise,
   BoundingBox,
-  Crop,
+  Eye,
   Pentagon,
   Search,
   X,
@@ -100,6 +100,15 @@ export default function QuickFilters() {
         onSubmit={(e) => {
           e.preventDefault();
           submitSearch();
+        }}
+        onBlur={(e) => {
+          // Empty and abandoned: close it up rather than leave an empty field
+          // sitting open. A term already published keeps it open (see
+          // searchExpanded), and focus moving to the clear/submit button
+          // within this same form is not a departure.
+          if (searchText || datasetTitleSearchText) return;
+          if (e.currentTarget.contains(e.relatedTarget)) return;
+          setSearchOpen(false);
         }}
       >
         <button
@@ -200,7 +209,7 @@ export default function QuickFilters() {
         title={t("datasetsCardOnlyInViewTitle")}
         aria-label={t("datasetsCardOnlyInViewText")}
       >
-        <Crop size={18} aria-hidden="true" />
+        <Eye size={18} aria-hidden="true" />
       </button>
       {/* Only these four. The chips panel's own Clear-all still resets
           everything, but it is only on screen while a modal filter is set — so
