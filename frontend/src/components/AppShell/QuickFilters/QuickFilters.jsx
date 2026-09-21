@@ -3,8 +3,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowCounterclockwise,
   BoundingBox,
-  ChevronCompactDown,
-  ChevronCompactUp,
   Eye,
   Pentagon,
   Search,
@@ -18,7 +16,6 @@ import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 // The quick filters: the four that act on the map rather than on a list of
@@ -36,12 +33,11 @@ import "./styles.css";
 // their pressed state off the shape on the map instead. Between arming a draw
 // and closing the shape, neither is lit.
 //
-// Show/Hide for the active-filter chips (see ActiveFilterChips) closes the
-// row off, when there is a chip list to act on: it reads more naturally next
-// to the tools that already narrow the map than above a card of its own. The
-// reset button is one for both rows — quick filters and the modal ones the
-// chips show alike — rather than a second button next to it clearing only
-// half of what is set.
+// Show/Hide for this row and the active-filter chips beneath it (see
+// TopControls) lives on the main Filters button instead of here — one toggle
+// for both rather than each keeping its own. The reset button is one for
+// both rows — quick filters and the modal ones the chips show alike — rather
+// than a second button next to it clearing only half of what is set.
 export default function QuickFilters() {
   const { t } = useTranslation();
   const { requestDraw, resetDataLayers } = useMapState();
@@ -54,7 +50,6 @@ export default function QuickFilters() {
   } = useSelection();
   const activeFilterCount = useActiveFilters().length;
   const { resetFilters } = useFilters();
-  const { filterChipsCollapsed, setFilterChipsCollapsed } = useUI();
 
   const searchInputId = useId();
   const inputRef = useRef(null);
@@ -226,33 +221,6 @@ export default function QuickFilters() {
       >
         <Eye size={18} aria-hidden="true" />
       </button>
-      {/* Show/Hide for the active-filter chips underneath — only worth
-          showing once there is a chip list for it to act on. */}
-      {activeFilterCount > 0 && (
-        <button
-          type="button"
-          className="quickFilterButton"
-          data-testid="filter-chips-toggle"
-          onClick={() => setFilterChipsCollapsed((c) => !c)}
-          aria-expanded={!filterChipsCollapsed}
-          aria-label={
-            filterChipsCollapsed
-              ? t("activeFiltersShow")
-              : t("activeFiltersHide")
-          }
-          title={
-            filterChipsCollapsed
-              ? t("activeFiltersShow")
-              : t("activeFiltersHide")
-          }
-        >
-          {filterChipsCollapsed ? (
-            <ChevronCompactDown size={18} aria-hidden="true" />
-          ) : (
-            <ChevronCompactUp size={18} aria-hidden="true" />
-          )}
-        </button>
-      )}
       {/* One reset for everything this row and the chips below can set —
           quick filters and the modal ones alike — rather than two buttons
           each clearing half of it. */}

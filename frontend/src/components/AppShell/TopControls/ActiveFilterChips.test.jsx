@@ -168,9 +168,10 @@ describe("ActiveFilterChips", () => {
     expect(names.some((name) => name.includes("Oxygen"))).toBe(true);
   });
 
-  // Show/Hide and Clear-all now live with the quick filters (see
-  // QuickFilters.test.jsx) — one toggle for both rows — so this component no
-  // longer renders them itself; it only reacts to filterChipsCollapsed.
+  // Show/Hide now lives on the main Filters button (see
+  // TopControls.test.jsx) and Clear-all lives with the quick filters (see
+  // QuickFilters.test.jsx) — this component renders neither itself, so it
+  // has nothing of its own left to test here.
 
   // The quick filters are named by their own buttons on the map (and a row in
   // the Filters modal), which carry both their state and the way to drop them

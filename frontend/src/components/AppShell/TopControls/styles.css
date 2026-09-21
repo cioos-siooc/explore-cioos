@@ -191,6 +191,66 @@
   box-shadow: var(--cioos-focus);
 }
 
+/* The Filters segment carries two controls, not one: the button that opens
+   the modal, and — riding on its far edge — the toggle for the quick-filter
+   and active-filter-chip rows beneath the bar (see TopControls, QuickFilters,
+   ActiveFilterChips). Built as a container plus two real buttons rather than
+   a button nested in a button, which browsers refuse to render as written;
+   the container keeps the segment's own background/active/applied wash
+   (still ".topBarButton"), and both inner buttons go transparent so that
+   wash shows through. */
+.topBar .topBarActions .topBarButton.topBarFiltersSegment {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  gap: 0;
+}
+
+.topBarFiltersOpen,
+.topBarFiltersToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.topBarFiltersOpen {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+}
+
+.topBarFiltersOpen > svg,
+.topBarFiltersOpen > .topBarCount,
+.topBarFiltersToggle > svg {
+  flex: 0 0 auto;
+}
+
+/* A hairline of its own, separate from the one the whole segment already
+   gets from its left-hand neighbour, so the two controls read as split
+   rather than one continuous hit area. */
+.topBarFiltersToggle {
+  flex: 0 0 auto;
+  padding: 4px 10px 4px 6px;
+  border-left: 1px solid rgb(82 167 155 / 32%);
+}
+
+.topBarButton.active .topBarFiltersToggle {
+  border-left-color: rgb(255 255 255 / 40%);
+}
+
+.topBarFiltersOpen:focus-visible,
+.topBarFiltersToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+  border-radius: var(--cioos-radius-sm);
+}
+
 /* ------------------------------------------------------------------
  * Dataset tally — one compact line of type between the brand lockup and the
  * tab strip: "123/150 datasets ( 23 in view )". Banded rather than floated on
