@@ -42,7 +42,13 @@ test("keeps the newest rows even when ERDDAP returns them out of order", () => {
 });
 
 test("falls back to the head slice when there is no time column", () => {
-  const t = { columnNames: ["depth", "salinity"], rows: [[1, 2], [3, 4]] };
+  const t = {
+    columnNames: ["depth", "salinity"],
+    rows: [
+      [1, 2],
+      [3, 4],
+    ],
+  };
   assert.deepEqual(trimPreviewRows(t, 1).rows, [[1, 2]]);
 });
 

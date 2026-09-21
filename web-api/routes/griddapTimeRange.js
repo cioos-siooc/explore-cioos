@@ -79,9 +79,7 @@ function timeDimensionFrom(table) {
   };
   if (Object.values(at).some((i) => i < 0)) return null;
 
-  const rows = (table.rows || []).filter(
-    (row) => row[at.variable] === "time",
-  );
+  const rows = (table.rows || []).filter((row) => row[at.variable] === "time");
   const dimensionRow = rows.find((row) => row[at.rowType] === "dimension");
   if (!dimensionRow) return null;
 
@@ -142,15 +140,23 @@ router.get(
       if (!time || (!time.min && !time.max)) {
         // A static grid with no time axis. Not an error: the caller keeps the
         // harvested dimensions and its slider simply has nothing to move.
-        return res.status(404).send({ error: "NO_TIME_DIMENSION", dataset: dataset_id });
+        return res
+          .status(404)
+          .send({ error: "NO_TIME_DIMENSION", dataset: dataset_id });
       }
       return res.send(time);
     } catch (error) {
       const status = error.response?.status;
       if (status === 404) {
-        return res.status(404).send({ error: "DATASET_NOT_FOUND", dataset: dataset_id });
+        return res
+          .status(404)
+          .send({ error: "DATASET_NOT_FOUND", dataset: dataset_id });
       }
-      console.error("Griddap time range upstream failure", status, error.message);
+      console.error(
+        "Griddap time range upstream failure",
+        status,
+        error.message,
+      );
       Sentry.captureException(error, {
         tags: { route: "griddapTimeRange", erddap_status: status ?? "none" },
         extra: { infoUrl, dataset: dataset_id },

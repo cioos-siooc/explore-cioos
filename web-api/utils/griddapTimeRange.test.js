@@ -1,21 +1,54 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { timeDimensionFrom, erddapTimeToIso } = require("../routes/griddapTimeRange");
+const {
+  timeDimensionFrom,
+  erddapTimeToIso,
+} = require("../routes/griddapTimeRange");
 
 // ERDDAP's /info/{id}/index.json, trimmed to the rows that matter.
 const info = (rows) => ({
-  columnNames: ["Row Type", "Variable Name", "Attribute Name", "Data Type", "Value"],
+  columnNames: [
+    "Row Type",
+    "Variable Name",
+    "Attribute Name",
+    "Data Type",
+    "Value",
+  ],
   rows,
 });
 
 test("reads nValues, spacing and bounds off the time rows", () => {
   const time = timeDimensionFrom(
     info([
-      ["dimension", "time", "", "double", "nValues=168, evenlySpaced=true, averageSpacing=1h"],
-      ["attribute", "time", "actual_range", "double", "1.0257408E9, 1.0263456E9"],
-      ["attribute", "time", "units", "String", "seconds since 1970-01-01T00:00:00Z"],
-      ["dimension", "latitude", "", "double", "nValues=100, evenlySpaced=true, averageSpacing=0.1"],
+      [
+        "dimension",
+        "time",
+        "",
+        "double",
+        "nValues=168, evenlySpaced=true, averageSpacing=1h",
+      ],
+      [
+        "attribute",
+        "time",
+        "actual_range",
+        "double",
+        "1.0257408E9, 1.0263456E9",
+      ],
+      [
+        "attribute",
+        "time",
+        "units",
+        "String",
+        "seconds since 1970-01-01T00:00:00Z",
+      ],
+      [
+        "dimension",
+        "latitude",
+        "",
+        "double",
+        "nValues=100, evenlySpaced=true, averageSpacing=0.1",
+      ],
     ]),
   );
   assert.equal(time.n_values, 168);
@@ -31,10 +64,28 @@ test("does not mistake another variable's rows for the time axis", () => {
   // actual_range, and reading it as a time would put the slider in 1970.
   const time = timeDimensionFrom(
     info([
-      ["dimension", "latitude", "", "double", "nValues=100, evenlySpaced=true, averageSpacing=0.1"],
+      [
+        "dimension",
+        "latitude",
+        "",
+        "double",
+        "nValues=100, evenlySpaced=true, averageSpacing=0.1",
+      ],
       ["attribute", "latitude", "actual_range", "double", "40.0, 50.0"],
-      ["dimension", "time", "", "double", "nValues=5, evenlySpaced=false, averageSpacing=1 day 3h"],
-      ["attribute", "time", "actual_range", "double", "1.0257408E9, 1.0263456E9"],
+      [
+        "dimension",
+        "time",
+        "",
+        "double",
+        "nValues=5, evenlySpaced=false, averageSpacing=1 day 3h",
+      ],
+      [
+        "attribute",
+        "time",
+        "actual_range",
+        "double",
+        "1.0257408E9, 1.0263456E9",
+      ],
     ]),
   );
   assert.equal(time.n_values, 5);
@@ -59,7 +110,10 @@ test("returns null for an unrecognised document shape", () => {
 
 test("parses both of ERDDAP's time formats", () => {
   assert.equal(erddapTimeToIso("1.0257408E9"), "2002-07-04T00:00:00.000Z");
-  assert.equal(erddapTimeToIso("2002-07-04T00:00:00Z"), "2002-07-04T00:00:00.000Z");
+  assert.equal(
+    erddapTimeToIso("2002-07-04T00:00:00Z"),
+    "2002-07-04T00:00:00.000Z",
+  );
   for (const empty of ["", "   ", "NaN", null, undefined]) {
     assert.equal(erddapTimeToIso(empty), null);
   }

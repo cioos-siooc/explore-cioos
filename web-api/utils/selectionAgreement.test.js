@@ -306,7 +306,10 @@ test("every selection route inherits the realtimeOnly dataset filter", async () 
     // that actually select from a table.
   ].filter((sql) => /FROM cde\./.test(sql));
 
-  assert.ok(statements.length >= 6, "expected at least one statement per route");
+  assert.ok(
+    statements.length >= 6,
+    "expected at least one statement per route",
+  );
   for (const sql of statements) {
     assert.match(
       sql,
