@@ -86,8 +86,10 @@ export default function ActiveFilterChips() {
                 onClick={f.goToFilter}
                 title={t("activeFilterGoToFilterTitle", { filter: f.label })}
               >
-                {f.icon}
-                {f.label}
+                <span className="activeFilterGroupIcon" aria-hidden="true">
+                  {f.icon}
+                </span>
+                <span className="activeFilterGroupLabelText">{f.label}</span>
               </button>
             </span>
             {shownItems.map((item) => (

@@ -74,7 +74,7 @@ const ICON_FOR_KEY = {
 function iconForKey(key) {
   const Icon = ICON_FOR_KEY[key];
   return Icon
-    ? React.createElement(Icon, { size: 12, "aria-hidden": true })
+    ? React.createElement(Icon, { size: 14, "aria-hidden": true })
     : null;
 }
 

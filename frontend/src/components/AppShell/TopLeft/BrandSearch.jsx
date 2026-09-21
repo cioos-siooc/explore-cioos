@@ -5,19 +5,16 @@ import classNames from "classnames";
 
 import CioosLogo from "../../ui/CioosLogo.jsx";
 import LanguageSelector from "../../Controls/LanguageSelector/LanguageSelector.jsx";
+import FeedbackButton from "../../Controls/FeedbackButton/FeedbackButton.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 // The brand card: logo, the two-line app title lockup, and the minor actions
-// (intro / projection / language) on the top row. The logo is drawn rather than
-// loaded, and is also the app's loading indicator — see CioosLogo. The
-// centered top bar passes the merged Datasets/Filters control in as children,
-// so it renders as a second row welded into this same card.
-//
-// Feedback is not among the minor actions: IntroModal already renders the same
-// FeedbackButton, with a line of copy explaining what it is for, so a second
-// copy up here was the same action twice.
+// (feedback / intro / projection / language) on the top row. The logo is
+// drawn rather than loaded, and is also the app's loading indicator — see
+// CioosLogo. The centered top bar passes the merged Datasets/Filters control
+// in as children, so it renders as a second row welded into this same card.
 export default function BrandSearch({ children }) {
   const { t, i18n } = useTranslation();
   const { showIntroModal, setShowIntroModal } = useUI();
@@ -64,6 +61,7 @@ export default function BrandSearch({ children }) {
             )}
           </h1>
           <div className="brandMinorItems">
+            <FeedbackButton className="brandMinorItem" size={20} />
             <button
               type="button"
               className={classNames("brandMinorItem", {
