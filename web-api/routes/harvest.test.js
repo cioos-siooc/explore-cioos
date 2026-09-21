@@ -39,6 +39,22 @@ test("GET /harvest/servers/:slug resolves the slug and returns its datasets", as
   assert.deepEqual(res.body, [{ dataset_id: "obs_270", status: "success" }]);
 });
 
+test("GET /harvest/servers/:slug selects dataset_is_realtime for each dataset", async () => {
+  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
+  db.queueRaw([
+    { dataset_id: "obs_270", status: "success", is_realtime: true },
+  ]);
+
+  const res = await agent.get("/harvest/servers/erddap-example-com-erddap");
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body[0].is_realtime, true);
+  assert.match(
+    db.queries[1],
+    /dataset_is_realtime\(ds\.coverage_time_max, ds\.verified_at\)/,
+  );
+});
+
 test("GET /harvest/servers/:slug passes status/q through to the query", async () => {
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]);
   db.queueRaw([]);
@@ -67,7 +83,7 @@ test("GET /harvest/dataset/:slug/:datasetId 404s when the dataset has no harvest
 test("GET /harvest/dataset/:slug/:datasetId returns history + meta when found", async () => {
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
   db.queueRaw([{ run_id: "r1", status: "success" }]); // datasetHistory
-  db.queueRaw([{ content_hash: "abc123" }]); // datasetMeta
+  db.queueRaw([{ content_hash: "abc123", is_realtime: true }]); // datasetMeta
 
   const res = await agent.get(
     "/harvest/dataset/erddap-example-com-erddap/obs_270",
@@ -76,6 +92,7 @@ test("GET /harvest/dataset/:slug/:datasetId returns history + meta when found", 
   assert.equal(res.status, 200);
   assert.equal(res.body.history.length, 1);
   assert.equal(res.body.meta.content_hash, "abc123");
+  assert.equal(res.body.meta.is_realtime, true);
   assert.equal(res.body.erddap_url, "https://erddap.example.com/erddap");
   assert.equal(res.body.historyTruncated, false);
   assert.equal(res.body.historyLimit, 200);

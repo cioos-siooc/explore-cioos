@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import HarvestModeBadge from "./HarvestModeBadge.jsx";
+import HarvestRealtimeBadge from "./HarvestRealtimeBadge.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
 import { hostname, fmtDt, fmtDurationMs, datasetLink } from "./format.js";
@@ -114,6 +115,7 @@ export default function HarvestDataset() {
           >
             <StatusBadge status={latest.status} />
             {meta && <HarvestModeBadge dataset={meta} />}
+            {meta && <HarvestRealtimeBadge isRealtime={meta.is_realtime} />}
             {latest.reason_code && (
               <span className="harvest-text-md" title={latest.reason_code}>
                 {reasonLabel(t, latest.reason_code)}

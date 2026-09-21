@@ -144,6 +144,21 @@
   color: var(--harvest-success-ink);
 }
 
+/* ── Realtime badge (dataset_is_realtime) ────────────────────────────────────
+   Same solid badge as the dataset cards' Live badge (DatasetsTable/styles.css
+   .datasetCardLive), sized to the admin table's smaller type scale. */
+.harvest-realtime-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-live);
+  color: var(--cioos-white);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ── Sparkline ────────────────────────────────────────────────────────────── */
 .harvest-spark {
   font-family: monospace;
