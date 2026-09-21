@@ -261,3 +261,7 @@ export const languages = [
     name: "Français",
   },
 ];
+
+// Show only datasets that were still producing data when we harvested them.
+// Off by default: nothing ticked means no constraint, like every other filter.
+export const defaultRealtimeOnly = false;

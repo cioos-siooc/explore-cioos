@@ -78,10 +78,20 @@ CREATE TABLE datasets (
     -- Why content_hash is NULL (HASH_* code: database-backed, Croissant fetch error, …);
     -- NULL when a hash was produced. Lets the dashboard explain unhashed datasets.
     content_hash_reason TEXT,
+    -- Two different clocks: last_updated_at moves only when the dataset's
+    -- content changed, verified_at on every harvest that reached it (the
+    -- loader bumps it alone for datasets skipped as unchanged). verified_at is
+    -- therefore "when we last looked", and the timestamp that
+    -- dataset_is_realtime() (8_range_functions.sql) measures
+    -- coverage_time_max against.
     last_updated_at timestamptz,
     verified_at timestamptz,
-    -- Griddap (metadata-only) coverage. Kept at table end so temp_datasets
-    -- (LIKE ...) column order stays stable.
+    -- Dataset-level coverage. lat/lon/depth are griddap-only (metadata-only
+    -- datasets with no feature rows); coverage_time_* is populated for EVERY
+    -- type -- grids from their time dimension, everything else from the
+    -- allDatasets listing -- and feeds dataset_is_realtime() in
+    -- 8_range_functions.sql. Kept at table end so temp_datasets (LIKE ...)
+    -- column order stays stable.
     coverage_lat_min double precision,
     coverage_lat_max double precision,
     coverage_lon_min double precision,

@@ -110,6 +110,11 @@ class Dataset:
         self.coverage_depth_max = None
         self.grid_variables = None
         self.grid_dimensions = None
+        # Dataset-level time coverage from the allDatasets listing (ISO strings,
+        # set by the harvest loop). For tabledap this is the only coverage a
+        # dataset gets; for grids the dimension-derived value above wins.
+        self.listing_time_min = None
+        self.listing_time_max = None
         # Per-variable metadata for every column, griddap and tabledap alike.
         # get_metadata() fills it; see core/variables.py for why.
         self.table_variables = None
@@ -140,13 +145,19 @@ class Dataset:
                 "content_hash_reason": [self.content_hash_reason],
                 "last_updated_at": [now],
                 "verified_at": [now],
-                # Griddap metadata-only columns (None for tabledap types).
+                # lat/lon/depth extent: griddap only (None for tabledap).
                 "coverage_lat_min": [self.coverage_lat_min],
                 "coverage_lat_max": [self.coverage_lat_max],
                 "coverage_lon_min": [self.coverage_lon_min],
                 "coverage_lon_max": [self.coverage_lon_max],
-                "coverage_time_min": [self.coverage_time_min],
-                "coverage_time_max": [self.coverage_time_max],
+                # Grid handler's dimension-derived extent wins; the
+                # allDatasets listing fills it in for every other type.
+                # get_df() runs after extract_features(), so by here the grid
+                # values are already set and this `or` only fills the gap.
+                "coverage_time_min": [
+                    self.coverage_time_min or self.listing_time_min],
+                "coverage_time_max": [
+                    self.coverage_time_max or self.listing_time_max],
                 "coverage_depth_min": [self.coverage_depth_min],
                 "coverage_depth_max": [self.coverage_depth_max],
                 "table_variables": [self.table_variables],

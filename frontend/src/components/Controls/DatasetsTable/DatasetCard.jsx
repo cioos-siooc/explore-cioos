@@ -298,6 +298,18 @@ export default function DatasetCard({
             <PinMapFill size={13} aria-hidden="true" />
             {locationsLabel}
           </span>
+
+          {/* Same "still producing data" signal as the dataset inspector's
+              Last update row — on this row here since it is the card's other
+              home for small dataset-level facts. */}
+          {row.is_realtime && (
+            <span
+              className="datasetCardLive"
+              title={t("datasetRealtimeBadgeTitle")}
+            >
+              {t("datasetRealtimeBadgeText")}
+            </span>
+          )}
         </div>
 
         {/* Where this dataset lives and how to fetch it, outside the estimates

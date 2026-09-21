@@ -59,8 +59,15 @@ function filterNameForKey(key, t) {
 // number and the list it labels cannot disagree.
 export default function useActiveFilters() {
   const { t } = useTranslation();
-  const { buildActiveFilters, startDate, endDate, startDepth, endDepth } =
-    useFilters();
+  const {
+    buildActiveFilters,
+    startDate,
+    endDate,
+    startDepth,
+    endDepth,
+    realtimeOnly,
+    setRealtimeOnly,
+  } = useFilters();
   const {
     polygon,
     datasetTitleSearchText,
@@ -112,6 +119,22 @@ export default function useActiveFilters() {
           id: "search",
           label: datasetTitleSearchText,
           remove: () => setDatasetTitleSearchText(""),
+        },
+      ],
+    },
+    realtimeOnly && {
+      key: "realtimeOnly",
+      label: t("realtimeFilterName"),
+      goToFilter: () => {
+        setOpenFilter(t("realtimeFilterName"));
+        setShowFiltersModal(true);
+      },
+      removeAll: () => setRealtimeOnly(false),
+      items: [
+        {
+          id: "realtimeOnly",
+          label: t("realtimeFilterChipText"),
+          remove: () => setRealtimeOnly(false),
         },
       ],
     },

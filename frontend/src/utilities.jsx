@@ -120,6 +120,7 @@ export function createDataFilterQueryString(query) {
     scientificNamesSelected,
     obisNodesSelected,
     erddapServersSelected,
+    realtimeOnly,
   } = query;
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
@@ -227,6 +228,9 @@ export function createDataFilterQueryString(query) {
     includeObis,
     scientificNames,
     obisNodes,
+    // Only ever sent when on; objectToURL drops empty strings, so the default
+    // leaves the URL (and the API request) untouched.
+    realtimeOnly: realtimeOnly ? "true" : "",
   };
 
   return objectToURL(apiMappedQuery);

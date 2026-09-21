@@ -1,11 +1,12 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
 import { useSelection } from "./SelectionProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
+import { useFilters } from "../filters/FilterProvider.jsx";
 import { erddapServerSlug } from "../../utilities.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 
@@ -13,10 +14,12 @@ let latest;
 // The map side of the same render, so the suite can assert that a narrowing
 // made here actually reaches the queries the map draws from.
 let latestMapState;
+let latestFilters;
 
 function Probe() {
   latest = useSelection();
   latestMapState = useMapState();
+  latestFilters = useFilters();
   return (
     <span data-testid="state">
       {latest.initialPointsQueryComplete ? "loaded" : "loading"}
@@ -43,6 +46,46 @@ describe("SelectionProvider", () => {
       (p) => p.dataset_id === pointQueryFixture[0].dataset_id,
     );
     expect(row.title).toBe(pointQueryFixture[0].title_translated.en);
+  });
+
+  it("keeps the latest time-filtered results when an older request finishes last", async () => {
+    await renderLoaded();
+    vi.useFakeTimers();
+    const fallbackFetch = globalThis.fetch;
+    const pending = new Map();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (!url.includes("/pointQuery")) return fallbackFetch(input, init);
+        const timeMin = new URL(url).searchParams.get("timeMin");
+        return new Promise((resolve) => pending.set(timeMin, resolve));
+      }),
+    );
+
+    try {
+      act(() => latestFilters.setStartDate("2020-01-01"));
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+      expect(pending.has("2020-01-01")).toBe(true);
+
+      act(() => latestFilters.setStartDate("2021-01-01"));
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+      expect(pending.has("2021-01-01")).toBe(true);
+
+      await act(async () => {
+        pending.get("2021-01-01")(
+          new Response(JSON.stringify([pointQueryFixture[0]])),
+        );
+      });
+      expect(latest.pointsData).toHaveLength(1);
+
+      await act(async () => {
+        pending.get("2020-01-01")(new Response(JSON.stringify([])));
+      });
+      expect(latest.pointsData).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("resolves inspectDataset from a ?dataset=&server= share link", async () => {

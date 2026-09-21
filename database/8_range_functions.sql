@@ -149,3 +149,90 @@ $$
            )
          );
 $$;
+
+/*
+
+dataset_is_realtime( coverage_time_max, harvested_at, cdm_data_type )
+
+"Was this dataset still producing data at the moment we harvested it?"
+
+The first two arguments are stored columns on cde.datasets, so this is
+IMMUTABLE: the answer is fixed at harvest time and does not drift as the clock
+moves. That is deliberate. A now()-relative test would need the catalogue
+refreshed on a timer to stay honest, and would flip a dataset's badge between
+page loads; "this dataset is updated in real time" is a property of the
+dataset, not of this instant. The cost is that the flag ages with the harvest:
+a feed that died yesterday keeps its badge until the next harvest re-measures
+it.
+
+coverage_time_max is the dataset's newest data as the server itself reported it
+(from the allDatasets listing, or the time dimension for grids); harvested_at is
+when we last looked at the dataset. A dataset whose newest data is less than 7
+days behind its own harvest was live at that moment. That window is deliberately
+loose: we don't distinguish strictly-real-time from near-real-time feeds (one
+"Live" badge covers both), and near-real-time sources can legitimately lag by
+more than a day for QC/processing, or simply report less often than daily. The
+default harvest cadence itself is every 3 days (HARVESTER_CRON), so a 1-day
+window would mislabel a perfectly healthy NRT feed as dead; 7 days gives enough
+slack for that lag plus a missed harvest run without also blessing feeds that
+have actually gone stale.
+
+Callers pass verified_at, not last_updated_at. last_updated_at only moves when
+the dataset's content changed, so on an incremental harvest a dataset skipped as
+unchanged keeps the old value (the loader bumps verified_at alone --
+loading/loader.py). A feed that dies therefore freezes coverage_time_max and
+last_updated_at together, a few hours apart, and would read realtime forever:
+the "next harvest re-measures it" the paragraph above promises never arrives for
+exactly the datasets the flag is meant to catch. verified_at advances on every
+harvest that reaches the dataset, so the gap widens on its own and the flag
+turns false 7 days after the data stops.
+
+Forecast grids have a coverage_time_max in the future and so are realtime,
+which is correct -- they are continuously reissued. But some sources have
+metadata/clock errors that put coverage_time_max decades ahead (e.g. a
+time_coverage_end of 2050) -- not a forecast, just bad data. coverage_time_max
+is capped at harvested_at + 90 days, past real-world weather/ocean forecast
+horizons (days to a few months), so those bogus dates read as not realtime
+instead of forever "live".
+
+cdm_data_type gates the shape of dataset this even makes sense for: grids
+(cdm_data_type='Grid', ERDDAP's griddap) and the TimeSeries / Trajectory
+family are continuously-updated feeds, but a Profile (a one-off vertical cast,
+possibly grouped into TimeSeriesProfile/TrajectoryProfile -- those match the
+prefix, not this) or a bare Point (OBIS occurrence records) is not something a
+server "keeps producing"; recent coverage there means recent data entry, not a
+live feed. Prefix-matched rather than an exact IN-list so TimeSeries/Trajectory
+subtypes stay covered without editing this function.
+
+NULL on either side means "unknown", which is not evidence of being live, so
+the answer is false rather than NULL. That keeps callers from needing IS TRUE /
+IS NOT TRUE to avoid three-valued logic dropping rows from both sides of the
+filter.
+
+  SELECT dataset_is_realtime(coverage_time_max, verified_at, cdm_data_type)
+    FROM cde.datasets;
+
+*/
+
+-- Dropped first, like the functions above: CREATE OR REPLACE refuses to rename
+-- an existing function's parameters, so re-applying this file over a database
+-- that still has an older signature would error out mid-migration.
+DROP FUNCTION IF EXISTS dataset_is_realtime( timestamptz, timestamptz );
+DROP FUNCTION IF EXISTS dataset_is_realtime( timestamptz, timestamptz, text );
+CREATE OR REPLACE FUNCTION dataset_is_realtime(
+    coverage_time_max timestamptz,
+    harvested_at timestamptz,
+    cdm_data_type text
+  )
+  RETURNS boolean
+  LANGUAGE sql IMMUTABLE PARALLEL SAFE
+AS
+$$
+  SELECT coverage_time_max IS NOT NULL
+     AND harvested_at IS NOT NULL
+     AND coverage_time_max >= harvested_at - interval '7 days'
+     AND coverage_time_max <= harvested_at + interval '90 days'
+     AND (cdm_data_type = 'Grid'
+          OR cdm_data_type ILIKE 'TimeSeries%'
+          OR cdm_data_type ILIKE 'Trajectory%');
+$$;

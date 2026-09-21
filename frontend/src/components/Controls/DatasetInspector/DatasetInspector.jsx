@@ -22,7 +22,11 @@ import {
   DATA_LAYER_LABEL_KEYS,
 } from "../../../state/dataLayers.js";
 import { gridNodeFactors, totalGridNodes } from "../../../wmsUtilities";
-import { formatInstantRange, formatRange } from "../../../utilities.jsx";
+import {
+  formatInstant,
+  formatInstantRange,
+  formatRange,
+} from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
 import ListCard, {
   CardField,
@@ -635,6 +639,33 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
+          {/* Dataset-level freshness. coverage_time_max is the newest data the
+              server reported across EVERY record in the dataset, so for a
+              mooring network or a glider programme it is not the end of any one
+              record — which is why it is labelled on the dataset and the record
+              cards below keep their own (harvest-era) ranges. */}
+          {dataset.coverage_time_max && (
+            <div className="metaCell">
+              <dt className="metadataLabel">
+                {t("datasetInspectorLatestDataText")}
+              </dt>
+              <dd className="metadataValue metadataValueCentered">
+                <span className="metadataChip">
+                  {formatInstant(dataset.coverage_time_max)}
+                </span>
+                {/* Same badge as the dataset card's (DatasetCard.jsx) — the
+                    freshness signal sits beside the timestamp it explains. */}
+                {dataset.is_realtime && (
+                  <span
+                    className="datasetTitleLive"
+                    title={t("datasetRealtimeBadgeTitle")}
+                  >
+                    {t("datasetRealtimeBadgeText")}
+                  </span>
+                )}
+              </dd>
+            </div>
+          )}
           {/* The outbound links used to be a labelled row each; they say what
               they are in their own text, so one "Sources" line holds them
               all. */}

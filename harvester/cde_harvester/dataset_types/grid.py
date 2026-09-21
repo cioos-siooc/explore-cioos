@@ -18,26 +18,15 @@ import pandas as pd
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 from cde_harvester.dataset_types.tabledap_features import _axis_bounds_from_metadata
-from cde_harvester.utils import eov_standard_name, standard_name_to_eovs
+from cde_harvester.utils import (
+    eov_standard_name,
+    erddap_time_to_iso,
+    standard_name_to_eovs,
+)
 
 _N_VALUES_RE = re.compile(r"nValues=(\d+)")
 _EVENLY_SPACED_RE = re.compile(r"evenlySpaced=(true|false)")
 _AVERAGE_SPACING_RE = re.compile(r"averageSpacing=(.+)$")
-
-
-def _erddap_time_to_iso(value):
-    """ERDDAP time value ('1.0257408E9' epoch seconds or an ISO 8601 string)
-    -> ISO-8601 UTC string, or None when unparseable."""
-    s = str(value).strip()
-    if not s or s.lower() in ("nan", "none", "nat"):
-        return None
-    try:
-        ts = pd.to_datetime(float(s), unit="s", utc=True)
-    except (TypeError, ValueError):
-        ts = pd.to_datetime(s, errors="coerce", utc=True)
-    if pd.isna(ts):
-        return None
-    return ts.isoformat()
 
 
 def _parse_dimension_attrs(value):
@@ -116,7 +105,7 @@ def _extract_dimensions(dataset):
         bounds = _actual_range(dataset, name) or (None, None)
         is_time = name == "time" or var_meta.get("standard_name") == "time"
         if is_time:
-            lo, hi = _erddap_time_to_iso(bounds[0]), _erddap_time_to_iso(bounds[1])
+            lo, hi = erddap_time_to_iso(bounds[0]), erddap_time_to_iso(bounds[1])
         else:
             lo, hi = _to_float(bounds[0]), _to_float(bounds[1])
         dimensions.append(
@@ -207,10 +196,10 @@ def extract_grid_extent(dataset):
     time_dim = next((d for d in dimensions if d["name"] == "time"), None)
     dataset.coverage_time_min = (
         time_dim and time_dim["min"]
-    ) or _erddap_time_to_iso(dataset.globals.get("time_coverage_start"))
+    ) or erddap_time_to_iso(dataset.globals.get("time_coverage_start"))
     dataset.coverage_time_max = (
         time_dim and time_dim["max"]
-    ) or _erddap_time_to_iso(dataset.globals.get("time_coverage_end"))
+    ) or erddap_time_to_iso(dataset.globals.get("time_coverage_end"))
 
     depth_min, depth_max = _vertical_extent(dataset, dimensions)
     dataset.coverage_depth_min = depth_min
