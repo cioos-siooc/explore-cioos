@@ -586,6 +586,23 @@
   overflow-wrap: anywhere;
 }
 
+/* "Live": same solid orange badge as the dataset inspector's, sized down to
+   the card's smaller type scale. flex: 0 0 auto so it keeps its shape next to
+   the title's flex: 1 1 auto instead of stretching with it. */
+.datasetCardLive {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-live);
+  color: var(--cioos-white);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 .datasetCardMeta {
   display: flex;
   flex-wrap: wrap;
