@@ -180,6 +180,12 @@
     "color": null
   },
   {
+    "pk": 724,
+    "pk_url": 724,
+    "name": "Dalhousie University (Ocean Frontier Institute)",
+    "color": null
+  },
+  {
     "pk": 101,
     "pk_url": 101,
     "name": "Defence Research and Development Canada (DRDC)",
@@ -231,12 +237,6 @@
     "pk": 94,
     "pk_url": 94,
     "name": "Fisheries and Oceans Canada",
-    "color": null
-  },
-  {
-    "pk": 40,
-    "pk_url": 40,
-    "name": "Fisheries and Oceans Canada - Pêches et Océans Canada",
     "color": null
   }
 ]
