@@ -4,6 +4,18 @@
 [![Deploy](https://github.com/cioos-siooc/explore-cioos/actions/workflows/deploy.yml/badge.svg)](https://github.com/cioos-siooc/explore-cioos/actions/workflows/deploy.yml)
 [![Last Harvest](https://github.com/cioos-siooc/explore-cioos/actions/workflows/harvest.yml/badge.svg)](https://github.com/cioos-siooc/explore-cioos/actions/workflows/harvest.yml)
 
+## Architecture
+
+```mermaid
+flowchart TD
+    Sources["ERDDAP / OBIS / CKAN"] --> Harvester["harvester (Prefect)"]
+    Harvester --> CSV["CSV"] --> Loader["db-loader"] --> DB[("Postgres/PostGIS\nschema `cde`")]
+    DB --> API["web-api (Express, Redis-cached)"] --> Frontend["frontend (React/MapLibre)"]
+    Frontend -- download request --> Scheduler["download_scheduler"] --> Downloader["downloader"] --> Email["email"]
+```
+
+`nginx/` is the edge proxy; `test/` holds the integration smoke tests.
+
 ## Testing a dataset
 
 If you just want to see how a dataset is harvested by CDE:
@@ -230,6 +242,43 @@ For complete local development with all services running outside Docker (advance
    ```
 
 8. See website at <http://localhost:8000>
+
+## Linting and tests
+
+Docker images bake their own dependencies and source (no bind mount), so the
+stack needs no local install — rebuild an image to pick up code changes. Run
+`uv sync && npm ci && npm --prefix frontend ci && npm --prefix web-api ci` only
+for local lint/format hooks and local frontend dev.
+
+Python uses uv, pinned to 3.10 everywhere (`.python-version`). `uv lock --check`
+must pass in `.`, `harvester`, `downloader` and `download_scheduler`: the
+Dockerfiles build with `uv sync --locked`, so a stale lock is a broken image.
+
+Prettier formats; ESLint, stylelint and ruff lint. Each has one config at the
+repo root covering every sub-project (ruff walks up to the root
+`pyproject.toml`). `uvx pre-commit install` adds the rest (line endings,
+secrets, lockfile checks).
+
+```sh
+uvx ruff check .
+uv run pytest -m "not integration"                     # Python unit tests
+npm run lint && npm run lint:css && npm run format:check
+npm --prefix web-api test
+npm --prefix frontend run build
+```
+
+Narrower runs:
+
+```sh
+uv run pytest tests/unit/test_foo.py::test_bar        # from harvester/, downloader/, or download_scheduler/
+npm --prefix web-api run test:unit                     # node --test utils/**/*.test.js
+npm --prefix web-api run test:routes                   # node --test routes/**/*.test.js
+npm --prefix web-api run test:contract                 # jest (supertest)
+npx vitest run src/path/to/File.test.jsx                # from frontend/
+npm --prefix frontend run test:e2e                     # Playwright, API mocked from e2e/fixtures
+npm --prefix frontend run test:visual                  # needs Docker (e2e/in-container.sh)
+npm --prefix frontend run test:a11y                    # axe, ratcheting baseline
+```
 
 ## CI/CD
 
