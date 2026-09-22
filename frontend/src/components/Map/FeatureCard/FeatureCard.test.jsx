@@ -214,4 +214,57 @@ describe("FeatureCard", () => {
       screen.getByTitle("Gridded datasets are accessed directly on ERDDAP"),
     ).toBeInTheDocument();
   });
+
+  // The bug this endpoint exists for: the tile carries one `count` for the
+  // whole cell, so every dataset in it used to be labelled with that same
+  // number — a one-day dataset reading the same as the 1115-day mooring beside
+  // it. The figures come from /tiles/datasets now, one per dataset.
+  it("gives each dataset in a cell its own day count, not the cell's total", async () => {
+    await renderReady();
+    const [a, b, c] = pointQueryFixture;
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 11,
+        lngLat: [0, 0],
+        // No `count` on the items: the cell total is deliberately not the
+        // per-dataset figure, so it is not carried here at all.
+        items: [a, b, c].map((row) => ({
+          kind: "observation",
+          pk: row.pk,
+          aggregate: true,
+          title: row.title,
+        })),
+        observationCount: 1121,
+        buckets: { hexPks: [970], pointPks: [], source: "main", z: 6 },
+      });
+    });
+
+    // Fixture: pk 7 -> 1115, pk 8 -> 5, pk 9 -> 1.
+    await waitFor(() =>
+      expect(screen.getByTitle(a.title)).toHaveTextContent(
+        "1,115 day(s) of data",
+      ),
+    );
+    expect(screen.getByTitle(b.title)).toHaveTextContent("5 day(s) of data");
+    expect(screen.getByTitle(c.title)).toHaveTextContent("1 day(s) of data");
+  });
+
+  it("shows no day count for a dataset the breakdown has not answered for", async () => {
+    await renderReady();
+    const row = pointQueryFixture[0];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 12,
+        lngLat: [0, 0],
+        items: [{ kind: "observation", pk: row.pk, title: row.title }],
+        // No buckets: nothing to ask about, so nothing is claimed. Showing a
+        // "0 day(s)" here would be the same class of lie as showing the
+        // cell's total.
+        buckets: { hexPks: [], pointPks: [], source: "main", z: 6 },
+      });
+    });
+    expect(screen.getByTitle(row.title)).not.toHaveTextContent(
+      "day(s) of data",
+    );
+  });
 });
