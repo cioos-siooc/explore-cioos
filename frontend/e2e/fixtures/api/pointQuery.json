@@ -13,13 +13,8 @@
       "en": "Acoustic Doppler Current Profiler Time Series from Fixed Platform on the British Columbia Central Coast (Provisional)",
       "fr": "Série chronologique de profileur de courant à effet Doppler acoustique depuis une plateforme fixe sur la côte centrale de la Colombie-Britannique (Provisoire)"
     },
-    "eovs": [
-      "subSurfaceCurrents",
-      "oceanSound"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["subSurfaceCurrents", "oceanSound"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 6,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiADCPTimeSeriesProfileProvisional.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/9c581481-f2ee-4353-b1ab-c5bf242945fe"
@@ -38,13 +33,8 @@
       "en": "Surface Seawater and Marine Boundary Layer CO2 Time Series from the Bute Inlet Ocean Observing Station (BIOOS) Buoy, Bute Inlet, BC, Canada (Provisional)",
       "fr": "Séries chronologiques du CO2 de l'eau de mer de surface et de la couche limite marine provenant de la bouée de la station d'observation océanique de Bute Inlet (BIOOS), Bute Inlet, Colombie-Britannique, Canada (provisoire)"
     },
-    "eovs": [
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["subSurfaceSalinity", "subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiBIOOSBuoy1hour.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/5dea887f-9b1d-4b20-a59a-3d4a2877a52c"
@@ -63,14 +53,8 @@
       "en": "Surface Seawater and Marine Boundary Layer CO2 Time Series from the Bute Inlet Ocean Observing Station (BIOOS) Buoy, Bute Inlet, BC, Canada (Research)",
       "fr": "Séries chronologiques sur le CO2 de l'eau de mer de surface et de la couche limite marine provenant de la bouée de la station d'observation océanique de Bute Inlet (BIOOS), Bute Inlet, Colombie-Britannique, Canada (Recherche)"
     },
-    "eovs": [
-      "inorganicCarbon",
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["inorganicCarbon", "subSurfaceSalinity", "subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiBIOOSBuoyResearch.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/0894f661-f9cb-48cb-a0b4-8a001eb69420"
@@ -89,12 +73,8 @@
       "en": "Water Level Time Series, Choke Pass, Central Coast, BC, Canada (Provisional)",
       "fr": "Série chronologique des niveaux d'eau, Choke Pass, côte centrale, Colombie-Britannique, Canada (provisoire)"
     },
-    "eovs": [
-      "seaSurfaceHeight"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["seaSurfaceHeight"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiCalvertCP1TideGauge.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/7607322d-6dea-4758-a257-de8353c899c1"
@@ -113,13 +93,8 @@
       "en": "Bulk and Size-Fractionated Chlorophyll and Phaeopigment Concentrations Collected by Niskin Bottle, BC, Canada (Provisional)",
       "fr": "Concentrations de chlorophylle et de phéopigments en vrac et fractionnées par taille recueillies par Niskin Bottle, Colombie-Britannique, Canada (provisoire)"
     },
-    "eovs": [
-      "phytoplanktonBiomassAndDiversity",
-      "oceanColour"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["phytoplanktonBiomassAndDiversity", "oceanColour"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 136,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiChlorophyllSampleProvisional.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/bf7c05e8-510d-4449-9e81-4c358ff3f440"
@@ -138,13 +113,8 @@
       "en": "Bulk and Size-Fractionated Chlorophyll and Phaeopigment Concentrations Collected by Niskin Bottle, BC, Canada (Research)",
       "fr": null
     },
-    "eovs": [
-      "phytoplanktonBiomassAndDiversity",
-      "oceanColour"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["phytoplanktonBiomassAndDiversity", "oceanColour"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 3,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiChlorophyllSampleResearch.html",
     "ckan_url": null
@@ -163,13 +133,8 @@
       "en": "Phytoplankton Pigment Time Series from High-Performance Liquid Chromatography for the Northern Salish Sea and Central Coast, BC, Canada (Research)",
       "fr": "Séries chronologiques de pigments phytoplanctoniques issues de la chromatographie liquide à haute performance pour le nord de la mer des Salish et la côte centrale, Colombie-Britannique, Canada (Recherche)"
     },
-    "eovs": [
-      "phytoplanktonBiomassAndDiversity",
-      "oceanColour"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["phytoplanktonBiomassAndDiversity", "oceanColour"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 5,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiHPLCResearch.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/cb0f4710-d78a-4073-959c-95f874f88711"
@@ -195,9 +160,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiKCBuoy1hour.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/c68b9ec8-9f26-4fb0-9333-79730f4ea1ca"
@@ -216,14 +179,8 @@
       "en": "Surface Seawater and Marine Boundary Layer CO2 Observations from the Kwakshua Channel (KC) Buoy on the Central Coast of British Columbia (Research)",
       "fr": "Observations du CO2 dans l'eau de mer de surface et dans la couche limite marine à partir de la bouée du canal Kwakshua (KC) sur la côte centrale de la Colombie-Britannique (Recherche)"
     },
-    "eovs": [
-      "inorganicCarbon",
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["inorganicCarbon", "subSurfaceSalinity", "subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiKCBuoyResearch.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/3f883dc6-56ac-42f5-a1d4-6de554a9e63d"
@@ -242,11 +199,7 @@
       "en": "High-resolution time series of surface seawater CO2 content from the OceansAlaska Shellfish Hatchery in Ketchikan, Alaska, USA",
       "fr": "Séries chronologiques à haute résolution sur la teneur en CO2 de l'eau de mer de surface provenant de l'écloserie OceansAlaska Shellfish à Ketchikan, Alaska, États-Unis"
     },
-    "eovs": [
-      "inorganicCarbon",
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
+    "eovs": ["inorganicCarbon", "subSurfaceSalinity", "subSurfaceTemperature"],
     "organizations": [
       "Hakai Institute",
       "Oregon State University",
@@ -270,14 +223,8 @@
       "en": "Seawater Carbon Dioxide (CO2) Content from the SuperCO2 System in the Pacific Ecosystem Autonomous Research Laboratory, Bamfield Marine Sciences Centre, BC, Canada (Research)",
       "fr": null
     },
-    "eovs": [
-      "inorganicCarbon",
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["inorganicCarbon", "subSurfaceSalinity", "subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiPearlBoLResearch.html",
     "ckan_url": null
@@ -296,12 +243,8 @@
       "en": "Water Level and Weather Station Time Series, Pruth Bay, Kwakshua Channel, Central Coast, BC, Canada (Provisional)",
       "fr": "Séries chronologiques du niveau de l'eau et des stations météorologiques, baie de Pruth, canal Kwakshua, côte centrale, Colombie-Britannique, Canada (provisoire)"
     },
-    "eovs": [
-      "oceanColour"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["oceanColour"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiPruthDockProvisional.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/11051c56-8d67-43fc-a13c-b706e851a5a4"
@@ -320,12 +263,8 @@
       "en": "Pruth Bay Thermistor String Oceanographic Mooring on Calvert Island (Provisional)",
       "fr": "Amarrage océanographique de Pruth Bay sur l'île Calvert (provisoire)"
     },
-    "eovs": [
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiPruthMooringProvisional.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/3031aa60-689f-4b94-9dc6-9912cc742431"
@@ -344,12 +283,8 @@
       "en": "Oceanographic Mooring Time Series, Hyacinthe Bay, BC, Canada (Provisional)",
       "fr": "Série chronologique d'amarrage océanographique, baie d'Hyacinthe, Colombie-Britannique, Canada (provisoire)"
     },
-    "eovs": [
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiQU5MMooringProvisional.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/7c2b8668-75a3-4fc8-bff3-bdae5d95f52d"
@@ -368,14 +303,8 @@
       "en": "Seawater Carbon Dioxide (CO2) Content from the Burke-o-Lator pCO2/TCO2 analyzer located at the Hakai Institute’s Quadra Island Field Station, Hyacinthe Bay, BC, Canada (Research)",
       "fr": "Teneur en dioxyde de carbone (CO2) de l'eau de mer provenant de l'analyseur pCO2/tCO2 Burke-o-Lator situé à la station de terrain de Quadra Island de l'Institut Hakai, Hyacinthe Bay, Colombie-Britannique, Canada (Recherche)"
     },
-    "eovs": [
-      "inorganicCarbon",
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["inorganicCarbon", "subSurfaceSalinity", "subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiQuadraBoLResearch.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/79433a1f-ec07-4cd5-a31a-8c2c53069085"
@@ -394,12 +323,8 @@
       "en": "Weather Station Time Series, Hyacinthe Bay, BC, Canada (Provisional)",
       "fr": null
     },
-    "eovs": [
-      "oceanColour"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["oceanColour"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 1,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiQuadraWeather5min.html",
     "ckan_url": null
@@ -418,14 +343,8 @@
       "en": "Oceanographic Mooring Time Series, Rivers Inlet, BC, Canada (Research)",
       "fr": "Série chronologique d'amarrage océanographique, Rivers Inlet, Colombie-Britannique, Canada (Recherche)"
     },
-    "eovs": [
-      "oxygen",
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["oxygen", "subSurfaceSalinity", "subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 8,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiRiversInletMooringResearch.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/4a9b4584-a5ef-4baf-9d4a-bacf8e6a5d1d"
@@ -444,12 +363,8 @@
       "en": "Sentinels of Change Sea Surface Temperature Time Series Data Along the British Columbia Coast",
       "fr": "Séries chronologiques de températures de surface de la mer recueillies par Sentinels of Change le long de la côte de la Colombie-Britannique"
     },
-    "eovs": [
-      "subSurfaceTemperature"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["subSurfaceTemperature"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 24,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiSentinelTemperature.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/0049e274-f23e-448c-b307-14aa3b4e0b4a"
@@ -468,11 +383,7 @@
       "en": "Seawater Carbon Dioxide (CO2) Content from the Burke-o-Lator pCO2/TCO2 analyzer located at Sitka Harbor, Sitka, Alaska, USA (Research)",
       "fr": "Teneur en dioxyde de carbone (CO2) de l'eau de mer provenant de l'analyseur pCO2/tCO2 Burke-o-Lator situé dans le port de Sitka, Sitka, Alaska, États-Unis (Recherche)"
     },
-    "eovs": [
-      "inorganicCarbon",
-      "subSurfaceSalinity",
-      "subSurfaceTemperature"
-    ],
+    "eovs": ["inorganicCarbon", "subSurfaceSalinity", "subSurfaceTemperature"],
     "organizations": [
       "Hakai Institute",
       "Oregon State University",
@@ -505,9 +416,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 393,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiWaterPropertiesInstrumentProfileProvisional.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/13dc3c6c-9dd4-47a4-92ad-681c653d3565"
@@ -535,9 +444,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 157,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiWaterPropertiesInstrumentProfileResearch.html",
     "ckan_url": "https://catalogue.cioos.ca/dataset/613ba2f9-b21d-445f-8eaa-f42950c9350b"
@@ -556,12 +463,8 @@
       "en": "Watersheds Stream Stations Timeseries, Calvert and Hecate Islands, BC, Canada (Provisional)",
       "fr": null
     },
-    "eovs": [
-      "particulateMatter"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["particulateMatter"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 7,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiWatershedsStreamStationsProvisional.html",
     "ckan_url": null
@@ -580,12 +483,8 @@
       "en": "Watersheds Stream Stations Timeseries, Calvert and Hecate Islands, BC, Canada (Research)",
       "fr": null
     },
-    "eovs": [
-      "particulateMatter"
-    ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "eovs": ["particulateMatter"],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 7,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiWatershedsStreamStationsResearch.html",
     "ckan_url": null
@@ -611,9 +510,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Hakai Institute"
-    ],
+    "organizations": ["Hakai Institute"],
     "profiles_count": 2,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/HakaiWirewalkerProvisional.html",
     "ckan_url": null
@@ -641,9 +538,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 11,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Asseek.html",
     "ckan_url": null
@@ -671,9 +566,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 12,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_BellaCoola.html",
     "ckan_url": null
@@ -701,9 +594,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 12,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Chemainus.html",
     "ckan_url": null
@@ -731,9 +622,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 10,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Cluxewe.html",
     "ckan_url": null
@@ -761,9 +650,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 6,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Conuma.html",
     "ckan_url": null
@@ -791,9 +678,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 20,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Cowichan.html",
     "ckan_url": null
@@ -821,9 +706,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 11,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Englishman.html",
     "ckan_url": null
@@ -851,9 +734,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 13,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_FulmoreShoal.html",
     "ckan_url": null
@@ -881,9 +762,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 9,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Glendale.html",
     "ckan_url": null
@@ -911,9 +790,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 9,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Hoeya.html",
     "ckan_url": null
@@ -941,9 +818,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 14,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Kaouk.html",
     "ckan_url": null
@@ -971,9 +846,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 11,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Koeye.html",
     "ckan_url": null
@@ -1001,9 +874,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 6,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_LittleQualicum.html",
     "ckan_url": null
@@ -1031,9 +902,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 7,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Malksope.html",
     "ckan_url": null
@@ -1061,9 +930,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 11,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Moyeha.html",
     "ckan_url": null
@@ -1091,9 +958,7 @@
       "phytoplanktonBiomassAndDiversity",
       "oceanColour"
     ],
-    "organizations": [
-      "Nature Trust"
-    ],
+    "organizations": ["Nature Trust"],
     "profiles_count": 34,
     "erddap_url": "https://catalogue.hakai.org/erddap/tabledap/NatureTrustWaterPropertiesVerticalProfilesProvisional_Nanaimo.html",
     "ckan_url": null
