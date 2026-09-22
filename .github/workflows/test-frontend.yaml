@@ -85,16 +85,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Every project in one invocation, all of it gating: behaviour at the
-      # three viewport regimes, the screenshot baselines, and the a11y ratchet.
-      # One playwright run rather than one per project, so the projects share a
-      # single dev server and Playwright parallelises across them.
+      # Behaviour at the three viewport regimes, plus the a11y ratchet: these
+      # assert through data-testid and user-visible text (a11y through axe),
+      # which survive restyling by design, so they gate every push and PR.
+      - name: Run the behavioural and accessibility suites
+        run: npx playwright test --project=desktop --project=tablet --project=mobile --project=a11y
+        env:
+          CI: "true"
+
+      # The visual suite asserts pixels against committed baselines, so a UI
+      # actively being reworked makes it stale on purpose — running it on every
+      # PR push just means re-recording baselines mid-review. It runs only on a
+      # push that actually lands on development-v2, i.e. the "final check" for
+      # what merged, not a gate on every commit getting there.
+      #
+      # TODO: once development-v2 stabilizes and starts merging to main/master,
+      # extend this condition to push events on those branches too (and
+      # consider whether PRs into them should gate on it directly).
       #
       # The visual baselines are recorded in this same image, which is what
       # makes them reproducible here — see e2e/in-container.sh, and
       # `npm run test:visual:update` when a UI change is meant to move them.
-      - name: Run the browser suites
-        run: npx playwright test
+      - name: Run the visual regression suite
+        if: github.event_name == 'push' && github.ref == 'refs/heads/development-v2'
+        run: npx playwright test --project=visual
         env:
           CI: "true"
 
