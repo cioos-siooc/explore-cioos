@@ -3,7 +3,7 @@
     "title": "63rd St., Chicago, IL Weather Station",
     "pk": 2337,
     "organization_pks": [54],
-    "platform": "land or seafloor",
+    "platform": "unknown",
     "title_translated": {
       "en": "63rd St., Chicago, IL Weather Station",
       "fr": null
@@ -33,7 +33,7 @@
     "title": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
     "pk": 1962,
     "organization_pks": [96],
-    "platform": "mooring",
+    "platform": "unknown",
     "title_translated": {
       "en": "Alpena Thunder Bay Buoy: Realtime Coastal Observation Network (ReCON) Station",
       "fr": null
@@ -76,7 +76,7 @@
     "platform": "unknown",
     "title_translated": {
       "en": "Antigonish County Water Quality Data",
-      "fr": "Données de qualité de l'eau du comté d'Antigonish"
+      "fr": null
     }
   },
   {

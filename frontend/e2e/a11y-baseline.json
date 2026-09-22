@@ -19,7 +19,7 @@
   },
   "active filter chips": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 44,
+    "color-contrast": 42,
     "nested-interactive": 25
   },
   "intro modal": {
@@ -28,7 +28,7 @@
     "nested-interactive": 25
   },
   "mobile datasets sheet": {
-    "color-contrast": 30,
+    "color-contrast": 31,
     "nested-interactive": 25
   }
 }

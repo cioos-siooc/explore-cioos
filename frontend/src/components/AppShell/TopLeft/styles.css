@@ -114,7 +114,7 @@
   font-weight: 500;
 }
 
-/* Minor actions (intro / feedback / language): right-hand side column,
+/* Minor actions (intro / projection / language): right-hand side column,
    mirroring the logo column's width so the wordmark stays centered. */
 .brandMinorItems {
   display: flex;

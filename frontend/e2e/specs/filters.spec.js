@@ -58,7 +58,7 @@ test.describe("filters", () => {
     await openApp(page, "eovs=oxygen&platforms=mooring");
     await expect(page.getByTestId("filter-chip-group")).toHaveCount(2);
 
-    await page.getByTestId("filter-chips-reset").click();
+    await page.getByTestId("quick-filter-reset").click();
 
     await expect(page.getByTestId("active-filter-chips")).toHaveCount(0);
   });
