@@ -288,6 +288,43 @@
   white-space: nowrap;
 }
 
+/* The in-view tally doubles as the switch that applies the narrowing, so it is
+   the one part of the line that looks pressable — a text link, no chrome, so
+   the strip stays a line of type. */
+.topBarCountsInView {
+  padding: 0;
+
+  /* Breathing room inside the brackets. A margin rather than padding so the
+     underline stays under the words and doesn't run out to the brackets. */
+  margin: 0 4px;
+  background: transparent;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  font: inherit;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--cioos-transition-fast);
+}
+
+.topBarCountsInView:hover {
+  color: var(--cioos-primary);
+}
+
+.topBarCountsInView:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Applied: bolder and no longer underlined — it now reads as the state the
+   list is in, with a second click to leave it. */
+.topBarCountsInView.active {
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  text-decoration: none;
+}
+
 /* Filters badge: the active-filter count, a single digit or two. */
 .topBarCount {
   display: inline-flex;
