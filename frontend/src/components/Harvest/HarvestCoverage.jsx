@@ -1,14 +1,17 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
 import BUCKETS, { bucketByKey } from "./coverageBuckets.js";
-import CoverageDonut from "./CoverageDonut.jsx";
 import { slugify } from "./slug.js";
 import { hostname, fmtDt, datasetLink } from "./format.js";
 import { server } from "../../config.js";
+
+// The Plotly chunk is ~1.4MB, so the donut only loads once this page is
+// actually visited — same pattern as CoverageModal / DatasetPreview.
+const CoverageDonut = lazy(() => import("./CoverageDonut.jsx"));
 
 const OBIS_SENTINEL = "https://obis.org";
 
@@ -389,16 +392,24 @@ export default function HarvestCoverage() {
                 title={t("harvest.coverage.integrationTitle")}
                 definition={t("harvest.coverage.def.integration")}
               />
-              <CoverageDonut
-                rings={integration.rings}
-                total={integration.total}
-                centerLabel={t("harvest.coverage.integratedCenter")}
-                caption={t("harvest.coverage.integrationCaption", {
-                  integrated: integration.integrated.toLocaleString(),
-                  total: integration.total.toLocaleString(),
-                })}
-                hint={t("harvest.coverage.vizHint")}
-              />
+              <Suspense
+                fallback={
+                  <div className="harvest-loading">
+                    {t("harvest.coverage.loading")}
+                  </div>
+                }
+              >
+                <CoverageDonut
+                  rings={integration.rings}
+                  total={integration.total}
+                  centerLabel={t("harvest.coverage.integratedCenter")}
+                  caption={t("harvest.coverage.integrationCaption", {
+                    integrated: integration.integrated.toLocaleString(),
+                    total: integration.total.toLocaleString(),
+                  })}
+                  hint={t("harvest.coverage.vizHint")}
+                />
+              </Suspense>
             </>
           )}
 

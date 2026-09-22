@@ -727,38 +727,34 @@ a.harvest-link:hover {
   align-items: center;
 }
 
-/* Recessive by default; hovering one segment pushes the others back rather
-   than lighting the hovered one up, so the colours never shift meaning. */
-.harvest-viz-arc {
-  stroke: none;
-  transition: opacity 120ms ease;
-  cursor: default;
+.harvest-viz-plot-wrap {
+  position: relative;
+  width: 260px;
+  height: 260px;
 }
 
-.harvest-viz-arc.is-dimmed {
-  opacity: 0.35;
+.harvest-viz-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .harvest-viz-center-value {
-  text-anchor: middle;
   font-size: 2rem;
   font-weight: 700;
-  fill: var(--cioos-ink);
+  color: var(--cioos-ink);
 }
 
 .harvest-viz-center-label {
-  text-anchor: middle;
   font-size: 0.72rem;
-  fill: var(--harvest-muted-strong);
+  color: var(--harvest-muted-strong);
 }
 
-/* Fixed min-height so the row does not reflow as the tooltip text changes. */
-.harvest-viz-readout {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 1.4rem;
-  font-size: 0.82rem;
+.harvest-viz-hint {
   max-width: 260px;
   text-align: center;
 }

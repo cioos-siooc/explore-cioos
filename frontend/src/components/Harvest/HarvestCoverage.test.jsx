@@ -1,11 +1,33 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockHarvestFetch } from "../../test/mockHarvestFetch.js";
 import HarvestCoverage from "./HarvestCoverage.jsx";
+
+// Plotly draws to a real canvas and probes media queries jsdom's stub does
+// not answer (src/test/viewport.js), same as CoverageModal.test.jsx. This
+// suite is about what buildIntegration() computes, not the chart itself, so
+// a stand-in exposes the rings/total reaching the donut.
+vi.mock("./CoverageDonut.jsx", () => ({
+  default: ({ rings, total, centerLabel, caption }) => (
+    <div data-testid="coverage-donut">
+      <div data-testid="coverage-donut-total">{total}</div>
+      <div data-testid="coverage-donut-label">{centerLabel}</div>
+      <p>{caption}</p>
+      <ul>
+        {rings.flat().map((seg) => (
+          <li key={seg.key} data-testid="coverage-donut-segment">
+            <span data-testid="coverage-donut-segment-label">{seg.label}</span>
+            <span data-testid="coverage-donut-segment-value">{seg.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ),
+}));
 
 const COVERAGE = {
   summary: {
@@ -120,16 +142,18 @@ describe("HarvestCoverage", () => {
     // Ring 1 is integrated vs not; ring 2 splits each by source. 100 + 20
     // served against 7 + 290 advertised-but-missing, plus 12 datasets only
     // CKAN knows of and 30 records backing no data at all = 459 known.
+    expect(screen.getByTestId("coverage-donut-total").textContent).toBe("459");
     expect(
-      container.querySelector(".harvest-viz-center-value").textContent,
-    ).toBe("26%");
-    expect(container.querySelectorAll(".harvest-viz-arc")).toHaveLength(8);
+      container.querySelectorAll('[data-testid="coverage-donut-segment"]'),
+    ).toHaveLength(8);
 
     // The CKAN slices must not swallow datasets the source gaps already count:
     // ring 2 has to sum to the whole, and ring 1's halves to the same total.
     const values = [
-      ...container.querySelectorAll(".harvest-viz-legend-value"),
-    ].map((n) => Number(n.textContent.replace(/,/g, "")));
+      ...container.querySelectorAll(
+        '[data-testid="coverage-donut-segment-value"]',
+      ),
+    ].map((n) => Number(n.textContent));
     const [integrated, missing, ...outer] = values;
     expect(integrated + missing).toBe(459);
     expect(outer.reduce((a, b) => a + b, 0)).toBe(459);
@@ -141,11 +165,24 @@ describe("HarvestCoverage", () => {
     const { container } = renderWithProviders(<HarvestCoverage />);
     await screen.findByRole("heading", { name: "Sources" });
 
-    const arcs = container.querySelectorAll(".harvest-viz-arc").length;
-    const legend = container.querySelectorAll(
-      ".harvest-viz-legend-item",
-    ).length;
-    expect(legend).toBe(arcs);
+    // Every segment reaching the donut carries a real label and a numeric
+    // value, rather than expecting colour alone to identify it.
+    const segments = container.querySelectorAll(
+      '[data-testid="coverage-donut-segment"]',
+    );
+    expect(segments).toHaveLength(8);
+    segments.forEach((seg) => {
+      expect(
+        seg.querySelector('[data-testid="coverage-donut-segment-label"]')
+          .textContent,
+      ).not.toBe("");
+      expect(
+        Number(
+          seg.querySelector('[data-testid="coverage-donut-segment-value"]')
+            .textContent,
+        ),
+      ).not.toBeNaN();
+    });
   });
 
   it("shows the catalogue's gap as the same measure its bucket counts", async () => {
