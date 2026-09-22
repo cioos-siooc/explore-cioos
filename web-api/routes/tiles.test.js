@@ -145,3 +145,83 @@ test("GET /tiles/tracks/:z/:x/:y.mvt caps the candidate set at TRACKS_MAX_PER_TI
   });
   assert.match(db.queries[0], /LIMIT 2500/);
 });
+
+/*
+ * /tiles/datasets — the per-dataset split of a clicked bucket's count.
+ *
+ * The invariant worth pinning is that it aggregates the SAME rows the tile did,
+ * one grouping level finer. If its branches ever drift from the tile's, the
+ * card will report numbers the hex it describes cannot account for.
+ */
+
+test("GET /tiles/datasets groups the tile's own rows by dataset", async () => {
+  db.queueRaw([{ pk: 111, count: 1115 }]);
+  const res = await agent
+    .get("/tiles/datasets")
+    .query({ z: 6, metric: "days", hexes: "970" });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, [{ pk: 111, count: 1115 }]);
+  const sql = db.queries[0];
+  assert.match(sql, /GROUP BY d\.pk_url/);
+  // The bucket restriction is pushed into each branch (the scan prune), and
+  // each table names its bucket differently.
+  assert.match(sql, /hex_pk = ANY\(/);
+  assert.match(sql, /"hex_1_pk" = ANY\(/);
+  // The total is the tile's to report, not this route's: re-deriving it by
+  // summing these parts would be wrong for `days`, where they overlap.
+  assert.doesNotMatch(sql, /GROUPING SETS/);
+});
+
+test("GET /tiles/datasets at point zoom buckets on the point, not a hex", async () => {
+  db.queueRaw([]);
+  await agent
+    .get("/tiles/datasets")
+    .query({ z: 10, metric: "days", points: "42" });
+
+  const sql = db.queries[0];
+  assert.match(sql, /point_pk = ANY\(/);
+  // Past z7 the cell tables are drawn by /tiles/cells instead, so the main
+  // source is profiles alone — exactly as the tile route does it.
+  assert.doesNotMatch(sql, /FROM cde\.trajectory_hexes/);
+  assert.doesNotMatch(sql, /FROM cde\.obis_cells/);
+});
+
+test("GET /tiles/datasets source=cells asks the coverage layer's sources", async () => {
+  db.queueRaw([]);
+  await agent
+    .get("/tiles/datasets")
+    .query({ z: 10, metric: "days", hexes: "970", source: "cells" });
+
+  const sql = db.queries[0];
+  // /tiles/cells never reads profiles, and stays on hexes at any zoom.
+  assert.doesNotMatch(sql, /FROM cde\.profiles/);
+  assert.match(sql, /FROM cde\.trajectory_hexes/);
+});
+
+test("GET /tiles/datasets honours the layer switches the tile was drawn with", async () => {
+  db.queueRaw([]);
+  await agent.get("/tiles/datasets").query({
+    z: 6,
+    metric: "days",
+    hexes: "970",
+    includeTrajectory: "false",
+  });
+
+  assert.doesNotMatch(db.queries[0], /FROM cde\.trajectory_hexes/);
+});
+
+test("GET /tiles/datasets requires buckets and rejects junk in the pk lists", async () => {
+  const noBuckets = await agent.get("/tiles/datasets").query({ z: 6 });
+  assert.equal(noBuckets.status, 400);
+
+  const junk = await agent
+    .get("/tiles/datasets")
+    .query({ z: 6, hexes: "970; DROP TABLE cde.datasets" });
+  assert.equal(junk.status, 400);
+
+  const noZoom = await agent.get("/tiles/datasets").query({ hexes: "970" });
+  assert.equal(noZoom.status, 400);
+
+  assert.equal(db.queries.length, 0);
+});

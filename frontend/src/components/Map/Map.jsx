@@ -3544,6 +3544,15 @@ export default function CreateMap({
       const observations = new Map();
       let observationCount = 0;
       const cellFeatures = [];
+      // What was clicked, in the terms /tiles/datasets takes: the tile buckets
+      // themselves, plus which layer drew them. `source` starts at the main
+      // tile layer and only moves if a coverage hex is what was hit.
+      const buckets = {
+        hexPks: new Set(),
+        pointPks: new Set(),
+        source: "main",
+        z: Math.floor(map.current.getZoom()),
+      };
       observationHits.forEach((feature) => {
         const layerId = feature.layer.id;
         const count = Number(feature.properties.count) || 0;
@@ -3584,10 +3593,22 @@ export default function CreateMap({
           }
           cellFeatures.push(merged);
         }
+        // The bucket this feature stands for, so the card can ask the API what
+        // each dataset in it contributes. A tile carries only the bucket TOTAL
+        // (`count`), and for the days metric that total is a union across the
+        // datasets in the cell — it is nobody's individual figure. Splitting it
+        // here is not possible; /tiles/datasets does it from the rows.
+        (layerId === "points" ? buckets.pointPks : buckets.hexPks).add(
+          Number(feature.properties.pk),
+        );
+        // 'coverage-hexes' is drawn from /tiles/cells, which unions a different
+        // set of sources than /tiles. The card has to ask the same one, or the
+        // numbers it shows will not add up to the hex it is describing.
+        if (layerId === "coverage-hexes") buckets.source = "cells";
+
         datasetPksOf(feature).forEach((pk) => {
           const existing = observations.get(pk);
           if (existing) {
-            existing.count += count;
             existing.platform =
               existing.platform || feature.properties.platform;
             return;
@@ -3595,7 +3616,6 @@ export default function CreateMap({
           observations.set(pk, {
             kind: "observation",
             pk,
-            count,
             platform: feature.properties.platform,
             // A marker is a place the user can point at; a cell is a
             // neighbourhood. The card says which it is rather than implying a
@@ -3699,6 +3719,14 @@ export default function CreateMap({
         items,
         observationCount,
         highlight,
+        // What the card asks /tiles/datasets about — see the buckets comment
+        // above. Sets are not serialisable and the card only ever reads them
+        // as lists, so they are flattened here.
+        buckets: {
+          ...buckets,
+          hexPks: [...buckets.hexPks],
+          pointPks: [...buckets.pointPks],
+        },
         // Every dataset under the click, which the datasets list reads to pin
         // and outline them (DatasetsTable's pinnedPks).
         datasetPks: [...new Set(items.map((item) => item.pk))],

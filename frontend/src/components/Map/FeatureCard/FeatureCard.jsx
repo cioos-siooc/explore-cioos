@@ -17,6 +17,7 @@ import { useChanged } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import useCellDatasetDays from "./useCellDatasetDays.js";
 import "./styles.css";
 
 // The "what's here" card: the single answer to a click anywhere on the map.
@@ -45,13 +46,14 @@ const KIND_ORDER = ["track", "observation", "grid"];
 
 export default function FeatureCard() {
   const { t, i18n } = useTranslation();
-  const { featureQuery, setFeatureQuery } = useMapState();
+  const { featureQuery, setFeatureQuery, dataLayers } = useMapState();
   const {
     pointsData,
     setInspectDataset,
     selectTrajectoryFromMap,
     addDatasetsToSelection,
     selectedPks,
+    combinedQueries,
   } = useSelection();
   const { sidebarOpen } = useUI();
 
@@ -67,6 +69,12 @@ export default function FeatureCard() {
   const [held, setHeld] = useState(featureQuery);
   if (featureQuery && featureQuery !== held) setHeld(featureQuery);
   const query = featureQuery ?? held;
+
+  // What each dataset under the click contributes to the cell's figure. The
+  // tile only carries the cell TOTAL, which is why this is asked for
+  // separately — see the hook. Empty until it lands, so a row shows no figure
+  // rather than the cell's, which is what every row used to show.
+  const datasetDays = useCellDatasetDays(query, combinedQueries, dataLayers);
 
   const close = useCallback(() => setFeatureQuery(null), [setFeatureQuery]);
 
@@ -115,6 +123,9 @@ export default function FeatureCard() {
         ...item,
         title: row?.title || item.title,
         platform: row?.platform || item.platform,
+        // undefined until the breakdown lands, and for a track or grid, which
+        // have no cell figure of their own.
+        count: datasetDays.get(item.pk),
         row,
         // A dataset page resolves out of pointsData. A track without one still
         // opens: selectTrajectoryFromMap draws the platform's history either
@@ -262,7 +273,12 @@ export default function FeatureCard() {
                         : entry.kind === "grid"
                           ? t("featureCardGrid")
                           : [
-                              countLabel(entry.count),
+                              // No figure yet (or the request failed): the row
+                              // says what it can rather than showing a number
+                              // that isn't this dataset's.
+                              entry.count === undefined
+                                ? null
+                                : countLabel(entry.count),
                               // An aggregate cell is a neighbourhood, not a
                               // place: say so rather than implying the precision
                               // an individual marker has.

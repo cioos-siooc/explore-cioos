@@ -4,7 +4,9 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
-const { pipeline } = require("../utils/routePipeline");
+const { check } = require("express-validator");
+
+const { pipeline, MAX_TILE_ZOOM } = require("../utils/routePipeline");
 const {
   ALL_PROFILE_TYPES,
   ALL_TRAJECTORY_TYPES,
@@ -74,6 +76,144 @@ function trajectoryTypePredicate(types) {
   return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
     .map((t) => `'${t}'`)
     .join(",")}))`;
+}
+
+/*
+ * WHICH ROWS A REQUEST HAS IN PLAY.
+ *
+ * The two tile routes and /tiles/datasets must agree on this exactly. The card
+ * reports each dataset's share of the very cell the tile drew, so a predicate
+ * that drifted between them would put a number on the card that the map cannot
+ * account for. The branches live here once; what each caller PROJECTS around
+ * them (a point geometry, a src discriminator, nothing at all) stays at the
+ * call site, because that is the part that genuinely differs.
+ *
+ * `prefilterFor(table)` is how a caller prunes each branch's scan: the tile
+ * routes pass the tile-region geometry test, /tiles/datasets the hexes or
+ * points that were actually clicked. Returning null prunes nothing.
+ */
+
+// Shared by both builders: the source toggles, which are read the same way
+// whoever is asking. See utils/selection.js for the OBIS-only rule and
+// utils/dataTypes.js for the type vocabularies.
+function requestedSources(query) {
+  const erddap = erddapVisible(query);
+  const profileTypes = requestedProfileTypes(query);
+  const trajectoryTypes = requestedTrajectoryTypes(query);
+  return {
+    profileTypes,
+    trajectoryTypes,
+    includeObis: obisVisible(query),
+    includeProfiles: erddap && profileTypes.length > 0,
+    includeTrajectory:
+      query.includeTrajectory !== "false" &&
+      erddap &&
+      trajectoryTypes.length > 0,
+  };
+}
+
+// The `combined` CTE behind /tiles and /tiles/datasets?source=main: profiles,
+// plus (at hex zoom only) trajectory coverage and OBIS cells.
+function mainBranchesSQL(query, { metric, hexTier, isHexGrid, prefilterFor }) {
+  const {
+    profileTypes,
+    trajectoryTypes,
+    includeObis,
+    includeProfiles,
+    includeTrajectory,
+  } = requestedSources(query);
+
+  // At hex zoom we only need the hex FK and point_pk (for distinct counts);
+  // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
+  // zoom we project the actual point geom.
+  // Features spanning a region (show_as_point=false) are kept off the map
+  // entirely — excluded from both the individual dots (z>=7) and the hex
+  // aggregation counts (z<7). They remain searchable via the sidebar
+  // geospatial filters (shapeQuery has no such gate). search_geom (the bbox
+  // for profiles, the cell point otherwise) backs the shared spatial filter.
+  // When only some profile types are requested, additionally restrict the
+  // branch to datasets of those cdm_data_types (values allowlisted in
+  // utils/dataTypes.js → safe to inline). All-three or none → no type filter
+  // (none never reaches the branch).
+  const profilesTypeFilter =
+    profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
+      ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
+          .map((t) => `'${t}'`)
+          .join(",")}))`
+      : "";
+  const profilesPrefilter = prefilterFor("profiles");
+  const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr("profiles", metric)},
+           time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
+    FROM cde.profiles ${metricJoin("profiles", metric)}
+    WHERE ${DRAWN_AS_POINT}${profilesTypeFilter}${profilesPrefilter ? ` AND ${profilesPrefilter}` : ""} AND :profileFilters`;
+  // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
+  // merge into the combined hex counts (z<7, the green ramp) but never
+  // appear as individual points (z>=7). Their cell spacing is a grid
+  // artifact, not a measurement location, so at point zoom they're shown
+  // only via the dedicated always-hex coverage layer from
+  // /tiles/cells/:z/:x/:y.mvt.
+  // Same shape as profilesTypeFilter above: restrict to the requested
+  // geometries when only some are on, and combine with the caller's prefilter
+  // into one WHERE (either, both, or neither can be present).
+  const trajectoryConds = [
+    prefilterFor("trajectory_hexes"),
+    trajectoryTypePredicate(trajectoryTypes),
+  ].filter(Boolean);
+  // cde.trajectory_hexes is already keyed on the hex, one row per
+  // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
+  // predicate where the other branches carry two hex FK columns. point_pk is
+  // NULL because trajectory coverage never renders at the point tier.
+  const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${metricValueExpr("trajectory_hexes", metric)},
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(" AND ")}` : ""}`;
+  const obisPrefilter = prefilterFor("obis_cells");
+  const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
+           ${metricValueExpr("obis_cells", metric)},
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
+    WHERE :obisFilters${obisPrefilter ? ` AND ${obisPrefilter}` : ""}`;
+
+  const branches = [];
+  if (includeProfiles) branches.push(profilesBranch);
+  // Trajectory coverage cells only join the combined hex counts at hex zoom;
+  // at point zoom they're shown via the dedicated /tiles/cells layer.
+  if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
+  if (includeObis && isHexGrid) branches.push(obisBranch);
+  return unionBranches(branches, profilesBranch);
+}
+
+// The `combined` CTE behind /tiles/cells and /tiles/datasets?source=cells:
+// trajectory coverage and OBIS cells only, always at hex grain.
+//
+// A `src` discriminator lets one pass over the union produce both the
+// unified count that colours the hex AND the per-kind figures the hover
+// tooltip names. trajectory_id is meaningless for OBIS cells and is only
+// ever read behind its own FILTER.
+function cellsBranchesSQL(query, { metric, hexTier, prefilterFor }) {
+  const { trajectoryTypes, includeObis, includeTrajectory } =
+    requestedSources(query);
+
+  const trajectoryConds = [
+    prefilterFor("trajectory_hexes"),
+    trajectoryTypePredicate(trajectoryTypes),
+  ].filter(Boolean);
+  const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
+           trajectory_id, ${metricValueExpr("trajectory_hexes", metric)},
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
+    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(" AND ")}` : ""}`;
+  const obisPrefilter = prefilterFor("obis_cells");
+  const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
+           NULL as trajectory_id, ${metricValueExpr("obis_cells", metric)},
+           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
+    FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
+    WHERE :obisFilters${obisPrefilter ? ` AND ${obisPrefilter}` : ""}`;
+
+  const branches = [];
+  if (includeTrajectory) branches.push(trajectoryBranch);
+  if (includeObis) branches.push(obisBranch);
+  return unionBranches(branches, trajectoryBranch);
 }
 
 /**
@@ -149,83 +289,16 @@ router.get(
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
-    const includeObis = obisVisible(req.query);
     // What the hex/point `count` property means — see utils/hexMetric.js. The
     // same metric must reach /legend, or the ramp domain won't match the tiles.
     const metric = parseMetric(req.query.metric);
-    // Data-type layer toggle (map layer selector). Trajectories: an explicit
-    // includeTrajectory=false hides them. Profiles: the profileTypes comma
-    // list names the cdm_data_types to show — see utils/dataTypes.js, which
-    // owns the vocabulary the values are matched against (that match is what
-    // makes them safe to inline into the branch SQL below).
-    const profileTypes = requestedProfileTypes(req.query);
-    const trajectoryToggledOn = req.query.includeTrajectory !== "false";
-    const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    // ERDDAP-sourced data (profiles + trajectory coverage) is hidden wholesale
-    // when the selection is OBIS-only — see utils/selection.js. The layer
-    // toggles above narrow that further; they are display state, not part of
-    // what the selection contains.
-    const erddap = erddapVisible(req.query);
-    const includeProfiles = erddap && profileTypes.length > 0;
-    const includeTrajectory =
-      trajectoryToggledOn && erddap && trajectoryTypes.length > 0;
 
-    // At hex zoom we only need the hex FK and point_pk (for distinct counts);
-    // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
-    // zoom we project the actual point geom.
-    // Features spanning a region (show_as_point=false) are kept off the map
-    // entirely — excluded from both the individual dots (z>=7) and the hex
-    // aggregation counts (z<7). They remain searchable via the sidebar
-    // geospatial filters (shapeQuery has no such gate). search_geom (the bbox
-    // for profiles, the cell point otherwise) backs the shared spatial filter.
-    // When only some profile types are requested, additionally restrict the
-    // branch to datasets of those cdm_data_types (values allowlisted above →
-    // safe to inline). All-three or none → no type filter (none never reaches
-    // the branch).
-    const profilesTypeFilter =
-      profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
-        ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
-            .map((t) => `'${t}'`)
-            .join(",")}))`
-        : "";
-    const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr("profiles", metric)},
-           time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
-    FROM cde.profiles ${metricJoin("profiles", metric)}
-    WHERE ${DRAWN_AS_POINT}${profilesTypeFilter}${cellPrefilter ? ` AND ${cellPrefilter}` : ""} AND :profileFilters`;
-    // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
-    // merge into the combined hex counts (z<7, the green ramp) but never
-    // appear as individual points (z>=7). Their cell spacing is a grid
-    // artifact, not a measurement location, so at point zoom they're shown
-    // only via the dedicated always-hex coverage layer from
-    // /tiles/cells/:z/:x/:y.mvt.
-    // Same shape as profilesTypeFilter above: restrict to the requested
-    // geometries when only some are on, and combine with the tile prefilter
-    // into one WHERE (either, both, or neither can be present).
-    const trajectoryConds = [
-      cellPrefilter,
-      trajectoryTypePredicate(trajectoryTypes),
-    ].filter(Boolean);
-    // cde.trajectory_hexes is already keyed on the hex, one row per
-    // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
-    // predicate where the other branches carry two hex FK columns. point_pk is
-    // NULL because trajectory coverage never renders at the point tier.
-    const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${metricValueExpr("trajectory_hexes", metric)},
-           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
-    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(" AND ")}` : ""}`;
-    const obisBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom,
-           ${metricValueExpr("obis_cells", metric)},
-           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
-    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ""}`;
-
-    const branches = [];
-    if (includeProfiles) branches.push(profilesBranch);
-    // Trajectory coverage cells only join the combined hex counts at hex zoom;
-    // at point zoom they're shown via the dedicated /tiles/cells layer.
-    if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
-    if (includeObis && isHexGrid) branches.push(obisBranch);
-    const combinedInner = unionBranches(branches, profilesBranch);
+    const combinedInner = mainBranchesSQL(req.query, {
+      metric,
+      hexTier,
+      isHexGrid,
+      prefilterFor: () => cellPrefilter,
+    });
 
     // `count` is the same quantity at both tiers — the aggregated metric. It
     // used to be count(distinct point_pk) at hex zoom and a sum at point zoom,
@@ -361,42 +434,13 @@ router.get(
     // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
-    const includeObis = obisVisible(req.query);
     const metric = parseMetric(req.query.metric);
-    // Trajectory cells are ERDDAP data, so an OBIS-only selection hides them
-    // (utils/selection.js). On top of that, an explicit includeTrajectory=false
-    // hides them — the trajectories layer toggle, and tracks mode (where track
-    // lines replace the coverage hexes but OBIS cells stay) — and, since the
-    // two trajectory geometries are separate layers, so does deselecting both.
-    const trajectoryTypes = requestedTrajectoryTypes(req.query);
-    const includeTrajectory =
-      req.query.includeTrajectory !== "false" &&
-      trajectoryTypes.length > 0 &&
-      erddapVisible(req.query);
 
-    // A `src` discriminator lets one pass over the union produce both the
-    // unified count that colours the hex AND the per-kind figures the hover
-    // tooltip names. trajectory_id is meaningless for OBIS cells and is only
-    // ever read behind its own FILTER below.
-    const trajectoryConds = [
-      cellPrefilter,
-      trajectoryTypePredicate(trajectoryTypes),
-    ].filter(Boolean);
-    const trajectoryBranch = `SELECT dataset_pk, hex_pk as zoom_pk, 'trajectory' as src,
-           trajectory_id, ${metricValueExpr("trajectory_hexes", metric)},
-           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
-    WHERE hex_tier = ${hexTier}${trajectoryConds.length ? ` AND ${trajectoryConds.join(" AND ")}` : ""}`;
-    const obisBranch = `SELECT dataset_pk, :zoomPKColumn: as zoom_pk, 'obis' as src,
-           NULL as trajectory_id, ${metricValueExpr("obis_cells", metric)},
-           time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
-    FROM cde.obis_cells ${metricJoin("obis_cells", metric)}
-    WHERE :obisFilters${cellPrefilter ? ` AND ${cellPrefilter}` : ""}`;
-
-    const branches = [];
-    if (includeTrajectory) branches.push(trajectoryBranch);
-    if (includeObis) branches.push(obisBranch);
-    const combinedInner = unionBranches(branches, trajectoryBranch);
+    const combinedInner = cellsBranchesSQL(req.query, {
+      metric,
+      hexTier,
+      prefilterFor: () => cellPrefilter,
+    });
 
     // The tile-envelope test is applied BEFORE the aggregation (hexes are
     // disjoint, so filtering hexes before or after grouping yields identical
@@ -457,6 +501,154 @@ router.get(
 
     res.setHeader("Content-Type", "application/x-protobuf");
     res.status(200).send(tileRaw.rows[0].st_asmvt);
+  },
+);
+
+/**
+ * @swagger
+ * /tiles/datasets:
+ *   get:
+ *     summary: Per-dataset metric for the tile buckets under a map click
+ *     tags: [Tiles]
+ *     description: >
+ *       Splits a tile bucket's `count` among the datasets inside it, for the
+ *       what's-here card. A tile carries only the bucket total and the list of
+ *       dataset pks, and for `days` the per-dataset figure cannot be derived
+ *       from the total: a bucket's day count is the UNION of its datasets' day
+ *       sets, so a hex reading 1120 days can hold a mooring with 1115 and a
+ *       single cast with 1. Takes the same filters and layer switches as the
+ *       tile it describes, plus the clicked buckets, and aggregates exactly
+ *       the rows that tile aggregated.
+ *     parameters:
+ *       - in: query
+ *         name: z
+ *         required: true
+ *         description: >
+ *           Zoom the click happened at; picks the hex tier and, for
+ *           source=main, whether the cell layers are in play — exactly as the
+ *           tile route does.
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: source
+ *         description: >
+ *           Which layer was clicked - `main` for /tiles (hexes and markers),
+ *           `cells` for /tiles/cells (trajectory + OBIS coverage).
+ *         schema: { type: string, enum: [main, cells], default: main }
+ *       - in: query
+ *         name: hexes
+ *         description: Comma list of hex pks that were clicked.
+ *         schema: { type: string }
+ *       - in: query
+ *         name: points
+ *         description: >
+ *           Comma list of point pks that were clicked (source=main at point
+ *           zoom).
+ *         schema: { type: string }
+ *       - in: query
+ *         name: metric
+ *         schema: { type: string, enum: [records, days, datasets], default: records }
+ *     responses:
+ *       200:
+ *         description: One row per dataset in the requested buckets.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   pk: { type: integer }
+ *                   count: { type: integer }
+ */
+/* GET /tiles/datasets */
+/* The per-dataset split of a clicked bucket's count — see the swagger note */
+router.get(
+  "/datasets",
+  ...pipeline({
+    checks: [
+      check("z").isInt({ min: 0, max: MAX_TILE_ZOOM }),
+      check("source").isIn(["main", "cells"]).optional(),
+      // Same shape as the pk lists filterValidators() already accepts, and
+      // bounded: a click gathers a handful of buckets, never hundreds.
+      check(["hexes", "points"])
+        .matches(/^[0-9]+(,[0-9]+)*$/)
+        .isLength({ max: 2000 })
+        .optional(),
+    ],
+  }),
+  async (req, res) => {
+    const filters = await createDBFilter(req.query);
+
+    const { source = "main" } = req.query;
+    const z = Number(req.query.z);
+    const isHexGrid = z < 7;
+    const { tier: hexTier, pointColumn: zoomPKColumn } = tierForZoom(z);
+    const metric = parseMetric(req.query.metric);
+
+    const hexPks = req.query.hexes ? req.query.hexes.split(",") : [];
+    const pointPks = req.query.points ? req.query.points.split(",") : [];
+    if (!hexPks.length && !pointPks.length) {
+      return res.status(400).json({ errors: ["hexes or points is required"] });
+    }
+
+    // The bucket restriction, pushed down into each branch so it prunes the
+    // scan the way the tile routes' geometry prefilter does. Without it every
+    // branch reads its whole table and clips at the end (~2.5 s; see
+    // tileCellPrefilter). Each table names its bucket differently:
+    // trajectory_hexes is already keyed on the hex, the other two carry a hex
+    // FK per tier, and at point zoom the bucket is the point itself.
+    const prefilterFor = (table) => {
+      if (pointPks.length && table === "profiles") {
+        return "point_pk = ANY(:pointPks)";
+      }
+      if (!hexPks.length) return null;
+      return table === "trajectory_hexes"
+        ? "hex_pk = ANY(:hexPks)"
+        : ":zoomPKColumn: = ANY(:hexPks)";
+    };
+
+    const combinedInner =
+      source === "cells"
+        ? cellsBranchesSQL(req.query, { metric, hexTier, prefilterFor })
+        : mainBranchesSQL(req.query, {
+            metric,
+            hexTier,
+            isHexGrid,
+            prefilterFor,
+          });
+
+    // One grouping level finer than the tile's. The bucket total is NOT
+    // recomputed here — the tile already carries it, and re-deriving it by
+    // summing these parts would be wrong for `days`, where they overlap.
+    //
+    // Grouped by pk_url rather than dataset_pk because that is the id the card
+    // holds; a dataset with no pk_url yet has nothing the card could match it
+    // to, so it is dropped rather than returned unlabelled.
+    const SQL = `
+  with combined as (
+    ${combinedInner}
+  )
+  SELECT d.pk_url pk, ${countAggregate(metric, "p")} count
+  FROM combined p
+  JOIN cde.datasets d ON p.dataset_pk = d.pk
+  WHERE d.pk_url IS NOT NULL${filters.hasShared ? " AND :filters" : ""}
+  GROUP BY d.pk_url
+  ORDER BY count DESC`;
+
+    const { rows } = await db.raw(SQL, {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
+      zoomPKColumn,
+      hexPks,
+      pointPks,
+    });
+
+    return res
+      .status(200)
+      .json(
+        rows.map((row) => ({ pk: Number(row.pk), count: Number(row.count) })),
+      );
   },
 );
 
