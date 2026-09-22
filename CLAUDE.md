@@ -9,13 +9,13 @@ there): `harvester/`, `database/`, `web-api/`, `frontend/`, `downloader/`,
 Human docs live in `README.md`; read the relevant section when you need it:
 
 - **Architecture** — service diagram.
-- **Starting using docker** — local stack setup (`./scripts/init-dev-env.sh`
-  creates the gitignored configs).
-- **Linting and tests** — every lint/test command, single-test invocations, the
-  uv/lockfile rules.
-- **Front End Development** — local frontend against a local or remote API.
-- **CI/CD**, **Deploying with Coolify**, **Production deployment** — deploys, and
-  the `Rebuild Database` deployment needed after a schema change.
+- **Quick start**, **Configuration** — local stack setup and env vars.
+- **Harvesting** — Prefect deployments, harvest config, and the
+  `Rebuild Database` deployment needed after a schema change.
+- **Downloads** — the download queue and scheduler.
+- **Development** — local frontend, services outside Docker, and **Linting and
+  tests** (every lint/test command, the uv/lockfile rules).
+- **Deployment** — CI/CD, Coolify, self-hosted production.
 
 Gotchas worth knowing without opening the README:
 
