@@ -25,7 +25,9 @@ export const TIPS = [
   "datasetNav",
   "filterMap",
   "realtime",
+  "trackDate",
   "griddapWms",
+  "griddedCoverage",
   "nonna",
   "globe",
   "sizeLimit",
@@ -70,15 +72,20 @@ export default function TipsProvider({ children }) {
     gate.current = { tipsEnabled, seenTips, modalOpen };
   }, [tipsEnabled, seenTips, modalOpen]);
 
+  // Takes one key or several in priority order, and offers the first not yet
+  // seen — so a page with a specific tip of its own falls back to the general
+  // one once that has been read.
+  //
   // One tip per visit at most, each tip once ever, and never behind a modal:
   // an offer made while one is up (a filter set from the Filters dialog, say)
   // waits for it to close. The latest such offer wins.
   const pendingTip = useRef();
   const offerTip = useCallback(
-    (key) => {
+    (keys) => {
       const { tipsEnabled, seenTips, modalOpen } = gate.current;
       if (firstVisit || shownThisLoad.current || !tipsEnabled) return;
-      if (seenTips.includes(key)) return;
+      const key = [keys].flat().find((k) => !seenTips.includes(k));
+      if (!key) return;
       if (modalOpen) {
         pendingTip.current = key;
         return;

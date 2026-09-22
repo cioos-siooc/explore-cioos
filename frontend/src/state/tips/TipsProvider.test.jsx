@@ -21,6 +21,12 @@ function Probe() {
       <button type="button" onClick={() => offerTip("sliderKeys")}>
         offer slider
       </button>
+      <button
+        type="button"
+        onClick={() => offerTip(["reshapeArea", "sliderKeys"])}
+      >
+        offer either
+      </button>
       <button type="button" onClick={() => setShowFiltersModal(true)}>
         open filters
       </button>
@@ -74,6 +80,17 @@ describe("contextual tips", () => {
     await user.click(screen.getByText("offer reshape"));
     expect(card()).toBeNull();
     await user.click(screen.getByText("offer slider"));
+    expect(card()).toHaveTextContent(/time bar/);
+  });
+
+  it("offers the first unseen tip of a priority list", async () => {
+    returningVisitor();
+    window.localStorage.setItem(
+      "cde.seenTips",
+      JSON.stringify(["reshapeArea"]),
+    );
+    const { user } = renderProbe();
+    await user.click(screen.getByText("offer either"));
     expect(card()).toHaveTextContent(/time bar/);
   });
 

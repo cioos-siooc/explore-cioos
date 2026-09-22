@@ -23,10 +23,18 @@ export default function GriddapDetails({
 }) {
   const { t } = useTranslation();
   const { eovsSelected } = useFilters();
-  const { pendingWmsSlice, setPendingWmsSlice } = useMapState();
+  const { pendingWmsSlice, setPendingWmsSlice, griddapCoverageVisible } =
+    useMapState();
   const { sidebarOpen } = useUI();
   const { offerTip } = useTips();
-  useEffect(() => offerTip("griddapWms"), [offerTip]);
+  useEffect(
+    () =>
+      offerTip([
+        "griddapWms",
+        ...(griddapCoverageVisible ? [] : ["griddedCoverage"]),
+      ]),
+    [offerTip, griddapCoverageVisible],
+  );
   const dimensions = dataset.grid_dimensions || [];
   const variables = dataset.grid_variables || [];
   const overlayActive = activeWmsOverlay?.pk === dataset.pk;

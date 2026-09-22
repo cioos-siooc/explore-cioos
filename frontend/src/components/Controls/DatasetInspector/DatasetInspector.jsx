@@ -21,6 +21,7 @@ import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   dataLayerKeyForDataset,
   DATA_LAYER_LABEL_KEYS,
+  TRAJECTORY_TYPE_KEYS,
 } from "../../../state/dataLayers.js";
 import { gridNodeFactors, totalGridNodes } from "../../../wmsUtilities";
 import {
@@ -147,10 +148,18 @@ export default function DatasetInspector({
   const { handleSelectDataset, selectedPks } = useSelection();
   const { setShowDownloadModal } = useUI();
   const { offerTip } = useTips();
+  const isTrajectory = TRAJECTORY_TYPE_KEYS.some(
+    ([, type]) => type === dataset.cdm_data_type,
+  );
   const isRealtime = Boolean(dataset.is_realtime);
   useEffect(
-    () => offerTip(isRealtime ? "realtime" : "datasetNav"),
-    [offerTip, isRealtime],
+    () =>
+      offerTip([
+        ...(isTrajectory ? ["trackDate"] : []),
+        ...(isRealtime ? ["realtime"] : []),
+        "datasetNav",
+      ]),
+    [offerTip, isTrajectory, isRealtime],
   );
   const [datasetRecords, setDatasetRecords] = useState();
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
