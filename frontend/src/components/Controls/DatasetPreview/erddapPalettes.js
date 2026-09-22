@@ -12,12 +12,13 @@
 // unmapped falls through to the index palette in previewColors.js — 82% declare
 // no palette at all, so that fallback IS the common case.
 //
-// WHY WHOLE RAMPS FOR A SINGLE COLOUR
-// Nothing draws a ramp any more: the colour dimension (one variable shading
-// every panel, one colourbar) was replaced by one solid colour per variable, and
-// paletteColorFor() below projects a ramp down to one of its stops. The ramps
-// stay anyway, because they cannot be re-derived — see the 404s above — and
-// because the projection is only defensible next to what it projects.
+// WHOLE RAMPS, READ TWO WAYS
+// previewColorScales.js draws a ramp as a ramp, for the colour dimension: one
+// column shading every panel, through one colourbar. previewColors.js reads the
+// same table for a single solid colour per variable, via paletteColorFor()
+// below, which projects a ramp down to one of its stops. Both are the
+// publisher's declared intent, at two resolutions — and the projection is only
+// defensible next to what it projects, which is why they share one table.
 
 // Approximations of the cmocean ramps in Plotly's [position, css-colour] form.
 // Five stops each: enough to be recognisable, small enough to read.

@@ -2,8 +2,10 @@ import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
+import PaneDivider from "../../ui/PaneDivider.jsx";
 import useElementSize from "../../ui/useElementSize.js";
 import VariableColorPicker from "./VariableColorPicker.jsx";
+import ColorScalePicker from "./ColorScalePicker.jsx";
 import "./styles.css";
 
 import Plotly from "plotly.js-basic-dist-min";
@@ -15,15 +17,45 @@ import {
   shortLabelFor,
   measurementsOf,
 } from "../DatasetPreview/previewVariables.js";
-import { sharedCandidatesFor } from "../DatasetPreview/previewFacetPlan.js";
 import {
+  axisDirectionsFor,
+  sharedCandidatesFor,
+} from "../DatasetPreview/previewFacetPlan.js";
+import {
+  boxBudgetFor,
   buildFigure,
+  heightBudgetFor,
   plotHeightFor,
   plotWidthFor,
   recordTitleFor,
   titleLinesFor,
 } from "../DatasetPreview/previewFacetFigure.js";
+import {
+  clampPaneWidth,
+  PANE_DEFAULT_PX,
+  PANE_MAX_PX,
+  PANE_MIN_PX,
+} from "../DatasetPreview/previewPaneLayout.js";
 import { defaultColorFor } from "../DatasetPreview/previewColors.js";
+import { autoScaleNameFor } from "../DatasetPreview/previewColorScales.js";
+
+// Which key names each axis's direction, so the caption can say which way round
+// this plot is drawn. See axisDirectionsFor.
+const DIRECTION_LABELS = {
+  vertical: "datasetPreviewPlotAxisVertical",
+  horizontal: "datasetPreviewPlotAxisHorizontal",
+};
+const DIRECTION_GLYPHS = { vertical: "↕", horizontal: "↔" };
+
+// t(plotType) would work for two of the three: there is no `markers+lines` key,
+// only `markersAndLine`, so the toggle used to show the raw mode string.
+const PLOT_MODE_LABELS = {
+  markers: "markers",
+  lines: "line",
+  "markers+lines": "markersAndLine",
+};
+
+const PARAMS_PANE_ID = "datasetPreviewParamsPane";
 
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
@@ -52,25 +84,37 @@ export default function DatasetPreviewPlot({
   setPanels,
   variableColors,
   setVariableColor,
+  colorCandidates,
+  colorAxis,
+  setColorAxis,
+  colorScale,
+  setColorScale,
   plotType,
   setPlotType,
   customLabels,
   setCustomLabels,
   uirevision,
-  // clientHeight of the modal's one scroll container. An INPUT to the plot's
-  // height — never the plot's own box, which would be a feedback loop.
+  // clientHeight of the scroll container the panes fill. The CEILING on the
+  // plot's height — never the plot's own box on its own, which would be a
+  // feedback loop. See heightBudgetFor for the other half.
   availableHeight,
+  paneWidth,
+  setPaneWidth,
 }) {
   const { t, i18n } = useTranslation();
   // Purely local: a disclosure triangle is not worth a param, and nobody wants
   // to share which panel they had folded open.
   const [showLabels, setShowLabels] = useState(false);
+  // Only for the cursor and the text-selection lock while a drag is live.
+  const [resizing, setResizing] = useState(false);
 
-  // Width comes from the element that owns it: the plot area is flex-sized by
-  // the row, independent of how tall the figure ends up.
+  // The plot pane's own box. Its width is what the figure is drawn to; its
+  // height enters only through heightBudgetFor, which can lower the ceiling
+  // above but never raise it.
   const [plotAreaRef, plotAreaSize] = useElementSize();
   const measurements = measurementsOf(variables);
   const sharedCandidates = sharedCandidatesFor(variables);
+  const directions = axisDirectionsFor(plan.orientation);
 
   // What names the record, and therefore what the figure is titled. Computed
   // here as well as inside buildFigure because the title's height is part of the
@@ -83,18 +127,19 @@ export default function DatasetPreviewPlot({
   const width = plotWidthFor(
     plan.orientation,
     panels.length,
-    plotAreaSize.width,
+    boxBudgetFor(plotAreaSize.width),
+    Boolean(colorAxis),
   );
   // The lines the title really wraps to, not the two-line worst case the sizing
   // helpers assume on their own: at a short scroller that is the difference
   // between three stacked panels fitting and scrolling.
   const titleLines = titleLinesFor(title, width);
-  // The whole scroller: with the plot-type control moved into the left column
+  // The whole pane: with the plot-type control moved into the parameters pane
   // there is nothing above the figure to subtract.
   const height = plotHeightFor(
     plan.orientation,
     panels.length,
-    availableHeight || 0,
+    heightBudgetFor(availableHeight, plotAreaSize.height),
     titleLines,
   );
 
@@ -115,6 +160,8 @@ export default function DatasetPreviewPlot({
             labels: customLabels,
             title,
             mode: plotType,
+            colorAxis,
+            colorScale,
             size: { width, height },
             uirevision: `${inspectRecordID}|${uirevision}`,
           })
@@ -129,6 +176,8 @@ export default function DatasetPreviewPlot({
       customLabels,
       title,
       plotType,
+      colorAxis,
+      colorScale,
       width,
       height,
       inspectRecordID,
@@ -137,6 +186,28 @@ export default function DatasetPreviewPlot({
   );
 
   const labelOf = (columnName) => labelFor(variablesByName.get(columnName));
+
+  // "X axis ↕" — the name says which axis, the glyph says which way this plot
+  // draws it. Labelled rather than aria-hidden: ui/Tooltip portals its bubble
+  // with no aria-describedby, so a tooltip here would never be announced.
+  const axisCaption = (key, direction) => (
+    <span className="controlCaption">
+      {t(key)}{" "}
+      <span
+        className="controlCaptionDirection"
+        role="img"
+        aria-label={t(DIRECTION_LABELS[direction])}
+      >
+        {DIRECTION_GLYPHS[direction]}
+      </span>
+    </span>
+  );
+
+  // .dropdown .btn is inline-flex, so a bare string becomes an anonymous flex
+  // item that text-overflow cannot reach and min-width: auto will not shrink.
+  const toggleLabel = (text) => (
+    <span className="dropdownToggleLabel">{text}</span>
+  );
 
   // The variable picker. Checkbox rows rather than Dropdown.Item, because
   // Dropdown.Item closes the menu on click (ui/Dropdown.jsx) and choosing
@@ -150,12 +221,12 @@ export default function DatasetPreviewPlot({
 
   const panelPicker = (
     <div className="controlRow">
-      <span className="controlCaption">{t("datasetPreviewPlotVariables")}</span>
+      {axisCaption("datasetPreviewPlotYAxis", directions.y)}
       <Tooltip placement="right" content={panels.map(labelOf).join(", ")}>
         <span className="controlButtonWrap">
           <DropdownButton
             className="dropdownButtonLeft"
-            title={variablesToggleTitle}
+            title={toggleLabel(variablesToggleTitle)}
           >
             {measurements.length === 0 && (
               <span className="dropdownEmptyNote">
@@ -203,14 +274,17 @@ export default function DatasetPreviewPlot({
     </div>
   );
 
-  // Plot type. First in the column deliberately: it is the one control that
+  // Plot type. First in the pane deliberately: it is the one control that
   // changes every panel at once, and it used to sit alone in a row above the
   // figure, which cost the figure that row's height for one dropdown.
   const plotTypeRow = (
     <div className="controlRow">
       <span className="controlCaption">{t("plotType")}</span>
       <span className="controlButtonWrap">
-        <DropdownButton className="dropdownButtonLeft" title={t(plotType)}>
+        <DropdownButton
+          className="dropdownButtonLeft"
+          title={toggleLabel(t(PLOT_MODE_LABELS[plotType]))}
+        >
           <Dropdown.Item
             active={plotType === "markers"}
             onClick={() => setPlotType("markers")}
@@ -240,14 +314,12 @@ export default function DatasetPreviewPlot({
   // the variable's own, picked beside its name in the panel below.
   const sharedAxisRow = (
     <div className="controlRow">
-      <span className="controlCaption">
-        {t("datasetPreviewPlotSharedAxis")}
-      </span>
+      {axisCaption("datasetPreviewPlotXAxis", directions.x)}
       <Tooltip placement="right" content={labelOf(sharedAxis)}>
         <span className="controlButtonWrap">
           <DropdownButton
             className="dropdownButtonLeft"
-            title={shortLabelFor(variablesByName.get(sharedAxis))}
+            title={toggleLabel(shortLabelFor(variablesByName.get(sharedAxis)))}
           >
             {sharedCandidates.map((variable) => (
               <Dropdown.Item
@@ -261,6 +333,64 @@ export default function DatasetPreviewPlot({
           </DropdownButton>
         </span>
       </Tooltip>
+    </div>
+  );
+
+  // The third dimension. No direction glyph beside the caption: colour has no
+  // direction, and reusing axisCaption here would imply it was a third axis
+  // rather than a shading of the two the panels already have.
+  const colorByRow = (
+    <div className="controlRow">
+      <span className="controlCaption">{t("datasetPreviewPlotColorBy")}</span>
+      <Tooltip
+        placement="right"
+        content={
+          colorAxis ? labelOf(colorAxis) : t("datasetPreviewPlotColorNone")
+        }
+      >
+        <span className="controlButtonWrap">
+          <DropdownButton
+            className="dropdownButtonLeft"
+            title={toggleLabel(
+              colorAxis
+                ? shortLabelFor(variablesByName.get(colorAxis))
+                : t("datasetPreviewPlotColorNone"),
+            )}
+          >
+            <Dropdown.Item
+              active={!colorAxis}
+              onClick={() => setColorAxis(null)}
+            >
+              {t("datasetPreviewPlotColorNone")}
+            </Dropdown.Item>
+            {colorCandidates.map((variable) => (
+              <Dropdown.Item
+                key={variable.columnName}
+                active={variable.columnName === colorAxis}
+                onClick={() => setColorAxis(variable.columnName)}
+              >
+                {labelFor(variable)}
+              </Dropdown.Item>
+            ))}
+          </DropdownButton>
+        </span>
+      </Tooltip>
+    </div>
+  );
+
+  // Only while there is something to scale.
+  const colorScaleRow = colorAxis && (
+    <div className="controlRow">
+      <span className="controlCaption">
+        {t("datasetPreviewPlotColorScale")}
+      </span>
+      <span className="controlButtonWrap">
+        <ColorScalePicker
+          value={colorScale}
+          autoName={autoScaleNameFor(variablesByName.get(colorAxis))}
+          onPick={setColorScale}
+        />
+      </span>
     </div>
   );
 
@@ -299,12 +429,26 @@ export default function DatasetPreviewPlot({
     </div>
   );
 
+  const bounds = { paneWidth, plotWidth: plotAreaSize.width };
+
   return (
-    <div className="datasetPreviewControls">
-      <div className="datasetPreviewControlsColumn">
+    <div
+      className={
+        resizing
+          ? "datasetPreviewPlotPanes isResizing"
+          : "datasetPreviewPlotPanes"
+      }
+    >
+      <div
+        className="datasetPreviewParamsPane"
+        id={PARAMS_PANE_ID}
+        style={{ width: paneWidth }}
+      >
         {plotTypeRow}
-        {panelPicker}
         {sharedAxisRow}
+        {panelPicker}
+        {colorByRow}
+        {colorScaleRow}
 
         <button
           type="button"
@@ -321,40 +465,49 @@ export default function DatasetPreviewPlot({
         )}
       </div>
 
+      <PaneDivider
+        label={t("datasetPreviewPlotResizeParams")}
+        controls={PARAMS_PANE_ID}
+        value={paneWidth}
+        min={PANE_MIN_PX}
+        max={clampPaneWidth(PANE_MAX_PX, bounds)}
+        reset={PANE_DEFAULT_PX}
+        onChange={(next) => setPaneWidth(clampPaneWidth(next, bounds))}
+        onDragChange={setResizing}
+      />
+
       <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
-        <div className="datasetPreviewPlot">
-          {figure ? (
-            <Plot
-              data={figure.data}
-              layout={figure.layout}
-              // Explicit width/height in the layout, so Plotly never runs
-              // plotAutoSize. That is what used to read a container height of
-              // 0px on first mount and silently fall back to its own 450px
-              // default, leaving the plot small until the next relayout.
-              style={{ width: `${width}px`, height: `${height}px` }}
-              useResizeHandler={false}
-              config={{
-                displaylogo: false,
-                modeBarButtonsToRemove: [
-                  "select2d",
-                  "lasso2d",
-                  "resetScale2d",
-                  "pan2d",
-                ],
-                // Off deliberately: `responsive` re-measures from computed
-                // style on every window resize, which would fight the sizes
-                // above. useElementSize drives resizing instead.
-                responsive: false,
-                scrollZoom: true,
-                locale: i18n.language === "fr" ? "fr" : "en",
-              }}
-            />
-          ) : (
-            <p className="datasetPreviewPlotEmpty">
-              {t("datasetPreviewPlotNoVariablesSelected")}
-            </p>
-          )}
-        </div>
+        {figure ? (
+          <Plot
+            data={figure.data}
+            layout={figure.layout}
+            // Explicit width/height in the layout, so Plotly never runs
+            // plotAutoSize. That is what used to read a container height of
+            // 0px on first mount and silently fall back to its own 450px
+            // default, leaving the plot small until the next relayout.
+            style={{ width: `${width}px`, height: `${height}px` }}
+            useResizeHandler={false}
+            config={{
+              displaylogo: false,
+              modeBarButtonsToRemove: [
+                "select2d",
+                "lasso2d",
+                "resetScale2d",
+                "pan2d",
+              ],
+              // Off deliberately: `responsive` re-measures from computed
+              // style on every window resize, which would fight the sizes
+              // above. useElementSize drives resizing instead.
+              responsive: false,
+              scrollZoom: true,
+              locale: i18n.language === "fr" ? "fr" : "en",
+            }}
+          />
+        ) : (
+          <p className="datasetPreviewPlotEmpty">
+            {t("datasetPreviewPlotNoVariablesSelected")}
+          </p>
+        )}
       </div>
     </div>
   );

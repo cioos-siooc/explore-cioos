@@ -8,6 +8,8 @@ import useElementSize from "../../ui/useElementSize.js";
 import Loading from "../Loading/Loading.jsx";
 import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
+import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
+import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
 import "./styles.css";
 
 // Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
@@ -17,6 +19,22 @@ import "./styles.css";
 const DatasetPreviewPlot = lazy(
   () => import("../DatasetPreviewPlot/DatasetPreviewPlot.jsx"),
 );
+
+// What each refusal reads as, and what the axis search was looking for. Two maps
+// rather than one message per case in the JSX: the codes are the plan module's
+// vocabulary, and this is the only place that turns them into sentences.
+const BLOCKED_MESSAGES = {
+  [PLOT_BLOCKED.NO_COLUMNS]: "datasetPreviewPlotBlockedNoColumns",
+  [PLOT_BLOCKED.UNSUPPORTED_TYPE]: "datasetPreviewPlotBlockedType",
+  [PLOT_BLOCKED.NO_SHARED_AXIS]: "datasetPreviewPlotBlockedNoAxis",
+  [PLOT_BLOCKED.NO_MEASUREMENTS]: "datasetPreviewPlotBlockedNoMeasurements",
+};
+const WANTED_LABELS = {
+  vertical: "datasetPreviewPlotWantedVertical",
+  time: "datasetPreviewPlotWantedTime",
+  track: "datasetPreviewPlotWantedTrack",
+  measurement: "datasetPreviewPlotWantedMeasurement",
+};
 
 const NO_CUSTOM_LABELS = {};
 // Never equal to a linkKey (which is a query string, and may be ""), so the
@@ -66,6 +84,11 @@ export default function DatasetPreview({
     togglePanel,
     variableColors,
     setVariableColor,
+    colorCandidates,
+    colorAxis,
+    setColorAxis,
+    colorScale,
+    setColorScale,
     plotType,
     setPlotType,
     uirevision,
@@ -87,10 +110,18 @@ export default function DatasetPreview({
   const [copiedLinkKey, setCopiedLinkKey] = useState(NO_LINK_COPIED);
   const linkCopied = copiedLinkKey === linkKey;
 
-  // The modal's ONE scroll container. Measured here because its height is set by
-  // the modal (flex, capped at the viewport) and does not move when the plot
-  // grows — which is what makes it safe to feed into the plot's height. See
-  // useElementSize.
+  // How wide the plot's parameters pane is. Lifted here for the same reason
+  // customLabels is: the plot is unmounted on every Table/Plot flip, and a pane
+  // dragged wider has to still be wide on the way back. Not in the URL, and not
+  // reset per record — it is a viewing preference like the disclosure triangle
+  // in the plot, not a view of the data.
+  const [paneWidth, setPaneWidth] = useState(PANE_DEFAULT_PX);
+
+  // The Table view's scroll container, and the CEILING on the plot's height —
+  // the plot fills it exactly and scrolls inside its own pane. Measured here
+  // because its height is set by the modal (flex, capped at the viewport) and
+  // does not move when the plot grows, which is what makes it safe to feed into
+  // the plot's height. See useElementSize.
   const [scrollRef, scrollSize] = useElementSize();
 
   // A different record is a different plot: drop the previous one's names.
@@ -102,6 +133,27 @@ export default function DatasetPreview({
     setLabelledRecordID(inspectRecordID);
     setCustomLabels(NO_CUSTOM_LABELS);
   }
+
+  // What stopped this record from being plotted, when nothing else did. Two
+  // records of the same cdm_data_type genuinely differ here — one publisher
+  // declares the coordinate metadata and the next does not — so the message has
+  // to name the missing column rather than blame the type.
+  const plotBlocker = useMemo(
+    () => (plan ? null : plotBlockerFor(inspectDataset, variables, data)),
+    [plan, inspectDataset, variables, data],
+  );
+  const blockedMessage = (blocker) => {
+    if (
+      blocker.code === PLOT_BLOCKED.UNSUPPORTED_TYPE &&
+      !blocker.cdmDataType
+    ) {
+      return t("datasetPreviewPlotBlockedNoType");
+    }
+    return t(BLOCKED_MESSAGES[blocker.code], {
+      type: blocker.cdmDataType,
+      wanted: blocker.wanted ? t(WANTED_LABELS[blocker.wanted]) : "",
+    });
+  };
 
   const onModalClose = () => {
     // One call, one history entry: setInspectRecordID clears ?preview= and every
@@ -212,19 +264,38 @@ export default function DatasetPreview({
                             setPanels={setPanels}
                             variableColors={variableColors}
                             setVariableColor={setVariableColor}
+                            colorCandidates={colorCandidates}
+                            colorAxis={colorAxis}
+                            setColorAxis={setColorAxis}
+                            colorScale={colorScale}
+                            setColorScale={setColorScale}
                             plotType={plotType}
                             setPlotType={setPlotType}
                             customLabels={customLabels}
                             setCustomLabels={setCustomLabels}
                             uirevision={uirevision}
                             availableHeight={scrollSize.height}
+                            paneWidth={paneWidth}
+                            setPaneWidth={setPaneWidth}
                           />
                         </Suspense>
                       ) : (
-                        // Reachable only via ?vis=plot on a type with no layout
-                        // (Grid), or a dataset whose columns are all coordinates
-                        // and ids. The table is still right there in the header.
-                        <p>{t("datasetPreviewPlotNotPlottable")}</p>
+                        plotBlocker && (
+                          // In the plot's place, saying which column is missing:
+                          // the table is still one click away in the header, but
+                          // "this type has no layout" was wrong three times out
+                          // of four and told nobody what to fix.
+                          <div className="datasetPreviewPlotBlocked">
+                            <p>{blockedMessage(plotBlocker)}</p>
+                            {plotBlocker.columns.length > 0 && (
+                              <p className="datasetPreviewPlotBlockedColumns">
+                                {t("datasetPreviewPlotBlockedColumns", {
+                                  columns: plotBlocker.columns.join(", "),
+                                })}
+                              </p>
+                            )}
+                          </div>
+                        )
                       )}
                     </>
                   ) : (

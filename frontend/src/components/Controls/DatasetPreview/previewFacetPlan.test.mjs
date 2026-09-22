@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 
 import { variablesFrom } from "./previewVariables.js";
 import {
+  axisDirectionsFor,
+  colorCandidatesFor,
   facetPlanFor,
+  plotBlockerFor,
+  PLOT_BLOCKED,
   sharedCandidatesFor,
   resolvePanels,
   defaultVisFor,
@@ -187,4 +191,120 @@ test("the plan names the cf_role columns, which is what titles the figure", () =
     "station_id",
     "profile",
   ]);
+});
+
+test("the axis names stay put; only the direction they are drawn in flips", () => {
+  // X is the axis every panel is drawn against and Y is the panels, in both
+  // layouts — a profile just draws its shared depth axis down the side.
+  assert.deepEqual(axisDirectionsFor(COLUMNS), {
+    x: "vertical",
+    y: "horizontal",
+  });
+  assert.deepEqual(axisDirectionsFor(ROWS), {
+    x: "horizontal",
+    y: "vertical",
+  });
+  assert.deepEqual(
+    axisDirectionsFor(planFor("Profile").orientation),
+    axisDirectionsFor(COLUMNS),
+  );
+  assert.deepEqual(
+    axisDirectionsFor(planFor("Trajectory").orientation),
+    axisDirectionsFor(ROWS),
+  );
+});
+
+// --- why a record refuses to plot --------------------------------------------
+
+const blockerFor = (type, table = VIKING, data) => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: type };
+  return plotBlockerFor(dataset, variablesFrom(table, dataset), data);
+};
+
+test("a record that plots is not also blocked", () => {
+  for (const type of ["Profile", "TimeSeries", "Trajectory", "Point"]) {
+    assert.ok(planFor(type), type);
+    assert.equal(blockerFor(type), null, type);
+  }
+});
+
+test("no columns at all is its own answer, not a complaint about the type", () => {
+  const empty = { columnNames: [], columnTypes: [], columnUnits: [] };
+  assert.equal(blockerFor("Profile", empty).code, PLOT_BLOCKED.NO_COLUMNS);
+  assert.equal(
+    plotBlockerFor(undefined, undefined, undefined).code,
+    PLOT_BLOCKED.NO_COLUMNS,
+  );
+});
+
+test("an unplottable cdm_data_type is named, blank or not", () => {
+  const grid = blockerFor("Grid");
+  assert.equal(grid.code, PLOT_BLOCKED.UNSUPPORTED_TYPE);
+  assert.equal(grid.cdmDataType, "Grid");
+  assert.equal(blockerFor("").cdmDataType, "");
+});
+
+test("a plottable type missing its shared axis says which column it wanted", () => {
+  // The reported symptom: same type, one record plots and the next does not,
+  // because this publisher's ERDDAP declares no vertical coordinate.
+  const noDepth = {
+    columnNames: ["station", "temperature"],
+    columnTypes: ["String", "float"],
+    columnUnits: [null, "degree_C"],
+  };
+  const profile = blockerFor("Profile", noDepth);
+  assert.equal(profile.code, PLOT_BLOCKED.NO_SHARED_AXIS);
+  assert.equal(profile.wanted, "vertical");
+  assert.equal(profile.cdmDataType, "Profile");
+
+  const noTime = {
+    columnNames: ["depth", "temperature"],
+    columnTypes: ["float", "float"],
+    columnUnits: ["m", "degree_C"],
+  };
+  assert.equal(blockerFor("TimeSeries", noTime).wanted, "time");
+  assert.equal(blockerFor("Trajectory", noTime).wanted, "track");
+});
+
+test("the columns the record DOES have are reported, to say what to fix", () => {
+  const noDepth = {
+    columnNames: ["station", "temperature"],
+    columnTypes: ["String", "float"],
+    columnUnits: [null, "degree_C"],
+  };
+  assert.deepEqual(blockerFor("Profile", noDepth).columns, [
+    "station",
+    "temperature",
+  ]);
+});
+
+test("an axis but nothing to draw against it blames the measurements", () => {
+  // Order matters: the shared axis resolves first, so a record with a depth
+  // column and no measurement must not be reported as missing an axis.
+  const idsOnly = {
+    columnNames: ["depth", "station_id", "temperature_qc"],
+    columnTypes: ["float", "String", "byte"],
+    columnUnits: ["m", null, null],
+  };
+  const blocker = blockerFor("Profile", idsOnly);
+  assert.equal(blocker.code, PLOT_BLOCKED.NO_MEASUREMENTS);
+  assert.deepEqual(blocker.columns, ["depth", "station_id", "temperature_qc"]);
+});
+
+test("the colour dimension offers the shared axis's columns, time included", () => {
+  const candidates = colorCandidatesFor(
+    variablesFrom(VIKING, VIKING_DATASET),
+  ).map((variable) => variable.columnName);
+  assert.ok(candidates.includes("time"));
+  assert.ok(candidates.includes("depth"));
+  assert.ok(candidates.includes("TE90_01"));
+});
+
+test("a column no ramp can order is never offered as the colour dimension", () => {
+  const candidates = colorCandidatesFor(
+    variablesFrom(VIKING, VIKING_DATASET),
+  ).map((variable) => variable.columnName);
+  // Strings both, and station_id is an id besides.
+  assert.ok(!candidates.includes("station_id"));
+  assert.ok(!candidates.includes("profile"));
 });

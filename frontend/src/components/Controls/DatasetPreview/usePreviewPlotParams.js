@@ -3,11 +3,13 @@ import { useSearchParams } from "react-router-dom";
 
 import { variablesFrom, byColumnName } from "./previewVariables.js";
 import {
+  colorCandidatesFor,
   facetPlanFor,
   resolvePanels,
   defaultVisFor,
 } from "./previewFacetPlan.js";
 import { parseColorsParam, formatColorsParam } from "./previewColors.js";
+import { normalizeColorScale } from "./previewColorScales.js";
 
 // Everything that describes the plot on screen, kept in the query string so a
 // link reproduces it — the same arrangement SelectionProvider already uses for
@@ -181,6 +183,40 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams, variableColors],
   );
 
+  // The third dimension: one column shading every panel. Not a second axis —
+  // the panels keep the two they had — so it defaults to off and is written only
+  // when the user turns it on.
+  const colorCandidates = useMemo(
+    () => colorCandidatesFor(variables),
+    [variables],
+  );
+  const colorParam = searchParams.get("pz");
+  // A link may name a column this dataset does not have, or one a ramp cannot
+  // order. OFF rather than substituted — unlike paxis, which falls back to the
+  // plan's own axis: "colour by something else instead" is a decision nobody
+  // made.
+  const colorAxis = useMemo(
+    () =>
+      colorCandidates.some((variable) => variable.columnName === colorParam)
+        ? colorParam
+        : null,
+    [colorCandidates, colorParam],
+  );
+  const colorScale = normalizeColorScale(searchParams.get("pzscale"));
+  const setColorAxis = useCallback(
+    (columnName) =>
+      // The scale goes with the column in the SAME write: one picked for
+      // salinity means nothing on temperature, and react-router hands a
+      // functional updater the params from the last RENDER, so two calls in one
+      // handler would leave the old scale behind.
+      setParams({ pz: columnName || null, pzscale: null }),
+    [setParams],
+  );
+  const setColorScale = useCallback(
+    (name) => setParams({ pzscale: normalizeColorScale(name) }),
+    [setParams],
+  );
+
   const modeParam = searchParams.get("pmode");
   const plotType = PLOT_MODES.includes(modeParam) ? modeParam : DEFAULT_MODE;
   const setPlotType = useCallback(
@@ -210,6 +246,11 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     togglePanel,
     variableColors,
     setVariableColor,
+    colorCandidates,
+    colorAxis,
+    setColorAxis,
+    colorScale,
+    setColorScale,
     plotType,
     setPlotType,
     uirevision,

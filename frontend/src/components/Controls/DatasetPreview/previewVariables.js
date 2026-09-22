@@ -172,7 +172,14 @@ export function variablesFrom(table, dataset) {
       positive: meta && trimmed(meta.positive),
       ioosCategory: meta && trimmed(meta.ioos_category),
       palette: meta && trimmed(meta.colorBarPalette),
+      // Read by previewColorScales.js for the colour dimension's ramp.
       colorBarScale: meta && trimmed(meta.colorBarScale),
+      // Deliberately unread, now that the colour dimension could read them:
+      // ERDDAP's colorBar bounds are per standard_name across a whole catalogue
+      // (0-8000 for depth, 0-32 for temperature), and one record spans a sliver
+      // of that — honouring them would flatten every profile to two adjacent
+      // shades of its ramp. Kept because they describe the column, and the next
+      // reader should see the decision rather than assume an oversight.
       cmin: meta ? numberOr(meta.colorBarMinimum, undefined) : undefined,
       cmax: meta ? numberOr(meta.colorBarMaximum, undefined) : undefined,
     };
@@ -222,6 +229,20 @@ export function measurementsOf(variables) {
 // actually on screen.
 export function idVariablesFor(variables) {
   return (variables || []).filter((variable) => variable.cfRole);
+}
+
+// A time column, however ERDDAP spelled it. Separate from `kind === 'coordinate'`
+// because time is the one coordinate that arrives as TEXT: tabledap serves it as
+// an ISO string, so anything that wants to order it — the colour dimension — has
+// to parse it first, and has to know when to.
+export function isTimeLike(variable) {
+  if (!variable) return false;
+  return Boolean(
+    variable.axis === "T" ||
+    variable.standardName === "time" ||
+    TIME_UNITS.has(variable.unit) ||
+    (variable.unit && TIME_FORMAT_UNIT.test(variable.unit)),
+  );
 }
 
 // A depth axis has to be drawn downwards. `positive` is the only attribute that

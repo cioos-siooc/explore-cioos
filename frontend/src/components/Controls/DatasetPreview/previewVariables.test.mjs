@@ -9,6 +9,7 @@ import {
   measurementsOf,
   byColumnName,
   isDownwardVertical,
+  isTimeLike,
 } from "./previewVariables.js";
 
 // The real payload shape of /api/preview?dataset=mpoPmzaVikingCtdInsitu — a
@@ -433,6 +434,26 @@ test("the id columns come back in ERDDAP order — that is title order", () => {
   };
   assert.deepEqual(idVariablesFor(variablesFrom(table, {})), []);
   assert.deepEqual(idVariablesFor(undefined), []);
+});
+
+test("a time column is recognised however ERDDAP spelled its units", () => {
+  const table = {
+    columnNames: ["time", "year", "flagged_time", "temperature"],
+    columnTypes: ["String", "uint", "String", "float"],
+    columnUnits: ["UTC", "CCYY-MM-DD", null, "degree_C"],
+    columnMeta: [
+      { name: "time" },
+      { name: "year" },
+      { name: "flagged_time", axis: "T" },
+      { name: "temperature" },
+    ],
+  };
+  const index = byColumnName(variablesFrom(table, {}));
+  assert.equal(isTimeLike(index.get("time")), true);
+  assert.equal(isTimeLike(index.get("year")), true);
+  assert.equal(isTimeLike(index.get("flagged_time")), true);
+  assert.equal(isTimeLike(index.get("temperature")), false);
+  assert.equal(isTimeLike(undefined), false);
 });
 
 export { VIKING, VIKING_NO_META, VIKING_DATASET };

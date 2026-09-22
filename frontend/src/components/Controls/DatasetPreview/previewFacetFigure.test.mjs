@@ -1,11 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { variablesFrom, byColumnName } from "./previewVariables.js";
+import { variablesFrom, byColumnName, labelFor } from "./previewVariables.js";
 import { facetPlanFor, COLUMNS, ROWS } from "./previewFacetPlan.js";
 import {
+  boxBudgetFor,
   buildFigure,
+  COLORBAR_GUTTER_PX,
   domainsFor,
+  heightBudgetFor,
   plotHeightFor,
   plotWidthFor,
   marginFor,
@@ -23,7 +26,7 @@ import {
   LABEL_FONT_PX,
 } from "./previewFacetFigure.js";
 import { defaultColorFor } from "./previewColors.js";
-import { paletteColorFor } from "./erddapPalettes.js";
+import { paletteColorFor, paletteFor } from "./erddapPalettes.js";
 import {
   VIKING,
   VIKING_NO_META,
@@ -592,19 +595,22 @@ test("the user's colour beats both, on the line as well as the markers", () => {
   assert.equal(data[0].marker.color, defaultColorFor(undefined, 0));
 });
 
-test("nothing draws a colourbar any anymore, and no width is kept for one", () => {
-  const { data } = figure("TimeSeriesProfile", ALL_SIX);
+test("no colour column means no colourbar, and no width kept for one", () => {
+  const { data, layout } = figure("TimeSeriesProfile", ALL_SIX);
   data.forEach((trace) => {
     assert.ok(!trace.marker.colorbar);
     assert.ok(!("showscale" in trace.marker));
+    assert.ok(!("coloraxis" in trace.marker));
     assert.ok(!trace.customdata);
   });
+  assert.ok(!layout.coloraxis);
   assert.equal(plotWidthFor(COLUMNS, 8, 2000), 2000);
+  assert.equal(plotWidthFor(COLUMNS, 8, 2000, false), 2000);
 });
 
-test("lines-only stays lines — nothing forces markers on any more", () => {
-  // Markers used to be forced whenever colouring was on, because a per-point
-  // colour has nothing to render on without one.
+test("lines-only stays lines while no colour column is set", () => {
+  // Markers are forced only when colouring is on, because a per-point colour
+  // has nothing to render on without one. See the colour dimension below.
   const { data } = figure("TimeSeriesProfile", ["TE90_01"], { mode: "lines" });
   assert.equal(data[0].mode, "lines");
 });
@@ -717,4 +723,271 @@ test("the title wraps at the line cap rather than overflowing the figure", () =>
   assert.ok(lines[lines.length - 1].endsWith("…"));
   // Wrapped at the FIGURE's width, not a panel's: it is centred on the figure.
   assert.ok(titleLinesFor(TITLE, 1140) < titleLinesFor(TITLE, 400));
+});
+
+test("a measured box is spent one pixel short of what it reported", () => {
+  // clientWidth/clientHeight are integers rounded from a fractional box, so the
+  // number reported can be half a pixel more than the box that has to hold the
+  // figure — and in a scroll container that half pixel is a stub scrollbar on
+  // one axis that then takes ~15px from the other.
+  assert.equal(boxBudgetFor(700), 699);
+  assert.equal(boxBudgetFor(699.6), 698);
+  assert.equal(boxBudgetFor(0), 0);
+  assert.equal(boxBudgetFor(undefined), 0);
+});
+
+test("the height budget is the plot pane's own box, scrollbar and all", () => {
+  // A horizontal scrollbar took 15px of the pane; that is measured, never
+  // guessed at a constant, because it is 0 on overlay-scrollbar platforms.
+  assert.equal(heightBudgetFor(700, 685), 684);
+  // Nothing measured yet (first render): the scroller is all there is to go on.
+  assert.equal(heightBudgetFor(700, 0), 699);
+});
+
+test("the height budget can only ever come down — no growth loop", () => {
+  // The guard that makes it safe to measure the plot's OWN pane here: a pane
+  // reporting taller than the scroller it sits in cannot buy the figure room.
+  assert.equal(heightBudgetFor(700, 900), 699);
+  let previous = Infinity;
+  for (const paneHeight of [900, 800, 700, 600, 400, 200, 0]) {
+    const budget = heightBudgetFor(700, paneHeight);
+    if (paneHeight > 0) {
+      assert.ok(budget <= previous, `${paneHeight}px pane -> ${budget}px`);
+      previous = budget;
+    }
+    assert.ok(budget >= 0);
+  }
+  assert.equal(heightBudgetFor(0, 0), 0);
+  // And an empty budget still cannot collapse the figure (see the first-render
+  // case above).
+  assert.ok(plotHeightFor(COLUMNS, 1, heightBudgetFor(0, 0)) > 0);
+});
+
+test("a profile spends the whole budget it is given", () => {
+  const budget = heightBudgetFor(700, 685);
+  assert.equal(plotHeightFor(COLUMNS, 3, budget), budget);
+});
+
+// --- the colour dimension ----------------------------------------------------
+
+const colored = (panels, extra = {}) =>
+  figureFrom(VIKING_PALETTES, "TimeSeriesProfile", panels, {
+    colorAxis: "depth",
+    ...extra,
+  });
+
+test("a colour column shades every panel, off one shared colour axis", () => {
+  const { data, layout } = colored(["TE90_01", "PSAL_01", "FLOR_01"]);
+  data.forEach((trace, index) => {
+    assert.equal(trace.marker.coloraxis, "coloraxis", `panel ${index}`);
+    assert.deepEqual(
+      trace.marker.color,
+      DATA.map((row) => row.depth),
+      `panel ${index}`,
+    );
+  });
+  assert.ok(layout.coloraxis);
+});
+
+test("the bar is the layout's, so no trace carries a scale of its own", () => {
+  const { data, layout } = colored(ALL_SIX);
+  data.forEach((trace) => {
+    assert.ok(!("cmin" in trace.marker));
+    assert.ok(!("cmax" in trace.marker));
+    assert.ok(!("colorscale" in trace.marker));
+    assert.ok(!("showscale" in trace.marker));
+    assert.ok(!trace.marker.colorbar);
+  });
+  // One bar, however many panels: the range is Plotly's to take across every
+  // trace on the axis, which is what makes the panels comparable at all.
+  assert.equal(layout.coloraxis.showscale, true);
+  assert.ok(layout.coloraxis.colorbar);
+});
+
+test("a declared colorBarMinimum does not narrow the record to the catalogue", () => {
+  // ERDDAP's colorBarMinimum/Maximum are per standard_name across the whole
+  // catalogue (0-8000 for depth); a record spans metres of that. Honouring it
+  // would flatten every profile to two adjacent shades.
+  const { layout } = colored(["TE90_01"]);
+  assert.ok(!("cmin" in layout.coloraxis));
+  assert.ok(!("cmax" in layout.coloraxis));
+});
+
+test("the colour column's own palette is what the bar opens in", () => {
+  const { layout } = figureFrom(
+    VIKING_PALETTES,
+    "TimeSeriesProfile",
+    ["FLOR_01"],
+    {
+      colorAxis: "PSAL_01",
+    },
+  );
+  assert.deepEqual(layout.coloraxis.colorscale, paletteFor("KT_haline"));
+});
+
+test("a rainbow colour column is drawn in viridis, and a pick beats both", () => {
+  const rainbow = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) =>
+      meta.name === "PSAL_01" ? { ...meta, colorBarPalette: "Rainbow" } : meta,
+    ),
+  };
+  const auto = figureFrom(rainbow, "TimeSeriesProfile", ["FLOR_01"], {
+    colorAxis: "PSAL_01",
+  });
+  assert.equal(auto.layout.coloraxis.colorscale, "Viridis");
+
+  const picked = figureFrom(rainbow, "TimeSeriesProfile", ["FLOR_01"], {
+    colorAxis: "PSAL_01",
+    colorScale: "KT_algae",
+  });
+  assert.deepEqual(picked.layout.coloraxis.colorscale, paletteFor("KT_algae"));
+});
+
+test("the line keeps the variable's own colour while the markers carry the ramp", () => {
+  const { data } = colored(["TE90_01", "PSAL_01"]);
+  assert.equal(data[0].line.color, paletteColorFor("KT_thermal"));
+  assert.equal(data[1].line.color, paletteColorFor("KT_haline"));
+});
+
+test("lines become markers+lines when colouring, and markers are left alone", () => {
+  assert.equal(
+    colored(["TE90_01"], { mode: "lines" }).data[0].mode,
+    "markers+lines",
+  );
+  assert.equal(
+    colored(["TE90_01"], { mode: "markers" }).data[0].mode,
+    "markers",
+  );
+  assert.equal(
+    colored(["TE90_01"], { mode: "markers+lines" }).data[0].mode,
+    "markers+lines",
+  );
+});
+
+test("the colourbar takes its width out of the right margin, not the panels", () => {
+  const plain = marginFor(COLUMNS, 1);
+  const withBar = marginFor(COLUMNS, 1, true);
+  assert.equal(withBar.r, plain.r + COLORBAR_GUTTER_PX);
+  assert.equal(withBar.l, plain.l);
+  assert.equal(withBar.t, plain.t);
+  assert.equal(withBar.b, plain.b);
+  // The height is the bar's own business: it hangs inside the plotting area.
+  assert.equal(plotHeightFor(ROWS, 3, 600, 1), plotHeightFor(ROWS, 3, 600, 1));
+});
+
+test("the panel floor still holds once the colourbar has been paid for", () => {
+  const margin = marginFor(COLUMNS, MAX_TITLE_LINES, true);
+  const width = plotWidthFor(COLUMNS, 6, 800, true);
+  const panels = (width - margin.l - margin.r) / panelPitch(6, 0.22);
+  assert.ok(
+    panels >= MIN_PANEL_PX,
+    `${panels}px panels once the bar is reserved`,
+  );
+  assert.equal(
+    plotWidthFor(COLUMNS, 6, 800, true),
+    plotWidthFor(COLUMNS, 6, 800) + COLORBAR_GUTTER_PX,
+  );
+});
+
+test("the bar hangs from the top, clear of the vertical modebar", () => {
+  const { layout } = colored(["TE90_01"]);
+  const bar = layout.coloraxis.colorbar;
+  assert.equal(bar.y, 1);
+  assert.equal(bar.yanchor, "top");
+  assert.equal(bar.x, 1);
+  assert.equal(bar.xanchor, "left");
+  assert.ok(bar.len < 1);
+  // No title on the bar: Plotly measures one into the bar's own thickness, and
+  // the margin above was sized without it.
+  assert.ok(!bar.title);
+});
+
+test("the colour label is an annotation under the bar, wrapped into the gutter", () => {
+  const { layout } = colored(["TE90_01"]);
+  const label = layout.annotations[layout.annotations.length - 1];
+  assert.equal(label.xref, "paper");
+  assert.equal(label.x, 1);
+  assert.equal(label.xanchor, "left");
+  assert.ok(label.y < layout.coloraxis.colorbar.len);
+  label.text.split("<br>").forEach((line) => {
+    assert.ok(line.length <= maxCharsFor(LABEL_GUTTER_PX), line);
+  });
+  const depth = byColumnName(variablesFrom(VIKING, VIKING_DATASET)).get(
+    "depth",
+  );
+  assert.ok(
+    label.text.replace(/<br>/g, " ").startsWith(labelFor(depth).slice(0, 5)),
+  );
+});
+
+test("the colour label goes last, so no panel's own label moved", () => {
+  const plain = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"]);
+  const withColor = colored(["TE90_01", "PSAL_01"]);
+  assert.equal(
+    withColor.layout.annotations.length,
+    plain.layout.annotations.length + 1,
+  );
+  plain.layout.annotations.forEach((annotation, index) => {
+    assert.deepEqual(withColor.layout.annotations[index], annotation);
+  });
+});
+
+test("hover gains the colour value, off customdata", () => {
+  // Coloured by a column this panel does not otherwise print — see the next
+  // test for the one that does.
+  const { data } = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+    colorAxis: "PSAL_01",
+  });
+  assert.deepEqual(
+    data[0].customdata,
+    DATA.map((row) => row.PSAL_01),
+  );
+  assert.ok(data[0].hovertemplate.includes("%{customdata}"));
+});
+
+test("colouring by a column the panel already prints adds no second copy", () => {
+  // The shared axis is on both of this panel's axes already...
+  const bySharedAxis = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+    colorAxis: "depth",
+  });
+  assert.ok(!bySharedAxis.data[0].hovertemplate.includes("%{customdata}"));
+
+  // ...and so is the variable this panel draws.
+  const byPanel = figureFrom(
+    VIKING,
+    "TimeSeriesProfile",
+    ["TE90_01", "PSAL_01"],
+    {
+      colorAxis: "PSAL_01",
+    },
+  );
+  assert.ok(!byPanel.data[1].hovertemplate.includes("%{customdata}"));
+  assert.ok(byPanel.data[0].hovertemplate.includes("%{customdata}"));
+});
+
+test("a time colour column is ramped over epoch ms and ticked in timestamps", () => {
+  const { data, layout } = figureFrom(
+    VIKING,
+    "TimeSeriesProfile",
+    ["TE90_01"],
+    {
+      colorAxis: "time",
+    },
+  );
+  assert.equal(data[0].marker.color[0], Date.parse(DATA[0].time));
+  // The hover still reads the timestamp the record published.
+  assert.equal(data[0].customdata[0], DATA[0].time);
+  assert.equal(layout.coloraxis.colorbar.tickmode, "array");
+  assert.equal(layout.coloraxis.colorbar.ticktext.length, 4);
+});
+
+test("a colour column this record cannot order leaves the figure as it was", () => {
+  const plain = figure("TimeSeriesProfile", ["TE90_01"]);
+  const unorderable = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+    colorAxis: "station_id",
+  });
+  assert.ok(!unorderable.layout.coloraxis);
+  assert.deepEqual(unorderable.data, plain.data);
+  assert.deepEqual(unorderable.layout, plain.layout);
 });

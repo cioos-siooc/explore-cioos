@@ -1,16 +1,43 @@
-/* Controls (left column) + plot (fills the rest) laid out side by side. */
-.datasetPreviewControls {
+/* Three panes on one row: the parameters, the divider, and the plot.
+ *
+ * height: 100% — not a stretch, not a min-height — is the whole trick. The
+ * modal's height is definite (DatasetPreview/styles.css), so .tableAndPlot's
+ * flexed height is definite too and a percentage resolves against it. Being
+ * exactly 100% of the scroller it sits in means the Plot view never gives that
+ * scroller anything to scroll, so the two panes below are the only scrollers on
+ * screen — which is what lets "Customize plot" grow the parameters pane without
+ * moving the figure. */
+.datasetPreviewPlotPanes {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   align-items: stretch;
   width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
-.datasetPreviewControlsColumn {
+/* While a drag is live: no text selection in the row, and the resize cursor
+   even where the pointer has run ahead of the divider. */
+.datasetPreviewPlotPanes.isResizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* The parameters pane. Its width is state — the divider writes it, so it is set
+   inline — and only the bounds live here. max-width is the backstop for a narrow
+   modal (.modal-xl is calc(100vw - 32px)), where the measured clamp can be a
+   frame stale; if CSS wins, the figure simply measures what is really left.
+   Nothing in here needs to escape sideways: the dropdown menus, the colour
+   picker and the tooltips all portal to document.body. */
+.datasetPreviewParamsPane {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 8px;
-  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 60%;
+  min-height: 0;
+  overflow: hidden auto;
 }
 
 /* Checkbox rows in the variable picker. The menu is portaled to document.body
@@ -58,26 +85,42 @@
   font-size: 0.9em;
 }
 
+/* The direction the plot draws this axis in. Beside the name rather than in a
+   tooltip, because ui/Tooltip portals its bubble with no aria-describedby. */
+.controlCaptionDirection {
+  color: var(--cioos-text-muted, #666);
+}
+
+/* The toggle grows with the pane, which takes three boxes agreeing: this wrap
+   (Tooltip's trigger, so it has to stay exactly one element), the .dropdown that
+   ui/Dropdown renders inside it, and the toggle itself. width: 100% on the
+   toggle alone would resolve against a shrink-to-fit inline-block — against
+   itself — and quietly hand back the content width. */
 .controlButtonWrap {
-  display: inline-block;
-}
-
-/* Right side: nothing but the plot. The plot-type button used to sit in a
-   header row here; it is a control like the other three, so it lives in the left
-   column now and the figure gets the whole height of the scroller. */
-.datasetPreviewPlotArea {
-  flex: 1;
-  min-width: 0;
   display: flex;
-  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-/* No height rules here at all, and that is the fix.
+.controlButtonWrap .dropdown {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The plot pane: the figure's only scroller, on both axes. A stack of panels
+ * taller than the pane scrolls here, and so does a profile wide enough to push
+ * its panels to MIN_PANEL_PX. A plain block deliberately — no flex — so nothing
+ * can stretch or shrink Plotly's px-sized root.
  *
- * This used to carry `min-height: 100%` plus
+ * useElementSize measures this box for the figure's width and, through
+ * heightBudgetFor, for its height; so it must never be sized BY the figure,
+ * which is what min-height: 0 and the overflow are for.
+ *
+ * NO HEIGHT RULE MAY COME BACK HERE OR ON THE FIGURE. There used to be
+ * `min-height: 100%` plus
  * `.svg-container { min-height: 560px !important; height: 100% !important }`.
- * Every one of those percentages resolved against an indefinite ancestor
- * (.datasetPreviewControls has no height, and nothing sets html/body/#app), so
+ * Every one of those percentages resolved against an indefinite ancestor, so
  * they collapsed to auto — while Plotly, running plotAutoSize because
  * layout.autosize was on with no width/height, read getComputedStyle(gd).height
  * as 0px on first mount and fell back to its schema default of 450px. The
@@ -86,15 +129,14 @@
  * listens on window (plotly-basic ships no ResizeObserver at all). That 110px
  * gap was the "renders badly until you change something" bug.
  *
- * The figure now gets explicit layout.width/height from useElementSize, so the
- * container must simply not fight them. */
-.datasetPreviewPlot {
-  flex: 1;
+ * Note the trap has changed shape rather than gone: the pane row above now HAS
+ * a definite height, so a percentage here would resolve instead of collapsing —
+ * and would silently fight the explicit layout.width/height the figure gets. */
+.datasetPreviewPlotArea {
+  flex: 1 1 auto;
   min-width: 0;
-
-  /* Profiles widen past the modal once panels hit their minimum width; that
-     scrolls here rather than in the modal's vertical scroller. */
-  overflow-x: auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .datasetPreviewPlotEmpty {
@@ -107,11 +149,27 @@
    document.body, so it is not a descendant of .dropdownButtonLeft and cannot be
    styled from this file. Layering is handled there too, via --cioos-z-dropdown. */
 .dropdownButtonLeft .dropdown-toggle {
-  min-width: 120px !important;
-  max-width: 120px !important;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   overflow: hidden;
+}
+
+/* .dropdown .btn is inline-flex (ui/dropdownStyles.css), so a bare string title
+   becomes an anonymous flex item that text-overflow cannot reach and
+   min-width: auto will not let shrink — which is why the label is a span, and
+   why the caret is pinned against shrinking beside it. */
+.dropdownToggleLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dropdownButtonLeft .dropdown-toggle::after {
+  flex: 0 0 auto;
 }
 
 /* Collapsible "Customize plot" panel: one block per drawn variable, holding its
@@ -225,4 +283,27 @@
   border-radius: 4px;
   background: none;
   cursor: pointer;
+}
+
+/* The colour scale's gradient, on the toggle and again on every row of its menu.
+   Wide rather than square, because what it has to show is the RAMP and not a
+   colour; the hairline keeps a pale end visible against white. */
+.colorScaleChip {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 12px;
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: 3px;
+}
+
+.colorScaleLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The menu portals to document.body, so it cannot be reached from the toggle's
+   own class — same as the variable pickers' cap in ui/dropdownStyles.css. */
+.colorScaleMenu {
+  min-width: 180px;
 }

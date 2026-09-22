@@ -10,7 +10,15 @@ import {
 
 test("the preview owns the record param and the plot params", () => {
   assert.equal(RECORD_PARAM, "preview");
-  assert.deepEqual(PLOT_PARAMS, ["vis", "pvars", "paxis", "pmode", "pcolors"]);
+  assert.deepEqual(PLOT_PARAMS, [
+    "vis",
+    "pvars",
+    "paxis",
+    "pmode",
+    "pcolors",
+    "pz",
+    "pzscale",
+  ]);
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {
     assert.ok(PREVIEW_PARAMS.includes(param), param);
   }
@@ -27,9 +35,12 @@ test("retired params are still cleaned up, and never written again", () => {
     assert.ok(!PLOT_PARAMS.includes(param), `${param} must not be written`);
   }
   // pcolors is the live one, and one letter from a retired one: they are
-  // different things and must not be confused for each other.
+  // different things and must not be confused for each other. The colour
+  // dimension pcolor once carried is live again under pz, which is why it was
+  // not simply un-retired.
   assert.ok(PLOT_PARAMS.includes("pcolors"));
   assert.ok(!PLOT_PARAMS.includes("pcolor"));
+  assert.ok(PLOT_PARAMS.includes("pz"));
 });
 
 test("no preview param collides with one the map or the filters already use", () => {
@@ -91,6 +102,7 @@ test("closing the preview strips all of its params and touches nothing else", ()
   const params = new URLSearchParams(
     "lat=45&zoom=5&dataset=X&server=ogsl&preview=R1&vis=table&paxis=depth" +
       "&pvars=TE90_01,PSAL_01&pmode=lines&pcolors=TE90_01~a52c60" +
+      "&pz=time&pzscale=Cividis" +
       // The colour dimension's two params, from a link made before it was replaced.
       "&pcolor=depth&pscale=Jet" +
       // A stale link from before faceting, carried into the same close.
