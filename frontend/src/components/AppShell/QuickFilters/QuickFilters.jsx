@@ -137,7 +137,7 @@ export default function QuickFilters() {
           title={
             searchExpanded
               ? t("filterSearchSubmitTitle")
-              : t("textSearchFilterName")
+              : t("quickFilterSearchTitle")
           }
           aria-label={
             searchExpanded
@@ -194,7 +194,7 @@ export default function QuickFilters() {
         data-testid="quick-filter-box"
         onClick={() => draw("box", boxActive)}
         aria-pressed={boxActive}
-        title={t("drawBoundingBoxOption")}
+        title={t("quickFilterBoxTitle")}
         aria-label={t("drawBoundingBoxOption")}
       >
         <BoundingBox size={18} aria-hidden="true" />
@@ -205,7 +205,7 @@ export default function QuickFilters() {
         data-testid="quick-filter-polygon"
         onClick={() => draw("polygon", polygonActive)}
         aria-pressed={polygonActive}
-        title={t("drawPolygonOption")}
+        title={t("quickFilterPolygonTitle")}
         aria-label={t("drawPolygonOption")}
       >
         <Pentagon size={18} aria-hidden="true" />
@@ -216,7 +216,7 @@ export default function QuickFilters() {
         data-testid="quick-filter-in-view"
         onClick={() => setOnlyInView(!onlyInView)}
         aria-pressed={onlyInView}
-        title={t("datasetsCardOnlyInViewTitle")}
+        title={t("quickFilterInViewTitle")}
         aria-label={t("datasetsCardOnlyInViewText")}
       >
         <Eye size={18} aria-hidden="true" />
