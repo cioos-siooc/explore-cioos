@@ -140,8 +140,7 @@ DROP TABLE IF EXISTS organizations;
 CREATE TABLE organizations (
     pk SERIAL PRIMARY KEY,
     pk_url INTEGER,
-    name TEXT UNIQUE,
-    color TEXT
+    name TEXT UNIQUE
 );
 
 
@@ -578,7 +577,7 @@ CREATE INDEX obis_scientific_name_popularity_total_records
 
 
 -- Vernacular (common) names per scientific name, sourced from WoRMS.
--- Populated by db-loader/cde_db_loader/populate_vernaculars.py; not written by the harvester.
+-- Populated by cde_harvester/loading/populate_vernaculars.py, not by the harvest itself.
 -- Searches use unnest + ILIKE; with a small row count (one per scientific name)
 -- a seq scan is fast enough without a trigram index. Add a denormalised text
 -- column + IMMUTABLE wrapper if this ever needs an index.

@@ -33,7 +33,6 @@ DISCOVERY_CONFIG = {
 def config_file(tmp_path, monkeypatch):
     # resolve_harvest_config_file() prefers these env vars over the passed path,
     # and .env sets HARVEST_CONFIG_FILE in a dev checkout.
-    monkeypatch.delenv("HARVEST_CONFIG_YAML", raising=False)
     monkeypatch.delenv("HARVEST_CONFIG_FILE", raising=False)
 
     def _write(config):

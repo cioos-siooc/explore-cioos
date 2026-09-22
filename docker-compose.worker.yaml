@@ -35,7 +35,7 @@ services:
       # Central Prefect API — MUST be overridden to a reachable URL for this host.
       PREFECT_API_URL: ${PREFECT_API_URL:?set PREFECT_API_URL to the central Prefect server}
       PREFECT_LOGGING_LEVEL: INFO
-      PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
+      PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_harvester
       # DB / redis reachable from THIS host (override in .env or shell).
       DB_HOST_EXTERNAL: ${DB_HOST_EXTERNAL:?set DB_HOST_EXTERNAL to the central Postgres}
       REDIS_HOST: ${REDIS_HOST:-}
