@@ -55,11 +55,21 @@ export default function UIProvider({ children }) {
   useEffect(() => {
     if (!sidebarChosenRef.current) setSidebarOpenState(wideScreen);
   }, [wideScreen]);
-  // The two modal surfaces: filter management and the download order.
+  // The modal surfaces: filter management, the download order, the
+  // dataset-coverage figure, and how the download selection is made.
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [showCoverageModal, setShowCoverageModal] = useState(false);
+  // How picking datasets for a download works, opened from the sidebar
+  // footer's one-line version of the same thing.
+  const [showSelectionHelpModal, setShowSelectionHelpModal] = useState(false);
   // Which filter flyout is open inside the filters modal (one at a time).
   const [openFilter, setOpenFilter] = useState();
+  // The quick-filter row and the active-filter chips under it (see
+  // QuickFilters, ActiveFilterChips): shown by default, put away together by
+  // one toggle living on the main Filters button, rather than each row
+  // keeping its own.
+  const [quickFiltersCollapsed, setQuickFiltersCollapsed] = useState(false);
   const introOpenCookie = !getCookieValue("introModalOpen");
   const [showIntroModal, setShowIntroModal] = useState(
     introOpenCookie !== undefined ? introOpenCookie : true,
@@ -108,8 +118,14 @@ export default function UIProvider({ children }) {
     setShowFiltersModal,
     showDownloadModal,
     setShowDownloadModal,
+    showCoverageModal,
+    setShowCoverageModal,
+    showSelectionHelpModal,
+    setShowSelectionHelpModal,
     openFilter,
     setOpenFilter,
+    quickFiltersCollapsed,
+    setQuickFiltersCollapsed,
     showIntroModal,
     setShowIntroModal,
   };

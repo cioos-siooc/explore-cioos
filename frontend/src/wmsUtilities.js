@@ -7,6 +7,8 @@
 // canvas before it's handed to the map. Without the warp, features at
 // Canadian latitudes land 1-2 degrees of latitude off at low zoom.
 
+import { server } from "./config";
+
 // EPSG:3857 blows up at the poles; MapLibre clamps rendering there too.
 const MAX_MERCATOR_LAT = 85.05;
 
@@ -157,16 +159,83 @@ export function wmsSliceFromParams(searchParams) {
   return Object.keys(slice).length ? slice : undefined;
 }
 
+/*
+ * The live time axis, read from ERDDAP on demand.
+ *
+ * A rolling griddap product -- many satellite grids keep only the last week or
+ * two -- moves both ends of its time axis between harvests, so the harvested
+ * copy in `grid_dimensions` would cap the slider short of the newest slice (and
+ * on a fast-rolling grid, point at slices the server has already dropped).
+ * Reading it when the WMS view opens is what lets the catalogue harvest stay
+ * infrequent: nothing has to be kept warm for the slider to be right.
+ *
+ * Resolves to null rather than throwing on any failure, including a static grid
+ * with no time axis (the route answers 404). The caller then keeps the harvested
+ * dimensions, which is exactly the behaviour this replaced.
+ */
+export async function fetchGriddapTimeRange(datasetId) {
+  if (!datasetId) return null;
+  try {
+    const response = await fetch(
+      `${server}/griddapTimeRange?dataset=${encodeURIComponent(datasetId)}`,
+    );
+    if (!response.ok) return null;
+    const time = await response.json();
+    return time?.name === "time" ? time : null;
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * Substitute the live time axis for the harvested one, for the rails' benefit.
+ *
+ * Applied only to the overlay descriptor that GridSlice and WmsLegend read --
+ * never to `dataset.grid_dimensions`, which the inspector's axis cards and
+ * GridNodeCount present as harvested fact.
+ *
+ * Takes the live n_values along with the bounds, and that pairing is the point:
+ * gridAxisNodes() derives its step as (max - min) / (count - 1), so moving one
+ * end without the count silently stretches every step and lands each marker
+ * between slices instead of on one. A field the server did not report falls back
+ * to the harvested value.
+ */
+export function withLiveTimeDimension(dimensions, liveTime) {
+  const dims = dimensions || [];
+  if (!liveTime) return dims;
+  const index = dims.findIndex((dim) => dim.name === "time");
+  if (index < 0) return dims;
+  const merged = { ...dims[index] };
+  for (const key of [
+    "min",
+    "max",
+    "n_values",
+    "spacing",
+    "even_spacing",
+    "units",
+  ]) {
+    if (liveTime[key] !== null && liveTime[key] !== undefined) {
+      merged[key] = liveTime[key];
+    }
+  }
+  const next = dims.slice();
+  next[index] = merged;
+  return next;
+}
+
 // The griddap overlay descriptor consumed by the Map image source and the
 // WmsLegend card. Shared by the auto-show-on-inspect effect and the manual
 // "show on map" toggle so both default the variable the same way.
+//
+// `liveTime` is the time axis as the server reports it now
+// (fetchGriddapTimeRange), or null/undefined to keep the harvested one.
 //
 // `slice` is a share link's remembered slice (wmsSliceFromParams), honoured as
 // far as this dataset can: a variable it doesn't serve falls back to the
 // default pick, and a time or level between two of its own nodes is snapped
 // onto one by the rails that read them.
-export function buildWmsOverlay(dataset, selectedEovTitles, slice) {
-  const dimensions = dataset.grid_dimensions || [];
+export function buildWmsOverlay(dataset, selectedEovTitles, slice, liveTime) {
+  const dimensions = withLiveTimeDimension(dataset.grid_dimensions, liveTime);
   const variables = dataset.grid_variables || [];
   const timeDimension = getTimeDimension(dimensions);
   const named =

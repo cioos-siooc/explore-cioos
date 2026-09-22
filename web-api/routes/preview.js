@@ -47,6 +47,7 @@ const db = require("../db");
 const cache = require("../utils/cache");
 const { pipeline } = require("../utils/routePipeline");
 const { ALL_TRAJECTORY_TYPES } = require("../utils/dataTypes");
+const { trimPreviewRows } = require("../utils/previewRows");
 
 // A record id goes into ERDDAP as a regex constraint (`=~"..."`), and ERDDAP
 // regexes are Java regexes matched against the WHOLE value. Escaping the
@@ -140,8 +141,11 @@ SELECT ds.dataset_id,
        END AS profile_variable,
        f.feature_id AS profile_id,
        f.n_records,
-       f.time_max::text  AS time_max,
-       win.new_start_time::text AS new_start_time,
+       -- ::text renders '2024-01-02 03:04:05+00' -- a literal space and a
+       -- non-Z offset, both of which go straight into an ERDDAP URL. Same
+       -- to_char idiom shapeQuery.js's records CTE uses.
+       to_char(win.new_start_time AT TIME ZONE 'UTC',
+               'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS new_start_time,
        (win.new_start_time IS NULL
          OR win.new_start_time <= f.time_min
          OR f.n_records <= :NUM_RECORDS) AS use_whole_profile
@@ -198,7 +202,6 @@ router.get(
       cdm_data_type,
       erddap_url,
       profile_id,
-      time_max,
       new_start_time,
       use_whole_profile,
       table_variables,
@@ -219,8 +222,22 @@ router.get(
     )}`;
     let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
     if (!use_whole_profile) {
-      // Including time_max guards against records added since the last harvest.
-      erddapQuery += `&time>${new_start_time}&time<${time_max}`;
+      // Lower bound only. This used to also send `&time<${time_max}` -- the
+      // harvested maximum -- to guard "against records added since the last
+      // harvest", which meant a near-real-time dataset's plot always stopped
+      // where the last harvest stopped. Those newer records are the point, so
+      // the ceiling is gone and trimPreviewRows() keeps the newest of whatever
+      // comes back. (The old bound was also strict, so it excluded the
+      // record's own final row.)
+      //
+      // The window start stays anchored on this record's own time_max, not on
+      // the dataset's: in a dataset with many stations or missions the newest
+      // data usually belongs to a different record, so anchoring on the
+      // dataset would start the window after a quieter record's last row and
+      // return nothing. The cost of an open upper end is up to one harvest
+      // interval of extra rows for a high-cadence live record -- the same
+      // exposure the use_whole_profile branch below already carries.
+      erddapQuery += `&time>${new_start_time}`;
     }
 
     console.log("Fetching preview from ", erddapQuery);
@@ -240,7 +257,7 @@ router.get(
           .status(404)
           .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
       }
-      data.table.rows = data.table.rows.slice(0, NUM_RECORDS);
+      trimPreviewRows(data.table, NUM_RECORDS);
       // Per-variable metadata (long_name, cf_role, colorBar*, ...) harvested
       // from ERDDAP's /info document. Attached here rather than in
       // shapeQuery.js on purpose: that one feeds /pointQuery, which would then

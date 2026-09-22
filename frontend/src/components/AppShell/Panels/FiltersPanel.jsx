@@ -1,11 +1,18 @@
 import * as React from "react";
 import { useState } from "react";
 import {
+  ArrowCounterclockwise,
   ArrowsExpand,
   BoundingBox,
   Building,
   CalendarWeek,
+  Cursor,
+  Eye,
   FileEarmarkSpreadsheet,
+  Funnel,
+  HandIndex,
+  Intersect,
+  Map as MapIcon,
   Pentagon,
   Search,
   Stack,
@@ -50,6 +57,15 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
+
+// The how-to shown in the detail pane before any filter is open (below) —
+// one step per glyph, in the order a first-time visitor would do them.
+const PLACEHOLDER_STEPS = [
+  { key: "select", Icon: HandIndex },
+  { key: "combine", Icon: Intersect },
+  { key: "live", Icon: MapIcon },
+  { key: "reset", Icon: ArrowCounterclockwise },
+];
 
 function createOptionSubset(searchTerms, allOptions) {
   if (searchTerms) {
@@ -100,6 +116,8 @@ export default function FiltersPanel() {
     setEndDepth,
     scientificNamesSelected,
     setScientificNamesSelected,
+    realtimeOnly,
+    setRealtimeOnly,
     timeFilterActive,
     depthFilterActive,
     anyServersSelected,
@@ -132,6 +150,7 @@ export default function FiltersPanel() {
   const [scientificNameSearchTerms, setScientificNameSearchTerms] =
     useState("");
 
+  const realtimeFilterName = t("realtimeFilterName");
   const inViewFilterName = t("datasetsCardOnlyInViewText");
 
   // Same badge rule as the catalogue filters: the bare filter name while the
@@ -253,7 +272,7 @@ export default function FiltersPanel() {
             {/* Ahead of Data Layers: it matches free text against dataset
                 titles directly, rather than narrowing by facet, so it is the
                 one row here that isn't picking from an options list — the
-                same state the brand bar's search icon and the datasets list
+                same state the map's own search button and the datasets list
                 search box read and write (SelectionProvider). */}
             <Filter
               active={Boolean(datasetTitleSearchText)}
@@ -262,6 +281,9 @@ export default function FiltersPanel() {
               icon={<Search />}
               controlled
               searchable
+              // Unlike the facet rows, this one's value re-queries the map, so
+              // it goes on Enter or the magnifier rather than on a pause.
+              searchOnSubmit
               searchTerms={datasetTitleSearchText}
               setSearchTerms={setDatasetTitleSearchText}
               searchPlaceholder={t("textSearchFilterPlaceholder")}
@@ -327,7 +349,7 @@ export default function FiltersPanel() {
               badgeTitle={platformsBadgeTitle}
               setOptionsSelected={setPlatformsSelected}
               tooltip={t("platformFilterTooltip")}
-              icon={<BroadcastPin />}
+              icon={<Cursor />}
               controlled
               searchable
               searchTerms={platformsSearchTerms}
@@ -531,10 +553,35 @@ export default function FiltersPanel() {
               />
             </Filter>
             <Filter
+              active={realtimeOnly}
+              badgeTitle={t("realtimeFilterName")}
+              tooltip={t("realtimeFilterTooltip")}
+              icon={<BroadcastPin />}
+              controlled
+              filterName={realtimeFilterName}
+              openFilter={openFilter === realtimeFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                realtimeOnly ? () => setRealtimeOnly(false) : undefined
+              }
+            >
+              <label className="inViewFilterToggle">
+                <input
+                  type="checkbox"
+                  checked={realtimeOnly}
+                  onChange={(e) => setRealtimeOnly(e.target.checked)}
+                />
+                <span>{t("realtimeFilterOptionText")}</span>
+              </label>
+              <div className="inViewFilterCount">
+                {t("realtimeFilterHelpText")}
+              </div>
+            </Filter>
+            <Filter
               active={onlyInView}
               badgeTitle={t("datasetsCardOnlyInViewText")}
               tooltip={t("datasetsCardOnlyInViewTitle")}
-              icon={<BoundingBox />}
+              icon={<Eye />}
               controlled
               filterName={inViewFilterName}
               openFilter={openFilter === inViewFilterName}
@@ -587,7 +634,25 @@ export default function FiltersPanel() {
           )}
         </div>
         {!openFilter && (
-          <div className="filtersPanelPlaceholder">{t("filtersPanelHint")}</div>
+          <div className="filtersPanelPlaceholder">
+            <span className="filtersPanelPlaceholderIcon" aria-hidden="true">
+              <Funnel size={22} />
+            </span>
+            <p className="filtersPanelPlaceholderTitle">
+              {t("filtersPanelHintTitle")}
+            </p>
+            <p className="filtersPanelPlaceholderText">
+              {t("filtersPanelHint")}
+            </p>
+            <ul className="filtersPanelPlaceholderSteps">
+              {PLACEHOLDER_STEPS.map(({ key, Icon }) => (
+                <li key={key}>
+                  <Icon size={16} aria-hidden="true" />
+                  <span>{t(`filtersPanelHintStep_${key}`)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
       {/* Filters apply live, so there is nothing to confirm here — but the

@@ -2,14 +2,18 @@ import * as React from "react";
 import { createContext, useContext, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import CloseButton from "./CloseButton.jsx";
+
 import "./modalStyles.css";
 
 const ModalContext = createContext({ onHide: () => {} });
 
 // Drop-in replacement for the react-bootstrap Modal subset this app uses.
 // Emits Bootstrap-compatible class names (.modal, .modal-dialog,
-// .modal-content, .modal-header, .modal-title, .modal-body, .btn-close) so
-// the existing per-component CSS keeps applying.
+// .modal-content, .modal-header, .modal-title, .modal-body) so the existing
+// per-component CSS keeps applying. The header's close button is the app's
+// shared one, not Bootstrap's .btn-close — a modal is dismissed with the same
+// control as every other surface here.
 export default function Modal({
   show,
   onHide = () => {},
@@ -24,13 +28,26 @@ export default function Modal({
   "data-testid": testId,
 }) {
   const contentRef = useRef(null);
-  const previousFocus = useRef(null);
 
+  // What opening does, once per opening: take focus into the dialog, and give
+  // it back to whatever had it when the dialog goes. Keyed on `show` alone —
+  // callers pass `onHide` as an inline arrow, so it is a new function on every
+  // render, and re-running this whenever the app re-rendered underneath took
+  // focus off whatever was being typed into (a search box publishing what it
+  // had, say) and put it back on the dialog itself, mid-word.
   useEffect(() => {
-    if (!show) return;
-    previousFocus.current = document.activeElement;
+    if (!show) return undefined;
+    const previousFocus = document.activeElement;
     document.body.classList.add("cioos-modal-open");
     contentRef.current?.focus();
+    return () => {
+      document.body.classList.remove("cioos-modal-open");
+      previousFocus?.focus?.();
+    };
+  }, [show]);
+
+  useEffect(() => {
+    if (!show) return undefined;
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
@@ -54,13 +71,7 @@ export default function Modal({
       }
     }
     document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.classList.remove("cioos-modal-open");
-      if (previousFocus.current && previousFocus.current.focus) {
-        previousFocus.current.focus();
-      }
-    };
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [show, onHide]);
 
   if (!show) return null;
@@ -105,14 +116,7 @@ function ModalHeader({ closeButton, className = "", children }) {
   return (
     <div className={`modal-header ${className}`}>
       {children}
-      {closeButton && (
-        <button
-          type="button"
-          className="btn-close"
-          aria-label="Close"
-          onClick={onHide}
-        />
-      )}
+      {closeButton && <CloseButton label="Close" onClick={onHide} />}
     </div>
   );
 }

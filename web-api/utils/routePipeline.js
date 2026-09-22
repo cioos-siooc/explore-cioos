@@ -42,7 +42,7 @@ function filterValidators() {
       .isInt({ min: -999999, max: 999999 })
       .optional(),
     // comma separated list of pks, eg pointPKs=12342,34534,456456
-    check(["organizations", "datasetPKs", "pointPKs"])
+    check(["organizations", "datasetPKs", "excludeDatasetPKs", "pointPKs"])
       .matches(/^[0-9,]*$/)
       .optional(),
     check("eovs")
@@ -60,7 +60,7 @@ function filterValidators() {
     // Source and layer switches. Only "false" is ever meaningful (the routes
     // read `!== "false"`), but accepting exactly the two spellings keeps a
     // typo'd flag from silently reading as "on".
-    check(["includeObis", "includeTrajectory"])
+    check(["includeObis", "includeTrajectory", "realtimeOnly"])
       .isIn(["true", "false"])
       .optional(),
     // Which number the hex ramp counts. utils/hexMetric.js defaults an absent
@@ -244,7 +244,7 @@ function pipeline({
   tileParams = null,
   checks = [],
   cacheFor = DEFAULT_CACHE_DURATION,
-  cacheToggle = undefined,
+  cacheToggle = cache.onlyOk,
 } = {}) {
   return [
     ...(tileParams ? tileParamValidators(tileParams) : []),
@@ -252,8 +252,8 @@ function pipeline({
     ...(shape ? shapeValidators() : []),
     ...checks,
     errorHandler,
-    // `cacheToggle` decides per response whether it may be stored/served —
-    // see cache.onlyOk, for a route whose upstream can fail.
+    // `cacheToggle` decides per response whether it may be stored/served.
+    // Defaulting to 200 keeps a transient handler error from becoming a cache hit.
     ...(cacheFor === null
       ? []
       : [cache.route(cacheFor, cacheToggle), fullResponseForCacheMiss]),

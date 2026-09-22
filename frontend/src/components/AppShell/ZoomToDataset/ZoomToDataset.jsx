@@ -13,8 +13,10 @@ import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 // is the one place the camera is asked to travel, from the button below or
 // from a double-click on the dataset's title (DatasetInspector).
 //
-// The button renders into the dataset page's title bar and is styled there,
-// alongside the filter action it sits with (see DatasetInspector/styles.css).
+// The button renders into the dataset page's actions row and is styled there,
+// alongside the download and filter actions it sits with (see
+// DatasetInspector/styles.css) — a named button like both of them, since an
+// unlabelled magnifier in that row says nothing about where it would take you.
 //
 // filtered_bbox_geojson is the extent of the features the current filters
 // actually matched, so the framing follows the filters — narrowing the time
@@ -54,17 +56,16 @@ export default function ZoomToDataset() {
   const { t } = useTranslation();
   const { zoomToDataset, canZoom, framed } = useZoomToDataset();
 
-  if (!canZoom || framed) return null;
-
   return (
     <button
       type="button"
       className="zoomToDatasetButton"
       onClick={zoomToDataset}
       title={t("zoomToDatasetTitle")}
-      aria-label={t("zoomToDatasetText")}
+      disabled={canZoom || !framed}
     >
       <ZoomIn size={15} aria-hidden="true" />
+      {t("zoomToDatasetText")}
     </button>
   );
 }

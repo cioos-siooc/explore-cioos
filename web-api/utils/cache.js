@@ -167,8 +167,7 @@ module.exports = {
   // process.
   route: createCache().route,
   createCache,
-  // Ready-made toggle for routes that proxy an upstream which can fail: cache
-  // the good answer, never the failure.
+  // Ready-made toggle for cached routes: cache the good answer, never a failure.
   onlyOk: (req, res) => res.statusCode === 200,
   // Test seam: apicache's adapter is process-global, so a test exercising the
   // redis branch has to be able to put that global back.

@@ -13,6 +13,7 @@ import {
   Server,
   PinMapFill,
   FileEarmarkSpreadsheet,
+  X,
 } from "react-bootstrap-icons";
 import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
@@ -40,6 +41,10 @@ export default function DatasetCard({
   downloadLink,
   onSelect,
   onInspect,
+  // Drops the dataset from the order entirely (download modal only) — unlike
+  // onSelect, which only ticks it in or out of this particular batch, this
+  // takes the row off the list.
+  onRemove,
   onHover = () => {},
   onHoverEnd = () => {},
   // The card's group is hidden from the map: the dataset stays in the list
@@ -248,6 +253,26 @@ export default function DatasetCard({
               )}
             </span>
           )}
+
+          {/* Drops the dataset from the order outright. Separate from the
+              checkbox at the other end of this row on purpose: that one only
+              decides whether this batch includes it, and stays available for
+              a dataset the 1 GB ceiling excluded — removing it here is the
+              only way out for that one. */}
+          {isDownloadModal && onRemove && (
+            <button
+              type="button"
+              className="datasetCardRemove"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(row);
+              }}
+              title={t("datasetCardRemoveFromSelectionTitle")}
+              aria-label={`${t("datasetCardRemoveFromSelectionTitle")}: ${row.title}`}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         <div className="datasetCardMeta">
@@ -273,6 +298,18 @@ export default function DatasetCard({
             <PinMapFill size={13} aria-hidden="true" />
             {locationsLabel}
           </span>
+
+          {/* Same "still producing data" signal as the dataset inspector's
+              Last update row — on this row here since it is the card's other
+              home for small dataset-level facts. */}
+          {row.is_realtime && (
+            <span
+              className="datasetCardLive"
+              title={t("datasetRealtimeBadgeTitle")}
+            >
+              {t("datasetRealtimeBadgeText")}
+            </span>
+          )}
         </div>
 
         {/* Where this dataset lives and how to fetch it, outside the estimates

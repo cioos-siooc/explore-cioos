@@ -49,6 +49,10 @@
   --cioos-warn-bg: #fdf3da; /* the tinted ground --cioos-warn sits on */
   --cioos-info: #0f6d8e;
 
+  /* Solid orange, reserved for the dataset inspector's "Realtime" badge —
+     darker than the map's grid amber so white text on it still clears 4.5:1. */
+  --cioos-live: #c2410c;
+
   /* --- Map data keys --- */
 
   /* Colours that identify one layer or tool wherever it shows up: the paint on
@@ -80,6 +84,11 @@
   --cioos-map-click: #daa520; /* click highlight ring + the row accents */
   --cioos-map-click-glow: rgb(218 165 32 / 35%); /* the ring/glow shadows */
   --cioos-map-click-surface: #fbf1d9; /* opaque tint, the map fill's counterpart */
+
+  /* The space the globe hangs in. Navy-tinted rather than pure black, like
+     every other neutral here, so the sphere's edge meets a colour from the
+     same family instead of an absolute. */
+  --cioos-globe-space: #050f14;
 
   /* --- Elevation --- */
   --cioos-shadow-card: 0 2px 8px rgb(21 47 55 / 8%);
@@ -157,10 +166,21 @@
      And how far the griddap card reaches up from the bottom-right corner,
      which MapLibre's own controls in that corner step above. The card holds
      itself off the two bars, so this already includes their clearance; it is 0
-     while no gridded dataset is drawn. */
+     while no gridded dataset is drawn.
+
+     The API error banner's is the same measurement in the bottom centre, for
+     the activity panel stacking on top of it. 0 while the catalogue is
+     answering. */
   --cioos-time-bar-space: 0px;
   --cioos-depth-bar-space: 0px;
   --cioos-wms-legend-space: 0px;
+  --cioos-api-error-space: 0px;
+
+  /* --- Layout: the left column's width ---
+     The datasets sidebar's, and the "what's here" card's, which stands in that
+     same corner while the sidebar is closed and is hidden the moment it opens.
+     One number so the two never disagree about how wide that column is. */
+  --cioos-sidebar-width: 420px;
 
   /* --- Header & Layout (Modern Sidebar) --- */
   --cioos-header-height: 70px;

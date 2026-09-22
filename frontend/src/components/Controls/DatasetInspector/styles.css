@@ -23,11 +23,19 @@
 .datasetTitleBlock {
   flex: 0 0 auto;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 8px;
   padding: 9px 12px;
   border-bottom: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
+}
+
+/* The heading's own row: icon and title, with the full width to wrap into. */
+.datasetTitleHeading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
 }
 
 /* Same bare, no-tile icon treatment as the Filters/Download/Datasets headers —
@@ -52,29 +60,51 @@
   color: var(--cioos-ink);
 }
 
-/* Stacked, not side by side: the title takes the width it needs and the two
-   actions sit in a narrow column against the right edge. */
+/* "Real-time": same solid orange badge as the dataset card's (.datasetCardLive),
+   sized to this page's larger type scale. Sits beside the Last update chip in
+   the metadata sheet, so no margin nudge is needed — the field's own
+   flex-start row keeps it level with the timestamp. */
+.datasetTitleLive {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 9px;
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-live);
+  color: var(--cioos-white);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* A row of their own under the heading. Beside the title they had room for an
+   icon and nothing else; across the full width each one can say what it does,
+   which is the whole point of them being here. */
 .datasetTitleActions {
   display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 
-/* Both title-bar actions, including the zoom button ZoomToDataset renders into
-   this row: a small bordered icon button, the same treatment the page's other
-   controls wear. Defined here because this row is the only place either one
-   appears. */
+/* Every action in this row, including the zoom button ZoomToDataset renders
+   into it: a small bordered button carrying its icon and its name. Defined
+   here because this row is the only place any of them appears. */
 .datasetTitleAction,
 .datasetTitleActions .zoomToDatasetButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  padding: 0;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
@@ -105,6 +135,20 @@
   transform: translateY(1px);
 }
 
+/* Griddap: no download to add to a selection. The button stays in place and
+   its tooltip says why, rather than the row losing a control from one dataset
+   to the next. */
+.datasetTitleAction:disabled {
+  color: var(--cioos-ink-60);
+  background-color: var(--cioos-surface-2);
+  cursor: not-allowed;
+}
+
+.datasetTitleAction:disabled:hover {
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+}
+
 /* Filtering is a state, not a one-shot action: while the map is narrowed to
    this dataset the button stays filled, and its icon is the solid funnel. */
 .datasetTitleAction.active {
@@ -120,26 +164,6 @@
   color: var(--cioos-white);
 }
 
-/* Metadata chips read as informational values that can wrap to two lines
-   (long organization / variable names). Give the wrapped text room to breathe
-   and use a tighter corner so a taller, multi-line chip reads as a neat
-   rounded rectangle rather than an oversized lozenge. */
-.datasetInspector .filterButton {
-  padding: 2px 8px;
-  border-radius: var(--cioos-radius-sm);
-  white-space: normal;
-  text-align: left;
-  line-height: 1.3;
-}
-
-/* These chips double as filter toggles, but here they read as informational
-   metadata values. Hide the inherited "deselect" X (shown on selected chips
-   in the filter sidebar) so a selected platform/EOV/org value stays clean —
-   selection is still conveyed by the chip's .selected fill. */
-.datasetInspector .filterButton > svg {
-  display: none;
-}
-
 /* Shared eyebrow label for every metadata field. */
 .metadataLabel {
   display: block;
@@ -152,20 +176,19 @@
 }
 
 /* --- Metadata record sheet ---
-   The front matter of a journal article, compressed: each field is a tiny
-   eyebrow label with its value beside it on the same line — the same
-   label/value baseline pairing the record cards use (.listCardField) — and
-   the fields flow two to a row. The narrow ones (platform, record count) pair
-   up; the ones carrying chips or links take a full row. Whitespace does the
-   dividing, so there are no rules and no 86px label gutter eating the width. */
+   The front matter of a journal article, compressed: one field per line, each
+   a tiny eyebrow label with its value beside it on the same line — the same
+   label/value baseline pairing the record cards use (.listCardField). Rows
+   stack in a single column so every field reads label-left/value-right down
+   one edge; whitespace does the dividing, so there are no rules and no label
+   gutter eating the width. */
 
 /* No top rule of its own: the pinned title block above already draws one. */
 .datasetMetaSheet {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 14px;
+  gap: 3px;
   margin: 0 0 10px;
-  padding: 9px 11px;
+  padding: 7px 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
@@ -180,11 +203,6 @@
   align-items: baseline;
   gap: 2px 8px;
   min-width: 0;
-}
-
-/* Chips, link lists and a grid's node product need the whole width. */
-.datasetMetaSheet .metaCellWide {
-  grid-column: 1 / -1;
 }
 
 .datasetMetaSheet .metadataLabel {
@@ -212,10 +230,16 @@
   gap: 4px;
 }
 
+/* Last update: a single chip plus its Real-time badge, never several chips
+   wrapping onto their own lines — so unlike the top-aligned default above,
+   the badge can center on the chip's own height instead of its top edge. */
+.datasetMetaSheet .metadataValueCentered {
+  align-items: center;
+}
+
 /* Chips sit flush inside their field; the field's gap handles spacing. */
-.datasetMetaSheet .filterButton {
+.datasetMetaSheet .metadataChip {
   margin: 0;
-  font-size: 0.78rem;
 }
 
 /* Grid node count: the axis factors read as small stacked value/name pairs,
@@ -277,6 +301,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 12px;
+  text-align: left;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
@@ -287,6 +312,14 @@
 .datasetMetaSheet .metadataChip {
   font-weight: 500;
   color: var(--cioos-ink);
+}
+
+/* A field the harvest left empty (an OBIS dataset's ocean variables, a
+   dataset with no platform code): the dash holds the row's shape without
+   pretending there is a value to read. */
+.datasetMetaSheet .metadataEmpty {
+  font-size: 0.78rem;
+  color: var(--cioos-ink-60);
 }
 
 /* Source links (ERDDAP / CKAN / OBIS): the same badge, coloured and weighted
@@ -534,6 +567,25 @@
   overflow-wrap: anywhere;
 }
 
+/* A field whose value is one atomic token — a timestamp range — rather than
+   prose. Label and value hold one line together: the value is sized to its
+   content (not the 140px basis above) and never breaks mid-date, and the
+   label gives up the 96px gutter that aligns the other fields' values. That
+   gutter is what costs the row its line — the widest range formatInstantRange
+   produces is 230px, and 96 + 230 leaves too little for the scrollbar this
+   column carries. Below 700px the label still takes a line of its own (see
+   the media query at the end of this file): the range is 266px at that type
+   size against a card narrower than that, so one line isn't on offer. */
+.listCardFieldNowrap .listCardFieldLabel {
+  min-width: 0;
+}
+
+.listCardFieldNowrap .listCardFieldValue {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 /* Ocean variables: quiet tags, not the filter chips the metadata sheet uses —
    these say what one record measured, they don't filter anything. Only the
    first few are shown (see CardTags) — the rest are behind the "+n" beside
@@ -599,5 +651,19 @@
   /* No room for a label gutter: the value takes the line under its label. */
   .listCardFieldLabel {
     min-width: 100%;
+  }
+
+  /* Matches the specificity of .listCardFieldNowrap's desktop rule above, so
+     a timeframe label stacks over its value here like every other field. */
+  .listCardFieldNowrap .listCardFieldLabel {
+    min-width: 100%;
+  }
+
+  /* One line isn't on offer at this type size, so let the range wrap rather
+     than run past the card on the narrowest phones. overflow-wrap stays
+     normal, so a break can only land beside the arrow, never inside a date. */
+  .listCardFieldNowrap .listCardFieldValue {
+    flex: 1 1 140px;
+    white-space: normal;
   }
 }

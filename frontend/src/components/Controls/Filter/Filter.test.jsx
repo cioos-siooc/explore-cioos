@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -127,7 +127,71 @@ describe("Filter (controlled)", () => {
 });
 
 describe("Filter search / reset / info", () => {
-  it("the search box calls setSearchTerms as the user types, and Clear resets it", async () => {
+  // A facet row: its search re-filters and re-renders a list thousands of
+  // options long, so the box publishes once typing pauses rather than per
+  // keystroke — typing a word used to do that once per character. The Text
+  // Search row is the one that waits to be submitted (searchOnSubmit, below),
+  // because its value re-queries the map.
+  function SearchHarness({ onPublish, ...props }) {
+    const [terms, setTerms] = useState("");
+    return (
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        searchable
+        searchTerms={terms}
+        setSearchTerms={(next) => {
+          onPublish(next);
+          setTerms(next);
+        }}
+        searchPlaceholder="Search"
+        {...props}
+      >
+        <div>options</div>
+      </Filter>
+    );
+  }
+
+  it("publishes the typed text once, after typing pauses — not per keystroke", async () => {
+    // No inter-keystroke delay, so the whole word is typed well inside the
+    // debounce however loaded the machine running this is.
+    const user = userEvent.setup({ delay: null });
+    const onPublish = vi.fn();
+    render(<SearchHarness onPublish={onPublish} />);
+
+    await user.click(screen.getByTestId("filter-header"));
+    await user.type(screen.getByPlaceholderText("Search"), "oxy");
+
+    expect(screen.getByPlaceholderText("Search")).toHaveValue("oxy");
+    expect(onPublish).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(onPublish).toHaveBeenCalledWith("oxy"));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  // searchOnSubmit — the Text Search row. Nothing is published until the
+  // search is asked for, so a half-typed word never reaches the map.
+  it("with searchOnSubmit, publishes on the magnifier and not on a pause", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onPublish = vi.fn();
+    render(<SearchHarness onPublish={onPublish} searchOnSubmit />);
+
+    await user.click(screen.getByTestId("filter-header"));
+    await user.type(screen.getByPlaceholderText("Search"), "oxy");
+
+    expect(screen.getByPlaceholderText("Search")).toHaveValue("oxy");
+    // Long enough that a pause-triggered box would have published by now.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(onPublish).not.toHaveBeenCalled();
+
+    await user.click(screen.getByLabelText("Search"));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    expect(onPublish).toHaveBeenCalledWith("oxy");
+  });
+
+  // Clearing is the exception to the pause: it publishes there and then, which
+  // is what this asserts by never waiting.
+  it("Clear empties the search immediately", async () => {
     const user = userEvent.setup();
     const setSearchTerms = vi.fn();
     render(
@@ -160,7 +224,7 @@ describe("Filter search / reset / info", () => {
       </Filter>,
     );
     await user.click(screen.getByTestId("filter-header"));
-    await user.click(screen.getByText("Reset"));
+    await user.click(screen.getByText("Clear"));
     expect(resetButton).toHaveBeenCalled();
   });
 

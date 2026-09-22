@@ -7,17 +7,17 @@ import {
   GeoAlt,
   Grid3x3Gap,
   Plus,
-  Search,
-  X,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
+import CloseButton from "../../ui/CloseButton.jsx";
 import platformColors from "../../platformColors";
 import { useChanged } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import useCellDatasetDays from "./useCellDatasetDays.js";
 import "./styles.css";
 
 // The "what's here" card: the single answer to a click anywhere on the map.
@@ -46,23 +46,41 @@ const KIND_ORDER = ["track", "observation", "grid"];
 
 export default function FeatureCard() {
   const { t, i18n } = useTranslation();
-  const { featureQuery, setFeatureQuery, zoomToGeometry } = useMapState();
+  const { featureQuery, setFeatureQuery, dataLayers } = useMapState();
   const {
     pointsData,
     setInspectDataset,
     selectTrajectoryFromMap,
     addDatasetsToSelection,
     selectedPks,
+    combinedQueries,
   } = useSelection();
   const { sidebarOpen } = useUI();
 
   const [expanded, setExpanded] = useState(false);
 
+  // The card travels on and off screen rather than appearing and vanishing
+  // (see styles.css), so it outlives the query that filled it: dismissing it
+  // clears `featureQuery` at once — that is also what un-rings the region on
+  // the map — and a card that blanked halfway out would be a worse exit than
+  // none. This holds the last answer so it is still the one on screen while it
+  // leaves. Adjusted during render rather than in an effect, the same shape
+  // useChanged is built on.
+  const [held, setHeld] = useState(featureQuery);
+  if (featureQuery && featureQuery !== held) setHeld(featureQuery);
+  const query = featureQuery ?? held;
+
+  // What each dataset under the click contributes to the cell's figure. The
+  // tile only carries the cell TOTAL, which is why this is asked for
+  // separately — see the hook. Empty until it lands, so a row shows no figure
+  // rather than the cell's, which is what every row used to show.
+  const datasetDays = useCellDatasetDays(query, combinedQueries, dataLayers);
+
   const close = useCallback(() => setFeatureQuery(null), [setFeatureQuery]);
 
   // A fresh query is a fresh card: collapse any "show all" the last one was
   // left in.
-  if (useChanged(featureQuery?.nonce)) setExpanded(false);
+  if (useChanged(query?.nonce)) setExpanded(false);
 
   // Escape closes, like every other dismissable surface in the app.
   useEffect(() => {
@@ -77,7 +95,9 @@ export default function FeatureCard() {
   // The datasets sidebar already answers "what did that click find?" once it's
   // open — see the comment up top. The query itself is left alone so the card
   // picks back up where it left off if the sidebar closes again.
-  if (!featureQuery || sidebarOpen) return null;
+  const open = Boolean(featureQuery) && !sidebarOpen;
+  // Nothing has been clicked yet in this session: there is no card to park.
+  if (!query) return null;
 
   // The hex and point tiles carry dataset pks but no titles, so an observation
   // row has to resolve against the current results to have anything to say —
@@ -92,7 +112,10 @@ export default function FeatureCard() {
   // the actions that genuinely need a result row are withheld.
   const byPk = new Map(pointsData.map((row) => [Number(row.pk), row]));
 
-  const rows = featureQuery.items
+  // A marker click's featureQuery is deliberately item-less (see Map.jsx's
+  // handleMapClick): it opens the dataset page directly and only sets this to
+  // pin the dataset in the list, so the card itself has nothing to list.
+  const rows = (query.items || [])
     .map((item) => {
       const row = byPk.get(item.pk);
       if (!row && item.kind === "observation") return null;
@@ -100,6 +123,9 @@ export default function FeatureCard() {
         ...item,
         title: row?.title || item.title,
         platform: row?.platform || item.platform,
+        // undefined until the breakdown lands, and for a track or grid, which
+        // have no cell figure of their own.
+        count: datasetDays.get(item.pk),
         row,
         // A dataset page resolves out of pointsData. A track without one still
         // opens: selectTrajectoryFromMap draws the platform's history either
@@ -126,16 +152,6 @@ export default function FeatureCard() {
   const shown = expanded ? rows : rows.slice(0, VISIBLE_ROWS);
   const hidden = rows.length - shown.length;
 
-  // Deduped: the same dataset can appear as both a track and an observation
-  // under one click, and "Add all 5" should not claim five when it means four.
-  const addablePks = [
-    ...new Set(
-      rows
-        .filter((entry) => entry.selectable && !entry.inSelection)
-        .map((entry) => entry.pk),
-    ),
-  ];
-
   const openDataset = (entry) => {
     if (entry.kind === "track") {
       // Same call the inspector's platform table makes: open the page and draw
@@ -150,37 +166,13 @@ export default function FeatureCard() {
     }
   };
 
-  // Adding a single row keeps the card open: picking two of the five datasets
-  // under one click is the normal case, and closing after the first would make
-  // the user click the same hex again for the second. "Add all" is the end of
-  // the interaction, so that one closes.
+  // Adding a row keeps the card open: picking two of the five datasets under
+  // one click is the normal case, and closing after the first would make the
+  // user click the same hex again for the second.
   //
   // "Selection", not "download": these datasets are being set aside. Downloading
   // is one thing you can then do with them, from the list's footer.
   const addOne = (pk) => addDatasetsToSelection([pk]);
-
-  const addAll = (pks) => {
-    addDatasetsToSelection(pks);
-    close();
-  };
-
-  const zoomHere = () => {
-    if (!featureQuery.bounds) return;
-    const [[west, south], [east, north]] = featureQuery.bounds;
-    zoomToGeometry({
-      type: "Polygon",
-      coordinates: [
-        [
-          [west, south],
-          [east, south],
-          [east, north],
-          [west, north],
-          [west, south],
-        ],
-      ],
-    });
-    close();
-  };
 
   const kindIcon = (entry) => {
     if (entry.kind === "grid") {
@@ -206,22 +198,23 @@ export default function FeatureCard() {
       total: Number(value || 0).toLocaleString(i18n.language),
     });
 
-  // Pinned to the top-left corner of the map on desktop and to the bottom
+  // Pinned to the bottom-left corner of the map on desktop and to the bottom
   // edge on phones — see styles.css, where the media query overrides `left`,
-  // `top` and friends wholesale.
+  // `inset` and friends wholesale, the direction it travels in included.
   return (
     <div
       data-testid="feature-card"
-      className={classNames("featureCard", { featureCardEmpty: empty })}
+      className={classNames("featureCard", {
+        open,
+        featureCardEmpty: empty,
+      })}
       role="dialog"
       aria-label={t("featureCardTitle")}
     >
       <div className="featureCardHeader">
-        <GeoAlt
-          className="featureCardHeadingIcon"
-          size={20}
-          aria-hidden="true"
-        />
+        <span className="featureCardHeadingIcon" aria-hidden="true">
+          <GeoAlt size={20} />
+        </span>
         <div className="featureCardHeading">
           <span className="featureCardHeadingTitleRow">
             <span className="featureCardHeadingTitle">
@@ -240,20 +233,13 @@ export default function FeatureCard() {
               </span>
             )}
           </span>
-          {!empty && featureQuery.observationCount > 0 && (
+          {!empty && query.observationCount > 0 && (
             <span className="featureCardHeadingMeta">
-              {countLabel(featureQuery.observationCount)}
+              {countLabel(query.observationCount)}
             </span>
           )}
         </div>
-        <button
-          type="button"
-          className="featureCardClose"
-          onClick={close}
-          title={t("featureCardClose")}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        <CloseButton label={t("featureCardClose")} onClick={close} />
       </div>
 
       {empty ? (
@@ -287,7 +273,12 @@ export default function FeatureCard() {
                         : entry.kind === "grid"
                           ? t("featureCardGrid")
                           : [
-                              countLabel(entry.count),
+                              // No figure yet (or the request failed): the row
+                              // says what it can rather than showing a number
+                              // that isn't this dataset's.
+                              entry.count === undefined
+                                ? null
+                                : countLabel(entry.count),
                               // An aggregate cell is a neighbourhood, not a
                               // place: say so rather than implying the precision
                               // an individual marker has.
@@ -336,30 +327,6 @@ export default function FeatureCard() {
               {t("featureCardShowMore", { n: hidden })}
             </button>
           )}
-
-          <div className="featureCardActions">
-            {addablePks.length > 0 && (
-              <button
-                type="button"
-                className="featureCardAction primary"
-                onClick={() => addAll(addablePks)}
-                title={t("featureCardAddAllTitle", { n: addablePks.length })}
-              >
-                <Plus size={15} aria-hidden="true" />
-                {t("featureCardAddAll")}
-              </button>
-            )}
-            {featureQuery.bounds && (
-              <button
-                type="button"
-                className="featureCardAction"
-                onClick={zoomHere}
-              >
-                <Search size={14} aria-hidden="true" />
-                {t("featureCardZoomHere")}
-              </button>
-            )}
-          </div>
         </>
       )}
     </div>

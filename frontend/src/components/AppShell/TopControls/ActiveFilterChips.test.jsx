@@ -47,6 +47,26 @@ describe("ActiveFilterChips", () => {
     );
   });
 
+  it("announces the realtime filter carried in the link", async () => {
+    open("realtimeOnly=true");
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const realtime = group("realtimeOnly");
+    expect(realtime).toBeInTheDocument();
+    expect(within(realtime).getByTestId("filter-chip-item")).toHaveTextContent(
+      "Real-time only",
+    );
+  });
+
+  it("ignores realtimeOnly=false, so the default link shows no chip", async () => {
+    // The param is only ever written when the toggle is on; an explicit false
+    // must read as "not filtering", not as a second state to announce.
+    open("realtimeOnly=false");
+    await waitFor(() =>
+      expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
+    );
+  });
+
   it("gives one group per filter and one item per chosen value", async () => {
     open("eovs=oxygen,subSurfaceTemperature&platforms=mooring");
     await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));
@@ -57,6 +77,55 @@ describe("ActiveFilterChips", () => {
     expect(
       within(group("platforms")).getAllByTestId("filter-chip-item"),
     ).toHaveLength(1);
+  });
+
+  it("folds a group's values beyond the visible cap behind a +N chip", async () => {
+    open("eovs=oxygen,subSurfaceTemperature,seaState,nutrients");
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const eovs = group("eovs");
+    expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(2);
+    expect(within(eovs).getByTestId("filter-chip-more")).toHaveTextContent(
+      "+2",
+    );
+  });
+
+  it("reveals a group's folded values when its +N chip is clicked", async () => {
+    const { user } = open(
+      "eovs=oxygen,subSurfaceTemperature,seaState,nutrients",
+    );
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const eovs = group("eovs");
+    await user.click(within(eovs).getByTestId("filter-chip-more"));
+
+    await waitFor(() =>
+      expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(4),
+    );
+    expect(within(eovs).queryByTestId("filter-chip-more")).toBeNull();
+  });
+
+  it("folds a group's values back when its −N chip is clicked", async () => {
+    const { user } = open(
+      "eovs=oxygen,subSurfaceTemperature,seaState,nutrients",
+    );
+    await waitFor(() => expect(groups()).toHaveLength(1));
+
+    const eovs = group("eovs");
+    await user.click(within(eovs).getByTestId("filter-chip-more"));
+    await waitFor(() =>
+      expect(within(eovs).getByTestId("filter-chip-less")).toBeInTheDocument(),
+    );
+
+    await user.click(within(eovs).getByTestId("filter-chip-less"));
+
+    await waitFor(() =>
+      expect(within(eovs).getAllByTestId("filter-chip-item")).toHaveLength(2),
+    );
+    expect(within(eovs).getByTestId("filter-chip-more")).toHaveTextContent(
+      "+2",
+    );
+    expect(within(eovs).queryByTestId("filter-chip-less")).toBeNull();
   });
 
   it("drops one value without touching the rest of its group", async () => {
@@ -99,28 +168,21 @@ describe("ActiveFilterChips", () => {
     expect(names.some((name) => name.includes("Oxygen"))).toBe(true);
   });
 
-  it("hides and shows the chips without clearing them", async () => {
-    const { user } = open("eovs=oxygen");
-    await waitFor(() => expect(groups()).toHaveLength(1));
+  // Show/Hide now lives on the main Filters button (see
+  // TopControls.test.jsx) and Clear-all lives with the quick filters (see
+  // QuickFilters.test.jsx) — this component renders neither itself, so it
+  // has nothing of its own left to test here.
 
-    const toggle = screen.getByTestId("filter-chips-toggle");
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(groups()).toHaveLength(0);
-
-    await user.click(toggle);
-    expect(groups()).toHaveLength(1);
-  });
-
-  it("announces the drawn selection as its own chip", async () => {
-    open("latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000");
-    await waitFor(() =>
-      expect(screen.getByTestId("active-filter-chips")).toBeInTheDocument(),
+  // The quick filters are named by their own buttons on the map (and a row in
+  // the Filters modal), which carry both their state and the way to drop them
+  // (see QuickFilters), so repeating them here would be the same filter
+  // announced twice.
+  it("leaves the quick filters to their own row", async () => {
+    open(
+      "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
     );
-    expect(
-      screen.getAllByTestId("filter-chip-item-remove").length,
-    ).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
+    );
   });
 });

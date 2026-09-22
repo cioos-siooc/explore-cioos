@@ -6,13 +6,12 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetInspector from "./DatasetInspector.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 
-// Built from real catalog fixture rows (e2e/fixtures/api/datasets.json,
-// organizations.json, platforms.json) rather than pointQuery.json, whose rows
-// aren't cross-consistent with those — pk 2337 / "Chicago Park District"
-// (org pk 54) / "mooring" all come from the catalog fixtures FilterProvider
-// actually loads, so the filter chips this page renders (which look
-// themselves up in FilterProvider's catalog-seeded selections) resolve.
+// pk 2337 / "Chicago Park District" / "mooring" come from the catalog fixtures
+// (e2e/fixtures/api/datasets.json, organizations.json, platforms.json) that
+// FilterProvider loads, so the dataset this page is handed is one the catalog
+// also knows — which is what the title bar's filter toggle needs.
 //
 // This passes `dataset` directly rather than through
 // useSelection().setInspectDataset/inspectDataset — pointsData (what
@@ -34,36 +33,20 @@ const DATASET = {
   ckan_url: null,
 };
 
-function Harness({ returnToList = () => {} }) {
-  const {
-    catalogLoaded,
-    eovsSelected,
-    setEovsSelected,
-    platformsSelected,
-    setPlatformsSelected,
-    orgsSelected,
-    setOrgsSelected,
-    datasetsSelected,
-    setDatasetsSelected,
-  } = useFilters();
+function Harness({ returnToList = () => {}, dataset = DATASET }) {
+  const { catalogLoaded } = useFilters();
+  const { showDownloadModal } = useUI();
   if (!catalogLoaded) return <span data-testid="state">loading</span>;
-
-  const filterSet = {
-    eovFilter: { eovsSelected, setEovsSelected },
-    platformFilter: { platformsSelected, setPlatformsSelected },
-    orgFilter: { orgsSelected, setOrgsSelected },
-    datasetFilter: { datasetsSelected, setDatasetsSelected },
-  };
 
   return (
     <>
       <span data-testid="state">loaded</span>
+      <span data-testid="download-modal-open">{String(showDownloadModal)}</span>
       <DatasetInspector
-        dataset={DATASET}
+        dataset={dataset}
         returnToList={returnToList}
         setHoveredDataset={() => {}}
         setInspectRecordID={() => {}}
-        filterSet={filterSet}
         query={{}}
         activeWmsOverlay={undefined}
         setActiveWmsOverlay={() => {}}
@@ -104,6 +87,49 @@ describe("DatasetInspector", () => {
     expect(screen.getByText("Mooring")).toBeInTheDocument();
     const erddapLink = screen.getByRole("link", { name: /Dataset/ });
     expect(erddapLink).toHaveAttribute("href", DATASET.erddap_url);
+  });
+
+  it("renders organization, variable and platform values as plain chips, not filter toggles", async () => {
+    await renderReady();
+    for (const value of ["Chicago Park District", "Oxygen", "Mooring"]) {
+      const chip = screen.getByText(value);
+      expect(chip).toHaveClass("metadataChip");
+      expect(chip.closest("button")).toBeNull();
+    }
+    expect(screen.queryAllByTestId("filter-option")).toHaveLength(0);
+  });
+
+  it("Download adds the dataset to the selection and opens the download", async () => {
+    const { user } = await renderReady();
+    expect(screen.getByTestId("download-modal-open")).toHaveTextContent(
+      "false",
+    );
+    await user.click(screen.getByRole("button", { name: /Download/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId("download-modal-open")).toHaveTextContent(
+        "true",
+      ),
+    );
+  });
+
+  it("clicking Download again unchecks the dataset from the selection", async () => {
+    const { user } = await renderReady();
+    const button = screen.getByRole("button", { name: /Download/ });
+
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
+
+    await user.click(button);
+    await waitFor(() =>
+      expect(button).toHaveAttribute("aria-pressed", "false"),
+    );
+  });
+
+  it("disables Download for a griddap dataset, which has none", async () => {
+    await renderReady({
+      dataset: { ...DATASET, cdm_data_type: "Grid" },
+    });
+    expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
   });
 
   it("shows the no-records message once the (empty) record list has loaded", async () => {

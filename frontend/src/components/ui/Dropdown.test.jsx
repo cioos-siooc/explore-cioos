@@ -81,6 +81,32 @@ describe("DropdownButton / Dropdown.Item", () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
+  it("leaves the menu width to menuClassName when one is given", async () => {
+    // The floor is an inline style, so it beats any class the caller adds. A
+    // caller that passes menuClassName is reaching for the menu's width (the
+    // top bar's lone chevron needs a menu far wider than itself), and the
+    // floor would silently win over it.
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <DropdownButton title="Sort">
+        <Dropdown.Item>A-Z</Dropdown.Item>
+      </DropdownButton>,
+    );
+    await user.click(screen.getByRole("button", { name: "Sort" }));
+    expect(document.querySelector(".dropdown-menu").style.minWidth).not.toBe(
+      "",
+    );
+
+    rerender(
+      <DropdownButton title="Sort" menuClassName="wideMenu">
+        <Dropdown.Item>A-Z</Dropdown.Item>
+      </DropdownButton>,
+    );
+    const menu = document.querySelector(".dropdown-menu");
+    expect(menu).toHaveClass("wideMenu");
+    expect(menu.style.minWidth).toBe("");
+  });
+
   it("marks the active item", async () => {
     const user = userEvent.setup();
     render(

@@ -279,6 +279,28 @@ export default function SelectionProvider({ children }) {
     i18n.language,
   ]);
 
+  // filteredDatasets as a pk list, for the queries that ask a question about
+  // the filtered data rather than draw it (the coverage figure). Everything
+  // the list narrows by — the search box, "only in view", the data-layer
+  // switches — is client-side, so a route that only ever sees the filter query
+  // string answers for datasets the user has already filtered out; handing it
+  // this list is how those three reach the API at all.
+  //
+  // Identity, not a flag, decides whether anything narrows: filteredDatasets
+  // returns pointsData itself when none of the three is active, and undefined
+  // here leaves the query as the filters wrote it (see applyDatasetPKs).
+  //
+  // Deliberately NOT mapDatasetPks: that one carries the hidden groups (a map
+  // visibility toggle the list ignores) and deliberately drops "only in view",
+  // which would rewrite every tile URL on every pan. This one is the list.
+  const filteredDatasetPks = useMemo(
+    () =>
+      filteredDatasets === pointsData
+        ? undefined
+        : filteredDatasets.map((row) => row.pk),
+    [filteredDatasets, pointsData],
+  );
+
   const selectedPks = useMemo(
     () =>
       new Set(
@@ -340,14 +362,15 @@ export default function SelectionProvider({ children }) {
   // Map/tileQuery.js), and "only in view" is the viewport itself, so feeding
   // it back would rewrite every map query on every pan for no visible change.
   //
-  // The search text is debounced here — the list filters in memory on every
-  // keystroke, but each distinct value here is a fresh set of tile, legend and
-  // coverage URLs, so typing a word uncached would otherwise cost a round of
-  // map requests per character.
-  const debouncedSearchText = useDebounce(datasetTitleSearchText, 300);
+  // Each distinct search text here is a fresh set of tile, legend and coverage
+  // URLs, so typing a word uncached would cost a round of map requests per
+  // character — which is why every box that writes this state waits to be
+  // submitted, on Enter or on its magnifier, rather than publishing as it is
+  // typed (useSearchInput's "submit" trigger). Debouncing it here on top of
+  // that would only delay the map behind the list it has to agree with.
   const mapDatasetPks = useMemo(() => {
-    const query = debouncedSearchText.toLowerCase();
-    const hasSearch = !isEmpty(debouncedSearchText);
+    const query = datasetTitleSearchText.toLowerCase();
+    const hasSearch = !isEmpty(datasetTitleSearchText);
     if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
     return pointsData
       .filter(
@@ -356,7 +379,7 @@ export default function SelectionProvider({ children }) {
           (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
       )
       .map((row) => row.pk);
-  }, [hiddenDatasetPks, pointsData, debouncedSearchText, i18n.language]);
+  }, [hiddenDatasetPks, pointsData, datasetTitleSearchText, i18n.language]);
 
   useEffect(() => {
     setMapDatasetPKs(mapDatasetPks);
@@ -643,30 +666,37 @@ export default function SelectionProvider({ children }) {
         combinedQueries ? "?" + combinedQueries : ""
       }`;
       const controller = new AbortController();
-      fetch(urlString, { signal: controller.signal })
-        .then((response) => {
-          if (response.ok) {
-            response.json().then((data) => {
-              setPointsData(
-                data.map((point) =>
-                  datasetInLanguage(point, languageRef.current),
-                ),
-              );
-            });
-          } else {
-            setPointsData([]);
-          }
+      let current = true;
+
+      async function loadPoints() {
+        try {
+          const response = await fetch(urlString, {
+            signal: controller.signal,
+          });
+          if (!current) return;
+          const data = response.ok ? await response.json() : [];
+          // Aborting a fetch after its response arrived does not necessarily
+          // cancel response.json(), so check again before publishing it.
+          if (!current) return;
+          setPointsData(
+            data.map((point) => datasetInLanguage(point, languageRef.current)),
+          );
           setInitialPointsQueryComplete(true);
-        })
-        .catch((error) => {
-          if (error.name === "AbortError") return;
+        } catch (error) {
+          if (!current || error.name === "AbortError") return;
           // network failure / gateway timeout: land on an empty list rather
           // than an endless spinner
           reportError("pointQuery failed", error);
           setPointsData([]);
           setInitialPointsQueryComplete(true);
-        });
-      return () => controller.abort();
+        }
+      }
+
+      loadPoints();
+      return () => {
+        current = false;
+        controller.abort();
+      };
     }
   }, [query, polygon, catalogLoaded]);
 
@@ -837,6 +867,7 @@ export default function SelectionProvider({ children }) {
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     filteredDatasets,
+    filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,
     inViewCount: datasetsInViewPks.size,

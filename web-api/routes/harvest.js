@@ -212,7 +212,9 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
            sp.history_times,
            ds.content_hash,
            ds.content_hash_reason,
-           ds.last_updated_at
+           ds.last_updated_at,
+           dataset_is_realtime(ds.coverage_time_max, ds.verified_at,
+                               ds.cdm_data_type) AS is_realtime
     FROM latest_attempt la
     LEFT JOIN sparkline   sp USING (erddap_url, dataset_id)
     LEFT JOIN cde.datasets ds
@@ -272,7 +274,9 @@ async function datasetHistory(erddapUrl, datasetId, limit = HISTORY_MAX_ROWS) {
 
 async function datasetMeta(erddapUrl, datasetId) {
   const sql = `
-    SELECT content_hash, content_hash_reason, last_updated_at
+    SELECT content_hash, content_hash_reason, last_updated_at,
+           dataset_is_realtime(coverage_time_max, verified_at,
+                               cdm_data_type) AS is_realtime
     FROM cde.datasets
     WHERE dataset_id = ?
       AND rtrim(erddap_url, '/') = rtrim(?, '/')
