@@ -19,6 +19,13 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/test-frontend.yaml"
+  # The visual suite's own trigger — see the "Run the visual regression suite"
+  # step below. GitHub doesn't support `paths:` filtering on `release` events,
+  # so a published release runs this whole workflow unconditionally; that's
+  # the point, a tagged release gets a full check regardless of which paths
+  # moved to get there.
+  release:
+    types: [published]
   workflow_dispatch:
 
 concurrency:
@@ -94,20 +101,20 @@ jobs:
           CI: "true"
 
       # The visual suite asserts pixels against committed baselines, so a UI
-      # actively being reworked makes it stale on purpose — running it on every
-      # PR push just means re-recording baselines mid-review. It runs only on a
-      # push that actually lands on development-v2, i.e. the "final check" for
-      # what merged, not a gate on every commit getting there.
-      #
-      # TODO: once development-v2 stabilizes and starts merging to main/master,
-      # extend this condition to push events on those branches too (and
-      # consider whether PRs into them should gate on it directly).
+      # actively being reworked makes it stale on purpose — running it on
+      # every push and PR just meant re-recording baselines mid-review, which
+      # is what was slowing development down (and piling up screenshot
+      # artifacts) for no benefit while the UI is still moving. It now runs
+      # only off a published GitHub Release — decoupled from branch pushes
+      # entirely, so it fires exactly once per release rather than once per
+      # commit on whichever branch currently happens to be "the" release
+      # branch.
       #
       # The visual baselines are recorded in this same image, which is what
       # makes them reproducible here — see e2e/in-container.sh, and
       # `npm run test:visual:update` when a UI change is meant to move them.
       - name: Run the visual regression suite
-        if: github.event_name == 'push' && github.ref == 'refs/heads/development-v2'
+        if: github.event_name == 'release'
         run: npx playwright test --project=visual
         env:
           CI: "true"
