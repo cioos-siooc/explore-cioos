@@ -293,7 +293,7 @@
 
 /* A figure being replaced: dimmed and inert while the new one loads, so the
    shape stays readable but it is visibly not the answer to the control that
-   was just changed. The small spinner sits over it rather than replacing it. */
+   was just changed. The spinner sits over it rather than replacing it. */
 .coveragePlotStale {
   height: 100%;
   opacity: 0.4;
@@ -307,9 +307,8 @@
 
 .coveragePlotBusy {
   position: absolute;
-  top: var(--cioos-space-sm);
-  right: var(--cioos-space-sm);
-  color: var(--cioos-ink-60);
+  inset: 0;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
