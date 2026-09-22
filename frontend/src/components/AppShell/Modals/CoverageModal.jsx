@@ -1,5 +1,5 @@
 import * as React from "react";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BarChartLine } from "react-bootstrap-icons";
 
@@ -27,6 +27,13 @@ const GROUP_OPTIONS = ["source", "platform", "dataType", "organization"];
 // What the bars count. Keys match the API's `count` values.
 const COUNT_OPTIONS = ["datasets", "features", "days"];
 
+// How many past responses to keep. The two dropdowns alone are 12 combinations
+// of one selection, and each is a query the API answers in seconds when its
+// own cache is cold, so holding them is worth far more than the few kB they
+// cost. Bounded because the key includes the dataset list, which changes as
+// the map is panned; oldest is evicted first.
+const MAX_CACHED_RESPONSES = 20;
+
 // The dataset-coverage figure, launched from the top bar: a histogram of how
 // many datasets match the applied filters over time, with the bars split by a
 // chosen dimension. Depth is handled by the filter, not drawn as an axis.
@@ -51,28 +58,46 @@ export default function CoverageModal() {
     [pointsData],
   );
 
+  // Responses already fetched, keyed by the request that produced them. The
+  // modal never unmounts (it is always rendered, visibility is a prop), so
+  // this survives closing it — which is the point: reopening the figure, and
+  // toggling either dropdown back to a value already looked at, are the two
+  // things people do most and both used to pay full price for it.
+  const cache = useRef(new Map());
+
   // Fetch only while the modal is open; refetch when the applied filters or
   // the chosen grouping change so the figure always matches the map + control.
   useEffect(() => {
-    if (!showCoverageModal) return;
-    const controller = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError(false);
+    if (!showCoverageModal) return undefined;
     const filterString = applyDatasetPKs(
       combinedQueries,
       filteredDatasetPks,
       allDatasetPks,
     );
-    fetch(
-      `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&${filterString}`,
-      { signal: controller.signal },
-    )
+    const url = `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&${filterString}`;
+
+    const cached = cache.current.get(url);
+    if (cached) {
+      setHistogram(cached);
+      setError(false);
+      setLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError(false);
+    fetch(url, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       })
       .then((data) => {
+        cache.current.set(url, data);
+        // Map iterates in insertion order, so the first key is the oldest.
+        if (cache.current.size > MAX_CACHED_RESPONSES) {
+          cache.current.delete(cache.current.keys().next().value);
+        }
         setHistogram(data);
         setLoading(false);
       })
@@ -93,6 +118,9 @@ export default function CoverageModal() {
   ]);
 
   const isEmpty = histogram && histogram.cells.length === 0;
+  // A refetch over a figure already on screen: keep drawing the old one until
+  // the new one lands. An error or an empty result replaces it as before.
+  const showStalePlot = Boolean(loading && histogram && !isEmpty);
 
   return (
     <Modal
@@ -172,7 +200,12 @@ export default function CoverageModal() {
           <div className="coverageToolbarNote">{t("coverageDaysNote")}</div>
         )}
         <div className="coveragePlotArea">
-          {loading && (
+          {/* A refetch keeps the bars it already has, dimmed, rather than
+              blanking to a spinner: switching Count or Colour-by changes one
+              facet of the same figure, and these queries take seconds when the
+              API's cache is cold. Only the first load, with nothing to show
+              yet, gets the full-area spinner. */}
+          {loading && !showStalePlot && (
             <div className="coverageModalStatus">
               <Spinner size="lg" />
             </div>
@@ -187,7 +220,7 @@ export default function CoverageModal() {
               {t("coverageEmptyMessage")}
             </div>
           )}
-          {!loading && !error && histogram && !isEmpty && (
+          {(showStalePlot || (!loading && !error && histogram && !isEmpty)) && (
             <Suspense
               fallback={
                 <div className="coverageModalStatus">
@@ -195,8 +228,20 @@ export default function CoverageModal() {
                 </div>
               }
             >
-              <CoverageHistogramPlot histogram={histogram} />
+              <div
+                className={
+                  loading ? "coveragePlotStale" : "coveragePlotCurrent"
+                }
+                aria-busy={loading || undefined}
+              >
+                <CoverageHistogramPlot histogram={histogram} />
+              </div>
             </Suspense>
+          )}
+          {showStalePlot && (
+            <div className="coveragePlotBusy">
+              <Spinner size="sm" />
+            </div>
           )}
         </div>
       </Modal.Body>

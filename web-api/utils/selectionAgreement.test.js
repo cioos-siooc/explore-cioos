@@ -318,3 +318,47 @@ test("every selection route inherits the realtimeOnly dataset filter", async () 
     );
   }
 });
+
+test("every coverageHistogram count reads the same branch set", async () => {
+  // The three counts used to share one CTE string, so testing any of them
+  // tested all three. They now build their own — the days count merges each
+  // feature's day set before joining cde.datasets, which the entity counts
+  // have no use for — and the thing that must not drift with them is which
+  // sources they read. They still share one `combined`; this is what says so.
+  const branchesOf = async (count) => {
+    const sql = (await sqlFrom("coverageHistogram", { count }))
+      .map(stripEmptyGuard)
+      .join(" ");
+    return {
+      profiles: readsProfiles(sql),
+      trajectory: readsTrajectory(sql),
+      obis: readsObis(sql),
+    };
+  };
+
+  const reference = await branchesOf("datasets");
+  assert.deepEqual(reference, { profiles: true, trajectory: true, obis: true });
+  for (const count of ["features", "days"]) {
+    assert.deepEqual(await branchesOf(count), reference, count);
+  }
+
+  // And the gates still apply to each of them, not just the default.
+  for (const count of ["datasets", "features", "days"]) {
+    const noObis = (
+      await sqlFrom("coverageHistogram", { count, includeObis: "false" })
+    )
+      .map(stripEmptyGuard)
+      .join(" ");
+    assert.ok(!readsObis(noObis), `${count} kept OBIS`);
+
+    const taxon = (
+      await sqlFrom("coverageHistogram", { count, scientificNames: "Gadus" })
+    )
+      .map(stripEmptyGuard)
+      .join(" ");
+    assert.ok(
+      !readsTrajectory(taxon),
+      `${count} kept ERDDAP under a taxon filter`,
+    );
+  }
+});
