@@ -36,12 +36,13 @@ const MONTH_MS = YEAR_MS / 12;
 // Human label for a series key, by the kind the API tagged it with. An erddap
 // key is a server URL, which the rest of the app already knows how to name —
 // and which can arrive null for a dataset with no erddap_url, so the shared
-// helper's own null handling matters here.
+// helper's own null handling matters here. Source series carry their platform
+// so an ERDDAP server and an OBIS node with similar names stay distinguishable.
 function seriesLabel(key, kind, language) {
   if (kind === "erddap")
-    return formatErddapServerName(key, language, erddapServers);
-  // OBIS nodes, platforms, data types and organization names are already
-  // display-ready.
+    return `${formatErddapServerName(key, language, erddapServers)} (ERDDAP)`;
+  if (kind === "obis") return `${key} (OBIS)`;
+  // Platforms, data types and organization names are already display-ready.
   return key;
 }
 
