@@ -1,0 +1,54 @@
+/* The contextual tip, flowing as the last row of the top bar's column (see
+   TipCard.jsx). Sized like a chip row rather than a panel: it should read as
+   an aside to the controls above it, not as something to deal with. */
+.tipCard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cioos-space-sm);
+  width: min(440px, 100%);
+  padding: var(--cioos-space-sm) var(--cioos-space-sm) var(--cioos-space-sm)
+    var(--cioos-space-md);
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-left: 3px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+.tipCardIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--cioos-primary);
+}
+
+.tipCardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.tipCardHeading {
+  font-family: var(--cioos-font-display);
+  font-weight: 600;
+  color: var(--cioos-navy);
+}
+
+.tipCardBody p {
+  margin: 2px 0 4px;
+}
+
+.tipCardDisable {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tipCardDisable:hover {
+  color: var(--cioos-ink);
+}

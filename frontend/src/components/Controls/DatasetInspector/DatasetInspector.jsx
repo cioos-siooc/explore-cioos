@@ -17,6 +17,7 @@ import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   dataLayerKeyForDataset,
   DATA_LAYER_LABEL_KEYS,
@@ -145,6 +146,12 @@ export default function DatasetInspector({
   const { eovsSelected, datasetsSelected, setDatasetsSelected } = useFilters();
   const { handleSelectDataset, selectedPks } = useSelection();
   const { setShowDownloadModal } = useUI();
+  const { offerTip } = useTips();
+  const isRealtime = Boolean(dataset.is_realtime);
+  useEffect(
+    () => offerTip(isRealtime ? "realtime" : "datasetNav"),
+    [offerTip, isRealtime],
+  );
   const [datasetRecords, setDatasetRecords] = useState();
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
   const inspectorRef = useRef(null);

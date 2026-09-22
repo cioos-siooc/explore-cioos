@@ -43,6 +43,10 @@ describe("AppShell (composition)", () => {
     // the card's own chevron just dismisses it — is itself part of what this
     // test exercises.
     setViewportWidth(MOBILE_WIDTH);
+    // A returning visitor, so the intro isn't sitting over the page (jsdom
+    // doesn't stop clicks behind it) and its own headings stay out of the query
+    // below.
+    document.cookie = "introModalOpen=false; path=/";
     renderWithProviders(<AppShell />, { providers: "app" });
     await waitFor(() =>
       expect(screen.getByTestId("mock-map")).toBeInTheDocument(),

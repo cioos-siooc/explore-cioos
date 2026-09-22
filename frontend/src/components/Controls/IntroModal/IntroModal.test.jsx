@@ -1,96 +1,107 @@
 import * as React from "react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, screen } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
+import { installMockFetch } from "../../../test/mockFetch.js";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { TIPS } from "../../../state/tips/TipsProvider.jsx";
 import IntroModal from "./IntroModal.jsx";
 
 // FeedbackButton calls Sentry.getFeedback() on click, which is undefined
 // outside a real Sentry init — mock it out so the button renders inert.
 vi.mock("@sentry/react", () => ({ getFeedback: () => undefined }));
 
+// The modal reads UI and tips state (the selection-help link, the tips
+// switch), so it renders under the app's providers, with the same open flag
+// the app hands it.
+function Harness({ setShowModal = () => {} }) {
+  const { showSelectionHelpModal } = useUI();
+  return (
+    <>
+      <IntroModal showModal setShowModal={setShowModal} />
+      <span data-testid="selection-help">
+        {showSelectionHelpModal ? "open" : "closed"}
+      </span>
+    </>
+  );
+}
+
+const renderIntro = (props) =>
+  renderWithProviders(<Harness {...props} />, { providers: "app" });
+
+const stepInfo = () => screen.getByTestId("intro-step-info").textContent;
+const tip = () => screen.getByTestId("intro-tip").textContent;
+
 describe("IntroModal", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
   it("renders nothing (Modal unmounts its body) when show is false", () => {
     renderWithProviders(
       <IntroModal showModal={false} setShowModal={() => {}} />,
+      { providers: "app" },
     );
     expect(screen.queryByText("CIOOS Data Explorer")).not.toBeInTheDocument();
   });
 
-  it("shows the welcome message by default when open", () => {
-    renderWithProviders(<IntroModal showModal setShowModal={() => {}} />);
+  it("opens on the welcome and the first step", () => {
+    renderIntro();
     expect(screen.getByText("CIOOS Data Explorer")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Welcome to the CIOOS Data Explorer/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/brings ocean data/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Filter/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(stepInfo()).toMatch(/Filters button/);
   });
 
-  it("hovering a step shows that step's info instead of the welcome message", async () => {
-    const { user } = renderWithProviders(
-      <IntroModal showModal setShowModal={() => {}} />,
+  it("clicking a step shows that step's explanation", async () => {
+    const { user } = renderIntro();
+    await user.click(screen.getByRole("button", { name: /Select/ }));
+    expect(stepInfo()).toMatch(/Draw a box or a polygon/);
+    await user.click(screen.getByRole("button", { name: /Inspect/ }));
+    expect(stepInfo()).toMatch(/Datasets button/);
+    await user.click(screen.getByRole("button", { name: /^\d?Download/ }));
+    expect(stepInfo()).toMatch(/1 GB/);
+    expect(screen.getByRole("button", { name: /Select/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
     );
-    await user.hover(screen.getByText("Filter", { selector: ".stepImage" }));
-    expect(
-      screen.getAllByText("Filter").some((el) => el.closest(".stepInfo")),
-    ).toBe(true);
-    expect(
-      screen.queryByText(/Welcome to the CIOOS Data Explorer/),
-    ).not.toBeInTheDocument();
   });
 
-  it("hovering the select step shows the selection-tools info", async () => {
-    const { user } = renderWithProviders(
-      <IntroModal showModal setShowModal={() => {}} />,
+  it("the Download step opens the selection help", async () => {
+    const { user } = renderIntro();
+    await user.click(screen.getByRole("button", { name: /^\d?Download/ }));
+    await user.click(
+      screen.getByRole("button", { name: "What can I download?" }),
     );
-    await user.hover(screen.getByText("Select", { selector: ".stepImage" }));
-    expect(
-      screen.getAllByText("Select").some((el) => el.closest(".stepInfo")),
-    ).toBe(true);
+    expect(screen.getByTestId("selection-help")).toHaveTextContent("open");
   });
 
-  it("hovering the inspect step shows the inspect info", async () => {
-    const { user } = renderWithProviders(
-      <IntroModal showModal setShowModal={() => {}} />,
-    );
-    await user.hover(screen.getByText("Inspect", { selector: ".stepImage" }));
-    expect(
-      screen.getAllByText("Inspect").some((el) => el.closest(".stepInfo")),
-    ).toBe(true);
+  it("pages through the tips, wrapping round at the end", async () => {
+    const { user } = renderIntro();
+    const first = tip();
+    expect(first).toMatch(`Tip 1 of ${TIPS.length}`);
+    await user.click(screen.getByRole("button", { name: "Next tip" }));
+    expect(tip()).toMatch(`Tip 2 of ${TIPS.length}`);
+    for (let i = 1; i < TIPS.length; i += 1)
+      await user.click(screen.getByRole("button", { name: "Next tip" }));
+    expect(tip()).toBe(first);
   });
 
-  it("hovering the download step shows the download info", async () => {
-    const { user } = renderWithProviders(
-      <IntroModal showModal setShowModal={() => {}} />,
-    );
-    await user.hover(screen.getByText("Download", { selector: ".stepImage" }));
-    expect(
-      screen.getAllByText("Download").some((el) => el.closest(".stepInfo")),
-    ).toBe(true);
-  });
-
-  it("moving off the steps reverts back to the welcome message", async () => {
-    const { user } = renderWithProviders(
-      <IntroModal showModal setShowModal={() => {}} />,
-    );
-    await user.hover(screen.getByText("Filter", { selector: ".stepImage" }));
-    expect(
-      screen.queryByText(/Welcome to the CIOOS Data Explorer/),
-    ).not.toBeInTheDocument();
-
-    await user.unhover(screen.getByText("Filter", { selector: ".stepImage" }));
-    expect(
-      screen.getByText(/Welcome to the CIOOS Data Explorer/),
-    ).toBeInTheDocument();
+  it("the tips switch persists the choice", async () => {
+    const { user } = renderIntro();
+    const toggle = screen.getByRole("switch", { name: /Show tips/ });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+    expect(toggle).not.toBeChecked();
+    expect(window.localStorage.getItem("cde.tipsEnabled")).toBe("false");
   });
 
   it("shows the French CIOOS logo link when the language is French", async () => {
-    // providers: "none" doesn't mount UrlSync, so a ?lang= in the URL alone
-    // doesn't drive i18n — flip the returned instance's language directly,
-    // same as IntroModal reads it (i18n.language), and let the component
-    // re-render off that.
-    const { i18n } = renderWithProviders(
-      <IntroModal showModal setShowModal={() => {}} />,
-    );
+    const { i18n } = renderIntro();
     await act(async () => {
       await i18n.changeLanguage("fr");
     });
@@ -100,9 +111,7 @@ describe("IntroModal", () => {
 
   it("closing (X) calls setShowModal(false)", async () => {
     const setShowModal = vi.fn();
-    const { user } = renderWithProviders(
-      <IntroModal showModal setShowModal={setShowModal} />,
-    );
+    const { user } = renderIntro({ setShowModal });
     await user.click(screen.getByRole("button", { name: /close/i }));
     expect(setShowModal).toHaveBeenCalledWith(false);
   });

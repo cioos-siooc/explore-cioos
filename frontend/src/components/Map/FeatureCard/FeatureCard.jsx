@@ -17,6 +17,7 @@ import { useChanged } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import useCellDatasetDays from "./useCellDatasetDays.js";
 import "./styles.css";
 
@@ -56,6 +57,7 @@ export default function FeatureCard() {
     combinedQueries,
   } = useSelection();
   const { sidebarOpen } = useUI();
+  const { offerTip } = useTips();
 
   const [expanded, setExpanded] = useState(false);
 
@@ -96,6 +98,9 @@ export default function FeatureCard() {
   // open — see the comment up top. The query itself is left alone so the card
   // picks back up where it left off if the sidebar closes again.
   const open = Boolean(featureQuery) && !sidebarOpen;
+  useEffect(() => {
+    if (open) offerTip("whatsHere");
+  }, [open, offerTip]);
   // Nothing has been clicked yet in this session: there is no card to park.
   if (!query) return null;
 

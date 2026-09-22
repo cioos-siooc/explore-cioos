@@ -13,6 +13,7 @@ import classNames from "classnames";
 import BrandSearch from "../TopLeft/BrandSearch.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 import SingleDatasetView from "./SingleDatasetView.jsx";
+import TipCard from "../../Controls/Tips/TipCard.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
 import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
@@ -191,6 +192,7 @@ export default function TopControls() {
           of it. Only up while the datasets card — whose banner otherwise says
           this — is collapsed. */}
       <SingleDatasetView />
+      <TipCard />
     </div>
   );
 }

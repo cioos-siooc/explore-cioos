@@ -6,6 +6,7 @@ import { buildWmsOverlay, fetchGriddapTimeRange } from "../../../wmsUtilities";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import WmsLegend from "../WmsLegend/WmsLegend.jsx";
 import "./styles.css";
 
@@ -24,6 +25,8 @@ export default function GriddapDetails({
   const { eovsSelected } = useFilters();
   const { pendingWmsSlice, setPendingWmsSlice } = useMapState();
   const { sidebarOpen } = useUI();
+  const { offerTip } = useTips();
+  useEffect(() => offerTip("griddapWms"), [offerTip]);
   const dimensions = dataset.grid_dimensions || [];
   const variables = dataset.grid_variables || [];
   const overlayActive = activeWmsOverlay?.pk === dataset.pk;

@@ -1,9 +1,10 @@
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "react-bootstrap-icons";
 
 import { defaultStartDate } from "../../config.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, {
   DateField,
   IntervalSelect,
@@ -67,6 +68,8 @@ function TimeBarSurface() {
     timeExtent,
   } = useFilters();
 
+  const { offerTip } = useTips();
+  useEffect(() => offerTip("timeCoverage"), [offerTip]);
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-time-bar-space", measureBarSpace);
 
@@ -102,6 +105,7 @@ function TimeBarSurface() {
   // axis in the first place, and that a chosen window moves whole.
   const setHandleValue = useCallback(
     (handle, iso) => {
+      offerTip("sliderKeys");
       if (!windowLocked) return setFieldValue(handle, iso);
       const { start, end } = slideRange(handle, iso, {
         startDate,
@@ -113,6 +117,7 @@ function TimeBarSurface() {
       setEndDate(end);
     },
     [
+      offerTip,
       setFieldValue,
       setStartDate,
       setEndDate,

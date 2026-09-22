@@ -283,6 +283,8 @@ export default function CreateMap({
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
   onFeatureQuery = () => {},
+  // A box or polygon has just been finished with the draw tools.
+  onShapeDrawn = () => {},
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
@@ -3927,6 +3929,7 @@ export default function CreateMap({
       const polygon = feature.geometry.coordinates[0];
       highlightPoints(polygon);
       setPolygon(polygon);
+      onShapeDrawn();
       map.current.getCanvas().style.cursor = "unset";
       // Straight into direct_select so the shape is immediately draggable
       // (yellow, with handles) rather than sitting in simple_select first.

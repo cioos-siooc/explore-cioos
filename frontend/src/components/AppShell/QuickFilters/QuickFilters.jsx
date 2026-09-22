@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { polygonIsRectangle, useSearchInput } from "../../../utilities.jsx";
+import { isMarkerTier } from "../../config.js";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
@@ -40,7 +42,7 @@ import "./styles.css";
 // than a second button next to it clearing only half of what is set.
 export default function QuickFilters() {
   const { t } = useTranslation();
-  const { requestDraw, resetDataLayers } = useMapState();
+  const { requestDraw, resetDataLayers, zoom } = useMapState();
   const {
     polygon,
     datasetTitleSearchText,
@@ -50,6 +52,12 @@ export default function QuickFilters() {
   } = useSelection();
   const activeFilterCount = useActiveFilters().length;
   const { resetFilters } = useFilters();
+  const { offerTip } = useTips();
+  // Zoomed in to a local area, the whole-catalogue list stops matching the map.
+  const zoomedIn = isMarkerTier(zoom) && !onlyInView;
+  useEffect(() => {
+    if (zoomedIn) offerTip("inView");
+  }, [zoomedIn, offerTip]);
 
   const searchInputId = useId();
   const inputRef = useRef(null);

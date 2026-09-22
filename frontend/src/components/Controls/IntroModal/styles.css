@@ -1,22 +1,3 @@
-.introButton {
-  position: absolute;
-  bottom: 312px;
-  right: 10px;
-  pointer-events: all;
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-card);
-  border-radius: var(--cioos-radius);
-  border: 0;
-  height: 42px;
-  width: 42px;
-  text-align: center;
-  z-index: 3;
-}
-
-.introButton:hover {
-  background-color: var(--cioos-surface-2);
-}
-
 .introModal .modalHeader {
   padding: 0 160px 0 0;
 }
@@ -43,42 +24,36 @@
 /* The tagline ("Ocean Data For Our Ocean Future") reads as a quiet
    subtitle, not competing with the product name. */
 .introModal .tagLine {
-  color: var(--cioos-ink-60);
+  display: inline;
+  margin: auto;
+  font-size: smaller;
+  font-style: italic;
   font-weight: 400;
+  color: var(--cioos-ink-60);
+}
+
+.introLogo {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 130px;
+  height: 40px;
+  margin: 5px 40px auto auto;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  background-color: var(--cioos-white);
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: all;
 }
 
 .introLogo.english {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
   background-image: url("../../Images/NationalLogoEnglish.png");
-  background-color: var(--cioos-white);
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  margin: 5px 40px auto auto;
 }
 
 .introLogo.french {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
   background-image: url("../../Images/NationalLogoFrench.png");
-  background-color: var(--cioos-white);
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  margin: 5px 40px auto auto;
 }
 
 .introLogo:hover {
@@ -87,196 +62,122 @@
 
 .introModal .modal-body {
   overflow-y: auto;
+  color: var(--cioos-ink);
 }
 
-.steps {
+.introLead {
+  font-size: var(--cioos-font-size-md);
+}
+
+.introHeading {
   display: flex;
-  justify-content: space-between;
-}
-
-.stepImage {
-  text-align: center;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+  margin: var(--cioos-space-lg) 0 var(--cioos-space-sm);
   font-family: var(--cioos-font-display);
-  font-size: large;
+  font-size: var(--cioos-font-size-lg);
   font-weight: 600;
   color: var(--cioos-navy);
+}
 
-  /* flex-grow: 1; */
-  flex-shrink: 1;
-  flex-wrap: nowrap;
-  width: 250px;
-  height: 250px;
-  border-radius: var(--cioos-radius);
+.introSteps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--cioos-space-sm);
+}
+
+.introStep {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+  padding: var(--cioos-space-md) var(--cioos-space-sm);
   border: 1px solid var(--cioos-hairline);
-  padding: 2px;
-  margin: 2px;
+  border-radius: var(--cioos-radius);
   background-color: var(--cioos-teal-light);
-  background-repeat: no-repeat;
-  background-size: 225px 225px;
-  background-position: bottom;
-  transition: box-shadow 0.15s ease;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-md);
+  font-weight: 600;
+  color: var(--cioos-navy);
+  cursor: pointer;
+  transition: box-shadow var(--cioos-transition-fast);
 }
 
-@media (max-width: 1200px) {
-  .stepImage {
-    height: 210px;
-    background-size: 180px 180px;
-  }
+.introStep:hover {
+  box-shadow: 0 0 0 2px var(--cioos-primary);
 }
 
-@media (max-width: 992px) {
-  .stepImage {
-    height: 140px;
-    background-size: 110px 110px;
-  }
+.introStep[aria-pressed="true"] {
+  box-shadow: 0 0 0 3px var(--cioos-primary);
+  background-color: var(--cioos-white);
 }
 
-.stepImage.filterStep {
-  background-image: url("../../Images/filtersImage.png");
+.introStepNumber {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
 }
 
-.stepImage.filterStep.fr {
-  background-image: url("../../Images/filtersImage_FR.png");
+.introStepInfo,
+.introTip {
+  margin-top: var(--cioos-space-sm);
+  padding: var(--cioos-space-sm) var(--cioos-space-md);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-surface-2);
 }
 
-.stepImage.selectStep {
-  background-image: url("../../Images/selectionImage.png");
+.introStepInfo p,
+.introTip p {
+  margin: 0;
 }
 
-.stepImage.inspectStep {
-  background-image: url("../../Images/inspectImage.png");
+/* Sized to the longest step text, so switching steps doesn't make the dialog
+   jump under the pointer. */
+.introStepInfo {
+  min-height: 7.5em;
 }
 
-.stepImage.inspectStep.fr {
-  background-image: url("../../Images/inspectImage_FR.png");
+.introTipNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--cioos-space-xs);
 }
 
-.stepImage.downloadStep {
-  background-image: url("../../Images/downloadImage.png");
+.introTipCount {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
 }
 
-.stepImage.downloadStep.fr {
-  background-image: url("../../Images/downloadImage_FR.png");
-}
-
-.stepImage:hover {
-  /* border: 4px solid var(--cioos-primary); */
-  box-shadow: 0 0 0 4px var(--cioos-primary);
+.introLink {
+  margin-top: var(--cioos-space-xs);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
   cursor: pointer;
 }
 
-.stepInfo {
-  margin-top: 15px;
-  text-align: center;
-  font-size: large;
-  font-style: oblique;
-  min-height: 250px;
+.introFooter {
+  margin-top: var(--cioos-space-lg);
+  padding-top: var(--cioos-space-sm);
+  border-top: 1px solid var(--cioos-hairline);
 }
 
-.stepInfoContent {
-  text-align: left;
-  font-size: medium;
-  font-style: normal;
+.introFooter p {
+  display: flex;
+  align-items: center;
+  margin: var(--cioos-space-xs) 0;
 }
 
-.tipInfo {
-  margin-top: 15px;
-
-  /* min-height: 275px; */
-}
-
-.tipInfo p {
-  margin: 15px 0;
-}
-
-.tipInfo a {
-  margin-right: 15px;
-}
-
-.tagLine {
-  display: inline;
-  margin: auto;
-  font-style: italic;
-
-  /* text-align: center; */
-  font-size: smaller;
-  width: 100%;
-
-  /* margin: 0px 0px 15px 0px; */
-}
-
-.tipInfo img {
-  width: 50px;
-  height: 50px;
-  border-radius: 10px;
-  margin-right: 15px;
-  background-repeat: no-repeat;
-  background-size: contain;
-}
-
-/* .feedbackButtonImage {
-  background-image: url(../../Images/feedbackButton.png);
-} */
-
-.infoButtonImage {
-  background-image: url("../../Images/infoButton.png");
-}
-
-@media all and (max-height: 500px) {
-  .introButton {
-    top: 145px;
-  }
-}
-
-/* ------------------------------------------------------------------
- * Mobile: the dialog is already full-screen here (fullscreen='lg-down'),
- * but it was still laid out as a wide one. The header reserved 160px on
- * its right for a logo that then sat under the close button, and the four
- * 250px step tiles were asked to share a row about 100px wider than one
- * of them.
- * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
-  /* The brand is on the app's own header two taps away; here it only stands
-     between the title and the button that closes the dialog. */
-  .introModal .introLogo {
-    display: none;
-  }
-
-  .introModal .modalHeader {
-    padding: 0;
-  }
-
-  /* Two up rather than four across, and sized off the column rather than off
-     a fixed 250px. The tiles are hover targets on a pointer device; a tap
-     works the same way here, so they stay as they are otherwise. */
-  .introModal .steps {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--cioos-space-sm);
-  }
-
-  .introModal .stepImage {
-    width: auto;
-    height: 130px;
-    margin: 0;
-
-    /* Same ~30px of tile left over for the label as the 992px rung leaves. */
-    background-size: 100px 100px;
-  }
-
-  /* The hovered/tapped step's write-up sizes to its text instead of holding
-     open a 250px well under the tiles. */
-  .introModal .stepInfo {
-    min-height: 0;
-  }
-
-  .introModal .infoBox {
-    min-height: 0;
-  }
-}
-
-.infoBox {
-  min-height: 300px;
+.introFooterIcon {
+  flex: none;
+  margin: 0 21px 0 6px;
+  color: var(--cioos-primary);
 }
 
 /* Inline icon button that opens the Sentry feedback dialog; sits beside the
@@ -284,9 +185,9 @@
    chrome control. */
 .feedbackButton {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  vertical-align: middle;
   margin-right: 15px;
   padding: 6px;
   border: 0;
@@ -298,4 +199,25 @@
 
 .feedbackButton:hover {
   background-color: var(--cioos-surface-2);
+}
+
+/* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
+   brand is on the app's own header, and here it would only stand between the
+   title and the close button; the steps go two up. */
+@media (max-width: 700px) {
+  .introModal .introLogo {
+    display: none;
+  }
+
+  .introModal .modalHeader {
+    padding: 0;
+  }
+
+  .introSteps {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .introStepInfo {
+    min-height: 0;
+  }
 }

@@ -7,10 +7,12 @@ import MapStateProvider from "./map/MapStateProvider.jsx";
 import SelectionProvider from "./selection/SelectionProvider.jsx";
 import DownloadProvider from "./download/DownloadProvider.jsx";
 import UIProvider from "./ui/UIProvider.jsx";
+import TipsProvider from "./tips/TipsProvider.jsx";
 import UrlSync from "./useUrlSync.js";
 
 // Provider order matters: MapState reads Filter (query); Selection reads
-// Filter + MapState; Download reads Filter + Selection; UI reads Selection.
+// Filter + MapState; Download reads Filter + Selection; UI reads Selection;
+// Tips reads UI (it holds back while the intro or any modal is up).
 // Activity is outermost because anything, at any depth, may declare that it is
 // waiting on something.
 export default function AppProviders({ children }) {
@@ -21,9 +23,11 @@ export default function AppProviders({ children }) {
           <SelectionProvider>
             <DownloadProvider>
               <UIProvider>
-                <UrlSync />
-                <ActivityTasks />
-                {children}
+                <TipsProvider>
+                  <UrlSync />
+                  <ActivityTasks />
+                  {children}
+                </TipsProvider>
               </UIProvider>
             </DownloadProvider>
           </SelectionProvider>

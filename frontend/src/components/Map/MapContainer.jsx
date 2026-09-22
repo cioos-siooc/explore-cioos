@@ -7,11 +7,13 @@ import reportError from "../../state/reportError.js";
 import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
+import { useTips } from "../../state/tips/TipsProvider.jsx";
 
 // Single adapter between the state providers and the imperative Map
 // component — Map.js keeps its prop-based interface untouched.
 export default function MapContainer() {
   const { setDatasetsSelected } = useFilters();
+  const { offerTip } = useTips();
   const {
     mapQueryString,
     setLoading,
@@ -143,6 +145,7 @@ export default function MapContainer() {
       coverageRangeLevels={coverageRangeLevels}
       onViewportHexRange={setViewportHexRange}
       onFeatureQuery={handleFeatureQuery}
+      onShapeDrawn={() => offerTip("reshapeArea")}
       featureQuery={featureQuery}
       sharedFeatureQueryAt={sharedFeatureQueryAt}
       onMarkerClick={onMarkerClick}
