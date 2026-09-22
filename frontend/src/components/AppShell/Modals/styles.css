@@ -291,6 +291,33 @@
   min-height: 0;
 }
 
+/* A figure being replaced: dimmed and inert while the new one loads, so the
+   shape stays readable but it is visibly not the answer to the control that
+   was just changed. The small spinner sits over it rather than replacing it. */
+.coveragePlotStale {
+  height: 100%;
+  opacity: 0.4;
+  transition: opacity 120ms ease-in-out;
+  pointer-events: none;
+}
+
+.coveragePlotCurrent {
+  height: 100%;
+}
+
+.coveragePlotBusy {
+  position: absolute;
+  top: var(--cioos-space-sm);
+  right: var(--cioos-space-sm);
+  color: var(--cioos-ink-60);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coveragePlotStale {
+    transition: none;
+  }
+}
+
 /* Loading / error / empty states centered in the plot area. */
 .coverageModalStatus {
   display: flex;
