@@ -80,7 +80,27 @@ const track = (trajectoryId, from, to) => ({
 });
 
 // A track on open water, alone.
-export const OPEN_TRACK = track("ship-3", [-200, -120], [-40, -120]);
+// Kept right of centre: a click on it opens the dataset page, which covers the
+// left of the map on a tablet.
+export const OPEN_TRACK = track("ship-3", [-120, -120], [40, -120]);
 // A track crossing CROSSED_MARKER.
 export const CROSSING_TRACK = track("glider-7", [-120, 140], [120, 140]);
 export const TRACKS = [OPEN_TRACK, CROSSING_TRACK];
+
+// Two gridded footprints, overlapping, the second also over CROSSED_MARKER.
+// Rectangles as [left, top, right, bottom] offsets. Their pks are not in the
+// recorded pointQuery, like a griddap dataset the results do not list.
+const grid = (pk, rect, title) => ({
+  rect,
+  properties: {
+    pk,
+    dataset_id: `synthetic_grid_${pk}`,
+    title_translated: { en: title, fr: title },
+  },
+});
+export const GRID_A = grid(920001, [-180, 180, -60, 300], "Synthetic grid A");
+export const GRID_B = grid(920002, [-120, 120, 60, 260], "Synthetic grid B");
+export const GRIDS = [GRID_A, GRID_B];
+// Under GRID_A alone, and under both.
+export const GRID_A_ONLY = [-150, 285];
+export const GRID_OVERLAP = [-90, 220];

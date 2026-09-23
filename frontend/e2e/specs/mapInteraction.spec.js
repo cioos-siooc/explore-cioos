@@ -4,10 +4,14 @@ import {
   CENTRE,
   CROSSED_MARKER,
   CROSSING_TRACK,
+  GRID_A,
+  GRID_A_ONLY,
+  GRID_OVERLAP,
   LONE_MARKER,
   OPEN_TRACK,
   SHARED_MARKER,
   ZOOM,
+  lngLatAt,
 } from "../support/syntheticScene.js";
 
 // The one spec that points the mouse at the WebGL canvas itself, so hover and
@@ -49,7 +53,7 @@ const canvasCentre = async (page) => {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 };
 
-const openScene = (page) => openAt(page, CENTRE, "", ZOOM);
+const openScene = (page, extra = "") => openAt(page, CENTRE, extra, ZOOM);
 
 // A scene offset as a page coordinate.
 const sceneAt = async (page, [dx, dy]) => {
@@ -229,5 +233,109 @@ test.describe("pointing at markers and tracks", () => {
     const rows = openCard(page).locator(".featureCardRow");
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toContainText("glider-7");
+  });
+});
+
+test.describe("pointing at gridded coverage", () => {
+  test("hovering one grid names it", async ({ page }) => {
+    await openScene(page, "&griddap=true");
+    await hoverUntil(page, GRID_A_ONLY, () =>
+      expect(chip(page)).toHaveText(GRID_A.properties.title_translated.en, {
+        timeout: 1_000,
+      }),
+    );
+  });
+
+  test("hovering stacked grids counts them", async ({ page }) => {
+    await openScene(page, "&griddap=true");
+    await hoverUntil(page, GRID_OVERLAP, () =>
+      expect(chip(page)).toHaveText("2 gridded datasets", { timeout: 1_000 }),
+    );
+  });
+
+  test("a marker keeps the hover over a grid", async ({ page }) => {
+    await openScene(page, "&griddap=true");
+    await hoverUntil(page, CROSSED_MARKER.at, () =>
+      expect(chip(page)).toHaveText("5 day(s) of data", { timeout: 1_000 }),
+    );
+  });
+
+  test("clicking stacked grids lists each once", async ({ page }) => {
+    await openScene(page, "&griddap=true");
+    await clickUntil(page, GRID_OVERLAP, () =>
+      expect(openCard(page)).toBeVisible({ timeout: 1_000 }),
+    );
+    const rows = openCard(page).locator(".featureCardRow");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText("Gridded dataset");
+  });
+});
+
+test.describe("the selected track", () => {
+  test("a fix of the drawn track outranks the track line under it", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "the dataset page covers the map on a phone",
+    );
+    await openScene(page);
+    const middle = midpoint(OPEN_TRACK);
+    await clickUntil(page, middle, () =>
+      expect(page).toHaveURL(/[?&]track=ship-3/, { timeout: 1_000 }),
+    );
+    // The middle fix sits on the tile track's line. Its chip carries the
+    // fix's own time; the line's would name the trajectory instead.
+    await hoverUntil(page, middle, () =>
+      expect(chip(page)).toContainText("2026-01-07 12:00Z", {
+        timeout: 1_000,
+      }),
+    );
+    await expect(chip(page)).not.toContainText("ship-3");
+  });
+});
+
+test.describe("drawing a spatial filter", () => {
+  const near = (value, expected) =>
+    expect(Math.abs(Number(value) - expected)).toBeLessThan(0.02);
+
+  test("a box drawn on the map becomes the filter", async ({ page }) => {
+    await openScene(page);
+    await page.getByTestId("quick-filter-box").click();
+    const from = await sceneAt(page, [-100, -60]);
+    const to = await sceneAt(page, [100, 60]);
+    await page.mouse.click(from.x, from.y);
+    await page.mouse.move(to.x, to.y, { steps: 5 });
+    await page.mouse.click(to.x, to.y);
+    await expect(page).toHaveURL(/[?&]latMin=/);
+    const params = new URL(page.url()).searchParams;
+    const [west, north] = lngLatAt([-100, -60]);
+    const [east, south] = lngLatAt([100, 60]);
+    near(params.get("lonMin"), west);
+    near(params.get("lonMax"), east);
+    near(params.get("latMin"), south);
+    near(params.get("latMax"), north);
+  });
+
+  test("clicking while drawing adds a vertex, not a card", async ({ page }) => {
+    await openScene(page);
+    await page.getByTestId("quick-filter-polygon").click();
+    // Paced like a person: mapbox-gl-draw only knows the first vertex is under
+    // the cursor once it has redrawn after a move, so a closing click that
+    // lands in the same frame as the last one misses it.
+    const clickAt = async (at) => {
+      const { x, y } = await sceneAt(page, at);
+      await page.mouse.move(x, y, { steps: 4 });
+      await page.waitForTimeout(150);
+      await page.mouse.click(x, y);
+    };
+    for (const at of [SHARED_MARKER.at, [90, 100], [-60, 100]]) {
+      await clickAt(at);
+    }
+    await expect(openCard(page)).toHaveCount(0);
+    // Closing the ring on its first vertex finishes the shape.
+    await clickAt(SHARED_MARKER.at);
+    await expect(page).toHaveURL(/[?&]polygon=/);
+    await expect(openCard(page)).toHaveCount(0);
   });
 });
