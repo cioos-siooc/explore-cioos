@@ -2177,6 +2177,658 @@ export default function CreateMap({
   const mapLongitude = searchParams.get("lon");
   const mapLatitude = searchParams.get("lat");
 
+  function addObservationLayers() {
+    const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
+
+    // Two shared vector sources for all point/hex layers. Each layer used to
+    // carry its own inline source — six separate copies of the same two tile
+    // pyramids, each fetched and parsed independently on every pan. The
+    // highlight layer renders nothing until a pk filter is set, and those pks
+    // always come from queryRenderedFeatures on the filtered layers, so
+    // sharing the filtered sources loses nothing.
+    //
+    // maxzoom stops at the level past which the server has nothing new to
+    // say: routes/tiles.js selects individual points for any z >= 7, so a z17
+    // tile is the same content as its z14 parent cut into 64 pieces — 64
+    // ST_AsMVT queries for one tile's worth of data. Capping the source lets
+    // MapLibre overzoom instead. Precision is unaffected in practice:
+    // ST_AsMVTGeom at extent 4096 over a z14 tile is ~0.42 m/unit at 45°N,
+    // finer than a z17 pixel (0.84 m). It matters more than the tile count
+    // suggests, because every filter change calls setTiles below, which drops
+    // the whole cache and refetches from scratch.
+    //
+    // promoteId lifts each feature's pk to its feature id, which is what
+    // setFeatureState addresses — see the focus dimming above.
+    map.current.addSource("cde-tiles", {
+      type: "vector",
+      tiles: [tileQuery],
+      maxzoom: 14,
+      promoteId: "pk",
+    });
+    map.current.addSource("cde-cells", {
+      type: "vector",
+      tiles: [cellTileQuery],
+      maxzoom: 14,
+      promoteId: "pk",
+    });
+
+    // Every data layer is inserted below the basemap's label layers
+    // (beforeId FIRST_LABEL_LAYER_ID or an existing data layer) so water
+    // and place names stay readable over hexes and points.
+    map.current.addLayer(
+      {
+        id: "points",
+        type: "circle",
+        minzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+        layout: {
+          "circle-sort-key": ["get", "count"],
+        },
+        paint: {
+          // Zero until the ramp is final — see revealData. Both the colour
+          // below and the radius above come off the ramp, so before it lands
+          // these are placeholder values.
+          "circle-opacity": dataRevealed.current ? circleOpacity : 0,
+          "circle-radius-transition": NO_TRANSITION,
+          "circle-radius": radiusExpression(pointRadiusRange.current),
+          // setColorStops rewrites this one whenever the ramp moves — see
+          // NO_TRANSITION.
+          "circle-color-transition": NO_TRANSITION,
+          "circle-color": dimmable(colors),
+          "circle-stroke-color": dimmable(colors),
+          "circle-stroke-opacity": 0.001,
+          "circle-stroke-width": 10,
+        },
+      },
+      FIRST_LABEL_LAYER_ID,
+    );
+
+    // Trajectory and OBIS coverage cells, always drawn as hexes. Inserted
+    // with beforeId 'points' (which must already exist on the map —
+    // MapLibre throws otherwise) so they sit at the bottom of the stack,
+    // under the points layer. Below hexMaxZoom their counts are already
+    // merged into the green 'hexes' layer; this layer only takes over once
+    // profiles switch to points. A hex is coloured by what it holds —
+    // trajectories, occurrence records, or both — see coverageHexFillColor.
+    map.current.addLayer(
+      {
+        id: "coverage-hexes",
+        type: "fill",
+        minzoom: hexMaxZoom,
+        source: "cde-cells",
+        "source-layer": "coverage-hexes-layer",
+        paint: {
+          // Zero until the ramp is final — see revealData. Then a plain
+          // taper with zoom; the count's share of the transparency rides on
+          // the fill colour's alpha (toRampStops).
+          "fill-opacity": dataRevealed.current
+            ? coverageHexOpacityExpression()
+            : 0,
+          // Neither this nor the colours below may transition — see
+          // NO_TRANSITION. For the opacity that delay was the flicker on the
+          // opening reveal and on every threshold change after it; for the
+          // colours it is the lag between the tiles landing and the ramp
+          // arriving on them.
+          "fill-opacity-transition": NO_TRANSITION,
+          "fill-color": dimmable(coverageHexFillColor()),
+          "fill-color-transition": NO_TRANSITION,
+          "fill-outline-color": coverageHexOutlineColor(),
+        },
+      },
+      "points",
+    );
+
+    // What is left of a coverage cell once the fill has faded out from under
+    // it: the boundary alone, in the fill's own ramp colour, over an
+    // unobscured basemap. A fill layer's 'fill-outline-color' is drawn at the
+    // fill's own opacity, so it goes exactly when the fill does and cannot be
+    // the thing that outlives it — hence a line layer of its own, reading the
+    // same source and rising over the same zooms the fill falls across.
+    //
+    // Gated by the same opening reveal as the fills, and repainted by
+    // setColorStops with them: it carries the ramp, so it has the same reason
+    // not to be seen wearing the placeholder one.
+    map.current.addLayer(
+      {
+        id: "coverage-hex-outlines",
+        type: "line",
+        minzoom: hexMaxZoom,
+        source: "cde-cells",
+        "source-layer": "coverage-hexes-layer",
+        paint: {
+          "line-color-transition": NO_TRANSITION,
+          "line-color": coverageHexBorderColor(),
+          "line-opacity-transition": NO_TRANSITION,
+          "line-opacity": dataRevealed.current
+            ? coverageHexOutlineOpacityExpression()
+            : 0,
+          // Wide enough that a colour reads off it — it is standing in for a
+          // whole hexagon of fill.
+          "line-width": 2,
+        },
+      },
+      "points",
+    );
+
+    // Purely visual white casing under the points so they stay readable
+    // over the coverage hex fills; all interaction stays on 'points',
+    // which keeps its invisible wide-stroke hit area.
+    //
+    // No 'circle-sort-key' here, unlike 'points' and 'points-highlighted',
+    // and deliberately so rather than by oversight. Every feature in this
+    // layer is the same #ffffff, and alpha-over compositing of identical RGB
+    // is order-independent — two overlapping casings come out white at
+    // 1-(1-a1)(1-a2) whichever is drawn first, including the dimmed 0.5 /
+    // undimmed 0.9 mix pointsHaloOpacity produces. A sort key here would be
+    // invisible and would still cost a per-tile sort on the worker.
+    map.current.addLayer(
+      {
+        id: "points-halo",
+        type: "circle",
+        minzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-color": "#ffffff",
+          // Zero until the ramp is final — see revealData. It has no colour
+          // on the ramp, but its radius is sized off the same one the points
+          // are, and a casing without its point is just a white dot.
+          "circle-opacity": dataRevealed.current ? pointsHaloOpacity() : 0,
+          "circle-radius-transition": NO_TRANSITION,
+          "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
+        },
+      },
+      "points",
+    );
+
+    map.current.addLayer(
+      {
+        id: "hexes",
+        type: "fill",
+        minzoom: hexMinZoom,
+        maxzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+
+        paint: {
+          // Zero until the ramp is final — see revealData. Then a plain taper
+          // with zoom; the count's share of the transparency rides on the fill
+          // colour's alpha (toRampStops).
+          "fill-opacity": dataRevealed.current ? hexOpacityExpression() : 0,
+          // Neither this nor the colour below may transition — see
+          // NO_TRANSITION. For the opacity that delay was the flicker on the
+          // opening reveal and on every threshold change after it; for the
+          // colour it is the lag between the tiles landing and the ramp
+          // arriving on them.
+          "fill-opacity-transition": NO_TRANSITION,
+          // A real interpolate expression rather than the legacy
+          // { property, stops } paint function, because that form cannot be
+          // nested inside the 'case' dimmable wraps it in — the same reason
+          // coverageHexFillColor builds its ramps through rampExpression.
+          "fill-color": dimmable(hexFillColor()),
+          "fill-color-transition": NO_TRANSITION,
+        },
+      },
+      FIRST_LABEL_LAYER_ID,
+    );
+
+    map.current.addLayer(
+      {
+        id: "points-highlighted",
+        type: "circle",
+        minzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+        layout: {
+          // The same key 'points' carries, and it has to be: this layer draws a
+          // filled circle plus a selection ring over the same features, so if
+          // the two sorted differently the rings and the markers under them
+          // would disagree about which of an overlapping pair is on top.
+          "circle-sort-key": ["get", "count"],
+        },
+        paint: {
+          "circle-color": dimmable(colors),
+          "circle-opacity": circleOpacity,
+          "circle-radius-transition": NO_TRANSITION,
+          "circle-radius": radiusExpression(pointRadiusRange.current),
+          "circle-stroke-color": "black",
+          // The selection ring is dropped on dimmed points: a focused dataset
+          // greys the rest of the map, and a black ring around a grey circle
+          // would still read as picked out.
+          "circle-stroke-width": ["case", IS_DIMMED, 0, 0.75],
+        },
+        filter: ["in", "pk", ""],
+      },
+      FIRST_LABEL_LAYER_ID,
+    );
+  }
+
+  function addGriddapLayers() {
+    // Griddap (gridded, metadata-only) datasets: the optional coverage
+    // layer (all matching bboxes, toggled off by default) and the
+    // single-dataset highlight (hover from the list / pinned while a WMS
+    // overlay is shown). GeoJSON sources — coverage is tens of features
+    // served whole by /griddapCoverage, not tiles. Inserted before
+    // 'points-highlighted' so selection/hover circles stay on top.
+    map.current.addSource("griddap-coverage", {
+      type: "geojson",
+      // pk as the feature id so the hover feature-state below can address
+      // individual rectangles.
+      promoteId: "pk",
+      data: griddapCoverageRef.current || emptyFeatureCollection,
+    });
+    map.current.addSource("griddap-highlight", {
+      type: "geojson",
+      data: emptyFeatureCollection,
+    });
+    map.current.addLayer(
+      {
+        id: "griddap-coverage-fill",
+        type: "fill",
+        source: "griddap-coverage",
+        // Light wash at rest, a touch stronger on hover. Kept low because
+        // overlapping rectangles composite: a dozen grids stacked over the
+        // same water turn any generous fill into a solid slab, so the hover
+        // affordance leans on the outline below rather than the fill.
+        paint: {
+          "fill-color": "#52a79b",
+          "fill-opacity": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            0.12,
+            0.07,
+          ],
+        },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-coverage-line",
+        type: "line",
+        source: "griddap-coverage",
+        paint: {
+          "line-color": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            "#fbb03b",
+            "#52a79b",
+          ],
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            2.5,
+            1.5,
+          ],
+          "line-dasharray": [2, 2],
+        },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-highlight-fill",
+        type: "fill",
+        source: "griddap-highlight",
+        paint: { "fill-color": "#fbb03b", "fill-opacity": 0.1 },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-highlight-line",
+        type: "line",
+        source: "griddap-highlight",
+        paint: { "line-color": "#fbb03b", "line-width": 2.5 },
+      },
+      "points-highlighted",
+    );
+  }
+
+  function addClickHighlightLayers() {
+    // --- Clicked region ---------------------------------------------------
+    // What the "what's here" card is talking about. Added last of the overlay
+    // layers and never given a beforeId, so it draws over every data layer —
+    // the whole job is being unmistakable, and a highlight the markers cover
+    // is no highlight. Cleared when the card closes.
+    map.current.addSource("click-highlight", {
+      type: "geojson",
+      data: emptyFeatureCollection,
+    });
+    // The flat merged fill goes down first. A stack of grid boxes draws its
+    // glow (below) per individual box, not once for the merged shape — put
+    // the fill on top of that glow instead and every box nested inside the
+    // stack has its glow smothered from both sides by the fill covering it,
+    // leaving only the outermost box's glow poking out past the fill's own
+    // edge. That read as "just the biggest box got selected" even though
+    // every box was outlined and listed correctly.
+    map.current.addLayer({
+      id: "click-highlight-fill",
+      type: "fill",
+      source: "click-highlight",
+      // Excludes the individual grid rectangles, which the merged stand-in
+      // shape fills on their behalf — see the `role` comment in
+      // buildFeatureQuery. Painting both would compound a stack's opacity;
+      // painting only the individual boxes is exactly what this avoids.
+      filter: [
+        "all",
+        ["!=", ["geometry-type"], "Point"],
+        ["!=", ["get", "role"], "outline"],
+      ],
+      paint: {
+        "fill-color": clickHighlightColor,
+        "fill-opacity": 0.18,
+      },
+    });
+    // A soft blurred halo under the crisp outline/point below, so the
+    // selected item reads as picked out at a glance instead of just
+    // outlined. Point and polygon geometries blur through different paint
+    // properties (circle-blur vs. line-blur), so each gets its own layer.
+    // Painted after the fill above so every box's glow shows through it,
+    // not just the outermost one's.
+    map.current.addLayer({
+      id: "click-highlight-glow",
+      type: "line",
+      source: "click-highlight",
+      // Excludes the fill-only merged grid shape — see click-highlight-fill.
+      filter: [
+        "all",
+        ["!=", ["geometry-type"], "Point"],
+        ["!=", ["get", "role"], "fill"],
+      ],
+      paint: {
+        "line-color": clickHighlightColor,
+        "line-width": 10,
+        "line-blur": 8,
+        "line-opacity": 0.85,
+      },
+    });
+    map.current.addLayer({
+      id: "click-highlight-point-glow",
+      type: "circle",
+      source: "click-highlight",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius-transition": NO_TRANSITION,
+        "circle-radius": radiusExpression(pointRadiusRange.current, 6),
+        "circle-color": clickHighlightColor,
+        "circle-blur": 0.8,
+        "circle-opacity": 0.85,
+      },
+    });
+    map.current.addLayer({
+      id: "click-highlight-line",
+      type: "line",
+      source: "click-highlight",
+      // Excludes the fill-only merged grid shape: it exists purely to give
+      // the fill layer a flat-opacity stand-in, and its outline would just
+      // duplicate the outer envelope of the individual boxes drawn here.
+      filter: [
+        "all",
+        ["!=", ["geometry-type"], "Point"],
+        ["!=", ["get", "role"], "fill"],
+      ],
+      paint: {
+        "line-color": clickHighlightColor,
+        "line-width": 2.5,
+      },
+    });
+    // A marker is outlined, not enlarged and not filled: it keeps the size the
+    // ramp gave it (so the legend's size key still reads true) and the
+    // platform colour underneath stays visible. The radius is the same
+    // expression 'points' paints with, evaluated against the `count` carried
+    // on the highlight feature, so the ring sits exactly on the marker's edge
+    // rather than around it.
+    //
+    // The marker's own circle-stroke can't be used for this: it is the
+    // invisible 10px hit halo (see the 'points' paint), 2-4x the drawn circle.
+    map.current.addLayer({
+      id: "click-highlight-point",
+      type: "circle",
+      source: "click-highlight",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius-transition": NO_TRANSITION,
+        "circle-radius": radiusExpression(pointRadiusRange.current),
+        "circle-color": "rgba(0, 0, 0, 0)",
+        "circle-stroke-color": "#000000",
+        "circle-stroke-width": 1.5,
+      },
+    });
+  }
+
+  function addTrackLayers() {
+    // --- Track-line layers ---------------------------------------------
+    // Track lines + head positions from /tiles/tracks, shown only when the
+    // track-lines switch is on. Independent of the trajectory hex layers —
+    // both can draw at once. Created via refs so the current switch state and
+    // scrub window apply even though this load handler runs once.
+    const tracksVisibility = tracksModeRef.current ? "visible" : "none";
+    map.current.addSource("tracks", {
+      type: "vector",
+      // No minzoom: track lines/heads render at every zoom level, including
+      // fully zoomed out. maxzoom caps the fetched tile zoom at 8 and lets
+      // maplibre overzoom past it rather than re-fetch expensive tiles at
+      // every zoom level in. NOTE: at low zoom a single tile can assemble
+      // every trajectory over the whole time window (100k+ features,
+      // multi-MB) — the bounded default trail (defaultTrailingDays) and the
+      // long-trail zoom gate (effectiveTrailingDays, both in config.js) keep
+      // that in check. If it regresses, add server-side low-zoom
+      // simplification in web-api/routes/tiles.js rather than a minzoom.
+      maxzoom: 8,
+      tiles: [
+        buildTracksTileUrl(
+          mapQueryRef.current,
+          scrubTimeRef.current,
+          trailingDaysRef.current,
+          map.current.getZoom(),
+        ),
+      ],
+    });
+    appliedTrailRef.current = effectiveTrailingDays(
+      trailingDaysRef.current,
+      map.current.getZoom(),
+    );
+
+    // Crossing the long-trail zoom gate changes the window the tracks tiles
+    // carry, so the source is rebuilt — but only on an actual crossing, not
+    // on every zoomend, since setTiles drops the whole tile cache.
+    map.current.on("zoomend", () => {
+      if (!tracksModeRef.current || !map.current.getSource("tracks")) return;
+      const effective = effectiveTrailingDays(
+        trailingDaysRef.current,
+        map.current.getZoom(),
+      );
+      if (effective === appliedTrailRef.current) return;
+      refreshTracksSource(
+        mapQueryRef.current,
+        scrubTimeRef.current,
+        trailingDaysRef.current,
+      );
+    });
+
+    map.current.addLayer({
+      id: "track-lines",
+      type: "line",
+      source: "tracks",
+      "source-layer": "track-lines",
+      layout: {
+        visibility: tracksVisibility,
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": trackLineColor,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 2, 1, 10, 2.5],
+        // Partial opacity so coincident tracks compound: many voyages ply
+        // the same shipping corridor (27 St. Lawrence voyages in a 90-day
+        // window overlap into what full opacity renders as ONE line), and
+        // stacked translucent lines read as a visibly busier corridor.
+        "line-opacity": 0.55,
+      },
+    });
+
+    // No per-fix markers on the global tracks layer: clicking a track draws
+    // that platform's own track, marked fix by fix ('selected-track' below),
+    // which is the detail view breadcrumb dots only hinted at.
+    //
+    // Heads with a known course over ground render as arrowheads rotated
+    // to the direction of travel; heads where cog is undefined (single-fix
+    // trajectories, stationary platforms) fall back to circles.
+    map.current.addImage(
+      "track-head-arrow",
+      buildHeadArrowImage(trackLineColor),
+      {
+        pixelRatio: 2,
+      },
+    );
+    map.current.addImage(
+      "track-head-arrow-dim",
+      buildHeadArrowImage("lightgrey"),
+      {
+        pixelRatio: 2,
+      },
+    );
+
+    map.current.addLayer({
+      id: "track-heads",
+      type: "symbol",
+      source: "tracks",
+      "source-layer": "track-heads",
+      filter: ["has", "cog"],
+      layout: {
+        visibility: tracksVisibility,
+        "icon-image": "track-head-arrow",
+        "icon-rotate": ["get", "cog"],
+        // rotate with the map, not the viewport, so the arrow keeps
+        // pointing along the geographic course
+        "icon-rotation-alignment": "map",
+        // Collision culling is zoom-gated at hexMaxZoom (7). Below it a tile
+        // can carry ~100k heads (whole catalogue at low zoom) — forcing every
+        // one to render overwhelms the tab, so let maplibre drop overlapping
+        // arrows there. At/above z7 a tile covers a small enough area that the
+        // head count is a few hundred, so overlap/ignore-placement are safe
+        // and every heading stays visible (the /tiles/tracks per-tile cap also
+        // bounds the count). z7 is the same breakpoint hexes→points use.
+        "icon-allow-overlap": ["step", ["zoom"], false, hexMaxZoom, true],
+        "icon-ignore-placement": ["step", ["zoom"], false, hexMaxZoom, true],
+        // When culling (below z7), keep the most recent heads deterministically
+        // rather than an arbitrary subset.
+        "symbol-sort-key": ["-", 0, ["coalesce", ["get", "head_time"], 0]],
+      },
+    });
+
+    map.current.addLayer({
+      id: "track-heads-fixed",
+      type: "circle",
+      source: "tracks",
+      "source-layer": "track-heads",
+      filter: ["!", ["has", "cog"]],
+      layout: { visibility: tracksVisibility },
+      paint: {
+        "circle-color": trackLineColor,
+        "circle-radius": 4.5,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 1.5,
+      },
+    });
+
+    // These three layers were just created in full colour, so whatever focus
+    // paint was on the old ones is gone with them.
+    trackFocusApplied.current = undefined;
+    applyTrackFocus();
+  }
+
+  function addSelectedTrackLayers() {
+    // One selected platform's track (GeoJSON from /trajectories/track, clipped
+    // to the time filter — see renderSelectedTrack).
+    // Line features render the path; point features are the raw fixes.
+    map.current.addSource("selected-track", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
+
+    // Painted in the click-highlight colour rather than one of its own: a
+    // drawn track is what the last click found, the same as the ring around
+    // a clicked marker or the outline around a clicked hex, so it wears the
+    // same accent instead of teaching the reader a second "this is what you
+    // asked about" colour. It used to be crimson, which read as one more
+    // data layer beside the purple tracks and the amber griddap coverage.
+    map.current.addLayer({
+      id: "selected-track-line",
+      type: "line",
+      source: "selected-track",
+      filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": clickHighlightColor,
+        "line-width": 3,
+      },
+    });
+
+    // Raw fixes with a known course over ground render as arrowheads
+    // (white fill, highlight-coloured outline — the inverse of the global
+    // heads, matching the old fix circles); fixes where cog is undefined
+    // (singleton runs) keep circles.
+    map.current.addImage(
+      "selected-fix-arrow",
+      buildHeadArrowImage("#ffffff", clickHighlightColor),
+      { pixelRatio: 2 },
+    );
+
+    map.current.addLayer({
+      id: "selected-track-fixes",
+      type: "symbol",
+      source: "selected-track",
+      // full expression syntax ('geometry-type', not the legacy '$type'):
+      // MapLibre 5 rejects filters that mix legacy and expression operators
+      filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "cog"]],
+      layout: {
+        "icon-image": "selected-fix-arrow",
+        "icon-size": 0.75,
+        "icon-rotate": ["get", "cog"],
+        "icon-rotation-alignment": "map",
+        // Breadcrumbs, not one arrowhead per fix. A retained track runs to
+        // tens of thousands of fixes (the harvester's per-trajectory cap is
+        // 60k), and forcing every one to draw — which allow-overlap true did
+        // — buried the line under a solid mass of overlapping arrows at any
+        // zoom that showed more than a few hours of it.
+        //
+        // Letting MapLibre's collision index do the thinning keeps a subset
+        // spaced icon-padding apart on SCREEN, so the density is right at
+        // every zoom and fills back in as you zoom into a stretch — no
+        // decimation constant to pick, and no re-generating the source on
+        // zoom. Placement walks the layer in feature order, which is time
+        // order here, so the survivors are an even walk along the track
+        // rather than an arbitrary subset. This layer is the top-most symbol
+        // layer, so it is placed before (and therefore wins against) the
+        // basemap labels underneath it, which the old solid mass of arrows
+        // covered up anyway.
+        "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-padding": 4,
+      },
+    });
+
+    map.current.addLayer({
+      id: "selected-track-fixes-nocog",
+      type: "circle",
+      source: "selected-track",
+      filter: [
+        "all",
+        ["==", ["geometry-type"], "Point"],
+        ["!", ["has", "cog"]],
+      ],
+      paint: {
+        "circle-color": "#ffffff",
+        "circle-radius": 3,
+        "circle-stroke-color": clickHighlightColor,
+        "circle-stroke-width": 1.5,
+      },
+    });
+  }
+
   useEffect(() => {
     // If already created don't proceed
     if (map.current) return;
@@ -2228,648 +2880,11 @@ export default function CreateMap({
 
     map.current.on("load", () => {
       setColorStopsRef.current();
-
-      const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
-
-      // Two shared vector sources for all point/hex layers. Each layer used to
-      // carry its own inline source — six separate copies of the same two tile
-      // pyramids, each fetched and parsed independently on every pan. The
-      // highlight layer renders nothing until a pk filter is set, and those pks
-      // always come from queryRenderedFeatures on the filtered layers, so
-      // sharing the filtered sources loses nothing.
-      //
-      // maxzoom stops at the level past which the server has nothing new to
-      // say: routes/tiles.js selects individual points for any z >= 7, so a z17
-      // tile is the same content as its z14 parent cut into 64 pieces — 64
-      // ST_AsMVT queries for one tile's worth of data. Capping the source lets
-      // MapLibre overzoom instead. Precision is unaffected in practice:
-      // ST_AsMVTGeom at extent 4096 over a z14 tile is ~0.42 m/unit at 45°N,
-      // finer than a z17 pixel (0.84 m). It matters more than the tile count
-      // suggests, because every filter change calls setTiles below, which drops
-      // the whole cache and refetches from scratch.
-      //
-      // promoteId lifts each feature's pk to its feature id, which is what
-      // setFeatureState addresses — see the focus dimming above.
-      map.current.addSource("cde-tiles", {
-        type: "vector",
-        tiles: [tileQuery],
-        maxzoom: 14,
-        promoteId: "pk",
-      });
-      map.current.addSource("cde-cells", {
-        type: "vector",
-        tiles: [cellTileQuery],
-        maxzoom: 14,
-        promoteId: "pk",
-      });
-
-      // Every data layer is inserted below the basemap's label layers
-      // (beforeId FIRST_LABEL_LAYER_ID or an existing data layer) so water
-      // and place names stay readable over hexes and points.
-      map.current.addLayer(
-        {
-          id: "points",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-          layout: {
-            "circle-sort-key": ["get", "count"],
-          },
-          paint: {
-            // Zero until the ramp is final — see revealData. Both the colour
-            // below and the radius above come off the ramp, so before it lands
-            // these are placeholder values.
-            "circle-opacity": dataRevealed.current ? circleOpacity : 0,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current),
-            // setColorStops rewrites this one whenever the ramp moves — see
-            // NO_TRANSITION.
-            "circle-color-transition": NO_TRANSITION,
-            "circle-color": dimmable(colors),
-            "circle-stroke-color": dimmable(colors),
-            "circle-stroke-opacity": 0.001,
-            "circle-stroke-width": 10,
-          },
-        },
-        FIRST_LABEL_LAYER_ID,
-      );
-
-      // Trajectory and OBIS coverage cells, always drawn as hexes. Inserted
-      // with beforeId 'points' (which must already exist on the map —
-      // MapLibre throws otherwise) so they sit at the bottom of the stack,
-      // under the points layer. Below hexMaxZoom their counts are already
-      // merged into the green 'hexes' layer; this layer only takes over once
-      // profiles switch to points. A hex is coloured by what it holds —
-      // trajectories, occurrence records, or both — see coverageHexFillColor.
-      map.current.addLayer(
-        {
-          id: "coverage-hexes",
-          type: "fill",
-          minzoom: hexMaxZoom,
-          source: "cde-cells",
-          "source-layer": "coverage-hexes-layer",
-          paint: {
-            // Zero until the ramp is final — see revealData. Then a plain
-            // taper with zoom; the count's share of the transparency rides on
-            // the fill colour's alpha (toRampStops).
-            "fill-opacity": dataRevealed.current
-              ? coverageHexOpacityExpression()
-              : 0,
-            // Neither this nor the colours below may transition — see
-            // NO_TRANSITION. For the opacity that delay was the flicker on the
-            // opening reveal and on every threshold change after it; for the
-            // colours it is the lag between the tiles landing and the ramp
-            // arriving on them.
-            "fill-opacity-transition": NO_TRANSITION,
-            "fill-color": dimmable(coverageHexFillColor()),
-            "fill-color-transition": NO_TRANSITION,
-            "fill-outline-color": coverageHexOutlineColor(),
-          },
-        },
-        "points",
-      );
-
-      // What is left of a coverage cell once the fill has faded out from under
-      // it: the boundary alone, in the fill's own ramp colour, over an
-      // unobscured basemap. A fill layer's 'fill-outline-color' is drawn at the
-      // fill's own opacity, so it goes exactly when the fill does and cannot be
-      // the thing that outlives it — hence a line layer of its own, reading the
-      // same source and rising over the same zooms the fill falls across.
-      //
-      // Gated by the same opening reveal as the fills, and repainted by
-      // setColorStops with them: it carries the ramp, so it has the same reason
-      // not to be seen wearing the placeholder one.
-      map.current.addLayer(
-        {
-          id: "coverage-hex-outlines",
-          type: "line",
-          minzoom: hexMaxZoom,
-          source: "cde-cells",
-          "source-layer": "coverage-hexes-layer",
-          paint: {
-            "line-color-transition": NO_TRANSITION,
-            "line-color": coverageHexBorderColor(),
-            "line-opacity-transition": NO_TRANSITION,
-            "line-opacity": dataRevealed.current
-              ? coverageHexOutlineOpacityExpression()
-              : 0,
-            // Wide enough that a colour reads off it — it is standing in for a
-            // whole hexagon of fill.
-            "line-width": 2,
-          },
-        },
-        "points",
-      );
-
-      // Purely visual white casing under the points so they stay readable
-      // over the coverage hex fills; all interaction stays on 'points',
-      // which keeps its invisible wide-stroke hit area.
-      //
-      // No 'circle-sort-key' here, unlike 'points' and 'points-highlighted',
-      // and deliberately so rather than by oversight. Every feature in this
-      // layer is the same #ffffff, and alpha-over compositing of identical RGB
-      // is order-independent — two overlapping casings come out white at
-      // 1-(1-a1)(1-a2) whichever is drawn first, including the dimmed 0.5 /
-      // undimmed 0.9 mix pointsHaloOpacity produces. A sort key here would be
-      // invisible and would still cost a per-tile sort on the worker.
-      map.current.addLayer(
-        {
-          id: "points-halo",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-          paint: {
-            "circle-color": "#ffffff",
-            // Zero until the ramp is final — see revealData. It has no colour
-            // on the ramp, but its radius is sized off the same one the points
-            // are, and a casing without its point is just a white dot.
-            "circle-opacity": dataRevealed.current ? pointsHaloOpacity() : 0,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
-          },
-        },
-        "points",
-      );
-
-      map.current.addLayer(
-        {
-          id: "hexes",
-          type: "fill",
-          minzoom: hexMinZoom,
-          maxzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-
-          paint: {
-            // Zero until the ramp is final — see revealData. Then a plain taper
-            // with zoom; the count's share of the transparency rides on the fill
-            // colour's alpha (toRampStops).
-            "fill-opacity": dataRevealed.current ? hexOpacityExpression() : 0,
-            // Neither this nor the colour below may transition — see
-            // NO_TRANSITION. For the opacity that delay was the flicker on the
-            // opening reveal and on every threshold change after it; for the
-            // colour it is the lag between the tiles landing and the ramp
-            // arriving on them.
-            "fill-opacity-transition": NO_TRANSITION,
-            // A real interpolate expression rather than the legacy
-            // { property, stops } paint function, because that form cannot be
-            // nested inside the 'case' dimmable wraps it in — the same reason
-            // coverageHexFillColor builds its ramps through rampExpression.
-            "fill-color": dimmable(hexFillColor()),
-            "fill-color-transition": NO_TRANSITION,
-          },
-        },
-        FIRST_LABEL_LAYER_ID,
-      );
-
-      map.current.addLayer(
-        {
-          id: "points-highlighted",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-          layout: {
-            // The same key 'points' carries, and it has to be: this layer draws a
-            // filled circle plus a selection ring over the same features, so if
-            // the two sorted differently the rings and the markers under them
-            // would disagree about which of an overlapping pair is on top.
-            "circle-sort-key": ["get", "count"],
-          },
-          paint: {
-            "circle-color": dimmable(colors),
-            "circle-opacity": circleOpacity,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current),
-            "circle-stroke-color": "black",
-            // The selection ring is dropped on dimmed points: a focused dataset
-            // greys the rest of the map, and a black ring around a grey circle
-            // would still read as picked out.
-            "circle-stroke-width": ["case", IS_DIMMED, 0, 0.75],
-          },
-          filter: ["in", "pk", ""],
-        },
-        FIRST_LABEL_LAYER_ID,
-      );
-
-      // Griddap (gridded, metadata-only) datasets: the optional coverage
-      // layer (all matching bboxes, toggled off by default) and the
-      // single-dataset highlight (hover from the list / pinned while a WMS
-      // overlay is shown). GeoJSON sources — coverage is tens of features
-      // served whole by /griddapCoverage, not tiles. Inserted before
-      // 'points-highlighted' so selection/hover circles stay on top.
-      map.current.addSource("griddap-coverage", {
-        type: "geojson",
-        // pk as the feature id so the hover feature-state below can address
-        // individual rectangles.
-        promoteId: "pk",
-        data: griddapCoverageRef.current || emptyFeatureCollection,
-      });
-      map.current.addSource("griddap-highlight", {
-        type: "geojson",
-        data: emptyFeatureCollection,
-      });
-      map.current.addLayer(
-        {
-          id: "griddap-coverage-fill",
-          type: "fill",
-          source: "griddap-coverage",
-          // Light wash at rest, a touch stronger on hover. Kept low because
-          // overlapping rectangles composite: a dozen grids stacked over the
-          // same water turn any generous fill into a solid slab, so the hover
-          // affordance leans on the outline below rather than the fill.
-          paint: {
-            "fill-color": "#52a79b",
-            "fill-opacity": [
-              "case",
-              ["boolean", ["feature-state", "hovered"], false],
-              0.12,
-              0.07,
-            ],
-          },
-        },
-        "points-highlighted",
-      );
-      map.current.addLayer(
-        {
-          id: "griddap-coverage-line",
-          type: "line",
-          source: "griddap-coverage",
-          paint: {
-            "line-color": [
-              "case",
-              ["boolean", ["feature-state", "hovered"], false],
-              "#fbb03b",
-              "#52a79b",
-            ],
-            "line-width": [
-              "case",
-              ["boolean", ["feature-state", "hovered"], false],
-              2.5,
-              1.5,
-            ],
-            "line-dasharray": [2, 2],
-          },
-        },
-        "points-highlighted",
-      );
-      map.current.addLayer(
-        {
-          id: "griddap-highlight-fill",
-          type: "fill",
-          source: "griddap-highlight",
-          paint: { "fill-color": "#fbb03b", "fill-opacity": 0.1 },
-        },
-        "points-highlighted",
-      );
-      map.current.addLayer(
-        {
-          id: "griddap-highlight-line",
-          type: "line",
-          source: "griddap-highlight",
-          paint: { "line-color": "#fbb03b", "line-width": 2.5 },
-        },
-        "points-highlighted",
-      );
-
-      // --- Clicked region ---------------------------------------------------
-      // What the "what's here" card is talking about. Added last of the overlay
-      // layers and never given a beforeId, so it draws over every data layer —
-      // the whole job is being unmistakable, and a highlight the markers cover
-      // is no highlight. Cleared when the card closes.
-      map.current.addSource("click-highlight", {
-        type: "geojson",
-        data: emptyFeatureCollection,
-      });
-      // The flat merged fill goes down first. A stack of grid boxes draws its
-      // glow (below) per individual box, not once for the merged shape — put
-      // the fill on top of that glow instead and every box nested inside the
-      // stack has its glow smothered from both sides by the fill covering it,
-      // leaving only the outermost box's glow poking out past the fill's own
-      // edge. That read as "just the biggest box got selected" even though
-      // every box was outlined and listed correctly.
-      map.current.addLayer({
-        id: "click-highlight-fill",
-        type: "fill",
-        source: "click-highlight",
-        // Excludes the individual grid rectangles, which the merged stand-in
-        // shape fills on their behalf — see the `role` comment in
-        // buildFeatureQuery. Painting both would compound a stack's opacity;
-        // painting only the individual boxes is exactly what this avoids.
-        filter: [
-          "all",
-          ["!=", ["geometry-type"], "Point"],
-          ["!=", ["get", "role"], "outline"],
-        ],
-        paint: {
-          "fill-color": clickHighlightColor,
-          "fill-opacity": 0.18,
-        },
-      });
-      // A soft blurred halo under the crisp outline/point below, so the
-      // selected item reads as picked out at a glance instead of just
-      // outlined. Point and polygon geometries blur through different paint
-      // properties (circle-blur vs. line-blur), so each gets its own layer.
-      // Painted after the fill above so every box's glow shows through it,
-      // not just the outermost one's.
-      map.current.addLayer({
-        id: "click-highlight-glow",
-        type: "line",
-        source: "click-highlight",
-        // Excludes the fill-only merged grid shape — see click-highlight-fill.
-        filter: [
-          "all",
-          ["!=", ["geometry-type"], "Point"],
-          ["!=", ["get", "role"], "fill"],
-        ],
-        paint: {
-          "line-color": clickHighlightColor,
-          "line-width": 10,
-          "line-blur": 8,
-          "line-opacity": 0.85,
-        },
-      });
-      map.current.addLayer({
-        id: "click-highlight-point-glow",
-        type: "circle",
-        source: "click-highlight",
-        filter: ["==", ["geometry-type"], "Point"],
-        paint: {
-          "circle-radius-transition": NO_TRANSITION,
-          "circle-radius": radiusExpression(pointRadiusRange.current, 6),
-          "circle-color": clickHighlightColor,
-          "circle-blur": 0.8,
-          "circle-opacity": 0.85,
-        },
-      });
-      map.current.addLayer({
-        id: "click-highlight-line",
-        type: "line",
-        source: "click-highlight",
-        // Excludes the fill-only merged grid shape: it exists purely to give
-        // the fill layer a flat-opacity stand-in, and its outline would just
-        // duplicate the outer envelope of the individual boxes drawn here.
-        filter: [
-          "all",
-          ["!=", ["geometry-type"], "Point"],
-          ["!=", ["get", "role"], "fill"],
-        ],
-        paint: {
-          "line-color": clickHighlightColor,
-          "line-width": 2.5,
-        },
-      });
-      // A marker is outlined, not enlarged and not filled: it keeps the size the
-      // ramp gave it (so the legend's size key still reads true) and the
-      // platform colour underneath stays visible. The radius is the same
-      // expression 'points' paints with, evaluated against the `count` carried
-      // on the highlight feature, so the ring sits exactly on the marker's edge
-      // rather than around it.
-      //
-      // The marker's own circle-stroke can't be used for this: it is the
-      // invisible 10px hit halo (see the 'points' paint), 2-4x the drawn circle.
-      map.current.addLayer({
-        id: "click-highlight-point",
-        type: "circle",
-        source: "click-highlight",
-        filter: ["==", ["geometry-type"], "Point"],
-        paint: {
-          "circle-radius-transition": NO_TRANSITION,
-          "circle-radius": radiusExpression(pointRadiusRange.current),
-          "circle-color": "rgba(0, 0, 0, 0)",
-          "circle-stroke-color": "#000000",
-          "circle-stroke-width": 1.5,
-        },
-      });
-
-      // --- Track-line layers ---------------------------------------------
-      // Track lines + head positions from /tiles/tracks, shown only when the
-      // track-lines switch is on. Independent of the trajectory hex layers —
-      // both can draw at once. Created via refs so the current switch state and
-      // scrub window apply even though this load handler runs once.
-      const tracksVisibility = tracksModeRef.current ? "visible" : "none";
-      map.current.addSource("tracks", {
-        type: "vector",
-        // No minzoom: track lines/heads render at every zoom level, including
-        // fully zoomed out. maxzoom caps the fetched tile zoom at 8 and lets
-        // maplibre overzoom past it rather than re-fetch expensive tiles at
-        // every zoom level in. NOTE: at low zoom a single tile can assemble
-        // every trajectory over the whole time window (100k+ features,
-        // multi-MB) — the bounded default trail (defaultTrailingDays) and the
-        // long-trail zoom gate (effectiveTrailingDays, both in config.js) keep
-        // that in check. If it regresses, add server-side low-zoom
-        // simplification in web-api/routes/tiles.js rather than a minzoom.
-        maxzoom: 8,
-        tiles: [
-          buildTracksTileUrl(
-            mapQueryRef.current,
-            scrubTimeRef.current,
-            trailingDaysRef.current,
-            map.current.getZoom(),
-          ),
-        ],
-      });
-      appliedTrailRef.current = effectiveTrailingDays(
-        trailingDaysRef.current,
-        map.current.getZoom(),
-      );
-
-      // Crossing the long-trail zoom gate changes the window the tracks tiles
-      // carry, so the source is rebuilt — but only on an actual crossing, not
-      // on every zoomend, since setTiles drops the whole tile cache.
-      map.current.on("zoomend", () => {
-        if (!tracksModeRef.current || !map.current.getSource("tracks")) return;
-        const effective = effectiveTrailingDays(
-          trailingDaysRef.current,
-          map.current.getZoom(),
-        );
-        if (effective === appliedTrailRef.current) return;
-        refreshTracksSource(
-          mapQueryRef.current,
-          scrubTimeRef.current,
-          trailingDaysRef.current,
-        );
-      });
-
-      map.current.addLayer({
-        id: "track-lines",
-        type: "line",
-        source: "tracks",
-        "source-layer": "track-lines",
-        layout: {
-          visibility: tracksVisibility,
-          "line-cap": "round",
-          "line-join": "round",
-        },
-        paint: {
-          "line-color": trackLineColor,
-          "line-width": ["interpolate", ["linear"], ["zoom"], 2, 1, 10, 2.5],
-          // Partial opacity so coincident tracks compound: many voyages ply
-          // the same shipping corridor (27 St. Lawrence voyages in a 90-day
-          // window overlap into what full opacity renders as ONE line), and
-          // stacked translucent lines read as a visibly busier corridor.
-          "line-opacity": 0.55,
-        },
-      });
-
-      // No per-fix markers on the global tracks layer: clicking a track draws
-      // that platform's own track, marked fix by fix ('selected-track' below),
-      // which is the detail view breadcrumb dots only hinted at.
-      //
-      // Heads with a known course over ground render as arrowheads rotated
-      // to the direction of travel; heads where cog is undefined (single-fix
-      // trajectories, stationary platforms) fall back to circles.
-      map.current.addImage(
-        "track-head-arrow",
-        buildHeadArrowImage(trackLineColor),
-        {
-          pixelRatio: 2,
-        },
-      );
-      map.current.addImage(
-        "track-head-arrow-dim",
-        buildHeadArrowImage("lightgrey"),
-        {
-          pixelRatio: 2,
-        },
-      );
-
-      map.current.addLayer({
-        id: "track-heads",
-        type: "symbol",
-        source: "tracks",
-        "source-layer": "track-heads",
-        filter: ["has", "cog"],
-        layout: {
-          visibility: tracksVisibility,
-          "icon-image": "track-head-arrow",
-          "icon-rotate": ["get", "cog"],
-          // rotate with the map, not the viewport, so the arrow keeps
-          // pointing along the geographic course
-          "icon-rotation-alignment": "map",
-          // Collision culling is zoom-gated at hexMaxZoom (7). Below it a tile
-          // can carry ~100k heads (whole catalogue at low zoom) — forcing every
-          // one to render overwhelms the tab, so let maplibre drop overlapping
-          // arrows there. At/above z7 a tile covers a small enough area that the
-          // head count is a few hundred, so overlap/ignore-placement are safe
-          // and every heading stays visible (the /tiles/tracks per-tile cap also
-          // bounds the count). z7 is the same breakpoint hexes→points use.
-          "icon-allow-overlap": ["step", ["zoom"], false, hexMaxZoom, true],
-          "icon-ignore-placement": ["step", ["zoom"], false, hexMaxZoom, true],
-          // When culling (below z7), keep the most recent heads deterministically
-          // rather than an arbitrary subset.
-          "symbol-sort-key": ["-", 0, ["coalesce", ["get", "head_time"], 0]],
-        },
-      });
-
-      map.current.addLayer({
-        id: "track-heads-fixed",
-        type: "circle",
-        source: "tracks",
-        "source-layer": "track-heads",
-        filter: ["!", ["has", "cog"]],
-        layout: { visibility: tracksVisibility },
-        paint: {
-          "circle-color": trackLineColor,
-          "circle-radius": 4.5,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1.5,
-        },
-      });
-
-      // These three layers were just created in full colour, so whatever focus
-      // paint was on the old ones is gone with them.
-      trackFocusApplied.current = undefined;
-      applyTrackFocus();
-
-      // One selected platform's track (GeoJSON from /trajectories/track, clipped
-      // to the time filter — see renderSelectedTrack).
-      // Line features render the path; point features are the raw fixes.
-      map.current.addSource("selected-track", {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
-
-      // Painted in the click-highlight colour rather than one of its own: a
-      // drawn track is what the last click found, the same as the ring around
-      // a clicked marker or the outline around a clicked hex, so it wears the
-      // same accent instead of teaching the reader a second "this is what you
-      // asked about" colour. It used to be crimson, which read as one more
-      // data layer beside the purple tracks and the amber griddap coverage.
-      map.current.addLayer({
-        id: "selected-track-line",
-        type: "line",
-        source: "selected-track",
-        filter: ["==", ["geometry-type"], "LineString"],
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": clickHighlightColor,
-          "line-width": 3,
-        },
-      });
-
-      // Raw fixes with a known course over ground render as arrowheads
-      // (white fill, highlight-coloured outline — the inverse of the global
-      // heads, matching the old fix circles); fixes where cog is undefined
-      // (singleton runs) keep circles.
-      map.current.addImage(
-        "selected-fix-arrow",
-        buildHeadArrowImage("#ffffff", clickHighlightColor),
-        { pixelRatio: 2 },
-      );
-
-      map.current.addLayer({
-        id: "selected-track-fixes",
-        type: "symbol",
-        source: "selected-track",
-        // full expression syntax ('geometry-type', not the legacy '$type'):
-        // MapLibre 5 rejects filters that mix legacy and expression operators
-        filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "cog"]],
-        layout: {
-          "icon-image": "selected-fix-arrow",
-          "icon-size": 0.75,
-          "icon-rotate": ["get", "cog"],
-          "icon-rotation-alignment": "map",
-          // Breadcrumbs, not one arrowhead per fix. A retained track runs to
-          // tens of thousands of fixes (the harvester's per-trajectory cap is
-          // 60k), and forcing every one to draw — which allow-overlap true did
-          // — buried the line under a solid mass of overlapping arrows at any
-          // zoom that showed more than a few hours of it.
-          //
-          // Letting MapLibre's collision index do the thinning keeps a subset
-          // spaced icon-padding apart on SCREEN, so the density is right at
-          // every zoom and fills back in as you zoom into a stretch — no
-          // decimation constant to pick, and no re-generating the source on
-          // zoom. Placement walks the layer in feature order, which is time
-          // order here, so the survivors are an even walk along the track
-          // rather than an arbitrary subset. This layer is the top-most symbol
-          // layer, so it is placed before (and therefore wins against) the
-          // basemap labels underneath it, which the old solid mass of arrows
-          // covered up anyway.
-          "icon-allow-overlap": false,
-          "icon-ignore-placement": false,
-          "icon-padding": 4,
-        },
-      });
-
-      map.current.addLayer({
-        id: "selected-track-fixes-nocog",
-        type: "circle",
-        source: "selected-track",
-        filter: [
-          "all",
-          ["==", ["geometry-type"], "Point"],
-          ["!", ["has", "cog"]],
-        ],
-        paint: {
-          "circle-color": "#ffffff",
-          "circle-radius": 3,
-          "circle-stroke-color": clickHighlightColor,
-          "circle-stroke-width": 1.5,
-        },
-      });
+      addObservationLayers();
+      addGriddapLayers();
+      addClickHighlightLayers();
+      addTrackLayers();
+      addSelectedTrackLayers();
 
       // Apply the initial track-layer visibility from the URL-restored
       // track-lines switch + data-layer selection.
