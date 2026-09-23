@@ -162,7 +162,7 @@
 }
 
 .brandLanguage {
-  font-size: var(--cioos-font-size-md);
+  font-size: var(--cioos-font-size-sm);
   font-weight: 700;
 }
 
