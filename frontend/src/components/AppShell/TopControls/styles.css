@@ -394,36 +394,32 @@
     border-radius: 0;
   }
 
-  /* One rung under the mobile body size. This strip is a compact segmented
-     control rather than running text, and at the full 16px the French label no
-     longer fitted its half of the row: it wrapped, and a wrapped label is not
-     merely two lines — its box is still as wide as the column gave it, so the
-     text sat in a box half again its own width and the slack read as a gap
-     between the icon and the words. At 14px "Jeux de données" is back on one
-     line from 360px up, so the box is the text and there is no slack to place.
-     Still two rungs above the 12px this label used to be pinned at, and the
-     wrap (with the start alignment above) is left as the fallback for the
-     narrowest phones, where nothing fits on one line. */
+  /* Two rungs under the mobile body size: this strip is a compact segmented
+     control rather than running text, and every pixel it takes comes off the
+     map. The wrap (with the centred alignment above) stays the fallback for
+     labels that still don't fit on one line. */
   .topBarButtonLabel {
-    font-size: var(--cioos-font-size-sm);
+    font-size: var(--cioos-font-size-xs);
   }
 
   .topBar .topBarActions .topBarButton {
-    gap: 6px;
-
-    /* Taller, not wider: a 40px row is a cramped touch target for the app's
-       primary entry points, and the height is the dimension a phone can
-       spare. */
-    min-height: 48px;
-    padding: 4px 8px;
+    gap: 4px;
+    min-height: 36px;
+    padding: 2px 6px;
   }
 
-  /* The tally is a readout between two dense rows, so it gives up its own
-     padding rather than its type size — which the mobile scale has just
-     raised, this being one of the lines that was hardest to read. */
+  /* The icons are sized in the markup; CSS width/height beat the attributes. */
+  .topBarButton svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* The tally is a readout between two dense rows: tight padding, and the
+     same type as the strip under it. */
   .topBarCountsRow {
     min-height: 0;
-    padding: 3px 8px;
+    padding: 2px 8px;
+    font-size: var(--cioos-font-size-xs);
   }
 }
 
