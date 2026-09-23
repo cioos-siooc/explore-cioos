@@ -158,6 +158,13 @@ def resolve_harvest_config_file(config_file):
     """
     env_config_b64 = os.getenv("HARVEST_CONFIG_B64", "").strip()
     env_config_file = os.getenv("HARVEST_CONFIG_FILE", "").strip()
+    # A mounted file would otherwise win silently over the removed channel.
+    if os.getenv("HARVEST_CONFIG_YAML", "").strip() and not env_config_b64:
+        raise ValueError(
+            "HARVEST_CONFIG_YAML is no longer supported. Move the config to "
+            "HARVEST_CONFIG_B64 (base64 < harvest_config.yaml | tr -d '\\n') "
+            "and unset HARVEST_CONFIG_YAML."
+        )
     if env_config_b64:
         env_config = validate_harvest_config(decode_harvest_config_b64(env_config_b64))
         env_config_path = Path("/tmp/harvest_config_from_env.yaml")

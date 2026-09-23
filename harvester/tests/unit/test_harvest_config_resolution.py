@@ -140,6 +140,14 @@ class TestResolveHarvestConfigFile:
         with pytest.raises(ValueError, match="HARVEST_CONFIG_B64"):
             resolve_harvest_config_file(str(mounted))
 
+    def test_removed_yaml_var_raises_instead_of_using_the_mounted_file(self, monkeypatch, tmp_path):
+        mounted = tmp_path / "harvest_config.yaml"
+        mounted.write_text(SAMPLE_YAML)
+        monkeypatch.setenv("HARVEST_CONFIG_YAML", SAMPLE_YAML)
+
+        with pytest.raises(ValueError, match="HARVEST_CONFIG_YAML is no longer supported"):
+            resolve_harvest_config_file(str(mounted))
+
     def test_missing_config_raises_with_instructions(self, tmp_path):
         missing = tmp_path / "nope.yaml"
 

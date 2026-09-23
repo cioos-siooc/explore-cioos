@@ -27,7 +27,12 @@ POOL_NAME="cde-process-pool"
 # worker, the first flow run) crash with an obscure traceback. Priority here
 # mirrors cde_harvester/core/config.py:resolve_harvest_config_file.
 CONFIG_FILE="${HARVEST_CONFIG_FILE:-harvest_config.yaml}"
-if [ -n "${HARVEST_CONFIG_B64:-}" ]; then
+if [ -n "${HARVEST_CONFIG_YAML:-}" ] && [ -z "${HARVEST_CONFIG_B64:-}" ]; then
+  echo "[worker-entrypoint] ERROR: HARVEST_CONFIG_YAML is no longer supported." >&2
+  echo "[worker-entrypoint] Move the config to HARVEST_CONFIG_B64 and unset HARVEST_CONFIG_YAML:" >&2
+  echo "[worker-entrypoint]   base64 < harvest_config.yaml | tr -d '\\n'" >&2
+  exit 1
+elif [ -n "${HARVEST_CONFIG_B64:-}" ]; then
   echo "[worker-entrypoint] Harvest config: HARVEST_CONFIG_B64 env var"
 elif [ -f "${CONFIG_FILE}" ]; then
   echo "[worker-entrypoint] Harvest config: ${CONFIG_FILE}"
