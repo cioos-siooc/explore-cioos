@@ -195,15 +195,15 @@
      so what padding it keeps is spent on the edges rather than on holding a
      lockup together.
 
-     The tracks change too. `1fr auto 1fr` buys a wordmark centred in the card
-     by giving the side columns equal width — but the centre track is sized to
-     its own content, and the wordmark is nowrap, so its min-content is a floor
-     the row cannot go under: past that the logo and the icon cluster are
-     pushed out from under it and the three draw on top of each other. Here the
-     side columns take only what they need and the wordmark takes what is left,
-     which it can be asked to fit. */
+     The tracks change too. The floating card's `minmax(0, 1fr)` sides can
+     shrink under the logo and icons, and its `auto` centre can't go under the
+     nowrap wordmark's min-content, so on a phone the three draw on top of each
+     other. Here it is the other way round: the sides never shrink below their
+     content, the wordmark can. While the row has room the two 1fr sides still
+     come out equal, so the wordmark stays centred in the card; only once it
+     doesn't does the narrower side give up its share to the wordmark. */
   .brandCardTop {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 1fr minmax(0, auto) 1fr;
     gap: 8px;
     padding: 6px 10px;
   }
@@ -241,14 +241,26 @@
      narrowest phones need to shrink the logo rather than push it under its
      neighbours. On the lockup as a whole, so the mark comes down with the text
      instead of being left oversized beside it. */
-  .brandLogo {
+  .brandLogo .cioosLogo-inline {
     font-size: min(var(--cioos-font-size-xl), 5.5vw);
   }
 
-  /* Touch targets for the icon actions, the smallest things on the
-     header — and no larger, the row's width being spoken for. */
+  /* The name, not the mark, gives up size: it is what makes the logo's side
+     column wider than the icons', and the centred wordmark pays for the
+     wider of the two twice. */
+  .brandLogo .cioosLogoName {
+    font-size: 0.7em;
+  }
+
+  /* No room for a fourth icon; the About modal carries its own. */
+  .brandFeedback {
+    display: none;
+  }
+
+  /* Smaller than the floating card's so the icon cluster's column is not
+     much wider than the logo's, which is what the centred wordmark gives up. */
   .brandMinorItem {
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
   }
 }
