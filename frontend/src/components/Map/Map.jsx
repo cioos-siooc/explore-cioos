@@ -3542,6 +3542,25 @@ export default function CreateMap({
       });
 
       const observations = new Map();
+      const addObservations = (feature) => {
+        datasetPksOf(feature).forEach((pk) => {
+          const existing = observations.get(pk);
+          if (existing) {
+            existing.platform =
+              existing.platform || feature.properties.platform;
+            return;
+          }
+          observations.set(pk, {
+            kind: "observation",
+            pk,
+            platform: feature.properties.platform,
+            // A marker is a place the user can point at; a cell is a
+            // neighbourhood. The card says which it is rather than implying a
+            // precision the aggregate doesn't have.
+            aggregate: feature.layer.id !== "points",
+          });
+        });
+      };
       let observationCount = 0;
       const cellFeatures = [];
       // What was clicked, in the terms /tiles/datasets takes: the tile buckets
@@ -3606,24 +3625,30 @@ export default function CreateMap({
         // numbers it shows will not add up to the hex it is describing.
         if (layerId === "coverage-hexes") buckets.source = "cells";
 
-        datasetPksOf(feature).forEach((pk) => {
-          const existing = observations.get(pk);
-          if (existing) {
-            existing.platform =
-              existing.platform || feature.properties.platform;
-            return;
-          }
-          observations.set(pk, {
-            kind: "observation",
-            pk,
-            platform: feature.properties.platform,
-            // A marker is a place the user can point at; a cell is a
-            // neighbourhood. The card says which it is rather than implying a
-            // precision the aggregate doesn't have.
-            aggregate: layerId !== "points",
-          });
-        });
+        addObservations(feature);
       });
+
+      // A coverage hex shares the marker tier's zoom band, so a click on one
+      // is a click on everything drawn inside it: the stations sitting in the
+      // hex join the card (and the datasets list's pin) alongside the hex's own
+      // datasets, and their counts join the header's total.
+      const markersInCells = [];
+      if (cellFeatures.length && map.current.getLayer("points")) {
+        const seenMarkers = new Set();
+        turfPointsWithinPolygon(
+          helpers.featureCollection(
+            map.current.queryRenderedFeatures({ layers: ["points"] }),
+          ),
+          helpers.featureCollection(cellFeatures),
+        ).features.forEach((feature) => {
+          if (seenMarkers.has(feature.properties.pk)) return;
+          seenMarkers.add(feature.properties.pk);
+          markersInCells.push(feature);
+          observationCount += Number(feature.properties.count) || 0;
+          buckets.pointPks.add(Number(feature.properties.pk));
+          addObservations(feature);
+        });
+      }
 
       // Gridded footprints, deduped by dataset — a stack of grids covering the
       // same water is the norm, not the exception.
@@ -3707,6 +3732,7 @@ export default function CreateMap({
           ...areaHighlights,
           ...observationHits
             .filter((feature) => feature.layer.id === "points")
+            .concat(markersInCells)
             .map((feature) => highlightFeature({ feature, role: "both" })),
         ],
       };

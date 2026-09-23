@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor, act } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -264,6 +264,54 @@ describe("FeatureCard", () => {
     );
     expect(screen.getByTitle(b.title)).toHaveTextContent("5 day(s) of data");
     expect(screen.getByTitle(c.title)).toHaveTextContent("1 day(s) of data");
+  });
+
+  // A coverage hex at marker zoom lists the stations inside it too. Those are
+  // profiles, which /tiles/datasets only has under source=main, so the hex and
+  // its markers are asked of their own sources and the answers merged.
+  it("asks a coverage hex's markers of the main source and the hex of cells", async () => {
+    await renderReady();
+    const hexFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input, init) => {
+      const url = new URL(typeof input === "string" ? input : input.url);
+      if (url.pathname.endsWith("/tiles/datasets")) {
+        const rows =
+          url.searchParams.get("source") === "cells"
+            ? [{ pk: 7, count: 30 }]
+            : [{ pk: 10, count: 4 }];
+        return Promise.resolve(Response.json(rows));
+      }
+      return hexFetch(input, init);
+    });
+    const hexRow = pointQueryFixture[0];
+    const markerRow = pointQueryFixture[3];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 13,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: hexRow.pk, aggregate: true },
+          { kind: "observation", pk: markerRow.pk, aggregate: false },
+        ],
+        buckets: { hexPks: [5], pointPks: [42], source: "cells", z: 9 },
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTitle(markerRow.title)).toHaveTextContent(
+        "4 day(s) of data",
+      ),
+    );
+    expect(screen.getByTitle(hexRow.title)).toHaveTextContent(
+      "30 day(s) of data",
+    );
+    const asked = globalThis.fetch.mock.calls
+      .map(([input]) => new URL(input).searchParams)
+      .filter((params) => params.has("source"));
+    expect(asked.map((params) => params.toString())).toEqual([
+      expect.stringMatching(/source=cells&hexes=5$/),
+      expect.stringMatching(/source=main&points=42$/),
+    ]);
   });
 
   it("shows no day count for a dataset the breakdown has not answered for", async () => {
