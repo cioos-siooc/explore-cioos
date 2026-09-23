@@ -34,6 +34,9 @@ import "./styles.css";
 // their pressed state off the shape on the map instead. Between arming a draw
 // and closing the shape, neither is lit.
 //
+// Each button carries a caption naming it: a touch screen has no hover to show
+// the title, and an icon alone was a guess.
+//
 // Show/Hide for this row and the active-filter chips beneath it (see
 // TopControls) lives on the main Filters button instead of here — one toggle
 // for both rather than each keeping its own. The reset button is one for
@@ -52,6 +55,7 @@ export default function QuickFilters() {
   const activeFilterCount = useActiveFilters().length;
   const { resetFilters, realtimeOnly, setRealtimeOnly } = useFilters();
 
+  const labelId = useId();
   const searchInputId = useId();
   const inputRef = useRef(null);
   const searchButtonRef = useRef(null);
@@ -99,9 +103,12 @@ export default function QuickFilters() {
     <div
       className="quickFilters"
       role="group"
-      aria-label={t("topBarQuickFiltersLabel")}
+      aria-labelledby={labelId}
       data-testid="quick-filters"
     >
+      <span id={labelId} className="quickFiltersLabel">
+        {t("topBarQuickFiltersLabel")}
+      </span>
       {/* A form, so Enter searches natively and the magnifier is that same
           submit rather than a second code path. Collapsed, that magnifier is
           instead the button that opens the field. */}
@@ -148,6 +155,9 @@ export default function QuickFilters() {
           }
         >
           <Search size={18} aria-hidden="true" />
+          <span className="quickFilterCaption" aria-hidden="true">
+            {t("quickFilterCaptionSearch")}
+          </span>
         </button>
         {searchExpanded && (
           <>
@@ -200,6 +210,9 @@ export default function QuickFilters() {
         aria-label={t("drawBoundingBoxOption")}
       >
         <BoundingBox size={18} aria-hidden="true" />
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCaptionBox")}
+        </span>
       </button>
       <button
         type="button"
@@ -211,6 +224,9 @@ export default function QuickFilters() {
         aria-label={t("drawPolygonOption")}
       >
         <Pentagon size={18} aria-hidden="true" />
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCaptionPolygon")}
+        </span>
       </button>
       <button
         type="button"
@@ -222,6 +238,9 @@ export default function QuickFilters() {
         aria-label={t("datasetsCardOnlyInViewText")}
       >
         <Eye size={18} aria-hidden="true" />
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCaptionInView")}
+        </span>
       </button>
       <button
         type="button"
@@ -233,29 +252,35 @@ export default function QuickFilters() {
         aria-label={t("realtimeFilterOptionText")}
       >
         <BroadcastPin size={18} aria-hidden="true" />
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCaptionRealtime")}
+        </span>
       </button>
       {/* One reset for everything this row and the chips below can set —
           quick filters and the modal ones alike — rather than two buttons
-          each clearing half of it. */}
-      {(anySet || activeFilterCount > 0) && (
-        <button
-          type="button"
-          className="quickFilterButton quickFilterReset"
-          data-testid="quick-filter-reset"
-          onClick={() => {
-            resetFilters();
-            resetDataLayers();
-            requestDraw("clear");
-            setDatasetTitleSearchText("");
-            setOnlyInView(false);
-            setSearchOpen(false);
-          }}
-          title={t("resetFiltersButtonTooltipText")}
-          aria-label={t("resetFiltersButtonTooltipText")}
-        >
-          <ArrowCounterclockwise size={18} aria-hidden="true" />
-        </button>
-      )}
+          each clearing half of it. Disabled rather than removed while
+          nothing is set, so the row keeps its shape. */}
+      <button
+        type="button"
+        className="quickFilterButton quickFilterReset"
+        data-testid="quick-filter-reset"
+        disabled={!anySet && activeFilterCount === 0}
+        onClick={() => {
+          resetFilters();
+          resetDataLayers();
+          requestDraw("clear");
+          setDatasetTitleSearchText("");
+          setOnlyInView(false);
+          setSearchOpen(false);
+        }}
+        title={t("resetFiltersButtonTooltipText")}
+        aria-label={t("resetFiltersButtonTooltipText")}
+      >
+        <ArrowCounterclockwise size={18} aria-hidden="true" />
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCaptionReset")}
+        </span>
+      </button>
     </div>
   );
 }

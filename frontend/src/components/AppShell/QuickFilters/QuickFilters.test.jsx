@@ -244,9 +244,21 @@ describe("QuickFilters", () => {
     );
   });
 
-  it("offers no reset until something is set", () => {
+  it("keeps the reset in place but disabled until something is set", () => {
     renderRow();
-    expect(screen.queryByTestId("quick-filter-reset")).toBeNull();
+    expect(screen.getByTestId("quick-filter-reset")).toBeDisabled();
+  });
+
+  it("enables the reset once anything is set", () => {
+    renderRow("/?realtimeOnly=true");
+    expect(screen.getByTestId("quick-filter-reset")).toBeEnabled();
+  });
+
+  it("is named by its visible label", () => {
+    renderRow();
+    expect(
+      screen.getByRole("group", { name: "Quick filters" }),
+    ).toBeInTheDocument();
   });
 
   it("drops every quick filter at once", async () => {
