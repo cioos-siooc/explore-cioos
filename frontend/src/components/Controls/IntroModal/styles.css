@@ -3,7 +3,6 @@
    small "About" eyebrow. */
 .introModal .modal-content {
   border: none;
-  border-radius: var(--cioos-radius-lg);
   overflow: hidden;
 }
 
