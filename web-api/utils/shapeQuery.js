@@ -232,7 +232,7 @@ async function buildShapeSql(
                       ? ""
                       : `CASE WHEN d.cdm_data_type <> 'Grid'
                               THEN day_range_overlap_days(d.day_ranges,
-                                     daterange(:timeMin::date, (:timeMax::date) + 1))
+                                     daterange(:timeMin::date, (:timeMax::date) + 1))::integer
                          END AS days,`
                   }
                   -- griddap footprint for the frontend bbox highlight; NULL
