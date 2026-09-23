@@ -808,7 +808,7 @@ now split, was two specific call sites.
 > `FeatureCard` assertion in the repo. Hover/click ranking — precisely what step 3 moves — has no
 > regression net. Steps 1–2 are pure functions under vitest and are unblocked today.
 
-- [x] **2026-09-23: the mount effect is 240 lines (was 1749), `Map.jsx` ~3,800 (was 4,338).**
+- [x] **2026-09-23: the mount effect is 240 lines (was 1749), `Map.jsx` 3,847 (was 4,338).**
       22 `useEffect`, 42 `useRef`, **3** `useState`, 32 props, 22 `addLayer`. **~1900 lines sit
       behind a live WebGL context.** The mount effect alone is 1749 lines (2371–4119).
       **[re-verified 2026-09-10 — `useState` was 2, now 3; the other four are exact]**
