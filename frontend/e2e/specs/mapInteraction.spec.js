@@ -338,4 +338,33 @@ test.describe("drawing a spatial filter", () => {
     await expect(page).toHaveURL(/[?&]polygon=/);
     await expect(openCard(page)).toHaveCount(0);
   });
+
+  test("a shared box comes back editable, and stays a box", async ({
+    page,
+  }) => {
+    const [west, north] = lngLatAt([-100, -60]);
+    const [east, south] = lngLatAt([100, 60]);
+    await openScene(
+      page,
+      `&latMin=${south}&lonMin=${west}&latMax=${north}&lonMax=${east}`,
+    );
+    // Only a shape the draw control holds has corners to drag: moving one
+    // rewrites the bounds, and the rectangle mode drags its neighbours along
+    // so it never turns into a free-form polygon.
+    const corner = await sceneAt(page, [100, -60]);
+    const target = await sceneAt(page, [130, -90]);
+    await expect(async () => {
+      await page.mouse.move(corner.x, corner.y);
+      await page.mouse.down();
+      await page.mouse.move(target.x, target.y, { steps: 8 });
+      await page.mouse.up();
+      const params = new URL(page.url()).searchParams;
+      near(params.get("lonMax"), lngLatAt([130, -90])[0]);
+    }).toPass({ timeout: 20_000 });
+    const params = new URL(page.url()).searchParams;
+    near(params.get("latMax"), lngLatAt([130, -90])[1]);
+    near(params.get("lonMin"), west);
+    near(params.get("latMin"), south);
+    expect(params.has("polygon")).toBe(false);
+  });
 });
