@@ -15,6 +15,7 @@ export default function MapContainer() {
     setLoading,
     reportFirstPaint,
     setLoadingLayers,
+    mapView,
     setMapView,
     rangeLevels,
     coverageRangeLevels,
@@ -136,6 +137,7 @@ export default function MapContainer() {
       setLoading={setLoading}
       setLoadingLayers={setLoadingLayers}
       mapQueryString={mapQueryString}
+      initialView={mapView}
       setMapView={setMapView}
       rangeLevels={rangeLevels}
       coverageRangeLevels={coverageRangeLevels}

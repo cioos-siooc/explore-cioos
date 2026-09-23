@@ -13,7 +13,6 @@ import turfBbox from "@turf/bbox";
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
 import "./styles.css";
 
 import { server } from "../../config";
@@ -28,7 +27,6 @@ import {
   polygonIsRectangle,
   quantizeCountRange,
   rangesEqual,
-  selectionFromSearchParams,
   zoomToDatasetCamera,
   splitTrackRuns,
   initialBearing,
@@ -47,8 +45,6 @@ import {
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
-  defaultMapCenter,
-  defaultMapZoom,
   effectiveTrailingDays,
 } from "../config";
 import platformColors from "../../components/platformColors";
@@ -469,6 +465,9 @@ export default function CreateMap({
   setPolygon,
   setLoading,
   setLoadingLayers = () => {},
+  // The camera to open at — MapStateProvider's mapView, which it seeds from the
+  // share link. Read once, when the map is created.
+  initialView,
   setMapView,
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
@@ -522,8 +521,6 @@ export default function CreateMap({
   onFirstPaint = () => {},
 }) {
   const { t, i18n } = useTranslation();
-
-  const [searchParams] = useSearchParams();
 
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -2173,10 +2170,6 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrajectory, mapQueryString]);
 
-  const mapZoom = searchParams.get("zoom");
-  const mapLongitude = searchParams.get("lon");
-  const mapLatitude = searchParams.get("lat");
-
   function addObservationLayers() {
     const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
 
@@ -3435,14 +3428,10 @@ export default function CreateMap({
       // gathered by an AttributionControl the legend card builds and parents
       // itself (see LegendFooter.jsx).
       attributionControl: false,
-      // Starting camera. The same share-link params and the same fallbacks
-      // MapStateProvider seeds its mapView from — the two have to agree, or
-      // the legend describes a zoom the map isn't at until the first moveend.
-      center: [
-        mapLongitude || defaultMapCenter.lon,
-        mapLatitude || defaultMapCenter.lat,
-      ],
-      zoom: mapZoom || defaultMapZoom,
+      // Starting camera: the provider's own mapView, so the legend describes
+      // the zoom the map opens at from the first render.
+      center: [initialView.lon, initialView.lat],
+      zoom: initialView.zoom,
       // Stop at the deepest level the satellite imagery actually exists at
       // everywhere it matters: Esri is cached to z17 on remote Arctic coasts
       // (z19 in cities), and past its coverage it serves a grey "map data not
@@ -3485,12 +3474,11 @@ export default function CreateMap({
 
       // A share link can carry the spatial selection (rectangle bounds or a
       // polygon ring). SelectionProvider has already seeded it into the app
-      // state — this puts the shape back into the draw control so it is drawn,
-      // editable, and survives the next filter change (which re-derives the
-      // selection from whatever the draw control holds).
-      const sharedSelection = selectionFromSearchParams(
-        new URL(window.location.href).searchParams,
-      );
+      // state, which is the polygon prop this mount-time closure holds — this
+      // puts the shape back into the draw control so it is drawn, editable,
+      // and survives the next filter change (which re-derives the selection
+      // from whatever the draw control holds).
+      const sharedSelection = polygon;
       if (sharedSelection) {
         const [featureId] = drawPolygon.current.add({
           type: "Feature",
