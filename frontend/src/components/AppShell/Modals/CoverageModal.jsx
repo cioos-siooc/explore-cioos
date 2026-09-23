@@ -47,7 +47,7 @@ export default function CoverageModal() {
   // search box, "only in view" and the geometry switches had removed.
   const { combinedQueries, filteredDatasetPks, pointsData } = useSelection();
   const [groupBy, setGroupBy] = useState("source");
-  const [count, setCount] = useState("datasets");
+  const [count, setCount] = useState("days");
   const [histogram, setHistogram] = useState();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -201,10 +201,9 @@ export default function CoverageModal() {
         )}
         <div className="coveragePlotArea">
           {/* A refetch keeps the bars it already has, dimmed, rather than
-              blanking to a spinner: switching Count or Colour-by changes one
-              facet of the same figure, and these queries take seconds when the
-              API's cache is cold. Only the first load, with nothing to show
-              yet, gets the full-area spinner. */}
+              blanking to an empty area: switching Count or Colour-by changes
+              one facet of the same figure, and these queries take seconds when
+              the API's cache is cold. */}
           {loading && !showStalePlot && (
             <div className="coverageModalStatus">
               <Spinner size="lg" />
@@ -239,8 +238,8 @@ export default function CoverageModal() {
             </Suspense>
           )}
           {showStalePlot && (
-            <div className="coveragePlotBusy">
-              <Spinner size="sm" />
+            <div className="coverageModalStatus coveragePlotBusy">
+              <Spinner size="lg" />
             </div>
           )}
         </div>

@@ -65,18 +65,18 @@ describe("CoverageModal", () => {
     const user = open();
     await waitFor(() => expect(histogramCalls()).toHaveLength(1));
     const first = histogramCalls()[0];
-    expect(first).toContain("count=datasets");
+    expect(first).toContain("count=days");
 
-    await chooseCount(user, "Days of data");
+    await chooseCount(user, "Datasets");
     await waitFor(() => expect(histogramCalls()).toHaveLength(2));
-    expect(histogramCalls()[1]).toContain("count=days");
+    expect(histogramCalls()[1]).toContain("count=datasets");
 
     // Back to the one already held: answered from memory, no third request.
-    await chooseCount(user, "Datasets");
+    await chooseCount(user, "Days of data");
     await waitFor(() =>
       expect(
         screen.getByTestId("coverage-count-dropdown-toggle"),
-      ).toHaveTextContent("Datasets"),
+      ).toHaveTextContent("Days of data"),
     );
     expect(histogramCalls()).toHaveLength(2);
   });
@@ -96,7 +96,7 @@ describe("CoverageModal", () => {
     const realFetch = global.fetch;
     global.fetch = (...args) => pending.then(() => realFetch(...args));
 
-    await chooseCount(user, "Days of data");
+    await chooseCount(user, "Datasets");
 
     // The bars are still drawn, dimmed and marked busy — not swapped for a
     // spinner over an empty area.

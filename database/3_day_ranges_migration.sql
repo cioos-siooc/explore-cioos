@@ -30,3 +30,6 @@
 ALTER TABLE cde.profiles          ADD COLUMN IF NOT EXISTS day_ranges daterange[];
 ALTER TABLE cde.obis_cells        ADD COLUMN IF NOT EXISTS day_ranges daterange[];
 ALTER TABLE cde.trajectory_hexes  ADD COLUMN IF NOT EXISTS day_ranges daterange[];
+-- The per-dataset rollup of the three above; backfilled at the bottom of
+-- 5_profile_process.sql, which defines the function that builds it.
+ALTER TABLE cde.datasets          ADD COLUMN IF NOT EXISTS day_ranges daterange[];

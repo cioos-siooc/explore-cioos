@@ -193,6 +193,10 @@ class TestDbLoaderMainFullReload:
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
         assert any("validate_loaded_data" in s for s in sql_calls)
 
+    def test_refresh_dataset_day_ranges_called(self, harvest_folder, mock_engine, mocker):
+        sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
+        assert any("refresh_dataset_day_ranges" in s for s in sql_calls)
+
 
 # ---------------------------------------------------------------------------
 # main() — incremental mode
@@ -206,6 +210,10 @@ class TestDbLoaderMainIncremental:
     def test_process_incremental_update_called(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
         assert any("process_incremental_update" in s for s in sql_calls)
+
+    def test_refresh_dataset_day_ranges_called(self, harvest_folder, mock_engine, mocker):
+        sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
+        assert any("refresh_dataset_day_ranges" in s for s in sql_calls)
 
     def test_drop_constraints_not_called_in_incremental(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
