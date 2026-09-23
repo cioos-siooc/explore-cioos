@@ -16,8 +16,8 @@
 
   /* Wide enough apart for the captions under each button, and the row's own
      bottom padding holds them clear of the chips below. */
-  gap: 22px 18px;
-  padding-bottom: 14px;
+  gap: 24px 30px;
+  padding-bottom: 16px;
 }
 
 /* Names the row on screen as well as for assistive tech (it labels the
@@ -30,9 +30,9 @@
   line-height: 1.15;
   text-align: right;
   color: var(--cioos-ink);
-  text-shadow:
-    0 0 3px var(--cioos-white),
-    0 0 3px var(--cioos-white);
+  padding: 5px 10px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
 }
 
 .quickFilterButton {
@@ -112,11 +112,11 @@
 }
 
 /* Hung below the circle rather than inside it, so the circles keep their size
-   and the row just spaces out to make room. The halo keeps it legible over
-   whatever the map draws beneath. */
+   and the row just spaces out to make room. The white pill keeps it legible
+   over whatever the map draws beneath. */
 .quickFilterCaption {
   position: absolute;
-  top: calc(100% + 3px);
+  top: calc(100% + 4px);
   left: 50%;
   transform: translateX(-50%);
   font-size: var(--cioos-font-size-2xs);
@@ -124,9 +124,9 @@
   line-height: 1;
   white-space: nowrap;
   color: var(--cioos-ink);
-  text-shadow:
-    0 0 3px var(--cioos-white),
-    0 0 3px var(--cioos-white);
+  padding: 3px 6px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
   pointer-events: none;
 }
 
@@ -221,14 +221,25 @@
   .quickFilters {
     align-self: center;
     max-width: calc(100vw - 16px);
+
+    /* Six 40px buttons at this pitch fill a 360px screen exactly, which caps
+       the captions' side padding (below) at what keeps the widest neighbours
+       (Recherche, Rectangle) from touching. */
+    gap: 20px 19px;
+    padding-bottom: 16px;
   }
 
-  /* The six buttons alone fill a 360px screen, so the label gets the line
-     above them — pulled in close, since the row gap is sized for captions. */
+  /* No room beside the six buttons, and a line of its own is too high a price
+     for a heading the captions already spell out. Still names the group:
+     aria-labelledby reads a hidden label. */
   .quickFiltersLabel {
-    flex-basis: 100%;
-    max-width: none;
-    margin-bottom: -14px;
-    text-align: center;
+    display: none;
+  }
+
+  /* Held at the desktop size rather than the mobile rung's: at the larger one
+     neighbouring captions run into each other on a 360px screen. */
+  .quickFilterCaption {
+    padding: 3px 2px;
+    font-size: var(--cioos-font-size-3xs);
   }
 }
