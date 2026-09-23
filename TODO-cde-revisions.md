@@ -784,7 +784,7 @@ now split, was two specific call sites.
 - [ ] Unqualified `CREATE OR REPLACE FUNCTION` in `3_`–`9_`: `1_schema.sql:11`'s `SET search_path` is
       session-scoped and does not carry into separate `psql` invocations, and `db_migrate` never sets it.
 
-### P2.6 — Give `Map.jsx` a seam that isn't WebGL `[Strong]` — *largest prize, largest risk*
+### P2.6 — Give `Map.jsx` a seam that isn't WebGL `[Strong]` — **DONE** (2026-09-23), WMS still ungated
 
 `frontend/src/components/Map/Map.jsx` — 4338 lines, one default export
 
@@ -808,11 +808,12 @@ now split, was two specific call sites.
 > `FeatureCard` assertion in the repo. Hover/click ranking — precisely what step 3 moves — has no
 > regression net. Steps 1–2 are pure functions under vitest and are unblocked today.
 
-- [ ] 22 `useEffect`, 42 `useRef`, **3** `useState`, 32 props, 22 `addLayer`. **~1900 lines sit
+- [x] **2026-09-23: the mount effect is 240 lines (was 1749), `Map.jsx` ~3,800 (was 4,338).**
+      22 `useEffect`, 42 `useRef`, **3** `useState`, 32 props, 22 `addLayer`. **~1900 lines sit
       behind a live WebGL context.** The mount effect alone is 1749 lines (2371–4119).
       **[re-verified 2026-09-10 — `useState` was 2, now 3; the other four are exact]**
-- [~] **Allocations done 2026-09-23** (patching at module scope, `draw`/`popup` built once); the
-      eight render-time ref writes remain. The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
+- [x] **Done 2026-09-23**: patching at module scope, `draw`/`popup` built once, the eight
+      render-time ref writes moved to one layout effect. The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
       and allocates a fresh `MapboxDraw` (640) and `Popup` (978) on **every render**, plus eight ref
       writes during render (`rangeLevelsRef`, `onViewportHexRangeRef`, `selectedTrajectoryRef`,
       `setColorStopsRef`, `mapQueryRef`, `onFeatureQueryRef`, `onMarkerClickRef`, `onTrackClickRef`).
@@ -825,7 +826,7 @@ now split, was two specific call sites.
       silently. Note they only *need* to agree at `padding = 0`: `radiusExpression` takes a padding
       the JS twin has no parameter for, and the `points` layer that `isOnAPointIn` hit-tests is the
       `padding = 0` entry in `POINT_LAYERS`. **[re-verified]**
-- [ ] Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus`,
+- [x] **Reviewed 2026-09-23, kept — see step 5.** Re-entrancy is held by **five ad-hoc idempotence guards** (`appliedFocus`,
       `trackFocusApplied`, `appliedTrailRef`, `wmsRenderToken`, `lastClickHandledAt` — a plain
       `let`, not a ref), each documented as fixing one loop or flicker. One of them is also wrong
       today: `wmsRenderToken` is bumped only on overlay removal (`removeWmsOverlay`), so it does not
@@ -862,7 +863,7 @@ now split, was two specific call sites.
       *already* fabricates `{ lngLat: { lng, lat } }` from a bare coordinate pair. Narrowing the
       signature to `(lngLat, hits)` is a no-behaviour-change diff at both call sites, and it is worth
       doing *before* the risky move rather than as part of it. **[new 2026-09-10]**
-- [ ] `setColorStops` (106 lines) has **four entry points** — the `[rangeLevels,
+- [x] **Done 2026-09-23, see step 5.** `setColorStops` (106 lines) has **four entry points** — the `[rangeLevels,
       coverageRangeLevels]` effect, the `load` handler, a `zoomend` listener, and
       `refreshViewportHexRange` via `setColorStopsRef`. **[re-verified]**
 - [x] **Both deleted 2026-09-23.** Dead: `Map.jsx` no longer declares a `setDatasetsSelected` prop, yet `MapContainer.jsx:14`
@@ -871,7 +872,7 @@ now split, was two specific call sites.
       in the repo (`Map.jsx:1224` is its sole occurrence); a `getLayer` guard makes it silently
       inert. Both are safe to delete today, independently of everything else in this section.
       **[re-verified]**
-- [ ] `Map.jsx` reads the URL directly twice (`useSearchParams` at 375, and
+- [x] **Done 2026-09-23 for `Map.jsx`, see step 5** (the other modules are P2.8's). `Map.jsx` reads the URL directly twice (`useSearchParams` at 375, and
       `new URL(window.location.href)` at 3087 inside the `load` handler), bypassing both context and
       its props. There are **eight** independent modules reading `window.location` across eleven
       sites (`index.jsx:36`, `config.js:13`, `state/usePersistentState.js:46`,
@@ -923,9 +924,29 @@ now split, was two specific call sites.
    card, track-head hover, lone track click → `?track=`, and marker-vs-track precedence both ways
    (mutation-checked: `isOnAPointIn` forced false or true each fails its own test). Still ungated:
    griddap rectangles, the selected-track fixes, draw/box-select, WMS.
-   **Still open:** the mount effect itself (still one effect), the eight ref writes during render,
-   the remaining guards, and `setColorStops`'s four entry points. Splitting the effect reorders
-   layer adds and listener registration; griddap and draw have no gate yet.
+   **Then gated (2026-09-23):** grid hover (one / a stack), marker over a grid, stacked grids in
+   the card, a drawn track's fix over the track line, drawing a box, clicks while drawing, and a
+   shared box restored editable (mutation-checked). Getting the grid tests to pass exposed a
+   harness bug: the clock fixture used `setFixedTime`, and lodash `debounce` measures its wait with
+   `Date.now()`, so under a pinned clock no debounced call ever fired in e2e (grid hover, the draw
+   commit, the viewport ramp). It now uses `setSystemTime` (starts at `FROZEN_TIME`, keeps running);
+   visual 12/12 and a11y 7/7 unchanged. **WMS is still ungated** — no GetMap fixture.
+   **Then done under the gate (2026-09-23), each its own commit, each checked as a pure move:**
+   - Mount effect **1749 → 240 lines**: the `load` handler is five ordered calls
+     (`addObservationLayers`, `addGriddapLayers`, `addClickHighlightLayers`, `addTrackLayers`,
+     `addSelectedTrackLayers`); hover and click are `installHover()` / `installClick()`; the
+     hit-test contexts, `clickLayerIds` and `hitsAt` are component-level.
+   - The eight render-time ref writes → one `useLayoutEffect` after commit.
+   - `setColorStops`: all four triggers remain (they are four real events) but all go through
+     `setColorStopsRef`; the `zoomend` listener is registered once instead of re-registered on
+     every range change, and `load` no longer calls the first render's stale closure.
+   - `Map.jsx` no longer reads the URL: camera from `MapStateProvider`'s `mapView` (`initialView`
+     prop), shared selection from the seeded `polygon` prop.
+   - **Guards kept, deliberately:** `appliedFocus` and `trackFocusApplied` stop real render loops
+     (writing feature state fires the events that call them); `appliedTrailRef` is set in the two
+     places that build the tracks URL; `lastClickHandledAt` is the tap-echo guard of a handler
+     registered once. They are the standard last-applied memo for imperative map writes, and a
+     shared helper would save two lines each. Not an item to re-raise.
 
 ### P2.7 — One descriptor for the metric and the tiers `[Worth exploring]`
 
