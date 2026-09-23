@@ -77,7 +77,7 @@ function GridNodeCount({ dimensions }) {
 // The order below follows that coalesce, with a trajectory's own role first
 // when the dataset is one. Datasets that declare no role at all (OBIS, a
 // tabledap table with no cf_role attribute anywhere) fall back to the generic
-// "Record ID".
+// "Feature ID".
 const CF_ROLE_LABELS = {
   timeseries_id: "cfRoleTimeseriesIdText",
   profile_id: "cfRoleProfileIdText",

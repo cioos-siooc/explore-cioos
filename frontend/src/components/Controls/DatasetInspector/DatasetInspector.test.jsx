@@ -147,20 +147,20 @@ describe("DatasetInspector", () => {
     expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
   });
 
-  it("shows the no-records message once the (empty) record list has loaded", async () => {
+  it("shows the no-features message once the (empty) feature list has loaded", async () => {
     await renderReady();
     await waitFor(() =>
       expect(
-        screen.getByText("No records match your search."),
+        screen.getByText("No features match your search."),
       ).toBeInTheDocument(),
     );
   });
 
-  it("falls back to the generic Record ID label when the dataset names no cf_role variable", async () => {
+  it("falls back to the generic Feature ID label when the dataset names no cf_role variable", async () => {
     await renderReady();
     await waitFor(() =>
       expect(document.querySelector(".recordIdCaption")).toHaveTextContent(
-        "Record ID",
+        "Feature ID",
       ),
     );
   });
