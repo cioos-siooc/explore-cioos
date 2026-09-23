@@ -433,6 +433,7 @@
 }
 
 .listCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -494,14 +495,64 @@
 }
 
 /* The id is what the card is called: given the width of the card and set in
-   mono, since it is a value out of the dataset rather than prose. */
+   mono, since it is a value out of the dataset rather than prose. Room kept on
+   the right for the action below, so a long id wraps before it rather than
+   running under it. */
 .listCardId {
+  padding-right: 24px;
   font-family: ui-monospace, monospace;
   font-size: var(--cioos-font-size-base);
   font-weight: 700;
   line-height: 1.25;
   color: var(--cioos-ink);
   overflow-wrap: anywhere;
+}
+
+/* The card's second action, in the corner: out of the card's own column flow so
+   adding one costs the fields below no layout at all. */
+.listCardAction {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+}
+
+/* Draw this track on the map, or clear it — the card itself opens the record's
+   plot. Goldenrod once drawn, which is what the map draws the selected track in
+   (--cioos-map-click, theme.css), so the button and the line are one answer. */
+.listCardTrackButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.listCardTrackButton:hover {
+  border-color: var(--cioos-primary);
+  color: var(--cioos-primary);
+}
+
+.listCardTrackButton:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.listCardTrackButton.drawn {
+  border-color: var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
+  color: var(--cioos-map-click);
 }
 
 .listCardFields {

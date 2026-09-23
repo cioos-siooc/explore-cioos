@@ -68,7 +68,13 @@ const ID_NAME = /(_id|[a-z0-9]ID)$/;
 
 // ioos_category is authoritative where it is declared (~48% of variables).
 const ID_CATEGORIES = new Set(["Identifier"]);
-const COORDINATE_CATEGORIES = new Set(["Time", "Location"]);
+// "Location" is deliberately NOT here: it says what a column is ABOUT, not that
+// it is an axis. Every column in the catalogue that really is a horizontal
+// coordinate also declares axis, a CF standard_name, or degrees units, so the
+// category added nothing there — while it classified ismerOsl002's `distance`
+// (the along-transect abscissa, units m, no axis, no standard_name) as a
+// coordinate, which left that record with no measurement to draw at all.
+const COORDINATE_CATEGORIES = new Set(["Time"]);
 
 const trimmed = (value) =>
   typeof value === "string" && value.trim() ? value.trim() : null;

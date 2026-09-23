@@ -21,6 +21,10 @@ export default function ListCard({
   // wearing the same goldenrod the map put on what was clicked.
   pinned,
   onClick,
+  // A second thing this card can do, drawn beside its id — a trajectory record's
+  // "show the track on the map", where the card itself opens the preview. Its
+  // own click must not also trigger the card's, hence the wrapper below.
+  action,
   children,
 }) {
   const handleKeyDown = (e) => {
@@ -41,6 +45,15 @@ export default function ListCard({
       <span className="listCardId" title={id}>
         {id}
       </span>
+      {action && (
+        <span
+          className="listCardAction"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {action}
+        </span>
+      )}
       <dl className="listCardFields">{children}</dl>
     </div>
   );

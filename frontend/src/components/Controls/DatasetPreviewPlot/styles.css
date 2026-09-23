@@ -364,3 +364,61 @@
 .colorScaleMenu {
   min-width: 180px;
 }
+
+/* Which profile of the record is drawn. Above the figure, not in the parameters
+   pane: at the pane's ~200px the cast's date was ellipsised, which is the one
+   thing this control exists to show. 75% of the plot column leaves the rail a
+   usable length and the readout its full text. */
+.previewProfileSlice {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  width: 75%;
+  padding: 0 0 6px;
+  font-size: var(--cioos-font-size-xs);
+}
+
+.previewProfileSliceCaption {
+  flex-shrink: 0;
+  color: var(--cioos-ink-60);
+}
+
+/* The only part that gives: the steppers and the readout are sized by their
+   own text. */
+.previewProfileSliceRail {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.previewProfileSliceRail .railTrack {
+  height: 14px;
+}
+
+/* The cast that is drawn, spelled out in full — no ellipsis, which is the whole
+   point of moving this out of the pane. */
+.previewProfileSliceLabel {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Which one of how many — the reading the label alone cannot give, and the one
+   that says whether there is a profile on either side. */
+.previewProfileSliceCount {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--cioos-ink-60);
+}
+
+/* How far into the record the drawn profile sits. Nothing is filtered by it. */
+.previewProfileSliceFill {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary);
+}

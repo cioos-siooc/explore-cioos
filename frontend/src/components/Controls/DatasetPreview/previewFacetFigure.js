@@ -410,6 +410,9 @@ export function recordTitleFor({ plan, variablesByName, data }) {
  * @param mode          'markers' | 'lines' | 'markers+lines'
  * @param colorAxis     column whose values shade EVERY panel, or null
  * @param colorScale    the user's scale for it, or null for the automatic one
+ * @param sharedTicks   { tickvals, ticktext } for a shared axis whose values are
+ *                      ranks rather than a quantity, or null
+ * @param sharedText    one string per row naming where that row is, or null
  * @param size          { width, height }
  * @param uirevision    changes whenever the axis set changes
  */
@@ -425,6 +428,8 @@ export function buildFigure({
   mode = "markers",
   colorAxis = null,
   colorScale = null,
+  sharedTicks = null,
+  sharedText = null,
   size = {},
   uirevision,
 }) {
@@ -556,6 +561,15 @@ export function buildFigure({
   }
 
   const sharedTitle = titleFor(sharedAxis);
+  // A rank has no quantity to tick at: every label is named by the caller, and
+  // Plotly's own choice of round numbers would be positions nobody sampled.
+  const tickOverride = sharedTicks
+    ? {
+        tickmode: "array",
+        tickvals: sharedTicks.tickvals,
+        ticktext: sharedTicks.ticktext,
+      }
+    : {};
 
   if (isColumns) {
     // One depth axis on the left, spanning the full height. Its label cannot be
@@ -566,6 +580,7 @@ export function buildFigure({
       domain: [0, 1],
       anchor: "x",
       ...sharedAxisSpike,
+      ...tickOverride,
       // The unified box's own title. Left alone it is the bare axis value; this
       // makes it read like the rows underneath it.
       unifiedhovertitle: { text: hoverLine(sharedAxis, "%{y}") },
@@ -579,6 +594,7 @@ export function buildFigure({
       domain: [0, 1],
       anchor: "y",
       ...sharedAxisSpike,
+      ...tickOverride,
       title: {
         text: wrapAt(sharedTitle, plottingWidth),
         font: { size: LABEL_FONT_PX },
@@ -645,6 +661,11 @@ export function buildFigure({
       colorAxis !== sharedAxis &&
       colorAxis !== columnName;
 
+    // Where the row IS, when the shared axis only says which row it is. Carried
+    // as `text` because customdata is spoken for by the colour dimension, and
+    // the trace's own name is dropped by <extra></extra> anyway.
+    const positionInHover = !isColumns && sharedText && sharedText.length;
+
     return {
       type: "scatter",
       mode: drawMode,
@@ -661,7 +682,7 @@ export function buildFigure({
         // already; two in a box of its own, which has no title.
         (isColumns
           ? hoverLine(columnName, "%{x}")
-          : `${hoverLine(sharedAxis, "%{x}")}<br>${hoverLine(columnName, "%{y}")}`) +
+          : `${hoverLine(sharedAxis, "%{x}")}${positionInHover ? "<br>%{text}" : ""}<br>${hoverLine(columnName, "%{y}")}`) +
         (colorInHover ? `<br>${hoverLine(colorAxis, "%{customdata}")}` : "") +
         "<extra></extra>",
       // The markers carry the third dimension; the line still carries the
@@ -670,6 +691,7 @@ export function buildFigure({
         ? { color: colorDimension.values, coloraxis: "coloraxis" }
         : { color },
       line: { color },
+      ...(positionInHover ? { text: sharedText } : {}),
       ...(hasColorBar ? { customdata: colorDimension.hoverValues } : {}),
     };
   });

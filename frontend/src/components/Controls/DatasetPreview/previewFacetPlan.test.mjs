@@ -6,6 +6,7 @@ import {
   axisDirectionsFor,
   colorCandidatesFor,
   facetPlanFor,
+  panelCandidatesFor,
   plotBlockerFor,
   PLOT_BLOCKED,
   sharedCandidatesFor,
@@ -15,10 +16,17 @@ import {
   ROWS,
 } from "./previewFacetPlan.js";
 import {
+  POSITION_INDEX_COLUMN,
+  positionRowsFor,
+  trackIndexFor,
+} from "./previewTrackIndex.js";
+import {
   VIKING,
   VIKING_NO_META,
   VIKING_DATASET,
 } from "./previewVariables.test.mjs";
+
+const TRACK_DATASET = { ...VIKING_DATASET, cdm_data_type: "Trajectory" };
 
 const planFor = (type, table = VIKING, data) =>
   facetPlanFor(
@@ -43,7 +51,30 @@ test("a timeseries stacks, sharing time, and is not reversed", () => {
   assert.equal(plan.sharedReversed, false);
 });
 
-test("a trajectory shares whichever of lon/lat actually moves", () => {
+test("a trajectory shares the position index when one was built", () => {
+  const variables = variablesFrom(VIKING, TRACK_DATASET);
+  const data = [
+    { time: "2021-05-24T20:38:00Z", latitude: 47.57, longitude: -69.85 },
+    { time: "2021-05-24T17:06:00Z", latitude: 47.61, longitude: -69.92 },
+  ];
+  const trackIndex = trackIndexFor(TRACK_DATASET, variables, data, "Position");
+  const plan = facetPlanFor(
+    TRACK_DATASET,
+    [...variables, trackIndex.variable],
+    positionRowsFor(data, trackIndex),
+  );
+  assert.equal(plan.orientation, ROWS);
+  assert.equal(plan.sharedAxis, POSITION_INDEX_COLUMN);
+  assert.equal(plan.sharedReversed, false);
+  // Both coordinates stay offerable, so ?paxis=longitude still resolves and the
+  // old axis is one dropdown pick away.
+  assert.ok(plan.sharedCandidates.includes("longitude"));
+  assert.ok(plan.sharedCandidates.includes("latitude"));
+  // A coordinate, so it is never also a panel.
+  assert.ok(!plan.panelDefaults.includes(POSITION_INDEX_COLUMN));
+});
+
+test("without an index a trajectory falls back to whichever of lon/lat moves", () => {
   // Mostly north-south: latitude spans 5 degrees, longitude 0.01.
   const northSouth = [
     { latitude: 45, longitude: -60.0 },
@@ -307,4 +338,107 @@ test("a column no ramp can order is never offered as the colour dimension", () =
   // Strings both, and station_id is an id besides.
   assert.ok(!candidates.includes("station_id"));
   assert.ok(!candidates.includes("profile"));
+});
+
+// ismerOsl002BathymetricProfilsPointeDesMonts, as ERDDAP publishes it: a
+// transect whose measured quantity is the sea floor's depth and whose abscissa
+// is the distance along it. Every numeric column here declares something that
+// once read as a coordinate, which left the record with no panel at all.
+const BATHYMETRY = {
+  columnNames: [
+    "profilID",
+    "transectID",
+    "time",
+    "longitude",
+    "latitude",
+    "distance",
+    "sea_floor_depth",
+  ],
+  columnTypes: [
+    "String",
+    "String",
+    "String",
+    "float",
+    "float",
+    "float",
+    "float",
+  ],
+  columnUnits: [
+    "unitless",
+    "unitless",
+    "UTC",
+    "degrees_east",
+    "degrees_north",
+    "m",
+    "m",
+  ],
+  columnMeta: [
+    { name: "profilID", cf_role: "profile_id", ioos_category: "Identifier" },
+    {
+      name: "transectID",
+      cf_role: "trajectory_id",
+      ioos_category: "Identifier",
+    },
+    { name: "time", axis: "T", standard_name: "time", ioos_category: "Time" },
+    {
+      name: "longitude",
+      axis: "X",
+      standard_name: "longitude",
+      ioos_category: "Location",
+    },
+    {
+      name: "latitude",
+      axis: "Y",
+      standard_name: "latitude",
+      ioos_category: "Location",
+    },
+    { name: "distance", long_name: "Distance", ioos_category: "Location" },
+    {
+      name: "sea_floor_depth",
+      axis: "Z",
+      standard_name: "sea_floor_depth_below_sea_surface",
+      ioos_category: "Bathymetry",
+    },
+  ],
+};
+const BATHYMETRY_DATASET = {
+  cdm_data_type: "TrajectoryProfile",
+  profile_id_variable: "profilID",
+  trajectory_id_variable: "transectID",
+  first_eov_column: "sea_floor_depth",
+};
+
+test("a bathymetric transect is drawn rather than refused", () => {
+  const variables = variablesFrom(BATHYMETRY, BATHYMETRY_DATASET);
+  const plan = facetPlanFor(BATHYMETRY_DATASET, variables, []);
+  assert.ok(plan, "the transect used to be blocked as noMeasurements");
+  // Depth down the shared axis, distance across it: a cross-section. Not
+  // reversed — the dataset's depths are already negative.
+  assert.equal(plan.orientation, COLUMNS);
+  assert.equal(plan.sharedAxis, "sea_floor_depth");
+  assert.equal(plan.sharedReversed, false);
+  assert.deepEqual(plan.panelDefaults, ["distance"]);
+});
+
+test("panelCandidatesFor offers the measurements, minus the shared axis", () => {
+  const variables = variablesFrom(VIKING, VIKING_DATASET);
+  assert.deepEqual(
+    panelCandidatesFor(variables, "TE90_01").map((v) => v.columnName),
+    ["CNDC_01", "PRES_01", "PSAL_01", "FLOR_01", "DOXY_01"],
+  );
+});
+
+test("panelCandidatesFor falls back to the vertical coordinate, never to position", () => {
+  // With distance as the shared axis the transect has no measurement left, and
+  // an empty panel picker is a dead end the axis dropdown can walk into.
+  const variables = variablesFrom(BATHYMETRY, BATHYMETRY_DATASET);
+  assert.deepEqual(
+    panelCandidatesFor(variables, "distance").map((v) => v.columnName),
+    ["sea_floor_depth"],
+  );
+  // Latitude and longitude say where, not what: never a panel.
+  const offered = panelCandidatesFor(variables, "sea_floor_depth").map(
+    (v) => v.columnName,
+  );
+  assert.deepEqual(offered, ["distance"]);
 });

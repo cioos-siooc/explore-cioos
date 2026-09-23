@@ -1,7 +1,9 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import { variablesFrom, byColumnName } from "./previewVariables.js";
+import { positionRowsFor, trackIndexFor } from "./previewTrackIndex.js";
 import {
   colorCandidatesFor,
   facetPlanFor,
@@ -9,6 +11,7 @@ import {
   defaultVisFor,
 } from "./previewFacetPlan.js";
 import { parseColorsParam, formatColorsParam } from "./previewColors.js";
+import { STEP_PARAM } from "../../../state/selection/previewParams.js";
 import { normalizeColorScale } from "./previewColorScales.js";
 
 // Everything that describes the plot on screen, kept in the query string so a
@@ -52,6 +55,7 @@ const sameList = (a, b) =>
 
 export default function usePreviewPlotParams(inspectDataset, table, data) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation();
 
   // One writer for all of them. A null/undefined/'' value deletes its param, so
   // "back to the default" and "never set" produce the same URL.
@@ -81,17 +85,41 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   // Every column of the payload, described. Empty until /preview lands, which is
   // why the vis default below must not depend on it.
-  const variables = useMemo(
+  const columns = useMemo(
     () => variablesFrom(table, inspectDataset),
     [table, inspectDataset],
   );
+
+  // A trajectory's positions, ranked by time. Null for every other type. The
+  // axis label is translated here because the module that builds it is pure —
+  // it is the only user-visible string in the whole chain that is not a column
+  // name the publisher chose.
+  const positionAxisLabel = t("previewPositionAxis");
+  const trackIndex = useMemo(
+    () => trackIndexFor(inspectDataset, columns, data, positionAxisLabel),
+    [inspectDataset, columns, data, positionAxisLabel],
+  );
+
+  // The index is offered like any other column, so the axis picker, the label
+  // editor and the colour candidates need no special case for it.
+  const variables = useMemo(
+    () => (trackIndex ? [...columns, trackIndex.variable] : columns),
+    [columns, trackIndex],
+  );
   const variablesByName = useMemo(() => byColumnName(variables), [variables]);
+
+  // The rows the FIGURE draws: in track order, each carrying its index. The
+  // table keeps `data` as it arrived.
+  const plotData = useMemo(
+    () => positionRowsFor(data, trackIndex),
+    [data, trackIndex],
+  );
 
   // The layout this dataset type implies: which axis the panels share, which way
   // they stack, and which variable opens.
   const plan = useMemo(
-    () => facetPlanFor(inspectDataset, variables, data),
-    [inspectDataset, variables, data],
+    () => facetPlanFor(inspectDataset, variables, plotData),
+    [inspectDataset, variables, plotData],
   );
 
   // Table or plot. Only the deviation is stored, so `vis` appears in the link
@@ -224,6 +252,15 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams],
   );
 
+  // Which profile inside the record is drawn, or null for the window /preview
+  // returns on its own. SelectionProvider reads the same param to build the
+  // fetch — this half is only what the slider binds to.
+  const step = searchParams.get(STEP_PARAM) || null;
+  const setStep = useCallback(
+    (value) => setParams({ [STEP_PARAM]: value }),
+    [setParams],
+  );
+
   // Changes whenever the axis SET changes, so Plotly does not try to restore a
   // zoom onto an axis that no longer exists after a panel is added or removed.
   const uirevision = `${sharedAxis || ""}|${panels.join(",")}`;
@@ -236,6 +273,8 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   return {
     variables,
     variablesByName,
+    trackIndex,
+    plotData,
     plan,
     selectedVis,
     setSelectedVis,
@@ -253,6 +292,8 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     setColorScale,
     plotType,
     setPlotType,
+    step,
+    setStep,
     uirevision,
     linkKey,
   };

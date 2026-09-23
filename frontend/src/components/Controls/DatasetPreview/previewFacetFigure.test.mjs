@@ -4,6 +4,11 @@ import assert from "node:assert/strict";
 import { variablesFrom, byColumnName, labelFor } from "./previewVariables.js";
 import { facetPlanFor, COLUMNS, ROWS } from "./previewFacetPlan.js";
 import {
+  POSITION_INDEX_COLUMN,
+  positionRowsFor,
+  trackIndexFor,
+} from "./previewTrackIndex.js";
+import {
   boxBudgetFor,
   buildFigure,
   domainsFor,
@@ -1079,4 +1084,132 @@ test("a colour column this record cannot order leaves the figure as it was", () 
   assert.ok(!unorderable.layout.coloraxis);
   assert.deepEqual(unorderable.data, plain.data);
   assert.deepEqual(unorderable.layout, plain.layout);
+});
+
+// --- a trajectory's position axis --------------------------------------------
+
+const TRACK_DATASET = { ...VIKING_DATASET, cdm_data_type: "Trajectory" };
+
+// Out of time order on purpose, so a test that passed on input order would fail.
+const TRACK_ROWS = [
+  {
+    time: "2021-05-24T20:38:00Z",
+    latitude: 47.57189,
+    longitude: -69.85413,
+    TE90_01: 15.84,
+  },
+  {
+    time: "2021-05-24T18:54:00Z",
+    latitude: 47.590416,
+    longitude: -69.8673,
+    TE90_01: 15.06,
+  },
+  {
+    time: "2021-05-24T17:06:00Z",
+    latitude: 47.615696,
+    longitude: -69.9255,
+    TE90_01: 9.81,
+  },
+];
+
+function trackFigure(panels = ["TE90_01"], extra = {}) {
+  const columns = variablesFrom(VIKING, TRACK_DATASET);
+  const trackIndex = trackIndexFor(
+    TRACK_DATASET,
+    columns,
+    TRACK_ROWS,
+    "Position along track",
+  );
+  const variables = [...columns, trackIndex.variable];
+  const variablesByName = byColumnName(variables);
+  const rows = positionRowsFor(TRACK_ROWS, trackIndex);
+  const plan = facetPlanFor(TRACK_DATASET, variables, rows);
+  // The whole point of the chain above: without this the figure below would be
+  // drawn against longitude and the ticks would label the wrong numbers.
+  assert.equal(plan.sharedAxis, POSITION_INDEX_COLUMN);
+  return buildFigure({
+    plan,
+    variablesByName,
+    panels,
+    sharedAxis: plan.sharedAxis,
+    data: rows,
+    title: "",
+    mode: "markers",
+    sharedTicks: trackIndex.ticks,
+    sharedText: trackIndex.labels,
+    uirevision: "test",
+    ...extra,
+  });
+}
+
+test("a track is drawn against its rank, in time order", () => {
+  const { data, layout } = trackFigure();
+  assert.equal(layout.xaxis.domain[1], 1);
+  assert.deepEqual(data[0].x, [1, 2, 3]);
+  // The earliest sample is position 1, not the first row of the payload.
+  assert.deepEqual(data[0].y, [9.81, 15.06, 15.84]);
+});
+
+test("the shared axis ticks at the positions, never at round numbers", () => {
+  const { layout } = trackFigure();
+  assert.equal(layout.xaxis.tickmode, "array");
+  assert.deepEqual(layout.xaxis.tickvals, [1, 2, 3]);
+  assert.deepEqual(layout.xaxis.ticktext, [
+    "47.6157<br>-69.9255",
+    "47.5904<br>-69.8673",
+    "47.5719<br>-69.8541",
+  ]);
+});
+
+test("the hover names the position between the rank and the value", () => {
+  const { data } = trackFigure();
+  assert.equal(
+    data[0].hovertemplate,
+    "Position along track: %{x}<br>%{text}<br>Temperature (1990 sca…: %{y} degree_C<extra></extra>",
+  );
+  assert.deepEqual(data[0].text, [
+    "47.6157, -69.9255",
+    "47.5904, -69.8673",
+    "47.5719, -69.8541",
+  ]);
+});
+
+test("the axis is labelled with the name the caller translated", () => {
+  const { layout } = trackFigure();
+  assert.equal(layout.xaxis.title.text, "Position along track");
+});
+
+test("picking a real column back as the shared axis drops both", () => {
+  // What DatasetPreviewPlot does when ?paxis=longitude: the ticks belong to the
+  // index and would label the wrong numbers on anything else.
+  const { data, layout } = trackFigure(["TE90_01"], {
+    sharedAxis: "longitude",
+    sharedTicks: null,
+    sharedText: null,
+  });
+  assert.equal(layout.xaxis.tickmode, undefined);
+  assert.equal(data[0].text, undefined);
+  assert.ok(!data[0].hovertemplate.includes("%{text}"));
+});
+
+test("without a position axis every figure is exactly what it was", () => {
+  const { data, layout } = figure("TimeSeries", ALL_SIX);
+  assert.equal(layout.xaxis.tickmode, undefined);
+  assert.equal(layout.xaxis.tickvals, undefined);
+  data.forEach((trace) => {
+    assert.equal(trace.text, undefined);
+    assert.ok(!trace.hovertemplate.includes("%{text}"));
+  });
+});
+
+test("a profile never takes position text — its box is unified", () => {
+  // Every row of a unified box is the same data row, so one %{text} per panel
+  // would be one copy of the same position per panel.
+  const { data } = figure("Profile", ALL_SIX, {
+    sharedText: ["a", "b", "c"],
+  });
+  data.forEach((trace) => {
+    assert.equal(trace.text, undefined);
+    assert.ok(!trace.hovertemplate.includes("%{text}"));
+  });
 });

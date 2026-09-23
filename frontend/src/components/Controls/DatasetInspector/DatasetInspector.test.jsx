@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -33,7 +33,13 @@ const DATASET = {
   ckan_url: null,
 };
 
-function Harness({ returnToList = () => {}, dataset = DATASET }) {
+function Harness({
+  returnToList = () => {},
+  dataset = DATASET,
+  setInspectRecordID = () => {},
+  selectedTrajectory,
+  setSelectedTrajectory = () => {},
+}) {
   const { catalogLoaded } = useFilters();
   const { showDownloadModal } = useUI();
   if (!catalogLoaded) return <span data-testid="state">loading</span>;
@@ -46,8 +52,10 @@ function Harness({ returnToList = () => {}, dataset = DATASET }) {
         dataset={dataset}
         returnToList={returnToList}
         setHoveredDataset={() => {}}
-        setInspectRecordID={() => {}}
+        setInspectRecordID={setInspectRecordID}
         query={{}}
+        selectedTrajectory={selectedTrajectory}
+        setSelectedTrajectory={setSelectedTrajectory}
         activeWmsOverlay={undefined}
         setActiveWmsOverlay={() => {}}
       />
@@ -171,5 +179,144 @@ describe("DatasetInspector", () => {
     await user.click(screen.getByPlaceholderText("Search table"));
     await user.keyboard("{Backspace}");
     expect(returnToList).not.toHaveBeenCalled();
+  });
+  // A trajectory dataset used to get TWO card lists holding the same ids: a
+  // "Platforms / Trajectories" section that drew a track on the map, above a
+  // record list that opened the plot. The first one is what the user reached,
+  // so a trajectory's graph and table were effectively unreachable.
+  describe("a trajectory dataset's records", () => {
+    const TRAJECTORY_DATASET = {
+      ...DATASET,
+      cdm_data_type: "Trajectory",
+      trajectory_id_variable: "surveyID",
+    };
+    const RECORDS = [
+      {
+        profile_id: "Mai21",
+        time_min: "2021-05-24T18:54:00Z",
+        time_max: "2021-05-24T20:38:00Z",
+        depth_min: 0,
+        depth_max: 0,
+        eovs: null,
+      },
+      {
+        profile_id: "Oct22_1",
+        time_min: "2022-10-25T17:42:00Z",
+        time_max: "2022-10-25T19:30:00Z",
+        depth_min: 0,
+        depth_max: 0,
+        eovs: null,
+      },
+    ];
+    const PLATFORMS = [
+      { trajectory_id: "Mai21", n_points: 9 },
+      { trajectory_id: "Oct22_1", n_points: 12 },
+    ];
+
+    // The two endpoints this page joins have no fixture with rows in it, and a
+    // recorded one per query would key on the whole filter string. Answer them
+    // here and let the mock serve everything else.
+    function serveRecords() {
+      installMockFetch();
+      const fixtures = globalThis.fetch;
+      const json = (body) =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input, init) => {
+          const url = typeof input === "string" ? input : input.url;
+          if (url.includes("/datasetRecordsList"))
+            return json({ profiles: RECORDS });
+          if (url.includes("/trajectories/platforms")) return json(PLATFORMS);
+          return fixtures(input, init);
+        }),
+      );
+    }
+
+    // The cards carrying this id. One per list the page draws it in — which is
+    // the whole point of the first test below.
+    const cardsNamed = (id) =>
+      waitFor(() => {
+        const cards = screen
+          .getAllByTitle(id)
+          .map((label) => label.closest(".listCard"));
+        expect(cards.length).toBeGreaterThan(0);
+        return cards;
+      });
+
+    it("are listed once, not once per section", async () => {
+      serveRecords();
+      await renderReady({ dataset: TRAJECTORY_DATASET });
+      expect(await cardsNamed("Mai21")).toHaveLength(1);
+      expect(screen.getAllByTitle("Oct22_1")).toHaveLength(1);
+      // The fixes count the platform list used to carry, kept on the one card.
+      expect(screen.getByText("9")).toBeInTheDocument();
+    });
+
+    it("open the preview when the card is clicked", async () => {
+      serveRecords();
+      const setInspectRecordID = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        setInspectRecordID,
+      });
+      await user.click((await cardsNamed("Mai21"))[0]);
+      expect(setInspectRecordID).toHaveBeenCalledWith("Mai21");
+    });
+
+    it("draw the track from the card's own control, without opening anything", async () => {
+      serveRecords();
+      const setInspectRecordID = vi.fn();
+      const setSelectedTrajectory = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        setInspectRecordID,
+        setSelectedTrajectory,
+      });
+      const [card] = await cardsNamed("Mai21");
+      await user.click(
+        within(card).getByLabelText("Draw this track on the map"),
+      );
+      expect(setSelectedTrajectory).toHaveBeenCalledWith({
+        datasetPk: TRAJECTORY_DATASET.pk,
+        datasetTitle: TRAJECTORY_DATASET.title,
+        trajectoryId: "Mai21",
+        frameView: true,
+      });
+      // The control is inside the card, so its click must not also navigate.
+      expect(setInspectRecordID).not.toHaveBeenCalled();
+    });
+
+    it("clear the drawn track when its control is pressed again", async () => {
+      serveRecords();
+      const setSelectedTrajectory = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        selectedTrajectory: {
+          datasetPk: TRAJECTORY_DATASET.pk,
+          trajectoryId: "Mai21",
+        },
+        setSelectedTrajectory,
+      });
+      const [card] = await cardsNamed("Mai21");
+      const control = within(card).getByLabelText(
+        "Clear this track from the map",
+      );
+      expect(control).toHaveAttribute("aria-pressed", "true");
+      await user.click(control);
+      expect(setSelectedTrajectory).toHaveBeenCalledWith(undefined);
+    });
+
+    it("carry no track control on a dataset that is not a trajectory", async () => {
+      serveRecords();
+      await renderReady();
+      await cardsNamed("Mai21");
+      expect(
+        screen.queryByLabelText("Draw this track on the map"),
+      ).not.toBeInTheDocument();
+    });
   });
 });

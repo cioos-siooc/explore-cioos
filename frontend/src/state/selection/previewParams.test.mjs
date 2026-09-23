@@ -5,6 +5,7 @@ import {
   PLOT_PARAMS,
   PREVIEW_PARAMS,
   RECORD_PARAM,
+  STEP_PARAM,
   withoutPreviewParams,
 } from "./previewParams.js";
 
@@ -18,10 +19,27 @@ test("the preview owns the record param and the plot params", () => {
     "pcolors",
     "pz",
     "pzscale",
+    "pstep",
   ]);
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {
     assert.ok(PREVIEW_PARAMS.includes(param), param);
   }
+});
+
+test("the step param is a plot param, and is named once", () => {
+  // Read in two places — usePreviewPlotParams binds the slider to it, and
+  // SelectionProvider puts it in the /preview URL as `at`, because it is the
+  // only plot param that changes what is FETCHED. The constant is what keeps
+  // those two from drifting to different spellings.
+  assert.equal(STEP_PARAM, "pstep");
+  assert.ok(PLOT_PARAMS.includes(STEP_PARAM));
+  assert.ok(PREVIEW_PARAMS.includes(STEP_PARAM));
+  // Closing the modal has to take it with everything else: a cast id left in
+  // the address bar names a profile of a record that is no longer open.
+  const left = withoutPreviewParams(
+    new URLSearchParams({ preview: "AZMP-ESG", pstep: "cast-1" }),
+  );
+  assert.equal(left.get(STEP_PARAM), null);
 });
 
 test("retired params are still cleaned up, and never written again", () => {

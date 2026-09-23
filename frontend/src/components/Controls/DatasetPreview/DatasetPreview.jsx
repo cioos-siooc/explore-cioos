@@ -10,6 +10,7 @@ import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx"
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
 import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
+import usePreviewProfiles from "./usePreviewProfiles.js";
 import { PREVIEW_ERROR } from "./previewErrors.js";
 import "./styles.css";
 
@@ -85,6 +86,8 @@ export default function DatasetPreview({
   const {
     variables,
     variablesByName,
+    trackIndex,
+    plotData,
     plan,
     selectedVis,
     setSelectedVis,
@@ -102,9 +105,19 @@ export default function DatasetPreview({
     setColorScale,
     plotType,
     setPlotType,
+    step,
+    setStep,
     uirevision,
     linkKey,
   } = usePreviewPlotParams(inspectDataset, datasetPreview?.table, data);
+
+  // Which profiles this record holds, so the plot can step to any of them —
+  // fetched separately from the rows, and independent of them: a record whose
+  // list fails simply gets no slider.
+  const profiles = usePreviewProfiles(
+    inspectDataset?.dataset_id,
+    inspectRecordID,
+  );
 
   // Per-column display names. Lifted out of the plot so they survive the
   // Table/Plot flip (which unmounts it) like everything else now does, but
@@ -150,8 +163,8 @@ export default function DatasetPreview({
   // declares the coordinate metadata and the next does not — so the message has
   // to name the missing column rather than blame the type.
   const plotBlocker = useMemo(
-    () => (plan ? null : plotBlockerFor(inspectDataset, variables, data)),
-    [plan, inspectDataset, variables, data],
+    () => (plan ? null : plotBlockerFor(inspectDataset, variables, plotData)),
+    [plan, inspectDataset, variables, plotData],
   );
   const blockedMessage = (blocker) => {
     if (
@@ -264,7 +277,8 @@ export default function DatasetPreview({
                         >
                           <DatasetPreviewPlot
                             inspectRecordID={inspectRecordID}
-                            data={data}
+                            data={plotData}
+                            trackIndex={trackIndex}
                             variables={variables}
                             variablesByName={variablesByName}
                             plan={plan}
@@ -282,6 +296,9 @@ export default function DatasetPreview({
                             setColorScale={setColorScale}
                             plotType={plotType}
                             setPlotType={setPlotType}
+                            profiles={profiles}
+                            step={step}
+                            setStep={setStep}
                             customLabels={customLabels}
                             setCustomLabels={setCustomLabels}
                             uirevision={uirevision}

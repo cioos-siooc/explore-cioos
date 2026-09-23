@@ -7,19 +7,17 @@ import useElementSize from "../../ui/useElementSize.js";
 import VariableColorPicker from "./VariableColorPicker.jsx";
 import ColorScalePicker from "./ColorScalePicker.jsx";
 import ColorScaleLegend from "./ColorScaleLegend.jsx";
+import ProfileSlice from "./ProfileSlice.jsx";
 import "./styles.css";
 
 import Plotly from "plotly.js-basic-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import frLocale from "plotly.js-locales/fr";
 
-import {
-  labelFor,
-  shortLabelFor,
-  measurementsOf,
-} from "../DatasetPreview/previewVariables.js";
+import { labelFor, shortLabelFor } from "../DatasetPreview/previewVariables.js";
 import {
   axisDirectionsFor,
+  panelCandidatesFor,
   sharedCandidatesFor,
 } from "../DatasetPreview/previewFacetPlan.js";
 import {
@@ -39,6 +37,7 @@ import {
 } from "../DatasetPreview/previewPaneLayout.js";
 import { defaultColorFor } from "../DatasetPreview/previewColors.js";
 import { autoScaleNameFor } from "../DatasetPreview/previewColorScales.js";
+import { POSITION_INDEX_COLUMN } from "../DatasetPreview/previewTrackIndex.js";
 
 // Which key names each axis's direction, so the caption can say which way round
 // this plot is drawn. See axisDirectionsFor.
@@ -75,6 +74,10 @@ const Plot = createPlotlyComponent(Plotly);
 export default function DatasetPreviewPlot({
   inspectRecordID,
   data,
+  // A trajectory's positions, ranked by time — see previewTrackIndex. Null for
+  // every other type, and ignored the moment the user picks a real column as
+  // the shared axis.
+  trackIndex,
   variables,
   variablesByName,
   plan,
@@ -92,6 +95,11 @@ export default function DatasetPreviewPlot({
   setColorScale,
   plotType,
   setPlotType,
+  // The record's own profiles, and which of them is drawn. From
+  // usePreviewProfiles; `step` rides the URL and the /preview fetch.
+  profiles,
+  step,
+  setStep,
   customLabels,
   setCustomLabels,
   uirevision,
@@ -113,7 +121,9 @@ export default function DatasetPreviewPlot({
   // height enters only through heightBudgetFor, which can lower the ceiling
   // above but never raise it.
   const [plotAreaRef, plotAreaSize] = useElementSize();
-  const measurements = measurementsOf(variables);
+  // What this record can put in a panel — the same list defaultPanelsFor picks
+  // from, so the picker and the defaults cannot disagree about what is drawable.
+  const panelChoices = panelCandidatesFor(variables, sharedAxis);
   const sharedCandidates = sharedCandidatesFor(variables);
   const directions = axisDirectionsFor(plan.orientation);
 
@@ -143,6 +153,12 @@ export default function DatasetPreviewPlot({
     titleLines,
   );
 
+  // The ticks and the position labels belong to the index and to nothing else:
+  // switch the axis back to longitude and they would label the wrong numbers.
+  const onPositionAxis = Boolean(
+    trackIndex && sharedAxis === POSITION_INDEX_COLUMN,
+  );
+
   // Memoised because react-plotly.js compares `data`/`layout` by IDENTITY and
   // calls Plotly.react() whenever either differs. A figure rebuilt on every
   // render means a full re-plot of every panel on every keystroke in the rename
@@ -162,6 +178,8 @@ export default function DatasetPreviewPlot({
             mode: plotType,
             colorAxis,
             colorScale,
+            sharedTicks: onPositionAxis ? trackIndex.ticks : null,
+            sharedText: onPositionAxis ? trackIndex.labels : null,
             size: { width, height },
             uirevision: `${inspectRecordID}|${uirevision}`,
           })
@@ -178,6 +196,8 @@ export default function DatasetPreviewPlot({
       plotType,
       colorAxis,
       colorScale,
+      onPositionAxis,
+      trackIndex,
       width,
       height,
       inspectRecordID,
@@ -228,12 +248,12 @@ export default function DatasetPreviewPlot({
             className="dropdownButtonLeft"
             title={toggleLabel(variablesToggleTitle)}
           >
-            {measurements.length === 0 && (
+            {panelChoices.length === 0 && (
               <span className="dropdownEmptyNote">
                 {t("datasetPreviewPlotNoVariables")}
               </span>
             )}
-            {measurements.map((variable) => (
+            {panelChoices.map((variable) => (
               <label
                 className="dropdown-item variablePickerRow"
                 key={variable.columnName}
@@ -248,7 +268,7 @@ export default function DatasetPreviewPlot({
                 </span>
               </label>
             ))}
-            {measurements.length > 1 && (
+            {panelChoices.length > 1 && (
               <>
                 <hr />
                 <button
@@ -256,13 +276,13 @@ export default function DatasetPreviewPlot({
                   className="dropdown-item"
                   onClick={() =>
                     setPanels(
-                      panels.length === measurements.length
+                      panels.length === panelChoices.length
                         ? []
-                        : measurements.map((variable) => variable.columnName),
+                        : panelChoices.map((variable) => variable.columnName),
                     )
                   }
                 >
-                  {panels.length === measurements.length
+                  {panels.length === panelChoices.length
                     ? t("datasetPreviewPlotSelectNone")
                     : t("datasetPreviewPlotSelectAll")}
                 </button>
@@ -477,6 +497,11 @@ export default function DatasetPreviewPlot({
       />
 
       <div className="datasetPreviewPlotColumn">
+        {/* Above the figure rather than in the parameters pane: this says WHICH
+            rows are drawn where every control in the pane says how, and the
+            pane is too narrow to read a cast's date in. */}
+        <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
+
         {/* Above the scroller, not inside it: a profile wide enough to scroll
             is exactly the plot whose scale would otherwise be off-screen. */}
         <ColorScaleLegend legend={figure && figure.colorLegend} />

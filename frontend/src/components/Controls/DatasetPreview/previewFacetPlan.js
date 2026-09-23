@@ -27,6 +27,10 @@ import {
   isTimeLike,
   measurementsOf,
 } from "./previewVariables.js";
+import {
+  POSITION_INDEX_COLUMN,
+  timeCoordinateOf,
+} from "./previewTrackIndex.js";
 
 export const COLUMNS = "columns"; // profiles: panels across, shared Y
 export const ROWS = "rows"; // timeseries: panels stacked, shared X
@@ -58,16 +62,6 @@ const verticalCoordinate = (variables) =>
         variable.standardName === "depth" ||
         variable.standardName === "altitude" ||
         variable.columnName.toLowerCase() === "depth"),
-  );
-
-const timeCoordinate = (variables) =>
-  find(
-    variables,
-    (variable) =>
-      variable.kind === "coordinate" &&
-      (variable.axis === "T" ||
-        variable.standardName === "time" ||
-        variable.unit === "UTC"),
   );
 
 // Whichever of latitude / longitude actually moves over the record. The image
@@ -140,29 +134,69 @@ export function colorCandidatesFor(variables) {
 function defaultSharedFor(dataset, variables, data) {
   const type = (dataset && dataset.cdm_data_type) || "";
   if (PROFILE_TYPES.has(type)) return verticalCoordinate(variables);
-  if (type === "TimeSeries") return timeCoordinate(variables);
+  if (type === "TimeSeries") return timeCoordinateOf(variables);
   if (type === "Trajectory") {
-    return trackCoordinate(variables, data) || timeCoordinate(variables);
+    // The index when trackIndexFor built one, which is the usual case. Without
+    // it — a track with no time to rank by — the coordinate that moves furthest
+    // is still a better axis than nothing.
+    return (
+      find(
+        variables,
+        (variable) => variable.columnName === POSITION_INDEX_COLUMN,
+      ) ||
+      trackCoordinate(variables, data) ||
+      timeCoordinateOf(variables)
+    );
   }
   if (type === "Point") return measurementsOf(variables)[0];
   return undefined;
 }
 
+// Where a measurement was taken, never what it measured. Excluded from the
+// fallback below: a transect plotted against its own longitude says nothing the
+// map is not already showing.
+const isHorizontalPosition = (variable) =>
+  variable.axis === "X" ||
+  variable.axis === "Y" ||
+  variable.standardName === "latitude" ||
+  variable.standardName === "longitude";
+
+// What this record can put in a panel, given the axis the panels share.
+//
+// Normally the measurements, which is what `measurement` means. The fallback is
+// for a record that MEASURES ITS OWN VERTICAL COORDINATE — ismerOsl002 sounds a
+// transect, so its quantity is sea_floor_depth (axis Z, hence a coordinate) and
+// its abscissa is distance. Such a record has no measurement left once the
+// depth becomes the shared axis, and refusing to draw it was wrong: the
+// coordinate is the data. Only reached when the primary list is empty, so a
+// record with measurements is untouched.
+export function panelCandidatesFor(variables, sharedAxis) {
+  const notShared = (variable) =>
+    !sharedAxis || variable.columnName !== sharedAxis;
+  const measurements = measurementsOf(variables).filter(notShared);
+  if (measurements.length) return measurements;
+  return (variables || []).filter(
+    (variable) =>
+      variable.kind === "coordinate" &&
+      variable.isNumeric &&
+      notShared(variable) &&
+      !isHorizontalPosition(variable),
+  );
+}
+
 // The panels a record opens on: the dataset's own first EOV column when it is
-// plottable, else the first measurement. One panel, matching what the preview
+// plottable, else the first candidate. One panel, matching what the preview
 // showed before faceting.
 function defaultPanelsFor(dataset, variables, shared) {
-  const measurements = measurementsOf(variables).filter(
-    (variable) => !shared || variable.columnName !== shared.columnName,
-  );
-  if (!measurements.length) return [];
+  const candidates = panelCandidatesFor(variables, shared && shared.columnName);
+  if (!candidates.length) return [];
   const preferred =
     dataset &&
     dataset.first_eov_column &&
-    measurements.find(
+    candidates.find(
       (variable) => variable.columnName === dataset.first_eov_column,
     );
-  return [(preferred || measurements[0]).columnName];
+  return [(preferred || candidates[0]).columnName];
 }
 
 // Why a record has no plan. Four codes rather than one "not plottable", because

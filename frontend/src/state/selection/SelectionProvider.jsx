@@ -30,7 +30,11 @@ import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, hiddenDatasetPksFor } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
-import { RECORD_PARAM, withoutPreviewParams } from "./previewParams.js";
+import {
+  RECORD_PARAM,
+  STEP_PARAM,
+  withoutPreviewParams,
+} from "./previewParams.js";
 import {
   PREVIEW_ERROR,
   networkPreviewError,
@@ -470,6 +474,10 @@ export default function SelectionProvider({ children }) {
           if (!recordId) return withoutPreviewParams(previous);
           const next = new URLSearchParams(previous);
           next.set(RECORD_PARAM, recordId);
+          // A profile id belongs to the record it came from: carrying one to
+          // the next station names a cast that station never took, and
+          // /preview answers NO_DATA for it.
+          next.delete(STEP_PARAM);
           return next;
         },
         { replace },
@@ -796,14 +804,20 @@ export default function SelectionProvider({ children }) {
   // here, because doing it here is what would wipe a shared link's own record
   // before its dataset had a chance to load.
   const inspectDatasetId = inspectDataset?.dataset_id;
+  // Which profile INSIDE the record is drawn. The one plot param read here
+  // rather than in usePreviewPlotParams: it changes what is fetched, not how
+  // the rows are drawn, so it rides this fetch instead of a second one — one
+  // request, one previewError, one recordLoading.
+  const inspectRecordStep = searchParams.get(STEP_PARAM) || undefined;
 
   useEffect(() => {
     if (!inspectDatasetId || !inspectRecordID) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setRecordLoading(true);
-    const previewUrl = `${server}/preview?dataset=${encodeURIComponent(
-      inspectDatasetId,
-    )}&profile=${encodeURIComponent(inspectRecordID)}`;
+    const previewUrl =
+      `${server}/preview?dataset=${encodeURIComponent(inspectDatasetId)}` +
+      `&profile=${encodeURIComponent(inspectRecordID)}` +
+      (inspectRecordStep ? `&at=${encodeURIComponent(inspectRecordStep)}` : "");
     fetch(previewUrl)
       .then((response) => {
         if (response.ok) {
@@ -836,7 +850,7 @@ export default function SelectionProvider({ children }) {
           reportError("preview upstream failure", new Error(previewUrl));
         }
       });
-  }, [inspectRecordID, inspectDatasetId]);
+  }, [inspectRecordID, inspectDatasetId, inspectRecordStep]);
 
   const value = {
     polygon,

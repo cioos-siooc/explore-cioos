@@ -16,6 +16,11 @@
 // modal the user had not asked to see.
 export const RECORD_PARAM = "preview";
 
+// Which profile inside that record. Read by SelectionProvider as well as by
+// usePreviewPlotParams, because it is the one plot param that changes what is
+// FETCHED rather than how it is drawn — see the /preview `at` parameter.
+export const STEP_PARAM = "pstep";
+
 // How that record is being drawn. Each of these is written ONLY when it differs
 // from the default the dataset type implies, so an untouched plot adds nothing
 // to the link — the same rule the map's layer switches follow.
@@ -36,6 +41,11 @@ export const RECORD_PARAM = "preview";
 //   pzscale  the colourscale that column is drawn in
 //                                  (default: its own colorBarPalette, else
 //                                  Viridis — and never a rainbow)
+//   pstep    which profile INSIDE the record is drawn, by the value of the
+//            dataset's cf_role=profile_id column
+//                                  (default: none, meaning the window
+//                                  /preview returns on its own — every profile
+//                                  in the tail of the record at once)
 export const PLOT_PARAMS = [
   "vis",
   "pvars",
@@ -44,6 +54,7 @@ export const PLOT_PARAMS = [
   "pcolors",
   "pz",
   "pzscale",
+  STEP_PARAM,
 ];
 
 // Written by an earlier version of the plot and never again. They stay in the
