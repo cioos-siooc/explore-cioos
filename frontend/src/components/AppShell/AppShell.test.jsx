@@ -36,6 +36,15 @@ describe("AppShell (composition)", () => {
     });
   });
 
+  it("states the selection count inside the Download button, not beside it", async () => {
+    renderWithProviders(<AppShell />, { providers: "app" });
+    const footer = await screen.findByTestId("sidebar-footer");
+    const button = screen.getByRole("button", { name: /Download/ });
+    expect(button).toHaveTextContent("0 selected");
+    expect(button).toBeDisabled();
+    expect(footer.textContent.match(/selected/g)).toHaveLength(1);
+  });
+
   it("opens the dataset list and, from it, a dataset's own page — Sidebar, DatasetsTable, SelectionProvider and DatasetInspector working together", async () => {
     const user = userEvent.setup();
     // Phone-width default (UIProvider's breakpoint): sidebar starts collapsed,

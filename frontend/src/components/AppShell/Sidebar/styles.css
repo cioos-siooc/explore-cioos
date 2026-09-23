@@ -277,27 +277,16 @@
 }
 
 /* ------------------------------------------------------------------
- * Footer: dataset counts on the left, the Download action on the right.
+ * Footer: how the selection is made on the left, the Download action on the right.
  * ------------------------------------------------------------------ */
 .sidebarFooter {
   display: flex;
-
-  /* Two stacked rows: the sentence that says how the selection is made, then
-     the counts + Download it is about. */
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   flex-shrink: 0;
   padding: 10px 12px;
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-sand, var(--cioos-surface-2));
-}
-
-.sidebarFooterActions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 /* A plain paragraph rather than a flex row: the icon is meant to read as the
@@ -307,6 +296,8 @@
    it. Normal inline flow wraps the way running text always does, with the
    icon staying attached to the words that follow it on every line. */
 .sidebarFooterHint {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: var(--cioos-font-size-xs);
   line-height: 1.4;
@@ -325,16 +316,12 @@
 
 .sidebarFooterHintMore {
   display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  vertical-align: -2px;
   margin-left: 4px;
   padding: 0;
   border: 0;
   background: none;
-  font: inherit;
-  font-weight: 700;
   color: var(--cioos-primary-700);
-  text-decoration: underline;
   cursor: pointer;
 }
 
@@ -342,30 +329,10 @@
   color: var(--cioos-navy);
 }
 
-.sidebarCounts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink);
-}
-
-.sidebarCountsDatasets {
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 /* A refetch is in flight: the numbers on screen are the previous ones, so fade
-   them rather than swapping in a spinner and making the counters flicker. */
-.datasetsHeaderCount.updating,
-.sidebarCountsDatasets.updating {
+   them rather than swapping in a spinner and making the counter flicker. */
+.datasetsHeaderCount.updating {
   opacity: 0.55;
-}
-
-.sidebarCountsSelected {
-  color: var(--cioos-ink-60);
-  white-space: nowrap;
 }
 
 .sidebarDownloadButton {
@@ -373,7 +340,7 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  padding: 8px 16px;
+  padding: 6px 14px;
   border: 1px solid var(--cioos-primary-700);
 
   /* Same corner radius as the dataset cards it sits under. */
@@ -395,16 +362,19 @@
   cursor: default;
 }
 
+/* The label and the selection count it acts on, stacked so the button stays
+   narrow enough to leave the hint beside it. */
+.sidebarDownloadText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
 .sidebarDownloadCount {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 8px;
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
   font-size: var(--cioos-font-size-xs);
-  font-weight: 700;
-  line-height: 1.6;
+  font-weight: 400;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------
@@ -484,7 +454,7 @@
   }
 
   /* The footer is the surface's action bar: the Download button gets a full
-     touch target, and the counts beside it stay on one line each. */
+     touch target. */
   .sidebarFooter {
     padding: var(--cioos-space-md) var(--cioos-space-lg);
 
