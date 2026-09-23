@@ -568,9 +568,16 @@ BEGIN
     ) grouped
     GROUP BY dataset_pk, island
   ),
+  -- Grids have no feature rows: their day set is the time dimension's
+  -- extent, which is regular, so the span is the best answer there is.
   merged AS (
-    SELECT d.pk, array_agg(i.r ORDER BY i.r) FILTER (WHERE i.r IS NOT NULL)
-                   AS day_ranges
+    SELECT d.pk,
+           CASE WHEN d.cdm_data_type = 'Grid' AND d.coverage_time_min IS NOT NULL
+                THEN ARRAY[daterange(d.coverage_time_min::date,
+                                     GREATEST(d.coverage_time_max::date,
+                                              d.coverage_time_min::date) + 1)]
+                ELSE array_agg(i.r ORDER BY i.r) FILTER (WHERE i.r IS NOT NULL)
+           END AS day_ranges
     FROM cde.datasets d
     LEFT JOIN islands i ON i.dataset_pk = d.pk
     GROUP BY d.pk

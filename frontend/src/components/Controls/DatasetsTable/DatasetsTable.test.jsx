@@ -53,7 +53,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).toEqual(["Alpha station", "Beta station", "Gamma grid"]);
   });
 
-  it("sorts by days of data, grids last when descending", async () => {
+  it("sorts by days of data, grids included", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <DatasetsTable
@@ -65,7 +65,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
             title: "Grid",
             cdm_data_type: "Grid",
             grid_dimensions: [],
-            days: null,
+            days: 400,
           }),
         ]}
         selectAll={false}
@@ -82,7 +82,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     const cards = screen.getAllByTestId("dataset-card");
     expect(
       cards.map((c) => c.querySelector(".datasetCardTitle").textContent),
-    ).toEqual(["Long", "Short", "Grid"]);
+    ).toEqual(["Long", "Grid", "Short"]);
     expect(cards[0]).toHaveTextContent("3,650");
   });
 

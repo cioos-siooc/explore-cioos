@@ -168,7 +168,7 @@ export default function DatasetsTable({
         case "locations":
           return isGrid ? -1 : Number(row.profiles_count) || 0;
         case "days":
-          return isGrid ? -1 : Number(row.days) || 0;
+          return Number(row.days) || 0;
         case "size":
           return Number(row?.sizeEstimate?.filteredSize) || 0;
         case "downloadable":
