@@ -432,6 +432,16 @@
     inset: 0;
     width: auto;
     z-index: calc(var(--cioos-z-dock, 35) + 1);
+
+    /* Undo theme.css's phone step-up so more of the list fits on screen; the
+       small tiers stop at their desktop sizes rather than drop further. */
+    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-2xs: 10px;
+    --cioos-font-size-xs: 11px;
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-base: 13px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
   }
 
   .sidebarDatasets {
