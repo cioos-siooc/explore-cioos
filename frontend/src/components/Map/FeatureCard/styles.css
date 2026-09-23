@@ -210,7 +210,7 @@
 .featureCardRowText {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
   min-width: 0;
 }
 

@@ -92,24 +92,6 @@ export default function DatasetCard({
     (pc) => pc.platform === row.platform,
   );
 
-  const serverName = formatErddapServerName(
-    row.erddap_server_url || row.erddap_url,
-    i18n.language,
-    erddapServersJSONfile,
-  );
-
-  const typeLabel = isGrid
-    ? t("griddapTypeLabel")
-    : (row.cdm_data_type || "")
-        .replace("TimeSeriesProfile", "Time series / Profile")
-        .replace("TimeSeries", "Time series");
-
-  const locationsLabel = isGrid
-    ? formatGridSize(row.grid_dimensions) || "—"
-    : row.profiles_count !== row.n_profiles
-      ? `${row.profiles_count} / ${row.n_profiles}`
-      : row.profiles_count;
-
   const selectTitle = isGrid
     ? t("griddapNotDownloadableTooltip")
     : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
@@ -276,51 +258,7 @@ export default function DatasetCard({
           )}
         </div>
 
-        <div className="datasetCardMeta">
-          <span className="datasetCardMetaItem" title="ERDDAP™ Server">
-            <Server size={13} aria-hidden="true" />
-            {serverName}
-          </span>
-          <span
-            className="datasetCardMetaItem"
-            title={t("datasetsTableHeaderTypeText")}
-          >
-            <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
-            {typeLabel}
-          </span>
-          <span
-            className="datasetCardMetaItem"
-            title={
-              isGrid
-                ? t("griddapGridSizeTooltip")
-                : t("datasetsTableHeaderLocationsText")
-            }
-          >
-            <PinMapFill size={13} aria-hidden="true" />
-            {locationsLabel}
-          </span>
-          {row.days != null && (
-            <span
-              className="datasetCardMetaItem"
-              title={t("datasetsCardSortDaysText")}
-            >
-              <CalendarCheck size={13} aria-hidden="true" />
-              {Number(row.days).toLocaleString(i18n.language)}
-            </span>
-          )}
-
-          {/* Same "still producing data" signal as the dataset inspector's
-              Last update row — on this row here since it is the card's other
-              home for small dataset-level facts. */}
-          {row.is_realtime && (
-            <span
-              className="datasetCardLive"
-              title={t("datasetRealtimeBadgeTitle")}
-            >
-              {t("datasetRealtimeBadgeText")}
-            </span>
-          )}
-        </div>
+        <DatasetCardMeta row={row} t={t} i18n={i18n} />
 
         {/* Where this dataset lives and how to fetch it, outside the estimates
             branch because none of it depends on them: the one dataset the
@@ -432,5 +370,75 @@ export default function DatasetCard({
         )}
       </div>
     </div>
+  );
+}
+
+// The card's second row: where the dataset lives, what kind it is, how many
+// locations and days it holds, and whether it is live. Shared with the map's
+// "what's here" card so a dataset reads the same in both lists.
+export function DatasetCardMeta({ row, t, i18n }) {
+  const isGrid = row.cdm_data_type === "Grid";
+  const serverName = formatErddapServerName(
+    row.erddap_server_url || row.erddap_url,
+    i18n.language,
+    erddapServersJSONfile,
+  );
+  const typeLabel = isGrid
+    ? t("griddapTypeLabel")
+    : (row.cdm_data_type || "")
+        .replace("TimeSeriesProfile", "Time series / Profile")
+        .replace("TimeSeries", "Time series");
+  const locationsLabel = isGrid
+    ? formatGridSize(row.grid_dimensions) || "—"
+    : row.profiles_count !== row.n_profiles
+      ? `${row.profiles_count} / ${row.n_profiles}`
+      : row.profiles_count;
+
+  return (
+    <span className="datasetCardMeta">
+      <span className="datasetCardMetaItem" title="ERDDAP™ Server">
+        <Server size={13} aria-hidden="true" />
+        {serverName}
+      </span>
+      <span
+        className="datasetCardMetaItem"
+        title={t("datasetsTableHeaderTypeText")}
+      >
+        <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
+        {typeLabel}
+      </span>
+      <span
+        className="datasetCardMetaItem"
+        title={
+          isGrid
+            ? t("griddapGridSizeTooltip")
+            : t("datasetsTableHeaderLocationsText")
+        }
+      >
+        <PinMapFill size={13} aria-hidden="true" />
+        {locationsLabel}
+      </span>
+      {row.days != null && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("datasetsCardSortDaysText")}
+        >
+          <CalendarCheck size={13} aria-hidden="true" />
+          {Number(row.days).toLocaleString(i18n.language)}
+        </span>
+      )}
+
+      {/* Same "still producing data" signal as the dataset inspector's
+          Last update row — on this row here since it is the card's other
+          home for small dataset-level facts. */}
+      {row.is_realtime && (
+        <span
+          className="datasetCardLive"
+          title={t("datasetRealtimeBadgeTitle")}
+        >
+          {t("datasetRealtimeBadgeText")}
+        </span>
+      )}
+    </span>
   );
 }

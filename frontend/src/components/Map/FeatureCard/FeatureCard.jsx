@@ -18,6 +18,8 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useCellDatasetDays from "./useCellDatasetDays.js";
+import { DatasetCardMeta } from "../../Controls/DatasetsTable/DatasetCard.jsx";
+import "../../Controls/DatasetsTable/styles.css";
 import "./styles.css";
 
 // The "what's here" card: the single answer to a click anywhere on the map.
@@ -268,6 +270,9 @@ export default function FeatureCard() {
                   <span className="featureCardRowIcon">{kindIcon(entry)}</span>
                   <span className="featureCardRowText">
                     <span className="featureCardRowTitle">{entry.title}</span>
+                    {entry.row && (
+                      <DatasetCardMeta row={entry.row} t={t} i18n={i18n} />
+                    )}
                     <span className="featureCardRowMeta">
                       {entry.kind === "track"
                         ? entry.trajectoryId || t("featureCardTrack")

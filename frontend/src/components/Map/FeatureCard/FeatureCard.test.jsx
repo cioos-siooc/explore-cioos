@@ -82,6 +82,23 @@ describe("FeatureCard", () => {
     expect(screen.getByTitle(row.title)).toBeInTheDocument();
   });
 
+  it("gives a row the same second row as the datasets list's card", async () => {
+    await renderReady();
+    const row = pointQueryFixture[0];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 13,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: row.pk, count: 4, title: row.title },
+        ],
+      });
+    });
+    const meta = screen.getByTitle(row.title).querySelector(".datasetCardMeta");
+    expect(meta).toHaveTextContent("Time series / Profile");
+    expect(meta).toHaveTextContent(String(row.profiles_count));
+  });
+
   it("closing (X) clears the featureQuery", async () => {
     const { user } = await renderReady();
     const row = pointQueryFixture[0];
