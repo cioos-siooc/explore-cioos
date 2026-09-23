@@ -91,24 +91,17 @@ function iconForKey(key) {
 // The chips render this list and the Filters button and modal count it, so the
 // number and the list it labels cannot disagree.
 //
-// The quick filters — the title search, the drawn area and the "only in view"
-// narrowing — are deliberately not here, even though FiltersPanel also has a
-// row for each of them: they have their own buttons on the map (see
-// QuickFilters), so a chip and a badge tick for something that already has a
-// lit button next to it would be the same state announced twice. Both write
-// the same underlying state (Selection), so the modal row and the map button
+// The quick filters — the title search, the drawn area, the "only in view"
+// narrowing and the real-time toggle — are deliberately not here, even though
+// FiltersPanel also has a row for each of them: they have their own buttons on
+// the map (see QuickFilters), so a chip and a badge tick for something that
+// already has a lit button next to it would be the same state announced twice.
+// Both write the same underlying state, so the modal row and the map button
 // always agree with each other.
 export default function useActiveFilters() {
   const { t } = useTranslation();
-  const {
-    buildActiveFilters,
-    startDate,
-    endDate,
-    startDepth,
-    endDepth,
-    realtimeOnly,
-    setRealtimeOnly,
-  } = useFilters();
+  const { buildActiveFilters, startDate, endDate, startDepth, endDepth } =
+    useFilters();
   const { dataLayers, toggleDataLayer, resetDataLayers } = useMapState();
   const { setShowFiltersModal, setOpenFilter } = useUI();
 
@@ -142,32 +135,14 @@ export default function useActiveFilters() {
       })),
     },
     ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),
-    realtimeOnly && {
-      key: "realtimeOnly",
-      label: t("realtimeFilterName"),
-      goToFilter: () => {
-        setOpenFilter(t("realtimeFilterName"));
-        setShowFiltersModal(true);
-      },
-      removeAll: () => setRealtimeOnly(false),
-      items: [
-        {
-          id: "realtimeOnly",
-          label: t("realtimeFilterChipText"),
-          remove: () => setRealtimeOnly(false),
-        },
-      ],
-    },
   ]
     .filter(Boolean)
     .map((f) => ({
       ...f,
       icon: iconForKey(f.key),
-      goToFilter:
-        f.goToFilter ||
-        (() => {
-          setOpenFilter(filterNameForKey(f.key, t));
-          setShowFiltersModal(true);
-        }),
+      goToFilter: () => {
+        setOpenFilter(filterNameForKey(f.key, t));
+        setShowFiltersModal(true);
+      },
     }));
 }

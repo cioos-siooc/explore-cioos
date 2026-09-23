@@ -1,8 +1,7 @@
 # db-loader (`cde_harvester.loading`)
 
 Loads harvested data into the CIOOS Explorer database. Formerly the standalone
-`db-loader` package (`cde_db_loader`); it now lives inside the harvester package —
-`python -m cde_db_loader` still works via a deprecated shim.
+`db-loader` package (`cde_db_loader`); it now lives inside the harvester package.
 
 ## Overview
 

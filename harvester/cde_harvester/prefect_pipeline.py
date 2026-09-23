@@ -419,7 +419,7 @@ class PrefectCDEPipeline:
         # else is inherited from the worker container's env.
         job_vars = {
             "env": {
-                "PREFECT_LOGGING_EXTRA_LOGGERS": "populate_vernaculars,cde_db_loader,cde_harvester",
+                "PREFECT_LOGGING_EXTRA_LOGGERS": "populate_vernaculars,cde_harvester",
                 # Escape hatch for the db-loader full-reload guard: set to 1 to
                 # permit a full reload that prunes sources missing from the
                 # incoming harvest (e.g. dropping OBIS). Empty = guard enforced.
@@ -679,7 +679,7 @@ def populate_vernaculars_run(
     """
     # PREFECT_LOGGING_EXTRA_LOGGERS attaches a handler but doesn't set the level,
     # so force INFO or the script's progress lines get filtered out.
-    for name in ("populate_vernaculars", "cde_db_loader", "cde_harvester"):
+    for name in ("populate_vernaculars", "cde_harvester"):
         logging.getLogger(name).setLevel(logging.INFO)
 
     # populate_vernaculars uses argparse; monkey-patch sys.argv instead of refactoring it.
