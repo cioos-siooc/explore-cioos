@@ -99,6 +99,31 @@ describe("DatasetInspector", () => {
     expect(screen.queryAllByTestId("filter-option")).toHaveLength(0);
   });
 
+  it("filtering to an excluded dataset includes it instead of leaving it excluded", async () => {
+    function ExcludedFlag() {
+      const { datasetsSelected } = useFilters();
+      const option = datasetsSelected.find((d) => d.pk === DATASET.pk);
+      return <span data-testid="excluded">{String(!!option?.isExcluded)}</span>;
+    }
+    const { user } = renderWithProviders(
+      <>
+        <Harness />
+        <ExcludedFlag />
+      </>,
+      { providers: "app", url: `/?excludeDatasetPKs=${DATASET.pk}` },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("excluded")).toHaveTextContent("true"),
+    );
+    const button = screen.getByRole("button", {
+      pressed: false,
+      name: /filter/i,
+    });
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByTestId("excluded")).toHaveTextContent("false");
+  });
+
   it("Download adds the dataset to the selection and opens the download", async () => {
     const { user } = await renderReady();
     expect(screen.getByTestId("download-modal-open")).toHaveTextContent(

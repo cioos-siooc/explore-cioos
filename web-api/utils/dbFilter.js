@@ -136,6 +136,7 @@ async function createDBFilter(
     polygon,
     platforms,
     realtimeOnly,
+    eovsMatch,
 
     // These are comma separated lists
     eovs,
@@ -146,6 +147,10 @@ async function createDBFilter(
     scientificNames,
     obisNodes,
     erddapServers,
+    excludePlatforms,
+    excludeOrganizations,
+    excludeObisNodes,
+    excludeErddapServers,
   } = request;
 
   const filters = [];
@@ -155,9 +160,11 @@ async function createDBFilter(
 
   if (eovs) {
     parameters.eovsCommaSeparatedString = unique(eovs.split(","));
+    // "all" = the dataset/feature measured every selected EOV, not just one.
+    const eovsOp = eovsMatch === "all" ? "@>" : "&&";
     // Dataset level: bare `eovs` here resolves to cde.datasets.eovs, because
     // every route applies this blob after joining cde.datasets.
-    filters.push("eovs && :eovsCommaSeparatedString");
+    filters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
     // Feature level: cde.profiles carries the EOVs each feature actually holds
     // (a subset of its dataset's), so a multi-EOV dataset contributes only the
     // stations/casts that measured the selected variable instead of all of
@@ -175,12 +182,21 @@ async function createDBFilter(
     // kept there: obis_cells, trajectory cells and track stats, the griddap
     // pseudo-branch, and the two coverage-cell queries (/tiles/cells and the
     // legend's coverage ramp) which read only trajectory + OBIS cells.
-    profileFilters.push("eovs && :eovsCommaSeparatedString");
+    profileFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
   }
 
   if (platforms) {
     parameters.platformsCommaSeparatedString = unique(platforms.split(","));
     filters.push("platform = any(:platformsCommaSeparatedString)");
+  }
+
+  // The exclude* params below drop what they name and keep everything else —
+  // including rows where the column is NULL, which a bare `<> ALL` or
+  // `NOT (&&)` would evaluate to NULL and drop too (same trap as
+  // excludeDatasetPKs). They are ANDed on top of the include lists.
+  if (excludePlatforms) {
+    parameters.excludePlatformsArr = unique(excludePlatforms.split(","));
+    filters.push("(platform IS NULL OR platform <> ALL(:excludePlatformsArr))");
   }
 
   if (timeMin) {
@@ -265,6 +281,13 @@ async function createDBFilter(
     filters.push("organization_pks && :organizationsString");
   }
 
+  if (excludeOrganizations) {
+    parameters.excludeOrganizationsArr = excludeOrganizations.split(",");
+    filters.push(
+      "NOT coalesce(organization_pks && :excludeOrganizationsArr, false)",
+    );
+  }
+
   // Dataset-level, so it belongs in `filters` (the shared fragment) rather than
   // profileFilters, which only ever sees cde.profiles. Being shared means the
   // tile, legend, timeExtent, download and griddap branches all inherit it
@@ -308,6 +331,20 @@ async function createDBFilter(
     filters.push("d.obis_nodes && :obisNodesArr");
   } else if (erddapServers) {
     filters.push("d.erddap_url = ANY(:erddapServersArray)");
+  }
+
+  // Unlike the includes above, the source excludes take no part in the
+  // OBIS-only gate (utils/selection.js): dropping a server or node narrows the
+  // selection without changing which feature sources are in it.
+  if (excludeErddapServers) {
+    parameters.excludeErddapServersArr = excludeErddapServers.split(",");
+    filters.push(
+      "(d.erddap_url IS NULL OR d.erddap_url <> ALL(:excludeErddapServersArr))",
+    );
+  }
+  if (excludeObisNodes) {
+    parameters.excludeObisNodesArr = excludeObisNodes.split(",");
+    filters.push("NOT coalesce(d.obis_nodes && :excludeObisNodesArr, false)");
   }
 
   if (polygon) {

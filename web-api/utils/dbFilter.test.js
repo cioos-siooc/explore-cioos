@@ -80,6 +80,66 @@ test("excluding datasets does not drop the ones with no pk_url yet", async () =>
   assert.match(f.shared.toString(), /d\.pk_url IS NULL OR d\.pk_url <> ALL/);
 });
 
+test("exclude params drop what they name but keep rows where the column is NULL", async () => {
+  // `NULL <> ALL (...)` and `NOT (NULL && ...)` are both NULL, so an unguarded
+  // exclusion would also drop every dataset with no platform, organisation,
+  // server or node — the opposite of "everything except X".
+  const sql = (
+    await createDBFilter({
+      excludePlatforms: "mooring",
+      excludeOrganizations: "7",
+      excludeErddapServers: "https://a.example/erddap",
+      excludeObisNodes: "Node A",
+    })
+  ).shared.toString();
+  assert.match(
+    sql,
+    /\(platform IS NULL OR platform <> ALL\('\{"mooring"\}'\)\)/,
+  );
+  assert.match(sql, /NOT coalesce\(organization_pks && '\{"7"\}', false\)/);
+  assert.match(
+    sql,
+    /\(d\.erddap_url IS NULL OR d\.erddap_url <> ALL\('\{"https:\/\/a\.example\/erddap"\}'\)\)/,
+  );
+  assert.match(sql, /NOT coalesce\(d\.obis_nodes && '\{"Node A"\}', false\)/);
+});
+
+test("an include and an exclude on the same filter are ANDed", async () => {
+  const sql = (
+    await createDBFilter({ platforms: "glider,argo", excludePlatforms: "argo" })
+  ).shared.toString();
+  assert.match(sql, /platform = any\('\{"glider","argo"\}'\) AND/);
+  assert.match(sql, /platform <> ALL\('\{"argo"\}'\)/);
+});
+
+test("source excludes do not take part in the include OR", async () => {
+  // The include pair is one OR'd predicate (the combined Data Source filter);
+  // an exclusion must narrow on top of it, not become a third alternative.
+  const sql = (
+    await createDBFilter({
+      obisNodes: "Node A",
+      erddapServers: "https://a.example/erddap",
+      excludeObisNodes: "Node B",
+    })
+  ).shared.toString();
+  assert.match(sql, /\(d\.obis_nodes && .* OR d\.erddap_url = ANY/);
+  assert.match(sql, /AND \nNOT coalesce\(d\.obis_nodes && '\{"Node B"\}'/);
+});
+
+test("eovsMatch=all asks for every EOV at both dataset and feature level", async () => {
+  const all = await createDBFilter({
+    eovs: "temperature,oxygen",
+    eovsMatch: "all",
+  });
+  assert.match(all.shared.toString(), /eovs @> '\{"temperature","oxygen"\}'/);
+  assert.match(
+    all.profileOnly.toString(),
+    /eovs @> '\{"temperature","oxygen"\}'/,
+  );
+  const any = await createDBFilter({ eovs: "temperature", eovsMatch: "any" });
+  assert.match(any.shared.toString(), /eovs && /);
+});
+
 test("latitude is clamped to the Mercator-valid range", async () => {
   // Transforming a ±90° envelope throws "transform: tolerance condition
   // error" in PostGIS and 500s the request.

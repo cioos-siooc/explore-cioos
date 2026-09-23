@@ -1,8 +1,13 @@
 import * as React from "react";
-import { CheckSquare, CircleFill, Square } from "react-bootstrap-icons";
+import {
+  CheckSquare,
+  CircleFill,
+  Square,
+  XSquare,
+} from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import Tooltip from "../../../ui/Tooltip.jsx";
-import { capitalizeFirstLetter } from "../../../../utilities";
+import { capitalizeFirstLetter, nextOptionState } from "../../../../utilities";
 import platformColors from "../../../platformColors";
 import "./styles.css";
 
@@ -12,6 +17,8 @@ export default function MultiCheckboxFilter({
   translatable,
   colored,
   allOptions,
+  // Clicks cycle include -> exclude -> clear instead of toggling include.
+  excludable,
 }) {
   const { t, i18n } = useTranslation();
 
@@ -36,7 +43,11 @@ export default function MultiCheckboxFilter({
   function toggleOption(option) {
     setOptionsSelected(
       universe.map((opt) =>
-        opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt,
+        opt.pk !== option.pk
+          ? opt
+          : excludable
+            ? nextOptionState(opt)
+            : { ...opt, isSelected: !opt.isSelected },
       ),
     );
   }
@@ -47,7 +58,7 @@ export default function MultiCheckboxFilter({
     setOptionsSelected(
       universe.map((option) =>
         listOfPKs.includes(option.pk)
-          ? { ...option, isSelected: !allShownChecked }
+          ? { ...option, isSelected: !allShownChecked, isExcluded: false }
           : option,
       ),
     );
@@ -122,7 +133,9 @@ export default function MultiCheckboxFilter({
               content={hoverText}
             >
               <div
-                className={`optionButton ${isChecked(option) && "selected"}`}
+                className={`optionButton ${isChecked(option) && "selected"} ${
+                  option.isExcluded ? "excluded" : ""
+                }`}
                 key={index}
                 title={hoverText ? "" : t(title)}
                 // A checkbox in everything but tag name: it was a bare div, so
@@ -134,6 +147,7 @@ export default function MultiCheckboxFilter({
                 data-testid="filter-option"
                 data-option-pk={option.pk}
                 data-selected={isChecked(option)}
+                data-excluded={Boolean(option.isExcluded)}
                 onClick={() => toggleOption(option)}
                 onKeyDown={(event) => {
                   if (event.key === " " || event.key === "Enter") {
@@ -144,10 +158,23 @@ export default function MultiCheckboxFilter({
                   }
                 }}
               >
-                {isChecked(option) ? <CheckSquare /> : <Square />}
+                {isChecked(option) ? (
+                  <CheckSquare />
+                ) : option.isExcluded ? (
+                  <XSquare />
+                ) : (
+                  <Square />
+                )}
                 <span className="optionName">
                   {capitalizeFirstLetter(title)}
                 </span>
+                {/* aria-checked can only say "included"; "mixed" would mean
+                    partially, so exclusion is announced as text instead. */}
+                {option.isExcluded && (
+                  <span className="sr-only">
+                    {` (${t("filterOptionExcludedLabel")})`}
+                  </span>
+                )}
                 {colored && (
                   <CircleFill
                     className="optionColorCircle"

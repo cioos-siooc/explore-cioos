@@ -6,9 +6,10 @@ import {
   ChevronRight,
   DashSquare,
   Square,
+  XSquare,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
-import { capitalizeFirstLetter } from "../../../../utilities";
+import { capitalizeFirstLetter, nextOptionState } from "../../../../utilities";
 import "./styles.css";
 
 // Combined data-source filter: ERDDAP servers as a flat list, plus a single
@@ -51,14 +52,17 @@ export default function SourceFilter({
 
   const allNodesSelected =
     obisNodesSelected.length > 0 && obisNodesSelected.every(isChecked);
-  const someNodesSelected = obisNodesSelected.some(isChecked);
+  const allNodesExcluded =
+    obisNodesSelected.length > 0 &&
+    obisNodesSelected.every((node) => node.isExcluded);
+  const someNodesSet = obisNodesSelected.some(
+    (node) => node.isSelected || node.isExcluded,
+  );
 
   function toggleServer(pk) {
     setErddapServersSelected(
       erddapServersSelected.map((server) =>
-        server.pk === pk
-          ? { ...server, isSelected: !server.isSelected }
-          : server,
+        server.pk === pk ? nextOptionState(server) : server,
       ),
     );
   }
@@ -66,19 +70,39 @@ export default function SourceFilter({
   function toggleNode(pk) {
     setObisNodesSelected(
       obisNodesSelected.map((node) =>
-        node.pk === pk ? { ...node, isSelected: !node.isSelected } : node,
+        node.pk === pk ? nextOptionState(node) : node,
       ),
     );
   }
 
+  // The group runs the same cycle over every node at once; a mixed group
+  // starts it from the top, so the first click always means "all of OBIS".
   function toggleAllNodes() {
     setObisNodesSelected(
       obisNodesSelected.map((node) => ({
         ...node,
-        isSelected: !allNodesSelected,
+        isSelected: !allNodesSelected && !allNodesExcluded,
+        isExcluded: allNodesSelected,
       })),
     );
   }
+
+  const optionClass = (option) =>
+    `optionButton ${isChecked(option) ? "selected" : ""} ${
+      option.isExcluded ? "excluded" : ""
+    }`;
+  const optionIcon = (option) =>
+    isChecked(option) ? (
+      <CheckSquare />
+    ) : option.isExcluded ? (
+      <XSquare />
+    ) : (
+      <Square />
+    );
+  const excludedLabel = (option) =>
+    option.isExcluded && (
+      <span className="sr-only">{` (${t("filterOptionExcludedLabel")})`}</span>
+    );
 
   const obisChildrenVisible = obisExpanded || (search && nodesShown.length > 0);
 
@@ -95,26 +119,31 @@ export default function SourceFilter({
       {serversShown.map((server) => (
         <div
           key={server.pk}
-          className={`optionButton ${isChecked(server) && "selected"}`}
+          className={optionClass(server)}
           title={server.title}
           onClick={() => toggleServer(server.pk)}
         >
-          {isChecked(server) ? <CheckSquare /> : <Square />}
+          {optionIcon(server)}
           <span className="optionName">
             {capitalizeFirstLetter(server.title)}
           </span>
+          {excludedLabel(server)}
         </div>
       ))}
       {showObisGroup && (
         <>
           <div
-            className={`optionButton obisGroupButton ${allNodesSelected && "selected"}`}
+            className={`optionButton obisGroupButton ${
+              allNodesSelected ? "selected" : ""
+            } ${allNodesExcluded ? "excluded" : ""}`}
             title={t("sourceFilterObisGroupTooltip")}
             onClick={() => toggleAllNodes()}
           >
             {allNodesSelected ? (
               <CheckSquare />
-            ) : someNodesSelected ? (
+            ) : allNodesExcluded ? (
+              <XSquare />
+            ) : someNodesSet ? (
               <DashSquare />
             ) : (
               <Square />
@@ -135,12 +164,13 @@ export default function SourceFilter({
               {nodesShown.map((node) => (
                 <div
                   key={node.pk}
-                  className={`optionButton ${isChecked(node) && "selected"}`}
+                  className={optionClass(node)}
                   title={node.title}
                   onClick={() => toggleNode(node.pk)}
                 >
-                  {isChecked(node) ? <CheckSquare /> : <Square />}
+                  {optionIcon(node)}
                   <span className="optionName">{node.title}</span>
+                  {excludedLabel(node)}
                 </div>
               ))}
             </div>

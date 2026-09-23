@@ -30,6 +30,7 @@ import FilterSection from "../../Controls/Filter/FilterMenu/FilterSection.jsx";
 import DataLayersFilter from "../../Controls/Filter/DataLayersFilter/DataLayersFilter.jsx";
 import MultiCheckboxFilter from "../../Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx";
 import SourceFilter from "../../Controls/Filter/SourceFilter/SourceFilter.jsx";
+import Switch from "../../ui/Switch.jsx";
 import ScientificNameFilter from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
 import SpatialFilter from "../../Controls/Filter/SpatialFilter/SpatialFilter.jsx";
 import TimeSelector from "../../Controls/Filter/TimeSelector/TimeSelector.jsx";
@@ -67,6 +68,9 @@ const PLACEHOLDER_STEPS = [
   { key: "reset", Icon: ArrowCounterclockwise },
 ];
 
+// Included or excluded — either way the option constrains the filter.
+const isSet = (option) => option.isSelected || option.isExcluded;
+
 function createOptionSubset(searchTerms, allOptions) {
   if (searchTerms) {
     return allOptions.filter((option) =>
@@ -88,6 +92,8 @@ export default function FiltersPanel() {
     setEovsSelected,
     eovsSearchTerms,
     setEovsSearchTerms,
+    eovsMatchAll,
+    setEovsMatchAll,
     orgsSelected,
     setOrgsSelected,
     orgsSearchTerms,
@@ -120,9 +126,8 @@ export default function FiltersPanel() {
     setRealtimeOnly,
     timeFilterActive,
     depthFilterActive,
-    anyServersSelected,
-    anyObisNodesSelected,
     allObisNodesSelected,
+    allObisNodesExcluded,
     showObis,
     obisDataAvailable,
     resetFilters,
@@ -199,12 +204,19 @@ export default function FiltersPanel() {
   const sourcesFilterTranslationKey = "sourceFilterName";
 
   const sourcesBadgeTitle = (() => {
+    const notTitle = (title) => t("filterExcludedOption", { title });
     const selectedTitles = [
-      ...erddapServersSelected.filter((s) => s.isSelected).map((s) => s.title),
-      // a fully selected OBIS group reads as one source
+      ...erddapServersSelected
+        .filter(isSet)
+        .map((s) => (s.isExcluded ? notTitle(s.title) : s.title)),
+      // a fully selected (or fully excluded) OBIS group reads as one source
       ...(allObisNodesSelected
         ? ["OBIS"]
-        : obisNodesSelected.filter((n) => n.isSelected).map((n) => n.title)),
+        : allObisNodesExcluded
+          ? [notTitle("OBIS")]
+          : obisNodesSelected
+              .filter(isSet)
+              .map((n) => (n.isExcluded ? notTitle(n.title) : n.title))),
     ];
     if (selectedTitles.length === 0) return t(sourcesFilterTranslationKey);
     if (selectedTitles.length === 1) {
@@ -331,6 +343,13 @@ export default function FiltersPanel() {
                 setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
               }
             >
+              <Switch
+                id="eovsMatchAll"
+                data-testid="eovs-match-all"
+                label={t("eovsMatchAllLabel")}
+                checked={eovsMatchAll}
+                onChange={(e) => setEovsMatchAll(e.target.checked)}
+              />
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   eovsSearchTerms,
@@ -343,9 +362,7 @@ export default function FiltersPanel() {
               />
             </Filter>
             <Filter
-              active={
-                platformsSelected.filter((eov) => eov.isSelected).length !== 0
-              }
+              active={platformsSelected.some(isSet)}
               badgeTitle={platformsBadgeTitle}
               setOptionsSelected={setPlatformsSelected}
               tooltip={t("platformFilterTooltip")}
@@ -374,6 +391,7 @@ export default function FiltersPanel() {
                 )}
                 setOptionsSelected={setPlatformsSelected}
                 searchable
+                excludable
                 colored
                 translatable
                 allOptions={platformsSelected}
@@ -382,7 +400,7 @@ export default function FiltersPanel() {
           </FilterSection>
           <FilterSection title={t("filterGroupFrom")}>
             <Filter
-              active={orgsSelected.filter((eov) => eov.isSelected).length !== 0}
+              active={orgsSelected.some(isSet)}
               badgeTitle={orgsBadgeTitle}
               optionsSelected={orgsSelected}
               setOptionsSelected={setOrgsSelected}
@@ -407,13 +425,12 @@ export default function FiltersPanel() {
                 )}
                 setOptionsSelected={setOrgsSelected}
                 searchable
+                excludable
                 allOptions={orgsSelected}
               />
             </Filter>
             <Filter
-              active={
-                datasetsSelected.filter((eov) => eov.isSelected).length !== 0
-              }
+              active={datasetsSelected.some(isSet)}
               badgeTitle={datasetsBadgeTitle}
               optionsSelected={datasetsSelected}
               setOptionsSelected={setDatasetsSelected}
@@ -442,12 +459,16 @@ export default function FiltersPanel() {
                 )}
                 setOptionsSelected={setDatasetsSelected}
                 searchable
+                excludable
                 allOptions={datasetsSelected}
                 translatable
               />
             </Filter>
             <Filter
-              active={anyServersSelected || anyObisNodesSelected}
+              active={
+                erddapServersSelected.some(isSet) ||
+                obisNodesSelected.some(isSet)
+              }
               badgeTitle={sourcesBadgeTitle}
               tooltip={t("sourceFilterTooltip")}
               icon={<Server />}

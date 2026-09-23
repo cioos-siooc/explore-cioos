@@ -218,26 +218,31 @@ test("every branch reading cde.profiles binds the feature-level EOV filter", asy
   // dbFilter's profileOnly fragment is what makes a multi-EOV dataset
   // contribute only the casts that measured the selected variable. A branch
   // that omits it silently falls back to dataset-level EOVs, with no error.
-  const query = { eovs: "temperature" };
-  const statements = [
-    ...(await sqlFrom("tiles", query)),
-    ...(await sqlFrom("legend", query)),
-    ...(await sqlFrom("timeExtent", query)),
-    ...(await sqlFrom("download", query)),
-    ...(await sqlFrom("coverageHistogram", query)),
-    await shapeSql(query),
-  ].filter(readsProfiles);
+  // Both match modes, since "all" swaps the operator in the same fragment.
+  for (const [query, operator] of [
+    [{ eovs: "temperature" }, /eovs && /],
+    [{ eovs: "temperature,oxygen", eovsMatch: "all" }, /eovs @> /],
+  ]) {
+    const statements = [
+      ...(await sqlFrom("tiles", query)),
+      ...(await sqlFrom("legend", query)),
+      ...(await sqlFrom("timeExtent", query)),
+      ...(await sqlFrom("download", query)),
+      ...(await sqlFrom("coverageHistogram", query)),
+      await shapeSql(query),
+    ].filter(readsProfiles);
 
-  assert.ok(statements.length >= 5, "expected a profiles branch per route");
-  for (const sql of statements) {
-    // The fragment is interpolated by the time it is captured, so look for the
-    // predicate itself rather than the binding name.
-    const profilesBranch = sql.slice(sql.indexOf("FROM cde.profiles"));
-    assert.match(
-      profilesBranch.slice(0, 400),
-      /eovs && /,
-      `a profiles branch omits the feature-level EOV filter: ${profilesBranch.slice(0, 160)}`,
-    );
+    assert.ok(statements.length >= 5, "expected a profiles branch per route");
+    for (const sql of statements) {
+      // The fragment is interpolated by the time it is captured, so look for
+      // the predicate itself rather than the binding name.
+      const profilesBranch = sql.slice(sql.indexOf("FROM cde.profiles"));
+      assert.match(
+        profilesBranch.slice(0, 400),
+        operator,
+        `a profiles branch omits the feature-level EOV filter: ${profilesBranch.slice(0, 160)}`,
+      );
+    }
   }
 });
 
@@ -315,6 +320,35 @@ test("every selection route inherits the realtimeOnly dataset filter", async () 
       sql,
       /dataset_is_realtime\(/,
       `a selection statement omits the realtime filter: ${sql.slice(0, 160)}`,
+    );
+  }
+});
+
+test("every selection route inherits the exclude filters", async () => {
+  // Same shared-fragment guarantee as realtimeOnly above, for the exclusions
+  // the filters panel sends; one param per predicate shape is enough.
+  const query = { excludePlatforms: "mooring", excludeObisNodes: "Node A" };
+  const statements = [
+    ...(await sqlFrom("tiles", query)),
+    ...(await sqlFrom("tiles/cells", query)),
+    ...(await sqlFrom("legend", query)),
+    ...(await sqlFrom("timeExtent", query)),
+    ...(await sqlFrom("download", query)),
+    ...(await sqlFrom("griddapCoverage", query)),
+    await shapeSql(query),
+  ].filter((sql) => /FROM cde\./.test(sql));
+
+  assert.ok(
+    statements.length >= 6,
+    "expected at least one statement per route",
+  );
+  for (const sql of statements) {
+    const head = sql.slice(0, 160);
+    assert.match(sql, /platform <> ALL\(/, `omits excludePlatforms: ${head}`);
+    assert.match(
+      sql,
+      /NOT coalesce\(d\.obis_nodes && /,
+      `omits excludeObisNodes: ${head}`,
     );
   }
 });

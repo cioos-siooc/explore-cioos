@@ -10,9 +10,21 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
       return {
         ...option,
         isSelected,
+        isExcluded: false,
       };
     }),
   );
+}
+
+// The click cycle of an excludable filter option: neutral -> include ->
+// exclude -> neutral. The two flags are mutually exclusive, and `isSelected`
+// keeps meaning "included" everywhere it was already read.
+export function nextOptionState(option) {
+  if (option.isSelected)
+    return { ...option, isSelected: false, isExcluded: true };
+  if (option.isExcluded)
+    return { ...option, isSelected: false, isExcluded: false };
+  return { ...option, isSelected: true, isExcluded: false };
 }
 
 /*
@@ -43,12 +55,14 @@ export function generateMultipleSelectBadgeTitle(
 ) {
   if (optionsSelected) {
     const optionsSelectedFiltered = optionsSelected.filter(
-      (option) => option.isSelected,
+      (option) => option.isSelected || option.isExcluded,
     );
     if (optionsSelectedFiltered.length === 0) {
       return t(badgeTitle);
     } else if (optionsSelectedFiltered.length === 1) {
-      return capitalizeFirstLetter(t(optionsSelectedFiltered[0].title));
+      const [option] = optionsSelectedFiltered;
+      const title = capitalizeFirstLetter(t(option.title));
+      return option.isExcluded ? t("filterExcludedOption", { title }) : title;
     } else {
       // More than 0 or 1 options are selected
       const mapping = {
@@ -121,6 +135,7 @@ export function createDataFilterQueryString(query) {
     obisNodesSelected,
     erddapServersSelected,
     realtimeOnly,
+    eovsMatchAll,
   } = query;
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
@@ -141,6 +156,18 @@ export function createDataFilterQueryString(query) {
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
     .map((eov) => eov.title)
     .join(); // create the comma delimited list of eovs
+  // With a single EOV "all" and "any" are the same selection, so the param is
+  // left off rather than giving one selection two URLs and two cache keys.
+  const eovsMatch =
+    eovsMatchAll && eovsSelected.filter((eov) => eov.isSelected).length > 1
+      ? "all"
+      : "";
+
+  const excludedList = (options, value) =>
+    (options || [])
+      .filter((option) => option.isExcluded)
+      .map(value)
+      .join(",");
 
   if (platformsSelected.every((e) => e.isSelected)) {
     platforms = "";
@@ -217,10 +244,18 @@ export function createDataFilterQueryString(query) {
   const apiMappedQuery = {
     // These properties are specified by the API's schema
     eovs,
+    eovsMatch,
     platforms,
+    excludePlatforms: excludedList(platformsSelected, (p) => p.title),
     datasetPKs,
+    excludeDatasetPKs: excludedList(datasetsSelected, (d) => d.pk),
     organizations: orgPKs,
+    excludeOrganizations: excludedList(orgsSelected, (o) => o.pk),
     erddapServers,
+    excludeErddapServers: excludedList(erddapServersSelected, (s) => s.url),
+    excludeObisNodes: excludedList(obisNodesSelected, (n) =>
+      encodeURIComponent(n.title),
+    ),
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
@@ -759,8 +794,13 @@ export function applyDatasetPKs(queryString, datasetPKs, allDatasetPKs) {
   const dropped = (allDatasetPKs || []).filter((pk) => !kept.has(pk));
   if (allDatasetPKs && dropped.length < datasetPKs.length) {
     // Nothing dropped is no narrowing at all — say nothing rather than send an
-    // empty param the API would have to decide the meaning of.
-    if (dropped.length > 0) params.set("excludeDatasetPKs", dropped.join(","));
+    // empty param the API would have to decide the meaning of. The query may
+    // already exclude datasets of its own (the Datasets filter), and those
+    // must survive this narrowing rather than be overwritten by it.
+    const alreadyExcluded = params.get("excludeDatasetPKs")?.split(",") ?? [];
+    const excluded = [...new Set([...alreadyExcluded, ...dropped.map(String)])];
+    if (excluded.length > 0)
+      params.set("excludeDatasetPKs", excluded.join(","));
   } else {
     params.set(
       "datasetPKs",

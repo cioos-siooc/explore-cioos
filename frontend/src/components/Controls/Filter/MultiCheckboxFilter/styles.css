@@ -31,6 +31,18 @@
   background-color: var(--cioos-teal-light);
 }
 
+.multiCheckboxFilter .optionButton.excluded {
+  background-color: var(--cioos-error-bg);
+}
+
+.multiCheckboxFilter .optionButton.excluded .optionName {
+  text-decoration: line-through;
+}
+
+.multiCheckboxFilter .optionButton.excluded > svg:first-child {
+  color: var(--cioos-error);
+}
+
 .multiCheckboxFilter .searchResultsButton {
   background-color: var(--cioos-white);
   margin-left: 10px;
