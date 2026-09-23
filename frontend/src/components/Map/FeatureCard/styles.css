@@ -234,12 +234,15 @@
    (DatasetsTable's datasetCardAdd) — it is the same action on the same
    dataset, so it reads the same. */
 .featureCardRowAdd {
-  /* Leading, where the list puts its own download toggle. */
+  /* Leading, where the list puts its own download toggle, and on the title's
+     first line like it (.datasetCardSelect) rather than centered on the row. */
   order: -1;
   flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 34px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  width: 30px;
+  padding: calc(var(--cioos-space-sm) + 1px) 0 0;
   border: none;
   border-radius: var(--cioos-radius-sm);
   background: transparent;
@@ -263,6 +266,12 @@
 .featureCardRowAdd.isSelected {
   color: var(--cioos-primary);
   cursor: default;
+}
+
+/* Griddap: metadata-only, never downloadable — greyed out as in the list. */
+.featureCardRowAdd:disabled:not(.isSelected) {
+  color: var(--cioos-hairline);
+  cursor: not-allowed;
 }
 
 .featureCardMore {

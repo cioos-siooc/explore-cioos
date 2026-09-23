@@ -115,6 +115,22 @@ describe("DatasetCard", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("draws trajectories and OBIS as hexagons, like the map's cells", () => {
+    const glyph = (row) => {
+      const { container, unmount } = render(
+        <DatasetCard row={{ ...ROW, ...row }} t={t} i18n={i18n} />,
+      );
+      const cls = container.querySelector(".datasetCardPlatform svg").classList;
+      unmount();
+      return cls;
+    };
+    expect(glyph({ cdm_data_type: "Trajectory" })).toContain("bi-hexagon-fill");
+    expect(
+      glyph({ cdm_data_type: "Occurrence", source_type: "obis" }),
+    ).toContain("bi-hexagon-fill");
+    expect(glyph({})).toContain("bi-circle-fill");
+  });
+
   it("calls onHover/onHoverEnd on mouse enter/leave", async () => {
     const user = userEvent.setup();
     const onHover = vi.fn();

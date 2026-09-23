@@ -9,6 +9,7 @@ import {
   Download,
   ExclamationTriangleFill,
   Grid3x3Gap,
+  HexagonFill,
   Check2Circle,
   XCircle,
   Server,
@@ -88,10 +89,6 @@ export default function DatasetCard({
       }
     : undefined;
 
-  const platformColor = platformColors.find(
-    (pc) => pc.platform === row.platform,
-  );
-
   const selectTitle = isGrid
     ? t("griddapNotDownloadableTooltip")
     : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
@@ -146,19 +143,12 @@ export default function DatasetCard({
           {/* The wrapper is the height of the title's first line, so the dot
               stays centered on that line however the title wraps. */}
           <span className="datasetCardPlatform">
-            {isGrid ? (
-              <Grid3x3Gap
-                title={t("griddapTypeLabel")}
-                color="#52a79b"
-                size={13}
-              />
-            ) : (
-              <CircleFill
-                title={t(row.platform)}
-                fill={platformColor?.color || "#000000"}
-                size={13}
-              />
-            )}
+            <DatasetPlatformIcon
+              platform={row.platform}
+              cdmDataType={row.cdm_data_type}
+              sourceType={row.source_type}
+              t={t}
+            />
           </span>
           <span className="datasetCardTitle" title={row.title}>
             {row.title}
@@ -370,6 +360,29 @@ export default function DatasetCard({
         )}
       </div>
     </div>
+  );
+}
+
+// The dataset's glyph, shaped like what the map draws for it: a grid for a
+// gridded footprint, a hexagon for trajectories and OBIS (shown as hex cells),
+// a dot for everything drawn as markers. Coloured by platform.
+export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
+  if (cdmDataType === "Grid") {
+    return (
+      <Grid3x3Gap title={t("griddapTypeLabel")} color="#52a79b" size={13} />
+    );
+  }
+  const Icon =
+    cdmDataType === "Trajectory" || sourceType === "obis"
+      ? HexagonFill
+      : CircleFill;
+  const platformColor = platformColors.find((pc) => pc.platform === platform);
+  return (
+    <Icon
+      title={t(platform)}
+      fill={platformColor?.color || "#000000"}
+      size={13}
+    />
   );
 }
 

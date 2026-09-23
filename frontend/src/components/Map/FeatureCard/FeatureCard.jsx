@@ -1,24 +1,23 @@
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ArrowRight,
   CheckCircleFill,
-  CircleFill,
   Download,
   GeoAlt,
-  Grid3x3Gap,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import CloseButton from "../../ui/CloseButton.jsx";
-import platformColors from "../../platformColors";
 import { useChanged } from "../../../utilities.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useCellDatasetDays from "./useCellDatasetDays.js";
-import { DatasetCardMeta } from "../../Controls/DatasetsTable/DatasetCard.jsx";
+import {
+  DatasetCardMeta,
+  DatasetPlatformIcon,
+} from "../../Controls/DatasetsTable/DatasetCard.jsx";
 import "../../Controls/DatasetsTable/styles.css";
 import "./styles.css";
 
@@ -176,24 +175,19 @@ export default function FeatureCard() {
   // is one thing you can then do with them, from the list's footer.
   const addOne = (pk) => addDatasetsToSelection([pk]);
 
-  const kindIcon = (entry) => {
-    if (entry.kind === "grid") {
-      return <Grid3x3Gap size={13} aria-hidden="true" />;
-    }
-    if (entry.kind === "track") {
-      return <ArrowRight size={13} aria-hidden="true" />;
-    }
-    const platformColor = platformColors.find(
-      (pc) => pc.platform === entry.platform,
-    );
-    return (
-      <CircleFill
-        size={9}
-        aria-hidden="true"
-        style={platformColor ? { color: platformColor.color } : undefined}
-      />
-    );
-  };
+  // The list card's glyph. A track row without a result row still is a
+  // trajectory, and a grid row without one still a grid.
+  const kindIcon = (entry) => (
+    <DatasetPlatformIcon
+      platform={entry.platform}
+      cdmDataType={
+        entry.row?.cdm_data_type ??
+        { track: "Trajectory", grid: "Grid" }[entry.kind]
+      }
+      sourceType={entry.row?.source_type}
+      t={t}
+    />
+  );
 
   const countLabel = (value) =>
     t("mapHexCountDays", {
