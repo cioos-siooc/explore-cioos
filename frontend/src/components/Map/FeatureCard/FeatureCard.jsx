@@ -1,10 +1,6 @@
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  CheckCircleFill,
-  Download,
-  GeoAlt,
-} from "react-bootstrap-icons";
+import { CheckCircleFill, Download, GeoAlt } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -243,78 +239,100 @@ export default function FeatureCard() {
       ) : (
         <>
           <div className="featureCardList">
-            {shown.map((entry) => (
-              <div
-                className="featureCardRow"
-                key={`${entry.kind}:${entry.pk}:${entry.trajectoryId ?? ""}`}
-              >
-                {/* A gridded footprint the current results don't contain has no
-                    page to open — the rectangles come from their own source and
-                    outlive the filter that dropped the dataset. It still reads
-                    as a row (it is genuinely here) and its download button
-                    still brings it in; it just isn't a button pretending to
-                    lead somewhere. */}
-                <button
-                  type="button"
-                  className="featureCardRowOpen"
-                  onClick={() => openDataset(entry)}
-                  disabled={!entry.openable}
-                  title={entry.title}
-                >
-                  <span className="featureCardRowIcon">{kindIcon(entry)}</span>
-                  <span className="featureCardRowText">
-                    <span className="featureCardRowTitle">{entry.title}</span>
-                    {entry.row && (
-                      <DatasetCardMeta row={entry.row} t={t} i18n={i18n} />
-                    )}
-                    <span className="featureCardRowMeta">
-                      {entry.kind === "track"
-                        ? entry.trajectoryId || t("featureCardTrack")
-                        : entry.kind === "grid"
-                          ? t("featureCardGrid")
-                          : [
-                              // No figure yet (or the request failed): the row
-                              // says what it can rather than showing a number
-                              // that isn't this dataset's.
-                              entry.count === undefined
-                                ? null
-                                : countLabel(entry.count),
-                              // An aggregate cell is a neighbourhood, not a
-                              // place: say so rather than implying the precision
-                              // an individual marker has.
-                              entry.aggregate ? t("featureCardNearby") : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
-                    </span>
-                  </span>
-                </button>
-                {/* Ticks the dataset into the download selection — the same
-                    thing its checkbox in the list does, with the same glyphs:
-                    a download sign while out, a tick once in. */}
-                <button
-                  type="button"
-                  className={classNames("featureCardRowAdd", {
-                    isSelected: entry.inSelection,
+            {shown.map((entry) => {
+              const here =
+                entry.kind === "track"
+                  ? entry.trajectoryId || t("featureCardTrack")
+                  : entry.kind === "grid"
+                    ? t("featureCardGrid")
+                    : [
+                        // No figure yet (or the request failed): the row says
+                        // what it can rather than showing a number that isn't
+                        // this dataset's.
+                        entry.count === undefined
+                          ? null
+                          : countLabel(entry.count),
+                        // An aggregate cell is a neighbourhood, not a place:
+                        // say so rather than implying the precision an
+                        // individual marker has.
+                        entry.aggregate ? t("featureCardNearby") : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ");
+              // Laid out like the datasets list's card (DatasetCard): the whole
+              // card opens the dataset, the download toggle sits on the title's
+              // line, and the lines below run the card's full width.
+              //
+              // A gridded footprint the current results don't contain has no
+              // page to open — the rectangles come from their own source and
+              // outlive the filter that dropped the dataset. It still reads as
+              // a card (it is genuinely here); it just isn't one pretending to
+              // lead somewhere.
+              return (
+                <div
+                  className={classNames("featureCardRow", {
+                    clickable: entry.openable,
                   })}
-                  onClick={() => addOne(entry.pk)}
-                  disabled={!entry.selectable || entry.inSelection}
-                  title={
-                    !entry.selectable
-                      ? t("griddapNotDownloadableTooltip")
-                      : entry.inSelection
-                        ? t("featureCardAlreadyAdded")
-                        : t("featureCardAddOne")
+                  key={`${entry.kind}:${entry.pk}:${entry.trajectoryId ?? ""}`}
+                  title={entry.title}
+                  role={entry.openable ? "button" : undefined}
+                  tabIndex={entry.openable ? 0 : undefined}
+                  onClick={
+                    entry.openable ? () => openDataset(entry) : undefined
+                  }
+                  onKeyDown={
+                    entry.openable
+                      ? (e) => {
+                          if (e.target !== e.currentTarget) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDataset(entry);
+                          }
+                        }
+                      : undefined
                   }
                 >
-                  {entry.inSelection ? (
-                    <CheckCircleFill size={15} aria-hidden="true" />
-                  ) : (
-                    <Download size={16} aria-hidden="true" />
+                  <span className="featureCardRowHeadline">
+                    {/* Ticks the dataset into the download selection — the
+                        same thing its checkbox in the list does, with the same
+                        glyphs: a download sign while out, a tick once in. */}
+                    <button
+                      type="button"
+                      className={classNames("featureCardRowAdd", {
+                        isSelected: entry.inSelection,
+                      })}
+                      onClick={(e) => {
+                        // The card itself opens the dataset page.
+                        e.stopPropagation();
+                        addOne(entry.pk);
+                      }}
+                      disabled={!entry.selectable || entry.inSelection}
+                      title={
+                        !entry.selectable
+                          ? t("griddapNotDownloadableTooltip")
+                          : entry.inSelection
+                            ? t("featureCardAlreadyAdded")
+                            : t("featureCardAddOne")
+                      }
+                    >
+                      {entry.inSelection ? (
+                        <CheckCircleFill size={16} aria-hidden="true" />
+                      ) : (
+                        <Download size={16} aria-hidden="true" />
+                      )}
+                    </button>
+                    <span className="featureCardRowIcon">
+                      {kindIcon(entry)}
+                    </span>
+                    <span className="featureCardRowTitle">{entry.title}</span>
+                  </span>
+                  {entry.row && (
+                    <DatasetCardMeta row={entry.row} t={t} i18n={i18n} />
                   )}
-                </button>
-              </div>
-            ))}
+                  {here && <span className="featureCardRowMeta">{here}</span>}
+                </div>
+              );
+            })}
           </div>
 
           {hidden > 0 && (

@@ -150,12 +150,17 @@
    DatasetsTable/styles.css): same datasets, same look in both places. */
 .featureCardRow {
   display: flex;
-  align-items: stretch;
-  gap: 2px;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--cioos-space-sm) 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
   box-shadow: var(--cioos-shadow-card);
+}
+
+.featureCardRow.clickable {
+  cursor: pointer;
 }
 
 /* Guarded, because a touch device leaves :hover latched on the last thing
@@ -163,61 +168,39 @@
    on. Every hover state here is decoration; nothing is only reachable by
    hovering. */
 @media (hover: hover) {
-  .featureCardRow:hover {
+  .featureCardRow.clickable:hover {
     border-color: var(--cioos-primary);
     background-color: var(--cioos-surface-2);
   }
 }
 
-.featureCardRowOpen {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--cioos-space-sm);
-  flex: 1;
-  min-width: 0;
-  padding: var(--cioos-space-sm);
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  background: transparent;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-}
-
-.featureCardRowOpen:focus-visible {
+.featureCardRow.clickable:focus-visible {
+  border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
   outline: none;
 }
 
-/* No page to open (see FeatureCard.jsx). The row still reads normally — it is
-   describing something genuinely under the click — it just doesn't offer the
-   pointer that says "this leads somewhere". */
-.featureCardRowOpen:disabled {
-  cursor: default;
+.featureCardRowHeadline {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
 }
 
+/* The download toggle and the platform glyph are each one title line tall,
+   so they sit on its first line however the title wraps. */
+.featureCardRowAdd,
 .featureCardRowIcon {
   flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-
-  /* Lines the marker dot up with the first line of the title rather than the
-     middle of a two-line block. */
-  height: 1.15em;
-  color: var(--cioos-ink-40);
-}
-
-.featureCardRowText {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(var(--cioos-font-size-sm) * 1.35);
 }
 
 .featureCardRowTitle {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  min-width: 0;
   overflow: hidden;
   font-family: var(--cioos-font-display);
   font-weight: 700;
@@ -230,21 +213,11 @@
   color: var(--cioos-ink-60);
 }
 
-/* Same plain color-only hover as the datasets list's own add control
-   (DatasetsTable's datasetCardAdd) — it is the same action on the same
-   dataset, so it reads the same. */
+/* Same plain color-only states as the list's own toggle (.datasetCardSelect):
+   the same action on the same dataset reads the same. */
 .featureCardRowAdd {
-  /* Leading, where the list puts its own download toggle, and on the title's
-     first line like it (.datasetCardSelect) rather than centered on the row. */
-  order: -1;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  width: 30px;
-  padding: calc(var(--cioos-space-sm) + 1px) 0 0;
+  padding: 0;
   border: none;
-  border-radius: var(--cioos-radius-sm);
   background: transparent;
   color: var(--cioos-ink-40);
   cursor: pointer;
@@ -252,9 +225,9 @@
 }
 
 .featureCardRowAdd:focus-visible:not(:disabled) {
-  box-shadow: var(--cioos-focus);
-  color: var(--cioos-primary-700);
-  outline: none;
+  border-radius: 50%;
+  outline: 2px solid var(--cioos-primary-700);
+  outline-offset: 2px;
 }
 
 @media (hover: hover) {
@@ -339,13 +312,9 @@
   }
 
   /* Comfortable touch targets: the desktop rows are sized for a cursor. */
-  .featureCardRowOpen {
+  .featureCardRow {
     min-height: 44px;
     padding: var(--cioos-space-sm) var(--cioos-space-md);
-  }
-
-  .featureCardRowAdd {
-    width: 44px;
   }
 }
 

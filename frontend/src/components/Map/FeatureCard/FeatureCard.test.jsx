@@ -190,10 +190,10 @@ describe("FeatureCard", () => {
       });
     });
     const moreButton = await screen.findByText("Show 2 more");
-    expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(5);
+    expect(document.querySelectorAll(".featureCardRow")).toHaveLength(5);
     await user.click(moreButton);
     await waitFor(() =>
-      expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(7),
+      expect(document.querySelectorAll(".featureCardRow")).toHaveLength(7),
     );
   });
 
