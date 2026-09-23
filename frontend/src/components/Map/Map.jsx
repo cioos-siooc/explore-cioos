@@ -2829,109 +2829,72 @@ export default function CreateMap({
     });
   }
 
-  useEffect(() => {
-    // If already created don't proceed
-    if (map.current) return;
-    // Create map
-    map.current = new maplibreGl.Map({
-      container: mapContainer.current,
-      // Ocean-first basemap: bathymetry raster + vector rivers/boundaries and
-      // FR/EN labels. Data layers are inserted below the label layers.
-      //
-      // The projection is part of the style in MapLibre 5, and it has to be
-      // set here rather than left to the effect above: that effect's first run
-      // happens while map.current is still null, and projection doesn't change
-      // again, so a globe restored from localStorage would never be applied.
-      style: {
-        ...buildBasemapStyle(i18n.language),
-        projection: { type: projection === "globe" ? "globe" : "mercator" },
-      },
-      // MapLibre defaults to powerPreference 'high-performance', which wakes
-      // the discrete GPU on dual-GPU laptops. The map is circles and fills —
-      // the integrated GPU renders it fine, so hint 'low-power'.
-      canvasContextAttributes: { powerPreference: "low-power" },
-      // No attribution in the map's own corner: the per-source attributions are
-      // gathered by an AttributionControl the legend card builds and parents
-      // itself (see LegendFooter.jsx).
-      attributionControl: false,
-      // Starting camera. The same share-link params and the same fallbacks
-      // MapStateProvider seeds its mapView from — the two have to agree, or
-      // the legend describes a zoom the map isn't at until the first moveend.
-      center: [
-        mapLongitude || defaultMapCenter.lon,
-        mapLatitude || defaultMapCenter.lat,
-      ],
-      zoom: mapZoom || defaultMapZoom,
-      // Stop at the deepest level the satellite imagery actually exists at
-      // everywhere it matters: Esri is cached to z17 on remote Arctic coasts
-      // (z19 in cities), and past its coverage it serves a grey "map data not
-      // yet available" tile rather than a 404. Capping the camera here means
-      // that tile is never reached on land, without masking anything off.
-      maxZoom: 17,
-    });
-    // Share the instance with MapStateProvider (see mapInstance there).
-    onMapReady(map.current);
+  // What the hit-test rules in hitTest.js need from the map, read at the
+  // moment they run.
+  const pointHitContext = () => ({
+    project: (lngLat) => map.current.project(lngLat),
+    radiusRange: pointRadiusRange.current,
+  });
+  const featureQueryContext = () => ({
+    zoom: map.current.getZoom(),
+    queryRendered: (options) => map.current.queryRenderedFeatures(options),
+    language: i18n.language,
+  });
 
-    // disable map rotation using right click + drag
-    map.current.dragRotate.disable();
+  // --- Click ---------------------------------------------------------------
+  // One handler, one hit-test, one outcome: report what is under the click and
+  // let the card offer the actions.
+  //
+  // This replaces six competing handlers (points, hexes, coverage hexes,
+  // griddap rectangles, tracks, and a map-wide fallback) which between them
+  // did five unrelated things to the same gesture — fly the camera to zoom 7,
+  // build a hidden 20px bbox filter, overwrite the dataset filter, open a
+  // dataset page, or clear the selection — and needed a ladder of mutual
+  // stand-aside tests to decide which. Nothing here changes the camera or a
+  // filter; every consequence is a button in the card.
+  //
+  // 'points' and the hex layers carry `datasets`, a JSON array of dataset
+  // pk_urls, and `count`, the metric the ramp colours by. The griddap
+  // rectangles carry a single pk. Titles are not on the tiles at all — the
+  // card resolves the pks against the current results, which is also what
+  // keeps it honest about what is actually in the list.
+  const clickLayerIds = [
+    ...trackClickLayers,
+    ...selectedTrackLayers,
+    "points",
+    "coverage-hexes",
+    "hexes",
+    "griddap-coverage-fill",
+  ];
 
-    // disable map rotation using touch rotation gesture
-    map.current.touchZoomRotate.disableRotation();
+  // Everything the click layers have under a point — the hit-test both a
+  // click and a share link's remembered point (see the replay at the end of the
+  // mount effect) ask the map.
+  //
+  // A marker is a specific station and a track is a specific voyage; the hex
+  // layers are the neighbourhood aggregate drawn under both — a trajectory's
+  // own coverage hexes lie beneath every metre of its track, and
+  // 'coverage-hexes' shares the marker tier's zoom band (both render at
+  // z >= hexMaxZoom). Either precise geometry is what the user pointed at, so
+  // once one is under the point the hex hits are dropped rather than merged
+  // into it: a click here means "this station" or "this track", never
+  // "…plus whatever hex happens to be under it".
+  const hitsAt = (point) => {
+    const layers = clickLayerIds.filter((id) => map.current.getLayer(id));
+    const hits = layers.length
+      ? map.current.queryRenderedFeatures(point, { layers })
+      : [];
+    const precise =
+      hits.some((feature) => feature.layer.id === "points") ||
+      trackItemsIn(hits).length > 0;
+    return precise
+      ? hits.filter(
+          (feature) => !["hexes", "coverage-hexes"].includes(feature.layer.id),
+        )
+      : hits;
+  };
 
-    map.current.on("load", () => {
-      setColorStopsRef.current();
-      addObservationLayers();
-      addGriddapLayers();
-      addClickHighlightLayers();
-      addTrackLayers();
-      addSelectedTrackLayers();
-
-      // Apply the initial track-layer visibility from the URL-restored
-      // track-lines switch + data-layer selection.
-      applyLayerVisibility();
-
-      // Layers are created visible; re-apply the picker state in case the hex
-      // and point layers were toggled off before the style finished loading.
-      // The track layers are not the picker's to hide, so they are left alone.
-      if (!dataLayersVisibleRef.current) {
-        setLayersVisibility(observationLayerIds, false);
-      }
-      // Same for the depth rasters, which come from the style itself and are
-      // therefore always created visible.
-      if (!bathymetryVisibleRef.current) {
-        setLayersVisibility(bathymetryLayerIds, false);
-      }
-
-      // A share link can carry the spatial selection (rectangle bounds or a
-      // polygon ring). SelectionProvider has already seeded it into the app
-      // state — this puts the shape back into the draw control so it is drawn,
-      // editable, and survives the next filter change (which re-derives the
-      // selection from whatever the draw control holds).
-      const sharedSelection = selectionFromSearchParams(
-        new URL(window.location.href).searchParams,
-      );
-      if (sharedSelection) {
-        const [featureId] = drawPolygon.current.add({
-          type: "Feature",
-          geometry: { type: "Polygon", coordinates: [sharedSelection] },
-        });
-        drawPolygon.current.changeMode("direct_select", { featureId });
-        highlightPoints(sharedSelection);
-      }
-    });
-
-    // What the hit-test rules in hitTest.js need from the map, read at the
-    // moment they run.
-    const pointHitContext = () => ({
-      project: (lngLat) => map.current.project(lngLat),
-      radiusRange: pointRadiusRange.current,
-    });
-    const featureQueryContext = () => ({
-      zoom: map.current.getZoom(),
-      queryRendered: (options) => map.current.queryRenderedFeatures(options),
-      language: i18n.language,
-    });
-
+  function installHover() {
     // The whole hover vocabulary: a chip naming what is under the cursor, with
     // no markup and no click hint.
     //
@@ -3224,61 +3187,9 @@ export default function CreateMap({
         popup.remove();
       }
     });
+  }
 
-    // --- Click ---------------------------------------------------------------
-    // One handler, one hit-test, one outcome: report what is under the click and
-    // let the card offer the actions.
-    //
-    // This replaces six competing handlers (points, hexes, coverage hexes,
-    // griddap rectangles, tracks, and a map-wide fallback) which between them
-    // did five unrelated things to the same gesture — fly the camera to zoom 7,
-    // build a hidden 20px bbox filter, overwrite the dataset filter, open a
-    // dataset page, or clear the selection — and needed a ladder of mutual
-    // stand-aside tests to decide which. Nothing here changes the camera or a
-    // filter; every consequence is a button in the card.
-    //
-    // 'points' and the hex layers carry `datasets`, a JSON array of dataset
-    // pk_urls, and `count`, the metric the ramp colours by. The griddap
-    // rectangles carry a single pk. Titles are not on the tiles at all — the
-    // card resolves the pks against the current results, which is also what
-    // keeps it honest about what is actually in the list.
-    const clickLayerIds = [
-      ...trackClickLayers,
-      ...selectedTrackLayers,
-      "points",
-      "coverage-hexes",
-      "hexes",
-      "griddap-coverage-fill",
-    ];
-
-    // Everything the click layers have under a point — the hit-test both a
-    // click and a share link's remembered point (see the replay at the end of
-    // this effect) ask the map.
-    //
-    // A marker is a specific station and a track is a specific voyage; the hex
-    // layers are the neighbourhood aggregate drawn under both — a trajectory's
-    // own coverage hexes lie beneath every metre of its track, and
-    // 'coverage-hexes' shares the marker tier's zoom band (both render at
-    // z >= hexMaxZoom). Either precise geometry is what the user pointed at, so
-    // once one is under the point the hex hits are dropped rather than merged
-    // into it: a click here means "this station" or "this track", never
-    // "…plus whatever hex happens to be under it".
-    const hitsAt = (point) => {
-      const layers = clickLayerIds.filter((id) => map.current.getLayer(id));
-      const hits = layers.length
-        ? map.current.queryRenderedFeatures(point, { layers })
-        : [];
-      const precise =
-        hits.some((feature) => feature.layer.id === "points") ||
-        trackItemsIn(hits).length > 0;
-      return precise
-        ? hits.filter(
-            (feature) =>
-              !["hexes", "coverage-hexes"].includes(feature.layer.id),
-          )
-        : hits;
-    };
-
+  function installClick() {
     // A tap on a touch screen delivers 'touchend' and then a synthesized
     // 'click' a moment later, and both are wired to this handler. Whichever
     // lands second is the same gesture — drop it, or every tap would build the
@@ -3464,6 +3375,135 @@ export default function CreateMap({
       }
     };
 
+    // One registration for the whole map. There is no layer fan-out any more, so
+    // no repeat deliveries to dedupe and no preventDefault() plumbing between
+    // handlers — and the mapbox-gl-draw click-swallowing workaround
+    // (https://github.com/mapbox/mapbox-gl-draw/issues/617) that the per-layer
+    // touchend bindings existed for goes with it, since the draw modes are
+    // checked directly at the top of the handler.
+    map.current.on("click", handleMapClick);
+
+    // Touch. A tap has to be told apart from the end of a pan or a pinch, which
+    // is why the old code bound 'touchend' per layer and pointedly not
+    // map-wide: a map-wide binding fired at the end of every drag and would
+    // have cleared the selection each time. Measuring the gesture instead makes
+    // the map-wide binding safe, which is what finally gives a touch user the
+    // tap-empty-water-to-clear escape hatch they never had.
+    const TAP_SLOP_PX = 12;
+    const TAP_TIMEOUT_MS = 500;
+    let touchStart = null;
+    map.current.on("touchstart", (e) => {
+      touchStart =
+        e.originalEvent.touches.length === 1
+          ? { point: e.point, at: Date.now() }
+          : null;
+    });
+    map.current.on("touchend", (e) => {
+      const start = touchStart;
+      touchStart = null;
+      if (!start) return;
+      if (Date.now() - start.at > TAP_TIMEOUT_MS) return;
+      const dx = e.point.x - start.point.x;
+      const dy = e.point.y - start.point.y;
+      if (dx * dx + dy * dy > TAP_SLOP_PX ** 2) return;
+      handleMapClick(e);
+    });
+  }
+
+  useEffect(() => {
+    // If already created don't proceed
+    if (map.current) return;
+    // Create map
+    map.current = new maplibreGl.Map({
+      container: mapContainer.current,
+      // Ocean-first basemap: bathymetry raster + vector rivers/boundaries and
+      // FR/EN labels. Data layers are inserted below the label layers.
+      //
+      // The projection is part of the style in MapLibre 5, and it has to be
+      // set here rather than left to the effect above: that effect's first run
+      // happens while map.current is still null, and projection doesn't change
+      // again, so a globe restored from localStorage would never be applied.
+      style: {
+        ...buildBasemapStyle(i18n.language),
+        projection: { type: projection === "globe" ? "globe" : "mercator" },
+      },
+      // MapLibre defaults to powerPreference 'high-performance', which wakes
+      // the discrete GPU on dual-GPU laptops. The map is circles and fills —
+      // the integrated GPU renders it fine, so hint 'low-power'.
+      canvasContextAttributes: { powerPreference: "low-power" },
+      // No attribution in the map's own corner: the per-source attributions are
+      // gathered by an AttributionControl the legend card builds and parents
+      // itself (see LegendFooter.jsx).
+      attributionControl: false,
+      // Starting camera. The same share-link params and the same fallbacks
+      // MapStateProvider seeds its mapView from — the two have to agree, or
+      // the legend describes a zoom the map isn't at until the first moveend.
+      center: [
+        mapLongitude || defaultMapCenter.lon,
+        mapLatitude || defaultMapCenter.lat,
+      ],
+      zoom: mapZoom || defaultMapZoom,
+      // Stop at the deepest level the satellite imagery actually exists at
+      // everywhere it matters: Esri is cached to z17 on remote Arctic coasts
+      // (z19 in cities), and past its coverage it serves a grey "map data not
+      // yet available" tile rather than a 404. Capping the camera here means
+      // that tile is never reached on land, without masking anything off.
+      maxZoom: 17,
+    });
+    // Share the instance with MapStateProvider (see mapInstance there).
+    onMapReady(map.current);
+
+    // disable map rotation using right click + drag
+    map.current.dragRotate.disable();
+
+    // disable map rotation using touch rotation gesture
+    map.current.touchZoomRotate.disableRotation();
+
+    map.current.on("load", () => {
+      setColorStopsRef.current();
+      addObservationLayers();
+      addGriddapLayers();
+      addClickHighlightLayers();
+      addTrackLayers();
+      addSelectedTrackLayers();
+
+      // Apply the initial track-layer visibility from the URL-restored
+      // track-lines switch + data-layer selection.
+      applyLayerVisibility();
+
+      // Layers are created visible; re-apply the picker state in case the hex
+      // and point layers were toggled off before the style finished loading.
+      // The track layers are not the picker's to hide, so they are left alone.
+      if (!dataLayersVisibleRef.current) {
+        setLayersVisibility(observationLayerIds, false);
+      }
+      // Same for the depth rasters, which come from the style itself and are
+      // therefore always created visible.
+      if (!bathymetryVisibleRef.current) {
+        setLayersVisibility(bathymetryLayerIds, false);
+      }
+
+      // A share link can carry the spatial selection (rectangle bounds or a
+      // polygon ring). SelectionProvider has already seeded it into the app
+      // state — this puts the shape back into the draw control so it is drawn,
+      // editable, and survives the next filter change (which re-derives the
+      // selection from whatever the draw control holds).
+      const sharedSelection = selectionFromSearchParams(
+        new URL(window.location.href).searchParams,
+      );
+      if (sharedSelection) {
+        const [featureId] = drawPolygon.current.add({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [sharedSelection] },
+        });
+        drawPolygon.current.changeMode("direct_select", { featureId });
+        highlightPoints(sharedSelection);
+      }
+    });
+
+    installHover();
+    installClick();
+
     map.current.on("draw.create", () => {
       setLoading(true);
       if (drawPolygon.current.getAll().features.length > 1) {
@@ -3576,40 +3616,6 @@ export default function CreateMap({
         map.current.getCanvas().style.cursor = "unset";
         shiftBoxCreate.current = false;
       }
-    });
-
-    // One registration for the whole map. There is no layer fan-out any more, so
-    // no repeat deliveries to dedupe and no preventDefault() plumbing between
-    // handlers — and the mapbox-gl-draw click-swallowing workaround
-    // (https://github.com/mapbox/mapbox-gl-draw/issues/617) that the per-layer
-    // touchend bindings existed for goes with it, since the draw modes are
-    // checked directly at the top of the handler.
-    map.current.on("click", handleMapClick);
-
-    // Touch. A tap has to be told apart from the end of a pan or a pinch, which
-    // is why the old code bound 'touchend' per layer and pointedly not
-    // map-wide: a map-wide binding fired at the end of every drag and would
-    // have cleared the selection each time. Measuring the gesture instead makes
-    // the map-wide binding safe, which is what finally gives a touch user the
-    // tap-empty-water-to-clear escape hatch they never had.
-    const TAP_SLOP_PX = 12;
-    const TAP_TIMEOUT_MS = 500;
-    let touchStart = null;
-    map.current.on("touchstart", (e) => {
-      touchStart =
-        e.originalEvent.touches.length === 1
-          ? { point: e.point, at: Date.now() }
-          : null;
-    });
-    map.current.on("touchend", (e) => {
-      const start = touchStart;
-      touchStart = null;
-      if (!start) return;
-      if (Date.now() - start.at > TAP_TIMEOUT_MS) return;
-      const dx = e.point.x - start.point.x;
-      const dy = e.point.y - start.point.y;
-      if (dx * dx + dy * dy > TAP_SLOP_PX ** 2) return;
-      handleMapClick(e);
     });
 
     // The card a share link arrived with (?at=lng,lat): ask the same question
