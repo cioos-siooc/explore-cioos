@@ -14,7 +14,8 @@ import "./styles.css";
 // holds the top-right corner, which nothing else claims; narrower, it flows
 // last in the top bar's column instead. A status rather than a dialog:
 // announced, but it never takes focus from what the user is doing,
-// and it stays until dismissed rather than timing out mid-read.
+// and — bar the few fleeting ones — it stays until dismissed rather than
+// timing out mid-read.
 export default function TipCard({ corner = false }) {
   const { t } = useTranslation();
   const { activeTip, touring, stepTour, dismissTip, disableTips } = useTips();

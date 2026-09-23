@@ -33,6 +33,12 @@ export const TIPS = [
   "sizeLimit",
 ];
 
+// Offered the moment a shape is finished, when the user is looking at the map
+// rather than the card, and the reshaping it describes is right there to try:
+// it gets a few seconds instead of waiting to be closed.
+const FLEETING_TIPS = ["reshapeArea"];
+const FLEETING_TIP_MS = 8000;
+
 // Outside the provider (leaf-component tests render without it) offering a
 // tip is a no-op rather than a crash.
 const TipsContext = createContext({
@@ -153,6 +159,12 @@ export default function TipsProvider({ children }) {
     setActiveTip();
     setTouring(false);
   }, []);
+
+  useEffect(() => {
+    if (touring || !FLEETING_TIPS.includes(activeTip)) return;
+    const timer = setTimeout(dismissTip, FLEETING_TIP_MS);
+    return () => clearTimeout(timer);
+  }, [activeTip, touring, dismissTip]);
   const disableTips = useCallback(() => {
     setTipsEnabled(false);
     setActiveTip();

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
@@ -170,6 +170,27 @@ describe("contextual tips", () => {
     const { user } = renderProbe();
     await user.click(screen.getByText("offer reshape"));
     expect(card()).toBeNull();
+  });
+
+  it("lets the reshape tip go by itself after a few seconds", async () => {
+    returningVisitor();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderProbe();
+    fireEvent.click(screen.getByText("offer reshape"));
+    expect(card()).toHaveTextContent(/Drag the corners/);
+    act(() => vi.advanceTimersByTime(8000));
+    expect(card()).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("keeps other tips up until closed", async () => {
+    returningVisitor();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderProbe();
+    fireEvent.click(screen.getByText("offer slider"));
+    act(() => vi.advanceTimersByTime(60000));
+    expect(card()).toHaveTextContent(/time bar/);
+    vi.useRealTimers();
   });
 
   it("holds an offer made behind a modal until it closes", async () => {
