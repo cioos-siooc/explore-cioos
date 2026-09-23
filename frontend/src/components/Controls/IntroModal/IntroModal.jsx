@@ -1,38 +1,225 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  BoundingBox,
+  ArrowRight,
+  BarChartLine,
+  Bezier2,
   Download,
-  Filter,
+  GeoAlt,
+  GlobeAmericas,
+  Grid3x3Gap,
   InfoCircle,
   Lightbulb,
-  ListUl,
+  Search,
+  Water,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
-import classNames from "classnames";
 
+import CioosLogo from "../../ui/CioosLogo.jsx";
 import Modal from "../../ui/Modal.jsx";
 import Switch from "../../ui/Switch.jsx";
 import FeedbackButton from "../FeedbackButton/FeedbackButton.jsx";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { TRAJECTORY_TYPE_KEYS } from "../../../state/dataLayers.js";
+import { MARKER_MIN_ZOOM } from "../../config.js";
+import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
-// Each step leads with the glyph the user meets on the control that does it,
-// so the explanation and the button are recognisably the same thing.
-const STEPS = [
-  { key: "Filter", Icon: Filter },
-  { key: "Select", Icon: BoundingBox },
-  { key: "Inspect", Icon: ListUl },
-  { key: "Download", Icon: Download },
+// What the tool is for, in the order a newcomer meets it: find data on the
+// map, narrow it down, take it away. Each card leads with the glyph of the
+// control that does it.
+const FEATURES = [
+  { key: "explore", Icon: GlobeAmericas },
+  { key: "search", Icon: Search },
+  { key: "download", Icon: Download },
 ];
+
+// Halifax Harbour: charted by CHS in detail, so the NONNA soundings are there
+// to see as soon as the camera lands.
+const NONNA_SHOWCASE_AREA = {
+  type: "Polygon",
+  coordinates: [
+    [
+      [-63.62, 44.6],
+      [-63.5, 44.6],
+      [-63.5, 44.7],
+      [-63.62, 44.7],
+      [-63.62, 44.6],
+    ],
+  ],
+};
+
+// The Gulf of St. Lawrence, thick with profile and time-series stations. A
+// point frames at exactly the camera's maxZoom, just past the zoom where hexes
+// give way to markers.
+const STATIONS_SHOWCASE_CENTRE = {
+  type: "Point",
+  coordinates: [-63.914, 49.038],
+};
+const STATIONS_SHOWCASE_ZOOM = MARKER_MIN_ZOOM + 0.8;
+
+// A glider mission off the west coast of Vancouver Island, with its track
+// drawn and the camera where it reads best. Catalogues without
+// it fall back to the first trajectory dataset, framed on its footprint.
+const TRAJECTORY_SHOWCASE = {
+  datasetId: "colin_1142_20260708_R",
+  trajectoryId: "colin_1142_20260708",
+  centre: { type: "Point", coordinates: [-127.598, 48.273] },
+  zoom: 6.6,
+};
+
+const isTrajectory = (dataset) =>
+  TRAJECTORY_TYPE_KEYS.some(([, type]) => type === dataset.cdm_data_type);
+const footprint = (dataset) =>
+  dataset.filtered_bbox_geojson || dataset.coverage_bbox_geojson;
+
+// A few of the app's views, one click away from the intro: each closes the
+// dialog and sets the app up the way a user would have, using the same
+// actions the controls do. One whose data isn't in the catalogue (no gridded
+// dataset with a WMS server, nothing downloadable) is left out.
+function useShowcases(close) {
+  const {
+    pointsData,
+    pointsToReview,
+    setInspectDataset,
+    handleSelectDataset,
+    selectTrajectoryFromMap,
+  } = useSelection();
+  const { zoomToGeometry, setBathymetryVisible } = useMapState();
+  const { setShowDownloadModal, setShowCoverageModal } = useUI();
+
+  const gridded = pointsData.find((dataset) => dataset.wms_url);
+  const voyage = pointsData.find(
+    (dataset) => dataset.dataset_id === TRAJECTORY_SHOWCASE.datasetId,
+  );
+  const trajectory =
+    voyage ||
+    pointsData.find((dataset) => isTrajectory(dataset) && footprint(dataset));
+  const downloadable = pointsData.find(
+    (dataset) => dataset.cdm_data_type !== "Grid",
+  );
+
+  return [
+    gridded && {
+      key: "wms",
+      Icon: Grid3x3Gap,
+      run: () => {
+        // Opening a gridded dataset's page draws its WMS overlay by itself
+        // (see GriddapDetails).
+        setInspectDataset(gridded);
+        zoomToGeometry(footprint(gridded));
+      },
+    },
+    trajectory && {
+      key: "trajectory",
+      Icon: Bezier2,
+      run: () => {
+        if (voyage) {
+          selectTrajectoryFromMap(
+            voyage.pk,
+            TRAJECTORY_SHOWCASE.trajectoryId,
+            voyage.title,
+          );
+          zoomToGeometry(TRAJECTORY_SHOWCASE.centre, {
+            maxZoom: TRAJECTORY_SHOWCASE.zoom,
+          });
+          return;
+        }
+        setInspectDataset(trajectory);
+        zoomToGeometry(footprint(trajectory));
+      },
+    },
+    {
+      key: "stations",
+      Icon: GeoAlt,
+      run: () =>
+        zoomToGeometry(STATIONS_SHOWCASE_CENTRE, {
+          maxZoom: STATIONS_SHOWCASE_ZOOM,
+        }),
+    },
+    {
+      key: "coverage",
+      Icon: BarChartLine,
+      run: () => setShowCoverageModal(true),
+    },
+    downloadable && {
+      key: "download",
+      Icon: Download,
+      run: () => {
+        if (!pointsToReview?.length) handleSelectDataset(downloadable);
+        setShowDownloadModal(true);
+      },
+    },
+    {
+      key: "nonna",
+      Icon: Water,
+      run: () => {
+        setBathymetryVisible(true);
+        zoomToGeometry(NONNA_SHOWCASE_AREA, { maxZoom: 12 });
+      },
+    },
+  ]
+    .filter(Boolean)
+    .map((showcase) => ({
+      ...showcase,
+      run: () => {
+        close();
+        showcase.run();
+      },
+    }));
+}
+
+const COUNT_UP_MS = 900;
+
+// Counts up to `target` once it is known, so the catalogue's size reads as a
+// live figure rather than copy. Lands on it at once when motion is reduced.
+function useCountUp(target) {
+  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!target || reduced) return undefined;
+    let frame;
+    const start = performance.now();
+    const step = (now) => {
+      const progress = Math.min((now - start) / COUNT_UP_MS, 1);
+      // Ease out, so the last digits settle rather than stop dead.
+      setValue(Math.round(target * (1 - (1 - progress) ** 3)));
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, reduced]);
+  return reduced ? target : value;
+}
+
+function Stat({ value, label, language }) {
+  const shown = useCountUp(value);
+  if (!value) return null;
+  return (
+    <li className="introStat">
+      <span className="introStatValue">{shown.toLocaleString(language)}</span>
+      <span className="introStatLabel">{label}</span>
+    </li>
+  );
+}
 
 export default function IntroModal({ showModal, setShowModal }) {
   const { t, i18n } = useTranslation();
   const { setShowSelectionHelpModal } = useUI();
   const { tipsEnabled, setTipsEnabled } = useTips();
-  const [step, setStep] = useState(STEPS[0].key);
+  const {
+    totalNumberOfDatasets,
+    erddapServersSelected,
+    orgsSelected,
+    obisDataAvailable,
+  } = useFilters();
   const [tipIndex, setTipIndex] = useState(0);
+  const close = () => setShowModal(false);
+  const showcases = useShowcases(close);
 
   return (
     <Modal
@@ -40,98 +227,161 @@ export default function IntroModal({ showModal, setShowModal }) {
       size="xl"
       centered
       aria-labelledby="introModalTitle"
-      onHide={() => setShowModal(false)}
+      onHide={close}
       scrollable
       className="introModal"
       fullscreen="lg-down"
     >
       <Modal.Header closeButton>
-        <Modal.Title className="modalHeader" id="introModalTitle">
-          <span>{t("CIOOSDataExplorer") + " "}</span>
+        <a
+          className="introBrand"
+          href={
+            i18n.language === "fr" ? "https://siooc.ca/" : "https://cioos.ca/"
+          }
+          target="_blank"
+          rel="noreferrer"
+          title={t("CIOOSLogoButtonTitle")}
+        >
+          <CioosLogo />
+        </a>
+        <Modal.Title className="introTitle" id="introModalTitle">
+          <span className="introEyebrow">{t("dockIntroButtonTitle")}</span>
+          <span className="introTitleName">{t("CIOOSDataExplorer")}</span>
           <span className="tagLine">{t("CIOOSQuote")}</span>
-          <a
-            title={t("CIOOSLogoButtonTitle")}
-            className={classNames(
-              "introLogo",
-              i18n.language === "en" ? "english" : "french",
-            )}
-            href="https://cioos.ca/"
-            target="_blank"
-            rel="noreferrer"
-          />
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <p className="introLead">{t("introModalWelcomeMessage")}</p>
-
-        <h2 className="introHeading">{t("introStepsHeading")}</h2>
-        <div className="introSteps" role="group">
-          {STEPS.map(({ key, Icon }, index) => (
-            <button
-              key={key}
-              type="button"
-              className="introStep"
-              aria-pressed={step === key}
-              onClick={() => setStep(key)}
-            >
-              <span className="introStepNumber">{index + 1}</span>
-              <Icon size={28} aria-hidden="true" />
-              <span>{t(`stepInfo${key}`)}</span>
-            </button>
-          ))}
-        </div>
-        <div className="introStepInfo" data-testid="intro-step-info">
-          <p>{t(`stepInfo${step}Text`)}</p>
-          {step === "Download" && (
-            <button
-              type="button"
-              className="introLink"
-              onClick={() => setShowSelectionHelpModal(true)}
-            >
-              {t("sidebarSelectionHintMoreText")}
-            </button>
-          )}
-        </div>
-
-        <h2 className="introHeading">
-          <Lightbulb size={18} aria-hidden="true" /> {t("tipsHeading")}
-        </h2>
-        <div className="introTip" data-testid="intro-tip">
-          <p>{t(`tip_${TIPS[tipIndex]}`)}</p>
-          <div className="introTipNav">
-            <span className="introTipCount">
-              {t("tipCounter", { n: tipIndex + 1, total: TIPS.length })}
-            </span>
-            <button
-              type="button"
-              className="introLink"
-              onClick={() => setTipIndex((tipIndex + 1) % TIPS.length)}
-            >
-              {t("tipNext")}
-            </button>
+        <section className="introHero">
+          <svg
+            className="introHeroWaves"
+            viewBox="0 0 1200 120"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path d="M0 60 C200 20 400 100 600 60 S1000 20 1200 60 V120 H0Z" />
+            <path d="M0 80 C200 40 400 120 600 80 S1000 40 1200 80 V120 H0Z" />
+          </svg>
+          <div className="introHeroCopy">
+            <h2 className="introHeroTitle">{t("introHeroTitle")}</h2>
+            <p className="introHeroText">{t("introHeroText")}</p>
+            <div className="introHeroActions">
+              <button type="button" className="introCta" onClick={close}>
+                {t("introHeroCta")}
+              </button>
+              <span className="introSource">ERDDAP™</span>
+              {obisDataAvailable && <span className="introSource">OBIS</span>}
+            </div>
           </div>
-        </div>
-
-        <div className="introFooter">
-          <p>
-            <FeedbackButton className="feedbackButton" size={24} />
-            {t("tipInfoFeedback")}
-          </p>
-          <p>
-            <InfoCircle
-              className="introFooterIcon"
-              size={20}
-              aria-hidden="true"
+          <ul className="introStats" aria-label={t("introStatsLabel")}>
+            <Stat
+              value={totalNumberOfDatasets}
+              label={t("introStatDatasets")}
+              language={i18n.language}
             />
-            {t("introReopenText")}
-          </p>
-          <Switch
-            id="introTipsToggle"
-            label={t("tipsToggleLabel")}
-            checked={tipsEnabled}
-            onChange={() => setTipsEnabled(!tipsEnabled)}
-          />
-        </div>
+            <Stat
+              value={erddapServersSelected?.length}
+              label={t("introStatServers")}
+              language={i18n.language}
+            />
+            <Stat
+              value={orgsSelected?.length}
+              label={t("introStatOrganizations")}
+              language={i18n.language}
+            />
+          </ul>
+        </section>
+
+        <ul className="introFeatures">
+          {FEATURES.map(({ key, Icon }, index) => (
+            <li
+              key={key}
+              className="introFeature"
+              style={{ "--intro-feature-index": index }}
+            >
+              <span className="introFeatureIcon" aria-hidden="true">
+                <Icon size={22} />
+              </span>
+              <h3>{t(`introFeature_${key}_title`)}</h3>
+              <p>{t(`introFeature_${key}_body`)}</p>
+              {key === "download" && (
+                <button
+                  type="button"
+                  className="introLink"
+                  onClick={() => setShowSelectionHelpModal(true)}
+                >
+                  {t("sidebarSelectionHintMoreText")}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <h2 className="introHeading">{t("introShowcasesHeading")}</h2>
+        <ul className="introShowcases">
+          {showcases.map(({ key, Icon, run }) => (
+            <li key={key}>
+              <button type="button" className="introShowcase" onClick={run}>
+                <span className="introShowcaseIcon" aria-hidden="true">
+                  <Icon size={20} />
+                </span>
+                <span className="introShowcaseText">
+                  <span className="introShowcaseTitle">
+                    {t(`introShowcase_${key}_title`)}
+                  </span>
+                  <span className="introShowcaseBody">
+                    {t(`introShowcase_${key}_body`)}
+                  </span>
+                </span>
+                <ArrowRight
+                  className="introShowcaseArrow"
+                  size={18}
+                  aria-hidden="true"
+                />
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <footer className="introFooter">
+          <section className="introTip" data-testid="intro-tip">
+            <h2 className="introTipHeading">
+              <Lightbulb size={16} aria-hidden="true" /> {t("tipsHeading")}
+            </h2>
+            <p key={tipIndex}>{t(`tip_${TIPS[tipIndex]}`)}</p>
+            <div className="introTipNav">
+              <span className="introTipCount">
+                {t("tipCounter", { n: tipIndex + 1, total: TIPS.length })}
+              </span>
+              <button
+                type="button"
+                className="introLink"
+                onClick={() => setTipIndex((tipIndex + 1) % TIPS.length)}
+              >
+                {t("tipNext")}
+              </button>
+            </div>
+          </section>
+          <div className="introFooterLinks">
+            <p>
+              <FeedbackButton className="feedbackButton" size={24} />
+              {t("tipInfoFeedback")}
+            </p>
+            <p>
+              <InfoCircle
+                className="introFooterIcon"
+                size={20}
+                aria-hidden="true"
+              />
+              {t("introReopenText")}
+            </p>
+            <Switch
+              id="introTipsToggle"
+              label={t("tipsToggleLabel")}
+              checked={tipsEnabled}
+              onChange={() => setTipsEnabled(!tipsEnabled)}
+            />
+          </div>
+        </footer>
       </Modal.Body>
     </Modal>
   );

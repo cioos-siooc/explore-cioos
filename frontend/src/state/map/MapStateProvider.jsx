@@ -255,8 +255,10 @@ export default function MapStateProvider({ children }) {
   // Both are stable for the life of the provider — they only call setters — so
   // consumers can list them in a dependency array without re-running on every
   // render of this provider.
-  const zoomToGeometry = useCallback((geometry) => {
-    if (geometry) setZoomTarget({ geometry, nonce: Date.now() });
+  // `camera` overrides the zoom-to-dataset framing (see zoomToDatasetCamera),
+  // for a caller that needs to land closer in than a dataset's footprint does.
+  const zoomToGeometry = useCallback((geometry, camera) => {
+    if (geometry) setZoomTarget({ geometry, camera, nonce: Date.now() });
   }, []);
 
   const requestDraw = useCallback((mode) => {

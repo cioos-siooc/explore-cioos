@@ -1924,6 +1924,7 @@ export default function CreateMap({
     if (!bounds) return;
     map.current.fitBounds(bounds, {
       ...zoomToDatasetCamera(),
+      ...zoomTarget.camera,
       duration: 1000,
     });
   }, [zoomTarget]);

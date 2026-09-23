@@ -62,7 +62,7 @@ describe("FeatureCard", () => {
     });
     expect(
       screen.getByText(
-        "Nothing here is in the current results — the filters have excluded it.",
+        "Nothing here is in the current results because the filters have excluded it.",
       ),
     ).toBeInTheDocument();
   });
