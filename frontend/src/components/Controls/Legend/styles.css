@@ -515,13 +515,37 @@
  * from the 700px rule above, which this width is inside.
  * ------------------------------------------------------------------ */
 
+/* The card drops below even the desktop type sizes: it is a glance over the
+   map, and the full keys are a tap away in the dialog, which keeps the larger
+   type. */
+.legendCompact {
+  --cioos-font-size-3xs: 8px;
+  --cioos-font-size-2xs: 9px;
+  --cioos-font-size-xs: 10px;
+
+  min-width: 96px;
+  max-width: 136px;
+}
+
 /* The header is the control that opens the rest now, so it is sized as one
    rather than as a caption with a collapse arrow on the end. */
 .legendCompact .legendHeader {
-  gap: 10px;
-  min-height: 40px;
-  padding: 6px 12px;
+  gap: 6px;
+  min-height: 26px;
+  padding: 3px 8px;
   color: var(--cioos-ink);
+}
+
+.legendCompact .legendBody {
+  padding: 0 6px 4px;
+}
+
+.legendCompact .legendFooter {
+  padding: 2px 6px 3px;
+}
+
+.legendCompact .legendColorBar {
+  height: 6px;
 }
 
 .legendCompact .legendHeader svg {
