@@ -517,7 +517,9 @@ isolation) touch the same two files and are cheapest taken as one sitting.
       chunked download"). `:206` has the same gap from the other side: an oversized *chunk* is fatal
       rather than subdivided. Fix: catch both exceptions at all
       four sites, and halve an oversized chunk rather than skipping it. **[verified]**
-- [ ] **A stale WMS image can overwrite the current viewport.** `renderWmsImage` captures
+- [x] **A stale WMS image can overwrite the current viewport.** — **FIXED 2026-09-23**: the token
+      is now bumped at the top of `renderWmsImage`. No automated test: `Map.jsx` is e2e-only and the
+      fixtures have no WMS overlay. `renderWmsImage` captures
       `wmsRenderToken.current` at `Map.jsx:1812` and re-checks it in `img.onload` at `:1816`, but the
       token is only incremented in `removeWmsOverlay` (`:1754`). Two renders of the *same* overlay —
       which is the normal case: `:1983` re-renders on a debounced `moveend` — therefore share one
@@ -796,6 +798,8 @@ now split, was two specific call sites.
 > here — `vite.config.mjs` already aliases `maplibre-gl` to `src/test/stubs/maplibre.js`, which is
 > the harness a seam module needs.
 >
+> **Superseded 2026-09-23:** `e2e/specs/mapInteraction.spec.js` now drives the canvas (hexes only
+> — see step 5). Kept for the history of why the gate was needed:
 > **But there is still no behavioural gate on map interaction, so steps 3–4 stay gated.** The e2e
 > suite asserts only that the map *paints*: `e2e/specs/smoke.spec.js:7` and `mobile.spec.js:13`
 > check `map-container` is visible, `visual.spec.js:22` **hides the WebGL canvas** in every shot
@@ -807,7 +811,8 @@ now split, was two specific call sites.
 - [ ] 22 `useEffect`, 42 `useRef`, **3** `useState`, 32 props, 22 `addLayer`. **~1900 lines sit
       behind a live WebGL context.** The mount effect alone is 1749 lines (2371–4119).
       **[re-verified 2026-09-10 — `useState` was 2, now 3; the other four are exact]**
-- [ ] The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
+- [~] **Allocations done 2026-09-23** (patching at module scope, `draw`/`popup` built once); the
+      eight render-time ref writes remain. The render body monkey-patches MapboxDraw's mode table (393–478, plus 79–81 at module scope)
       and allocates a fresh `MapboxDraw` (640) and `Popup` (978) on **every render**, plus eight ref
       writes during render (`rangeLevelsRef`, `onViewportHexRangeRef`, `selectedTrajectoryRef`,
       `setColorStopsRef`, `mapQueryRef`, `onFeatureQueryRef`, `onMarkerClickRef`, `onTrackClickRef`).
@@ -825,7 +830,7 @@ now split, was two specific call sites.
       `let`, not a ref), each documented as fixing one loop or flicker. One of them is also wrong
       today: `wmsRenderToken` is bumped only on overlay removal (`removeWmsOverlay`), so it does not
       discard a stale same-overlay render — a one-line fix, filed in P1 (2026-09-09) so it is not
-      blocked behind this section. **Still unfixed as of 2026-09-10.** The survey named eight:
+      blocked behind this section. **Fixed 2026-09-23.** The survey named eight:
       `hexesRevealed` is now `dataRevealed`, `rampMeasuredForPk` is now `rampMeasuredFor`, and
       `hexRangeDirty` is gone entirely. **[re-verified — all seven refs present]**
 - [x] Pure but unexported, so untestable: **`buildTileSuffix` and `griddapOutranksHexesIn` are done**
@@ -834,7 +839,8 @@ now split, was two specific call sites.
       `rampExpression` (5), `featureHasDataset` (7), `dedupeGriddapByPk` (8), `datasetPksOf` (8),
       and the dedupe/role/bbox rules inside `buildFeatureQuery` (208).
       **[re-verified — every span byte-identical to the 2026-09-09 pass]**
-- [ ] **The seam is the hit-test group, and it is three map methods wide.** `isOnAPointIn`,
+- [x] **The seam is the hit-test group, and it is three map methods wide.** — settled 2026-09-23 as
+      injected functions, see step 4. `isOnAPointIn`,
       `trackFeatureIn`, `griddapCoveredIn`, `datasetPksOf`, `trackItemsIn`
       and `buildFeatureQuery` are ~280 lines of array-of-feature ranking and dedupe buried inside the
       mount effect. Their dependency on MapLibre is `map.current.getZoom()`,
@@ -855,7 +861,7 @@ now split, was two specific call sites.
 - [ ] `setColorStops` (106 lines) has **four entry points** — the `[rangeLevels,
       coverageRangeLevels]` effect, the `load` handler, a `zoomend` listener, and
       `refreshViewportHexRange` via `setColorStopsRef`. **[re-verified]**
-- [ ] Dead: `Map.jsx` no longer declares a `setDatasetsSelected` prop, yet `MapContainer.jsx:14`
+- [x] **Both deleted 2026-09-23.** Dead: `Map.jsx` no longer declares a `setDatasetsSelected` prop, yet `MapContainer.jsx:14`
       still reads it from context and `:146` still forwards it — a prop handed to a component that
       does not accept it. Layer id `'points-hovered'` is in `POINT_LAYERS` but never added anywhere
       in the repo (`Map.jsx:1224` is its sole occurrence); a `getLayer` guard makes it silently
@@ -889,13 +895,28 @@ now split, was two specific call sites.
 3. ~~`buildFeatureQuery(e, hits)` → `(lngLat, hits)`~~ — **DONE 2026-09-23.** Takes a `{ lng, lat }`
    (MapLibre's `LngLat` shape); the click handler passes `e.lngLat`, the shared-link replay passes
    `{ lng, lat }` instead of fabricating an event.
-4. The hit-test group above — the largest prize, and much narrower than "largest risk" implies, but
-   there is no e2e gate under hover/click ranking (see the preamble). So: settle the
-   `queryRenderedFeatures` question, then move in a commit that is *provably* a pure move — bodies
-   byte-identical, no tidying — and add characterisation tests against the new module immediately.
-   Extract-and-tidy in one commit is still an unverified refactor.
-5. The 1749-line mount effect and the guards — leave alone until there is a Playwright gate that
-   actually drives the canvas. Nothing in 1–4 requires moving them.
+4. ~~The hit-test group~~ — **DONE 2026-09-23.** `queryRenderedFeatures` question settled as the
+   first option: it is injected. `isOnAPointIn(hits, point, { project, radiusRange })`,
+   `griddapCoveredIn(hits, zoom)`, `buildFeatureQuery(lngLat, hits, { zoom, queryRendered,
+   language })`, plus `trackFeatureIn`, `trackItemsIn`, `datasetPksOf`, `dedupeGriddapByPk`,
+   `griddapTitle(feature, language)` and the two track layer lists, all in `Map/hitTest.js`.
+   Moved in its own commit, checked mechanically: the moved text differs from the original only
+   at the `map.current`/`i18n` reads that became arguments. `Map.jsx` builds the injected context
+   in `pointHitContext()` / `featureQueryContext()`, read at call time. 28 characterisation tests
+   added in a second commit (`hitTest.test.js`, 36 total).
+5. **Gate built, part of the section done 2026-09-23.** `e2e/specs/mapInteraction.spec.js` drives
+   the canvas at all three viewports: hex hover chip, empty-water hover, hex click → card contents
+   and `?at=`, shared-link replay, empty-water click closes the card. Mutation-checked (a
+   `buildFeatureQuery` that always returns null fails the three click tests). **It covers hexes
+   only** — the recorded fixtures are four z2 hex tiles with no markers, tracks or grids — so
+   marker/track/grid ranking and the marker record jump are still ungated.
+   Done under it: the MapboxDraw mode patching and `drawControlOptions` moved to module scope
+   (they ran on every render); `draw` and `popup` are built once (`useState` initialisers) instead
+   of on every render; `wmsRenderToken` bug fixed (see P1).
+   **Still open:** the mount effect itself (still one effect), the eight ref writes during render,
+   the remaining guards, and `setColorStops`'s four entry points. Splitting the effect reorders
+   layer adds and listener registration; do it only once the fixtures hold markers and tracks so
+   the gate covers what it moves.
 
 ### P2.7 — One descriptor for the metric and the tiers `[Worth exploring]`
 
