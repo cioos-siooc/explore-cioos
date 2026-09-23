@@ -68,6 +68,7 @@ import {
 } from "./basemapStyle.js";
 import { buildTileSuffix } from "./tileQuery.js";
 import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
+import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // direct_select's own dragVertex/toDisplayFeatures, captured once here at
 // module load — before the component below patches these modes on every
@@ -79,6 +80,8 @@ import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
 const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex;
 const defaultDirectSelectToDisplayFeatures =
   MapboxDraw.modes.direct_select.toDisplayFeatures;
+const drawPolygonMode = withPolygonHint(MapboxDraw.modes.draw_polygon);
+const drawRectangleMode = withBoxHint(DrawRectangle);
 
 // A rectangle drawn with draw_rectangle is a 4-point ring — mapbox-gl-draw
 // strips the closing duplicate point internally (see Polygon's constructor
@@ -439,7 +442,8 @@ export default function CreateMap({
   modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature;
   modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature;
 
-  modes.draw_rectangle = DrawRectangle;
+  modes.draw_polygon = drawPolygonMode;
+  modes.draw_rectangle = drawRectangleMode;
 
   const drawControlOptions = {
     displayControlsDefault: false,

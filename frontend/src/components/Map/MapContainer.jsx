@@ -1,5 +1,6 @@
 import * as React from "react";
 
+import DrawHint from "./DrawHint/DrawHint.jsx";
 import Map from "./Map.jsx";
 import { server } from "../../config";
 import fetchJson from "../../state/fetchJson.js";
@@ -32,6 +33,7 @@ export default function MapContainer() {
     zoomTarget,
     drawRequest,
     featureQueryRequest,
+    mapInstance,
     setMapInstance,
     featureQuery,
     setFeatureQuery,
@@ -135,41 +137,44 @@ export default function MapContainer() {
   // drawn on the map, and its row pinned in the page's platform list.
 
   return (
-    <Map
-      polygon={polygon}
-      setPolygon={setPolygon}
-      setLoading={setLoading}
-      setLoadingLayers={setLoadingLayers}
-      mapQueryString={mapQueryString}
-      setMapView={setMapView}
-      rangeLevels={rangeLevels}
-      coverageRangeLevels={coverageRangeLevels}
-      onViewportHexRange={setViewportHexRange}
-      onFeatureQuery={handleFeatureQuery}
-      onShapeDrawn={() => offerTip("reshapeArea")}
-      featureQuery={featureQuery}
-      sharedFeatureQueryAt={sharedFeatureQueryAt}
-      onMarkerClick={onMarkerClick}
-      onTrackClick={selectTrajectoryFromMap}
-      setHoveredDataset={setHoveredDataset}
-      hoveredDataset={hoveredDataset}
-      inspectDataset={inspectDataset}
-      setDatasetsSelected={setDatasetsSelected}
-      tracksMode={tracksMode}
-      scrubTime={debouncedScrubTime}
-      trailingDays={trailingDays}
-      selectedTrajectory={selectedTrajectory}
-      dataLayers={dataLayers}
-      griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
-      dataLayersVisible={dataLayersVisible}
-      bathymetryVisible={bathymetryVisible}
-      activeWmsOverlay={activeWmsOverlay}
-      projection={projection}
-      zoomTarget={zoomTarget}
-      drawRequest={drawRequest}
-      featureQueryRequest={featureQueryRequest}
-      onMapReady={setMapInstance}
-      onFirstPaint={reportFirstPaint}
-    />
+    <>
+      <Map
+        polygon={polygon}
+        setPolygon={setPolygon}
+        setLoading={setLoading}
+        setLoadingLayers={setLoadingLayers}
+        mapQueryString={mapQueryString}
+        setMapView={setMapView}
+        rangeLevels={rangeLevels}
+        coverageRangeLevels={coverageRangeLevels}
+        onViewportHexRange={setViewportHexRange}
+        onFeatureQuery={handleFeatureQuery}
+        onShapeDrawn={() => offerTip("reshapeArea")}
+        featureQuery={featureQuery}
+        sharedFeatureQueryAt={sharedFeatureQueryAt}
+        onMarkerClick={onMarkerClick}
+        onTrackClick={selectTrajectoryFromMap}
+        setHoveredDataset={setHoveredDataset}
+        hoveredDataset={hoveredDataset}
+        inspectDataset={inspectDataset}
+        setDatasetsSelected={setDatasetsSelected}
+        tracksMode={tracksMode}
+        scrubTime={debouncedScrubTime}
+        trailingDays={trailingDays}
+        selectedTrajectory={selectedTrajectory}
+        dataLayers={dataLayers}
+        griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
+        dataLayersVisible={dataLayersVisible}
+        bathymetryVisible={bathymetryVisible}
+        activeWmsOverlay={activeWmsOverlay}
+        projection={projection}
+        zoomTarget={zoomTarget}
+        drawRequest={drawRequest}
+        featureQueryRequest={featureQueryRequest}
+        onMapReady={setMapInstance}
+        onFirstPaint={reportFirstPaint}
+      />
+      <DrawHint map={mapInstance} />
+    </>
   );
 }
