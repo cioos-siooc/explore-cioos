@@ -3,7 +3,7 @@ import maplibreGl, { Popup } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 
 import * as helpers from "@turf/helpers";
 import turfBboxPolygon from "@turf/bbox-polygon";
@@ -606,7 +606,6 @@ export default function CreateMap({
   // the first render's closure (like setColorStops, which it reaches through a
   // ref of its own), so the prop it captured is forever the mount-time one.
   const rangeLevelsRef = useRef(rangeLevels);
-  rangeLevelsRef.current = rangeLevels;
   // Point-tier count range, kept so the circle-radius ramp can be rebuilt on
   // the layers whenever the filters change (see setColorStops).
   const pointRadiusRange = useRef(null);
@@ -640,13 +639,11 @@ export default function CreateMap({
   // Latest onViewportHexRange, for the same reason: the debounced handler that
   // reports the measurement is registered once.
   const onViewportHexRangeRef = useRef(onViewportHexRange);
-  onViewportHexRangeRef.current = onViewportHexRange;
   // Read by the track-focus paint (see applyTrackFocus). It also fed a
   // "click to show this platform's full track" line on the track tooltips,
   // which the chips dropped: every hover said the same thing, and it said it
   // about a gesture the user had not made yet.
   const selectedTrajectoryRef = useRef(selectedTrajectory);
-  selectedTrajectoryRef.current = selectedTrajectory;
 
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null);
@@ -1217,7 +1214,6 @@ export default function CreateMap({
       );
     }
   }
-  setColorStopsRef.current = setColorStops;
 
   // Whether queryRenderedFeatures can still answer "what is on screen". It
   // builds the region it searches by unprojecting the viewport corners, and in
@@ -1849,21 +1845,32 @@ export default function CreateMap({
   // Latest map query, readable from the map 'load' closure (which would
   // otherwise build its tile URLs from the query as of the first render).
   const mapQueryRef = useRef(mapQueryString);
-  mapQueryRef.current = mapQueryString;
 
   // The one click listener is registered once, in the map-creation effect, so
   // it must not close over the first render's setter — read it through a ref.
   // (Selecting a trajectory used to need the same treatment, for the track
   // click handler; the card does that itself now, straight from the provider.)
   const onFeatureQueryRef = useRef(onFeatureQuery);
-  onFeatureQueryRef.current = onFeatureQuery;
   // Consumed once by the mount effect; a ref rather than the prop so replaying
   // it can't be re-triggered by a later render.
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
   const onMarkerClickRef = useRef(onMarkerClick);
-  onMarkerClickRef.current = onMarkerClick;
   const onTrackClickRef = useRef(onTrackClick);
-  onTrackClickRef.current = onTrackClick;
+
+  // The latest-value refs above, for the handlers registered once on mount.
+  // Written after commit rather than during render, so a render React throws
+  // away never leaks into them. Layout effects run before every effect and map
+  // event that reads them, so no reader sees an older value than before.
+  useLayoutEffect(() => {
+    rangeLevelsRef.current = rangeLevels;
+    onViewportHexRangeRef.current = onViewportHexRange;
+    selectedTrajectoryRef.current = selectedTrajectory;
+    setColorStopsRef.current = setColorStops;
+    mapQueryRef.current = mapQueryString;
+    onFeatureQueryRef.current = onFeatureQuery;
+    onMarkerClickRef.current = onMarkerClick;
+    onTrackClickRef.current = onTrackClick;
+  });
 
   // The filter query and the data-layer selection combine into one suffix
   // shared by both source URLs — see buildTileSuffix. The two routes split the
