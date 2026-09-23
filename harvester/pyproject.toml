@@ -28,11 +28,8 @@ dependencies = [
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
-# cde_db_loader is a deprecated thin shim over cde_harvester.loading, kept so
-# `python -m cde_db_loader` survives one deploy cycle. Drop it from here when
-# the shim is deleted.
 [tool.hatch.build.targets.wheel]
-packages = ["cde_harvester", "cde_db_loader"]
+packages = ["cde_harvester"]
 
 [dependency-groups]
 dev = [
