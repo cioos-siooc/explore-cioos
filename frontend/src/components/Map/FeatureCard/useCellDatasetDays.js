@@ -32,8 +32,9 @@ const EMPTY = new Map();
 const MAX_CACHED_RESPONSES = 30;
 
 export default function useCellDatasetDays(query, combinedQueries, dataLayers) {
-  // Answers keyed by url. State rather than a ref because it is read during
-  // render: a url already answered renders its figures on the first pass.
+  // Answers keyed by url (space-joined when a click takes two). State rather
+  // than a ref because it is read during render: a url already answered
+  // renders its figures on the first pass.
   const [answers, setAnswers] = useState(EMPTY);
 
   const buckets = query?.buckets;
@@ -43,19 +44,33 @@ export default function useCellDatasetDays(query, combinedQueries, dataLayers) {
   // A marker-click query carries no items and no buckets (see Map.jsx's
   // handleMapClick): it opens the dataset page directly and the card has
   // nothing to list, so there is nothing to ask about either.
+  //
+  // The markers inside a clicked coverage hex are profiles, which only the
+  // main source has, while the hex itself is asked of `cells` — so that click
+  // takes one request per source. At any other zoom a click hits hexes or
+  // markers, never both, and this is a single request as before.
   let url = null;
   if (hexes || points) {
     // buildTileSuffix is what the tile layers themselves are requested with,
     // so the metric and the layer switches cannot drift from the tile this is
     // describing — the whole point of asking the same question of the API.
-    const params = new URLSearchParams(
-      buildTileSuffix(combinedQueries, dataLayers).replace(/^\?/, ""),
+    const suffix = buildTileSuffix(combinedQueries, dataLayers).replace(
+      /^\?/,
+      "",
     );
-    params.set("z", buckets.z);
-    params.set("source", buckets.source || "main");
-    if (hexes) params.set("hexes", hexes);
-    if (points) params.set("points", points);
-    url = `${server}/tiles/datasets?${params.toString()}`;
+    const urlFor = (source, key, pks) => {
+      const params = new URLSearchParams(suffix);
+      params.set("z", buckets.z);
+      params.set("source", source);
+      params.set(key, pks);
+      return `${server}/tiles/datasets?${params.toString()}`;
+    };
+    url = [
+      hexes && urlFor(buckets.source || "main", "hexes", hexes),
+      points && urlFor("main", "points", points),
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   useEffect(() => {
@@ -72,12 +87,17 @@ export default function useCellDatasetDays(query, combinedQueries, dataLayers) {
         return next;
       });
 
-    fetch(url, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-      })
-      .then((rows) => remember(new Map(rows.map((row) => [row.pk, row.count]))))
+    Promise.all(
+      url.split(" ").map((part) =>
+        fetch(part, { signal: controller.signal }).then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json();
+        }),
+      ),
+    )
+      .then((responses) =>
+        remember(new Map(responses.flat().map((row) => [row.pk, row.count]))),
+      )
       .catch((error) => {
         if (error.name === "AbortError") return;
         reportError("tiles/datasets fetch failed", error);

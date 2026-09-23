@@ -129,6 +129,11 @@ CREATE TABLE datasets (
               coverage_lon_max, LEAST(GREATEST(coverage_lat_max, -85.06), 85.06))),
             4326), 3857)
       END) STORED,
+    -- Union of every feature's day set, merged into disjoint ranges, so the
+    -- datasets list can show and sort by days of data without unioning
+    -- hundreds of thousands of feature ranges per request. Rebuilt after each
+    -- load by refresh_dataset_day_ranges() (5_profile_process.sql).
+    day_ranges daterange[],
     UNIQUE(dataset_id, erddap_url)
 );
 

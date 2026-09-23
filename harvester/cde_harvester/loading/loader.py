@@ -970,6 +970,11 @@ def main(folder, incremental=False):
                 logger.info("Validating loaded data")
                 transaction.execute(text("SELECT validate_loaded_data();"))
 
+        # Both paths: the datasets list reads each dataset's merged day set
+        # from here rather than unioning feature ranges per request.
+        with _timed("refresh_dataset_day_ranges", logger):
+            transaction.execute(text("SELECT refresh_dataset_day_ranges();"))
+
         # Harvest audit: append-only. Same writes in both incremental and
         # full-reload paths since these tables are never truncated.
         if harvest_runs_df is not None and not harvest_runs_df.empty:
