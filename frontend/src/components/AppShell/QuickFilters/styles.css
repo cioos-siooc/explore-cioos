@@ -142,6 +142,63 @@
 }
 
 /* ------------------------------------------------------------------
+ * The Area control: one button whose menu picks box or polygon. The menu
+ * hangs where the caption sits, so the caption steps aside while it is open,
+ * and it stacks above the active-filter chips that follow in the top bar.
+ * ------------------------------------------------------------------ */
+.quickFilterArea {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.quickFilterArea.open .quickFilterCaption {
+  display: none;
+}
+
+.quickFilterAreaMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-md);
+}
+
+.quickFilterAreaItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.quickFilterAreaItem:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.quickFilterAreaItem.selected {
+  background-color: var(--cioos-teal-light);
+}
+
+.quickFilterAreaItem:focus-visible {
+  outline: none;
+  box-shadow: inset var(--cioos-focus);
+}
+
+/* ------------------------------------------------------------------
  * The search control: one circle that grows into a pill. The button is the
  * magnifier throughout — it opens the field while closed and submits it once
  * open — so the circle never moves as the field appears beside it.
@@ -221,7 +278,7 @@
 /* ------------------------------------------------------------------
  * Large screen with a mouse: the buttons' titles and hover say what each one
  * does, so a caption shows only for the button being pointed at (or focused
- * from the keyboard), and the row packs back together without the room six
+ * from the keyboard), and the row packs back together without the room five
  * standing captions needed. The label takes the line above instead of the
  * space beside.
  * ------------------------------------------------------------------ */
@@ -258,14 +315,13 @@
     align-self: center;
     max-width: calc(100vw - 16px);
 
-    /* Six 40px buttons at this pitch fill a 360px screen exactly, which caps
-       the captions' side padding (below) at what keeps the widest neighbours
-       (Recherche, Rectangle) from touching. */
+    /* Sized for six 40px buttons filling a 360px screen exactly; the five
+       left now fit with room to spare. */
     gap: 20px 19px;
     padding-bottom: 16px;
   }
 
-  /* No room beside the six buttons, and a line of its own is too high a price
+  /* No room beside the buttons, and a line of its own is too high a price
      for a heading the captions already spell out. Still names the group:
      aria-labelledby reads a hidden label. */
   .quickFiltersLabel {

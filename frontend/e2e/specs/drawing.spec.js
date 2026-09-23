@@ -12,17 +12,15 @@ test.describe("drawing an area with a mouse", () => {
   test("guides a box from its first corner to done", async ({ page }) => {
     await openApp(page);
     const hint = page.getByTestId("draw-hint");
-    await page.getByTestId("quick-filter-box").click();
+    await page.getByTestId("quick-filter-area").click();
+    await page.getByTestId("quick-filter-area-box").click();
     await expect(hint).toHaveText("Click one corner of the box.");
 
     await page.mouse.click(...(await mapPoint(page, -60, -40)));
     await expect(hint).toContainText("Click the opposite corner");
     await page.mouse.click(...(await mapPoint(page, 60, 40)));
     await expect(hint).toHaveText("Drag any corner to reshape it.");
-    await expect(page.getByTestId("quick-filter-box")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(page.getByTestId("quick-filter-area")).toHaveClass(/applied/);
     await expect(hint).toHaveCount(0, { timeout: 10_000 });
   });
 
@@ -31,7 +29,8 @@ test.describe("drawing an area with a mouse", () => {
   }) => {
     await openApp(page);
     const hint = page.getByTestId("draw-hint");
-    await page.getByTestId("quick-filter-polygon").click();
+    await page.getByTestId("quick-filter-area").click();
+    await page.getByTestId("quick-filter-area-polygon").click();
     await expect(hint).toHaveText("Click to place the polygon's first point.");
 
     await page.mouse.click(...(await mapPoint(page, -60, 40)));
@@ -42,25 +41,20 @@ test.describe("drawing an area with a mouse", () => {
 
     await page.keyboard.press("Enter");
     await expect(hint).toHaveText("Drag any corner to reshape it.");
-    await expect(page.getByTestId("quick-filter-polygon")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(page.getByTestId("quick-filter-area")).toHaveClass(/applied/);
   });
 
   test("closes a polygon on a double-click", async ({ page }) => {
     await openApp(page);
-    await page.getByTestId("quick-filter-polygon").click();
+    await page.getByTestId("quick-filter-area").click();
+    await page.getByTestId("quick-filter-area-polygon").click();
     await page.mouse.click(...(await mapPoint(page, -60, 40)));
     await page.mouse.click(...(await mapPoint(page, 0, -50)));
     await page.mouse.dblclick(...(await mapPoint(page, 60, 40)));
     await expect(page.getByTestId("draw-hint")).toHaveText(
       "Drag any corner to reshape it.",
     );
-    await expect(page.getByTestId("quick-filter-polygon")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(page.getByTestId("quick-filter-area")).toHaveClass(/applied/);
   });
 });
 
@@ -72,7 +66,8 @@ test.describe("drawing an area by touch", () => {
   }) => {
     await openApp(page);
     const hint = page.getByTestId("draw-hint");
-    await page.getByTestId("quick-filter-polygon").tap();
+    await page.getByTestId("quick-filter-area").tap();
+    await page.getByTestId("quick-filter-area-polygon").tap();
     await expect(hint).toHaveText("Tap to place the polygon's first point.");
 
     await page.touchscreen.tap(...(await mapPoint(page, -60, 40)));
@@ -89,9 +84,6 @@ test.describe("drawing an area by touch", () => {
     await page.touchscreen.tap(...last);
     await page.touchscreen.tap(...last);
     await expect(hint).toHaveText("Drag any corner to reshape it.");
-    await expect(page.getByTestId("quick-filter-polygon")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(page.getByTestId("quick-filter-area")).toHaveClass(/applied/);
   });
 });
