@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
@@ -33,13 +34,15 @@ describe("QuickFilters", () => {
   // the same one-shot requestDraw the map already answers. Both are asserted
   // through that shared state rather than through the markup.
   function renderRow(url = "/") {
-    const seen = { search: [], draw: [], onlyInView: [] };
+    const seen = { search: [], draw: [], onlyInView: [], realtimeOnly: [] };
     function Probe() {
       const { datasetTitleSearchText, onlyInView } = useSelection();
       const { drawRequest } = useMapState();
+      const { realtimeOnly } = useFilters();
       seen.search.push(datasetTitleSearchText);
       seen.draw.push(drawRequest?.mode);
       seen.onlyInView.push(onlyInView);
+      seen.realtimeOnly.push(realtimeOnly);
       return null;
     }
     const user = userEvent.setup({ delay: null });
@@ -215,19 +218,48 @@ describe("QuickFilters", () => {
     expect(button).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("toggles the real-time narrowing", async () => {
+    const { user, seen } = renderRow();
+    const button = screen.getByTestId("quick-filter-realtime");
+    expect(button).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(button);
+
+    await waitFor(() => expect(seen.realtimeOnly.at(-1)).toBe(true));
+    expect(button).toHaveAttribute("aria-pressed", "true");
+  });
+
+  // The param is only ever written when the toggle is on; an explicit false
+  // must read as "not filtering", not as a second state to show.
+  it.each([
+    ["true", "true"],
+    ["false", "false"],
+  ])("reads realtimeOnly=%s from the link", async (param, pressed) => {
+    renderRow(`/?realtimeOnly=${param}`);
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-filter-realtime")).toHaveAttribute(
+        "aria-pressed",
+        pressed,
+      ),
+    );
+  });
+
   it("offers no reset until something is set", () => {
     renderRow();
     expect(screen.queryByTestId("quick-filter-reset")).toBeNull();
   });
 
   it("drops every quick filter at once", async () => {
-    const { user, seen } = renderRow(`/?search=temperature&onlyInView=true`);
+    const { user, seen } = renderRow(
+      `/?search=temperature&onlyInView=true&realtimeOnly=true`,
+    );
 
     await user.click(screen.getByTestId("quick-filter-reset"));
 
     await waitFor(() => {
       expect(seen.search.at(-1)).toBe("");
       expect(seen.onlyInView.at(-1)).toBe(false);
+      expect(seen.realtimeOnly.at(-1)).toBe(false);
       expect(seen.draw.at(-1)).toBe("clear");
     });
   });

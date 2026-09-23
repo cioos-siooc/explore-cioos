@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowCounterclockwise,
   BoundingBox,
+  BroadcastPin,
   Eye,
   Pentagon,
   Search,
@@ -18,8 +19,8 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
 
-// The quick filters: the four that act on the map rather than on a list of
-// options, each one click, as round buttons floating under the top bar.
+// The quick filters: the one-click ones that act on the map or are a single
+// toggle rather than a list of options, as round buttons floating under the top bar.
 //
 // They used to be scattered — search and the two draw tools behind an unlabeled
 // caret on the Filters segment, "only in view" hidden inside the parentheses of
@@ -49,7 +50,7 @@ export default function QuickFilters() {
     setOnlyInView,
   } = useSelection();
   const activeFilterCount = useActiveFilters().length;
-  const { resetFilters } = useFilters();
+  const { resetFilters, realtimeOnly, setRealtimeOnly } = useFilters();
 
   const searchInputId = useId();
   const inputRef = useRef(null);
@@ -82,7 +83,8 @@ export default function QuickFilters() {
   const hasShape = Boolean(polygon);
   const boxActive = hasShape && polygonIsRectangle(polygon);
   const polygonActive = hasShape && !boxActive;
-  const anySet = hasShape || onlyInView || Boolean(datasetTitleSearchText);
+  const anySet =
+    hasShape || onlyInView || realtimeOnly || Boolean(datasetTitleSearchText);
 
   // Arming the tool that is already drawn is how its shape is cleared — the
   // same second-click-to-leave the other two buttons here have.
@@ -220,6 +222,17 @@ export default function QuickFilters() {
         aria-label={t("datasetsCardOnlyInViewText")}
       >
         <Eye size={18} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={classNames("quickFilterButton", { applied: realtimeOnly })}
+        data-testid="quick-filter-realtime"
+        onClick={() => setRealtimeOnly(!realtimeOnly)}
+        aria-pressed={realtimeOnly}
+        title={t("quickFilterRealtimeTitle")}
+        aria-label={t("realtimeFilterOptionText")}
+      >
+        <BroadcastPin size={18} aria-hidden="true" />
       </button>
       {/* One reset for everything this row and the chips below can set —
           quick filters and the modal ones alike — rather than two buttons
