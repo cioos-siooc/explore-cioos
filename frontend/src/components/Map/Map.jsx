@@ -80,13 +80,9 @@ import {
 } from "./hitTest.js";
 import { radiusExpression } from "./pointRadius.js";
 
-// direct_select's own dragVertex/toDisplayFeatures, captured once here at
-// module load — before the component below patches these modes on every
-// render (see the simple_select.toDisplayFeatures override further down).
-// Capturing the ORIGINAL library functions at module scope, rather than
-// inside the component, means each render's override always falls back to
-// true library behavior, not to the previous render's override — so
-// re-renders don't stack wrapper upon wrapper.
+// direct_select's own dragVertex/toDisplayFeatures, captured before the
+// overrides below replace them, so each override can fall back to true library
+// behavior.
 const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex;
 const defaultDirectSelectToDisplayFeatures =
   MapboxDraw.modes.direct_select.toDisplayFeatures;
@@ -101,6 +97,208 @@ function isRectangleFeature(feature) {
     Boolean(ring) && ring.length === 4 && polygonIsRectangle([...ring, ring[0]])
   );
 }
+
+// Suppresses vertex/midpoint handles for a merely-*selected* shape (one
+// click, still simple_select) — direct_select keeps its library-default
+// toDisplayFeatures, which is what draws those handles for dragging. A
+// second click on the selected shape (mapbox-gl-draw's own
+// clickOnFeature/clickOnVertex transitions) enters direct_select and
+// reveals them. The vertex/midpoint layer styles below are already scoped
+// to `!= mode simple_select` for exactly this split.
+const disabledEvent = function (state, geojson, display) {
+  display(geojson);
+};
+
+const modes = MapboxDraw.modes;
+MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
+
+// A drawn bounding box must stay an axis-aligned rectangle while it's being
+// edited: dragging the whole shape already preserves that (translation),
+// but the library's default dragVertex moves only the one dragged corner,
+// which would let it warp into an arbitrary quadrilateral. For a
+// rectangle's single-corner drags, also slide its two ring-adjacent
+// corners along the axis they already share with it (the one on the same
+// old X gets the new X, the one on the same old Y gets the new Y), leaving
+// the opposite corner as the resize anchor. Anything else — a polygon, or
+// more than one selected vertex — keeps the library's own behavior.
+modes.direct_select.dragVertex = function (state, e, delta) {
+  const path = state.selectedCoordPaths[0];
+  if (
+    state.selectedCoordPaths.length !== 1 ||
+    !isRectangleFeature(state.feature)
+  ) {
+    defaultDragVertex.call(this, state, e, delta);
+    return;
+  }
+  const [ringIndex, index] = path.split(".").map((x) => parseInt(x, 10));
+  const oldCoord = state.feature.getCoordinate(path);
+  const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat];
+  [(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
+    const neighborPath = `${ringIndex}.${neighborIndex}`;
+    const neighborOld = state.feature.getCoordinate(neighborPath);
+    if (neighborOld[0] === oldCoord[0]) {
+      state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1]);
+    } else {
+      state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1]);
+    }
+  });
+  state.feature.updateCoordinate(path, newCoord[0], newCoord[1]);
+};
+
+// Dragging the body of a drawn shape (as opposed to one of its corner/
+// midpoint handles) defaults to translating the whole thing — disable
+// that so a spatial filter can only be resized from its handles, never
+// moved wholesale. Still track dragMoveLocation so a later handle-drag in
+// the same gesture doesn't jump using a stale reference point.
+modes.direct_select.dragFeature = function (state, e) {
+  state.dragMoveLocation = e.lngLat;
+};
+
+// A midpoint handle lets a user add a 5th vertex, which would permanently
+// break a rectangle's "always 4 corners" invariant — so suppress midpoint
+// handles specifically while editing a rectangle. Free-form polygons keep
+// their midpoints, so vertices can still be added to those as before.
+modes.direct_select.toDisplayFeatures = function (state, geojson, push) {
+  if (
+    state.featureId === geojson.properties.id &&
+    isRectangleFeature(state.feature)
+  ) {
+    defaultDirectSelectToDisplayFeatures.call(
+      this,
+      state,
+      geojson,
+      (feature) => {
+        if (feature.properties?.meta === "midpoint") return;
+        push(feature);
+      },
+    );
+    return;
+  }
+  defaultDirectSelectToDisplayFeatures.call(this, state, geojson, push);
+};
+
+// A drawn shape should always render "active" (yellow, with drag handles)
+// rather than dropping back to simple_select's plain/blue look. The
+// library's own clickNoTarget/clickInactive (clicking empty water, or a
+// second inactive feature, while editing) exit to simple_select — reuse
+// its clickActiveFeature instead, which just clears any selected vertex
+// and stays in direct_select.
+modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature;
+modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature;
+
+modes.draw_rectangle = DrawRectangle;
+
+const drawControlOptions = {
+  displayControlsDefault: false,
+  // No buttons of its own: draw_rectangle/draw_polygon/simple_select are
+  // driven imperatively from the top bar's spatial filter button (see the
+  // drawRequest effect), not by clicking a control here.
+  controls: {
+    point: false,
+    line_string: false,
+    polygon: false,
+    trash: false,
+    combine_features: false,
+    uncombine_features: false,
+    modes,
+    pitchWithRotate: false,
+    dragRotate: false,
+    touchZoomRotate: false,
+  },
+  styles: [
+    {
+      id: "gl-draw-polygon-fill",
+      type: "fill",
+      filter: ["all", ["==", "$type", "Polygon"]],
+      paint: {
+        "fill-color": [
+          "case",
+          ["==", ["get", "active"], "true"],
+          "#fbb03b",
+          "#3bb2d0",
+        ],
+        "fill-opacity": 0.1,
+      },
+    },
+    {
+      id: "gl-draw-lines",
+      type: "line",
+      filter: [
+        "any",
+        ["==", "$type", "LineString"],
+        ["==", "$type", "Polygon"],
+      ],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": [
+          "case",
+          ["==", ["get", "active"], "true"],
+          "#fbb03b",
+          "#3bb2d0",
+        ],
+        "line-dasharray": ["literal", [0.2, 2]],
+        "line-width": 2,
+      },
+    },
+    {
+      id: "gl-draw-point-outer",
+      type: "circle",
+      filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
+        "circle-color": "#fff",
+      },
+    },
+    {
+      id: "gl-draw-point-inner",
+      type: "circle",
+      filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
+        "circle-color": [
+          "case",
+          ["==", ["get", "active"], "true"],
+          "#fbb03b",
+          "#3bb2d0",
+        ],
+      },
+    },
+    {
+      id: "gl-draw-vertex-outer",
+      type: "circle",
+      filter: [
+        "all",
+        ["==", "$type", "Point"],
+        ["==", "meta", "vertex"],
+        ["!=", "mode", "simple_select"],
+      ],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
+        "circle-color": "#fff",
+      },
+    },
+    {
+      id: "gl-draw-vertex-inner",
+      type: "circle",
+      filter: [
+        "all",
+        ["==", "$type", "Point"],
+        ["==", "meta", "vertex"],
+        ["!=", "mode", "simple_select"],
+      ],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
+        "circle-color": "#fbb03b",
+      },
+    },
+    {
+      id: "gl-draw-midpoint",
+      type: "circle",
+      filter: ["all", ["==", "meta", "midpoint"]],
+      paint: { "circle-radius": 3, "circle-color": "#fbb03b" },
+    },
+  ],
+};
 
 // --- Viewport-adaptive hex ramp knobs ------------------------------------
 // How long the camera has to hold still before the visible hexes are measured.
@@ -351,215 +549,6 @@ export default function CreateMap({
   const creatingPolygon = useRef(false);
   const shiftBoxCreate = useRef(false);
 
-  // Suppresses vertex/midpoint handles for a merely-*selected* shape (one
-  // click, still simple_select) — direct_select keeps its library-default
-  // toDisplayFeatures, which is what draws those handles for dragging. A
-  // second click on the selected shape (mapbox-gl-draw's own
-  // clickOnFeature/clickOnVertex transitions) enters direct_select and
-  // reveals them. The vertex/midpoint layer styles below are already scoped
-  // to `!= mode simple_select` for exactly this split.
-  const disabledEvent = function (state, geojson, display) {
-    display(geojson);
-  };
-
-  const modes = MapboxDraw.modes;
-  MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
-
-  // A drawn bounding box must stay an axis-aligned rectangle while it's being
-  // edited: dragging the whole shape already preserves that (translation),
-  // but the library's default dragVertex moves only the one dragged corner,
-  // which would let it warp into an arbitrary quadrilateral. For a
-  // rectangle's single-corner drags, also slide its two ring-adjacent
-  // corners along the axis they already share with it (the one on the same
-  // old X gets the new X, the one on the same old Y gets the new Y), leaving
-  // the opposite corner as the resize anchor. Anything else — a polygon, or
-  // more than one selected vertex — keeps the library's own behavior.
-  modes.direct_select.dragVertex = function (state, e, delta) {
-    const path = state.selectedCoordPaths[0];
-    if (
-      state.selectedCoordPaths.length !== 1 ||
-      !isRectangleFeature(state.feature)
-    ) {
-      defaultDragVertex.call(this, state, e, delta);
-      return;
-    }
-    const [ringIndex, index] = path.split(".").map((x) => parseInt(x, 10));
-    const oldCoord = state.feature.getCoordinate(path);
-    const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat];
-    [(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
-      const neighborPath = `${ringIndex}.${neighborIndex}`;
-      const neighborOld = state.feature.getCoordinate(neighborPath);
-      if (neighborOld[0] === oldCoord[0]) {
-        state.feature.updateCoordinate(
-          neighborPath,
-          newCoord[0],
-          neighborOld[1],
-        );
-      } else {
-        state.feature.updateCoordinate(
-          neighborPath,
-          neighborOld[0],
-          newCoord[1],
-        );
-      }
-    });
-    state.feature.updateCoordinate(path, newCoord[0], newCoord[1]);
-  };
-
-  // Dragging the body of a drawn shape (as opposed to one of its corner/
-  // midpoint handles) defaults to translating the whole thing — disable
-  // that so a spatial filter can only be resized from its handles, never
-  // moved wholesale. Still track dragMoveLocation so a later handle-drag in
-  // the same gesture doesn't jump using a stale reference point.
-  modes.direct_select.dragFeature = function (state, e) {
-    state.dragMoveLocation = e.lngLat;
-  };
-
-  // A midpoint handle lets a user add a 5th vertex, which would permanently
-  // break a rectangle's "always 4 corners" invariant — so suppress midpoint
-  // handles specifically while editing a rectangle. Free-form polygons keep
-  // their midpoints, so vertices can still be added to those as before.
-  modes.direct_select.toDisplayFeatures = function (state, geojson, push) {
-    if (
-      state.featureId === geojson.properties.id &&
-      isRectangleFeature(state.feature)
-    ) {
-      defaultDirectSelectToDisplayFeatures.call(
-        this,
-        state,
-        geojson,
-        (feature) => {
-          if (feature.properties?.meta === "midpoint") return;
-          push(feature);
-        },
-      );
-      return;
-    }
-    defaultDirectSelectToDisplayFeatures.call(this, state, geojson, push);
-  };
-
-  // A drawn shape should always render "active" (yellow, with drag handles)
-  // rather than dropping back to simple_select's plain/blue look. The
-  // library's own clickNoTarget/clickInactive (clicking empty water, or a
-  // second inactive feature, while editing) exit to simple_select — reuse
-  // its clickActiveFeature instead, which just clears any selected vertex
-  // and stays in direct_select.
-  modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature;
-  modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature;
-
-  modes.draw_rectangle = DrawRectangle;
-
-  const drawControlOptions = {
-    displayControlsDefault: false,
-    // No buttons of its own: draw_rectangle/draw_polygon/simple_select are
-    // driven imperatively from the top bar's spatial filter button (see the
-    // drawRequest effect), not by clicking a control here.
-    controls: {
-      point: false,
-      line_string: false,
-      polygon: false,
-      trash: false,
-      combine_features: false,
-      uncombine_features: false,
-      modes,
-      pitchWithRotate: false,
-      dragRotate: false,
-      touchZoomRotate: false,
-    },
-    styles: [
-      {
-        id: "gl-draw-polygon-fill",
-        type: "fill",
-        filter: ["all", ["==", "$type", "Polygon"]],
-        paint: {
-          "fill-color": [
-            "case",
-            ["==", ["get", "active"], "true"],
-            "#fbb03b",
-            "#3bb2d0",
-          ],
-          "fill-opacity": 0.1,
-        },
-      },
-      {
-        id: "gl-draw-lines",
-        type: "line",
-        filter: [
-          "any",
-          ["==", "$type", "LineString"],
-          ["==", "$type", "Polygon"],
-        ],
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": [
-            "case",
-            ["==", ["get", "active"], "true"],
-            "#fbb03b",
-            "#3bb2d0",
-          ],
-          "line-dasharray": ["literal", [0.2, 2]],
-          "line-width": 2,
-        },
-      },
-      {
-        id: "gl-draw-point-outer",
-        type: "circle",
-        filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
-          "circle-color": "#fff",
-        },
-      },
-      {
-        id: "gl-draw-point-inner",
-        type: "circle",
-        filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
-          "circle-color": [
-            "case",
-            ["==", ["get", "active"], "true"],
-            "#fbb03b",
-            "#3bb2d0",
-          ],
-        },
-      },
-      {
-        id: "gl-draw-vertex-outer",
-        type: "circle",
-        filter: [
-          "all",
-          ["==", "$type", "Point"],
-          ["==", "meta", "vertex"],
-          ["!=", "mode", "simple_select"],
-        ],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
-          "circle-color": "#fff",
-        },
-      },
-      {
-        id: "gl-draw-vertex-inner",
-        type: "circle",
-        filter: [
-          "all",
-          ["==", "$type", "Point"],
-          ["==", "meta", "vertex"],
-          ["!=", "mode", "simple_select"],
-        ],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
-          "circle-color": "#fbb03b",
-        },
-      },
-      {
-        id: "gl-draw-midpoint",
-        type: "circle",
-        filter: ["all", ["==", "meta", "midpoint"]],
-        paint: { "circle-radius": 3, "circle-color": "#fbb03b" },
-      },
-    ],
-  };
   const circleOpacity = 0.7;
   // The transparency at the world view, and the only thing letting the basemap
   // through: the hex colours themselves are opaque. It lets it through equally
@@ -604,7 +593,7 @@ export default function CreateMap({
     [hexMinZoom, hexOpacity],
     [hexMaxZoom, COVERAGE_HEX_OPACITY_STOPS[0][1]],
   ];
-  const draw = new MapboxDraw(drawControlOptions);
+  const [draw] = useState(() => new MapboxDraw(drawControlOptions));
   const drawPolygon = useRef(draw);
   const doFinalCheck = useRef(false);
   const layersLoaded = useRef(false);
@@ -942,13 +931,16 @@ export default function CreateMap({
   // The hover chip. Its own class so the frame-stripping in styles.css is
   // scoped to this popup rather than to every MapLibre popup there might ever
   // be. offset lifts it clear of the cursor and of the marker it names.
-  const popup = new Popup({
-    closeButton: false,
-    closeOnClick: true,
-    className: "mapChipPopup",
-    offset: 10,
-    maxWidth: "260px",
-  });
+  const [popup] = useState(
+    () =>
+      new Popup({
+        closeButton: false,
+        closeOnClick: true,
+        className: "mapChipPopup",
+        offset: 10,
+        maxWidth: "260px",
+      }),
+  );
 
   const colors = ["match", ["get", "platform"]];
   platformColors.reduce((accumulatedPlatformColors, platformColor) => {
@@ -1694,6 +1686,10 @@ export default function CreateMap({
   // so the debounced moveend handler always clips with the current polygon.
   function renderWmsImage(overlay) {
     if (!map.current) return;
+    // Every render supersedes the last, not just an overlay removal: a GetMap
+    // for an earlier pan that resolves after a newer one would otherwise paint
+    // its stale bounds over the current view.
+    const token = ++wmsRenderToken.current;
     const viewportBounds = clampBoundsForWms(map.current.getBounds());
     if (
       viewportBounds.south >= viewportBounds.north ||
@@ -1729,7 +1725,6 @@ export default function CreateMap({
       time: overlay.time,
       elevation: overlay.elevation,
     });
-    const token = wmsRenderToken.current;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
