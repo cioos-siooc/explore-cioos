@@ -350,13 +350,13 @@
 
 /* ------------------------------------------------------------------
  * Phones. The filters surface is full-screen here, so everything in it
- * is a touch target rather than a pointer target: 44px minimum, and the
+ * is a touch target rather than a pointer target: 36-40px, and the
  * typed fields at least 16px, below which Safari zooms the whole page in
  * when one takes focus.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
   .filterSearch {
-    min-height: 44px;
+    min-height: 40px;
 
     /* Deliberately not a --cioos-font-size-* token: this is iOS's zoom
        threshold, not a step on the type scale, and must not move with it. */
@@ -364,17 +364,17 @@
   }
 
   .clearFilter {
-    width: 44px;
+    width: 40px;
   }
 
   .filterOptionsActions button {
-    min-height: 44px;
-    padding: 0 18px;
-    margin: 4px 4px 0 0;
+    min-height: 36px;
+    padding: 0 14px;
+    margin: 2px 4px 0 0;
   }
 
   .filterOptionsActions .filterInfoButton {
-    height: 44px;
+    height: 36px;
   }
 
   /* The 130px name column plus a field beside it does not fit a 360px screen
@@ -393,13 +393,13 @@
   .filterRangeSelector .filterRangeInput {
     width: 100%;
     flex-basis: auto;
-    min-height: 44px;
+    min-height: 40px;
     font-size: 16px;
   }
 
   .inViewFilterToggle {
     align-items: center;
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .inViewFilterToggle input {

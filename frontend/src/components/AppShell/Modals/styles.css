@@ -387,8 +387,11 @@
   }
 
   /* Same phone type scale as the datasets sheet (Sidebar/styles.css), so the
-     two full-screen surfaces read alike. */
+     two full-screen surfaces read alike. The font-size re-applies the base
+     here: text without its own size inherits body's, which was computed from
+     the phone base before these tokens were overridden. */
   .filtersModal {
+    font-size: var(--cioos-font-size-base);
     --cioos-font-size-3xs: 9px;
     --cioos-font-size-2xs: 10px;
     --cioos-font-size-xs: 11px;
