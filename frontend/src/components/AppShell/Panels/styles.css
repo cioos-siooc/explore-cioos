@@ -523,15 +523,15 @@
     display: none;
   }
 
-  /* Touch targets: a notch taller than the pointer-sized rows, but short of
-     the 44px guideline so more of each list fits on the screen. */
+  /* Touch targets: 44px is the floor on a phone. The padding stays tight so
+     the rows sit at that floor rather than above it. */
   .filtersPanelList .filterHeader {
-    min-height: 40px;
+    min-height: 44px;
     padding: 2px 8px;
   }
 
   .filtersPanel .filterOptionsBody .optionButton {
-    min-height: 36px;
+    min-height: 44px;
     padding: 6px 8px;
     margin: 0;
   }
@@ -547,7 +547,7 @@
   }
 
   .filtersPanelReset {
-    min-height: 36px;
+    min-height: 44px;
     padding: 0 14px;
   }
 
