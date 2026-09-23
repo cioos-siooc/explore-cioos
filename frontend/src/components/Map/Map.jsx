@@ -1138,7 +1138,7 @@ export default function CreateMap({
   // as the tail of the movement. So they all take the snap without the wait.
   const NO_TRANSITION = { duration: 0 };
 
-  // The four layers that draw the same point features, and the halo's extra
+  // The layers that draw the same point features, and the halo's extra
   // radius. They share one paint, so a radius change has to reach all of them
   // or the halo/highlight desync from the markers they sit under.
   // click-highlight-point rides along so the outline the "what's here" card
@@ -1147,7 +1147,6 @@ export default function CreateMap({
     ["points", 0],
     ["points-halo", 1.25],
     ["points-highlighted", 0],
-    ["points-hovered", 0],
     ["click-highlight-point", 0],
     ["click-highlight-point-glow", 6],
   ];
