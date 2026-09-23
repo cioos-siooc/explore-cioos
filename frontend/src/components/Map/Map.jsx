@@ -19,6 +19,7 @@ import "./styles.css";
 
 import { server } from "../../config";
 import reportError from "../../state/reportError.js";
+import fetchJson from "../../state/fetchJson.js";
 import {
   boundsFromGeoJson,
   escapeHtml,
@@ -323,6 +324,7 @@ export default function CreateMap({
   scrubTime,
   trailingDays,
   selectedTrajectory,
+  mappedRecord,
   dataLayers,
   griddapCoverage,
   dataLayersVisible = true,
@@ -2344,6 +2346,64 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrajectory, mapQueryString]);
 
+  // The record "Show on map" picked: fetch where it was sampled, ring it, and
+  // frame it when asked to — the same round trip the selected track makes,
+  // for a profile or time series.
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    async function renderMappedRecord() {
+      if (!map.current) return;
+      // Same wait as the selected track's: a share link resolves before the
+      // style has added the source.
+      const source = map.current.getSource("mapped-record");
+      if (!source) {
+        map.current.once("load", renderMappedRecord);
+        return;
+      }
+      source.setData(emptyFeatureCollection);
+      if (!mappedRecord) return;
+
+      const { datasetPk, recordId, frameView } = mappedRecord;
+      let coordinates;
+      try {
+        ({ coordinates } = await fetchJson(
+          `${server}/datasetRecordsList/location?datasetPKs=${datasetPk}&recordId=${encodeURIComponent(recordId)}`,
+          { signal: abortController.signal },
+        ));
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          reportError("record location fetch failed", error);
+        }
+        return;
+      }
+      if (!coordinates.length) return;
+      source.setData({
+        type: "FeatureCollection",
+        features: coordinates.map((coordinate) => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: coordinate },
+          properties: {},
+        })),
+      });
+      if (!frameView) return;
+      const longitudes = coordinates.map((c) => c[0]);
+      const latitudes = coordinates.map((c) => c[1]);
+      map.current.fitBounds(
+        [
+          [Math.min(...longitudes), Math.min(...latitudes)],
+          [Math.max(...longitudes), Math.max(...latitudes)],
+        ],
+        zoomToDatasetCamera(),
+      );
+    }
+    renderMappedRecord();
+    return () => {
+      abortController.abort();
+      map.current?.off("load", renderMappedRecord);
+    };
+  }, [mappedRecord]);
+
   const mapZoom = searchParams.get("zoom");
   const mapLongitude = searchParams.get("lon");
   const mapLatitude = searchParams.get("lat");
@@ -2812,6 +2872,37 @@ export default function CreateMap({
           "circle-color": "rgba(0, 0, 0, 0)",
           "circle-stroke-color": "#000000",
           "circle-stroke-width": 1.5,
+        },
+      });
+
+      // The record "Show on map" picked on the dataset page, ringed in the
+      // same goldenrod as the card that asked for it. A fixed size rather than
+      // the marker's own ramp: the record's feature carries no `count`, and a
+      // ring a little wider than any marker reads as around it either way.
+      map.current.addSource("mapped-record", {
+        type: "geojson",
+        data: emptyFeatureCollection,
+      });
+      map.current.addLayer({
+        id: "mapped-record-glow",
+        type: "circle",
+        source: "mapped-record",
+        paint: {
+          "circle-radius": 16,
+          "circle-color": clickHighlightColor,
+          "circle-blur": 0.8,
+          "circle-opacity": 0.85,
+        },
+      });
+      map.current.addLayer({
+        id: "mapped-record-ring",
+        type: "circle",
+        source: "mapped-record",
+        paint: {
+          "circle-radius": 11,
+          "circle-color": "rgba(0, 0, 0, 0)",
+          "circle-stroke-color": clickHighlightColor,
+          "circle-stroke-width": 3,
         },
       });
 

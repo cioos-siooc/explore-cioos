@@ -99,41 +99,6 @@
   color: var(--cioos-ink);
 }
 
-.datasetsTableSearchWrap {
-  flex: 1 1 110px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  padding: 0 8px;
-  margin: 0;
-  background-color: var(--cioos-white);
-  color: var(--cioos-ink-40);
-  cursor: text;
-}
-
-.datasetsTableSearchWrap:focus-within {
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
-.datasetsTableSearchWrap svg {
-  flex: 0 0 auto;
-}
-
-.datasetsTableSearch {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: none;
-  padding: 4px 0;
-  font-size: var(--cioos-font-size-xs);
-  outline: none;
-  background: transparent;
-  color: var(--cioos-ink);
-}
-
 /* The download modal's sort and format pickers. */
 .datasetsCardArrange {
   display: flex;

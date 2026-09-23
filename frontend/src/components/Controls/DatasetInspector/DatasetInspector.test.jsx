@@ -1,12 +1,13 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetInspector from "./DatasetInspector.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
 // pk 2337 / "Chicago Park District" / "mooring" come from the catalog fixtures
 // (e2e/fixtures/api/datasets.json, organizations.json, platforms.json) that
@@ -33,20 +34,34 @@ const DATASET = {
   ckan_url: null,
 };
 
-function Harness({ returnToList = () => {}, dataset = DATASET }) {
+function Harness({
+  returnToList = () => {},
+  dataset = DATASET,
+  setInspectRecordID = () => {},
+}) {
   const { catalogLoaded } = useFilters();
   const { showDownloadModal } = useUI();
+  const [selectedTrajectory, setSelectedTrajectory] = React.useState();
+  const { mappedRecord } = useSelection();
   if (!catalogLoaded) return <span data-testid="state">loading</span>;
 
   return (
     <>
       <span data-testid="state">loaded</span>
       <span data-testid="download-modal-open">{String(showDownloadModal)}</span>
+      <span data-testid="mapped-record">
+        {mappedRecord?.recordId ?? "none"}
+      </span>
+      <span data-testid="drawn-track">
+        {selectedTrajectory?.trajectoryId ?? "none"}
+      </span>
       <DatasetInspector
         dataset={dataset}
         returnToList={returnToList}
         setHoveredDataset={() => {}}
-        setInspectRecordID={() => {}}
+        setInspectRecordID={setInspectRecordID}
+        selectedTrajectory={selectedTrajectory}
+        setSelectedTrajectory={setSelectedTrajectory}
         query={{}}
         activeWmsOverlay={undefined}
         setActiveWmsOverlay={() => {}}
@@ -160,5 +175,97 @@ describe("DatasetInspector", () => {
     await user.click(screen.getByPlaceholderText("Search table"));
     await user.keyboard("{Backspace}");
     expect(returnToList).not.toHaveBeenCalled();
+  });
+
+  describe("a trajectory dataset", () => {
+    const TRAJECTORY_DATASET = {
+      ...DATASET,
+      cdm_data_type: "Trajectory",
+      trajectory_id_variable: "cruise",
+    };
+
+    beforeEach(() => {
+      const fixtureFetch = globalThis.fetch;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input) => {
+          if (!String(input).includes("/datasetRecordsList")) {
+            return fixtureFetch(input);
+          }
+          return new Response(
+            JSON.stringify({
+              profiles: [
+                { profile_id: "cruise-a", time_min: "2020-01-01T00:00:00Z" },
+                { profile_id: "cruise-b", time_min: "2021-01-01T00:00:00Z" },
+              ],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }),
+      );
+    });
+
+    it("lists its trajectories once, as the record list", async () => {
+      await renderReady({ dataset: TRAJECTORY_DATASET });
+      await screen.findByText("cruise-a");
+      expect(document.querySelectorAll(".recordSection")).toHaveLength(1);
+      expect(screen.getAllByText("cruise-b")).toHaveLength(1);
+    });
+
+    it("Show on map draws that trajectory's track, and clears it again, without opening the preview", async () => {
+      const setInspectRecordID = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        setInspectRecordID,
+      });
+      const card = (await screen.findByText("cruise-b")).closest(".listCard");
+      const show = within(card).getByRole("button", { name: /Show on map/ });
+
+      await user.click(show);
+      expect(screen.getByTestId("drawn-track")).toHaveTextContent("cruise-b");
+      expect(show).toHaveAttribute("aria-pressed", "true");
+      expect(card).toHaveClass("selected");
+
+      await user.click(show);
+      expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
+      expect(setInspectRecordID).not.toHaveBeenCalled();
+    });
+
+    it("clicking the card itself opens its preview", async () => {
+      const setInspectRecordID = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        setInspectRecordID,
+      });
+      await user.click(await screen.findByText("cruise-a"));
+      expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a");
+      expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
+    });
+  });
+
+  it("Show on map on a time-series record rings it on the map, and clears it again", async () => {
+    const fixtureFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input) =>
+        String(input).includes("/datasetRecordsList?")
+          ? new Response(
+              JSON.stringify({ profiles: [{ profile_id: "station-7" }] }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            )
+          : fixtureFetch(input),
+      ),
+    );
+    const { user } = await renderReady();
+    const card = (await screen.findByText("station-7")).closest(".listCard");
+    const show = within(card).getByRole("button", { name: /Show on map/ });
+
+    await user.click(show);
+    expect(screen.getByTestId("mapped-record")).toHaveTextContent("station-7");
+    expect(show).toHaveAttribute("aria-pressed", "true");
+    expect(card).toHaveClass("selected");
+
+    await user.click(show);
+    expect(screen.getByTestId("mapped-record")).toHaveTextContent("none");
   });
 });

@@ -11,7 +11,6 @@ import {
   Check2Circle,
   Eye,
   EyeSlash,
-  Search,
   XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -34,6 +33,7 @@ import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
+import TableFilter from "../../ui/TableFilter.jsx";
 import "./styles.css";
 
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
@@ -382,17 +382,11 @@ export default function DatasetsTable({
         // Search, sort and grouping on one row: every row spent here is a
         // dataset card the sidebar does not show.
         <div className="datasetsCardToolbar">
-          <label className="datasetsTableSearchWrap">
-            <Search size={13} aria-hidden="true" />
-            <input
-              className="datasetsTableSearch"
-              type="search"
-              value={searchText}
-              placeholder={t("datasetsListSearchPlaceholder")}
-              aria-label={t("datasetsListSearchPlaceholder")}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
-          </label>
+          <TableFilter
+            value={searchText}
+            onChange={setSearchText}
+            placeholder={t("datasetsListSearchPlaceholder")}
+          />
           {sortControl}
           <SelectPill
             label={t("datasetsCardGroupByLabel")}

@@ -5,6 +5,8 @@ import {
   CheckCircleFill,
   Download,
   FileEarmarkText,
+  PinMap,
+  PinMapFill,
 } from "react-bootstrap-icons";
 // import platformColors from '../../platformColors'
 import Loading from "../Loading/Loading.jsx";
@@ -117,9 +119,8 @@ function IdCaption({ label, variable }) {
 // down the sheet.
 const EOV_VISIBLE_LIMIT = 3;
 
-// Stable identities so CardList's sort memo is not rebuilt on every render of
+// Stable identity so CardList's sort memo is not rebuilt on every render of
 // this page.
-const trajectoryKeyOf = (row) => row.trajectory_id;
 const recordKeyOf = (row) => row.profile_id;
 
 export default function DatasetInspector({
@@ -143,7 +144,8 @@ export default function DatasetInspector({
   const { t, i18n } = useTranslation();
   const { zoomToDataset } = useZoomToDataset();
   const { eovsSelected } = useFilters();
-  const { handleSelectDataset, selectedPks } = useSelection();
+  const { handleSelectDataset, selectedPks, mappedRecord, setMappedRecord } =
+    useSelection();
   const { setShowDownloadModal } = useUI();
   const { offerTip, tipHighlight } = useTips();
   const isTrajectory = TRAJECTORY_TYPE_KEYS.some(
@@ -160,7 +162,6 @@ export default function DatasetInspector({
     [offerTip, isTrajectory, isRealtime],
   );
   const [datasetRecords, setDatasetRecords] = useState();
-  const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
   const inspectorRef = useRef(null);
   const isGrid = dataset.cdm_data_type === "Grid";
   // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
@@ -229,23 +230,6 @@ export default function DatasetInspector({
     // is reopened instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset, hasRecordList]);
-
-  // Trajectory datasets: list the platforms (trajectory ids) so one can be
-  // picked to draw its track on the map.
-  useEffect(() => {
-    if (!isTrajectoryDataset) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTrajectoryPlatforms();
-      return;
-    }
-    fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((platforms) => setTrajectoryPlatforms(platforms))
-      .catch((error) => {
-        reportError("trajectory platforms fetch failed", error);
-        setTrajectoryPlatforms([]);
-      });
-  }, [dataset, isTrajectoryDataset]);
 
   // Browser Back needs no handling here: the open dataset lives in the URL
   // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
@@ -378,42 +362,40 @@ export default function DatasetInspector({
   // (see DatasetsTable's pinnedPks).
   const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk;
 
-  // Same value the record id carries, named the same way: the
-  // cf_role=trajectory_id variable, or the plain "Platform ID" when the dataset
-  // is a single unnamed trajectory with no such variable.
-  const platformIdLabel = dataset.trajectory_id_variable
-    ? t("cfRoleTrajectoryIdText")
-    : t("trajectoryPlatformIdText");
-
-  const platformSortFields = useMemo(
-    () => [
-      {
-        id: "id",
-        label: platformIdLabel,
-        type: "string",
-        value: (row) => row.trajectory_id,
-      },
-      {
-        id: "timeMin",
-        label: t("timeSelectorStartDate"),
-        type: "string",
-        value: (row) => row.time_min,
-      },
-      {
-        id: "timeMax",
-        label: t("timeSelectorEndDate"),
-        type: "string",
-        value: (row) => row.time_max,
-      },
-      {
-        id: "fixes",
-        label: t("trajectoryPlatformFixesText"),
-        type: "number",
-        value: (row) => row.n_points,
-      },
-    ],
-    [t, platformIdLabel],
-  );
+  // "Show on map": a trajectory dataset's records are its trajectories
+  // (shapeQuery aliases trajectory_id into profile_id), so its cards draw the
+  // whole track; every other record is ringed where it was sampled. Either
+  // way a card gives no clue where on earth that is, so the map goes there —
+  // unlike a track clicked on the map, which is already in view (see
+  // selectTrajectoryFromMap).
+  const onMapId = isTrajectoryDataset
+    ? selectedTrajectory?.datasetPk === dataset.pk
+      ? selectedTrajectory.trajectoryId
+      : undefined
+    : mappedRecord?.datasetPk === dataset.pk
+      ? mappedRecord.recordId
+      : undefined;
+  const toggleOnMap = (recordId) => {
+    const shown = onMapId === recordId;
+    if (isTrajectoryDataset) {
+      setSelectedTrajectory(
+        shown
+          ? undefined
+          : {
+              datasetPk: dataset.pk,
+              datasetTitle: dataset.title,
+              trajectoryId: recordId,
+              frameView: true,
+            },
+      );
+    } else {
+      setMappedRecord(
+        shown
+          ? undefined
+          : { datasetPk: dataset.pk, recordId, frameView: true },
+      );
+    }
+  };
 
   const {
     shown: shownEovs,
@@ -700,88 +682,25 @@ export default function DatasetInspector({
             setActiveWmsOverlay={setActiveWmsOverlay}
           />
         )}
-        {isTrajectoryDataset && trajectoryPlatforms?.length > 0 && (
+        {hasRecordList && (
           <div className="recordSection">
             <div
               className="recordSectionHeader"
-              // The selected platform's card takes the pointer when there is one.
+              // The drawn trajectory's track button takes the pointer when
+              // there is one.
               data-tip-highlight={
-                selectedTrajectory?.datasetPk !== dataset.pk
+                isTrajectoryDataset && onMapId === undefined
                   ? tipHighlight("trackDate")
                   : undefined
               }
             >
-              <strong>{t("trajectoryPlatformsTitle")}</strong>
-              <span className="recordHint">
-                {t("trajectoryPlatformsClickText")}
-              </span>
-              <IdCaption
-                label={platformIdLabel}
-                variable={dataset.trajectory_id_variable || undefined}
-              />
-            </div>
-            <CardList
-              items={trajectoryPlatforms}
-              keyOf={trajectoryKeyOf}
-              sortFields={platformSortFields}
-              defaultSort={{ field: "id", dir: "asc" }}
-              filterPlaceholder={t("trajectoryPlatformsSearchPlaceholder")}
-              emptyText={t("trajectoryPlatformsNoResultsText")}
-              focusKey={
-                selectedTrajectory?.datasetPk === dataset.pk
-                  ? selectedTrajectory.trajectoryId
-                  : undefined
-              }
-              pagerLabel={t("trajectoryPlatformsPagerLabel")}
-              perPageLabel={t("trajectoryPlatformsPerPageLabel")}
-              renderItem={(row) => (
-                <ListCard
-                  id={row.trajectory_id || "—"}
-                  pressed={
-                    selectedTrajectory?.datasetPk === dataset.pk &&
-                    selectedTrajectory?.trajectoryId === row.trajectory_id
-                  }
-                  tipHighlight={
-                    selectedTrajectory?.datasetPk === dataset.pk &&
-                    selectedTrajectory?.trajectoryId === row.trajectory_id
-                      ? tipHighlight("trackDate")
-                      : undefined
-                  }
-                  onClick={() =>
-                    setSelectedTrajectory &&
-                    setSelectedTrajectory(
-                      selectedTrajectory?.trajectoryId === row.trajectory_id
-                        ? undefined // click the drawn platform again to clear
-                        : {
-                            datasetPk: dataset.pk,
-                            datasetTitle: dataset.title,
-                            trajectoryId: row.trajectory_id,
-                            // A row in this list gives no clue where its
-                            // platform sailed, so the map has to go there —
-                            // unlike a track clicked on the map, which is
-                            // already in view (see selectTrajectoryFromMap).
-                            frameView: true,
-                          },
-                    )
-                  }
-                >
-                  <CardField label={t("datasetInspectorTimeframeText")} nowrap>
-                    {formatInstantRange(row.time_min, row.time_max)}
-                  </CardField>
-                  <CardField label={t("trajectoryPlatformFixesText")}>
-                    {row.n_points?.toLocaleString()}
-                  </CardField>
-                </ListCard>
-              )}
-            />
-          </div>
-        )}
-        {hasRecordList && (
-          <div className="recordSection">
-            <div className="recordSectionHeader">
               <strong>{t("datasetInspectorRecordTable")}</strong>
               <span className="recordHint">
-                {t("datasetInspectorClickPreviewText")}
+                {t(
+                  isTrajectoryDataset
+                    ? "trajectoryClickPreviewText"
+                    : "datasetInspectorClickPreviewText",
+                )}
               </span>
               <IdCaption {...recordIdField} />
             </div>
@@ -815,6 +734,7 @@ export default function DatasetInspector({
                 pinnedKey={
                   markerRecordPinned ? highlightedRecord.profileId : undefined
                 }
+                focusKey={onMapId}
                 pagerLabel={t("datasetInspectorRecordsPagerLabel")}
                 perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
                 renderItem={(row) => {
@@ -824,12 +744,44 @@ export default function DatasetInspector({
                   // (trajectory, OBIS, grid), where the dataset's own list is
                   // the best answer available.
                   const eovs = (row.eovs ?? dataset.eovs)?.map((eov) => t(eov));
+                  const onMap = onMapId === row.profile_id;
                   return (
                     <ListCard
-                      id={row.profile_id}
+                      id={row.profile_id || "—"}
                       pinned={
                         markerRecordPinned &&
                         row.profile_id === highlightedRecord.profileId
+                      }
+                      selected={onMap}
+                      action={
+                        // A record with no id cannot be looked up again.
+                        (isTrajectoryDataset || row.profile_id) && (
+                          <button
+                            type="button"
+                            className="listCardMapButton"
+                            aria-pressed={onMap}
+                            data-tip-highlight={
+                              onMap && isTrajectoryDataset
+                                ? tipHighlight("trackDate")
+                                : undefined
+                            }
+                            title={t(
+                              onMap
+                                ? "datasetInspectorHideFromMapTitle"
+                                : isTrajectoryDataset
+                                  ? "trajectoryTrackShowTitle"
+                                  : "datasetInspectorShowOnMapTitle",
+                            )}
+                            onClick={() => toggleOnMap(row.profile_id)}
+                          >
+                            {onMap ? (
+                              <PinMapFill size={13} aria-hidden="true" />
+                            ) : (
+                              <PinMap size={13} aria-hidden="true" />
+                            )}
+                            {t("datasetInspectorShowOnMapText")}
+                          </button>
+                        )
                       }
                       onClick={() => setInspectRecordID(row.profile_id)}
                     >

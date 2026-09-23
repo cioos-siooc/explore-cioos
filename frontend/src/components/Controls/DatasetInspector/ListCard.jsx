@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import "./styles.css";
 
-// One row of a dataset page's record or platform list, as a card: the item's
+// One row of a dataset page's record list, as a card: the item's
 // id on top and its fields as label/value pairs beneath, each on its own line.
 // This is the shape that survives the sidebar's width — see CardList.jsx for
 // why these lists are cards at all.
@@ -14,14 +14,14 @@ import "./styles.css";
 // button may not contain. Same treatment DatasetCard uses.
 export default function ListCard({
   id,
-  // Toggle cards (a platform, whose track the click draws or clears) say so
-  // with aria-pressed; a card that opens something leaves this undefined.
-  pressed,
+  // Drawn on the map right now (a trajectory whose track is shown).
+  selected,
   // Held at the top of the list because the last map click found this item —
   // wearing the same goldenrod the map put on what was clicked.
   pinned,
-  // The active tip's pointer target (see tipHighlight).
-  tipHighlight,
+  // A control of its own beside the id (a trajectory's "show on map"), doing
+  // something other than the card's click.
+  action,
   onClick,
   children,
 }) {
@@ -33,17 +33,27 @@ export default function ListCard({
 
   return (
     <div
-      className={classNames("listCard", { selected: pressed, pinned })}
+      className={classNames("listCard", { selected, pinned })}
       role="button"
       tabIndex={0}
-      aria-pressed={pressed}
-      data-tip-highlight={tipHighlight}
       onClick={onClick}
       onKeyDown={handleKeyDown}
     >
-      <span className="listCardId" title={id}>
-        {id}
-      </span>
+      <div className="listCardHead">
+        <span className="listCardId" title={id}>
+          {id}
+        </span>
+        {action && (
+          // Kept from reaching the card, whose click would open the preview too.
+          <span
+            className="listCardAction"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {action}
+          </span>
+        )}
+      </div>
       <dl className="listCardFields">{children}</dl>
     </div>
   );
