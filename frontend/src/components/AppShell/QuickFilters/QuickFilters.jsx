@@ -115,7 +115,9 @@ export default function QuickFilters() {
       data-testid="quick-filters"
     >
       <span id={labelId} className="quickFiltersLabel">
-        {t("topBarQuickFiltersLabel")}
+        <span className="quickFiltersLabelText">
+          {t("topBarQuickFiltersLabel")}
+        </span>
       </span>
       {/* A form, so Enter searches natively and the magnifier is that same
           submit rather than a second code path. Collapsed, that magnifier is

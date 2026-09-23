@@ -21,8 +21,8 @@
 }
 
 /* Names the row on screen as well as for assistive tech (it labels the
-   group). Wrapped onto two short lines beside the buttons; on a phone it sits
-   above them instead (see below). */
+   group). Wrapped onto two short lines beside the buttons; with a mouse it
+   sits above them, and on a phone it is hidden (see below). */
 .quickFiltersLabel {
   max-width: 5.5em;
   font-size: var(--cioos-font-size-xs);
@@ -30,7 +30,13 @@
   line-height: 1.15;
   text-align: right;
   color: var(--cioos-ink);
-  padding: 5px 10px;
+}
+
+/* The pill is on the text rather than the label, so it stays sized to the
+   words when the label is stretched across a line of its own. */
+.quickFiltersLabelText {
+  display: inline-block;
+  padding: 2px 10px;
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-white);
 }
@@ -210,6 +216,36 @@
   outline: none;
   border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-focus);
+}
+
+/* ------------------------------------------------------------------
+ * Large screen with a mouse: the buttons' titles and hover say what each one
+ * does, so a caption shows only for the button being pointed at (or focused
+ * from the keyboard), and the row packs back together without the room six
+ * standing captions needed. The label takes the line above instead of the
+ * space beside.
+ * ------------------------------------------------------------------ */
+@media (min-width: 701px) and (hover: hover) and (pointer: fine) {
+  .quickFilters {
+    gap: 8px 18px;
+    padding-bottom: 8px;
+  }
+
+  .quickFiltersLabel {
+    flex-basis: 100%;
+    max-width: none;
+    text-align: center;
+  }
+
+  .quickFilterCaption {
+    opacity: 0;
+    transition: opacity var(--cioos-transition-fast);
+  }
+
+  .quickFilterButton:hover .quickFilterCaption,
+  .quickFilterButton:focus-visible .quickFilterCaption {
+    opacity: 1;
+  }
 }
 
 /* ------------------------------------------------------------------
