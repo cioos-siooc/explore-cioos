@@ -6,6 +6,7 @@ import {
   buildFeatureQuery,
   datasetPksOf,
   dedupeGriddapByPk,
+  featureHasDataset,
   griddapCoveredIn,
   griddapOutranksHexesIn,
   griddapTitle,
@@ -441,5 +442,23 @@ describe("buildFeatureQuery", () => {
       "grid",
     ]);
     expect(query.datasetPks).toEqual([1, 2, 3]);
+  });
+});
+
+describe("featureHasDataset", () => {
+  it("finds a dataset in the stringified list", () => {
+    expect(featureHasDataset(feature("hexes", { datasets: "[3,7]" }), 7)).toBe(
+      true,
+    );
+    expect(featureHasDataset(feature("hexes", { datasets: "[3,7]" }), 8)).toBe(
+      false,
+    );
+  });
+
+  it("is false for a list it cannot read", () => {
+    expect(featureHasDataset(feature("hexes", { datasets: "x" }), 3)).toBe(
+      false,
+    );
+    expect(featureHasDataset(feature("hexes", {}), 3)).toBe(false);
   });
 });

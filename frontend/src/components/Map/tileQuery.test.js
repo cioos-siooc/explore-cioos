@@ -1,13 +1,23 @@
 import { describe, it, expect } from "vitest";
 
-import { buildTileSuffix } from "./tileQuery.js";
+import {
+  buildTileSuffix,
+  filterTimeWindow,
+  tracksTimeWindow,
+} from "./tileQuery.js";
 import {
   ALL_DATA_LAYERS,
   onlyDataLayer,
   PROFILE_TYPE_KEYS,
   TRAJECTORY_TYPE_KEYS,
 } from "../../state/dataLayers.js";
-import { HEX_METRIC } from "../config";
+import {
+  HEX_METRIC,
+  TRAIL_ALL,
+  longTrailMaxDays,
+  longTrailMinZoom,
+  tracksMinDate,
+} from "../config";
 
 const params = (suffix) => new URLSearchParams(suffix);
 
@@ -122,5 +132,53 @@ describe("no trajectory geometry means none, not all", () => {
     expect(params(buildTileSuffix("", layers)).get("includeTrajectory")).toBe(
       "false",
     );
+  });
+});
+
+describe("filterTimeWindow", () => {
+  it("reads the time filter back as two instants", () => {
+    expect(
+      filterTimeWindow("eovs=oxygen&timeMin=2020-01-01&timeMax=2020-12-31"),
+    ).toEqual({
+      min: Date.UTC(2020, 0, 1),
+      max: Date.UTC(2020, 11, 31),
+    });
+  });
+
+  it("leaves out a bound the query does not carry", () => {
+    expect(filterTimeWindow("timeMin=2020-01-01")).toEqual({
+      min: Date.UTC(2020, 0, 1),
+      max: undefined,
+    });
+    expect(filterTimeWindow("")).toEqual({ min: undefined, max: undefined });
+  });
+
+  it("drops a bound that is not a date", () => {
+    expect(filterTimeWindow("timeMin=soon").min).toBeUndefined();
+  });
+});
+
+describe("tracksTimeWindow", () => {
+  it("ends the day after the scrub date and starts the trail before it", () => {
+    expect(tracksTimeWindow("2024-03-10", 7, longTrailMinZoom)).toEqual({
+      timeMin: "2024-03-03T00:00:00Z",
+      timeMax: "2024-03-11T00:00:00Z",
+    });
+  });
+
+  it("starts the 'all' trail at the scrub bar's own start", () => {
+    expect(
+      tracksTimeWindow("2024-03-10", TRAIL_ALL, longTrailMinZoom).timeMin,
+    ).toBe(`${tracksMinDate}T00:00:00Z`);
+  });
+
+  it("clamps a long trail when zoomed out", () => {
+    const { timeMin } = tracksTimeWindow(
+      "2024-03-10",
+      TRAIL_ALL,
+      longTrailMinZoom - 1,
+    );
+    const days = (Date.parse("2024-03-10") - Date.parse(timeMin)) / 86_400_000;
+    expect(days).toBe(longTrailMaxDays);
   });
 });
