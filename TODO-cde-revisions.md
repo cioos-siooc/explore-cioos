@@ -838,6 +838,10 @@ now split, was two specific call sites.
       co-mover into `tileQuery.js`, it parses the same query string), `tracksTimeWindow` (11),
       `rampExpression` (5), `featureHasDataset` (7), `dedupeGriddapByPk` (8), `datasetPksOf` (8),
       and the dedupe/role/bbox rules inside `buildFeatureQuery` (208).
+      **2026-09-23: `filterTimeWindow` and `tracksTimeWindow` → `tileQuery.js`, `rampExpression`
+      (with `toRampStops` and `HEX_RAMP_MIN_ALPHA`) → `hexRamp.js`, `featureHasDataset` →
+      `hitTest.js`; `dedupeGriddapByPk`, `datasetPksOf` and `buildFeatureQuery` went with step 4.
+      All tested.**
       **[re-verified — every span byte-identical to the 2026-09-09 pass]**
 - [x] **The seam is the hit-test group, and it is three map methods wide.** — settled 2026-09-23 as
       injected functions, see step 4. `isOnAPointIn`,
@@ -913,10 +917,15 @@ now split, was two specific call sites.
    Done under it: the MapboxDraw mode patching and `drawControlOptions` moved to module scope
    (they ran on every render); `draw` and `popup` are built once (`useState` initialisers) instead
    of on every render; `wmsRenderToken` bug fixed (see P1).
+   **Gate extended 2026-09-23 to markers and tracks** from a synthetic z7 scene
+   (`e2e/support/syntheticScene.js`, encoded by `e2e/build-synthetic-tiles.mjs` — no stack with
+   matching data to record from): marker hover, one-dataset marker → dataset page, shared marker →
+   card, track-head hover, lone track click → `?track=`, and marker-vs-track precedence both ways
+   (mutation-checked: `isOnAPointIn` forced false or true each fails its own test). Still ungated:
+   griddap rectangles, the selected-track fixes, draw/box-select, WMS.
    **Still open:** the mount effect itself (still one effect), the eight ref writes during render,
    the remaining guards, and `setColorStops`'s four entry points. Splitting the effect reorders
-   layer adds and listener registration; do it only once the fixtures hold markers and tracks so
-   the gate covers what it moves.
+   layer adds and listener registration; griddap and draw have no gate yet.
 
 ### P2.7 — One descriptor for the metric and the tiers `[Worth exploring]`
 
