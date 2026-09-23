@@ -36,6 +36,7 @@
   "tipCounter": "Tip {{n}} of {{total}}",
   "tipsToggleLabel": "Show tips on the map as I use the Explorer",
   "tipCardHeading": "Tip",
+  "tipCardOpen": "A tip is available",
   "tipCardClose": "Close tip",
   "tipsDisable": "Don't show tips",
   "tip_shareLink": "The page address keeps your map view, filters, drawn area and open dataset. Copy it to share exactly what you see, or bookmark it to come back later.",

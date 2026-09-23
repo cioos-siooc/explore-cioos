@@ -13,13 +13,9 @@ import classNames from "classnames";
 import BrandSearch from "../TopLeft/BrandSearch.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 import SingleDatasetView from "./SingleDatasetView.jsx";
-import TipCard from "../../Controls/Tips/TipCard.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
 import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
-import useMediaQuery, {
-  LAPTOP_QUERY,
-} from "../../../state/ui/useMediaQuery.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -80,8 +76,6 @@ export default function TopControls() {
   } = useUI();
   const { inspectDataset, returnToDatasetList } = useSelection();
   const { tipHighlight } = useTips();
-
-  const tipInCorner = useMediaQuery(LAPTOP_QUERY);
 
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-top-bar-space", measureTopBarSpace);
@@ -200,8 +194,6 @@ export default function TopControls() {
           of it. Only up while the datasets card — whose banner otherwise says
           this — is collapsed. */}
       <SingleDatasetView />
-      {/* Wide screens hold it in the top-right corner instead (see AppShell). */}
-      {!tipInCorner && <TipCard />}
     </div>
   );
 }

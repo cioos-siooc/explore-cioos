@@ -10,10 +10,6 @@ import { useCallback, useSyncExternalStore } from "react";
 // stylesheets that branch on it in CSS cannot drift apart.
 export const MOBILE_QUERY = "(max-width: 700px)";
 
-// The 1200px laptop rung in theme.css: wide enough for the tip card to sit
-// beside the 490px brand card rather than under it.
-export const LAPTOP_QUERY = "(min-width: 1200px)";
-
 // A screen driven by touch alone: no pointer to follow, and no keyboard to
 // press Esc or Enter on.
 export const TOUCH_QUERY = "(hover: none)";

@@ -36,6 +36,7 @@
   "tipCounter": "Astuce {{n}} sur {{total}}",
   "tipsToggleLabel": "Afficher des astuces sur la carte pendant que j'utilise l'explorateur",
   "tipCardHeading": "Astuce",
+  "tipCardOpen": "Une astuce est disponible",
   "tipCardClose": "Fermer l'astuce",
   "tipsDisable": "Ne plus afficher d'astuces",
   "tip_shareLink": "L'adresse de la page conserve la vue de la carte, les filtres, la zone dessinée et le jeu de données ouvert. Copiez-la pour partager exactement ce que vous voyez, ou ajoutez-la à vos favoris pour y revenir.",

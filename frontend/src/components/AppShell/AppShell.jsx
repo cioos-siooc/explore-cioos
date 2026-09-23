@@ -27,7 +27,6 @@ import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
 import { useTips } from "../../state/tips/TipsProvider.jsx";
-import useMediaQuery, { LAPTOP_QUERY } from "../../state/ui/useMediaQuery.js";
 import { bathymetryLegendMinZoom } from "../config.js";
 import "./styles.css";
 
@@ -60,7 +59,6 @@ export default function AppShell() {
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI();
   const { inspectDataset, platformsAvailable } = useSelection();
   const { offerTip } = useTips();
-  const tipInCorner = useMediaQuery(LAPTOP_QUERY);
 
   // Zoomed in far enough that the CHS NONNA soundings take over the seafloor.
   const nonnaShown = bathymetryVisible && zoom >= bathymetryLegendMinZoom;
@@ -172,7 +170,7 @@ export default function AppShell() {
       <ActivityIndicator />
       <Sidebar />
       <TopControls />
-      {tipInCorner && <TipCard corner />}
+      <TipCard />
       <FiltersModal />
       <DownloadModal />
       <CoverageModal />

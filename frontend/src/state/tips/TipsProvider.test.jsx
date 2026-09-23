@@ -4,6 +4,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
+import { MOBILE_WIDTH, setViewportWidth } from "../../test/viewport.js";
 import TipCard from "../../components/Controls/Tips/TipCard.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
@@ -210,6 +211,28 @@ describe("contextual tips", () => {
     await user.click(screen.getByRole("button", { name: "Don't show tips" }));
     expect(card()).toBeNull();
     expect(window.localStorage.getItem("cde.tipsEnabled")).toBe("false");
+  });
+
+  describe("on a phone", () => {
+    beforeEach(() => setViewportWidth(MOBILE_WIDTH));
+
+    it("waits as a lightbulb until tapped, then shows the card", async () => {
+      returningVisitor();
+      const { user } = renderProbe();
+      await user.click(screen.getByText("offer slider"));
+      expect(card()).toBeNull();
+      await user.click(
+        screen.getByRole("button", { name: "A tip is available" }),
+      );
+      expect(card()).toHaveTextContent(/arrow keys/);
+    });
+
+    it("opens a tour straight away", async () => {
+      returningVisitor();
+      const { user } = renderProbe();
+      await user.click(screen.getByText("start tour"));
+      expect(card()).toHaveTextContent(/Time coverage/);
+    });
   });
 
   describe("tour", () => {
