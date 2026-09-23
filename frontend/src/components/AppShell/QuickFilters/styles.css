@@ -21,14 +21,16 @@
 }
 
 /* Names the row on screen as well as for assistive tech (it labels the
-   group). Wrapped onto two short lines beside the buttons; with a mouse it
-   sits above them, and on a phone it is hidden (see below). */
+   group). Takes the line above the buttons; on a phone it is hidden (see
+   below). The row gap is sized for captions, which hang under the buttons,
+   not above them, so the label pulls itself back down to the row. */
 .quickFiltersLabel {
-  max-width: 5.5em;
+  flex-basis: 100%;
+  margin-bottom: -16px;
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   line-height: 1.15;
-  text-align: right;
+  text-align: center;
   color: var(--cioos-ink);
 }
 
@@ -279,8 +281,7 @@
  * Large screen with a mouse: the buttons' titles and hover say what each one
  * does, so a caption shows only for the button being pointed at (or focused
  * from the keyboard), and the row packs back together without the room five
- * standing captions needed. The label takes the line above instead of the
- * space beside.
+ * standing captions needed.
  * ------------------------------------------------------------------ */
 @media (min-width: 701px) and (hover: hover) and (pointer: fine) {
   .quickFilters {
@@ -289,9 +290,7 @@
   }
 
   .quickFiltersLabel {
-    flex-basis: 100%;
-    max-width: none;
-    text-align: center;
+    margin-bottom: 0;
   }
 
   .quickFilterCaption {
