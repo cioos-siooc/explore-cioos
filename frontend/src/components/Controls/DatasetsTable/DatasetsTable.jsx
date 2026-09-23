@@ -61,13 +61,12 @@ export default function DatasetsTable({
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
-  // Lifted to SelectionProvider so it can surface as a removable chip
-  // (ActiveFilterChips) alongside the rest of the active filters. The grouping
-  // lives there too: the hidden groups decide what the map draws, and both are
-  // carried in the URL.
+  // The search, grouping and hidden groups live in SelectionProvider: they
+  // outlive this list while a dataset page replaces it, the hidden groups
+  // decide what the map draws, and all of them are carried in the URL.
   const {
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
+    listSearchText,
+    setListSearchText,
     groupBy: selectedGroupBy,
     setGroupBy,
     hiddenGroups,
@@ -80,13 +79,10 @@ export default function DatasetsTable({
     // not whether it is in the order at all.
     handleSelectDataset: removeFromSelection,
   } = useSelection();
-  // The same free-text search the top bar and the Filters modal write, and it
-  // narrows the map as well as this list — so the box below goes on Enter or
-  // on its magnifier (useSearchInput) rather than on a pause mid-word.
-  const [searchText, setSearchText, submitSearch] = useSearchInput(
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
-    { trigger: "submit" },
+  // Narrows only this list (see listedDatasets), so it can follow the typing.
+  const [searchText, setSearchText] = useSearchInput(
+    listSearchText,
+    setListSearchText,
   );
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
@@ -182,9 +178,8 @@ export default function DatasetsTable({
     [t],
   );
 
-  // Search filtering happens upstream (SelectionProvider's filteredDatasets),
-  // so it's reflected in the shared dataset counters too — this just sorts
-  // whatever it's handed.
+  // Search filtering happens upstream (SelectionProvider's listedDatasets) —
+  // this just sorts whatever it's handed.
   const visibleRows = useMemo(() => {
     const field = sortFields.find((f) => f.id === sort.field);
     const factor = sort.dir === "asc" ? 1 : -1;
@@ -353,12 +348,17 @@ export default function DatasetsTable({
     if (listRef.current) listRef.current.scrollTop = 0;
   };
 
+  const sortControl = (
+    <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
+  );
+
   const controls = (
     <div className="datasetsCardControls" data-testid="datasets-controls">
-      <div className="datasetsCardToolbar">
-        {isDownloadModal && (
-          // The same checkbox the rows below carry, so the control that ticks
-          // them all reads as one of them rather than as a pill that lights up.
+      {isDownloadModal ? (
+        <>
+          {/* The same checkbox the rows below carry, so the control that ticks
+              them all reads as one of them rather than as a pill that lights
+              up. */}
           <label
             className="selectAllToggle"
             title={t("datasetsTableHeaderSelectAllTitle")}
@@ -370,71 +370,54 @@ export default function DatasetsTable({
             />
             {t("datasetsTableHeaderSelectAllTitle")}
           </label>
-        )}
-        {!isDownloadModal && (
-          // A form, so Enter searches natively and the magnifier is that same
-          // submit rather than a decorative icon with a handler bolted on.
-          <form
-            className="datasetsTableSearchWrap"
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitSearch();
-            }}
-          >
-            <button
-              type="submit"
-              className="datasetsTableSearchSubmit"
-              title={t("filterSearchSubmitTitle")}
-              aria-label={t("filterSearchSubmitTitle")}
-            >
-              <Search size={13} aria-hidden="true" />
-            </button>
+          {/* The format pickers (DownloadFormats) are settings of the same
+              kind as the sort: they change what every Download button on the
+              cards below asks the server for. */}
+          <div className="datasetsCardArrange">
+            {sortControl}
+            {downloadFormatControls}
+          </div>
+        </>
+      ) : (
+        // Search, sort and grouping on one row: every row spent here is a
+        // dataset card the sidebar does not show.
+        <div className="datasetsCardToolbar">
+          <label className="datasetsTableSearchWrap">
+            <Search size={13} aria-hidden="true" />
             <input
               className="datasetsTableSearch"
-              type="text"
+              type="search"
               value={searchText}
-              placeholder={t("datasetInspectorFilterText")}
+              placeholder={t("datasetsListSearchPlaceholder")}
+              aria-label={t("datasetsListSearchPlaceholder")}
               onChange={(e) => setSearchText(e.target.value)}
             />
-          </form>
-        )}
-      </div>
-
-      {/* How the list is arranged: what it is sorted on and what it is grouped
-          by, as the same pill so the pair reads as one row of settings. The
-          download modal adds its format pickers here (DownloadFormats), which
-          are settings of the same kind: they change what every Download button
-          on the cards below asks the server for. */}
-      <div className="datasetsCardArrange">
-        <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
-        {isDownloadModal && downloadFormatControls}
-        {!isDownloadModal && (
-          <>
-            <SelectPill
-              label={t("datasetsCardGroupByLabel")}
-              value={groupBy}
-              options={groupByOptions}
-              onChange={setGroupBy}
-            />
-            {hiddenGroups.size > 0 && (
-              <button
-                type="button"
-                className="datasetsCardShowAllGroups"
-                onClick={showAllGroups}
-                title={t("datasetsCardGroupShowAllText", {
-                  count: hiddenGroups.size,
-                })}
-                aria-label={t("datasetsCardGroupShowAllText", {
-                  count: hiddenGroups.size,
-                })}
-              >
-                <Eye size={13} aria-hidden="true" />
-                {hiddenGroups.size}
-              </button>
-            )}
-          </>
-        )}
-      </div>
+          </label>
+          {sortControl}
+          <SelectPill
+            label={t("datasetsCardGroupByLabel")}
+            value={groupBy}
+            options={groupByOptions}
+            onChange={setGroupBy}
+          />
+          {hiddenGroups.size > 0 && (
+            <button
+              type="button"
+              className="datasetsCardShowAllGroups"
+              onClick={showAllGroups}
+              title={t("datasetsCardGroupShowAllText", {
+                count: hiddenGroups.size,
+              })}
+              aria-label={t("datasetsCardGroupShowAllText", {
+                count: hiddenGroups.size,
+              })}
+            >
+              <Eye size={13} aria-hidden="true" />
+              {hiddenGroups.size}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* What the size pill and the tick/cross on each card below mean. It
           belongs on this row rather than under the list: it is a key to the

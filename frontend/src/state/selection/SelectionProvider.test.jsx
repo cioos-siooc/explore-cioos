@@ -182,6 +182,26 @@ describe("SelectionProvider", () => {
     );
   });
 
+  it("listSearchText narrows listedDatasets only — not the counters or the map", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const needle = target.title.slice(0, 6);
+    act(() => latest.setListSearchText(needle));
+    await waitFor(() => {
+      expect(latest.listedDatasets).toContain(target);
+      expect(
+        latest.listedDatasets.every((row) =>
+          row.title.toLowerCase().includes(needle.toLowerCase()),
+        ),
+      ).toBe(true);
+    });
+    expect(latest.filteredDatasets).toBe(latest.pointsData);
+    expect(latest.filteredDatasetPks).toBeUndefined();
+    expect(
+      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
+    ).toBeNull();
+  });
+
   it("\"only in view\" narrows the coverage figure's dataset list, not the map's", async () => {
     await renderLoaded();
     expect(latest.filteredDatasetPks).toBeUndefined();

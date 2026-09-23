@@ -243,6 +243,7 @@
   "datasetInspectorDepthTooLargeWarningText": "too big",
   "datasetInspectorRecordsShownText": "records shown...",
   "datasetInspectorFilterText": "Search table",
+  "datasetsListSearchPlaceholder": "Filter this list",
   "datasetInspectorClickPreviewText": "Click on a record to preview the first 1000 records in a table or plot",
   "datasetInspectorRecordTable": "Record list",
   "datasetInspectorNoRecordsText": "No records match your search.",

@@ -61,6 +61,7 @@ export default function UrlSync() {
   const {
     polygon,
     datasetTitleSearchText,
+    listSearchText,
     onlyInView,
     groupBy,
     hiddenGroups,
@@ -95,6 +96,7 @@ export default function UrlSync() {
       ...Object.fromEntries(selectionParams),
       lang,
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
+      ...(listSearchText ? { listSearch: listSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
@@ -168,6 +170,7 @@ export default function UrlSync() {
     mapView,
     polygon,
     datasetTitleSearchText,
+    listSearchText,
     onlyInView,
     groupBy,
     hiddenGroupsParam,

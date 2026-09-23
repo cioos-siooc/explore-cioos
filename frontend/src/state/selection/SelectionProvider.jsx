@@ -170,6 +170,12 @@ export default function SelectionProvider({ children }) {
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
     () => initialParams.get("search") || "",
   );
+  // The datasets sidebar's own search box. Unlike the title search above it is
+  // not a filter: it only narrows the list being read (listedDatasets below),
+  // never the map, the counters or the downloads.
+  const [listSearchText, setListSearchText] = useState(
+    () => initialParams.get("listSearch") || "",
+  );
   const [combinedQueries, setCombinedQueries] = useState([]);
   // "Only in view": restrict the list to datasets whose extent overlaps the
   // current map viewport. Lifted here (like the title search) so it also drives
@@ -278,6 +284,14 @@ export default function SelectionProvider({ children }) {
     dataLayers,
     i18n.language,
   ]);
+
+  const listedDatasets = useMemo(() => {
+    if (isEmpty(listSearchText)) return filteredDatasets;
+    const query = listSearchText.toLowerCase();
+    return filteredDatasets.filter((row) =>
+      datasetMatchesSearch(row, query, i18n.language),
+    );
+  }, [filteredDatasets, listSearchText, i18n.language]);
 
   // filteredDatasets as a pk list, for the queries that ask a question about
   // the filtered data rather than draw it (the coverage figure). Everything
@@ -866,7 +880,10 @@ export default function SelectionProvider({ children }) {
     setDatasetPreview,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
+    listSearchText,
+    setListSearchText,
     filteredDatasets,
+    listedDatasets,
     filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,

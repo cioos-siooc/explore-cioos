@@ -244,6 +244,7 @@
   "datasetInspectorDepthTooLargeWarningText": "trop volumineux",
   "datasetInspectorRecordsShownText": " enregistrements affichés...",
   "datasetInspectorFilterText": "Rechercher le tableau",
+  "datasetsListSearchPlaceholder": "Filtrer cette liste",
   "datasetInspectorClickPreviewText": "Cliquez sur un enregistrement pour prévisualiser les 1000 premiers enregistrements d'un tableau ou d'un graphique.",
   "datasetInspectorRecordTable": "Liste d'enregistrements",
   "datasetInspectorNoRecordsText": "Aucun enregistrement ne correspond à votre recherche.",
