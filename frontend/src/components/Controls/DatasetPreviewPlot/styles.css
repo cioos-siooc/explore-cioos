@@ -108,6 +108,63 @@
   min-width: 0;
 }
 
+/* The plot side of the row: the fixed colour legend, then the scroller. A column
+ * so the legend can sit outside .datasetPreviewPlotArea — inside it, a wide
+ * profile would scroll the legend off with the panels, which is the whole
+ * reason the colourbar left the figure. Its width is the scroller's, so
+ * clampPaneWidth still sees a two-box row. */
+.datasetPreviewPlotColumn {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Shaped after the map's legend ramp (Controls/Legend): a gradient bar with an
+ * absolutely-positioned tick row under it. Its own classes rather than
+ * Legend's, which are private to that component's stylesheet. */
+.colorScaleLegend {
+  flex: 0 0 auto;
+  padding: 0 0 6px;
+}
+
+.colorScaleLegendLabel {
+  margin-bottom: 3px;
+  font-size: var(--cioos-font-size-2xs, 11px);
+  color: var(--cioos-ink-60);
+}
+
+.colorScaleLegendBar {
+  height: 10px;
+  border: 1px solid var(--cioos-hairline, #dce8e5);
+  border-radius: 3px;
+}
+
+.colorScaleLegendTicks {
+  position: relative;
+  height: 12px;
+  margin-top: 3px;
+}
+
+.colorScaleLegendTicks .colorScaleLegendTick {
+  position: absolute;
+  top: 0;
+  font-size: var(--cioos-font-size-3xs, 9px);
+  line-height: 1;
+  color: var(--cioos-ink-60);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.colorScaleLegendTicks .colorScaleLegendTick.start {
+  transform: translateX(0);
+}
+
+.colorScaleLegendTicks .colorScaleLegendTick.end {
+  transform: translateX(-100%);
+}
+
 /* The plot pane: the figure's only scroller, on both axes. A stack of panels
  * taller than the pane scrolls here, and so does a profile wide enough to push
  * its panels to MIN_PANEL_PX. A plain block deliberately — no flex — so nothing

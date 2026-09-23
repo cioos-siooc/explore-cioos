@@ -43,6 +43,11 @@ def is_valid_duration(duration):
 #                     attribute that says so; ~41 variables declare it.
 #   quality flags     flag_values, flag_meanings, ancillary_variables - how a QC
 #                     flag column announces itself, so plots can exclude them.
+#   short names       generic_name, original_name - a name short enough for a
+#                     hover box, where long_name runs to 125 characters and the
+#                     variable name is often a BODC P01 code. ~12% and ~31% of
+#                     variables respectively across the OGSL catalogue, so the
+#                     reader falls back to long_name.
 #
 # tests/conftest.py imports this list rather than restating it: the fixtures
 # built by build_variables_df() must pivot exactly what production pivots.
@@ -63,6 +68,8 @@ CONSIDERED_VARIABLE_ATTRIBUTES = [
     "flag_values",
     "flag_meanings",
     "ancillary_variables",
+    "generic_name",
+    "original_name",
 ]
 
 

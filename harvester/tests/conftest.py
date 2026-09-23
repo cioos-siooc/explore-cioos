@@ -150,6 +150,8 @@ attribute,chlorophyll,colorBarMaximum,double,30.0
 attribute,chlorophyll,colorBarScale,,Log
 attribute,chlorophyll,colorBarContinuous,,false
 attribute,chlorophyll,ancillary_variables,,chlorophyll_qc
+attribute,chlorophyll,generic_name,,fluorescence
+attribute,chlorophyll,original_name,,chl_a
 variable,chlorophyll_qc,,byte,
 attribute,chlorophyll_qc,long_name,,Chlorophyll-a Quality Flag
 attribute,chlorophyll_qc,flag_values,byte,"1, 2, 3, 4, 9"

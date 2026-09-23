@@ -6,6 +6,7 @@ import PaneDivider from "../../ui/PaneDivider.jsx";
 import useElementSize from "../../ui/useElementSize.js";
 import VariableColorPicker from "./VariableColorPicker.jsx";
 import ColorScalePicker from "./ColorScalePicker.jsx";
+import ColorScaleLegend from "./ColorScaleLegend.jsx";
 import "./styles.css";
 
 import Plotly from "plotly.js-basic-dist-min";
@@ -128,7 +129,6 @@ export default function DatasetPreviewPlot({
     plan.orientation,
     panels.length,
     boxBudgetFor(plotAreaSize.width),
-    Boolean(colorAxis),
   );
   // The lines the title really wraps to, not the two-line worst case the sizing
   // helpers assume on their own: at a short scroller that is the difference
@@ -476,38 +476,44 @@ export default function DatasetPreviewPlot({
         onDragChange={setResizing}
       />
 
-      <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
-        {figure ? (
-          <Plot
-            data={figure.data}
-            layout={figure.layout}
-            // Explicit width/height in the layout, so Plotly never runs
-            // plotAutoSize. That is what used to read a container height of
-            // 0px on first mount and silently fall back to its own 450px
-            // default, leaving the plot small until the next relayout.
-            style={{ width: `${width}px`, height: `${height}px` }}
-            useResizeHandler={false}
-            config={{
-              displaylogo: false,
-              modeBarButtonsToRemove: [
-                "select2d",
-                "lasso2d",
-                "resetScale2d",
-                "pan2d",
-              ],
-              // Off deliberately: `responsive` re-measures from computed
-              // style on every window resize, which would fight the sizes
-              // above. useElementSize drives resizing instead.
-              responsive: false,
-              scrollZoom: true,
-              locale: i18n.language === "fr" ? "fr" : "en",
-            }}
-          />
-        ) : (
-          <p className="datasetPreviewPlotEmpty">
-            {t("datasetPreviewPlotNoVariablesSelected")}
-          </p>
-        )}
+      <div className="datasetPreviewPlotColumn">
+        {/* Above the scroller, not inside it: a profile wide enough to scroll
+            is exactly the plot whose scale would otherwise be off-screen. */}
+        <ColorScaleLegend legend={figure && figure.colorLegend} />
+
+        <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
+          {figure ? (
+            <Plot
+              data={figure.data}
+              layout={figure.layout}
+              // Explicit width/height in the layout, so Plotly never runs
+              // plotAutoSize. That is what used to read a container height of
+              // 0px on first mount and silently fall back to its own 450px
+              // default, leaving the plot small until the next relayout.
+              style={{ width: `${width}px`, height: `${height}px` }}
+              useResizeHandler={false}
+              config={{
+                displaylogo: false,
+                modeBarButtonsToRemove: [
+                  "select2d",
+                  "lasso2d",
+                  "resetScale2d",
+                  "pan2d",
+                ],
+                // Off deliberately: `responsive` re-measures from computed
+                // style on every window resize, which would fight the sizes
+                // above. useElementSize drives resizing instead.
+                responsive: false,
+                scrollZoom: true,
+                locale: i18n.language === "fr" ? "fr" : "en",
+              }}
+            />
+          ) : (
+            <p className="datasetPreviewPlotEmpty">
+              {t("datasetPreviewPlotNoVariablesSelected")}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

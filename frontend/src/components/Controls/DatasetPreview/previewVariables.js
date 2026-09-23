@@ -162,6 +162,11 @@ export function variablesFrom(table, dataset) {
       type,
       isNumeric: NUMERIC_TYPES.has(String(type)),
       longName: meta && trimmed(meta.long_name),
+      // The two short names ERDDAP publishes, for the plot's hover box. Absent
+      // on a catalogue harvested before they were whitelisted, which is why
+      // shortestNameFor falls through to long_name.
+      genericName: meta && trimmed(meta.generic_name),
+      originalName: meta && trimmed(meta.original_name),
       standardName: meta && trimmed(meta.standard_name),
       // The harvest first, the dataset's id fields second: columnMeta is what
       // ERDDAP itself publishes for this variable, where the dataset fields are
@@ -206,6 +211,21 @@ export function labelFor(variable) {
 export function shortLabelFor(variable) {
   if (!variable) return "";
   return variable.longName || variable.columnName;
+}
+
+// The shortest name the publisher gave this column, for a hover box that is open
+// on every panel at once. `generic_name` is plain words ("temperature",
+// "fluorescence"); `original_name` is the source file's own column name. Across
+// the OGSL catalogue long_name has a median of 21 characters and a maximum of
+// 125, which is why it is third rather than first.
+export function shortestNameFor(variable) {
+  if (!variable) return "";
+  return (
+    variable.genericName ||
+    variable.originalName ||
+    variable.longName ||
+    variable.columnName
+  );
 }
 
 export function byColumnName(variables) {

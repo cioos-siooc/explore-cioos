@@ -30,24 +30,26 @@ test("the publisher's own colorBarPalette is what a column opens in", () => {
   );
 });
 
+const VIRIDIS = colorScaleFor(DEFAULT_COLOR_SCALE);
+
 test("a column declaring no palette is drawn in viridis", () => {
-  assert.equal(colorScaleForVariable(variable("depth")), DEFAULT_COLOR_SCALE);
-  assert.equal(colorScaleForVariable(undefined), DEFAULT_COLOR_SCALE);
+  assert.deepEqual(colorScaleForVariable(variable("depth")), VIRIDIS);
+  assert.deepEqual(colorScaleForVariable(undefined), VIRIDIS);
 });
 
 test("a palette this build does not map falls back to viridis", () => {
-  assert.equal(
+  assert.deepEqual(
     colorScaleForVariable(variable("x", { palette: "BlueWhiteRed" })),
-    DEFAULT_COLOR_SCALE,
+    VIRIDIS,
   );
 });
 
 test("every rainbow is drawn in viridis instead, however it was asked for", () => {
   for (const rainbow of ["Rainbow", "LightRainbow", "ReverseRainbow", "Jet"]) {
     // Declared by the dataset...
-    assert.equal(
+    assert.deepEqual(
       colorScaleForVariable(variable("x", { palette: rainbow })),
-      DEFAULT_COLOR_SCALE,
+      VIRIDIS,
       rainbow,
     );
     // ...or asked for by a hand-edited link.
@@ -79,10 +81,15 @@ test("a scale name this build does not offer is ignored, not passed on", () => {
   assert.equal(normalizeColorScale(" Cividis "), "Cividis");
 });
 
-test("plotly's own scales go by name; ours go as stops", () => {
-  assert.equal(colorScaleFor("Viridis"), "Viridis");
-  assert.equal(colorScaleFor("Cividis"), "Cividis");
+test("every scale goes as stops, plotly's own included", () => {
+  // Viridis used to be handed over as a NAME, which was fine while Plotly drew
+  // the bar. The legend beside the plot is a CSS gradient, and a name Plotly
+  // resolves privately would be a second, different ramp next to the first.
   assert.deepEqual(colorScaleFor("KT_haline"), paletteFor("KT_haline"));
+  ["Viridis", "Cividis"].forEach((name) => {
+    assert.ok(Array.isArray(colorScaleFor(name)), name);
+    assert.deepEqual(swatchStopsFor(name), colorScaleFor(name), name);
+  });
 });
 
 test("every offered scale has stops to paint its swatch with", () => {

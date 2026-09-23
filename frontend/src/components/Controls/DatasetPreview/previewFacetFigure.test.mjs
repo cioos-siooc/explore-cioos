@@ -6,7 +6,6 @@ import { facetPlanFor, COLUMNS, ROWS } from "./previewFacetPlan.js";
 import {
   boxBudgetFor,
   buildFigure,
-  COLORBAR_GUTTER_PX,
   domainsFor,
   heightBudgetFor,
   plotHeightFor,
@@ -25,6 +24,7 @@ import {
   MIN_PANEL_PX,
   LABEL_FONT_PX,
 } from "./previewFacetFigure.js";
+import { colorScaleFor } from "./previewColorScales.js";
 import { defaultColorFor } from "./previewColors.js";
 import { paletteColorFor, paletteFor } from "./erddapPalettes.js";
 import {
@@ -486,19 +486,122 @@ test("one panel is wide enough not to wrap", () => {
   assert.ok(!layout.xaxis.title.text.includes("<br>"));
 });
 
-test("hover text keeps the unwrapped label", () => {
-  // A <br> in a hover box breaks the line where the panel needed it.
+test("the hover names the column as briefly as the publisher allows", () => {
   const { data } = figure("TimeSeriesProfile", ALL_SIX, {
     size: { width: 1140, height: 620 },
   });
   assert.ok(data[0].layout === undefined);
+  // This record declares no generic_name or original_name, so the name falls
+  // back to long_name — and is capped, because a box is open on every panel at
+  // once. The panel's own title carries it whole.
+  assert.equal(
+    data[0].hovertemplate,
+    "Temperature (1990 sca…: %{x} degree_C<extra></extra>",
+  );
+  // The colour dimension adds a third line here, off customdata — not here.
+  assert.ok(!data[0].hovertemplate.includes("customdata"));
+  // The trace's own name is never drawn, and keeps the long label unwrapped: a
+  // <br> belongs to the panel that needed it.
   assert.ok(data[0].name.includes("Temperature (1990 scale)"));
   assert.ok(!data[0].name.includes("<br>"));
-  assert.ok(
-    data[0].hovertemplate.startsWith("Temperature (1990 scale) ( degree_C ):"),
+});
+
+test("a stacked panel prints the axis it shares first", () => {
+  const { data } = figure("TimeSeries", ["TE90_01"]);
+  assert.equal(
+    data[0].hovertemplate,
+    "Time: %{x} UTC<br>Temperature (1990 sca…: %{y} degree_C<extra></extra>",
   );
-  // The colour dimension used to add a third line here, off customdata.
-  assert.ok(!data[0].hovertemplate.includes("customdata"));
+});
+
+test("a column with no unit leaves no trailing space", () => {
+  const noUnit = {
+    ...VIKING,
+    columnUnits: VIKING.columnUnits.map((unit, index) =>
+      VIKING.columnNames[index] === "TE90_01" ? null : unit,
+    ),
+  };
+  const { data } = figureFrom(noUnit, "TimeSeriesProfile", ["TE90_01"]);
+  assert.equal(
+    data[0].hovertemplate,
+    "Temperature (1990 sca…: %{x}<extra></extra>",
+  );
+});
+
+test("the shortest name the publisher gave wins, in ERDDAP's own order", () => {
+  // What a reharvested catalogue looks like: generic_name on one column,
+  // original_name on the next, neither on the third.
+  const shortNames = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) => {
+      if (meta.name === "TE90_01")
+        return { ...meta, generic_name: "temperature", original_name: "temp" };
+      if (meta.name === "PSAL_01") return { ...meta, original_name: "sal" };
+      return meta;
+    }),
+  };
+  const { data } = figureFrom(shortNames, "TimeSeriesProfile", [
+    "TE90_01",
+    "PSAL_01",
+    "FLOR_01",
+  ]);
+  assert.ok(data[0].hovertemplate.startsWith("temperature: "));
+  assert.ok(data[1].hovertemplate.startsWith("sal: "));
+  assert.ok(data[2].hovertemplate.startsWith("Fluorescence: "));
+});
+
+test("a renamed variable is renamed in the hover too", () => {
+  const { data } = figure("TimeSeriesProfile", ["TE90_01"], {
+    labels: { TE90_01: "  Temp  " },
+  });
+  assert.ok(data[0].hovertemplate.startsWith("Temp: %{x} degree_C"));
+});
+
+test("one hover answers on every panel that shares the axis", () => {
+  const columns = figure("TimeSeriesProfile", ALL_SIX);
+  const rows = figure("TimeSeries", ALL_SIX);
+  // The shared axis in each layout: depth down the side, time along the bottom.
+  // Unified for the profile, because plain "y" is the one Plotly draws at 60°.
+  assert.equal(columns.layout.hovermode, "y unified");
+  assert.equal(rows.layout.hovermode, "x");
+  // Plotly's own default is "overlaying", which answers for the hovered panel
+  // alone — this is what widens it to every panel on that axis.
+  assert.equal(columns.layout.hoversubplots, "axis");
+  assert.equal(rows.layout.hoversubplots, "axis");
+});
+
+test("a unified box is titled with the axis its rows share", () => {
+  const { layout } = figure("TimeSeriesProfile", ALL_SIX);
+  // Left alone, Plotly titles it with the bare number.
+  assert.equal(
+    layout.yaxis.unifiedhovertitle.text,
+    "depth of observation: %{y} m",
+  );
+  // A stack's boxes have no title to carry it, which is why they still print it.
+  assert.equal(
+    figure("TimeSeries", ALL_SIX).layout.xaxis.unifiedhovertitle,
+    undefined,
+  );
+});
+
+test("the spike runs across the panels, on the shared axis alone", () => {
+  const columns = figure("TimeSeriesProfile", ALL_SIX).layout;
+  assert.equal(columns.yaxis.showspikes, true);
+  assert.equal(columns.yaxis.spikemode, "across");
+  // Still reversed: the spike is spread in beside the depth direction, not over
+  // it.
+  assert.equal(columns.yaxis.autorange, "reversed");
+
+  const rows = figure("TimeSeries", ALL_SIX).layout;
+  assert.equal(rows.xaxis.showspikes, true);
+  assert.equal(rows.xaxis.spikemode, "across");
+
+  // One line, not one per panel.
+  ALL_SIX.forEach((_, index) => {
+    const suffix = index === 0 ? "" : index + 1;
+    assert.equal(columns[`xaxis${suffix}`].showspikes, undefined, `x${suffix}`);
+    assert.equal(rows[`yaxis${suffix}`].showspikes, undefined, `y${suffix}`);
+  });
 });
 
 // --- margins -----------------------------------------------------------------
@@ -605,7 +708,6 @@ test("no colour column means no colourbar, and no width kept for one", () => {
   });
   assert.ok(!layout.coloraxis);
   assert.equal(plotWidthFor(COLUMNS, 8, 2000), 2000);
-  assert.equal(plotWidthFor(COLUMNS, 8, 2000, false), 2000);
 });
 
 test("lines-only stays lines while no colour column is set", () => {
@@ -789,28 +891,29 @@ test("a colour column shades every panel, off one shared colour axis", () => {
   assert.ok(layout.coloraxis);
 });
 
-test("the bar is the layout's, so no trace carries a scale of its own", () => {
+test("the scale is the layout's, so no trace carries one of its own", () => {
   const { data, layout } = colored(ALL_SIX);
   data.forEach((trace) => {
     assert.ok(!("cmin" in trace.marker));
     assert.ok(!("cmax" in trace.marker));
     assert.ok(!("colorscale" in trace.marker));
     assert.ok(!("showscale" in trace.marker));
-    assert.ok(!trace.marker.colorbar);
   });
-  // One bar, however many panels: the range is Plotly's to take across every
-  // trace on the axis, which is what makes the panels comparable at all.
-  assert.equal(layout.coloraxis.showscale, true);
-  assert.ok(layout.coloraxis.colorbar);
+  // One mapping, however many panels — which is what makes the panels
+  // comparable at all. Plotly draws no bar for it: the legend beside the plot
+  // does, from the same stops and the same range.
+  assert.equal(layout.coloraxis.showscale, false);
+  assert.ok(!layout.coloraxis.colorbar);
 });
 
-test("a declared colorBarMinimum does not narrow the record to the catalogue", () => {
+test("the range is the record's own, not the catalogue's", () => {
   // ERDDAP's colorBarMinimum/Maximum are per standard_name across the whole
   // catalogue (0-8000 for depth); a record spans metres of that. Honouring it
-  // would flatten every profile to two adjacent shades.
+  // would flatten every profile to two adjacent shades. Stated all the same, so
+  // the legend paints the range the markers were mapped over.
   const { layout } = colored(["TE90_01"]);
-  assert.ok(!("cmin" in layout.coloraxis));
-  assert.ok(!("cmax" in layout.coloraxis));
+  assert.equal(layout.coloraxis.cmin, 1);
+  assert.equal(layout.coloraxis.cmax, DATA.length);
 });
 
 test("the colour column's own palette is what the bar opens in", () => {
@@ -835,7 +938,7 @@ test("a rainbow colour column is drawn in viridis, and a pick beats both", () =>
   const auto = figureFrom(rainbow, "TimeSeriesProfile", ["FLOR_01"], {
     colorAxis: "PSAL_01",
   });
-  assert.equal(auto.layout.coloraxis.colorscale, "Viridis");
+  assert.deepEqual(auto.layout.coloraxis.colorscale, colorScaleFor("Viridis"));
 
   const picked = figureFrom(rainbow, "TimeSeriesProfile", ["FLOR_01"], {
     colorAxis: "PSAL_01",
@@ -865,109 +968,91 @@ test("lines become markers+lines when colouring, and markers are left alone", ()
   );
 });
 
-test("the colourbar takes its width out of the right margin, not the panels", () => {
-  const plain = marginFor(COLUMNS, 1);
-  const withBar = marginFor(COLUMNS, 1, true);
-  assert.equal(withBar.r, plain.r + COLORBAR_GUTTER_PX);
-  assert.equal(withBar.l, plain.l);
-  assert.equal(withBar.t, plain.t);
-  assert.equal(withBar.b, plain.b);
-  // The height is the bar's own business: it hangs inside the plotting area.
-  assert.equal(plotHeightFor(ROWS, 3, 600, 1), plotHeightFor(ROWS, 3, 600, 1));
-});
-
-test("the panel floor still holds once the colourbar has been paid for", () => {
-  const margin = marginFor(COLUMNS, MAX_TITLE_LINES, true);
-  const width = plotWidthFor(COLUMNS, 6, 800, true);
+test("a colour column costs the panels no width at all", () => {
+  // The bar used to be drawn at the figure's right edge and reserved 86px of
+  // margin for itself. It is DOM now, outside the scroller, so the figure is
+  // the same width whether or not a colour column is set.
+  const margin = marginFor(COLUMNS, MAX_TITLE_LINES);
+  const width = plotWidthFor(COLUMNS, 6, 800);
   const panels = (width - margin.l - margin.r) / panelPitch(6, 0.22);
-  assert.ok(
-    panels >= MIN_PANEL_PX,
-    `${panels}px panels once the bar is reserved`,
-  );
-  assert.equal(
-    plotWidthFor(COLUMNS, 6, 800, true),
-    plotWidthFor(COLUMNS, 6, 800) + COLORBAR_GUTTER_PX,
-  );
-});
-
-test("the bar hangs from the top, clear of the vertical modebar", () => {
-  const { layout } = colored(["TE90_01"]);
-  const bar = layout.coloraxis.colorbar;
-  assert.equal(bar.y, 1);
-  assert.equal(bar.yanchor, "top");
-  assert.equal(bar.x, 1);
-  assert.equal(bar.xanchor, "left");
-  assert.ok(bar.len < 1);
-  // No title on the bar: Plotly measures one into the bar's own thickness, and
-  // the margin above was sized without it.
-  assert.ok(!bar.title);
-});
-
-test("the colour label is an annotation under the bar, wrapped into the gutter", () => {
-  const { layout } = colored(["TE90_01"]);
-  const label = layout.annotations[layout.annotations.length - 1];
-  assert.equal(label.xref, "paper");
-  assert.equal(label.x, 1);
-  assert.equal(label.xanchor, "left");
-  assert.ok(label.y < layout.coloraxis.colorbar.len);
-  label.text.split("<br>").forEach((line) => {
-    assert.ok(line.length <= maxCharsFor(LABEL_GUTTER_PX), line);
+  assert.ok(panels >= MIN_PANEL_PX, `${panels}px panels`);
+  assert.deepEqual(colored(ALL_SIX).layout.margin, {
+    ...figure("TimeSeriesProfile", ALL_SIX).layout.margin,
   });
+});
+
+test("the legend carries the label, the stops and the ticks", () => {
+  const { colorLegend, layout } = colored(["TE90_01"]);
   const depth = byColumnName(variablesFrom(VIKING, VIKING_DATASET)).get(
     "depth",
   );
-  assert.ok(
-    label.text.replace(/<br>/g, " ").startsWith(labelFor(depth).slice(0, 5)),
-  );
+  assert.equal(colorLegend.label, labelFor(depth));
+  // The same stops the markers were given, not a second likeness of them.
+  assert.deepEqual(colorLegend.stops, layout.coloraxis.colorscale);
+  assert.equal(colorLegend.ticks.length, 4);
+  assert.equal(colorLegend.ticks[0].position, 0);
+  assert.equal(colorLegend.ticks[3].position, 1);
+  assert.equal(colorLegend.ticks[0].text, "1");
+  assert.equal(colorLegend.ticks[3].text, String(DATA.length));
 });
 
-test("the colour label goes last, so no panel's own label moved", () => {
+test("no colour column, no legend", () => {
+  assert.equal(figure("TimeSeriesProfile", ALL_SIX).colorLegend, null);
+});
+
+test("a colour column moves no annotation, because it adds none", () => {
   const plain = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"]);
   const withColor = colored(["TE90_01", "PSAL_01"]);
-  assert.equal(
-    withColor.layout.annotations.length,
-    plain.layout.annotations.length + 1,
-  );
-  plain.layout.annotations.forEach((annotation, index) => {
-    assert.deepEqual(withColor.layout.annotations[index], annotation);
-  });
+  assert.deepEqual(withColor.layout.annotations, plain.layout.annotations);
 });
 
 test("hover gains the colour value, off customdata", () => {
-  // Coloured by a column this panel does not otherwise print — see the next
-  // test for the one that does.
-  const { data } = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+  // A stacked layout, because that is the one with a box per panel: a profile's
+  // rows are gathered into one box and the next test covers what that means.
+  // Coloured by a column this panel does not otherwise print.
+  const { data } = figureFrom(VIKING, "TimeSeries", ["TE90_01"], {
     colorAxis: "PSAL_01",
   });
   assert.deepEqual(
     data[0].customdata,
     DATA.map((row) => row.PSAL_01),
   );
-  assert.ok(data[0].hovertemplate.includes("%{customdata}"));
+  // With its own unit, like every other line in the box.
+  assert.ok(
+    data[0].hovertemplate.endsWith(
+      "<br>Practical Salinity: %{customdata} PSU<extra></extra>",
+    ),
+  );
+});
+
+test("a unified box never repeats the colour value, once per panel", () => {
+  // Every row of it comes from the same data row, so one line per panel would
+  // be the same number N times.
+  const { data } = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+    colorAxis: "PSAL_01",
+  });
+  assert.ok(!data[0].hovertemplate.includes("%{customdata}"));
+  // The values are still there: the markers are what carry them.
+  assert.ok(data[0].marker.coloraxis);
 });
 
 test("colouring by a column the panel already prints adds no second copy", () => {
   // The shared axis is on both of this panel's axes already...
-  const bySharedAxis = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
-    colorAxis: "depth",
+  const bySharedAxis = figureFrom(VIKING, "TimeSeries", ["TE90_01"], {
+    colorAxis: "time",
   });
   assert.ok(!bySharedAxis.data[0].hovertemplate.includes("%{customdata}"));
 
   // ...and so is the variable this panel draws.
-  const byPanel = figureFrom(
-    VIKING,
-    "TimeSeriesProfile",
-    ["TE90_01", "PSAL_01"],
-    {
-      colorAxis: "PSAL_01",
-    },
-  );
+  const byPanel = figureFrom(VIKING, "TimeSeries", ["TE90_01", "PSAL_01"], {
+    colorAxis: "PSAL_01",
+  });
   assert.ok(!byPanel.data[1].hovertemplate.includes("%{customdata}"));
   assert.ok(byPanel.data[0].hovertemplate.includes("%{customdata}"));
 });
 
 test("a time colour column is ramped over epoch ms and ticked in timestamps", () => {
-  const { data, layout } = figureFrom(
+  const { data, colorLegend } = figureFrom(
     VIKING,
     "TimeSeriesProfile",
     ["TE90_01"],
@@ -978,8 +1063,12 @@ test("a time colour column is ramped over epoch ms and ticked in timestamps", ()
   assert.equal(data[0].marker.color[0], Date.parse(DATA[0].time));
   // The hover still reads the timestamp the record published.
   assert.equal(data[0].customdata[0], DATA[0].time);
-  assert.equal(layout.coloraxis.colorbar.tickmode, "array");
-  assert.equal(layout.coloraxis.colorbar.ticktext.length, 4);
+  // And the legend labels the ramp in timestamps rather than epoch ms.
+  assert.equal(colorLegend.ticks.length, 4);
+  colorLegend.ticks.forEach((tick) => {
+    assert.match(tick.text, /^\d{2}:\d{2}$/, tick.text);
+    assert.ok(tick.position >= 0 && tick.position <= 1, String(tick.position));
+  });
 });
 
 test("a colour column this record cannot order leaves the figure as it was", () => {

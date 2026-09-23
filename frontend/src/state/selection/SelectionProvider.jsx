@@ -31,6 +31,11 @@ import { useMapState } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, hiddenDatasetPksFor } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import { RECORD_PARAM, withoutPreviewParams } from "./previewParams.js";
+import {
+  PREVIEW_ERROR,
+  networkPreviewError,
+  previewErrorFrom,
+} from "../../components/Controls/DatasetPreview/previewErrors.js";
 
 const SelectionContext = createContext();
 
@@ -164,6 +169,10 @@ export default function SelectionProvider({ children }) {
     Boolean(initialParams.get(RECORD_PARAM)),
   );
   const [datasetPreview, setDatasetPreview] = useState();
+  // Why the last /preview came back with nothing, or undefined when it did not.
+  // Set and cleared in the same tick as datasetPreview, so the modal can never
+  // hold one record's rows beside another's excuse.
+  const [previewError, setPreviewError] = useState();
   // Free-text title search for the datasets list (DatasetsTable's search
   // box). Lifted out of that component so it can also surface as a
   // removable chip in ActiveFilterChips.
@@ -797,26 +806,35 @@ export default function SelectionProvider({ children }) {
     )}&profile=${encodeURIComponent(inspectRecordID)}`;
     fetch(previewUrl)
       .then((response) => {
-        if (response.ok) return response.json();
-        // /preview distinguishes its failures now: 404 RECORD_NOT_FOUND or
-        // NO_DATA is an empty record (expected, the modal says so), while a
-        // 502 ERDDAP_UNAVAILABLE is an outage worth reporting. Before, every
-        // upstream failure came back as `200 []` and looked like empty data.
-        if (response.status >= 500) {
-          reportError(
-            `preview upstream failure (${response.status})`,
-            new Error(previewUrl),
-          );
+        if (response.ok) {
+          return response.json().then((preview) => ({ preview }));
         }
-        return undefined;
-      })
-      .then((preview) => {
-        setDatasetPreview(preview);
-        setRecordLoading(false);
+        // /preview says WHY it refused — four codes — and the modal has a
+        // sentence for each. The body is read here rather than discarded: a
+        // failure with no reason is the one thing the modal cannot explain.
+        // Anything that is not JSON (a proxy's HTML 502) reads as no body,
+        // which previewErrorFrom answers from the status alone.
+        return response
+          .json()
+          .catch(() => null)
+          .then((body) => ({
+            previewError: previewErrorFrom(response.status, body),
+          }));
       })
       .catch((error) => {
         reportError("preview fetch failed", error);
+        return { previewError: networkPreviewError() };
+      })
+      .then(({ preview, previewError: failure }) => {
+        // Cleared together, always: a failure that left the previous record's
+        // rows in state showed them under the new record's title.
+        setDatasetPreview(preview);
+        setPreviewError(failure);
         setRecordLoading(false);
+        if (failure && failure.code === PREVIEW_ERROR.ERDDAP_UNAVAILABLE) {
+          // An outage is worth reporting; an empty or unknown record is not.
+          reportError("preview upstream failure", new Error(previewUrl));
+        }
       });
   }, [inspectRecordID, inspectDatasetId]);
 
@@ -853,6 +871,7 @@ export default function SelectionProvider({ children }) {
     // this, a cold link simply opens once its dataset lands, on the spinner
     // recordLoading is still holding up.
     showPreviewModal: Boolean(inspectDataset && inspectRecordID),
+    previewError,
     recordLoading,
     setRecordLoading,
     datasetPreview,

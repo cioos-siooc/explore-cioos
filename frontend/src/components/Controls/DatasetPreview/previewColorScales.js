@@ -23,9 +23,10 @@ const RAINBOWS = new Set(["Rainbow", "LightRainbow", "ReverseRainbow", "Jet"]);
 
 export const DEFAULT_COLOR_SCALE = "Viridis";
 
-// What the picker offers, in the order it offers it. The two built-ins are
-// handed to Plotly BY NAME — its own Viridis is a seventeen-stop ramp and a
-// second, worse copy of it here would only drift. The rest are the ERDDAP ramps
+// What the picker offers, in the order it offers it. The first two are Plotly's
+// own names, tabulated here rather than handed over as names: the legend beside
+// the plot is a CSS gradient, and a name Plotly resolves privately would be a
+// different ramp from the one the legend paints. The rest are the ERDDAP ramps
 // already tabulated for the solid colours, so a publisher's intent stays
 // pickable even on a variable that did not declare it.
 export const COLOR_SCALES = [
@@ -42,22 +43,35 @@ export const COLOR_SCALES = [
   "YellowRed",
 ];
 
-// Five stops each, for the 60x12px gradient chip in the picker and nothing else.
-// The real ones are Plotly's and are not reachable from the dist bundle, so this
-// is a likeness of the swatch, never of the mapping the figure draws.
-const BUILT_IN_SWATCHES = {
+// Viridis and Cividis, sampled from their own definitions at eleven stops. Used
+// for everything: the figure's markers, the picker's chip, and the legend beside
+// the plot — one table so the three cannot disagree, which is the whole reason
+// they are not passed to Plotly by name.
+const BUILT_IN_PALETTES = {
   Viridis: [
     [0, "#440154"],
-    [0.25, "#3b528b"],
-    [0.5, "#21918c"],
-    [0.75, "#5ec962"],
+    [0.1, "#482878"],
+    [0.2, "#3e4a89"],
+    [0.3, "#31688e"],
+    [0.4, "#26828e"],
+    [0.5, "#1f9e89"],
+    [0.6, "#35b779"],
+    [0.7, "#6ece58"],
+    [0.8, "#b5de2b"],
+    [0.9, "#fde725"],
     [1, "#fde725"],
   ],
   Cividis: [
     [0, "#00224e"],
-    [0.25, "#3b496c"],
-    [0.5, "#707173"],
-    [0.75, "#a59c74"],
+    [0.1, "#123570"],
+    [0.2, "#3b496c"],
+    [0.3, "#575d6d"],
+    [0.4, "#707173"],
+    [0.5, "#8a8678"],
+    [0.6, "#a59c74"],
+    [0.7, "#c3b369"],
+    [0.8, "#e1cc55"],
+    [0.9, "#fee838"],
     [1, "#fee838"],
   ],
 };
@@ -70,16 +84,15 @@ export function normalizeColorScale(value) {
   return COLOR_SCALES.includes(name) && !RAINBOWS.has(name) ? name : null;
 }
 
-// The form Plotly takes: a named scale it already carries, or one of our ramps.
+// The stops a ramp is drawn from, whoever is drawing: Plotly's marker colours,
+// the picker's chip, the legend's gradient. Never a bare name — see the comment
+// on COLOR_SCALES.
 export function colorScaleFor(name) {
-  return paletteFor(name) || name;
+  return paletteFor(name) || BUILT_IN_PALETTES[name] || [];
 }
 
-// The stops a swatch is painted from — our ramps as they are, the built-ins as
-// the likeness above.
-export function swatchStopsFor(name) {
-  return paletteFor(name) || BUILT_IN_SWATCHES[name] || [];
-}
+// The same stops, under the name the picker's chip asks for them by.
+export const swatchStopsFor = colorScaleFor;
 
 // The scale a column draws in when nobody has picked one: the publisher's own
 // colorBarPalette, else Viridis — and never a rainbow. The NAME rather than the
@@ -183,13 +196,52 @@ export function colorDimensionFor(variable, data) {
       return Number.isFinite(parsed) ? parsed : null;
     });
     if (!values.some((value) => value !== null)) return null;
-    return { values, hoverValues: raw, ticks: timeTicksFor(values) };
+    return {
+      values,
+      hoverValues: raw,
+      range: extentOf(values),
+      ticks: timeTicksFor(values),
+    };
   }
 
   if (!variable.isNumeric) return null;
 
   const values = raw.map(numberOrGap);
   return values.some((value) => value !== null)
-    ? { values, hoverValues: values, ticks: null }
+    ? { values, hoverValues: values, range: extentOf(values), ticks: null }
     : null;
+}
+
+// At most this many significant digits on a legend tick: enough to tell four
+// ticks apart, few enough that 27.837999999999997 does not appear.
+const TICK_DIGITS = 4;
+
+const formatTick = (value) => String(Number(value.toPrecision(TICK_DIGITS)));
+
+/**
+ * The ticks the legend beside the plot paints, as `{ position, text }` with
+ * position in 0..1 along the ramp.
+ *
+ * Plotly used to draw these itself, inside a figure that scrolls horizontally —
+ * which is how the colourbar ended up off-screen on a wide profile. The ramp is
+ * DOM now, so its ticks have to be computed rather than delegated.
+ */
+export function legendTicksFor(dimension) {
+  if (!dimension || !dimension.range) return [];
+  const [low, high] = dimension.range;
+  const span = high - low;
+  if (!(span > 0)) return [];
+
+  // A time column already has its four, formatted: they are the reason the
+  // column is offerable at all.
+  if (dimension.ticks && dimension.ticks.tickvals) {
+    return dimension.ticks.tickvals.map((value, index) => ({
+      position: (value - low) / span,
+      text: dimension.ticks.ticktext[index],
+    }));
+  }
+  return Array.from({ length: TICK_COUNT }, (_, index) => {
+    const position = index / (TICK_COUNT - 1);
+    return { position, text: formatTick(low + span * position) };
+  });
 }

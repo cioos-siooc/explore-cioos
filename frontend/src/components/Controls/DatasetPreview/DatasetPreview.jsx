@@ -10,6 +10,7 @@ import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx"
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
 import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
+import { PREVIEW_ERROR } from "./previewErrors.js";
 import "./styles.css";
 
 // Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
@@ -29,6 +30,15 @@ const BLOCKED_MESSAGES = {
   [PLOT_BLOCKED.NO_SHARED_AXIS]: "datasetPreviewPlotBlockedNoAxis",
   [PLOT_BLOCKED.NO_MEASUREMENTS]: "datasetPreviewPlotBlockedNoMeasurements",
 };
+// Why /preview came back with nothing, in the reader's terms. Only the outage
+// suggests trying again — the other three do not get better by waiting.
+const PREVIEW_ERROR_MESSAGES = {
+  [PREVIEW_ERROR.NO_DATA]: "datasetPreviewErrorNoData",
+  [PREVIEW_ERROR.ERDDAP_UNAVAILABLE]: "datasetPreviewErrorUnavailable",
+  [PREVIEW_ERROR.NO_RECORD_ID_VARIABLE]: "datasetPreviewErrorNoRecordId",
+  [PREVIEW_ERROR.RECORD_NOT_FOUND]: "datasetPreviewErrorNotFound",
+  [PREVIEW_ERROR.NETWORK]: "datasetPreviewErrorNetwork",
+};
 const WANTED_LABELS = {
   vertical: "datasetPreviewPlotWantedVertical",
   time: "datasetPreviewPlotWantedTime",
@@ -43,6 +53,7 @@ const NO_LINK_COPIED = Symbol("no link copied");
 
 export default function DatasetPreview({
   datasetPreview,
+  previewError,
   inspectDataset,
   inspectRecordID,
   setInspectRecordID,
@@ -299,9 +310,18 @@ export default function DatasetPreview({
                       )}
                     </>
                   ) : (
-                    <>
-                      <p>{t("datasetPreviewNoData")}</p>
-                    </>
+                    // In the plot's place, like the blocked message above:
+                    // /preview names the cause, and "try again later" was only
+                    // ever right for one of the five.
+                    <div className="datasetPreviewPlotBlocked">
+                      <p>
+                        {t(
+                          (previewError &&
+                            PREVIEW_ERROR_MESSAGES[previewError.code]) ||
+                            "datasetPreviewNoData",
+                        )}
+                      </p>
+                    </div>
                   )}
                 </>
               )}

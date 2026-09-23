@@ -34,11 +34,16 @@
 // named. The title says what the cf_role columns say: see recordTitleFor.
 
 import { COLUMNS } from "./previewFacetPlan.js";
-import { labelFor, shortLabelFor } from "./previewVariables.js";
+import {
+  labelFor,
+  shortLabelFor,
+  shortestNameFor,
+} from "./previewVariables.js";
 import { defaultColorFor } from "./previewColors.js";
 import {
   colorDimensionFor,
   colorScaleForVariable,
+  legendTicksFor,
 } from "./previewColorScales.js";
 
 // Left of every vertical axis: room for its tick labels, then room for the
@@ -61,24 +66,12 @@ const COLUMNS_MARGIN = {
 };
 const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 62 };
 
-// One colourbar's worth of right margin: the gap Plotly leaves on BOTH sides of
-// the strip, the strip, and room for its tick labels — the same room the left
-// axis reserves for its own, because they label the same kind of number.
-//
-// It has to match what Plotly asks for, because a colourbar calls autoMargin:
-// reserve less and it grows the margin inside a width fixed here, taking the
-// difference out of the panels. Reserving exactly its request means it asks for
-// nothing. That holds until a tick label runs past TICK_ROOM_PX, which is a few
-// pixels off the panels rather than a broken layout.
-const COLORBAR_PAD_PX = 10; // Plotly's own xpad default
-const COLORBAR_THICKNESS_PX = 14;
-export const COLORBAR_GUTTER_PX =
-  2 * COLORBAR_PAD_PX + COLORBAR_THICKNESS_PX + TICK_ROOM_PX;
-// The bar hangs from the top and its label goes underneath, not above: the
-// modebar is vertical and lives in the top right corner, so a label up there
-// would be drawn under it every time the pointer entered the figure.
-const COLORBAR_LEN = 0.82;
-const COLORBAR_LABEL_GAP = 0.02;
+// WHERE THE COLOURBAR WENT
+// Plotly drew it at the right edge of the FIGURE, and a profile with many panels
+// is wider than its pane — so on exactly the plots that need it, the bar sat
+// past the end of a horizontal scroll. It is a DOM strip above the plot area
+// now, outside the scroller: see ColorScaleLegend.jsx, fed by the colorLegend
+// buildFigure returns. Nothing here reserves width for it any more.
 
 // The title is bigger than a label (12) because it is a title, and its room is
 // reserved by hand for the same reason the annotations' is: see marginFor.
@@ -99,21 +92,11 @@ export function titleRoomFor(lineCount) {
 /**
  * The margins the layout uses. `titleLines` defaults to the worst case, so the
  * sizing floors below reserve room for a title they cannot measure; buildFigure
- * passes the count it actually wrapped to. `hasColorBar` defaults to off, so
- * every caller that knows nothing about the colour dimension keeps the margins
- * it always had.
+ * passes the count it actually wrapped to.
  */
-export function marginFor(
-  orientation,
-  titleLines = MAX_TITLE_LINES,
-  hasColorBar = false,
-) {
+export function marginFor(orientation, titleLines = MAX_TITLE_LINES) {
   const base = orientation === COLUMNS ? COLUMNS_MARGIN : ROWS_MARGIN;
-  return {
-    ...base,
-    r: base.r + (hasColorBar ? COLORBAR_GUTTER_PX : 0),
-    t: base.t + titleRoomFor(titleLines),
-  };
+  return { ...base, t: base.t + titleRoomFor(titleLines) };
 }
 
 // Gap between panels, as a fraction of ONE PANEL rather than of the whole
@@ -144,6 +127,9 @@ export const LABEL_FONT_PX = 12;
 // two panel titles on top of each other, which is the bug this is fixing.
 const CHAR_PX_PER_FONT_PX = 0.58;
 const MAX_LABEL_LINES = 3;
+// How much of a name a hover row may spend. Long enough for "Practical
+// Salinity", short enough that six rows stay a box rather than a paragraph.
+const HOVER_NAME_CHARS = 22;
 
 // How many characters fit in `widthPx`. 0 means "unknown" — buildFigure is
 // called before the plot area has been measured, and every caller treats 0 as
@@ -302,15 +288,10 @@ export function plotHeightFor(
 // Profiles get narrow fast: six panels in a 1140 px modal is ~170 px each, which
 // still reads, but the floor is what keeps a 14-column selection legible at the
 // cost of a horizontal scroll.
-export function plotWidthFor(
-  orientation,
-  panelCount,
-  availableWidth,
-  hasColorBar = false,
-) {
+export function plotWidthFor(orientation, panelCount, availableWidth) {
   const available = Math.max(availableWidth || 0, MIN_PLOT_PX);
   if (orientation !== COLUMNS) return available;
-  const margin = marginFor(orientation, MAX_TITLE_LINES, hasColorBar);
+  const margin = marginFor(orientation, MAX_TITLE_LINES);
   const needed =
     MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r;
   return Math.ceil(Math.max(available, needed));
@@ -348,54 +329,23 @@ const axisLabel = (text, y) => ({
 const wrapAxisLabel = (text) =>
   wrapLabel(text, maxCharsFor(LABEL_GUTTER_PX), 4);
 
-// The bar itself. Identical in both orientations: the panels span the whole
-// plotting height either way, so there is nothing orientation-specific to say.
+// The hover's line, on the SHARED axis alone — a second one per panel would be
+// noise. `across` is what makes it span every panel: Plotly draws it between the
+// lowest and highest domain of that axis's counter axes, which is all N of them,
+// rather than stopping at the panel under the pointer.
 //
-// NO title: a vertical colourbar's title is measured INTO the bar's own
-// thickness, so a long one pushes the right margin past what marginFor reserved
-// and takes the width back out of the panels — the same trap layout.title's
-// automargin is left off for. The label is an annotation instead, below.
-const colorBarFor = (ticks) => ({
-  // paper x 1 is the right edge of the plotting area, i.e. the inside edge of
-  // the margin marginFor() widened; xpad is the gap from there to the strip.
-  x: 1,
-  xanchor: "left",
-  xpad: COLORBAR_PAD_PX,
-  thicknessmode: "pixels",
-  thickness: COLORBAR_THICKNESS_PX,
-  lenmode: "fraction",
-  len: COLORBAR_LEN,
-  y: 1,
-  yanchor: "top",
-  // Nothing is drawn outside the thickness the margin was sized from.
-  outlinewidth: 0,
-  // Stated rather than inherited, like every other label here.
-  tickfont: { size: LABEL_FONT_PX },
-  // A colour axis over time carries epoch milliseconds, which nobody can read;
-  // these are the four timestamps that stand in for them.
-  ...(ticks || {}),
-});
-
-// Under the bar, horizontal, in the gutter the margin reserves — the mirror of
-// axisLabel() on the other side of the figure.
-const colorBarLabel = (text) => ({
-  text,
-  xref: "paper",
-  x: 1,
-  xanchor: "left",
-  xshift: COLORBAR_PAD_PX,
-  yref: "paper",
-  y: 1 - COLORBAR_LEN - COLORBAR_LABEL_GAP,
-  yanchor: "top",
-  showarrow: false,
-  align: "left",
-  font: { size: LABEL_FONT_PX },
-});
-
-// Two lines, not the four a left-hand axis label gets: what is left under the
-// bar is 16% of the plotting height, which at the MIN_PLOT_PX floor is ~36px.
-const wrapColorBarLabel = (text) =>
-  wrapLabel(text, maxCharsFor(LABEL_GUTTER_PX), 2);
+// A fixed grey because the default is the hovered POINT's colour, and with a
+// colour dimension set that tints the line by the ramp value it is pointing at —
+// the line is a guide, not data.
+const SPIKE_COLOR = "#6c757d";
+const sharedAxisSpike = {
+  showspikes: true,
+  spikemode: "across",
+  spikesnap: "hovered data",
+  spikethickness: 1, // Plotly's own default is 3, which reads as a rule
+  spikedash: "dot",
+  spikecolor: SPIKE_COLOR,
+};
 
 // Between two id entries in the title, and between several values of one id.
 const TITLE_JOIN = " — ";
@@ -487,6 +437,25 @@ export function buildFigure({
       : custom;
   };
 
+  // What the hover calls a column: the user's rename, else the shortest name
+  // the publisher gave it. Capped because a box is open on every panel at once
+  // and one 125-character long_name would stretch it across the figure — the
+  // panel's own label carries the whole thing.
+  const hoverNameFor = (columnName) => {
+    const custom = labels[columnName] && labels[columnName].trim();
+    const name =
+      custom || shortestNameFor(variablesByName.get(columnName)) || columnName;
+    return ellipsize(name, HOVER_NAME_CHARS);
+  };
+  // After the value rather than after the name: "3.21 degree_C" reads as a
+  // measurement, where "TE90_01 ( degree_C ): 3.21" reads as a column heading.
+  const hoverUnitFor = (columnName) => {
+    const variable = variablesByName.get(columnName);
+    return variable && variable.unit ? ` ${variable.unit}` : "";
+  };
+  const hoverLine = (columnName, token) =>
+    `${hoverNameFor(columnName)}: ${token}${hoverUnitFor(columnName)}`;
+
   const isColumns = plan.orientation === COLUMNS;
   const gap = isColumns ? COLUMN_GAP : ROW_GAP;
   const domains = domainsFor(panels.length, gap);
@@ -504,11 +473,13 @@ export function buildFigure({
   const colorVariable = colorAxis ? variablesByName.get(colorAxis) : undefined;
   const colorDimension = colorDimensionFor(colorVariable, data);
   const hasColorBar = Boolean(colorDimension);
-  const colorTitle = hasColorBar ? titleFor(colorAxis) : "";
+  const colorStops = hasColorBar
+    ? colorScaleForVariable(colorVariable, colorScale)
+    : null;
   // A ramp has nothing to draw on without markers.
   const drawMode = hasColorBar && mode === "lines" ? "markers+lines" : mode;
 
-  const margin = marginFor(plan.orientation, titleLines, hasColorBar);
+  const margin = marginFor(plan.orientation, titleLines);
   // The width labels actually have to fit in. 0 until the plot area has been
   // measured, and maxCharsFor turns that into "leave the label alone".
   const plottingWidth = size.width
@@ -523,7 +494,20 @@ export function buildFigure({
     // Stated rather than inherited, because maxCharsFor's estimate assumes it.
     font: { size: LABEL_FONT_PX },
     showlegend: false, // each panel is titled; a legend would repeat it
-    hovermode: "closest",
+    // One hover for every panel at once, along the axis they share: `closest`
+    // answered for the one panel under the pointer, so reading three variables
+    // at one depth took three hovers. `hoversubplots` is what widens it past
+    // that panel — its default, "overlaying", would leave this as it was.
+    //
+    // WHY A PROFILE'S IS UNIFIED AND A STACK'S IS NOT
+    // Plotly rotates every hover box by a fixed 60° when hovermode is "y" and
+    // more than one of them is drawn — YANGLE, no attribute turns it off. A
+    // profile's shared axis is the vertical one, so per-panel boxes there come
+    // out on a diagonal; unified gathers them into one horizontal box instead.
+    // A stack hovers along "x", which is not rotated, so it keeps a box per
+    // panel.
+    hovermode: isColumns ? "y unified" : "x",
+    hoversubplots: "axis",
     dragmode: "zoom",
     modebar: { orientation: "v" },
     ...(size.width ? { width: size.width } : {}),
@@ -556,12 +540,18 @@ export function buildFigure({
   if (hasColorBar) {
     // ONE colour axis in the layout, not one mapping per trace: Plotly ranges it
     // across every trace that references it, so all the panels read against the
-    // one bar by construction rather than by every trace happening to carry the
-    // same values. It is also what keeps cmin/cmax out of the traces entirely.
+    // one scale by construction rather than by every trace happening to carry
+    // the same values.
+    //
+    // The range is stated rather than left to Plotly, because the legend beside
+    // the plot has to paint the same one: "both ends up to whoever computed
+    // them" is how a strip and its markers drift apart.
     layout.coloraxis = {
-      colorscale: colorScaleForVariable(colorVariable, colorScale),
-      showscale: true,
-      colorbar: colorBarFor(colorDimension.ticks),
+      colorscale: colorStops,
+      ...(colorDimension.range
+        ? { cmin: colorDimension.range[0], cmax: colorDimension.range[1] }
+        : {}),
+      showscale: false, // drawn outside the figure — see ColorScaleLegend.jsx
     };
   }
 
@@ -575,6 +565,10 @@ export function buildFigure({
       automargin: true,
       domain: [0, 1],
       anchor: "x",
+      ...sharedAxisSpike,
+      // The unified box's own title. Left alone it is the bare axis value; this
+      // makes it read like the rows underneath it.
+      unifiedhovertitle: { text: hoverLine(sharedAxis, "%{y}") },
       ...(plan.sharedReversed ? { autorange: "reversed" } : {}),
     };
     annotations.push(axisLabel(wrapAxisLabel(sharedTitle), 0.5));
@@ -584,6 +578,7 @@ export function buildFigure({
       automargin: true,
       domain: [0, 1],
       anchor: "y",
+      ...sharedAxisSpike,
       title: {
         text: wrapAt(sharedTitle, plottingWidth),
         font: { size: LABEL_FONT_PX },
@@ -641,25 +636,33 @@ export function buildFigure({
 
     // The colour column is worth a hover line unless this panel already prints
     // it — colouring by the shared axis, or by the variable drawn here, would
-    // otherwise say the same number twice.
+    // otherwise say the same number twice. Never in a unified box: every row of
+    // it comes from the SAME data row, so one line per panel would be one copy
+    // of the same value per panel.
     const colorInHover =
-      hasColorBar && colorAxis !== sharedAxis && colorAxis !== columnName;
+      !isColumns &&
+      hasColorBar &&
+      colorAxis !== sharedAxis &&
+      colorAxis !== columnName;
 
     return {
       type: "scatter",
       mode: drawMode,
-      // Plain, never the wrapped text: a <br> in a hover box breaks the line
-      // where the panel needed it, not where the sentence does.
+      // Never drawn — <extra></extra> below drops the box Plotly keeps it in —
+      // but plain rather than wrapped: a <br> belongs to the panel that needed
+      // it, not to the trace's own name.
       name: panelTitle,
       x: isColumns ? panelValues : sharedValues,
       y: isColumns ? sharedValues : panelValues,
       xaxis: isColumns ? axisRef("x", index) : "x",
       yaxis: isColumns ? "y" : axisRef("y", index),
       hovertemplate:
+        // One line in a unified box, where the shared axis is in the title
+        // already; two in a box of its own, which has no title.
         (isColumns
-          ? `${panelTitle}: %{x}<br>${sharedTitle}: %{y}`
-          : `${sharedTitle}: %{x}<br>${panelTitle}: %{y}`) +
-        (colorInHover ? `<br>${colorTitle}: %{customdata}` : "") +
+          ? hoverLine(columnName, "%{x}")
+          : `${hoverLine(sharedAxis, "%{x}")}<br>${hoverLine(columnName, "%{y}")}`) +
+        (colorInHover ? `<br>${hoverLine(colorAxis, "%{customdata}")}` : "") +
         "<extra></extra>",
       // The markers carry the third dimension; the line still carries the
       // variable's own colour, which is what says WHICH panel this is.
@@ -671,11 +674,17 @@ export function buildFigure({
     };
   });
 
-  // Last, so that adding a colour column cannot shift the index of any panel's
-  // own label.
-  if (hasColorBar)
-    annotations.push(colorBarLabel(wrapColorBarLabel(colorTitle)));
-
   layout.annotations = annotations;
-  return { data: traces, layout };
+  // What the strip above the plot paints: the same stops the markers were given
+  // and the same range they were mapped over, so the two cannot disagree about
+  // what a colour means. Null when there is no colour column, which is what
+  // decides whether the strip is rendered at all.
+  const colorLegend = hasColorBar
+    ? {
+        label: titleFor(colorAxis),
+        stops: colorStops,
+        ticks: legendTicksFor(colorDimension),
+      }
+    : null;
+  return { data: traces, layout, colorLegend };
 }
