@@ -52,11 +52,11 @@ describe("TimeBar", () => {
     expect(document.querySelector(".timeBar")).not.toBeInTheDocument();
   });
 
-  it("Reset restores the default start/end dates", async () => {
+  it("Clear restores the default start/end dates", async () => {
     const { user } = await renderReady({
       url: "/?timeMin=2015-01-01T00:00:00Z",
     });
-    await user.click(screen.getByTitle("Reset the time range to all dates"));
+    await user.click(screen.getByTitle("Clear the time range to all dates"));
     await waitFor(() =>
       expect(document.querySelector(".timeBar")).not.toBeInTheDocument(),
     );

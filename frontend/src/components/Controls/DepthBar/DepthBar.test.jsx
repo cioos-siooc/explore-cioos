@@ -52,9 +52,9 @@ describe("DepthBar", () => {
     expect(document.querySelector(".depthBar")).not.toBeInTheDocument();
   });
 
-  it("Reset restores the default start/end depths", async () => {
+  it("Clear restores the default start/end depths", async () => {
     const { user } = await renderReady({ url: "/?depthMin=100" });
-    await user.click(screen.getByTitle("Reset the depth range to all depths"));
+    await user.click(screen.getByTitle("Clear the depth range to all depths"));
     await waitFor(() =>
       expect(document.querySelector(".depthBar")).not.toBeInTheDocument(),
     );

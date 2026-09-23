@@ -102,6 +102,44 @@ describe("Legend", () => {
     expect(screen.getByLabelText("Gridded coverage")).toBeInTheDocument();
   });
 
+  it("explains the metric from the info button on the group label", async () => {
+    const { user } = renderLegend();
+    await user.click(screen.getByLabelText("About Days of data"));
+    const help = await screen.findByTestId("legend-help-modal");
+    expect(help).toHaveTextContent("the distinct days on which anything was");
+    expect(help).toHaveTextContent("A day counts once");
+  });
+
+  it("gives the hexes and the markers explainers of their own", async () => {
+    const { user } = renderLegend({ zoom: 10 });
+    await user.click(screen.getByLabelText("About Hexes"));
+    expect(await screen.findByTestId("legend-help-modal")).toHaveTextContent(
+      "summed into hexagonal cells",
+    );
+    await user.click(screen.getByLabelText("Close"));
+    await user.click(screen.getByLabelText("About Markers"));
+    const markers = await screen.findByTestId("legend-help-modal");
+    expect(markers).toHaveTextContent("stop being cells");
+    expect(markers).toHaveTextContent("Colour is the platform");
+  });
+
+  it("gives the keyless layers group an info button of its own", async () => {
+    const { user } = renderLegend({
+      layerControls: [
+        {
+          key: "griddap",
+          label: "Gridded coverage",
+          checked: false,
+          onChange: vi.fn(),
+        },
+      ],
+    });
+    await user.click(screen.getByLabelText("About Gridded data coverage"));
+    expect(await screen.findByTestId("legend-help-modal")).toHaveTextContent(
+      "What it draws",
+    );
+  });
+
   it("on a phone-width viewport, collapses to a compact ramp and opens the rest behind a dialog", async () => {
     setViewportWidth(MOBILE_WIDTH);
     const { user } = renderLegend();

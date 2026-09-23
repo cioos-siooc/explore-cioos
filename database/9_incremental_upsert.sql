@@ -304,7 +304,7 @@ BEGIN
   -- backfilled columns are permanently NULL-able and the hex FKs are DEFERRABLE
   -- INITIALLY DEFERRED (validated at COMMIT), so this whole function stays on DML
   -- (ROW EXCLUSIVE) and never takes the ACCESS EXCLUSIVE lock that deadlocked
-  -- with live web-api reads. See 7_contraints.sql / validate_loaded_data().
+  -- with live web-api reads. See 7_constraints.sql / validate_loaded_data().
   PERFORM replace_profiles_from_temp();
 
   -- 5. Replace obis_cells (delete old, insert new)

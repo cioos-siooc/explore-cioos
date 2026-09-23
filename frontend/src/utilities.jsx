@@ -1,6 +1,7 @@
+import bytes from "bytes";
 import isEmpty from "lodash-es/isEmpty";
 import { scaleLinear, scaleLog } from "d3-scale";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { defaultQuery } from "./components/config.js";
 
 export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
@@ -12,6 +13,20 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
       };
     }),
   );
+}
+
+/*
+ * A download size as the modal shows it. Every byte figure there comes from
+ * /downloadEstimate, which counts rows against the filters and multiplies —
+ * it is never a measured file size, so the tilde travels with the number
+ * rather than being stated once in a legend: the figures are read one card at
+ * a time, and a bare "1.2GB" beside a dataset reads as a fact about that file.
+ *
+ * `bytes()` returns null for a null or NaN input, which is how a dataset the
+ * estimate response did not cover arrives here.
+ */
+export function formatSizeEstimate(size) {
+  return `~${bytes(size) || "0B"}`;
 }
 
 export function capitalizeFirstLetter(string) {
@@ -105,6 +120,7 @@ export function createDataFilterQueryString(query) {
     scientificNamesSelected,
     obisNodesSelected,
     erddapServersSelected,
+    realtimeOnly,
   } = query;
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
@@ -212,6 +228,9 @@ export function createDataFilterQueryString(query) {
     includeObis,
     scientificNames,
     obisNodes,
+    // Only ever sent when on; objectToURL drops empty strings, so the default
+    // leaves the URL (and the API request) untouched.
+    realtimeOnly: realtimeOnly ? "true" : "",
   };
 
   return objectToURL(apiMappedQuery);
@@ -381,6 +400,113 @@ export function useDebounce(value, delay) {
   return debouncedValue;
 }
 
+// A search box that doesn't set the whole app to work on every keystroke: the
+// typed text is local, so the field itself stays instant, and it is published
+// to the state the rest of the app reacts to — an options list's search terms,
+// or the free-text dataset search behind the map, the list and the counters —
+// on whichever trigger suits what that search costs.
+//
+// `trigger` is what publishes a non-empty box:
+//   - "pause" (the default) publishes once typing stops for `delay`. Right for
+//     a box narrowing an options list already in memory, where publishing is
+//     an array filter, and for the scientific-name typeahead, whose whole job
+//     is to offer names as they are typed.
+//   - "submit" publishes nothing until `submit()` — Enter, or the magnifier
+//     beside the field. Right for the free-text dataset search, where each
+//     distinct value is a fresh round of tile, legend and coverage requests
+//     (see SelectionProvider): a pause is only a guess at when the word is
+//     finished, and it guesses wrong often enough to spend a whole round of
+//     those on "temperat" on the way to "temperature".
+//
+// Returns the text to show, the setter its onChange calls, and submit, so the
+// markup, the placeholder and the clear button stay with whichever component
+// owns them.
+//
+// Two rules hold on either trigger, both about never losing what was asked for:
+//   - Emptying the box publishes at once. Undoing a search has to read as the
+//     clear button working, and an empty search is the cheapest query there is.
+//   - A box that goes away with typing unpublished publishes it on the way out,
+//     so typing into a filter pane and closing it straight after searches for
+//     what was typed rather than for nothing. That holds under "submit" too:
+//     not having pressed Enter is a weaker signal than having typed the word.
+//
+// A change to `value` from anywhere else — Reset, a chip removed, a share link
+// — is adopted into the box; this hook's own published value arriving back is
+// not, or every keystroke after a publish would be overwritten by it.
+export function useSearchInput(
+  value,
+  onChange,
+  { trigger = "pause", delay = 300 } = {},
+) {
+  const [text, setText] = useState(value);
+  // The value last published from here. State rather than a ref because it is
+  // read during render, to tell our own value coming back around from a change
+  // made anywhere else.
+  const [published, setPublished] = useState(value);
+  const timer = useRef(undefined);
+  // What the timer and the unmount flush read, both of them outliving the
+  // render that scheduled them. Written in a layout effect: refs must not be
+  // written during render, and a passive effect can still be pending when a
+  // timer armed before it fires.
+  const latest = useRef({ text, published, onChange });
+  useLayoutEffect(() => {
+    latest.current = { text, published, onChange };
+  });
+
+  // A change made anywhere else — Reset, a chip removed, a share link — replaces
+  // what is in the box. Mirrored during render rather than in an effect (see
+  // useChanged) so the box never paints a frame of the text it has been told to
+  // drop.
+  if (useChanged(value) && value !== published) {
+    setPublished(value);
+    setText(value);
+  }
+
+  // Typing that hadn't landed by the time the box went away — a filter pane
+  // closed right after a word was typed into it — is published on the way out
+  // rather than lost.
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      const { text: typed, published: sent, onChange: send } = latest.current;
+      if (typed !== sent) send(typed);
+    },
+    [],
+  );
+
+  function publish(next) {
+    setPublished(next);
+    latest.current.onChange(next);
+  }
+
+  function change(next) {
+    setText(next);
+    clearTimeout(timer.current);
+    // Emptied, it publishes there and then — see above.
+    if (next === "") {
+      publish(next);
+      return;
+    }
+    if (trigger !== "pause") return;
+    timer.current = setTimeout(() => {
+      // Only while the box still holds what was typed — a value taken from
+      // outside since then has already replaced it, and publishing this would
+      // undo that.
+      if (latest.current.text === next) publish(next);
+    }, delay);
+  }
+
+  // Enter, or the magnifier. Publishes the box as it stands whatever the
+  // trigger: a pause-triggered box told to search now has no reason to sit out
+  // the rest of its delay.
+  function submit() {
+    clearTimeout(timer.current);
+    if (text !== published) publish(text);
+  }
+
+  return [text, change, submit];
+}
+
 // Which of the three tiers the ramp is drawn from, for a zoom. Every zoom maps
 // onto one: an unknown zoom (the map hasn't reported its camera yet) takes the
 // widest tier rather than falling out of the switch — a caller that got
@@ -444,16 +570,6 @@ export function rangesEqual(a, b) {
 // with no explanation.
 export function rangeLevelHasData(rangeLevel) {
   return Array.isArray(rangeLevel) && Number.isFinite(rangeLevel[1]);
-}
-
-export function getPointsDataSize(pointsData) {
-  let total = 0;
-  pointsData.forEach((point) => {
-    if (point.selected && point.size !== "NaN" && point.size !== null) {
-      total += point.size;
-    }
-  });
-  return total;
 }
 
 // returns true for rectangles, false for rotated rectangles
@@ -541,18 +657,31 @@ export function polygonIsRectangle(polygon) {
   return lons.length === 2 && lats.length === 2;
 }
 
-// translate a rectangular polygon to a bounding box query using lat/long min/max
-function polygonToMaxMins(polygon) {
-  const p = polygon.slice(0, 4);
-
-  const lons = unique(p.map((e) => e[0]));
-  const lats = unique(p.map((e) => e[1]));
+// The envelope of any polygon ring — a rectangle's own four corners, or the
+// enclosing box of a freeform shape's. Numbers, not display strings: callers
+// round or label as their own context needs (a query string wants
+// .toFixed(4) keys, a readout wants labelled, unrounded figures).
+export function polygonBounds(polygon) {
+  const lons = polygon.map((e) => e[0]);
+  const lats = polygon.map((e) => e[1]);
 
   return {
-    latMin: Math.min(...lats).toFixed(4),
-    lonMin: Math.min(...lons).toFixed(4),
-    latMax: Math.max(...lats).toFixed(4),
-    lonMax: Math.max(...lons).toFixed(4),
+    west: Math.min(...lons),
+    south: Math.min(...lats),
+    east: Math.max(...lons),
+    north: Math.max(...lats),
+  };
+}
+
+// translate a rectangular polygon to a bounding box query using lat/long min/max
+function polygonToMaxMins(polygon) {
+  const { west, south, east, north } = polygonBounds(polygon);
+
+  return {
+    latMin: south.toFixed(4),
+    lonMin: west.toFixed(4),
+    latMax: north.toFixed(4),
+    lonMax: east.toFixed(4),
   };
 }
 
@@ -604,22 +733,40 @@ export function selectionFromSearchParams(searchParams) {
   ];
 }
 
-// No dataset carries pk 0, so this is how the map asks for nothing at all —
-// an empty datasetPKs would read as "no dataset filter" and draw everything.
+// No dataset carries pk 0, so this is how a caller asks for nothing at all —
+// an empty datasetPKs would read as "no dataset filter" and return everything.
 const NO_DATASETS_PK = "0";
 
-// Map-only narrowing of a filter query string (tiles, legend, griddap
-// coverage) to the datasets whose group is still shown. The datasets list
-// keeps the hidden groups — this is a map visibility toggle, not a filter — so
-// the narrowing is applied to the map's queries alone. mapDatasetPKs is
-// undefined while nothing is hidden, which leaves the query untouched.
-export function applyMapDatasetPKs(queryString, mapDatasetPKs) {
-  if (!mapDatasetPKs) return queryString;
+// Narrows a filter query string to an explicit dataset list, for the narrowings
+// the API has no parameter of its own for. Each caller brings its own list,
+// because they narrow by different things: the map draws the shown groups
+// (SelectionProvider's mapDatasetPks), the coverage figure covers the datasets
+// the list is showing (filteredDatasetPks). `datasetPKs` is undefined while
+// nothing narrows, which leaves the query untouched.
+//
+// `allDatasetPKs` — the result set the list was narrowed FROM — is what keeps
+// the URL inside the request-line limit. A pk costs ~5 bytes and a comma
+// another three once encoded, so naming much over 2000 datasets is a 431 from
+// the server rather than a query; a narrowing that drops few datasets is sent
+// as the ones it dropped instead (excludeDatasetPKs), which is the same filter
+// written the shorter way. Without it the caller always names what it kept,
+// which is fine for a narrowing that keeps little (a title search) and breaks
+// for one that keeps nearly everything ("only in view", zoomed out).
+export function applyDatasetPKs(queryString, datasetPKs, allDatasetPKs) {
+  if (!datasetPKs) return queryString;
   const params = new URLSearchParams(queryString);
-  params.set(
-    "datasetPKs",
-    mapDatasetPKs.length > 0 ? mapDatasetPKs.join(",") : NO_DATASETS_PK,
-  );
+  const kept = new Set(datasetPKs);
+  const dropped = (allDatasetPKs || []).filter((pk) => !kept.has(pk));
+  if (allDatasetPKs && dropped.length < datasetPKs.length) {
+    // Nothing dropped is no narrowing at all — say nothing rather than send an
+    // empty param the API would have to decide the meaning of.
+    if (dropped.length > 0) params.set("excludeDatasetPKs", dropped.join(","));
+  } else {
+    params.set(
+      "datasetPKs",
+      datasetPKs.length > 0 ? datasetPKs.join(",") : NO_DATASETS_PK,
+    );
+  }
   return params.toString();
 }
 

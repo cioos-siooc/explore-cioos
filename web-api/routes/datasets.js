@@ -33,11 +33,8 @@ const { pipeline } = require("../utils/routePipeline");
  *                   title_translated:
  *                     type: object
  */
-router.get(
-  "/",
-  ...pipeline({ filters: false, cacheFor: "5 minutes" }),
-  async (req, res) => {
-    const SQL = `SELECT title,
+router.get("/", ...pipeline({ filters: false }), async (req, res) => {
+  const SQL = `SELECT title,
                       pk_url pk,
                       organization_pks,
                       platform,
@@ -46,8 +43,7 @@ router.get(
                       FROM cde.datasets
                       ORDER BY UPPER(title)`;
 
-    res.send((await db.raw(SQL)).rows);
-  },
-);
+  res.send((await db.raw(SQL)).rows);
+});
 
 module.exports = router;

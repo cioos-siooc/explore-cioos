@@ -1,6 +1,7 @@
 dist/
 build/
 coverage/
+frontend/test-results/
 node_modules/
 .venv/
 venv/

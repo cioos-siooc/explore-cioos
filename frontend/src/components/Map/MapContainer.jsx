@@ -84,7 +84,7 @@ export default function MapContainer() {
   // one point via pointPKs — reused here rather than adding a new endpoint.
   // Only a single matching record gets highlighted; more than one is
   // genuinely ambiguous and is left for the record list itself to browse.
-  const onMarkerClick = async (datasetPk, pointPk) => {
+  const onMarkerClick = async (datasetPk, pointPk, highlightQuery) => {
     const row = pointsData.find((point) => Number(point.pk) === datasetPk);
     if (!row) return;
     // A second marker click resets the page for the new one rather than
@@ -102,6 +102,13 @@ export default function MapContainer() {
     setInspectRecordID(undefined);
     setHighlightedRecord(undefined);
     setInspectDataset(row, { replace: true });
+    // Set directly rather than through handleFeatureQuery above: that helper
+    // also calls returnToDatasetList when a dataset is already open, and
+    // doing that in the same tick as the setInspectDataset just above would
+    // race two navigations off the same stale search-params snapshot. This
+    // click's only navigation is the setInspectDataset it already made, so
+    // the pin just needs to be recorded for whenever the list is next seen.
+    setFeatureQuery(highlightQuery);
     try {
       const params = new URLSearchParams(combinedQueries);
       params.set("datasetPKs", datasetPk);

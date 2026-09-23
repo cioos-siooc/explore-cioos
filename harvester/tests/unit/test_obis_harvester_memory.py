@@ -36,8 +36,9 @@ class AlwaysExemptGeoFilter:
 
 
 def make_occurrences(n, lat=44.6, lon=-63.6):
-    return {
-        "results": [
+    """iter_occurrences yields DataFrames, not a {"results": [...]} dict."""
+    return pd.DataFrame(
+        [
             {
                 "decimalLatitude": lat,
                 "decimalLongitude": lon,
@@ -48,9 +49,8 @@ def make_occurrences(n, lat=44.6, lon=-63.6):
                 "maximumDepthInMeters": 0,
             }
             for _ in range(n)
-        ],
-        "total": n,
-    }
+        ]
+    )
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def harvester(tmp_path, monkeypatch):
         geo_filter=AlwaysExemptGeoFilter(),
     )
     monkeypatch.setattr(h, "fetch_dataset_metadata", lambda dataset_id: {})
-    monkeypatch.setattr(h, "get_occurrences", lambda dataset_id: make_occurrences(3))
+    monkeypatch.setattr(h, "iter_occurrences", lambda dataset_id, bbox=None: iter([make_occurrences(3)]))
     return h
 
 
@@ -100,7 +100,7 @@ def test_final_result_is_identical_regardless_of_chunk_size(monkeypatch, tmp_pat
         )
         h.CELLS_FLUSH_EVERY = flush_every
         monkeypatch.setattr(h, "fetch_dataset_metadata", lambda dataset_id: {})
-        monkeypatch.setattr(h, "get_occurrences", lambda dataset_id: make_occurrences(3))
+        monkeypatch.setattr(h, "iter_occurrences", lambda dataset_id, bbox=None: iter([make_occurrences(3)]))
         return h.harvest()
 
     unchunked = build_result(1000)  # never flushes mid-run

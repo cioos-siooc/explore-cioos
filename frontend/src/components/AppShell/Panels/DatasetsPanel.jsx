@@ -3,7 +3,6 @@ import * as React from "react";
 import DatasetsTable from "../../Controls/DatasetsTable/DatasetsTable.jsx";
 import DatasetInspector from "../../Controls/DatasetInspector/DatasetInspector.jsx";
 import Loading from "../../Controls/Loading/Loading.jsx";
-import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
@@ -11,19 +10,8 @@ import "./styles.css";
 // The Datasets panel: results list ⇄ single-dataset inspector drill-in.
 // All state lives in the providers, so the panel can unmount freely.
 export default function DatasetsPanel() {
-  const {
-    eovsSelected,
-    setEovsSelected,
-    platformsSelected,
-    setPlatformsSelected,
-    orgsSelected,
-    setOrgsSelected,
-    datasetsSelected,
-    setDatasetsSelected,
-  } = useFilters();
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState();
   const {
-    setPointsData,
     filteredDatasets,
     inspectDataset,
     setInspectDataset,
@@ -31,9 +19,7 @@ export default function DatasetsPanel() {
     selectionLoading,
     initialPointsQueryComplete,
     setInspectRecordID,
-    selectAll,
     handleSelectDataset,
-    handleSelectAllDatasets,
     setHoveredDataset,
     combinedQueries,
     datasetsInViewPks,
@@ -42,13 +28,6 @@ export default function DatasetsPanel() {
     highlightedRecord,
     setHighlightedRecord,
   } = useSelection();
-
-  const filterSet = {
-    eovFilter: { eovsSelected, setEovsSelected },
-    platformFilter: { platformsSelected, setPlatformsSelected },
-    orgFilter: { orgsSelected, setOrgsSelected },
-    datasetFilter: { datasetsSelected, setDatasetsSelected },
-  };
 
   // Before the first /pointQuery lands there is no list to show at all.
   if (!initialPointsQueryComplete) {
@@ -81,7 +60,6 @@ export default function DatasetsPanel() {
             setHoveredDataset={setHoveredDataset}
             returnToList={returnToDatasetList}
             setInspectRecordID={setInspectRecordID}
-            filterSet={filterSet}
             query={combinedQueries}
             selectedTrajectory={selectedTrajectory}
             setSelectedTrajectory={setSelectedTrajectory}
@@ -94,12 +72,8 @@ export default function DatasetsPanel() {
       ) : (
         <div className="datasetsPanelView datasetsPanelList" key="list">
           <DatasetsTable
-            handleSelectAllDatasets={handleSelectAllDatasets}
             handleSelectDataset={handleSelectDataset}
             setInspectDataset={setInspectDataset}
-            filterSet={filterSet}
-            selectAll={selectAll}
-            setDatasets={setPointsData}
             datasets={filteredDatasets}
             setHoveredDataset={setHoveredDataset}
             datasetsInViewPks={datasetsInViewPks}

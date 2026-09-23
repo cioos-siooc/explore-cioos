@@ -98,6 +98,7 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
     "adder",
     "depthMax",
     "depthMin",
+    "depthVariableProbe",
     "filters",
     "multiplier",
     "obisFilters",
@@ -109,11 +110,14 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
   const plain = await build({}, { doEstimate: false });
   assert.doesNotMatch(plain.sql, /records_count/);
   // The estimate's bindings must not linger: knex rejects a named binding the
-  // SQL does not reference.
+  // SQL does not reference. The time window stays, for the days column.
   assert.deepEqual(Object.keys(plain.params).sort(), [
+    "depthVariableProbe",
     "filters",
     "obisFilters",
     "profileFilters",
+    "timeMax",
+    "timeMin",
   ]);
 });
 
@@ -172,4 +176,41 @@ test("the trajectory arm is pinned to one tier", async () => {
   const { sql } = await build({});
   assert.match(sql, new RegExp(`t\\.hex_tier = ${FINE.tier}\\b`));
   assert.match(sql, new RegExp(`JOIN ${FINE.hexesTable} h`));
+});
+
+test("the dataset payload carries the freshness fields the frontend reads", async () => {
+  // DatasetInspector and DatasetCard read these off /pointQuery rather than
+  // fetching, and wmsUtilities falls back to coverage_time_max, so dropping
+  // them from the select list would break the UI with no server-side error.
+  const { sql } = await build({});
+  assert.match(sql, /AS coverage_time_max/);
+  assert.match(sql, /AS is_realtime/);
+  // Stamped in UTC with a Z, like the record extents — these reach the browser
+  // as strings and are parsed there.
+  assert.match(sql, /to_char\(d\.coverage_time_max AT TIME ZONE 'UTC'/);
+});
+
+test("has_depth is projected, and its probe is bound rather than inlined", async () => {
+  // The frontend's direct-download links carry the depth filter only for
+  // datasets that expose a `depth` variable — tabledap 400s on the rest.
+  const { sql, params } = await build({}, { doEstimate: false });
+  assert.match(sql, /AS has_depth/);
+  assert.match(sql, /table_variables @> :depthVariableProbe::jsonb/);
+  assert.deepEqual(JSON.parse(params.depthVariableProbe), [{ name: "depth" }]);
+  // Bound, not inlined: an inlined probe would put a JSON object literal
+  // straight into the SQL text.
+  assert.doesNotMatch(sql, /@> '\[/);
+});
+
+test("the datasets list reads days from the stored day set, clipped to the time filter", async () => {
+  const list = await build({}, { doEstimate: false, getRecordsList: false });
+  assert.match(
+    list.sql,
+    /day_range_overlap_days\(d\.day_ranges,\s+daterange\(:timeMin::date/,
+  );
+  // Never unioned per request: that is what cost ~3 s cold.
+  assert.doesNotMatch(list.sql, /day_union_days/);
+
+  const estimate = await build({}, { doEstimate: true, getRecordsList: false });
+  assert.doesNotMatch(estimate.sql, /AS days/);
 });

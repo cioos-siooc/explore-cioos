@@ -65,7 +65,8 @@
     "test:all": "npm run test && e2e/in-container.sh test",
     "dev:test": "vite --mode test",
     "test:e2e:live": "LIVE_BASE_URL=${LIVE_BASE_URL:-http://localhost:8098} playwright test --project=live",
-    "test:e2e:record": "node e2e/record-fixtures.mjs"
+    "test:e2e:record": "node e2e/record-fixtures.mjs",
+    "test:e2e:update": "npm run test:e2e:record && npm run test:visual:update && npm run test:a11y:baseline"
   },
   "author": "",
   "license": "ISC"

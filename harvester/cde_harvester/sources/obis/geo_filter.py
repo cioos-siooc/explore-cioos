@@ -88,6 +88,18 @@ class ObisGeoFilter:
             logger.warning("Could not parse dataset extent WKT: %s", e)
             return None
 
+    def bounds(self):
+        """(lon_min, lat_min, lon_max, lat_max) of the boundary polygon, or
+        None when the filter isn't clipping to a polygon (mode="none").
+
+        A superset pre-filter: any point outside this box is guaranteed to
+        fail filter_points, so callers can use it to discard rows before the
+        precise polygon test without changing which rows are ultimately kept.
+        """
+        if self.mode == "none" or self.polygon is None:
+            return None
+        return self.polygon.bounds
+
     def filter_points(self, lat, lon) -> np.ndarray:
         """Boolean mask: True where (lat, lon) is inside the boundary polygon.
 

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
-import { ChevronUp, Grid3x3Gap, X } from "react-bootstrap-icons";
+import { ChevronUp, Grid3x3Gap } from "react-bootstrap-icons";
 import classNames from "classnames";
+import CloseButton from "../../ui/CloseButton.jsx";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import { useTranslation } from "react-i18next";
 
@@ -167,23 +168,13 @@ export default function WmsLegend({
             which turns the overlay off — this one only stops showing its key,
             and it is only here where the card has a button to fold back to. */}
         {isCompact && (
-          <button
-            className="wmsLegendCloseButton"
+          <CloseButton
+            label={t("wmsLegendCollapseTitle")}
             onClick={() => setCompactOpen(false)}
-            title={t("wmsLegendCollapseTitle")}
-            aria-label={t("wmsLegendCollapseTitle")}
-          >
-            <ChevronUp size={16} />
-          </button>
+            icon={ChevronUp}
+          />
         )}
-        <button
-          className="wmsLegendCloseButton"
-          onClick={onClose}
-          title={t("wmsLegendCloseTitle")}
-          aria-label={t("wmsLegendCloseTitle")}
-        >
-          <X size={16} />
-        </button>
+        <CloseButton label={t("wmsLegendCloseTitle")} onClick={onClose} />
       </div>
       {legendUrl && !legendFailed ? (
         <a

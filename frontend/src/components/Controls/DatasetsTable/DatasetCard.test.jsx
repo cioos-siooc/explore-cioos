@@ -19,7 +19,6 @@ const ROW = {
   erddap_url: "https://seagull-erddap.glos.org/erddap/tabledap/obs_270.html",
   profiles_count: 1,
   n_profiles: 1,
-  selected: false,
 };
 
 describe("DatasetCard", () => {
@@ -49,7 +48,7 @@ describe("DatasetCard", () => {
     expect(screen.getByTestId("dataset-card")).not.toHaveAttribute("role");
   });
 
-  it("the add-to-download button calls onSelect without also triggering onInspect", async () => {
+  it("the select checkbox calls onSelect without also triggering onInspect", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const onInspect = vi.fn();
@@ -63,17 +62,21 @@ describe("DatasetCard", () => {
       />,
     );
     await user.click(
-      screen.getByRole("button", { name: "datasetsCardSelectForDownloadText" }),
+      screen.getByRole("checkbox", {
+        name: "datasetsCardSelectForDownloadText",
+      }),
     );
     expect(onSelect).toHaveBeenCalledWith(ROW);
     expect(onInspect).not.toHaveBeenCalled();
   });
 
-  it("disables the add-to-download button for a Grid (metadata-only) dataset", () => {
+  it("disables the select checkbox for a Grid (metadata-only) dataset", () => {
     const grid = { ...ROW, cdm_data_type: "Grid" };
     render(<DatasetCard row={grid} t={t} i18n={i18n} onSelect={() => {}} />);
     expect(
-      screen.getByRole("button", { name: "datasetsCardSelectForDownloadText" }),
+      screen.getByRole("checkbox", {
+        name: "datasetsCardSelectForDownloadText",
+      }),
     ).toBeDisabled();
   });
 
@@ -97,6 +100,35 @@ describe("DatasetCard", () => {
     const partial = { ...ROW, profiles_count: 3, n_profiles: 10 };
     render(<DatasetCard row={partial} t={t} i18n={i18n} />);
     expect(screen.getByText("3 / 10")).toBeInTheDocument();
+  });
+
+  it("shows the dataset's days of data when the query carries them", () => {
+    const { rerender } = render(
+      <DatasetCard row={{ ...ROW, days: 1234 }} t={t} i18n={i18n} />,
+    );
+    expect(screen.getByTitle("datasetsCardSortDaysText")).toHaveTextContent(
+      "1,234",
+    );
+    rerender(<DatasetCard row={{ ...ROW, days: null }} t={t} i18n={i18n} />);
+    expect(
+      screen.queryByTitle("datasetsCardSortDaysText"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("draws trajectories and OBIS as hexagons, like the map's cells", () => {
+    const glyph = (row) => {
+      const { container, unmount } = render(
+        <DatasetCard row={{ ...ROW, ...row }} t={t} i18n={i18n} />,
+      );
+      const cls = container.querySelector(".datasetCardPlatform svg").classList;
+      unmount();
+      return cls;
+    };
+    expect(glyph({ cdm_data_type: "Trajectory" })).toContain("bi-hexagon-fill");
+    expect(
+      glyph({ cdm_data_type: "Occurrence", source_type: "obis" }),
+    ).toContain("bi-hexagon-fill");
+    expect(glyph({})).toContain("bi-circle-fill");
   });
 
   it("calls onHover/onHoverEnd on mouse enter/leave", async () => {
@@ -144,9 +176,7 @@ describe("DatasetCard", () => {
           downloadSizeEstimates={{}}
         />,
       );
-      expect(
-        screen.getByText("downloadSizeUnavailableTitle"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("downloadSizeUnavailable")).toBeInTheDocument();
     });
 
     it("shows the size and a CDE-downloadable badge once the estimate is ready", () => {
@@ -165,30 +195,23 @@ describe("DatasetCard", () => {
         />,
       );
       expect(
-        screen.getByText("datasetsCardSortDownloadableText"),
+        screen.getByTitle("datasetsCardSortDownloadableText"),
       ).toBeInTheDocument();
-      expect(screen.getByText("488.28KB")).toBeInTheDocument();
+      expect(screen.getByText("~488.28KB")).toBeInTheDocument();
     });
 
-    it("links out to ERDDAP when the dataset can't be downloaded through the CDE", () => {
-      const external = {
-        ...ROW,
-        internalDownload: false,
-        erddapLink:
-          "https://seagull-erddap.glos.org/erddap/tabledap/obs_270.html",
-        sizeEstimate: { filteredSize: 500000, unfilteredSize: 500000 },
-      };
+    it("links out to the source server for every dataset in the modal", () => {
       render(
         <DatasetCard
-          row={external}
+          row={ROW}
           t={t}
           i18n={i18n}
           isDownloadModal
-          downloadSizeEstimates={{ 1: external.sizeEstimate }}
+          downloadSizeEstimates={{ 1: { filteredSize: 500000 } }}
         />,
       );
-      const link = screen.getByRole("link", { name: "ERDDAP™" });
-      expect(link).toHaveAttribute("href", external.erddapLink);
+      const link = screen.getByRole("link", { name: /ERDDAP™/ });
+      expect(link).toHaveAttribute("href", ROW.erddap_url);
     });
 
     it("disables selection when the CDE can't deliver the dataset", () => {
@@ -203,10 +226,68 @@ describe("DatasetCard", () => {
         />,
       );
       expect(
-        screen.getByRole("button", {
+        screen.getByRole("checkbox", {
           name: "datasetsCardSelectForDownloadText",
         }),
       ).toBeDisabled();
+    });
+
+    it("shows the dataset's direct download link and copies its URL", async () => {
+      const user = userEvent.setup();
+      const downloadLink = {
+        url: "https://seagull-erddap.glos.org/erddap/tabledap/obs_270.csv",
+        filename: "obs_270.csv",
+        format: { label: "CSV" },
+      };
+      render(
+        <DatasetCard
+          row={ROW}
+          t={t}
+          i18n={i18n}
+          isDownloadModal
+          downloadLink={downloadLink}
+          downloadSizeEstimates={{ 1: { filteredSize: 500000 } }}
+        />,
+      );
+      const link = screen.getByRole("link", {
+        name: "datasetCardDirectDownloadText",
+      });
+      expect(link).toHaveAttribute("href", downloadLink.url);
+
+      await user.click(
+        screen.getByRole("button", { name: "datasetCardCopyLinkText" }),
+      );
+      expect(await navigator.clipboard.readText()).toBe(downloadLink.url);
+    });
+
+    it("the remove button calls onRemove without also triggering onInspect", async () => {
+      const user = userEvent.setup();
+      const onRemove = vi.fn();
+      const onInspect = vi.fn();
+      render(
+        <DatasetCard
+          row={ROW}
+          t={t}
+          i18n={i18n}
+          isDownloadModal
+          onRemove={onRemove}
+          onInspect={onInspect}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: "datasetCardRemoveFromSelectionTitle: Green Bay LoRaWAN Buoy 4",
+        }),
+      );
+      expect(onRemove).toHaveBeenCalledWith(ROW);
+      expect(onInspect).not.toHaveBeenCalled();
+    });
+
+    it("shows no remove button without an onRemove handler", () => {
+      render(<DatasetCard row={ROW} t={t} i18n={i18n} isDownloadModal />);
+      expect(
+        screen.queryByTitle("datasetCardRemoveFromSelectionTitle"),
+      ).not.toBeInTheDocument();
     });
   });
 });

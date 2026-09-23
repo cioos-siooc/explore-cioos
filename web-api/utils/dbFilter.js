@@ -135,11 +135,13 @@ async function createDBFilter(
     lonMax,
     polygon,
     platforms,
+    realtimeOnly,
 
     // These are comma separated lists
     eovs,
     organizations,
     datasetPKs,
+    excludeDatasetPKs,
     pointPKs,
     scientificNames,
     obisNodes,
@@ -231,6 +233,25 @@ async function createDBFilter(
     filters.push("d.pk_url = ANY (:datasetPKs)");
   }
 
+  // The same narrowing said the other way round. A client that narrows the
+  // catalogue on its own (the datasets list: its search box, "only in view",
+  // the geometry switches) can only tell the API about it as a pk list, and a
+  // list of the datasets it KEPT runs to ~5 bytes per dataset — past roughly
+  // 2300 of them the request line is longer than the header limit and every
+  // such query 431s. Naming the ones it dropped instead is the identical
+  // filter at a fraction of the length whenever the narrowing is mild, which
+  // is the common case ("only in view" while zoomed out drops nothing at all).
+  // Callers send whichever list is shorter; see applyDatasetPKs in the
+  // frontend's utilities.
+  if (excludeDatasetPKs) {
+    parameters.excludeDatasetPKs = excludeDatasetPKs.split(",");
+    // pk_url is nullable until 5_profile_process.sql back-fills it, and
+    // `NULL <> ALL (...)` is NULL rather than TRUE — so without the guard,
+    // naming one dataset to drop would also drop every dataset that has not
+    // been back-filled yet, which sending no list at all would have kept.
+    filters.push("(d.pk_url IS NULL OR d.pk_url <> ALL (:excludeDatasetPKs))");
+  }
+
   if (pointPKs) {
     // Comma-separated, like datasetPKs/organizations above — this was binding
     // the raw query string instead of an array, so `= ANY(:pointPKs)` never
@@ -242,6 +263,27 @@ async function createDBFilter(
   if (organizations) {
     parameters.organizationsString = organizations.split(",");
     filters.push("organization_pks && :organizationsString");
+  }
+
+  // Dataset-level, so it belongs in `filters` (the shared fragment) rather than
+  // profileFilters, which only ever sees cde.profiles. Being shared means the
+  // tile, legend, timeExtent, download and griddap branches all inherit it
+  // without a per-site edit -- selectionAgreement.test.js is what proves that.
+  //
+  // The predicate reads stored columns only (see dataset_is_realtime in
+  // database/8_range_functions.sql), so it is IMMUTABLE and cannot return NULL,
+  // which is why a plain boolean test is safe here: `NOT f(...)` over a
+  // three-valued result would drop rows from both sides of the facet.
+  // cdm_data_type restricts it to griddap/timeseries*/trajectory* datasets --
+  // a Profile or a bare OBIS Point is a one-off, not a live feed.
+  //
+  // verified_at, not last_updated_at: the latter only moves when the dataset's
+  // content changed, so a dead feed skipped as unchanged by an incremental
+  // harvest would keep its badge forever.
+  if (realtimeOnly === "true") {
+    filters.push(
+      "dataset_is_realtime(d.coverage_time_max, d.verified_at, d.cdm_data_type)",
+    );
   }
 
   // Both live on cde.datasets; the join alias `d` is present in tile, legend

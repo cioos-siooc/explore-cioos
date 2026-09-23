@@ -42,7 +42,7 @@ function filterValidators() {
       .isInt({ min: -999999, max: 999999 })
       .optional(),
     // comma separated list of pks, eg pointPKs=12342,34534,456456
-    check(["organizations", "datasetPKs", "pointPKs"])
+    check(["organizations", "datasetPKs", "excludeDatasetPKs", "pointPKs"])
       .matches(/^[0-9,]*$/)
       .optional(),
     check("eovs")
@@ -60,7 +60,7 @@ function filterValidators() {
     // Source and layer switches. Only "false" is ever meaningful (the routes
     // read `!== "false"`), but accepting exactly the two spellings keeps a
     // typo'd flag from silently reading as "on".
-    check(["includeObis", "includeTrajectory"])
+    check(["includeObis", "includeTrajectory", "realtimeOnly"])
       .isIn(["true", "false"])
       .optional(),
     // Which number the hex ramp counts. utils/hexMetric.js defaults an absent
@@ -168,16 +168,64 @@ async function errorHandler(req, res, next) {
   await next();
 }
 
-const DEFAULT_CACHE_DURATION = "5 minutes";
+// Everything this default covers — tiles, legend, timeExtent, pointQuery,
+// datasetRecordsList, griddapCoverage, downloadEstimate, scientificNames,
+// trajectories, and the six catalog routes the app fetches on boot (datasets,
+// organizations, platforms, oceanVariables, obisNodes, erddapServers, which
+// used to pin their own 5 minutes) — is derived from the harvest, so it only
+// changes when a harvest load changes it, and the pipeline flushes redis then
+// (harvester/cde_harvester/prefect_pipeline.py). The TTL is a safety net, not
+// the invalidation mechanism: at the previous 5 minutes, a tile key (z/x/y ×
+// filter combination) almost never saw a second hit before expiring, so redis
+// was cold for practically every visitor and the harvest-time cache warm-up
+// had evaporated long before anyone arrived.
+//
+// This does NOT set how long a browser may hold the response: apicache derives
+// its cache-control max-age from this same duration, so nginx overrides the
+// browser's half at the edge (see $api_browser_cache in nginx/nginx.conf) —
+// a server-side flush cannot reach a browser cache, so the two need different
+// lifetimes.
+const DEFAULT_CACHE_DURATION = "24 hours";
+
+/*
+ * apicache stores a response only if it has a body: its res.end patch guards
+ * the write on `res._apicache.content`. Express answers a conditional request
+ * by stripping the body and sending 304, so a revalidation that MISSES the
+ * cache runs the full query, returns an empty 304, and stores NOTHING. The
+ * entry is never written, so the next revalidation misses too — for a browser
+ * that already holds an ETag the cache can never warm up, and every repeat
+ * visit pays the uncached query again.
+ *
+ * Measured on prod (explore-v2, one z3 hex tile, redis empty): a conditional
+ * GET returned 304 in 3.2 s and left redis empty; repeating it cost 3.0 s
+ * again. The same tile requested WITHOUT the validator cost 3.1 s once and
+ * then 15 ms from redis. The default map view is 18 such tiles.
+ *
+ * This stage only ever runs on a cache MISS — on a hit apicache answers from
+ * its store and never calls next() — so dropping the validators here says
+ * exactly "a miss must produce a response the cache can keep".
+ *
+ * No 304 worth having is lost. apicache compares the cached ETag against
+ * If-None-Match itself (sendCachedResponse) and answers a hit with a bodiless
+ * 304 without ever reaching the handler, which is the cheap revalidation
+ * browsers actually want. Stripping the validators here only costs one full
+ * body per key per cache lifetime — the response that fills the entry.
+ */
+function fullResponseForCacheMiss(req, res, next) {
+  delete req.headers["if-none-match"];
+  delete req.headers["if-modified-since"];
+  next();
+}
 
 /**
  * The middleware chain every route registers, in one order:
- * validate -> reject -> cache -> handler.
+ * validate -> reject -> cache -> fullResponseForCacheMiss -> handler.
  *
- * The cache comes last because apicache stores whatever status the chain
- * produces: with it registered first, a 400 was written to the request's cache
- * key and served from there. Validating first also means a cached entry was
- * valid at the moment it was stored.
+ * The cache comes after validation because apicache stores whatever status the
+ * chain produces: with it registered first, a 400 was written to the request's
+ * cache key and served from there. Validating first also means a cached entry
+ * was valid at the moment it was stored. Only the miss path continues past the
+ * cache, which is what lets the stage after it assume a miss.
  *
  * Returns a fresh array on every call. The old `requiredShapeMiddleware`
  * returned a module-level `express.Router()` it had `use`d the stack onto, so
@@ -196,7 +244,7 @@ function pipeline({
   tileParams = null,
   checks = [],
   cacheFor = DEFAULT_CACHE_DURATION,
-  cacheToggle = undefined,
+  cacheToggle = cache.onlyOk,
 } = {}) {
   return [
     ...(tileParams ? tileParamValidators(tileParams) : []),
@@ -204,14 +252,17 @@ function pipeline({
     ...(shape ? shapeValidators() : []),
     ...checks,
     errorHandler,
-    // `cacheToggle` decides per response whether it may be stored/served —
-    // see cache.onlyOk, for a route whose upstream can fail.
-    ...(cacheFor === null ? [] : [cache.route(cacheFor, cacheToggle)]),
+    // `cacheToggle` decides per response whether it may be stored/served.
+    // Defaulting to 200 keeps a transient handler error from becoming a cache hit.
+    ...(cacheFor === null
+      ? []
+      : [cache.route(cacheFor, cacheToggle), fullResponseForCacheMiss]),
   ];
 }
 
 module.exports = {
   pipeline,
+  fullResponseForCacheMiss,
   filterValidators,
   shapeValidators,
   tileParamValidators,

@@ -39,10 +39,17 @@ To run the scheduler outside of Docker:
 
 The scheduler uses these environment variables from `.env`:
 
-- `DB_HOST`: Database hostname (use `localhost` when running outside Docker)
-- `DB_NAME`: Database name
-- `DB_USER`: Database username
-- `DB_PASSWORD`: Database password
-- `DOWNLOADS_FOLDER`: Directory for downloaded files
-- `DOWNLOAD_WAF_URL`: Base URL for WAF downloads
-- `CREATE_PDF`: Enable/disable PDF generation
+- `DB_HOST`: Database hostname (use `localhost` when running outside Docker;
+  inside compose it is pinned to the `db` service)
+- `DB_NAME`: Database name (default `cde`)
+- `DB_USER`: Database username (default `postgres`)
+- `DB_PASSWORD`: Database password (no default)
+- `DOWNLOAD_WAF_URL`: Base URL emailed download links are built on. Inside
+  compose it is **derived**, not set by hand:
+  `${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/downloads`.
+  Set `APP_URL` instead.
+- `CREATE_PDF`: Enable/disable PDF generation (`True`/`False`)
+
+The output directory is not configurable — it is always `./downloads` relative
+to the working directory (`download_scheduler.py`), which compose backs with the
+shared `downloads` volume that nginx serves.

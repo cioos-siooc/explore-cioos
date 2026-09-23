@@ -23,8 +23,12 @@
 .filtersPanelList {
   flex: 0 0 280px;
   width: 280px;
-  padding: 10px;
+  padding: 8px 10px;
   border-right: 1px solid var(--cioos-hairline);
+
+  /* Fallback for a viewport too short for the modal to fit every row at once
+     (see the .filtersModal .modal-content max-height) — the common case now
+     fits without this ever engaging. */
   overflow-y: auto;
 }
 
@@ -80,18 +84,99 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Hint shown in the detail pane while no filter is open. */
+/* How-to shown in the detail pane while no filter is open — the first thing
+   a visitor to the modal sees, so it carries the instructions rather than a
+   one-line placeholder. Sized to fit without its own scrollbar in the common
+   case (auto overflow is a fallback for short windows, not the expectation:
+   see the max-height breakpoint below). */
 .filtersPanelPlaceholder {
   position: absolute;
   inset: 12px 12px 12px 296px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   text-align: center;
-  padding: 24px;
-  color: var(--cioos-ink-40);
-  font-size: var(--cioos-font-size-sm);
+  padding: 16px 24px;
+  overflow-y: auto;
   pointer-events: none;
+}
+
+.filtersPanelPlaceholderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary);
+}
+
+.filtersPanelPlaceholderTitle {
+  margin: 0;
+  font-family: var(--cioos-font-display);
+  font-weight: 700;
+  font-size: var(--cioos-font-size-lg);
+  color: var(--cioos-navy);
+}
+
+.filtersPanelPlaceholderText {
+  margin: 0 0 16px;
+  max-width: 44ch;
+  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.45;
+}
+
+.filtersPanelPlaceholderSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.filtersPanelPlaceholderSteps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 44ch;
+  color: var(--cioos-ink-80);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.35;
+}
+
+.filtersPanelPlaceholderSteps svg {
+  flex: 0 0 auto;
+  margin-top: 0.15em;
+  color: var(--cioos-primary);
+}
+
+/* Short window: give the how-to room to shrink and, failing that, scroll
+   inside its own inset rather than push the footer off-screen. */
+@media (max-height: 640px) {
+  .filtersPanelPlaceholder {
+    justify-content: flex-start;
+    gap: 2px;
+    padding: 12px 24px;
+  }
+
+  .filtersPanelPlaceholderIcon {
+    margin-bottom: 4px;
+  }
+
+  .filtersPanelPlaceholderText {
+    margin-bottom: 10px;
+  }
+
+  .filtersPanelPlaceholderSteps {
+    gap: 6px;
+  }
 }
 
 /* Each filter is a full-width row inside the list column. */
@@ -108,7 +193,7 @@
   border: 1px solid transparent;
   border-radius: var(--cioos-radius);
   box-shadow: none;
-  padding: 6px 12px;
+  padding: 5px 12px;
 }
 
 .filtersPanelList .filterHeader .badgeTitle {
@@ -268,11 +353,14 @@
   height: 30px;
 }
 
-/* Sections stay compact inside the modal. */
+/* Sections stay compact inside the modal — tight enough that every row in
+   every section fits without the list needing its own scrollbar in the
+   common case (see .filtersPanelList's overflow-y, kept as the fallback for
+   short viewports). */
 .filtersPanel .filterSection + .filterSection {
-  margin-top: 6px;
+  margin-top: 4px;
   border-top: 1px solid var(--cioos-hairline);
-  padding-top: 6px;
+  padding-top: 4px;
 }
 
 .filtersPanel .filterSectionHeading {
@@ -282,13 +370,13 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cioos-ink-60);
-  padding: 6px 10px 4px;
+  padding: 4px 10px 2px;
 }
 
 .filtersPanel .filterSectionItems {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 /* ------------------------------------------------------------------
@@ -378,11 +466,33 @@
   color: var(--cioos-ink-60);
 }
 
+/* The settings band (applied filters, link format) keeps its place while the
+   dataset list under it scrolls — that list is the panel's one scroll region,
+   which is what lets the order bar stay on screen at the foot of the modal. */
+.downloadPanel > .downloadBandRow {
+  flex: 0 0 auto;
+}
+
+.downloadPanel > .downloadDetails {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* ------------------------------------------------------------------
  * Mobile: the filters master and detail become two screens, one filter
  * at a time, and everything in them becomes a touch target.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px) {
+  /* The download panel scrolls as one column here — see the note in
+     DownloadDetails/styles.css. */
+  .downloadPanel {
+    height: auto;
+  }
+
+  .downloadPanel > .downloadDetails {
+    flex: 0 0 auto;
+  }
+
   /* One column: the list is the whole surface, and so is the open filter. */
   .filtersPanelList {
     flex: 1 1 auto;

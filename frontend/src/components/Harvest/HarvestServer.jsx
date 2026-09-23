@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import HarvestModeBadge from "./HarvestModeBadge.jsx";
+import HarvestRealtimeBadge from "./HarvestRealtimeBadge.jsx";
 import Sparkline from "./Sparkline.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
@@ -173,6 +174,7 @@ export default function HarvestServer() {
               <th>{t("harvest.col.status")}</th>
               <th>{t("harvest.col.datasetId")}</th>
               <th>{t("harvest.col.hashable")}</th>
+              <th>{t("harvest.col.realtime")}</th>
               <th>{t("harvest.col.recent")}</th>
               <th>{t("harvest.col.reason")}</th>
               <th>{t("harvest.col.lastUpdate")}</th>
@@ -210,6 +212,9 @@ export default function HarvestServer() {
                     <HarvestModeBadge dataset={d} />
                   </td>
                   <td>
+                    <HarvestRealtimeBadge isRealtime={d.is_realtime} />
+                  </td>
+                  <td>
                     <Sparkline statuses={d.history_statuses} />
                   </td>
                   <td>
@@ -239,7 +244,7 @@ export default function HarvestServer() {
             })}
             {!loading && (!datasets || datasets.length === 0) && (
               <tr>
-                <td colSpan="8" className="harvest-empty-row">
+                <td colSpan="9" className="harvest-empty-row">
                   {t("harvest.server.noDatasets")}
                 </td>
               </tr>

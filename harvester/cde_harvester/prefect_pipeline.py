@@ -321,7 +321,9 @@ class PrefectCDEPipeline:
 
                 logger.info("Running cde_db_loader subflow")
                 try:
-                    db_loader_main(folder=str(run_folder), incremental=effective_incremental)
+                    load_summary = db_loader_main(
+                        folder=str(run_folder), incremental=effective_incremental
+                    )
                     logger.info("cde_db_loader completed successfully")
                     # Prune only after a successful load so failed runs' CSVs survive.
                     _prune_server_run_folders(base_folder, protect=[run_folder])
@@ -329,7 +331,11 @@ class PrefectCDEPipeline:
                     logger.error(f"cde_db_loader failed: {e}", exc_info=True)
                     raise
 
-                if self.flush_redis:
+                # A run where every dataset hashed unchanged moved nothing the API
+                # serves, so dropping the cache would only make the next visitor
+                # pay for a rebuild that changes no bytes. The load itself decides
+                # this — see the summary returned by loading/loader.py:main.
+                if self.flush_redis and load_summary["changed"]:
                     logger.info("Refreshing redis cache")
                     try:
                         clearRedisCache()
@@ -338,6 +344,13 @@ class PrefectCDEPipeline:
                     except Exception as e:
                         logger.error(f"redis refresh failed: {e}", exc_info=True)
                         raise
+                elif self.flush_redis:
+                    logger.info(
+                        "Nothing changed in this load (%d changed dataset(s), %d pruned); "
+                        "keeping the redis cache warm",
+                        load_summary["changed_datasets"],
+                        load_summary["pruned"],
+                    )
 
                 logger.info("CDE Pipeline completed successfully")
             finally:
@@ -406,7 +419,7 @@ class PrefectCDEPipeline:
         # else is inherited from the worker container's env.
         job_vars = {
             "env": {
-                "PREFECT_LOGGING_EXTRA_LOGGERS": "populate_vernaculars,cde_db_loader,cde_harvester",
+                "PREFECT_LOGGING_EXTRA_LOGGERS": "populate_vernaculars,cde_harvester",
                 # Escape hatch for the db-loader full-reload guard: set to 1 to
                 # permit a full reload that prunes sources missing from the
                 # incoming harvest (e.g. dropping OBIS). Empty = guard enforced.
@@ -666,7 +679,7 @@ def populate_vernaculars_run(
     """
     # PREFECT_LOGGING_EXTRA_LOGGERS attaches a handler but doesn't set the level,
     # so force INFO or the script's progress lines get filtered out.
-    for name in ("populate_vernaculars", "cde_db_loader", "cde_harvester"):
+    for name in ("populate_vernaculars", "cde_harvester"):
         logging.getLogger(name).setLevel(logging.INFO)
 
     # populate_vernaculars uses argparse; monkey-patch sys.argv instead of refactoring it.
