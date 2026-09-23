@@ -68,6 +68,7 @@ import {
 } from "./basemapStyle.js";
 import { buildTileSuffix } from "./tileQuery.js";
 import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
+import { pointRadiusFor, radiusExpression } from "./pointRadius.js";
 
 // direct_select's own dragVertex/toDisplayFeatures, captured once here at
 // module load — before the component below patches these modes on every
@@ -549,8 +550,6 @@ export default function CreateMap({
       },
     ],
   };
-  const smallCircleSize = 2.75;
-  const largeCircleSize = 6;
   const circleOpacity = 0.7;
   // The transparency at the world view, and the only thing letting the basemap
   // through: the hex colours themselves are opaque. It lets it through equally
@@ -1118,47 +1117,6 @@ export default function CreateMap({
     t("mapHexCountDays", {
       total: Number(value || 0).toLocaleString(i18n.language),
     });
-
-  // Point markers size by the same count the hexes colour by, log-spaced over
-  // the point-tier range so the marker for a long mooring record reads bigger
-  // than one for a single cast. Log because the range spans orders of
-  // magnitude — linear would leave every marker at the minimum but one.
-  //
-  // `padding` is the halo's extra radius: it sits under the markers and has to
-  // grow with them or it stops being a halo.
-  //
-  // A degenerate range (every point the same count, or the legend not back
-  // yet) has nothing to ramp: use the small radius flat.
-  const radiusExpression = (range, padding = 0) => {
-    const lo = Math.max(range?.[0] ?? 1, 1);
-    const hi = range?.[1];
-    if (!Number.isFinite(hi) || hi <= lo) return smallCircleSize + padding;
-    return [
-      "interpolate",
-      ["linear"],
-      ["log10", ["max", ["get", "count"], 1]],
-      Math.log10(lo),
-      smallCircleSize + padding,
-      Math.log10(hi),
-      largeCircleSize + padding,
-    ];
-  };
-
-  // The same ramp evaluated in JS, for the hit-tests that need to know how big
-  // a circle actually got drawn. MapLibre clamps an `interpolate` outside its
-  // domain to the endpoint value, so this clamps too — otherwise a count past
-  // the legend's range would report a radius larger than the one on screen.
-  const pointRadiusFor = (count) => {
-    const range = pointRadiusRange.current;
-    const lo = Math.max(range?.[0] ?? 1, 1);
-    const hi = range?.[1];
-    if (!Number.isFinite(hi) || hi <= lo) return smallCircleSize;
-    const loLog = Math.log10(lo);
-    const hiLog = Math.log10(hi);
-    const at = Math.log10(Math.max(Number(count) || 1, 1));
-    const ratio = Math.min(Math.max((at - loLog) / (hiLog - loLog), 0), 1);
-    return smallCircleSize + ratio * (largeCircleSize - smallCircleSize);
-  };
 
   // Every ramp-driven paint property below is ALWAYS an expression, and
   // MapLibre cannot interpolate a paint property to or from a data-driven value
@@ -3088,7 +3046,8 @@ export default function CreateMap({
         .some((feature) => {
           const centre = map.current.project(feature.geometry.coordinates);
           const radius =
-            pointRadiusFor(feature.properties.count) + POINT_HIT_GRACE_PX;
+            pointRadiusFor(feature.properties.count, pointRadiusRange.current) +
+            POINT_HIT_GRACE_PX;
           return (
             (centre.x - point.x) ** 2 + (centre.y - point.y) ** 2 <= radius ** 2
           );
@@ -3517,7 +3476,7 @@ export default function CreateMap({
 
     // Everything one click found, grouped the way the card reads it out. Returns
     // null when the click landed on empty water.
-    const buildFeatureQuery = (e, hits) => {
+    const buildFeatureQuery = (lngLat, hits) => {
       if (hits.length === 0) return null;
 
       // Tracks first — see trackItemsIn.
@@ -3715,7 +3674,7 @@ export default function CreateMap({
         // A nonce, so clicking the same spot twice re-opens a card the user
         // dismissed rather than being deduped away by React.
         nonce: Date.now(),
-        lngLat: [e.lngLat.lng, e.lngLat.lat],
+        lngLat: [lngLat.lng, lngLat.lat],
         items,
         observationCount,
         highlight,
@@ -3876,7 +3835,7 @@ export default function CreateMap({
         return;
       }
 
-      const query = buildFeatureQuery(e, hits);
+      const query = buildFeatureQuery(e.lngLat, hits);
 
       popup.remove();
       onFeatureQueryRef.current(query);
@@ -4077,7 +4036,7 @@ export default function CreateMap({
         if (!lngLat || !map.current) return;
         sharedFeatureQueryAtRef.current = null;
         const query = buildFeatureQuery(
-          { lngLat: { lng: lngLat[0], lat: lngLat[1] } },
+          { lng: lngLat[0], lat: lngLat[1] },
           hitsAt(map.current.project(lngLat)),
         );
         if (query) onFeatureQueryRef.current(query);

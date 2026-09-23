@@ -812,7 +812,7 @@ now split, was two specific call sites.
       writes during render (`rangeLevelsRef`, `onViewportHexRangeRef`, `selectedTrajectoryRef`,
       `setColorStopsRef`, `mapQueryRef`, `onFeatureQueryRef`, `onMarkerClickRef`, `onTrackClickRef`).
       **[re-verified — still eight, one substitution: `selectedTrajectoryRef` is new]**
-- [ ] **Twin maths kept in step by hand**: `radiusExpression` builds a MapLibre expression and
+- [x] **Twin maths kept in step by hand** — **DONE 2026-09-23**, see step 2. `radiusExpression` builds a MapLibre expression and
       `pointRadiusFor` re-implements the same arithmetic in JS. The test that would keep them honest
       cannot be written — neither is exported, and `pointRadiusFor` reads `pointRadiusRange.current`
       from closure rather than taking it as an argument. They agree today (both clamp outside the
@@ -847,7 +847,7 @@ now split, was two specific call sites.
       where the untested logic actually lives. **Decide this before moving anything.**
       **[corrected 2026-09-10 — the 2026-09-09 pass claimed the *entire* MapLibre dependency was two
       methods and missed `queryRenderedFeatures`]**
-- [ ] **`buildFeatureQuery`'s event coupling is already gone in practice.** It is declared
+- [x] **`buildFeatureQuery`'s event coupling is already gone in practice.** — **DONE 2026-09-23**, see step 3. It is declared
       `(e, hits)` but reads only `e.lngLat` (`:3765`), and the second of its two call sites (`:4102`)
       *already* fabricates `{ lngLat: { lng, lat } }` from a bare coordinate pair. Narrowing the
       signature to `(lngLat, hits)` is a no-behaviour-change diff at both call sites, and it is worth
@@ -879,10 +879,16 @@ now split, was two specific call sites.
    step-4 group) now imports the threshold its other half tests. 22 tests in
    `tileQuery.test.js` + `hitTest.test.js`; suite 117 passed, `eslint .` clean, `vite build` passes.
    `HEX_METRIC` and `PROFILE_TYPE_KEYS` left `Map.jsx`'s import list with the function.
-2. The twin maths — give `pointRadiusFor` the range as a parameter instead of reading the ref, move
-   both into a module, and test that they agree across a swept range at `padding = 0`.
-3. `buildFeatureQuery(e, hits)` → `(lngLat, hits)`. Zero-behaviour diff, removes the last event
-   coupling, done before the risky move rather than inside it.
+2. ~~The twin maths~~ — **DONE 2026-09-23.** `radiusExpression`, `pointRadiusFor` and the two
+   circle sizes moved to `Map/pointRadius.js`; `pointRadiusFor` now takes the range as
+   `(count, range)` and `isOnAPointIn` passes `pointRadiusRange.current`. `pointRadius.test.js`
+   evaluates the real expression with `@maplibre/maplibre-gl-style-spec`'s evaluator (new
+   devDependency — the same 24.x `maplibre-gl` already depends on, now hoisted) and checks the JS
+   twin against it over five ranges × thirteen counts, plus degenerate ranges, clamping and padding.
+   Mutation-checked: removing the clamp in the twin fails 7 of 14 tests.
+3. ~~`buildFeatureQuery(e, hits)` → `(lngLat, hits)`~~ — **DONE 2026-09-23.** Takes a `{ lng, lat }`
+   (MapLibre's `LngLat` shape); the click handler passes `e.lngLat`, the shared-link replay passes
+   `{ lng, lat }` instead of fabricating an event.
 4. The hit-test group above — the largest prize, and much narrower than "largest risk" implies, but
    there is no e2e gate under hover/click ranking (see the preamble). So: settle the
    `queryRenderedFeatures` question, then move in a commit that is *provably* a pure move — bodies
