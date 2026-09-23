@@ -1,6 +1,7 @@
 import React from "react";
 import {
   BoxArrowUpRight,
+  CalendarCheck,
   CheckCircleFill,
   CircleFill,
   Clipboard,
@@ -298,6 +299,15 @@ export default function DatasetCard({
             <PinMapFill size={13} aria-hidden="true" />
             {locationsLabel}
           </span>
+          {row.days != null && (
+            <span
+              className="datasetCardMetaItem"
+              title={t("datasetsCardSortDaysText")}
+            >
+              <CalendarCheck size={13} aria-hidden="true" />
+              {Number(row.days).toLocaleString(i18n.language)}
+            </span>
+          )}
 
           {/* Same "still producing data" signal as the dataset inspector's
               Last update row — on this row here since it is the card's other

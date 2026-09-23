@@ -4,9 +4,9 @@ import {
   ArrowRight,
   CheckCircleFill,
   CircleFill,
+  Download,
   GeoAlt,
   Grid3x3Gap,
-  Plus,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -134,7 +134,7 @@ export default function FeatureCard() {
         openable: item.kind === "track" || Boolean(row),
         // Griddap is metadata-only: it never enters the selection, and the
         // list's own button is disabled for one, so the card says the same
-        // rather than offering a "+" that would quietly do nothing.
+        // rather than offering a button that would quietly do nothing.
         selectable: item.kind !== "grid" && row?.cdm_data_type !== "Grid",
         inSelection: selectedPks.has(row?.pk),
       };
@@ -255,8 +255,9 @@ export default function FeatureCard() {
                 {/* A gridded footprint the current results don't contain has no
                     page to open — the rectangles come from their own source and
                     outlive the filter that dropped the dataset. It still reads
-                    as a row (it is genuinely here) and "+" still brings it in;
-                    it just isn't a button pretending to lead somewhere. */}
+                    as a row (it is genuinely here) and its download button
+                    still brings it in; it just isn't a button pretending to
+                    lead somewhere. */}
                 <button
                   type="button"
                   className="featureCardRowOpen"
@@ -290,9 +291,8 @@ export default function FeatureCard() {
                   </span>
                 </button>
                 {/* Ticks the dataset into the download selection — the same
-                    thing its checkbox in the list does. A tick replaces the
-                    plus once it is in, so the card reads as a running basket
-                    rather than a row of identical buttons. */}
+                    thing its checkbox in the list does, with the same glyphs:
+                    a download sign while out, a tick once in. */}
                 <button
                   type="button"
                   className={classNames("featureCardRowAdd", {
@@ -311,7 +311,7 @@ export default function FeatureCard() {
                   {entry.inSelection ? (
                     <CheckCircleFill size={15} aria-hidden="true" />
                   ) : (
-                    <Plus size={16} aria-hidden="true" />
+                    <Download size={16} aria-hidden="true" />
                   )}
                 </button>
               </div>

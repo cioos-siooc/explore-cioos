@@ -520,3 +520,77 @@ BEGIN
   RETURN total;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- Rebuilds cde.datasets.day_ranges: each dataset's features' day sets merged
+-- into disjoint ranges (gaps and islands), falling back to a feature's
+-- [time_min, time_max] span where its day set is unknown — the same rule as
+-- the map's `days` metric (web-api/utils/hexMetric.js). A full rebuild costs
+-- ~2 s and runs once per load; it is what spares every /pointQuery the union.
+-- Only rows whose ranges changed are written, like n_profiles above.
+CREATE OR REPLACE FUNCTION refresh_dataset_day_ranges() RETURNS bigint AS $$
+DECLARE
+  n bigint;
+BEGIN
+  WITH feature_ranges AS (
+    SELECT DISTINCT dataset_pk, r
+    FROM (
+      SELECT dataset_pk, day_ranges, time_min, time_max FROM cde.profiles
+      UNION ALL
+      SELECT dataset_pk, day_ranges, time_min, time_max FROM cde.trajectory_hexes
+      UNION ALL
+      SELECT dataset_pk, day_ranges, time_min, time_max FROM cde.obis_cells
+    ) f
+    CROSS JOIN LATERAL unnest(
+      CASE WHEN coalesce(array_length(day_ranges, 1), 0) > 0 THEN day_ranges
+           WHEN time_min IS NOT NULL THEN
+             ARRAY[daterange(time_min::date, GREATEST(time_max::date, time_min::date) + 1)]
+      END) r
+    WHERE dataset_pk IS NOT NULL AND r IS NOT NULL AND NOT isempty(r)
+  ),
+  -- Abutting ranges merge too: bounds are half-open, so lower = previous
+  -- upper is not a gap.
+  marked AS (
+    SELECT dataset_pk, r,
+           CASE WHEN lower(r) > max(upper(r)) OVER (
+                    PARTITION BY dataset_pk ORDER BY r
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)
+                THEN 1 ELSE 0 END AS starts_island
+    FROM feature_ranges
+  ),
+  islands AS (
+    SELECT dataset_pk, daterange(min(lower(r)), max(upper(r))) AS r
+    FROM (
+      SELECT dataset_pk, r,
+             sum(starts_island) OVER (PARTITION BY dataset_pk ORDER BY r
+                                      ROWS UNBOUNDED PRECEDING) AS island
+      FROM marked
+    ) grouped
+    GROUP BY dataset_pk, island
+  ),
+  merged AS (
+    SELECT d.pk, array_agg(i.r ORDER BY i.r) FILTER (WHERE i.r IS NOT NULL)
+                   AS day_ranges
+    FROM cde.datasets d
+    LEFT JOIN islands i ON i.dataset_pk = d.pk
+    GROUP BY d.pk
+  )
+  UPDATE cde.datasets d
+  SET day_ranges = merged.day_ranges
+  FROM merged
+  WHERE merged.pk = d.pk
+    AND d.day_ranges IS DISTINCT FROM merged.day_ranges;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+-- One-off backfill for databases that predate the column
+-- (3_day_ranges_migration.sql); a no-op once any dataset carries ranges.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM cde.datasets WHERE day_ranges IS NOT NULL) THEN
+    PERFORM refresh_dataset_day_ranges();
+  END IF;
+END;
+$$;

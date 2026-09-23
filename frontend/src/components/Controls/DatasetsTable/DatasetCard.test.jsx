@@ -102,6 +102,19 @@ describe("DatasetCard", () => {
     expect(screen.getByText("3 / 10")).toBeInTheDocument();
   });
 
+  it("shows the dataset's days of data when the query carries them", () => {
+    const { rerender } = render(
+      <DatasetCard row={{ ...ROW, days: 1234 }} t={t} i18n={i18n} />,
+    );
+    expect(screen.getByTitle("datasetsCardSortDaysText")).toHaveTextContent(
+      "1,234",
+    );
+    rerender(<DatasetCard row={{ ...ROW, days: null }} t={t} i18n={i18n} />);
+    expect(
+      screen.queryByTitle("datasetsCardSortDaysText"),
+    ).not.toBeInTheDocument();
+  });
+
   it("calls onHover/onHoverEnd on mouse enter/leave", async () => {
     const user = userEvent.setup();
     const onHover = vi.fn();

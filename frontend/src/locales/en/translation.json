@@ -133,6 +133,7 @@
   "datasetsTableHeaderDetailsText": "Details",
   "datasetsCardSortByLabel": "Sort",
   "datasetsCardSortPlatformText": "Platform",
+  "datasetsCardSortDaysText": "Days of data",
   "datasetsCardSortDownloadableText": "Downloadable",
   "datasetsCardNotDownloadableText": "Not downloadable",
   "datasetsCardSortAscendingTitle": "Sorted ascending — tap to reverse",

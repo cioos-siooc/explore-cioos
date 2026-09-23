@@ -53,6 +53,39 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).toEqual(["Alpha station", "Beta station", "Gamma grid"]);
   });
 
+  it("sorts by days of data, grids last when descending", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <DatasetsTable
+        datasets={[
+          makeRow({ pk: 1, title: "Short", days: 12 }),
+          makeRow({ pk: 2, title: "Long", days: 3650 }),
+          makeRow({
+            pk: 3,
+            title: "Grid",
+            cdm_data_type: "Grid",
+            grid_dimensions: [],
+            days: null,
+          }),
+        ]}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await user.selectOptions(
+      await screen.findByLabelText("Sort"),
+      "Days of data",
+    );
+    await user.click(screen.getByTitle("Sorted ascending — tap to reverse"));
+    const cards = screen.getAllByTestId("dataset-card");
+    expect(
+      cards.map((c) => c.querySelector(".datasetCardTitle").textContent),
+    ).toEqual(["Long", "Short", "Grid"]);
+    expect(cards[0]).toHaveTextContent("3,650");
+  });
+
   // DatasetsTable's own search box writes to SelectionProvider's shared
   // datasetTitleSearchText rather than filtering its own `datasets` prop —
   // narrowing happens upstream (SelectionProvider's filteredDatasets), which
