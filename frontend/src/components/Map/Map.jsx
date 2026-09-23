@@ -32,7 +32,6 @@ import {
   zoomToDatasetCamera,
   splitTrackRuns,
   initialBearing,
-  withAlpha,
 } from "../../utilities";
 import {
   buildWmsGetMapUrl,
@@ -48,10 +47,8 @@ import {
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
-  tracksMinDate,
   defaultMapCenter,
   defaultMapZoom,
-  TRAIL_ALL,
   effectiveTrailingDays,
 } from "../config";
 import platformColors from "../../components/platformColors";
@@ -65,11 +62,16 @@ import {
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS,
 } from "./basemapStyle.js";
-import { buildTileSuffix } from "./tileQuery.js";
+import {
+  buildTileSuffix,
+  filterTimeWindow,
+  tracksTimeWindow,
+} from "./tileQuery.js";
 import {
   buildFeatureQuery,
   datasetPksOf,
   dedupeGriddapByPk,
+  featureHasDataset,
   griddapCoveredIn,
   griddapOutranksHexesIn,
   griddapTitle,
@@ -79,6 +81,7 @@ import {
   trackItemsIn,
 } from "./hitTest.js";
 import { radiusExpression } from "./pointRadius.js";
+import { rampExpression, toRampStops } from "./hexRamp.js";
 
 // direct_select's own dragVertex/toDisplayFeatures, captured before the
 // overrides below replace them, so each override can fall back to true library
@@ -396,28 +399,6 @@ function buildHeadArrowImage(fillColor, strokeColor = "#ffffff") {
   return ctx.getImageData(0, 0, size, size);
 }
 
-// The time filter as two instants, read back out of the map query string —
-// the same timeMin/timeMax the hexes, the points, the counts and the record
-// lists are filtered by (createDataFilterQueryString writes them, and leaves
-// them out entirely while the range is still the full default one). Bounds are
-// the API's own: date-only strings at UTC midnight, both ends inclusive, so a
-// track is clipped to exactly the span the numbers beside it are counted over.
-//
-// Not to be confused with tracksTimeWindow below, which is the scrub bar's
-// trailing window — the tracks TILES are drawn for that and deliberately
-// ignore this filter (see buildTracksTileUrl and TrajectoryDate.jsx).
-function filterTimeWindow(queryString) {
-  const params = new URLSearchParams(queryString);
-  const instant = (value) => {
-    const ms = value ? Date.parse(value) : NaN;
-    return Number.isNaN(ms) ? undefined : ms;
-  };
-  return {
-    min: instant(params.get("timeMin")),
-    max: instant(params.get("timeMax")),
-  };
-}
-
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 // While a WMS overlay is active every other data layer is hidden so the
 // gridded field reads cleanly; only the basemap, the raster and the
@@ -672,25 +653,6 @@ export default function CreateMap({
   // The selection the camera was last framed for, so a redraw from a filter
   // change doesn't re-frame it (see renderSelectedTrack).
   const framedTrackRef = useRef(null);
-
-  // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
-  // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
-  // up to the scrub date; see config.js). Day snapping keeps the tile URLs
-  // stable so the server's URL-keyed tile cache gets hits across scrubs and
-  // users. The requested trail is clamped by zoom first — a long window costs
-  // far more zoomed out, where one tile can carry the whole catalogue (see
-  // effectiveTrailingDays).
-  function tracksTimeWindow(scrub, trailing, zoom) {
-    const MS_PER_DAY = 24 * 60 * 60 * 1000;
-    const days = effectiveTrailingDays(trailing, zoom);
-    const end = new Date(`${scrub}T00:00:00Z`).getTime();
-    const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
-    const timeMin =
-      days === TRAIL_ALL
-        ? `${tracksMinDate}T00:00:00Z`
-        : `${new Date(end - days * MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
-    return { timeMin, timeMax };
-  }
 
   // Tracks tile URL: dataset-level filters from the regular map query string,
   // minus the TimeSelector's timeMin/timeMax (the scrub window must not
@@ -996,17 +958,6 @@ export default function CreateMap({
     },
   };
 
-  // Hex and marker features carry the datasets they aggregate as a JSON array
-  // of pks (MapLibre hands nested properties back as strings). Both the dimming
-  // and the ramp's domain ask the same question of them.
-  const featureHasDataset = (feature, pk) => {
-    try {
-      return JSON.parse(feature.properties.datasets).includes(pk);
-    } catch {
-      return false;
-    }
-  };
-
   // Tracks are the third way a dataset draws itself (hexes, markers, tracks),
   // and they need no feature-state: every track feature carries its dataset on
   // it (pk_url, as a string in the tile), so the paint expression can read the
@@ -1059,52 +1010,6 @@ export default function CreateMap({
     drawPolygon.current.changeMode("simple_select");
     deleteAllShapes();
   }
-
-  // The one hex ramp, shared by the combined 'hexes' layer below z7 and the
-  // 'coverage-hexes' layer at and above it. Both read the same 'count'
-  // property (the summed metric — see web-api/utils/hexMetric.js), so hex
-  // darkness means the same thing at every zoom.
-  //
-  // The stops are log-spaced by generateColorStops, but the interpolation
-  // between them is linear: the non-linearity lives in where the stops sit,
-  // not in how MapLibre blends across them.
-  //
-  // A single-stop ramp (a range of one value, e.g. a filter that leaves one
-  // hex) can't be interpolated: fall back to the flat color, since there's
-  // nothing to interpolate between.
-  // How much of the basemap the palest hex on the ramp lets through, as a
-  // fraction of what the darkest one lets through. The count is told twice on
-  // purpose — in the shade AND in how solid it is — because a sparse cell that
-  // is merely pale still covers the coastline underneath it as completely as a
-  // busy one does, and the two channels agree at every point on the ramp, so
-  // neither can contradict the other or the legend's key.
-  const HEX_RAMP_MIN_ALPHA = 0.55;
-
-  // The ramp's colours with that alpha baked in, rising with the stop just as
-  // the colour darkens with it. Linked to the ramp rather than measured on its
-  // own: this replaces a second data-driven fill-opacity that carried a
-  // 95th-percentile threshold of the counts on screen, which meant a percentile
-  // pass over every rendered hex on every settled camera, a threshold to hold
-  // and re-apply, and an expression evaluated per feature per frame — all of it
-  // to say what these stops already say. The stops are rebuilt only when the
-  // domain moves (setColorStops); the fill-opacity left on the layers is now
-  // zoom-only, so nothing here is recomputed while panning.
-  const toRampStops = (colorStops) =>
-    colorStops.map(({ stop, color }, index) => [
-      stop,
-      withAlpha(
-        color,
-        HEX_RAMP_MIN_ALPHA +
-          (1 - HEX_RAMP_MIN_ALPHA) *
-            (colorStops.length > 1 ? index / (colorStops.length - 1) : 1),
-      ),
-    ]);
-
-  const rampExpression = (stops, property) => {
-    if (stops.length === 0) return "lightgrey";
-    if (stops.length === 1) return stops[0][1];
-    return ["interpolate", ["linear"], ["get", property], ...stops.flat()];
-  };
 
   const hexFillColor = () => rampExpression(colorStops.current, "count");
 

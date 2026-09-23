@@ -377,3 +377,14 @@ export const buildFeatureQuery = (
     datasetPks: [...new Set(items.map((item) => item.pk))],
   };
 };
+
+// Hex and marker features carry the datasets they aggregate as a JSON array
+// of pks (MapLibre hands nested properties back as strings). Both the dimming
+// and the ramp's domain ask the same question of them.
+export const featureHasDataset = (feature, pk) => {
+  try {
+    return JSON.parse(feature.properties.datasets).includes(pk);
+  } catch {
+    return false;
+  }
+};
