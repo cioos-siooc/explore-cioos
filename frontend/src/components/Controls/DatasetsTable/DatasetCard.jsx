@@ -57,6 +57,8 @@ export default function DatasetCard({
   // reordering reads as an answer rather than as the list having shuffled
   // itself.
   fromMapClick,
+  // For the select toggle's `data-tip-highlight` (see TipsProvider).
+  tipHighlight,
   t,
   i18n,
 }) {
@@ -132,6 +134,7 @@ export default function DatasetCard({
             onClick={handleSelect}
             disabled={selectDisabled}
             aria-label={t("datasetsCardSelectForDownloadText")}
+            data-tip-highlight={tipHighlight}
           >
             {selected ? (
               <CheckCircleFill size={16} aria-hidden="true" />

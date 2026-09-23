@@ -10,6 +10,7 @@ import {
 
 import { usePersistentState } from "../usePersistentState.js";
 import { useUI } from "../ui/UIProvider.jsx";
+import useTourStages from "./useTourStages.js";
 
 // Every tip, in the order the About dialog pages through them. The copy is
 // `tip_<key>` in the locale files. Most are also offered on the map the first
@@ -23,7 +24,6 @@ export const TIPS = [
   "sliderKeys",
   "timeCoverage",
   "datasetNav",
-  "filterMap",
   "realtime",
   "trackDate",
   "griddapWms",
@@ -35,7 +35,10 @@ export const TIPS = [
 
 // Outside the provider (leaf-component tests render without it) offering a
 // tip is a no-op rather than a crash.
-const TipsContext = createContext({ offerTip: () => {} });
+const TipsContext = createContext({
+  offerTip: () => {},
+  tipHighlight: () => undefined,
+});
 
 export function useTips() {
   return useContext(TipsContext);
@@ -52,6 +55,9 @@ export default function TipsProvider({ children }) {
   const [tipsEnabled, setTipsEnabled] = usePersistentState("tipsEnabled", true);
   const [seenTips, setSeenTips] = usePersistentState("seenTips", []);
   const [activeTip, setActiveTip] = useState();
+  // Paging through every tip on request (from the About dialog) rather than
+  // being offered one: none of the rules below apply while it runs.
+  const [touring, setTouring] = useState(false);
 
   // The intro opens by itself only on a first visit, and already covers the
   // basics — a tip on top of that would be one thing too many on day one.
@@ -67,10 +73,10 @@ export default function TipsProvider({ children }) {
   // offerTip is called from map event handlers registered once, so it has to
   // be stable and read the latest state through a ref. Seeded, not left empty:
   // children's mount effects run before this component's own.
-  const gate = useRef({ tipsEnabled, seenTips, modalOpen });
+  const gate = useRef({ tipsEnabled, seenTips, modalOpen, touring });
   useEffect(() => {
-    gate.current = { tipsEnabled, seenTips, modalOpen };
-  }, [tipsEnabled, seenTips, modalOpen]);
+    gate.current = { tipsEnabled, seenTips, modalOpen, touring };
+  }, [tipsEnabled, seenTips, modalOpen, touring]);
 
   // Takes one key or several in priority order, and offers the first not yet
   // seen — so a page with a specific tip of its own falls back to the general
@@ -82,8 +88,10 @@ export default function TipsProvider({ children }) {
   const pendingTip = useRef();
   const offerTip = useCallback(
     (keys) => {
-      const { tipsEnabled, seenTips, modalOpen } = gate.current;
-      if (firstVisit || shownThisLoad.current || !tipsEnabled) return;
+      const { tipsEnabled, seenTips, modalOpen, touring } = gate.current;
+      if (firstVisit || shownThisLoad.current || !tipsEnabled || touring) {
+        return;
+      }
       const key = [keys].flat().find((k) => !seenTips.includes(k));
       if (!key) return;
       if (modalOpen) {
@@ -104,7 +112,47 @@ export default function TipsProvider({ children }) {
     offerTip(key);
   }, [modalOpen, offerTip]);
 
-  const dismissTip = useCallback(() => setActiveTip(), []);
+  // For the `data-tip-highlight` attribute of the control a tip talks about,
+  // so the tip card's text has something on screen to point at. Undefined,
+  // not false, so React drops the attribute rather than writing "false".
+  const tipHighlight = useCallback(
+    (key) => (key && key === activeTip) || undefined,
+    [activeTip],
+  );
+
+  // Read at call time: the stages close over the selection and the catalogue,
+  // which change far more often than a step is taken.
+  const stages = useTourStages();
+  const stagesRef = useRef(stages);
+  useEffect(() => {
+    stagesRef.current = stages;
+  });
+
+  const showTourStep = useCallback((key) => {
+    setActiveTip(key);
+    stagesRef.current[key]?.();
+  }, []);
+  const startTour = useCallback(
+    (key) => {
+      // The tour is this visit's tip; nothing is offered on top of it after.
+      shownThisLoad.current = true;
+      setTouring(true);
+      showTourStep(key);
+    },
+    [showTourStep],
+  );
+  const stepTour = useCallback(
+    (step) =>
+      showTourStep(
+        TIPS[(TIPS.indexOf(activeTip) + step + TIPS.length) % TIPS.length],
+      ),
+    [activeTip, showTourStep],
+  );
+
+  const dismissTip = useCallback(() => {
+    setActiveTip();
+    setTouring(false);
+  }, []);
   const disableTips = useCallback(() => {
     setTipsEnabled(false);
     setActiveTip();
@@ -113,6 +161,10 @@ export default function TipsProvider({ children }) {
   const value = {
     activeTip,
     offerTip,
+    tipHighlight,
+    touring,
+    startTour,
+    stepTour,
     dismissTip,
     disableTips,
     tipsEnabled,

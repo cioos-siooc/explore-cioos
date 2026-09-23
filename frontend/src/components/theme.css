@@ -295,7 +295,8 @@
                         that change markup rather than layout.
      900px   tablet     the legend moves out of the top-right corner
      992px   tablet     legacy Bootstrap rung, modal + intro layout only
-     1200px  laptop     the WMS legend goes compact
+     1200px  laptop     the WMS legend goes compact; the tip card moves to the
+                        top-right corner
      1400px  desktop    wide enough for the datasets column to sit beside the
                         map rather than over it, so it opens by default
                         (WIDE_SCREEN_QUERY in UIProvider) and the time bar

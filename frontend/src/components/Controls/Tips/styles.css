@@ -1,6 +1,6 @@
-/* The contextual tip, flowing as the last row of the top bar's column (see
-   TipCard.jsx). Sized like a chip row rather than a panel: it should read as
-   an aside to the controls above it, not as something to deal with. */
+/* The contextual tip (see TipCard.jsx). Sized like a chip row rather than a
+   panel: it should read as an aside to the controls above it, not as
+   something to deal with. */
 .tipCard {
   display: flex;
   align-items: flex-start;
@@ -16,6 +16,15 @@
   font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink);
+}
+
+/* Above the map chrome but under the modals, which the tip waits out anyway. */
+.tipCardCorner {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: var(--cioos-z-dock, 35);
+  width: min(360px, calc((100vw - var(--cioos-brand-width)) / 2 - 24px));
 }
 
 .tipCardIcon {
@@ -39,7 +48,24 @@
   margin: 2px 0 4px;
 }
 
-.tipCardDisable {
+.tipGlyph {
+  vertical-align: -2px;
+  color: var(--cioos-primary);
+}
+
+.tipCardTour {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-md);
+}
+
+.tipCardCount {
+  margin-right: auto;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.tipCardLink {
   padding: 0;
   border: 0;
   background: none;
@@ -49,6 +75,64 @@
   cursor: pointer;
 }
 
-.tipCardDisable:hover {
+.tipCardLink:hover {
   color: var(--cioos-ink);
+}
+
+/* The control the active tip talks about (tipHighlight in TipsProvider), in
+   the tip card's own primary — the ring-and-glow recipe of the datasets list's
+   .fromMapClick card, recoloured so card, pointer and control read as one.
+   !important because it has to win over each control's own shadow — the
+   raised cards, the pressed buttons — while the tip is up. */
+[data-tip-highlight] {
+  --tip-glow: color-mix(in srgb, var(--cioos-primary) 45%, transparent);
+
+  box-shadow:
+    0 0 0 2px var(--tip-glow),
+    0 0 10px 1px var(--tip-glow) !important;
+}
+
+/* The hand pointing at the control the active tip talks about (TipPointer).
+   Over the map chrome, under the modals the tip waits out. A badge rather than
+   a bare glyph, which washes out against the light basemap and the white
+   panels — hung from its top edge, where the fingertip is, and turned
+   over to point down from above. */
+.tipPointer {
+  position: fixed;
+  z-index: calc(var(--cioos-z-dock, 35) + 1);
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+}
+
+.tipPointerAbove {
+  transform: translate(-50%, calc(-100% - 4px)) rotate(180deg);
+}
+
+/* A nudge towards the control, not a pulse: it reads as pointing. */
+.tipPointerBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 2px solid var(--cioos-white);
+  border-radius: 50%;
+  background-color: var(--cioos-primary);
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
+  color: var(--cioos-white);
+  animation: tipPointerNudge 1.2s ease-in-out infinite;
+}
+
+@keyframes tipPointerNudge {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tipPointerBadge {
+    animation: none;
+  }
 }

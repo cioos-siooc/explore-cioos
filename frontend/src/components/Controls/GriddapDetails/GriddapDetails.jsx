@@ -117,6 +117,7 @@ export default function GriddapDetails({
           <strong>{t("griddapMapPreviewTitle")}</strong>
           <Switch
             id="griddapShowOnMapSwitch"
+            tipTarget="griddapWms"
             label={t("griddapShowOnMapToggle")}
             checked={overlayActive}
             disabled={!variables.length}

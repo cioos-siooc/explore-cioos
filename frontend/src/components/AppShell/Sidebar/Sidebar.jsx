@@ -16,6 +16,7 @@ import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
 // The left column: the datasets card — a header naming the list, the list
@@ -37,6 +38,7 @@ export default function Sidebar() {
     setShowDownloadModal,
     setShowSelectionHelpModal,
   } = useUI();
+  const { tipHighlight } = useTips();
   // Until `ready`, there is no dataset count to show — not even a zero. See
   // useDatasetCounts.
   const {
@@ -193,6 +195,7 @@ export default function Sidebar() {
             <button
               type="button"
               className="sidebarDownloadButton"
+              data-tip-highlight={tipHighlight("sizeLimit")}
               disabled={selectedCount === 0}
               onClick={() => setShowDownloadModal(true)}
               title={t("dockDownloadCountTitle", { count: selectedCount })}

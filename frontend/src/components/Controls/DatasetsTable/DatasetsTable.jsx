@@ -19,6 +19,7 @@ import classNames from "classnames";
 
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   GROUP_NONE,
   HIDEABLE_DIMENSIONS,
@@ -97,6 +98,7 @@ export default function DatasetsTable({
     if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET;
     return new Set(featureQuery.datasetPks.map(Number));
   }, [featureQuery, isDownloadModal]);
+  const { tipHighlight } = useTips();
 
   // The download modal is a flat review list — it never groups, whatever the
   // sidebar is grouped by.
@@ -308,6 +310,15 @@ export default function DatasetsTable({
     collapsedGroups,
   ]);
 
+  // The what's here tip points at one of the click's datasets that can be
+  // ticked in, while this list rather than the card holds them (see Sidebar).
+  const whatsHereTarget = pageItems.find(
+    (item) =>
+      !item.header &&
+      item.row.cdm_data_type !== "Grid" &&
+      pinnedPks.has(Number(item.row.pk)),
+  );
+
   const toggleGroupCollapsed = (group) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -506,6 +517,9 @@ export default function DatasetsTable({
                     item.group !== undefined && hiddenGroups.has(item.group)
                   }
                   fromMapClick={pinnedPks.has(Number(item.row.pk))}
+                  tipHighlight={tipHighlight(
+                    item === whatsHereTarget && "whatsHere",
+                  )}
                   t={t}
                   i18n={i18n}
                 />

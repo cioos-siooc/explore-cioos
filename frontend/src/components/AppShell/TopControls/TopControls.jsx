@@ -17,9 +17,13 @@ import TipCard from "../../Controls/Tips/TipCard.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
 import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
+import useMediaQuery, {
+  LAPTOP_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
 // Gap held between the bottom of the top bar and whatever it pushes down. Half
@@ -75,6 +79,9 @@ export default function TopControls() {
     setQuickFiltersCollapsed,
   } = useUI();
   const { inspectDataset, returnToDatasetList } = useSelection();
+  const { tipHighlight } = useTips();
+
+  const tipInCorner = useMediaQuery(LAPTOP_QUERY);
 
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-top-bar-space", measureTopBarSpace);
@@ -108,6 +115,7 @@ export default function TopControls() {
               active: showCoverageModal,
             })}
             data-testid="topbar-coverage-button"
+            data-tip-highlight={tipHighlight("timeCoverage")}
             onClick={() => setShowCoverageModal(true)}
             aria-pressed={showCoverageModal}
             // "Time coverage", not the "Time" the label would otherwise want
@@ -192,7 +200,8 @@ export default function TopControls() {
           of it. Only up while the datasets card — whose banner otherwise says
           this — is collapsed. */}
       <SingleDatasetView />
-      <TipCard />
+      {/* Wide screens hold it in the top-right corner instead (see AppShell). */}
+      {!tipInCorner && <TipCard />}
     </div>
   );
 }

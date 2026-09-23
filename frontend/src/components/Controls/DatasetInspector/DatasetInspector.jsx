@@ -5,8 +5,6 @@ import {
   CheckCircleFill,
   Download,
   FileEarmarkText,
-  Funnel,
-  FunnelFill,
 } from "react-bootstrap-icons";
 // import platformColors from '../../platformColors'
 import Loading from "../Loading/Loading.jsx";
@@ -144,10 +142,10 @@ export default function DatasetInspector({
 }) {
   const { t, i18n } = useTranslation();
   const { zoomToDataset } = useZoomToDataset();
-  const { eovsSelected, datasetsSelected, setDatasetsSelected } = useFilters();
+  const { eovsSelected } = useFilters();
   const { handleSelectDataset, selectedPks } = useSelection();
   const { setShowDownloadModal } = useUI();
-  const { offerTip } = useTips();
+  const { offerTip, tipHighlight } = useTips();
   const isTrajectory = TRAJECTORY_TYPE_KEYS.some(
     ([, type]) => type === dataset.cdm_data_type,
   );
@@ -439,22 +437,6 @@ export default function DatasetInspector({
     [eovsSelected],
   );
 
-  // The title bar's filter button: narrow the map to this dataset alone, or
-  // release it again. The one control on this page that touches a filter —
-  // it is a labelled button that says so, not a value chip that happens to be
-  // clickable.
-  const datasetIsFiltered = datasetsSelected.some(
-    (option) => option.pk === dataset.pk && option.isSelected,
-  );
-  const toggleDatasetFilter = () =>
-    setDatasetsSelected(
-      datasetsSelected.map((option) =>
-        option.pk === dataset.pk
-          ? { ...option, isSelected: !option.isSelected }
-          : option,
-      ),
-    );
-
   // Griddap is metadata-only and never enters the download selection
   // (handleSelectDataset drops it), so the button says why rather than
   // failing silently on click.
@@ -490,15 +472,15 @@ export default function DatasetInspector({
           control, in the one place that marks the panel as being on a dataset
           rather than the list. */}
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
-        <div className="datasetTitleHeading">
+        <div
+          className="datasetTitleHeading"
+          data-tip-highlight={tipHighlight("datasetNav")}
+        >
           <FileEarmarkText
             className="datasetTitleIcon"
             size={20}
             aria-hidden="true"
           />
-          {/* A heading, and only a heading. Filtering the map to this dataset
-              used to be a click on the title itself, which no reader expects of
-              a page's title — it is a named button in the row below now. */}
           <h2 className="datasetTitle">{dataset.title}</h2>
         </div>
         {/* Every action on this page, named. These are the only things here
@@ -527,26 +509,6 @@ export default function DatasetInspector({
               <Download size={15} aria-hidden="true" />
             )}
             {t("datasetInspectorDownloadText")}
-          </button>
-          <button
-            type="button"
-            className={classNames("datasetTitleAction", {
-              active: datasetIsFiltered,
-            })}
-            onClick={toggleDatasetFilter}
-            aria-pressed={datasetIsFiltered}
-            title={t(
-              datasetIsFiltered
-                ? "datasetFilterButtonRemove"
-                : "datasetFilterButtonApply",
-            )}
-          >
-            {datasetIsFiltered ? (
-              <FunnelFill size={15} aria-hidden="true" />
-            ) : (
-              <Funnel size={15} aria-hidden="true" />
-            )}
-            {t("datasetFilterButtonApplyText")}
           </button>
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
@@ -674,6 +636,7 @@ export default function DatasetInspector({
                 {dataset.is_realtime && (
                   <span
                     className="datasetTitleLive"
+                    data-tip-highlight={tipHighlight("realtime")}
                     title={t("datasetRealtimeBadgeTitle")}
                   >
                     {t("datasetRealtimeBadgeText")}
@@ -739,7 +702,15 @@ export default function DatasetInspector({
         )}
         {isTrajectoryDataset && trajectoryPlatforms?.length > 0 && (
           <div className="recordSection">
-            <div className="recordSectionHeader">
+            <div
+              className="recordSectionHeader"
+              // The selected platform's card takes the pointer when there is one.
+              data-tip-highlight={
+                selectedTrajectory?.datasetPk !== dataset.pk
+                  ? tipHighlight("trackDate")
+                  : undefined
+              }
+            >
               <strong>{t("trajectoryPlatformsTitle")}</strong>
               <span className="recordHint">
                 {t("trajectoryPlatformsClickText")}
@@ -769,6 +740,12 @@ export default function DatasetInspector({
                   pressed={
                     selectedTrajectory?.datasetPk === dataset.pk &&
                     selectedTrajectory?.trajectoryId === row.trajectory_id
+                  }
+                  tipHighlight={
+                    selectedTrajectory?.datasetPk === dataset.pk &&
+                    selectedTrajectory?.trajectoryId === row.trajectory_id
+                      ? tipHighlight("trackDate")
+                      : undefined
                   }
                   onClick={() =>
                     setSelectedTrajectory &&

@@ -328,6 +328,7 @@ export default function CreateMap({
   projection = "mercator",
   zoomTarget,
   drawRequest,
+  featureQueryRequest,
   // Called once with the MapLibre instance, as soon as it is constructed.
   onMapReady = () => {},
   // Called once, when the map is worth handing over. See reportFirstPaint.
@@ -1928,6 +1929,20 @@ export default function CreateMap({
       duration: 1000,
     });
   }, [zoomTarget]);
+
+  // Asks the card's question of a point with no click behind it, from what is
+  // drawn there now; set by the mount effect, which owns the hit-test.
+  const askAtRef = useRef();
+  // Declared after the zoom effect above so a camera move requested in the same
+  // render has already started, and 'idle' waits for it to land.
+  useEffect(() => {
+    if (!map.current || !featureQueryRequest) return;
+    const { lngLat } = featureQueryRequest;
+    map.current.once("idle", () => askAtRef.current?.(lngLat));
+    // A map already at rest renders nothing more, and so never goes idle again
+    // on its own.
+    map.current.triggerRepaint();
+  }, [featureQueryRequest]);
 
   // Spatial filter button (top bar): 'box'/'polygon' replace whatever was
   // drawn before and start that draw mode; 'clear' cancels out of drawing and
@@ -4101,16 +4116,19 @@ export default function CreateMap({
     // the clear-everything one below are things the user did, and a link is
     // written with the card open — so replaying a click here could only undo
     // the selection and the page the same link just restored.
+    askAtRef.current = (lngLat) => {
+      const query = buildFeatureQuery(
+        { lngLat: { lng: lngLat[0], lat: lngLat[1] } },
+        hitsAt(map.current.project(lngLat)),
+      );
+      if (query) onFeatureQueryRef.current(query);
+    };
     if (sharedFeatureQueryAtRef.current) {
       map.current.once("idle", () => {
         const lngLat = sharedFeatureQueryAtRef.current;
         if (!lngLat || !map.current) return;
         sharedFeatureQueryAtRef.current = null;
-        const query = buildFeatureQuery(
-          { lngLat: { lng: lngLat[0], lat: lngLat[1] } },
-          hitsAt(map.current.project(lngLat)),
-        );
-        if (query) onFeatureQueryRef.current(query);
+        askAtRef.current(lngLat);
       });
     }
 

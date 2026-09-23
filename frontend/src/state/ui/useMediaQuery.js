@@ -10,6 +10,10 @@ import { useCallback, useSyncExternalStore } from "react";
 // stylesheets that branch on it in CSS cannot drift apart.
 export const MOBILE_QUERY = "(max-width: 700px)";
 
+// The 1200px laptop rung in theme.css: wide enough for the tip card to sit
+// beside the 490px brand card rather than under it.
+export const LAPTOP_QUERY = "(min-width: 1200px)";
+
 // Subscribes to a media query and re-renders when it flips. Layout that CSS can
 // carry belongs in CSS; this is for the cases where the markup itself differs —
 // a different icon, a card that becomes a modal, a control that isn't rendered

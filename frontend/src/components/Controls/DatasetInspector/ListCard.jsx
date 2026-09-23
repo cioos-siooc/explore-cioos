@@ -20,6 +20,8 @@ export default function ListCard({
   // Held at the top of the list because the last map click found this item —
   // wearing the same goldenrod the map put on what was clicked.
   pinned,
+  // The active tip's pointer target (see tipHighlight).
+  tipHighlight,
   onClick,
   children,
 }) {
@@ -35,6 +37,7 @@ export default function ListCard({
       role="button"
       tabIndex={0}
       aria-pressed={pressed}
+      data-tip-highlight={tipHighlight}
       onClick={onClick}
       onKeyDown={handleKeyDown}
     >

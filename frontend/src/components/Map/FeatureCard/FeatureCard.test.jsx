@@ -4,17 +4,24 @@ import { screen, waitFor, act } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
-import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
+import {
+  DESKTOP_WIDTH,
+  MOBILE_WIDTH,
+  setViewportWidth,
+} from "../../../test/viewport.js";
 import FeatureCard from "./FeatureCard.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import pointQueryFixture from "../../../../e2e/fixtures/api/pointQuery.json";
 
 let latestMap;
 let latestSelection;
+let latestUI;
 function Probe() {
   latestMap = useMapState();
   latestSelection = useSelection();
+  latestUI = useUI();
   const { initialPointsQueryComplete } = latestSelection;
   return (
     <span data-testid="state">
@@ -23,11 +30,11 @@ function Probe() {
   );
 }
 
-async function renderReady() {
-  // FeatureCard defers to the datasets sidebar once it's open (see the
-  // component's own comment) — the sidebar starts open at desktop width, so
-  // force the phone-width "starts closed" case to actually exercise the card.
-  setViewportWidth(MOBILE_WIDTH);
+async function renderReady(width = MOBILE_WIDTH) {
+  // FeatureCard waits out the datasets sidebar where it can't stand beside it
+  // (see the component's own comment), so the default is the phone-width
+  // "sidebar starts closed" case, which exercises the card on its own.
+  setViewportWidth(width);
   const result = renderWithProviders(
     <>
       <FeatureCard />
@@ -65,6 +72,15 @@ describe("FeatureCard", () => {
         "Nothing here is in the current results because the filters have excluded it.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("is never open at the same time as the datasets sidebar", async () => {
+    await renderReady(DESKTOP_WIDTH);
+    expect(latestUI.sidebarOpen).toBe(true);
+    act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
+    expect(screen.getByTestId("feature-card")).not.toHaveClass("open");
+    act(() => latestUI.setSidebarOpen(false));
+    expect(screen.getByTestId("feature-card")).toHaveClass("open");
   });
 
   it("resolves an observation row against pointsData and shows its title", async () => {

@@ -31,6 +31,7 @@ export default function MapContainer() {
     projection,
     zoomTarget,
     drawRequest,
+    featureQueryRequest,
     setMapInstance,
     featureQuery,
     setFeatureQuery,
@@ -166,6 +167,7 @@ export default function MapContainer() {
       projection={projection}
       zoomTarget={zoomTarget}
       drawRequest={drawRequest}
+      featureQueryRequest={featureQueryRequest}
       onMapReady={setMapInstance}
       onFirstPaint={reportFirstPaint}
     />

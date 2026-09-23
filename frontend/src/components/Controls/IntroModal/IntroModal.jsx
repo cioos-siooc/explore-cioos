@@ -19,14 +19,20 @@ import CioosLogo from "../../ui/CioosLogo.jsx";
 import Modal from "../../ui/Modal.jsx";
 import Switch from "../../ui/Switch.jsx";
 import FeedbackButton from "../FeedbackButton/FeedbackButton.jsx";
+import TipText from "../Tips/TipText.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import { TRAJECTORY_TYPE_KEYS } from "../../../state/dataLayers.js";
 import { MARKER_MIN_ZOOM } from "../../config.js";
 import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
+import {
+  findTrajectory,
+  showGridded,
+  showNonna,
+  showTrajectory,
+} from "../../../state/tips/scenes.js";
 import "./styles.css";
 
 // What the tool is for, in the order a newcomer meets it: find data on the
@@ -38,21 +44,6 @@ const FEATURES = [
   { key: "download", Icon: Download },
 ];
 
-// Halifax Harbour: charted by CHS in detail, so the NONNA soundings are there
-// to see as soon as the camera lands.
-const NONNA_SHOWCASE_AREA = {
-  type: "Polygon",
-  coordinates: [
-    [
-      [-63.62, 44.6],
-      [-63.5, 44.6],
-      [-63.5, 44.7],
-      [-63.62, 44.7],
-      [-63.62, 44.6],
-    ],
-  ],
-};
-
 // The Gulf of St. Lawrence, thick with profile and time-series stations. A
 // point frames at exactly the camera's maxZoom, just past the zoom where hexes
 // give way to markers.
@@ -61,21 +52,6 @@ const STATIONS_SHOWCASE_CENTRE = {
   coordinates: [-63.914, 49.038],
 };
 const STATIONS_SHOWCASE_ZOOM = MARKER_MIN_ZOOM + 0.8;
-
-// A glider mission off the west coast of Vancouver Island, with its track
-// drawn and the camera where it reads best. Catalogues without
-// it fall back to the first trajectory dataset, framed on its footprint.
-const TRAJECTORY_SHOWCASE = {
-  datasetId: "colin_1142_20260708_R",
-  trajectoryId: "colin_1142_20260708",
-  centre: { type: "Point", coordinates: [-127.598, 48.273] },
-  zoom: 6.6,
-};
-
-const isTrajectory = (dataset) =>
-  TRAJECTORY_TYPE_KEYS.some(([, type]) => type === dataset.cdm_data_type);
-const footprint = (dataset) =>
-  dataset.filtered_bbox_geojson || dataset.coverage_bbox_geojson;
 
 // A few of the app's views, one click away from the intro: each closes the
 // dialog and sets the app up the way a user would have, using the same
@@ -93,12 +69,7 @@ function useShowcases(close) {
   const { setShowDownloadModal, setShowCoverageModal } = useUI();
 
   const gridded = pointsData.find((dataset) => dataset.wms_url);
-  const voyage = pointsData.find(
-    (dataset) => dataset.dataset_id === TRAJECTORY_SHOWCASE.datasetId,
-  );
-  const trajectory =
-    voyage ||
-    pointsData.find((dataset) => isTrajectory(dataset) && footprint(dataset));
+  const trajectory = findTrajectory(pointsData);
   const downloadable = pointsData.find(
     (dataset) => dataset.cdm_data_type !== "Grid",
   );
@@ -107,31 +78,17 @@ function useShowcases(close) {
     gridded && {
       key: "wms",
       Icon: Grid3x3Gap,
-      run: () => {
-        // Opening a gridded dataset's page draws its WMS overlay by itself
-        // (see GriddapDetails).
-        setInspectDataset(gridded);
-        zoomToGeometry(footprint(gridded));
-      },
+      run: () => showGridded(gridded, { setInspectDataset, zoomToGeometry }),
     },
     trajectory && {
       key: "trajectory",
       Icon: Bezier2,
-      run: () => {
-        if (voyage) {
-          selectTrajectoryFromMap(
-            voyage.pk,
-            TRAJECTORY_SHOWCASE.trajectoryId,
-            voyage.title,
-          );
-          zoomToGeometry(TRAJECTORY_SHOWCASE.centre, {
-            maxZoom: TRAJECTORY_SHOWCASE.zoom,
-          });
-          return;
-        }
-        setInspectDataset(trajectory);
-        zoomToGeometry(footprint(trajectory));
-      },
+      run: () =>
+        showTrajectory(trajectory, {
+          selectTrajectoryFromMap,
+          setInspectDataset,
+          zoomToGeometry,
+        }),
     },
     {
       key: "stations",
@@ -157,10 +114,7 @@ function useShowcases(close) {
     {
       key: "nonna",
       Icon: Water,
-      run: () => {
-        setBathymetryVisible(true);
-        zoomToGeometry(NONNA_SHOWCASE_AREA, { maxZoom: 12 });
-      },
+      run: () => showNonna({ setBathymetryVisible, zoomToGeometry }),
     },
   ]
     .filter(Boolean)
@@ -210,7 +164,7 @@ function Stat({ value, label, language }) {
 export default function IntroModal({ showModal, setShowModal }) {
   const { t, i18n } = useTranslation();
   const { setShowSelectionHelpModal } = useUI();
-  const { tipsEnabled, setTipsEnabled } = useTips();
+  const { tipsEnabled, setTipsEnabled, startTour } = useTips();
   const {
     totalNumberOfDatasets,
     erddapServersSelected,
@@ -347,7 +301,24 @@ export default function IntroModal({ showModal, setShowModal }) {
             <h2 className="introTipHeading">
               <Lightbulb size={16} aria-hidden="true" /> {t("tipsHeading")}
             </h2>
-            <p key={tipIndex}>{t(`tip_${TIPS[tipIndex]}`)}</p>
+            {/* Closes the dialog and pages through the tips on the map, each
+                pointing at the control it is about (see startTour). */}
+            <button
+              type="button"
+              key={tipIndex}
+              className="introTipShow"
+              title={t("tipShowMe")}
+              onClick={() => {
+                close();
+                startTour(TIPS[tipIndex]);
+              }}
+            >
+              <TipText tip={TIPS[tipIndex]} />
+              <span className="introTipShowLabel">
+                {t("tipShowMe")}
+                <ArrowRight size={14} aria-hidden="true" />
+              </span>
+            </button>
             <div className="introTipNav">
               <span className="introTipCount">
                 {t("tipCounter", { n: tipIndex + 1, total: TIPS.length })}

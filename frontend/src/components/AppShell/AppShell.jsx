@@ -21,11 +21,13 @@ import DepthBar from "../Controls/DepthBar/DepthBar.jsx";
 import TimeBar from "../Controls/TimeBar/TimeBar.jsx";
 import WmsLegend from "../Controls/WmsLegend/WmsLegend.jsx";
 import IntroModal from "../Controls/IntroModal/IntroModal.jsx";
+import TipCard from "../Controls/Tips/TipCard.jsx";
 import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
 import { useTips } from "../../state/tips/TipsProvider.jsx";
+import useMediaQuery, { LAPTOP_QUERY } from "../../state/ui/useMediaQuery.js";
 import { bathymetryLegendMinZoom } from "../config.js";
 import "./styles.css";
 
@@ -58,6 +60,7 @@ export default function AppShell() {
   const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI();
   const { inspectDataset, platformsAvailable } = useSelection();
   const { offerTip } = useTips();
+  const tipInCorner = useMediaQuery(LAPTOP_QUERY);
 
   // Zoomed in far enough that the CHS NONNA soundings take over the seafloor.
   const nonnaShown = bathymetryVisible && zoom >= bathymetryLegendMinZoom;
@@ -101,6 +104,7 @@ export default function AppShell() {
       label: t("layersBathymetry"),
       checked: bathymetryVisible,
       onChange: () => setBathymetryVisible(!bathymetryVisible),
+      tipTarget: "nonna",
     },
     tracks: {
       key: "tracks",
@@ -119,6 +123,7 @@ export default function AppShell() {
       label: t("layersGriddedCoverage"),
       checked: griddapCoverageVisible,
       onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible),
+      tipTarget: "griddedCoverage",
     },
   ];
 
@@ -167,6 +172,7 @@ export default function AppShell() {
       <ActivityIndicator />
       <Sidebar />
       <TopControls />
+      {tipInCorner && <TipCard corner />}
       <FiltersModal />
       <DownloadModal />
       <CoverageModal />

@@ -47,9 +47,14 @@ function measureBarSpace({ top, height }) {
 // the range is set there.
 export default function TimeBar() {
   const { timeFilterActive } = useFilters();
+  const { activeTip } = useTips();
   const isMobile = useMediaQuery(MOBILE_QUERY);
 
-  if (!timeFilterActive || isMobile) return null;
+  // Its own tip brings it up over the whole range, so there is a bar to point
+  // at before any range is set.
+  if ((!timeFilterActive && activeTip !== "sliderKeys") || isMobile) {
+    return null;
+  }
   return <TimeBarSurface />;
 }
 
@@ -68,7 +73,7 @@ function TimeBarSurface() {
     timeExtent,
   } = useFilters();
 
-  const { offerTip } = useTips();
+  const { offerTip, tipHighlight } = useTips();
   useEffect(() => offerTip("timeCoverage"), [offerTip]);
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-time-bar-space", measureBarSpace);
@@ -129,7 +134,12 @@ function TimeBarSurface() {
   );
 
   return (
-    <div className="timeBar" ref={barRef} aria-label={t("timeBarAriaLabel")}>
+    <div
+      className="timeBar"
+      ref={barRef}
+      aria-label={t("timeBarAriaLabel")}
+      data-tip-highlight={tipHighlight("sliderKeys")}
+    >
       {/* The fields sit inside the card, along the top of the rail they drive,
           rather than in a pill of their own floating above it: one surface for
           one control. */}

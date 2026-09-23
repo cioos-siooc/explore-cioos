@@ -35,7 +35,7 @@ import "./styles.css";
 // It never competes with the datasets sidebar for the same corner: the sidebar
 // already sorts and outlines the datasets a click found (see DatasetsTable's
 // pinnedPks), so once it is open the card would be a second, redundant answer
-// to the same click sitting on top of the first.
+// to the same click sitting on top of the first. It is one or the other.
 
 // How far a stack has to grow before the list scrolls rather than the card.
 const VISIBLE_ROWS = 5;
@@ -54,7 +54,7 @@ export default function FeatureCard() {
     combinedQueries,
   } = useSelection();
   const { sidebarOpen } = useUI();
-  const { offerTip } = useTips();
+  const { offerTip, tipHighlight } = useTips();
 
   const [expanded, setExpanded] = useState(false);
 
@@ -91,9 +91,9 @@ export default function FeatureCard() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [featureQuery, close]);
 
-  // The datasets sidebar already answers "what did that click find?" once it's
-  // open — see the comment up top. The query itself is left alone so the card
-  // picks back up where it left off if the sidebar closes again.
+  // Held back by the open sidebar — see the comment up top. The query itself is
+  // left alone so the card picks back up where it left off if the sidebar
+  // closes again.
   const open = Boolean(featureQuery) && !sidebarOpen;
   useEffect(() => {
     if (open) offerTip("whatsHere");
@@ -244,7 +244,7 @@ export default function FeatureCard() {
       ) : (
         <>
           <div className="featureCardList">
-            {shown.map((entry) => {
+            {shown.map((entry, index) => {
               const here =
                 entry.kind === "track"
                   ? entry.trajectoryId || t("featureCardTrack")
@@ -311,6 +311,12 @@ export default function FeatureCard() {
                         e.stopPropagation();
                         addOne(entry.pk);
                       }}
+                      // One is enough to point at. The sidebar list's own
+                      // toggle stands in for it while the card is held back
+                      // (see DatasetsTable).
+                      data-tip-highlight={tipHighlight(
+                        open && index === 0 && "whatsHere",
+                      )}
                       disabled={!entry.selectable || entry.inSelection}
                       title={
                         !entry.selectable

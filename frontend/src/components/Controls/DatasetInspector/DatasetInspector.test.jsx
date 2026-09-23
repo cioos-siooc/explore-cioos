@@ -150,17 +150,6 @@ describe("DatasetInspector", () => {
     );
   });
 
-  it("toggling the filter button calls setDatasetsSelected for this dataset's pk", async () => {
-    const { user } = await renderReady();
-    const button = screen.getByTitle("Filter the map to this dataset");
-    await user.click(button);
-    await waitFor(() =>
-      expect(
-        screen.getByTitle("Stop filtering the map to this dataset"),
-      ).toBeInTheDocument(),
-    );
-  });
-
   it("Backspace calls returnToList, except while typing in a field", async () => {
     const returnToList = vi.fn();
     const { user } = await renderReady({ returnToList });

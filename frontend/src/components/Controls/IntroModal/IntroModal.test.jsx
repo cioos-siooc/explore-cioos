@@ -8,6 +8,7 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { TIPS } from "../../../state/tips/TipsProvider.jsx";
+import TipCard from "../Tips/TipCard.jsx";
 import IntroModal from "./IntroModal.jsx";
 
 // FeedbackButton calls Sentry.getFeedback() on click, which is undefined
@@ -36,6 +37,7 @@ function Harness({ setShowModal = () => {} }) {
       </span>
       <span data-testid="download-count">{pointsToReview?.length ?? 0}</span>
       <span data-testid="bathymetry">{bathymetryVisible ? "on" : "off"}</span>
+      <TipCard />
     </>
   );
 }
@@ -166,6 +168,19 @@ describe("IntroModal", () => {
     for (let i = 1; i < TIPS.length; i += 1)
       await user.click(screen.getByRole("button", { name: "Next tip" }));
     expect(tip()).toBe(first);
+  });
+
+  it("clicking a tip closes the dialog and starts the tour on it", async () => {
+    const setShowModal = vi.fn();
+    const { user } = renderIntro({ setShowModal });
+    await user.click(screen.getByRole("button", { name: "Next tip" }));
+    await user.click(
+      screen.getByRole("button", { name: /Show me on the map/ }),
+    );
+    expect(setShowModal).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId("tip-card")).toHaveTextContent(
+      `Tip 2 of ${TIPS.length}`,
+    );
   });
 
   it("the tips switch persists the choice", async () => {

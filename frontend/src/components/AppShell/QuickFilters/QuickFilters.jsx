@@ -56,7 +56,7 @@ export default function QuickFilters() {
   } = useSelection();
   const activeFilterCount = useActiveFilters().length;
   const { resetFilters, realtimeOnly, setRealtimeOnly } = useFilters();
-  const { offerTip } = useTips();
+  const { offerTip, tipHighlight } = useTips();
   // Zoomed in to a local area, the whole-catalogue list stops matching the map.
   const zoomedIn = isMarkerTier(zoom) && !onlyInView;
   useEffect(() => {
@@ -212,6 +212,10 @@ export default function QuickFilters() {
         type="button"
         className={classNames("quickFilterButton", { applied: boxActive })}
         data-testid="quick-filter-box"
+        // With no shape drawn yet, both buttons that draw one are the point.
+        data-tip-highlight={tipHighlight(
+          (boxActive || !polygonActive) && "reshapeArea",
+        )}
         onClick={() => draw("box", boxActive)}
         aria-pressed={boxActive}
         title={t("quickFilterBoxTitle")}
@@ -226,6 +230,9 @@ export default function QuickFilters() {
         type="button"
         className={classNames("quickFilterButton", { applied: polygonActive })}
         data-testid="quick-filter-polygon"
+        data-tip-highlight={tipHighlight(
+          (polygonActive || !boxActive) && "reshapeArea",
+        )}
         onClick={() => draw("polygon", polygonActive)}
         aria-pressed={polygonActive}
         title={t("quickFilterPolygonTitle")}
@@ -240,6 +247,7 @@ export default function QuickFilters() {
         type="button"
         className={classNames("quickFilterButton", { applied: onlyInView })}
         data-testid="quick-filter-in-view"
+        data-tip-highlight={tipHighlight("inView")}
         onClick={() => setOnlyInView(!onlyInView)}
         aria-pressed={onlyInView}
         title={t("quickFilterInViewTitle")}

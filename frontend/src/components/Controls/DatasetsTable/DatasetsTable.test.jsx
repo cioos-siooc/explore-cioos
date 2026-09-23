@@ -78,7 +78,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       await screen.findByLabelText("Sort"),
       "Days of data",
     );
-    await user.click(screen.getByTitle("Sorted ascending — tap to reverse"));
+    await user.click(screen.getByTitle("Sorted ascending (tap to reverse)"));
     const cards = screen.getAllByTestId("dataset-card");
     expect(
       cards.map((c) => c.querySelector(".datasetCardTitle").textContent),

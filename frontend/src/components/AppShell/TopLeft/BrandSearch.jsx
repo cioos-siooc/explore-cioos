@@ -23,7 +23,7 @@ export default function BrandSearch({ children }) {
   const { t, i18n } = useTranslation();
   const { showIntroModal, setShowIntroModal } = useUI();
   const { projection, setProjection, zoom } = useMapState();
-  const { offerTip } = useTips();
+  const { offerTip, tipHighlight } = useTips();
 
   const isFrench = i18n.language === "fr";
   // The org's own site, one per language — CIOOS at the English domain, SIOOC
@@ -89,6 +89,7 @@ export default function BrandSearch({ children }) {
               type="button"
               className="brandMinorItem"
               onClick={() => setProjection(globeOn ? "mercator" : "globe")}
+              data-tip-highlight={tipHighlight("globe")}
               title={projectionLabel}
               aria-label={projectionLabel}
             >

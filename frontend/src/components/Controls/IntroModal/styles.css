@@ -382,10 +382,36 @@
   color: var(--cioos-navy);
 }
 
-.introTip p {
+/* The tip itself is the way into the tour: a button that reads as the
+   paragraph it replaces, with its call to action trailing the text. */
+.introTipShow {
+  display: block;
+  width: 100%;
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   line-height: 1.55;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
   animation: intro-fade 0.3s ease-out;
+}
+
+.introTipShowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--cioos-space-xs);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  white-space: nowrap;
+}
+
+.introTipShow:hover .introTipShowLabel,
+.introTipShow:focus-visible .introTipShowLabel {
+  text-decoration: underline;
 }
 
 @keyframes intro-fade {
@@ -487,7 +513,7 @@
 @media (prefers-reduced-motion: reduce) {
   .introHeroWaves,
   .introFeature,
-  .introTip p {
+  .introTipShow {
     animation: none;
   }
 
