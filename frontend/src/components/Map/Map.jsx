@@ -2220,7 +2220,7 @@ export default function CreateMap({
     map.current.touchZoomRotate.disableRotation();
 
     map.current.on("load", () => {
-      setColorStops();
+      setColorStopsRef.current();
 
       const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
 
@@ -3511,6 +3511,10 @@ export default function CreateMap({
       setLoading(false);
     });
 
+    // The hex color stops depend on the zoom band (getCurrentRangeLevel), so
+    // returning below point level with point-level (zoom2) stops would clamp
+    // every hex past the top stop into a single green.
+    map.current.on("zoomend", () => setColorStopsRef.current());
     map.current.on("zoomend", () => {
       doFinalCheck.current = true;
       if (drawPolygon.current.getAll().features.length > 0) {
@@ -3755,20 +3759,6 @@ export default function CreateMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // The hex color stops depend on the zoom band (getCurrentRangeLevel), but
-  // were only applied at load or on legend refresh — so returning below
-  // point level left 'hexes' painted with point-level (zoom2) stops, where
-  // every hex count clamps past the top stop into a single green. Re-apply
-  // on zoomend, re-registering so the handler sees the latest range levels.
-  // Declared after the map-creation effect so map.current exists on mount.
-  useEffect(() => {
-    if (!map.current) return;
-    const reapplyColorStops = () => setColorStops();
-    map.current.on("zoomend", reapplyColorStops);
-    return () => map.current.off("zoomend", reapplyColorStops);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeLevels, coverageRangeLevels]);
 
   // Keep the ramp scaled to the hexes actually on screen. Registered once —
   // the handler reads the current setColorStops through a ref — so the
