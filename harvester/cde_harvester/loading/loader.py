@@ -794,7 +794,7 @@ def main(folder, incremental=False):
             # No drop_constraints() step: the backfilled columns are permanently
             # NULL-able and the hex FKs are DEFERRABLE INITIALLY DEFERRED (checked
             # at COMMIT), so nothing needs toggling before the load. See
-            # 7_contraints.sql / validate_loaded_data().
+            # 7_constraints.sql / validate_loaded_data().
             with _timed("remove_all_data", logger):
                 logger.info("Clearing tables")
                 transaction.execute(text("SELECT remove_all_data();"))
