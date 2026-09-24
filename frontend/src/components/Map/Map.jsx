@@ -19,6 +19,7 @@ import "./styles.css";
 
 import { server } from "../../config";
 import reportError from "../../state/reportError.js";
+import fetchJson from "../../state/fetchJson.js";
 import {
   boundsFromGeoJson,
   escapeHtml,
@@ -26,9 +27,11 @@ import {
   formatInstantRange,
   generateColorStops,
   getCurrentRangeLevel,
+  mapCoverPadding,
   polygonIsRectangle,
   quantizeCountRange,
   rangesEqual,
+  revealOffset,
   selectionFromSearchParams,
   zoomToDatasetCamera,
   splitTrackRuns,
@@ -68,6 +71,8 @@ import {
 } from "./basemapStyle.js";
 import { buildTileSuffix } from "./tileQuery.js";
 import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
+import { featureHasDataset, focusedPointFeatures } from "./focusedPoints.js";
+import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // direct_select's own dragVertex/toDisplayFeatures, captured once here at
 // module load — before the component below patches these modes on every
@@ -79,6 +84,8 @@ import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
 const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex;
 const defaultDirectSelectToDisplayFeatures =
   MapboxDraw.modes.direct_select.toDisplayFeatures;
+const drawPolygonMode = withPolygonHint(MapboxDraw.modes.draw_polygon);
+const drawRectangleMode = withBoxHint(DrawRectangle);
 
 // A rectangle drawn with draw_rectangle is a 4-point ring — mapbox-gl-draw
 // strips the closing duplicate point internally (see Polygon's constructor
@@ -220,6 +227,8 @@ const observationLayerIds = [
   "points",
   "points-halo",
   "points-highlighted",
+  "focused-points",
+  "focused-points-halo",
   "coverage-hexes",
   "coverage-hex-outlines",
 ];
@@ -283,6 +292,8 @@ export default function CreateMap({
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
   onFeatureQuery = () => {},
+  // A box or polygon has just been finished with the draw tools.
+  onShapeDrawn = () => {},
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
@@ -318,6 +329,7 @@ export default function CreateMap({
   scrubTime,
   trailingDays,
   selectedTrajectory,
+  mappedRecord,
   dataLayers,
   griddapCoverage,
   dataLayersVisible = true,
@@ -326,6 +338,7 @@ export default function CreateMap({
   projection = "mercator",
   zoomTarget,
   drawRequest,
+  featureQueryRequest,
   // Called once with the MapLibre instance, as soon as it is constructed.
   onMapReady = () => {},
   // Called once, when the map is worth handing over. See reportFirstPaint.
@@ -436,7 +449,8 @@ export default function CreateMap({
   modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature;
   modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature;
 
-  modes.draw_rectangle = DrawRectangle;
+  modes.draw_polygon = drawPolygonMode;
+  modes.draw_rectangle = drawRectangleMode;
 
   const drawControlOptions = {
     displayControlsDefault: false,
@@ -866,6 +880,18 @@ export default function CreateMap({
         pointsHaloOpacity(),
       );
     }
+    if (map.current.getLayer("focused-points")) {
+      map.current.setPaintProperty(
+        "focused-points",
+        "circle-opacity",
+        circleOpacity,
+      );
+      map.current.setPaintProperty(
+        "focused-points-halo",
+        "circle-opacity",
+        0.9,
+      );
+    }
   }
 
   // The moment the map is worth handing over, reported once — this is what the
@@ -993,17 +1019,6 @@ export default function CreateMap({
       source: "cde-cells",
       sourceLayer: "coverage-hexes-layer",
     },
-  };
-
-  // Hex and marker features carry the datasets they aggregate as a JSON array
-  // of pks (MapLibre hands nested properties back as strings). Both the dimming
-  // and the ramp's domain ask the same question of them.
-  const featureHasDataset = (feature, pk) => {
-    try {
-      return JSON.parse(feature.properties.datasets).includes(pk);
-    } catch {
-      return false;
-    }
   };
 
   // Tracks are the third way a dataset draws itself (hexes, markers, tracks),
@@ -1170,7 +1185,7 @@ export default function CreateMap({
   // as the tail of the movement. So they all take the snap without the wait.
   const NO_TRANSITION = { duration: 0 };
 
-  // The four layers that draw the same point features, and the halo's extra
+  // The layers that draw the same point features, and the halo's extra
   // radius. They share one paint, so a radius change has to reach all of them
   // or the halo/highlight desync from the markers they sit under.
   // click-highlight-point rides along so the outline the "what's here" card
@@ -1179,7 +1194,8 @@ export default function CreateMap({
     ["points", 0],
     ["points-halo", 1.25],
     ["points-highlighted", 0],
-    ["points-hovered", 0],
+    ["focused-points", 0],
+    ["focused-points-halo", 1.25],
     ["click-highlight-point", 0],
     ["click-highlight-point-glow", 6],
   ];
@@ -1302,6 +1318,13 @@ export default function CreateMap({
           "circle-color",
           dimmable(colors),
         );
+        if (map.current.getLayer("focused-points")) {
+          map.current.setPaintProperty(
+            "focused-points",
+            "circle-color",
+            colors,
+          );
+        }
       }
       // Always keep the hexes layer's stops populated, not just when zoomed
       // into the hex band — a reload while zoomed in (zoom >= 7) would
@@ -1318,7 +1341,7 @@ export default function CreateMap({
     }
 
     // The circle-radius ramp tracks the same metric as the fill, so it has to
-    // be re-applied whenever the ranges change — on all four point layers,
+    // be re-applied whenever the ranges change — on every point layer,
     // which share one paint.
     POINT_LAYERS.forEach(([layer, padding]) => {
       if (map.current.getLayer(layer)) {
@@ -1570,17 +1593,23 @@ export default function CreateMap({
     const dimmedLayers = [pointLevel ? "points" : "hexes", "coverage-hexes"];
 
     const dimmed = {};
+    let focusedPoints = emptyFeatureCollection;
     dimmedLayers.forEach((layerId) => {
       if (!pk || !map.current.getLayer(layerId)) {
         dimmed[layerId] = [];
         return;
       }
-      dimmed[layerId] = map.current
-        .queryRenderedFeatures({ layers: [layerId] })
+      const hits = map.current.queryRenderedFeatures({ layers: [layerId] });
+      dimmed[layerId] = hits
         .filter((feature) => !featureHasDataset(feature, pk))
         // promoteId puts pk on the feature id, which is what setFeatureState
         // addresses.
         .map((feature) => feature.id);
+      // 'points' stacks by count, which a layout property can't make depend
+      // on feature-state, so the focused markers were often buried under grey
+      // ones. They are redrawn on top from a copy instead — a filtered tile
+      // layer would relayout the whole source on every focus change.
+      if (layerId === "points") focusedPoints = focusedPointFeatures(hits, pk);
     });
 
     // Writing the state makes the map fire the very events that re-run this
@@ -1591,9 +1620,12 @@ export default function CreateMap({
       pk,
       pointLevel,
       ...dimmedLayers.map((layerId) => dimmed[layerId].join(",")),
+      focusedPoints.features.map((feature) => feature.id).join(","),
     ].join("|");
     if (signature === appliedFocus.current) return;
     appliedFocus.current = signature;
+
+    map.current.getSource("focused-points")?.setData(focusedPoints);
 
     // Cleared wholesale rather than by tracking what was set last time: two
     // calls, and they cannot drift out of step with the map. Both source layers
@@ -1623,6 +1655,10 @@ export default function CreateMap({
   // Latest spatial filter, readable from the debounced moveend handler (which
   // would otherwise capture the polygon as of the overlay's last render).
   const polygonRef = useRef(null);
+  // For the 'load' handler: an overlay set before the style loaded hid layers
+  // that did not exist yet.
+  const activeWmsOverlayRef = useRef(null);
+  const revealedWmsPk = useRef();
 
   // Single-dataset griddap footprint (hover from the list, or pinned while
   // its WMS overlay is shown).
@@ -1636,13 +1672,70 @@ export default function CreateMap({
     );
   }
 
+  // Brings `bounds` out from under whatever panel is floating over it (the
+  // What's here card, the sidebar — see mapCoverPadding), and otherwise leaves
+  // the camera alone. `frame` asks for the zoom-to-dataset framing whenever any
+  // of it is hidden; without it, a pan when it fits beside the panel, a zoom
+  // out only when none of it is in view, nothing when it is already partly seen.
+  function revealBounds(bounds, { frame = false } = {}) {
+    if (!map.current || !bounds) return;
+    const { width, height } = map.current.getCanvas().getBoundingClientRect();
+    const padding = mapCoverPadding(map.current);
+    const free = {
+      left: padding.left,
+      top: padding.top,
+      right: width - padding.right,
+      bottom: height - padding.bottom,
+    };
+    const corners = [bounds[0], bounds[1]].map((c) => map.current.project(c));
+    const box = {
+      left: Math.min(...corners.map((p) => p.x)),
+      right: Math.max(...corners.map((p) => p.x)),
+      top: Math.min(...corners.map((p) => p.y)),
+      bottom: Math.max(...corners.map((p) => p.y)),
+    };
+    const offset = revealOffset(box, free, 24);
+    if (offset && !offset[0] && !offset[1]) return;
+    if (frame) {
+      map.current.fitBounds(bounds, zoomToDatasetCamera(map.current));
+      return;
+    }
+    if (offset) {
+      map.current.panBy(offset);
+      return;
+    }
+    const outOfView =
+      box.right < free.left ||
+      box.left > free.right ||
+      box.bottom < free.top ||
+      box.top > free.bottom;
+    if (outOfView) {
+      map.current.fitBounds(bounds, {
+        padding,
+        maxZoom: map.current.getZoom(),
+      });
+    }
+  }
+
   // Outline the region the open card describes, and clear it when the card
   // closes. Guarded on the source existing: a share link can resolve a click
   // payload before the style has finished adding layers.
+  const revealedQueryNonce = useRef();
   useEffect(() => {
     const source = map.current?.getSource("click-highlight");
     if (!source) return;
     source.setData(featureQuery?.highlight || emptyFeatureCollection);
+    if (!featureQuery?.highlight?.features?.length) return;
+    if (revealedQueryNonce.current === featureQuery.nonce) return;
+    revealedQueryNonce.current = featureQuery.nonce;
+    const bounds = boundsFromGeoJson({
+      coordinates: featureQuery.highlight.features.map(
+        (f) => f.geometry.coordinates,
+      ),
+    });
+    // A frame later, once the card or sidebar this click opened is marked.
+    const frame = requestAnimationFrame(() => revealBounds(bounds));
+    return () => cancelAnimationFrame(frame);
   }, [featureQuery]);
 
   // Coverage rectangles under the cursor, deduped by dataset: a stack of
@@ -1921,10 +2014,25 @@ export default function CreateMap({
     const bounds = boundsFromGeoJson(zoomTarget.geometry);
     if (!bounds) return;
     map.current.fitBounds(bounds, {
-      ...zoomToDatasetCamera(),
+      ...zoomToDatasetCamera(map.current),
+      ...zoomTarget.camera,
       duration: 1000,
     });
   }, [zoomTarget]);
+
+  // Asks the card's question of a point with no click behind it, from what is
+  // drawn there now; set by the mount effect, which owns the hit-test.
+  const askAtRef = useRef();
+  // Declared after the zoom effect above so a camera move requested in the same
+  // render has already started, and 'idle' waits for it to land.
+  useEffect(() => {
+    if (!map.current || !featureQueryRequest) return;
+    const { lngLat } = featureQueryRequest;
+    map.current.once("idle", () => askAtRef.current?.(lngLat));
+    // A map already at rest renders nothing more, and so never goes idle again
+    // on its own.
+    map.current.triggerRepaint();
+  }, [featureQueryRequest]);
 
   // Spatial filter button (top bar): 'box'/'polygon' replace whatever was
   // drawn before and start that draw mode; 'clear' cancels out of drawing and
@@ -1950,9 +2058,11 @@ export default function CreateMap({
   useEffect(() => {
     if (!map.current) return;
     polygonRef.current = polygon;
+    activeWmsOverlayRef.current = activeWmsOverlay;
     removeWmsOverlay();
     if (!activeWmsOverlay) {
       setGriddapHighlight(null);
+      revealedWmsPk.current = undefined;
       return;
     }
     renderWmsImage(activeWmsOverlay);
@@ -1962,6 +2072,12 @@ export default function CreateMap({
     setDataLayersVisibility(false);
     // pin the dataset's footprint outline while its overlay is shown
     setGriddapHighlight(activeWmsOverlay.bbox);
+    // Once per dataset: a new slice or variable is the same layer in the same
+    // place, and the user may have moved off it on purpose.
+    if (revealedWmsPk.current !== activeWmsOverlay.pk) {
+      revealedWmsPk.current = activeWmsOverlay.pk;
+      revealBounds(boundsFromGeoJson(activeWmsOverlay.bbox), { frame: true });
+    }
     return () => removeWmsOverlay();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWmsOverlay, polygon]);
@@ -2307,7 +2423,7 @@ export default function CreateMap({
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)],
         ],
-        zoomToDatasetCamera(),
+        zoomToDatasetCamera(map.current),
       );
     }
     renderSelectedTrack();
@@ -2321,6 +2437,64 @@ export default function CreateMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrajectory, mapQueryString]);
+
+  // The record "Show on map" picked: fetch where it was sampled, ring it, and
+  // frame it when asked to — the same round trip the selected track makes,
+  // for a profile or time series.
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    async function renderMappedRecord() {
+      if (!map.current) return;
+      // Same wait as the selected track's: a share link resolves before the
+      // style has added the source.
+      const source = map.current.getSource("mapped-record");
+      if (!source) {
+        map.current.once("load", renderMappedRecord);
+        return;
+      }
+      source.setData(emptyFeatureCollection);
+      if (!mappedRecord) return;
+
+      const { datasetPk, recordId, frameView } = mappedRecord;
+      let coordinates;
+      try {
+        ({ coordinates } = await fetchJson(
+          `${server}/datasetRecordsList/location?datasetPKs=${datasetPk}&recordId=${encodeURIComponent(recordId)}`,
+          { signal: abortController.signal },
+        ));
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          reportError("record location fetch failed", error);
+        }
+        return;
+      }
+      if (!coordinates.length) return;
+      source.setData({
+        type: "FeatureCollection",
+        features: coordinates.map((coordinate) => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: coordinate },
+          properties: {},
+        })),
+      });
+      if (!frameView) return;
+      const longitudes = coordinates.map((c) => c[0]);
+      const latitudes = coordinates.map((c) => c[1]);
+      map.current.fitBounds(
+        [
+          [Math.min(...longitudes), Math.min(...latitudes)],
+          [Math.max(...longitudes), Math.max(...latitudes)],
+        ],
+        zoomToDatasetCamera(map.current),
+      );
+    }
+    renderMappedRecord();
+    return () => {
+      abortController.abort();
+      map.current?.off("load", renderMappedRecord);
+    };
+  }, [mappedRecord]);
 
   const mapZoom = searchParams.get("zoom");
   const mapLongitude = searchParams.get("lon");
@@ -2603,6 +2777,51 @@ export default function CreateMap({
         FIRST_LABEL_LAYER_ID,
       );
 
+      // The focused dataset's markers, redrawn over the greyed rest — see
+      // hoverHighlightPoints. Purely visual: clicks still resolve on 'points'.
+      // Below 'points-highlighted' so a drawn shape's selection rings stay on
+      // top.
+      map.current.addSource("focused-points", {
+        type: "geojson",
+        data: emptyFeatureCollection,
+      });
+      map.current.addLayer(
+        {
+          id: "focused-points-halo",
+          type: "circle",
+          minzoom: hexMaxZoom,
+          source: "focused-points",
+          paint: {
+            "circle-color": "#ffffff",
+            // Zero until the ramp is final, like the layers it copies — see
+            // revealData.
+            "circle-opacity": dataRevealed.current ? 0.9 : 0,
+            "circle-radius-transition": NO_TRANSITION,
+            "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
+          },
+        },
+        "points-highlighted",
+      );
+      map.current.addLayer(
+        {
+          id: "focused-points",
+          type: "circle",
+          minzoom: hexMaxZoom,
+          source: "focused-points",
+          layout: {
+            "circle-sort-key": ["get", "count"],
+          },
+          paint: {
+            "circle-color-transition": NO_TRANSITION,
+            "circle-color": colors,
+            "circle-opacity": dataRevealed.current ? circleOpacity : 0,
+            "circle-radius-transition": NO_TRANSITION,
+            "circle-radius": radiusExpression(pointRadiusRange.current),
+          },
+        },
+        "points-highlighted",
+      );
+
       // Griddap (gridded, metadata-only) datasets: the optional coverage
       // layer (all matching bboxes, toggled off by default) and the
       // single-dataset highlight (hover from the list / pinned while a WMS
@@ -2792,6 +3011,48 @@ export default function CreateMap({
           "circle-stroke-width": 1.5,
         },
       });
+
+      // The record "Show on map" picked on the dataset page, ringed in the
+      // same goldenrod as the card that asked for it. A fixed size rather than
+      // the marker's own ramp: the record's feature carries no `count`, and a
+      // ring a little wider than any marker reads as around it either way.
+      //
+      // Both go under the focused markers rather than over everything: the
+      // record belongs to the open page's dataset, so its own marker is in
+      // 'focused-points' and stays visible inside the glow. The ring is wider
+      // than the largest marker, so it still shows around it.
+      map.current.addSource("mapped-record", {
+        type: "geojson",
+        data: emptyFeatureCollection,
+      });
+      map.current.addLayer(
+        {
+          id: "mapped-record-glow",
+          type: "circle",
+          source: "mapped-record",
+          paint: {
+            "circle-radius": 16,
+            "circle-color": clickHighlightColor,
+            "circle-blur": 0.8,
+            "circle-opacity": 0.85,
+          },
+        },
+        "focused-points-halo",
+      );
+      map.current.addLayer(
+        {
+          id: "mapped-record-ring",
+          type: "circle",
+          source: "mapped-record",
+          paint: {
+            "circle-radius": 11,
+            "circle-color": "rgba(0, 0, 0, 0)",
+            "circle-stroke-color": clickHighlightColor,
+            "circle-stroke-width": 3,
+          },
+        },
+        "focused-points-halo",
+      );
 
       // --- Track-line layers ---------------------------------------------
       // Track lines + head positions from /tiles/tracks, shown only when the
@@ -3030,6 +3291,9 @@ export default function CreateMap({
       if (!dataLayersVisibleRef.current) {
         setLayersVisibility(observationLayerIds, false);
       }
+      // A share link opening a gridded dataset can put its WMS overlay up
+      // before the style has loaded, when there were no data layers to hide.
+      if (activeWmsOverlayRef.current) setDataLayersVisibility(false);
       // Same for the depth rasters, which come from the style itself and are
       // therefore always created visible.
       if (!bathymetryVisibleRef.current) {
@@ -3542,6 +3806,25 @@ export default function CreateMap({
       });
 
       const observations = new Map();
+      const addObservations = (feature) => {
+        datasetPksOf(feature).forEach((pk) => {
+          const existing = observations.get(pk);
+          if (existing) {
+            existing.platform =
+              existing.platform || feature.properties.platform;
+            return;
+          }
+          observations.set(pk, {
+            kind: "observation",
+            pk,
+            platform: feature.properties.platform,
+            // A marker is a place the user can point at; a cell is a
+            // neighbourhood. The card says which it is rather than implying a
+            // precision the aggregate doesn't have.
+            aggregate: feature.layer.id !== "points",
+          });
+        });
+      };
       let observationCount = 0;
       const cellFeatures = [];
       // What was clicked, in the terms /tiles/datasets takes: the tile buckets
@@ -3606,24 +3889,30 @@ export default function CreateMap({
         // numbers it shows will not add up to the hex it is describing.
         if (layerId === "coverage-hexes") buckets.source = "cells";
 
-        datasetPksOf(feature).forEach((pk) => {
-          const existing = observations.get(pk);
-          if (existing) {
-            existing.platform =
-              existing.platform || feature.properties.platform;
-            return;
-          }
-          observations.set(pk, {
-            kind: "observation",
-            pk,
-            platform: feature.properties.platform,
-            // A marker is a place the user can point at; a cell is a
-            // neighbourhood. The card says which it is rather than implying a
-            // precision the aggregate doesn't have.
-            aggregate: layerId !== "points",
-          });
-        });
+        addObservations(feature);
       });
+
+      // A coverage hex shares the marker tier's zoom band, so a click on one
+      // is a click on everything drawn inside it: the stations sitting in the
+      // hex join the card (and the datasets list's pin) alongside the hex's own
+      // datasets, and their counts join the header's total.
+      const markersInCells = [];
+      if (cellFeatures.length && map.current.getLayer("points")) {
+        const seenMarkers = new Set();
+        turfPointsWithinPolygon(
+          helpers.featureCollection(
+            map.current.queryRenderedFeatures({ layers: ["points"] }),
+          ),
+          helpers.featureCollection(cellFeatures),
+        ).features.forEach((feature) => {
+          if (seenMarkers.has(feature.properties.pk)) return;
+          seenMarkers.add(feature.properties.pk);
+          markersInCells.push(feature);
+          observationCount += Number(feature.properties.count) || 0;
+          buckets.pointPks.add(Number(feature.properties.pk));
+          addObservations(feature);
+        });
+      }
 
       // Gridded footprints, deduped by dataset — a stack of grids covering the
       // same water is the norm, not the exception.
@@ -3707,6 +3996,7 @@ export default function CreateMap({
           ...areaHighlights,
           ...observationHits
             .filter((feature) => feature.layer.id === "points")
+            .concat(markersInCells)
             .map((feature) => highlightFeature({ feature, role: "both" })),
         ],
       };
@@ -3927,6 +4217,7 @@ export default function CreateMap({
       const polygon = feature.geometry.coordinates[0];
       highlightPoints(polygon);
       setPolygon(polygon);
+      onShapeDrawn();
       map.current.getCanvas().style.cursor = "unset";
       // Straight into direct_select so the shape is immediately draggable
       // (yellow, with handles) rather than sitting in simple_select first.
@@ -4071,16 +4362,19 @@ export default function CreateMap({
     // the clear-everything one below are things the user did, and a link is
     // written with the card open — so replaying a click here could only undo
     // the selection and the page the same link just restored.
+    askAtRef.current = (lngLat) => {
+      const query = buildFeatureQuery(
+        { lngLat: { lng: lngLat[0], lat: lngLat[1] } },
+        hitsAt(map.current.project(lngLat)),
+      );
+      if (query) onFeatureQueryRef.current(query);
+    };
     if (sharedFeatureQueryAtRef.current) {
       map.current.once("idle", () => {
         const lngLat = sharedFeatureQueryAtRef.current;
         if (!lngLat || !map.current) return;
         sharedFeatureQueryAtRef.current = null;
-        const query = buildFeatureQuery(
-          { lngLat: { lng: lngLat[0], lat: lngLat[1] } },
-          hitsAt(map.current.project(lngLat)),
-        );
-        if (query) onFeatureQueryRef.current(query);
+        askAtRef.current(lngLat);
       });
     }
 

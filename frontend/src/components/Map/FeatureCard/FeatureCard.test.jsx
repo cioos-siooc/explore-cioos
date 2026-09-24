@@ -1,20 +1,27 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor, act } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
-import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
+import {
+  DESKTOP_WIDTH,
+  MOBILE_WIDTH,
+  setViewportWidth,
+} from "../../../test/viewport.js";
 import FeatureCard from "./FeatureCard.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import pointQueryFixture from "../../../../e2e/fixtures/api/pointQuery.json";
 
 let latestMap;
 let latestSelection;
+let latestUI;
 function Probe() {
   latestMap = useMapState();
   latestSelection = useSelection();
+  latestUI = useUI();
   const { initialPointsQueryComplete } = latestSelection;
   return (
     <span data-testid="state">
@@ -23,11 +30,11 @@ function Probe() {
   );
 }
 
-async function renderReady() {
-  // FeatureCard defers to the datasets sidebar once it's open (see the
-  // component's own comment) — the sidebar starts open at desktop width, so
-  // force the phone-width "starts closed" case to actually exercise the card.
-  setViewportWidth(MOBILE_WIDTH);
+async function renderReady(width = MOBILE_WIDTH) {
+  // FeatureCard waits out the datasets sidebar where it can't stand beside it
+  // (see the component's own comment), so the default is the phone-width
+  // "sidebar starts closed" case, which exercises the card on its own.
+  setViewportWidth(width);
   const result = renderWithProviders(
     <>
       <FeatureCard />
@@ -62,9 +69,32 @@ describe("FeatureCard", () => {
     });
     expect(
       screen.getByText(
-        "Nothing here is in the current results — the filters have excluded it.",
+        "Nothing here is in the current results because the filters have excluded it.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("is never open at the same time as the datasets sidebar", async () => {
+    await renderReady(DESKTOP_WIDTH);
+    expect(latestUI.sidebarOpen).toBe(true);
+    act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
+    expect(screen.getByTestId("feature-card")).not.toHaveClass("open");
+    act(() => latestUI.setSidebarOpen(false));
+    expect(screen.getByTestId("feature-card")).toHaveClass("open");
+  });
+
+  it("stays shut while a dataset is open, even with the sidebar closed", async () => {
+    await renderReady();
+    act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
+    act(() => latestSelection.setInspectDataset(pointQueryFixture[0]));
+    act(() => latestUI.setSidebarOpen(false));
+    await waitFor(() =>
+      expect(screen.getByTestId("feature-card")).not.toHaveClass("open"),
+    );
+    act(() => latestSelection.returnToDatasetList());
+    await waitFor(() =>
+      expect(screen.getByTestId("feature-card")).toHaveClass("open"),
+    );
   });
 
   it("resolves an observation row against pointsData and shows its title", async () => {
@@ -80,6 +110,23 @@ describe("FeatureCard", () => {
       });
     });
     expect(screen.getByTitle(row.title)).toBeInTheDocument();
+  });
+
+  it("gives a row the same second row as the datasets list's card", async () => {
+    await renderReady();
+    const row = pointQueryFixture[0];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 13,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: row.pk, count: 4, title: row.title },
+        ],
+      });
+    });
+    const meta = screen.getByTitle(row.title).querySelector(".datasetCardMeta");
+    expect(meta).toHaveTextContent("Time series / Profile");
+    expect(meta).toHaveTextContent(String(row.profiles_count));
   });
 
   it("closing (X) clears the featureQuery", async () => {
@@ -173,10 +220,10 @@ describe("FeatureCard", () => {
       });
     });
     const moreButton = await screen.findByText("Show 2 more");
-    expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(5);
+    expect(document.querySelectorAll(".featureCardRow")).toHaveLength(5);
     await user.click(moreButton);
     await waitFor(() =>
-      expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(7),
+      expect(document.querySelectorAll(".featureCardRow")).toHaveLength(7),
     );
   });
 
@@ -247,6 +294,54 @@ describe("FeatureCard", () => {
     );
     expect(screen.getByTitle(b.title)).toHaveTextContent("5 day(s) of data");
     expect(screen.getByTitle(c.title)).toHaveTextContent("1 day(s) of data");
+  });
+
+  // A coverage hex at marker zoom lists the stations inside it too. Those are
+  // profiles, which /tiles/datasets only has under source=main, so the hex and
+  // its markers are asked of their own sources and the answers merged.
+  it("asks a coverage hex's markers of the main source and the hex of cells", async () => {
+    await renderReady();
+    const hexFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input, init) => {
+      const url = new URL(typeof input === "string" ? input : input.url);
+      if (url.pathname.endsWith("/tiles/datasets")) {
+        const rows =
+          url.searchParams.get("source") === "cells"
+            ? [{ pk: 7, count: 30 }]
+            : [{ pk: 10, count: 4 }];
+        return Promise.resolve(Response.json(rows));
+      }
+      return hexFetch(input, init);
+    });
+    const hexRow = pointQueryFixture[0];
+    const markerRow = pointQueryFixture[3];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 13,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: hexRow.pk, aggregate: true },
+          { kind: "observation", pk: markerRow.pk, aggregate: false },
+        ],
+        buckets: { hexPks: [5], pointPks: [42], source: "cells", z: 9 },
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTitle(markerRow.title)).toHaveTextContent(
+        "4 day(s) of data",
+      ),
+    );
+    expect(screen.getByTitle(hexRow.title)).toHaveTextContent(
+      "30 day(s) of data",
+    );
+    const asked = globalThis.fetch.mock.calls
+      .map(([input]) => new URL(input).searchParams)
+      .filter((params) => params.has("source"));
+    expect(asked.map((params) => params.toString())).toEqual([
+      expect.stringMatching(/source=cells&hexes=5$/),
+      expect.stringMatching(/source=main&points=42$/),
+    ]);
   });
 
   it("shows no day count for a dataset the breakdown has not answered for", async () => {

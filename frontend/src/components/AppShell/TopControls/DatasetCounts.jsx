@@ -10,9 +10,10 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 // Datasets/Filters tabs, banded off from both so it reads as its own strip —
 // "123/150 datasets (23 in view)".
 //
-// All readout, no controls. The parenthetical used to double as the switch that
-// applied the "only in view" narrowing — a filter hidden inside the brackets of
-// a number — which is now its own button among the quick filters below the card
+// The parenthetical is a button, not just a caption: it reports how many of
+// the filtered datasets the current viewport holds and applies the "only in
+// view" narrowing on click — a second, in-line entry point onto the same
+// toggle the Eye button among the quick filters below the card also sets
 // (see QuickFilters).
 //
 // Until `ready` there is no count to show — not even a zero — so the strip is a
@@ -25,7 +26,7 @@ export default function DatasetCounts() {
     filteredCount,
     total,
   } = useDatasetCounts();
-  const { inViewCount } = useSelection();
+  const { onlyInView, setOnlyInView, inViewCount } = useSelection();
 
   // A failed /datasets leaves no catalogue total; what came back filtered is
   // then all we know it to be.
@@ -55,7 +56,24 @@ export default function DatasetCounts() {
                 bracket: a literal one would be trimmed as leading whitespace
                 at the start of the flex item. */}
           <span className="topBarCountsInViewWrap">
-            ({t("topBarCountsInViewLink", { count: inViewCount })})
+            (
+            <button
+              type="button"
+              data-testid="counts-only-in-view"
+              className={classNames("topBarCountsInView", {
+                active: onlyInView,
+              })}
+              onClick={() => setOnlyInView(!onlyInView)}
+              aria-pressed={onlyInView}
+              title={
+                onlyInView
+                  ? t("topBarCountsInViewOffTitle")
+                  : t("quickFilterInViewTitle")
+              }
+            >
+              {t("topBarCountsInViewLink", { count: inViewCount })}
+            </button>
+            )
           </span>
         </>
       )}

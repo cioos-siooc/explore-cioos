@@ -1,56 +1,66 @@
-import { describe, it, expect } from "vitest";
-
 import {
   ALL_DATA_LAYERS,
   DATA_LAYER_KEYS,
   DEFAULT_DATA_LAYERS,
+  allDataLayersOn,
   anyTrajectoryLayerOn,
-  commitDataLayers,
+  chosenDataLayerKeys,
   dataLayerKeyForDataset,
-  dataLayersAreDefault,
+  dataLayersFromChoices,
   datasetInDataLayers,
-  isDataLayerChecked,
-  onlyDataLayer,
-  selectedDataLayerKeys,
+  nextDataLayerChoice,
 } from "./dataLayers.js";
 
+const onlyDataLayer = (key) => dataLayersFromChoices({ [key]: "include" });
+
 describe("the unfiltered state is everything-on", () => {
-  it("defaults to every geometry", () => {
+  it("defaults to every geometry, which is what no picks draws", () => {
     expect(DEFAULT_DATA_LAYERS).toEqual(ALL_DATA_LAYERS);
-    expect(dataLayersAreDefault(ALL_DATA_LAYERS)).toBe(true);
-  });
-
-  it("draws no ticks while everything is on", () => {
-    // A fully drawn map isn't a filter: no ticks, no badge, no chip.
-    expect(isDataLayerChecked(ALL_DATA_LAYERS, "profile")).toBe(false);
-    expect(selectedDataLayerKeys(ALL_DATA_LAYERS)).toEqual([]);
-  });
-
-  it("ticks exactly what a narrowed selection kept, in render order", () => {
-    const narrowed = onlyDataLayer("obis");
-    expect(isDataLayerChecked(narrowed, "obis")).toBe(true);
-    expect(isDataLayerChecked(narrowed, "profile")).toBe(false);
-    expect(selectedDataLayerKeys(narrowed)).toEqual(["obis"]);
+    expect(dataLayersFromChoices({})).toEqual(ALL_DATA_LAYERS);
+    expect(chosenDataLayerKeys({})).toEqual([]);
   });
 
   it("treats an absent selection as everything-on", () => {
     // MapStateProvider hands undefined through before ?layers= is resolved.
-    expect(dataLayersAreDefault(undefined)).toBe(true);
+    expect(allDataLayersOn(undefined)).toBe(true);
     expect(anyTrajectoryLayerOn(undefined)).toBe(true);
   });
 });
 
-describe("commitDataLayers", () => {
-  it("keeps a real selection", () => {
-    const next = onlyDataLayer("grid");
-    expect(commitDataLayers(next)).toBe(next);
+describe("choices, like every other list filter", () => {
+  it("cycles include -> exclude -> clear", () => {
+    expect(nextDataLayerChoice(undefined)).toBe("include");
+    expect(nextDataLayerChoice("include")).toBe("exclude");
+    expect(nextDataLayerChoice("exclude")).toBeUndefined();
   });
 
-  it('folds "nothing left" back to everything', () => {
-    // Unticking the last box has to land on the unfiltered map, not a blank one
-    // no control could recover from.
-    const empty = Object.fromEntries(DATA_LAYER_KEYS.map((k) => [k, false]));
-    expect(commitDataLayers(empty)).toEqual(ALL_DATA_LAYERS);
+  it("draws only the included geometries once any is included", () => {
+    const drawn = dataLayersFromChoices({ obis: "include", grid: "include" });
+    expect(DATA_LAYER_KEYS.filter((key) => drawn[key])).toEqual([
+      "obis",
+      "grid",
+    ]);
+  });
+
+  it("draws everything but the excluded ones when none is included", () => {
+    const drawn = dataLayersFromChoices({ grid: "exclude" });
+    expect(drawn.grid).toBe(false);
+    expect(DATA_LAYER_KEYS.filter((key) => drawn[key])).toHaveLength(
+      DATA_LAYER_KEYS.length - 1,
+    );
+  });
+
+  it("includes and excludes combine", () => {
+    const drawn = dataLayersFromChoices({ obis: "include", grid: "exclude" });
+    expect(drawn.obis).toBe(true);
+    expect(drawn.grid).toBe(false);
+    expect(drawn.profile).toBe(false);
+  });
+
+  it("lists the picked geometries in render order", () => {
+    expect(
+      chosenDataLayerKeys({ grid: "exclude", profile: "include" }),
+    ).toEqual(["profile", "grid"]);
   });
 });
 

@@ -221,6 +221,18 @@ async function buildShapeSql(
                   dataset_is_realtime(d.coverage_time_max,
                                       d.verified_at,
                                       d.cdm_data_type) AS is_realtime,
+                  -- Days of data: the dataset's stored day set (rebuilt per
+                  -- load by refresh_dataset_day_ranges) clipped to the time
+                  -- filter. Unioning the matched features' ranges here instead
+                  -- cost ~3 s per cold request, so area, depth and feature
+                  -- filters don't narrow it.
+                  ${
+                    doEstimate
+                      ? ""
+                      : `day_range_overlap_days(d.day_ranges,
+                           daterange(:timeMin::date, (:timeMax::date) + 1))::integer
+                           AS days,`
+                  }
                   -- griddap footprint for the frontend bbox highlight; NULL
                   -- for every other type
                   CASE WHEN d.cdm_data_type = 'Grid'
@@ -278,9 +290,9 @@ FROM   sub
     // Bound rather than inlined: a CKAN_URL carrying a port (http://host:8080)
     // would put a ':8080' into the SQL, which knex reads as a named binding.
     ckanDatasetUrlPrefix: CKAN_DATASET_URL_PREFIX,
-    ...(doEstimate
-      ? { timeMin, timeMax, depthMin, depthMax, adder: 0, multiplier: 10 }
-      : {}),
+    timeMin,
+    timeMax,
+    ...(doEstimate ? { depthMin, depthMax, adder: 0, multiplier: 10 } : {}),
   };
 
   return { sql, params: queryParams };

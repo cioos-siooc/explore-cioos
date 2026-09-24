@@ -111,13 +111,15 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
   const plain = await build({}, { doEstimate: false });
   assert.doesNotMatch(plain.sql, /records_count/);
   // The estimate's bindings must not linger: knex rejects a named binding the
-  // SQL does not reference.
+  // SQL does not reference. The time window stays, for the days column.
   assert.deepEqual(Object.keys(plain.params).sort(), [
     "ckanDatasetUrlPrefix",
     "depthVariableProbe",
     "filters",
     "obisFilters",
     "profileFilters",
+    "timeMax",
+    "timeMin",
   ]);
 });
 
@@ -200,4 +202,17 @@ test("has_depth is projected, and its probe is bound rather than inlined", async
   // Bound, not inlined: an inlined probe would put a JSON object literal
   // straight into the SQL text.
   assert.doesNotMatch(sql, /@> '\[/);
+});
+
+test("the datasets list reads days from the stored day set, clipped to the time filter", async () => {
+  const list = await build({}, { doEstimate: false, getRecordsList: false });
+  assert.match(
+    list.sql,
+    /day_range_overlap_days\(d\.day_ranges,\s+daterange\(:timeMin::date/,
+  );
+  // Never unioned per request: that is what cost ~3 s cold.
+  assert.doesNotMatch(list.sql, /day_union_days/);
+
+  const estimate = await build({}, { doEstimate: true, getRecordsList: false });
+  assert.doesNotMatch(estimate.sql, /AS days/);
 });

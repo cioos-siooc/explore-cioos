@@ -136,6 +136,9 @@ async function createDBFilter(
     polygon,
     platforms,
     realtimeOnly,
+    eovsMatch,
+    organizationsMatch,
+    scientificNamesMatch,
 
     // These are comma separated lists
     eovs,
@@ -146,6 +149,12 @@ async function createDBFilter(
     scientificNames,
     obisNodes,
     erddapServers,
+    excludePlatforms,
+    excludeOrganizations,
+    excludeObisNodes,
+    excludeErddapServers,
+    excludeEovs,
+    excludeScientificNames,
   } = request;
 
   const filters = [];
@@ -155,9 +164,11 @@ async function createDBFilter(
 
   if (eovs) {
     parameters.eovsCommaSeparatedString = unique(eovs.split(","));
+    // "all" = the dataset/feature measured every selected EOV, not just one.
+    const eovsOp = eovsMatch === "all" ? "@>" : "&&";
     // Dataset level: bare `eovs` here resolves to cde.datasets.eovs, because
     // every route applies this blob after joining cde.datasets.
-    filters.push("eovs && :eovsCommaSeparatedString");
+    filters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
     // Feature level: cde.profiles carries the EOVs each feature actually holds
     // (a subset of its dataset's), so a multi-EOV dataset contributes only the
     // stations/casts that measured the selected variable instead of all of
@@ -175,12 +186,29 @@ async function createDBFilter(
     // kept there: obis_cells, trajectory cells and track stats, the griddap
     // pseudo-branch, and the two coverage-cell queries (/tiles/cells and the
     // legend's coverage ramp) which read only trajectory + OBIS cells.
-    profileFilters.push("eovs && :eovsCommaSeparatedString");
+    profileFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
+  }
+
+  // Both levels, like the include: a dataset that measured an excluded EOV is
+  // dropped whole, so every branch agrees with the profiles one.
+  if (excludeEovs) {
+    parameters.excludeEovsArr = unique(excludeEovs.split(","));
+    filters.push("NOT coalesce(eovs && :excludeEovsArr, false)");
+    profileFilters.push("NOT coalesce(eovs && :excludeEovsArr, false)");
   }
 
   if (platforms) {
     parameters.platformsCommaSeparatedString = unique(platforms.split(","));
     filters.push("platform = any(:platformsCommaSeparatedString)");
+  }
+
+  // The exclude* params below drop what they name and keep everything else —
+  // including rows where the column is NULL, which a bare `<> ALL` or
+  // `NOT (&&)` would evaluate to NULL and drop too (same trap as
+  // excludeDatasetPKs). They are ANDed on top of the include lists.
+  if (excludePlatforms) {
+    parameters.excludePlatformsArr = unique(excludePlatforms.split(","));
+    filters.push("(platform IS NULL OR platform <> ALL(:excludePlatformsArr))");
   }
 
   if (timeMin) {
@@ -262,7 +290,15 @@ async function createDBFilter(
 
   if (organizations) {
     parameters.organizationsString = organizations.split(",");
-    filters.push("organization_pks && :organizationsString");
+    const organizationsOp = organizationsMatch === "all" ? "@>" : "&&";
+    filters.push(`organization_pks ${organizationsOp} :organizationsString`);
+  }
+
+  if (excludeOrganizations) {
+    parameters.excludeOrganizationsArr = excludeOrganizations.split(",");
+    filters.push(
+      "NOT coalesce(organization_pks && :excludeOrganizationsArr, false)",
+    );
   }
 
   // Dataset-level, so it belongs in `filters` (the shared fragment) rather than
@@ -310,6 +346,20 @@ async function createDBFilter(
     filters.push("d.erddap_url = ANY(:erddapServersArray)");
   }
 
+  // Unlike the includes above, the source excludes take no part in the
+  // OBIS-only gate (utils/selection.js): dropping a server or node narrows the
+  // selection without changing which feature sources are in it.
+  if (excludeErddapServers) {
+    parameters.excludeErddapServersArr = excludeErddapServers.split(",");
+    filters.push(
+      "(d.erddap_url IS NULL OR d.erddap_url <> ALL(:excludeErddapServersArr))",
+    );
+  }
+  if (excludeObisNodes) {
+    parameters.excludeObisNodesArr = excludeObisNodes.split(",");
+    filters.push("NOT coalesce(d.obis_nodes && :excludeObisNodesArr, false)");
+  }
+
   if (polygon) {
     const wktPolygon = polygonJSONToWKT(polygon);
     if (!wktPolygon) throw new InvalidPolygonError();
@@ -321,40 +371,70 @@ async function createDBFilter(
     );
   }
 
-  if (scientificNames) {
-    const scientificNamesArr = unique(
-      scientificNames
+  const splitNames = (list) =>
+    unique(
+      list
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
     );
-    parameters.scientificNamesArr = scientificNamesArr;
 
-    // Non-integer ids (NULL on not_found rows) are dropped here rather than in
-    // the fetcher, so the guarantee holds whatever supplied them.
-    const expandedAphiaIds = (await fetchAphiaIds(scientificNamesArr)).filter(
-      (n) => Number.isInteger(n),
+  // Non-integer ids (NULL on not_found rows) are dropped here rather than in
+  // the fetcher, so the guarantee holds whatever supplied them.
+  const expandNames = async (namesArr) => {
+    const expanded = (await fetchAphiaIds(namesArr)).filter((n) =>
+      Number.isInteger(n),
     );
-
-    if (expandedAphiaIds.length > MAX_EXPANDED_APHIA_IDS) {
+    if (expanded.length > MAX_EXPANDED_APHIA_IDS) {
       throw new ScientificNameSelectionTooBroadError(
-        expandedAphiaIds.length,
+        expanded.length,
         MAX_EXPANDED_APHIA_IDS,
       );
     }
+    return expanded;
+  };
 
-    parameters.expandedAphiaIds = expandedAphiaIds;
+  // Rank-aware match against obis_cells.aphia_ids using the precomputed
+  // expansion (a flat int[] parameter — PG plans this as one BitmapOr over
+  // GIN posting lists, no nested InitPlan, no per-row recheck of an inline
+  // subquery). The literal scientific_names branch is the back-compat
+  // fallback for selections WoRMS never resolved (aphia_id IS NULL on
+  // not_found rows) and for any obis_cells whose aphia_ids weren't
+  // backfilled yet — e.g. freshly harvested cells before
+  // 5_profile_process.sql runs.
+  const taxonMatch = (idsParam, namesParam) =>
+    `(aphia_ids && :${idsParam} OR scientific_names && :${namesParam})`;
 
-    // Rank-aware match against obis_cells.aphia_ids using the precomputed
-    // expansion (a flat int[] parameter — PG plans this as one BitmapOr over
-    // GIN posting lists, no nested InitPlan, no per-row recheck of an inline
-    // subquery). The literal scientific_names branch is the back-compat
-    // fallback for selections WoRMS never resolved (aphia_id IS NULL on
-    // not_found rows) and for any obis_cells whose aphia_ids weren't
-    // backfilled yet — e.g. freshly harvested cells before
-    // 5_profile_process.sql runs.
+  if (scientificNames) {
+    const scientificNamesArr = splitNames(scientificNames);
+    if (scientificNamesMatch === "all") {
+      // One rolldown per name: the cell must hold something under each of
+      // them, which a single merged expansion cannot express.
+      const expansions = await Promise.all(
+        scientificNamesArr.map((name) => expandNames([name])),
+      );
+      scientificNamesArr.forEach((name, i) => {
+        parameters[`expandedAphiaIds${i}`] = expansions[i];
+        parameters[`scientificName${i}`] = [name];
+        obisFilters.push(
+          taxonMatch(`expandedAphiaIds${i}`, `scientificName${i}`),
+        );
+      });
+    } else {
+      parameters.scientificNamesArr = scientificNamesArr;
+      parameters.expandedAphiaIds = await expandNames(scientificNamesArr);
+      obisFilters.push(taxonMatch("expandedAphiaIds", "scientificNamesArr"));
+    }
+  }
+
+  // Cells only: ERDDAP features carry no taxa, so they pass an exclude, which
+  // is also why it takes no part in the OBIS-only gate (utils/selection.js).
+  if (excludeScientificNames) {
+    const excludeScientificNamesArr = splitNames(excludeScientificNames);
+    parameters.excludeScientificNamesArr = excludeScientificNamesArr;
+    parameters.excludedAphiaIds = await expandNames(excludeScientificNamesArr);
     obisFilters.push(
-      "(aphia_ids && :expandedAphiaIds OR scientific_names && :scientificNamesArr)",
+      `NOT coalesce(${taxonMatch("excludedAphiaIds", "excludeScientificNamesArr")}, false)`,
     );
   }
 

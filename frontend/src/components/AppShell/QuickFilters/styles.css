@@ -7,18 +7,44 @@
 .quickFilters {
   display: flex;
 
-  /* Wrapping is what holds the row inside the screen at every width, and it is
-     why there is no breakpoint below: collapsed the row is ~240px, expanded
-     ~440px — still inside the brand card on a desktop — and on a phone the
-     expanded field takes the first line and the buttons drop to a second
-     rather than pushing the page sideways. */
+  /* Wrapping is what holds the row inside the screen at every width: on a
+     phone the label takes a line of its own (see the breakpoint below), and
+     an expanded field takes another, rather than pushing the page sideways. */
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+
+  /* Wide enough apart for the captions under each button, and the row's own
+     bottom padding holds them clear of the chips below. */
+  gap: 24px 30px;
+  padding-bottom: 16px;
+}
+
+/* Names the row on screen as well as for assistive tech (it labels the
+   group). Takes the line above the buttons; on a phone it is hidden (see
+   below). The row gap is sized for captions, which hang under the buttons,
+   not above them, so the label pulls itself back down to the row. */
+.quickFiltersLabel {
+  flex-basis: 100%;
+  margin-bottom: -16px;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--cioos-ink);
+}
+
+/* The pill is on the text rather than the label, so it stays sized to the
+   words when the label is stretched across a line of its own. */
+.quickFiltersLabelText {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
 }
 
 .quickFilterButton {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -71,8 +97,8 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* The reset is not a filter and never lights up; held apart from the four it
-   clears so it doesn't read as a fifth of them. It drops everything this row
+/* The reset is not a filter and never lights up; held apart from the filters
+   it clears so it doesn't read as another of them. It drops everything this row
    and the active-filter chips below can set, so its hover earns the app's
    destructive-action colour rather than the shared teal wash every other
    button here gets. */
@@ -81,10 +107,97 @@
   color: var(--cioos-ink-60);
 }
 
-.quickFilterReset:hover {
+.quickFilterReset:disabled {
+  color: var(--cioos-ink-40);
+  cursor: default;
+  box-shadow: none;
+}
+
+.quickFilterReset:not(:disabled):hover {
   background-color: var(--cioos-error);
   border-color: transparent;
   color: var(--cioos-white);
+}
+
+/* Hung below the circle rather than inside it, so the circles keep their size
+   and the row just spaces out to make room. The white pill keeps it legible
+   over whatever the map draws beneath. */
+.quickFilterCaption {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--cioos-ink);
+  padding: 3px 6px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  pointer-events: none;
+}
+
+/* Open, the field's own placeholder says what it is for. */
+.quickFilterSearch.expanded .quickFilterCaption {
+  display: none;
+}
+
+/* ------------------------------------------------------------------
+ * The Area control: one button whose menu picks box or polygon. The menu
+ * hangs where the caption sits, so the caption steps aside while it is open,
+ * and it stacks above the active-filter chips that follow in the top bar.
+ * ------------------------------------------------------------------ */
+.quickFilterArea {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.quickFilterArea.open .quickFilterCaption {
+  display: none;
+}
+
+.quickFilterAreaMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-md);
+}
+
+.quickFilterAreaItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.quickFilterAreaItem:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.quickFilterAreaItem.selected {
+  background-color: var(--cioos-teal-light);
+}
+
+.quickFilterAreaItem:focus-visible {
+  outline: none;
+  box-shadow: inset var(--cioos-focus);
 }
 
 /* ------------------------------------------------------------------
@@ -165,6 +278,33 @@
 }
 
 /* ------------------------------------------------------------------
+ * Large screen with a mouse: the buttons' titles and hover say what each one
+ * does, so a caption shows only for the button being pointed at (or focused
+ * from the keyboard), and the row packs back together without the room five
+ * standing captions needed.
+ * ------------------------------------------------------------------ */
+@media (min-width: 701px) and (hover: hover) and (pointer: fine) {
+  .quickFilters {
+    gap: 8px 18px;
+    padding-bottom: 8px;
+  }
+
+  .quickFiltersLabel {
+    margin-bottom: 0;
+  }
+
+  .quickFilterCaption {
+    opacity: 0;
+    transition: opacity var(--cioos-transition-fast);
+  }
+
+  .quickFilterButton:hover .quickFilterCaption,
+  .quickFilterButton:focus-visible .quickFilterCaption {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------
  * Mobile: the top bar is a full-bleed header stretching its children, which
  * would pull this row's buttons apart across the screen. It keeps its own
  * width instead and stays centered under the header.
@@ -173,5 +313,24 @@
   .quickFilters {
     align-self: center;
     max-width: calc(100vw - 16px);
+
+    /* Sized for six 40px buttons filling a 360px screen exactly; the five
+       left now fit with room to spare. */
+    gap: 20px 19px;
+    padding-bottom: 16px;
+  }
+
+  /* No room beside the buttons, and a line of its own is too high a price
+     for a heading the captions already spell out. Still names the group:
+     aria-labelledby reads a hidden label. */
+  .quickFiltersLabel {
+    display: none;
+  }
+
+  /* Held at the desktop size rather than the mobile rung's: at the larger one
+     neighbouring captions run into each other on a 360px screen. */
+  .quickFilterCaption {
+    padding: 3px 2px;
+    font-size: var(--cioos-font-size-3xs);
   }
 }

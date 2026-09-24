@@ -81,10 +81,15 @@ export default function UIProvider({ children }) {
     }`;
   }, [showIntroModal]);
 
-  // A map selection (click or draw) surfaces the matching datasets. These reveal
-  // the list without counting as the user's choice about it, so the screen-size
-  // default still applies afterwards.
-  useRevealSidebar(polygon, (value) => !isEmpty(value), setSidebarOpenState);
+  // A drawn box or polygon surfaces the matching datasets — on wide screens
+  // only: narrower, the list would cover the shape just drawn, and the top-bar
+  // counter already reports the result. These reveals don't count as the user's
+  // choice about the list, so the screen-size default still applies afterwards.
+  useRevealSidebar(
+    polygon,
+    (value) => wideScreen && !isEmpty(value),
+    setSidebarOpenState,
+  );
 
   // A dataset page has to be somewhere the user can see it. Opening one used to
   // imply a track click or a filter narrowed to a single dataset, both of which

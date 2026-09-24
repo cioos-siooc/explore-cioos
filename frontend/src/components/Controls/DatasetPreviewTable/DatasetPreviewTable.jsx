@@ -34,11 +34,13 @@ export default function DatasetPreviewTable({ datasetPreview, data }) {
 
   return (
     <>
-      <TableFilter
-        value={filterText}
-        onChange={setFilterText}
-        placeholder={t("datasetInspectorFilterText")}
-      />
+      <div className="datasetPreviewFilter">
+        <TableFilter
+          value={filterText}
+          onChange={setFilterText}
+          placeholder={t("datasetInspectorFilterText")}
+        />
+      </div>
       <DataTable
         striped
         columns={columns}

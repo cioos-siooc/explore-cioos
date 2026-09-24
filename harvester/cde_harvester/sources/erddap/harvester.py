@@ -77,8 +77,6 @@ def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
         # Store the full configured URL (scheme + host + /erddap path) — not
         # erddap.domain which is just the hostname — so the harvest-dashboard
         # can build correct /tabledap/ links without a server-list lookup.
-        # erddap.domain is still used by the skipped_datasets table elsewhere
-        # for legacy compatibility.
         "erddap_url": erddap_url.rstrip("/"),
         "dataset_id": dataset_id,
         "source": "erddap",
@@ -165,6 +163,9 @@ class ERDDAPHarvester(BaseHarvester):
         attempt_records = []
         verified_rows = []
         hostname = urlparse(self.erddap_url).hostname
+        # Same key as the datasets rows: prune_stale_datasets() matches skips
+        # against cde.datasets on it, so a bare hostname never protected one.
+        erddap_url = self.erddap_url.rstrip("/")
         datasets_to_skip = self.get_datasets_to_skip().get(hostname, [])
 
         spills.register("profiles", ProfileSchema.to_schema().columns.keys())
@@ -219,7 +220,7 @@ class ERDDAPHarvester(BaseHarvester):
             base = self.erddap_url.rstrip("/")
             for dataset_id in unsupported_datasets_list:
                 skipped_datasets_reasons += [
-                    [erddap.domain, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
+                    [erddap_url, dataset_id, CDM_DATA_TYPE_UNSUPPORTED]
                 ]
                 cdm_type = unsupported_datasets.loc[
                     unsupported_datasets["datasetID"] == dataset_id, "cdm_data_type"
@@ -244,7 +245,7 @@ class ERDDAPHarvester(BaseHarvester):
             erddap_logger.info(
                 f"Skipping dataset: {dataset_id} because its on the skip list"
             )
-            skipped_datasets_reasons += [[erddap.domain, dataset_id, ON_SKIP_LIST]]
+            skipped_datasets_reasons += [[erddap_url, dataset_id, ON_SKIP_LIST]]
             attempt_records.append(_build_attempt(
                 self.run_id, self.erddap_url, dataset_id,
                 status="skipped",
@@ -305,13 +306,13 @@ class ERDDAPHarvester(BaseHarvester):
                     })
                 elif result.skipped_reason_code:
                     skipped_datasets_reasons += [
-                        [erddap.domain, dataset_id, result.skipped_reason_code]
+                        [erddap_url, dataset_id, result.skipped_reason_code]
                     ]
             except DatasetHarvestError as e:
                 # Record the error and continue to the next dataset.
                 attempt_records.append(e.attempt)
                 skipped_datasets_reasons += [
-                    [erddap.domain, dataset_id, e.skipped_reason_code]
+                    [erddap_url, dataset_id, e.skipped_reason_code]
                 ]
             finally:
                 # One unit of work done, whatever the outcome — the spill

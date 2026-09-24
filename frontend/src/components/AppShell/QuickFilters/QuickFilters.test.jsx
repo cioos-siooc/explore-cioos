@@ -5,14 +5,15 @@ import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
 import QuickFilters from "./QuickFilters.jsx";
 
-// A rectangle and a free shape, as a share link delivers them: the two draw
-// buttons read their pressed state off the shape on the map, so which one is
-// lit is decided by these params alone (see polygonIsRectangle).
+// A rectangle and a free shape, as a share link delivers them: the Area button
+// reads its lit state and marked shape off the shape on the map, so both are
+// decided by these params alone (see polygonIsRectangle).
 const BOX = "latMin=40&lonMin=-70&latMax=50&lonMax=-60";
 const FREE_SHAPE = `polygon=${encodeURIComponent(
   JSON.stringify([
@@ -29,17 +30,19 @@ describe("QuickFilters", () => {
   });
 
   // The row writes nothing of its own: the search publishes the same
-  // datasetTitleSearchText the datasets list does, and the draw buttons send
+  // datasetTitleSearchText the datasets list does, and the Area menu sends
   // the same one-shot requestDraw the map already answers. Both are asserted
   // through that shared state rather than through the markup.
   function renderRow(url = "/") {
-    const seen = { search: [], draw: [], onlyInView: [] };
+    const seen = { search: [], draw: [], onlyInView: [], realtimeOnly: [] };
     function Probe() {
       const { datasetTitleSearchText, onlyInView } = useSelection();
       const { drawRequest } = useMapState();
+      const { realtimeOnly } = useFilters();
       seen.search.push(datasetTitleSearchText);
       seen.draw.push(drawRequest?.mode);
       seen.onlyInView.push(onlyInView);
+      seen.realtimeOnly.push(realtimeOnly);
       return null;
     }
     const user = userEvent.setup({ delay: null });
@@ -159,49 +162,76 @@ describe("QuickFilters", () => {
     expect(screen.queryByTestId("quick-filter-search-input")).toBeNull();
   });
 
+  const openArea = async (user) =>
+    user.click(screen.getByTestId("quick-filter-area"));
+
   it.each([
-    ["box", "quick-filter-box"],
-    ["polygon", "quick-filter-polygon"],
-  ])("asks the map to start a %s draw", async (mode, testId) => {
-    const { user, seen } = renderRow();
+    ["box", "quick-filter-area-box"],
+    ["polygon", "quick-filter-area-polygon"],
+  ])(
+    "asks the map to start a %s draw from the Area menu",
+    async (mode, testId) => {
+      const { user, seen } = renderRow();
+      await openArea(user);
 
-    await user.click(screen.getByTestId(testId));
+      await user.click(screen.getByTestId(testId));
 
-    await waitFor(() => expect(seen.draw.at(-1)).toBe(mode));
+      await waitFor(() => expect(seen.draw.at(-1)).toBe(mode));
+      expect(screen.queryByTestId("quick-filter-area-menu")).toBeNull();
+      expect(screen.getByTestId("quick-filter-area")).toHaveFocus();
+    },
+  );
+
+  it("keeps the Area menu closed until asked for, with nothing to clear", async () => {
+    const { user } = renderRow();
+    const button = screen.getByTestId("quick-filter-area");
+    expect(screen.queryByTestId("quick-filter-area-menu")).toBeNull();
+    expect(button).not.toHaveClass("applied");
+
+    await openArea(user);
+
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByTestId("quick-filter-area-clear")).toBeNull();
   });
 
-  it("lights the tool that drew the shape that is up, and only that one", () => {
-    renderRow(`/?${BOX}`);
-    expect(screen.getByTestId("quick-filter-box")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByTestId("quick-filter-polygon")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+  it.each([
+    ["a rectangle", BOX, "quick-filter-area-box", "quick-filter-area-polygon"],
+    [
+      "a free shape",
+      FREE_SHAPE,
+      "quick-filter-area-polygon",
+      "quick-filter-area-box",
+    ],
+  ])("marks the shape that drew %s", async (_, params, on, off) => {
+    const { user } = renderRow(`/?${params}`);
+    expect(screen.getByTestId("quick-filter-area")).toHaveClass("applied");
+
+    await openArea(user);
+
+    expect(screen.getByTestId(on)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId(off)).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("lights the polygon button for a shape that is not a rectangle", () => {
-    renderRow(`/?${FREE_SHAPE}`);
-    expect(screen.getByTestId("quick-filter-polygon")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByTestId("quick-filter-box")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-  });
-
-  // Second click on the lit button is how the shape goes, rather than a clear
-  // control appearing beside it.
-  it("clears the drawn shape when its own button is pressed again", async () => {
+  it("clears the drawn shape from the Area menu", async () => {
     const { user, seen } = renderRow(`/?${BOX}`);
+    await openArea(user);
 
-    await user.click(screen.getByTestId("quick-filter-box"));
+    await user.click(screen.getByTestId("quick-filter-area-clear"));
 
     await waitFor(() => expect(seen.draw.at(-1)).toBe("clear"));
+  });
+
+  it("closes the Area menu on Escape and on a click elsewhere", async () => {
+    const { user, seen } = renderRow();
+    await openArea(user);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("quick-filter-area-menu")).toBeNull();
+    expect(screen.getByTestId("quick-filter-area")).toHaveFocus();
+
+    await openArea(user);
+    await user.click(document.body);
+    expect(screen.queryByTestId("quick-filter-area-menu")).toBeNull();
+    expect(seen.draw.filter(Boolean)).toEqual([]);
   });
 
   it("toggles the in-view narrowing", async () => {
@@ -215,19 +245,60 @@ describe("QuickFilters", () => {
     expect(button).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("offers no reset until something is set", () => {
+  it("toggles the real-time narrowing", async () => {
+    const { user, seen } = renderRow();
+    const button = screen.getByTestId("quick-filter-realtime");
+    expect(button).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(button);
+
+    await waitFor(() => expect(seen.realtimeOnly.at(-1)).toBe(true));
+    expect(button).toHaveAttribute("aria-pressed", "true");
+  });
+
+  // The param is only ever written when the toggle is on; an explicit false
+  // must read as "not filtering", not as a second state to show.
+  it.each([
+    ["true", "true"],
+    ["false", "false"],
+  ])("reads realtimeOnly=%s from the link", async (param, pressed) => {
+    renderRow(`/?realtimeOnly=${param}`);
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-filter-realtime")).toHaveAttribute(
+        "aria-pressed",
+        pressed,
+      ),
+    );
+  });
+
+  it("keeps the reset in place but disabled until something is set", () => {
     renderRow();
-    expect(screen.queryByTestId("quick-filter-reset")).toBeNull();
+    expect(screen.getByTestId("quick-filter-reset")).toBeDisabled();
+  });
+
+  it("enables the reset once anything is set", () => {
+    renderRow("/?realtimeOnly=true");
+    expect(screen.getByTestId("quick-filter-reset")).toBeEnabled();
+  });
+
+  it("is named by its visible label", () => {
+    renderRow();
+    expect(
+      screen.getByRole("group", { name: "Quick filters" }),
+    ).toBeInTheDocument();
   });
 
   it("drops every quick filter at once", async () => {
-    const { user, seen } = renderRow(`/?search=temperature&onlyInView=true`);
+    const { user, seen } = renderRow(
+      `/?search=temperature&onlyInView=true&realtimeOnly=true`,
+    );
 
     await user.click(screen.getByTestId("quick-filter-reset"));
 
     await waitFor(() => {
       expect(seen.search.at(-1)).toBe("");
       expect(seen.onlyInView.at(-1)).toBe(false);
+      expect(seen.realtimeOnly.at(-1)).toBe(false);
       expect(seen.draw.at(-1)).toBe("clear");
     });
   });

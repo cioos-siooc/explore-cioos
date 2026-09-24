@@ -22,6 +22,14 @@
   width: 100%;
 }
 
+/* MapLibre's bottom-right stack clears the time bar wherever the bar's right
+   edge reaches the corner. */
+@media (max-width: 1100px) {
+  .maplibregl-ctrl-bottom-right {
+    margin-bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  }
+}
+
 /* The hover chip. One label per line, nothing else — see the showChip comment
    in Map.jsx for what this replaced and why.
    The popup's own frame is stripped back to nothing: MapLibre's default content

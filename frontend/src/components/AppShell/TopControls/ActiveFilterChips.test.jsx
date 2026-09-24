@@ -47,24 +47,25 @@ describe("ActiveFilterChips", () => {
     );
   });
 
-  it("announces the realtime filter carried in the link", async () => {
-    open("realtimeOnly=true");
-    await waitFor(() => expect(groups()).toHaveLength(1));
+  it("marks an excluded value with a NOT tag, apart from the included ones", async () => {
+    open("eovs=oxygen&excludeEovs=subSurfaceTemperature&excludeLayers=grid");
+    await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));
 
-    const realtime = group("realtimeOnly");
-    expect(realtime).toBeInTheDocument();
-    expect(within(realtime).getByTestId("filter-chip-item")).toHaveTextContent(
-      "Real-time only",
+    const [included, excluded] = within(group("eovs")).getAllByTestId(
+      "filter-chip-item",
     );
-  });
-
-  it("ignores realtimeOnly=false, so the default link shows no chip", async () => {
-    // The param is only ever written when the toggle is on; an explicit false
-    // must read as "not filtering", not as a second state to announce.
-    open("realtimeOnly=false");
-    await waitFor(() =>
-      expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
+    expect(included).toHaveAttribute("data-excluded", "false");
+    expect(included).not.toHaveTextContent(/not/i);
+    expect(excluded).toHaveAttribute("data-excluded", "true");
+    expect(excluded.querySelector(".activeFilterItemNot")).toHaveTextContent(
+      "not",
     );
+    // Its remove button names the whole thing, "not" included.
+    expect(within(excluded).getByRole("button")).toHaveAccessibleName(/: not /);
+    // Geometry chips follow the same rule.
+    expect(
+      within(group("dataLayers")).getByTestId("filter-chip-item"),
+    ).toHaveAttribute("data-excluded", "true");
   });
 
   it("gives one group per filter and one item per chosen value", async () => {

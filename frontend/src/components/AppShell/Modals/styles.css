@@ -293,7 +293,7 @@
 
 /* A figure being replaced: dimmed and inert while the new one loads, so the
    shape stays readable but it is visibly not the answer to the control that
-   was just changed. The small spinner sits over it rather than replacing it. */
+   was just changed. The spinner sits over it rather than replacing it. */
 .coveragePlotStale {
   height: 100%;
   opacity: 0.4;
@@ -307,9 +307,8 @@
 
 .coveragePlotBusy {
   position: absolute;
-  top: var(--cioos-space-sm);
-  right: var(--cioos-space-sm);
-  color: var(--cioos-ink-60);
+  inset: 0;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -340,6 +339,16 @@
     height: 100vh;
     max-height: none;
     border-radius: 0;
+  }
+}
+
+/* Phones: the text around the figure steps back down from theme.css's phone
+   sizes so the chart keeps as much of the small screen as it can. */
+@media (max-width: 700px) {
+  .coverageModal {
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
   }
 }
 
@@ -375,6 +384,22 @@
     max-width: 100vw;
     min-height: 100dvh;
     margin: 0;
+  }
+
+  /* Same phone type scale as the datasets sheet (Sidebar/styles.css), so the
+     two full-screen surfaces read alike. The font-size re-applies the base
+     here: text without its own size inherits body's, which was computed from
+     the phone base before these tokens were overridden. */
+  .filtersModal {
+    font-size: var(--cioos-font-size-base);
+
+    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-2xs: 10px;
+    --cioos-font-size-xs: 11px;
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-base: 13px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
   }
 
   .filtersModal .modal-content,
