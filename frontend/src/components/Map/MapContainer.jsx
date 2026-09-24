@@ -52,7 +52,6 @@ export default function MapContainer() {
     setInspectDataset,
     setHighlightedRecord,
     setInspectRecordID,
-    returnToDatasetList,
     selectedTrajectory,
     selectTrajectoryFromMap,
     mappedRecord,
@@ -64,15 +63,11 @@ export default function MapContainer() {
   // cluster of markers too ambiguous for onMarkerClick below) reports what it
   // found through featureQuery, which the datasets list reads to sort and
   // outline the matching rows (DatasetsTable's pinnedPks) — an answer only
-  // the list can give. A dataset page left open from an earlier click would
-  // otherwise sit there unrelated to this one, so back out to the list first
-  // whenever the click actually found something. Gated on a page actually
-  // being open: returnToDatasetList still pushes a (no-op) navigation entry
-  // even when there's nothing to leave, and firing it on every hex click
-  // while the list is already showing would spam browser history for
-  // nothing.
+  // the list can give. While a dataset is open the map is keyed to that one
+  // dataset, so the click asks nothing of the others: no card, no ring, and
+  // the page stays put. The marker and track shortcuts below still apply.
   const handleFeatureQuery = (query) => {
-    if (query && inspectDataset) returnToDatasetList();
+    if (query && inspectDataset) return;
     setFeatureQuery(query);
   };
 
@@ -108,12 +103,9 @@ export default function MapContainer() {
     setInspectRecordID(undefined);
     setHighlightedRecord(undefined);
     setInspectDataset(row, { replace: true });
-    // Set directly rather than through handleFeatureQuery above: that helper
-    // also calls returnToDatasetList when a dataset is already open, and
-    // doing that in the same tick as the setInspectDataset just above would
-    // race two navigations off the same stale search-params snapshot. This
-    // click's only navigation is the setInspectDataset it already made, so
-    // the pin just needs to be recorded for whenever the list is next seen.
+    // Set directly rather than through handleFeatureQuery above, which drops
+    // every query while a dataset is open — and this one always opens one.
+    // The pin just needs to be recorded for whenever the list is next seen.
     setFeatureQuery(highlightQuery);
     try {
       const params = new URLSearchParams(combinedQueries);

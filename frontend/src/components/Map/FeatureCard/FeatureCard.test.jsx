@@ -83,6 +83,20 @@ describe("FeatureCard", () => {
     expect(screen.getByTestId("feature-card")).toHaveClass("open");
   });
 
+  it("stays shut while a dataset is open, even with the sidebar closed", async () => {
+    await renderReady();
+    act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
+    act(() => latestSelection.setInspectDataset(pointQueryFixture[0]));
+    act(() => latestUI.setSidebarOpen(false));
+    await waitFor(() =>
+      expect(screen.getByTestId("feature-card")).not.toHaveClass("open"),
+    );
+    act(() => latestSelection.returnToDatasetList());
+    await waitFor(() =>
+      expect(screen.getByTestId("feature-card")).toHaveClass("open"),
+    );
+  });
+
   it("resolves an observation row against pointsData and shows its title", async () => {
     await renderReady();
     const row = pointQueryFixture[0];

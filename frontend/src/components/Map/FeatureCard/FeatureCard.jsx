@@ -47,6 +47,7 @@ export default function FeatureCard() {
   const { featureQuery, setFeatureQuery, dataLayers } = useMapState();
   const {
     pointsData,
+    inspectDataset,
     setInspectDataset,
     selectTrajectoryFromMap,
     addDatasetsToSelection,
@@ -91,10 +92,11 @@ export default function FeatureCard() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [featureQuery, close]);
 
-  // Held back by the open sidebar — see the comment up top. The query itself is
-  // left alone so the card picks back up where it left off if the sidebar
-  // closes again.
-  const open = Boolean(featureQuery) && !sidebarOpen;
+  // Held back by the open sidebar — see the comment up top — and by a dataset
+  // view, which is keyed to one dataset rather than to what a click found. The
+  // query itself is left alone so the card picks back up where it left off
+  // once neither is in the way.
+  const open = Boolean(featureQuery) && !sidebarOpen && !inspectDataset;
   useEffect(() => {
     if (open) offerTip("whatsHere");
   }, [open, offerTip]);
