@@ -4,6 +4,7 @@ import {
   Download,
   FileEarmarkText,
   ListUl,
+  Map as MapIcon,
   QuestionCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -27,7 +28,10 @@ import "./styles.css";
 // Drilling into a single dataset swaps that header for a banner naming the way
 // back and the surface in view: the card hosts two different surfaces, and the
 // header is what tells them apart.
-// Either way the way out is the app's one close button, in the corner.
+// The list's way out is the app's one close button, in the corner. A dataset
+// page isn't closed from there but minimized to the map (see DatasetMapCard),
+// so its corner says Map instead: an X there read as leaving the dataset while
+// the map stayed keyed to it.
 export default function Sidebar() {
   const { t } = useTranslation();
   const { pointsToReview, inspectDataset, returnToDatasetList } =
@@ -105,7 +109,16 @@ export default function Sidebar() {
               <FileEarmarkText size={13} aria-hidden="true" />
               {t("sidebarDatasetDetailsLabel")}
             </span>
-            {collapseButton}
+            <button
+              type="button"
+              className="datasetsMapButton"
+              data-testid="sidebar-collapse"
+              onClick={() => setSidebarOpen(false)}
+              title={t("sidebarShowMapTitle")}
+            >
+              <MapIcon size={14} aria-hidden="true" />
+              <span>{t("sidebarShowMapText")}</span>
+            </button>
           </div>
         ) : (
           <div className="datasetsHeader">

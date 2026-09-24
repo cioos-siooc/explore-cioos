@@ -38,16 +38,13 @@
 }
 
 /* Phones: the map legend holds the bottom-left, so the tip takes the
-   bottom-right, held clear of the griddap card that shares it. Opened, the card
-   keeps to a reading width rather than the full screen. */
+   bottom-right. Opened, the card keeps to a reading width rather than the
+   full screen. */
 @media (max-width: 700px) {
   .tipCard,
   .tipBadge {
     right: 12px;
-    bottom: max(
-      calc(12px + var(--cioos-time-bar-space, 0px)),
-      var(--cioos-wms-legend-space, 0px)
-    );
+    bottom: calc(12px + var(--cioos-time-bar-space, 0px));
     left: auto;
   }
 

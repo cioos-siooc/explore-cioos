@@ -12,9 +12,10 @@ import classNames from "classnames";
 
 import BrandSearch from "../TopLeft/BrandSearch.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
-import SingleDatasetView from "./SingleDatasetView.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
+import DatasetMapCard from "../DatasetMapCard/DatasetMapCard.jsx";
 import QuickFilters from "../QuickFilters/QuickFilters.jsx";
+import TopBarRow from "./TopBarRow.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -74,8 +75,12 @@ export default function TopControls() {
     quickFiltersCollapsed,
     setQuickFiltersCollapsed,
   } = useUI();
-  const { inspectDataset, returnToDatasetList } = useSelection();
+  const { inspectDataset } = useSelection();
   const { tipHighlight } = useTips();
+  // A dataset page minimized to the map: the card naming it takes the quick
+  // filters' place under the brand card, since those act on the whole catalogue
+  // rather than on the one dataset the map is keyed to.
+  const datasetMinimized = Boolean(inspectDataset) && !sidebarOpen;
 
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-top-bar-space", measureTopBarSpace);
@@ -89,13 +94,16 @@ export default function TopControls() {
             type="button"
             className={classNames("topBarButton", { active: sidebarOpen })}
             data-testid="topbar-datasets-button"
-            onClick={() => {
-              if (inspectDataset) returnToDatasetList();
-              setSidebarOpen(!sidebarOpen);
-            }}
+            // A minimized dataset page comes back as it was left; the page's
+            // own Return to datasets is the way to the list.
+            onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-pressed={sidebarOpen}
             title={
-              sidebarOpen ? t("sidebarCollapseTitle") : t("sidebarShowTitle")
+              sidebarOpen
+                ? t("sidebarCollapseTitle")
+                : inspectDataset
+                  ? t("sidebarShowDatasetTitle")
+                  : t("sidebarShowTitle")
             }
           >
             <ListUl size={18} aria-hidden="true" />
@@ -184,16 +192,24 @@ export default function TopControls() {
           </div>
         </div>
       </BrandSearch>
-      {!quickFiltersCollapsed && (
-        <>
+      <TopBarRow
+        contentKey={
+          datasetMinimized
+            ? "dataset"
+            : quickFiltersCollapsed
+              ? null
+              : "filters"
+        }
+      >
+        {datasetMinimized ? (
+          <DatasetMapCard dataset={inspectDataset} />
+        ) : (
           <QuickFilters />
-          <ActiveFilterChips />
-        </>
-      )}
-      {/* Last in the stack: the dataset the map is keyed to, and the way out
-          of it. Only up while the datasets card — whose banner otherwise says
-          this — is collapsed. */}
-      <SingleDatasetView />
+        )}
+      </TopBarRow>
+      <TopBarRow contentKey={quickFiltersCollapsed ? null : "chips"}>
+        <ActiveFilterChips />
+      </TopBarRow>
     </div>
   );
 }

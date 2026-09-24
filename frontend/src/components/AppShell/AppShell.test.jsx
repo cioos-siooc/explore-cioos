@@ -93,6 +93,59 @@ describe("AppShell (composition)", () => {
     });
   });
 
+  describe("a minimized dataset page", () => {
+    // Collapsing the sidebar on a dataset page used to leave the map keyed to
+    // that dataset with no way back to its page: the top bar's Datasets button
+    // dropped the dataset on the way to the list.
+    async function minimize() {
+      const user = userEvent.setup();
+      document.cookie = "introModalOpen=false; path=/";
+      const row = pointQueryFixture[0];
+      renderWithProviders(<AppShell />, {
+        providers: "app",
+        url: `/?dataset=${row.dataset_id}`,
+      });
+      await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
+      await user.click(screen.getByTestId("sidebar-collapse"));
+      const card = await screen.findByTestId("dataset-map-card");
+      return { user, row, card };
+    }
+
+    it("stands in for the page on the map, named by its dataset", async () => {
+      const { row, card } = await minimize();
+      expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
+        "data-expanded",
+        "false",
+      );
+      expect(card).toHaveAccessibleName(row.title);
+    });
+
+    it.each([
+      ["the card's Details button", "dataset-map-card-details"],
+      ["the top bar's Datasets button", "topbar-datasets-button"],
+    ])("comes back as it was left from %s", async (_, testId) => {
+      const { user } = await minimize();
+      await user.click(screen.getByTestId(testId));
+      expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
+        "data-expanded",
+        "true",
+      );
+      expect(screen.getByTestId("sidebar-back")).toBeInTheDocument();
+      expect(screen.queryByTestId("dataset-map-card")).toBeNull();
+    });
+
+    it("is left for good from the card's close button", async () => {
+      const { user } = await minimize();
+      await user.click(screen.getByTestId("dataset-map-card-close"));
+      expect(screen.queryByTestId("dataset-map-card")).toBeNull();
+      await waitFor(() =>
+        expect(
+          new URL(window.location.href).searchParams.get("dataset"),
+        ).toBeNull(),
+      );
+    });
+  });
+
   it("opening the Filters modal shows the filter panel", async () => {
     const user = userEvent.setup();
     renderWithProviders(<AppShell />, { providers: "app" });

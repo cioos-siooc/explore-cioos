@@ -2,8 +2,7 @@
  * TopBar — the centered top header floating over the map. First layer:
  * the brand bar. Second layer: the merged Datasets/Filters segmented
  * pill. The quick-filter buttons flow beneath (QuickFilters, which brings
- * its own stylesheet), then the active-filter chips, and under those the
- * single-dataset card (SingleDatasetView) when one is up. Everything
+ * its own stylesheet), then the active-filter chips. Everything
  * stays centered on the horizontal midline of the viewport.
  * ------------------------------------------------------------------ */
 .topBar {
@@ -15,9 +14,98 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--top-bar-gap);
   max-width: calc(100vw - 24px);
   pointer-events: none;
+
+  --top-bar-gap: 10px;
+}
+
+/* The brand card is what the rows below slide out from under. */
+.topBar > .brandSearch {
+  position: relative;
+  z-index: 1;
+}
+
+/* A row under the brand card (see TopBarRow). Laid out as the content it holds;
+   the grid is there for the height to open and close with the slide. */
+.topBarRow {
+  display: grid;
+  grid-template-rows: 1fr;
+  justify-items: center;
+}
+
+/* An empty row (no chips to show) takes no gap either. */
+.topBarRow:not(:has(> .topBarRowInner > *)) {
+  display: none;
+}
+
+.topBarRowInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  max-width: 100%;
+}
+
+/* Only while moving: clipped at the row's top edge, which is where the brand
+   card's bottom edge is, so the content reads as passing under it. Clipping
+   the rest of the time would cut off the cards' shadows. */
+.topBarRow.entering,
+.topBarRow.leaving {
+  overflow: hidden;
+  animation: topBarRowOpen 180ms ease-out both;
+}
+
+.topBarRow.leaving {
+  animation-name: topBarRowClose;
+  animation-timing-function: ease-in;
+}
+
+.topBarRow.entering > .topBarRowInner {
+  animation: topBarRowSlideIn 180ms ease-out both;
+}
+
+.topBarRow.leaving > .topBarRowInner {
+  animation: topBarRowSlideOut 180ms ease-in both;
+}
+
+@keyframes topBarRowOpen {
+  from {
+    grid-template-rows: 0fr;
+    margin-top: calc(-1 * var(--top-bar-gap));
+  }
+
+  to {
+    grid-template-rows: 1fr;
+    margin-top: 0;
+  }
+}
+
+@keyframes topBarRowClose {
+  from {
+    grid-template-rows: 1fr;
+    margin-top: 0;
+  }
+
+  to {
+    grid-template-rows: 0fr;
+    margin-top: calc(-1 * var(--top-bar-gap));
+  }
+}
+
+@keyframes topBarRowSlideIn {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes topBarRowSlideOut {
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
 }
 
 .topBar > * {
@@ -370,7 +458,16 @@
 
     /* Only the chips are still a floating layer under the header, so the gap
        belongs to them rather than to the stack. */
-    gap: 6px;
+    --top-bar-gap: 6px;
+  }
+
+  /* Rows take the header's full width, as the column itself does here. */
+  .topBarRow {
+    justify-items: stretch;
+  }
+
+  .topBarRowInner {
+    align-items: stretch;
   }
 
   /* The chips hang under the full-width header, so they take its width too. */
@@ -631,93 +728,4 @@
 .activeFilterMoreButton:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
-}
-
-/* ------------------------------------------------------------------
- * Single-dataset card: the last layer of the bar, under the chips. A
- * dataset page keys the map to one dataset and greys the rest, and the
- * datasets card's banner is what says so — collapse that card and this
- * is the only thing left that does (see SingleDatasetView). Mounted
- * only then, so the stack's gap closes up again the rest of the time.
- *
- * The dataset named above, its two actions in a row below. Tinted like
- * the sidebar banner it stands in for rather than washed like the three
- * entry points above — it reports a state, it is not a way in.
- * ------------------------------------------------------------------ */
-.singleDatasetView {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-
-  /* The chips' width, so the bar's lower layers line up as one column. */
-  max-width: min(var(--cioos-brand-width), calc(100vw - 24px));
-  padding: 6px 10px 8px;
-  border: 1px solid var(--cioos-primary);
-  border-radius: var(--cioos-radius-lg);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-float);
-}
-
-/* The name, as a label and nothing more: the actions are the buttons below.
-   Kept to one line — the card is a marker, not the page — with the full title
-   on hover for anything longer than the card. */
-.singleDatasetViewTitle {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
-  color: var(--cioos-primary-700);
-}
-
-.singleDatasetViewActions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.singleDatasetViewButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 4px 12px;
-  border: 1px solid var(--cioos-primary);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-teal-light);
-  font: inherit;
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
-  color: var(--cioos-primary-700);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background-color var(--cioos-transition-fast);
-}
-
-.singleDatasetViewButton:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-.singleDatasetViewButton:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-.singleDatasetViewButton > svg {
-  flex: 0 0 auto;
-}
-
-@media (max-width: 700px) {
-  /* Touch targets; the two share the row's width rather than shrinking. */
-  .singleDatasetViewButton {
-    flex: 1 1 auto;
-    min-height: 40px;
-  }
-
-  .singleDatasetViewActions {
-    align-self: stretch;
-  }
 }

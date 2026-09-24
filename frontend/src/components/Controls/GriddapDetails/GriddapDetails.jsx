@@ -13,9 +13,8 @@ import "./styles.css";
 // Griddap-specific section of the dataset inspector: grid structure, variable
 // list, and (when the ERDDAP serves WMS) the show-on-map switch. While the
 // dataset page is open the WmsLegend (variable picker, colorbar) renders inline
-// here; when the sidebar is collapsed it moves to the floating card over the
-// map (rendered by AppShell). Which slice of the grid is drawn is set on the
-// bars along the bottom of the map, beside the filters for the same axes.
+// here; when the sidebar is collapsed it moves into the minimized dataset card
+// over the map (see DatasetMapCard).
 export default function GriddapDetails({
   dataset,
   activeWmsOverlay,

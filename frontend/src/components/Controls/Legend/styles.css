@@ -2,16 +2,9 @@
    the right, the "what's here" card on the left, both down on the bottom edge
    where they are read against the map rather than over the top bar. */
 .mapLegend {
-  /* How far up this corner the card starts, against whichever of the two
-     surfaces that stand in it reaches higher: the time bar, which owns the
-     bottom edge and publishes its reach, and the griddap colorbar, which takes
-     this corner itself while an overlay is on and publishes its own — a figure
-     that already includes that card's clearance of the bar, so the two are
-     alternatives rather than a sum. Each is 0 while its surface is absent. */
-  --legend-corner-offset: max(
-    calc(12px + var(--cioos-time-bar-space, 0px)),
-    var(--cioos-wms-legend-space, 0px)
-  );
+  /* The card holds the corner itself; the time bar, which owns the bottom
+     edge, is the one thing it clears. */
+  --legend-corner-offset: calc(12px + var(--cioos-time-bar-space, 0px));
 
   /* Viewport held clear above the card, so a long list of keys stops short of
      the centered top bar instead of running the height of the screen. */
@@ -477,17 +470,13 @@
   text-decoration: underline;
 }
 
-/* Phones keep the bottom-left corner: the bottom-right is the griddap
-   colorbar's here — it stands down to a button in it (WmsLegend's
-   COMPACT_QUERY) and there is no room on this width for the two side by side.
+/* Phones keep the bottom-left corner: the bottom-right is the tip card's
+   here, and there is no room on this width for the two side by side.
    700px is the app's own mobile rung (MOBILE_QUERY in useMediaQuery), the same
    one Legend.jsx branches on to render the keys as a dialog, so the corner and
    the markup move together rather than at two numbers that can drift. */
 @media (max-width: 700px) {
   .mapLegend {
-    /* The griddap card holds the other corner here, so the only thing to clear
-       is the tracks-mode time bar, which owns the whole bottom edge. */
-    --legend-corner-offset: calc(12px + var(--cioos-time-bar-space, 0px));
     --legend-top-reserve: 136px;
 
     right: auto;

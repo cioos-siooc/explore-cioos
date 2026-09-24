@@ -19,7 +19,6 @@ import Loading from "../Controls/Loading/Loading.jsx";
 import Legend from "../Controls/Legend/Legend.jsx";
 import DepthBar from "../Controls/DepthBar/DepthBar.jsx";
 import TimeBar from "../Controls/TimeBar/TimeBar.jsx";
-import WmsLegend from "../Controls/WmsLegend/WmsLegend.jsx";
 import IntroModal from "../Controls/IntroModal/IntroModal.jsx";
 import TipCard from "../Controls/Tips/TipCard.jsx";
 import { useFilters } from "../../state/filters/FilterProvider.jsx";
@@ -49,15 +48,13 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
-    activeWmsOverlay,
-    setActiveWmsOverlay,
     tracksMode,
     toggleTrackLines,
     dataLayers,
   } = useMapState();
   const { startDate, endDate, timeFilterActive } = useFilters();
-  const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI();
-  const { inspectDataset, platformsAvailable } = useSelection();
+  const { showIntroModal, setShowIntroModal } = useUI();
+  const { platformsAvailable } = useSelection();
   const { offerTip } = useTips();
 
   // Zoomed in far enough that the CHS NONNA soundings take over the seafloor.
@@ -74,13 +71,6 @@ export default function AppShell() {
   // in step if a later wait ever earns a splash of its own.
   if (useChanged(firstPaintPending) && firstPaintPending)
     setSplashMounted(true);
-
-  // The griddap legend lives inside the dataset page while that page is open
-  // (see GriddapDetails); otherwise it pins itself to the top-left corner of
-  // the map, over the datasets column rather than inside it — see its
-  // stylesheet for why it overlaps instead of stacking.
-  const wmsLegendIsInline =
-    sidebarOpen && activeWmsOverlay?.pk === inspectDataset?.pk;
 
   // The switches that ride on the legend entries they key, rather than sitting
   // in the layers list below: each of these turns off exactly what one legend
@@ -199,14 +189,6 @@ export default function AppShell() {
           below). */}
       <TimeBar />
       <DepthBar />
-      {activeWmsOverlay && !wmsLegendIsInline && (
-        <WmsLegend
-          overlay={activeWmsOverlay}
-          variant="floating"
-          onClose={() => setActiveWmsOverlay()}
-          setActiveWmsOverlay={setActiveWmsOverlay}
-        />
-      )}
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
       <PreviewHost />
     </>

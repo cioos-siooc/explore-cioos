@@ -241,6 +241,35 @@
   box-shadow: var(--cioos-focus);
 }
 
+/* Minimizes the page to the map card. Quieter than the back button: it
+   keeps the user where they are. */
+.datasetsMapButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-pill);
+  background: none;
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+  color: var(--cioos-primary-700);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.datasetsMapButton:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-white);
+}
+
+.datasetsMapButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 /* Names the surface, not the dataset — the dataset's own title is the
    heading directly below, and repeating it here would just crowd the row.
    Shrinks before the back button does, and clips rather than pushing the
@@ -451,6 +480,11 @@
      the next line on screen and says the same thing in full. */
   .datasetsBannerMode {
     display: none;
+  }
+
+  .datasetsMapButton {
+    margin-left: auto;
+    min-height: 40px;
   }
 
   /* The footer is the surface's action bar: the Download button gets a full
