@@ -155,6 +155,12 @@
   margin-right: var(--cioos-space-xs);
 }
 
+/* The sources wrap as one group, so a narrow screen never strands one pill. */
+.introSources {
+  display: flex;
+  gap: var(--cioos-space-sm);
+}
+
 /* Stacked down the right edge, divided from the copy by a hairline. */
 .introStats {
   position: relative;
@@ -493,8 +499,9 @@
   }
 
   .introStats {
-    flex-flow: row wrap;
-    gap: var(--cioos-space-lg);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--cioos-space-md);
     padding: var(--cioos-space-md) 0 0;
     border-top: 1px solid rgb(255 255 255 / 20%);
     border-left: 0;

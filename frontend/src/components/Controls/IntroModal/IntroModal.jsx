@@ -222,8 +222,12 @@ export default function IntroModal({ showModal, setShowModal }) {
               <button type="button" className="introCta" onClick={close}>
                 {t("introHeroCta")}
               </button>
-              <span className="introSource">ERDDAP™</span>
-              {obisDataAvailable && <span className="introSource">OBIS</span>}
+              <span className="introSources">
+                <span className="introSource">ERDDAP™</span>
+                {obisDataAvailable && (
+                  <span className="introSource">OBIS</span>
+                )}
+              </span>
             </div>
           </div>
           <ul className="introStats" aria-label={t("introStatsLabel")}>
