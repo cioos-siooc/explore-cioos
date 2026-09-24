@@ -1,0 +1,175 @@
+/* The contextual tip (see TipCard.jsx). Sized like a chip row rather than a
+   panel: it should read as an aside to the controls, not as something to deal
+   with. Above the map chrome but under the modals, which the tip waits out
+   anyway. Bottom-left by default, since below the laptop rung the top-right is
+   too narrow beside the centered brand card. */
+.tipCard,
+.tipBadge {
+  position: fixed;
+  z-index: var(--cioos-z-dock, 35);
+}
+
+.tipCard {
+  left: 12px;
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cioos-space-sm);
+  width: min(360px, calc(100vw - 24px));
+  padding: var(--cioos-space-sm) var(--cioos-space-sm) var(--cioos-space-sm)
+    var(--cioos-space-md);
+  background-color: var(--cioos-white);
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+@media (min-width: 1200px) {
+  .tipCard {
+    inset: 12px 12px auto auto;
+    width: min(360px, calc((100vw - var(--cioos-brand-width)) / 2 - 24px));
+  }
+}
+
+/* Phones: the map legend holds the bottom-left, so the tip takes the
+   bottom-right. Opened, the card keeps to a reading width rather than the
+   full screen. */
+@media (max-width: 700px) {
+  .tipCard,
+  .tipBadge {
+    right: 12px;
+    bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+    left: auto;
+  }
+
+  .tipCard {
+    width: min(320px, calc(100vw - 24px));
+  }
+}
+
+.tipBadgeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: 50%;
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+  color: var(--cioos-primary);
+  cursor: pointer;
+}
+
+.tipCardIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--cioos-primary);
+}
+
+.tipCardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.tipCardHeading {
+  font-family: var(--cioos-font-display);
+  font-weight: 600;
+  color: var(--cioos-navy);
+}
+
+.tipCardBody p {
+  margin: 2px 0 4px;
+}
+
+.tipGlyph {
+  vertical-align: -2px;
+  color: var(--cioos-primary);
+}
+
+.tipCardTour {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-md);
+}
+
+.tipCardCount {
+  margin-right: auto;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.tipCardLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tipCardLink:hover {
+  color: var(--cioos-ink);
+}
+
+/* The control the active tip talks about (tipHighlight in TipsProvider), in
+   the tip card's own primary — the ring-and-glow recipe of the datasets list's
+   .fromMapClick card, recoloured so card, pointer and control read as one.
+   !important because it has to win over each control's own shadow — the
+   raised cards, the pressed buttons — while the tip is up. */
+[data-tip-highlight] {
+  --tip-glow: color-mix(in srgb, var(--cioos-primary) 45%, transparent);
+
+  box-shadow:
+    0 0 0 2px var(--tip-glow),
+    0 0 10px 1px var(--tip-glow) !important;
+}
+
+/* The hand pointing at the control the active tip talks about (TipPointer).
+   Over the map chrome, under the modals the tip waits out. A badge rather than
+   a bare glyph, which washes out against the light basemap and the white
+   panels — hung from its top edge, where the fingertip is, and turned
+   over to point down from above. */
+.tipPointer {
+  position: fixed;
+  z-index: calc(var(--cioos-z-dock, 35) + 1);
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+}
+
+.tipPointerAbove {
+  transform: translate(-50%, calc(-100% - 4px)) rotate(180deg);
+}
+
+/* A nudge towards the control, not a pulse: it reads as pointing. */
+.tipPointerBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 2px solid var(--cioos-white);
+  border-radius: 50%;
+  background-color: var(--cioos-primary);
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
+  color: var(--cioos-white);
+  animation: tipPointerNudge 1.2s ease-in-out infinite;
+}
+
+@keyframes tipPointerNudge {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tipPointerBadge {
+    animation: none;
+  }
+}

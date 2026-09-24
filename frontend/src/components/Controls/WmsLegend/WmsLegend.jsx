@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { ChevronUp, Grid3x3Gap } from "react-bootstrap-icons";
 import classNames from "classnames";
 import CloseButton from "../../ui/CloseButton.jsx";
@@ -8,36 +8,20 @@ import { useTranslation } from "react-i18next";
 import { abbreviateString, useChanged, useDebounce } from "../../../utilities";
 import { buildGriddapLegendUrl } from "../../../wmsUtilities";
 import { GridTimeSlice, GridDepthSlice } from "../GridSlice/GridSlice.jsx";
-import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
 
-// How far up the bottom-right corner this card reaches, plus a gap — the same
-// measurement whether it is the card or the button it folds into. MapLibre's
-// own controls sit in that corner and step up over whichever is there; the
-// property is cleared when the overlay goes away, and the controls drop back.
-const CORNER_STACK_GAP = 8;
-function measureWmsLegendSpace({ top }) {
-  return window.innerHeight - top + CORNER_STACK_GAP;
-}
-
-// Below this width the card is a large fraction of the map it is drawn over,
-// so it stands down to a button and opens only when asked.
-//
-// It used to be the top bar's doing: the card held the top-left corner, the
-// centered bar reached over it below about 1200px, and standing down was how
-// the card got out of the way without being pushed around. The card holds the
-// bottom-right corner now, which nothing else reaches, so what is left is the
-// plain question of how much of a small screen a colorbar should take — which
-// is the app's own phone breakpoint, and not a number of this card's own.
+// On a phone the colorbar would be a large fraction of the map it keys, so in
+// the map card it stands down to a button naming the variable and opens only
+// when asked.
 const COMPACT_QUERY = MOBILE_QUERY;
 
-// Card shown while a griddap WMS overlay is active: the colorbar, the variable
-// picker over it, and the overlay's always-available off switch. It renders
-// either inside the dataset page (`inline`) or, when that page isn't open,
-// pinned to the bottom-right corner of the map (`floating`).
+// Shown while a griddap WMS overlay is active: the colorbar, the variable picker
+// over it, and the slice controls. It renders inside the dataset page
+// (`inline`, with the overlay's off switch) or, while that page is minimized,
+// inside the map card that stands in for it (`card`, see DatasetMapCard).
 //
 // The card carries no caption of its own. ERDDAP draws one into the legend
 // image — the variable and its units, the dataset title, and the slice being
@@ -56,24 +40,15 @@ export default function WmsLegend({
   overlay,
   onClose,
   setActiveWmsOverlay,
-  variant = "floating",
+  variant = "inline",
 }) {
   const { t } = useTranslation();
   const [legendFailed, setLegendFailed] = useState(false);
 
-  // Only the floating card is drawn over the map; the inline one is inside the
+  // Only the map card is drawn over the map; the inline one is inside the
   // dataset page and always has its own room.
-  const isCompact = useMediaQuery(COMPACT_QUERY) && variant === "floating";
+  const isCompact = useMediaQuery(COMPACT_QUERY) && variant === "card";
   const [compactOpen, setCompactOpen] = useState(false);
-
-  // Attached to whichever of the two the floating variant is showing, and to
-  // neither when this card is inline — nothing in the map's corner then.
-  const cornerRef = useRef(null);
-  usePublishedFootprint(
-    cornerRef,
-    "--cioos-wms-legend-space",
-    measureWmsLegendSpace,
-  );
 
   const variables = overlay.variables || [];
 
@@ -115,7 +90,6 @@ export default function WmsLegend({
       <button
         type="button"
         className="wmsLegendPeek"
-        ref={cornerRef}
         onClick={() => setCompactOpen(true)}
         title={t("wmsLegendShowTitle")}
       >
@@ -130,16 +104,13 @@ export default function WmsLegend({
   }
 
   return (
-    <div
-      className={classNames("wmsLegend", variant, { compactOpen: isCompact })}
-      ref={variant === "floating" ? cornerRef : undefined}
-    >
+    <div className={classNames("wmsLegend", variant)}>
       {/* One row above the image, holding the two controls: what is drawn, and
-          the way out. It sits above rather than over the image because the top
+          (on the page) the way out. It sits above rather than over the image because the top
           of the image is the colorbar, edge to edge, with no corner to cover
           without covering a reading. A dataset serving one variable has
           nothing to pick, and the image has already named it — then the row is
-          the close button alone. */}
+          whatever is left of the other two, or nothing. */}
       <div className="wmsLegendHeader">
         {variables.length > 1 && (
           <DropdownButton
@@ -174,7 +145,9 @@ export default function WmsLegend({
             icon={ChevronUp}
           />
         )}
-        <CloseButton label={t("wmsLegendCloseTitle")} onClick={onClose} />
+        {onClose && (
+          <CloseButton label={t("wmsLegendCloseTitle")} onClick={onClose} />
+        )}
       </div>
       {legendUrl && !legendFailed ? (
         <a

@@ -19,6 +19,12 @@ export function readBaseline() {
 }
 
 export async function scan(page) {
+  // A colour caught mid-transition is a different contrast ratio, so a slower
+  // runner counted a different number of nodes than the one that recorded.
+  await page.addStyleTag({
+    content:
+      "*,*::before,*::after{animation:none!important;transition:none!important}",
+  });
   return (
     new AxeBuilder({ page })
       .withTags(A11Y_TAGS)

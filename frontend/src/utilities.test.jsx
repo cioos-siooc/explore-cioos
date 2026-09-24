@@ -4,6 +4,7 @@ import {
   abbreviateString,
   applyDatasetPKs,
   capitalizeFirstLetter,
+  coverPadding,
   createDataFilterQueryString,
   createSelectionQueryString,
   escapeHtml,
@@ -15,6 +16,7 @@ import {
   quantizeCountRange,
   rangesEqual,
   rangeLevelHasData,
+  revealOffset,
   selectionFromSearchParams,
   splitAtAntimeridian,
   splitTrackRuns,
@@ -526,6 +528,65 @@ describe("track geometry", () => {
     const times = [t0, t0 + 3600e3, t0 + 400 * day, t0 + 400 * day + 3600e3];
     const runs = splitTrackRuns(coords, times);
     expect(runs.length).toBeGreaterThan(1);
+  });
+});
+
+describe("revealing a feature from under the panels", () => {
+  const canvas = { left: 0, top: 0, right: 1366, bottom: 768 };
+
+  it("gives the left column the left edge", () => {
+    const sidebar = { left: 12, top: 12, right: 432, bottom: 756 };
+    expect(coverPadding(canvas, [sidebar])).toEqual({
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 432,
+    });
+  });
+
+  it("gives a phone's bottom sheet the bottom edge", () => {
+    const phone = { left: 0, top: 0, right: 390, bottom: 844 };
+    const sheet = { left: 0, top: 422, right: 390, bottom: 844 };
+    expect(coverPadding(phone, [sheet])).toEqual({
+      top: 0,
+      right: 0,
+      bottom: 422,
+      left: 0,
+    });
+  });
+
+  it("keeps the widest inset when two panels share an edge", () => {
+    const card = { left: 12, top: 400, right: 432, bottom: 756 };
+    const miniCard = { left: 12, top: 80, right: 300, bottom: 200 };
+    expect(coverPadding(canvas, [card, miniCard]).left).toBe(432);
+  });
+
+  it("ignores a panel parked off the canvas", () => {
+    const parked = { left: -450, top: 12, right: -30, bottom: 756 };
+    expect(coverPadding(canvas, [parked])).toEqual({
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    });
+  });
+
+  const free = { left: 432, top: 0, right: 1366, bottom: 768 };
+
+  it("does not pan a box already clear of the panel", () => {
+    const box = { left: 600, top: 300, right: 620, bottom: 320 };
+    expect(revealOffset(box, free, 24)).toEqual([0, 0]);
+  });
+
+  it("pans just far enough to clear the panel", () => {
+    const box = { left: 200, top: 750, right: 220, bottom: 770 };
+    // panBy moves the camera, so the content travels the opposite way.
+    expect(revealOffset(box, free, 24)).toEqual([-256, 26]);
+  });
+
+  it("gives up on a box too big to fit beside the panel", () => {
+    const box = { left: 100, top: 100, right: 1300, bottom: 300 };
+    expect(revealOffset(box, free, 24)).toBeNull();
   });
 });
 

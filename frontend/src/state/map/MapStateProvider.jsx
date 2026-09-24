@@ -208,6 +208,10 @@ export default function MapStateProvider({ children }) {
   // nonce lets the same mode be re-requested (picking "Bounding box" again
   // after cancelling out of it).
   const [drawRequest, setDrawRequest] = useState();
+  // One-shot "open the what's here card for this point" request for the Map,
+  // for a caller with no click to give it (the tips tour). Answered once the
+  // map has settled, so a camera move requested alongside it lands first.
+  const [featureQueryRequest, setFeatureQueryRequest] = useState();
   // A share link can carry ?dataset=… with no lat/lon/zoom (the user only
   // meant to point at the dataset, not a specific camera). SelectionProvider
   // consumes this once the dataset resolves, framing its footprint instead of
@@ -253,12 +257,18 @@ export default function MapStateProvider({ children }) {
   // Both are stable for the life of the provider — they only call setters — so
   // consumers can list them in a dependency array without re-running on every
   // render of this provider.
-  const zoomToGeometry = useCallback((geometry) => {
-    if (geometry) setZoomTarget({ geometry, nonce: Date.now() });
+  // `camera` overrides the zoom-to-dataset framing (see zoomToDatasetCamera),
+  // for a caller that needs to land closer in than a dataset's footprint does.
+  const zoomToGeometry = useCallback((geometry, camera) => {
+    if (geometry) setZoomTarget({ geometry, camera, nonce: Date.now() });
   }, []);
 
   const requestDraw = useCallback((mode) => {
     setDrawRequest({ mode, nonce: Date.now() });
+  }, []);
+
+  const requestFeatureQueryAt = useCallback((lngLat) => {
+    setFeatureQueryRequest({ lngLat, nonce: Date.now() });
   }, []);
 
   // Tracks mode (trajectory track lines + time scrub bar) and the data-type
@@ -541,6 +551,8 @@ export default function MapStateProvider({ children }) {
     zoomToGeometry,
     drawRequest,
     requestDraw,
+    featureQueryRequest,
+    requestFeatureQueryAt,
     pendingDatasetZoom,
     setPendingDatasetZoom,
     mapInstance,

@@ -1,244 +1,361 @@
 import * as React from "react";
-import { useState } from "react";
-import Modal from "../../ui/Modal.jsx";
+import { useEffect, useState } from "react";
+import {
+  ArrowRight,
+  BarChartLine,
+  Bezier2,
+  Download,
+  GeoAlt,
+  GlobeAmericas,
+  Grid3x3Gap,
+  InfoCircle,
+  Lightbulb,
+  Search,
+  Water,
+} from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
+import CioosLogo from "../../ui/CioosLogo.jsx";
+import Modal from "../../ui/Modal.jsx";
+import Switch from "../../ui/Switch.jsx";
 import FeedbackButton from "../FeedbackButton/FeedbackButton.jsx";
-
-import polygonImage from "../../Images/polygonIcon.png";
-import rectangleImage from "../../Images/rectangleIcon.png";
+import TipText from "../Tips/TipText.jsx";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { MARKER_MIN_ZOOM } from "../../config.js";
+import useMediaQuery from "../../../state/ui/useMediaQuery.js";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
+import {
+  findTrajectory,
+  showGridded,
+  showNonna,
+  showTrajectory,
+} from "../../../state/tips/scenes.js";
 import "./styles.css";
+
+// What the tool is for, in the order a newcomer meets it: find data on the
+// map, narrow it down, take it away. Each card leads with the glyph of the
+// control that does it.
+const FEATURES = [
+  { key: "explore", Icon: GlobeAmericas },
+  { key: "search", Icon: Search },
+  { key: "download", Icon: Download },
+];
+
+// The Gulf of St. Lawrence, thick with profile and time-series stations. A
+// point frames at exactly the camera's maxZoom, just past the zoom where hexes
+// give way to markers.
+const STATIONS_SHOWCASE_CENTRE = {
+  type: "Point",
+  coordinates: [-63.914, 49.038],
+};
+const STATIONS_SHOWCASE_ZOOM = MARKER_MIN_ZOOM + 0.8;
+
+// A few of the app's views, one click away from the intro: each closes the
+// dialog and sets the app up the way a user would have, using the same
+// actions the controls do. One whose data isn't in the catalogue (no gridded
+// dataset with a WMS server, nothing downloadable) is left out.
+function useShowcases(close) {
+  const {
+    pointsData,
+    pointsToReview,
+    setInspectDataset,
+    handleSelectDataset,
+    selectTrajectoryFromMap,
+  } = useSelection();
+  const { zoomToGeometry, setBathymetryVisible } = useMapState();
+  const { setShowDownloadModal, setShowCoverageModal } = useUI();
+
+  const gridded = pointsData.find((dataset) => dataset.wms_url);
+  const trajectory = findTrajectory(pointsData);
+  const downloadable = pointsData.find(
+    (dataset) => dataset.cdm_data_type !== "Grid",
+  );
+
+  return [
+    gridded && {
+      key: "wms",
+      Icon: Grid3x3Gap,
+      run: () => showGridded(gridded, { setInspectDataset, zoomToGeometry }),
+    },
+    trajectory && {
+      key: "trajectory",
+      Icon: Bezier2,
+      run: () =>
+        showTrajectory(trajectory, {
+          selectTrajectoryFromMap,
+          setInspectDataset,
+          zoomToGeometry,
+        }),
+    },
+    {
+      key: "stations",
+      Icon: GeoAlt,
+      run: () =>
+        zoomToGeometry(STATIONS_SHOWCASE_CENTRE, {
+          maxZoom: STATIONS_SHOWCASE_ZOOM,
+        }),
+    },
+    {
+      key: "coverage",
+      Icon: BarChartLine,
+      run: () => setShowCoverageModal(true),
+    },
+    downloadable && {
+      key: "download",
+      Icon: Download,
+      run: () => {
+        if (!pointsToReview?.length) handleSelectDataset(downloadable);
+        setShowDownloadModal(true);
+      },
+    },
+    {
+      key: "nonna",
+      Icon: Water,
+      run: () => showNonna({ setBathymetryVisible, zoomToGeometry }),
+    },
+  ]
+    .filter(Boolean)
+    .map((showcase) => ({
+      ...showcase,
+      run: () => {
+        close();
+        showcase.run();
+      },
+    }));
+}
+
+const COUNT_UP_MS = 900;
+
+// Counts up to `target` once it is known, so the catalogue's size reads as a
+// live figure rather than copy. Lands on it at once when motion is reduced.
+function useCountUp(target) {
+  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!target || reduced) return undefined;
+    let frame;
+    const start = performance.now();
+    const step = (now) => {
+      const progress = Math.min((now - start) / COUNT_UP_MS, 1);
+      // Ease out, so the last digits settle rather than stop dead.
+      setValue(Math.round(target * (1 - (1 - progress) ** 3)));
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, reduced]);
+  return reduced ? target : value;
+}
+
+function Stat({ value, label, language }) {
+  const shown = useCountUp(value);
+  if (!value) return null;
+  return (
+    <li className="introStat">
+      <span className="introStatValue">{shown.toLocaleString(language)}</span>
+      <span className="introStatLabel">{label}</span>
+    </li>
+  );
+}
 
 export default function IntroModal({ showModal, setShowModal }) {
   const { t, i18n } = useTranslation();
-  const [hoveredStep, setHoveredStep] = useState();
-  // Potential idea for cut through transparency to highligh controls: https://ishadeed.com/article/thinking-about-the-cut-out-effect/
-
-  function generateInfo() {
-    switch (hoveredStep) {
-      case "filter":
-        return (
-          <div className="stepInfo">
-            {t("stepInfoFilter")}
-            <div className="stepInfoContent">{t("stepInfoFilterText")}</div>
-          </div>
-        );
-      case "select":
-        return (
-          <div className="stepInfo">
-            {t("stepInfoSelect")}
-            <div className="stepInfoContent">
-              {t("stepInfoSelectTextA")}
-              {/* There are four ways to select data: */}
-              <ul>
-                <li>
-                  <button
-                    style={{
-                      height: "42px",
-                      borderRadius: "4px",
-                      border: "0px",
-                      boxShadow: "0 0 0 2px rgb(0 0 0 / 10%)",
-                      backgroundColor: "#fff",
-                      padding: "5px",
-                      width: "42px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "inline",
-                        backgroundImage: `url(${rectangleImage})`,
-                        backgroundRepeat: "no-repeat",
-                        backgroundSize: "30px 30px",
-                        backgroundPositionX: "0px",
-                        backgroundPositionY: "-5px",
-                        borderRadius: "0px",
-                        height: "42px",
-                        width: "42px",
-                        paddingLeft: "42px",
-                      }}
-                    />
-                  </button>
-                  {"  "}
-                  {t("stepInfoSelectTextB")}
-                  {/* Creating a rectangle at any zoom level:
-                  Click and hold shift while dragging the cursor at any zoom level or use the rectangle tool (insert icon).
-                  With the tool selected, click on the map to start drawing the rectangle.
-                  Drag to the opposing corner and click again.
-                  Note that you can only have one rectangle selection active at a time. */}
-                </li>
-                <li>
-                  <button
-                    style={{
-                      height: "42px",
-                      borderRadius: "4px",
-                      border: "0px",
-                      boxShadow: "0 0 0 2px rgb(0 0 0 / 10%)",
-                      backgroundColor: "#fff",
-                      padding: "5px",
-                      width: "42px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "inline",
-                        backgroundImage: `url(${polygonImage})`,
-                        backgroundRepeat: "no-repeat",
-                        backgroundSize: "30px 28px",
-                        backgroundPositionX: "0px",
-                        backgroundPositionY: "-5px",
-                        borderRadius: "0px",
-                        height: "42px",
-                        width: "42px",
-                        paddingLeft: "42px",
-                      }}
-                    />
-                  </button>
-                  {"  "}
-                  {t("stepInfoSelectTextC")}
-                  {/* Creating a polygon at any zoom level:
-                  For an irregular shape use the polygon tool (insert icon).
-                  With the tool selected, click on the map to start drawing the polygon.
-                  When you\'ve finished drawing the search area, finish your search area by clicking on the first point again. */}
-                </li>
-                <li>
-                  {t("stepInfoSelectTextD")}
-                  {/* Selecting points at the points zoom level:
-                  At the points zoom level, click to directly select. */}
-                </li>
-              </ul>
-            </div>
-          </div>
-        );
-      case "inspect":
-        return (
-          <div className="stepInfo">
-            {t("stepInfoInspect")}
-            <div className="stepInfoContent">
-              {t("stepInfoInspectText")}
-
-              {/* <Trans i18nKey="stepInfoInspectText" >
-                After making a selection, a summary of the selected dataset(s) will appear in a panel to the left.
-                Click the table headers to sort results alphabetically by title, type of dataset, or numerically by number of records and estimated size.
-                You can view each dataset in more detail by clicking the arrow button next to the estimated dataset size.
-                <i> Note: Only selected datasets will be available to download.</i>
-              </Trans> */}
-            </div>
-          </div>
-        );
-      case "download":
-        return (
-          <div className="stepInfo">
-            {t("stepInfoDownload")}
-            <div className="stepInfoContent">
-              {t("stepInfoDownloadText")}
-              {/* To download the data, click the Download link at the bottom of the panel or top of the page.
-              This page allows the user to confirm their data order by verifying dataset titles, records, the size of the download, and inspect dataset details.
-              Enter your email address and submit to confirm your order.
-              An email providing the direct download link will be sent shortly.
-              <i> Note: Filters that have been applied in the search will also be applied to the data download. A 100MB size limit applies to all orders; downloads that are more than 100MB will be cut off at 100MB. Check the bar at the bottom of the panel to verify the order does not exceed the maximum. If the size is over 100MB, please submit multiple orders of smaller sizes.</i> */}
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="tipInfo">
-            <p>{t("introModalWelcomeMessage")}</p>
-            <p>
-              <FeedbackButton className="feedbackButton" size={30} />
-              {t("tipInfoFeedback")}
-              {/* Click the chat button to send us feedback — it helps improve this interface and find bugs. */}
-            </p>
-            <p>
-              <img className="infoButtonImage" />
-              {t("tipInfoReopen")}
-              {/* Click the info button to reopen this information panel. */}
-            </p>
-          </div>
-        );
-    }
-  }
+  const { setShowSelectionHelpModal } = useUI();
+  const { tipsEnabled, setTipsEnabled, startTour } = useTips();
+  const {
+    totalNumberOfDatasets,
+    erddapServersSelected,
+    orgsSelected,
+    obisDataAvailable,
+  } = useFilters();
+  const [tipIndex, setTipIndex] = useState(0);
+  const close = () => setShowModal(false);
+  const showcases = useShowcases(close);
 
   return (
-    <div>
-      <Modal
-        show={showModal}
-        size="xl"
-        centered
-        aria-labelledby="contained-modal-title-vcenter"
-        onHide={() => setShowModal(false)}
-        scrollable
-        className="introModal"
-        fullscreen="lg-down"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title
-            className="modalHeader"
-            id="contained-modal-title-vcenter"
+    <Modal
+      show={showModal}
+      size="xl"
+      centered
+      aria-labelledby="introModalTitle"
+      onHide={close}
+      scrollable
+      className="introModal"
+      fullscreen="lg-down"
+    >
+      <Modal.Header closeButton>
+        <a
+          className="introBrand"
+          href={
+            i18n.language === "fr" ? "https://siooc.ca/" : "https://cioos.ca/"
+          }
+          target="_blank"
+          rel="noreferrer"
+          title={t("CIOOSLogoButtonTitle")}
+        >
+          <CioosLogo />
+        </a>
+        <Modal.Title className="introTitle" id="introModalTitle">
+          <span className="introEyebrow">{t("dockIntroButtonTitle")}</span>
+          <span className="introTitleName">{t("CIOOSDataExplorer")}</span>
+          <span className="tagLine">{t("CIOOSQuote")}</span>
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <section className="introHero">
+          <svg
+            className="introHeroWaves"
+            viewBox="0 0 1200 120"
+            preserveAspectRatio="none"
+            aria-hidden="true"
           >
-            <span>
-              {t("CIOOSDataExplorer") + " "}
-              {/* CIOOS Data Explorer */}
-            </span>
-            <span className="tagLine">
-              {t("CIOOSQuote")}
-              {/* "Ocean Data For Our Ocean Future" */}
-            </span>
-            {i18n.language === "en" ? (
-              <a
-                title={t("CIOOSLogoButtonTitle")}
-                className="introLogo english"
-                href="https://cioos.ca/"
-                target="_blank"
-                rel="noreferrer"
-              />
-            ) : (
-              <a
-                title={t("CIOOSLogoButtonTitle")}
-                className="introLogo french"
-                href="https://cioos.ca/"
-                target="_blank"
-                rel="noreferrer"
-              />
-            )}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="container-fluid">
-            <div className="row" style={{ marginBottom: "5px" }}>
-              {t("tipInfoHoverHelpHeading")}
+            <path d="M0 60 C200 20 400 100 600 60 S1000 20 1200 60 V120 H0Z" />
+            <path d="M0 80 C200 40 400 120 600 80 S1000 40 1200 80 V120 H0Z" />
+          </svg>
+          <div className="introHeroCopy">
+            <h2 className="introHeroTitle">{t("introHeroTitle")}</h2>
+            <p className="introHeroText">{t("introHeroText")}</p>
+            <div className="introHeroActions">
+              <button type="button" className="introCta" onClick={close}>
+                {t("introHeroCta")}
+              </button>
+              <span className="introSources">
+                <span className="introSource">ERDDAP™</span>
+                {obisDataAvailable && <span className="introSource">OBIS</span>}
+              </span>
             </div>
-            <div className="row">
-              <div className="steps" onMouseOut={() => setHoveredStep()}>
-                <div
-                  className={`stepImage filterStep ${i18n.language}`}
-                  onMouseOver={() => setHoveredStep("filter")}
-                >
-                  {t("stepInfoFilter")}
-                </div>
-                <div
-                  className={`stepImage selectStep ${i18n.language}`}
-                  onMouseOver={() => setHoveredStep("select")}
-                >
-                  {t("stepInfoSelect")}
-                </div>
-                <div
-                  className={`stepImage inspectStep ${i18n.language}`}
-                  onMouseOver={() => setHoveredStep("inspect")}
-                >
-                  {t("stepInfoInspect")}
-                </div>
-                <div
-                  className={`stepImage downloadStep ${i18n.language}`}
-                  onMouseOver={() => setHoveredStep("download")}
-                >
-                  {t("stepInfoDownload")}
-                </div>
-              </div>
-            </div>
-            <div className="row infoBox">{generateInfo()}</div>
           </div>
-        </Modal.Body>
-      </Modal>
-    </div>
+          <ul className="introStats" aria-label={t("introStatsLabel")}>
+            <Stat
+              value={totalNumberOfDatasets}
+              label={t("introStatDatasets")}
+              language={i18n.language}
+            />
+            <Stat
+              value={erddapServersSelected?.length}
+              label={t("introStatServers")}
+              language={i18n.language}
+            />
+            <Stat
+              value={orgsSelected?.length}
+              label={t("introStatOrganizations")}
+              language={i18n.language}
+            />
+          </ul>
+        </section>
+
+        <ul className="introFeatures">
+          {FEATURES.map(({ key, Icon }, index) => (
+            <li
+              key={key}
+              className="introFeature"
+              style={{ "--intro-feature-index": index }}
+            >
+              <span className="introFeatureIcon" aria-hidden="true">
+                <Icon size={22} />
+              </span>
+              <h3>{t(`introFeature_${key}_title`)}</h3>
+              <p>{t(`introFeature_${key}_body`)}</p>
+              {key === "download" && (
+                <button
+                  type="button"
+                  className="introLink"
+                  onClick={() => setShowSelectionHelpModal(true)}
+                >
+                  {t("sidebarSelectionHintMoreText")}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <h2 className="introHeading">{t("introShowcasesHeading")}</h2>
+        <ul className="introShowcases">
+          {showcases.map(({ key, Icon, run }) => (
+            <li key={key}>
+              <button type="button" className="introShowcase" onClick={run}>
+                <span className="introShowcaseIcon" aria-hidden="true">
+                  <Icon size={20} />
+                </span>
+                <span className="introShowcaseText">
+                  <span className="introShowcaseTitle">
+                    {t(`introShowcase_${key}_title`)}
+                  </span>
+                  <span className="introShowcaseBody">
+                    {t(`introShowcase_${key}_body`)}
+                  </span>
+                </span>
+                <ArrowRight
+                  className="introShowcaseArrow"
+                  size={18}
+                  aria-hidden="true"
+                />
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <footer className="introFooter">
+          <section className="introTip" data-testid="intro-tip">
+            <h2 className="introTipHeading">
+              <Lightbulb size={16} aria-hidden="true" /> {t("tipsHeading")}
+            </h2>
+            {/* Closes the dialog and pages through the tips on the map, each
+                pointing at the control it is about (see startTour). */}
+            <button
+              type="button"
+              key={tipIndex}
+              className="introTipShow"
+              title={t("tipShowMe")}
+              onClick={() => {
+                close();
+                startTour(TIPS[tipIndex]);
+              }}
+            >
+              <TipText tip={TIPS[tipIndex]} />
+              <span className="introTipShowLabel">
+                {t("tipShowMe")}
+                <ArrowRight size={14} aria-hidden="true" />
+              </span>
+            </button>
+            <div className="introTipNav">
+              <span className="introTipCount">
+                {t("tipCounter", { n: tipIndex + 1, total: TIPS.length })}
+              </span>
+              <button
+                type="button"
+                className="introLink"
+                onClick={() => setTipIndex((tipIndex + 1) % TIPS.length)}
+              >
+                {t("tipNext")}
+              </button>
+            </div>
+          </section>
+          <div className="introFooterLinks">
+            <p>
+              <FeedbackButton className="feedbackButton" size={24} />
+              {t("tipInfoFeedback")}
+            </p>
+            <p>
+              <InfoCircle
+                className="introFooterIcon"
+                size={20}
+                aria-hidden="true"
+              />
+              {t("introReopenText")}
+            </p>
+            <Switch
+              id="introTipsToggle"
+              label={t("tipsToggleLabel")}
+              checked={tipsEnabled}
+              onChange={() => setTipsEnabled(!tipsEnabled)}
+            />
+          </div>
+        </footer>
+      </Modal.Body>
+    </Modal>
   );
 }

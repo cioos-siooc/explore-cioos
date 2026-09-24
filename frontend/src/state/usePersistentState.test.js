@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 
-import { useUrlSeededPersistentState } from "./usePersistentState.js";
+import {
+  usePersistentState,
+  useUrlSeededPersistentState,
+} from "./usePersistentState.js";
 
 const parseBool = (raw) => raw === "true";
 
@@ -79,5 +82,24 @@ describe("useUrlSeededPersistentState", () => {
     expect(result.current[0]).toBe(false);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe("usePersistentState", () => {
+  it("reads the stored value, ignoring the URL", () => {
+    window.history.replaceState({}, "", "/?tipsEnabled=true");
+    window.localStorage.setItem("cde.tipsEnabled", JSON.stringify(false));
+    const { result } = renderHook(() =>
+      usePersistentState("tipsEnabled", true),
+    );
+    expect(result.current[0]).toBe(false);
+  });
+
+  it("persists what it is set to", () => {
+    const { result } = renderHook(() => usePersistentState("seenTips", []));
+    act(() => result.current[1](["shareLink"]));
+    expect(JSON.parse(window.localStorage.getItem("cde.seenTips"))).toEqual([
+      "shareLink",
+    ]);
   });
 });

@@ -55,6 +55,20 @@ describe("UrlSync", () => {
     await waitFor(() => expect(params().has("search")).toBe(false));
   });
 
+  it("writes the list search into ?listSearch=, and drops it when cleared", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+
+    act(() => hooks.selection.setListSearchText("orca"));
+    await waitFor(() => expect(params().get("listSearch")).toBe("orca"));
+    expect(params().has("search")).toBe(false);
+
+    act(() => hooks.selection.setListSearchText(""));
+    await waitFor(() => expect(params().has("listSearch")).toBe(false));
+  });
+
   it("keeps the search's dataset list out of the link — only the expression", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
     // The results themselves, not `ready`: this is the one test here that

@@ -72,8 +72,7 @@ test("names every quick filter under its button, and still fits the width", asyn
   const row = page.getByTestId("quick-filters");
   for (const [testId, caption] of [
     ["quick-filter-search", "Search"],
-    ["quick-filter-box", "Box"],
-    ["quick-filter-polygon", "Polygon"],
+    ["quick-filter-area", "Area"],
     ["quick-filter-in-view", "In view"],
     ["quick-filter-realtime", "Real-time"],
   ]) {

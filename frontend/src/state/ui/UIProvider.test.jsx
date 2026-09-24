@@ -10,6 +10,7 @@ import {
   TABLET_WIDTH,
   setViewportWidth,
 } from "../../test/viewport.js";
+import { useSelection } from "../selection/SelectionProvider.jsx";
 import { useUI } from "./UIProvider.jsx";
 
 // Reports the sidebar's state and offers the two ways it changes, so the rules
@@ -77,6 +78,55 @@ describe("the datasets sidebar default", () => {
 
     act(() => setViewportWidth(TABLET_WIDTH));
     act(() => setViewportWidth(DESKTOP_WIDTH));
+    expect(state()).toBe("closed");
+  });
+});
+
+describe("revealing the sidebar for a drawn shape", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
+  const RING = [
+    [-64, 44],
+    [-63, 44],
+    [-63, 45],
+    [-64, 45],
+    [-64, 44],
+  ];
+
+  function DrawProbe() {
+    const { setPolygon } = useSelection();
+    return (
+      <>
+        <SidebarProbe />
+        <button type="button" onClick={() => setPolygon(RING)}>
+          draw
+        </button>
+      </>
+    );
+  }
+
+  it("reopens a closed list on a wide screen", async () => {
+    setViewportWidth(DESKTOP_WIDTH);
+    const { user } = renderWithProviders(<DrawProbe />, { providers: "app" });
+    await waitFor(() => expect(state()).toBe("open"));
+    await user.click(screen.getByRole("button", { name: "toggle" }));
+
+    await user.click(screen.getByRole("button", { name: "draw" }));
+    expect(state()).toBe("open");
+  });
+
+  it.each([
+    ["tablet", TABLET_WIDTH],
+    ["phone", MOBILE_WIDTH],
+  ])("leaves the list closed on a %s", async (_, width) => {
+    // The list would cover the shape just drawn.
+    setViewportWidth(width);
+    const { user } = renderWithProviders(<DrawProbe />, { providers: "app" });
+    await waitFor(() => expect(state()).toBe("closed"));
+
+    await user.click(screen.getByRole("button", { name: "draw" }));
     expect(state()).toBe("closed");
   });
 });

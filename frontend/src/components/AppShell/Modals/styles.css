@@ -342,6 +342,16 @@
   }
 }
 
+/* Phones: the text around the figure steps back down from theme.css's phone
+   sizes so the chart keeps as much of the small screen as it can. */
+@media (max-width: 700px) {
+  .coverageModal {
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
+  }
+}
+
 /* Both modals host panels that manage their own scrolling; the body is the
    positioned, non-padded frame they fill. */
 .filtersModal .modal-body,
@@ -374,6 +384,22 @@
     max-width: 100vw;
     min-height: 100dvh;
     margin: 0;
+  }
+
+  /* Same phone type scale as the datasets sheet (Sidebar/styles.css), so the
+     two full-screen surfaces read alike. The font-size re-applies the base
+     here: text without its own size inherits body's, which was computed from
+     the phone base before these tokens were overridden. */
+  .filtersModal {
+    font-size: var(--cioos-font-size-base);
+
+    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-2xs: 10px;
+    --cioos-font-size-xs: 11px;
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-base: 13px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
   }
 
   .filtersModal .modal-content,

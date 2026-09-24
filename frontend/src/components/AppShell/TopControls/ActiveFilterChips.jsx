@@ -1,9 +1,10 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import useActiveFilters from "../../../state/useActiveFilters.js";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 // How many values a group shows before folding the rest behind a "+N" chip —
 // short enough that a group's own values stay on the one row its label pill
@@ -27,6 +28,11 @@ const MAX_VISIBLE_VALUES = 2;
 export default function ActiveFilterChips() {
   const { t } = useTranslation();
   const activeFilters = useActiveFilters();
+  const { offerTip } = useTips();
+  const filtering = activeFilters.length > 0;
+  useEffect(() => {
+    if (filtering) offerTip("shareLink");
+  }, [filtering, offerTip]);
 
   // Which groups currently show every value rather than the folded MAX_VISIBLE_VALUES —
   // toggled by the button at the end of the group's own row, so opening one

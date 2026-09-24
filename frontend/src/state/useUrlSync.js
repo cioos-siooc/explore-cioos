@@ -62,11 +62,13 @@ export default function UrlSync() {
   const {
     polygon,
     datasetTitleSearchText,
+    listSearchText,
     onlyInView,
     groupBy,
     hiddenGroups,
     highlightedRecord,
     selectedTrajectory,
+    mappedRecord,
   } = useSelection();
   const [isPageLoad, setIsPageLoad] = useState(true);
 
@@ -96,6 +98,7 @@ export default function UrlSync() {
       ...Object.fromEntries(selectionParams),
       lang,
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
+      ...(listSearchText ? { listSearch: listSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
@@ -118,12 +121,14 @@ export default function UrlSync() {
       // The rest is derived from state rather than preserved, and is likewise
       // keyed to the ?dataset= above and gone with it: which slice of a griddap
       // overlay is drawn, and which subset of the dataset is highlighted — the
-      // record a marker click pinned, or the platform whose track is on the map.
+      // record a marker click pinned, the platform whose track is on the map, or
+      // the record "Show on map" rings.
       // Note these are the HIGHLIGHT, distinct from the ?preview= above: they
       // point a row out on the dataset page without opening its plot.
       ...(activeWmsOverlay ? wmsSliceParams(activeWmsOverlay) : {}),
       ...(highlightedRecord ? { record: highlightedRecord.profileId } : {}),
       ...(selectedTrajectory ? { track: selectedTrajectory.trajectoryId } : {}),
+      ...(mappedRecord ? { onMap: mappedRecord.recordId } : {}),
       // Where the "what's here" card was opened. The card's contents are
       // whatever is drawn under that point, so the point is the whole of it —
       // Map asks the question again on load. Six decimals is ~0.1 m, well
@@ -169,6 +174,7 @@ export default function UrlSync() {
     mapView,
     polygon,
     datasetTitleSearchText,
+    listSearchText,
     onlyInView,
     groupBy,
     hiddenGroupsParam,
@@ -185,6 +191,7 @@ export default function UrlSync() {
     featureQuery,
     highlightedRecord,
     selectedTrajectory,
+    mappedRecord,
   ]);
 
   // `i18n` deliberately excluded from the deps, despite reading it in the

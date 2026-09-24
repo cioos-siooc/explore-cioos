@@ -3,6 +3,11 @@
   min-width: 50%;
 }
 
+.datasetPreviewFilter {
+  display: flex;
+  margin: 6px 0;
+}
+
 /* .datasetPreviewTable.top-scrollbars {
   transform: rotateX(180deg);
 }

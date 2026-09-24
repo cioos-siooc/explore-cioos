@@ -38,14 +38,24 @@ function persist(key, value) {
 // read 'false'/'true', and the projection maps `globe=true` onto its two named
 // values. So the link says what the user sees rather than naming internal
 // state, and a junk param lands on the default instead of somewhere unexpected.
-//
-// There was a plain localStorage-only variant of this alongside it. Every
-// preference the map has is shareable now, so it had no callers left.
 export function useUrlSeededPersistentState(key, param, defaultValue, parse) {
   const [value, setValue] = useState(() => {
     const raw = new URL(window.location.href).searchParams.get(param);
     return raw === null ? read(key, defaultValue) : parse(raw);
   });
+
+  useEffect(() => {
+    persist(key, value);
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
+// For the preferences that describe the viewer rather than the map (which tips
+// they have already seen, whether they want tips at all), so a share link has
+// no business carrying them.
+export function usePersistentState(key, defaultValue) {
+  const [value, setValue] = useState(() => read(key, defaultValue));
 
   useEffect(() => {
     persist(key, value);
