@@ -29,9 +29,9 @@ import "./styles.css";
 // back and the surface in view: the card hosts two different surfaces, and the
 // header is what tells them apart.
 // The list's way out is the app's one close button, in the corner. A dataset
-// page isn't closed from there but minimized to the map (see DatasetMapCard),
-// so its corner says Map instead: an X there read as leaving the dataset while
-// the map stayed keyed to it.
+// page has two: Map minimizes it to a card (see DatasetMapCard), keeping the
+// map keyed to it, and the X leaves the dataset and closes the card, as the
+// minimized card's own X does.
 export default function Sidebar() {
   const { t } = useTranslation();
   const { pointsToReview, inspectDataset, returnToDatasetList } =
@@ -119,6 +119,14 @@ export default function Sidebar() {
               <MapIcon size={14} aria-hidden="true" />
               <span>{t("sidebarShowMapText")}</span>
             </button>
+            <CloseButton
+              label={t("closeDatasetText")}
+              onClick={() => {
+                returnToDatasetList();
+                setSidebarOpen(false);
+              }}
+              testId="sidebar-close-dataset"
+            />
           </div>
         ) : (
           <div className="datasetsHeader">

@@ -93,6 +93,27 @@ describe("AppShell (composition)", () => {
     });
   });
 
+  it("closes a dataset page and the sidebar from the banner's close button", async () => {
+    const user = userEvent.setup();
+    document.cookie = "introModalOpen=false; path=/";
+    renderWithProviders(<AppShell />, {
+      providers: "app",
+      url: `/?dataset=${pointQueryFixture[0].dataset_id}`,
+    });
+    await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
+    await user.click(screen.getByTestId("sidebar-close-dataset"));
+    expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
+      "data-expanded",
+      "false",
+    );
+    await waitFor(() =>
+      expect(
+        new URL(window.location.href).searchParams.get("dataset"),
+      ).toBeNull(),
+    );
+    expect(screen.queryByTestId("dataset-map-card")).toBeNull();
+  });
+
   describe("a minimized dataset page", () => {
     // Collapsing the sidebar on a dataset page used to leave the map keyed to
     // that dataset with no way back to its page: the top bar's Datasets button
