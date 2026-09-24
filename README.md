@@ -88,11 +88,9 @@ startup and again at the start of every flow run, from the first of:
 
 1. `HARVEST_CONFIG_B64` — the whole YAML, base64 on one line
    (`base64 < harvest_config.yaml | tr -d '\n'`). Use this under Coolify.
-2. `HARVEST_CONFIG_YAML` — raw YAML. **Deprecated**: Coolify's env editor mangles
-   multi-line values, which is why the base64 form exists.
-3. `HARVEST_CONFIG_FILE` — path to a mounted file
+2. `HARVEST_CONFIG_FILE` — path to a mounted file
    (`/app/harvester/harvest_config.yaml` in the compose files).
-4. A file mounted at `/app/harvester/harvest_config.yaml`.
+3. A file mounted at `/app/harvester/harvest_config.yaml`.
 
 With none of these — or a value that fails to decode — the worker refuses to
 start rather than harvest the wrong thing.

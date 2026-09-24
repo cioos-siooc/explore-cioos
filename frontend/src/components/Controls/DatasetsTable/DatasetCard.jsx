@@ -1,6 +1,7 @@
 import React from "react";
 import {
   BoxArrowUpRight,
+  CalendarCheck,
   CheckCircleFill,
   CircleFill,
   Clipboard,
@@ -8,6 +9,7 @@ import {
   Download,
   ExclamationTriangleFill,
   Grid3x3Gap,
+  HexagonFill,
   Check2Circle,
   XCircle,
   Server,
@@ -87,28 +89,6 @@ export default function DatasetCard({
       }
     : undefined;
 
-  const platformColor = platformColors.find(
-    (pc) => pc.platform === row.platform,
-  );
-
-  const serverName = formatErddapServerName(
-    row.erddap_server_url || row.erddap_url,
-    i18n.language,
-    erddapServersJSONfile,
-  );
-
-  const typeLabel = isGrid
-    ? t("griddapTypeLabel")
-    : (row.cdm_data_type || "")
-        .replace("TimeSeriesProfile", "Time series / Profile")
-        .replace("TimeSeries", "Time series");
-
-  const locationsLabel = isGrid
-    ? formatGridSize(row.grid_dimensions) || "—"
-    : row.profiles_count !== row.n_profiles
-      ? `${row.profiles_count} / ${row.n_profiles}`
-      : row.profiles_count;
-
   const selectTitle = isGrid
     ? t("griddapNotDownloadableTooltip")
     : t("datasetsTableDownloadModalDatasetCheckboxTooltip");
@@ -163,19 +143,12 @@ export default function DatasetCard({
           {/* The wrapper is the height of the title's first line, so the dot
               stays centered on that line however the title wraps. */}
           <span className="datasetCardPlatform">
-            {isGrid ? (
-              <Grid3x3Gap
-                title={t("griddapTypeLabel")}
-                color="#52a79b"
-                size={13}
-              />
-            ) : (
-              <CircleFill
-                title={t(row.platform)}
-                fill={platformColor?.color || "#000000"}
-                size={13}
-              />
-            )}
+            <DatasetPlatformIcon
+              platform={row.platform}
+              cdmDataType={row.cdm_data_type}
+              sourceType={row.source_type}
+              t={t}
+            />
           </span>
           <span className="datasetCardTitle" title={row.title}>
             {row.title}
@@ -275,42 +248,7 @@ export default function DatasetCard({
           )}
         </div>
 
-        <div className="datasetCardMeta">
-          <span className="datasetCardMetaItem" title="ERDDAP™ Server">
-            <Server size={13} aria-hidden="true" />
-            {serverName}
-          </span>
-          <span
-            className="datasetCardMetaItem"
-            title={t("datasetsTableHeaderTypeText")}
-          >
-            <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
-            {typeLabel}
-          </span>
-          <span
-            className="datasetCardMetaItem"
-            title={
-              isGrid
-                ? t("griddapGridSizeTooltip")
-                : t("datasetsTableHeaderLocationsText")
-            }
-          >
-            <PinMapFill size={13} aria-hidden="true" />
-            {locationsLabel}
-          </span>
-
-          {/* Same "still producing data" signal as the dataset inspector's
-              Last update row — on this row here since it is the card's other
-              home for small dataset-level facts. */}
-          {row.is_realtime && (
-            <span
-              className="datasetCardLive"
-              title={t("datasetRealtimeBadgeTitle")}
-            >
-              {t("datasetRealtimeBadgeText")}
-            </span>
-          )}
-        </div>
+        <DatasetCardMeta row={row} t={t} i18n={i18n} />
 
         {/* Where this dataset lives and how to fetch it, outside the estimates
             branch because none of it depends on them: the one dataset the
@@ -422,5 +360,98 @@ export default function DatasetCard({
         )}
       </div>
     </div>
+  );
+}
+
+// The dataset's glyph, shaped like what the map draws for it: a grid for a
+// gridded footprint, a hexagon for trajectories and OBIS (shown as hex cells),
+// a dot for everything drawn as markers. Coloured by platform.
+export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
+  if (cdmDataType === "Grid") {
+    return (
+      <Grid3x3Gap title={t("griddapTypeLabel")} color="#52a79b" size={13} />
+    );
+  }
+  const Icon =
+    cdmDataType === "Trajectory" || sourceType === "obis"
+      ? HexagonFill
+      : CircleFill;
+  const platformColor = platformColors.find((pc) => pc.platform === platform);
+  return (
+    <Icon
+      title={t(platform)}
+      fill={platformColor?.color || "#000000"}
+      size={13}
+    />
+  );
+}
+
+// The card's second row: where the dataset lives, what kind it is, how many
+// locations and days it holds, and whether it is live. Shared with the map's
+// "what's here" card so a dataset reads the same in both lists.
+export function DatasetCardMeta({ row, t, i18n }) {
+  const isGrid = row.cdm_data_type === "Grid";
+  const serverName = formatErddapServerName(
+    row.erddap_server_url || row.erddap_url,
+    i18n.language,
+    erddapServersJSONfile,
+  );
+  const typeLabel = isGrid
+    ? t("griddapTypeLabel")
+    : (row.cdm_data_type || "")
+        .replace("TimeSeriesProfile", "Time series / Profile")
+        .replace("TimeSeries", "Time series");
+  const locationsLabel = isGrid
+    ? formatGridSize(row.grid_dimensions) || "—"
+    : row.profiles_count !== row.n_profiles
+      ? `${row.profiles_count} / ${row.n_profiles}`
+      : row.profiles_count;
+
+  return (
+    <span className="datasetCardMeta">
+      <span className="datasetCardMetaItem" title="ERDDAP™ Server">
+        <Server size={13} aria-hidden="true" />
+        {serverName}
+      </span>
+      <span
+        className="datasetCardMetaItem"
+        title={t("datasetsTableHeaderTypeText")}
+      >
+        <FileEarmarkSpreadsheet size={13} aria-hidden="true" />
+        {typeLabel}
+      </span>
+      <span
+        className="datasetCardMetaItem"
+        title={
+          isGrid
+            ? t("griddapGridSizeTooltip")
+            : t("datasetsTableHeaderLocationsText")
+        }
+      >
+        <PinMapFill size={13} aria-hidden="true" />
+        {locationsLabel}
+      </span>
+      {row.days != null && (
+        <span
+          className="datasetCardMetaItem"
+          title={t("datasetsCardSortDaysText")}
+        >
+          <CalendarCheck size={13} aria-hidden="true" />
+          {Number(row.days).toLocaleString(i18n.language)}
+        </span>
+      )}
+
+      {/* Same "still producing data" signal as the dataset inspector's
+          Last update row — on this row here since it is the card's other
+          home for small dataset-level facts. */}
+      {row.is_realtime && (
+        <span
+          className="datasetCardLive"
+          title={t("datasetRealtimeBadgeTitle")}
+        >
+          {t("datasetRealtimeBadgeText")}
+        </span>
+      )}
+    </span>
   );
 }

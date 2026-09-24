@@ -106,7 +106,7 @@ export default function DatasetsTable({
   const listRef = useRef(null);
 
   // Sort fields differ by context: the download modal exposes the size and
-  // downloadable status; the sidebar exposes the locations count.
+  // downloadable status; the sidebar exposes the locations and days counts.
   const sortFields = useMemo(() => {
     const base = [
       { id: "title", label: t("datasetsTableHeaderTitleText"), type: "string" },
@@ -132,6 +132,11 @@ export default function DatasetsTable({
       base.push({
         id: "locations",
         label: t("datasetsTableHeaderLocationsText"),
+        type: "number",
+      });
+      base.push({
+        id: "days",
+        label: t("datasetsCardSortDaysText"),
         type: "number",
       });
     }
@@ -162,6 +167,8 @@ export default function DatasetsTable({
           ).toLowerCase();
         case "locations":
           return isGrid ? -1 : Number(row.profiles_count) || 0;
+        case "days":
+          return Number(row.days) || 0;
         case "size":
           return Number(row?.sizeEstimate?.filteredSize) || 0;
         case "downloadable":

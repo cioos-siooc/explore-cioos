@@ -794,7 +794,7 @@ def main(folder, incremental=False):
             # No drop_constraints() step: the backfilled columns are permanently
             # NULL-able and the hex FKs are DEFERRABLE INITIALLY DEFERRED (checked
             # at COMMIT), so nothing needs toggling before the load. See
-            # 7_contraints.sql / validate_loaded_data().
+            # 7_constraints.sql / validate_loaded_data().
             with _timed("remove_all_data", logger):
                 logger.info("Clearing tables")
                 transaction.execute(text("SELECT remove_all_data();"))
@@ -969,6 +969,11 @@ def main(folder, incremental=False):
                 # are validated by the DEFERRABLE constraint at COMMIT.
                 logger.info("Validating loaded data")
                 transaction.execute(text("SELECT validate_loaded_data();"))
+
+        # Both paths: the datasets list reads each dataset's merged day set
+        # from here rather than unioning feature ranges per request.
+        with _timed("refresh_dataset_day_ranges", logger):
+            transaction.execute(text("SELECT refresh_dataset_day_ranges();"))
 
         # Harvest audit: append-only. Same writes in both incremental and
         # full-reload paths since these tables are never truncated.

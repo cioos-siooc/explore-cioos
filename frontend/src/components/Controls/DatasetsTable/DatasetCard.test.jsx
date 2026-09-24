@@ -102,6 +102,35 @@ describe("DatasetCard", () => {
     expect(screen.getByText("3 / 10")).toBeInTheDocument();
   });
 
+  it("shows the dataset's days of data when the query carries them", () => {
+    const { rerender } = render(
+      <DatasetCard row={{ ...ROW, days: 1234 }} t={t} i18n={i18n} />,
+    );
+    expect(screen.getByTitle("datasetsCardSortDaysText")).toHaveTextContent(
+      "1,234",
+    );
+    rerender(<DatasetCard row={{ ...ROW, days: null }} t={t} i18n={i18n} />);
+    expect(
+      screen.queryByTitle("datasetsCardSortDaysText"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("draws trajectories and OBIS as hexagons, like the map's cells", () => {
+    const glyph = (row) => {
+      const { container, unmount } = render(
+        <DatasetCard row={{ ...ROW, ...row }} t={t} i18n={i18n} />,
+      );
+      const cls = container.querySelector(".datasetCardPlatform svg").classList;
+      unmount();
+      return cls;
+    };
+    expect(glyph({ cdm_data_type: "Trajectory" })).toContain("bi-hexagon-fill");
+    expect(
+      glyph({ cdm_data_type: "Occurrence", source_type: "obis" }),
+    ).toContain("bi-hexagon-fill");
+    expect(glyph({})).toContain("bi-circle-fill");
+  });
+
   it("calls onHover/onHoverEnd on mouse enter/leave", async () => {
     const user = userEvent.setup();
     const onHover = vi.fn();
