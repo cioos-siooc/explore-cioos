@@ -7,7 +7,7 @@ import {
   createSelectionQueryString,
 } from "../utilities.jsx";
 import { wmsSliceParams } from "../wmsUtilities.js";
-import { anyTrajectoryLayerOn, dataLayersAreDefault } from "./dataLayers.js";
+import { anyTrajectoryLayerOn, chosenDataLayerKeys } from "./dataLayers.js";
 import { GROUP_NONE } from "./datasetGroups.js";
 import { PLOT_PARAMS, RECORD_PARAM } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
@@ -51,6 +51,7 @@ export default function UrlSync() {
     debouncedScrubTime,
     trailingDays,
     dataLayers,
+    dataLayerChoices,
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,
@@ -61,11 +62,13 @@ export default function UrlSync() {
   const {
     polygon,
     datasetTitleSearchText,
+    listSearchText,
     onlyInView,
     groupBy,
     hiddenGroups,
     highlightedRecord,
     selectedTrajectory,
+    mappedRecord,
   } = useSelection();
   const [isPageLoad, setIsPageLoad] = useState(true);
 
@@ -95,6 +98,7 @@ export default function UrlSync() {
       ...Object.fromEntries(selectionParams),
       lang,
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
+      ...(listSearchText ? { listSearch: listSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
@@ -117,12 +121,14 @@ export default function UrlSync() {
       // The rest is derived from state rather than preserved, and is likewise
       // keyed to the ?dataset= above and gone with it: which slice of a griddap
       // overlay is drawn, and which subset of the dataset is highlighted — the
-      // record a marker click pinned, or the platform whose track is on the map.
+      // record a marker click pinned, the platform whose track is on the map, or
+      // the record "Show on map" rings.
       // Note these are the HIGHLIGHT, distinct from the ?preview= above: they
       // point a row out on the dataset page without opening its plot.
       ...(activeWmsOverlay ? wmsSliceParams(activeWmsOverlay) : {}),
       ...(highlightedRecord ? { record: highlightedRecord.profileId } : {}),
       ...(selectedTrajectory ? { track: selectedTrajectory.trajectoryId } : {}),
+      ...(mappedRecord ? { onMap: mappedRecord.recordId } : {}),
       // Where the "what's here" card was opened. The card's contents are
       // whatever is drawn under that point, so the point is the whole of it —
       // Map asks the question again on load. Six decimals is ~0.1 m, well
@@ -142,13 +148,13 @@ export default function UrlSync() {
       obj.scrubTime = scrubTime;
       if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays;
     }
-    // Data-layer selection persists only when not the default selection.
-    if (!dataLayersAreDefault(dataLayers)) {
-      obj.layers = Object.entries(dataLayers)
-        .filter(([, on]) => on)
-        .map(([key]) => key)
+    // The geometry picks, each list only when it has something in it.
+    const layersChosen = (choice) =>
+      chosenDataLayerKeys(dataLayerChoices)
+        .filter((key) => dataLayerChoices[key] === choice)
         .join(",");
-    }
+    if (layersChosen("include")) obj.layers = layersChosen("include");
+    if (layersChosen("exclude")) obj.excludeLayers = layersChosen("exclude");
     // The legend's layer switches, each recording only its non-default state so
     // an untouched map keeps the short link it had before they were shareable.
     // They are preferences as well (localStorage), and a param in the link wins
@@ -168,6 +174,7 @@ export default function UrlSync() {
     mapView,
     polygon,
     datasetTitleSearchText,
+    listSearchText,
     onlyInView,
     groupBy,
     hiddenGroupsParam,
@@ -175,6 +182,7 @@ export default function UrlSync() {
     debouncedScrubTime,
     trailingDays,
     dataLayers,
+    dataLayerChoices,
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,
@@ -183,6 +191,7 @@ export default function UrlSync() {
     featureQuery,
     highlightedRecord,
     selectedTrajectory,
+    mappedRecord,
   ]);
 
   // `i18n` deliberately excluded from the deps, despite reading it in the

@@ -121,6 +121,19 @@ const GRIDDAP_EXACT_TIME_DEPTH_COLUMNS = `d.coverage_time_min AS time_min,
 const GRIDDAP_FROM = `FROM cde.datasets d
         WHERE d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL`;
 
+/*
+ * A cde.datasets row (aliased d) that at least one of the sources above can
+ * put on the map. The loader can leave a row with none — every feature
+ * dropped for an unparseable time, or a dataset now skipped upstream whose
+ * old row survives — and /pointQuery never returns such a row, so a catalog
+ * total that counted it would read "N-1 / N" with nothing to find.
+ */
+const DATASET_HAS_FEATURES = `(EXISTS (SELECT 1 FROM cde.profiles p WHERE p.dataset_pk = d.pk)
+        OR EXISTS (SELECT 1 FROM cde.trajectory_hexes t
+                   WHERE t.dataset_pk = d.pk AND t.hex_tier = ${FINE.tier})
+        OR EXISTS (SELECT 1 FROM cde.obis_cells o WHERE o.dataset_pk = d.pk)
+        OR (d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL))`;
+
 // ---------------------------------------------------------------------------
 // Assembly
 
@@ -153,5 +166,6 @@ module.exports = {
   GRIDDAP_TIME_DEPTH_COLUMNS,
   GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
   GRIDDAP_FROM,
+  DATASET_HAS_FEATURES,
   unionBranches,
 };

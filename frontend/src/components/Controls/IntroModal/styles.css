@@ -1,41 +1,52 @@
-.introButton {
-  position: absolute;
-  bottom: 312px;
-  right: 10px;
-  pointer-events: all;
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-card);
-  border-radius: var(--cioos-radius);
-  border: 0;
-  height: 42px;
-  width: 42px;
-  text-align: center;
-  z-index: 3;
-}
-
-.introButton:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-.introModal .modalHeader {
-  padding: 0 160px 0 0;
-}
-
-/* Modal chrome — brand the onboarding "hero". A thin primary rule at the
-   top ties it to the rest of the interface; the header sits on sand. */
+/* Modal chrome. The header is the brand lockup the app's own header wears
+   (the drawn mark and name), a divider, and the dialog's title stacked under a
+   small "About" eyebrow. */
 .introModal .modal-content {
   border: none;
-  border-radius: var(--cioos-radius);
   overflow: hidden;
 }
 
 .introModal .modal-header {
-  background-color: var(--cioos-sand);
+  justify-content: flex-start;
+  gap: var(--cioos-space-lg);
+  padding: var(--cioos-space-md) var(--cioos-space-lg);
   border-bottom: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
 }
 
-.introModal .modal-title {
+/* The close button keeps the far end of the row. */
+.introModal .modal-header > .closeButton {
+  margin-left: auto;
+}
+
+.introBrand {
+  flex: none;
+  padding-right: var(--cioos-space-lg);
+  border-right: 1px solid var(--cioos-hairline);
+  font-size: var(--cioos-font-size-lg);
+  color: var(--cioos-navy);
+  text-decoration: none;
+}
+
+.introTitle {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.introEyebrow {
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cioos-primary-700);
+}
+
+.introTitleName {
   font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-xl);
   font-weight: 700;
   color: var(--cioos-navy);
 }
@@ -43,240 +54,409 @@
 /* The tagline ("Ocean Data For Our Ocean Future") reads as a quiet
    subtitle, not competing with the product name. */
 .introModal .tagLine {
-  color: var(--cioos-ink-60);
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
+  font-style: italic;
   font-weight: 400;
-}
-
-.introLogo.english {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url("../../Images/NationalLogoEnglish.png");
-  background-color: var(--cioos-white);
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  margin: 5px 40px auto auto;
-}
-
-.introLogo.french {
-  width: 130px;
-  height: 40px;
-  border: 2px solid transparent;
-  pointer-events: all;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-image: url("../../Images/NationalLogoFrench.png");
-  background-color: var(--cioos-white);
-  background-repeat: no-repeat;
-  background-size: contain;
-  border-radius: 10px;
-  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
-  margin: 5px 40px auto auto;
-}
-
-.introLogo:hover {
-  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
 }
 
 .introModal .modal-body {
   overflow-y: auto;
+  color: var(--cioos-ink);
 }
 
-.steps {
+.introHeading {
   display: flex;
-  justify-content: space-between;
-}
-
-.stepImage {
-  text-align: center;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+  margin: var(--cioos-space-lg) 0 var(--cioos-space-sm);
   font-family: var(--cioos-font-display);
-  font-size: large;
+  font-size: var(--cioos-font-size-lg);
   font-weight: 600;
   color: var(--cioos-navy);
+}
 
-  /* flex-grow: 1; */
-  flex-shrink: 1;
-  flex-wrap: nowrap;
-  width: 250px;
-  height: 250px;
+/* The hero: what the Explorer is, over the navy the brand's dark surfaces
+   use, with the catalogue's live size beside it. Two columns wherever there is
+   the width for them, so it stays a banner rather than a screenful. The waves
+   drift slowly along its foot — the one bit of motion that says "ocean"
+   without an image. */
+.introHero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--cioos-space-lg) var(--cioos-space-xl);
+  align-items: center;
+  overflow: hidden;
+  padding: var(--cioos-space-lg) var(--cioos-space-xl) 48px;
+  border-radius: var(--cioos-radius-lg);
+  background: linear-gradient(
+    135deg,
+    var(--cioos-navy) 0%,
+    color-mix(in srgb, var(--cioos-navy) 60%, var(--cioos-primary)) 55%,
+    var(--cioos-primary-700) 100%
+  );
+  color: var(--cioos-white);
+}
+
+.introHeroCopy {
+  position: relative;
+}
+
+.introHeroWaves {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 200%;
+  height: 40px;
+  animation: intro-waves 18s linear infinite;
+  pointer-events: none;
+}
+
+.introHeroWaves path:first-child {
+  fill: color-mix(in srgb, var(--cioos-primary) 25%, transparent);
+}
+
+.introHeroWaves path:last-child {
+  fill: color-mix(in srgb, var(--cioos-teal-light) 15%, transparent);
+}
+
+@keyframes intro-waves {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.introHeroTitle {
+  margin: 0 0 var(--cioos-space-xs);
+  font-family: var(--cioos-font-display);
+  font-size: clamp(1.4rem, 1rem + 1.2vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--cioos-white);
+}
+
+.introHeroText {
+  max-width: 70ch;
+  margin: 0 0 var(--cioos-space-md);
+  line-height: 1.55;
+  color: rgb(255 255 255 / 85%);
+}
+
+.introHeroActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+}
+
+.introHeroActions .introCta {
+  margin-right: var(--cioos-space-xs);
+}
+
+/* The sources wrap as one group, so a narrow screen never strands one pill. */
+.introSources {
+  display: flex;
+  gap: var(--cioos-space-sm);
+}
+
+/* Stacked down the right edge, divided from the copy by a hairline. */
+.introStats {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cioos-space-md);
+  margin: 0;
+  padding: 0 0 0 var(--cioos-space-xl);
+  border-left: 1px solid rgb(255 255 255 / 20%);
+  list-style: none;
+}
+
+.introStat {
+  display: flex;
+  flex-direction: column;
+}
+
+.introStatValue {
+  font-family: var(--cioos-font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-teal-light);
+}
+
+.introStatLabel {
+  margin-top: 2px;
+  font-size: var(--cioos-font-size-sm);
+  color: rgb(255 255 255 / 75%);
+}
+
+.introSource {
+  padding: 4px 12px;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: var(--cioos-radius-pill);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.introCta {
+  position: relative;
+  padding: 12px 24px;
+  border: 0;
   border-radius: var(--cioos-radius);
-  border: 1px solid var(--cioos-hairline);
-  padding: 2px;
-  margin: 2px;
-  background-color: var(--cioos-teal-light);
-  background-repeat: no-repeat;
-  background-size: 225px 225px;
-  background-position: bottom;
-  transition: box-shadow 0.15s ease;
+  background: var(--cioos-primary);
+  font-weight: 600;
+  color: var(--cioos-white);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    transform var(--cioos-transition-fast);
 }
 
-@media (max-width: 1200px) {
-  .stepImage {
-    height: 210px;
-    background-size: 180px 180px;
+.introCta:hover {
+  background: var(--cioos-white);
+  color: var(--cioos-navy);
+  transform: translateY(-1px);
+}
+
+/* "See it in action": one-click jumps into a few of the app's views, as a row
+   of tiles whose arrow nudges forward on hover — they go somewhere. */
+.introShowcases {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--cioos-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.introShowcase {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+  width: 100%;
+  height: 100%;
+  padding: var(--cioos-space-sm) var(--cioos-space-md);
+  border: 1px solid color-mix(in srgb, var(--cioos-sand), var(--cioos-ink) 15%);
+  border-radius: var(--cioos-radius-lg);
+  background: var(--cioos-sand);
+  font: inherit;
+  text-align: left;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  transition:
+    border-color var(--cioos-transition-fast),
+    background-color var(--cioos-transition-fast);
+}
+
+.introShowcase:hover,
+.introShowcase:focus-visible {
+  border-color: var(--cioos-ink-40);
+  background: var(--cioos-white);
+}
+
+.introShowcaseIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--cioos-navy);
+  color: var(--cioos-teal-light);
+}
+
+.introShowcaseText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.introShowcaseTitle {
+  font-weight: 600;
+  color: var(--cioos-navy);
+}
+
+.introShowcaseBody {
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+.introShowcaseArrow {
+  flex: none;
+  color: var(--cioos-primary-700);
+  transition: transform var(--cioos-transition-fast);
+}
+
+.introShowcase:hover .introShowcaseArrow {
+  transform: translateX(3px);
+}
+
+/* The three things the tool does, as cards that arrive one after another. */
+.introFeatures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--cioos-space-md);
+  margin: var(--cioos-space-lg) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.introFeature {
+  padding: var(--cioos-space-lg);
+  border: 1px solid var(--cioos-teal-light);
+  border-radius: var(--cioos-radius-lg);
+  background: var(--cioos-white);
+  box-shadow: 0 2px 8px rgb(21 47 55 / 8%);
+  animation: intro-rise 0.5s ease-out both;
+  animation-delay: calc(var(--intro-feature-index, 0) * 90ms + 150ms);
+  transition:
+    transform var(--cioos-transition-fast),
+    box-shadow var(--cioos-transition-fast);
+}
+
+.introFeature:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--cioos-shadow-lift);
+}
+
+.introFeature h3 {
+  margin: var(--cioos-space-sm) 0 var(--cioos-space-xs);
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-lg);
+  font-weight: 600;
+  color: var(--cioos-navy);
+}
+
+.introFeature p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.introFeatureIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--cioos-teal-light);
+  color: var(--cioos-primary-700);
+}
+
+@keyframes intro-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }
 
-@media (max-width: 992px) {
-  .stepImage {
-    height: 140px;
-    background-size: 110px 110px;
+/* The footer: a tip on one side, the housekeeping (feedback, how to come
+   back here, the tips switch) on the other. Two columns keep the tip to a
+   readable measure instead of a line the width of the dialog. */
+.introFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--cioos-space-lg);
+  align-items: start;
+  margin-top: var(--cioos-space-lg);
+  padding-top: var(--cioos-space-md);
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.introTip {
+  max-width: 60ch;
+  padding: var(--cioos-space-sm) var(--cioos-space-md);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-surface-2);
+}
+
+.introTipHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+  margin: 0 0 var(--cioos-space-xs);
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-md);
+  font-weight: 600;
+  color: var(--cioos-navy);
+}
+
+/* The tip itself is the way into the tour: a button that reads as the
+   paragraph it replaces, with its call to action trailing the text. */
+.introTipShow {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  line-height: 1.55;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  animation: intro-fade 0.3s ease-out;
+}
+
+.introTipShowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--cioos-space-xs);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  white-space: nowrap;
+}
+
+.introTipShow:hover .introTipShowLabel,
+.introTipShow:focus-visible .introTipShowLabel {
+  text-decoration: underline;
+}
+
+@keyframes intro-fade {
+  from {
+    opacity: 0;
   }
 }
 
-.stepImage.filterStep {
-  background-image: url("../../Images/filtersImage.png");
+.introTipNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--cioos-space-xs);
 }
 
-.stepImage.filterStep.fr {
-  background-image: url("../../Images/filtersImage_FR.png");
+.introTipCount {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
 }
 
-.stepImage.selectStep {
-  background-image: url("../../Images/selectionImage.png");
-}
-
-.stepImage.inspectStep {
-  background-image: url("../../Images/inspectImage.png");
-}
-
-.stepImage.inspectStep.fr {
-  background-image: url("../../Images/inspectImage_FR.png");
-}
-
-.stepImage.downloadStep {
-  background-image: url("../../Images/downloadImage.png");
-}
-
-.stepImage.downloadStep.fr {
-  background-image: url("../../Images/downloadImage_FR.png");
-}
-
-.stepImage:hover {
-  /* border: 4px solid var(--cioos-primary); */
-  box-shadow: 0 0 0 4px var(--cioos-primary);
+.introLink {
+  margin-top: var(--cioos-space-xs);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
   cursor: pointer;
 }
 
-.stepInfo {
-  margin-top: 15px;
-  text-align: center;
-  font-size: large;
-  font-style: oblique;
-  min-height: 250px;
+.introFooterLinks p {
+  display: flex;
+  align-items: center;
+  margin: var(--cioos-space-xs) 0;
 }
 
-.stepInfoContent {
-  text-align: left;
-  font-size: medium;
-  font-style: normal;
-}
-
-.tipInfo {
-  margin-top: 15px;
-
-  /* min-height: 275px; */
-}
-
-.tipInfo p {
-  margin: 15px 0;
-}
-
-.tipInfo a {
-  margin-right: 15px;
-}
-
-.tagLine {
-  display: inline;
-  margin: auto;
-  font-style: italic;
-
-  /* text-align: center; */
-  font-size: smaller;
-  width: 100%;
-
-  /* margin: 0px 0px 15px 0px; */
-}
-
-.tipInfo img {
-  width: 50px;
-  height: 50px;
-  border-radius: 10px;
-  margin-right: 15px;
-  background-repeat: no-repeat;
-  background-size: contain;
-}
-
-/* .feedbackButtonImage {
-  background-image: url(../../Images/feedbackButton.png);
-} */
-
-.infoButtonImage {
-  background-image: url("../../Images/infoButton.png");
-}
-
-@media all and (max-height: 500px) {
-  .introButton {
-    top: 145px;
-  }
-}
-
-/* ------------------------------------------------------------------
- * Mobile: the dialog is already full-screen here (fullscreen='lg-down'),
- * but it was still laid out as a wide one. The header reserved 160px on
- * its right for a logo that then sat under the close button, and the four
- * 250px step tiles were asked to share a row about 100px wider than one
- * of them.
- * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
-  /* The brand is on the app's own header two taps away; here it only stands
-     between the title and the button that closes the dialog. */
-  .introModal .introLogo {
-    display: none;
-  }
-
-  .introModal .modalHeader {
-    padding: 0;
-  }
-
-  /* Two up rather than four across, and sized off the column rather than off
-     a fixed 250px. The tiles are hover targets on a pointer device; a tap
-     works the same way here, so they stay as they are otherwise. */
-  .introModal .steps {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--cioos-space-sm);
-  }
-
-  .introModal .stepImage {
-    width: auto;
-    height: 130px;
-    margin: 0;
-
-    /* Same ~30px of tile left over for the label as the 992px rung leaves. */
-    background-size: 100px 100px;
-  }
-
-  /* The hovered/tapped step's write-up sizes to its text instead of holding
-     open a 250px well under the tiles. */
-  .introModal .stepInfo {
-    min-height: 0;
-  }
-
-  .introModal .infoBox {
-    min-height: 0;
-  }
-}
-
-.infoBox {
-  min-height: 300px;
+.introFooterIcon {
+  flex: none;
+  margin: 0 21px 0 6px;
+  color: var(--cioos-primary);
 }
 
 /* Inline icon button that opens the Sentry feedback dialog; sits beside the
@@ -284,9 +464,9 @@
    chrome control. */
 .feedbackButton {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  vertical-align: middle;
   margin-right: 15px;
   padding: 6px;
   border: 0;
@@ -298,4 +478,54 @@
 
 .feedbackButton:hover {
   background-color: var(--cioos-surface-2);
+}
+
+/* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
+   brand and tagline are on the app's own header, and here they would only
+   crowd the title and the close button; the hero stacks. */
+@media (max-width: 700px) {
+  .introBrand,
+  .introModal .tagLine {
+    display: none;
+  }
+
+  .introModal .modal-header {
+    padding: var(--cioos-space-sm) var(--cioos-space-md);
+  }
+
+  .introHero {
+    grid-template-columns: 1fr;
+    padding: var(--cioos-space-lg) var(--cioos-space-md) 48px;
+  }
+
+  .introStats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--cioos-space-md);
+    padding: var(--cioos-space-md) 0 0;
+    border-top: 1px solid rgb(255 255 255 / 20%);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 992px) {
+  .introFeatures,
+  .introShowcases,
+  .introFooter {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .introHeroWaves,
+  .introFeature,
+  .introTipShow {
+    animation: none;
+  }
+
+  .introFeature:hover,
+  .introCta:hover,
+  .introShowcase:hover .introShowcaseArrow {
+    transform: none;
+  }
 }
