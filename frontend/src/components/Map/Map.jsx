@@ -1632,6 +1632,9 @@ export default function CreateMap({
   // Latest spatial filter, readable from the debounced moveend handler (which
   // would otherwise capture the polygon as of the overlay's last render).
   const polygonRef = useRef(null);
+  // For the 'load' handler: an overlay set before the style loaded hid layers
+  // that did not exist yet.
+  const activeWmsOverlayRef = useRef(null);
 
   // Single-dataset griddap footprint (hover from the list, or pinned while
   // its WMS overlay is shown).
@@ -1974,6 +1977,7 @@ export default function CreateMap({
   useEffect(() => {
     if (!map.current) return;
     polygonRef.current = polygon;
+    activeWmsOverlayRef.current = activeWmsOverlay;
     removeWmsOverlay();
     if (!activeWmsOverlay) {
       setGriddapHighlight(null);
@@ -3143,6 +3147,9 @@ export default function CreateMap({
       if (!dataLayersVisibleRef.current) {
         setLayersVisibility(observationLayerIds, false);
       }
+      // A share link opening a gridded dataset can put its WMS overlay up
+      // before the style has loaded, when there were no data layers to hide.
+      if (activeWmsOverlayRef.current) setDataLayersVisibility(false);
       // Same for the depth rasters, which come from the style itself and are
       // therefore always created visible.
       if (!bathymetryVisibleRef.current) {
