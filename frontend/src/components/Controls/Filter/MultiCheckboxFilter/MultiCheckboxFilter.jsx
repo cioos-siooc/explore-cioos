@@ -2,8 +2,13 @@ import * as React from "react";
 import { CheckSquare, CircleFill, Square } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import Tooltip from "../../../ui/Tooltip.jsx";
-import { capitalizeFirstLetter } from "../../../../utilities";
+import { capitalizeFirstLetter, nextOptionState } from "../../../../utilities";
 import platformColors from "../../../platformColors";
+import {
+  ExcludedLabel,
+  OptionStateIcon,
+  optionStateClass,
+} from "./OptionState.jsx";
 import "./styles.css";
 
 export default function MultiCheckboxFilter({
@@ -36,7 +41,7 @@ export default function MultiCheckboxFilter({
   function toggleOption(option) {
     setOptionsSelected(
       universe.map((opt) =>
-        opt.pk === option.pk ? { ...opt, isSelected: !opt.isSelected } : opt,
+        opt.pk === option.pk ? nextOptionState(opt) : opt,
       ),
     );
   }
@@ -47,7 +52,7 @@ export default function MultiCheckboxFilter({
     setOptionsSelected(
       universe.map((option) =>
         listOfPKs.includes(option.pk)
-          ? { ...option, isSelected: !allShownChecked }
+          ? { ...option, isSelected: !allShownChecked, isExcluded: false }
           : option,
       ),
     );
@@ -122,7 +127,7 @@ export default function MultiCheckboxFilter({
               content={hoverText}
             >
               <div
-                className={`optionButton ${isChecked(option) && "selected"}`}
+                className={optionStateClass(option)}
                 key={index}
                 title={hoverText ? "" : t(title)}
                 // A checkbox in everything but tag name: it was a bare div, so
@@ -134,6 +139,7 @@ export default function MultiCheckboxFilter({
                 data-testid="filter-option"
                 data-option-pk={option.pk}
                 data-selected={isChecked(option)}
+                data-excluded={Boolean(option.isExcluded)}
                 onClick={() => toggleOption(option)}
                 onKeyDown={(event) => {
                   if (event.key === " " || event.key === "Enter") {
@@ -144,10 +150,11 @@ export default function MultiCheckboxFilter({
                   }
                 }}
               >
-                {isChecked(option) ? <CheckSquare /> : <Square />}
+                <OptionStateIcon {...option} />
                 <span className="optionName">
                   {capitalizeFirstLetter(title)}
                 </span>
+                <ExcludedLabel {...option} />
                 {colored && (
                   <CircleFill
                     className="optionColorCircle"

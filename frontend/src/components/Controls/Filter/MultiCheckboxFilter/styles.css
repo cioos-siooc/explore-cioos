@@ -17,6 +17,11 @@
   margin: 0 0 10px;
   cursor: pointer;
   line-height: 30px;
+
+  /* The include/exclude cycle is repeated clicks, which would otherwise
+     select the option's text. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .multiCheckboxFilter .optionButton {
@@ -29,6 +34,18 @@
 
 .multiCheckboxFilter .optionButton.selected {
   background-color: var(--cioos-teal-light);
+}
+
+.multiCheckboxFilter .optionButton.excluded {
+  background-color: var(--cioos-error-bg);
+}
+
+.multiCheckboxFilter .optionButton.excluded .optionName {
+  text-decoration: line-through;
+}
+
+.multiCheckboxFilter .optionButton.excluded > svg:first-child {
+  color: var(--cioos-error);
 }
 
 .multiCheckboxFilter .searchResultsButton {

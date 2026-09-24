@@ -9,6 +9,7 @@ import {
   escapeHtml,
   formatDatasetCount,
   getCurrentRangeLevel,
+  nextOptionState,
   polygonIsRectangle,
   polygonToWkt,
   quantizeCountRange,
@@ -40,6 +41,12 @@ function makeQuery(overrides = {}) {
 }
 
 const selected = (title, extra = {}) => ({ title, isSelected: true, ...extra });
+const excluded = (title, extra = {}) => ({
+  title,
+  isSelected: false,
+  isExcluded: true,
+  ...extra,
+});
 const unselected = (title, extra = {}) => ({
   title,
   isSelected: false,
@@ -153,6 +160,121 @@ describe("createDataFilterQueryString", () => {
       expect(params.get("erddapServers")).toBe("https://erddap0.example");
       expect(params.has("includeObis")).toBe(false);
     });
+
+    it("sends excluded sources on their own, without hiding OBIS", () => {
+      // An exclusion narrows; it must not trip the servers-only rule above,
+      // which would drop every OBIS row the user did not exclude.
+      const params = new URLSearchParams(
+        createDataFilterQueryString(
+          makeQuery({
+            erddapServersSelected: [
+              excluded("s0", { url: "https://erddap0.example" }),
+              unselected("s1", { url: "https://erddap1.example" }),
+            ],
+            obisNodesSelected: [
+              excluded("OBIS USA"),
+              unselected("OBIS Canada"),
+            ],
+          }),
+        ),
+      );
+      expect(params.get("excludeErddapServers")).toBe(
+        "https://erddap0.example",
+      );
+      expect(params.get("excludeObisNodes")).toBe("OBIS USA");
+      expect(params.has("erddapServers")).toBe(false);
+      expect(params.has("obisNodes")).toBe(false);
+      expect(params.has("includeObis")).toBe(false);
+    });
+  });
+
+  it("sends included and excluded options of one filter side by side", () => {
+    const params = new URLSearchParams(
+      createDataFilterQueryString(
+        makeQuery({
+          platformsSelected: [selected("glider"), excluded("mooring")],
+          orgsSelected: [excluded("Org", { pk: 7 })],
+          datasetsSelected: [
+            excluded("Set", { pk: 11 }),
+            unselected("B", { pk: 12 }),
+          ],
+        }),
+      ),
+    );
+    expect(params.get("platforms")).toBe("glider");
+    expect(params.get("excludePlatforms")).toBe("mooring");
+    expect(params.get("excludeOrganizations")).toBe("7");
+    expect(params.get("excludeDatasetPKs")).toBe("11");
+    expect(params.has("organizations")).toBe(false);
+    expect(params.has("datasetPKs")).toBe(false);
+  });
+
+  it("asks for all EOVs only when there is more than one to match", () => {
+    // With one EOV "all" and "any" are the same selection; sending the flag
+    // anyway would give it a second URL and cache key.
+    const eovs = (...titles) => titles.map((title) => selected(title));
+    const paramsFor = (eovsSelected, eovsMatchAll) =>
+      new URLSearchParams(
+        createDataFilterQueryString(makeQuery({ eovsSelected, eovsMatchAll })),
+      );
+    expect(paramsFor(eovs("oxygen", "salinity"), true).get("eovsMatch")).toBe(
+      "all",
+    );
+    expect(paramsFor(eovs("oxygen"), true).has("eovsMatch")).toBe(false);
+    expect(paramsFor(eovs("oxygen", "salinity"), false).has("eovsMatch")).toBe(
+      false,
+    );
+  });
+
+  it("every multi-valued list sends its match mode and its exclusions", () => {
+    const params = new URLSearchParams(
+      createDataFilterQueryString(
+        makeQuery({
+          eovsSelected: [excluded("salinity")],
+          orgsSelected: [
+            selected("A", { pk: 1 }),
+            selected("B", { pk: 2 }),
+            unselected("C", { pk: 3 }),
+          ],
+          orgsMatchAll: true,
+          scientificNamesSelected: ["Gadus morhua", "Clupea harengus"],
+          scientificNamesExcluded: ["Orcinus orca"],
+          scientificNamesMatchAll: true,
+        }),
+      ),
+    );
+    expect(params.get("excludeEovs")).toBe("salinity");
+    expect(params.get("organizations")).toBe("1,2");
+    expect(params.get("organizationsMatch")).toBe("all");
+    expect(params.get("scientificNamesMatch")).toBe("all");
+    expect(params.get("excludeScientificNames")).toBe("Orcinus orca");
+  });
+
+  it("every org ticked is still a filter when all of them must match", () => {
+    const orgsSelected = [selected("A", { pk: 1 }), selected("B", { pk: 2 })];
+    const paramsFor = (orgsMatchAll) =>
+      new URLSearchParams(
+        createDataFilterQueryString(makeQuery({ orgsSelected, orgsMatchAll })),
+      );
+    expect(paramsFor(false).has("organizations")).toBe(false);
+    expect(paramsFor(true).get("organizations")).toBe("1,2");
+  });
+});
+
+describe("nextOptionState", () => {
+  it("cycles neutral -> include -> exclude -> neutral", () => {
+    const neutral = { pk: 1, isSelected: false };
+    const included = nextOptionState(neutral);
+    expect(included).toMatchObject({ isSelected: true, isExcluded: false });
+    const excludedOption = nextOptionState(included);
+    expect(excludedOption).toMatchObject({
+      isSelected: false,
+      isExcluded: true,
+    });
+    expect(nextOptionState(excludedOption)).toMatchObject({
+      isSelected: false,
+      isExcluded: false,
+    });
   });
 });
 
@@ -250,6 +372,16 @@ describe("applyDatasetPKs", () => {
   it("sends neither list when the narrowing drops nothing", () => {
     const all = [1, 2, 3];
     expect(applyDatasetPKs("eovs=oxygen", [1, 2, 3], all)).toBe("eovs=oxygen");
+  });
+
+  it("keeps the datasets the filters already exclude", () => {
+    // The Datasets filter can exclude on its own; the list's narrowing must add
+    // to that exclusion, not overwrite it.
+    const all = Array.from({ length: 10 }, (_, i) => i + 1);
+    const params = new URLSearchParams(
+      applyDatasetPKs("excludeDatasetPKs=42", all.slice(1), all),
+    );
+    expect(params.get("excludeDatasetPKs")).toBe("42,1");
   });
 
   it("asks for nothing at all when the list is empty", () => {
