@@ -7,7 +7,7 @@ import {
   createSelectionQueryString,
 } from "../utilities.jsx";
 import { wmsSliceParams } from "../wmsUtilities.js";
-import { anyTrajectoryLayerOn, dataLayersAreDefault } from "./dataLayers.js";
+import { anyTrajectoryLayerOn, chosenDataLayerKeys } from "./dataLayers.js";
 import { GROUP_NONE } from "./datasetGroups.js";
 import { PLOT_PARAMS, RECORD_PARAM } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
@@ -51,6 +51,7 @@ export default function UrlSync() {
     debouncedScrubTime,
     trailingDays,
     dataLayers,
+    dataLayerChoices,
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,
@@ -147,13 +148,13 @@ export default function UrlSync() {
       obj.scrubTime = scrubTime;
       if (trailingDays !== defaultTrailingDays) obj.trail = trailingDays;
     }
-    // Data-layer selection persists only when not the default selection.
-    if (!dataLayersAreDefault(dataLayers)) {
-      obj.layers = Object.entries(dataLayers)
-        .filter(([, on]) => on)
-        .map(([key]) => key)
+    // The geometry picks, each list only when it has something in it.
+    const layersChosen = (choice) =>
+      chosenDataLayerKeys(dataLayerChoices)
+        .filter((key) => dataLayerChoices[key] === choice)
         .join(",");
-    }
+    if (layersChosen("include")) obj.layers = layersChosen("include");
+    if (layersChosen("exclude")) obj.excludeLayers = layersChosen("exclude");
     // The legend's layer switches, each recording only its non-default state so
     // an untouched map keeps the short link it had before they were shareable.
     // They are preferences as well (localStorage), and a param in the link wins
@@ -181,6 +182,7 @@ export default function UrlSync() {
     debouncedScrubTime,
     trailingDays,
     dataLayers,
+    dataLayerChoices,
     dataLayersVisible,
     bathymetryVisible,
     griddapCoverageVisible,

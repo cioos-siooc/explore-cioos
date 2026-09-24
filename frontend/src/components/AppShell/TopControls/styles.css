@@ -700,6 +700,27 @@
   color: var(--cioos-white);
 }
 
+/* An excluded value: the error red the filter rows use for the same state,
+   and a "NOT" tag ahead of the name so it cannot be read as an include. */
+.activeFilterItem.excluded {
+  background-color: var(--cioos-error-bg);
+  border-color: var(--cioos-error);
+}
+
+.activeFilterItemNot {
+  flex: 0 0 auto;
+  margin-right: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-error-700);
+}
+
+.activeFilterItem.excluded .activeFilterItemRemove:hover {
+  background-color: var(--cioos-error);
+}
+
 /* The "+N" chip standing in for the values a group folded away (see
    MAX_VISIBLE_VALUES) — a button, not a static count, so it reads as the way
    to see the rest rather than a dead-end tally. Neutral rather than teal: it

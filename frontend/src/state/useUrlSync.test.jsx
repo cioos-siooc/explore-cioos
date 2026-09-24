@@ -129,6 +129,26 @@ describe("UrlSync", () => {
     await waitFor(() => expect(params().get("obs")).toBe("false"));
   });
 
+  it("records included and excluded geometries in their own params", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    act(() => hooks.mapState.cycleDataLayer("profile"));
+    act(() => hooks.mapState.cycleDataLayer("grid"));
+    act(() => hooks.mapState.cycleDataLayer("grid"));
+    await waitFor(() => {
+      expect(params().get("layers")).toBe("profile");
+      expect(params().get("excludeLayers")).toBe("grid");
+    });
+
+    act(() => hooks.mapState.resetDataLayers());
+    await waitFor(() => {
+      expect(params().has("layers")).toBe(false);
+      expect(params().has("excludeLayers")).toBe(false);
+    });
+  });
+
   it("records the debounced filter query once it settles (an EOV selection)", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
     await waitFor(() =>

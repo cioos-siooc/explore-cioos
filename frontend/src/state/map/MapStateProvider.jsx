@@ -42,11 +42,9 @@ function legendUrl(legendQuery) {
 import { useFilters } from "../filters/FilterProvider.jsx";
 import {
   DATA_LAYER_KEYS,
-  DEFAULT_DATA_LAYERS,
   DEFAULT_TRACKS_MODE,
-  allDataLayersOn,
-  commitDataLayers,
-  onlyDataLayer,
+  dataLayersFromChoices,
+  nextDataLayerChoice,
 } from "../dataLayers.js";
 
 const MapStateContext = createContext();
@@ -297,28 +295,41 @@ export default function MapStateProvider({ children }) {
     return Number.parseInt(trail) || defaultTrailingDays;
   });
 
-  // Data-type layers shown on the map. Absent `layers` param = the default
-  // selection (everything but trajectories — see DEFAULT_DATA_LAYERS); a present
-  // param is the comma list of enabled layers, so a non-default selection
-  // round-trips through the URL. An empty param means all off, which is why
-  // this tests for null rather than falsiness.
-  const [dataLayers, setDataLayers] = useState(() => {
-    const layersParam = urlParams.get("layers");
-    if (layersParam == null) return DEFAULT_DATA_LAYERS;
-    const on = new Set(layersParam.split(",").filter(Boolean));
-    return Object.fromEntries(DATA_LAYER_KEYS.map((key) => [key, on.has(key)]));
-  });
-
-  // The geometry filter. Ticking a box while everything is on narrows to that
-  // one geometry — the same first pick the catalogue filters make — and
-  // unticking the last one folds back to everything (see commitDataLayers).
-  function toggleDataLayer(key) {
-    setDataLayers(
-      allDataLayersOn(dataLayers)
-        ? onlyDataLayer(key)
-        : commitDataLayers({ ...dataLayers, [key]: !dataLayers[key] }),
+  // The geometry filter's picks: ?layers= names the included geometries and
+  // ?excludeLayers= the excluded ones. An empty ?layers= is how older links
+  // said "all off", which is excluding every geometry.
+  const [dataLayerChoices, setDataLayerChoices] = useState(() => {
+    const listParam = (name) =>
+      (urlParams.get(name) ?? "").split(",").filter(Boolean);
+    const included = listParam("layers");
+    const excluded =
+      urlParams.get("layers") === ""
+        ? DATA_LAYER_KEYS
+        : listParam("excludeLayers");
+    // Every geometry included is how older links said "everything".
+    const includesAll = DATA_LAYER_KEYS.every((key) => included.includes(key));
+    return Object.fromEntries(
+      DATA_LAYER_KEYS.flatMap((key) =>
+        excluded.includes(key)
+          ? [[key, "exclude"]]
+          : included.includes(key) && !includesAll
+            ? [[key, "include"]]
+            : [],
+      ),
     );
+  });
+  const dataLayers = useMemo(
+    () => dataLayersFromChoices(dataLayerChoices),
+    [dataLayerChoices],
+  );
+
+  function setDataLayerChoice(key, choice) {
+    const { [key]: _previous, ...others } = dataLayerChoices;
+    setDataLayerChoices(choice ? { ...others, [key]: choice } : others);
   }
+  const cycleDataLayer = (key) =>
+    setDataLayerChoice(key, nextDataLayerChoice(dataLayerChoices[key]));
+  const clearDataLayer = (key) => setDataLayerChoice(key, undefined);
 
   // Whether the trajectory data draws its track lines. It belongs to Trajectory
   // and TrajectoryProfile jointly — one set of map layers fed by both — which is
@@ -343,7 +354,7 @@ export default function MapStateProvider({ children }) {
   // are deliberately untouched — they are map appearance, not part of this
   // filter, so a filter reset has no business changing them.
   function resetDataLayers() {
-    setDataLayers({ ...DEFAULT_DATA_LAYERS });
+    setDataLayerChoices({});
   }
 
   const { zoom } = mapView;
@@ -527,7 +538,9 @@ export default function MapStateProvider({ children }) {
     trailingDays,
     setTrailingDays,
     dataLayers,
-    toggleDataLayer,
+    dataLayerChoices,
+    cycleDataLayer,
+    clearDataLayer,
     resetDataLayers,
     griddapCoverage,
     activeWmsOverlay,
