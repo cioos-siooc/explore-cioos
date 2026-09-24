@@ -66,7 +66,12 @@ describe("MultiCheckboxFilter", () => {
       .find((el) => el.dataset.optionPk === "1");
     await user.click(option);
     expect(setOptionsSelected).toHaveBeenCalledWith([
-      { pk: 1, title: "seaSurfaceTemperature", isSelected: true },
+      {
+        pk: 1,
+        title: "seaSurfaceTemperature",
+        isSelected: true,
+        isExcluded: false,
+      },
       { pk: 2, title: "salinity", isSelected: true }, // pk 2 untouched
     ]);
     // The mutation bug this guards against: sorting for display must not
@@ -145,7 +150,7 @@ describe("MultiCheckboxFilter", () => {
     ]);
   });
 
-  it("an excludable option cycles include -> exclude -> clear", async () => {
+  it("an option cycles include -> exclude -> clear", async () => {
     const user = userEvent.setup();
     // Stateful, so the three clicks walk the cycle rather than each starting
     // from the initial props.
@@ -158,7 +163,6 @@ describe("MultiCheckboxFilter", () => {
           optionsSelected={options}
           setOptionsSelected={setOptions}
           allOptions={options}
-          excludable
         />
       );
     }
@@ -180,7 +184,7 @@ describe("MultiCheckboxFilter", () => {
     expect(option()).toHaveAttribute("data-excluded", "false");
   });
 
-  it("without excludable, a second click unticks instead of excluding", async () => {
+  it("clicking an included option excludes it rather than unticking it", async () => {
     const user = userEvent.setup();
     const setOptionsSelected = vi.fn();
     render(
@@ -196,7 +200,7 @@ describe("MultiCheckboxFilter", () => {
     await user.click(ticked);
     expect(setOptionsSelected).toHaveBeenCalledWith([
       { pk: 1, title: "seaSurfaceTemperature", isSelected: false },
-      { pk: 2, title: "salinity", isSelected: false },
+      { pk: 2, title: "salinity", isSelected: false, isExcluded: true },
     ]);
   });
 });

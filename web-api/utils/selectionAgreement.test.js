@@ -218,10 +218,12 @@ test("every branch reading cde.profiles binds the feature-level EOV filter", asy
   // dbFilter's profileOnly fragment is what makes a multi-EOV dataset
   // contribute only the casts that measured the selected variable. A branch
   // that omits it silently falls back to dataset-level EOVs, with no error.
-  // Both match modes, since "all" swaps the operator in the same fragment.
+  // Both match modes, since "all" swaps the operator in the same fragment,
+  // and the exclusion, which rides in the same fragment too.
   for (const [query, operator] of [
     [{ eovs: "temperature" }, /eovs && /],
     [{ eovs: "temperature,oxygen", eovsMatch: "all" }, /eovs @> /],
+    [{ excludeEovs: "salinity" }, /NOT coalesce\(eovs && /],
   ]) {
     const statements = [
       ...(await sqlFrom("tiles", query)),
@@ -324,10 +326,15 @@ test("every selection route inherits the realtimeOnly dataset filter", async () 
   }
 });
 
-test("every selection route inherits the exclude filters", async () => {
+test("every selection route inherits the exclude filters and match modes", async () => {
   // Same shared-fragment guarantee as realtimeOnly above, for the exclusions
   // the filters panel sends; one param per predicate shape is enough.
-  const query = { excludePlatforms: "mooring", excludeObisNodes: "Node A" };
+  const query = {
+    excludePlatforms: "mooring",
+    excludeObisNodes: "Node A",
+    organizations: "1,2",
+    organizationsMatch: "all",
+  };
   const statements = [
     ...(await sqlFrom("tiles", query)),
     ...(await sqlFrom("tiles/cells", query)),
@@ -349,6 +356,11 @@ test("every selection route inherits the exclude filters", async () => {
       sql,
       /NOT coalesce\(d\.obis_nodes && /,
       `omits excludeObisNodes: ${head}`,
+    );
+    assert.match(
+      sql,
+      /organization_pks @> /,
+      `omits organizationsMatch: ${head}`,
     );
   }
 });

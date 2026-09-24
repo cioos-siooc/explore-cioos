@@ -51,11 +51,13 @@ function filterValidators() {
     ])
       .matches(/^[0-9,]*$/)
       .optional(),
-    check("eovs")
+    check(["eovs", "excludeEovs"])
       .matches(/^[a-zA-Z,]*$/)
       .optional(),
-    check("eovsMatch").isIn(["any", "all"]).optional(),
-    check("scientificNames")
+    check(["eovsMatch", "organizationsMatch", "scientificNamesMatch"])
+      .isIn(["any", "all"])
+      .optional(),
+    check(["scientificNames", "excludeScientificNames"])
       // letters, digits, space, period, comma, apostrophe, parens, hyphen
       // (accommodates subgenus notation like "Halichondria (Halichondria) phakellioides")
       .matches(/^[A-Za-z0-9 .,'()-]*$/)

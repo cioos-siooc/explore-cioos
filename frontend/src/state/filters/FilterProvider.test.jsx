@@ -78,12 +78,42 @@ describe("FilterProvider", () => {
         depthRangeBadgeTitle: "",
       })
       .find((c) => c.key === "platforms");
-    expect(platformsChip.items.map((i) => i.label)).toEqual(["not Mooring"]);
+    expect(platformsChip.items).toMatchObject([
+      { label: "Mooring", excluded: true },
+    ]);
 
     act(() => latest.resetFilters());
     await waitFor(() => {
       expect(latest.platformsSelected.some((p) => p.isExcluded)).toBe(false);
       expect(latest.eovsMatchAll).toBe(false);
+    });
+  });
+
+  it("seeds every list's exclusions and match mode from the URL, and reset clears them", async () => {
+    await renderLoaded({
+      url: "/?excludeEovs=oxygen&organizationsMatch=all&scientificNamesMatch=all&excludeScientificNames=Orcinus%20orca",
+    });
+    const oxygen = latest.eovsSelected.find((e) => e.title === "oxygen");
+    expect(oxygen).toMatchObject({ isSelected: false, isExcluded: true });
+    expect(latest.orgsMatchAll).toBe(true);
+    expect(latest.scientificNamesMatchAll).toBe(true);
+    expect(latest.scientificNamesExcluded).toEqual(["Orcinus orca"]);
+    const speciesChip = latest
+      .buildActiveFilters({
+        timeframesBadgeTitle: "",
+        depthRangeBadgeTitle: "",
+      })
+      .find((c) => c.key === "scientificName");
+    expect(speciesChip.items).toMatchObject([
+      { label: "Orcinus orca", excluded: true },
+    ]);
+
+    act(() => latest.resetFilters());
+    await waitFor(() => {
+      expect(latest.eovsSelected.some((e) => e.isExcluded)).toBe(false);
+      expect(latest.orgsMatchAll).toBe(false);
+      expect(latest.scientificNamesMatchAll).toBe(false);
+      expect(latest.scientificNamesExcluded).toEqual([]);
     });
   });
 

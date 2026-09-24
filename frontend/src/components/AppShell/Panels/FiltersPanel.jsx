@@ -15,6 +15,7 @@ import {
   Map as MapIcon,
   Pentagon,
   Search,
+  SlashCircle,
   Stack,
   Tag,
   Water,
@@ -50,7 +51,7 @@ import {
 } from "../../../utilities.jsx";
 import {
   DATA_LAYER_LABEL_KEYS,
-  selectedDataLayerKeys,
+  chosenDataLayerKeys,
 } from "../../../state/dataLayers.js";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
@@ -64,6 +65,7 @@ import "./styles.css";
 const PLACEHOLDER_STEPS = [
   { key: "select", Icon: HandIndex },
   { key: "combine", Icon: Intersect },
+  { key: "exclude", Icon: SlashCircle },
   { key: "live", Icon: MapIcon },
   { key: "reset", Icon: ArrowCounterclockwise },
 ];
@@ -98,6 +100,8 @@ export default function FiltersPanel() {
     setOrgsSelected,
     orgsSearchTerms,
     setOrgsSearchTerms,
+    orgsMatchAll,
+    setOrgsMatchAll,
     datasetsSelected,
     setDatasetsSelected,
     datasetSearchTerms,
@@ -122,6 +126,10 @@ export default function FiltersPanel() {
     setEndDepth,
     scientificNamesSelected,
     setScientificNamesSelected,
+    scientificNamesExcluded,
+    setScientificNamesExcluded,
+    scientificNamesMatchAll,
+    setScientificNamesMatchAll,
     realtimeOnly,
     setRealtimeOnly,
     timeFilterActive,
@@ -147,7 +155,7 @@ export default function FiltersPanel() {
     filteredCount,
     total,
   } = useDatasetCounts();
-  const { dataLayers, resetDataLayers, requestDraw } = useMapState();
+  const { dataLayerChoices, resetDataLayers, requestDraw } = useMapState();
 
   // The one search box whose terms aren't a filter over options already in
   // state — it is a query against WoRMS — so it is kept here rather than in the
@@ -161,12 +169,18 @@ export default function FiltersPanel() {
   // Same badge rule as the catalogue filters: the bare filter name while the
   // filter is doing nothing, the chosen value(s) once it is.
   const dataLayersFilterTranslationKey = "layerSelectorLabel";
-  const dataLayersChosen = selectedDataLayerKeys(dataLayers);
+  const dataLayersChosen = chosenDataLayerKeys(dataLayerChoices);
+  const dataLayerLabel = (key) => {
+    const title = t(DATA_LAYER_LABEL_KEYS[key]);
+    return dataLayerChoices[key] === "exclude"
+      ? t("filterExcludedOption", { title })
+      : title;
+  };
   const dataLayersBadgeTitle =
     dataLayersChosen.length === 0
       ? t(dataLayersFilterTranslationKey)
       : dataLayersChosen.length === 1
-        ? t(DATA_LAYER_LABEL_KEYS[dataLayersChosen[0]])
+        ? dataLayerLabel(dataLayersChosen[0])
         : dataLayersChosen.length + t("dataLayersMulti");
 
   // No options list of its own (it matches free text against dataset titles),
@@ -234,12 +248,29 @@ export default function FiltersPanel() {
   // Not one of the catalogue's own facets, so it has no options list to count:
   // the badge names the picked species instead, on the same one/many rule.
   const scientificNamesFilterTranslationKey = "scientificNameFilterName";
+  const scientificNamesPicked = [
+    ...scientificNamesSelected,
+    ...scientificNamesExcluded.map((title) =>
+      t("filterExcludedOption", { title }),
+    ),
+  ];
   const scientificNamesBadgeTitle =
-    scientificNamesSelected.length === 0
+    scientificNamesPicked.length === 0
       ? t(scientificNamesFilterTranslationKey)
-      : scientificNamesSelected.length === 1
-        ? scientificNamesSelected[0]
-        : scientificNamesSelected.length + t("scientificNamesMulti");
+      : scientificNamesPicked.length === 1
+        ? scientificNamesPicked[0]
+        : scientificNamesPicked.length + t("scientificNamesMulti");
+
+  // The Any/All control, on the lists where a dataset can carry several values.
+  const matchAllSwitch = (id, checked, setChecked) => (
+    <Switch
+      id={id}
+      data-testid={id}
+      label={t("filterMatchAllLabel")}
+      checked={checked}
+      onChange={(e) => setChecked(e.target.checked)}
+    />
+  );
 
   const depthRangeFilterName = t("depthRangeFilterName");
   const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(
@@ -325,7 +356,7 @@ export default function FiltersPanel() {
               <DataLayersFilter />
             </Filter>
             <Filter
-              active={eovsSelected.filter((eov) => eov.isSelected).length !== 0}
+              active={eovsSelected.some(isSet)}
               badgeTitle={eovsBadgeTitle}
               optionsSelected={eovsSelected}
               setOptionsSelected={setEovsSelected}
@@ -343,13 +374,7 @@ export default function FiltersPanel() {
                 setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
               }
             >
-              <Switch
-                id="eovsMatchAll"
-                data-testid="eovs-match-all"
-                label={t("eovsMatchAllLabel")}
-                checked={eovsMatchAll}
-                onChange={(e) => setEovsMatchAll(e.target.checked)}
-              />
+              {matchAllSwitch("eovs-match-all", eovsMatchAll, setEovsMatchAll)}
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   eovsSearchTerms,
@@ -391,7 +416,6 @@ export default function FiltersPanel() {
                 )}
                 setOptionsSelected={setPlatformsSelected}
                 searchable
-                excludable
                 colored
                 translatable
                 allOptions={platformsSelected}
@@ -418,6 +442,7 @@ export default function FiltersPanel() {
                 setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
               }
             >
+              {matchAllSwitch("orgs-match-all", orgsMatchAll, setOrgsMatchAll)}
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   orgsSearchTerms,
@@ -425,7 +450,6 @@ export default function FiltersPanel() {
                 )}
                 setOptionsSelected={setOrgsSelected}
                 searchable
-                excludable
                 allOptions={orgsSelected}
               />
             </Filter>
@@ -459,7 +483,6 @@ export default function FiltersPanel() {
                 )}
                 setOptionsSelected={setDatasetsSelected}
                 searchable
-                excludable
                 allOptions={datasetsSelected}
                 translatable
               />
@@ -625,7 +648,7 @@ export default function FiltersPanel() {
           {obisDataAvailable && (
             <FilterSection title={t("filterGroupBiodiversity")}>
               <Filter
-                active={scientificNamesSelected.length > 0}
+                active={scientificNamesPicked.length > 0}
                 badgeTitle={scientificNamesBadgeTitle}
                 tooltip={t("scientificNameFilterTooltip")}
                 disabled={!showObis}
@@ -640,14 +663,24 @@ export default function FiltersPanel() {
                 openFilter={openFilter === scientificNamesFilterTranslationKey}
                 setOpenFilter={setOpenFilter}
                 resetButton={
-                  scientificNamesSelected.length > 0
-                    ? () => setScientificNamesSelected([])
+                  scientificNamesPicked.length > 0
+                    ? () => {
+                        setScientificNamesSelected([]);
+                        setScientificNamesExcluded([]);
+                      }
                     : undefined
                 }
               >
+                {matchAllSwitch(
+                  "scientific-names-match-all",
+                  scientificNamesMatchAll,
+                  setScientificNamesMatchAll,
+                )}
                 <ScientificNameFilter
                   scientificNamesSelected={scientificNamesSelected}
                   setScientificNamesSelected={setScientificNamesSelected}
+                  scientificNamesExcluded={scientificNamesExcluded}
+                  setScientificNamesExcluded={setScientificNamesExcluded}
                   searchTerms={scientificNameSearchTerms}
                 />
               </Filter>

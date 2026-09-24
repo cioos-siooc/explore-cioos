@@ -205,6 +205,56 @@ test("obisNodes and erddapServers OR together only when both are set", async () 
   assert.doesNotMatch(serversOnly.shared.toString(), /obis_nodes/);
 });
 
+test("excludeEovs drops at both levels and keeps datasets with no EOVs", async () => {
+  const f = await createDBFilter({ excludeEovs: "salinity" });
+  const clause = /NOT coalesce\(eovs && '\{"salinity"\}', false\)/;
+  assert.match(f.shared.toString(), clause);
+  assert.match(f.profileOnly.toString(), clause);
+});
+
+test("organizationsMatch=all asks for every organisation", async () => {
+  const all = await createDBFilter({
+    organizations: "1,2",
+    organizationsMatch: "all",
+  });
+  assert.match(all.shared.toString(), /organization_pks @> '\{"1","2"\}'/);
+  const any = await createDBFilter({ organizations: "1,2" });
+  assert.match(any.shared.toString(), /organization_pks && '\{"1","2"\}'/);
+});
+
+test("scientificNamesMatch=all rolls each name down on its own and ANDs them", async () => {
+  const askedFor = [];
+  const f = await createDBFilter(
+    {
+      scientificNames: "Gadus morhua,Clupea harengus",
+      scientificNamesMatch: "all",
+    },
+    {
+      fetchAphiaIds: async (names) => {
+        askedFor.push(names);
+        return names[0] === "Gadus morhua" ? [126436] : [126417];
+      },
+    },
+  );
+  assert.deepEqual(askedFor, [["Gadus morhua"], ["Clupea harengus"]]);
+  assert.match(
+    f.obisOnly.toString(),
+    /\(aphia_ids && '\{126436\}' OR scientific_names && '\{"Gadus morhua"\}'\) AND \n\(aphia_ids && '\{126417\}' OR scientific_names && '\{"Clupea harengus"\}'\)/,
+  );
+});
+
+test("excludeScientificNames drops the rolled-down taxa from cells only", async () => {
+  const f = await createDBFilter(
+    { excludeScientificNames: "Gadus" },
+    { fetchAphiaIds: async () => [125732, 126436] },
+  );
+  assert.equal(f.shared.toString(), "TRUE");
+  assert.match(
+    f.obisOnly.toString(),
+    /NOT coalesce\(\(aphia_ids && '\{125732,126436\}' OR scientific_names && '\{"Gadus"\}'\), false\)/,
+  );
+});
+
 test("scientificNames expands via the injected fetcher and filters OBIS only", async () => {
   let askedFor;
   const f = await createDBFilter(

@@ -572,6 +572,7 @@
   "filtersPanelHint": "Pick any filter on the left to see its options here — combine as many as you like to narrow what's shown on the map.",
   "filtersPanelHintStep_select": "Click a filter to open its options in this space.",
   "filtersPanelHintStep_combine": "Combine filters across categories — results match all of them.",
+  "filtersPanelHintStep_exclude": "Click an option once to include it, again to exclude it, a third time to clear it.",
   "filtersPanelHintStep_live": "Changes apply to the map right away, no confirmation needed.",
   "filtersPanelHintStep_reset": "Use “Clear all” below to remove every filter at once.",
   "filtersModalBackTitle": "Back to all filters",
@@ -710,7 +711,8 @@
   "legendHelp_hexes_scale_body": "The scale is recalculated for the hexagons in view, so the same green means different amounts at different zooms.",
   "legendHelp_seafloor_source_link": "About CHS NONNA data",
   "filterExcludedOption": "not {{title}}",
+  "filterNotTag": "not",
   "filterOptionExcludedLabel": "excluded",
-  "eovsMatchAll": "all",
-  "eovsMatchAllLabel": "Match all selected variables"
+  "filterMatchAll": "all",
+  "filterMatchAllLabel": "Match all included options"
 }

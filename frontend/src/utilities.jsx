@@ -16,7 +16,7 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
   );
 }
 
-// The click cycle of an excludable filter option: neutral -> include ->
+// The click cycle of a list filter option: neutral -> include ->
 // exclude -> neutral. The two flags are mutually exclusive, and `isSelected`
 // keeps meaning "included" everywhere it was already read.
 export function nextOptionState(option) {
@@ -132,10 +132,13 @@ export function createDataFilterQueryString(query) {
     platformsSelected,
     datasetsSelected,
     scientificNamesSelected,
+    scientificNamesExcluded,
     obisNodesSelected,
     erddapServersSelected,
     realtimeOnly,
     eovsMatchAll,
+    orgsMatchAll,
+    scientificNamesMatchAll,
   } = query;
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
@@ -156,12 +159,22 @@ export function createDataFilterQueryString(query) {
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
     .map((eov) => eov.title)
     .join(); // create the comma delimited list of eovs
-  // With a single EOV "all" and "any" are the same selection, so the param is
-  // left off rather than giving one selection two URLs and two cache keys.
-  const eovsMatch =
-    eovsMatchAll && eovsSelected.filter((eov) => eov.isSelected).length > 1
-      ? "all"
-      : "";
+  // With a single include "all" and "any" are the same selection, so the param
+  // is left off rather than giving one selection two URLs and two cache keys.
+  const matchParam = (matchAll, includedCount) =>
+    matchAll && includedCount > 1 ? "all" : "";
+  const eovsMatch = matchParam(
+    eovsMatchAll,
+    eovsSelected.filter((eov) => eov.isSelected).length,
+  );
+  const organizationsMatch = matchParam(
+    orgsMatchAll,
+    orgsSelected.filter((org) => org.isSelected).length,
+  );
+  const scientificNamesMatch = matchParam(
+    scientificNamesMatchAll,
+    scientificNamesSelected?.length ?? 0,
+  );
 
   const excludedList = (options, value) =>
     (options || [])
@@ -187,7 +200,8 @@ export function createDataFilterQueryString(query) {
       .join(); // create the comma delimited list of dataset pks
   }
 
-  if (orgsSelected.every((e) => e.isSelected)) {
+  // Every org ticked only means "no filter" when any one of them will do.
+  if (!organizationsMatch && orgsSelected.every((e) => e.isSelected)) {
     orgPKs = "";
   } else {
     orgPKs = orgsSelected
@@ -197,10 +211,8 @@ export function createDataFilterQueryString(query) {
   }
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults;
 
-  const scientificNames =
-    scientificNamesSelected && scientificNamesSelected.length
-      ? scientificNamesSelected.map(encodeURIComponent).join(",")
-      : "";
+  const namesList = (names) => (names || []).map(encodeURIComponent).join(",");
+  const scientificNames = namesList(scientificNamesSelected);
 
   // Combined "Data Source" filter (ERDDAP servers + OBIS nodes). No selection
   // — or everything selected — means no source filtering. A server-only
@@ -245,11 +257,13 @@ export function createDataFilterQueryString(query) {
     // These properties are specified by the API's schema
     eovs,
     eovsMatch,
+    excludeEovs: excludedList(eovsSelected, (e) => e.title),
     platforms,
     excludePlatforms: excludedList(platformsSelected, (p) => p.title),
     datasetPKs,
     excludeDatasetPKs: excludedList(datasetsSelected, (d) => d.pk),
     organizations: orgPKs,
+    organizationsMatch,
     excludeOrganizations: excludedList(orgsSelected, (o) => o.pk),
     erddapServers,
     excludeErddapServers: excludedList(erddapServersSelected, (s) => s.url),
@@ -262,6 +276,8 @@ export function createDataFilterQueryString(query) {
     depthMax: endDepth,
     includeObis,
     scientificNames,
+    scientificNamesMatch,
+    excludeScientificNames: namesList(scientificNamesExcluded),
     obisNodes,
     // Only ever sent when on; objectToURL drops empty strings, so the default
     // leaves the URL (and the API request) untouched.

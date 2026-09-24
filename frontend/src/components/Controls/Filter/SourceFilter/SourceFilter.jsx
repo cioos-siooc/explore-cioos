@@ -10,6 +10,11 @@ import {
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import { capitalizeFirstLetter, nextOptionState } from "../../../../utilities";
+import {
+  ExcludedLabel,
+  OptionStateIcon,
+  optionStateClass,
+} from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
 // Combined data-source filter: ERDDAP servers as a flat list, plus a single
@@ -87,23 +92,6 @@ export default function SourceFilter({
     );
   }
 
-  const optionClass = (option) =>
-    `optionButton ${isChecked(option) ? "selected" : ""} ${
-      option.isExcluded ? "excluded" : ""
-    }`;
-  const optionIcon = (option) =>
-    isChecked(option) ? (
-      <CheckSquare />
-    ) : option.isExcluded ? (
-      <XSquare />
-    ) : (
-      <Square />
-    );
-  const excludedLabel = (option) =>
-    option.isExcluded && (
-      <span className="sr-only">{` (${t("filterOptionExcludedLabel")})`}</span>
-    );
-
   const obisChildrenVisible = obisExpanded || (search && nodesShown.length > 0);
 
   if (serversShown.length === 0 && !showObisGroup) {
@@ -119,15 +107,15 @@ export default function SourceFilter({
       {serversShown.map((server) => (
         <div
           key={server.pk}
-          className={optionClass(server)}
+          className={optionStateClass(server)}
           title={server.title}
           onClick={() => toggleServer(server.pk)}
         >
-          {optionIcon(server)}
+          <OptionStateIcon {...server} />
           <span className="optionName">
             {capitalizeFirstLetter(server.title)}
           </span>
-          {excludedLabel(server)}
+          <ExcludedLabel {...server} />
         </div>
       ))}
       {showObisGroup && (
@@ -164,13 +152,13 @@ export default function SourceFilter({
               {nodesShown.map((node) => (
                 <div
                   key={node.pk}
-                  className={optionClass(node)}
+                  className={optionStateClass(node)}
                   title={node.title}
                   onClick={() => toggleNode(node.pk)}
                 >
-                  {optionIcon(node)}
+                  <OptionStateIcon {...node} />
                   <span className="optionName">{node.title}</span>
-                  {excludedLabel(node)}
+                  <ExcludedLabel {...node} />
                 </div>
               ))}
             </div>

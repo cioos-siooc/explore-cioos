@@ -225,6 +225,40 @@ describe("createDataFilterQueryString", () => {
       false,
     );
   });
+
+  it("every multi-valued list sends its match mode and its exclusions", () => {
+    const params = new URLSearchParams(
+      createDataFilterQueryString(
+        makeQuery({
+          eovsSelected: [excluded("salinity")],
+          orgsSelected: [
+            selected("A", { pk: 1 }),
+            selected("B", { pk: 2 }),
+            unselected("C", { pk: 3 }),
+          ],
+          orgsMatchAll: true,
+          scientificNamesSelected: ["Gadus morhua", "Clupea harengus"],
+          scientificNamesExcluded: ["Orcinus orca"],
+          scientificNamesMatchAll: true,
+        }),
+      ),
+    );
+    expect(params.get("excludeEovs")).toBe("salinity");
+    expect(params.get("organizations")).toBe("1,2");
+    expect(params.get("organizationsMatch")).toBe("all");
+    expect(params.get("scientificNamesMatch")).toBe("all");
+    expect(params.get("excludeScientificNames")).toBe("Orcinus orca");
+  });
+
+  it("every org ticked is still a filter when all of them must match", () => {
+    const orgsSelected = [selected("A", { pk: 1 }), selected("B", { pk: 2 })];
+    const paramsFor = (orgsMatchAll) =>
+      new URLSearchParams(
+        createDataFilterQueryString(makeQuery({ orgsSelected, orgsMatchAll })),
+      );
+    expect(paramsFor(false).has("organizations")).toBe(false);
+    expect(paramsFor(true).get("organizations")).toBe("1,2");
+  });
 });
 
 describe("nextOptionState", () => {

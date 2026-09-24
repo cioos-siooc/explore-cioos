@@ -17,6 +17,10 @@
   margin: 0 0 10px;
   cursor: pointer;
   line-height: 30px;
+  /* The include/exclude cycle is repeated clicks, which would otherwise
+     select the option's text. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .multiCheckboxFilter .optionButton {

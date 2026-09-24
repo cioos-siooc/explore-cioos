@@ -573,6 +573,7 @@
   "filtersPanelHint": "Choisissez un filtre à gauche pour afficher ses options ici — combinez-en autant que vous le souhaitez pour affiner ce qui est affiché sur la carte.",
   "filtersPanelHintStep_select": "Cliquez sur un filtre pour ouvrir ses options ici.",
   "filtersPanelHintStep_combine": "Combinez des filtres de différentes catégories — les résultats correspondent à tous.",
+  "filtersPanelHintStep_exclude": "Cliquez une fois sur une option pour l'inclure, une deuxième fois pour l'exclure, une troisième fois pour l'effacer.",
   "filtersPanelHintStep_live": "Les changements s'appliquent à la carte immédiatement, sans confirmation.",
   "filtersPanelHintStep_reset": "Utilisez « Tout effacer » ci-dessous pour retirer tous les filtres à la fois.",
   "filtersModalBackTitle": "Retour à tous les filtres",
@@ -711,7 +712,8 @@
   "legendHelp_hexes_scale_body": "L'échelle est recalculée pour les hexagones affichés : un même vert représente donc des quantités différentes selon le zoom.",
   "legendHelp_seafloor_source_link": "Les données NONNA du SHC",
   "filterExcludedOption": "sauf {{title}}",
+  "filterNotTag": "sauf",
   "filterOptionExcludedLabel": "exclue",
-  "eovsMatchAll": "toutes",
-  "eovsMatchAllLabel": "Toutes les variables sélectionnées"
+  "filterMatchAll": "toutes",
+  "filterMatchAllLabel": "Correspondre à toutes les options incluses"
 }

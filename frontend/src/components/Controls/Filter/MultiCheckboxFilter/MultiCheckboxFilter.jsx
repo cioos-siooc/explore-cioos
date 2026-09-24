@@ -1,14 +1,14 @@
 import * as React from "react";
-import {
-  CheckSquare,
-  CircleFill,
-  Square,
-  XSquare,
-} from "react-bootstrap-icons";
+import { CheckSquare, CircleFill, Square } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import Tooltip from "../../../ui/Tooltip.jsx";
 import { capitalizeFirstLetter, nextOptionState } from "../../../../utilities";
 import platformColors from "../../../platformColors";
+import {
+  ExcludedLabel,
+  OptionStateIcon,
+  optionStateClass,
+} from "./OptionState.jsx";
 import "./styles.css";
 
 export default function MultiCheckboxFilter({
@@ -17,8 +17,6 @@ export default function MultiCheckboxFilter({
   translatable,
   colored,
   allOptions,
-  // Clicks cycle include -> exclude -> clear instead of toggling include.
-  excludable,
 }) {
   const { t, i18n } = useTranslation();
 
@@ -43,11 +41,7 @@ export default function MultiCheckboxFilter({
   function toggleOption(option) {
     setOptionsSelected(
       universe.map((opt) =>
-        opt.pk !== option.pk
-          ? opt
-          : excludable
-            ? nextOptionState(opt)
-            : { ...opt, isSelected: !opt.isSelected },
+        opt.pk === option.pk ? nextOptionState(opt) : opt,
       ),
     );
   }
@@ -133,9 +127,7 @@ export default function MultiCheckboxFilter({
               content={hoverText}
             >
               <div
-                className={`optionButton ${isChecked(option) && "selected"} ${
-                  option.isExcluded ? "excluded" : ""
-                }`}
+                className={optionStateClass(option)}
                 key={index}
                 title={hoverText ? "" : t(title)}
                 // A checkbox in everything but tag name: it was a bare div, so
@@ -158,23 +150,11 @@ export default function MultiCheckboxFilter({
                   }
                 }}
               >
-                {isChecked(option) ? (
-                  <CheckSquare />
-                ) : option.isExcluded ? (
-                  <XSquare />
-                ) : (
-                  <Square />
-                )}
+                <OptionStateIcon {...option} />
                 <span className="optionName">
                   {capitalizeFirstLetter(title)}
                 </span>
-                {/* aria-checked can only say "included"; "mixed" would mean
-                    partially, so exclusion is announced as text instead. */}
-                {option.isExcluded && (
-                  <span className="sr-only">
-                    {` (${t("filterOptionExcludedLabel")})`}
-                  </span>
-                )}
+                <ExcludedLabel {...option} />
                 {colored && (
                   <CircleFill
                     className="optionColorCircle"
