@@ -69,6 +69,7 @@ import {
 } from "./basemapStyle.js";
 import { buildTileSuffix } from "./tileQuery.js";
 import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
+import { featureHasDataset, focusedPointFeatures } from "./focusedPoints.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // direct_select's own dragVertex/toDisplayFeatures, captured once here at
@@ -224,6 +225,8 @@ const observationLayerIds = [
   "points",
   "points-halo",
   "points-highlighted",
+  "focused-points",
+  "focused-points-halo",
   "coverage-hexes",
   "coverage-hex-outlines",
 ];
@@ -875,6 +878,18 @@ export default function CreateMap({
         pointsHaloOpacity(),
       );
     }
+    if (map.current.getLayer("focused-points")) {
+      map.current.setPaintProperty(
+        "focused-points",
+        "circle-opacity",
+        circleOpacity,
+      );
+      map.current.setPaintProperty(
+        "focused-points-halo",
+        "circle-opacity",
+        0.9,
+      );
+    }
   }
 
   // The moment the map is worth handing over, reported once — this is what the
@@ -1002,17 +1017,6 @@ export default function CreateMap({
       source: "cde-cells",
       sourceLayer: "coverage-hexes-layer",
     },
-  };
-
-  // Hex and marker features carry the datasets they aggregate as a JSON array
-  // of pks (MapLibre hands nested properties back as strings). Both the dimming
-  // and the ramp's domain ask the same question of them.
-  const featureHasDataset = (feature, pk) => {
-    try {
-      return JSON.parse(feature.properties.datasets).includes(pk);
-    } catch {
-      return false;
-    }
   };
 
   // Tracks are the third way a dataset draws itself (hexes, markers, tracks),
@@ -1179,7 +1183,7 @@ export default function CreateMap({
   // as the tail of the movement. So they all take the snap without the wait.
   const NO_TRANSITION = { duration: 0 };
 
-  // The four layers that draw the same point features, and the halo's extra
+  // The layers that draw the same point features, and the halo's extra
   // radius. They share one paint, so a radius change has to reach all of them
   // or the halo/highlight desync from the markers they sit under.
   // click-highlight-point rides along so the outline the "what's here" card
@@ -1188,7 +1192,8 @@ export default function CreateMap({
     ["points", 0],
     ["points-halo", 1.25],
     ["points-highlighted", 0],
-    ["points-hovered", 0],
+    ["focused-points", 0],
+    ["focused-points-halo", 1.25],
     ["click-highlight-point", 0],
     ["click-highlight-point-glow", 6],
   ];
@@ -1311,6 +1316,13 @@ export default function CreateMap({
           "circle-color",
           dimmable(colors),
         );
+        if (map.current.getLayer("focused-points")) {
+          map.current.setPaintProperty(
+            "focused-points",
+            "circle-color",
+            colors,
+          );
+        }
       }
       // Always keep the hexes layer's stops populated, not just when zoomed
       // into the hex band — a reload while zoomed in (zoom >= 7) would
@@ -1327,7 +1339,7 @@ export default function CreateMap({
     }
 
     // The circle-radius ramp tracks the same metric as the fill, so it has to
-    // be re-applied whenever the ranges change — on all four point layers,
+    // be re-applied whenever the ranges change — on every point layer,
     // which share one paint.
     POINT_LAYERS.forEach(([layer, padding]) => {
       if (map.current.getLayer(layer)) {
@@ -1579,17 +1591,23 @@ export default function CreateMap({
     const dimmedLayers = [pointLevel ? "points" : "hexes", "coverage-hexes"];
 
     const dimmed = {};
+    let focusedPoints = emptyFeatureCollection;
     dimmedLayers.forEach((layerId) => {
       if (!pk || !map.current.getLayer(layerId)) {
         dimmed[layerId] = [];
         return;
       }
-      dimmed[layerId] = map.current
-        .queryRenderedFeatures({ layers: [layerId] })
+      const hits = map.current.queryRenderedFeatures({ layers: [layerId] });
+      dimmed[layerId] = hits
         .filter((feature) => !featureHasDataset(feature, pk))
         // promoteId puts pk on the feature id, which is what setFeatureState
         // addresses.
         .map((feature) => feature.id);
+      // 'points' stacks by count, which a layout property can't make depend
+      // on feature-state, so the focused markers were often buried under grey
+      // ones. They are redrawn on top from a copy instead — a filtered tile
+      // layer would relayout the whole source on every focus change.
+      if (layerId === "points") focusedPoints = focusedPointFeatures(hits, pk);
     });
 
     // Writing the state makes the map fire the very events that re-run this
@@ -1600,9 +1618,12 @@ export default function CreateMap({
       pk,
       pointLevel,
       ...dimmedLayers.map((layerId) => dimmed[layerId].join(",")),
+      focusedPoints.features.map((feature) => feature.id).join(","),
     ].join("|");
     if (signature === appliedFocus.current) return;
     appliedFocus.current = signature;
+
+    map.current.getSource("focused-points")?.setData(focusedPoints);
 
     // Cleared wholesale rather than by tracking what was set last time: two
     // calls, and they cannot drift out of step with the map. Both source layers
@@ -2689,6 +2710,51 @@ export default function CreateMap({
         FIRST_LABEL_LAYER_ID,
       );
 
+      // The focused dataset's markers, redrawn over the greyed rest — see
+      // hoverHighlightPoints. Purely visual: clicks still resolve on 'points'.
+      // Below 'points-highlighted' so a drawn shape's selection rings stay on
+      // top.
+      map.current.addSource("focused-points", {
+        type: "geojson",
+        data: emptyFeatureCollection,
+      });
+      map.current.addLayer(
+        {
+          id: "focused-points-halo",
+          type: "circle",
+          minzoom: hexMaxZoom,
+          source: "focused-points",
+          paint: {
+            "circle-color": "#ffffff",
+            // Zero until the ramp is final, like the layers it copies — see
+            // revealData.
+            "circle-opacity": dataRevealed.current ? 0.9 : 0,
+            "circle-radius-transition": NO_TRANSITION,
+            "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
+          },
+        },
+        "points-highlighted",
+      );
+      map.current.addLayer(
+        {
+          id: "focused-points",
+          type: "circle",
+          minzoom: hexMaxZoom,
+          source: "focused-points",
+          layout: {
+            "circle-sort-key": ["get", "count"],
+          },
+          paint: {
+            "circle-color-transition": NO_TRANSITION,
+            "circle-color": colors,
+            "circle-opacity": dataRevealed.current ? circleOpacity : 0,
+            "circle-radius-transition": NO_TRANSITION,
+            "circle-radius": radiusExpression(pointRadiusRange.current),
+          },
+        },
+        "points-highlighted",
+      );
+
       // Griddap (gridded, metadata-only) datasets: the optional coverage
       // layer (all matching bboxes, toggled off by default) and the
       // single-dataset highlight (hover from the list / pinned while a WMS
@@ -2883,32 +2949,43 @@ export default function CreateMap({
       // same goldenrod as the card that asked for it. A fixed size rather than
       // the marker's own ramp: the record's feature carries no `count`, and a
       // ring a little wider than any marker reads as around it either way.
+      //
+      // Both go under the focused markers rather than over everything: the
+      // record belongs to the open page's dataset, so its own marker is in
+      // 'focused-points' and stays visible inside the glow. The ring is wider
+      // than the largest marker, so it still shows around it.
       map.current.addSource("mapped-record", {
         type: "geojson",
         data: emptyFeatureCollection,
       });
-      map.current.addLayer({
-        id: "mapped-record-glow",
-        type: "circle",
-        source: "mapped-record",
-        paint: {
-          "circle-radius": 16,
-          "circle-color": clickHighlightColor,
-          "circle-blur": 0.8,
-          "circle-opacity": 0.85,
+      map.current.addLayer(
+        {
+          id: "mapped-record-glow",
+          type: "circle",
+          source: "mapped-record",
+          paint: {
+            "circle-radius": 16,
+            "circle-color": clickHighlightColor,
+            "circle-blur": 0.8,
+            "circle-opacity": 0.85,
+          },
         },
-      });
-      map.current.addLayer({
-        id: "mapped-record-ring",
-        type: "circle",
-        source: "mapped-record",
-        paint: {
-          "circle-radius": 11,
-          "circle-color": "rgba(0, 0, 0, 0)",
-          "circle-stroke-color": clickHighlightColor,
-          "circle-stroke-width": 3,
+        "focused-points-halo",
+      );
+      map.current.addLayer(
+        {
+          id: "mapped-record-ring",
+          type: "circle",
+          source: "mapped-record",
+          paint: {
+            "circle-radius": 11,
+            "circle-color": "rgba(0, 0, 0, 0)",
+            "circle-stroke-color": clickHighlightColor,
+            "circle-stroke-width": 3,
+          },
         },
-      });
+        "focused-points-halo",
+      );
 
       // --- Track-line layers ---------------------------------------------
       // Track lines + head positions from /tiles/tracks, shown only when the
