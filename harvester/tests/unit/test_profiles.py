@@ -142,6 +142,26 @@ class TestGetProfilesEmptyAndEdgeCases:
         result = get_profiles(bad_geometry_dataset)
         assert result.empty
 
+    def test_unparseable_time_feature_filtered_out(self, single_station_dataset):
+        """A time pandas can't represent (year 0019, a typo for 2019) coerces
+        to NaT; the feature must go here so the dataset is skipped, not loaded
+        with a feature the db-loader then silently drops."""
+        single_station_dataset.df_variables.loc["time", "actual_range"] = (
+            "0019-06-24T00:20:00Z,0019-11-01T07:40:00Z"
+        )
+        max_min = single_station_dataset.get_max_min.side_effect
+
+        def _year_0019_times(vars_list):
+            df = max_min(vars_list)
+            if vars_list[-1] == "time":
+                df["time_min"] = "0019-06-24T00:20:00Z"
+                df["time_max"] = "0019-11-01T07:40:00Z"
+            return df
+
+        single_station_dataset.get_max_min.side_effect = _year_0019_times
+        result = get_profiles(single_station_dataset)
+        assert result.empty
+
     def test_profile_id_column_added_when_missing(self, single_station_dataset):
         """timeSeries datasets have no profile_id variable; it should default to empty string."""
         result = get_profiles(single_station_dataset)
