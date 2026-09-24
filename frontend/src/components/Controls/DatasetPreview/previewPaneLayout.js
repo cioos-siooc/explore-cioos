@@ -1,13 +1,11 @@
 // How wide the plot's parameters pane may be, and the clamp every change to it
-// commits through.
-//
-// Pure, for the same reason the facet plan and the figure are: the bounds are
-// where a resizable pane goes wrong, and they are assertable without a browser.
+// commits through. Pure: the bounds are where a resizable pane goes wrong, and
+// they are assertable without a browser.
 
-import { MIN_PLOT_PX } from "./previewFacetFigure.js";
+import { MIN_PLOT_PX } from "./previewFacetSizing.js";
 
 // 90px of caption plus the row's 8px gap leaves about 100px of dropdown, which
-// still reads. The column sized itself to 218px before it could be dragged.
+// still reads.
 export const PANE_MIN_PX = 200;
 export const PANE_DEFAULT_PX = 240;
 export const PANE_MAX_PX = 424;

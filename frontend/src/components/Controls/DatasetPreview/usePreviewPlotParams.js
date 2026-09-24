@@ -28,8 +28,17 @@ import { normalizeColorScale } from "./previewColorScales.js";
 // The param names live in state/selection/previewParams.js, because UrlSync has
 // to carry them through and SelectionProvider has to clear them.
 
-const DEFAULT_MODE = "markers";
-const PLOT_MODES = ["markers", "lines", "markers+lines"];
+// The modes, in the order the picker offers them. One table: the hook validates
+// against it and the picker renders from it, so a mode can never be reachable in
+// a link but missing from the menu. `markers+lines` has no key of its own — the
+// bundle spells it `markersAndLine`.
+export const PLOT_MODES = [
+  { value: "markers", labelKey: "markers" },
+  { value: "lines", labelKey: "line" },
+  { value: "markers+lines", labelKey: "markersAndLine" },
+];
+
+const DEFAULT_MODE = PLOT_MODES[0].value;
 
 // A panel list rides in one param rather than one param per panel: the count is
 // unbounded (as many variables as the dataset has), and pvars=A,B,C stays
@@ -188,10 +197,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // One colour per variable, keyed by COLUMN NAME and not by panel index: a
   // colour then survives unticking a variable and ticking it again, and a link's
   // colours cannot slide onto the wrong panels when the selection differs.
-  //
-  // This replaces `pcolor`, which named the ONE variable whose values shaded
-  // every panel. See previewColors.js for the codec and previewParams.js for why
-  // the old param is retired rather than reused.
+  // See previewColors.js for the codec.
   const variableColors = useMemo(
     () =>
       parseColorsParam(searchParams.get("pcolors"), (columnName) =>
@@ -246,7 +252,9 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   );
 
   const modeParam = searchParams.get("pmode");
-  const plotType = PLOT_MODES.includes(modeParam) ? modeParam : DEFAULT_MODE;
+  const plotType = PLOT_MODES.some((mode) => mode.value === modeParam)
+    ? modeParam
+    : DEFAULT_MODE;
   const setPlotType = useCallback(
     (mode) => setParams({ pmode: mode === DEFAULT_MODE ? null : mode }),
     [setParams],

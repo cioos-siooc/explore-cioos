@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { MIN_PLOT_PX } from "./previewFacetFigure.js";
+import { MIN_PLOT_PX } from "./previewFacetSizing.js";
 import {
   clampPaneWidth,
   PANE_DEFAULT_PX,

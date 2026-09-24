@@ -1,10 +1,8 @@
 // The plot's third dimension: one column whose values shade the markers of every
 // selected variable, through one scale and one colourbar.
 //
-// This is the dimension the pre-faceting preview had, removed when colour became
-// "which variable is this panel" and brought back beside it: the solid colour
-// still says which variable, the ramp says what a third one was doing at each
-// point. previewColors.js owns the first, this owns the second, and
+// previewColors.js owns the solid colour that says WHICH variable a panel is;
+// this owns the ramp that says what a third column was doing at each point.
 // erddapPalettes.js is the ramp table both read.
 //
 // Pure on purpose — no React, no Plotly — so every rule below is assertable
@@ -91,7 +89,6 @@ export function colorScaleFor(name) {
   return paletteFor(name) || BUILT_IN_PALETTES[name] || [];
 }
 
-// The same stops, under the name the picker's chip asks for them by.
 export const swatchStopsFor = colorScaleFor;
 
 // The scale a column draws in when nobody has picked one: the publisher's own

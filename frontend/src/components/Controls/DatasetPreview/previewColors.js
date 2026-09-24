@@ -1,11 +1,9 @@
 // One colour per plotted variable: where its default comes from, and how a
 // user's override survives a link.
 //
-// One of the two things colour says here. This one names the PANEL: with a panel
-// per variable, a solid colour is free to say which variable is drawn rather
-// than what its values are. The other is the colour dimension in
-// previewColorScales.js — a third column shading every panel's markers — which
-// takes the markers while this keeps the line.
+// This one names the PANEL: with a panel per variable, a solid colour is free to
+// say which variable is drawn rather than what its values are. It keeps the
+// line; previewColorScales.js takes the markers.
 //
 // Pure on purpose: the param codec has to be assertable under `node --test`, and
 // usePreviewPlotParams (which owns the param) imports react-router.

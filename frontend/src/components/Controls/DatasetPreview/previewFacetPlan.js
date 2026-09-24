@@ -1,22 +1,6 @@
 // What to draw for a record: which axis every panel shares, which way the panels
-// stack, and which variables get a panel by default.
-//
-// The layouts come from CDE_Graphs_SANDBOX.png, one per cdm_data_type:
-//
-//   PROFILS / TIMESERIES PROFILS / TRAJECTORIES PROFILS
-//     panels side by side, each with its own X on top, all sharing one depth
-//     axis on the left that runs downwards.
-//   TIMESERIES / TRAJECTORIES
-//     panels stacked, each with its own Y, all sharing one X at the bottom
-//     (time, or longitude/latitude for a trajectory), first variable at the
-//     bottom.
-//   POINT
-//     stacked like a timeseries, but the shared X is the FIRST VARIABLE rather
-//     than a coordinate.
-//
-// Point needs no branch of its own: the shared axis is always excluded from the
-// panel set, so "variable 1 on x, the rest as panels" is what falls out of
-// pointing the shared axis at a measurement.
+// stack, and which variables get a panel by default. CDM_LAYOUTS below holds the
+// whole vocabulary, one row per cdm_data_type, after CDE_Graphs_SANDBOX.png.
 //
 // Pure: no React, no Plotly. DatasetPreview asks whether a plot is possible at
 // all before mounting the lazy chunk, and this is what answers.
@@ -35,23 +19,7 @@ import {
 export const COLUMNS = "columns"; // profiles: panels across, shared Y
 export const ROWS = "rows"; // timeseries: panels stacked, shared X
 
-const PROFILE_TYPES = new Set([
-  "Profile",
-  "TimeSeriesProfile",
-  "TrajectoryProfile",
-]);
-
-// The types a layout exists for. Read twice: here, to tell "no layout for this
-// type" apart from "layout, but this record is missing its axis", and by
-// defaultVisFor at the bottom of the file.
-const PLOTTABLE_TYPES = new Set([
-  ...PROFILE_TYPES,
-  "TimeSeries",
-  "Trajectory",
-  "Point",
-]);
-
-const find = (variables, predicate) => variables.find(predicate);
+const find = (variables, predicate) => (variables || []).find(predicate);
 
 const verticalCoordinate = (variables) =>
   find(
@@ -97,6 +65,64 @@ function trackCoordinate(variables, data) {
     : candidates[0];
 }
 
+// The index when trackIndexFor built one, which is the usual case. Without it —
+// a track with no time to rank by — the coordinate that moves furthest is still
+// a better axis than nothing.
+function trackAxisFor(variables, data) {
+  return (
+    find(
+      variables,
+      (variable) => variable.columnName === POSITION_INDEX_COLUMN,
+    ) ||
+    trackCoordinate(variables, data) ||
+    timeCoordinateOf(variables)
+  );
+}
+
+// One row per plottable cdm_data_type: how its panels stack, which axis they
+// share, and what the search was looking for when a record has none. A seventh
+// type is one row here and nowhere else — this table is what `defaultVisFor`
+// means by plottable and what the blocker message names.
+//
+// Point needs nothing beyond its first measurement: the shared axis is always
+// excluded from the panel set, so "variable 1 on x, the rest as panels" falls
+// out of pointing the shared axis at a measurement.
+const CDM_LAYOUTS = {
+  Profile: {
+    orientation: COLUMNS,
+    wanted: "vertical",
+    sharedAxisFor: verticalCoordinate,
+  },
+  TimeSeriesProfile: {
+    orientation: COLUMNS,
+    wanted: "vertical",
+    sharedAxisFor: verticalCoordinate,
+  },
+  TrajectoryProfile: {
+    orientation: COLUMNS,
+    wanted: "vertical",
+    sharedAxisFor: verticalCoordinate,
+  },
+  TimeSeries: {
+    orientation: ROWS,
+    wanted: "time",
+    sharedAxisFor: timeCoordinateOf,
+  },
+  Trajectory: {
+    orientation: ROWS,
+    wanted: "track",
+    sharedAxisFor: trackAxisFor,
+  },
+  Point: {
+    orientation: ROWS,
+    wanted: "measurement",
+    sharedAxisFor: (variables) => measurementsOf(variables)[0],
+  },
+};
+
+const layoutFor = (dataset) =>
+  CDM_LAYOUTS[(dataset && dataset.cdm_data_type) || ""] || null;
+
 // Which way round the two axis controls are drawn. X is the axis every panel is
 // drawn against and Y is the panels themselves, in BOTH layouts — the names are
 // about the data, so they do not swap when the panels do. What the orientation
@@ -128,28 +154,6 @@ export function colorCandidatesFor(variables) {
   return sharedCandidatesFor(variables).filter(
     (variable) => variable.isNumeric || isTimeLike(variable),
   );
-}
-
-// The shared axis a dataset type implies, or undefined when nothing fits.
-function defaultSharedFor(dataset, variables, data) {
-  const type = (dataset && dataset.cdm_data_type) || "";
-  if (PROFILE_TYPES.has(type)) return verticalCoordinate(variables);
-  if (type === "TimeSeries") return timeCoordinateOf(variables);
-  if (type === "Trajectory") {
-    // The index when trackIndexFor built one, which is the usual case. Without
-    // it — a track with no time to rank by — the coordinate that moves furthest
-    // is still a better axis than nothing.
-    return (
-      find(
-        variables,
-        (variable) => variable.columnName === POSITION_INDEX_COLUMN,
-      ) ||
-      trackCoordinate(variables, data) ||
-      timeCoordinateOf(variables)
-    );
-  }
-  if (type === "Point") return measurementsOf(variables)[0];
-  return undefined;
 }
 
 // Where a measurement was taken, never what it measured. Excluded from the
@@ -210,17 +214,6 @@ export const PLOT_BLOCKED = {
   NO_MEASUREMENTS: "noMeasurements",
 };
 
-// What defaultSharedFor goes looking for, per type, so the message can name it
-// in the same terms the search used.
-const WANTED_BY_TYPE = {
-  Profile: "vertical",
-  TimeSeriesProfile: "vertical",
-  TrajectoryProfile: "vertical",
-  TimeSeries: "time",
-  Trajectory: "track",
-  Point: "measurement",
-};
-
 // One walk, two readings: the plan when there is one, otherwise what stopped it.
 // Shared so the answer and the excuse can never disagree about what is missing.
 function planOrBlockerFor(dataset, variables, data) {
@@ -233,22 +226,22 @@ function planOrBlockerFor(dataset, variables, data) {
   if (!dataset || !variables || !variables.length) {
     return blocked(PLOT_BLOCKED.NO_COLUMNS);
   }
-  if (!PLOTTABLE_TYPES.has(cdmDataType)) {
+  const layout = layoutFor(dataset);
+  if (!layout) {
     return blocked(PLOT_BLOCKED.UNSUPPORTED_TYPE);
   }
 
-  const shared = defaultSharedFor(dataset, variables, data);
+  const shared = layout.sharedAxisFor(variables, data);
   if (!shared) {
-    return blocked(PLOT_BLOCKED.NO_SHARED_AXIS, {
-      wanted: WANTED_BY_TYPE[cdmDataType],
-    });
+    return blocked(PLOT_BLOCKED.NO_SHARED_AXIS, { wanted: layout.wanted });
   }
 
   const panelDefaults = defaultPanelsFor(dataset, variables, shared);
   if (!panelDefaults.length) return blocked(PLOT_BLOCKED.NO_MEASUREMENTS);
 
-  const orientation = PROFILE_TYPES.has(cdmDataType) ? COLUMNS : ROWS;
-  return { plan: planFrom(orientation, shared, variables, panelDefaults) };
+  return {
+    plan: planFrom(layout.orientation, shared, variables, panelDefaults),
+  };
 }
 
 // What stopped this record from being plotted, or null when nothing did.
@@ -300,9 +293,7 @@ export function resolvePanels(panels, variables, sharedAxis) {
   });
 }
 
-// Table or plot when the link says nothing.
-//
-// Deliberately decided from cdm_data_type ALONE, never from the payload: the
+// Table or plot when the link says nothing. Deliberately decided from cdm_data_type ALONE, never from the payload: the
 // /preview fetch is async, so a default that consulted the columns would answer
 // "table" on the first render and "plot" once the rows landed, bouncing the user
 // between views mid-load. The type is what says whether a layout exists at all;
@@ -310,7 +301,5 @@ export function resolvePanels(panels, variables, sharedAxis) {
 // plot than by silently reverting to the table — see plotBlockerFor, which is
 // what reports it.
 export function defaultVisFor(dataset) {
-  return PLOTTABLE_TYPES.has((dataset && dataset.cdm_data_type) || "")
-    ? "plot"
-    : "table";
+  return layoutFor(dataset) ? "plot" : "table";
 }

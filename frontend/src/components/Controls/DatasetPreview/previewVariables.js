@@ -27,8 +27,8 @@ const NUMERIC_TYPES = new Set([
 ]);
 
 // Units that identify a coordinate no matter what the column is called. 'UTC' is
-// how ERDDAP marks a time column in columnUnits — more reliable than matching
-// the name 'time', which is what this replaces.
+// how ERDDAP marks a time column in columnUnits, which is more reliable than
+// matching the name 'time'.
 const TIME_UNITS = new Set(["UTC"]);
 // ERDDAP also states a time column's units as its format string. mpoEaeTemperature
 // publishes `year` with units "CCYY-MM-DD"; without this it reads as a plottable
@@ -159,7 +159,7 @@ export function variablesFrom(table, dataset) {
   const variables = columnNames.map((columnName, index) => {
     const meta = (columnMeta && columnMeta[index]) || null;
     const type = trimmed(columnTypes[index]) || (meta && trimmed(meta.type));
-    const variable = {
+    return {
       columnName,
       // columnUnits is ERDDAP's own answer for THIS query, so it wins over the
       // harvest, which may predate a units change.
@@ -194,7 +194,6 @@ export function variablesFrom(table, dataset) {
       cmin: meta ? numberOr(meta.colorBarMinimum, undefined) : undefined,
       cmax: meta ? numberOr(meta.colorBarMaximum, undefined) : undefined,
     };
-    return variable;
   });
 
   return variables.map((variable) => ({

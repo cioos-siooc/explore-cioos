@@ -2,21 +2,15 @@
 // its coordinates.
 //
 // WHY NOT LATITUDE OR LONGITUDE
-// The layout image says a trajectory is read against its track, and the first
-// reading of that was max([lat],[lon]) — whichever coordinate spans further.
-// That only works on a track that never turns back: a survey that revisits a
+// A coordinate only orders a track that never turns back: a survey revisiting a
 // station gives two different moments the same x, and the line crosses itself.
-// The rows do not even arrive in track order — IsmerOslKamouraskaGeochemistry's
-// Mai21 comes back in sampleID order, whose first row is 20:38 and second 18:54.
-//
-// So the axis becomes 1..N in TIME order, and the coordinates move to the tick
-// labels and the hover, where two of them can be read at once. Latitude and
-// longitude stay in sharedCandidatesFor, so the old axis is one dropdown pick
-// away.
+// The rows do not even arrive in track order. So the axis is 1..N in TIME order,
+// and the coordinates move to the tick labels and the hover, where both can be
+// read at once — they stay in sharedCandidatesFor, one dropdown pick away.
 //
 // Pure: no React, no Plotly. The synthetic variable is shaped exactly like one
-// of variablesFrom's, so every reader downstream — the axis picker, the label
-// editor, the colour candidates — treats it as an ordinary column.
+// of variablesFrom's, so every reader downstream treats it as an ordinary
+// column.
 
 // Chosen to read in a URL (?paxis=position_index). A dataset that already
 // publishes a column of this name keeps it, and gets no index.
@@ -34,8 +28,7 @@ const COORDINATE_DIGITS = 4;
 
 const find = (variables, predicate) => (variables || []).find(predicate);
 
-// Verbatim the predicate previewFacetPlan used before this module existed, and
-// deliberately narrower than isTimeLike: that one also matches a "CCyy" year
+// Deliberately narrower than isTimeLike: that one also matches a "CCyy" year
 // column, which orders a track far more coarsely than its timestamps do.
 export function timeCoordinateOf(variables) {
   return find(
