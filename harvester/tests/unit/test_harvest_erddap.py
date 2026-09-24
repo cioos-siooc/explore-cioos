@@ -114,6 +114,14 @@ class TestHarvestErddapSkipping:
         assert "bad_ds" in result.skipped["dataset_id"].values
         assert CDM_DATA_TYPE_UNSUPPORTED in result.skipped["reason_code"].values
 
+    def test_skipped_keyed_on_the_datasets_erddap_url(self):
+        """prune_stale_datasets() matches skips against cde.datasets rows, which
+        carry the full URL; a bare hostname never matched, so errored datasets
+        were pruned as gone upstream."""
+        erddap_mock = _make_erddap_mock([("bad_ds", "Point")])
+        result = _run_harvest(erddap_mock)
+        assert (result.skipped["erddap_url"] == ERDDAP_URL.rstrip("/")).all()
+
     def test_non_compliant_dataset_added_to_skipped(self):
         """A dataset with no EOVs should fail compliance and appear in skipped."""
         non_compliant = build_mock_dataset(ERDDAP_INFO_NO_EOVS_CSV)
