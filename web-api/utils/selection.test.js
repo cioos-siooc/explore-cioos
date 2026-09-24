@@ -38,6 +38,10 @@ test("a scientific-name selection is OBIS-only", () => {
   );
 });
 
+test("excluding a taxon keeps ERDDAP, which carries none to exclude", () => {
+  assert.equal(erddapVisible({ excludeScientificNames: "Gadus morhua" }), true);
+});
+
 test("an obisNodes selection is OBIS-only unless erddapServers joins it", () => {
   // The pair is the frontend's combined Data Source filter, which dbFilter
   // turns into one OR'd dataset predicate — both feature sets have to be

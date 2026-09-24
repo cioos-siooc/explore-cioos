@@ -434,7 +434,7 @@ export default function DatasetInspector({
     setDatasetsSelected(
       datasetsSelected.map((option) =>
         option.pk === dataset.pk
-          ? { ...option, isSelected: !option.isSelected }
+          ? { ...option, isSelected: !option.isSelected, isExcluded: false }
           : option,
       ),
     );
