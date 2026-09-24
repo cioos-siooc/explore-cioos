@@ -12,12 +12,12 @@ from prefect import get_run_logger, task
 from sqlalchemy import text
 
 from cde_harvester.core.day_sets import (
-    merge_ranges,
     ranges_from_iso,
     ranges_to_pg_literal,
     ranges_to_psycopg,
 )
 from cde_harvester.core.db import create_db_engine, db_host
+from cde_harvester.core.obis_cells import merge_cells
 from cde_harvester.core.observability import init_sentry
 from cde_harvester.core.schemas import (
     DATASET_ARRAY_DTYPES,
@@ -77,28 +77,36 @@ logger = logging.getLogger()
 init_sentry()
 
 
+def parse_day_ranges(value):
+    """A day_ranges cell -> list of (date, date) runs.
+
+    The value arrives as a repr'd list of ISO pairs from the CSV, or as the
+    live list when the harvester hands the frame over in-process. Both load
+    paths need this; only what they do with the result differs, so the
+    rendering stays with the caller (profiles bind parameters and need
+    psycopg2 ranges, obis_cells go through COPY and need a text literal).
+    """
+    # NaN is truthy, so `value or []` would let a missing cell through into
+    # ranges_from_iso; check the types explicitly instead.
+    if isinstance(value, str):
+        value = ast.literal_eval(value)
+    if not isinstance(value, (list, tuple)):
+        return []
+    return ranges_from_iso(value)
+
+
 def prepare_profiles_dataframe(profiles):
     """Clean and prepare profiles DataFrame for insertion."""
     profiles = profiles.replace("", np.NaN)
-    # day_ranges arrives as a repr'd list of ISO pairs from the CSV, or as the
-    # live list when the harvester hands the frame over in-process. to_sql
-    # binds parameters rather than running them through a column input
+    # to_sql binds parameters rather than running them through a column input
     # function, and psycopg2 adapts a list of strings as text[] — which
     # PostgreSQL refuses to assign to a daterange[] column. Its own DateRange
     # type adapts correctly, so convert here, at the one place both callers
     # pass through.
     if "day_ranges" in profiles.columns:
-
-        def _to_ranges(value):
-            # NaN is truthy, so `value or []` would let a missing cell through
-            # into ranges_from_iso; check the types explicitly instead.
-            if isinstance(value, str):
-                value = ast.literal_eval(value)
-            if not isinstance(value, (list, tuple)):
-                return []
-            return ranges_to_psycopg(ranges_from_iso(value))
-
-        profiles["day_ranges"] = profiles["day_ranges"].apply(_to_ranges)
+        profiles["day_ranges"] = profiles["day_ranges"].apply(
+            lambda value: ranges_to_psycopg(parse_day_ranges(value))
+        )
     # Both time bounds are NOT NULL in cde.profiles. Drop either-null rows here,
     # mirroring the harvester's filter (profiles.py): a time_max that passes the
     # harvester's null check but fails parse_erddap_dates' coerce becomes NaT and
@@ -136,36 +144,17 @@ def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
     # falls back to the cell's span for those rows, so treat it as absent
     # rather than requiring a re-harvest to load at all.
     has_day_ranges = "day_ranges" in obis_cells.columns
-
-    # Deduplicate on unique key, merging scientific_names and aggregating numeric columns
-    key_cols = ["dataset_id", "latitude", "longitude"]
-    aggregations = {
-        "scientific_names": (
-            "scientific_names",
-            lambda lists: sorted({name for lst in lists for name in lst}),
-        ),
-        "n_records": ("n_records", "sum"),
-        # max, not sum: this dedup merges rows that are the SAME cell split by
-        # float noise, so their day sets overlap and summing would inflate —
-        # the defect this column exists to remove. n_records sums because its
-        # occurrence subsets really are disjoint.
-        "days": ("days", "max"),
-        "time_min": ("time_min", "min"),
-        "time_max": ("time_max", "max"),
-        "depth_min": ("depth_min", "min"),
-        "depth_max": ("depth_max", "max"),
-    }
     if has_day_ranges:
-        # Union, not max or concat: these rows are the SAME cell split by float
-        # noise, so their day sets overlap. merge_ranges is the Python twin of
-        # day_union_days, keeping `days` and `day_ranges` consistent.
-        aggregations["day_ranges"] = ("day_ranges", merge_ranges)
+        # Parse before the merge: merge_ranges unpacks each element as a
+        # (lo, hi) pair, so handing it the raw CSV string iterates it one
+        # character at a time and raises "not enough values to unpack".
+        obis_cells["day_ranges"] = obis_cells["day_ranges"].apply(parse_day_ranges)
 
-    agg = (
-        obis_cells.groupby(key_cols, dropna=False)
-        .agg(**aggregations)
-        .reset_index()
-    )
+    # Deduplicate rows that are the SAME cell split by float noise. Shared with
+    # the harvester, which runs the identical merge over the partial cells it
+    # produces per occurrence chunk -- both are merging disjoint occurrence
+    # subsets of one cell, so one implementation serves both.
+    agg = merge_cells(obis_cells, has_day_ranges=has_day_ranges)
 
     if name_to_aphia:
 
@@ -516,6 +505,13 @@ def main(folder, incremental=False):
             "skipping dataset load, will still bump verified_at and write harvest audit"
         )
 
+    # Outcome counters, reported in the summary this function returns. Both are
+    # assigned inside conditional branches below — pruning only on incremental
+    # runs with CDE_PRUNE_STALE enabled, GC only when the try-lock is won — so
+    # they need a value for the runs that take neither branch.
+    n_pruned = 0
+    n_gc = 0
+
     schema = "cde"
 
     def acquire_loader_lock():
@@ -798,7 +794,7 @@ def main(folder, incremental=False):
             # No drop_constraints() step: the backfilled columns are permanently
             # NULL-able and the hex FKs are DEFERRABLE INITIALLY DEFERRED (checked
             # at COMMIT), so nothing needs toggling before the load. See
-            # 7_contraints.sql / validate_loaded_data().
+            # 7_constraints.sql / validate_loaded_data().
             with _timed("remove_all_data", logger):
                 logger.info("Clearing tables")
                 transaction.execute(text("SELECT remove_all_data();"))
@@ -974,6 +970,11 @@ def main(folder, incremental=False):
                 logger.info("Validating loaded data")
                 transaction.execute(text("SELECT validate_loaded_data();"))
 
+        # Both paths: the datasets list reads each dataset's merged day set
+        # from here rather than unioning feature ranges per request.
+        with _timed("refresh_dataset_day_ranges", logger):
+            transaction.execute(text("SELECT refresh_dataset_day_ranges();"))
+
         # Harvest audit: append-only. Same writes in both incremental and
         # full-reload paths since these tables are never truncated.
         if harvest_runs_df is not None and not harvest_runs_df.empty:
@@ -1071,3 +1072,18 @@ def main(folder, incremental=False):
                 conn.execute(text("VACUUM ANALYZE cde.trajectory_days"))
             if trajectory_points is not None:
                 conn.execute(text("VACUUM ANALYZE cde.trajectory_points"))
+
+    # What this load actually did. The caller uses `changed` to decide whether
+    # to drop the redis cache: an incremental run where every dataset hashed
+    # unchanged still bumps verified_at and appends harvest audit rows, but
+    # nothing any cached API response is built from has moved, so flushing
+    # would throw away a warm cache for nothing. (The harvest dashboard routes
+    # that do read the audit tables carry their own 30s-2min TTLs and heal on
+    # their own.) A full reload always counts as changed — it TRUNCATEs.
+    return {
+        "changed": (not datasets.empty) or bool(n_pruned) or (not incremental),
+        "changed_datasets": len(datasets),
+        "pruned": n_pruned,
+        "gc": n_gc,
+        "full_reload": not incremental,
+    }

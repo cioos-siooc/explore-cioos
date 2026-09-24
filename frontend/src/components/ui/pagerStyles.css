@@ -87,7 +87,7 @@
 }
 
 .pagerSize select {
-  padding: 3px 6px;
+  padding: 8px 12px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);

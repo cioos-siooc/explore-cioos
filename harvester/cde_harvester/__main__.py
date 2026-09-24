@@ -13,7 +13,7 @@ from prefect import flow, get_run_logger, task
 from sentry_sdk.crons import monitor
 
 from cde_harvester.core.config import load_config, resolve_obis_config
-from cde_harvester.core.day_sets import ranges_to_iso
+from cde_harvester.core.day_sets import ranges_to_csv_cell
 from cde_harvester.core.issues import report_issues
 from cde_harvester.core.observability import (
     init_sentry,
@@ -30,7 +30,11 @@ from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
 from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
 from cde_harvester.sources.obis.harvester import harvest_obis
-from cde_harvester.utils import cf_standard_names, supported_standard_names
+from cde_harvester.utils import (
+    cf_standard_name_base,
+    cf_standard_names,
+    supported_standard_names,
+)
 
 load_dotenv()
 
@@ -288,10 +292,10 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         )
     # Same treatment for the day set, with one extra step: literal_eval only
     # accepts literals, and the repr of a datetime.date is a constructor call —
-    # so the runs go through as ISO-string pairs (day_sets.ranges_to_iso).
+    # so the runs go through as ISO-string pairs (day_sets.ranges_to_csv_cell).
     if "day_ranges" in erddap_profiles.columns:
         erddap_profiles["day_ranges"] = erddap_profiles["day_ranges"].apply(
-            lambda x: repr(ranges_to_iso(x)) if isinstance(x, (list, tuple)) else x
+            ranges_to_csv_cell
         )
     erddap_profiles.drop_duplicates().to_csv(profiles_file, index=False)
     if not df_ckan.empty:
@@ -299,6 +303,11 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     skipped_datasets.drop_duplicates().to_csv(skipped_datasets_file, index=False)
 
     if not obis_cells.empty:
+        # Same ISO-pair treatment as erddap_profiles above: aggregate_cells
+        # builds day_ranges as datetime.date tuples too.
+        if "day_ranges" in obis_cells.columns:
+            obis_cells = obis_cells.copy()
+            obis_cells["day_ranges"] = obis_cells["day_ranges"].apply(ranges_to_csv_cell)
         obis_cells.to_csv(obis_cells_file, index=False)
 
     if not erddap_trajectory_days.empty:
@@ -542,10 +551,14 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         standard_names_harvested = (
             variables.query("not standard_name.isnull()")["standard_name"].unique().tolist()
         )
+        standard_name_bases_harvested = {
+            cf_standard_name_base(name) for name in standard_names_harvested
+        }
+        standard_name_bases_harvested.discard(None)
 
         standard_names_not_harvested = [
             x
-            for x in standard_names_harvested
+            for x in standard_name_bases_harvested
             if (x not in supported_standard_names + IGNORED_STANDARD_NAMES) and (not x.startswith("platform_"))
         ]
 

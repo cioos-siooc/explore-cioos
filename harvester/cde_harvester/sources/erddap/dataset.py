@@ -10,8 +10,8 @@ from cde_harvester.core.observability import run_logger
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import (
+    eov_standard_name,
     eov_to_standard_name,
-    intersection,
     standard_name_to_eovs,
 )
 
@@ -110,6 +110,11 @@ class Dataset:
         self.coverage_depth_max = None
         self.grid_variables = None
         self.grid_dimensions = None
+        # Dataset-level time coverage from the allDatasets listing (ISO strings,
+        # set by the harvest loop). For tabledap this is the only coverage a
+        # dataset gets; for grids the dimension-derived value above wins.
+        self.listing_time_min = None
+        self.listing_time_max = None
         # Per-variable metadata for every column, griddap and tabledap alike.
         # get_metadata() fills it; see core/variables.py for why.
         self.table_variables = None
@@ -140,13 +145,19 @@ class Dataset:
                 "content_hash_reason": [self.content_hash_reason],
                 "last_updated_at": [now],
                 "verified_at": [now],
-                # Griddap metadata-only columns (None for tabledap types).
+                # lat/lon/depth extent: griddap only (None for tabledap).
                 "coverage_lat_min": [self.coverage_lat_min],
                 "coverage_lat_max": [self.coverage_lat_max],
                 "coverage_lon_min": [self.coverage_lon_min],
                 "coverage_lon_max": [self.coverage_lon_max],
-                "coverage_time_min": [self.coverage_time_min],
-                "coverage_time_max": [self.coverage_time_max],
+                # Grid handler's dimension-derived extent wins; the
+                # allDatasets listing fills it in for every other type.
+                # get_df() runs after extract_features(), so by here the grid
+                # values are already set and this `or` only fills the gap.
+                "coverage_time_min": [
+                    self.coverage_time_min or self.listing_time_min],
+                "coverage_time_max": [
+                    self.coverage_time_max or self.listing_time_max],
                 "coverage_depth_min": [self.coverage_depth_min],
                 "coverage_depth_max": [self.coverage_depth_max],
                 "table_variables": [self.table_variables],
@@ -310,22 +321,17 @@ class Dataset:
 
     def get_eovs(self):
         eovs = []
-        dataset_standard_names = self.df_variables["standard_name"].to_list()
+        eov_names = self.df_variables["standard_name"].map(eov_standard_name)
 
         for eov in eov_to_standard_name:
-            overlap = intersection(
-                dataset_standard_names, eov_to_standard_name[eov]
-            )
-            if overlap:
+            eov_columns = self.df_variables.loc[
+                eov_names.isin(eov_to_standard_name[eov])
+            ]
+            if not eov_columns.empty:
                 # check if list of standard names in this EOV overlaps with list of standard names in this dataset
 
                 # set first_eov_column, which is used to set default column in preview
-                first_standard_name = overlap[0]
-                self.first_eov_column = (
-                    self.df_variables.query(f"standard_name=='{first_standard_name}'")
-                    .head(1)["name"]
-                    .item()
-                )
+                self.first_eov_column = eov_columns.iloc[0]["name"]
                 eovs.append(eov)
         return eovs
 
@@ -339,7 +345,7 @@ class Dataset:
         """
         eov_variables = {}
         for name, row in self.df_variables.iterrows():
-            eovs = standard_name_to_eovs.get(row.get("standard_name"))
+            eovs = standard_name_to_eovs.get(eov_standard_name(row.get("standard_name")))
             if eovs:
                 eov_variables[name] = eovs
         return eov_variables

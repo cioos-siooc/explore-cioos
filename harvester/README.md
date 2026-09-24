@@ -88,12 +88,10 @@ runtime. It is resolved in priority order (see
 1. `HARVEST_CONFIG_B64` env var — the whole YAML file base64-encoded on one
    line (used on Coolify, where raw multi-line env values get mangled).
    Generate it with `base64 < harvest_config.yaml | tr -d '\n'`.
-2. `HARVEST_CONFIG_YAML` env var — the raw YAML text. Deprecated (multi-line
-   env values get mangled in transit); kept for existing deployments.
-3. `HARVEST_CONFIG_FILE` env var — path to a mounted config file. The
+2. `HARVEST_CONFIG_FILE` env var — path to a mounted config file. The
    docker-compose files set this to `/app/harvester/harvest_config.yaml`, so
    the mounted config is used without needing the `-f` flag.
-4. A file mounted at `/app/harvester/harvest_config.yaml`.
+3. A file mounted at `/app/harvester/harvest_config.yaml`.
 
 If none exists, startup fails with an error listing these options. See the main
 [README](../README.md#harvest-configuration) for how config changes propagate
@@ -150,9 +148,6 @@ cde_harvester/
 └── loading/              # db-loader (CSV folder -> PostgreSQL cde schema)
 ```
 
-`cde_db_loader/` is a deprecated shim kept so `python -m cde_db_loader` keeps
-working for one deploy cycle.
-
 ## Configuration
 
 Create `harvest_config.yaml` from `harvest_config.sample.yaml`:
@@ -190,9 +185,6 @@ DB_NAME=cde
 # Sentry error tracking (optional)
 SENTRY_DSN=your_sentry_dsn_here
 ENVIRONMENT=development  # or production
-
-# Path to your project root on the host machine (required for Docker volume mounting)
-HOST_ROOT=/path/to/your/workspace/explore-cioos
 
 # Optional: Harvester schedule (defaults to None unset)
 HARVESTER_CRON=10 0 */3 * *

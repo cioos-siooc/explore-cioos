@@ -10,10 +10,11 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 // Datasets/Filters tabs, banded off from both so it reads as its own strip —
 // "123/150 datasets (23 in view)".
 //
-// The parenthetical is a button, not a caption: it both reports how many of
-// those datasets the map viewport holds and applies the "only in view"
-// narrowing, so the number the user is reading is one click away from being the
-// only number.
+// The parenthetical is a button, not just a caption: it reports how many of
+// the filtered datasets the current viewport holds and applies the "only in
+// view" narrowing on click — a second, in-line entry point onto the same
+// toggle the Eye button among the quick filters below the card also sets
+// (see QuickFilters).
 //
 // Until `ready` there is no count to show — not even a zero — so the strip is a
 // spinner. See useDatasetCounts.
@@ -67,7 +68,7 @@ export default function DatasetCounts() {
               title={
                 onlyInView
                   ? t("topBarCountsInViewOffTitle")
-                  : t("datasetsCardOnlyInViewTitle")
+                  : t("quickFilterInViewTitle")
               }
             >
               {t("topBarCountsInViewLink", { count: inViewCount })}

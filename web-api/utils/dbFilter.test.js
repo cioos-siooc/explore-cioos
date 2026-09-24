@@ -64,6 +64,22 @@ test("comma-separated keys bind as arrays, not as the raw string", async () => {
   assert.match(sql, /organization_pks && '\{"7"\}'/);
 });
 
+test("excludeDatasetPKs is the same narrowing written the shorter way", async () => {
+  // A client that narrows the catalogue itself can name what it kept or what
+  // it dropped; both have to reach the same predicate column, or the mild
+  // narrowings that can only be sent as a drop list would filter nothing.
+  const f = await createDBFilter({ excludeDatasetPKs: "4,5" });
+  assert.match(f.shared.toString(), /d\.pk_url <> ALL \('\{"4","5"\}'\)/);
+});
+
+test("excluding datasets does not drop the ones with no pk_url yet", async () => {
+  // pk_url is nullable, and `NULL <> ALL (...)` is NULL, not TRUE. Without the
+  // guard a single exclusion silently drops every dataset that
+  // 5_profile_process.sql has not back-filled — the opposite of narrowing.
+  const f = await createDBFilter({ excludeDatasetPKs: "4" });
+  assert.match(f.shared.toString(), /d\.pk_url IS NULL OR d\.pk_url <> ALL/);
+});
+
 test("latitude is clamped to the Mercator-valid range", async () => {
   // Transforming a ±90° envelope throws "transform: tolerance condition
   // error" in PostGIS and 500s the request.
@@ -205,4 +221,40 @@ test("the fetcher is not called when no scientific name is selected", async () =
     },
   );
   assert.equal(called, false, "assembly must not touch the database");
+});
+
+test("realtimeOnly adds a dataset-level freshness predicate", async () => {
+  const f = await createDBFilter({ realtimeOnly: "true" });
+  const sql = f.shared.toString();
+  // Qualified with `d.`, because the bare column names would be ambiguous
+  // against the feature tables the branches union together.
+  //
+  // verified_at and not last_updated_at: last_updated_at only advances when the
+  // dataset's content changed, so an incremental harvest that skips a dead feed
+  // as unchanged freezes coverage_time_max and last_updated_at together and the
+  // dataset reads realtime forever. verified_at advances on every harvest that
+  // reached the dataset, so the gap widens and the flag expires on its own.
+  assert.match(
+    sql,
+    /dataset_is_realtime\(d\.coverage_time_max, d\.verified_at, d\.cdm_data_type\)/,
+  );
+  // A plain boolean test, never `NOT dataset_is_realtime(...)`: the function is
+  // IMMUTABLE over two stored columns and cannot return NULL, and a negation
+  // over a three-valued result would drop rows from both sides of the facet.
+  assert.doesNotMatch(sql, /NOT dataset_is_realtime/);
+  assert.equal(f.hasShared, true);
+});
+
+test("realtimeOnly is dataset-level, so it stays out of the profile fragment", async () => {
+  const f = await createDBFilter({ realtimeOnly: "true" });
+  assert.doesNotMatch(f.profileOnly.toString(), /dataset_is_realtime/);
+  assert.doesNotMatch(f.obisOnly.toString(), /dataset_is_realtime/);
+});
+
+test("realtimeOnly off or absent constrains nothing", async () => {
+  for (const request of [{}, { realtimeOnly: "false" }]) {
+    const f = await createDBFilter(request);
+    assert.equal(f.shared.toString(), "TRUE");
+    assert.equal(f.hasShared, false);
+  }
 });

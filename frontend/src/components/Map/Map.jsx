@@ -291,9 +291,13 @@ export default function CreateMap({
   sharedFeatureQueryAt,
   // A click that landed on exactly one individual marker naming exactly one
   // dataset — nothing else under the cursor, no ambiguity about which station
-  // the user meant. Called with (datasetPk, pointPk) instead of building a
-  // featureQuery, so the caller can jump straight to that station's record
-  // rather than making the user open a card and pick a row. See handleMapClick.
+  // the user meant. Called with (datasetPk, pointPk, highlightQuery) instead of
+  // building a featureQuery the usual way, so the caller can jump straight to
+  // that station's record rather than making the user open a card and pick a
+  // row. highlightQuery is still a real (if minimal) featureQuery — just the
+  // marker's own dataset and ring, not a card's worth of items — so the caller
+  // can pin that dataset in the datasets list the same way a hex click does.
+  // See handleMapClick.
   onMarkerClick = () => {},
   // A click that landed on exactly one track and nothing else — no ambiguity
   // about which voyage the user meant. Called with (datasetPk, trajectoryId,
@@ -3538,8 +3542,36 @@ export default function CreateMap({
       });
 
       const observations = new Map();
+      const addObservations = (feature) => {
+        datasetPksOf(feature).forEach((pk) => {
+          const existing = observations.get(pk);
+          if (existing) {
+            existing.platform =
+              existing.platform || feature.properties.platform;
+            return;
+          }
+          observations.set(pk, {
+            kind: "observation",
+            pk,
+            platform: feature.properties.platform,
+            // A marker is a place the user can point at; a cell is a
+            // neighbourhood. The card says which it is rather than implying a
+            // precision the aggregate doesn't have.
+            aggregate: feature.layer.id !== "points",
+          });
+        });
+      };
       let observationCount = 0;
       const cellFeatures = [];
+      // What was clicked, in the terms /tiles/datasets takes: the tile buckets
+      // themselves, plus which layer drew them. `source` starts at the main
+      // tile layer and only moves if a coverage hex is what was hit.
+      const buckets = {
+        hexPks: new Set(),
+        pointPks: new Set(),
+        source: "main",
+        z: Math.floor(map.current.getZoom()),
+      };
       observationHits.forEach((feature) => {
         const layerId = feature.layer.id;
         const count = Number(feature.properties.count) || 0;
@@ -3580,26 +3612,43 @@ export default function CreateMap({
           }
           cellFeatures.push(merged);
         }
-        datasetPksOf(feature).forEach((pk) => {
-          const existing = observations.get(pk);
-          if (existing) {
-            existing.count += count;
-            existing.platform =
-              existing.platform || feature.properties.platform;
-            return;
-          }
-          observations.set(pk, {
-            kind: "observation",
-            pk,
-            count,
-            platform: feature.properties.platform,
-            // A marker is a place the user can point at; a cell is a
-            // neighbourhood. The card says which it is rather than implying a
-            // precision the aggregate doesn't have.
-            aggregate: layerId !== "points",
-          });
-        });
+        // The bucket this feature stands for, so the card can ask the API what
+        // each dataset in it contributes. A tile carries only the bucket TOTAL
+        // (`count`), and for the days metric that total is a union across the
+        // datasets in the cell — it is nobody's individual figure. Splitting it
+        // here is not possible; /tiles/datasets does it from the rows.
+        (layerId === "points" ? buckets.pointPks : buckets.hexPks).add(
+          Number(feature.properties.pk),
+        );
+        // 'coverage-hexes' is drawn from /tiles/cells, which unions a different
+        // set of sources than /tiles. The card has to ask the same one, or the
+        // numbers it shows will not add up to the hex it is describing.
+        if (layerId === "coverage-hexes") buckets.source = "cells";
+
+        addObservations(feature);
       });
+
+      // A coverage hex shares the marker tier's zoom band, so a click on one
+      // is a click on everything drawn inside it: the stations sitting in the
+      // hex join the card (and the datasets list's pin) alongside the hex's own
+      // datasets, and their counts join the header's total.
+      const markersInCells = [];
+      if (cellFeatures.length && map.current.getLayer("points")) {
+        const seenMarkers = new Set();
+        turfPointsWithinPolygon(
+          helpers.featureCollection(
+            map.current.queryRenderedFeatures({ layers: ["points"] }),
+          ),
+          helpers.featureCollection(cellFeatures),
+        ).features.forEach((feature) => {
+          if (seenMarkers.has(feature.properties.pk)) return;
+          seenMarkers.add(feature.properties.pk);
+          markersInCells.push(feature);
+          observationCount += Number(feature.properties.count) || 0;
+          buckets.pointPks.add(Number(feature.properties.pk));
+          addObservations(feature);
+        });
+      }
 
       // Gridded footprints, deduped by dataset — a stack of grids covering the
       // same water is the norm, not the exception.
@@ -3683,30 +3732,10 @@ export default function CreateMap({
           ...areaHighlights,
           ...observationHits
             .filter((feature) => feature.layer.id === "points")
+            .concat(markersInCells)
             .map((feature) => highlightFeature({ feature, role: "both" })),
         ],
       };
-
-      // "Zoom here" frames the cell that was clicked where there is one, so the
-      // old hex click's zoom-to-7 is still reachable — as a button, and framing
-      // the actual cell instead of a fixed zoom level. A lone marker has no
-      // area to frame, so it gets no button rather than one that jumps the
-      // camera to nothing.
-      let bounds = null;
-      if (areaHighlights.length > 0) {
-        try {
-          const box = turfBbox({
-            type: "FeatureCollection",
-            features: areaHighlights,
-          });
-          bounds = [
-            [box[0], box[1]],
-            [box[2], box[3]],
-          ];
-        } catch {
-          bounds = null;
-        }
-      }
 
       return {
         // A nonce, so clicking the same spot twice re-opens a card the user
@@ -3715,9 +3744,17 @@ export default function CreateMap({
         lngLat: [e.lngLat.lng, e.lngLat.lat],
         items,
         observationCount,
-        bounds,
         highlight,
-        // Every dataset under the click, for the card's "add all" action.
+        // What the card asks /tiles/datasets about — see the buckets comment
+        // above. Sets are not serialisable and the card only ever reads them
+        // as lists, so they are flattened here.
+        buckets: {
+          ...buckets,
+          hexPks: [...buckets.hexPks],
+          pointPks: [...buckets.pointPks],
+        },
+        // Every dataset under the click, which the datasets list reads to pin
+        // and outline them (DatasetsTable's pinnedPks).
         datasetPks: [...new Set(items.map((item) => item.pk))],
       };
     };
@@ -3794,14 +3831,12 @@ export default function CreateMap({
         const markerDatasetPks = datasetPksOf(nearestMarker);
         if (markerDatasetPks.length === 1) {
           popup.remove();
-          // This path skips onFeatureQueryRef (see below) — it opens the
-          // dataset page directly rather than building a card query — so the
-          // usual featureQuery-driven click-highlight effect never runs for
-          // it. Ring the clicked marker here instead, the same way
-          // buildFeatureQuery would have: same source, same Point-with-count
-          // shape, so click-highlight-point sizes the ring to match the
-          // marker exactly.
-          map.current.getSource("click-highlight")?.setData({
+          // This path skips onFeatureQueryRef — it opens the dataset page
+          // directly rather than building a card query — so the ring is set
+          // here instead, the same way buildFeatureQuery would have: same
+          // source, same Point-with-count shape, so click-highlight-point
+          // sizes the ring to match the marker exactly.
+          const highlight = {
             type: "FeatureCollection",
             features: [
               {
@@ -3812,10 +3847,28 @@ export default function CreateMap({
                 },
               },
             ],
-          });
+          };
+          map.current.getSource("click-highlight")?.setData(highlight);
+          // The dataset still deserves the same "found under your last map
+          // click" pin the datasets list gives a hex — it just can't go
+          // through onFeatureQueryRef/handleFeatureQuery: that helper also
+          // returns to the datasets list when a different dataset is already
+          // open, and running that in the same tick as the record jump below
+          // races two navigations over the same stale search-params snapshot
+          // (see setInspectRecordID's comment in SelectionProvider). Handing
+          // it to onMarkerClick instead lets that one navigation own both.
           onMarkerClickRef.current(
             markerDatasetPks[0],
             Number(nearestMarker.properties.pk),
+            {
+              datasetPks: markerDatasetPks,
+              highlight,
+              nonce: Date.now(),
+              // useUrlSync's ?at= reads this off every featureQuery, hex or
+              // marker alike — the marker's own position stands in for the
+              // click point here.
+              lngLat: nearestMarker.geometry.coordinates,
+            },
           );
           return;
         }
@@ -4282,6 +4335,7 @@ export default function CreateMap({
       ref={mapContainer}
       className="map"
       data-testid="map-container"
+      data-projection={projection}
       data-map-ready={firstPainted || undefined}
     />
   );

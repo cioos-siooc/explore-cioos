@@ -7,6 +7,7 @@ const {
   DRAWN_AS_POINT,
   TRAJECTORY_COVERAGE_FROM,
   GRIDDAP_TIME_DEPTH_COLUMNS,
+  GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
   GRIDDAP_FROM,
   unionBranches,
 } = require("./selection");
@@ -82,6 +83,29 @@ test("the griddap row set aliases coverage_* to the names dbFilter uses", () => 
   // Both the aliases and the row set are written against the same alias.
   assert.match(GRIDDAP_FROM, /FROM cde\.datasets d\b/);
   assert.match(GRIDDAP_FROM, /d\.cdm_data_type = 'Grid'/);
+});
+
+test("the exact griddap row set keeps the aliases but not the time coalesce", () => {
+  for (const name of ["time_min", "time_max", "depth_min", "depth_max"]) {
+    assert.match(GRIDDAP_EXACT_TIME_DEPTH_COLUMNS, new RegExp(`AS ${name}\\b`));
+  }
+  // The whole point of this variant: a grid with no time coverage must leave
+  // its bounds NULL so a caller binning by time drops it, rather than landing
+  // in every bin it has.
+  assert.doesNotMatch(GRIDDAP_EXACT_TIME_DEPTH_COLUMNS, /infinity/);
+  assert.match(
+    GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
+    /d\.coverage_time_min AS time_min/,
+  );
+  assert.match(
+    GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
+    /d\.coverage_time_max AS time_max/,
+  );
+  // Depth still coalesces: a depthless grid is at the surface, not nowhere.
+  assert.match(
+    GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
+    /coalesce\(d\.coverage_depth_min, 0\)/,
+  );
 });
 
 test("show_as_point is named, not spelled out, so its absence is legible", () => {

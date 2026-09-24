@@ -4,410 +4,286 @@
 [![Deploy](https://github.com/cioos-siooc/explore-cioos/actions/workflows/deploy.yml/badge.svg)](https://github.com/cioos-siooc/explore-cioos/actions/workflows/deploy.yml)
 [![Last Harvest](https://github.com/cioos-siooc/explore-cioos/actions/workflows/harvest.yml/badge.svg)](https://github.com/cioos-siooc/explore-cioos/actions/workflows/harvest.yml)
 
-## Testing a dataset
+CDE harvests oceanographic dataset metadata from ERDDAP, OBIS and CKAN into
+PostgreSQL/PostGIS and serves a map-first search and download UI over it.
 
-If you just want to see how a dataset is harvested by CDE:
+## Architecture
 
-1. Install [uv](https://github.com/astral-sh/uv)
-2. `cd harvester`
-3. `uv run python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS`
-4. See files in `harvest` folder
-
-## Starting using docker
-
-1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker compose](https://docs.docker.com/compose/install/). New versions of Docker include `docker compose`
-2. Rename file `.env.sample` to `.env` and change any settings if needed. If you are running on your local machine these settings don't need to change
-3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and modify if needed. This step is required — the config is not baked into the image, and the worker refuses to start without one (see [Harvest configuration](#harvest-configuration)).
-4. Copy `docker-compose.override.yaml.sample` to `docker-compose.override.yaml`. The base `docker-compose.yaml` publishes **no** host ports (so it can be deployed as-is behind a proxy such as Coolify); the override publishes nginx and Prefect locally. Ports are configurable via `NGINX_PORT` (default 8098) and `PREFECT_PORT` (default 4200) in `.env`.
-5. Run locally with docker compose:
-    1. Development environment: `docker compose up -d`
-    2. Production configuration: `docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d` — `docker-compose.production.yaml` is an **overlay**, not a standalone stack (see [Production deployment](#production-deployment)).
-6. See website at <http://localhost:8098>
-7. See Prefect Dashboard at <http://localhost:4200> (Manage flows and deployments)
-
-### Data Harvesting with Prefect
-
-The harvester is now orchestrated by Prefect. The Docker Compose stack includes:
-- **Prefect Server** (`prefect`): Manage flows, view logs, and trigger runs.
-- **Prefect Worker** (`prefect_worker`): Runs harvest flows **in-process** on a `process` work pool (no per-run containers).
-
-The worker registers the work pool and all deployments automatically on startup
-(`REGISTER_DEPLOYMENTS=true`), so a plain `docker compose up -d` is enough — no
-separate deploy step. To (re)register after a config change, restart the worker:
-```bash
-docker compose up -d prefect_worker
+```mermaid
+flowchart TD
+    Sources["ERDDAP / OBIS / CKAN"] --> Harvester["harvester (Prefect)"]
+    Harvester --> CSV["CSV"] --> Loader["db-loader"] --> DB[("Postgres/PostGIS\nschema `cde`")]
+    DB --> API["web-api (Express, Redis-cached)"] --> Frontend["frontend (React/MapLibre)"]
+    Frontend -- download request --> Scheduler["download_scheduler"] --> Downloader["downloader"] --> Email["email"]
 ```
-*Note: Set `INCREMENTAL_MODE=true` in your `.env` to make the deployment default to incremental harvesting (faster, only updates changed datasets).*
 
-#### Downloads in Prefect
+`nginx/` is the edge proxy; `test/` holds the integration smoke tests. Each
+service has its own README.
 
-Downloads are queued in `cde.download_jobs` by the web API and consumed by the
-`scheduler` service, which is a plain polling worker — **not** a Prefect
-deployment, and it does not run on the `cde-process-pool`. Keeping it in its own
-container is deliberate: the pool's workers share a memory budget sized for
-harvests, and a download (OBIS parquet through DuckDB, multi-hundred-MB CSVs) is
-heavy enough that co-scheduling the two risks starving both. It also means a
-harvester crash or restart cannot take the download queue's only consumer with
-it.
+## Quick start
 
-Each job is still *reported* to Prefect, so the queue is observable in the same
-UI as the harvests. `run_download_observed` wraps every job in a flow run under
-the flow **`Download Job`**, named `download-<job_id>`, and mirrors the
-scheduler's loguru output into that run's logs. Run state reflects the outcome:
-a job finishing `failed` is a failed run; `completed`, `no-data` and
-`over-limit` are all successes, since those are results the user is emailed
-about rather than faults.
+Requires [Docker](https://docs.docker.com/get-docker/) with `docker compose`.
 
-This is controlled by `PREFECT_API_URL`, which compose sets on the `scheduler`
-service (hardcoded to `http://prefect:4200/api`, not interpolated from `.env` —
-that var holds `localhost:4200` for host-side CLI use, which inside the
-container points at the container itself). Remove the line and the queue still
-drains exactly as before — jobs simply stop appearing in Prefect. That is also
-why it is off by default outside compose: with no server to talk to, Prefect
-would record runs into its own ephemeral store where nobody would look.
+```sh
+./scripts/init-dev-env.sh   # creates .env, docker-compose.override.yaml, harvest_config.yaml
+docker compose up -d --build
+```
 
-#### Harvest configuration
+- Website: <http://localhost:8098>
+- Prefect dashboard (harvests, downloads): <http://localhost:4200>
 
-The harvest config (`harvest_config.yaml`) is **not baked into the image** — it
-is provided at runtime, so config changes never require an image rebuild. The
-worker resolves it in priority order (both when registering deployments at
-startup and again at the start of every flow run):
+`init-dev-env.sh` copies each `*.sample` template, skipping files that exist
+(`--force` overwrites). It seeds `harvest_config.yaml` from the full production
+source list; copy `harvest_config.sample.yaml` instead for a small, fast first
+harvest. The override file is what publishes nginx and Prefect on the host —
+the base `docker-compose.yaml` publishes no ports.
 
-1. **`HARVEST_CONFIG_B64`** env var — the *whole YAML file, base64-encoded on
-   one line*. This is the channel to use under Coolify; generate it with
-   `base64 < harvest_config.yaml | tr -d '\n'`. A value that fails to decode
-   (or decodes to something that isn't a YAML mapping) aborts startup — it
-   never silently falls back to a stale mounted config.
-2. **`HARVEST_CONFIG_YAML`** env var — the *raw YAML text*. **Deprecated**,
-   kept for deployments already using it: multi-line values do not survive
-   Coolify's env editor intact, which is the corruption `HARVEST_CONFIG_B64`
-   exists to avoid. Use it and you get a warning in the worker log.
-3. **`HARVEST_CONFIG_FILE`** env var — path to a config file mounted into the
-   container (set to `/app/harvester/harvest_config.yaml` in the compose files).
-4. A file mounted at `/app/harvester/harvest_config.yaml` — locally via
-   `docker-compose.override.yaml`, in production via the bind mount in
-   `docker-compose.production.yaml`.
+To see how a single dataset is harvested, without the stack:
 
-If none is found, the worker **refuses to start** with a message listing these
-options — there is no baked fallback, so a misconfigured deploy fails loudly
-instead of silently harvesting the sample servers.
+```sh
+cd harvester
+uv run python -m cde_harvester --urls https://data.cioospacific.ca/erddap --dataset_ids ECCC_MSC_BUOYS
+# output lands in harvester/harvest/
+```
 
-**Updating the config on a running deployment:**
+## Configuration
 
-| What changed | What's needed |
-|---|---|
-| Values in the mounted file (`cache`, `incremental`, `dataset_ids`, …) | Nothing — the next flow run re-reads the file |
-| `erddap_urls`, or turning OBIS on/off (`obis_discovery.enabled`) | `docker compose restart prefect_worker` — startup re-registers the per-source deployments |
-| Which OBIS datasets are harvested | Nothing — `obis_discovery` re-queries the OBIS API on every OBIS harvest, so new Canadian datasets are picked up automatically |
-| Anything set via env (`HARVEST_CONFIG_B64`/`HARVEST_CONFIG_YAML`, `HARVESTER_CRON`, `.env` values) | `docker compose up -d --force-recreate prefect_worker` — a plain `restart` reuses the old container **and its old environment** (on Coolify: redeploy the resource) |
+Every setting has a working default in `docker-compose.yaml`. Three values
+matter:
 
-Remote workers (`docker-compose.worker.yaml`) execute flows too, so they need
-the *same* config as the primary stack — via `HARVEST_CONFIG_B64` in their
-`.env` or a local file mount (see the comments in that compose file).
+| Variable      | Default                          | Purpose                                                                                                            |
+| ------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DB_PASSWORD` | _none — required_                | Compose aborts without it; production publishes the DB port, so a default would be a real credential.              |
+| `APP_URL`     | `http://localhost:${NGINX_PORT}` | Public URL for emailed download links and the OpenAPI `servers` entry. Coolify's `SERVICE_URL_NGINX` wins over it. |
+| `NGINX_PORT`  | `8098`                           | Host port for nginx (`PREFECT_PORT`, default 4200, for Prefect).                                                   |
 
-This will register the flow with the Prefect server. You can then trigger runs from the UI or let the schedule take over.
+The SPA calls `/api` relative to its own host, so changing the URL never needs a
+frontend rebuild. `DB_HOST` and `REDIS_HOST` are pinned to the compose service
+names; setting them in `.env` does nothing.
 
-To manually trigger a run:
-1. Go to <http://localhost:4200>
-2. Find the **cde-harvester-deployment**
-3. Click **Run** -> **Quick Run**
+## Harvesting
 
-For more details, see:
-- [Harvester Usage Guide](harvester/README.md)
-- [DB Loader README](db-loader/README.md)
+Harvests are Prefect flows run **in-process** by the `prefect_worker` container
+on the `cde-process-pool` work pool. On startup the worker registers the pool and
+every deployment (full harvest, one per source, vernaculars), so there is no
+separate deploy step and no system cron.
 
-## Front End Development
+When harvests run is set in `.env` (all optional):
 
-There are two main approaches for frontend development:
+- `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules; unset means none.
+- `RUN_ON_DEPLOY=true` — one full harvest on every (re)deploy.
+- `INCREMENTAL_MODE=true` — full runs only update changed datasets. Single-source
+  runs are always incremental so they can't truncate other sources.
 
-### Option 1: Frontend Local + Backend via Docker Compose
+To run one by hand, open the Prefect UI, find **cde-harvester-deployment** (or a
+per-source deployment) and click **Run → Quick Run**.
 
-Run the frontend locally while using Docker Compose for all backend services (recommended for full-stack development).
+More in the [harvester README](harvester/README.md) and the
+[DB loader README](harvester/cde_harvester/loading/README.md).
 
-1. Rename `.env.sample` from the root directory to `.env` and change any settings if needed. If you are running on your local machine, these settings don't need to change.
+### Harvest configuration
 
-2. Start all backend services using Docker Compose:
+`harvest_config.yaml` is never baked into the image. The worker reads it at
+startup and again at the start of every flow run, from the first of:
 
-   ```sh
-   docker compose up -d
-   ```
+1. `HARVEST_CONFIG_B64` — the whole YAML, base64 on one line
+   (`base64 < harvest_config.yaml | tr -d '\n'`). Use this under Coolify.
+2. `HARVEST_CONFIG_FILE` — path to a mounted file
+   (`/app/harvester/harvest_config.yaml` in the compose files).
+3. A file mounted at `/app/harvester/harvest_config.yaml`.
 
-3. Start the frontend locally:
+With none of these — or a value that fails to decode — the worker refuses to
+start rather than harvest the wrong thing.
 
-   ```sh
-   cd frontend
-   npm install
-   npm start
-   ```
+| What changed                                                                | What's needed                                                                                |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Values in the mounted file (`cache`, `incremental`, `dataset_ids`, …)       | Nothing — the next run re-reads it                                                           |
+| `erddap_urls`, or `obis_discovery.enabled`                                  | `docker compose restart prefect_worker` (re-registers per-source deployments)                |
+| Which OBIS datasets exist                                                   | Nothing — discovery re-queries the OBIS API every run                                        |
+| Anything set via env (`HARVEST_CONFIG_B64`, `HARVESTER_CRON`, other `.env`) | `docker compose up -d --force-recreate prefect_worker` — `restart` keeps the old environment |
 
-4. See website at <http://localhost:8000>
+### Scaling workers
 
-### Option 2: Frontend Local + Remote API
-
-Run only the frontend locally and connect to a remote API (recommended for frontend-only development).
-
-1. Start the frontend with a custom API URL:
-
-   ```sh
-   cd frontend
-   npm install
-   REACT_APP_API_URL=https://your-remote-api.com/api npm start
-   ```
-
-2. See website at <http://localhost:8000>
-
-### Full Local Development Setup
-
-For complete local development with all services running outside Docker (advanced):
-
-1. Rename `.env.sample` from the root directory to `.env` and change any settings if needed.
-
-2. Start a local database and prefect server using `docker`:
-
-   ```sh
-   docker compose up -d db prefect
-   ```
-   *Alternatively*, you can run the prefect server manually in a separate terminal:
-   ```sh
-   uv run prefect server start
-   ```
-
-3. Setup Python virtual env and install Python modules using uv (recommended):
-
-   ```sh
-   # Install uv if needed
-   # pip install uv
-
-   # Harvester
-   cd harvester
-   uv sync
-
-   # Download Scheduler
-   cd ../download_scheduler
-   uv sync
-   ```
-
-4. Start the API:
-
-   ```sh
-   cd web-api
-   npm install
-   npm start
-   ```
-
-5. Start the download scheduler:
-
-   ```sh
-   python -m download_scheduler
-   ```
-
-   Export `PREFECT_API_URL=http://localhost:4200/api` first if you want each
-   download to show up as a flow run in the Prefect dashboard — see
-   [Downloads in Prefect](#downloads-in-prefect).
-
-6. Start the frontend:
-
-   ```sh
-   cd frontend
-   npm install
-   npm start
-   ```
-
-7. Harvest a single dataset and load CKAN data:
-
-   ```sh
-   sh data_loader_test.sh
-   ```
-
-8. See website at <http://localhost:8000>
-
-## CI/CD
-
-Pushes to `master` and `development` automatically deploy to the corresponding environment via the [Deploy workflow](.github/workflows/deploy.yml). The workflow connects to the remote server over WireGuard VPN, syncs the repository to the exact commit that triggered the run, injects secrets from 1Password, and brings up the Docker Compose stack.
-
-## Deploying with Coolify (dev/staging)
-
-Coolify routes traffic through its own proxy over the docker network, so no host
-ports must be published. Create a **Docker Compose** resource pointing at
-`docker-compose.yaml` — that file publishes no host ports and already carries
-the Coolify "magic" variables:
-
-- `SERVICE_FQDN_NGINX_4000` (on `nginx`): Coolify generates a public FQDN and
-  proxies it to nginx's container port 4000.
-- `SERVICE_URL_NGINX`: injected by Coolify and used as the scheduler's
-  `DOWNLOAD_WAF_URL` base (falls back to `APP_DOMAIN` outside Coolify).
-
-Coolify ignores `docker-compose.override.yaml` (and only supports a single
-compose file per resource), so local-dev port publishing never leaks into a
-Coolify deploy.
-
-**Harvest config under Coolify:** relative bind mounts of repo files don't work
-under Coolify (the source resolves to an empty persistent-storage dir), and the
-image no longer bakes a config (the old `BAKED_HARVEST_CONFIG` build variable
-is gone). Provide the config one of two ways:
-
-- Set the **`HARVEST_CONFIG_B64`** env var on the resource to the whole YAML
-  file, base64-encoded onto a single line:
+- Same host: `docker compose up -d --scale prefect_worker=N` (registration is
+  idempotent).
+- Another host: the Prefect API and DB must be reachable, and the `cde-harvester`
+  image available there. Remote workers only poll (`REGISTER_DEPLOYMENTS=false`)
+  and need the same harvest config as the primary stack:
 
   ```sh
-  base64 < harvest_config.production.yaml | tr -d '\n'
+  PREFECT_API_URL=https://<prefect-host>/api DB_HOST_EXTERNAL=<db-host> \
+    docker compose -f docker-compose.worker.yaml up -d
   ```
 
-  Paste that one line as the value, then **redeploy** the resource (a restart
-  reuses the old environment). To check what a deployed value holds, run
-  `echo "$HARVEST_CONFIG_B64" | base64 -d`.
+  CSV output, logs and caches stay local to each host; the DB is the source of
+  truth.
 
-  Do *not* paste raw multi-line YAML into an env var. Coolify's env editor
-  reindents continuation lines and mangles `#` comments on the way to the
-  generated `.env`, so the config arrives corrupted — which is exactly why this
-  value is base64. To edit the config, change the YAML file in the repo and
-  re-encode it. (`HARVEST_CONFIG_YAML` still accepts raw YAML for existing
-  deployments, but it is deprecated for precisely this reason.)
+The Prefect server keeps its metadata in a dedicated `prefect` Postgres database
+in the shared `db` service — SQLite locks under concurrent workers.
 
-- Or, if you want the config to stay human-editable in the Coolify UI, add a
-  **Persistent Storage file mount** onto `/app/harvester/harvest_config.yaml`
-  and paste the YAML there instead. `HARVEST_CONFIG_FILE` already points at that
-  path in `docker-compose.yaml`. (Note this is a Coolify-managed *file* mount —
-  a relative bind mount of a repo file in the compose file does not work.)
+### Rebuilding the database after a schema change
 
-Without one of these the `prefect_worker` container exits at startup with a
-message explaining the options.
+Postgres applies `database/1_schema.sql` only on a **fresh** volume, and
+`db_migrate` re-applies only the `[3-9]_*.sql` function files. A deploy that adds
+or renames a table therefore migrates "cleanly" and then fails at query time with
+`relation "cde.<table>" does not exist`.
 
-## Production deployment
-
-Deploy CDE to production using Docker Compose with the production configuration
-file (no Coolify). Published host ports are configurable via `.env`:
-`NGINX_PORT` (default 8098), `PREFECT_PORT` (default 4200) and `DB_PORT`
-(default 5432 — also sets Postgres' internal `PGPORT`).
-
-### Compose file layout
-
-`docker-compose.production.yaml` is an **overlay**: it contains only what
-self-hosted production *adds* to `docker-compose.yaml`, so the whole
-production-vs-everything-else diff is that one short file. Deploy both:
+The `Rebuild Database` deployment fixes this in place. It drops the `cde` schema,
+re-applies all SQL in one transaction, flushes the redis tile cache and triggers a
+full harvest. **It destroys all harvested data**, so `confirm` must equal
+`DB_NAME`; pass `-p run_harvest=false` to leave the database empty.
 
 ```sh
-docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
+docker exec <prefect_worker> sh -c "cd /app/harvester && uv run prefect deployment run \
+  'Rebuild Database/cde-rebuild-database' -p confirm=$DB_NAME"
 ```
 
-One setting in `.env` makes that the default for every command run on the box
-(docker compose reads `COMPOSE_*` from `.env`), so ad-hoc `docker compose logs` /
-`ps` / `restart` on the server pick up the same pair — it is already in
-`.env.production`:
+Prefer this to deleting the Postgres volume. If you must delete it, it is named
+for the compose project (e.g. `explore-cioos-production_postgres-data`) — check
+`docker volume ls` first. Redis has no volume; restarting it clears the cache.
+
+## Downloads
+
+The web API queues downloads in `cde.download_jobs`; the `scheduler` service
+drains the queue. It is a plain polling worker, deliberately **not** on the
+Prefect pool: downloads (OBIS parquet through DuckDB, multi-hundred-MB CSVs) would
+compete with harvests for the pool's memory, and a harvester crash can't take the
+queue's only consumer down with it.
+
+Each job still shows up in Prefect as a `Download Job` flow run named
+`download-<job_id>`, with the scheduler's logs. `failed` jobs are failed runs;
+`completed`, `no-data` and `over-limit` are successes, since the user is emailed
+about those. This relies on `PREFECT_API_URL`, which compose hardcodes to
+`http://prefect:4200/api` on the scheduler (the `.env` value is `localhost`, which
+inside a container is the container itself). Without it the queue drains the same;
+jobs just don't appear in Prefect.
+
+## Development
+
+### Frontend
+
+**Option 1 — backend in Docker** (full-stack work): start the stack as in
+[Quick start](#quick-start), then
 
 ```sh
-COMPOSE_FILE=docker-compose.yaml:docker-compose.production.yaml
+cd frontend && npm install && npm start   # http://localhost:8000
 ```
 
-No `COMPOSE_PROFILES` is needed, and no service is profile-gated. `scheduler`
-used to sit behind a `tools` profile, which made starting the download-queue
-consumer opt-in: any deployment that forgot the env var — Coolify never sets it —
-came up with no consumer and left every download `open` forever. It is now an
-ordinary service.
+The dev server proxies `/api` to `http://localhost:8098`. For a stack on another
+port or host, set `DEV_API_PROXY_TARGET=http://localhost:9000`.
 
-What the overlay adds, and nothing else: host ports (nginx, Prefect, Postgres),
-the externally-managed `explore-cioos_default` network, the host-editable
-`harvest_config.yaml` bind mount, the capped redis config, and the two env vars
-whose base values assume Coolify (`DOWNLOAD_WAF_URL`, `DB_HOST_EXTERNAL`).
-Everything else — images, healthchecks, named volumes, harvester memory limits —
-is inherited from `docker-compose.yaml`, so it only has to be maintained once.
+**Option 2 — remote API** (frontend-only work):
 
-### Initial Setup
+```sh
+cd frontend && npm install && API_URL=https://explore.cioos.ca/api npm start
+```
 
-0. Create the shared network once, if it does not already exist on the host:
+### Running services outside Docker
+
+1. Start only the database and Prefect: `docker compose up -d db prefect`
+   (or `uv run prefect server start`).
+2. `uv sync` in `harvester/` and `download_scheduler/`.
+3. Start the API: `cd web-api && npm install && npm start`.
+4. Start the download scheduler: `cd download_scheduler && uv run python -m download_scheduler`.
+   Export `PREFECT_API_URL=http://localhost:4200/api` first to see downloads in
+   Prefect.
+5. Start the frontend as in Option 1.
+6. Harvest and load: `uv run --project harvester sh data_loader.sh` from the repo
+   root.
+
+### Linting and tests
+
+Docker images bake in their dependencies and source (no bind mount), so rebuild
+an image to pick up code changes. Install locally
+(`uv sync && npm ci && npm --prefix frontend ci && npm --prefix web-api ci`) only
+for lint/format hooks and local frontend dev.
+
+Python uses uv, pinned to 3.10 (`.python-version`). `uv lock --check` must pass in
+`.`, `harvester`, `downloader` and `download_scheduler` — the Dockerfiles build
+with `uv sync --locked`, so a stale lock is a broken image.
+
+Prettier formats; ESLint, stylelint and ruff lint, each with one config at the
+repo root covering every sub-project. `uvx pre-commit install` adds line-ending,
+secret and lockfile checks.
+
+```sh
+uvx ruff check .
+uv run pytest -m "not integration"                     # Python unit tests
+npm run lint && npm run lint:css && npm run format:check
+npm --prefix web-api test
+npm --prefix frontend run build
+```
+
+Narrower runs:
+
+```sh
+uv run pytest tests/unit/test_foo.py::test_bar        # from harvester/, downloader/, or download_scheduler/
+npm --prefix web-api run test:unit                     # node --test utils/**/*.test.js
+npm --prefix web-api run test:routes                   # node --test routes/**/*.test.js
+npm --prefix web-api run test:contract                 # jest (supertest)
+npx vitest run src/path/to/File.test.jsx                # from frontend/
+npm --prefix frontend run test:e2e                     # Playwright, API mocked from e2e/fixtures
+npm --prefix frontend run test:visual                  # needs Docker (e2e/in-container.sh)
+npm --prefix frontend run test:a11y                    # axe, ratcheting baseline
+```
+
+## Deployment
+
+### CI/CD
+
+The [Deploy workflow](.github/workflows/deploy.yml) deploys `master` and
+`development` once the Integration Tests workflow **succeeds** on that branch, so
+a red build never deploys (`workflow_dispatch` allows a manual deploy that skips
+the gate). It connects over WireGuard, checks out the tested commit, renders
+`.env.production` through 1Password into `.env` on the server, and runs the
+production compose pair.
+
+`.env.production` in this repo **is** the production configuration: `op://`
+references name 1Password items, everything else ships as written. Change
+production settings there, not on the box.
+
+### Coolify (dev/staging)
+
+Create a **Docker Compose** resource pointing at `docker-compose.yaml` alone. It
+publishes no host ports and already carries Coolify's magic variables
+(`SERVICE_FQDN_NGINX_4000`, `SERVICE_URL_NGINX`, and the same pair for Prefect).
+Coolify ignores `docker-compose.override.yaml`.
+
+Paste `.env.coolify.sample` into the resource's environment ("Developer view"):
+`DB_PASSWORD` is required; `HARVEST_CONFIG_B64`, `ENVIRONMENT`, `SENTRY_DSN`,
+`HARVESTER_CRON`, `INCREMENTAL_MODE` and `RUN_ON_DEPLOY` are optional. **Don't set
+`APP_URL` or `API_URL`** — Coolify's `SERVICE_URL_NGINX` provides the public URL.
+
+Relative bind mounts don't work under Coolify, so provide the harvest config
+either as `HARVEST_CONFIG_B64` (then **redeploy** — a restart keeps the old
+environment; check it with `echo "$HARVEST_CONFIG_B64" | base64 -d`) or as a
+Coolify **Persistent Storage file mount** at `/app/harvester/harvest_config.yaml`
+if you want it editable in the UI.
+
+### Self-hosted production
+
+`docker-compose.production.yaml` is an **overlay** on `docker-compose.yaml`,
+holding only what production adds: host ports (nginx, Prefect, Postgres), the
+external `explore-cioos_default` network, the host-editable `harvest_config.yaml`
+bind mount, a capped redis config, and an overridable `DB_HOST_EXTERNAL`.
+Everything else is inherited.
+
+1. Create the shared network once: `docker network create explore-cioos_default`.
+2. Create `.env` — CI does this for you. By hand, start from `.env.production`
+   (not `.env.sample`) and replace the `op://` references. Minimum:
 
    ```sh
-   docker network create explore-cioos_default
+   APP_URL=https://explore.example.ca
+   DB_PASSWORD=<db superuser password>
+   COMPOSE_FILE=docker-compose.yaml:docker-compose.production.yaml
    ```
 
-1. Rename `.env.sample` to `.env` and configure with production settings (docker compose only auto-loads `.env`). The deploy workflow renders these from `.env.production` via 1Password.
+   `COMPOSE_FILE` makes every `docker compose` command on the box use the pair.
+   Production also sets `DB_PORT=5433`, `CORS_ORIGINS`, `ENABLE_API_DOCS=false`,
+   Gmail credentials and Sentry. For an external harvester over the VPN, set
+   `DB_HOST_EXTERNAL` and `DB_BIND_ADDRESS` to the VPN address; otherwise the DB
+   port stays bound to `127.0.0.1`.
 
-2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and configure the datasets to harvest. The file is bind-mounted into the worker (not baked into the image), so it can be edited on the host at any time — see [Harvest configuration](#harvest-configuration) for how changes are picked up.
-
-3. Delete old redis and postgres data (if needed):
-
-   ```sh
-   sudo docker volume rm cde_postgres-data cde_redis-data
-   ```
-
-4. Start all services using the base file plus the production overlay:
-
-   ```sh
-   sudo docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
-   ```
-
-   With `COMPOSE_FILE` set in `.env` (above), plain
-   `sudo docker compose up -d --build` is equivalent.
-
-### Data Harvesting (Production)
-
-The harvester runs on a Prefect **`process` work pool**: the `prefect_worker`
-container runs harvest flows **in-process** (no per-run containers, no docker
-socket). Since we use Prefect for orchestration, you don't need a system cron job.
-
-1. Start the Prefect server and worker:
-   ```sh
-   docker compose up -d prefect prefect_worker
-   ```
-   On startup the worker registers the `cde-process-pool` work pool and all
-   deployments (full harvest, per-source, vernaculars), then begins polling.
-
-   > The Prefect server stores its metadata in **Postgres** (a dedicated
-   > `prefect` database in the shared `db` service, auto-created on startup),
-   > not SQLite — SQLite locks under the concurrent access from scaled / remote
-   > workers. This is why `prefect` depends on `db`.
-
-2. Control *when* harvests run via `.env` (all optional):
-   - `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules (unset = none).
-   - `RUN_ON_DEPLOY=true` — fire one full harvest immediately on (re)deploy.
-   - Manual / per-source — trigger from the Prefect UI or the dashboard
-     "Trigger harvest" button at any time.
-
-   *Note: single-source runs always force **Incremental Mode** so they can't
-   TRUNCATE the other sources. Full runs honor `INCREMENTAL_MODE`.*
-
-2b. **Rebuilding the schema after a table-layout change.** Postgres applies
-   `database/1_schema.sql` only when it initialises a *fresh* data volume, and
-   `db_migrate` re-applies only the `[3-9]_*.sql` function files — whose table
-   references all sit inside PL/pgSQL bodies and so are not checked at load time.
-   A deploy that adds or renames a table therefore reports a clean migration while
-   leaving the database on the old layout; the mismatch first shows up as
-   `relation "cde.<table>" does not exist` at query time.
-
-   The `Rebuild Database` deployment (`cde-rebuild-database`) fixes that in place —
-   no volume deletion and no host shell:
-
-   ```sh
-   docker exec <prefect_worker> sh -c "cd /app/harvester && uv run prefect deployment run \
-     'Rebuild Database/cde-rebuild-database' -p confirm=$DB_NAME"
-   ```
-
-   It drops the `cde` schema, re-applies `1_schema.sql` and the `[3-9]` files in one
-   transaction (a mid-way failure rolls back rather than half-migrating), flushes the
-   redis tile cache, and triggers `Harvest All Sources` to repopulate.
-
-   Requires `DB_NAME`/`DB_USER`/`DB_PASSWORD` on the deployment — Coolify supplies none
-   of them (see `.env.coolify.sample`). The worker now refuses to start without them
-   rather than registering deployments that fail at connection time inside every run.
-
-   **This destroys all harvested data**, exactly as deleting the Postgres volume would.
-   `confirm` must equal `DB_NAME` or the flow aborts before touching anything, so the
-   Run button in the Prefect UI can't wipe a database by accident. Pass
-   `-p run_harvest=false` to leave it empty.
-
-3. Scale workers (more concurrent runs) on the same host:
-   ```sh
-   docker compose up -d --scale prefect_worker=N
-   ```
-   Registration is idempotent, so extra replicas are safe.
-
-4. Run a worker on **another host** (added capacity): the central Prefect API
-   and DB must be network-reachable, and the `cde-harvester` image must be
-   available there (registry pull, or `docker save | ssh | docker load`). Then:
-   ```sh
-   PREFECT_API_URL=https://<prefect-host>/api DB_HOST_EXTERNAL=<db-host> \
-     docker compose -f docker-compose.worker.yaml up -d
-   ```
-   Remote workers set `REGISTER_DEPLOYMENTS=false` so they only poll. Note that
-   CSV/log output and caches are local to each host (plain named volumes aren't
-   shared across hosts); the DB is the source of truth.
+3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
+   [Harvest configuration](#harvest-configuration)).
+4. Start: `sudo docker compose up -d --build`.

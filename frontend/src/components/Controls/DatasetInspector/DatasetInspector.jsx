@@ -1,26 +1,39 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
-import { Funnel, FunnelFill } from "react-bootstrap-icons";
+import {
+  CheckCircleFill,
+  Download,
+  FileEarmarkText,
+  Funnel,
+  FunnelFill,
+} from "react-bootstrap-icons";
 // import platformColors from '../../platformColors'
 import Loading from "../Loading/Loading.jsx";
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import {
   dataLayerKeyForDataset,
   DATA_LAYER_LABEL_KEYS,
 } from "../../../state/dataLayers.js";
 import { gridNodeFactors, totalGridNodes } from "../../../wmsUtilities";
-import { formatInstantRange, formatRange } from "../../../utilities.jsx";
-import FilterButton from "../Filter/FilterButton/FilterButton.jsx";
+import {
+  formatInstant,
+  formatInstantRange,
+  formatRange,
+} from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
 import ListCard, {
   CardField,
   CardTags,
   useExpandableList,
 } from "./ListCard.jsx";
+import Tooltip from "../../ui/Tooltip.jsx";
 import ZoomToDataset, {
   useZoomToDataset,
 } from "../../AppShell/ZoomToDataset/ZoomToDataset.jsx";
@@ -116,7 +129,6 @@ export default function DatasetInspector({
   returnToList,
   setHoveredDataset,
   setInspectRecordID,
-  filterSet,
   query,
   selectedTrajectory,
   setSelectedTrajectory,
@@ -128,8 +140,11 @@ export default function DatasetInspector({
   activeWmsOverlay,
   setActiveWmsOverlay,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { zoomToDataset } = useZoomToDataset();
+  const { eovsSelected, datasetsSelected, setDatasetsSelected } = useFilters();
+  const { handleSelectDataset, selectedPks } = useSelection();
+  const { setShowDownloadModal } = useUI();
   const [datasetRecords, setDatasetRecords] = useState();
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
   const inspectorRef = useRef(null);
@@ -148,12 +163,6 @@ export default function DatasetInspector({
   const hasSources =
     dataset.source_type === "obis" ||
     Boolean(dataset.erddap_url || dataset.ckan_url);
-  // OBIS is always the one link; ERDDAP + CKAN can both be present, at which
-  // point the row needs the full width to hold two chips.
-  const hasMultipleSources =
-    dataset.source_type !== "obis" &&
-    Boolean(dataset.erddap_url) &&
-    Boolean(dataset.ckan_url);
   // Start loading rather than false: the fetch below is fired from an effect,
   // so an initial false would paint one frame of an empty record table before
   // the spinner appears.
@@ -392,8 +401,6 @@ export default function DatasetInspector({
     [t, platformIdLabel],
   );
 
-  const { eovFilter, platformFilter, orgFilter, datasetFilter } = filterSet;
-
   const {
     shown: shownEovs,
     hidden: hiddenEovCount,
@@ -401,24 +408,50 @@ export default function DatasetInspector({
     toggle: toggleEovsExpanded,
   } = useExpandableList(dataset.eovs, EOV_VISIBLE_LIMIT);
 
-  const platformOption = platformFilter.platformsSelected.filter(
-    (p) => dataset.platform === p.title,
-  )[0];
+  // An ocean variable's definition, for the chip's tooltip. The catalog the
+  // Filters panel loads is the only place these are written down; the chip
+  // itself no longer toggles that filter, but it can still say what the
+  // variable means.
+  const eovDefinitions = useMemo(
+    () =>
+      new Map(
+        eovsSelected.map((option) => [
+          option.title,
+          { en: option.hover_en, fr: option.hover_fr },
+        ]),
+      ),
+    [eovsSelected],
+  );
 
   // The title bar's filter button: narrow the map to this dataset alone, or
-  // release it again. Same toggle the dataset's chip in the Filters panel does
-  // (FilterButton), on the one dataset this page is about.
-  const datasetIsFiltered = datasetFilter.datasetsSelected.some(
+  // release it again. The one control on this page that touches a filter —
+  // it is a labelled button that says so, not a value chip that happens to be
+  // clickable.
+  const datasetIsFiltered = datasetsSelected.some(
     (option) => option.pk === dataset.pk && option.isSelected,
   );
   const toggleDatasetFilter = () =>
-    datasetFilter.setDatasetsSelected(
-      datasetFilter.datasetsSelected.map((option) =>
+    setDatasetsSelected(
+      datasetsSelected.map((option) =>
         option.pk === dataset.pk
           ? { ...option, isSelected: !option.isSelected }
           : option,
       ),
     );
+
+  // Griddap is metadata-only and never enters the download selection
+  // (handleSelectDataset drops it), so the button says why rather than
+  // failing silently on click.
+  const inDownloadSelection = selectedPks.has(dataset.pk);
+  // A real toggle, both ways: picking it up opens the download modal (there
+  // is nothing else to review it in from this page), dropping it just
+  // updates the selection — the modal is already open if that is where the
+  // click came from, and there is no order left to show for a dataset just
+  // taken out of it.
+  const toggleDownloadSelection = () => {
+    handleSelectDataset(dataset);
+    if (!inDownloadSelection) setShowDownloadModal(true);
+  };
 
   return (
     <div
@@ -428,9 +461,10 @@ export default function DatasetInspector({
       onMouseLeave={() => setHoveredDataset()}
     >
       {/* The title bar is pinned: it names the page, so it stays put while the
-          metadata sheet and record table scroll under it. Title on the left,
-          the two actions that belong to the dataset on the right — a heading at
-          the top of a page needs no "Title" label over it. Double-clicking the
+          metadata sheet and record table scroll under it. The heading takes the
+          full width and the dataset's actions sit in a row under it — stacked
+          against the right edge they were three bare icons in a narrow column,
+          which is no place to say what any of them does. Double-clicking the
           bar frames the map on this dataset, the same thing the zoom button
           does, for anyone who goes for the title first; the map is otherwise
           left where the user put it, since opening a page highlights the
@@ -440,11 +474,44 @@ export default function DatasetInspector({
           control, in the one place that marks the panel as being on a dataset
           rather than the list. */}
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
-        {/* A heading, and only a heading. Filtering the map to this dataset
-            used to be a click on the title itself, which no reader expects of
-            a page's title — it is the button beside the zoom one now. */}
-        <h2 className="datasetTitle">{dataset.title}</h2>
+        <div className="datasetTitleHeading">
+          <FileEarmarkText
+            className="datasetTitleIcon"
+            size={20}
+            aria-hidden="true"
+          />
+          {/* A heading, and only a heading. Filtering the map to this dataset
+              used to be a click on the title itself, which no reader expects of
+              a page's title — it is a named button in the row below now. */}
+          <h2 className="datasetTitle">{dataset.title}</h2>
+        </div>
+        {/* Every action on this page, named. These are the only things here
+            that change anything: the values in the sheet below are read, not
+            clicked. */}
         <div className="datasetTitleActions">
+          <button
+            type="button"
+            className={classNames("datasetTitleAction", {
+              active: inDownloadSelection,
+            })}
+            onClick={toggleDownloadSelection}
+            disabled={isGrid}
+            aria-pressed={inDownloadSelection}
+            title={t(
+              isGrid
+                ? "griddapNotDownloadableTooltip"
+                : inDownloadSelection
+                  ? "datasetInspectorDownloadInSelectionTitle"
+                  : "datasetInspectorDownloadTitle",
+            )}
+          >
+            {inDownloadSelection ? (
+              <CheckCircleFill size={15} aria-hidden="true" />
+            ) : (
+              <Download size={15} aria-hidden="true" />
+            )}
+            {t("datasetInspectorDownloadText")}
+          </button>
           <button
             type="button"
             className={classNames("datasetTitleAction", {
@@ -463,55 +530,49 @@ export default function DatasetInspector({
             ) : (
               <Funnel size={15} aria-hidden="true" />
             )}
+            {t("datasetFilterButtonApplyText")}
           </button>
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
         </div>
       </div>
       <div className="datasetInspectorBody">
-        {/* The front matter, as compact as it can be read: each field is a
-            small eyebrow label with its value beside it on the same line
-            (wrapping under only when the row is too narrow for both), and the
-            fields flow two-up across the sheet, the chip-carrying ones taking
-            a full row of their own. No row rules — the whitespace separates
-            them. */}
+        {/* The front matter, as compact as it can be read: one field per
+            line, each a small eyebrow label with its value beside it on the
+            same line (wrapping under only when the row is too narrow for
+            both). No row rules — the whitespace separates them. */}
         <dl className="datasetMetaSheet">
-          <div className="metaCell metaCellWide">
+          <div className="metaCell">
             <dt className="metadataLabel">
               {t("datasetInspectorOrganizationText")}
             </dt>
             <dd className="metadataValue">
-              {dataset.organizations.map((org, index) => {
-                return (
-                  <FilterButton
-                    key={index}
-                    setOptionsSelected={orgFilter.setOrgsSelected}
-                    optionsSelected={orgFilter.orgsSelected}
-                    option={
-                      orgFilter.orgsSelected.filter((o) => org === o.title)[0]
-                    }
-                  />
-                );
-              })}
+              {dataset.organizations.map((org) => (
+                <span className="metadataChip" key={org}>
+                  {org}
+                </span>
+              ))}
             </dd>
           </div>
-          <div className="metaCell metaCellWide">
+          <div className="metaCell">
             <dt className="metadataLabel">
               {t("datasetInspectorOceanVariablesText")}
             </dt>
             <dd className="metadataValue">
-              {shownEovs.map((eov, index) => {
-                return (
-                  <FilterButton
-                    key={index}
-                    setOptionsSelected={eovFilter.setEovsSelected}
-                    optionsSelected={eovFilter.eovsSelected}
-                    option={
-                      eovFilter.eovsSelected.filter((e) => eov === e.title)[0]
-                    }
-                  />
-                );
-              })}
+              {/* OBIS occurrence datasets carry no ocean variables at all. */}
+              {!dataset.eovs?.length && (
+                <span className="metadataEmpty">—</span>
+              )}
+              {shownEovs.map((eov) => (
+                <Tooltip
+                  key={eov}
+                  placement="bottom"
+                  delay={150}
+                  content={eovDefinitions.get(eov)?.[i18n.language]}
+                >
+                  <span className="metadataChip">{t(eov)}</span>
+                </Tooltip>
+              ))}
               {(hiddenEovCount > 0 || eovsExpanded) && (
                 <button
                   type="button"
@@ -551,16 +612,16 @@ export default function DatasetInspector({
               {t("datasetInspectorPlatformText")}
             </dt>
             <dd className="metadataValue">
-              <FilterButton
-                setOptionsSelected={platformFilter.setPlatformsSelected}
-                optionsSelected={platformFilter.platformsSelected}
-                option={platformOption}
-              />
+              {/* Nullable in the schema; an empty chip under a label reads as
+                  a broken field. */}
+              {dataset.platform ? (
+                <span className="metadataChip">{t(dataset.platform)}</span>
+              ) : (
+                <span className="metadataEmpty">—</span>
+              )}
             </dd>
           </div>
-          {/* A grid spells its node count out as a product of its axes, which
-              needs the full width; a plain record count shares its row. */}
-          <div className={isGrid ? "metaCell metaCellWide" : "metaCell"}>
+          <div className="metaCell">
             <dt className="metadataLabel">
               {isGrid
                 ? t("griddapNodesText")
@@ -578,17 +639,38 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
+          {/* Dataset-level freshness. coverage_time_max is the newest data the
+              server reported across EVERY record in the dataset, so for a
+              mooring network or a glider programme it is not the end of any one
+              record — which is why it is labelled on the dataset and the record
+              cards below keep their own (harvest-era) ranges. */}
+          {dataset.coverage_time_max && (
+            <div className="metaCell">
+              <dt className="metadataLabel">
+                {t("datasetInspectorLatestDataText")}
+              </dt>
+              <dd className="metadataValue metadataValueCentered">
+                <span className="metadataChip">
+                  {formatInstant(dataset.coverage_time_max)}
+                </span>
+                {/* Same badge as the dataset card's (DatasetCard.jsx) — the
+                    freshness signal sits beside the timestamp it explains. */}
+                {dataset.is_realtime && (
+                  <span
+                    className="datasetTitleLive"
+                    title={t("datasetRealtimeBadgeTitle")}
+                  >
+                    {t("datasetRealtimeBadgeText")}
+                  </span>
+                )}
+              </dd>
+            </div>
+          )}
           {/* The outbound links used to be a labelled row each; they say what
               they are in their own text, so one "Sources" line holds them
-              all — narrow like Locations before it so the two pair up on one
-              row, unless there's more than one link (ERDDAP + CKAN both), in
-              which case the row needs the full width to hold both badges. */}
+              all. */}
           {hasSources && (
-            <div
-              className={classNames("metaCell", {
-                metaCellWide: hasMultipleSources,
-              })}
-            >
+            <div className="metaCell">
               <dt className="metadataLabel">
                 {t("datasetInspectorSourcesText")}
               </dt>
@@ -690,7 +772,7 @@ export default function DatasetInspector({
                     )
                   }
                 >
-                  <CardField label={t("datasetInspectorTimeframeText")}>
+                  <CardField label={t("datasetInspectorTimeframeText")} nowrap>
                     {formatInstantRange(row.time_min, row.time_max)}
                   </CardField>
                   <CardField label={t("trajectoryPlatformFixesText")}>
@@ -758,7 +840,10 @@ export default function DatasetInspector({
                       }
                       onClick={() => setInspectRecordID(row.profile_id)}
                     >
-                      <CardField label={t("datasetInspectorTimeframeText")}>
+                      <CardField
+                        label={t("datasetInspectorTimeframeText")}
+                        nowrap
+                      >
                         {formatInstantRange(row.time_min, row.time_max)}
                       </CardField>
                       <CardField label={t("datasetInspectorDepthRangeText")}>

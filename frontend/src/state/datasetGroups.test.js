@@ -68,11 +68,12 @@ describe("groupKeysFor", () => {
     ]);
   });
 
-  it("groups by selection state for selected", () => {
-    expect(groupKeysFor({ selected: true }, "selected", null)).toEqual([
+  it("groups by shortlist membership for selected", () => {
+    const selectedPks = new Set([1]);
+    expect(groupKeysFor({ pk: 1 }, "selected", null, selectedPks)).toEqual([
       SELECTED_KEY,
     ]);
-    expect(groupKeysFor({ selected: false }, "selected", null)).toEqual([
+    expect(groupKeysFor({ pk: 2 }, "selected", null, selectedPks)).toEqual([
       UNSELECTED_KEY,
     ]);
   });

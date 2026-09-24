@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor, act } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -82,6 +82,23 @@ describe("FeatureCard", () => {
     expect(screen.getByTitle(row.title)).toBeInTheDocument();
   });
 
+  it("gives a row the same second row as the datasets list's card", async () => {
+    await renderReady();
+    const row = pointQueryFixture[0];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 13,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: row.pk, count: 4, title: row.title },
+        ],
+      });
+    });
+    const meta = screen.getByTitle(row.title).querySelector(".datasetCardMeta");
+    expect(meta).toHaveTextContent("Time series / Profile");
+    expect(meta).toHaveTextContent(String(row.profiles_count));
+  });
+
   it("closing (X) clears the featureQuery", async () => {
     const { user } = await renderReady();
     const row = pointQueryFixture[0];
@@ -157,50 +174,6 @@ describe("FeatureCard", () => {
     expect(latestMap.featureQuery).toBeNull();
   });
 
-  it("Add all adds every selectable row and closes the card", async () => {
-    const { user } = await renderReady();
-    const [rowA, rowB] = pointQueryFixture.filter((r) => !r.selected);
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 7,
-        lngLat: [0, 0],
-        items: [
-          { kind: "observation", pk: rowA.pk, count: 2, title: rowA.title },
-          { kind: "observation", pk: rowB.pk, count: 1, title: rowB.title },
-        ],
-      });
-    });
-    await user.click(screen.getByTitle("Select all 2 datasets here"));
-    await waitFor(() => {
-      const updated = latestSelection.pointsData.find((p) => p.pk === rowA.pk);
-      expect(updated.selected).toBe(true);
-    });
-    expect(latestMap.featureQuery).toBeNull();
-  });
-
-  it("Zoom here frames the click's bounds and closes the card", async () => {
-    const { user } = await renderReady();
-    const row = pointQueryFixture[0];
-    act(() => {
-      latestMap.setFeatureQuery({
-        nonce: 8,
-        lngLat: [0, 0],
-        bounds: [
-          [-10, -10],
-          [10, 10],
-        ],
-        items: [
-          { kind: "observation", pk: row.pk, count: 1, title: row.title },
-        ],
-      });
-    });
-    await user.click(screen.getByText("Zoom here"));
-    await waitFor(() =>
-      expect(latestMap.zoomTarget?.geometry?.type).toBe("Polygon"),
-    );
-    expect(latestMap.featureQuery).toBeNull();
-  });
-
   it("shows a Show more button past the visible-row cap, and expands the list", async () => {
     const { user } = await renderReady();
     const rows = pointQueryFixture.slice(0, 7);
@@ -217,10 +190,10 @@ describe("FeatureCard", () => {
       });
     });
     const moreButton = await screen.findByText("Show 2 more");
-    expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(5);
+    expect(document.querySelectorAll(".featureCardRow")).toHaveLength(5);
     await user.click(moreButton);
     await waitFor(() =>
-      expect(document.querySelectorAll(".featureCardRowOpen")).toHaveLength(7),
+      expect(document.querySelectorAll(".featureCardRow")).toHaveLength(7),
     );
   });
 
@@ -257,5 +230,106 @@ describe("FeatureCard", () => {
     expect(
       screen.getByTitle("Gridded datasets are accessed directly on ERDDAP"),
     ).toBeInTheDocument();
+  });
+
+  // The bug this endpoint exists for: the tile carries one `count` for the
+  // whole cell, so every dataset in it used to be labelled with that same
+  // number — a one-day dataset reading the same as the 1115-day mooring beside
+  // it. The figures come from /tiles/datasets now, one per dataset.
+  it("gives each dataset in a cell its own day count, not the cell's total", async () => {
+    await renderReady();
+    const [a, b, c] = pointQueryFixture;
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 11,
+        lngLat: [0, 0],
+        // No `count` on the items: the cell total is deliberately not the
+        // per-dataset figure, so it is not carried here at all.
+        items: [a, b, c].map((row) => ({
+          kind: "observation",
+          pk: row.pk,
+          aggregate: true,
+          title: row.title,
+        })),
+        observationCount: 1121,
+        buckets: { hexPks: [970], pointPks: [], source: "main", z: 6 },
+      });
+    });
+
+    // Fixture: pk 7 -> 1115, pk 8 -> 5, pk 9 -> 1.
+    await waitFor(() =>
+      expect(screen.getByTitle(a.title)).toHaveTextContent(
+        "1,115 day(s) of data",
+      ),
+    );
+    expect(screen.getByTitle(b.title)).toHaveTextContent("5 day(s) of data");
+    expect(screen.getByTitle(c.title)).toHaveTextContent("1 day(s) of data");
+  });
+
+  // A coverage hex at marker zoom lists the stations inside it too. Those are
+  // profiles, which /tiles/datasets only has under source=main, so the hex and
+  // its markers are asked of their own sources and the answers merged.
+  it("asks a coverage hex's markers of the main source and the hex of cells", async () => {
+    await renderReady();
+    const hexFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input, init) => {
+      const url = new URL(typeof input === "string" ? input : input.url);
+      if (url.pathname.endsWith("/tiles/datasets")) {
+        const rows =
+          url.searchParams.get("source") === "cells"
+            ? [{ pk: 7, count: 30 }]
+            : [{ pk: 10, count: 4 }];
+        return Promise.resolve(Response.json(rows));
+      }
+      return hexFetch(input, init);
+    });
+    const hexRow = pointQueryFixture[0];
+    const markerRow = pointQueryFixture[3];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 13,
+        lngLat: [0, 0],
+        items: [
+          { kind: "observation", pk: hexRow.pk, aggregate: true },
+          { kind: "observation", pk: markerRow.pk, aggregate: false },
+        ],
+        buckets: { hexPks: [5], pointPks: [42], source: "cells", z: 9 },
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTitle(markerRow.title)).toHaveTextContent(
+        "4 day(s) of data",
+      ),
+    );
+    expect(screen.getByTitle(hexRow.title)).toHaveTextContent(
+      "30 day(s) of data",
+    );
+    const asked = globalThis.fetch.mock.calls
+      .map(([input]) => new URL(input).searchParams)
+      .filter((params) => params.has("source"));
+    expect(asked.map((params) => params.toString())).toEqual([
+      expect.stringMatching(/source=cells&hexes=5$/),
+      expect.stringMatching(/source=main&points=42$/),
+    ]);
+  });
+
+  it("shows no day count for a dataset the breakdown has not answered for", async () => {
+    await renderReady();
+    const row = pointQueryFixture[0];
+    act(() => {
+      latestMap.setFeatureQuery({
+        nonce: 12,
+        lngLat: [0, 0],
+        items: [{ kind: "observation", pk: row.pk, title: row.title }],
+        // No buckets: nothing to ask about, so nothing is claimed. Showing a
+        // "0 day(s)" here would be the same class of lie as showing the
+        // cell's total.
+        buckets: { hexPks: [], pointPks: [], source: "main", z: 6 },
+      });
+    });
+    expect(screen.getByTitle(row.title)).not.toHaveTextContent(
+      "day(s) of data",
+    );
   });
 });

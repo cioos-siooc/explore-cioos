@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   abbreviateString,
-  applyMapDatasetPKs,
+  applyDatasetPKs,
   capitalizeFirstLetter,
   createDataFilterQueryString,
   createSelectionQueryString,
@@ -217,24 +217,47 @@ describe("the drawn selection round-trips through the url", () => {
   });
 });
 
-describe("applyMapDatasetPKs", () => {
-  it("leaves the query alone while no group is hidden", () => {
-    expect(applyMapDatasetPKs("eovs=oxygen", undefined)).toBe("eovs=oxygen");
+describe("applyDatasetPKs", () => {
+  it("leaves the query alone while nothing narrows the datasets", () => {
+    expect(applyDatasetPKs("eovs=oxygen", undefined)).toBe("eovs=oxygen");
   });
 
-  it("narrows the query to the still-visible datasets", () => {
-    const params = new URLSearchParams(
-      applyMapDatasetPKs("eovs=oxygen", [3, 9]),
-    );
+  it("narrows the query to the listed datasets", () => {
+    const params = new URLSearchParams(applyDatasetPKs("eovs=oxygen", [3, 9]));
     expect(params.get("datasetPKs")).toBe("3,9");
     expect(params.get("eovs")).toBe("oxygen");
   });
 
-  it("asks for nothing at all when every group is hidden", () => {
-    // An empty datasetPKs would read as "no dataset filter" and draw the world.
-    expect(
-      new URLSearchParams(applyMapDatasetPKs("", [])).get("datasetPKs"),
-    ).toBe("0");
+  it("names the dropped datasets when that is the shorter list", () => {
+    // ~5 bytes a pk: a narrowing that keeps nearly everything is a URL the
+    // server answers with 431 unless it travels as what it dropped.
+    const all = Array.from({ length: 10 }, (_, i) => i + 1);
+    const params = new URLSearchParams(
+      applyDatasetPKs("eovs=oxygen", all.slice(1), all),
+    );
+    expect(params.get("excludeDatasetPKs")).toBe("1");
+    expect(params.get("datasetPKs")).toBeNull();
+    expect(params.get("eovs")).toBe("oxygen");
+  });
+
+  it("still names what it kept when the narrowing drops more than it keeps", () => {
+    const all = [1, 2, 3, 4, 5];
+    const params = new URLSearchParams(applyDatasetPKs("", [1, 2], all));
+    expect(params.get("datasetPKs")).toBe("1,2");
+    expect(params.get("excludeDatasetPKs")).toBeNull();
+  });
+
+  it("sends neither list when the narrowing drops nothing", () => {
+    const all = [1, 2, 3];
+    expect(applyDatasetPKs("eovs=oxygen", [1, 2, 3], all)).toBe("eovs=oxygen");
+  });
+
+  it("asks for nothing at all when the list is empty", () => {
+    // An empty datasetPKs would read as "no dataset filter" and answer for
+    // the whole world.
+    expect(new URLSearchParams(applyDatasetPKs("", [])).get("datasetPKs")).toBe(
+      "0",
+    );
   });
 });
 
@@ -371,5 +394,29 @@ describe("track geometry", () => {
     const times = [t0, t0 + 3600e3, t0 + 400 * day, t0 + 400 * day + 3600e3];
     const runs = splitTrackRuns(coords, times);
     expect(runs.length).toBeGreaterThan(1);
+  });
+});
+
+describe("createDataFilterQueryString — realtime", () => {
+  const base = {
+    ...defaultQuery,
+    eovsSelected: [],
+    orgsSelected: [],
+    datasetsSelected: [],
+    platformsSelected: [],
+  };
+
+  it("emits realtimeOnly only when the toggle is on", () => {
+    expect(
+      createDataFilterQueryString({ ...base, realtimeOnly: true }),
+    ).toMatch(/(^|&)realtimeOnly=true(&|$)/);
+  });
+
+  it("leaves the query string untouched when it is off", () => {
+    for (const realtimeOnly of [false, undefined]) {
+      expect(
+        createDataFilterQueryString({ ...base, realtimeOnly }),
+      ).not.toMatch(/realtimeOnly/);
+    }
   });
 });

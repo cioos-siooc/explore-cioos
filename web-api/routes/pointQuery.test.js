@@ -35,6 +35,20 @@ test("calls getShapeQuery without an estimate or a records list", async () => {
   assert.equal(shapeQuery.calls[0].getRecordsList, false);
 });
 
+test("does not cache a failed time-filter query", async () => {
+  const query = { timeMin: "2020-01-01", timeMax: "2020-12-31" };
+  shapeQuery.queueError(new Error("database unavailable"));
+
+  const failed = await agent.get("/pointQuery").query(query);
+  assert.equal(failed.status, 500);
+
+  shapeQuery.queueResult([{ pk: 1, title: "Recovered dataset" }]);
+  const recovered = await agent.get("/pointQuery").query(query);
+  assert.equal(recovered.status, 200);
+  assert.deepEqual(recovered.body, [{ pk: 1, title: "Recovered dataset" }]);
+  assert.equal(shapeQuery.calls.length, 2);
+});
+
 // Unlike /download and /datasetRecordsList's shape counterparts, this route
 // runs pipeline() with its shape:false default (see the route's own comment:
 // "if no shape is given, it returns all datasets") — a half-specified bbox or

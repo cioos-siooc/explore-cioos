@@ -34,9 +34,13 @@ If you need to run the downloader outside of Docker:
 
 Configure the downloader through environment variables in `.env` file at the project root:
 
-- `DOWNLOADS_FOLDER`: Directory for downloaded files (default: `./downloads`)
-- `DOWNLOAD_WAF_URL`: Base URL for WAF downloads
+- `DOWNLOAD_WAF_URL`: Base URL emailed download links are built on. Inside
+  compose it is derived from `APP_URL` (see the root `.env.sample`), so set that
+  rather than this.
 - `CREATE_PDF`: Enable/disable PDF generation (default: `False`)
+
+Downloads always land in `./downloads` relative to the working directory; there
+is no variable for it.
 
 ## Usage
 

@@ -1,38 +1,26 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 
-import Spinner from "./Spinner.jsx";
 import "./activityListStyles.css";
 
 // What the app is waiting on, as a list of named waits. Presentational on
-// purpose: both callers — the corner status panel and the first-paint splash —
+// purpose: both callers — the bottom status panel and the first-paint splash —
 // read the activity registry themselves and hand the keys down, so this stays a
 // plain list with no state of its own.
 //
-// `marks` is the per-row spinner. The corner panel keeps it: it appears beside
-// a map the user is already reading, and the marks are what say the rows are
-// live. The splash drops it — the lockup above the list is already pulsing, and
-// five more copies of the same animation under it is noise, not information.
-export default function ActivityList({
-  labelKeys,
-  className = "",
-  marks = true,
-}) {
+// Rows carry no mark of their own. Each caller already shows one animation for
+// the whole wait — the splash's pulsing lockup, the status panel's spinner
+// under its heading — and a copy of it on every row was noise rather than
+// information: five marks all saying the same thing the one above them said.
+export default function ActivityList({ labelKeys, className = "" }) {
   const { t } = useTranslation();
 
   if (!labelKeys.length) return null;
 
-  const classes = ["activityList", marks ? "" : "activityList-plain", className]
-    .filter(Boolean)
-    .join(" ");
-
   return (
-    <ul className={classes}>
+    <ul className={["activityList", className].filter(Boolean).join(" ")}>
       {labelKeys.map((key) => (
-        <li key={key}>
-          {marks && <Spinner size="xs" role="presentation" />}
-          <span>{t(key)}</span>
-        </li>
+        <li key={key}>{t(key)}</li>
       ))}
     </ul>
   );

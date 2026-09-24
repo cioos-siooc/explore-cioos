@@ -11,6 +11,11 @@ const {
   unionBranches,
 } = require("./selection");
 
+// The jsonb containment probe behind has_depth below: datasets.table_variables
+// is an array of {name, ...} per variable, so a dataset exposes `depth` iff the
+// array contains an element with that name.
+const DEPTH_VARIABLE_PROBE = JSON.stringify([{ name: "depth" }]);
+
 /*
  * Assembles the shape query without running it: returns { sql, params } ready
  * for db.raw. Split out from getShapeQuery so the largest SQL contract in the
@@ -176,6 +181,21 @@ async function buildShapeSql(
                   organizations,
                   count(p.*)::integer profiles_count,
                   d.source_type,
+                  -- Whether the dataset exposes a variable literally named
+                  -- 'depth'. tabledap 400s on a depth>= constraint for a
+                  -- dataset that doesn't ("Unrecognized constraint
+                  -- variable"), so the frontend's direct-download links have
+                  -- to know before they can carry the depth filter. Datasets
+                  -- that express depth as z/pressure read false and get a
+                  -- link without the depth constraint rather than a broken
+                  -- one. NULL table_variables (not re-harvested since the
+                  -- column landed) reads false for the same reason.
+                  -- Containment rather than an unnest: it is a single index-
+                  -- friendly jsonb operation, and the probe is bound rather
+                  -- than inlined so its '"name":' cannot be read as a knex
+                  -- named binding.
+                  coalesce(d.table_variables @> :depthVariableProbe::jsonb, false)
+                                                                  AS has_depth,
                   d.erddap_url AS erddap_server_url,
                   CASE WHEN d.source_type = 'obis'
                            THEN 'https://obis.org/dataset/' || d.dataset_id
@@ -188,6 +208,31 @@ async function buildShapeSql(
                   d.wms_url,
                   d.grid_variables,
                   d.grid_dimensions,
+                  -- Freshness. coverage_time_max is the newest data the server
+                  -- itself reported at harvest time, across every record in the
+                  -- dataset -- so for a multi-station or multi-mission dataset
+                  -- it is not any single record's end, and the frontend labels
+                  -- it as the dataset's. is_realtime is derived from it here so
+                  -- the rule lives in exactly one place (see
+                  -- database/8_range_functions.sql).
+                  to_char(d.coverage_time_max AT TIME ZONE 'UTC',
+                          'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS coverage_time_max,
+                  d.verified_at,
+                  dataset_is_realtime(d.coverage_time_max,
+                                      d.verified_at,
+                                      d.cdm_data_type) AS is_realtime,
+                  -- Days of data: the dataset's stored day set (rebuilt per
+                  -- load by refresh_dataset_day_ranges) clipped to the time
+                  -- filter. Unioning the matched features' ranges here instead
+                  -- cost ~3 s per cold request, so area, depth and feature
+                  -- filters don't narrow it.
+                  ${
+                    doEstimate
+                      ? ""
+                      : `day_range_overlap_days(d.day_ranges,
+                           daterange(:timeMin::date, (:timeMax::date) + 1))::integer
+                           AS days,`
+                  }
                   -- griddap footprint for the frontend bbox highlight; NULL
                   -- for every other type
                   CASE WHEN d.cdm_data_type = 'Grid'
@@ -235,27 +280,17 @@ SELECT sub.*
        ${doEstimate ? ",round(:adder + records_count * num_columns * :multiplier) AS SIZE" : ""}
 FROM   sub
        ${getRecordsList ? "LEFT JOIN records ON records.dataset_pk = sub.pk" : ""}`;
-  let queryParams;
-
-  if (doEstimate) {
-    queryParams = {
-      timeMin,
-      timeMax,
-      depthMin,
-      depthMax,
-      filters: filters.shared,
-      obisFilters: filters.obisOnly,
-      profileFilters: filters.profileOnly,
-      adder: 0,
-      multiplier: 10,
-    };
-  } else {
-    queryParams = {
-      filters: filters.shared,
-      obisFilters: filters.obisOnly,
-      profileFilters: filters.profileOnly,
-    };
-  }
+  // Both shapes carry the same three filter fragments plus the has_depth
+  // probe; only the estimate's own arithmetic differs.
+  const queryParams = {
+    filters: filters.shared,
+    obisFilters: filters.obisOnly,
+    profileFilters: filters.profileOnly,
+    depthVariableProbe: DEPTH_VARIABLE_PROBE,
+    timeMin,
+    timeMax,
+    ...(doEstimate ? { depthMin, depthMax, adder: 0, multiplier: 10 } : {}),
+  };
 
   return { sql, params: queryParams };
 }

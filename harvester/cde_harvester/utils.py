@@ -51,6 +51,29 @@ def get_standard_name_to_eovs(eov_to_standard_name):
 standard_name_to_eovs = get_standard_name_to_eovs(eov_to_standard_name)
 
 
+def erddap_time_to_iso(value):
+    """ERDDAP time value ('1.0257408E9' epoch seconds or an ISO 8601 string)
+    -> ISO-8601 UTC string, or None when unparseable.
+
+    ERDDAP publishes times in either format depending on the endpoint, and
+    sometimes both within one response. Parsing per *value* matters: the
+    column-level sniff in ERDDAP.parse_erddap_dates() reads only the first
+    element, so a frame whose first row has an empty time sends a whole column
+    of epoch seconds down the ISO branch, where pd.to_datetime reads them as
+    nanoseconds and silently yields 1970.
+    """
+    s = str(value).strip()
+    if not s or s.lower() in ("nan", "none", "nat"):
+        return None
+    try:
+        ts = pd.to_datetime(float(s), unit="s", utc=True)
+    except (TypeError, ValueError):
+        ts = pd.to_datetime(s, errors="coerce", utc=True)
+    if pd.isna(ts):
+        return None
+    return ts.isoformat()
+
+
 def intersection(lst1, lst2):
     """
     intersection doesnt include nulls
@@ -66,6 +89,14 @@ def flatten(t):
 CF_STANDARD_NAMES_CSV = Path(__file__).parent / "data" / "cf_standard_names.csv"
 CF_STANDARD_NAMES_VERSION_FILE = Path(__file__).parent / "data" / "cf_standard_names_version.txt"
 CF_NAMES_XML_URL = "https://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
+CF_STANDARD_NAME_MODIFIERS = frozenset(
+    {
+        "detection_minimum",
+        "number_of_observations",
+        "standard_error",
+        "status_flag",
+    }
+)
 
 
 def get_cf_version_from_xml(url):
@@ -110,6 +141,38 @@ def get_cf_names():
 
 
 cf_standard_names = get_cf_names()
+
+
+def split_cf_standard_name(value):
+    """Return a CF standard name and optional Appendix C modifier, if well formed."""
+    if not isinstance(value, str):
+        return None
+    parts = value.split()
+    if len(parts) == 1:
+        return parts[0], None
+    if len(parts) == 2 and parts[1] in CF_STANDARD_NAME_MODIFIERS:
+        return parts[0], parts[1]
+    return None
+
+
+def is_cf_standard_name(value):
+    """Whether value is a table name optionally followed by a valid CF modifier."""
+    parsed = split_cf_standard_name(value)
+    return parsed is not None and parsed[0] in cf_standard_names
+
+
+def cf_standard_name_base(value):
+    """Return a well-formed standard name's unmodified base, or None."""
+    parsed = split_cf_standard_name(value)
+    return parsed[0] if parsed else None
+
+
+def eov_standard_name(value):
+    """Return an unmodified name eligible to represent an EOV measurement."""
+    parsed = split_cf_standard_name(value)
+    if parsed is None or parsed[1] is not None:
+        return None
+    return parsed[0]
 
 
 if __name__ == "__main__":

@@ -1,6 +1,12 @@
 import * as React from "react";
 import { useRef } from "react";
-import { Filter, ListUl } from "react-bootstrap-icons";
+import {
+  BarChartLine,
+  ChevronDown,
+  ChevronUp,
+  Filter,
+  ListUl,
+} from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -8,9 +14,9 @@ import BrandSearch from "../TopLeft/BrandSearch.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 import SingleDatasetView from "./SingleDatasetView.jsx";
 import DatasetCounts from "./DatasetCounts.jsx";
-import SpatialFilterButton from "./SpatialFilterButton.jsx";
+import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
-import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
@@ -37,44 +43,40 @@ function measureTopBarSpace(rect) {
 }
 
 // Centered top header. First layer: the brand bar. Second layer: the dataset
-// tally (shown / in view / total), which is what the three layers below act
-// on. Third layer, merged into a single segmented pill: the Datasets toggle
-// (opens/closes the left datasets sidebar), the spatial filter button (starts
-// a bounding-box or polygon draw on the map — see SpatialFilterButton) and
-// the Filters button (opens the filters modal). All three segments carry a
-// dimmed-primary wash so they read as the map's primary entry points. The
-// active-filter chips flow beneath, staying centered.
+// tally (shown / in view / total), which is what the layer below acts on.
+// Third layer, a single segmented pill of three equal-width peers — Datasets
+// (opens/closes the left datasets sidebar) and Coverage (opens the
+// time-distribution histogram) are the two ways to look at the current
+// selection, and Filters (opens the filters modal) is the one way to change
+// it. Every segment carries a dimmed-primary wash so they read as the map's
+// primary entry points.
+//
+// Under the card, on the map rather than in it, the quick filters (see
+// QuickFilters) — the ones that act on the map instead of on a list of
+// options. The active-filter chips flow beneath those, staying centered.
+// Both of those rows fold away together, toggled by the small chevron riding
+// on the far side of the Filters segment: it reads as part of the button that
+// already names the filter state, rather than a fourth control among the
+// tools it hides.
 export default function TopControls() {
   const { t } = useTranslation();
+  // The same list the chips below render, so the badge can never report a
+  // different number of filters than the row under it names.
+  const activeFilterCount = useActiveFilters().length;
   const {
-    eovsSelected,
-    orgsSelected,
-    datasetsSelected,
-    platformsSelected,
-    erddapServersSelected,
-    obisNodesSelected,
-    scientificNamesSelected,
-    timeFilterActive,
-    depthFilterActive,
-  } = useFilters();
-  const { showFiltersModal, setShowFiltersModal, sidebarOpen, setSidebarOpen } =
-    useUI();
+    showFiltersModal,
+    setShowFiltersModal,
+    showCoverageModal,
+    setShowCoverageModal,
+    sidebarOpen,
+    setSidebarOpen,
+    quickFiltersCollapsed,
+    setQuickFiltersCollapsed,
+  } = useUI();
   const { inspectDataset, returnToDatasetList } = useSelection();
 
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-top-bar-space", measureTopBarSpace);
-
-  const activeFilterCount = [
-    eovsSelected.some((o) => o.isSelected),
-    orgsSelected.some((o) => o.isSelected),
-    datasetsSelected.some((o) => o.isSelected),
-    platformsSelected.some((o) => o.isSelected),
-    erddapServersSelected.some((o) => o.isSelected) ||
-      obisNodesSelected.some((o) => o.isSelected),
-    scientificNamesSelected.length > 0,
-    timeFilterActive,
-    depthFilterActive,
-  ].filter(Boolean).length;
 
   return (
     <div className="topBar" ref={barRef} data-testid="top-bar">
@@ -99,32 +101,92 @@ export default function TopControls() {
               {t("topBarDatasetsLabel")}
             </span>
           </button>
-          <SpatialFilterButton />
           <button
             type="button"
             className={classNames("topBarButton", {
+              active: showCoverageModal,
+            })}
+            data-testid="topbar-coverage-button"
+            onClick={() => setShowCoverageModal(true)}
+            aria-pressed={showCoverageModal}
+            // "Time coverage", not the "Time" the label would otherwise want
+            // to be: that is already the time *filter's* own name
+            // (timeframeFilterName), and it names a chip that can be on screen
+            // at the same moment. The feature's full name — also the modal's
+            // title — stays on the accessible name and the tooltip.
+            aria-label={t("coverageButton")}
+            title={t("coverageButtonTitle")}
+          >
+            <BarChartLine size={18} aria-hidden="true" />
+            <span className="topBarButtonLabel">
+              {t("topBarCoverageLabel")}
+            </span>
+          </button>
+          <div
+            className={classNames("topBarButton topBarFiltersSegment", {
               // Solid while the modal itself is open; once it's closed, any
               // applied filters keep the button in the lighter "applied"
               // wash instead of dropping all the way back to baseline.
               active: showFiltersModal,
               applied: !showFiltersModal && activeFilterCount > 0,
             })}
-            data-testid="topbar-filters-button"
-            onClick={() => setShowFiltersModal(true)}
-            aria-pressed={showFiltersModal}
-            title={t("dockFiltersCountTitle", { count: activeFilterCount })}
           >
-            <Filter size={18} aria-hidden="true" />
-            <span className="topBarButtonLabel">{t("filtersMenuButton")}</span>
-            {activeFilterCount > 0 && (
-              <span className="topBarCount" data-testid="topbar-filter-count">
-                {activeFilterCount}
+            <button
+              type="button"
+              className="topBarFiltersOpen"
+              data-testid="topbar-filters-button"
+              onClick={() => setShowFiltersModal(true)}
+              aria-pressed={showFiltersModal}
+              title={t("dockFiltersCountTitle", { count: activeFilterCount })}
+            >
+              <Filter size={18} aria-hidden="true" />
+              <span className="topBarButtonLabel">
+                {t("filtersMenuButton")}
               </span>
-            )}
-          </button>
+              {activeFilterCount > 0 && (
+                <span className="topBarCount" data-testid="topbar-filter-count">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {/* Show/Hide for the quick-filter row and the active-filter
+                chips beneath it (see QuickFilters, ActiveFilterChips) — one
+                toggle for both, riding on the button that already names
+                whether any filter is set. */}
+            <button
+              type="button"
+              className="topBarFiltersToggle"
+              data-testid="quick-filters-toggle"
+              onClick={() =>
+                setQuickFiltersCollapsed((collapsed) => !collapsed)
+              }
+              aria-expanded={!quickFiltersCollapsed}
+              aria-label={
+                quickFiltersCollapsed
+                  ? t("quickFiltersShow")
+                  : t("quickFiltersHide")
+              }
+              title={
+                quickFiltersCollapsed
+                  ? t("quickFiltersShow")
+                  : t("quickFiltersHide")
+              }
+            >
+              {quickFiltersCollapsed ? (
+                <ChevronDown size={16} aria-hidden="true" />
+              ) : (
+                <ChevronUp size={16} aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
       </BrandSearch>
-      <ActiveFilterChips />
+      {!quickFiltersCollapsed && (
+        <>
+          <QuickFilters />
+          <ActiveFilterChips />
+        </>
+      )}
       {/* Last in the stack: the dataset the map is keyed to, and the way out
           of it. Only up while the datasets card — whose banner otherwise says
           this — is collapsed. */}

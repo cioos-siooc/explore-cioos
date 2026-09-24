@@ -12,6 +12,8 @@ import Sidebar from "./Sidebar/Sidebar.jsx";
 import TopControls from "./TopControls/TopControls.jsx";
 import FiltersModal from "./Modals/FiltersModal.jsx";
 import DownloadModal from "./Modals/DownloadModal.jsx";
+import CoverageModal from "./Modals/CoverageModal.jsx";
+import SelectionHelpModal from "./Modals/SelectionHelpModal.jsx";
 import PreviewHost from "./Panels/PreviewHost.jsx";
 import Loading from "../Controls/Loading/Loading.jsx";
 import Legend from "../Controls/Legend/Legend.jsx";
@@ -44,8 +46,6 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
-    projection,
-    setProjection,
     activeWmsOverlay,
     setActiveWmsOverlay,
     tracksMode,
@@ -111,13 +111,6 @@ export default function AppShell() {
       checked: griddapCoverageVisible,
       onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible),
     },
-    {
-      key: "globe",
-      label: t("layersGlobeView"),
-      checked: projection === "globe",
-      onChange: () =>
-        setProjection(projection === "globe" ? "mercator" : "globe"),
-    },
   ];
 
   // The data-type switches (which families of data draw at all) used to sit
@@ -167,6 +160,8 @@ export default function AppShell() {
       <TopControls />
       <FiltersModal />
       <DownloadModal />
+      <CoverageModal />
+      <SelectionHelpModal />
       <Legend
         currentRangeLevel={currentRangeLevel}
         hexRangeLevel={hexRangeLevel}
