@@ -164,17 +164,11 @@
      the top of the viewport (its foot, plus a gap). 0 when the strip isn't
      shown.
 
-     And how far the griddap card reaches up from the bottom-right corner,
-     which MapLibre's own controls in that corner step above. The card holds
-     itself off the two bars, so this already includes their clearance; it is 0
-     while no gridded dataset is drawn.
-
      The API error banner's is the same measurement in the bottom centre, for
      the activity panel stacking on top of it. 0 while the catalogue is
      answering. */
   --cioos-time-bar-space: 0px;
   --cioos-depth-bar-space: 0px;
-  --cioos-wms-legend-space: 0px;
   --cioos-api-error-space: 0px;
 
   /* --- Layout: the left column's width ---
@@ -296,7 +290,8 @@
                         that change markup rather than layout.
      900px   tablet     the legend moves out of the top-right corner
      992px   tablet     legacy Bootstrap rung, modal + intro layout only
-     1200px  laptop     the WMS legend goes compact
+     1200px  laptop     the WMS legend goes compact; the tip card moves from the
+                        bottom-left corner to the top-right
      1400px  desktop    wide enough for the datasets column to sit beside the
                         map rather than over it, so it opens by default
                         (WIDE_SCREEN_QUERY in UIProvider) and the time bar

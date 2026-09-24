@@ -18,7 +18,7 @@ describe("HarvestRealtimeBadge", () => {
     const badge = screen.getByText("Real-time");
     expect(badge).toHaveAttribute(
       "title",
-      "This dataset was still producing data as of its last harvest — the same signal as the map's Real-time badge.",
+      "This dataset was still producing data as of its last harvest. This is the same signal as the map's Real-time badge.",
     );
   });
 });

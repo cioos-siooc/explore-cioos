@@ -1,5 +1,6 @@
 const express = require("express");
 const { check } = require("express-validator");
+const db = require("../db");
 const { getShapeQuery } = require("../utils/shapeQuery");
 const { pipeline } = require("../utils/routePipeline");
 
@@ -44,6 +45,66 @@ router.get(
   async (req, res) => {
     const rows = await getShapeQuery(req.query, false, true);
     res.send(rows.pop());
+  },
+);
+
+/**
+ * @swagger
+ * /datasetRecordsList/location:
+ *   get:
+ *     summary: Where one record of a dataset was sampled
+ *     tags: [Datasets]
+ *     description: >
+ *       The distinct marker locations of one record (a profile or a time
+ *       series), keyed the way /datasetRecordsList keys its records — so the
+ *       dataset page can point one out on the map. Trajectories are drawn from
+ *       /trajectories/track instead.
+ *     parameters:
+ *       - in: query
+ *         name: datasetPKs
+ *         required: true
+ *         schema: { type: integer }
+ *         description: The dataset's pk_url.
+ *       - in: query
+ *         name: recordId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: The record's [longitude, latitude] pairs.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 coordinates:
+ *                   type: array
+ *                   items:
+ *                     type: array
+ *                     items: { type: number }
+ */
+router.get(
+  "/location",
+  ...pipeline({
+    filters: false,
+    checks: [
+      check("datasetPKs").isInt(),
+      check("recordId").isString().isLength({ min: 1, max: 256 }),
+    ],
+  }),
+  async (req, res) => {
+    const { datasetPKs, recordId } = req.query;
+    // coalesce(profile_id, timeseries_id) is the record list's own key (see
+    // shapeQuery's records CTE).
+    const { rows } = await db.raw(
+      `SELECT DISTINCT p.longitude, p.latitude
+       FROM cde.profiles p
+       JOIN cde.datasets d ON d.pk = p.dataset_pk
+       WHERE d.pk_url = :datasetPK
+         AND coalesce(p.profile_id, p.timeseries_id) = :recordId`,
+      { datasetPK: parseInt(datasetPKs, 10), recordId },
+    );
+    res.send({ coordinates: rows.map((r) => [r.longitude, r.latitude]) });
   },
 );
 
