@@ -391,6 +391,10 @@ $$ LANGUAGE plpgsql;
 -- unchanged) or temp_skipped_datasets (errored / filtered out). So a
 -- cde.datasets row of a covered source that appears in NONE of the three is
 -- gone upstream and can be deleted, along with its profiles/cells rows.
+-- A NO_PROFILES_FOUND skip is not protection: the harvester reached the
+-- dataset and it has nothing to show, so its old row is as stale as a
+-- vanished one — kept, it counts in /datasets with nothing on the map. Its
+-- skipped_datasets row is kept, so the reason stays on record.
 -- Sources absent from this run are never touched, so concurrent per-source
 -- harvesters each prune only their own source.
 --
@@ -429,7 +433,8 @@ BEGIN
     AND NOT EXISTS (SELECT 1 FROM temp_verified v
                     WHERE v.dataset_id = d.dataset_id AND v.erddap_url = d.erddap_url)
     AND NOT EXISTS (SELECT 1 FROM temp_skipped_datasets s
-                    WHERE s.dataset_id = d.dataset_id AND s.erddap_url = d.erddap_url);
+                    WHERE s.dataset_id = d.dataset_id AND s.erddap_url = d.erddap_url
+                      AND s.reason_code IS DISTINCT FROM 'NO_PROFILES_FOUND');
 
   FOR src IN SELECT erddap_url, count(*) AS n_stale
              FROM _prune_candidates GROUP BY erddap_url
@@ -474,7 +479,9 @@ BEGIN
   WHERE s.dataset_pk = c.pk;
 
   DELETE FROM cde.skipped_datasets s USING _prune_candidates c
-  WHERE s.dataset_id = c.dataset_id AND s.erddap_url = c.erddap_url;
+  WHERE s.dataset_id = c.dataset_id AND s.erddap_url = c.erddap_url
+    AND NOT EXISTS (SELECT 1 FROM temp_skipped_datasets ts
+                    WHERE ts.dataset_id = s.dataset_id AND ts.erddap_url = s.erddap_url);
 
   DELETE FROM cde.datasets d USING _prune_candidates c WHERE d.pk = c.pk;
   GET DIAGNOSTICS n = ROW_COUNT;

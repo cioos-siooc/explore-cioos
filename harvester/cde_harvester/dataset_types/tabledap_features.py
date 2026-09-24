@@ -496,6 +496,18 @@ def extract_features(dataset, handler):
     # Convert time variables and add dataset_id so the records can be linked to dataset in the DB
     profiles["time_min"] = ERDDAP.parse_erddap_dates(profiles["time_min"])
     profiles["time_max"] = ERDDAP.parse_erddap_dates(profiles["time_max"])
+    # A time pandas can't represent (e.g. year 0019 for 2019) coerces to NaT.
+    # Drop it here so a dataset left with no features is skipped as
+    # NO_PROFILES_FOUND, not loaded with a feature the loader then discards.
+    unparseable_time = profiles["time_min"].isna() | profiles["time_max"].isna()
+    if unparseable_time.any():
+        logger.warning(
+            "%d of %d features have an unparseable time and will be removed",
+            int(unparseable_time.sum()), len(profiles),
+        )
+        profiles = profiles[~unparseable_time].copy()
+        if profiles.empty:
+            return profiles
     profiles["dataset_id"] = dataset.id
     profiles["erddap_url"] = dataset.erddap_url
 
