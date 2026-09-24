@@ -8,6 +8,7 @@ import frLocale from "plotly.js-locales/fr";
 
 import erddapServers from "../../../erddapServers.json";
 import { escapeHtml, formatErddapServerName } from "../../../utilities";
+import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
@@ -28,6 +29,11 @@ const SERIES_COLORS = [
   "#4a3aa7", // violet
 ];
 const OTHER_COLOR = "#9a9a92";
+
+// Below the width at which the coverage dialog stops growing (1040px + its
+// 24px gutter), bars get too thin for their white outlines: Plotly strokes
+// every side, so the edges outweigh the fill.
+const NARROW_QUERY = "(max-width: 1064px)";
 
 const DAY_MS = 24 * 3600 * 1000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -81,6 +87,7 @@ function formatPeriod(startMs, endMs, locale) {
 export default function CoverageHistogramPlot({ histogram }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "fr" ? "fr-CA" : "en-CA";
+  const narrow = useMediaQuery(NARROW_QUERY);
 
   // Axis + hover wording follows what the bars count.
   const COUNT_LABELS = {
@@ -198,9 +205,10 @@ export default function CoverageHistogramPlot({ histogram }) {
           x: binCenters,
           y: trace.y,
           width: binWidths,
-          // No outline: Plotly strokes every side of every bar, so on
-          // fine bins (a few px wide) the white edges outweighed the fill.
-          marker: { color: trace.color, line: { width: 0 } },
+          marker: {
+            color: trace.color,
+            line: { color: "#ffffff", width: narrow ? 0 : 1 },
+          },
           customdata: trace.hoverText,
           hovertemplate: "%{customdata}<extra></extra>",
         }))}
