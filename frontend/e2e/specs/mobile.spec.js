@@ -64,3 +64,30 @@ test.describe("the phone layout", () => {
     );
   });
 });
+
+test("names every quick filter under its button, and still fits the width", async ({
+  page,
+}) => {
+  await openApp(page);
+  const row = page.getByTestId("quick-filters");
+  for (const [testId, caption] of [
+    ["quick-filter-search", "Search"],
+    ["quick-filter-area", "Area"],
+    ["quick-filter-in-view", "In view"],
+    ["quick-filter-realtime", "Real-time"],
+  ]) {
+    await expect(
+      row.getByTestId(testId).locator(".quickFilterCaption"),
+    ).toHaveText(caption);
+    await expect(
+      row.getByTestId(testId).locator(".quickFilterCaption"),
+    ).toBeVisible();
+  }
+
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow, "the page scrolls horizontally").toBeLessThanOrEqual(0);
+});

@@ -301,7 +301,8 @@ test.describe("drawing a spatial filter", () => {
 
   test("a box drawn on the map becomes the filter", async ({ page }) => {
     await openScene(page);
-    await page.getByTestId("quick-filter-box").click();
+    await page.getByTestId("quick-filter-area").click();
+    await page.getByTestId("quick-filter-area-box").click();
     const from = await sceneAt(page, [-100, -60]);
     const to = await sceneAt(page, [100, 60]);
     await page.mouse.click(from.x, from.y);
@@ -319,7 +320,8 @@ test.describe("drawing a spatial filter", () => {
 
   test("clicking while drawing adds a vertex, not a card", async ({ page }) => {
     await openScene(page);
-    await page.getByTestId("quick-filter-polygon").click();
+    await page.getByTestId("quick-filter-area").click();
+    await page.getByTestId("quick-filter-area-polygon").click();
     // Paced like a person: mapbox-gl-draw only knows the first vertex is under
     // the cursor once it has redrawn after a move, so a closing click that
     // lands in the same frame as the last one misses it.

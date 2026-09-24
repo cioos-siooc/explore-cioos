@@ -59,7 +59,7 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: E2E, visual and accessibility
+    name: E2E and accessibility
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -67,9 +67,9 @@ jobs:
       # mismatch fails with "Executable doesn't exist at /ms-playwright/…".
       # Bump the two together.
       #
-      # Running in the container is what makes the screenshot baselines
-      # reproducible: it is the same image `npm run test:visual:update` uses
-      # locally, so fonts and Chromium match rather than differing per machine.
+      # Running in the container is what makes the a11y node counts
+      # reproducible: it is the same image e2e/in-container.sh uses locally,
+      # so fonts and Chromium match rather than differing per machine.
       image: mcr.microsoft.com/playwright:v1.62.1-noble
       # Chromium dies on the default 64MB /dev/shm.
       options: --ipc=host
@@ -85,16 +85,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Every project in one invocation, all of it gating: behaviour at the
-      # three viewport regimes, the screenshot baselines, and the a11y ratchet.
-      # One playwright run rather than one per project, so the projects share a
-      # single dev server and Playwright parallelises across them.
+      # Behaviour at the three viewport regimes, plus the a11y ratchet: these
+      # assert through data-testid and user-visible text (a11y through axe),
+      # which survive restyling by design, so they gate every push and PR.
       #
-      # The visual baselines are recorded in this same image, which is what
-      # makes them reproducible here — see e2e/in-container.sh, and
-      # `npm run test:visual:update` when a UI change is meant to move them.
-      - name: Run the browser suites
-        run: npx playwright test
+      # The visual (screenshot) suite is NOT here — it moved to
+      # .github/workflows/build_and_test.yml, gated on a published release
+      # rather than on every push/PR. This workflow gates nothing on its own
+      # (deploy.yml only watches the "Integration Tests" workflow), so a
+      # pixel-diff check belongs in the pipeline that actually decides
+      # whether a release ships, not in this one.
+      - name: Run the behavioural and accessibility suites
+        run: npx playwright test --project=desktop --project=tablet --project=mobile --project=a11y
         env:
           CI: "true"
 

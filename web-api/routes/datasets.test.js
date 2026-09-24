@@ -29,3 +29,18 @@ test("GET /datasets returns the dataset rows as-is", async () => {
   assert.deepEqual(res.body, rows);
   assert.match(db.queries[0], /FROM cde\.datasets/);
 });
+
+test("GET /datasets counts only datasets /pointQuery can return", async () => {
+  db.queueRaw([]);
+
+  await agent.get("/datasets");
+
+  const sql = db.queries[0];
+  assert.match(sql, /FROM cde\.profiles p WHERE p\.dataset_pk = d\.pk/);
+  assert.match(sql, /FROM cde\.trajectory_hexes t/);
+  assert.match(sql, /FROM cde\.obis_cells o WHERE o\.dataset_pk = d\.pk/);
+  assert.match(
+    sql,
+    /d\.cdm_data_type = 'Grid' AND d\.coverage_bbox IS NOT NULL/,
+  );
+});

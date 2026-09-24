@@ -65,6 +65,10 @@ export const defaultQuery = {
   obisNodesSelected: defaultObisNodesSelected,
   erddapServersSelected: defaultErddapServersSelected,
   realtimeOnly: defaultRealtimeOnly,
+  eovsMatchAll: false,
+  orgsMatchAll: false,
+  scientificNamesExcluded: defaultScientificNamesSelected,
+  scientificNamesMatchAll: false,
 };
 
 export default function FilterProvider({ children }) {
@@ -73,10 +77,14 @@ export default function FilterProvider({ children }) {
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected);
   const debouncedEovsSelected = useDebounce(eovsSelected, 500);
   const [eovsSearchTerms, setEovsSearchTerms] = useState("");
+  // Any (default) or All of the included options, on the lists where a
+  // dataset can carry several values. Not debounced, like realtimeOnly.
+  const [eovsMatchAll, setEovsMatchAll] = useState(false);
 
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected);
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500);
   const [orgsSearchTerms, setOrgsSearchTerms] = useState("");
+  const [orgsMatchAll, setOrgsMatchAll] = useState(false);
 
   const [datasetsSelected, setDatasetsSelected] = useState(
     defaultDatatsetsSelected,
@@ -139,6 +147,14 @@ export default function FilterProvider({ children }) {
     scientificNamesSelected,
     500,
   );
+  const [scientificNamesExcluded, setScientificNamesExcluded] = useState(
+    defaultScientificNamesSelected,
+  );
+  const debouncedScientificNamesExcluded = useDebounce(
+    scientificNamesExcluded,
+    500,
+  );
+  const [scientificNamesMatchAll, setScientificNamesMatchAll] = useState(false);
 
   const [totalNumberOfDatasets, setTotalNumberOfDatasets] = useState();
 
@@ -147,9 +163,14 @@ export default function FilterProvider({ children }) {
   const allObisNodesSelected =
     obisNodesSelected.length > 0 &&
     obisNodesSelected.every((n) => n.isSelected);
+  const allObisNodesExcluded =
+    obisNodesSelected.length > 0 &&
+    obisNodesSelected.every((n) => n.isExcluded);
   // OBIS data is shown unless the source filter is active without any OBIS
-  // node selected. Drives the scientific-name filter's disabled state.
-  const showObis = !anyServersSelected || anyObisNodesSelected;
+  // node selected, or excludes every node. Drives the scientific-name filter's
+  // disabled state.
+  const showObis =
+    (!anyServersSelected || anyObisNodesSelected) && !allObisNodesExcluded;
   // No OBIS nodes returned from /obisNodes means the database has no OBIS data,
   // so OBIS-only UI (the Scientific Name filter) is hidden entirely.
   const obisDataAvailable = obisNodesSelected.length > 0;
@@ -173,9 +194,13 @@ export default function FilterProvider({ children }) {
       // filter is disabled in the UI, so don't apply stale selections to the
       // query (the selection state is preserved for when OBIS is re-enabled).
       scientificNamesSelected: showObis ? debouncedScientificNamesSelected : [],
+      scientificNamesExcluded: showObis ? debouncedScientificNamesExcluded : [],
       obisNodesSelected: debouncedObisNodesSelected,
       erddapServersSelected: debouncedErddapServersSelected,
       realtimeOnly,
+      eovsMatchAll,
+      orgsMatchAll,
+      scientificNamesMatchAll,
     }),
     [
       debouncedStartDate,
@@ -187,9 +212,13 @@ export default function FilterProvider({ children }) {
       debouncedDatasetsSelected,
       debouncedPlatformsSelected,
       debouncedScientificNamesSelected,
+      debouncedScientificNamesExcluded,
       debouncedObisNodesSelected,
       debouncedErddapServersSelected,
       realtimeOnly,
+      eovsMatchAll,
+      orgsMatchAll,
+      scientificNamesMatchAll,
       showObis,
     ],
   );
@@ -270,17 +299,32 @@ export default function FilterProvider({ children }) {
       scientificNames,
       obisNodes,
       realtimeOnly: realtimeOnlyFromURL,
+      eovsMatch,
+      organizationsMatch,
+      scientificNamesMatch,
+      excludeEovs,
+      excludePlatforms,
+      excludeOrganizations,
+      excludeDatasetPKs,
+      excludeErddapServers,
+      excludeObisNodes,
+      excludeScientificNames,
     } = filtersFromURL;
 
-    if (scientificNames) {
-      setScientificNamesSelected(
-        scientificNames
-          .split(",")
-          .map((name) => decodeURIComponent(name))
-          .filter(Boolean),
-      );
+    const namesFromURL = (list) =>
+      list
+        .split(",")
+        .map((name) => decodeURIComponent(name))
+        .filter(Boolean);
+    if (scientificNames)
+      setScientificNamesSelected(namesFromURL(scientificNames));
+    if (excludeScientificNames) {
+      setScientificNamesExcluded(namesFromURL(excludeScientificNames));
     }
     if (realtimeOnlyFromURL === "true") setRealtimeOnly(true);
+    if (eovsMatch === "all") setEovsMatchAll(true);
+    if (organizationsMatch === "all") setOrgsMatchAll(true);
+    if (scientificNamesMatch === "all") setScientificNamesMatchAll(true);
     if (timeMin) setStartDate(timeMin);
     if (timeMax) setEndDate(timeMax);
     if (depthMin && Number.parseInt(depthMin) > 0) {
@@ -290,6 +334,7 @@ export default function FilterProvider({ children }) {
       setEndDepth(Number.parseInt(depthMax));
     }
     const platformsFromURL = platforms?.split(",") || [];
+    const platformsExcludedFromURL = excludePlatforms?.split(",") || [];
 
     /* /platforms returns array of platform names:
       ['abc', 'def', ...]
@@ -306,6 +351,7 @@ export default function FilterProvider({ children }) {
               title: platform,
               pk: platform,
               isSelected: platformsFromURL.includes(platform),
+              isExcluded: platformsExcludedFromURL.includes(platform),
               hover_en: platformMetadata?.definition_en,
               hover_fr: platformMetadata?.definition_fr,
             };
@@ -315,6 +361,7 @@ export default function FilterProvider({ children }) {
     );
 
     const eovsFromURL = eovs?.split(",") || [];
+    const eovsExcludedFromURL = excludeEovs?.split(",") || [];
 
     const eovsRequest = fetchJson(`${server}/oceanVariables`).then((eovs) => {
       setEovsSelected(
@@ -324,6 +371,7 @@ export default function FilterProvider({ children }) {
           return {
             title: eov,
             isSelected: eovsFromURL.includes(eov),
+            isExcluded: eovsExcludedFromURL.includes(eov),
             pk: index,
             hover_en: eovMetadata?.["definition EN"],
             hover_fr: eovMetadata?.["definition FR"],
@@ -335,6 +383,9 @@ export default function FilterProvider({ children }) {
     const orgsFromURL = (organizations?.split(",") || []).map((e) =>
       Number.parseInt(e),
     );
+    const orgsExcludedFromURL = (excludeOrganizations?.split(",") || []).map(
+      (e) => Number.parseInt(e),
+    );
 
     const orgsRequest = fetchJson(`${server}/organizations`).then((orgsR) => {
       setOrgsSelected(
@@ -342,6 +393,7 @@ export default function FilterProvider({ children }) {
           return {
             title: org.name,
             isSelected: orgsFromURL.includes(org.pk),
+            isExcluded: orgsExcludedFromURL.includes(org.pk),
             pk: org.pk,
           };
         }),
@@ -353,11 +405,15 @@ export default function FilterProvider({ children }) {
     const obisNodesFromURL = (obisNodes?.split(",") || []).map((s) =>
       decodeURIComponent(s),
     );
+    const obisNodesExcludedFromURL = (excludeObisNodes?.split(",") || []).map(
+      (s) => decodeURIComponent(s),
+    );
     const obisNodesRequest = fetchJson(`${server}/obisNodes`).then((nodesR) => {
       setObisNodesSelected(
         nodesR.map((node) => ({
           title: node.name,
           isSelected: obisNodesFromURL.includes(node.name),
+          isExcluded: obisNodesExcludedFromURL.includes(node.name),
           pk: node.name,
         })),
       );
@@ -365,6 +421,9 @@ export default function FilterProvider({ children }) {
 
     const datasetsFromURL = (datasetPKs?.split(",") || []).map((e) =>
       Number.parseInt(e),
+    );
+    const datasetsExcludedFromURL = (excludeDatasetPKs?.split(",") || []).map(
+      (e) => Number.parseInt(e),
     );
 
     const datasetsRequest = fetchJson(`${server}/datasets`).then(
@@ -379,6 +438,7 @@ export default function FilterProvider({ children }) {
               titleTranslated: dataset.title_translated,
               platform: dataset.platform,
               isSelected: datasetsFromURL.includes(dataset.pk),
+              isExcluded: datasetsExcludedFromURL.includes(dataset.pk),
               pk: dataset.pk,
             };
           }),
@@ -387,6 +447,7 @@ export default function FilterProvider({ children }) {
     );
 
     const erddapServersFromURL = erddapServers?.split(",") || [];
+    const erddapServersExcludedFromURL = excludeErddapServers?.split(",") || [];
     // Legacy share links used includeObis=false with no server list to mean
     // "ERDDAP data only" — that now reads as every server selected.
     const selectAllServers =
@@ -403,6 +464,7 @@ export default function FilterProvider({ children }) {
               url: serverUrl,
               isSelected:
                 selectAllServers || erddapServersFromURL.includes(serverUrl),
+              isExcluded: erddapServersExcludedFromURL.includes(serverUrl),
               pk: index,
             })),
         );
@@ -444,41 +506,45 @@ export default function FilterProvider({ children }) {
 
   function resetFilters() {
     setRealtimeOnly(defaultRealtimeOnly);
+    setEovsMatchAll(false);
+    setOrgsMatchAll(false);
+    setScientificNamesMatchAll(false);
     setStartDate(defaultStartDate);
     setEndDate(defaultEndDate);
     setStartDepth(defaultStartDepth);
     setEndDepth(defaultEndDepth);
     setEovsSelected(
       eovsSelected.map((eov) => {
-        return { ...eov, isSelected: false };
+        return { ...eov, isSelected: false, isExcluded: false };
       }),
     );
     setOrgsSelected(
       orgsSelected.map((org) => {
-        return { ...org, isSelected: false };
+        return { ...org, isSelected: false, isExcluded: false };
       }),
     );
     setDatasetsSelected(
       datasetsSelected.map((dataset) => {
-        return { ...dataset, isSelected: false };
+        return { ...dataset, isSelected: false, isExcluded: false };
       }),
     );
     setPlatformsSelected(
       platformsSelected.map((platform) => {
-        return { ...platform, isSelected: false };
+        return { ...platform, isSelected: false, isExcluded: false };
       }),
     );
     setErddapServersSelected(
       erddapServersSelected.map((server) => {
-        return { ...server, isSelected: false };
+        return { ...server, isSelected: false, isExcluded: false };
       }),
     );
     setObisNodesSelected(
       obisNodesSelected.map((node) => {
-        return { ...node, isSelected: false };
+        return { ...node, isSelected: false, isExcluded: false };
       }),
     );
     setScientificNamesSelected([]);
+    setScientificNamesExcluded([]);
   }
 
   // Human label for a single multi-select option, matching how
@@ -501,26 +567,37 @@ export default function FilterProvider({ children }) {
 
   // Build the active-filter descriptor for one multi-select filter: the list
   // of chosen options (each removable on its own) plus a clear-all handler.
+  const matchAllLabel = (label, matchAll, includedCount) =>
+    matchAll && includedCount > 1 ? `${label} (${t("filterMatchAll")})` : label;
+
   const buildMultiActiveFilter = (
     key,
     label,
     selected,
     setSelected,
     translatable,
+    matchAll = false,
   ) => {
-    const chosen = selected.filter((o) => o.isSelected);
+    const chosen = selected.filter((o) => o.isSelected || o.isExcluded);
     if (chosen.length === 0) return false;
     return {
       key,
-      label,
+      label: matchAllLabel(
+        label,
+        matchAll,
+        chosen.filter((o) => o.isSelected).length,
+      ),
       removeAll: () => setAllOptionsIsSelectedTo(false, selected, setSelected),
       items: chosen.map((o) => ({
         id: o.pk,
         label: optionLabel(o, translatable),
+        excluded: Boolean(o.isExcluded),
         remove: () =>
           setSelected(
             selected.map((opt) =>
-              opt.pk === o.pk ? { ...opt, isSelected: false } : opt,
+              opt.pk === o.pk
+                ? { ...opt, isSelected: false, isExcluded: false }
+                : opt,
             ),
           ),
       })),
@@ -539,6 +616,7 @@ export default function FilterProvider({ children }) {
         eovsSelected,
         setEovsSelected,
         true,
+        eovsMatchAll,
       ),
       buildMultiActiveFilter(
         "platforms",
@@ -553,6 +631,7 @@ export default function FilterProvider({ children }) {
         orgsSelected,
         setOrgsSelected,
         false,
+        orgsMatchAll,
       ),
       buildMultiActiveFilter(
         "datasets",
@@ -567,7 +646,7 @@ export default function FilterProvider({ children }) {
         // its source array to avoid cross-deselecting on colliding pk values.
         const chosen = [
           ...erddapServersSelected
-            .filter((o) => o.isSelected)
+            .filter((o) => o.isSelected || o.isExcluded)
             .map((o) => ({
               o,
               src: "erddap",
@@ -575,7 +654,7 @@ export default function FilterProvider({ children }) {
               setSelected: setErddapServersSelected,
             })),
           ...obisNodesSelected
-            .filter((o) => o.isSelected)
+            .filter((o) => o.isSelected || o.isExcluded)
             .map((o) => ({
               o,
               src: "obis",
@@ -602,10 +681,13 @@ export default function FilterProvider({ children }) {
           items: chosen.map(({ o, src, all, setSelected }) => ({
             id: `${src}-${o.pk}`,
             label: optionLabel(o, false),
+            excluded: Boolean(o.isExcluded),
             remove: () =>
               setSelected(
                 all.map((opt) =>
-                  opt.pk === o.pk ? { ...opt, isSelected: false } : opt,
+                  opt.pk === o.pk
+                    ? { ...opt, isSelected: false, isExcluded: false }
+                    : opt,
                 ),
               ),
           })),
@@ -647,18 +729,37 @@ export default function FilterProvider({ children }) {
           },
         ],
       },
-      scientificNamesSelected.length > 0 && {
+      (scientificNamesSelected.length > 0 ||
+        scientificNamesExcluded.length > 0) && {
         key: "scientificName",
-        label: t("scientificNameFilterName"),
-        removeAll: () => setScientificNamesSelected([]),
-        items: scientificNamesSelected.map((name) => ({
-          id: name,
-          label: name,
-          remove: () =>
-            setScientificNamesSelected(
-              scientificNamesSelected.filter((n) => n !== name),
-            ),
-        })),
+        label: matchAllLabel(
+          t("scientificNameFilterName"),
+          scientificNamesMatchAll,
+          scientificNamesSelected.length,
+        ),
+        removeAll: () => {
+          setScientificNamesSelected([]);
+          setScientificNamesExcluded([]);
+        },
+        items: [
+          ...scientificNamesSelected.map((name) => ({
+            id: name,
+            label: name,
+            remove: () =>
+              setScientificNamesSelected(
+                scientificNamesSelected.filter((n) => n !== name),
+              ),
+          })),
+          ...scientificNamesExcluded.map((name) => ({
+            id: `not-${name}`,
+            label: name,
+            excluded: true,
+            remove: () =>
+              setScientificNamesExcluded(
+                scientificNamesExcluded.filter((n) => n !== name),
+              ),
+          })),
+        ],
       },
     ].filter(Boolean);
 
@@ -688,6 +789,12 @@ export default function FilterProvider({ children }) {
     setSourcesSearchTerms,
     realtimeOnly,
     setRealtimeOnly,
+    eovsMatchAll,
+    setEovsMatchAll,
+    orgsMatchAll,
+    setOrgsMatchAll,
+    scientificNamesMatchAll,
+    setScientificNamesMatchAll,
     startDate,
     setStartDate,
     endDate,
@@ -698,12 +805,15 @@ export default function FilterProvider({ children }) {
     setEndDepth,
     scientificNamesSelected,
     setScientificNamesSelected,
+    scientificNamesExcluded,
+    setScientificNamesExcluded,
     timeFilterActive,
     timeExtent,
     depthFilterActive,
     anyServersSelected,
     anyObisNodesSelected,
     allObisNodesSelected,
+    allObisNodesExcluded,
     showObis,
     obisDataAvailable,
     totalNumberOfDatasets,

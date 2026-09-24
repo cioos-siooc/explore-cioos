@@ -20,7 +20,7 @@ describe("HarvestModeBadge", () => {
     const badge = screen.getByText("file");
     expect(badge).toHaveAttribute(
       "title",
-      "File-based dataset — the harvester hashes its file list and skips re-querying ERDDAP when nothing has changed.",
+      "File-based dataset: the harvester hashes its file list and skips re-querying ERDDAP when nothing has changed.",
     );
   });
 

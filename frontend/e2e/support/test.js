@@ -55,6 +55,10 @@ export const test = base.extend({
       await context.addCookies([
         { name: "introModalOpen", value: "false", url: baseURL },
       ]);
+      // Contextual tips would otherwise pop up under the top bar mid-spec.
+      await context.addInitScript(() => {
+        window.localStorage.setItem("cde.tipsEnabled", "false");
+      });
       await use(unexpected);
       expect(unexpected, "requests with no fixture behind them").toEqual([]);
     },

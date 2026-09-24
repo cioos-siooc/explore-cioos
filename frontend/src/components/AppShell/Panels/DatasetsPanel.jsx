@@ -12,7 +12,7 @@ import "./styles.css";
 export default function DatasetsPanel() {
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState();
   const {
-    filteredDatasets,
+    listedDatasets,
     inspectDataset,
     setInspectDataset,
     returnToDatasetList,
@@ -74,7 +74,7 @@ export default function DatasetsPanel() {
           <DatasetsTable
             handleSelectDataset={handleSelectDataset}
             setInspectDataset={setInspectDataset}
-            datasets={filteredDatasets}
+            datasets={listedDatasets}
             setHoveredDataset={setHoveredDataset}
             datasetsInViewPks={datasetsInViewPks}
           />

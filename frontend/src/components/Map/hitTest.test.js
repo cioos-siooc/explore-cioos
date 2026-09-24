@@ -71,6 +71,7 @@ describe("only a coverage rectangle can outrank them", () => {
 // of Map.jsx, so a later tidy-up that changes a ranking fails here first.
 
 const feature = (layerId, properties = {}, geometry) => ({
+  type: "Feature",
   layer: { id: layerId },
   properties,
   geometry,
@@ -307,10 +308,14 @@ describe("buildFeatureQuery", () => {
   });
 
   it("re-queries a hex's fragments and unions them into one outline", () => {
-    const queryRendered = vi.fn(() => [
-      feature("hexes", { pk: 9 }, square(0, 0, 1, 1)),
-      feature("hexes", { pk: 9 }, square(1, 0, 2, 1)),
-    ]);
+    const queryRendered = vi.fn(({ layers }) =>
+      layers[0] === "hexes"
+        ? [
+            feature("hexes", { pk: 9 }, square(0, 0, 1, 1)),
+            feature("hexes", { pk: 9 }, square(1, 0, 2, 1)),
+          ]
+        : [],
+    );
     const hex = feature(
       "hexes",
       { pk: 9, count: 3, datasets: "[1]" },
@@ -338,6 +343,34 @@ describe("buildFeatureQuery", () => {
     expect(buildFeatureQuery(lngLat, [hex], context()).buckets.source).toBe(
       "cells",
     );
+  });
+
+  it("adds the markers drawn inside a clicked coverage hex, once each", () => {
+    const station = (pk, x) =>
+      feature(
+        "points",
+        { pk, count: 4, datasets: "[7]", platform: "buoy" },
+        { type: "Point", coordinates: [x, 0.5] },
+      );
+    const queryRendered = ({ layers }) =>
+      layers[0] === "points"
+        ? [station(5, 0.5), station(5, 0.5), station(6, 3)]
+        : [];
+    const hex = feature(
+      "coverage-hexes",
+      { pk: 2, count: 1, datasets: "[1]" },
+      square(0, 0, 1, 1),
+    );
+    const query = buildFeatureQuery(lngLat, [hex], context({ queryRendered }));
+    expect(query.observationCount).toBe(5);
+    expect(query.buckets.pointPks).toEqual([5]);
+    expect(query.items).toEqual([
+      { kind: "observation", pk: 1, platform: undefined, aggregate: true },
+      { kind: "observation", pk: 7, platform: "buoy", aggregate: false },
+    ]);
+    expect(
+      query.highlight.features.filter((f) => f.geometry.type === "Point"),
+    ).toHaveLength(1);
   });
 
   it("rings a marker without re-querying, and names its platform", () => {

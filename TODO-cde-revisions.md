@@ -1190,30 +1190,43 @@ below is a *production* number unless it says otherwise.
 
 ## P4 — Dead weight, docs, and long functions
 
-### Delete
+### Delete — **DONE** (2026-09-22)
 
-- [ ] `docker-compose-frontend.yaml` — 2022, `version: "3.3"`, superseded.
-- [ ] Root `package-lock.json` — 27-byte stub `{"lockfileVersion": 1}`, no `package.json`, dead since 2022. **[verified]**
-- [ ] `database/7_range_functions.sql` — see P0.
-- [ ] `cron.sh` — calls a nonexistent `harvester` service and a missing `cde_refresh_cache.sh`.
-- [ ] `downloader/test_downloader.sh` — iterates `test/*.json`; the directory is `downloader/tests/queries/`.
-- [ ] `harvester/cde_db_loader/` — a pure re-export deprecation shim, still listed in the wheel
-      (`harvester/pyproject.toml:35`) and documented in three places.
-- [ ] `HARVEST_CONFIG_YAML` — a deprecated env channel kept alive in six places.
-- [ ] `harvester/run.sh:2` — a commented-out old two-step entrypoint.
-- [ ] Rename `database/7_contraints.sql` (misspelled).
+- [x] `docker-compose-frontend.yaml` — deleted. It could not start: `nginx.conf` proxies to a literal
+      `web-api:5000`, which this file did not define, and local SPA work uses the Vite dev server.
+- [x] Root `package-lock.json` — **stale as written**: the root now has a real `package.json`
+      (repo-wide ESLint/stylelint/Prettier), so the lockfile is live.
+- [x] `database/7_range_functions.sql` — already deleted in P0.
+- [x] `cron.sh` — deleted. Harvests run through Prefect; the host crontab is not in this repo.
+- [x] `downloader/test_downloader.sh` — **stale as written**: already rewritten to run pytest or
+      one `tests/queries/*.json` file, and documented in `downloader/README.md`.
+- [x] `harvester/cde_db_loader/` — deleted with its wheel entry, Dockerfile `COPY`, docs, and the
+      `cde_db_loader` name in `PREFECT_LOGGING_EXTRA_LOGGERS` (no logger ever had that name —
+      `loader.py` logs on the root logger).
+- [x] `HARVEST_CONFIG_YAML` — removed (resolver, `normalize_coolify_multiline`, entrypoint
+      pre-flight, both env samples, both READMEs, Dockerfile, tests). All deployments are on
+      `HARVEST_CONFIG_B64`; a worker still setting only the YAML var now fails pre-flight loudly.
+- [x] `harvester/run.sh` — deleted with its `COPY` and the commented `CMD`; the image `CMD` runs
+      `prefect_pipeline` directly.
+- [x] `database/7_contraints.sql` → `7_constraints.sql`. Sort position unchanged, so init order
+      and `db_migrate`'s `[3-9]_*.sql` glob are unaffected.
 
 ### Dead SQL objects
 
-- [ ] `cde.organizations.color` — zero references anywhere.
+- [x] `cde.organizations.color` — dropped from `1_schema.sql`. Existing databases keep the
+      column until the next `Rebuild Database`; harmless meanwhile (`/organizations` returned it
+      as `null`, and no client read it).
 - [ ] `cde.skipped_datasets` — written by the harvester and SQL, never read by web-api. **Do not
       delete it**: `prune_stale_datasets` reads `temp_skipped_datasets` as the "this dataset errored,
       don't prune it" signal, which is the P0 item added 2026-09-09. Unread by web-api is not unused.
-- [ ] `cde.profiles.days` — written by `9_incremental_upsert.sql`, not in the Pandera schema, never read.
+- [x] `cde.profiles.days` — **stale as written**: it is now in the Pandera schema and is the
+      fallback for the map's `days` metric (see `1_schema.sql`, `day_ranges`).
 - [ ] Indexes no query can use, since all geometry filtering goes through `ST_Intersects`:
       `profiles(latitude)`, `profiles(longitude)`, `obis_cells(latitude, longitude)`,
       `trajectory_hexes_latlon_idx`. Plus three overlapping index prefixes on `profiles`
-      (`1_schema.sql:206,214,216`) and a prefix overlap on `trajectory_points`.
+      (`1_schema.sql:206,214,216`) and a prefix overlap on `trajectory_points`. Left open: check
+      `pg_stat_user_indexes.idx_scan` on prod before dropping — §P3 shows static reads of this
+      schema have been wrong before.
 - [ ] `9_incremental_upsert.sql:186` uses positional `INSERT … SELECT *`, which breaks silently on a
       column reorder — contrast the neighbouring block that spells the list out and explains why.
 

@@ -8,6 +8,7 @@ import frLocale from "plotly.js-locales/fr";
 
 import erddapServers from "../../../erddapServers.json";
 import { escapeHtml, formatErddapServerName } from "../../../utilities";
+import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
@@ -28,6 +29,11 @@ const SERIES_COLORS = [
   "#4a3aa7", // violet
 ];
 const OTHER_COLOR = "#9a9a92";
+
+// Below the width at which the coverage dialog stops growing (1040px + its
+// 24px gutter), bars get too thin for their white outlines: Plotly strokes
+// every side, so the edges outweigh the fill.
+const NARROW_QUERY = "(max-width: 1064px)";
 
 const DAY_MS = 24 * 3600 * 1000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -81,6 +87,7 @@ function formatPeriod(startMs, endMs, locale) {
 export default function CoverageHistogramPlot({ histogram }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "fr" ? "fr-CA" : "en-CA";
+  const narrow = useMediaQuery(NARROW_QUERY);
 
   // Axis + hover wording follows what the bars count.
   const COUNT_LABELS = {
@@ -90,79 +97,104 @@ export default function CoverageHistogramPlot({ histogram }) {
   };
   const countLabel = t(COUNT_LABELS[histogram.count] || COUNT_LABELS.datasets);
 
-  const { traces, periodLabels, binCenters, binWidths, legendSide } =
-    useMemo(() => {
-      const { timeBinEdges, series, cells } = histogram;
-      const edgesMs = timeBinEdges.map((edge) => Date.parse(edge));
-      const numBins = edgesMs.length - 1;
+  const { traces, binCenters, binWidths, legendSide } = useMemo(() => {
+    const { timeBinEdges, series, cells } = histogram;
+    const edgesMs = timeBinEdges.map((edge) => Date.parse(edge));
+    const numBins = edgesMs.length - 1;
 
-      const centers = Array.from(
-        { length: numBins },
-        (_, i) => new Date((edgesMs[i] + edgesMs[i + 1]) / 2),
-      );
-      // Bar width per bin (ms), so contiguous bins tile the time axis.
-      const widths = Array.from(
-        { length: numBins },
-        (_, i) => edgesMs[i + 1] - edgesMs[i],
-      );
-      const labels = Array.from({ length: numBins }, (_, i) =>
-        formatPeriod(edgesMs[i], edgesMs[i + 1], locale),
-      );
+    const centers = Array.from(
+      { length: numBins },
+      (_, i) => new Date((edgesMs[i] + edgesMs[i + 1]) / 2),
+    );
+    // Bar width per bin (ms), so contiguous bins tile the time axis.
+    const widths = Array.from(
+      { length: numBins },
+      (_, i) => edgesMs[i + 1] - edgesMs[i],
+    );
+    const labels = Array.from({ length: numBins }, (_, i) =>
+      formatPeriod(edgesMs[i], edgesMs[i + 1], locale),
+    );
 
-      // Top series keep their identity; everything past MAX_SERIES sums into a
-      // single "Other" stack segment.
-      const top = series.slice(0, MAX_SERIES);
-      const counts = new Map(
-        top.map((s) => [s.key, new Array(numBins).fill(0)]),
-      );
-      const other = new Array(numBins).fill(0);
-      let hasOther = series.length > MAX_SERIES;
+    // Top series keep their identity; everything past MAX_SERIES sums into a
+    // single "Other" stack segment.
+    const top = series.slice(0, MAX_SERIES);
+    const counts = new Map(top.map((s) => [s.key, new Array(numBins).fill(0)]));
+    const other = new Array(numBins).fill(0);
+    let hasOther = series.length > MAX_SERIES;
 
-      cells.forEach(([binIndex, key, count]) => {
-        const bucket = counts.get(key);
-        if (bucket) bucket[binIndex - 1] += count;
-        else {
-          other[binIndex - 1] += count;
-          hasOther = true;
-        }
-      });
-
-      // Stacking order = trace order; the largest series (first) sits at the
-      // bottom of every bar.
-      const built = top.map((s, index) => ({
-        name: seriesLabel(s.key, s.kind, i18n.language),
-        color: SERIES_COLORS[index % SERIES_COLORS.length],
-        y: counts.get(s.key),
-      }));
-      if (hasOther) {
-        built.push({
-          name: t("coverageOtherSeries"),
-          color: OTHER_COLOR,
-          y: other,
-        });
+    cells.forEach(([binIndex, key, count]) => {
+      const bucket = counts.get(key);
+      if (bucket) bucket[binIndex - 1] += count;
+      else {
+        other[binIndex - 1] += count;
+        hasOther = true;
       }
+    });
 
-      // The legend floats over the plot, so seat it on whichever end the bars
-      // leave emptiest. Only the outer third of each end matters: that is the
-      // width the keys occupy, and a stacked time histogram is nearly always
-      // lopsided (recent bins dwarf old ones).
-      const totals = new Array(numBins).fill(0);
-      built.forEach(({ y }) => y.forEach((value, i) => (totals[i] += value)));
-      const peak = (values) => values.reduce((max, v) => Math.max(max, v), 0);
-      const end = Math.max(1, Math.round(numBins / 3));
-      const side =
-        peak(totals.slice(0, end)) <= peak(totals.slice(-end))
-          ? "left"
-          : "right";
+    // Stacking order = trace order; the largest series (first) sits at the
+    // bottom of every bar.
+    const built = top.map((s, index) => ({
+      name: seriesLabel(s.key, s.kind, i18n.language),
+      color: SERIES_COLORS[index % SERIES_COLORS.length],
+      y: counts.get(s.key),
+    }));
+    if (hasOther) {
+      built.push({
+        name: t("coverageOtherSeries"),
+        color: OTHER_COLOR,
+        y: other,
+      });
+    }
 
-      return {
-        traces: built,
-        periodLabels: labels,
-        binCenters: centers,
-        binWidths: widths,
-        legendSide: side,
-      };
-    }, [histogram, locale, i18n.language, t]);
+    // The legend floats over the plot, so seat it on whichever end the bars
+    // leave emptiest. Only the outer third of each end matters: that is the
+    // width the keys occupy, and a stacked time histogram is nearly always
+    // lopsided (recent bins dwarf old ones).
+    const totals = new Array(numBins).fill(0);
+    built.forEach(({ y }) => y.forEach((value, i) => (totals[i] += value)));
+    const peak = (values) => values.reduce((max, v) => Math.max(max, v), 0);
+    const end = Math.max(1, Math.round(numBins / 3));
+    const side =
+      peak(totals.slice(0, end)) <= peak(totals.slice(-end)) ? "left" : "right";
+
+    // Hovering any segment describes the whole bar: its period, total and
+    // every series in it, listed top-down to match the stack, with the
+    // hovered one in bold. Names are harvested strings and Plotly parses the
+    // label as HTML, so they're escaped.
+    const format = (n) => n.toLocaleString(locale);
+    const hoverText = built.map((_, hovered) =>
+      labels.map((label, bin) => {
+        const rows = built
+          .map(({ name, color, y }, index) => ({
+            name,
+            color,
+            index,
+            count: y[bin],
+          }))
+          .filter(({ count }) => count > 0)
+          .reverse()
+          .map(({ name, color, index, count }) => {
+            const row = `<span style="color:${color}">■</span> ${escapeHtml(name)}: ${format(count)}`;
+            return index === hovered ? `<b>${row}</b>` : row;
+          });
+        return (
+          `<b>${label}</b><br>` +
+          `${countLabel}: ${format(totals[bin])}<br>` +
+          rows.join("<br>")
+        );
+      }),
+    );
+
+    return {
+      traces: built.map((trace, index) => ({
+        ...trace,
+        hoverText: hoverText[index],
+      })),
+      binCenters: centers,
+      binWidths: widths,
+      legendSide: side,
+    };
+  }, [histogram, locale, i18n.language, t, countLabel]);
 
   return (
     <div className="coverageHistogramPlot">
@@ -173,21 +205,12 @@ export default function CoverageHistogramPlot({ histogram }) {
           x: binCenters,
           y: trace.y,
           width: binWidths,
-          customdata: periodLabels,
           marker: {
             color: trace.color,
-            // 1px surface-colored separator between stacked segments.
-            line: { color: "#ffffff", width: 1 },
+            line: { color: "#ffffff", width: narrow ? 0 : 1 },
           },
-          // Plotly renders a hover label through its own HTML parser, and
-          // these names are harvested strings (organization, platform,
-          // cdm_data_type, OBIS node titles), so one holding a < would inject
-          // markup. The %{...} tokens need no such care: substitution is a
-          // single pass and never rescans what it wrote.
-          hovertemplate:
-            `<b>${escapeHtml(trace.name)}</b><br>` +
-            "%{customdata}<br>" +
-            `${countLabel}: %{y}<extra></extra>`,
+          customdata: trace.hoverText,
+          hovertemplate: "%{customdata}<extra></extra>",
         }))}
         layout={{
           barmode: "stack",
@@ -233,6 +256,12 @@ export default function CoverageHistogramPlot({ histogram }) {
           paper_bgcolor: "rgba(0,0,0,0)",
           plot_bgcolor: "rgba(0,0,0,0)",
           hovermode: "closest",
+          hoverlabel: {
+            bgcolor: "#ffffff",
+            bordercolor: "#DCE8E5",
+            font: { color: "#152F37" },
+            align: "left",
+          },
           dragmode: false,
         }}
         config={{
