@@ -92,12 +92,14 @@ holds a different number of cards, and axe, which can only judge contrast inside
 the viewport, counts a different number of nodes. Recording on a host and
 enforcing in CI does not work; these run where the numbers were taken.
 
-**CI note**: `test:visual` only runs in CI off a published GitHub Release —
-not on every push or PR. Pixel baselines go stale the moment the UI they
-cover is being reworked, so gating on every commit just means re-recording
-them mid-review; a PR still runs the behavioural and a11y suites on every
-push, and `npm run test:visual` remains available locally any time you want
-the pixel check before it runs in CI.
+**CI note**: `test:visual` runs in the root `Integration Tests` workflow
+(`.github/workflows/build_and_test.yml`, the one deploy actually gates on) and
+only off a published GitHub Release — not on every push or PR. Pixel
+baselines go stale the moment the UI they cover is being reworked, so gating
+on every commit just means re-recording them mid-review. `Frontend Tests`
+(`.github/workflows/test-frontend.yaml`) still runs the behavioural and a11y
+suites on every push/PR; `npm run test:visual` remains available locally any
+time you want the pixel check before it runs in CI.
 
 Rewrite the baselines with `npm run test:visual:update` and
 `npm run test:a11y:baseline` after reviewing what changed. The a11y file is a
