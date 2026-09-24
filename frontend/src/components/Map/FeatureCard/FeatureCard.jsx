@@ -203,6 +203,7 @@ export default function FeatureCard() {
   return (
     <div
       data-testid="feature-card"
+      data-map-cover={open || undefined}
       className={classNames("featureCard", {
         open,
         featureCardEmpty: empty,

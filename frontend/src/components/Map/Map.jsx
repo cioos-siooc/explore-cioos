@@ -27,9 +27,11 @@ import {
   formatInstantRange,
   generateColorStops,
   getCurrentRangeLevel,
+  mapCoverPadding,
   polygonIsRectangle,
   quantizeCountRange,
   rangesEqual,
+  revealOffset,
   selectionFromSearchParams,
   zoomToDatasetCamera,
   splitTrackRuns,
@@ -1656,6 +1658,7 @@ export default function CreateMap({
   // For the 'load' handler: an overlay set before the style loaded hid layers
   // that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
+  const revealedWmsPk = useRef();
 
   // Single-dataset griddap footprint (hover from the list, or pinned while
   // its WMS overlay is shown).
@@ -1669,13 +1672,70 @@ export default function CreateMap({
     );
   }
 
+  // Brings `bounds` out from under whatever panel is floating over it (the
+  // What's here card, the sidebar — see mapCoverPadding), and otherwise leaves
+  // the camera alone. `frame` asks for the zoom-to-dataset framing whenever any
+  // of it is hidden; without it, a pan when it fits beside the panel, a zoom
+  // out only when none of it is in view, nothing when it is already partly seen.
+  function revealBounds(bounds, { frame = false } = {}) {
+    if (!map.current || !bounds) return;
+    const { width, height } = map.current.getCanvas().getBoundingClientRect();
+    const padding = mapCoverPadding(map.current);
+    const free = {
+      left: padding.left,
+      top: padding.top,
+      right: width - padding.right,
+      bottom: height - padding.bottom,
+    };
+    const corners = [bounds[0], bounds[1]].map((c) => map.current.project(c));
+    const box = {
+      left: Math.min(...corners.map((p) => p.x)),
+      right: Math.max(...corners.map((p) => p.x)),
+      top: Math.min(...corners.map((p) => p.y)),
+      bottom: Math.max(...corners.map((p) => p.y)),
+    };
+    const offset = revealOffset(box, free, 24);
+    if (offset && !offset[0] && !offset[1]) return;
+    if (frame) {
+      map.current.fitBounds(bounds, zoomToDatasetCamera(map.current));
+      return;
+    }
+    if (offset) {
+      map.current.panBy(offset);
+      return;
+    }
+    const outOfView =
+      box.right < free.left ||
+      box.left > free.right ||
+      box.bottom < free.top ||
+      box.top > free.bottom;
+    if (outOfView) {
+      map.current.fitBounds(bounds, {
+        padding,
+        maxZoom: map.current.getZoom(),
+      });
+    }
+  }
+
   // Outline the region the open card describes, and clear it when the card
   // closes. Guarded on the source existing: a share link can resolve a click
   // payload before the style has finished adding layers.
+  const revealedQueryNonce = useRef();
   useEffect(() => {
     const source = map.current?.getSource("click-highlight");
     if (!source) return;
     source.setData(featureQuery?.highlight || emptyFeatureCollection);
+    if (!featureQuery?.highlight?.features?.length) return;
+    if (revealedQueryNonce.current === featureQuery.nonce) return;
+    revealedQueryNonce.current = featureQuery.nonce;
+    const bounds = boundsFromGeoJson({
+      coordinates: featureQuery.highlight.features.map(
+        (f) => f.geometry.coordinates,
+      ),
+    });
+    // A frame later, once the card or sidebar this click opened is marked.
+    const frame = requestAnimationFrame(() => revealBounds(bounds));
+    return () => cancelAnimationFrame(frame);
   }, [featureQuery]);
 
   // Coverage rectangles under the cursor, deduped by dataset: a stack of
@@ -1954,7 +2014,7 @@ export default function CreateMap({
     const bounds = boundsFromGeoJson(zoomTarget.geometry);
     if (!bounds) return;
     map.current.fitBounds(bounds, {
-      ...zoomToDatasetCamera(),
+      ...zoomToDatasetCamera(map.current),
       ...zoomTarget.camera,
       duration: 1000,
     });
@@ -2002,6 +2062,7 @@ export default function CreateMap({
     removeWmsOverlay();
     if (!activeWmsOverlay) {
       setGriddapHighlight(null);
+      revealedWmsPk.current = undefined;
       return;
     }
     renderWmsImage(activeWmsOverlay);
@@ -2011,6 +2072,12 @@ export default function CreateMap({
     setDataLayersVisibility(false);
     // pin the dataset's footprint outline while its overlay is shown
     setGriddapHighlight(activeWmsOverlay.bbox);
+    // Once per dataset: a new slice or variable is the same layer in the same
+    // place, and the user may have moved off it on purpose.
+    if (revealedWmsPk.current !== activeWmsOverlay.pk) {
+      revealedWmsPk.current = activeWmsOverlay.pk;
+      revealBounds(boundsFromGeoJson(activeWmsOverlay.bbox), { frame: true });
+    }
     return () => removeWmsOverlay();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWmsOverlay, polygon]);
@@ -2356,7 +2423,7 @@ export default function CreateMap({
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)],
         ],
-        zoomToDatasetCamera(),
+        zoomToDatasetCamera(map.current),
       );
     }
     renderSelectedTrack();
@@ -2419,7 +2486,7 @@ export default function CreateMap({
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)],
         ],
-        zoomToDatasetCamera(),
+        zoomToDatasetCamera(map.current),
       );
     }
     renderMappedRecord();

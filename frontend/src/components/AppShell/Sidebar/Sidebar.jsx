@@ -87,6 +87,7 @@ export default function Sidebar() {
         className={classNames("sidebarDatasets", { expanded })}
         data-testid="sidebar-datasets"
         data-expanded={expanded}
+        data-map-cover={expanded || undefined}
       >
         {inspecting ? (
           <div className="datasetsBanner">

@@ -31,6 +31,7 @@ export default function DatasetMapCard({ dataset }) {
     <section
       className={classNames("datasetMapCard", { withOverlay: overlay })}
       data-testid="dataset-map-card"
+      data-map-cover
       aria-label={dataset.title}
     >
       <div className="datasetMapCardHead">
