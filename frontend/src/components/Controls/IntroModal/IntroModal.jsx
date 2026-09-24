@@ -224,9 +224,7 @@ export default function IntroModal({ showModal, setShowModal }) {
               </button>
               <span className="introSources">
                 <span className="introSource">ERDDAP™</span>
-                {obisDataAvailable && (
-                  <span className="introSource">OBIS</span>
-                )}
+                {obisDataAvailable && <span className="introSource">OBIS</span>}
               </span>
             </div>
           </div>

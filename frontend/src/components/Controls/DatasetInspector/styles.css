@@ -436,6 +436,7 @@
    sideways. A card puts the same fields down the page instead: the id on its
    own line, then one label/value line per field, so a record reads whole at
    any width. */
+
 /* Search and sort on one row, as the datasets list's own toolbar has them
    (.datasetsCardToolbar). */
 .cardListToolbar {

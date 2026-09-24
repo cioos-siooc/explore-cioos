@@ -72,7 +72,10 @@ export default function BrandSearch({ children }) {
             )}
           </h1>
           <div className="brandMinorItems">
-            <FeedbackButton className="brandMinorItem brandFeedback" size={20} />
+            <FeedbackButton
+              className="brandMinorItem brandFeedback"
+              size={20}
+            />
             <button
               type="button"
               className={classNames("brandMinorItem", {

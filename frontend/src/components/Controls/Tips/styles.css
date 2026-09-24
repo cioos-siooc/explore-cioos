@@ -29,10 +29,7 @@
 
 @media (min-width: 1200px) {
   .tipCard {
-    top: 12px;
-    right: 12px;
-    bottom: auto;
-    left: auto;
+    inset: 12px 12px auto auto;
     width: min(360px, calc((100vw - var(--cioos-brand-width)) / 2 - 24px));
   }
 }
