@@ -59,7 +59,7 @@ def split_erddap_url(url):
     https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/fr/tabledap/cnodc_msc50_pacific.html
     """
 
-    pattern = re.compile(r"/erddap/(?:[a-z]{2}/)?tabledap/")
+    pattern = re.compile(r"/erddap/(?:[a-z]{2}/)?(?:tabledap|griddap)/")
     match = pattern.search(url)
     if match:
         erddap_host, f = re.split(pattern, url, maxsplit=1)
@@ -100,12 +100,10 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         records = records[0:limit]
     out = []
     for record_full in records:
-        # A record can list several datasets; keep every tabledap resource.
+        # A record can list several datasets; keep every ERDDAP resource.
         links = []
         for resource in record_full["resources"]:
             url = resource["url"]
-            if "tabledap" not in url:
-                continue
             try:
                 (erddap_host, dataset_id) = split_erddap_url(url)
             except ValueError:
@@ -207,7 +205,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
         erddap_datasets_query = (
             CKAN_API_URL
             + "/action/package_search?"
-            + urlencode({"rows": row_page_limit, "start": row_start, "q": "res_url:*tabledap*"})
+            + urlencode({"rows": row_page_limit, "start": row_start, "q": "res_url:*erddap*"})
         )
         logger.info(erddap_datasets_query)
         # print(erddap_datasets_query)

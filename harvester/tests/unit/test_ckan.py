@@ -77,6 +77,13 @@ class TestSplitErddapUrl:
         )
         assert ds_id == "uqarIsmerCtdHypoxie"
 
+    def test_griddap_url(self):
+        host, ds_id = split_erddap_url(
+            "https://erddap.ogsl.ca/erddap/griddap/cidcoBenthicSubstrateAiGodbout.graph"
+        )
+        assert host == "https://erddap.ogsl.ca"
+        assert ds_id == "cidcoBenthicSubstrateAiGodbout"
+
     def test_missing_dataset_id_raises_value_error(self):
         with pytest.raises(ValueError, match="Invalid URL format"):
             split_erddap_url("https://erddap.ogsl.ca/erddap/tabledap/")
@@ -179,17 +186,20 @@ class TestGetCkanRecordsMatching:
         get_ckan_records(None)
         from cde_harvester.sources.ckan import create_ckan_erddap_link as mod
         url = mod._build_ckan_session.return_value.get.call_args_list[0].args[0]
-        assert "q=res_url%3A%2Atabledap%2A" in url
+        assert "q=res_url%3A%2Aerddap%2A" in url
 
-    def test_every_tabledap_resource_in_a_record_is_kept(self, mocker):
+    def test_every_erddap_resource_in_a_record_is_kept(self, mocker):
         _make_ckan_get(mocker, _search_pages(_record(
             "multi",
             "https://erddap.ogsl.ca/erddap/tabledap/uqarIsmerCtdHypoxie.html",
             "https://catalogue.ogsl.ca/data/notes.pdf",
             "https://erddap.ogsl.ca/erddap/tabledap/uqarIsmerHypoxie2021Geochimie.html",
+            "https://erddap.ogsl.ca/erddap/griddap/ecccShopNautilo.graph",
         )))
         df = get_ckan_records(None)
-        assert sorted(df["dataset_id"]) == ["uqarIsmerCtdHypoxie", "uqarIsmerHypoxie2021Geochimie"]
+        assert sorted(df["dataset_id"]) == [
+            "ecccShopNautilo", "uqarIsmerCtdHypoxie", "uqarIsmerHypoxie2021Geochimie",
+        ]
         assert set(df["ckan_id"]) == {"multi"}
 
     def test_same_dataset_id_on_two_hosts_kept(self, mocker):
