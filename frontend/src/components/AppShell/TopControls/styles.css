@@ -1,7 +1,8 @@
 /* ------------------------------------------------------------------
  * TopBar — the centered top header floating over the map. First layer:
  * the brand bar. Second layer: the merged Datasets/Filters segmented
- * pill. Active-filter chips flow beneath, and under those the
+ * pill. The quick-filter buttons flow beneath (QuickFilters, which brings
+ * its own stylesheet), then the active-filter chips, and under those the
  * single-dataset card (SingleDatasetView) when one is up. Everything
  * stays centered on the horizontal midline of the viewport.
  * ------------------------------------------------------------------ */
@@ -31,12 +32,9 @@
 .topBarActions {
   display: grid;
 
-  /* One column per peer, in DOM order: Datasets, Coverage, and the Filters
-     group — the Filters button plus the quick-filters caret, which share this
-     last column rather than the caret claiming one of its own, so all three
-     peers stay the same width as each other. The count is explicit, so adding
-     a segment without widening this list drops it onto an implicit SECOND
-     grid row instead of into the strip. */
+  /* One column per peer, in DOM order: Datasets, Coverage, Filters. The count
+     is explicit, so adding a segment without widening this list drops it onto
+     an implicit SECOND grid row instead of into the strip. */
   grid-template-columns: 1fr 1fr 1fr;
   align-items: stretch;
   margin: 0 -1px -1px;
@@ -46,34 +44,9 @@
   overflow: hidden;
 }
 
-/* The third column's two parts. The caret takes only what its chevron needs
-   and Filters is given the rest, so the pair together measure exactly what
-   one peer's column is. */
-.topBarFiltersGroup {
-  display: flex;
-  align-items: stretch;
-  min-width: 0;
-}
-
-.topBarFiltersGroup > .topBarButton {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* QuickFiltersButton is a DropdownButton, whose own wrapper div would
-   otherwise be the flex item instead of the button inside it —
-   display:contents lifts the button itself into the group so it sizes to its
-   own content rather than an empty wrapper's. */
-.topBarFiltersGroup > .dropdown {
-  display: contents;
-}
-
-/* .topBar .topBarActions .topBarButton, not the bare class: the middle
-   segment's button is also a DropdownButton .dropdown-toggle, which carries
-   its own generic chrome (dropdownStyles.css, imported by a different
-   component) at equal class-selector specificity. The three-class prefix
-   here — cheaper than !important — outranks that generic chrome regardless
-   of which stylesheet the bundler happens to place first. */
+/* Three-class prefix rather than the bare class — cheaper than !important —
+   so this wins over any generic button chrome a shared stylesheet brings in,
+   whichever order the bundler happens to emit them in. */
 .topBar .topBarActions .topBarButton {
   display: inline-flex;
   align-items: center;
@@ -81,10 +54,9 @@
   gap: 8px;
   min-width: 0;
 
-  /* min-height, not height: the Datasets segment stacks a label over its
-     counts, and a long label can take a second line on a narrow viewport.
-     All five segments stretch together (the grid's align-items), so the
-     strip stays a single even band whatever the tallest one needs. */
+  /* min-height, not height: a long label can take a second line on a narrow
+     viewport. All three segments stretch together (the grid's align-items),
+     so the strip stays a single even band whatever the tallest one needs. */
   min-height: 40px;
   padding: 4px 10px;
   border: none;
@@ -94,7 +66,7 @@
      corners. */
   border-radius: 0;
 
-  /* Dimmed primary: a translucent teal wash that highlights the five entry
+  /* Dimmed primary: a translucent teal wash that highlights the three entry
      points without competing with the white brand row above them. */
   background-color: rgb(82 167 155 / 14%);
   font: inherit;
@@ -104,88 +76,6 @@
   transition:
     background-color var(--cioos-transition-fast),
     color var(--cioos-transition-fast);
-}
-
-/* Icon-only segment — the quick-filters caret: no label to keep clear of, so
-   it sits tighter than a worded one and takes only the width its chevron
-   needs (grid-template-columns above) rather than a share of the row. */
-.topBar .topBarActions .topBarIconButton {
-  padding: 4px 8px;
-}
-
-/* The generic dropdown chrome's own caret — this toggle draws its chevron
-   itself, as its content. */
-.topBar .topBarActions .topBarQuickFiltersToggle::after {
-  display: none;
-}
-
-/* The caret's menu keeps the generic dropdown chrome (dropdownStyles.css:
-   white, bordered, shadowed) — it is a real menu of rows now, where what used
-   to hang off this toggle was a bare search popover bringing its own card,
-   and the two cards would have nested white-on-white. Only a width is set,
-   and via menuClassName rather than a descendant selector off the toggle,
-   since the menu portals to document.body. Passing menuClassName is also what
-   stands DropdownButton's own floor down: it would otherwise pin the menu
-   inline at its toggle's width, which for a lone chevron is nothing like
-   enough for the search row below. */
-.topBarQuickFiltersMenu {
-  min-width: 280px;
-  max-width: calc(100vw - 24px);
-}
-
-/* The search row at the head of that menu. Not a dropdown-item — it holds a
-   live input rather than being a thing to click, and clicking it must not
-   close the menu — so it carries its own padding and a rule under it instead
-   of inheriting the item chrome. */
-.topBarSearchRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 12px 8px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--cioos-hairline);
-  color: var(--cioos-ink-40);
-}
-
-.topBarSearchRow > svg {
-  flex: 0 0 auto;
-}
-
-.topBarSearchInput {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: none;
-  padding: 6px 0;
-  outline: none;
-  background: transparent;
-  font: inherit;
-  font-size: var(--cioos-font-size-md);
-  color: var(--cioos-ink);
-}
-
-/* The magnifier is the submit button (the field publishes on Enter or on it,
-   never on a pause), so it carries the same reset as the clear button beside
-   the field rather than reading as a decorative icon. */
-.topBarSearchSubmit,
-.topBarSearchClear {
-  display: inline-flex;
-  flex: 0 0 auto;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-}
-
-.topBarSearchSubmit:hover,
-.topBarSearchClear:hover {
-  color: var(--cioos-ink);
-}
-
-.topBarSearchSubmit:focus-visible {
-  outline: none;
-  border-radius: var(--cioos-radius-sm);
-  box-shadow: var(--cioos-focus);
 }
 
 /* The icon and the filters badge hold their size; only text gives way. */
@@ -221,15 +111,9 @@
   overflow-wrap: break-word;
 }
 
-/* Hairline weld between the tabs. Not a sibling selector: the trailing
-   segment (QuickFiltersButton) is a real button nested inside its
-   DropdownButton's wrapper div, so it is not a DOM sibling of the Filters
-   button before it even though display:contents (above) puts them in the same
-   visual row. Every segment gets the weld; only the leading one — always the
-   Datasets toggle, the first DOM child of .topBarActions — has nothing to its
-   left to weld against, and the caret drops it again below so it reads as the
-   tail of the Filters button it shares a column with rather than a peer of
-   its own. */
+/* Hairline weld between the tabs. Every segment gets one; the leading one —
+   the Datasets toggle — has nothing to its left to weld against and drops it
+   again below. */
 .topBar .topBarActions .topBarButton {
   border-left: 1px solid rgb(82 167 155 / 32%);
 }
@@ -247,20 +131,9 @@
   border-bottom-left-radius: var(--cioos-radius-lg);
 }
 
-/* The other end of the row, and the other weld exception. Not
-   `> .topBarButton:last-child` like the corner above: the caret is not a child
-   of the row at all — it sits inside the Filters group, lifted out of its own
-   DropdownButton wrapper. This has to come after the weld rule above rather
-   than with the caret's other styling further up — same three-class
-   specificity, so source order is all that decides it. */
-.topBar .topBarActions .topBarQuickFiltersToggle {
-  /* Never shrinks, and never grows: the chevron's width is all it takes, and
-     the Filters button beside it absorbs the rest of the column. */
-  flex: 0 0 auto;
-
-  /* The tail of that button rather than a peer, so nothing is ruled between
-     the two. */
-  border-left: none;
+/* The other end of the row — same cross-layer clipping reason as the corner
+   above. */
+.topBarActions > .topBarButton:last-child {
   border-bottom-right-radius: var(--cioos-radius-lg);
 }
 
@@ -286,9 +159,9 @@
   color: var(--cioos-primary-700);
 }
 
-/* Pressed/open state (Datasets toggle open, the draw menu open, or the
-   Filters modal up): fill with solid primary. Two neighbours can be active
-   together (e.g. the datasets sidebar open while the draw menu is also open)
+/* Pressed/open state (Datasets toggle open, the Coverage or Filters modal
+   up): fill with solid primary. Two neighbours can be active together (e.g.
+   the datasets sidebar open while a modal is also up)
    — same solid fill, sitting flush with no gap between them, so without help
    they'd read as one wide block instead of two buttons. A lightened
    full-perimeter ring stacked on the app's shared 3D shadow (see theme.css —
@@ -316,6 +189,66 @@
 .topBar .topBarActions .topBarButton:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
+}
+
+/* The Filters segment carries two controls, not one: the button that opens
+   the modal, and — riding on its far edge — the toggle for the quick-filter
+   and active-filter-chip rows beneath the bar (see TopControls, QuickFilters,
+   ActiveFilterChips). Built as a container plus two real buttons rather than
+   a button nested in a button, which browsers refuse to render as written;
+   the container keeps the segment's own background/active/applied wash
+   (still ".topBarButton"), and both inner buttons go transparent so that
+   wash shows through. */
+.topBar .topBarActions .topBarButton.topBarFiltersSegment {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  gap: 0;
+}
+
+.topBarFiltersOpen,
+.topBarFiltersToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.topBarFiltersOpen {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+}
+
+.topBarFiltersOpen > svg,
+.topBarFiltersOpen > .topBarCount,
+.topBarFiltersToggle > svg {
+  flex: 0 0 auto;
+}
+
+/* A hairline of its own, separate from the one the whole segment already
+   gets from its left-hand neighbour, so the two controls read as split
+   rather than one continuous hit area. */
+.topBarFiltersToggle {
+  flex: 0 0 auto;
+  padding: 4px 10px 4px 6px;
+  border-left: 1px solid rgb(82 167 155 / 32%);
+}
+
+.topBarButton.active .topBarFiltersToggle {
+  border-left-color: rgb(255 255 255 / 40%);
+}
+
+.topBarFiltersOpen:focus-visible,
+.topBarFiltersToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+  border-radius: var(--cioos-radius-sm);
 }
 
 /* ------------------------------------------------------------------
@@ -441,7 +374,7 @@
   }
 
   /* The chips hang under the full-width header, so they take its width too. */
-  .activeFilterBullets {
+  .activeFiltersPanel {
     width: 100%;
     padding: 0 8px;
   }
@@ -495,197 +428,58 @@
 }
 
 /* ------------------------------------------------------------------
- * Active-filter chips, flowing after the Filters button. A white card holds
- * one header row: the legend explaining its two kinds of pill on the left,
- * the heading centered, and the Show/Hide and Clear-all actions as symbols
- * on the right. Under the card, one row per active filter category, laid out
- * in a shared three-column grid — family bubble, bracket, values — so every
- * row's bracket lands on the same central column as the next one, lined up
- * with the title card above rather than drifting with how wide each row's own
- * label happens to be.
+ * Active-filter chips, flowing directly under QuickFilters as the next line
+ * of the same floating toolbar rather than a boxed panel of its own: no
+ * enclosing card, no header bar — one wrapping row of small pills, at the
+ * same gap QuickFilters uses, so the two rows read as one. Each group is its
+ * own flex chunk (name pill + its values) so a group's label never wraps away
+ * from its own first value; the chunks themselves wrap onto new lines as the
+ * row runs out of width. Show/Hide and Clear-all live with the quick filters
+ * instead (see QuickFilters/styles.css) rather than closing this row off.
  * ------------------------------------------------------------------ */
 .activeFiltersPanel {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-
-  /* Stepped in from the brand card above (see TopLeft/styles.css, which
-     defines the token and the viewport cap) by the shell's 12px gutter twice
-     over: the chips are subordinate to that card — what the filters it names
-     are currently doing — so they read as a narrower layer tucked under it
-     rather than a second card of equal standing. The viewport cap keeps that
-     same 24px of map either side once the brand card has gone full-bleed. */
-  width: min(calc(var(--cioos-brand-width) - 48px), calc(100vw - 48px));
-
-  /* The top bar centres its children at desktop widths but stretches them on
-     a phone, where the brand card wants both screen edges. This panel is the
-     one child that stays a floating card at every width, so it centres
-     itself rather than inheriting either rule. */
-  align-self: center;
-  pointer-events: none;
-}
-
-/* Backs the title, its legend and the two actions with the same white-card
-   treatment as the filter bubbles below, so the row reads as chrome floating
-   over the map rather than bare text on top of it.
-
-   One row, three cells: legend, heading, actions. The two outer columns are
-   equal fractions rather than auto, so the heading stays on the card's centre
-   line — and therefore over the bracket column of the grid below — however
-   much width the legend or the actions happen to need.
-
-   The heading comes first in the DOM (it is what the chip list is labelled
-   by) and is placed into the middle column, so every cell must name its row
-   as well: auto-placement never walks the cursor backwards, and the legend
-   asking for column 1 after the heading took column 2 would otherwise start a
-   second row. */
-.activeFiltersTitleCard {
-  pointer-events: all;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  background-color: var(--cioos-white);
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  padding: 6px 12px;
-  box-shadow: var(--cioos-shadow-sm);
-}
-
-/* The row's title: sized and weighted to read as a heading, not a caption. */
-.activeFiltersHeading {
-  grid-row: 1;
-  grid-column: 2;
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--cioos-ink);
-  text-align: center;
-}
-
-/* What the two pill colours below mean, spelled out once instead of left for
-   the user to guess from the map. */
-.activeFiltersLegend {
-  grid-row: 1;
-  grid-column: 1;
-  justify-self: start;
-  display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 4px 10px;
-}
-
-/* Show/Hide and Clear-all, closing the row off on the right. */
-.activeFiltersActions {
-  grid-row: 1;
-  grid-column: 3;
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.activeFiltersLegendItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
-}
-
-.activeFiltersLegendSwatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: var(--cioos-radius-pill);
-}
-
-.activeFiltersLegendSwatchFamily {
-  background-color: var(--cioos-white);
-  border: 1px solid var(--cioos-hairline);
-}
-
-.activeFiltersLegendSwatchValue {
-  background-color: var(--cioos-teal-light);
-}
-
-.activeFiltersToggleButton,
-.activeFiltersClearButton {
-  flex: 0 0 auto;
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 50%;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-  transition:
-    background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast);
-}
-
-.activeFiltersToggleButton {
-  width: 22px;
-  height: 22px;
-}
-
-/* A step smaller than the toggle next to it: it's the more consequential of
-   the two (drops every filter at once), so it earns a lighter touch rather
-   than a bigger target. */
-.activeFiltersClearButton {
-  width: 22px;
-  height: 22px;
-}
-
-.activeFiltersToggleButton:hover {
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-primary);
-}
-
-.activeFiltersClearButton:hover {
-  background-color: var(--cioos-error);
-  color: var(--cioos-white);
-}
-
-/* One shared grid for every row: family bubbles (col 1) sit flush against
-   the bracket column (col 2), which is therefore the same width and the
-   same central position for every row — and, since this grid spans the same
-   width as .activeFiltersPanel, that centre lines up with the title card
-   above. Values (col 3) get the other half. */
-.activeFilterBullets {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px 6px;
-  width: 100%;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
-  pointer-events: none;
+
+  /* Sized to its own content, not pinned to the brand card's width above it —
+     a handful of chips reads as one line rather than wrapping inside a column
+     narrower than the space actually available. max-width is the real limit:
+     the viewport itself (with the shell's 24px gutter either side), so
+     flex-wrap only fires once the row genuinely runs out of room, same as
+     the mobile block below does for its own narrower width. */
+  width: fit-content;
+  max-width: calc(100vw - 48px);
+  align-self: center;
 }
 
-/* Each <li> is one grid row's worth of cells, not a box of its own — its
-   bubble/bracket/items children become the grid's actual items, so they land
-   in the shared columns above instead of a row-local layout that would let
-   each group's bracket drift to wherever its own label happens to end. */
+/* One group: its name pill immediately followed by its own value chips,
+   packed as one flex chunk so they wrap together rather than the label
+   landing on a different line than its first value.
+   A group wide enough to wrap on its own — its label plus a few chips already
+   fills the row — is forced by that wrap to the row's full width, so
+   .activeFiltersPanel's own justify-content: center has nothing left to
+   center: this element IS the row at that point. justify-content: center
+   here does for a group's own wrapped lines what the panel does for several
+   short groups sharing a line, so either way the pills read as centered
+   rather than the group's first line pinning everything to the left. */
 .activeFilterGroup {
-  display: contents;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
 }
 
-/* The group's own name and its clear-all, paired in one white bubble — a tag
-   naming the values it's attached to, rather than another chip among them.
-   Right-aligned so it sits flush against the bracket regardless of how much
-   of column 1 its own label needs. */
+/* The group's own name and its clear-all, paired in one small pill — a tag
+   naming the values that follow it, rather than another chip among them. */
 .activeFilterGroupBubble {
-  pointer-events: all;
-  grid-column: 1;
-  place-self: center end;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -694,10 +488,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   padding: 2px;
-
-  /* 3D depth (shared tokens; see theme.css) — the chip-scale ladder. */
-  transform: var(--cioos-perspective);
-  box-shadow: var(--cioos-shadow-3d-sm);
+  box-shadow: var(--cioos-shadow-float);
 }
 
 /* The clear-all sits first in the bubble, at its left. Visually paired with
@@ -727,10 +518,11 @@
 }
 
 .activeFilterGroupLabel {
-  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
   background: transparent;
   border: none;
   border-radius: var(--cioos-radius-pill);
@@ -740,6 +532,28 @@
   font-weight: 700;
   color: var(--cioos-ink);
   cursor: pointer;
+}
+
+.activeFilterGroupIcon {
+  display: inline-flex;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+.activeFilterGroupIcon > svg {
+  display: block;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+}
+
+.activeFilterGroupLabelText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -748,56 +562,16 @@
   text-decoration: underline;
 }
 
-/* The bracket linking the family bubble to its values — set notation's own
-   way of saying "here's what's inside this group". A plain squared-off "["
-   drawn from three borders rather than a hand-tuned curve: its height is
-   just its grid cell's height, so align-self: stretch always draws it exactly
-   as tall as the row (however many lines the values wrapped onto) with no
-   risk of a curve pointing the wrong way. Its open side (no right border)
-   faces column 3, embracing the values sitting there. */
-.activeFilterGroupBrace {
-  grid-column: 2;
-  place-self: stretch center;
-  width: 6px;
-  min-height: 20px;
-  border-top: 1.5px solid var(--cioos-ink-40);
-  border-bottom: 1.5px solid var(--cioos-ink-40);
-  border-left: 1.5px solid var(--cioos-ink-40);
-  border-top-left-radius: 3px;
-  border-bottom-left-radius: 3px;
-}
-
-/* Column 3: the value chips, in the primary-light teal that marks a chosen
-   value everywhere else in the app (see .activeFilterItem below). Wraps
-   within its own lane, capped and scrollable so one very long group never
-   grows its row far past the others. align-content: flex-start keeps wrapped
-   lines packed against the top at exactly the 4px gap rather than spread out
-   to fill the cell — the default `normal` would otherwise stretch that
-   spacing once align-items: center (below) leaves this cell taller than its
-   own content. */
-.activeFilterItems {
-  grid-column: 3;
-  place-self: center start;
-  pointer-events: all;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  align-content: flex-start;
-  gap: 4px;
-  max-height: 78px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  overscroll-behavior: contain;
-}
-
+/* The value chips, in the primary-light teal that marks a chosen value
+   everywhere else in the app. */
 .activeFilterItem {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   max-width: 170px;
   background-color: var(--cioos-teal-light);
-  border-radius: var(--cioos-radius-sm);
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-lg);
   padding: 2px 2px 2px 9px;
   font-size: 12px;
   font-weight: 600;
@@ -833,13 +607,34 @@
   color: var(--cioos-white);
 }
 
-/* Copy-as-WKT, appended to the spatial filter dropdown once a shape is
-   drawn. Icon-only — no WKT text is shown, just the button. Its .dropdown-item
-   class matches the Box/Polygon/Clear items above it (dropdownStyles.css);
-   this wrapper only adds the divider separating it from those. */
-.spatialFilterWktSection {
-  padding-top: 4px;
-  border-top: 1px solid var(--cioos-hairline);
+/* The "+N" chip standing in for the values a group folded away (see
+   MAX_VISIBLE_VALUES) — a button, not a static count, so it reads as the way
+   to see the rest rather than a dead-end tally. Neutral rather than teal: it
+   is not a value of the filter, just a door to the ones not shown. */
+.activeFilterMoreButton {
+  flex: 0 0 auto;
+  background-color: var(--cioos-surface-2);
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.activeFilterMoreButton:hover {
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary-700);
+}
+
+.activeFilterMoreButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* ------------------------------------------------------------------

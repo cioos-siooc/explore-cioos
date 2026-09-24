@@ -168,3 +168,53 @@ class TestHarvestErddapSkipping:
         error_message = result.attempts.query("status == 'error'")["error_message"].iloc[0]
         assert error_message.startswith("HTTP 500 Internal Server Error: ")
         assert "Unrecognized constraint" in error_message
+
+
+class TestListingTimeCoverage:
+    """The harvest loop reads minTime/maxTime off the allDatasets listing.
+
+    Worth pinning rather than trusting: the columns are read with getattr()
+    defaults so an older server without them still harvests, which means a
+    mistyped column name would not raise -- it would silently leave every
+    dataset with no coverage and no dataset flagged realtime.
+    """
+
+    def _harvest_with_listing(self, columns, row):
+        erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])
+        df = pd.DataFrame([row], columns=columns)
+        erddap_mock.df_all_datasets = df
+        erddap_mock.get_all_datasets.return_value = df
+        dataset_mock = build_mock_dataset()
+        _run_harvest(erddap_mock, dataset_mock=dataset_mock)
+        return dataset_mock
+
+    def test_epoch_seconds_are_converted_before_reaching_the_dataset(self):
+        dataset = self._harvest_with_listing(
+            ["datasetID", "cdm_data_type", "minTime", "maxTime"],
+            (DATASET_ID, "TimeSeries", "1.5778368E9", "1.7356896E9"),
+        )
+        assert dataset.listing_time_min == "2020-01-01T00:00:00+00:00"
+        assert dataset.listing_time_max == "2025-01-01T00:00:00+00:00"
+
+    def test_iso_times_pass_through(self):
+        dataset = self._harvest_with_listing(
+            ["datasetID", "cdm_data_type", "minTime", "maxTime"],
+            (DATASET_ID, "TimeSeries", "2020-01-01T00:00:00Z", "2025-01-01T00:00:00Z"),
+        )
+        assert dataset.listing_time_min == "2020-01-01T00:00:00+00:00"
+        assert dataset.listing_time_max == "2025-01-01T00:00:00+00:00"
+
+    def test_a_listing_without_the_columns_harvests_with_no_coverage(self):
+        dataset = self._harvest_with_listing(
+            ["datasetID", "cdm_data_type"], (DATASET_ID, "TimeSeries")
+        )
+        assert dataset.listing_time_min is None
+        assert dataset.listing_time_max is None
+
+    def test_an_empty_cell_is_no_coverage_rather_than_a_bad_date(self):
+        dataset = self._harvest_with_listing(
+            ["datasetID", "cdm_data_type", "minTime", "maxTime"],
+            (DATASET_ID, "TimeSeries", "", ""),
+        )
+        assert dataset.listing_time_min is None
+        assert dataset.listing_time_max is None

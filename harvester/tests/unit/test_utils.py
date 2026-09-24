@@ -8,6 +8,7 @@ from cde_harvester.utils import (
     df_eov_to_standard_name,
     eov_standard_name,
     eov_to_standard_name,
+    erddap_time_to_iso,
     get_eov_to_standard_name,
     intersection,
     is_cf_standard_name,
@@ -68,6 +69,34 @@ class TestCdeEovMappings:
         assert isinstance(mapping, dict)
         for key in mapping:
             assert isinstance(key, str)
+
+
+class TestErddapTimeToIso:
+    """ERDDAP publishes times as epoch seconds or ISO 8601, and the allDatasets
+    listing mixes the two across servers (and, for a timeless dataset, leaves
+    the cell empty). Parsing is per value for that reason -- the column-level
+    sniff in ERDDAP.parse_erddap_dates() reads only the first element."""
+
+    def test_epoch_seconds(self):
+        assert erddap_time_to_iso("1.5778368E9") == "2020-01-01T00:00:00+00:00"
+
+    def test_iso_string(self):
+        assert erddap_time_to_iso("2020-01-01T00:00:00Z") == "2020-01-01T00:00:00+00:00"
+
+    def test_plain_integer_seconds(self):
+        assert erddap_time_to_iso(1577836800) == "2020-01-01T00:00:00+00:00"
+
+    def test_missing_values_are_none(self):
+        for empty in ("", "   ", "nan", "NaN", "None", "NaT", None, float("nan")):
+            assert erddap_time_to_iso(empty) is None, empty
+
+    def test_unparseable_is_none(self):
+        assert erddap_time_to_iso("not a date") is None
+
+    def test_epoch_is_not_read_as_nanoseconds(self):
+        # The trap this function exists to avoid: pd.to_datetime on a float
+        # without unit="s" reads it as nanoseconds and silently yields 1970.
+        assert erddap_time_to_iso("1.5778368E9").startswith("2020-")
 
 
 class TestCFStandardNameModifiers:

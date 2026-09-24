@@ -396,3 +396,27 @@ describe("track geometry", () => {
     expect(runs.length).toBeGreaterThan(1);
   });
 });
+
+describe("createDataFilterQueryString — realtime", () => {
+  const base = {
+    ...defaultQuery,
+    eovsSelected: [],
+    orgsSelected: [],
+    datasetsSelected: [],
+    platformsSelected: [],
+  };
+
+  it("emits realtimeOnly only when the toggle is on", () => {
+    expect(
+      createDataFilterQueryString({ ...base, realtimeOnly: true }),
+    ).toMatch(/(^|&)realtimeOnly=true(&|$)/);
+  });
+
+  it("leaves the query string untouched when it is off", () => {
+    for (const realtimeOnly of [false, undefined]) {
+      expect(
+        createDataFilterQueryString({ ...base, realtimeOnly }),
+      ).not.toMatch(/realtimeOnly/);
+    }
+  });
+});

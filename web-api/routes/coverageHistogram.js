@@ -112,7 +112,34 @@ function buildTimeBins(timeMin, timeMax) {
   const edges = Array.from({ length: numBins + 1 }, (_, i) =>
     new Date(start + i * width).toISOString(),
   );
-  return { edges, start, end: start + numBins * width, numBins };
+  // The same edges as whole UTC days. The days count measures a day set, so it
+  // bins on dates rather than bucketing an epoch; slicing the ISO string is
+  // exactly what the old to_timestamp(...) AT TIME ZONE 'UTC' cast produced.
+  const dateEdges = edges.map((e) => e.slice(0, 10));
+  return { edges, dateEdges, start, end: start + numBins * width, numBins };
+}
+
+/*
+ * The series list for an additive count, folded out of the bars.
+ *
+ * Only sound where a series' window total is the sum of its bins, which is
+ * true of days and false of the entity counts — see the call site. Sorted
+ * descending because the figure takes the top few series by total and folds
+ * the rest into "Other" (CoverageHistogramPlot's MAX_SERIES).
+ */
+function rankSeriesFromCells(rows) {
+  const totals = new Map();
+  for (const row of rows) {
+    const seen = totals.get(row.series_key);
+    if (seen) seen.total += row.count;
+    else
+      totals.set(row.series_key, {
+        key: row.series_key,
+        kind: row.series_kind,
+        total: row.count,
+      });
+  }
+  return [...totals.values()].sort((a, b) => b.total - a.total);
 }
 
 /**
@@ -288,15 +315,140 @@ router.get(
     if (erddap) branches.push(profilesBranch, trajectoryBranch, griddapBranch);
     if (obis) branches.push(obisBranch);
 
-    // `filtered` also derives each row's series key/kind from the joined
-    // dataset, and `spans` turns each row into the stretches of time it
-    // actually holds data over. Shared by both queries below; declared as a
-    // string so the scan definition stays identical between them. NOTE: knex
-    // substitutes named bindings even inside SQL comments, so never write a
-    // colon-prefixed word in comments here.
-    const combinedAndFiltered = `combined AS (
+    // `combined` is the selection's row set; `filtered` applies the shared
+    // filter and the query window to it. Both counts start here, but they
+    // diverge immediately afterwards, so each builds its own CTE list rather
+    // than sharing one string: the days path used to carry the `spans` CTE it
+    // never reads, and because `spans` scans `filtered` twice that alone
+    // pushed `filtered` past one reference and forced PostgreSQL to
+    // materialize it. NOTE: knex substitutes named bindings even inside SQL
+    // comments, so never write a colon-prefixed word in comments here.
+    const combinedSql = `combined AS (
         ${unionBranches(branches, profilesBranch)}
+    )`;
+
+    const windowClause = `WHERE  ${filters.hasShared ? ":filters" : "TRUE"}
+        AND    p.time_max >= :timeStart::timestamptz
+        AND    p.time_min <= :timeEnd::timestamptz`;
+
+    /*
+     * The days count.
+     *
+     * The unit is the FEATURE and the aggregation is two-level: union within a
+     * feature, then sum ACROSS features. A trajectory is stored as one row per
+     * hex and an OBIS dataset as one row per cell, so a platform that moved
+     * holds many rows covering the same day; those have to be unioned up to the
+     * feature before anything is added, or a ship crossing fifty hexes in a day
+     * contributes fifty days. Summing across features is the deliberate
+     * opposite of the map's `days` ramp (utils/hexMetric.js), which unions
+     * instead: two moorings recording the same 90 days contribute 180. That is
+     * observation effort, not calendar coverage, so a bar can exceed the number
+     * of calendar days in its period. The figure says so.
+     *
+     * The union is done ONCE per feature here, as a gaps-and-islands merge into
+     * disjoint ranges, instead of by calling day_range_overlap_days() for every
+     * (feature, bin) pair — that re-unnested and re-sorted the feature's whole
+     * array on each call, and the range-overlap join that fed it compared every
+     * feature against every bin. Once the islands are disjoint, a bin's days
+     * are plain arithmetic and a plain sum.
+     *
+     * The merge runs BEFORE the cde.datasets join so the series key — an
+     * ERDDAP server URL — never enters the sort, and so the organization
+     * lateral multiplies the islands rather than the ranges.
+     */
+    const daysSql = `WITH ${combinedSql},
+    filtered AS (
+        SELECT p.dataset_pk, p.feature_key, p.time_min, p.time_max, p.day_ranges
+        FROM   combined p
+        JOIN   cde.datasets d
+        ON     p.dataset_pk = d.pk
+        ${windowClause}
     ),
+    /* One row per day range. A feature whose day set is unknown contributes
+       its extent clamped to the query window instead, which is what bounds a
+       griddap row: it has no day ranges at all, only the coverage extent. A
+       grid with no time coverage never reaches here, since the exact columns
+       leave its bounds NULL and the window comparison above drops it. */
+    range_rows AS (
+        SELECT dataset_pk, feature_key, lower(r) AS lo, upper(r) AS hi
+        FROM filtered
+        CROSS JOIN LATERAL (
+            SELECT GREATEST(time_min, :timeStart::timestamptz)::date AS clamped_lo,
+                   LEAST(time_max, :timeEnd::timestamptz)::date AS clamped_hi
+        ) clamp
+        CROSS JOIN LATERAL unnest(
+            CASE WHEN coalesce(array_length(day_ranges, 1), 0) > 0
+                 THEN day_ranges
+                 ELSE ARRAY[daterange(clamp.clamped_lo,
+                            GREATEST(clamp.clamped_hi, clamp.clamped_lo) + 1)]
+            END
+        ) r
+        WHERE r IS NOT NULL AND NOT isempty(r)
+    ),
+    /* Gaps and islands. Ordered by start, a range opens a new island when it
+       begins after the furthest end seen so far in the feature; otherwise it
+       extends the current one. Abutting ranges merge because the bounds are
+       half-open, so lower = previous upper is not a gap. */
+    islands AS (
+        SELECT dataset_pk, min(lo) AS lo, max(hi) AS hi
+        FROM (
+            SELECT dataset_pk, feature_key, lo, hi,
+                   sum(starts_island) OVER (PARTITION BY dataset_pk, feature_key
+                                            ORDER BY lo, hi
+                                            ROWS UNBOUNDED PRECEDING) AS island
+            FROM (
+                SELECT dataset_pk, feature_key, lo, hi,
+                       CASE WHEN lo > max(hi) OVER (
+                                PARTITION BY dataset_pk, feature_key
+                                ORDER BY lo, hi
+                                ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)
+                            THEN 1 ELSE 0 END AS starts_island
+                FROM range_rows
+            ) marked
+        ) grouped
+        GROUP BY dataset_pk, feature_key, island
+    ),
+    attributed AS (
+        SELECT ${group.keyExpr} AS series_key,
+               ${group.kindExpr} AS series_kind,
+               i.lo, i.hi
+        FROM islands i
+        JOIN cde.datasets d ON i.dataset_pk = d.pk${
+          group.join ? `\n        ${group.join}` : ""
+        }
+    ),
+    /* The bin edges, bound once. Every reference below is an uncorrelated
+       scalar subquery, which PostgreSQL evaluates a single time as an InitPlan
+       — spelling the array inline instead put a copy of all 128 dates at six
+       places in the statement. */
+    bin_edges AS (
+        SELECT (:binEdges)::date[] AS ed
+    ),
+    bins AS (
+        SELECT idx::integer AS idx, edge AS win_lo,
+               lead(edge) OVER (ORDER BY idx) AS win_hi
+        FROM bin_edges
+        CROSS JOIN LATERAL unnest(ed) WITH ORDINALITY AS b(edge, idx)
+    )
+    SELECT b.idx AS t, a.series_key, min(a.series_kind) AS series_kind,
+           sum(LEAST(a.hi, b.win_hi) - GREATEST(a.lo, b.win_lo))::integer AS count
+    FROM attributed a
+    CROSS JOIN LATERAL generate_series(
+        GREATEST(width_bucket(a.lo, (SELECT ed FROM bin_edges)), 1),
+        LEAST(width_bucket(a.hi - 1, (SELECT ed FROM bin_edges)),
+              (:numTimeBins)::integer)
+    ) AS g(t)
+    JOIN bins b ON b.idx = g.t
+    WHERE a.hi > (SELECT ed[1] FROM bin_edges)
+    AND   a.lo < (SELECT ed[array_length(ed, 1)] FROM bin_edges)
+    GROUP BY b.idx, a.series_key
+    HAVING sum(LEAST(a.hi, b.win_hi) - GREATEST(a.lo, b.win_lo)) > 0`;
+
+    // The datasets / features counts. `spans` turns each row into the
+    // stretches of time it actually holds data over, built from the real
+    // observation-day set wherever it is known and falling back to the extent
+    // where it is not.
+    const entityCtes = `${combinedSql},
     filtered AS (
         SELECT ${entityExpr} AS entity, p.time_min, p.time_max, p.day_ranges,
                ${group.keyExpr} AS series_key,
@@ -305,9 +457,7 @@ router.get(
         JOIN   cde.datasets d
         ON     p.dataset_pk = d.pk
         ${group.join || ""}
-        WHERE  ${filters.hasShared ? ":filters" : "TRUE"}
-        AND    p.time_max >= :timeStart::timestamptz
-        AND    p.time_min <= :timeEnd::timestamptz
+        ${windowClause}
         ${count === "features" ? "AND p.feature_key IS NOT NULL" : ""}
     ),
     spans AS (
@@ -321,75 +471,13 @@ router.get(
         SELECT entity, series_key, series_kind, time_min, time_max
         FROM filtered
         WHERE coalesce(array_length(day_ranges, 1), 0) = 0
-    ),
-    /* For the days count: one row per entity carrying every day range it
-       holds, plus the extent to pair it against bins cheaply. Rows whose day
-       set is unknown contribute their span clamped to the query window, which
-       is what bounds a griddap row: it has no day_ranges at all, only the
-       coverage extent. A grid with no time coverage never reaches this far,
-       since the exact columns leave its bounds NULL and the window comparison
-       in the filtered CTE drops it. day_range_overlap_days unions the array
-       before measuring, so ranges arriving from several hexes or cells for the
-       same entity overlap harmlessly instead of adding up. */
-    row_ranges AS (
-        SELECT entity, series_key, series_kind,
-               CASE WHEN coalesce(array_length(day_ranges, 1), 0) > 0
-                    THEN day_ranges
-                    ELSE ARRAY[daterange(
-                           clamped_lo::date,
-                           GREATEST(clamped_hi::date, clamped_lo::date) + 1)]
-               END AS ranges
-        FROM filtered
-        CROSS JOIN LATERAL (
-            SELECT GREATEST(time_min, :timeStart::timestamptz) AS clamped_lo,
-                   LEAST(time_max, :timeEnd::timestamptz) AS clamped_hi
-        ) clamp
-    ),
-    entity_ranges AS (
-        SELECT entity, series_key, min(series_kind) AS series_kind,
-               array_agg(r) AS ranges,
-               min(lower(r)) AS d_min, max(upper(r)) AS d_max
-        FROM row_ranges
-        CROSS JOIN LATERAL unnest(ranges) r
-        GROUP BY entity, series_key
-    ),
-    bins AS (
-        SELECT i AS idx,
-               daterange(
-                 (to_timestamp((:epochStart)::double precision
-                   + (i - 1) * (:binWidthSec)::double precision) AT TIME ZONE 'UTC')::date,
-                 (to_timestamp((:epochStart)::double precision
-                   + i * (:binWidthSec)::double precision) AT TIME ZONE 'UTC')::date
-               ) AS win
-        FROM generate_series(1, (:numTimeBins)::integer) i
     )`;
 
     // Cells: bucket each span into a 1-based bin-index range, collapse to
     // DISTINCT (entity, series, tb0, tb1) tuples first (buckets are coarse, so
     // a dataset's spans mostly share a tuple), then expand into the bins each
     // tuple covers and count distinct entities per (bin, series).
-    // Days: each entity's own day set, measured against each bin it reaches
-    // and then ADDED UP across entities — so two moorings recording the same
-    // 90 days contribute 180. That is observation effort, not calendar
-    // coverage, and it deliberately differs from the map's `days` ramp, which
-    // unions instead (utils/hexMetric.js). A bar can exceed the number of
-    // calendar days in its period; the figure says so.
-    const daysCellsSql = `WITH ${combinedAndFiltered}
-    SELECT b.idx AS t, e.series_key,
-           sum(day_range_overlap_days(e.ranges, b.win))::integer AS count
-    FROM entity_ranges e
-    JOIN bins b ON daterange(e.d_min, e.d_max) && b.win
-    GROUP BY b.idx, e.series_key
-    HAVING sum(day_range_overlap_days(e.ranges, b.win)) > 0`;
-
-    const daysSeriesSql = `WITH ${combinedAndFiltered}
-    SELECT series_key, min(series_kind) AS series_kind,
-           sum(day_range_overlap_days(ranges, :windowRange::daterange))::integer AS total
-    FROM entity_ranges
-    GROUP BY series_key
-    ORDER BY total DESC`;
-
-    const entityCellsSql = `WITH ${combinedAndFiltered},
+    const entityCellsSql = `WITH ${entityCtes},
     bucketed AS (
         SELECT DISTINCT entity, series_key,
             least(greatest(width_bucket(
@@ -418,7 +506,12 @@ router.get(
     // across its bins). Read from the same spans as the bars, so a row whose
     // extent overlaps the window but whose real day set does not is absent
     // from both. Used to rank series and pick the top ones.
-    const entitySeriesSql = `WITH ${combinedAndFiltered}
+    //
+    // The days count needs no query of its own here: the bins tile the window
+    // exactly, so summing a series' bars IS its total over the window, and
+    // deriving it below cannot disagree with the bars the way a second scan
+    // could.
+    const entitySeriesSql = `WITH ${entityCtes}
     SELECT series_key, min(series_kind) AS series_kind,
            count(DISTINCT entity)::integer AS total
     FROM spans
@@ -426,9 +519,6 @@ router.get(
     AND   span_min <= :timeEnd::timestamptz
     GROUP BY series_key
     ORDER BY total DESC`;
-
-    const cellsSql = count === "days" ? daysCellsSql : entityCellsSql;
-    const seriesSql = count === "days" ? daysSeriesSql : entitySeriesSql;
 
     const bindings = {
       filters: filters.shared,
@@ -439,30 +529,41 @@ router.get(
       epochStart: timeBins.start / 1000,
       epochEnd: timeBins.end / 1000,
       numTimeBins: timeBins.numBins,
-      // The days query builds its bins as date ranges rather than by bucketing
-      // an epoch, because a day set is measured in whole UTC days.
-      binWidthSec: (timeBins.end - timeBins.start) / 1000 / timeBins.numBins,
-      windowRange:
-        `[${new Date(timeBins.start).toISOString().slice(0, 10)},` +
-        `${new Date(timeBins.end).toISOString().slice(0, 10)})`,
+      // The days query bins on whole UTC days rather than by bucketing an
+      // epoch, so it takes the edges as dates and binary-searches them.
+      binEdges: timeBins.dateEdges,
     };
 
-    // Both scan the same tables independently; run concurrently so latency is
-    // bounded by the slower, not their sum (as /legend does).
-    const [cellRows, seriesRows] = await Promise.all([
-      db.raw(cellsSql, bindings),
-      db.raw(seriesSql, bindings),
-    ]);
+    // The days count answers both halves of the response from one scan: the
+    // bins tile the window exactly, so a series' total over the window IS the
+    // sum of its bars, and folding it out of them here cannot disagree with
+    // them the way a second scan could. The entity counts cannot do that —
+    // their total is a distinct count, which is not additive across bins — so
+    // they run a second query, concurrently, leaving latency bounded by the
+    // slower of the two rather than their sum (as /legend does).
+    let cellRows;
+    let series;
+    if (count === "days") {
+      cellRows = await db.raw(daysSql, bindings);
+      series = rankSeriesFromCells(cellRows.rows);
+    } else {
+      const [cells, totals] = await Promise.all([
+        db.raw(entityCellsSql, bindings),
+        db.raw(entitySeriesSql, bindings),
+      ]);
+      cellRows = cells;
+      series = totals.rows.map((r) => ({
+        key: r.series_key,
+        kind: r.series_kind,
+        total: r.total,
+      }));
+    }
 
     res.send({
       groupBy: groupByKey,
       count,
       timeBinEdges: timeBins.edges,
-      series: seriesRows.rows.map((r) => ({
-        key: r.series_key,
-        kind: r.series_kind,
-        total: r.total,
-      })),
+      series,
       cells: cellRows.rows.map((r) => [r.t, r.series_key, r.count]),
     });
   },

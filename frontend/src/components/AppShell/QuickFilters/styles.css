@@ -1,0 +1,234 @@
+/* ------------------------------------------------------------------
+ * Quick filters — round buttons floating under the top bar, one per filter
+ * that acts on the map rather than on a list of options. A layer of its own
+ * rather than another band welded into the brand card: these are the map's
+ * tools, and they read as sitting on the map with it.
+ * ------------------------------------------------------------------ */
+.quickFilters {
+  display: flex;
+
+  /* Wrapping is what holds the row inside the screen at every width: on a
+     phone the label takes a line of its own (see the breakpoint below), and
+     an expanded field takes another, rather than pushing the page sideways. */
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+
+  /* Wide enough apart for the captions under each button, and the row's own
+     bottom padding holds them clear of the chips below. */
+  gap: 22px 18px;
+  padding-bottom: 14px;
+}
+
+/* Names the row on screen as well as for assistive tech (it labels the
+   group). Wrapped onto two short lines beside the buttons; on a phone it sits
+   above them instead (see below). */
+.quickFiltersLabel {
+  max-width: 5.5em;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: right;
+  color: var(--cioos-ink);
+  text-shadow:
+    0 0 3px var(--cioos-white),
+    0 0 3px var(--cioos-white);
+}
+
+.quickFilterButton {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+
+  /* No --cioos-radius-circle in theme.css; every circle in the app draws its
+     own, as .brandMinorItem does. */
+  border-radius: 50%;
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  box-shadow: var(--cioos-shadow-float);
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast),
+    box-shadow var(--cioos-transition-fast);
+}
+
+.quickFilterButton:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-primary);
+}
+
+/* Set: the same solid-primary fill and raised chip the top bar's own segments
+   wear when what they control is on (see .topBarButton.active) — a lightened
+   full-perimeter ring over the shared 3D shadow, so a lit button reads as
+   pressed and lifted rather than merely a different colour. Icons draw with
+   currentColor, so the fill alone recolors them. */
+.quickFilterButton.applied {
+  border-color: transparent;
+  background-color: var(--cioos-primary);
+  color: var(--cioos-white);
+  transform: var(--cioos-perspective);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 55%),
+    var(--cioos-shadow-3d-sm);
+}
+
+.quickFilterButton.applied:hover {
+  background-color: var(--cioos-primary-700);
+  color: var(--cioos-white);
+}
+
+.quickFilterButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The reset is not a filter and never lights up; held apart from the filters
+   it clears so it doesn't read as another of them. It drops everything this row
+   and the active-filter chips below can set, so its hover earns the app's
+   destructive-action colour rather than the shared teal wash every other
+   button here gets. */
+.quickFilterReset {
+  margin-left: 4px;
+  color: var(--cioos-ink-60);
+}
+
+.quickFilterReset:disabled {
+  color: var(--cioos-ink-40);
+  cursor: default;
+  box-shadow: none;
+}
+
+.quickFilterReset:not(:disabled):hover {
+  background-color: var(--cioos-error);
+  border-color: transparent;
+  color: var(--cioos-white);
+}
+
+/* Hung below the circle rather than inside it, so the circles keep their size
+   and the row just spaces out to make room. The halo keeps it legible over
+   whatever the map draws beneath. */
+.quickFilterCaption {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--cioos-ink);
+  text-shadow:
+    0 0 3px var(--cioos-white),
+    0 0 3px var(--cioos-white);
+  pointer-events: none;
+}
+
+/* Open, the field's own placeholder says what it is for. */
+.quickFilterSearch.expanded .quickFilterCaption {
+  display: none;
+}
+
+/* ------------------------------------------------------------------
+ * The search control: one circle that grows into a pill. The button is the
+ * magnifier throughout — it opens the field while closed and submits it once
+ * open — so the circle never moves as the field appears beside it.
+ * ------------------------------------------------------------------ */
+.quickFilterSearch {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-width: 0;
+  transition: background-color var(--cioos-transition-fast);
+}
+
+/* Open, the form itself becomes the pill and the button inside it loses its
+   own chrome — one shape holding magnifier, field and clear, rather than a
+   circle with a box stuck to it. */
+.quickFilterSearch.expanded {
+  gap: 4px;
+  max-width: 100%;
+  padding-right: 8px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+}
+
+.quickFilterSearch.expanded .quickFilterButton {
+  border-color: transparent;
+  background: transparent;
+  color: var(--cioos-primary-700);
+  box-shadow: none;
+}
+
+.quickFilterSearch.expanded .quickFilterButton:hover {
+  color: var(--cioos-primary);
+}
+
+.quickFilterSearch.expanded .quickFilterButton:focus-visible {
+  box-shadow: var(--cioos-focus);
+}
+
+.quickFilterSearchInput {
+  flex: 1 1 auto;
+  width: 180px;
+
+  /* Shrinks ahead of the buttons on a narrow screen: the row wraps rather than
+     overflowing, and a field that can give way keeps it to fewer lines. */
+  min-width: 0;
+  padding: 6px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-md);
+  color: var(--cioos-ink);
+}
+
+.quickFilterSearchClear {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.quickFilterSearchClear:hover {
+  color: var(--cioos-ink);
+}
+
+.quickFilterSearchClear:focus-visible {
+  outline: none;
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-focus);
+}
+
+/* ------------------------------------------------------------------
+ * Mobile: the top bar is a full-bleed header stretching its children, which
+ * would pull this row's buttons apart across the screen. It keeps its own
+ * width instead and stays centered under the header.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .quickFilters {
+    align-self: center;
+    max-width: calc(100vw - 16px);
+  }
+
+  /* The six buttons alone fill a 360px screen, so the label gets the line
+     above them — pulled in close, since the row gap is sized for captions. */
+  .quickFiltersLabel {
+    flex-basis: 100%;
+    max-width: none;
+    margin-bottom: -14px;
+    text-align: center;
+  }
+}

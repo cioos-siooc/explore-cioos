@@ -46,6 +46,7 @@ from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.erddap.client import ERDDAP
 from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
 from cde_harvester.sources.erddap.state import load_previous_hashes
+from cde_harvester.utils import erddap_time_to_iso
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +265,15 @@ class ERDDAPHarvester(BaseHarvester):
             wms_url = getattr(df_dataset_row, "wms", None)
             if not isinstance(wms_url, str) or not wms_url:
                 wms_url = None
+            # The listing already carries the server's own view of each
+            # dataset's time coverage, so dataset-level coverage costs no extra
+            # request. It is the only coverage a tabledap dataset gets (the Grid
+            # handler derives its own from the dimension metadata, and wins).
+            # Older ERDDAPs omit these columns entirely, hence getattr.
+            listing_time_min = erddap_time_to_iso(
+                getattr(df_dataset_row, "minTime", None))
+            listing_time_max = erddap_time_to_iso(
+                getattr(df_dataset_row, "maxTime", None))
             try:
                 result = harvest_dataset(
                     erddap, dataset_id,
@@ -271,6 +281,8 @@ class ERDDAPHarvester(BaseHarvester):
                     skip_unchanged=self.skip_unchanged,
                     run_id=self.run_id, idx=i + 1, total=total,
                     data_structure=data_structure, wms_url=wms_url,
+                    listing_time_min=listing_time_min,
+                    listing_time_max=listing_time_max,
                 )
                 attempt_records.append(result.attempt)
                 if result.status == "success":
@@ -373,7 +385,8 @@ class ERDDAPHarvester(BaseHarvester):
 
 def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=False,
                     run_id=None, idx=None, total=None,
-                    data_structure="table", wms_url=None):
+                    data_structure="table", wms_url=None,
+                    listing_time_min=None, listing_time_max=None):
     """Harvest one ERDDAP dataset (plain function; reuses `erddap`, never rebuilds it).
 
     Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError on
@@ -418,6 +431,8 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         log.info(f"Querying dataset: {dataset_id}{progress}")
         dataset = erddap.get_dataset(dataset_id, data_structure=data_structure)
         dataset.wms_url = wms_url
+        dataset.listing_time_min = listing_time_min
+        dataset.listing_time_max = listing_time_max
         dataset.content_hash = new_hash
         # Record why there's no hash (database-backed, fetch failure, …) so the
         # harvest dashboard can distinguish "correctly unhashed" from "failed".

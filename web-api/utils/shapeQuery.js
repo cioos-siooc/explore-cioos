@@ -208,6 +208,31 @@ async function buildShapeSql(
                   d.wms_url,
                   d.grid_variables,
                   d.grid_dimensions,
+                  -- Freshness. coverage_time_max is the newest data the server
+                  -- itself reported at harvest time, across every record in the
+                  -- dataset -- so for a multi-station or multi-mission dataset
+                  -- it is not any single record's end, and the frontend labels
+                  -- it as the dataset's. is_realtime is derived from it here so
+                  -- the rule lives in exactly one place (see
+                  -- database/8_range_functions.sql).
+                  to_char(d.coverage_time_max AT TIME ZONE 'UTC',
+                          'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS coverage_time_max,
+                  d.verified_at,
+                  dataset_is_realtime(d.coverage_time_max,
+                                      d.verified_at,
+                                      d.cdm_data_type) AS is_realtime,
+                  -- Days of data: the dataset's stored day set (rebuilt per
+                  -- load by refresh_dataset_day_ranges) clipped to the time
+                  -- filter. Unioning the matched features' ranges here instead
+                  -- cost ~3 s per cold request, so area, depth and feature
+                  -- filters don't narrow it.
+                  ${
+                    doEstimate
+                      ? ""
+                      : `day_range_overlap_days(d.day_ranges,
+                           daterange(:timeMin::date, (:timeMax::date) + 1))::integer
+                           AS days,`
+                  }
                   -- griddap footprint for the frontend bbox highlight; NULL
                   -- for every other type
                   CASE WHEN d.cdm_data_type = 'Grid'
@@ -262,9 +287,9 @@ FROM   sub
     obisFilters: filters.obisOnly,
     profileFilters: filters.profileOnly,
     depthVariableProbe: DEPTH_VARIABLE_PROBE,
-    ...(doEstimate
-      ? { timeMin, timeMax, depthMin, depthMax, adder: 0, multiplier: 10 }
-      : {}),
+    timeMin,
+    timeMax,
+    ...(doEstimate ? { depthMin, depthMax, adder: 0, multiplier: 10 } : {}),
   };
 
   return { sql, params: queryParams };

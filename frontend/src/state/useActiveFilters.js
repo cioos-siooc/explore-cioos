@@ -1,4 +1,16 @@
+import * as React from "react";
 import { useTranslation } from "react-i18next";
+import {
+  ArrowsExpand,
+  BroadcastPin,
+  Building,
+  CalendarWeek,
+  FileEarmarkSpreadsheet,
+  Server,
+  Stack,
+  Tag,
+  Water,
+} from "react-bootstrap-icons";
 
 import { generateRangeSelectBadgeTitle } from "../utilities.jsx";
 import {
@@ -10,7 +22,6 @@ import {
 import { DATA_LAYER_LABEL_KEYS, selectedDataLayerKeys } from "./dataLayers.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
-import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 
 // Maps each group key to the filterName FiltersPanel opens it under (see
@@ -37,40 +48,62 @@ function filterNameForKey(key, t) {
       return "scientificNameFilterName";
     case "dataLayers":
       return "layerSelectorLabel";
-    case "polygon":
-      return "spatialFilterFilterName";
     default:
       return undefined;
   }
 }
 
-// Every filter currently constraining the map, as one list of groups:
+// The same icon FiltersPanel shows on that filter's own row (see
+// FiltersPanel.jsx's `icon` prop per <Filter>), so a chip and the row it came
+// from read as the same filter at a glance.
+const ICON_FOR_KEY = {
+  eovs: Water,
+  platforms: BroadcastPin,
+  orgs: Building,
+  datasets: FileEarmarkSpreadsheet,
+  sources: Server,
+  time: CalendarWeek,
+  depth: ArrowsExpand,
+  scientificName: Tag,
+  dataLayers: Stack,
+};
+
+// createElement, not JSX: this is a plain .js module (no esbuild JSX loader
+// configured for that extension — see vite.config.mjs), and renaming it to
+// .jsx isn't worth doing for the one element this hook returns.
+function iconForKey(key) {
+  const Icon = ICON_FOR_KEY[key];
+  return Icon
+    ? React.createElement(Icon, { size: 14, "aria-hidden": true })
+    : null;
+}
+
+// Every filter the Filters modal counts, as one list of groups:
 // `{ key, label, goToFilter, removeAll, items }`, one item per chosen value.
 //
-// Four of them are not the catalogue facets FilterProvider owns — the geometry
-// layers live in MapState, the title search, the "only in view" narrowing and
-// the drawn area in Selection — so the list can only be assembled above all
-// three providers. That is the whole reason this is a hook and not another
-// field on FilterProvider: counting only the facets it could see was what made
-// the Filters badge report fewer filters than the chips directly under it
+// One of them is not a catalogue facet FilterProvider owns — the geometry
+// layers live in MapState — so the list can only be assembled above both
+// providers. That is the whole reason this is a hook and not another field on
+// FilterProvider: counting only the facets it could see was what made the
+// Filters badge report fewer filters than the chips directly under it
 // listed.
 //
 // The chips render this list and the Filters button and modal count it, so the
 // number and the list it labels cannot disagree.
+//
+// The quick filters — the title search, the drawn area, the "only in view"
+// narrowing and the real-time toggle — are deliberately not here, even though
+// FiltersPanel also has a row for each of them: they have their own buttons on
+// the map (see QuickFilters), so a chip and a badge tick for something that
+// already has a lit button next to it would be the same state announced twice.
+// Both write the same underlying state, so the modal row and the map button
+// always agree with each other.
 export default function useActiveFilters() {
   const { t } = useTranslation();
   const { buildActiveFilters, startDate, endDate, startDepth, endDepth } =
     useFilters();
-  const {
-    polygon,
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
-    onlyInView,
-    setOnlyInView,
-  } = useSelection();
-  const { dataLayers, toggleDataLayer, resetDataLayers, requestDraw } =
-    useMapState();
-  const { setShowFiltersModal, setOpenFilter, setSidebarOpen } = useUI();
+  const { dataLayers, toggleDataLayer, resetDataLayers } = useMapState();
+  const { setShowFiltersModal, setOpenFilter } = useUI();
 
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
     t("timeframeFilterName"),
@@ -102,59 +135,14 @@ export default function useActiveFilters() {
       })),
     },
     ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),
-    datasetTitleSearchText && {
-      key: "search",
-      label: t("textSearchFilterName"),
-      goToFilter: () => setSidebarOpen(true),
-      removeAll: () => setDatasetTitleSearchText(""),
-      items: [
-        {
-          id: "search",
-          label: datasetTitleSearchText,
-          remove: () => setDatasetTitleSearchText(""),
-        },
-      ],
-    },
-    onlyInView && {
-      key: "onlyInView",
-      label: t("datasetsCardOnlyInViewText"),
-      goToFilter: () => {
-        setOpenFilter(t("datasetsCardOnlyInViewText"));
-        setShowFiltersModal(true);
-      },
-      removeAll: () => setOnlyInView(false),
-      items: [
-        {
-          id: "onlyInView",
-          label: t("datasetsCardOnlyInViewChipText"),
-          remove: () => setOnlyInView(false),
-        },
-      ],
-    },
-    // The drawn shape narrows the map exactly as the facets above do, so it is
-    // a group like any other rather than a chip on its own terms — which is
-    // also what lets the badge count it.
-    Boolean(polygon) && {
-      key: "polygon",
-      label: t("spatialFilterFilterName"),
-      removeAll: () => requestDraw("clear"),
-      items: [
-        {
-          id: "polygon",
-          label: t("chipMapSelectionLabel"),
-          remove: () => requestDraw("clear"),
-        },
-      ],
-    },
   ]
     .filter(Boolean)
     .map((f) => ({
       ...f,
-      goToFilter:
-        f.goToFilter ||
-        (() => {
-          setOpenFilter(filterNameForKey(f.key, t));
-          setShowFiltersModal(true);
-        }),
+      icon: iconForKey(f.key),
+      goToFilter: () => {
+        setOpenFilter(filterNameForKey(f.key, t));
+        setShowFiltersModal(true);
+      },
     }));
 }

@@ -60,6 +60,24 @@
   color: var(--cioos-ink);
 }
 
+/* "Real-time": same solid orange badge as the dataset card's (.datasetCardLive),
+   sized to this page's larger type scale. Sits beside the Last update chip in
+   the metadata sheet, so no margin nudge is needed — the field's own
+   flex-start row keeps it level with the timestamp. */
+.datasetTitleLive {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 9px;
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-live);
+  color: var(--cioos-white);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 /* A row of their own under the heading. Beside the title they had room for an
    icon and nothing else; across the full width each one can say what it does,
    which is the whole point of them being here. */
@@ -210,6 +228,13 @@
   align-items: flex-start;
   align-content: flex-start;
   gap: 4px;
+}
+
+/* Last update: a single chip plus its Real-time badge, never several chips
+   wrapping onto their own lines — so unlike the top-aligned default above,
+   the badge can center on the chip's own height instead of its top edge. */
+.datasetMetaSheet .metadataValueCentered {
+  align-items: center;
 }
 
 /* Chips sit flush inside their field; the field's gap handles spacing. */

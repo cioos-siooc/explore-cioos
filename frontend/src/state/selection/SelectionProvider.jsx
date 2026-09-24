@@ -683,30 +683,37 @@ export default function SelectionProvider({ children }) {
         combinedQueries ? "?" + combinedQueries : ""
       }`;
       const controller = new AbortController();
-      fetch(urlString, { signal: controller.signal })
-        .then((response) => {
-          if (response.ok) {
-            response.json().then((data) => {
-              setPointsData(
-                data.map((point) =>
-                  datasetInLanguage(point, languageRef.current),
-                ),
-              );
-            });
-          } else {
-            setPointsData([]);
-          }
+      let current = true;
+
+      async function loadPoints() {
+        try {
+          const response = await fetch(urlString, {
+            signal: controller.signal,
+          });
+          if (!current) return;
+          const data = response.ok ? await response.json() : [];
+          // Aborting a fetch after its response arrived does not necessarily
+          // cancel response.json(), so check again before publishing it.
+          if (!current) return;
+          setPointsData(
+            data.map((point) => datasetInLanguage(point, languageRef.current)),
+          );
           setInitialPointsQueryComplete(true);
-        })
-        .catch((error) => {
-          if (error.name === "AbortError") return;
+        } catch (error) {
+          if (!current || error.name === "AbortError") return;
           // network failure / gateway timeout: land on an empty list rather
           // than an endless spinner
           reportError("pointQuery failed", error);
           setPointsData([]);
           setInitialPointsQueryComplete(true);
-        });
-      return () => controller.abort();
+        }
+      }
+
+      loadPoints();
+      return () => {
+        current = false;
+        controller.abort();
+      };
     }
   }, [query, polygon, catalogLoaded]);
 

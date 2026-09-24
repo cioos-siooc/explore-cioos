@@ -6,7 +6,8 @@ import {
   BoundingBox,
   Building,
   CalendarWeek,
-  ChevronDown,
+  Cursor,
+  Eye,
   FileEarmarkSpreadsheet,
   Funnel,
   HandIndex,
@@ -63,11 +64,6 @@ const PLACEHOLDER_STEPS = [
   { key: "select", Icon: HandIndex },
   { key: "combine", Icon: Intersect },
   { key: "live", Icon: MapIcon },
-  // The one shortcut that skips this dialog entirely: the same ▾ caret icon
-  // QuickFiltersButton itself renders, welded onto the Filters segment on the
-  // map (see TopControls.jsx), for the two filters — text search and area
-  // draw — that act on the map directly rather than an options list here.
-  { key: "quickMenu", Icon: ChevronDown },
   { key: "reset", Icon: ArrowCounterclockwise },
 ];
 
@@ -120,6 +116,8 @@ export default function FiltersPanel() {
     setEndDepth,
     scientificNamesSelected,
     setScientificNamesSelected,
+    realtimeOnly,
+    setRealtimeOnly,
     timeFilterActive,
     depthFilterActive,
     anyServersSelected,
@@ -152,6 +150,7 @@ export default function FiltersPanel() {
   const [scientificNameSearchTerms, setScientificNameSearchTerms] =
     useState("");
 
+  const realtimeFilterName = t("realtimeFilterName");
   const inViewFilterName = t("datasetsCardOnlyInViewText");
 
   // Same badge rule as the catalogue filters: the bare filter name while the
@@ -273,7 +272,7 @@ export default function FiltersPanel() {
             {/* Ahead of Data Layers: it matches free text against dataset
                 titles directly, rather than narrowing by facet, so it is the
                 one row here that isn't picking from an options list — the
-                same state the brand bar's search icon and the datasets list
+                same state the map's own search button and the datasets list
                 search box read and write (SelectionProvider). */}
             <Filter
               active={Boolean(datasetTitleSearchText)}
@@ -350,7 +349,7 @@ export default function FiltersPanel() {
               badgeTitle={platformsBadgeTitle}
               setOptionsSelected={setPlatformsSelected}
               tooltip={t("platformFilterTooltip")}
-              icon={<BroadcastPin />}
+              icon={<Cursor />}
               controlled
               searchable
               searchTerms={platformsSearchTerms}
@@ -554,10 +553,35 @@ export default function FiltersPanel() {
               />
             </Filter>
             <Filter
+              active={realtimeOnly}
+              badgeTitle={t("realtimeFilterName")}
+              tooltip={t("realtimeFilterTooltip")}
+              icon={<BroadcastPin />}
+              controlled
+              filterName={realtimeFilterName}
+              openFilter={openFilter === realtimeFilterName}
+              setOpenFilter={setOpenFilter}
+              resetButton={
+                realtimeOnly ? () => setRealtimeOnly(false) : undefined
+              }
+            >
+              <label className="inViewFilterToggle">
+                <input
+                  type="checkbox"
+                  checked={realtimeOnly}
+                  onChange={(e) => setRealtimeOnly(e.target.checked)}
+                />
+                <span>{t("realtimeFilterOptionText")}</span>
+              </label>
+              <div className="inViewFilterCount">
+                {t("realtimeFilterHelpText")}
+              </div>
+            </Filter>
+            <Filter
               active={onlyInView}
               badgeTitle={t("datasetsCardOnlyInViewText")}
               tooltip={t("datasetsCardOnlyInViewTitle")}
-              icon={<BoundingBox />}
+              icon={<Eye />}
               controlled
               filterName={inViewFilterName}
               openFilter={openFilter === inViewFilterName}

@@ -287,7 +287,7 @@ services:
       REDIS_HOST: redis
       HARVESTER_LOG_DIR: /app/harvester/logs
       # Surface stdlib-logging from harvester/db-loader in Prefect UI logs.
-      PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_db_loader,cde_harvester
+      PREFECT_LOGGING_EXTRA_LOGGERS: populate_vernaculars,cde_harvester
       # This worker registers the pool + deployments on startup.
       REGISTER_DEPLOYMENTS: "true"
       # Optional: fire a harvest on (re)deploy. Off by default.

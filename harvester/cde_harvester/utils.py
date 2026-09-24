@@ -51,6 +51,29 @@ def get_standard_name_to_eovs(eov_to_standard_name):
 standard_name_to_eovs = get_standard_name_to_eovs(eov_to_standard_name)
 
 
+def erddap_time_to_iso(value):
+    """ERDDAP time value ('1.0257408E9' epoch seconds or an ISO 8601 string)
+    -> ISO-8601 UTC string, or None when unparseable.
+
+    ERDDAP publishes times in either format depending on the endpoint, and
+    sometimes both within one response. Parsing per *value* matters: the
+    column-level sniff in ERDDAP.parse_erddap_dates() reads only the first
+    element, so a frame whose first row has an empty time sends a whole column
+    of epoch seconds down the ISO branch, where pd.to_datetime reads them as
+    nanoseconds and silently yields 1970.
+    """
+    s = str(value).strip()
+    if not s or s.lower() in ("nan", "none", "nat"):
+        return None
+    try:
+        ts = pd.to_datetime(float(s), unit="s", utc=True)
+    except (TypeError, ValueError):
+        ts = pd.to_datetime(s, errors="coerce", utc=True)
+    if pd.isna(ts):
+        return None
+    return ts.isoformat()
+
+
 def intersection(lst1, lst2):
     """
     intersection doesnt include nulls

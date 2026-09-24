@@ -24,17 +24,18 @@ test.describe("time coverage", () => {
     ).toBeVisible();
 
     const countToggle = page.getByTestId("coverage-count-dropdown-toggle");
-    await expect(countToggle).toHaveText("Datasets");
+    await expect(countToggle).toHaveText("Days of data");
+    // Days is the one metric that adds its own explanatory note underneath.
+    await expect(page.getByText(/added together/)).toBeVisible();
 
     await countToggle.click();
     await page
       .getByTestId("coverage-count-option")
-      .getByText("Days of data")
+      .getByText("Datasets")
       .click();
 
-    await expect(countToggle).toHaveText("Days of data");
-    // Days is the one metric that adds its own explanatory note underneath.
-    await expect(page.getByText(/added together/)).toBeVisible();
+    await expect(countToggle).toHaveText("Datasets");
+    await expect(page.getByText(/added together/)).toHaveCount(0);
   });
 
   test("switching the grouping shows the organization caveat", async ({

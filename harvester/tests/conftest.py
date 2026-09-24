@@ -79,6 +79,18 @@ UNSUPPORTED_STANDARD_NAME = "some_completely_fake_variable_xyz"
 
 # allDatasets endpoint — skiprows=[1, 2] skips the units row and type-hint row.
 ERDDAP_ALL_DATASETS_CSV = """\
+datasetID,cdm_data_type,accessible,dataStructure,minTime,maxTime
+(String),(String),(String),(String),(UTC),(UTC)
+,,,,,
+test_timeseries_001,TimeSeries,public,table,1.5778368E9,1.7356896E9
+test_profile_001,Profile,public,table,2020-01-01T00:00:00Z,2025-01-01T00:00:00Z
+test_unsupported_001,Point,public,table,,
+"""
+
+# A server old enough to omit minTime/maxTime from the listing. The harvest has
+# to fall back to "no dataset-level coverage" rather than raising, which is what
+# the getattr() defaults in the harvest loop are for.
+ERDDAP_ALL_DATASETS_LEGACY_CSV = """\
 datasetID,cdm_data_type,accessible,dataStructure
 (String),(String),(String),(String)
 ,,,
