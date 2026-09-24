@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { pipeline } = require("../utils/routePipeline");
+const { DATASET_HAS_FEATURES } = require("../utils/selection");
 
 /**
  * @swagger
@@ -10,7 +11,7 @@ const { pipeline } = require("../utils/routePipeline");
  *   get:
  *     summary: List datasets
  *     tags: [Datasets]
- *     description: Returns all available datasets with translated titles.
+ *     description: Returns every dataset with something to show on the map, with translated titles.
  *     responses:
  *       200:
  *         description: Array of dataset objects.
@@ -40,7 +41,8 @@ router.get("/", ...pipeline({ filters: false }), async (req, res) => {
                       platform,
                       erddap_url,
                       json_build_object('en', title, 'fr', title_fr) title_translated
-                      FROM cde.datasets
+                      FROM cde.datasets d
+                      WHERE ${DATASET_HAS_FEATURES}
                       ORDER BY UPPER(title)`;
 
   res.send((await db.raw(SQL)).rows);
