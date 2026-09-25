@@ -182,6 +182,26 @@ describe("SelectionProvider", () => {
     );
   });
 
+  it("listSearchText narrows listedDatasets only — not the counters or the map", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const needle = target.title.slice(0, 6);
+    act(() => latest.setListSearchText(needle));
+    await waitFor(() => {
+      expect(latest.listedDatasets).toContain(target);
+      expect(
+        latest.listedDatasets.every((row) =>
+          row.title.toLowerCase().includes(needle.toLowerCase()),
+        ),
+      ).toBe(true);
+    });
+    expect(latest.filteredDatasets).toBe(latest.pointsData);
+    expect(latest.filteredDatasetPks).toBeUndefined();
+    expect(
+      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
+    ).toBeNull();
+  });
+
   it("\"only in view\" narrows the coverage figure's dataset list, not the map's", async () => {
     await renderLoaded();
     expect(latest.filteredDatasetPks).toBeUndefined();
@@ -333,5 +353,36 @@ describe("SelectionProvider", () => {
     );
     // A toggle would have cleared it; the guard leaves it exactly as it was.
     expect(latest.selectedTrajectory).toBe(selectionBefore);
+  });
+
+  it("restores a ?onMap= record once its dataset page resolves, and writes it back", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    const slug = erddapServerSlug(fixtureRow.erddap_url);
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&server=${slug}&onMap=station-7`,
+    });
+    await waitFor(() =>
+      expect(latest.mappedRecord).toEqual({
+        datasetPk: latest.inspectDataset.pk,
+        recordId: "station-7",
+      }),
+    );
+    expect(new URLSearchParams(window.location.search).get("onMap")).toBe(
+      "station-7",
+    );
+  });
+
+  it("clears the record shown on the map when the dataset page closes", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDataset?.pk).toBe(target.pk));
+    act(() =>
+      latest.setMappedRecord({ datasetPk: target.pk, recordId: "station-7" }),
+    );
+    await waitFor(() => expect(latest.mappedRecord).toBeDefined());
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.mappedRecord).toBeUndefined());
   });
 });

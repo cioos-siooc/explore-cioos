@@ -66,7 +66,7 @@ describe("MapContainer", () => {
     expect(typeof latestMapProps.onFeatureQuery).toBe("function");
   });
 
-  it("handleFeatureQuery returns to the dataset list when a page is open and the query found something", async () => {
+  it("handleFeatureQuery ignores a click that found something while a dataset is open", async () => {
     await renderReady();
     latestSelection.setInspectDataset(ROW);
     await waitFor(() =>
@@ -79,12 +79,8 @@ describe("MapContainer", () => {
       items: [{ kind: "observation" }],
     });
 
-    await waitFor(() => expect(latestSelection.inspectDataset).toBeUndefined());
-    expect(latestMapState.featureQuery).toEqual({
-      nonce: 1,
-      lngLat: [0, 0],
-      items: [{ kind: "observation" }],
-    });
+    expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk);
+    expect(latestMapState.featureQuery).toBeFalsy();
   });
 
   it("handleFeatureQuery does not touch the open dataset page for a null (cleared) query", async () => {

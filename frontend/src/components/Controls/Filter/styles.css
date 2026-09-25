@@ -369,8 +369,8 @@
 
   .filterOptionsActions button {
     min-height: 44px;
-    padding: 0 18px;
-    margin: 4px 4px 0 0;
+    padding: 0 14px;
+    margin: 2px 4px 0 0;
   }
 
   .filterOptionsActions .filterInfoButton {

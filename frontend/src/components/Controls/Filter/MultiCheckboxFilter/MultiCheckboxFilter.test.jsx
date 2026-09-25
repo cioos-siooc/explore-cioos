@@ -66,7 +66,12 @@ describe("MultiCheckboxFilter", () => {
       .find((el) => el.dataset.optionPk === "1");
     await user.click(option);
     expect(setOptionsSelected).toHaveBeenCalledWith([
-      { pk: 1, title: "seaSurfaceTemperature", isSelected: true },
+      {
+        pk: 1,
+        title: "seaSurfaceTemperature",
+        isSelected: true,
+        isExcluded: false,
+      },
       { pk: 2, title: "salinity", isSelected: true }, // pk 2 untouched
     ]);
     // The mutation bug this guards against: sorting for display must not
@@ -134,9 +139,68 @@ describe("MultiCheckboxFilter", () => {
     );
     await user.click(screen.getByTestId("filter-select-all-results"));
     expect(setOptionsSelected).toHaveBeenCalledWith([
-      { pk: 1, title: "seaSurfaceTemperature", isSelected: true },
-      { pk: 2, title: "salinity", isSelected: true },
+      {
+        pk: 1,
+        title: "seaSurfaceTemperature",
+        isSelected: true,
+        isExcluded: false,
+      },
+      { pk: 2, title: "salinity", isSelected: true, isExcluded: false },
       { pk: 3, title: "oxygen", isSelected: false },
+    ]);
+  });
+
+  it("an option cycles include -> exclude -> clear", async () => {
+    const user = userEvent.setup();
+    // Stateful, so the three clicks walk the cycle rather than each starting
+    // from the initial props.
+    function Harness() {
+      const [options, setOptions] = React.useState([
+        { pk: 1, title: "glider", isSelected: false },
+      ]);
+      return (
+        <MultiCheckboxFilter
+          optionsSelected={options}
+          setOptionsSelected={setOptions}
+          allOptions={options}
+        />
+      );
+    }
+    render(<Harness />);
+    const option = () => screen.getByTestId("filter-option");
+
+    await user.click(option());
+    expect(option()).toHaveAttribute("aria-checked", "true");
+    expect(option()).toHaveAttribute("data-excluded", "false");
+
+    await user.click(option());
+    expect(option()).toHaveAttribute("aria-checked", "false");
+    expect(option()).toHaveAttribute("data-excluded", "true");
+    // aria-checked cannot say "excluded", so it is announced as text.
+    expect(option()).toHaveTextContent("(excluded)");
+
+    await user.click(option());
+    expect(option()).toHaveAttribute("aria-checked", "false");
+    expect(option()).toHaveAttribute("data-excluded", "false");
+  });
+
+  it("clicking an included option excludes it rather than unticking it", async () => {
+    const user = userEvent.setup();
+    const setOptionsSelected = vi.fn();
+    render(
+      <MultiCheckboxFilter
+        optionsSelected={OPTIONS}
+        setOptionsSelected={setOptionsSelected}
+        allOptions={OPTIONS}
+      />,
+    );
+    const ticked = screen
+      .getAllByTestId("filter-option")
+      .find((el) => el.dataset.optionPk === "2");
+    await user.click(ticked);
+    expect(setOptionsSelected).toHaveBeenCalledWith([
+      { pk: 1, title: "seaSurfaceTemperature", isSelected: false },
+      { pk: 2, title: "salinity", isSelected: false, isExcluded: true },
     ]);
   });
 });

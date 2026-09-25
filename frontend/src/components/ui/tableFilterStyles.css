@@ -1,13 +1,16 @@
 .tableFilterWrap {
+  flex: 1 1 110px;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
-  padding: 0 12px;
-  margin: 6px 0;
+  padding: 0 8px;
+  margin: 0;
   background-color: var(--cioos-white);
   color: var(--cioos-ink-40);
+  cursor: text;
 }
 
 .tableFilterWrap:focus-within {
@@ -22,10 +25,10 @@
 .tableFilterInput {
   flex: 1 1 auto;
   min-width: 0;
-  border: 0;
+  border: none;
+  padding: 4px 0;
+  font-size: var(--cioos-font-size-xs);
   outline: none;
   background: transparent;
-  font-size: 13px;
-  padding: 6px 0;
   color: var(--cioos-ink);
 }

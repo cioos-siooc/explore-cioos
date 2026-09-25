@@ -33,6 +33,8 @@ describe("ScientificNameFilter", () => {
       <ScientificNameFilter
         scientificNamesSelected={[]}
         setScientificNamesSelected={() => {}}
+        scientificNamesExcluded={[]}
+        setScientificNamesExcluded={() => {}}
         searchTerms=""
       />,
     );
@@ -48,6 +50,8 @@ describe("ScientificNameFilter", () => {
       <ScientificNameFilter
         scientificNamesSelected={[]}
         setScientificNamesSelected={() => {}}
+        scientificNamesExcluded={[]}
+        setScientificNamesExcluded={() => {}}
         searchTerms=""
       />,
     );
@@ -66,6 +70,8 @@ describe("ScientificNameFilter", () => {
       <ScientificNameFilter
         scientificNamesSelected={[]}
         setScientificNamesSelected={() => {}}
+        scientificNamesExcluded={[]}
+        setScientificNamesExcluded={() => {}}
         searchTerms="orca"
       />,
     );
@@ -92,6 +98,8 @@ describe("ScientificNameFilter", () => {
       <ScientificNameFilter
         scientificNamesSelected={[]}
         setScientificNamesSelected={() => {}}
+        scientificNamesExcluded={[]}
+        setScientificNamesExcluded={() => {}}
         searchTerms="x"
       />,
     );
@@ -118,6 +126,8 @@ describe("ScientificNameFilter", () => {
       <ScientificNameFilter
         scientificNamesSelected={[]}
         setScientificNamesSelected={setScientificNamesSelected}
+        scientificNamesExcluded={[]}
+        setScientificNamesExcluded={() => {}}
         searchTerms="orca"
       />,
     );
@@ -130,19 +140,45 @@ describe("ScientificNameFilter", () => {
     expect(setScientificNamesSelected).toHaveBeenCalledWith(["Orcinus orca"]);
   });
 
-  it("clicking a selected name removes it", async () => {
+  it("clicking an included name excludes it", async () => {
     const user = userEvent.setup();
     const setScientificNamesSelected = vi.fn();
+    const setScientificNamesExcluded = vi.fn();
     renderWithProviders(
       <ScientificNameFilter
         scientificNamesSelected={["Orcinus orca"]}
         setScientificNamesSelected={setScientificNamesSelected}
+        scientificNamesExcluded={[]}
+        setScientificNamesExcluded={setScientificNamesExcluded}
         searchTerms=""
       />,
     );
     const option = await screen.findByText("Orcinus orca");
     await user.click(option);
     expect(setScientificNamesSelected).toHaveBeenCalledWith([]);
+    expect(setScientificNamesExcluded).toHaveBeenCalledWith(["Orcinus orca"]);
+  });
+
+  it("an excluded name stays pinned, reads as excluded, and clears on click", async () => {
+    const user = userEvent.setup();
+    const setScientificNamesSelected = vi.fn();
+    const setScientificNamesExcluded = vi.fn();
+    renderWithProviders(
+      <ScientificNameFilter
+        scientificNamesSelected={[]}
+        setScientificNamesSelected={setScientificNamesSelected}
+        scientificNamesExcluded={["Orcinus orca"]}
+        setScientificNamesExcluded={setScientificNamesExcluded}
+        searchTerms=""
+      />,
+    );
+    const option = await screen.findByText("Orcinus orca");
+    const row = option.closest(".optionButton");
+    expect(row).toHaveClass("excluded");
+    expect(row).toHaveTextContent("(excluded)");
+    await user.click(option);
+    expect(setScientificNamesExcluded).toHaveBeenCalledWith([]);
+    expect(setScientificNamesSelected).not.toHaveBeenCalled();
   });
 
   it("pins already-selected names at the top, ahead of new suggestions", async () => {
@@ -157,6 +193,8 @@ describe("ScientificNameFilter", () => {
       <ScientificNameFilter
         scientificNamesSelected={["Orcinus orca"]}
         setScientificNamesSelected={() => {}}
+        scientificNamesExcluded={[]}
+        setScientificNamesExcluded={() => {}}
         searchTerms="cod"
       />,
     );

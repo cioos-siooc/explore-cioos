@@ -36,6 +36,15 @@ describe("AppShell (composition)", () => {
     });
   });
 
+  it("states the selection count inside the Download button, not beside it", async () => {
+    renderWithProviders(<AppShell />, { providers: "app" });
+    const footer = await screen.findByTestId("sidebar-footer");
+    const button = screen.getByRole("button", { name: /Download/ });
+    expect(button).toHaveTextContent("0 selected");
+    expect(button).toBeDisabled();
+    expect(footer.textContent.match(/selected/g)).toHaveLength(1);
+  });
+
   it("opens the dataset list and, from it, a dataset's own page — Sidebar, DatasetsTable, SelectionProvider and DatasetInspector working together", async () => {
     const user = userEvent.setup();
     // Phone-width default (UIProvider's breakpoint): sidebar starts collapsed,
@@ -43,6 +52,10 @@ describe("AppShell (composition)", () => {
     // the card's own chevron just dismisses it — is itself part of what this
     // test exercises.
     setViewportWidth(MOBILE_WIDTH);
+    // A returning visitor, so the intro isn't sitting over the page (jsdom
+    // doesn't stop clicks behind it) and its own headings stay out of the query
+    // below.
+    document.cookie = "introModalOpen=false; path=/";
     renderWithProviders(<AppShell />, { providers: "app" });
     await waitFor(() =>
       expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
@@ -76,6 +89,80 @@ describe("AppShell (composition)", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
         firstCardTitle,
+      );
+    });
+  });
+
+  it("closes a dataset page and the sidebar from the banner's close button", async () => {
+    const user = userEvent.setup();
+    document.cookie = "introModalOpen=false; path=/";
+    renderWithProviders(<AppShell />, {
+      providers: "app",
+      url: `/?dataset=${pointQueryFixture[0].dataset_id}`,
+    });
+    await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
+    await user.click(screen.getByTestId("sidebar-close-dataset"));
+    expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
+      "data-expanded",
+      "false",
+    );
+    await waitFor(() =>
+      expect(
+        new URL(window.location.href).searchParams.get("dataset"),
+      ).toBeNull(),
+    );
+    expect(screen.queryByTestId("dataset-map-card")).toBeNull();
+  });
+
+  describe("a minimized dataset page", () => {
+    // Collapsing the sidebar on a dataset page used to leave the map keyed to
+    // that dataset with no way back to its page: the top bar's Datasets button
+    // dropped the dataset on the way to the list.
+    async function minimize() {
+      const user = userEvent.setup();
+      document.cookie = "introModalOpen=false; path=/";
+      const row = pointQueryFixture[0];
+      renderWithProviders(<AppShell />, {
+        providers: "app",
+        url: `/?dataset=${row.dataset_id}`,
+      });
+      await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
+      await user.click(screen.getByTestId("sidebar-collapse"));
+      const card = await screen.findByTestId("dataset-map-card");
+      return { user, row, card };
+    }
+
+    it("stands in for the page on the map, named by its dataset", async () => {
+      const { row, card } = await minimize();
+      expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
+        "data-expanded",
+        "false",
+      );
+      expect(card).toHaveAccessibleName(row.title);
+    });
+
+    it.each([
+      ["the card's Details button", "dataset-map-card-details"],
+      ["the top bar's Datasets button", "topbar-datasets-button"],
+    ])("comes back as it was left from %s", async (_, testId) => {
+      const { user } = await minimize();
+      await user.click(screen.getByTestId(testId));
+      expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
+        "data-expanded",
+        "true",
+      );
+      expect(screen.getByTestId("sidebar-back")).toBeInTheDocument();
+      expect(screen.queryByTestId("dataset-map-card")).toBeNull();
+    });
+
+    it("is left for good from the card's close button", async () => {
+      const { user } = await minimize();
+      await user.click(screen.getByTestId("dataset-map-card-close"));
+      expect(screen.queryByTestId("dataset-map-card")).toBeNull();
+      await waitFor(() =>
+        expect(
+          new URL(window.location.href).searchParams.get("dataset"),
+        ).toBeNull(),
       );
     });
   });

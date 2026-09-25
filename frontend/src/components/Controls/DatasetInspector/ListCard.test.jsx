@@ -40,15 +40,38 @@ describe("ListCard", () => {
     expect(onClick).toHaveBeenCalledTimes(3);
   });
 
-  it("carries pressed/pinned as aria-pressed and the pinned class", () => {
+  it("carries selected/pinned as classes", () => {
     renderWithProviders(
-      <ListCard id="rec-1" pressed pinned onClick={() => {}}>
+      <ListCard id="rec-1" selected pinned onClick={() => {}}>
         x
       </ListCard>,
     );
-    const card = screen.getByRole("button");
-    expect(card).toHaveAttribute("aria-pressed", "true");
-    expect(card).toHaveClass("selected", "pinned");
+    expect(screen.getByRole("button")).toHaveClass("selected", "pinned");
+  });
+
+  it("keeps its action's click and keys from reaching the card", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const onAction = vi.fn();
+    renderWithProviders(
+      <ListCard
+        id="rec-1"
+        onClick={onClick}
+        action={
+          <button type="button" onClick={onAction}>
+            act
+          </button>
+        }
+      >
+        x
+      </ListCard>,
+    );
+    const action = screen.getByRole("button", { name: "act" });
+    await user.click(action);
+    action.focus();
+    await user.keyboard("{Enter}");
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onClick).not.toHaveBeenCalled();
   });
 });
 
