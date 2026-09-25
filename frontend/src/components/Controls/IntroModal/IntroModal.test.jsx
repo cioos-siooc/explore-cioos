@@ -153,11 +153,11 @@ describe("IntroModal", () => {
     ).toBeInTheDocument();
   });
 
-  it("says where the data comes from", async () => {
+  it("names both data sources, ERDDAP™ and OBIS", () => {
     renderIntro();
-    expect(
-      await screen.findByText(/Data comes from ERDDAP™/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Data comes from ERDDAP™/)).toHaveTextContent(
+      "OBIS",
+    );
   });
 
   it("the tips switch persists the choice", async () => {

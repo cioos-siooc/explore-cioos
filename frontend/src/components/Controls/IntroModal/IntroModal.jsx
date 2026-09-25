@@ -141,8 +141,7 @@ export default function IntroModal({ showModal, setShowModal }) {
   const { t, i18n } = useTranslation();
   const { setShowSelectionHelpModal } = useUI();
   const { tipsEnabled, setTipsEnabled, startTour } = useTips();
-  const { totalNumberOfDatasets, orgsSelected, obisDataAvailable } =
-    useFilters();
+  const { totalNumberOfDatasets, orgsSelected } = useFilters();
   const close = () => setShowModal(false);
   const showcases = useShowcases(close);
 
@@ -282,6 +281,12 @@ export default function IntroModal({ showModal, setShowModal }) {
                   }}
                 />
               </p>
+              <Switch
+                id="introTipsToggle"
+                label={t("tipsToggleLabel")}
+                checked={tipsEnabled}
+                onChange={() => setTipsEnabled(!tipsEnabled)}
+              />
               <button
                 type="button"
                 className="introFooterAction"
@@ -293,12 +298,6 @@ export default function IntroModal({ showModal, setShowModal }) {
                 {t("introTourCta")}
                 <ArrowRight size={14} aria-hidden="true" />
               </button>
-              <Switch
-                id="introTipsToggle"
-                label={t("tipsToggleLabel")}
-                checked={tipsEnabled}
-                onChange={() => setTipsEnabled(!tipsEnabled)}
-              />
             </section>
             <section className="introFooterCard">
               <h2 className="introFooterHeading">
@@ -334,13 +333,7 @@ export default function IntroModal({ showModal, setShowModal }) {
               </p>
             </section>
           </div>
-          <p className="introSources">
-            {t(
-              obisDataAvailable
-                ? "introSourcesErddapObis"
-                : "introSourcesErddap",
-            )}
-          </p>
+          <p className="introSources">{t("introSources")}</p>
         </footer>
       </Modal.Body>
     </Modal>
