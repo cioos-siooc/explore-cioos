@@ -31,7 +31,7 @@ test.describe("time coverage", () => {
     await countToggle.click();
     await page
       .getByTestId("coverage-count-option")
-      .getByText("Datasets")
+      .getByText("Datasets", { exact: true })
       .click();
 
     await expect(countToggle).toHaveText("Datasets");
@@ -51,7 +51,7 @@ test.describe("time coverage", () => {
     await groupToggle.click();
     await page
       .getByTestId("coverage-group-option")
-      .getByText("Organization")
+      .getByText("Organization", { exact: true })
       .click();
 
     await expect(groupToggle).toHaveText("Organization");

@@ -260,6 +260,41 @@ environment; check it with `echo "$HARVEST_CONFIG_B64" | base64 -d`) or as a
 Coolify **Persistent Storage file mount** at `/app/harvester/harvest_config.yaml`
 if you want it editable in the UI.
 
+### Frontend PR previews (Coolify)
+
+Every PR into `development-v2` that touches `frontend/**` gets a
+frontend-only preview at `https://explore-pr-<N>.cool.juno.cioos.ca`. It runs
+against the dev-v2 API, and through it the dev-v2 database, Redis cache and
+download queue. Downloads requested from a preview are real jobs on dev-v2.
+
+Coolify's GitHub App does all of this: it builds the preview when a PR opens,
+redeploys it on each push that touches `frontend/`, comments the link on the
+PR, and deletes the preview when the PR closes. The settings live on the
+`explore-cioos-frontend-previews` application in the explore-cioos project:
+
+- Source is the `cioos-co-juno-coolify` GitHub App, branch `development-v2`.
+- Build pack **Dockerfile**, base directory `/frontend`, port 80.
+- Watch paths `frontend/**`.
+- Auto-deploy off, so the application's own deployment never runs.
+- Preview Deployments on, with URL template
+  `explore-pr-{{pr_id}}.cool.juno.cioos.ca`. It has to be one level under
+  `cool.juno.cioos.ca`, because the wildcard certificate doesn't cover a second
+  level.
+- Preview build variables: `API_URL=/api`, `BASE_URL=/` and
+  `ENVIRONMENT=preview`.
+- Preview runtime variables: `API_PROXY_HOST=explore-v2.cool.juno.cioos.ca` and
+  `API_PROXY_UPSTREAM=https://coolify-proxy`.
+
+dev-v2 sits behind Cloudflare Access, which answers cross-origin API calls with
+a login redirect. So the preview's nginx proxies `/api` to dev-v2 through
+Coolify's Traefik on the server's internal network, and the browser only ever
+calls its own origin. `frontend/api-proxy.sh` writes that proxy at container
+start, and only when `API_PROXY_HOST` is set. A PR branch only gets the proxy
+once it contains that script, so merge `development-v2` into older branches.
+
+Preview deployments are off on the dev-v2 compose stack itself, so PRs don't
+build full copies of the stack.
+
 ### Self-hosted production
 
 `docker-compose.production.yaml` is an **overlay** on `docker-compose.yaml`,
@@ -287,3 +322,45 @@ Everything else is inherited.
 3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
    [Harvest configuration](#harvest-configuration)).
 4. Start: `sudo docker compose up -d --build`.
+
+### Monitoring
+
+Every long-running service has a Docker healthcheck. They answer different
+questions:
+
+| Service                  | Healthy means                                                                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `db`, `redis`, `prefect` | the server accepts connections                                                                                                                       |
+| `web-api`, `frontend`    | the process serves HTTP (deliberately not the DB: nginx waits on these)                                                                              |
+| `scheduler`              | its poll loop touched `downloads/healthz` in the last 60 min                                                                                         |
+| `prefect_worker`         | the worker is polling its pool (`--with-healthcheck`, `:8080/health`)                                                                                |
+| `nginx`                  | end to end: `/healthz`, `/` (frontend), `/api/health/ready` (DB + download queue) and `/downloads/healthz` (downloads volume), all through the proxy |
+
+On the host:
+
+```sh
+docker compose ps                                        # (healthy) / (unhealthy) per service
+docker inspect --format '{{json .State.Health}}' <container>   # last probe outputs; nginx names the failing path
+curl -s https://<site>/api/health/ready                  # per-check JSON: db, redis, downloadQueue
+```
+
+`/api/health/ready` answers 503 when Postgres is unreachable or an `open`
+download job has waited over 5 minutes (no scheduler is consuming the queue).
+A Redis outage only reports `degraded` with a 200, because the API falls back to
+an in-memory cache. Docker does not restart unhealthy containers; the status is
+for you and for Coolify, which shows it per service and can notify on changes.
+
+Recommended alerting:
+
+- **Sentry Uptime Monitoring** on `https://<site>/api/health/ready`. One monitor
+  covers the proxy, API, database and download pipeline from outside; add one
+  on `/` for the frontend. Cloudflare may block the checker, so add a WAF skip
+  rule for that path if the monitor fails while the site works.
+- **Sentry errors**: web-api, the frontend and the scheduler report exceptions
+  when `SENTRY_DSN` is set. This catches failures that throw, not services that
+  are silently down; the uptime monitor covers those.
+- **Prefect UI** for harvests and downloads: failed harvest and `Download Job`
+  flow runs show up red (see [Downloads](#downloads)). Enable Prefect
+  automations if you want notifications on failed runs.
+- **Coolify notifications** (email/Slack/Discord) for containers going unhealthy
+  or exiting.

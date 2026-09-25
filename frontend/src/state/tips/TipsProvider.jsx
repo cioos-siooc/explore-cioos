@@ -147,11 +147,14 @@ export default function TipsProvider({ children }) {
     },
     [showTourStep],
   );
+  // Stepping on from an offered tip turns it into a tour.
   const stepTour = useCallback(
-    (step) =>
+    (step) => {
+      setTouring(true);
       showTourStep(
         TIPS[(TIPS.indexOf(activeTip) + step + TIPS.length) % TIPS.length],
-      ),
+      );
+    },
     [activeTip, showTourStep],
   );
 

@@ -41,4 +41,10 @@ WORKDIR /usr/src/app/download_scheduler
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
+# poll_once() touches downloads/healthz after every served poll. Missing or
+# stale means the loop is dead, hung, or cannot reach the database. The hour of
+# slack is for a single long download, which blocks the loop while it runs.
+HEALTHCHECK --interval=60s --timeout=5s --start-period=60s --retries=3 \
+  CMD find downloads/healthz -mmin -60 | grep -q .
+
 CMD [ "uv", "run", "python", "-m", "download_scheduler" ]
