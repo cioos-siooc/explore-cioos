@@ -15,12 +15,13 @@ venv/
 # Environment files. `*.env` matched `.env` and `foo.env` but not the
 # `.env.<name>` family, so a new per-environment file (`.env.local`,
 # `.env.staging`) could be committed with no warning. Ignore the family and
-# allow back the ones that are deliberately tracked: the samples, and the two
-# templated files whose secrets are `op://` 1Password refs resolved at deploy
+# allow back the ones that are deliberately tracked: samples and deployment
+# templates whose secrets are `op://` 1Password refs resolved at deploy
 # (deploy.yml `op_secret_files`) rather than literals.
 *.env
 .env.*
 !.env.sample
+!.env.staging.sample
 !.env.coolify.sample
 !.env.production
 !*/.env.sample

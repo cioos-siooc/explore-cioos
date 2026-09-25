@@ -37,7 +37,7 @@ services:
       DB_HOST_EXTERNAL: ${DB_HOST_EXTERNAL:-db}
     volumes:
       # Host-editable. A changed server list needs `restart prefect_worker`.
-      - ./harvest_config.yaml:/app/harvester/harvest_config.yaml:ro
+      - ${HARVEST_CONFIG_HOST_FILE:-./harvest_config.yaml}:/app/harvester/harvest_config.yaml:ro
 
   redis:
     # Bound the cache (see redis-config/redis.conf) so it can't compete with Postgres.
@@ -46,8 +46,8 @@ services:
       - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf:ro
 
 # Project default => every service joins it, including inherited ones.
-# Must exist: docker network create explore-cioos_default
+# Must exist: docker network create <COMPOSE_NETWORK_NAME>
 networks:
   default:
-    name: explore-cioos_default
+    name: ${COMPOSE_NETWORK_NAME:-explore-cioos_default}
     external: true
