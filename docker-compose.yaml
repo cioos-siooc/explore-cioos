@@ -250,6 +250,15 @@ services:
         condition: service_healthy
     restart: unless-stopped
     command: ["./worker-entrypoint.sh"]
+    healthcheck:
+      # Prefect's worker webserver (--with-healthcheck in worker-entrypoint.sh).
+      # In compose, not the image: the image's own CMD runs no worker. The long
+      # grace covers deployment registration, which runs before the worker.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
     volumes:
       # NOTE: the harvest config is NOT bind-mounted here, and the image does
       # NOT bake one — it must be provided at runtime (startup fails with
