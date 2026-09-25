@@ -7,7 +7,7 @@ import * as Sentry from "@sentry/react";
 // DOM, so every label has to be handed to it from i18n at open time — it can't
 // pick up translations from our markup. CIOOS tokens still resolve inside the
 // shadow root because custom properties inherit through it.
-export default function FeedbackButton({ className, size = 16 }) {
+export default function FeedbackButton({ className, size = 16, label }) {
   const { t } = useTranslation();
 
   async function openFeedbackDialog() {
@@ -44,9 +44,10 @@ export default function FeedbackButton({ className, size = 16 }) {
       className={className}
       onClick={openFeedbackDialog}
       title={t("feedbackButtonTitle")}
-      aria-label={t("feedbackButtonTitle")}
+      aria-label={label ? undefined : t("feedbackButtonTitle")}
     >
       <ChatDots size={size} aria-hidden="true" />
+      {label}
     </button>
   );
 }

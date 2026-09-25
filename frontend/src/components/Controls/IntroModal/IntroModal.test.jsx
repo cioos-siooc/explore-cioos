@@ -136,6 +136,23 @@ describe("IntroModal", () => {
     );
   });
 
+  it("points at the real buttons: the tips lightbulb and the About ⓘ", () => {
+    renderIntro();
+    expect(
+      screen.getByRole("img", { name: "A tip is available" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "About this tool" }),
+    ).toBeInTheDocument();
+  });
+
+  it("the feedback card has a labelled Send feedback button", () => {
+    renderIntro();
+    expect(
+      screen.getByRole("button", { name: "Send feedback" }),
+    ).toBeInTheDocument();
+  });
+
   it("says where the data comes from", async () => {
     renderIntro();
     expect(
