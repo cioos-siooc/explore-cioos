@@ -263,35 +263,29 @@ if you want it editable in the UI.
 ### Frontend PR previews (Coolify)
 
 Every PR into `development-v2` that touches `frontend/**` gets a
-frontend-only preview at `https://pr-<N>.preview.cool.juno.cioos.ca`. It runs
+frontend-only preview at `https://explore-pr-<N>.cool.juno.cioos.ca`. It runs
 against the dev-v2 API, and through it the dev-v2 database, Redis cache and
-download queue. `.github/workflows/frontend-preview.yml` deploys the preview on
-each push and deletes it when the PR closes. PRs from forks are skipped.
+download queue. Downloads requested from a preview are real jobs on dev-v2.
 
-The workflow, not Coolify, decides which PRs get a preview. Coolify ignores
-watch paths for PR events, so its own preview webhook would build every PR.
+Coolify's GitHub App does all of this: it builds the preview when a PR opens,
+redeploys it on each push that touches `frontend/`, comments the link on the
+PR, and deletes the preview when the PR closes. The settings live on the
+`explore-cioos-frontend-previews` application in the explore-cioos project:
 
-One-time setup:
+- Source is the `cioos-co-juno-coolify` GitHub App, branch `development-v2`.
+- Build pack **Dockerfile**, base directory `/frontend`, port 80.
+- Watch paths `frontend/**`.
+- Auto-deploy off, so the application's own deployment never runs.
+- Preview Deployments on, with URL template
+  `explore-pr-{{pr_id}}.cool.juno.cioos.ca`. It has to be one level under
+  `cool.juno.cioos.ca`, because the wildcard certificate doesn't cover a second
+  level.
+- Preview build variables: `API_URL=https://explore-v2.cool.juno.cioos.ca/api`,
+  `BASE_URL=/` and `ENVIRONMENT=preview`.
 
-- **DNS:** `*.preview.cool.juno.cioos.ca` points at the Coolify server,
-  DNS-only.
-- **Coolify application:**
-  - Source is the repo as a _public repository_ (not the GitHub App), so it
-    receives no webhooks. Branch `development-v2`.
-  - Build pack **Dockerfile**, base directory `/frontend`, port 80. Leave its
-    main deployment stopped.
-  - Preview Deployments enabled, with URL template
-    `pr-{{pr_id}}.preview.cool.juno.cioos.ca`.
-  - Preview build variables: `API_URL=https://explore-v2.cool.juno.cioos.ca/api`,
-    `BASE_URL=/` and `ENVIRONMENT=preview`. `SENTRY_DSN` is optional, and there
-    is no `SENTRY_AUTH_TOKEN`.
-- **Repo secrets:**
-  - `COOLIFY_URL` (`https://dashboard.cool.juno.cioos.ca`)
-  - `COOLIFY_TOKEN`, an API token with `read`, `write` and `deploy`
-  - `COOLIFY_FRONTEND_PREVIEW_UUID`
-
-The dev-v2 web-api must keep `CORS_ORIGINS=*`, because previews call it from
-their own origin.
+Preview deployments are off on the dev-v2 compose stack itself, so PRs don't
+build full copies of the stack. The dev-v2 web-api must keep `CORS_ORIGINS=*`,
+because previews call it from their own origin.
 
 ### Self-hosted production
 
