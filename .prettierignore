@@ -1,7 +1,8 @@
 dist/
 build/
 coverage/
-frontend/test-results/
+playwright-report/
+test-results/
 node_modules/
 .venv/
 venv/

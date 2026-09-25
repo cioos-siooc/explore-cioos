@@ -29,6 +29,10 @@ export default [
       "**/dist/**",
       "**/build/**",
       "**/coverage/**",
+      // Playwright's own output, gitignored the same way the three above are —
+      // its trace viewer is a bundled 500KB file that eslint chokes on.
+      "**/playwright-report/**",
+      "**/test-results/**",
       "**/node_modules/**",
       "**/.venv/**",
       "**/venv/**",
@@ -78,7 +82,10 @@ export default [
   {
     // Vitest runs with globals: true, so these are ambient in the unit tests
     // and in the helpers under src/test/ that they share.
-    files: ["frontend/src/**/*.test.{js,jsx}", "frontend/src/test/**/*.{js,jsx}"],
+    files: [
+      "frontend/src/**/*.test.{js,jsx}",
+      "frontend/src/test/**/*.{js,jsx}",
+    ],
     languageOptions: {
       globals: {
         describe: "readonly",

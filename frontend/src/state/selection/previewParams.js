@@ -16,6 +16,11 @@
 // modal the user had not asked to see.
 export const RECORD_PARAM = "preview";
 
+// Which profile inside that record. Read by SelectionProvider as well as by
+// usePreviewPlotParams, because it is the one plot param that changes what is
+// FETCHED rather than how it is drawn — see the /preview `at` parameter.
+export const STEP_PARAM = "pstep";
+
 // How that record is being drawn. Each of these is written ONLY when it differs
 // from the default the dataset type implies, so an untouched plot adds nothing
 // to the link — the same rule the map's layer switches follow.
@@ -29,7 +34,28 @@ export const RECORD_PARAM = "preview";
 //   pmode    markers | lines | markers+lines
 //   pcolors  per-variable colours, `column~rrggbb` comma-separated
 //                                  (default: the variable's own ERDDAP palette)
-export const PLOT_PARAMS = ["vis", "pvars", "paxis", "pmode", "pcolors"];
+//   pz       the column whose values shade EVERY panel — the third dimension
+//                                  (default: none; colour then says which
+//                                  variable a panel draws, not what a third
+//                                  one was doing)
+//   pzscale  the colourscale that column is drawn in
+//                                  (default: its own colorBarPalette, else
+//                                  Viridis — and never a rainbow)
+//   pstep    which profile INSIDE the record is drawn, by the value of the
+//            dataset's cf_role=profile_id column
+//                                  (default: none, meaning the window
+//                                  /preview returns on its own — every profile
+//                                  in the tail of the record at once)
+export const PLOT_PARAMS = [
+  "vis",
+  "pvars",
+  "paxis",
+  "pmode",
+  "pcolors",
+  "pz",
+  "pzscale",
+  STEP_PARAM,
+];
 
 // Written by an earlier version of the plot and never again. They stay in the
 // cleanup list so a link made before them does not leave orphans in the address
@@ -43,6 +69,13 @@ export const PLOT_PARAMS = ["vis", "pvars", "paxis", "pmode", "pcolors"];
 //                         note the singular/plural, they are different things,
 //                         and `pcolor` is retired rather than reused so a link
 //                         made yesterday cannot be misread as the new one.
+//                         The colour dimension itself came back beside the
+//                         per-variable colours, deliberately NOT under this
+//                         name: `pcolor` and `pcolors` one letter apart would be
+//                         unreadable, and a link carrying `pcolor` also carries
+//                         `px`/`py`, which no longer mean anything — half
+//                         reviving it would be worse than leaving it dead. See
+//                         `pz` in PLOT_PARAMS.
 const RETIRED_PLOT_PARAMS = ["px", "py", "p2", "pscale2", "pcolor", "pscale"];
 
 export const PREVIEW_PARAMS = [

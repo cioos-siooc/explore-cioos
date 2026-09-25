@@ -1,8 +1,15 @@
-/* THE one scroll container of the preview modal.
+/* The scroll container of the preview modal — for the TABLE view.
  *
- * There used to be two: .modal-body scrolled because DatasetPreview passed
- * `scrollable` to Modal (ui/modalStyles.css), and this element scrolled because
- * of `height: 100%; overflow: auto`. The outer one always had ~15px to scroll,
+ * The plot view fills it exactly instead (a three-pane row at height: 100%, see
+ * DatasetPreviewPlot/styles.css), so it has nothing to scroll there and the
+ * parameters pane and the plot pane are the only scrollers on screen. Don't
+ * "fix" that as duplication: three scrollers is the point, and it is what keeps
+ * a growing parameters list from moving the figure.
+ *
+ * There used to be two scrollers here, both for the same content: .modal-body
+ * scrolled because DatasetPreview passed `scrollable` to Modal
+ * (ui/modalStyles.css), and this element scrolled because of
+ * `height: 100%; overflow: auto`. The outer one always had ~15px to scroll,
  * from a margin-top on its only child, so it showed a permanent stub scrollbar
  * next to the real one.
  *
@@ -27,7 +34,10 @@
    *
    * A record preview also always wants the room: it is the largest thing in the
    * app, and the previous layout was effectively full height anyway via the
-   * 560px floor it forced on the plot. */
+   * 560px floor it forced on the plot.
+   *
+   * Definite here is also what makes the height definite all the way down, so
+   * the plot's pane row can take it as a percentage basis. */
   height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
 }
 
@@ -97,11 +107,6 @@
   margin: 10px auto;
 }
 
-.tableAndPlotGridItem .dropdown {
-  display: inline;
-  margin-right: 10px;
-}
-
 .tableAndPlotGridItem .dropdown button {
   background-color: var(--cioos-primary);
 }
@@ -133,10 +138,26 @@
 /* The lazy chunk's placeholder. Without a floor here the container sat at its
    minimum at exactly the moment Plotly measured it — which is how the plot
    ended up drawn at Plotly's own 450px default until the first control
-   change. */
+   change. It reserves the box the panes will take, so the modal does not jump
+   when the chunk lands. */
 .datasetPreviewPlotLoading {
   display: grid;
-  min-height: 420px;
+  height: 100%;
+  min-height: 320px;
+}
+
+/* Why a record refused to plot, in the plot's place. The columns it did find are
+   half the message — that is what says whether the fix is in the link or in the
+   dataset's own metadata — so they get their own muted line. */
+.datasetPreviewPlotBlocked {
+  max-width: 70ch;
+  padding: 24px 8px;
+}
+
+.datasetPreviewPlotBlockedColumns {
+  color: var(--cioos-text-muted, #666);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
 }
 
 .datasetPreviewPlotLoading .cioosSkeleton {

@@ -9,6 +9,7 @@ import {
   measurementsOf,
   byColumnName,
   isDownwardVertical,
+  isTimeLike,
 } from "./previewVariables.js";
 
 // The real payload shape of /api/preview?dataset=mpoPmzaVikingCtdInsitu — a
@@ -266,25 +267,49 @@ test("a _qc suffix is dropped when no metadata declares the link", () => {
   );
 });
 
-test("ioos_category Identifier / Time / Location are honoured", () => {
+test("ioos_category Identifier and Time are honoured; Location is not an axis", () => {
   // Authoritative where declared (~48% of variables) and it needs no naming
-  // convention to work.
+  // convention to work — but only for the two categories that really do say a
+  // column is not a measurement. "Location" says what a column is ABOUT, which
+  // is not the same claim: ismerOsl002 tags `distance` — the abscissa of a
+  // bathymetric transect, in metres — with it, and reading that as a coordinate
+  // left the record with nothing to draw at all.
   const table = {
-    columnNames: ["record_id", "year", "site", "temperature"],
+    columnNames: ["record_id", "year", "distance", "temperature"],
     columnTypes: ["int", "uint", "float", "float"],
-    columnUnits: ["unitless", "unitless", "unitless", "degree_C"],
+    columnUnits: ["unitless", "unitless", "m", "degree_C"],
     columnMeta: [
       { name: "record_id", ioos_category: "Identifier" },
       { name: "year", ioos_category: "Time" },
-      { name: "site", ioos_category: "Location" },
+      { name: "distance", ioos_category: "Location" },
       { name: "temperature", ioos_category: "Temperature" },
     ],
   };
   const index = byColumnName(variablesFrom(table, {}));
   assert.equal(index.get("record_id").kind, "id");
   assert.equal(index.get("year").kind, "coordinate");
-  assert.equal(index.get("site").kind, "coordinate");
+  assert.equal(index.get("distance").kind, "measurement");
   assert.equal(index.get("temperature").kind, "measurement");
+});
+
+test("a real horizontal coordinate needs no ioos_category to be one", () => {
+  // Why dropping "Location" costs nothing: every column in the catalogue that
+  // is genuinely a coordinate also declares an axis, a CF standard_name or
+  // degrees units, and each of those alone is enough.
+  const table = {
+    columnNames: ["lat_by_units", "lon_by_axis", "depth_by_standard_name"],
+    columnTypes: ["float", "float", "float"],
+    columnUnits: ["degrees_north", "unitless", "m"],
+    columnMeta: [
+      { name: "lat_by_units" },
+      { name: "lon_by_axis", axis: "X" },
+      { name: "depth_by_standard_name", standard_name: "depth" },
+    ],
+  };
+  const index = byColumnName(variablesFrom(table, {}));
+  assert.equal(index.get("lat_by_units").kind, "coordinate");
+  assert.equal(index.get("lon_by_axis").kind, "coordinate");
+  assert.equal(index.get("depth_by_standard_name").kind, "coordinate");
 });
 
 test("an ERDDAP time-format unit marks a coordinate", () => {
@@ -317,7 +342,7 @@ test("an ID-suffixed column is an id even when nothing declares it", () => {
   assert.equal(index.get("temperature").kind, "measurement");
 });
 
-test("label prefers long_name, then standard_name, then the column name", () => {
+test("label prefers long_name, then the column name", () => {
   const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET));
   assert.equal(
     labelFor(index.get("TE90_01")),
@@ -333,7 +358,7 @@ test("label prefers long_name, then standard_name, then the column name", () => 
       standardName: "sea_water_temperature",
       unit: "degree_C",
     }),
-    "sea_water_temperature ( degree_C )",
+    "x ( degree_C )",
   );
   assert.equal(labelFor({ columnName: "x" }), "x");
   assert.equal(labelFor(null), "");
@@ -342,6 +367,11 @@ test("label prefers long_name, then standard_name, then the column name", () => 
 test("short label drops the unit", () => {
   const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET));
   assert.equal(shortLabelFor(index.get("TE90_01")), "Temperature (1990 scale)");
+});
+
+test("a column with no metadata at all is named after itself", () => {
+  const index = byColumnName(variablesFrom(VIKING_NO_META, VIKING_DATASET));
+  assert.equal(shortLabelFor(index.get("TE90_01")), "TE90_01");
 });
 
 test("columnUnits wins over the harvest, which may predate a units change", () => {
@@ -433,6 +463,26 @@ test("the id columns come back in ERDDAP order — that is title order", () => {
   };
   assert.deepEqual(idVariablesFor(variablesFrom(table, {})), []);
   assert.deepEqual(idVariablesFor(undefined), []);
+});
+
+test("a time column is recognised however ERDDAP spelled its units", () => {
+  const table = {
+    columnNames: ["time", "year", "flagged_time", "temperature"],
+    columnTypes: ["String", "uint", "String", "float"],
+    columnUnits: ["UTC", "CCYY-MM-DD", null, "degree_C"],
+    columnMeta: [
+      { name: "time" },
+      { name: "year" },
+      { name: "flagged_time", axis: "T" },
+      { name: "temperature" },
+    ],
+  };
+  const index = byColumnName(variablesFrom(table, {}));
+  assert.equal(isTimeLike(index.get("time")), true);
+  assert.equal(isTimeLike(index.get("year")), true);
+  assert.equal(isTimeLike(index.get("flagged_time")), true);
+  assert.equal(isTimeLike(index.get("temperature")), false);
+  assert.equal(isTimeLike(undefined), false);
 });
 
 export { VIKING, VIKING_NO_META, VIKING_DATASET };

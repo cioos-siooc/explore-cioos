@@ -1,0 +1,33 @@
+/* 12px of hit area around a 2px rule — the rule is what is read, the padding is
+   what is grabbed. */
+.paneDivider {
+  position: relative;
+  flex: 0 0 12px;
+  align-self: stretch;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: col-resize;
+
+  /* A touch drag resizes the pane; without this it would scroll the pane
+     underneath instead. */
+  touch-action: none;
+}
+
+.paneDivider::before {
+  content: "";
+  position: absolute;
+  inset: 0 5px;
+  border-radius: 1px;
+  background-color: var(--cioos-hairline, #dce8e5);
+}
+
+.paneDivider:hover::before,
+.paneDivider:focus-visible::before {
+  background-color: var(--cioos-primary, #52a79b);
+}
+
+.paneDivider:focus-visible {
+  outline: 2px solid var(--cioos-primary, #52a79b);
+  outline-offset: 1px;
+}

@@ -189,6 +189,12 @@ describe("DatasetInspector", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(async (input) => {
+          if (String(input).includes("/trajectories/platforms")) {
+            return new Response(
+              JSON.stringify([{ trajectory_id: "cruise-a", n_points: 1234 }]),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          }
           if (!String(input).includes("/datasetRecordsList")) {
             return fixtureFetch(input);
           }
@@ -210,6 +216,12 @@ describe("DatasetInspector", () => {
       await screen.findByText("cruise-a");
       expect(document.querySelectorAll(".recordSection")).toHaveLength(1);
       expect(screen.getAllByText("cruise-b")).toHaveLength(1);
+    });
+
+    it("carries each trajectory's track fixes on its card", async () => {
+      await renderReady({ dataset: TRAJECTORY_DATASET });
+      const card = (await screen.findByText("cruise-a")).closest(".listCard");
+      expect(await within(card).findByText("1,234")).toBeInTheDocument();
     });
 
     it("Show on map draws that trajectory's track, and clears it again, without opening the preview", async () => {

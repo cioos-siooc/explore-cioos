@@ -5,15 +5,41 @@ import {
   PLOT_PARAMS,
   PREVIEW_PARAMS,
   RECORD_PARAM,
+  STEP_PARAM,
   withoutPreviewParams,
 } from "./previewParams.js";
 
 test("the preview owns the record param and the plot params", () => {
   assert.equal(RECORD_PARAM, "preview");
-  assert.deepEqual(PLOT_PARAMS, ["vis", "pvars", "paxis", "pmode", "pcolors"]);
+  assert.deepEqual(PLOT_PARAMS, [
+    "vis",
+    "pvars",
+    "paxis",
+    "pmode",
+    "pcolors",
+    "pz",
+    "pzscale",
+    "pstep",
+  ]);
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {
     assert.ok(PREVIEW_PARAMS.includes(param), param);
   }
+});
+
+test("the step param is a plot param, and is named once", () => {
+  // Read in two places — usePreviewPlotParams binds the slider to it, and
+  // SelectionProvider puts it in the /preview URL as `at`, because it is the
+  // only plot param that changes what is FETCHED. The constant is what keeps
+  // those two from drifting to different spellings.
+  assert.equal(STEP_PARAM, "pstep");
+  assert.ok(PLOT_PARAMS.includes(STEP_PARAM));
+  assert.ok(PREVIEW_PARAMS.includes(STEP_PARAM));
+  // Closing the modal has to take it with everything else: a cast id left in
+  // the address bar names a profile of a record that is no longer open.
+  const left = withoutPreviewParams(
+    new URLSearchParams({ preview: "AZMP-ESG", pstep: "cast-1" }),
+  );
+  assert.equal(left.get(STEP_PARAM), null);
 });
 
 test("retired params are still cleaned up, and never written again", () => {
@@ -27,9 +53,12 @@ test("retired params are still cleaned up, and never written again", () => {
     assert.ok(!PLOT_PARAMS.includes(param), `${param} must not be written`);
   }
   // pcolors is the live one, and one letter from a retired one: they are
-  // different things and must not be confused for each other.
+  // different things and must not be confused for each other. The colour
+  // dimension pcolor once carried is live again under pz, which is why it was
+  // not simply un-retired.
   assert.ok(PLOT_PARAMS.includes("pcolors"));
   assert.ok(!PLOT_PARAMS.includes("pcolor"));
+  assert.ok(PLOT_PARAMS.includes("pz"));
 });
 
 test("no preview param collides with one the map or the filters already use", () => {
@@ -91,6 +120,7 @@ test("closing the preview strips all of its params and touches nothing else", ()
   const params = new URLSearchParams(
     "lat=45&zoom=5&dataset=X&server=ogsl&preview=R1&vis=table&paxis=depth" +
       "&pvars=TE90_01,PSAL_01&pmode=lines&pcolors=TE90_01~a52c60" +
+      "&pz=time&pzscale=Cividis" +
       // The colour dimension's two params, from a link made before it was replaced.
       "&pcolor=depth&pscale=Jet" +
       // A stale link from before faceting, carried into the same close.
