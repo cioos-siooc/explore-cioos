@@ -6,7 +6,6 @@ import {
   idVariablesFor,
   labelFor,
   shortLabelFor,
-  shortestNameFor,
   measurementsOf,
   byColumnName,
   isDownwardVertical,
@@ -343,7 +342,7 @@ test("an ID-suffixed column is an id even when nothing declares it", () => {
   assert.equal(index.get("temperature").kind, "measurement");
 });
 
-test("label prefers long_name, then standard_name, then the column name", () => {
+test("label prefers long_name, then the column name", () => {
   const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET));
   assert.equal(
     labelFor(index.get("TE90_01")),
@@ -359,7 +358,7 @@ test("label prefers long_name, then standard_name, then the column name", () => 
       standardName: "sea_water_temperature",
       unit: "degree_C",
     }),
-    "sea_water_temperature ( degree_C )",
+    "x ( degree_C )",
   );
   assert.equal(labelFor({ columnName: "x" }), "x");
   assert.equal(labelFor(null), "");
@@ -370,28 +369,9 @@ test("short label drops the unit", () => {
   assert.equal(shortLabelFor(index.get("TE90_01")), "Temperature (1990 scale)");
 });
 
-test("the hover's name is the shortest one the publisher gave", () => {
-  const withShortNames = {
-    ...VIKING,
-    columnMeta: VIKING.columnMeta.map((meta) => {
-      if (meta.name === "TE90_01")
-        return { ...meta, generic_name: "temperature", original_name: "temp" };
-      if (meta.name === "PSAL_01") return { ...meta, original_name: "sal" };
-      return meta;
-    }),
-  };
-  const index = byColumnName(variablesFrom(withShortNames, VIKING_DATASET));
-  // ERDDAP's own order: generic_name, then original_name...
-  assert.equal(shortestNameFor(index.get("TE90_01")), "temperature");
-  assert.equal(shortestNameFor(index.get("PSAL_01")), "sal");
-  // ...then long_name, which every catalogue has and no harvest is needed for.
-  assert.equal(shortestNameFor(index.get("FLOR_01")), "Fluorescence");
-  assert.equal(shortestNameFor(undefined), "");
-});
-
 test("a column with no metadata at all is named after itself", () => {
   const index = byColumnName(variablesFrom(VIKING_NO_META, VIKING_DATASET));
-  assert.equal(shortestNameFor(index.get("TE90_01")), "TE90_01");
+  assert.equal(shortLabelFor(index.get("TE90_01")), "TE90_01");
 });
 
 test("columnUnits wins over the harvest, which may predate a units change", () => {

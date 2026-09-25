@@ -225,19 +225,6 @@ class TestTableVariables:
         by_name = {v["name"]: v for v in ds.table_variables}
         assert by_name["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
 
-    def test_short_names_survive_for_the_preview_hover(self, mock_erddap_server):
-        # long_name runs to 125 characters in the catalogue and a column name is
-        # often a BODC P01 code, so the hover box prefers these two.
-        ds = _make_dataset(mock_erddap_server, info_csv=ERDDAP_INFO_QC_AND_LOG_CSV)
-        by_name = {v["name"]: v for v in ds.table_variables}
-        assert by_name["chlorophyll"]["generic_name"] == "fluorescence"
-        assert by_name["chlorophyll"]["original_name"] == "chl_a"
-        # Undeclared reads as None, like every other attribute.
-        assert by_name["chlorophyll_qc"]["generic_name"] is None
-        # And neither one overwrites the variable's own name, which /preview
-        # matches columns by.
-        assert by_name["chlorophyll"]["name"] == "chlorophyll"
-
     def test_entries_are_json_serialisable(self, mock_erddap_server):
         # It lands in a jsonb column via a Python-repr CSV round trip, so a
         # numpy scalar leaking in here fails far downstream in the loader.
