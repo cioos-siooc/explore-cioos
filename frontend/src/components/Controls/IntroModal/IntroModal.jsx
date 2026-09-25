@@ -7,9 +7,7 @@ import {
   Download,
   GeoAlt,
   GlobeAmericas,
-  Grid3x3Gap,
   InfoCircle,
-  Lightbulb,
   Search,
   Water,
 } from "react-bootstrap-icons";
@@ -19,7 +17,6 @@ import CioosLogo from "../../ui/CioosLogo.jsx";
 import Modal from "../../ui/Modal.jsx";
 import Switch from "../../ui/Switch.jsx";
 import FeedbackButton from "../FeedbackButton/FeedbackButton.jsx";
-import TipText from "../Tips/TipText.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -29,7 +26,6 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   findTrajectory,
-  showGridded,
   showNonna,
   showTrajectory,
 } from "../../../state/tips/scenes.js";
@@ -55,31 +51,17 @@ const STATIONS_SHOWCASE_ZOOM = MARKER_MIN_ZOOM + 0.8;
 
 // A few of the app's views, one click away from the intro: each closes the
 // dialog and sets the app up the way a user would have, using the same
-// actions the controls do. One whose data isn't in the catalogue (no gridded
-// dataset with a WMS server, nothing downloadable) is left out.
+// actions the controls do. The trajectory is left out when the catalogue has
+// none.
 function useShowcases(close) {
-  const {
-    pointsData,
-    pointsToReview,
-    setInspectDataset,
-    handleSelectDataset,
-    selectTrajectoryFromMap,
-  } = useSelection();
+  const { pointsData, setInspectDataset, selectTrajectoryFromMap } =
+    useSelection();
   const { zoomToGeometry, setBathymetryVisible } = useMapState();
-  const { setShowDownloadModal, setShowCoverageModal } = useUI();
+  const { setShowCoverageModal } = useUI();
 
-  const gridded = pointsData.find((dataset) => dataset.wms_url);
   const trajectory = findTrajectory(pointsData);
-  const downloadable = pointsData.find(
-    (dataset) => dataset.cdm_data_type !== "Grid",
-  );
 
   return [
-    gridded && {
-      key: "wms",
-      Icon: Grid3x3Gap,
-      run: () => showGridded(gridded, { setInspectDataset, zoomToGeometry }),
-    },
     trajectory && {
       key: "trajectory",
       Icon: Bezier2,
@@ -99,22 +81,14 @@ function useShowcases(close) {
         }),
     },
     {
-      key: "coverage",
-      Icon: BarChartLine,
-      run: () => setShowCoverageModal(true),
-    },
-    downloadable && {
-      key: "download",
-      Icon: Download,
-      run: () => {
-        if (!pointsToReview?.length) handleSelectDataset(downloadable);
-        setShowDownloadModal(true);
-      },
-    },
-    {
       key: "nonna",
       Icon: Water,
       run: () => showNonna({ setBathymetryVisible, zoomToGeometry }),
+    },
+    {
+      key: "coverage",
+      Icon: BarChartLine,
+      run: () => setShowCoverageModal(true),
     },
   ]
     .filter(Boolean)
@@ -165,13 +139,8 @@ export default function IntroModal({ showModal, setShowModal }) {
   const { t, i18n } = useTranslation();
   const { setShowSelectionHelpModal } = useUI();
   const { tipsEnabled, setTipsEnabled, startTour } = useTips();
-  const {
-    totalNumberOfDatasets,
-    erddapServersSelected,
-    orgsSelected,
-    obisDataAvailable,
-  } = useFilters();
-  const [tipIndex, setTipIndex] = useState(0);
+  const { totalNumberOfDatasets, orgsSelected, obisDataAvailable } =
+    useFilters();
   const close = () => setShowModal(false);
   const showcases = useShowcases(close);
 
@@ -222,21 +191,22 @@ export default function IntroModal({ showModal, setShowModal }) {
               <button type="button" className="introCta" onClick={close}>
                 {t("introHeroCta")}
               </button>
-              <span className="introSources">
-                <span className="introSource">ERDDAP™</span>
-                {obisDataAvailable && <span className="introSource">OBIS</span>}
-              </span>
+              <button
+                type="button"
+                className="introCta introCtaSecondary"
+                onClick={() => {
+                  close();
+                  startTour(TIPS[0]);
+                }}
+              >
+                {t("introTourCta")}
+              </button>
             </div>
           </div>
           <ul className="introStats" aria-label={t("introStatsLabel")}>
             <Stat
               value={totalNumberOfDatasets}
               label={t("introStatDatasets")}
-              language={i18n.language}
-            />
-            <Stat
-              value={erddapServersSelected?.length}
-              label={t("introStatServers")}
               language={i18n.language}
             />
             <Stat
@@ -247,7 +217,7 @@ export default function IntroModal({ showModal, setShowModal }) {
           </ul>
         </section>
 
-        <ul className="introFeatures">
+        <ol className="introFeatures">
           {FEATURES.map(({ key, Icon }, index) => (
             <li
               key={key}
@@ -270,7 +240,7 @@ export default function IntroModal({ showModal, setShowModal }) {
               )}
             </li>
           ))}
-        </ul>
+        </ol>
 
         <h2 className="introHeading">{t("introShowcasesHeading")}</h2>
         <ul className="introShowcases">
@@ -299,61 +269,31 @@ export default function IntroModal({ showModal, setShowModal }) {
         </ul>
 
         <footer className="introFooter">
-          <section className="introTip" data-testid="intro-tip">
-            <h2 className="introTipHeading">
-              <Lightbulb size={16} aria-hidden="true" /> {t("tipsHeading")}
-            </h2>
-            {/* Closes the dialog and pages through the tips on the map, each
-                pointing at the control it is about (see startTour). */}
-            <button
-              type="button"
-              key={tipIndex}
-              className="introTipShow"
-              title={t("tipShowMe")}
-              onClick={() => {
-                close();
-                startTour(TIPS[tipIndex]);
-              }}
-            >
-              <TipText tip={TIPS[tipIndex]} />
-              <span className="introTipShowLabel">
-                {t("tipShowMe")}
-                <ArrowRight size={14} aria-hidden="true" />
-              </span>
-            </button>
-            <div className="introTipNav">
-              <span className="introTipCount">
-                {t("tipCounter", { n: tipIndex + 1, total: TIPS.length })}
-              </span>
-              <button
-                type="button"
-                className="introLink"
-                onClick={() => setTipIndex((tipIndex + 1) % TIPS.length)}
-              >
-                {t("tipNext")}
-              </button>
-            </div>
-          </section>
-          <div className="introFooterLinks">
-            <p>
-              <FeedbackButton className="feedbackButton" size={24} />
-              {t("tipInfoFeedback")}
-            </p>
-            <p>
-              <InfoCircle
-                className="introFooterIcon"
-                size={20}
-                aria-hidden="true"
-              />
-              {t("introReopenText")}
-            </p>
-            <Switch
-              id="introTipsToggle"
-              label={t("tipsToggleLabel")}
-              checked={tipsEnabled}
-              onChange={() => setTipsEnabled(!tipsEnabled)}
+          <p>
+            <FeedbackButton className="feedbackButton" size={24} />
+            {t("tipInfoFeedback")}
+          </p>
+          <p>
+            <InfoCircle
+              className="introFooterIcon"
+              size={20}
+              aria-hidden="true"
             />
-          </div>
+            {t("introReopenText")}
+          </p>
+          <p className="introSources">
+            {t(
+              obisDataAvailable
+                ? "introSourcesErddapObis"
+                : "introSourcesErddap",
+            )}
+          </p>
+          <Switch
+            id="introTipsToggle"
+            label={t("tipsToggleLabel")}
+            checked={tipsEnabled}
+            onChange={() => setTipsEnabled(!tipsEnabled)}
+          />
         </footer>
       </Modal.Body>
     </Modal>
