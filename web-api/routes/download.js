@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require("uuid");
 const express = require("express");
 
 const router = express.Router();
-const { check } = require("express-validator");
+const { body, check } = require("express-validator");
 const db = require("../db");
 const createDBFilter = require("../utils/dbFilter");
 const { getShapeQuery } = require("../utils/shapeQuery");
@@ -18,21 +18,27 @@ const {
 
 /**
  * /download
- * Requires a shape (either polygon or latMin/Max) and email
+ * Requires a shape (either polygon or latMin/Max) and, in the JSON body, an
+ * email — kept out of the URL so it never reaches access logs or traces.
  */
 
 /**
  * @swagger
  * /download:
- *   get:
+ *   post:
  *     summary: Submit download job
  *     tags: [Download]
  *     description: Creates a download job for datasets matching filters and spatial selection.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
  *     parameters:
- *       - in: query
- *         name: email
- *         required: true
- *         schema: { type: string, format: email }
  *       - in: query
  *         name: polygon
  *         schema: { type: string }
@@ -76,14 +82,14 @@ const {
  */
 // Not cached: this route enqueues a job, and a cached 200 would drop the
 // second identical request on the floor.
-router.get(
+router.post(
   "/",
   ...pipeline({
     shape: true,
     // lang picks the language of the job's confirmation email and rides into
     // cde.download_jobs as part of downloader_input.
     checks: [
-      check("email").isEmail(),
+      body("email").isEmail(),
       check("lang").isIn(["en", "fr"]).optional(),
     ],
     cacheFor: null,
@@ -98,10 +104,10 @@ router.get(
       depthMax,
       lonMin,
       lonMax,
-      email,
       polygon,
       lang = "en",
     } = req.query;
+    const { email } = req.body;
 
     const shapeQueryResponse = await getShapeQuery(req.query, true, false);
     const filters = await createDBFilter(req.query);
@@ -198,11 +204,14 @@ router.get(
       const downloadJobEntry = {
         job_id: jobID,
         email,
+        // Outlives the address, which the download scheduler clears after 7
+        // days, so usage can still be counted by institution.
+        email_domain: email.split("@").pop().toLowerCase(),
         downloader_input: downloaderInput,
         estimate_details: JSON.stringify(shapeQueryResponse),
         estimate_size: estimateTotalSize,
       };
-      console.log(downloadJobEntry);
+      console.log(`queued download job ${jobID}`);
       await db("cde.download_jobs").insert(downloadJobEntry);
 
       count = tile.json_agg.length;

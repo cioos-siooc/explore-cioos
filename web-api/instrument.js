@@ -16,6 +16,10 @@ if (process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.ENVIRONMENT || "development",
     release: process.env.SENTRY_RELEASE,
+    // Sentry is hosted in the US and /download's body carries the user's
+    // email: request bodies stay out of events, and so does the IP.
+    sendDefaultPii: false,
+    integrations: [Sentry.requestDataIntegration({ include: { data: false } })],
     tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
       ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
       : 0.1,
