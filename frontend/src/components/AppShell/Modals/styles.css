@@ -317,6 +317,69 @@
   }
 }
 
+/* Laid out like the plot: a legend box top-left over a plot area with
+   gridlines and a baseline, bars packed edge to edge along it. */
+.coverageSkeleton {
+  position: relative;
+  height: 100%;
+  padding: 16px 16px 32px 56px;
+}
+
+.coverageSkeletonBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 100%;
+  border-bottom: 1px solid var(--cioos-hairline);
+  background-image: linear-gradient(var(--cioos-hairline) 1px, transparent 1px);
+  background-size: 100% 20%;
+  animation: coverage-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* A shimmer per bar would flicker across 120 slivers; the bars pulse as one
+   figure instead. */
+.coverageSkeletonBars .cioosSkeleton {
+  flex: 1 1 0;
+  min-width: 0;
+  animation: none;
+  background-image: none;
+}
+
+@keyframes coverage-skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.coverageSkeletonLegend {
+  position: absolute;
+  top: 28px;
+  left: 72px;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  width: min(40%, 320px);
+  padding: 12px 16px;
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+}
+
+.coverageSkeletonLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.coverageSkeletonLegendRow .cioosSkeleton:first-child {
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coverageSkeletonBars {
+    animation: none !important;
+  }
+}
+
 /* Loading / error / empty states centered in the plot area. */
 .coverageModalStatus {
   display: flex;

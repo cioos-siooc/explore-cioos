@@ -2,6 +2,10 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
+import {
+  HarvestCardsSkeleton,
+  HarvestTableSkeleton,
+} from "./HarvestSkeleton.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
@@ -69,7 +73,7 @@ export default function HarvestOverview() {
       </p>
 
       {loadingServers ? (
-        <div className="harvest-loading">{t("harvest.loading.sources")}</div>
+        <HarvestCardsSkeleton label={t("harvest.loading.sources")} />
       ) : (
         <div className="harvest-card-grid">
           {(servers || []).map((s) => (
@@ -144,7 +148,7 @@ export default function HarvestOverview() {
 
       <h2 className="harvest-section-title">{t("harvest.recentRuns")}</h2>
       {loadingRuns ? (
-        <div className="harvest-loading">{t("harvest.loading.runs")}</div>
+        <HarvestTableSkeleton label={t("harvest.loading.runs")} />
       ) : (
         <table className="harvest-table">
           <thead>
