@@ -4,14 +4,16 @@ import {
   ArrowRight,
   BarChartLine,
   Bezier2,
+  ChatDots,
   Download,
   GeoAlt,
   GlobeAmericas,
   InfoCircle,
+  Lightbulb,
   Search,
   Water,
 } from "react-bootstrap-icons";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import CioosLogo from "../../ui/CioosLogo.jsx";
 import Modal from "../../ui/Modal.jsx";
@@ -191,16 +193,6 @@ export default function IntroModal({ showModal, setShowModal }) {
               <button type="button" className="introCta" onClick={close}>
                 {t("introHeroCta")}
               </button>
-              <button
-                type="button"
-                className="introCta introCtaSecondary"
-                onClick={() => {
-                  close();
-                  startTour(TIPS[0]);
-                }}
-              >
-                {t("introTourCta")}
-              </button>
             </div>
           </div>
           <ul className="introStats" aria-label={t("introStatsLabel")}>
@@ -269,18 +261,79 @@ export default function IntroModal({ showModal, setShowModal }) {
         </ul>
 
         <footer className="introFooter">
-          <p>
-            <FeedbackButton className="feedbackButton" size={24} />
-            {t("tipInfoFeedback")}
-          </p>
-          <p>
-            <InfoCircle
-              className="introFooterIcon"
-              size={20}
-              aria-hidden="true"
-            />
-            {t("introReopenText")}
-          </p>
+          <div className="introFooterCards">
+            <section className="introFooterCard" data-testid="intro-tips">
+              <h2 className="introFooterHeading">
+                <Lightbulb size={18} aria-hidden="true" />
+                {t("introTipsHeading")}
+              </h2>
+              <p>
+                <Trans
+                  i18nKey="introTipsText"
+                  components={{
+                    icon: (
+                      <Lightbulb
+                        className="introGlyph"
+                        size={14}
+                        role="img"
+                        aria-label={t("tipCardOpen")}
+                      />
+                    ),
+                  }}
+                />
+              </p>
+              <button
+                type="button"
+                className="introFooterAction"
+                onClick={() => {
+                  close();
+                  startTour(TIPS[0]);
+                }}
+              >
+                {t("introTourCta")}
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+              <Switch
+                id="introTipsToggle"
+                label={t("tipsToggleLabel")}
+                checked={tipsEnabled}
+                onChange={() => setTipsEnabled(!tipsEnabled)}
+              />
+            </section>
+            <section className="introFooterCard">
+              <h2 className="introFooterHeading">
+                <ChatDots size={18} aria-hidden="true" />
+                {t("introFeedbackHeading")}
+              </h2>
+              <p>{t("tipInfoFeedback")}</p>
+              <FeedbackButton
+                className="introFooterAction"
+                size={14}
+                label={t("introFeedbackCta")}
+              />
+            </section>
+            <section className="introFooterCard">
+              <h2 className="introFooterHeading">
+                <InfoCircle size={18} aria-hidden="true" />
+                {t("introReopenHeading")}
+              </h2>
+              <p>
+                <Trans
+                  i18nKey="introReopenText"
+                  components={{
+                    icon: (
+                      <InfoCircle
+                        className="introGlyph"
+                        size={14}
+                        role="img"
+                        aria-label={t("dockIntroButtonTitle")}
+                      />
+                    ),
+                  }}
+                />
+              </p>
+            </section>
+          </div>
           <p className="introSources">
             {t(
               obisDataAvailable
@@ -288,12 +341,6 @@ export default function IntroModal({ showModal, setShowModal }) {
                 : "introSourcesErddap",
             )}
           </p>
-          <Switch
-            id="introTipsToggle"
-            label={t("tipsToggleLabel")}
-            checked={tipsEnabled}
-            onChange={() => setTipsEnabled(!tipsEnabled)}
-          />
         </footer>
       </Modal.Body>
     </Modal>

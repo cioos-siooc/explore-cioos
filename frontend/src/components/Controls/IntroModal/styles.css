@@ -203,11 +203,6 @@
   transform: translateY(-1px);
 }
 
-.introCtaSecondary {
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 60%);
-  background: transparent;
-}
-
 /* "See it in action": one-click jumps into a few of the app's views, as a row
    of tiles whose arrow nudges forward on hover — they go somewhere. */
 .introShowcases {
@@ -349,12 +344,82 @@
   }
 }
 
-/* The housekeeping: feedback, how to come back here, where the data comes
-   from and the tips switch. */
+/* The housekeeping, as three matching cards: tips, feedback, and how to come
+   back here. Each names its control by the glyph the user will look for. */
 .introFooter {
-  margin-top: var(--cioos-space-lg);
-  padding-top: var(--cioos-space-md);
+  margin-top: var(--cioos-space-xl);
+  padding-top: var(--cioos-space-lg);
   border-top: 1px solid var(--cioos-hairline);
+}
+
+.introFooterCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--cioos-space-md);
+}
+
+.introFooterCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--cioos-space-sm);
+  padding: var(--cioos-space-md) var(--cioos-space-lg);
+  border-radius: var(--cioos-radius-lg);
+  background-color: var(--cioos-surface-2);
+}
+
+.introFooterCard p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.introFooterHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-xs);
+  margin: 0;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-md);
+  font-weight: 600;
+  color: var(--cioos-navy);
+}
+
+.introFooterHeading svg {
+  color: var(--cioos-primary);
+}
+
+.introFooterAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-white);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.introFooterAction:hover,
+.introFooterAction:focus-visible {
+  background: var(--cioos-primary);
+  color: var(--cioos-white);
+}
+
+.introGlyph {
+  vertical-align: -2px;
+  color: var(--cioos-primary);
+}
+
+.introSources {
+  margin: var(--cioos-space-md) 0 0;
+  font-size: var(--cioos-font-size-sm);
+  text-align: center;
+  color: var(--cioos-ink-80);
 }
 
 .introLink {
@@ -365,44 +430,6 @@
   color: var(--cioos-primary-700);
   text-decoration: underline;
   cursor: pointer;
-}
-
-.introFooter p {
-  display: flex;
-  align-items: center;
-  margin: var(--cioos-space-xs) 0;
-}
-
-.introSources {
-  font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-80);
-}
-
-.introFooterIcon {
-  flex: none;
-  margin: 0 21px 0 6px;
-  color: var(--cioos-primary);
-}
-
-/* Inline icon button that opens the Sentry feedback dialog; sits beside the
-   feedback sentence, so it stays flush with the text rather than reading as a
-   chrome control. */
-.feedbackButton {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  margin-right: 15px;
-  padding: 6px;
-  border: 0;
-  border-radius: 10px;
-  background-color: transparent;
-  color: var(--cioos-primary);
-  cursor: pointer;
-}
-
-.feedbackButton:hover {
-  background-color: var(--cioos-surface-2);
 }
 
 /* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
@@ -435,7 +462,8 @@
 
 @media (max-width: 992px) {
   .introFeatures,
-  .introShowcases {
+  .introShowcases,
+  .introFooterCards {
     grid-template-columns: 1fr;
   }
 }
