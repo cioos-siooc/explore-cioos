@@ -288,6 +288,7 @@
   "legendNoDataWarningTitle": "Choose less restrictive filters to see data",
   "legendNoDataWarningText": "No Data",
   "legendLoadingText": "Loading legend…",
+  "skeletonLoadingLabel": "Loading…",
   "downloadDetailsDownloadDataBoldText": "Download Data ",
   "downloadDetailsDownloadDataSteps1": "Finalize dataset selections,",
   "downloadDetailsDownloadDataSteps2": "Ensure selections are within the 100MB limit,",

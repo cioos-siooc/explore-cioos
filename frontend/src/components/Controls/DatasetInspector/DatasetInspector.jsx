@@ -9,7 +9,6 @@ import {
   PinMapFill,
 } from "react-bootstrap-icons";
 // import platformColors from '../../platformColors'
-import Loading from "../Loading/Loading.jsx";
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
@@ -33,8 +32,10 @@ import CardList from "./CardList.jsx";
 import ListCard, {
   CardField,
   CardTags,
+  ListCardSkeleton,
   useExpandableList,
 } from "./ListCard.jsx";
+import { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 import ZoomToDataset, {
   useZoomToDataset,
@@ -720,9 +721,11 @@ export default function DatasetInspector({
               </div>
             )}
             {loading ? (
-              <div className="datasetInspectorLoadingContainer">
-                <Loading variant="inline" />
-              </div>
+              <SkeletonGroup className="cardList">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <ListCardSkeleton key={i} />
+                ))}
+              </SkeletonGroup>
             ) : (
               <CardList
                 items={datasetRecords?.profiles}
