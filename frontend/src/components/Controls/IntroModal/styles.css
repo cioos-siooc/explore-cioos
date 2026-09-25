@@ -390,6 +390,7 @@
 
 .introFooterAction {
   display: inline-flex;
+  margin-top: auto;
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
