@@ -23,9 +23,18 @@ const SECTIONS = [
   { key: "errors", Icon: Bug },
   { key: "analytics", Icon: BarChartLine },
   { key: "map", Icon: Map },
+  { key: "rights", Icon: PersonCheck },
 ];
 
-const GUIDELINES_URL = "https://cioos.ca/privacy-guidelines/";
+// The CIOOS privacy guidelines promise a link to the privacy policy of any
+// third party that handles a visitor's personal data: Google sends the
+// download emails, Sentry receives feedback.
+const link = (href) => <a href={href} target="_blank" rel="noreferrer" />;
+const LINKS = {
+  guidelines: link("https://cioos.ca/privacy-guidelines/"),
+  google: link("https://policies.google.com/privacy"),
+  sentry: link("https://sentry.io/privacy/"),
+};
 
 export default function PrivacyModal() {
   const { t } = useTranslation();
@@ -40,29 +49,12 @@ export default function PrivacyModal() {
       icon={<ShieldLock size={20} />}
       title={t("privacyModalTitle")}
       subtitle={t("privacyModalSubtitle")}
-      items={[
-        ...SECTIONS.map(({ key, Icon }) => ({
-          key,
-          icon: <Icon size={16} />,
-          title: t(`privacy_${key}_title`),
-          body: t(`privacy_${key}_body`),
-        })),
-        {
-          key: "rights",
-          icon: <PersonCheck size={16} />,
-          title: t("privacy_rights_title"),
-          body: (
-            <Trans
-              i18nKey="privacy_rights_body"
-              components={{
-                guidelines: (
-                  <a href={GUIDELINES_URL} target="_blank" rel="noreferrer" />
-                ),
-              }}
-            />
-          ),
-        },
-      ]}
+      items={SECTIONS.map(({ key, Icon }) => ({
+        key,
+        icon: <Icon size={16} />,
+        title: t(`privacy_${key}_title`),
+        body: <Trans i18nKey={`privacy_${key}_body`} components={LINKS} />,
+      }))}
     />
   );
 }

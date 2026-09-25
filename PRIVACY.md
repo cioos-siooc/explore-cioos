@@ -6,8 +6,10 @@ stores nothing on the user's device that needs consent, and it tells users what
 leaves their browser.
 
 It applies the organization-wide
-[CIOOS privacy guidelines](https://cioos.ca/privacy-guidelines/), which the
-in-app notice links to for questions and requests.
+[CIOOS privacy guidelines](https://cioos.ca/privacy-guidelines/): data is kept
+only until the requested service is done, no cookies track users, and every
+third party that handles a visitor's personal data is named with a link to its
+privacy policy (Google for the download emails, Sentry for feedback).
 
 The in-app **Privacy** notice (linked from the About window and the download
 form, `frontend/src/components/AppShell/Modals/PrivacyModal.jsx`) is what users
@@ -46,7 +48,9 @@ third-party service or data flow belongs in both.
 ## Still to do outside the code
 
 - Publish the title and contact of the person in charge of personal
-  information (Law 25).
+  information, and how to ask for access, correction or deletion (Law 25). The
+  CIOOS guidelines have neither yet, and the in-app notice sends questions to
+  them.
 - Complete the privacy impact assessment Law 25 requires before personal
   information goes to Sentry in the US, and accept Sentry's data processing
   agreement. Turning on "Prevent Storing of IP Addresses" in the Sentry project
