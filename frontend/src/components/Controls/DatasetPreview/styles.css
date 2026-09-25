@@ -130,11 +130,23 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* The lazy chunk's placeholder. Loading is `position: absolute` and contributes
-   no height, so without a floor here the container sat at its minimum at exactly
-   the moment Plotly measured it — which is how the plot ended up drawn at
-   Plotly's own 450px default until the first control change. */
+/* The lazy chunk's placeholder. Without a floor here the container sat at its
+   minimum at exactly the moment Plotly measured it — which is how the plot
+   ended up drawn at Plotly's own 450px default until the first control
+   change. */
 .datasetPreviewPlotLoading {
-  position: relative;
+  display: grid;
   min-height: 420px;
+}
+
+.datasetPreviewPlotLoading .cioosSkeleton {
+  height: auto;
+}
+
+/* A header row and a few body rows, four columns wide. */
+.datasetPreviewTableSkeleton {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 16px;
+  padding: 12px;
 }

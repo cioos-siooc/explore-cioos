@@ -289,6 +289,7 @@
   "legendNoDataWarningTitle": "Choisissez des filtres moins restrictifs pour voir les données",
   "legendNoDataWarningText": "Aucune donnée disponible",
   "legendLoadingText": "Chargement de la légende…",
+  "skeletonLoadingLabel": "Chargement…",
   "downloadDetailsDownloadDataBoldText": "Téléchargement des données ",
   "downloadDetailsDownloadDataSteps1": "Finalisez la sélection de jeux de données,",
   "downloadDetailsDownloadDataSteps2": "Assurez-vous que les sélections ne dépassent pas la limite de 100MB,",
