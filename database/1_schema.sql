@@ -631,6 +631,41 @@ CREATE TABLE skipped_datasets (
     reason_code text
 );
 
+-- Snapshot of the CKAN catalogue as of the last harvest that fetched it.
+-- CKAN is CDE's metadata source; this table is what makes the harvest
+-- dashboard's coverage report able to answer the two questions harvest_attempts
+-- cannot: which datasets CKAN describes that CDE does not serve, and which
+-- datasets CDE serves that CKAN has no record of.
+--
+-- One row per (record, data link): a package publishing the same data on two
+-- ERDDAP servers gets two rows, and a package with no data link at all still
+-- gets one row with NULL erddap_url/dataset_id — "CKAN describes this but
+-- nothing points at data we can read" is itself a reportable state, which is
+-- why the natural key is not usable and pk is a surrogate.
+--
+-- Replaced wholesale (DELETE + INSERT) by the db-loader on every run that
+-- fetched a catalogue, unlike the append-only harvest_* audit tables. A run
+-- that fetched nothing leaves the previous snapshot untouched.
+DROP TABLE IF EXISTS cde.ckan_records;
+CREATE TABLE cde.ckan_records (
+    pk              serial PRIMARY KEY,
+    ckan_id         text NOT NULL,
+    ckan_name       text,                 -- url slug, for linking back to the record
+    title           text,
+    title_fr        text,
+    organizations   text[],
+    eovs            text[],
+    erddap_url      text,                 -- NULL when the record has no tabledap resource
+    dataset_id      text,                 -- ERDDAP datasetID from that resource
+    obis_dataset_id text,                 -- OBIS UUID from xml_location_url, else NULL
+    n_resources     integer,
+    snapshot_at     timestamptz NOT NULL
+);
+-- The coverage queries join on the rtrim'd url, matching datasets/harvest_attempts.
+CREATE INDEX ckan_records_erddap_idx ON cde.ckan_records (rtrim(erddap_url, '/'), dataset_id);
+CREATE INDEX ckan_records_obis_idx   ON cde.ckan_records (obis_dataset_id);
+CREATE INDEX ckan_records_ckan_id_idx ON cde.ckan_records (ckan_id);
+
 DROP TABLE IF EXISTS cde.organizations_lookup;
 CREATE TABLE cde.organizations_lookup (
     pk SERIAL PRIMARY KEY,

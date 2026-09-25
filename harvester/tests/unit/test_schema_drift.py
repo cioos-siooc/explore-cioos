@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from cde_harvester.core.schemas import (
+    CkanRecordSchema,
     DatasetSchema,
     HarvestAttemptSchema,
     HarvestRunSchema,
@@ -36,6 +37,7 @@ SCHEMA_TO_TABLE = {
     SkippedDatasetSchema: "skipped_datasets",
     HarvestRunSchema: "harvest_runs",
     HarvestAttemptSchema: "harvest_attempts",
+    CkanRecordSchema: "ckan_records",
 }
 
 
