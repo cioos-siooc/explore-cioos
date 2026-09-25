@@ -198,16 +198,14 @@ export function variablesFrom(table, dataset) {
 }
 
 // "Temperature (1990 scale) ( degree_C )" once a harvest has run, "TE90_01
-// ( degree_C )" before it. standard_name sits between the two because it is at
-// least words, where a column name is often a BODC P01 code.
+// ( degree_C )" before it.
 export function labelFor(variable) {
   if (!variable) return "";
-  const name =
-    variable.longName || variable.standardName || variable.columnName;
+  const name = shortLabelFor(variable);
   return variable.unit ? `${name} ( ${variable.unit} )` : name;
 }
 
-// Same precedence without the unit — for a dropdown, where the unit is noise.
+// Without the unit — for a dropdown, where the unit is noise.
 export function shortLabelFor(variable) {
   if (!variable) return "";
   return variable.longName || variable.columnName;

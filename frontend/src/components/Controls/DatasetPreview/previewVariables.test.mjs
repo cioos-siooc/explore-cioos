@@ -342,7 +342,7 @@ test("an ID-suffixed column is an id even when nothing declares it", () => {
   assert.equal(index.get("temperature").kind, "measurement");
 });
 
-test("label prefers long_name, then standard_name, then the column name", () => {
+test("label prefers long_name, then the column name", () => {
   const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET));
   assert.equal(
     labelFor(index.get("TE90_01")),
@@ -358,7 +358,7 @@ test("label prefers long_name, then standard_name, then the column name", () => 
       standardName: "sea_water_temperature",
       unit: "degree_C",
     }),
-    "sea_water_temperature ( degree_C )",
+    "x ( degree_C )",
   );
   assert.equal(labelFor({ columnName: "x" }), "x");
   assert.equal(labelFor(null), "");
