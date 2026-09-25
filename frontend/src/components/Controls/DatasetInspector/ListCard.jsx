@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import classNames from "classnames";
 import { useTranslation } from "react-i18next";
 
+import Skeleton from "../../ui/Skeleton.jsx";
 import "./styles.css";
 
-// One row of a dataset page's record or platform list, as a card: the item's
+// One row of a dataset page's record list, as a card: the item's
 // id on top and its fields as label/value pairs beneath, each on its own line.
 // This is the shape that survives the sidebar's width — see CardList.jsx for
 // why these lists are cards at all.
@@ -14,17 +15,15 @@ import "./styles.css";
 // button may not contain. Same treatment DatasetCard uses.
 export default function ListCard({
   id,
-  // Toggle cards (a platform, whose track the click draws or clears) say so
-  // with aria-pressed; a card that opens something leaves this undefined.
-  pressed,
+  // Drawn on the map right now (a trajectory whose track is shown).
+  selected,
   // Held at the top of the list because the last map click found this item —
   // wearing the same goldenrod the map put on what was clicked.
   pinned,
-  onClick,
-  // A second thing this card can do, drawn beside its id — a trajectory record's
-  // "show the track on the map", where the card itself opens the preview. Its
-  // own click must not also trigger the card's, hence the wrapper below.
+  // A control of its own beside the id (a trajectory's "show on map"), doing
+  // something other than the card's click.
   action,
+  onClick,
   children,
 }) {
   const handleKeyDown = (e) => {
@@ -35,26 +34,54 @@ export default function ListCard({
 
   return (
     <div
-      className={classNames("listCard", { selected: pressed, pinned })}
+      className={classNames("listCard", { selected, pinned })}
       role="button"
       tabIndex={0}
-      aria-pressed={pressed}
       onClick={onClick}
       onKeyDown={handleKeyDown}
     >
-      <span className="listCardId" title={id}>
-        {id}
-      </span>
-      {action && (
-        <span
-          className="listCardAction"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          {action}
+      <div className="listCardHead">
+        <span className="listCardId" title={id}>
+          {id}
         </span>
-      )}
+        {action && (
+          // Kept from reaching the card, whose click would open the preview too.
+          <span
+            className="listCardAction"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {action}
+          </span>
+        )}
+      </div>
       <dl className="listCardFields">{children}</dl>
+    </div>
+  );
+}
+
+// A record card's outline while the list is on its way, built in the card's
+// own text classes: the id, then the three fields a record carries.
+export function ListCardSkeleton() {
+  return (
+    <div className="listCard listCardSkeleton" aria-hidden="true">
+      <div className="listCardHead">
+        <span className="listCardId">
+          <Skeleton text width="40%" />
+        </span>
+      </div>
+      <div className="listCardFields">
+        {["70%", "50%", "60%"].map((width) => (
+          <div key={width} className="listCardField">
+            <span className="listCardFieldLabel">
+              <Skeleton text width="64px" />
+            </span>
+            <span className="listCardFieldValue">
+              <Skeleton text width={width} />
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

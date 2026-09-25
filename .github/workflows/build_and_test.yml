@@ -6,6 +6,14 @@ on:
     branches:
       - master
       - development
+  # The visual (screenshot) suite's own trigger — see "Run the visual
+  # regression suite" in the docker job below. GitHub doesn't support
+  # `paths:` filtering on `release` events, so a published release runs this
+  # whole workflow unconditionally; that's the point, a tagged release gets a
+  # full integration + pixel check regardless of which paths moved to get
+  # there.
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -148,8 +156,8 @@ jobs:
       # "no console errors on load". It is now a Playwright spec doing the same
       # thing against the same stack — one browser-automation stack in the repo
       # instead of two, and this one keeps a trace and a video when it fails.
-      # Unlike the mocked suite in test-frontend.yaml, nothing here is stubbed:
-      # this is the check that the real API and database actually serve the app.
+      # Unlike the visual step below, nothing here is stubbed: this is the
+      # check that the real API and database actually serve the app.
       - name: Frontend smoke test against the compose stack
         working-directory: frontend
         env:
@@ -160,10 +168,30 @@ jobs:
           npx playwright install --with-deps chromium
           npm run test:e2e:live
 
+      # Pixel baselines against the MOCKED suite (fixtures, frozen clock,
+      # empty webfonts — see frontend/e2e/fixtures/README.md), not the live
+      # stack above: screenshots need to be deterministic across runs, which
+      # real harvested data and a real clock aren't. Runs through
+      # e2e/in-container.sh (invoked by `npm run test:visual`), which pulls
+      # its own pinned Playwright image via `docker run` — this job runs
+      # directly on the runner rather than inside a container so it can drive
+      # `docker compose` above, so a nested container is how this step still
+      # gets the exact fonts/Chromium the baselines were recorded with.
+      #
+      # Deliberately not gated on every push/PR: a UI actively being reworked
+      # makes pixel baselines stale on purpose, and re-recording them on every
+      # commit is the friction this avoids. This workflow is what deploy.yml
+      # actually watches, so a published release is the one event a pixel
+      # check belongs on — a real final check, not a proxy for one.
+      - name: Run the visual regression suite
+        if: github.event_name == 'release'
+        working-directory: frontend
+        run: npm run test:visual
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: frontend-live-smoke-report
+          name: frontend-e2e-report
           path: |
             frontend/playwright-report/
             frontend/test-results/

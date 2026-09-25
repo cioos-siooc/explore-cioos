@@ -6,15 +6,15 @@ import { buildWmsOverlay, fetchGriddapTimeRange } from "../../../wmsUtilities";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import WmsLegend from "../WmsLegend/WmsLegend.jsx";
 import "./styles.css";
 
 // Griddap-specific section of the dataset inspector: grid structure, variable
 // list, and (when the ERDDAP serves WMS) the show-on-map switch. While the
 // dataset page is open the WmsLegend (variable picker, colorbar) renders inline
-// here; when the sidebar is collapsed it moves to the floating card over the
-// map (rendered by AppShell). Which slice of the grid is drawn is set on the
-// bars along the bottom of the map, beside the filters for the same axes.
+// here; when the sidebar is collapsed it moves into the minimized dataset card
+// over the map (see DatasetMapCard).
 export default function GriddapDetails({
   dataset,
   activeWmsOverlay,
@@ -22,8 +22,18 @@ export default function GriddapDetails({
 }) {
   const { t } = useTranslation();
   const { eovsSelected } = useFilters();
-  const { pendingWmsSlice, setPendingWmsSlice } = useMapState();
+  const { pendingWmsSlice, setPendingWmsSlice, griddapCoverageVisible } =
+    useMapState();
   const { sidebarOpen } = useUI();
+  const { offerTip } = useTips();
+  useEffect(
+    () =>
+      offerTip([
+        "griddapWms",
+        ...(griddapCoverageVisible ? [] : ["griddedCoverage"]),
+      ]),
+    [offerTip, griddapCoverageVisible],
+  );
   const dimensions = dataset.grid_dimensions || [];
   const variables = dataset.grid_variables || [];
   const overlayActive = activeWmsOverlay?.pk === dataset.pk;
@@ -106,6 +116,7 @@ export default function GriddapDetails({
           <strong>{t("griddapMapPreviewTitle")}</strong>
           <Switch
             id="griddapShowOnMapSwitch"
+            tipTarget="griddapWms"
             label={t("griddapShowOnMapToggle")}
             checked={overlayActive}
             disabled={!variables.length}

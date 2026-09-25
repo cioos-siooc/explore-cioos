@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { BarChartLine } from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
+import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -33,6 +34,58 @@ const COUNT_OPTIONS = ["datasets", "features", "days"];
 // cost. Bounded because the key includes the dataset list, which changes as
 // the map is panned; oldest is evicted first.
 const MAX_CACHED_RESPONSES = 20;
+
+// The figure's outline while it loads: the usual shape of the record — almost
+// nothing early on, a slow climb, a surge in recent decades and a dip in the
+// still-incomplete last years — as (position, height %) control points.
+const SKELETON_CURVE = [
+  [0, 0],
+  [0.12, 0],
+  [0.13, 2],
+  [0.2, 3],
+  [0.23, 5],
+  [0.28, 10],
+  [0.45, 10],
+  [0.55, 15],
+  [0.6, 22],
+  [0.72, 32],
+  [0.8, 45],
+  [0.88, 62],
+  [0.95, 100],
+  [0.98, 50],
+  [1, 22],
+];
+const SKELETON_BAR_COUNT = 120;
+const SKELETON_BAR_HEIGHTS = Array.from(
+  { length: SKELETON_BAR_COUNT },
+  (_, i) => {
+    const x = i / (SKELETON_BAR_COUNT - 1);
+    const k = SKELETON_CURVE.findIndex(([at]) => at >= x);
+    const [x1, y1] = SKELETON_CURVE[Math.max(k - 1, 0)];
+    const [x2, y2] = SKELETON_CURVE[k];
+    const y = x2 === x1 ? y2 : y1 + ((y2 - y1) * (x - x1)) / (x2 - x1);
+    // Fixed jitter so neighbouring bars differ like real ones do.
+    const jitter = 1 + 0.12 * Math.sin(i * 2.7);
+    return Math.min(100, y * jitter);
+  },
+);
+const histogramSkeleton = (
+  <SkeletonGroup className="coverageSkeleton">
+    <div className="coverageSkeletonLegend">
+      {[70, 90, 55, 75, 60].map((width, i) => (
+        <div key={i} className="coverageSkeletonLegendRow">
+          <Skeleton width="12px" height="12px" radius="2px" />
+          <Skeleton width={`${width}%`} />
+        </div>
+      ))}
+    </div>
+    <div className="coverageSkeletonBars">
+      {SKELETON_BAR_HEIGHTS.map((height, i) => (
+        <Skeleton key={i} height={`${height}%`} radius="0" />
+      ))}
+    </div>
+  </SkeletonGroup>
+);
 
 // The dataset-coverage figure, launched from the top bar: a histogram of how
 // many datasets match the applied filters over time, with the bars split by a
@@ -204,11 +257,7 @@ export default function CoverageModal() {
               blanking to an empty area: switching Count or Colour-by changes
               one facet of the same figure, and these queries take seconds when
               the API's cache is cold. */}
-          {loading && !showStalePlot && (
-            <div className="coverageModalStatus">
-              <Spinner size="lg" />
-            </div>
-          )}
+          {loading && !showStalePlot && histogramSkeleton}
           {!loading && error && (
             <div className="coverageModalStatus">
               {t("coverageErrorMessage")}
@@ -220,13 +269,7 @@ export default function CoverageModal() {
             </div>
           )}
           {(showStalePlot || (!loading && !error && histogram && !isEmpty)) && (
-            <Suspense
-              fallback={
-                <div className="coverageModalStatus">
-                  <Spinner size="lg" />
-                </div>
-              }
-            >
+            <Suspense fallback={histogramSkeleton}>
               <div
                 className={
                   loading ? "coveragePlotStale" : "coveragePlotCurrent"

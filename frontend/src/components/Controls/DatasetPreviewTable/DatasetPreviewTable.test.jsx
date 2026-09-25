@@ -45,7 +45,7 @@ describe("DatasetPreviewTable", () => {
 
   it("narrows the rows to the filter text", async () => {
     const { user } = open();
-    await user.type(screen.getByRole("textbox"), "31");
+    await user.type(screen.getByRole("searchbox"), "31");
     // Nothing matches 31, so both rows go rather than one staying by accident.
     expect(screen.queryByText("10")).not.toBeInTheDocument();
     expect(screen.queryByText("9")).not.toBeInTheDocument();

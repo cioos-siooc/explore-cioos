@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
+import { HarvestTableSkeleton } from "./HarvestSkeleton.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import {
   datasetBadgeClass,
@@ -206,7 +207,7 @@ export default function HarvestDownloads() {
       </div>
 
       {loadingDatasets ? (
-        <div className="harvest-loading">{t("harvest.loading.datasets")}</div>
+        <HarvestTableSkeleton label={t("harvest.loading.datasets")} />
       ) : (datasets || []).length === 0 ? (
         <div className="harvest-muted">{t("harvest.downloads.noDatasets")}</div>
       ) : (
@@ -249,7 +250,7 @@ export default function HarvestDownloads() {
         {t("harvest.downloads.requestsTitle")}
       </h2>
       {loadingJobs ? (
-        <div className="harvest-loading">{t("harvest.loading")}</div>
+        <HarvestTableSkeleton label={t("harvest.loading")} />
       ) : (
         <table className="harvest-table">
           <thead>

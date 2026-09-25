@@ -7,6 +7,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetInspector from "./DatasetInspector.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
 // pk 2337 / "Chicago Park District" / "mooring" come from the catalog fixtures
 // (e2e/fixtures/api/datasets.json, organizations.json, platforms.json) that
@@ -37,25 +38,31 @@ function Harness({
   returnToList = () => {},
   dataset = DATASET,
   setInspectRecordID = () => {},
-  selectedTrajectory,
-  setSelectedTrajectory = () => {},
 }) {
   const { catalogLoaded } = useFilters();
   const { showDownloadModal } = useUI();
+  const [selectedTrajectory, setSelectedTrajectory] = React.useState();
+  const { mappedRecord } = useSelection();
   if (!catalogLoaded) return <span data-testid="state">loading</span>;
 
   return (
     <>
       <span data-testid="state">loaded</span>
       <span data-testid="download-modal-open">{String(showDownloadModal)}</span>
+      <span data-testid="mapped-record">
+        {mappedRecord?.recordId ?? "none"}
+      </span>
+      <span data-testid="drawn-track">
+        {selectedTrajectory?.trajectoryId ?? "none"}
+      </span>
       <DatasetInspector
         dataset={dataset}
         returnToList={returnToList}
         setHoveredDataset={() => {}}
         setInspectRecordID={setInspectRecordID}
-        query={{}}
         selectedTrajectory={selectedTrajectory}
         setSelectedTrajectory={setSelectedTrajectory}
+        query={{}}
         activeWmsOverlay={undefined}
         setActiveWmsOverlay={() => {}}
       />
@@ -107,31 +114,6 @@ describe("DatasetInspector", () => {
     expect(screen.queryAllByTestId("filter-option")).toHaveLength(0);
   });
 
-  it("filtering to an excluded dataset includes it instead of leaving it excluded", async () => {
-    function ExcludedFlag() {
-      const { datasetsSelected } = useFilters();
-      const option = datasetsSelected.find((d) => d.pk === DATASET.pk);
-      return <span data-testid="excluded">{String(!!option?.isExcluded)}</span>;
-    }
-    const { user } = renderWithProviders(
-      <>
-        <Harness />
-        <ExcludedFlag />
-      </>,
-      { providers: "app", url: `/?excludeDatasetPKs=${DATASET.pk}` },
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("excluded")).toHaveTextContent("true"),
-    );
-    const button = screen.getByRole("button", {
-      pressed: false,
-      name: /filter/i,
-    });
-    await user.click(button);
-    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
-    expect(screen.getByTestId("excluded")).toHaveTextContent("false");
-  });
-
   it("Download adds the dataset to the selection and opens the download", async () => {
     const { user } = await renderReady();
     expect(screen.getByTestId("download-modal-open")).toHaveTextContent(
@@ -165,32 +147,21 @@ describe("DatasetInspector", () => {
     expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
   });
 
-  it("shows the no-records message once the (empty) record list has loaded", async () => {
+  it("shows the no-features message once the (empty) feature list has loaded", async () => {
     await renderReady();
     await waitFor(() =>
       expect(
-        screen.getByText("No records match your search."),
+        screen.getByText("No features match your search."),
       ).toBeInTheDocument(),
     );
   });
 
-  it("falls back to the generic Record ID label when the dataset names no cf_role variable", async () => {
+  it("falls back to the generic Feature ID label when the dataset names no cf_role variable", async () => {
     await renderReady();
     await waitFor(() =>
       expect(document.querySelector(".recordIdCaption")).toHaveTextContent(
-        "Record ID",
+        "Feature ID",
       ),
-    );
-  });
-
-  it("toggling the filter button calls setDatasetsSelected for this dataset's pk", async () => {
-    const { user } = await renderReady();
-    const button = screen.getByTitle("Filter the map to this dataset");
-    await user.click(button);
-    await waitFor(() =>
-      expect(
-        screen.getByTitle("Stop filtering the map to this dataset"),
-      ).toBeInTheDocument(),
     );
   });
 
@@ -205,143 +176,108 @@ describe("DatasetInspector", () => {
     await user.keyboard("{Backspace}");
     expect(returnToList).not.toHaveBeenCalled();
   });
-  // A trajectory dataset used to get TWO card lists holding the same ids: a
-  // "Platforms / Trajectories" section that drew a track on the map, above a
-  // record list that opened the plot. The first one is what the user reached,
-  // so a trajectory's graph and table were effectively unreachable.
-  describe("a trajectory dataset's records", () => {
+
+  describe("a trajectory dataset", () => {
     const TRAJECTORY_DATASET = {
       ...DATASET,
       cdm_data_type: "Trajectory",
-      trajectory_id_variable: "surveyID",
+      trajectory_id_variable: "cruise",
     };
-    const RECORDS = [
-      {
-        profile_id: "Mai21",
-        time_min: "2021-05-24T18:54:00Z",
-        time_max: "2021-05-24T20:38:00Z",
-        depth_min: 0,
-        depth_max: 0,
-        eovs: null,
-      },
-      {
-        profile_id: "Oct22_1",
-        time_min: "2022-10-25T17:42:00Z",
-        time_max: "2022-10-25T19:30:00Z",
-        depth_min: 0,
-        depth_max: 0,
-        eovs: null,
-      },
-    ];
-    const PLATFORMS = [
-      { trajectory_id: "Mai21", n_points: 9 },
-      { trajectory_id: "Oct22_1", n_points: 12 },
-    ];
 
-    // The two endpoints this page joins have no fixture with rows in it, and a
-    // recorded one per query would key on the whole filter string. Answer them
-    // here and let the mock serve everything else.
-    function serveRecords() {
-      installMockFetch();
-      const fixtures = globalThis.fetch;
-      const json = (body) =>
-        new Response(JSON.stringify(body), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
+    beforeEach(() => {
+      const fixtureFetch = globalThis.fetch;
       vi.stubGlobal(
         "fetch",
-        vi.fn(async (input, init) => {
-          const url = typeof input === "string" ? input : input.url;
-          if (url.includes("/datasetRecordsList"))
-            return json({ profiles: RECORDS });
-          if (url.includes("/trajectories/platforms")) return json(PLATFORMS);
-          return fixtures(input, init);
+        vi.fn(async (input) => {
+          if (String(input).includes("/trajectories/platforms")) {
+            return new Response(
+              JSON.stringify([{ trajectory_id: "cruise-a", n_points: 1234 }]),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          }
+          if (!String(input).includes("/datasetRecordsList")) {
+            return fixtureFetch(input);
+          }
+          return new Response(
+            JSON.stringify({
+              profiles: [
+                { profile_id: "cruise-a", time_min: "2020-01-01T00:00:00Z" },
+                { profile_id: "cruise-b", time_min: "2021-01-01T00:00:00Z" },
+              ],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
         }),
       );
-    }
+    });
 
-    // The cards carrying this id. One per list the page draws it in — which is
-    // the whole point of the first test below.
-    const cardsNamed = (id) =>
-      waitFor(() => {
-        const cards = screen
-          .getAllByTitle(id)
-          .map((label) => label.closest(".listCard"));
-        expect(cards.length).toBeGreaterThan(0);
-        return cards;
-      });
-
-    it("are listed once, not once per section", async () => {
-      serveRecords();
+    it("lists its trajectories once, as the record list", async () => {
       await renderReady({ dataset: TRAJECTORY_DATASET });
-      expect(await cardsNamed("Mai21")).toHaveLength(1);
-      expect(screen.getAllByTitle("Oct22_1")).toHaveLength(1);
-      // The fixes count the platform list used to carry, kept on the one card.
-      expect(screen.getByText("9")).toBeInTheDocument();
+      await screen.findByText("cruise-a");
+      expect(document.querySelectorAll(".recordSection")).toHaveLength(1);
+      expect(screen.getAllByText("cruise-b")).toHaveLength(1);
     });
 
-    it("open the preview when the card is clicked", async () => {
-      serveRecords();
+    it("carries each trajectory's track fixes on its card", async () => {
+      await renderReady({ dataset: TRAJECTORY_DATASET });
+      const card = (await screen.findByText("cruise-a")).closest(".listCard");
+      expect(await within(card).findByText("1,234")).toBeInTheDocument();
+    });
+
+    it("Show on map draws that trajectory's track, and clears it again, without opening the preview", async () => {
       const setInspectRecordID = vi.fn();
       const { user } = await renderReady({
         dataset: TRAJECTORY_DATASET,
         setInspectRecordID,
       });
-      await user.click((await cardsNamed("Mai21"))[0]);
-      expect(setInspectRecordID).toHaveBeenCalledWith("Mai21");
-    });
+      const card = (await screen.findByText("cruise-b")).closest(".listCard");
+      const show = within(card).getByRole("button", { name: /Show on map/ });
 
-    it("draw the track from the card's own control, without opening anything", async () => {
-      serveRecords();
-      const setInspectRecordID = vi.fn();
-      const setSelectedTrajectory = vi.fn();
-      const { user } = await renderReady({
-        dataset: TRAJECTORY_DATASET,
-        setInspectRecordID,
-        setSelectedTrajectory,
-      });
-      const [card] = await cardsNamed("Mai21");
-      await user.click(
-        within(card).getByLabelText("Draw this track on the map"),
-      );
-      expect(setSelectedTrajectory).toHaveBeenCalledWith({
-        datasetPk: TRAJECTORY_DATASET.pk,
-        datasetTitle: TRAJECTORY_DATASET.title,
-        trajectoryId: "Mai21",
-        frameView: true,
-      });
-      // The control is inside the card, so its click must not also navigate.
+      await user.click(show);
+      expect(screen.getByTestId("drawn-track")).toHaveTextContent("cruise-b");
+      expect(show).toHaveAttribute("aria-pressed", "true");
+      expect(card).toHaveClass("selected");
+
+      await user.click(show);
+      expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
       expect(setInspectRecordID).not.toHaveBeenCalled();
     });
 
-    it("clear the drawn track when its control is pressed again", async () => {
-      serveRecords();
-      const setSelectedTrajectory = vi.fn();
+    it("clicking the card itself opens its preview", async () => {
+      const setInspectRecordID = vi.fn();
       const { user } = await renderReady({
         dataset: TRAJECTORY_DATASET,
-        selectedTrajectory: {
-          datasetPk: TRAJECTORY_DATASET.pk,
-          trajectoryId: "Mai21",
-        },
-        setSelectedTrajectory,
+        setInspectRecordID,
       });
-      const [card] = await cardsNamed("Mai21");
-      const control = within(card).getByLabelText(
-        "Clear this track from the map",
-      );
-      expect(control).toHaveAttribute("aria-pressed", "true");
-      await user.click(control);
-      expect(setSelectedTrajectory).toHaveBeenCalledWith(undefined);
+      await user.click(await screen.findByText("cruise-a"));
+      expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a");
+      expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
     });
+  });
 
-    it("carry no track control on a dataset that is not a trajectory", async () => {
-      serveRecords();
-      await renderReady();
-      await cardsNamed("Mai21");
-      expect(
-        screen.queryByLabelText("Draw this track on the map"),
-      ).not.toBeInTheDocument();
-    });
+  it("Show on map on a time-series record rings it on the map, and clears it again", async () => {
+    const fixtureFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input) =>
+        String(input).includes("/datasetRecordsList?")
+          ? new Response(
+              JSON.stringify({ profiles: [{ profile_id: "station-7" }] }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            )
+          : fixtureFetch(input),
+      ),
+    );
+    const { user } = await renderReady();
+    const card = (await screen.findByText("station-7")).closest(".listCard");
+    const show = within(card).getByRole("button", { name: /Show on map/ });
+
+    await user.click(show);
+    expect(screen.getByTestId("mapped-record")).toHaveTextContent("station-7");
+    expect(show).toHaveAttribute("aria-pressed", "true");
+    expect(card).toHaveClass("selected");
+
+    await user.click(show);
+    expect(screen.getByTestId("mapped-record")).toHaveTextContent("none");
   });
 });

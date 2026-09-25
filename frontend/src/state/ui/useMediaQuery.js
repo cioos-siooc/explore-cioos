@@ -10,6 +10,10 @@ import { useCallback, useSyncExternalStore } from "react";
 // stylesheets that branch on it in CSS cannot drift apart.
 export const MOBILE_QUERY = "(max-width: 700px)";
 
+// A screen driven by touch alone: no pointer to follow, and no keyboard to
+// press Esc or Enter on.
+export const TOUCH_QUERY = "(hover: none)";
+
 // Subscribes to a media query and re-renders when it flips. Layout that CSS can
 // carry belongs in CSS; this is for the cases where the markup itself differs —
 // a different icon, a card that becomes a modal, a control that isn't rendered
