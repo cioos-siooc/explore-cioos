@@ -5,6 +5,10 @@ Quebec's Law 25 and the EU's ePrivacy/GDPR rules without a consent banner: it
 stores nothing on the user's device that needs consent, and it tells users what
 leaves their browser.
 
+It applies the organization-wide
+[CIOOS privacy guidelines](https://cioos.ca/privacy-guidelines/), which the
+in-app notice links to for questions and requests.
+
 The in-app **Privacy** notice (linked from the About window and the download
 form, `frontend/src/components/AppShell/Modals/PrivacyModal.jsx`) is what users
 read. This is the technical summary. Keep the two in step: a new stored key,

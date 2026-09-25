@@ -25,7 +25,7 @@ const SECTIONS = [
   { key: "map", Icon: Map },
 ];
 
-const GUIDELINES_URL = "https://www.cioos.ca/cioos-privacy-guidelines/";
+const GUIDELINES_URL = "https://cioos.ca/privacy-guidelines/";
 
 export default function PrivacyModal() {
   const { t } = useTranslation();
