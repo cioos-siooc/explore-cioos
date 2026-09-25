@@ -87,6 +87,15 @@ const histogramSkeleton = (
   </SkeletonGroup>
 );
 
+function CoverageOption({ label, help }) {
+  return (
+    <span className="coverageOption">
+      <span className="coverageOptionLabel">{label}</span>
+      <span className="coverageOptionHelp">{help}</span>
+    </span>
+  );
+}
+
 // The dataset-coverage figure, launched from the top bar: a histogram of how
 // many datasets match the applied filters over time, with the bars split by a
 // chosen dimension. Depth is handled by the filter, not drawn as an axis.
@@ -201,57 +210,73 @@ export default function CoverageModal() {
       </Modal.Header>
       <Modal.Body>
         <div className="coverageToolbar">
-          <span className="coverageToolbarLabel">
-            {t("coverageCountByLabel")}
-          </span>
-          <DropdownButton
-            data-testid="coverage-count-dropdown"
-            title={t(`coverageMetric_${count}`)}
-          >
-            {COUNT_OPTIONS.map((option) => (
-              <Dropdown.Item
-                key={option}
-                data-testid="coverage-count-option"
-                active={option === count}
-                onClick={() => setCount(option)}
-              >
-                {t(`coverageMetric_${option}`)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-          <span className="coverageToolbarLabel">
-            {t("coverageColorByLabel")}
-          </span>
-          <DropdownButton
-            data-testid="coverage-group-dropdown"
-            title={t(`coverageGroup_${groupBy}`)}
-          >
-            {GROUP_OPTIONS.map((option) => (
-              <Dropdown.Item
-                key={option}
-                data-testid="coverage-group-option"
-                active={option === groupBy}
-                onClick={() => setGroupBy(option)}
-              >
-                {t(`coverageGroup_${option}`)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-        </div>
-        {/* Organizations are the one multi-valued dimension: a dataset in two
-            of them lands in both series, so the stack total is not the
-            dataset count. Say so rather than let the axis imply otherwise. */}
-        {groupBy === "organization" && (
-          <div className="coverageToolbarNote">
-            {t("coverageOrganizationNote")}
+          <div className="coverageToolbarNotes">
+            {/* Organizations are the one multi-valued dimension: a dataset in
+                two of them lands in both series, so the stack total is not
+                the dataset count. Say so rather than let the axis imply
+                otherwise. */}
+            {groupBy === "organization" && (
+              <div className="coverageToolbarNote">
+                {t("coverageOrganizationNote")}
+              </div>
+            )}
+            {/* Days are per-feature and added up, so a bar measures
+                observation effort and routinely exceeds the number of
+                calendar days in its period. Deliberately unlike the map's
+                days ramp, which unions. */}
+            {count === "days" && (
+              <div className="coverageToolbarNote">{t("coverageDaysNote")}</div>
+            )}
           </div>
-        )}
-        {/* Days are per-feature and added up, so a bar measures observation
-            effort and routinely exceeds the number of calendar days in its
-            period. Deliberately unlike the map's days ramp, which unions. */}
-        {count === "days" && (
-          <div className="coverageToolbarNote">{t("coverageDaysNote")}</div>
-        )}
+          <div className="coverageToolbarControls">
+            <span className="coverageToolbarLabel">
+              {t("coverageCountByLabel")}
+            </span>
+            <DropdownButton
+              data-testid="coverage-count-dropdown"
+              title={t(`coverageMetric_${count}`)}
+              menuClassName="coverageOptionMenu"
+              align="end"
+            >
+              {COUNT_OPTIONS.map((option) => (
+                <Dropdown.Item
+                  key={option}
+                  data-testid="coverage-count-option"
+                  active={option === count}
+                  onClick={() => setCount(option)}
+                >
+                  <CoverageOption
+                    label={t(`coverageMetric_${option}`)}
+                    help={t(`coverageMetricHelp_${option}`)}
+                  />
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+            <span className="coverageToolbarLabel">
+              {t("coverageColorByLabel")}
+            </span>
+            <DropdownButton
+              data-testid="coverage-group-dropdown"
+              title={t(`coverageGroup_${groupBy}`)}
+              menuClassName="coverageOptionMenu"
+              align="end"
+            >
+              {GROUP_OPTIONS.map((option) => (
+                <Dropdown.Item
+                  key={option}
+                  data-testid="coverage-group-option"
+                  active={option === groupBy}
+                  onClick={() => setGroupBy(option)}
+                >
+                  <CoverageOption
+                    label={t(`coverageGroup_${option}`)}
+                    help={t(`coverageGroupHelp_${option}`)}
+                  />
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+          </div>
+        </div>
         <div className="coveragePlotArea">
           {/* A refetch keeps the bars it already has, dimmed, rather than
               blanking to an empty area: switching Count or Colour-by changes

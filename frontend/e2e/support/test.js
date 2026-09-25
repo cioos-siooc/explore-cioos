@@ -44,13 +44,11 @@ export const test = base.extend({
         appOrigin: new URL(baseURL).origin,
         apiOrigin: API_ORIGIN,
       });
-      // UIProvider shows the intro modal unless this cookie is set, and it
-      // covers everything. intro.spec.js clears it to test the modal itself.
-      await context.addCookies([
-        { name: "introModalOpen", value: "false", url: baseURL },
-      ]);
-      // Contextual tips would otherwise pop up under the top bar mid-spec.
+      // The intro modal opens by itself until it has been closed once, and it
+      // covers everything; contextual tips would otherwise pop up under the
+      // top bar mid-spec. a11y.spec.js opens the intro from its button.
       await context.addInitScript(() => {
+        window.localStorage.setItem("cde.introSeen", "true");
         window.localStorage.setItem("cde.tipsEnabled", "false");
       });
       await use(unexpected);

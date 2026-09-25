@@ -27,6 +27,9 @@ Sentry.init({
   dsn,
   enabled: Boolean(dsn),
   environment: process.env.ENVIRONMENT || "development",
+  // Already the default; pinned because the privacy notice promises no IP
+  // address reaches Sentry (US-hosted).
+  sendDefaultPii: false,
   release: process.env.SENTRY_RELEASE,
   integrations: [
     // Router-aware tracing: names pageload/navigation transactions after the
@@ -46,6 +49,9 @@ Sentry.init({
     Sentry.feedbackIntegration({
       autoInject: false,
       showBranding: false,
+      // Sentry is hosted in the US; the name adds nothing a reply needs, and
+      // the email field stays optional (see PrivacyModal).
+      showName: false,
       colorScheme: "light",
       themeLight: {
         foreground: "var(--cioos-ink)",

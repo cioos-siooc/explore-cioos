@@ -244,15 +244,32 @@
   flex-direction: column;
 }
 
-/* Toolbar: "Colour by" label + the grouping dropdown, right-aligned above the
-   plot. */
+/* Toolbar: the metric's caveats on the left, level with the Count and
+   Colour-by controls on the right. The notes wrap onto their own line above
+   the controls once the row is too narrow for both. */
 .coverageToolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--cioos-space-sm);
+  gap: var(--cioos-space-sm) var(--cioos-space-md);
   flex: 0 0 auto;
   padding-bottom: var(--cioos-space-sm);
+}
+
+.coverageToolbarNotes {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
+}
+
+.coverageToolbarControls {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
 }
 
 .coverageToolbarLabel {
@@ -260,14 +277,30 @@
   color: var(--cioos-ink-60);
 }
 
-/* Caveat shown under the toolbar for a grouping whose series overlap, so the
-   stacked total reads higher than the entity count. */
-.coverageToolbarNote {
-  flex: 0 0 auto;
-  font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
-  padding-bottom: var(--cioos-space-sm);
-  text-align: right;
+/* Each option carries a line saying what it measures, so the menu wraps
+   instead of the one-line nowrap rows other dropdowns use. */
+.coverageOptionMenu {
+  width: 300px;
+  max-width: calc(100vw - 24px);
+}
+
+.coverageOptionMenu .dropdown-item {
+  white-space: normal;
+}
+
+.coverageOption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coverageOptionLabel {
+  font-weight: 500;
+}
+
+.coverageOptionHelp {
+  color: var(--cioos-ink-80);
+  line-height: 1.3;
 }
 
 .coverageToolbar .dropdown-toggle {

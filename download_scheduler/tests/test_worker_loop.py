@@ -234,3 +234,15 @@ class TestPrefectObservability:
         assert "no-data" not in ds.FAILED_STATUSES
         assert "over-limit" not in ds.FAILED_STATUSES
         assert "completed" not in ds.FAILED_STATUSES
+
+
+@pytest.mark.parametrize("serving", [True, False])
+def test_poll_once_touches_the_heartbeat_only_when_serving(
+    monkeypatch, tmp_path, serving
+):
+    heartbeat = tmp_path / "downloads" / "healthz"
+    monkeypatch.setattr(ds, "heartbeat_file", heartbeat)
+    monkeypatch.setattr(ds, "process_next_job", lambda: serving)
+
+    assert ds.poll_once() is serving
+    assert heartbeat.exists() is serving
