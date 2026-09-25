@@ -73,9 +73,10 @@ const browser = await chromium.launch({ args: CHROMIUM_ARGS });
 const context = await browser.newContext({
   viewport: { width: 1600, height: 900 },
 });
-// The same fixed clock the specs run under, so recorded query strings (which
-// carry today's date as the default time bound) match what the specs request.
-await context.clock.setFixedTime(FROZEN_TIME);
+// The same clock the specs run under (started at FROZEN_TIME, then running —
+// see e2e/support/test.js), so recorded query strings, which carry today's date
+// as the default time bound, match what the specs request.
+await context.clock.setSystemTime(FROZEN_TIME);
 // The intro modal is dismissed in the specs too; recording with it up would
 // capture a first-visit state the tests never reach.
 await context.addCookies([

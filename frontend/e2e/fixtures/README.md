@@ -48,7 +48,14 @@ a harvest first, or the catalogue responses come back empty.
 ## Provenance
 
 `organizations`, `oceanVariables`, `platforms`, `datasets`, `pointQuery`,
-`legend` and the `tiles/` files are recorded responses, truncated to 40 rows so
-they stay reviewable in a diff. The rest are hand-written to the shapes in
+`legend` and the z2 `tiles/` files are recorded responses, truncated to 40 rows
+so they stay reviewable in a diff. The rest are hand-written to the shapes in
 `web-api/routes/`, because no deployment reachable from here serves them yet;
 re-record them against a local stack when one is running.
+
+The z7 tiles (`tiles/tiles/7-*`, `tiles/tiles-tracks/7-*`),
+`api/griddapCoverage.json` and `api/trajectories_track.json` are synthetic:
+markers, tracks and grids the recorded set has none of, generated from
+`e2e/support/syntheticScene.js` by `node e2e/build-synthetic-tiles.mjs`. Edit the scene and regenerate rather than
+touching the tiles. Their dataset pks are ones `pointQuery.json` holds, so a
+re-record that changes those rows has to re-point the scene too.

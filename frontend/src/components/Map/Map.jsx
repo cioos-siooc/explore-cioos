@@ -3,18 +3,16 @@ import maplibreGl, { Popup } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 
 import * as helpers from "@turf/helpers";
 import turfBboxPolygon from "@turf/bbox-polygon";
 import turfPointsWithinPolygon from "@turf/points-within-polygon";
 import turfBbox from "@turf/bbox";
-import turfUnion from "@turf/union";
 
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
 import "./styles.css";
 
 import { server } from "../../config";
@@ -32,11 +30,9 @@ import {
   quantizeCountRange,
   rangesEqual,
   revealOffset,
-  selectionFromSearchParams,
   zoomToDatasetCamera,
   splitTrackRuns,
   initialBearing,
-  withAlpha,
 } from "../../utilities";
 import {
   buildWmsGetMapUrl,
@@ -52,10 +48,6 @@ import {
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
-  tracksMinDate,
-  defaultMapCenter,
-  defaultMapZoom,
-  TRAIL_ALL,
   effectiveTrailingDays,
 } from "../config";
 import platformColors from "../../components/platformColors";
@@ -69,23 +61,35 @@ import {
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS,
 } from "./basemapStyle.js";
-import { buildTileSuffix } from "./tileQuery.js";
-import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
-import { featureHasDataset, focusedPointFeatures } from "./focusedPoints.js";
+import {
+  buildTileSuffix,
+  filterTimeWindow,
+  tracksTimeWindow,
+} from "./tileQuery.js";
+import {
+  buildFeatureQuery,
+  datasetPksOf,
+  dedupeGriddapByPk,
+  featureHasDataset,
+  griddapCoveredIn,
+  griddapOutranksHexesIn,
+  griddapTitle,
+  isOnAPointIn,
+  selectedTrackLayers,
+  trackClickLayers,
+  trackItemsIn,
+} from "./hitTest.js";
+import { radiusExpression } from "./pointRadius.js";
+import { rampExpression, toRampStops } from "./hexRamp.js";
+import { focusedPointFeatures } from "./focusedPoints.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
-// direct_select's own dragVertex/toDisplayFeatures, captured once here at
-// module load — before the component below patches these modes on every
-// render (see the simple_select.toDisplayFeatures override further down).
-// Capturing the ORIGINAL library functions at module scope, rather than
-// inside the component, means each render's override always falls back to
-// true library behavior, not to the previous render's override — so
-// re-renders don't stack wrapper upon wrapper.
+// direct_select's own dragVertex/toDisplayFeatures, captured before the
+// overrides below replace them, so each override can fall back to true library
+// behavior.
 const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex;
 const defaultDirectSelectToDisplayFeatures =
   MapboxDraw.modes.direct_select.toDisplayFeatures;
-const drawPolygonMode = withPolygonHint(MapboxDraw.modes.draw_polygon);
-const drawRectangleMode = withBoxHint(DrawRectangle);
 
 // A rectangle drawn with draw_rectangle is a 4-point ring — mapbox-gl-draw
 // strips the closing duplicate point internally (see Polygon's constructor
@@ -97,6 +101,209 @@ function isRectangleFeature(feature) {
     Boolean(ring) && ring.length === 4 && polygonIsRectangle([...ring, ring[0]])
   );
 }
+
+// Suppresses vertex/midpoint handles for a merely-*selected* shape (one
+// click, still simple_select) — direct_select keeps its library-default
+// toDisplayFeatures, which is what draws those handles for dragging. A
+// second click on the selected shape (mapbox-gl-draw's own
+// clickOnFeature/clickOnVertex transitions) enters direct_select and
+// reveals them. The vertex/midpoint layer styles below are already scoped
+// to `!= mode simple_select` for exactly this split.
+const disabledEvent = function (state, geojson, display) {
+  display(geojson);
+};
+
+const modes = MapboxDraw.modes;
+MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
+
+// A drawn bounding box must stay an axis-aligned rectangle while it's being
+// edited: dragging the whole shape already preserves that (translation),
+// but the library's default dragVertex moves only the one dragged corner,
+// which would let it warp into an arbitrary quadrilateral. For a
+// rectangle's single-corner drags, also slide its two ring-adjacent
+// corners along the axis they already share with it (the one on the same
+// old X gets the new X, the one on the same old Y gets the new Y), leaving
+// the opposite corner as the resize anchor. Anything else — a polygon, or
+// more than one selected vertex — keeps the library's own behavior.
+modes.direct_select.dragVertex = function (state, e, delta) {
+  const path = state.selectedCoordPaths[0];
+  if (
+    state.selectedCoordPaths.length !== 1 ||
+    !isRectangleFeature(state.feature)
+  ) {
+    defaultDragVertex.call(this, state, e, delta);
+    return;
+  }
+  const [ringIndex, index] = path.split(".").map((x) => parseInt(x, 10));
+  const oldCoord = state.feature.getCoordinate(path);
+  const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat];
+  [(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
+    const neighborPath = `${ringIndex}.${neighborIndex}`;
+    const neighborOld = state.feature.getCoordinate(neighborPath);
+    if (neighborOld[0] === oldCoord[0]) {
+      state.feature.updateCoordinate(neighborPath, newCoord[0], neighborOld[1]);
+    } else {
+      state.feature.updateCoordinate(neighborPath, neighborOld[0], newCoord[1]);
+    }
+  });
+  state.feature.updateCoordinate(path, newCoord[0], newCoord[1]);
+};
+
+// Dragging the body of a drawn shape (as opposed to one of its corner/
+// midpoint handles) defaults to translating the whole thing — disable
+// that so a spatial filter can only be resized from its handles, never
+// moved wholesale. Still track dragMoveLocation so a later handle-drag in
+// the same gesture doesn't jump using a stale reference point.
+modes.direct_select.dragFeature = function (state, e) {
+  state.dragMoveLocation = e.lngLat;
+};
+
+// A midpoint handle lets a user add a 5th vertex, which would permanently
+// break a rectangle's "always 4 corners" invariant — so suppress midpoint
+// handles specifically while editing a rectangle. Free-form polygons keep
+// their midpoints, so vertices can still be added to those as before.
+modes.direct_select.toDisplayFeatures = function (state, geojson, push) {
+  if (
+    state.featureId === geojson.properties.id &&
+    isRectangleFeature(state.feature)
+  ) {
+    defaultDirectSelectToDisplayFeatures.call(
+      this,
+      state,
+      geojson,
+      (feature) => {
+        if (feature.properties?.meta === "midpoint") return;
+        push(feature);
+      },
+    );
+    return;
+  }
+  defaultDirectSelectToDisplayFeatures.call(this, state, geojson, push);
+};
+
+// A drawn shape should always render "active" (yellow, with drag handles)
+// rather than dropping back to simple_select's plain/blue look. The
+// library's own clickNoTarget/clickInactive (clicking empty water, or a
+// second inactive feature, while editing) exit to simple_select — reuse
+// its clickActiveFeature instead, which just clears any selected vertex
+// and stays in direct_select.
+modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature;
+modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature;
+
+modes.draw_polygon = withPolygonHint(MapboxDraw.modes.draw_polygon);
+modes.draw_rectangle = withBoxHint(DrawRectangle);
+
+const drawControlOptions = {
+  displayControlsDefault: false,
+  // No buttons of its own: draw_rectangle/draw_polygon/simple_select are
+  // driven imperatively from the top bar's spatial filter button (see the
+  // drawRequest effect), not by clicking a control here.
+  controls: {
+    point: false,
+    line_string: false,
+    polygon: false,
+    trash: false,
+    combine_features: false,
+    uncombine_features: false,
+    modes,
+    pitchWithRotate: false,
+    dragRotate: false,
+    touchZoomRotate: false,
+  },
+  styles: [
+    {
+      id: "gl-draw-polygon-fill",
+      type: "fill",
+      filter: ["all", ["==", "$type", "Polygon"]],
+      paint: {
+        "fill-color": [
+          "case",
+          ["==", ["get", "active"], "true"],
+          "#fbb03b",
+          "#3bb2d0",
+        ],
+        "fill-opacity": 0.1,
+      },
+    },
+    {
+      id: "gl-draw-lines",
+      type: "line",
+      filter: [
+        "any",
+        ["==", "$type", "LineString"],
+        ["==", "$type", "Polygon"],
+      ],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": [
+          "case",
+          ["==", ["get", "active"], "true"],
+          "#fbb03b",
+          "#3bb2d0",
+        ],
+        "line-dasharray": ["literal", [0.2, 2]],
+        "line-width": 2,
+      },
+    },
+    {
+      id: "gl-draw-point-outer",
+      type: "circle",
+      filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
+        "circle-color": "#fff",
+      },
+    },
+    {
+      id: "gl-draw-point-inner",
+      type: "circle",
+      filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
+        "circle-color": [
+          "case",
+          ["==", ["get", "active"], "true"],
+          "#fbb03b",
+          "#3bb2d0",
+        ],
+      },
+    },
+    {
+      id: "gl-draw-vertex-outer",
+      type: "circle",
+      filter: [
+        "all",
+        ["==", "$type", "Point"],
+        ["==", "meta", "vertex"],
+        ["!=", "mode", "simple_select"],
+      ],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
+        "circle-color": "#fff",
+      },
+    },
+    {
+      id: "gl-draw-vertex-inner",
+      type: "circle",
+      filter: [
+        "all",
+        ["==", "$type", "Point"],
+        ["==", "meta", "vertex"],
+        ["!=", "mode", "simple_select"],
+      ],
+      paint: {
+        "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
+        "circle-color": "#fbb03b",
+      },
+    },
+    {
+      id: "gl-draw-midpoint",
+      type: "circle",
+      filter: ["all", ["==", "meta", "midpoint"]],
+      paint: { "circle-radius": 3, "circle-color": "#fbb03b" },
+    },
+  ],
+};
 
 // --- Viewport-adaptive hex ramp knobs ------------------------------------
 // How long the camera has to hold still before the visible hexes are measured.
@@ -194,28 +401,6 @@ function buildHeadArrowImage(fillColor, strokeColor = "#ffffff") {
   return ctx.getImageData(0, 0, size, size);
 }
 
-// The time filter as two instants, read back out of the map query string —
-// the same timeMin/timeMax the hexes, the points, the counts and the record
-// lists are filtered by (createDataFilterQueryString writes them, and leaves
-// them out entirely while the range is still the full default one). Bounds are
-// the API's own: date-only strings at UTC midnight, both ends inclusive, so a
-// track is clipped to exactly the span the numbers beside it are counted over.
-//
-// Not to be confused with tracksTimeWindow below, which is the scrub bar's
-// trailing window — the tracks TILES are drawn for that and deliberately
-// ignore this filter (see buildTracksTileUrl and TrajectoryDate.jsx).
-function filterTimeWindow(queryString) {
-  const params = new URLSearchParams(queryString);
-  const instant = (value) => {
-    const ms = value ? Date.parse(value) : NaN;
-    return Number.isNaN(ms) ? undefined : ms;
-  };
-  return {
-    min: instant(params.get("timeMin")),
-    max: instant(params.get("timeMax")),
-  };
-}
-
 // Using Maplibre with React: https://documentation.maptiler.com/hc/en-us/articles/4405444890897-Display-MapLibre-GL-JS-map-using-React-JS
 // While a WMS overlay is active every other data layer is hidden so the
 // gridded field reads cleanly; only the basemap, the raster and the
@@ -288,6 +473,9 @@ export default function CreateMap({
   setPolygon,
   setLoading,
   setLoadingLayers = () => {},
+  // The camera to open at — MapStateProvider's mapView, which it seeds from the
+  // share link. Read once, when the map is created.
+  initialView,
   setMapView,
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
@@ -346,225 +534,11 @@ export default function CreateMap({
 }) {
   const { t, i18n } = useTranslation();
 
-  const [searchParams] = useSearchParams();
-
   const mapContainer = useRef(null);
   const map = useRef(null);
   const creatingPolygon = useRef(false);
   const shiftBoxCreate = useRef(false);
 
-  // Suppresses vertex/midpoint handles for a merely-*selected* shape (one
-  // click, still simple_select) — direct_select keeps its library-default
-  // toDisplayFeatures, which is what draws those handles for dragging. A
-  // second click on the selected shape (mapbox-gl-draw's own
-  // clickOnFeature/clickOnVertex transitions) enters direct_select and
-  // reveals them. The vertex/midpoint layer styles below are already scoped
-  // to `!= mode simple_select` for exactly this split.
-  const disabledEvent = function (state, geojson, display) {
-    display(geojson);
-  };
-
-  const modes = MapboxDraw.modes;
-  MapboxDraw.modes.simple_select.toDisplayFeatures = disabledEvent;
-
-  // A drawn bounding box must stay an axis-aligned rectangle while it's being
-  // edited: dragging the whole shape already preserves that (translation),
-  // but the library's default dragVertex moves only the one dragged corner,
-  // which would let it warp into an arbitrary quadrilateral. For a
-  // rectangle's single-corner drags, also slide its two ring-adjacent
-  // corners along the axis they already share with it (the one on the same
-  // old X gets the new X, the one on the same old Y gets the new Y), leaving
-  // the opposite corner as the resize anchor. Anything else — a polygon, or
-  // more than one selected vertex — keeps the library's own behavior.
-  modes.direct_select.dragVertex = function (state, e, delta) {
-    const path = state.selectedCoordPaths[0];
-    if (
-      state.selectedCoordPaths.length !== 1 ||
-      !isRectangleFeature(state.feature)
-    ) {
-      defaultDragVertex.call(this, state, e, delta);
-      return;
-    }
-    const [ringIndex, index] = path.split(".").map((x) => parseInt(x, 10));
-    const oldCoord = state.feature.getCoordinate(path);
-    const newCoord = [oldCoord[0] + delta.lng, oldCoord[1] + delta.lat];
-    [(index + 3) % 4, (index + 1) % 4].forEach((neighborIndex) => {
-      const neighborPath = `${ringIndex}.${neighborIndex}`;
-      const neighborOld = state.feature.getCoordinate(neighborPath);
-      if (neighborOld[0] === oldCoord[0]) {
-        state.feature.updateCoordinate(
-          neighborPath,
-          newCoord[0],
-          neighborOld[1],
-        );
-      } else {
-        state.feature.updateCoordinate(
-          neighborPath,
-          neighborOld[0],
-          newCoord[1],
-        );
-      }
-    });
-    state.feature.updateCoordinate(path, newCoord[0], newCoord[1]);
-  };
-
-  // Dragging the body of a drawn shape (as opposed to one of its corner/
-  // midpoint handles) defaults to translating the whole thing — disable
-  // that so a spatial filter can only be resized from its handles, never
-  // moved wholesale. Still track dragMoveLocation so a later handle-drag in
-  // the same gesture doesn't jump using a stale reference point.
-  modes.direct_select.dragFeature = function (state, e) {
-    state.dragMoveLocation = e.lngLat;
-  };
-
-  // A midpoint handle lets a user add a 5th vertex, which would permanently
-  // break a rectangle's "always 4 corners" invariant — so suppress midpoint
-  // handles specifically while editing a rectangle. Free-form polygons keep
-  // their midpoints, so vertices can still be added to those as before.
-  modes.direct_select.toDisplayFeatures = function (state, geojson, push) {
-    if (
-      state.featureId === geojson.properties.id &&
-      isRectangleFeature(state.feature)
-    ) {
-      defaultDirectSelectToDisplayFeatures.call(
-        this,
-        state,
-        geojson,
-        (feature) => {
-          if (feature.properties?.meta === "midpoint") return;
-          push(feature);
-        },
-      );
-      return;
-    }
-    defaultDirectSelectToDisplayFeatures.call(this, state, geojson, push);
-  };
-
-  // A drawn shape should always render "active" (yellow, with drag handles)
-  // rather than dropping back to simple_select's plain/blue look. The
-  // library's own clickNoTarget/clickInactive (clicking empty water, or a
-  // second inactive feature, while editing) exit to simple_select — reuse
-  // its clickActiveFeature instead, which just clears any selected vertex
-  // and stays in direct_select.
-  modes.direct_select.clickNoTarget = modes.direct_select.clickActiveFeature;
-  modes.direct_select.clickInactive = modes.direct_select.clickActiveFeature;
-
-  modes.draw_polygon = drawPolygonMode;
-  modes.draw_rectangle = drawRectangleMode;
-
-  const drawControlOptions = {
-    displayControlsDefault: false,
-    // No buttons of its own: draw_rectangle/draw_polygon/simple_select are
-    // driven imperatively from the top bar's spatial filter button (see the
-    // drawRequest effect), not by clicking a control here.
-    controls: {
-      point: false,
-      line_string: false,
-      polygon: false,
-      trash: false,
-      combine_features: false,
-      uncombine_features: false,
-      modes,
-      pitchWithRotate: false,
-      dragRotate: false,
-      touchZoomRotate: false,
-    },
-    styles: [
-      {
-        id: "gl-draw-polygon-fill",
-        type: "fill",
-        filter: ["all", ["==", "$type", "Polygon"]],
-        paint: {
-          "fill-color": [
-            "case",
-            ["==", ["get", "active"], "true"],
-            "#fbb03b",
-            "#3bb2d0",
-          ],
-          "fill-opacity": 0.1,
-        },
-      },
-      {
-        id: "gl-draw-lines",
-        type: "line",
-        filter: [
-          "any",
-          ["==", "$type", "LineString"],
-          ["==", "$type", "Polygon"],
-        ],
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": [
-            "case",
-            ["==", ["get", "active"], "true"],
-            "#fbb03b",
-            "#3bb2d0",
-          ],
-          "line-dasharray": ["literal", [0.2, 2]],
-          "line-width": 2,
-        },
-      },
-      {
-        id: "gl-draw-point-outer",
-        type: "circle",
-        filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
-          "circle-color": "#fff",
-        },
-      },
-      {
-        id: "gl-draw-point-inner",
-        type: "circle",
-        filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"]],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
-          "circle-color": [
-            "case",
-            ["==", ["get", "active"], "true"],
-            "#fbb03b",
-            "#3bb2d0",
-          ],
-        },
-      },
-      {
-        id: "gl-draw-vertex-outer",
-        type: "circle",
-        filter: [
-          "all",
-          ["==", "$type", "Point"],
-          ["==", "meta", "vertex"],
-          ["!=", "mode", "simple_select"],
-        ],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 7, 5],
-          "circle-color": "#fff",
-        },
-      },
-      {
-        id: "gl-draw-vertex-inner",
-        type: "circle",
-        filter: [
-          "all",
-          ["==", "$type", "Point"],
-          ["==", "meta", "vertex"],
-          ["!=", "mode", "simple_select"],
-        ],
-        paint: {
-          "circle-radius": ["case", ["==", ["get", "active"], "true"], 5, 3],
-          "circle-color": "#fbb03b",
-        },
-      },
-      {
-        id: "gl-draw-midpoint",
-        type: "circle",
-        filter: ["all", ["==", "meta", "midpoint"]],
-        paint: { "circle-radius": 3, "circle-color": "#fbb03b" },
-      },
-    ],
-  };
-  const smallCircleSize = 2.75;
-  const largeCircleSize = 6;
   const circleOpacity = 0.7;
   // The transparency at the world view, and the only thing letting the basemap
   // through: the hex colours themselves are opaque. It lets it through equally
@@ -609,7 +583,7 @@ export default function CreateMap({
     [hexMinZoom, hexOpacity],
     [hexMaxZoom, COVERAGE_HEX_OPACITY_STOPS[0][1]],
   ];
-  const draw = new MapboxDraw(drawControlOptions);
+  const [draw] = useState(() => new MapboxDraw(drawControlOptions));
   const drawPolygon = useRef(draw);
   const doFinalCheck = useRef(false);
   const layersLoaded = useRef(false);
@@ -641,7 +615,6 @@ export default function CreateMap({
   // the first render's closure (like setColorStops, which it reaches through a
   // ref of its own), so the prop it captured is forever the mount-time one.
   const rangeLevelsRef = useRef(rangeLevels);
-  rangeLevelsRef.current = rangeLevels;
   // Point-tier count range, kept so the circle-radius ramp can be rebuilt on
   // the layers whenever the filters change (see setColorStops).
   const pointRadiusRange = useRef(null);
@@ -675,38 +648,17 @@ export default function CreateMap({
   // Latest onViewportHexRange, for the same reason: the debounced handler that
   // reports the measurement is registered once.
   const onViewportHexRangeRef = useRef(onViewportHexRange);
-  onViewportHexRangeRef.current = onViewportHexRange;
   // Read by the track-focus paint (see applyTrackFocus). It also fed a
   // "click to show this platform's full track" line on the track tooltips,
   // which the chips dropped: every hover said the same thing, and it said it
   // about a gesture the user had not made yet.
   const selectedTrajectoryRef = useRef(selectedTrajectory);
-  selectedTrajectoryRef.current = selectedTrajectory;
 
   // Raw selected-track response, cached so re-renders don't re-fetch.
   const rawTrackRef = useRef(null);
   // The selection the camera was last framed for, so a redraw from a filter
   // change doesn't re-frame it (see renderSelectedTrack).
   const framedTrackRef = useRef(null);
-
-  // UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
-  // or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
-  // up to the scrub date; see config.js). Day snapping keeps the tile URLs
-  // stable so the server's URL-keyed tile cache gets hits across scrubs and
-  // users. The requested trail is clamped by zoom first — a long window costs
-  // far more zoomed out, where one tile can carry the whole catalogue (see
-  // effectiveTrailingDays).
-  function tracksTimeWindow(scrub, trailing, zoom) {
-    const MS_PER_DAY = 24 * 60 * 60 * 1000;
-    const days = effectiveTrailingDays(trailing, zoom);
-    const end = new Date(`${scrub}T00:00:00Z`).getTime();
-    const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
-    const timeMin =
-      days === TRAIL_ALL
-        ? `${tracksMinDate}T00:00:00Z`
-        : `${new Date(end - days * MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
-    return { timeMin, timeMax };
-  }
 
   // Tracks tile URL: dataset-level filters from the regular map query string,
   // minus the TimeSelector's timeMin/timeMax (the scrub window must not
@@ -959,13 +911,16 @@ export default function CreateMap({
   // The hover chip. Its own class so the frame-stripping in styles.css is
   // scoped to this popup rather than to every MapLibre popup there might ever
   // be. offset lifts it clear of the cursor and of the marker it names.
-  const popup = new Popup({
-    closeButton: false,
-    closeOnClick: true,
-    className: "mapChipPopup",
-    offset: 10,
-    maxWidth: "260px",
-  });
+  const [popup] = useState(
+    () =>
+      new Popup({
+        closeButton: false,
+        closeOnClick: true,
+        className: "mapChipPopup",
+        offset: 10,
+        maxWidth: "260px",
+      }),
+  );
 
   const colors = ["match", ["get", "platform"]];
   platformColors.reduce((accumulatedPlatformColors, platformColor) => {
@@ -1074,52 +1029,6 @@ export default function CreateMap({
     deleteAllShapes();
   }
 
-  // The one hex ramp, shared by the combined 'hexes' layer below z7 and the
-  // 'coverage-hexes' layer at and above it. Both read the same 'count'
-  // property (the summed metric — see web-api/utils/hexMetric.js), so hex
-  // darkness means the same thing at every zoom.
-  //
-  // The stops are log-spaced by generateColorStops, but the interpolation
-  // between them is linear: the non-linearity lives in where the stops sit,
-  // not in how MapLibre blends across them.
-  //
-  // A single-stop ramp (a range of one value, e.g. a filter that leaves one
-  // hex) can't be interpolated: fall back to the flat color, since there's
-  // nothing to interpolate between.
-  // How much of the basemap the palest hex on the ramp lets through, as a
-  // fraction of what the darkest one lets through. The count is told twice on
-  // purpose — in the shade AND in how solid it is — because a sparse cell that
-  // is merely pale still covers the coastline underneath it as completely as a
-  // busy one does, and the two channels agree at every point on the ramp, so
-  // neither can contradict the other or the legend's key.
-  const HEX_RAMP_MIN_ALPHA = 0.55;
-
-  // The ramp's colours with that alpha baked in, rising with the stop just as
-  // the colour darkens with it. Linked to the ramp rather than measured on its
-  // own: this replaces a second data-driven fill-opacity that carried a
-  // 95th-percentile threshold of the counts on screen, which meant a percentile
-  // pass over every rendered hex on every settled camera, a threshold to hold
-  // and re-apply, and an expression evaluated per feature per frame — all of it
-  // to say what these stops already say. The stops are rebuilt only when the
-  // domain moves (setColorStops); the fill-opacity left on the layers is now
-  // zoom-only, so nothing here is recomputed while panning.
-  const toRampStops = (colorStops) =>
-    colorStops.map(({ stop, color }, index) => [
-      stop,
-      withAlpha(
-        color,
-        HEX_RAMP_MIN_ALPHA +
-          (1 - HEX_RAMP_MIN_ALPHA) *
-            (colorStops.length > 1 ? index / (colorStops.length - 1) : 1),
-      ),
-    ]);
-
-  const rampExpression = (stops, property) => {
-    if (stops.length === 0) return "lightgrey";
-    if (stops.length === 1) return stops[0][1];
-    return ["interpolate", ["linear"], ["get", property], ...stops.flat()];
-  };
-
   const hexFillColor = () => rampExpression(colorStops.current, "count");
 
   // The `count` property, worded: it is the number of distinct days that hold
@@ -1133,47 +1042,6 @@ export default function CreateMap({
     t("mapHexCountDays", {
       total: Number(value || 0).toLocaleString(i18n.language),
     });
-
-  // Point markers size by the same count the hexes colour by, log-spaced over
-  // the point-tier range so the marker for a long mooring record reads bigger
-  // than one for a single cast. Log because the range spans orders of
-  // magnitude — linear would leave every marker at the minimum but one.
-  //
-  // `padding` is the halo's extra radius: it sits under the markers and has to
-  // grow with them or it stops being a halo.
-  //
-  // A degenerate range (every point the same count, or the legend not back
-  // yet) has nothing to ramp: use the small radius flat.
-  const radiusExpression = (range, padding = 0) => {
-    const lo = Math.max(range?.[0] ?? 1, 1);
-    const hi = range?.[1];
-    if (!Number.isFinite(hi) || hi <= lo) return smallCircleSize + padding;
-    return [
-      "interpolate",
-      ["linear"],
-      ["log10", ["max", ["get", "count"], 1]],
-      Math.log10(lo),
-      smallCircleSize + padding,
-      Math.log10(hi),
-      largeCircleSize + padding,
-    ];
-  };
-
-  // The same ramp evaluated in JS, for the hit-tests that need to know how big
-  // a circle actually got drawn. MapLibre clamps an `interpolate` outside its
-  // domain to the endpoint value, so this clamps too — otherwise a count past
-  // the legend's range would report a radius larger than the one on screen.
-  const pointRadiusFor = (count) => {
-    const range = pointRadiusRange.current;
-    const lo = Math.max(range?.[0] ?? 1, 1);
-    const hi = range?.[1];
-    if (!Number.isFinite(hi) || hi <= lo) return smallCircleSize;
-    const loLog = Math.log10(lo);
-    const hiLog = Math.log10(hi);
-    const at = Math.log10(Math.max(Number(count) || 1, 1));
-    const ratio = Math.min(Math.max((at - loLog) / (hiLog - loLog), 0), 1);
-    return smallCircleSize + ratio * (largeCircleSize - smallCircleSize);
-  };
 
   // Every ramp-driven paint property below is ALWAYS an expression, and
   // MapLibre cannot interpolate a paint property to or from a data-driven value
@@ -1376,7 +1244,6 @@ export default function CreateMap({
       );
     }
   }
-  setColorStopsRef.current = setColorStops;
 
   // Whether queryRenderedFeatures can still answer "what is on screen". It
   // builds the region it searches by unprojecting the viewport corners, and in
@@ -1742,15 +1609,6 @@ export default function CreateMap({
   // gridded datasets covering the same water is the norm, not the exception.
   const hoveredGriddapIds = useRef([]);
 
-  function dedupeGriddapByPk(features) {
-    const byPk = new Map();
-    features.forEach((feature) => {
-      if (!byPk.has(feature.properties.pk))
-        byPk.set(feature.properties.pk, feature);
-    });
-    return [...byPk.values()];
-  }
-
   function setGriddapHovered(features) {
     if (!map.current?.getSource("griddap-coverage")) return;
     const setHovered = (id, hovered) =>
@@ -1761,20 +1619,6 @@ export default function CreateMap({
     hoveredGriddapIds.current.forEach((id) => setHovered(id, false));
     hoveredGriddapIds.current = features.map((feature) => feature.id);
     hoveredGriddapIds.current.forEach((id) => setHovered(id, true));
-  }
-
-  // nested feature properties arrive JSON-stringified from MapLibre
-  function griddapTitle(feature) {
-    try {
-      const titleTranslated = JSON.parse(feature.properties.title_translated);
-      return (
-        titleTranslated[i18n.language] ||
-        titleTranslated.en ||
-        feature.properties.dataset_id
-      );
-    } catch {
-      return feature.properties.dataset_id || "";
-    }
   }
 
   // Mirrors the dataLayersVisible prop so removeWmsOverlay (called from map
@@ -1843,6 +1687,10 @@ export default function CreateMap({
   // so the debounced moveend handler always clips with the current polygon.
   function renderWmsImage(overlay) {
     if (!map.current) return;
+    // Every render supersedes the last, not just an overlay removal: a GetMap
+    // for an earlier pan that resolves after a newer one would otherwise paint
+    // its stale bounds over the current view.
+    const token = ++wmsRenderToken.current;
     const viewportBounds = clampBoundsForWms(map.current.getBounds());
     if (
       viewportBounds.south >= viewportBounds.north ||
@@ -1878,7 +1726,6 @@ export default function CreateMap({
       time: overlay.time,
       elevation: overlay.elevation,
     });
-    const token = wmsRenderToken.current;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -2121,21 +1968,34 @@ export default function CreateMap({
   // Latest map query, readable from the map 'load' closure (which would
   // otherwise build its tile URLs from the query as of the first render).
   const mapQueryRef = useRef(mapQueryString);
-  mapQueryRef.current = mapQueryString;
 
   // The one click listener is registered once, in the map-creation effect, so
   // it must not close over the first render's setter — read it through a ref.
   // (Selecting a trajectory used to need the same treatment, for the track
   // click handler; the card does that itself now, straight from the provider.)
   const onFeatureQueryRef = useRef(onFeatureQuery);
-  onFeatureQueryRef.current = onFeatureQuery;
   // Consumed once by the mount effect; a ref rather than the prop so replaying
   // it can't be re-triggered by a later render.
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
   const onMarkerClickRef = useRef(onMarkerClick);
-  onMarkerClickRef.current = onMarkerClick;
   const onTrackClickRef = useRef(onTrackClick);
-  onTrackClickRef.current = onTrackClick;
+  const onShapeDrawnRef = useRef(onShapeDrawn);
+
+  // The latest-value refs above, for the handlers registered once on mount.
+  // Written after commit rather than during render, so a render React throws
+  // away never leaks into them. Layout effects run before every effect and map
+  // event that reads them, so no reader sees an older value than before.
+  useLayoutEffect(() => {
+    rangeLevelsRef.current = rangeLevels;
+    onViewportHexRangeRef.current = onViewportHexRange;
+    selectedTrajectoryRef.current = selectedTrajectory;
+    setColorStopsRef.current = setColorStops;
+    mapQueryRef.current = mapQueryString;
+    onFeatureQueryRef.current = onFeatureQuery;
+    onMarkerClickRef.current = onMarkerClick;
+    onTrackClickRef.current = onTrackClick;
+    onShapeDrawnRef.current = onShapeDrawn;
+  });
 
   // The filter query and the data-layer selection combine into one suffix
   // shared by both source URLs — see buildTileSuffix. The two routes split the
@@ -2496,896 +2356,811 @@ export default function CreateMap({
     };
   }, [mappedRecord]);
 
-  const mapZoom = searchParams.get("zoom");
-  const mapLongitude = searchParams.get("lon");
-  const mapLatitude = searchParams.get("lat");
+  function addObservationLayers() {
+    const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
 
-  useEffect(() => {
-    // If already created don't proceed
-    if (map.current) return;
-    // Create map
-    map.current = new maplibreGl.Map({
-      container: mapContainer.current,
-      // Ocean-first basemap: bathymetry raster + vector rivers/boundaries and
-      // FR/EN labels. Data layers are inserted below the label layers.
-      //
-      // The projection is part of the style in MapLibre 5, and it has to be
-      // set here rather than left to the effect above: that effect's first run
-      // happens while map.current is still null, and projection doesn't change
-      // again, so a globe restored from localStorage would never be applied.
-      style: {
-        ...buildBasemapStyle(i18n.language),
-        projection: { type: projection === "globe" ? "globe" : "mercator" },
-      },
-      // MapLibre defaults to powerPreference 'high-performance', which wakes
-      // the discrete GPU on dual-GPU laptops. The map is circles and fills —
-      // the integrated GPU renders it fine, so hint 'low-power'.
-      canvasContextAttributes: { powerPreference: "low-power" },
-      // No attribution in the map's own corner: the per-source attributions are
-      // gathered by an AttributionControl the legend card builds and parents
-      // itself (see LegendFooter.jsx).
-      attributionControl: false,
-      // Starting camera. The same share-link params and the same fallbacks
-      // MapStateProvider seeds its mapView from — the two have to agree, or
-      // the legend describes a zoom the map isn't at until the first moveend.
-      center: [
-        mapLongitude || defaultMapCenter.lon,
-        mapLatitude || defaultMapCenter.lat,
-      ],
-      zoom: mapZoom || defaultMapZoom,
-      // Stop at the deepest level the satellite imagery actually exists at
-      // everywhere it matters: Esri is cached to z17 on remote Arctic coasts
-      // (z19 in cities), and past its coverage it serves a grey "map data not
-      // yet available" tile rather than a 404. Capping the camera here means
-      // that tile is never reached on land, without masking anything off.
-      maxZoom: 17,
+    // Two shared vector sources for all point/hex layers. Each layer used to
+    // carry its own inline source — six separate copies of the same two tile
+    // pyramids, each fetched and parsed independently on every pan. The
+    // highlight layer renders nothing until a pk filter is set, and those pks
+    // always come from queryRenderedFeatures on the filtered layers, so
+    // sharing the filtered sources loses nothing.
+    //
+    // maxzoom stops at the level past which the server has nothing new to
+    // say: routes/tiles.js selects individual points for any z >= 7, so a z17
+    // tile is the same content as its z14 parent cut into 64 pieces — 64
+    // ST_AsMVT queries for one tile's worth of data. Capping the source lets
+    // MapLibre overzoom instead. Precision is unaffected in practice:
+    // ST_AsMVTGeom at extent 4096 over a z14 tile is ~0.42 m/unit at 45°N,
+    // finer than a z17 pixel (0.84 m). It matters more than the tile count
+    // suggests, because every filter change calls setTiles below, which drops
+    // the whole cache and refetches from scratch.
+    //
+    // promoteId lifts each feature's pk to its feature id, which is what
+    // setFeatureState addresses — see the focus dimming above.
+    map.current.addSource("cde-tiles", {
+      type: "vector",
+      tiles: [tileQuery],
+      maxzoom: 14,
+      promoteId: "pk",
     });
-    // Share the instance with MapStateProvider (see mapInstance there).
-    onMapReady(map.current);
+    map.current.addSource("cde-cells", {
+      type: "vector",
+      tiles: [cellTileQuery],
+      maxzoom: 14,
+      promoteId: "pk",
+    });
 
-    // disable map rotation using right click + drag
-    map.current.dragRotate.disable();
-
-    // disable map rotation using touch rotation gesture
-    map.current.touchZoomRotate.disableRotation();
-
-    map.current.on("load", () => {
-      setColorStops();
-
-      const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
-
-      // Two shared vector sources for all point/hex layers. Each layer used to
-      // carry its own inline source — six separate copies of the same two tile
-      // pyramids, each fetched and parsed independently on every pan. The
-      // highlight layer renders nothing until a pk filter is set, and those pks
-      // always come from queryRenderedFeatures on the filtered layers, so
-      // sharing the filtered sources loses nothing.
-      //
-      // maxzoom stops at the level past which the server has nothing new to
-      // say: routes/tiles.js selects individual points for any z >= 7, so a z17
-      // tile is the same content as its z14 parent cut into 64 pieces — 64
-      // ST_AsMVT queries for one tile's worth of data. Capping the source lets
-      // MapLibre overzoom instead. Precision is unaffected in practice:
-      // ST_AsMVTGeom at extent 4096 over a z14 tile is ~0.42 m/unit at 45°N,
-      // finer than a z17 pixel (0.84 m). It matters more than the tile count
-      // suggests, because every filter change calls setTiles below, which drops
-      // the whole cache and refetches from scratch.
-      //
-      // promoteId lifts each feature's pk to its feature id, which is what
-      // setFeatureState addresses — see the focus dimming above.
-      map.current.addSource("cde-tiles", {
-        type: "vector",
-        tiles: [tileQuery],
-        maxzoom: 14,
-        promoteId: "pk",
-      });
-      map.current.addSource("cde-cells", {
-        type: "vector",
-        tiles: [cellTileQuery],
-        maxzoom: 14,
-        promoteId: "pk",
-      });
-
-      // Every data layer is inserted below the basemap's label layers
-      // (beforeId FIRST_LABEL_LAYER_ID or an existing data layer) so water
-      // and place names stay readable over hexes and points.
-      map.current.addLayer(
-        {
-          id: "points",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-          layout: {
-            "circle-sort-key": ["get", "count"],
-          },
-          paint: {
-            // Zero until the ramp is final — see revealData. Both the colour
-            // below and the radius above come off the ramp, so before it lands
-            // these are placeholder values.
-            "circle-opacity": dataRevealed.current ? circleOpacity : 0,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current),
-            // setColorStops rewrites this one whenever the ramp moves — see
-            // NO_TRANSITION.
-            "circle-color-transition": NO_TRANSITION,
-            "circle-color": dimmable(colors),
-            "circle-stroke-color": dimmable(colors),
-            "circle-stroke-opacity": 0.001,
-            "circle-stroke-width": 10,
-          },
-        },
-        FIRST_LABEL_LAYER_ID,
-      );
-
-      // Trajectory and OBIS coverage cells, always drawn as hexes. Inserted
-      // with beforeId 'points' (which must already exist on the map —
-      // MapLibre throws otherwise) so they sit at the bottom of the stack,
-      // under the points layer. Below hexMaxZoom their counts are already
-      // merged into the green 'hexes' layer; this layer only takes over once
-      // profiles switch to points. A hex is coloured by what it holds —
-      // trajectories, occurrence records, or both — see coverageHexFillColor.
-      map.current.addLayer(
-        {
-          id: "coverage-hexes",
-          type: "fill",
-          minzoom: hexMaxZoom,
-          source: "cde-cells",
-          "source-layer": "coverage-hexes-layer",
-          paint: {
-            // Zero until the ramp is final — see revealData. Then a plain
-            // taper with zoom; the count's share of the transparency rides on
-            // the fill colour's alpha (toRampStops).
-            "fill-opacity": dataRevealed.current
-              ? coverageHexOpacityExpression()
-              : 0,
-            // Neither this nor the colours below may transition — see
-            // NO_TRANSITION. For the opacity that delay was the flicker on the
-            // opening reveal and on every threshold change after it; for the
-            // colours it is the lag between the tiles landing and the ramp
-            // arriving on them.
-            "fill-opacity-transition": NO_TRANSITION,
-            "fill-color": dimmable(coverageHexFillColor()),
-            "fill-color-transition": NO_TRANSITION,
-            "fill-outline-color": coverageHexOutlineColor(),
-          },
-        },
-        "points",
-      );
-
-      // What is left of a coverage cell once the fill has faded out from under
-      // it: the boundary alone, in the fill's own ramp colour, over an
-      // unobscured basemap. A fill layer's 'fill-outline-color' is drawn at the
-      // fill's own opacity, so it goes exactly when the fill does and cannot be
-      // the thing that outlives it — hence a line layer of its own, reading the
-      // same source and rising over the same zooms the fill falls across.
-      //
-      // Gated by the same opening reveal as the fills, and repainted by
-      // setColorStops with them: it carries the ramp, so it has the same reason
-      // not to be seen wearing the placeholder one.
-      map.current.addLayer(
-        {
-          id: "coverage-hex-outlines",
-          type: "line",
-          minzoom: hexMaxZoom,
-          source: "cde-cells",
-          "source-layer": "coverage-hexes-layer",
-          paint: {
-            "line-color-transition": NO_TRANSITION,
-            "line-color": coverageHexBorderColor(),
-            "line-opacity-transition": NO_TRANSITION,
-            "line-opacity": dataRevealed.current
-              ? coverageHexOutlineOpacityExpression()
-              : 0,
-            // Wide enough that a colour reads off it — it is standing in for a
-            // whole hexagon of fill.
-            "line-width": 2,
-          },
-        },
-        "points",
-      );
-
-      // Purely visual white casing under the points so they stay readable
-      // over the coverage hex fills; all interaction stays on 'points',
-      // which keeps its invisible wide-stroke hit area.
-      //
-      // No 'circle-sort-key' here, unlike 'points' and 'points-highlighted',
-      // and deliberately so rather than by oversight. Every feature in this
-      // layer is the same #ffffff, and alpha-over compositing of identical RGB
-      // is order-independent — two overlapping casings come out white at
-      // 1-(1-a1)(1-a2) whichever is drawn first, including the dimmed 0.5 /
-      // undimmed 0.9 mix pointsHaloOpacity produces. A sort key here would be
-      // invisible and would still cost a per-tile sort on the worker.
-      map.current.addLayer(
-        {
-          id: "points-halo",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-          paint: {
-            "circle-color": "#ffffff",
-            // Zero until the ramp is final — see revealData. It has no colour
-            // on the ramp, but its radius is sized off the same one the points
-            // are, and a casing without its point is just a white dot.
-            "circle-opacity": dataRevealed.current ? pointsHaloOpacity() : 0,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
-          },
-        },
-        "points",
-      );
-
-      map.current.addLayer(
-        {
-          id: "hexes",
-          type: "fill",
-          minzoom: hexMinZoom,
-          maxzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-
-          paint: {
-            // Zero until the ramp is final — see revealData. Then a plain taper
-            // with zoom; the count's share of the transparency rides on the fill
-            // colour's alpha (toRampStops).
-            "fill-opacity": dataRevealed.current ? hexOpacityExpression() : 0,
-            // Neither this nor the colour below may transition — see
-            // NO_TRANSITION. For the opacity that delay was the flicker on the
-            // opening reveal and on every threshold change after it; for the
-            // colour it is the lag between the tiles landing and the ramp
-            // arriving on them.
-            "fill-opacity-transition": NO_TRANSITION,
-            // A real interpolate expression rather than the legacy
-            // { property, stops } paint function, because that form cannot be
-            // nested inside the 'case' dimmable wraps it in — the same reason
-            // coverageHexFillColor builds its ramps through rampExpression.
-            "fill-color": dimmable(hexFillColor()),
-            "fill-color-transition": NO_TRANSITION,
-          },
-        },
-        FIRST_LABEL_LAYER_ID,
-      );
-
-      map.current.addLayer(
-        {
-          id: "points-highlighted",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "cde-tiles",
-          "source-layer": "internal-layer-name",
-          layout: {
-            // The same key 'points' carries, and it has to be: this layer draws a
-            // filled circle plus a selection ring over the same features, so if
-            // the two sorted differently the rings and the markers under them
-            // would disagree about which of an overlapping pair is on top.
-            "circle-sort-key": ["get", "count"],
-          },
-          paint: {
-            "circle-color": dimmable(colors),
-            "circle-opacity": circleOpacity,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current),
-            "circle-stroke-color": "black",
-            // The selection ring is dropped on dimmed points: a focused dataset
-            // greys the rest of the map, and a black ring around a grey circle
-            // would still read as picked out.
-            "circle-stroke-width": ["case", IS_DIMMED, 0, 0.75],
-          },
-          filter: ["in", "pk", ""],
-        },
-        FIRST_LABEL_LAYER_ID,
-      );
-
-      // The focused dataset's markers, redrawn over the greyed rest — see
-      // hoverHighlightPoints. Purely visual: clicks still resolve on 'points'.
-      // Below 'points-highlighted' so a drawn shape's selection rings stay on
-      // top.
-      map.current.addSource("focused-points", {
-        type: "geojson",
-        data: emptyFeatureCollection,
-      });
-      map.current.addLayer(
-        {
-          id: "focused-points-halo",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "focused-points",
-          paint: {
-            "circle-color": "#ffffff",
-            // Zero until the ramp is final, like the layers it copies — see
-            // revealData.
-            "circle-opacity": dataRevealed.current ? 0.9 : 0,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
-          },
-        },
-        "points-highlighted",
-      );
-      map.current.addLayer(
-        {
-          id: "focused-points",
-          type: "circle",
-          minzoom: hexMaxZoom,
-          source: "focused-points",
-          layout: {
-            "circle-sort-key": ["get", "count"],
-          },
-          paint: {
-            "circle-color-transition": NO_TRANSITION,
-            "circle-color": colors,
-            "circle-opacity": dataRevealed.current ? circleOpacity : 0,
-            "circle-radius-transition": NO_TRANSITION,
-            "circle-radius": radiusExpression(pointRadiusRange.current),
-          },
-        },
-        "points-highlighted",
-      );
-
-      // Griddap (gridded, metadata-only) datasets: the optional coverage
-      // layer (all matching bboxes, toggled off by default) and the
-      // single-dataset highlight (hover from the list / pinned while a WMS
-      // overlay is shown). GeoJSON sources — coverage is tens of features
-      // served whole by /griddapCoverage, not tiles. Inserted before
-      // 'points-highlighted' so selection/hover circles stay on top.
-      map.current.addSource("griddap-coverage", {
-        type: "geojson",
-        // pk as the feature id so the hover feature-state below can address
-        // individual rectangles.
-        promoteId: "pk",
-        data: griddapCoverageRef.current || emptyFeatureCollection,
-      });
-      map.current.addSource("griddap-highlight", {
-        type: "geojson",
-        data: emptyFeatureCollection,
-      });
-      map.current.addLayer(
-        {
-          id: "griddap-coverage-fill",
-          type: "fill",
-          source: "griddap-coverage",
-          // Light wash at rest, a touch stronger on hover. Kept low because
-          // overlapping rectangles composite: a dozen grids stacked over the
-          // same water turn any generous fill into a solid slab, so the hover
-          // affordance leans on the outline below rather than the fill.
-          paint: {
-            "fill-color": "#52a79b",
-            "fill-opacity": [
-              "case",
-              ["boolean", ["feature-state", "hovered"], false],
-              0.12,
-              0.07,
-            ],
-          },
-        },
-        "points-highlighted",
-      );
-      map.current.addLayer(
-        {
-          id: "griddap-coverage-line",
-          type: "line",
-          source: "griddap-coverage",
-          paint: {
-            "line-color": [
-              "case",
-              ["boolean", ["feature-state", "hovered"], false],
-              "#fbb03b",
-              "#52a79b",
-            ],
-            "line-width": [
-              "case",
-              ["boolean", ["feature-state", "hovered"], false],
-              2.5,
-              1.5,
-            ],
-            "line-dasharray": [2, 2],
-          },
-        },
-        "points-highlighted",
-      );
-      map.current.addLayer(
-        {
-          id: "griddap-highlight-fill",
-          type: "fill",
-          source: "griddap-highlight",
-          paint: { "fill-color": "#fbb03b", "fill-opacity": 0.1 },
-        },
-        "points-highlighted",
-      );
-      map.current.addLayer(
-        {
-          id: "griddap-highlight-line",
-          type: "line",
-          source: "griddap-highlight",
-          paint: { "line-color": "#fbb03b", "line-width": 2.5 },
-        },
-        "points-highlighted",
-      );
-
-      // --- Clicked region ---------------------------------------------------
-      // What the "what's here" card is talking about. Added last of the overlay
-      // layers and never given a beforeId, so it draws over every data layer —
-      // the whole job is being unmistakable, and a highlight the markers cover
-      // is no highlight. Cleared when the card closes.
-      map.current.addSource("click-highlight", {
-        type: "geojson",
-        data: emptyFeatureCollection,
-      });
-      // The flat merged fill goes down first. A stack of grid boxes draws its
-      // glow (below) per individual box, not once for the merged shape — put
-      // the fill on top of that glow instead and every box nested inside the
-      // stack has its glow smothered from both sides by the fill covering it,
-      // leaving only the outermost box's glow poking out past the fill's own
-      // edge. That read as "just the biggest box got selected" even though
-      // every box was outlined and listed correctly.
-      map.current.addLayer({
-        id: "click-highlight-fill",
-        type: "fill",
-        source: "click-highlight",
-        // Excludes the individual grid rectangles, which the merged stand-in
-        // shape fills on their behalf — see the `role` comment in
-        // buildFeatureQuery. Painting both would compound a stack's opacity;
-        // painting only the individual boxes is exactly what this avoids.
-        filter: [
-          "all",
-          ["!=", ["geometry-type"], "Point"],
-          ["!=", ["get", "role"], "outline"],
-        ],
-        paint: {
-          "fill-color": clickHighlightColor,
-          "fill-opacity": 0.18,
-        },
-      });
-      // A soft blurred halo under the crisp outline/point below, so the
-      // selected item reads as picked out at a glance instead of just
-      // outlined. Point and polygon geometries blur through different paint
-      // properties (circle-blur vs. line-blur), so each gets its own layer.
-      // Painted after the fill above so every box's glow shows through it,
-      // not just the outermost one's.
-      map.current.addLayer({
-        id: "click-highlight-glow",
-        type: "line",
-        source: "click-highlight",
-        // Excludes the fill-only merged grid shape — see click-highlight-fill.
-        filter: [
-          "all",
-          ["!=", ["geometry-type"], "Point"],
-          ["!=", ["get", "role"], "fill"],
-        ],
-        paint: {
-          "line-color": clickHighlightColor,
-          "line-width": 10,
-          "line-blur": 8,
-          "line-opacity": 0.85,
-        },
-      });
-      map.current.addLayer({
-        id: "click-highlight-point-glow",
+    // Every data layer is inserted below the basemap's label layers
+    // (beforeId FIRST_LABEL_LAYER_ID or an existing data layer) so water
+    // and place names stay readable over hexes and points.
+    map.current.addLayer(
+      {
+        id: "points",
         type: "circle",
-        source: "click-highlight",
-        filter: ["==", ["geometry-type"], "Point"],
+        minzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+        layout: {
+          "circle-sort-key": ["get", "count"],
+        },
         paint: {
+          // Zero until the ramp is final — see revealData. Both the colour
+          // below and the radius above come off the ramp, so before it lands
+          // these are placeholder values.
+          "circle-opacity": dataRevealed.current ? circleOpacity : 0,
           "circle-radius-transition": NO_TRANSITION,
-          "circle-radius": radiusExpression(pointRadiusRange.current, 6),
+          "circle-radius": radiusExpression(pointRadiusRange.current),
+          // setColorStops rewrites this one whenever the ramp moves — see
+          // NO_TRANSITION.
+          "circle-color-transition": NO_TRANSITION,
+          "circle-color": dimmable(colors),
+          "circle-stroke-color": dimmable(colors),
+          "circle-stroke-opacity": 0.001,
+          "circle-stroke-width": 10,
+        },
+      },
+      FIRST_LABEL_LAYER_ID,
+    );
+
+    // Trajectory and OBIS coverage cells, always drawn as hexes. Inserted
+    // with beforeId 'points' (which must already exist on the map —
+    // MapLibre throws otherwise) so they sit at the bottom of the stack,
+    // under the points layer. Below hexMaxZoom their counts are already
+    // merged into the green 'hexes' layer; this layer only takes over once
+    // profiles switch to points. A hex is coloured by what it holds —
+    // trajectories, occurrence records, or both — see coverageHexFillColor.
+    map.current.addLayer(
+      {
+        id: "coverage-hexes",
+        type: "fill",
+        minzoom: hexMaxZoom,
+        source: "cde-cells",
+        "source-layer": "coverage-hexes-layer",
+        paint: {
+          // Zero until the ramp is final — see revealData. Then a plain
+          // taper with zoom; the count's share of the transparency rides on
+          // the fill colour's alpha (toRampStops).
+          "fill-opacity": dataRevealed.current
+            ? coverageHexOpacityExpression()
+            : 0,
+          // Neither this nor the colours below may transition — see
+          // NO_TRANSITION. For the opacity that delay was the flicker on the
+          // opening reveal and on every threshold change after it; for the
+          // colours it is the lag between the tiles landing and the ramp
+          // arriving on them.
+          "fill-opacity-transition": NO_TRANSITION,
+          "fill-color": dimmable(coverageHexFillColor()),
+          "fill-color-transition": NO_TRANSITION,
+          "fill-outline-color": coverageHexOutlineColor(),
+        },
+      },
+      "points",
+    );
+
+    // What is left of a coverage cell once the fill has faded out from under
+    // it: the boundary alone, in the fill's own ramp colour, over an
+    // unobscured basemap. A fill layer's 'fill-outline-color' is drawn at the
+    // fill's own opacity, so it goes exactly when the fill does and cannot be
+    // the thing that outlives it — hence a line layer of its own, reading the
+    // same source and rising over the same zooms the fill falls across.
+    //
+    // Gated by the same opening reveal as the fills, and repainted by
+    // setColorStops with them: it carries the ramp, so it has the same reason
+    // not to be seen wearing the placeholder one.
+    map.current.addLayer(
+      {
+        id: "coverage-hex-outlines",
+        type: "line",
+        minzoom: hexMaxZoom,
+        source: "cde-cells",
+        "source-layer": "coverage-hexes-layer",
+        paint: {
+          "line-color-transition": NO_TRANSITION,
+          "line-color": coverageHexBorderColor(),
+          "line-opacity-transition": NO_TRANSITION,
+          "line-opacity": dataRevealed.current
+            ? coverageHexOutlineOpacityExpression()
+            : 0,
+          // Wide enough that a colour reads off it — it is standing in for a
+          // whole hexagon of fill.
+          "line-width": 2,
+        },
+      },
+      "points",
+    );
+
+    // Purely visual white casing under the points so they stay readable
+    // over the coverage hex fills; all interaction stays on 'points',
+    // which keeps its invisible wide-stroke hit area.
+    //
+    // No 'circle-sort-key' here, unlike 'points' and 'points-highlighted',
+    // and deliberately so rather than by oversight. Every feature in this
+    // layer is the same #ffffff, and alpha-over compositing of identical RGB
+    // is order-independent — two overlapping casings come out white at
+    // 1-(1-a1)(1-a2) whichever is drawn first, including the dimmed 0.5 /
+    // undimmed 0.9 mix pointsHaloOpacity produces. A sort key here would be
+    // invisible and would still cost a per-tile sort on the worker.
+    map.current.addLayer(
+      {
+        id: "points-halo",
+        type: "circle",
+        minzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+        paint: {
+          "circle-color": "#ffffff",
+          // Zero until the ramp is final — see revealData. It has no colour
+          // on the ramp, but its radius is sized off the same one the points
+          // are, and a casing without its point is just a white dot.
+          "circle-opacity": dataRevealed.current ? pointsHaloOpacity() : 0,
+          "circle-radius-transition": NO_TRANSITION,
+          "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
+        },
+      },
+      "points",
+    );
+
+    map.current.addLayer(
+      {
+        id: "hexes",
+        type: "fill",
+        minzoom: hexMinZoom,
+        maxzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+
+        paint: {
+          // Zero until the ramp is final — see revealData. Then a plain taper
+          // with zoom; the count's share of the transparency rides on the fill
+          // colour's alpha (toRampStops).
+          "fill-opacity": dataRevealed.current ? hexOpacityExpression() : 0,
+          // Neither this nor the colour below may transition — see
+          // NO_TRANSITION. For the opacity that delay was the flicker on the
+          // opening reveal and on every threshold change after it; for the
+          // colour it is the lag between the tiles landing and the ramp
+          // arriving on them.
+          "fill-opacity-transition": NO_TRANSITION,
+          // A real interpolate expression rather than the legacy
+          // { property, stops } paint function, because that form cannot be
+          // nested inside the 'case' dimmable wraps it in — the same reason
+          // coverageHexFillColor builds its ramps through rampExpression.
+          "fill-color": dimmable(hexFillColor()),
+          "fill-color-transition": NO_TRANSITION,
+        },
+      },
+      FIRST_LABEL_LAYER_ID,
+    );
+
+    map.current.addLayer(
+      {
+        id: "points-highlighted",
+        type: "circle",
+        minzoom: hexMaxZoom,
+        source: "cde-tiles",
+        "source-layer": "internal-layer-name",
+        layout: {
+          // The same key 'points' carries, and it has to be: this layer draws a
+          // filled circle plus a selection ring over the same features, so if
+          // the two sorted differently the rings and the markers under them
+          // would disagree about which of an overlapping pair is on top.
+          "circle-sort-key": ["get", "count"],
+        },
+        paint: {
+          "circle-color": dimmable(colors),
+          "circle-opacity": circleOpacity,
+          "circle-radius-transition": NO_TRANSITION,
+          "circle-radius": radiusExpression(pointRadiusRange.current),
+          "circle-stroke-color": "black",
+          // The selection ring is dropped on dimmed points: a focused dataset
+          // greys the rest of the map, and a black ring around a grey circle
+          // would still read as picked out.
+          "circle-stroke-width": ["case", IS_DIMMED, 0, 0.75],
+        },
+        filter: ["in", "pk", ""],
+      },
+      FIRST_LABEL_LAYER_ID,
+    );
+
+    // The focused dataset's markers, redrawn over the greyed rest — see
+    // hoverHighlightPoints. Purely visual: clicks still resolve on 'points'.
+    // Below 'points-highlighted' so a drawn shape's selection rings stay on
+    // top.
+    map.current.addSource("focused-points", {
+      type: "geojson",
+      data: emptyFeatureCollection,
+    });
+    map.current.addLayer(
+      {
+        id: "focused-points-halo",
+        type: "circle",
+        minzoom: hexMaxZoom,
+        source: "focused-points",
+        paint: {
+          "circle-color": "#ffffff",
+          // Zero until the ramp is final, like the layers it copies — see
+          // revealData.
+          "circle-opacity": dataRevealed.current ? 0.9 : 0,
+          "circle-radius-transition": NO_TRANSITION,
+          "circle-radius": radiusExpression(pointRadiusRange.current, 1.25),
+        },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "focused-points",
+        type: "circle",
+        minzoom: hexMaxZoom,
+        source: "focused-points",
+        layout: {
+          "circle-sort-key": ["get", "count"],
+        },
+        paint: {
+          "circle-color-transition": NO_TRANSITION,
+          "circle-color": colors,
+          "circle-opacity": dataRevealed.current ? circleOpacity : 0,
+          "circle-radius-transition": NO_TRANSITION,
+          "circle-radius": radiusExpression(pointRadiusRange.current),
+        },
+      },
+      "points-highlighted",
+    );
+  }
+
+  function addGriddapLayers() {
+    // Griddap (gridded, metadata-only) datasets: the optional coverage
+    // layer (all matching bboxes, toggled off by default) and the
+    // single-dataset highlight (hover from the list / pinned while a WMS
+    // overlay is shown). GeoJSON sources — coverage is tens of features
+    // served whole by /griddapCoverage, not tiles. Inserted before
+    // 'points-highlighted' so selection/hover circles stay on top.
+    map.current.addSource("griddap-coverage", {
+      type: "geojson",
+      // pk as the feature id so the hover feature-state below can address
+      // individual rectangles.
+      promoteId: "pk",
+      data: griddapCoverageRef.current || emptyFeatureCollection,
+    });
+    map.current.addSource("griddap-highlight", {
+      type: "geojson",
+      data: emptyFeatureCollection,
+    });
+    map.current.addLayer(
+      {
+        id: "griddap-coverage-fill",
+        type: "fill",
+        source: "griddap-coverage",
+        // Light wash at rest, a touch stronger on hover. Kept low because
+        // overlapping rectangles composite: a dozen grids stacked over the
+        // same water turn any generous fill into a solid slab, so the hover
+        // affordance leans on the outline below rather than the fill.
+        paint: {
+          "fill-color": "#52a79b",
+          "fill-opacity": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            0.12,
+            0.07,
+          ],
+        },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-coverage-line",
+        type: "line",
+        source: "griddap-coverage",
+        paint: {
+          "line-color": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            "#fbb03b",
+            "#52a79b",
+          ],
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            2.5,
+            1.5,
+          ],
+          "line-dasharray": [2, 2],
+        },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-highlight-fill",
+        type: "fill",
+        source: "griddap-highlight",
+        paint: { "fill-color": "#fbb03b", "fill-opacity": 0.1 },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-highlight-line",
+        type: "line",
+        source: "griddap-highlight",
+        paint: { "line-color": "#fbb03b", "line-width": 2.5 },
+      },
+      "points-highlighted",
+    );
+  }
+
+  function addClickHighlightLayers() {
+    // --- Clicked region ---------------------------------------------------
+    // What the "what's here" card is talking about. Added last of the overlay
+    // layers and never given a beforeId, so it draws over every data layer —
+    // the whole job is being unmistakable, and a highlight the markers cover
+    // is no highlight. Cleared when the card closes.
+    map.current.addSource("click-highlight", {
+      type: "geojson",
+      data: emptyFeatureCollection,
+    });
+    // The flat merged fill goes down first. A stack of grid boxes draws its
+    // glow (below) per individual box, not once for the merged shape — put
+    // the fill on top of that glow instead and every box nested inside the
+    // stack has its glow smothered from both sides by the fill covering it,
+    // leaving only the outermost box's glow poking out past the fill's own
+    // edge. That read as "just the biggest box got selected" even though
+    // every box was outlined and listed correctly.
+    map.current.addLayer({
+      id: "click-highlight-fill",
+      type: "fill",
+      source: "click-highlight",
+      // Excludes the individual grid rectangles, which the merged stand-in
+      // shape fills on their behalf — see the `role` comment in
+      // buildFeatureQuery. Painting both would compound a stack's opacity;
+      // painting only the individual boxes is exactly what this avoids.
+      filter: [
+        "all",
+        ["!=", ["geometry-type"], "Point"],
+        ["!=", ["get", "role"], "outline"],
+      ],
+      paint: {
+        "fill-color": clickHighlightColor,
+        "fill-opacity": 0.18,
+      },
+    });
+    // A soft blurred halo under the crisp outline/point below, so the
+    // selected item reads as picked out at a glance instead of just
+    // outlined. Point and polygon geometries blur through different paint
+    // properties (circle-blur vs. line-blur), so each gets its own layer.
+    // Painted after the fill above so every box's glow shows through it,
+    // not just the outermost one's.
+    map.current.addLayer({
+      id: "click-highlight-glow",
+      type: "line",
+      source: "click-highlight",
+      // Excludes the fill-only merged grid shape — see click-highlight-fill.
+      filter: [
+        "all",
+        ["!=", ["geometry-type"], "Point"],
+        ["!=", ["get", "role"], "fill"],
+      ],
+      paint: {
+        "line-color": clickHighlightColor,
+        "line-width": 10,
+        "line-blur": 8,
+        "line-opacity": 0.85,
+      },
+    });
+    map.current.addLayer({
+      id: "click-highlight-point-glow",
+      type: "circle",
+      source: "click-highlight",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius-transition": NO_TRANSITION,
+        "circle-radius": radiusExpression(pointRadiusRange.current, 6),
+        "circle-color": clickHighlightColor,
+        "circle-blur": 0.8,
+        "circle-opacity": 0.85,
+      },
+    });
+    map.current.addLayer({
+      id: "click-highlight-line",
+      type: "line",
+      source: "click-highlight",
+      // Excludes the fill-only merged grid shape: it exists purely to give
+      // the fill layer a flat-opacity stand-in, and its outline would just
+      // duplicate the outer envelope of the individual boxes drawn here.
+      filter: [
+        "all",
+        ["!=", ["geometry-type"], "Point"],
+        ["!=", ["get", "role"], "fill"],
+      ],
+      paint: {
+        "line-color": clickHighlightColor,
+        "line-width": 2.5,
+      },
+    });
+    // A marker is outlined, not enlarged and not filled: it keeps the size the
+    // ramp gave it (so the legend's size key still reads true) and the
+    // platform colour underneath stays visible. The radius is the same
+    // expression 'points' paints with, evaluated against the `count` carried
+    // on the highlight feature, so the ring sits exactly on the marker's edge
+    // rather than around it.
+    //
+    // The marker's own circle-stroke can't be used for this: it is the
+    // invisible 10px hit halo (see the 'points' paint), 2-4x the drawn circle.
+    map.current.addLayer({
+      id: "click-highlight-point",
+      type: "circle",
+      source: "click-highlight",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius-transition": NO_TRANSITION,
+        "circle-radius": radiusExpression(pointRadiusRange.current),
+        "circle-color": "rgba(0, 0, 0, 0)",
+        "circle-stroke-color": "#000000",
+        "circle-stroke-width": 1.5,
+      },
+    });
+
+    // The record "Show on map" picked on the dataset page, ringed in the
+    // same goldenrod as the card that asked for it. A fixed size rather than
+    // the marker's own ramp: the record's feature carries no `count`, and a
+    // ring a little wider than any marker reads as around it either way.
+    //
+    // Both go under the focused markers rather than over everything: the
+    // record belongs to the open page's dataset, so its own marker is in
+    // 'focused-points' and stays visible inside the glow. The ring is wider
+    // than the largest marker, so it still shows around it.
+    map.current.addSource("mapped-record", {
+      type: "geojson",
+      data: emptyFeatureCollection,
+    });
+    map.current.addLayer(
+      {
+        id: "mapped-record-glow",
+        type: "circle",
+        source: "mapped-record",
+        paint: {
+          "circle-radius": 16,
           "circle-color": clickHighlightColor,
           "circle-blur": 0.8,
           "circle-opacity": 0.85,
         },
-      });
-      map.current.addLayer({
-        id: "click-highlight-line",
-        type: "line",
-        source: "click-highlight",
-        // Excludes the fill-only merged grid shape: it exists purely to give
-        // the fill layer a flat-opacity stand-in, and its outline would just
-        // duplicate the outer envelope of the individual boxes drawn here.
-        filter: [
-          "all",
-          ["!=", ["geometry-type"], "Point"],
-          ["!=", ["get", "role"], "fill"],
-        ],
-        paint: {
-          "line-color": clickHighlightColor,
-          "line-width": 2.5,
-        },
-      });
-      // A marker is outlined, not enlarged and not filled: it keeps the size the
-      // ramp gave it (so the legend's size key still reads true) and the
-      // platform colour underneath stays visible. The radius is the same
-      // expression 'points' paints with, evaluated against the `count` carried
-      // on the highlight feature, so the ring sits exactly on the marker's edge
-      // rather than around it.
-      //
-      // The marker's own circle-stroke can't be used for this: it is the
-      // invisible 10px hit halo (see the 'points' paint), 2-4x the drawn circle.
-      map.current.addLayer({
-        id: "click-highlight-point",
+      },
+      "focused-points-halo",
+    );
+    map.current.addLayer(
+      {
+        id: "mapped-record-ring",
         type: "circle",
-        source: "click-highlight",
-        filter: ["==", ["geometry-type"], "Point"],
+        source: "mapped-record",
         paint: {
-          "circle-radius-transition": NO_TRANSITION,
-          "circle-radius": radiusExpression(pointRadiusRange.current),
+          "circle-radius": 11,
           "circle-color": "rgba(0, 0, 0, 0)",
-          "circle-stroke-color": "#000000",
-          "circle-stroke-width": 1.5,
+          "circle-stroke-color": clickHighlightColor,
+          "circle-stroke-width": 3,
         },
-      });
+      },
+      "focused-points-halo",
+    );
+  }
 
-      // The record "Show on map" picked on the dataset page, ringed in the
-      // same goldenrod as the card that asked for it. A fixed size rather than
-      // the marker's own ramp: the record's feature carries no `count`, and a
-      // ring a little wider than any marker reads as around it either way.
-      //
-      // Both go under the focused markers rather than over everything: the
-      // record belongs to the open page's dataset, so its own marker is in
-      // 'focused-points' and stays visible inside the glow. The ring is wider
-      // than the largest marker, so it still shows around it.
-      map.current.addSource("mapped-record", {
-        type: "geojson",
-        data: emptyFeatureCollection,
-      });
-      map.current.addLayer(
-        {
-          id: "mapped-record-glow",
-          type: "circle",
-          source: "mapped-record",
-          paint: {
-            "circle-radius": 16,
-            "circle-color": clickHighlightColor,
-            "circle-blur": 0.8,
-            "circle-opacity": 0.85,
-          },
-        },
-        "focused-points-halo",
-      );
-      map.current.addLayer(
-        {
-          id: "mapped-record-ring",
-          type: "circle",
-          source: "mapped-record",
-          paint: {
-            "circle-radius": 11,
-            "circle-color": "rgba(0, 0, 0, 0)",
-            "circle-stroke-color": clickHighlightColor,
-            "circle-stroke-width": 3,
-          },
-        },
-        "focused-points-halo",
-      );
-
-      // --- Track-line layers ---------------------------------------------
-      // Track lines + head positions from /tiles/tracks, shown only when the
-      // track-lines switch is on. Independent of the trajectory hex layers —
-      // both can draw at once. Created via refs so the current switch state and
-      // scrub window apply even though this load handler runs once.
-      const tracksVisibility = tracksModeRef.current ? "visible" : "none";
-      map.current.addSource("tracks", {
-        type: "vector",
-        // No minzoom: track lines/heads render at every zoom level, including
-        // fully zoomed out. maxzoom caps the fetched tile zoom at 8 and lets
-        // maplibre overzoom past it rather than re-fetch expensive tiles at
-        // every zoom level in. NOTE: at low zoom a single tile can assemble
-        // every trajectory over the whole time window (100k+ features,
-        // multi-MB) — the bounded default trail (defaultTrailingDays) and the
-        // long-trail zoom gate (effectiveTrailingDays, both in config.js) keep
-        // that in check. If it regresses, add server-side low-zoom
-        // simplification in web-api/routes/tiles.js rather than a minzoom.
-        maxzoom: 8,
-        tiles: [
-          buildTracksTileUrl(
-            mapQueryRef.current,
-            scrubTimeRef.current,
-            trailingDaysRef.current,
-            map.current.getZoom(),
-          ),
-        ],
-      });
-      appliedTrailRef.current = effectiveTrailingDays(
-        trailingDaysRef.current,
-        map.current.getZoom(),
-      );
-
-      // Crossing the long-trail zoom gate changes the window the tracks tiles
-      // carry, so the source is rebuilt — but only on an actual crossing, not
-      // on every zoomend, since setTiles drops the whole tile cache.
-      map.current.on("zoomend", () => {
-        if (!tracksModeRef.current || !map.current.getSource("tracks")) return;
-        const effective = effectiveTrailingDays(
-          trailingDaysRef.current,
-          map.current.getZoom(),
-        );
-        if (effective === appliedTrailRef.current) return;
-        refreshTracksSource(
+  function addTrackLayers() {
+    // --- Track-line layers ---------------------------------------------
+    // Track lines + head positions from /tiles/tracks, shown only when the
+    // track-lines switch is on. Independent of the trajectory hex layers —
+    // both can draw at once. Created via refs so the current switch state and
+    // scrub window apply even though this load handler runs once.
+    const tracksVisibility = tracksModeRef.current ? "visible" : "none";
+    map.current.addSource("tracks", {
+      type: "vector",
+      // No minzoom: track lines/heads render at every zoom level, including
+      // fully zoomed out. maxzoom caps the fetched tile zoom at 8 and lets
+      // maplibre overzoom past it rather than re-fetch expensive tiles at
+      // every zoom level in. NOTE: at low zoom a single tile can assemble
+      // every trajectory over the whole time window (100k+ features,
+      // multi-MB) — the bounded default trail (defaultTrailingDays) and the
+      // long-trail zoom gate (effectiveTrailingDays, both in config.js) keep
+      // that in check. If it regresses, add server-side low-zoom
+      // simplification in web-api/routes/tiles.js rather than a minzoom.
+      maxzoom: 8,
+      tiles: [
+        buildTracksTileUrl(
           mapQueryRef.current,
           scrubTimeRef.current,
           trailingDaysRef.current,
-        );
-      });
+          map.current.getZoom(),
+        ),
+      ],
+    });
+    appliedTrailRef.current = effectiveTrailingDays(
+      trailingDaysRef.current,
+      map.current.getZoom(),
+    );
 
-      map.current.addLayer({
-        id: "track-lines",
-        type: "line",
-        source: "tracks",
-        "source-layer": "track-lines",
-        layout: {
-          visibility: tracksVisibility,
-          "line-cap": "round",
-          "line-join": "round",
-        },
-        paint: {
-          "line-color": trackLineColor,
-          "line-width": ["interpolate", ["linear"], ["zoom"], 2, 1, 10, 2.5],
-          // Partial opacity so coincident tracks compound: many voyages ply
-          // the same shipping corridor (27 St. Lawrence voyages in a 90-day
-          // window overlap into what full opacity renders as ONE line), and
-          // stacked translucent lines read as a visibly busier corridor.
-          "line-opacity": 0.55,
-        },
-      });
-
-      // No per-fix markers on the global tracks layer: clicking a track draws
-      // that platform's own track, marked fix by fix ('selected-track' below),
-      // which is the detail view breadcrumb dots only hinted at.
-      //
-      // Heads with a known course over ground render as arrowheads rotated
-      // to the direction of travel; heads where cog is undefined (single-fix
-      // trajectories, stationary platforms) fall back to circles.
-      map.current.addImage(
-        "track-head-arrow",
-        buildHeadArrowImage(trackLineColor),
-        {
-          pixelRatio: 2,
-        },
+    // Crossing the long-trail zoom gate changes the window the tracks tiles
+    // carry, so the source is rebuilt — but only on an actual crossing, not
+    // on every zoomend, since setTiles drops the whole tile cache.
+    map.current.on("zoomend", () => {
+      if (!tracksModeRef.current || !map.current.getSource("tracks")) return;
+      const effective = effectiveTrailingDays(
+        trailingDaysRef.current,
+        map.current.getZoom(),
       );
-      map.current.addImage(
-        "track-head-arrow-dim",
-        buildHeadArrowImage("lightgrey"),
-        {
-          pixelRatio: 2,
-        },
+      if (effective === appliedTrailRef.current) return;
+      refreshTracksSource(
+        mapQueryRef.current,
+        scrubTimeRef.current,
+        trailingDaysRef.current,
       );
-
-      map.current.addLayer({
-        id: "track-heads",
-        type: "symbol",
-        source: "tracks",
-        "source-layer": "track-heads",
-        filter: ["has", "cog"],
-        layout: {
-          visibility: tracksVisibility,
-          "icon-image": "track-head-arrow",
-          "icon-rotate": ["get", "cog"],
-          // rotate with the map, not the viewport, so the arrow keeps
-          // pointing along the geographic course
-          "icon-rotation-alignment": "map",
-          // Collision culling is zoom-gated at hexMaxZoom (7). Below it a tile
-          // can carry ~100k heads (whole catalogue at low zoom) — forcing every
-          // one to render overwhelms the tab, so let maplibre drop overlapping
-          // arrows there. At/above z7 a tile covers a small enough area that the
-          // head count is a few hundred, so overlap/ignore-placement are safe
-          // and every heading stays visible (the /tiles/tracks per-tile cap also
-          // bounds the count). z7 is the same breakpoint hexes→points use.
-          "icon-allow-overlap": ["step", ["zoom"], false, hexMaxZoom, true],
-          "icon-ignore-placement": ["step", ["zoom"], false, hexMaxZoom, true],
-          // When culling (below z7), keep the most recent heads deterministically
-          // rather than an arbitrary subset.
-          "symbol-sort-key": ["-", 0, ["coalesce", ["get", "head_time"], 0]],
-        },
-      });
-
-      map.current.addLayer({
-        id: "track-heads-fixed",
-        type: "circle",
-        source: "tracks",
-        "source-layer": "track-heads",
-        filter: ["!", ["has", "cog"]],
-        layout: { visibility: tracksVisibility },
-        paint: {
-          "circle-color": trackLineColor,
-          "circle-radius": 4.5,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1.5,
-        },
-      });
-
-      // These three layers were just created in full colour, so whatever focus
-      // paint was on the old ones is gone with them.
-      trackFocusApplied.current = undefined;
-      applyTrackFocus();
-
-      // One selected platform's track (GeoJSON from /trajectories/track, clipped
-      // to the time filter — see renderSelectedTrack).
-      // Line features render the path; point features are the raw fixes.
-      map.current.addSource("selected-track", {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
-
-      // Painted in the click-highlight colour rather than one of its own: a
-      // drawn track is what the last click found, the same as the ring around
-      // a clicked marker or the outline around a clicked hex, so it wears the
-      // same accent instead of teaching the reader a second "this is what you
-      // asked about" colour. It used to be crimson, which read as one more
-      // data layer beside the purple tracks and the amber griddap coverage.
-      map.current.addLayer({
-        id: "selected-track-line",
-        type: "line",
-        source: "selected-track",
-        filter: ["==", ["geometry-type"], "LineString"],
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": clickHighlightColor,
-          "line-width": 3,
-        },
-      });
-
-      // Raw fixes with a known course over ground render as arrowheads
-      // (white fill, highlight-coloured outline — the inverse of the global
-      // heads, matching the old fix circles); fixes where cog is undefined
-      // (singleton runs) keep circles.
-      map.current.addImage(
-        "selected-fix-arrow",
-        buildHeadArrowImage("#ffffff", clickHighlightColor),
-        { pixelRatio: 2 },
-      );
-
-      map.current.addLayer({
-        id: "selected-track-fixes",
-        type: "symbol",
-        source: "selected-track",
-        // full expression syntax ('geometry-type', not the legacy '$type'):
-        // MapLibre 5 rejects filters that mix legacy and expression operators
-        filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "cog"]],
-        layout: {
-          "icon-image": "selected-fix-arrow",
-          "icon-size": 0.75,
-          "icon-rotate": ["get", "cog"],
-          "icon-rotation-alignment": "map",
-          // Breadcrumbs, not one arrowhead per fix. A retained track runs to
-          // tens of thousands of fixes (the harvester's per-trajectory cap is
-          // 60k), and forcing every one to draw — which allow-overlap true did
-          // — buried the line under a solid mass of overlapping arrows at any
-          // zoom that showed more than a few hours of it.
-          //
-          // Letting MapLibre's collision index do the thinning keeps a subset
-          // spaced icon-padding apart on SCREEN, so the density is right at
-          // every zoom and fills back in as you zoom into a stretch — no
-          // decimation constant to pick, and no re-generating the source on
-          // zoom. Placement walks the layer in feature order, which is time
-          // order here, so the survivors are an even walk along the track
-          // rather than an arbitrary subset. This layer is the top-most symbol
-          // layer, so it is placed before (and therefore wins against) the
-          // basemap labels underneath it, which the old solid mass of arrows
-          // covered up anyway.
-          "icon-allow-overlap": false,
-          "icon-ignore-placement": false,
-          "icon-padding": 4,
-        },
-      });
-
-      map.current.addLayer({
-        id: "selected-track-fixes-nocog",
-        type: "circle",
-        source: "selected-track",
-        filter: [
-          "all",
-          ["==", ["geometry-type"], "Point"],
-          ["!", ["has", "cog"]],
-        ],
-        paint: {
-          "circle-color": "#ffffff",
-          "circle-radius": 3,
-          "circle-stroke-color": clickHighlightColor,
-          "circle-stroke-width": 1.5,
-        },
-      });
-
-      // Apply the initial track-layer visibility from the URL-restored
-      // track-lines switch + data-layer selection.
-      applyLayerVisibility();
-
-      // Layers are created visible; re-apply the picker state in case the hex
-      // and point layers were toggled off before the style finished loading.
-      // The track layers are not the picker's to hide, so they are left alone.
-      if (!dataLayersVisibleRef.current) {
-        setLayersVisibility(observationLayerIds, false);
-      }
-      // A share link opening a gridded dataset can put its WMS overlay up
-      // before the style has loaded, when there were no data layers to hide.
-      if (activeWmsOverlayRef.current) setDataLayersVisibility(false);
-      // Same for the depth rasters, which come from the style itself and are
-      // therefore always created visible.
-      if (!bathymetryVisibleRef.current) {
-        setLayersVisibility(bathymetryLayerIds, false);
-      }
-
-      // A share link can carry the spatial selection (rectangle bounds or a
-      // polygon ring). SelectionProvider has already seeded it into the app
-      // state — this puts the shape back into the draw control so it is drawn,
-      // editable, and survives the next filter change (which re-derives the
-      // selection from whatever the draw control holds).
-      const sharedSelection = selectionFromSearchParams(
-        new URL(window.location.href).searchParams,
-      );
-      if (sharedSelection) {
-        const [featureId] = drawPolygon.current.add({
-          type: "Feature",
-          geometry: { type: "Polygon", coordinates: [sharedSelection] },
-        });
-        drawPolygon.current.changeMode("direct_select", { featureId });
-        highlightPoints(sharedSelection);
-      }
     });
 
-    // Clickable track layers, most-deliberate target first: an arrowhead is
-    // aimed at (it is what the head tooltip describes), the line is the fallback.
-    const trackClickLayers = [
-      "track-heads",
-      "track-heads-fixed",
-      "track-lines",
-    ];
+    map.current.addLayer({
+      id: "track-lines",
+      type: "line",
+      source: "tracks",
+      "source-layer": "track-lines",
+      layout: {
+        visibility: tracksVisibility,
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": trackLineColor,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 2, 1, 10, 2.5],
+        // Partial opacity so coincident tracks compound: many voyages ply
+        // the same shipping corridor (27 St. Lawrence voyages in a 90-day
+        // window overlap into what full opacity renders as ONE line), and
+        // stacked translucent lines read as a visibly busier corridor.
+        "line-opacity": 0.55,
+      },
+    });
 
-    // The selected platform's own drawing, which sits over the tile layers.
-    const selectedTrackLayers = [
-      "selected-track-fixes",
-      "selected-track-fixes-nocog",
-      "selected-track-line",
-    ];
-
-    // 'points' carries an invisible 10px hit stroke so small circles stay easy
-    // to hit (see its paint), but that halo is 2-4x the circle actually drawn —
-    // standing aside for all of it would leave track lines un-hoverable at z7+
-    // (where points appear) anywhere profiles are dense, which is most of the
-    // coast. A track yields only to the circle the user can see, plus a pixel
-    // or two of grace.
+    // No per-fix markers on the global tracks layer: clicking a track draws
+    // that platform's own track, marked fix by fix ('selected-track' below),
+    // which is the detail view breadcrumb dots only hinted at.
     //
-    // These precedence tests are now hover-only. Click used to run the same
-    // ladder — eight mutual stand-aside functions deciding which of six
-    // handlers owned a given pixel — and it is gone: one click gathers
-    // everything under it and the card lists it (see handleMapClick). Hover
-    // still has to pick a single winner, because there is only one tooltip.
-    const POINT_HIT_GRACE_PX = 2;
-    const isOnAPointIn = (hits, point) =>
-      hits
-        .filter((feature) => feature.layer.id === "points")
-        .some((feature) => {
-          const centre = map.current.project(feature.geometry.coordinates);
-          const radius =
-            pointRadiusFor(feature.properties.count) + POINT_HIT_GRACE_PX;
-          return (
-            (centre.x - point.x) ** 2 + (centre.y - point.y) ** 2 <= radius ** 2
-          );
-        });
+    // Heads with a known course over ground render as arrowheads rotated
+    // to the direction of travel; heads where cog is undefined (single-fix
+    // trajectories, stationary platforms) fall back to circles.
+    map.current.addImage(
+      "track-head-arrow",
+      buildHeadArrowImage(trackLineColor),
+      {
+        pixelRatio: 2,
+      },
+    );
+    map.current.addImage(
+      "track-head-arrow-dim",
+      buildHeadArrowImage("lightgrey"),
+      {
+        pixelRatio: 2,
+      },
+    );
 
-    // The track feature under a point, ranked by trackClickLayers rather than by
-    // render order, so a head from one trajectory and a line from another under
-    // the same cursor resolve the same way every time.
-    const trackFeatureIn = (hits) =>
-      hits
-        .filter((feature) => trackClickLayers.includes(feature.layer.id))
-        .sort(
-          (a, b) =>
-            trackClickLayers.indexOf(a.layer.id) -
-            trackClickLayers.indexOf(b.layer.id),
-        )[0];
+    map.current.addLayer({
+      id: "track-heads",
+      type: "symbol",
+      source: "tracks",
+      "source-layer": "track-heads",
+      filter: ["has", "cog"],
+      layout: {
+        visibility: tracksVisibility,
+        "icon-image": "track-head-arrow",
+        "icon-rotate": ["get", "cog"],
+        // rotate with the map, not the viewport, so the arrow keeps
+        // pointing along the geographic course
+        "icon-rotation-alignment": "map",
+        // Collision culling is zoom-gated at hexMaxZoom (7). Below it a tile
+        // can carry ~100k heads (whole catalogue at low zoom) — forcing every
+        // one to render overwhelms the tab, so let maplibre drop overlapping
+        // arrows there. At/above z7 a tile covers a small enough area that the
+        // head count is a few hundred, so overlap/ignore-placement are safe
+        // and every heading stays visible (the /tiles/tracks per-tile cap also
+        // bounds the count). z7 is the same breakpoint hexes→points use.
+        "icon-allow-overlap": ["step", ["zoom"], false, hexMaxZoom, true],
+        "icon-ignore-placement": ["step", ["zoom"], false, hexMaxZoom, true],
+        // When culling (below z7), keep the most recent heads deterministically
+        // rather than an arbitrary subset.
+        "symbol-sort-key": ["-", 0, ["coalesce", ["get", "head_time"], 0]],
+      },
+    });
 
-    // Griddap coverage rectangles defer to the point/hex layers, so a hover
-    // meant for an observation isn't swallowed by the grid drawn over it. Past
-    // GRIDDAP_PRIORITY_ZOOM the rectangles outrank the hex aggregates instead —
-    // see griddapOutranksHexesIn in hitTest.js, which holds the other half of
-    // this rule.
-    const griddapCoveredIn = (hits) => {
-      const covering =
-        map.current.getZoom() >= GRIDDAP_PRIORITY_ZOOM
-          ? ["points"]
-          : ["points", "hexes"];
-      return (
-        hits.some((feature) => covering.includes(feature.layer.id)) ||
-        Boolean(trackFeatureIn(hits))
-      );
-    };
+    map.current.addLayer({
+      id: "track-heads-fixed",
+      type: "circle",
+      source: "tracks",
+      "source-layer": "track-heads",
+      filter: ["!", ["has", "cog"]],
+      layout: { visibility: tracksVisibility },
+      paint: {
+        "circle-color": trackLineColor,
+        "circle-radius": 4.5,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 1.5,
+      },
+    });
 
+    // These three layers were just created in full colour, so whatever focus
+    // paint was on the old ones is gone with them.
+    trackFocusApplied.current = undefined;
+    applyTrackFocus();
+  }
+
+  function addSelectedTrackLayers() {
+    // One selected platform's track (GeoJSON from /trajectories/track, clipped
+    // to the time filter — see renderSelectedTrack).
+    // Line features render the path; point features are the raw fixes.
+    map.current.addSource("selected-track", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
+
+    // Painted in the click-highlight colour rather than one of its own: a
+    // drawn track is what the last click found, the same as the ring around
+    // a clicked marker or the outline around a clicked hex, so it wears the
+    // same accent instead of teaching the reader a second "this is what you
+    // asked about" colour. It used to be crimson, which read as one more
+    // data layer beside the purple tracks and the amber griddap coverage.
+    map.current.addLayer({
+      id: "selected-track-line",
+      type: "line",
+      source: "selected-track",
+      filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": clickHighlightColor,
+        "line-width": 3,
+      },
+    });
+
+    // Raw fixes with a known course over ground render as arrowheads
+    // (white fill, highlight-coloured outline — the inverse of the global
+    // heads, matching the old fix circles); fixes where cog is undefined
+    // (singleton runs) keep circles.
+    map.current.addImage(
+      "selected-fix-arrow",
+      buildHeadArrowImage("#ffffff", clickHighlightColor),
+      { pixelRatio: 2 },
+    );
+
+    map.current.addLayer({
+      id: "selected-track-fixes",
+      type: "symbol",
+      source: "selected-track",
+      // full expression syntax ('geometry-type', not the legacy '$type'):
+      // MapLibre 5 rejects filters that mix legacy and expression operators
+      filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "cog"]],
+      layout: {
+        "icon-image": "selected-fix-arrow",
+        "icon-size": 0.75,
+        "icon-rotate": ["get", "cog"],
+        "icon-rotation-alignment": "map",
+        // Breadcrumbs, not one arrowhead per fix. A retained track runs to
+        // tens of thousands of fixes (the harvester's per-trajectory cap is
+        // 60k), and forcing every one to draw — which allow-overlap true did
+        // — buried the line under a solid mass of overlapping arrows at any
+        // zoom that showed more than a few hours of it.
+        //
+        // Letting MapLibre's collision index do the thinning keeps a subset
+        // spaced icon-padding apart on SCREEN, so the density is right at
+        // every zoom and fills back in as you zoom into a stretch — no
+        // decimation constant to pick, and no re-generating the source on
+        // zoom. Placement walks the layer in feature order, which is time
+        // order here, so the survivors are an even walk along the track
+        // rather than an arbitrary subset. This layer is the top-most symbol
+        // layer, so it is placed before (and therefore wins against) the
+        // basemap labels underneath it, which the old solid mass of arrows
+        // covered up anyway.
+        "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-padding": 4,
+      },
+    });
+
+    map.current.addLayer({
+      id: "selected-track-fixes-nocog",
+      type: "circle",
+      source: "selected-track",
+      filter: [
+        "all",
+        ["==", ["geometry-type"], "Point"],
+        ["!", ["has", "cog"]],
+      ],
+      paint: {
+        "circle-color": "#ffffff",
+        "circle-radius": 3,
+        "circle-stroke-color": clickHighlightColor,
+        "circle-stroke-width": 1.5,
+      },
+    });
+  }
+
+  // What the hit-test rules in hitTest.js need from the map, read at the
+  // moment they run.
+  const pointHitContext = () => ({
+    project: (lngLat) => map.current.project(lngLat),
+    radiusRange: pointRadiusRange.current,
+  });
+  const featureQueryContext = () => ({
+    zoom: map.current.getZoom(),
+    queryRendered: (options) => map.current.queryRenderedFeatures(options),
+    language: i18n.language,
+  });
+
+  // --- Click ---------------------------------------------------------------
+  // One handler, one hit-test, one outcome: report what is under the click and
+  // let the card offer the actions.
+  //
+  // This replaces six competing handlers (points, hexes, coverage hexes,
+  // griddap rectangles, tracks, and a map-wide fallback) which between them
+  // did five unrelated things to the same gesture — fly the camera to zoom 7,
+  // build a hidden 20px bbox filter, overwrite the dataset filter, open a
+  // dataset page, or clear the selection — and needed a ladder of mutual
+  // stand-aside tests to decide which. Nothing here changes the camera or a
+  // filter; every consequence is a button in the card.
+  //
+  // 'points' and the hex layers carry `datasets`, a JSON array of dataset
+  // pk_urls, and `count`, the metric the ramp colours by. The griddap
+  // rectangles carry a single pk. Titles are not on the tiles at all — the
+  // card resolves the pks against the current results, which is also what
+  // keeps it honest about what is actually in the list.
+  const clickLayerIds = [
+    ...trackClickLayers,
+    ...selectedTrackLayers,
+    "points",
+    "coverage-hexes",
+    "hexes",
+    "griddap-coverage-fill",
+  ];
+
+  // Everything the click layers have under a point — the hit-test both a
+  // click and a share link's remembered point (see the replay at the end of the
+  // mount effect) ask the map.
+  //
+  // A marker is a specific station and a track is a specific voyage; the hex
+  // layers are the neighbourhood aggregate drawn under both — a trajectory's
+  // own coverage hexes lie beneath every metre of its track, and
+  // 'coverage-hexes' shares the marker tier's zoom band (both render at
+  // z >= hexMaxZoom). Either precise geometry is what the user pointed at, so
+  // once one is under the point the hex hits are dropped rather than merged
+  // into it: a click here means "this station" or "this track", never
+  // "…plus whatever hex happens to be under it".
+  const hitsAt = (point) => {
+    const layers = clickLayerIds.filter((id) => map.current.getLayer(id));
+    const hits = layers.length
+      ? map.current.queryRenderedFeatures(point, { layers })
+      : [];
+    const precise =
+      hits.some((feature) => feature.layer.id === "points") ||
+      trackItemsIn(hits).length > 0;
+    return precise
+      ? hits.filter(
+          (feature) => !["hexes", "coverage-hexes"].includes(feature.layer.id),
+        )
+      : hits;
+  };
+
+  function installHover() {
     // The whole hover vocabulary: a chip naming what is under the cursor, with
     // no markup and no click hint.
     //
@@ -3450,7 +3225,7 @@ export default function CreateMap({
         e.lngLat,
         features.length > 1
           ? t("mapChipGridStack", { n: features.length })
-          : griddapTitle(features[0]),
+          : griddapTitle(features[0], i18n.language),
       );
     }, 80);
 
@@ -3486,7 +3261,7 @@ export default function CreateMap({
       {
         id: "griddap",
         layers: ["griddap-coverage-fill"],
-        when: (hits) => !griddapCoveredIn(hits),
+        when: (hits) => !griddapCoveredIn(hits, map.current.getZoom()),
         show: (e, features) =>
           showGriddapTooltip(e, dedupeGriddapByPk(features)),
       },
@@ -3516,7 +3291,7 @@ export default function CreateMap({
         id: "track-lines",
         layers: ["track-lines"],
         when: (hits, point) =>
-          !isOnAPointIn(hits, point) &&
+          !isOnAPointIn(hits, point, pointHitContext()) &&
           !hits.some((feature) =>
             [
               "track-heads",
@@ -3546,7 +3321,7 @@ export default function CreateMap({
       {
         id: "track-heads",
         layers: ["track-heads", "track-heads-fixed"],
-        when: (hits, point) => !isOnAPointIn(hits, point),
+        when: (hits, point) => !isOnAPointIn(hits, point, pointHitContext()),
         // A head IS one fix — the platform's last one in the scrubbed window —
         // so it reads out like a fix on the drawn track: dataset, platform, the
         // record there (absent on a plain Trajectory, whose fixes are not
@@ -3678,351 +3453,9 @@ export default function CreateMap({
         popup.remove();
       }
     });
+  }
 
-    // --- Click ---------------------------------------------------------------
-    // One handler, one hit-test, one outcome: report what is under the click and
-    // let the card offer the actions.
-    //
-    // This replaces six competing handlers (points, hexes, coverage hexes,
-    // griddap rectangles, tracks, and a map-wide fallback) which between them
-    // did five unrelated things to the same gesture — fly the camera to zoom 7,
-    // build a hidden 20px bbox filter, overwrite the dataset filter, open a
-    // dataset page, or clear the selection — and needed a ladder of mutual
-    // stand-aside tests to decide which. Nothing here changes the camera or a
-    // filter; every consequence is a button in the card.
-    //
-    // 'points' and the hex layers carry `datasets`, a JSON array of dataset
-    // pk_urls, and `count`, the metric the ramp colours by. The griddap
-    // rectangles carry a single pk. Titles are not on the tiles at all — the
-    // card resolves the pks against the current results, which is also what
-    // keeps it honest about what is actually in the list.
-    const clickLayerIds = [
-      ...trackClickLayers,
-      ...selectedTrackLayers,
-      "points",
-      "coverage-hexes",
-      "hexes",
-      "griddap-coverage-fill",
-    ];
-
-    // Everything the click layers have under a point — the hit-test both a
-    // click and a share link's remembered point (see the replay at the end of
-    // this effect) ask the map.
-    //
-    // A marker is a specific station and a track is a specific voyage; the hex
-    // layers are the neighbourhood aggregate drawn under both — a trajectory's
-    // own coverage hexes lie beneath every metre of its track, and
-    // 'coverage-hexes' shares the marker tier's zoom band (both render at
-    // z >= hexMaxZoom). Either precise geometry is what the user pointed at, so
-    // once one is under the point the hex hits are dropped rather than merged
-    // into it: a click here means "this station" or "this track", never
-    // "…plus whatever hex happens to be under it".
-    const hitsAt = (point) => {
-      const layers = clickLayerIds.filter((id) => map.current.getLayer(id));
-      const hits = layers.length
-        ? map.current.queryRenderedFeatures(point, { layers })
-        : [];
-      const precise =
-        hits.some((feature) => feature.layer.id === "points") ||
-        trackItemsIn(hits).length > 0;
-      return precise
-        ? hits.filter(
-            (feature) =>
-              !["hexes", "coverage-hexes"].includes(feature.layer.id),
-          )
-        : hits;
-    };
-
-    const datasetPksOf = (feature) => {
-      try {
-        const pks = JSON.parse(feature.properties.datasets);
-        return Array.isArray(pks) ? pks.map(Number) : [];
-      } catch {
-        return [];
-      }
-    };
-
-    // The tracks one hit-test found, deduped by (dataset, trajectory): a click
-    // on an arrowhead sitting on its own line hits both layers, and a track
-    // that doubles back can be hit several times over. Shared by the card's
-    // query and by the single-track shortcut below, which both have to agree
-    // on how many distinct tracks a click actually landed on.
-    function trackItemsIn(hits) {
-      const tracks = [];
-      const seen = new Set();
-      hits
-        .filter((feature) =>
-          [...trackClickLayers, ...selectedTrackLayers].includes(
-            feature.layer.id,
-          ),
-        )
-        .forEach((feature) => {
-          const {
-            pk_url: pk,
-            trajectory_id: trajectoryId,
-            dataset_title: datasetTitle,
-          } = feature.properties;
-          // trajectory_id is '' for a dataset with a single unnamed trajectory
-          // (the schema default) and that is a valid selection end to end, so
-          // test for absence rather than falsiness.
-          if (pk == null || trajectoryId == null) return;
-          const key = `${pk}:${trajectoryId}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          tracks.push({
-            kind: "track",
-            pk: Number(pk),
-            trajectoryId,
-            title: datasetTitle,
-          });
-        });
-      return tracks;
-    }
-
-    // Everything one click found, grouped the way the card reads it out. Returns
-    // null when the click landed on empty water.
-    const buildFeatureQuery = (e, hits) => {
-      if (hits.length === 0) return null;
-
-      // Tracks first — see trackItemsIn.
-      const tracks = trackItemsIn(hits);
-
-      // Observations: individual markers where they are drawn, the aggregate
-      // cell otherwise. A marker also names its platform, which the cell can't.
-      //
-      // Deduped by (layer, pk) first. A cell or marker that straddles a tile
-      // boundary is returned once per tile it appears in, and counting it twice
-      // inflated the card's total; drawing it twice turned the clicked-region
-      // outline into a scribble of near-coincident hexagons.
-      const observationHits = [];
-      const seenObservations = new Set();
-      hits.forEach((feature) => {
-        const layerId = feature.layer.id;
-        if (!["points", "hexes", "coverage-hexes"].includes(layerId)) return;
-        const key = `${layerId}:${feature.properties.pk}`;
-        if (seenObservations.has(key)) return;
-        seenObservations.add(key);
-        observationHits.push(feature);
-      });
-
-      const observations = new Map();
-      const addObservations = (feature) => {
-        datasetPksOf(feature).forEach((pk) => {
-          const existing = observations.get(pk);
-          if (existing) {
-            existing.platform =
-              existing.platform || feature.properties.platform;
-            return;
-          }
-          observations.set(pk, {
-            kind: "observation",
-            pk,
-            platform: feature.properties.platform,
-            // A marker is a place the user can point at; a cell is a
-            // neighbourhood. The card says which it is rather than implying a
-            // precision the aggregate doesn't have.
-            aggregate: feature.layer.id !== "points",
-          });
-        });
-      };
-      let observationCount = 0;
-      const cellFeatures = [];
-      // What was clicked, in the terms /tiles/datasets takes: the tile buckets
-      // themselves, plus which layer drew them. `source` starts at the main
-      // tile layer and only moves if a coverage hex is what was hit.
-      const buckets = {
-        hexPks: new Set(),
-        pointPks: new Set(),
-        source: "main",
-        z: Math.floor(map.current.getZoom()),
-      };
-      observationHits.forEach((feature) => {
-        const layerId = feature.layer.id;
-        const count = Number(feature.properties.count) || 0;
-        observationCount += count;
-        // A hex is one row server-side, but MVT clips it to whichever tiles
-        // it crosses — at low zoom it fits inside a single tile, at high
-        // zoom (e.g. z10) the same hex spans several, and `feature` above is
-        // only the fragment the click point happened to land in. Pull every
-        // currently-rendered fragment sharing this pk so the highlight/bounds
-        // below cover the whole hex instead of the one sliver under the
-        // cursor.
-        //
-        // The fragments still meet at the tile edge they were clipped along,
-        // so unioning them back into one polygon isn't just cosmetic tidying
-        // — without it, click-highlight-line/glow draw that internal edge as
-        // a line cutting across the hex, on top of drawing its true outline.
-        if (layerId !== "points") {
-          const fragments = map.current.queryRenderedFeatures({
-            layers: [layerId],
-            filter: ["==", ["get", "pk"], feature.properties.pk],
-          });
-          const parts = fragments.length ? fragments : [feature];
-          let merged = parts[0];
-          for (let i = 1; i < parts.length; i++) {
-            try {
-              // @turf/union 7 takes ONE FeatureCollection, not two
-              // features. Still folded pairwise rather than unioning the
-              // whole collection in one call, so a single degenerate
-              // fragment costs only itself (see catch below).
-              merged =
-                turfUnion(helpers.featureCollection([merged, parts[i]])) ||
-                merged;
-            } catch {
-              // A degenerate fragment (e.g. a sliver from the MVT buffer
-              // overlap) fails to union — keep what merged so far rather
-              // than losing the highlight entirely.
-            }
-          }
-          cellFeatures.push(merged);
-        }
-        // The bucket this feature stands for, so the card can ask the API what
-        // each dataset in it contributes. A tile carries only the bucket TOTAL
-        // (`count`), and for the days metric that total is a union across the
-        // datasets in the cell — it is nobody's individual figure. Splitting it
-        // here is not possible; /tiles/datasets does it from the rows.
-        (layerId === "points" ? buckets.pointPks : buckets.hexPks).add(
-          Number(feature.properties.pk),
-        );
-        // 'coverage-hexes' is drawn from /tiles/cells, which unions a different
-        // set of sources than /tiles. The card has to ask the same one, or the
-        // numbers it shows will not add up to the hex it is describing.
-        if (layerId === "coverage-hexes") buckets.source = "cells";
-
-        addObservations(feature);
-      });
-
-      // A coverage hex shares the marker tier's zoom band, so a click on one
-      // is a click on everything drawn inside it: the stations sitting in the
-      // hex join the card (and the datasets list's pin) alongside the hex's own
-      // datasets, and their counts join the header's total.
-      const markersInCells = [];
-      if (cellFeatures.length && map.current.getLayer("points")) {
-        const seenMarkers = new Set();
-        turfPointsWithinPolygon(
-          helpers.featureCollection(
-            map.current.queryRenderedFeatures({ layers: ["points"] }),
-          ),
-          helpers.featureCollection(cellFeatures),
-        ).features.forEach((feature) => {
-          if (seenMarkers.has(feature.properties.pk)) return;
-          seenMarkers.add(feature.properties.pk);
-          markersInCells.push(feature);
-          observationCount += Number(feature.properties.count) || 0;
-          buckets.pointPks.add(Number(feature.properties.pk));
-          addObservations(feature);
-        });
-      }
-
-      // Gridded footprints, deduped by dataset — a stack of grids covering the
-      // same water is the norm, not the exception.
-      const gridFeatures = dedupeGriddapByPk(
-        hits.filter((feature) => feature.layer.id === "griddap-coverage-fill"),
-      );
-      const grids = gridFeatures.map((feature) => ({
-        kind: "grid",
-        pk: Number(feature.properties.pk),
-        title: griddapTitle(feature),
-      }));
-
-      const items = [...tracks, ...observations.values(), ...grids];
-      if (items.length === 0) return null;
-
-      // What the click actually landed on, drawn back onto the map so the card
-      // has something to point at. Without it the card was a panel of titles
-      // floating over an unchanged map, and nothing said which of forty
-      // identical hexes it was describing.
-      //
-      // Areas (hexes, coverage hexes, grid rectangles) are outlined; individual
-      // markers are ringed. They stay in one collection — the highlight layers
-      // filter on geometry type — but only the areas can be framed.
-      //
-      // Grid rectangles routinely stack — a dozen gridded datasets can share
-      // the same patch of ocean — and click-highlight-fill paints every area
-      // feature as its own translucent polygon, so pushing one per dataset
-      // would compound into a darker patch the more of them overlap here.
-      // A single unioned shape fixes the opacity, but painting *only* that
-      // shape (dropping the individual rectangles) collapses nested/uneven
-      // boxes down to just their outer envelope — the small ones disappear
-      // and it reads as "just the biggest box got selected". So both are
-      // kept, tagged with the `role` the highlight layers filter on: the
-      // merged shape feeds the fill and only the fill ('fill'), the
-      // individual rectangles feed the outline and glow and only those
-      // ('outline'), so every box in the stack still draws its own border.
-      // Everything else is drawn by all of them ('both').
-      let mergedGrid = gridFeatures[0] || null;
-      for (let i = 1; i < gridFeatures.length; i++) {
-        try {
-          // One FeatureCollection per call — see the note in the hex
-          // fragment union above.
-          mergedGrid =
-            turfUnion(
-              helpers.featureCollection([mergedGrid, gridFeatures[i]]),
-            ) || mergedGrid;
-        } catch {
-          // A degenerate polygon fails to union — keep what merged so far
-          // rather than losing the highlight entirely.
-        }
-      }
-
-      // A feature from queryRenderedFeatures is a MapLibre GeoJSONFeature,
-      // whose `geometry` is a getter on the prototype: it has to be read off
-      // the live object here, and a feature can never be tagged by spreading
-      // it (`{ ...feature, role }` copies own properties only, silently
-      // dropping the geometry and leaving the highlight with nothing to
-      // draw). Hence the (feature, role) pairs rather than tagged copies.
-      const highlightFeature = ({ feature, role }) => ({
-        type: "Feature",
-        geometry: feature.geometry,
-        properties: {
-          // `count` rides along because click-highlight-point sizes itself
-          // with the same ramp 'points' does, and that expression reads it.
-          // A unioned shape carries turf's empty properties, but only the
-          // point layers read `count`, and those are never unioned.
-          count: Number(feature.properties?.count) || 0,
-          role,
-        },
-      });
-
-      const areaHighlights = [
-        ...cellFeatures.map((feature) => ({ feature, role: "both" })),
-        ...gridFeatures.map((feature) => ({ feature, role: "outline" })),
-        ...(mergedGrid ? [{ feature: mergedGrid, role: "fill" }] : []),
-      ].map(highlightFeature);
-
-      const highlight = {
-        type: "FeatureCollection",
-        features: [
-          ...areaHighlights,
-          ...observationHits
-            .filter((feature) => feature.layer.id === "points")
-            .concat(markersInCells)
-            .map((feature) => highlightFeature({ feature, role: "both" })),
-        ],
-      };
-
-      return {
-        // A nonce, so clicking the same spot twice re-opens a card the user
-        // dismissed rather than being deduped away by React.
-        nonce: Date.now(),
-        lngLat: [e.lngLat.lng, e.lngLat.lat],
-        items,
-        observationCount,
-        highlight,
-        // What the card asks /tiles/datasets about — see the buckets comment
-        // above. Sets are not serialisable and the card only ever reads them
-        // as lists, so they are flattened here.
-        buckets: {
-          ...buckets,
-          hexPks: [...buckets.hexPks],
-          pointPks: [...buckets.pointPks],
-        },
-        // Every dataset under the click, which the datasets list reads to pin
-        // and outline them (DatasetsTable's pinnedPks).
-        datasetPks: [...new Set(items.map((item) => item.pk))],
-      };
-    };
-
+  function installClick() {
     // A tap on a touch screen delivers 'touchend' and then a synthesized
     // 'click' a moment later, and both are wired to this handler. Whichever
     // lands second is the same gesture — drop it, or every tap would build the
@@ -4166,7 +3599,7 @@ export default function CreateMap({
         return;
       }
 
-      const query = buildFeatureQuery(e, hits);
+      const query = buildFeatureQuery(e.lngLat, hits, featureQueryContext());
 
       popup.remove();
       onFeatureQueryRef.current(query);
@@ -4208,6 +3641,133 @@ export default function CreateMap({
       }
     };
 
+    // One registration for the whole map. There is no layer fan-out any more, so
+    // no repeat deliveries to dedupe and no preventDefault() plumbing between
+    // handlers — and the mapbox-gl-draw click-swallowing workaround
+    // (https://github.com/mapbox/mapbox-gl-draw/issues/617) that the per-layer
+    // touchend bindings existed for goes with it, since the draw modes are
+    // checked directly at the top of the handler.
+    map.current.on("click", handleMapClick);
+
+    // Touch. A tap has to be told apart from the end of a pan or a pinch, which
+    // is why the old code bound 'touchend' per layer and pointedly not
+    // map-wide: a map-wide binding fired at the end of every drag and would
+    // have cleared the selection each time. Measuring the gesture instead makes
+    // the map-wide binding safe, which is what finally gives a touch user the
+    // tap-empty-water-to-clear escape hatch they never had.
+    const TAP_SLOP_PX = 12;
+    const TAP_TIMEOUT_MS = 500;
+    let touchStart = null;
+    map.current.on("touchstart", (e) => {
+      touchStart =
+        e.originalEvent.touches.length === 1
+          ? { point: e.point, at: Date.now() }
+          : null;
+    });
+    map.current.on("touchend", (e) => {
+      const start = touchStart;
+      touchStart = null;
+      if (!start) return;
+      if (Date.now() - start.at > TAP_TIMEOUT_MS) return;
+      const dx = e.point.x - start.point.x;
+      const dy = e.point.y - start.point.y;
+      if (dx * dx + dy * dy > TAP_SLOP_PX ** 2) return;
+      handleMapClick(e);
+    });
+  }
+
+  useEffect(() => {
+    // If already created don't proceed
+    if (map.current) return;
+    // Create map
+    map.current = new maplibreGl.Map({
+      container: mapContainer.current,
+      // Ocean-first basemap: bathymetry raster + vector rivers/boundaries and
+      // FR/EN labels. Data layers are inserted below the label layers.
+      //
+      // The projection is part of the style in MapLibre 5, and it has to be
+      // set here rather than left to the effect above: that effect's first run
+      // happens while map.current is still null, and projection doesn't change
+      // again, so a globe restored from localStorage would never be applied.
+      style: {
+        ...buildBasemapStyle(i18n.language),
+        projection: { type: projection === "globe" ? "globe" : "mercator" },
+      },
+      // MapLibre defaults to powerPreference 'high-performance', which wakes
+      // the discrete GPU on dual-GPU laptops. The map is circles and fills —
+      // the integrated GPU renders it fine, so hint 'low-power'.
+      canvasContextAttributes: { powerPreference: "low-power" },
+      // No attribution in the map's own corner: the per-source attributions are
+      // gathered by an AttributionControl the legend card builds and parents
+      // itself (see LegendFooter.jsx).
+      attributionControl: false,
+      // Starting camera: the provider's own mapView, so the legend describes
+      // the zoom the map opens at from the first render.
+      center: [initialView.lon, initialView.lat],
+      zoom: initialView.zoom,
+      // Stop at the deepest level the satellite imagery actually exists at
+      // everywhere it matters: Esri is cached to z17 on remote Arctic coasts
+      // (z19 in cities), and past its coverage it serves a grey "map data not
+      // yet available" tile rather than a 404. Capping the camera here means
+      // that tile is never reached on land, without masking anything off.
+      maxZoom: 17,
+    });
+    // Share the instance with MapStateProvider (see mapInstance there).
+    onMapReady(map.current);
+
+    // disable map rotation using right click + drag
+    map.current.dragRotate.disable();
+
+    // disable map rotation using touch rotation gesture
+    map.current.touchZoomRotate.disableRotation();
+
+    map.current.on("load", () => {
+      setColorStopsRef.current();
+      addObservationLayers();
+      addGriddapLayers();
+      addClickHighlightLayers();
+      addTrackLayers();
+      addSelectedTrackLayers();
+
+      // Apply the initial track-layer visibility from the URL-restored
+      // track-lines switch + data-layer selection.
+      applyLayerVisibility();
+
+      // Layers are created visible; re-apply the picker state in case the hex
+      // and point layers were toggled off before the style finished loading.
+      // The track layers are not the picker's to hide, so they are left alone.
+      if (!dataLayersVisibleRef.current) {
+        setLayersVisibility(observationLayerIds, false);
+      }
+      // A share link opening a gridded dataset can put its WMS overlay up
+      // before the style has loaded, when there were no data layers to hide.
+      if (activeWmsOverlayRef.current) setDataLayersVisibility(false);
+      // Same for the depth rasters, which come from the style itself and are
+      // therefore always created visible.
+      if (!bathymetryVisibleRef.current) {
+        setLayersVisibility(bathymetryLayerIds, false);
+      }
+
+      // A share link can carry the spatial selection (rectangle bounds or a
+      // polygon ring). SelectionProvider has already seeded it into the app
+      // state, which is the polygon prop this mount-time closure holds — this
+      // puts the shape back into the draw control so it is drawn, editable,
+      // and survives the next filter change (which re-derives the selection
+      // from whatever the draw control holds).
+      const sharedSelection = polygon;
+      if (sharedSelection) {
+        const [featureId] = drawPolygon.current.add({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [sharedSelection] },
+        });
+        drawPolygon.current.changeMode("direct_select", { featureId });
+        highlightPoints(sharedSelection);
+      }
+    });
+
+    installHover();
+    installClick();
+
     map.current.on("draw.create", () => {
       setLoading(true);
       if (drawPolygon.current.getAll().features.length > 1) {
@@ -4217,7 +3777,7 @@ export default function CreateMap({
       const polygon = feature.geometry.coordinates[0];
       highlightPoints(polygon);
       setPolygon(polygon);
-      onShapeDrawn();
+      onShapeDrawnRef.current();
       map.current.getCanvas().style.cursor = "unset";
       // Straight into direct_select so the shape is immediately draggable
       // (yellow, with handles) rather than sitting in simple_select first.
@@ -4278,6 +3838,10 @@ export default function CreateMap({
       setLoading(false);
     });
 
+    // The hex color stops depend on the zoom band (getCurrentRangeLevel), so
+    // returning below point level with point-level (zoom2) stops would clamp
+    // every hex past the top stop into a single green.
+    map.current.on("zoomend", () => setColorStopsRef.current());
     map.current.on("zoomend", () => {
       doFinalCheck.current = true;
       if (drawPolygon.current.getAll().features.length > 0) {
@@ -4319,40 +3883,6 @@ export default function CreateMap({
       }
     });
 
-    // One registration for the whole map. There is no layer fan-out any more, so
-    // no repeat deliveries to dedupe and no preventDefault() plumbing between
-    // handlers — and the mapbox-gl-draw click-swallowing workaround
-    // (https://github.com/mapbox/mapbox-gl-draw/issues/617) that the per-layer
-    // touchend bindings existed for goes with it, since the draw modes are
-    // checked directly at the top of the handler.
-    map.current.on("click", handleMapClick);
-
-    // Touch. A tap has to be told apart from the end of a pan or a pinch, which
-    // is why the old code bound 'touchend' per layer and pointedly not
-    // map-wide: a map-wide binding fired at the end of every drag and would
-    // have cleared the selection each time. Measuring the gesture instead makes
-    // the map-wide binding safe, which is what finally gives a touch user the
-    // tap-empty-water-to-clear escape hatch they never had.
-    const TAP_SLOP_PX = 12;
-    const TAP_TIMEOUT_MS = 500;
-    let touchStart = null;
-    map.current.on("touchstart", (e) => {
-      touchStart =
-        e.originalEvent.touches.length === 1
-          ? { point: e.point, at: Date.now() }
-          : null;
-    });
-    map.current.on("touchend", (e) => {
-      const start = touchStart;
-      touchStart = null;
-      if (!start) return;
-      if (Date.now() - start.at > TAP_TIMEOUT_MS) return;
-      const dx = e.point.x - start.point.x;
-      const dy = e.point.y - start.point.y;
-      if (dx * dx + dy * dy > TAP_SLOP_PX ** 2) return;
-      handleMapClick(e);
-    });
-
     // The card a share link arrived with (?at=lng,lat): ask the same question
     // of the same point, once every source the hit-test reads has been
     // rendered — which is what 'idle' means, and the earliest moment the
@@ -4364,8 +3894,9 @@ export default function CreateMap({
     // the selection and the page the same link just restored.
     askAtRef.current = (lngLat) => {
       const query = buildFeatureQuery(
-        { lngLat: { lng: lngLat[0], lat: lngLat[1] } },
+        { lng: lngLat[0], lat: lngLat[1] },
         hitsAt(map.current.project(lngLat)),
+        featureQueryContext(),
       );
       if (query) onFeatureQueryRef.current(query);
     };
@@ -4524,20 +4055,6 @@ export default function CreateMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // The hex color stops depend on the zoom band (getCurrentRangeLevel), but
-  // were only applied at load or on legend refresh — so returning below
-  // point level left 'hexes' painted with point-level (zoom2) stops, where
-  // every hex count clamps past the top stop into a single green. Re-apply
-  // on zoomend, re-registering so the handler sees the latest range levels.
-  // Declared after the map-creation effect so map.current exists on mount.
-  useEffect(() => {
-    if (!map.current) return;
-    const reapplyColorStops = () => setColorStops();
-    map.current.on("zoomend", reapplyColorStops);
-    return () => map.current.off("zoomend", reapplyColorStops);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeLevels, coverageRangeLevels]);
 
   // Keep the ramp scaled to the hexes actually on screen. Registered once —
   // the handler reads the current setColorStops through a ref — so the

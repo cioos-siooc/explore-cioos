@@ -7,6 +7,7 @@ import { installMockFetch } from "../../test/mockFetch.js";
 import { useMapState } from "./MapStateProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 import legendFixture from "../../../e2e/fixtures/api/legend.json";
+import griddapCoverageFixture from "../../../e2e/fixtures/api/griddapCoverage.json";
 
 let latest;
 
@@ -143,10 +144,7 @@ describe("MapStateProvider", () => {
 
     act(() => latest.setGriddapCoverageVisible(true));
     await waitFor(() =>
-      expect(latest.griddapCoverage).toEqual({
-        type: "FeatureCollection",
-        features: [],
-      }),
+      expect(latest.griddapCoverage).toEqual(griddapCoverageFixture),
     );
   });
 
