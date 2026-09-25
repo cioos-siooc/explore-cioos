@@ -261,6 +261,20 @@ describe("contextual tips", () => {
       expect(card()).toBeNull();
     });
 
+    it("starts from an offered tip, which then no longer times out", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      returningVisitor();
+      const { user } = renderProbe();
+      await user.click(screen.getByText("offer reshape"));
+      expect(card()).toHaveTextContent(`Tip 3 of ${TIPS.length}`);
+      await user.click(screen.getByRole("button", { name: "Next tip" }));
+      expect(card()).toHaveTextContent(/eye button/);
+      await user.click(screen.getByRole("button", { name: "Previous tip" }));
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(card()).toHaveTextContent(/Drag the corners/);
+      vi.useRealTimers();
+    });
+
     it("holds back offered tips while it runs", async () => {
       returningVisitor();
       const { user } = renderProbe();
