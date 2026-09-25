@@ -260,6 +260,39 @@ environment; check it with `echo "$HARVEST_CONFIG_B64" | base64 -d`) or as a
 Coolify **Persistent Storage file mount** at `/app/harvester/harvest_config.yaml`
 if you want it editable in the UI.
 
+### Frontend PR previews (Coolify)
+
+Every PR into `development-v2` that touches `frontend/**` gets a
+frontend-only preview at `https://pr-<N>.preview.cool.juno.cioos.ca`. It runs
+against the dev-v2 API, and through it the dev-v2 database, Redis cache and
+download queue. `.github/workflows/frontend-preview.yml` deploys the preview on
+each push and deletes it when the PR closes. PRs from forks are skipped.
+
+The workflow, not Coolify, decides which PRs get a preview. Coolify ignores
+watch paths for PR events, so its own preview webhook would build every PR.
+
+One-time setup:
+
+- **DNS:** `*.preview.cool.juno.cioos.ca` points at the Coolify server,
+  DNS-only.
+- **Coolify application:**
+  - Source is the repo as a _public repository_ (not the GitHub App), so it
+    receives no webhooks. Branch `development-v2`.
+  - Build pack **Dockerfile**, base directory `/frontend`, port 80. Leave its
+    main deployment stopped.
+  - Preview Deployments enabled, with URL template
+    `pr-{{pr_id}}.preview.cool.juno.cioos.ca`.
+  - Preview build variables: `API_URL=https://explore-v2.cool.juno.cioos.ca/api`,
+    `BASE_URL=/` and `ENVIRONMENT=preview`. `SENTRY_DSN` is optional, and there
+    is no `SENTRY_AUTH_TOKEN`.
+- **Repo secrets:**
+  - `COOLIFY_URL` (`https://dashboard.cool.juno.cioos.ca`)
+  - `COOLIFY_TOKEN`, an API token with `read`, `write` and `deploy`
+  - `COOLIFY_FRONTEND_PREVIEW_UUID`
+
+The dev-v2 web-api must keep `CORS_ORIGINS=*`, because previews call it from
+their own origin.
+
 ### Self-hosted production
 
 `docker-compose.production.yaml` is an **overlay** on `docker-compose.yaml`,
