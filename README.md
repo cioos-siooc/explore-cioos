@@ -7,6 +7,9 @@
 CDE harvests oceanographic dataset metadata from ERDDAP, OBIS and CKAN into
 PostgreSQL/PostGIS and serves a map-first search and download UI over it.
 
+How the app handles personal information (no cookies, email retention, the
+third-party services it uses) is in [PRIVACY.md](PRIVACY.md).
+
 ## Architecture
 
 ```mermaid
