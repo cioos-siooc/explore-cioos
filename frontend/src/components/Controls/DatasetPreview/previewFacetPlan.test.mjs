@@ -224,9 +224,8 @@ test("the plan names the cf_role columns, which is what titles the figure", () =
   ]);
 });
 
-test("the axis names stay put; only the direction they are drawn in flips", () => {
-  // X is the axis every panel is drawn against and Y is the panels, in both
-  // layouts — a profile just draws its shared depth axis down the side.
+test("the orientation decides which control runs horizontally", () => {
+  // A profile draws its shared depth axis down the side, so that control is Y.
   assert.deepEqual(axisDirectionsFor(COLUMNS), {
     x: "vertical",
     y: "horizontal",

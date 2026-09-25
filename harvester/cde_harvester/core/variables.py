@@ -24,14 +24,11 @@ and lands in a ``jsonb`` column.
 # mpoPmzaVikingCtdInsitu, TE90_01 (degree_C) declares
 # actual_range = -1.4899, 191277.0.
 #
-# generic_name/original_name are the short names the preview's hover box prefers
-# over long_name. ERDDAP's own "name" attribute is deliberately NOT among them:
+# ERDDAP's own "name" attribute is deliberately NOT among them:
 # the key "name" below already holds the variable's destination name, which
 # /preview matches columns by, and the loop would overwrite it.
 PERSISTED_VARIABLE_ATTRIBUTES = [
     "long_name",
-    "generic_name",
-    "original_name",
     "standard_name",
     "units",
     "cf_role",

@@ -46,13 +46,13 @@ const DATASET = {
   first_eov_column: "temperature",
 };
 
-function open(url = "/") {
+function open(url = "/", dataset = DATASET) {
   const user = userEvent.setup({ delay: null });
   renderWithProviders(
     <DatasetPreview
       datasetPreview={{ table: TABLE }}
       previewError={null}
-      inspectDataset={DATASET}
+      inspectDataset={dataset}
       inspectRecordID="record-1"
       setInspectRecordID={vi.fn()}
       showModal
@@ -68,6 +68,8 @@ const plotted = async () => {
   await waitFor(() => expect(screen.getByTestId("plotly")).toBeInTheDocument());
   return screen.getByTestId("plotly");
 };
+const rowCaptioned = (caption) =>
+  screen.getByText(caption).closest(".controlRow");
 const traceCount = () =>
   Number(screen.getByTestId("plotly").getAttribute("data-traces"));
 
@@ -93,6 +95,27 @@ describe("DatasetPreviewPlot", () => {
     );
     // The colour scale row is withheld until there is something to scale.
     expect(screen.queryByText("Color scale")).not.toBeInTheDocument();
+  });
+
+  it("captions a profile's vertical shared axis Y and its panels X", async () => {
+    open();
+    await plotted();
+    expect(rowCaptioned("Y axis")).toHaveTextContent("depth");
+    expect(rowCaptioned("X axis")).toHaveTextContent("temperature");
+  });
+
+  it("captions a time series' horizontal shared axis X and its panels Y", async () => {
+    open("/", { ...DATASET, cdm_data_type: "TimeSeries" });
+    await plotted();
+    expect(rowCaptioned("X axis")).toHaveTextContent("time");
+    expect(rowCaptioned("Y axis")).toHaveTextContent("temperature");
+  });
+
+  it("hints that the panels axis takes more than one variable", async () => {
+    open();
+    await plotted();
+    expect(rowCaptioned("X axis")).toHaveTextContent("(+/-)");
+    expect(rowCaptioned("Y axis")).not.toHaveTextContent("(+/-)");
   });
 
   it("adds a panel when a second variable is ticked", async () => {
