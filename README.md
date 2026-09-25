@@ -231,23 +231,37 @@ npm --prefix frontend run test:a11y                    # axe, ratcheting baselin
 
 ### CI/CD
 
-The [Deploy workflow](.github/workflows/deploy.yml) deploys `master` and
-`development` once the Integration Tests workflow **succeeds** on that branch, so
-a red build never deploys (`workflow_dispatch` allows a manual deploy that skips
-the gate). It connects over WireGuard, checks out the tested commit, renders
-`.env.production` through 1Password into `.env` on the server, and runs the
-production compose pair.
+The [Deploy workflow](.github/workflows/deploy.yml) deploys immutable release
+tags after the release-triggered Integration Tests (including visual regression)
+succeed. A prerelease (for example `v1.2.0-rc.1`) must point to a commit on
+`development*` or `master` and deploys staging; a full release must point to a
+commit on `master` and deploys production. Both run on Juno over WireGuard.
+Once release tests pass, the workflow dispatches a branch-ref deploy of the
+exact tag SHA (the shared Compose action cannot clone a fresh directory from
+`refs/tags/*`). To roll back, dispatch Deploy with an existing published release
+tag and its matching environment; historic CI runs need not still be retained.
 
 `.env.production` in this repo **is** the production configuration: `op://`
 references name 1Password items, everything else ships as written. Change
 production settings there, not on the box.
 
-### Coolify (dev/staging)
+`.env.staging.sample` is the matching Juno staging template. Before publishing
+a prerelease, create its referenced `explore-cioos-staging` 1Password item with
+the listed fields. In particular, give staging its own public URL, nginx and
+Prefect ports, Postgres port/database/password, and external database address.
+Create the staging external Docker network once on Juno with
+`docker network create explore-cioos-staging_default`. The staging template
+uses that network and the tracked sample harvest config so its first deployment
+does not depend on production's network or host-editable config file.
 
-Create a **Docker Compose** resource pointing at `docker-compose.yaml` alone. It
-publishes no host ports and already carries Coolify's magic variables
-(`SERVICE_FQDN_NGINX_4000`, `SERVICE_URL_NGINX`, and the same pair for Prefect).
-Coolify ignores `docker-compose.override.yaml`.
+### Coolify (latest)
+
+Create a **Docker Compose** resource tracking `development-v2` and pointing at
+`docker-compose.yaml` alone. Enable Coolify's GitHub automatic deployment so it
+remains the branch-updated `latest` instance. It publishes no host ports and
+already carries Coolify's magic variables (`SERVICE_FQDN_NGINX_4000`,
+`SERVICE_URL_NGINX`, and the same pair for Prefect). Coolify ignores
+`docker-compose.override.yaml`.
 
 Paste `.env.coolify.sample` into the resource's environment ("Developer view"):
 `DB_PASSWORD` is required; `HARVEST_CONFIG_B64`, `ENVIRONMENT`, `SENTRY_DSN`,

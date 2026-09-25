@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      - development
+      - "development*"
   # The visual (screenshot) suite's own trigger — see "Run the visual
   # regression suite" in the docker job below. GitHub doesn't support
   # `paths:` filtering on `release` events, so a published release runs this

@@ -1,51 +1,153 @@
 name: Deploy
 
-# Gated on tests. This workflow used to trigger on `push` while reading
-# `github.event.workflow_run.*` in three places — an expression that is always
-# null outside a workflow_run event — so it fell through to `github.ref_name`
-# and a red build deployed anyway. It now runs only when the Integration Tests
-# workflow finishes on a deployable branch, and only when that run succeeded.
-#
-# Integration Tests is the single gate because it is a superset: it runs the
-# whole Python suite (`uv run pytest`) before standing up compose, on top of the
-# JS API/frontend suite and the download-request check.
+# Prereleases deploy staging; full releases deploy production. Wait for the
+# release's Integration Tests (including visual regression) before deploying.
 on:
-  workflow_run:
-    workflows: ["Integration Tests"]
-    types: [completed]
-    branches:
-      - master
-      - development
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to redeploy
+        required: true
+        type: string
+      environment:
+        description: Deployment target
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  actions: write
+  contents: read
 
 jobs:
-  deploy:
-    # workflow_dispatch has no workflow_run context — deploying by hand stays a
-    # deliberate override.
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
-    name: Deploy to ${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}
-    timeout-minutes: 15
+  release:
+    name: Verify release
+    timeout-minutes: 90
     runs-on: ubuntu-latest
-    environment: ${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      tag: ${{ steps.release.outputs.tag }}
+      target: ${{ steps.release.outputs.target }}
     steps:
-      - name: Checkout
+      - name: Checkout release
         uses: actions/checkout@v7
         with:
-          # A workflow_run event checks out the DEFAULT branch unless told
-          # otherwise, which would deploy master's compose files to development.
-          # Deploy exactly the commit that was tested.
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
 
+      - name: Verify release and source branch
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'staging' || 'production') }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          PUBLISHED_AT: ${{ github.event.release.published_at }}
+        run: |
+          [[ "$TAG" == v* ]]
+          git show-ref --verify --quiet "refs/tags/$TAG"
+          sha=$(git rev-parse "$TAG^{commit}")
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")
+          test "$(jq -r '.draft' <<< "$release")" = false
+          if [ "$TARGET" = staging ]; then
+            test "$(jq -r '.prerelease' <<< "$release")" = true
+          else
+            test "$(jq -r '.prerelease' <<< "$release")" = false
+          fi
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+          if [ "$TARGET" = production ]; then
+            git merge-base --is-ancestor "$sha" refs/remotes/origin/master
+          else
+            found=false
+            for branch in $(git for-each-ref --format='%(refname)' refs/remotes/origin); do
+              case "$branch" in
+                refs/remotes/origin/development*|refs/remotes/origin/master)
+                  if git merge-base --is-ancestor "$sha" "$branch"; then found=true; break; fi ;;
+              esac
+            done
+            test "$found" = true
+          fi
+          if [ "$MANUAL" != true ]; then
+            for _ in $(seq 1 70); do
+              conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build_and_test.yml/runs?event=release&head_sha=$sha&per_page=100" \
+                | jq -r --arg published "$PUBLISHED_AT" '.workflow_runs | map(select(.created_at >= $published)) | sort_by(.created_at) | last | .conclusion // "pending"')
+              case "$conclusion" in
+                success) break ;;
+                pending) sleep 60 ;;
+                *) echo "Release Integration Tests: $conclusion" >&2; exit 1 ;;
+              esac
+            done
+            test "$conclusion" = success
+          fi
+          {
+            printf 'sha=%s\n' "$sha"
+            printf 'tag=%s\n' "$TAG"
+            printf 'target=%s\n' "$TARGET"
+          } >> "$GITHUB_OUTPUT"
+
+  queue-deploy:
+    name: Queue tested release
+    needs: release
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy from the master workflow ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+          TARGET: ${{ needs.release.outputs.target }}
+        run: gh workflow run deploy.yml --ref master -f tag="$TAG" -f environment="$TARGET"
+
+  staging:
+    name: Deploy staging
+    needs: release
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'staging'
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
-          wg_config: ${{ secrets.BELUGA_WIREGUARD_VPN_CONFIG }}
-          ssh_host: "${{ secrets.SERVER_IP }}"
-          ssh_username: "runner"
-          ssh_key: ${{ secrets.BELUGA_RUNNER_PRIVATE_KEY }}
-          deploy_path: "/srv/services/explore-cioos"
-          stack_name: "explore-cioos-${{ (github.event.workflow_run.head_branch || github.ref_name) == 'master' && 'production' || 'development' }}"
-          # Production is an OVERLAY on the base file, not a standalone stack.
-          compose_files: "docker-compose.yaml docker-compose.production.yaml"
-          op_secret_files: ".env.production:.env"
+          wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
+          ssh_host: ${{ secrets.SERVER_IP }}
+          ssh_username: runner
+          ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
+          deploy_path: /srv/services/explore-cioos-staging
+          stack_name: explore-cioos-staging
+          compose_files: docker-compose.yaml docker-compose.production.yaml
+          op_secret_files: .env.staging.sample:.env
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
+          git_sha: ${{ needs.release.outputs.sha }}
+          docker_compose_down: "true"
+
+  production:
+    name: Deploy production
+    needs: release
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: cioos-siooc/cioos-deploy-docker-compose@main
+        with:
+          wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
+          ssh_host: "${{ secrets.SERVER_IP }}"
+          ssh_username: runner
+          ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
+          deploy_path: /srv/services/explore-cioos
+          stack_name: explore-cioos-production
+          compose_files: docker-compose.yaml docker-compose.production.yaml
+          op_secret_files: .env.production:.env
+          op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
+          git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"
