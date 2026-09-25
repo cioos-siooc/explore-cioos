@@ -17,11 +17,7 @@
 // annotations do not.
 
 import { COLUMNS, ROWS } from "./previewFacetPlan.js";
-import {
-  labelFor,
-  shortLabelFor,
-  shortestNameFor,
-} from "./previewVariables.js";
+import { labelFor, shortLabelFor } from "./previewVariables.js";
 import { defaultColorFor } from "./previewColors.js";
 import {
   colorDimensionFor,
@@ -263,13 +259,13 @@ export function buildFigure({
       : custom;
   };
 
-  // What the hover calls a column: the user's rename, else the shortest name the
-  // publisher gave it. Capped because a box is open on every panel at once and
-  // one 125-character long_name would stretch it across the figure.
+  // What the hover calls a column: the user's rename, else its long_name. Capped
+  // because a box is open on every panel at once and one 125-character long_name
+  // would stretch it across the figure.
   const hoverNameFor = (columnName) => {
     const custom = labels[columnName] && labels[columnName].trim();
     const name =
-      custom || shortestNameFor(variablesByName.get(columnName)) || columnName;
+      custom || shortLabelFor(variablesByName.get(columnName)) || columnName;
     return ellipsize(name, HOVER_NAME_CHARS);
   };
   // After the value rather than after the name: "3.21 degree_C" reads as a

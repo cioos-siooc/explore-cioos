@@ -363,14 +363,13 @@ test("one panel is wide enough not to wrap", () => {
   assert.ok(!layout.xaxis.title.text.includes("<br>"));
 });
 
-test("the hover names the column as briefly as the publisher allows", () => {
+test("the hover names the column by its capped long_name", () => {
   const { data } = figure("TimeSeriesProfile", ALL_SIX, {
     size: { width: 1140, height: 620 },
   });
   assert.ok(data[0].layout === undefined);
-  // This record declares no generic_name or original_name, so the name falls
-  // back to long_name — and is capped, because a box is open on every panel at
-  // once. The panel's own title carries it whole.
+  // Capped because a box is open on every panel at once. The panel's own title
+  // carries it whole.
   assert.equal(
     data[0].hovertemplate,
     "Temperature (1990 sca…: %{x} degree_C<extra></extra>",
@@ -403,28 +402,6 @@ test("a column with no unit leaves no trailing space", () => {
     data[0].hovertemplate,
     "Temperature (1990 sca…: %{x}<extra></extra>",
   );
-});
-
-test("the shortest name the publisher gave wins, in ERDDAP's own order", () => {
-  // What a reharvested catalogue looks like: generic_name on one column,
-  // original_name on the next, neither on the third.
-  const shortNames = {
-    ...VIKING,
-    columnMeta: VIKING.columnMeta.map((meta) => {
-      if (meta.name === "TE90_01")
-        return { ...meta, generic_name: "temperature", original_name: "temp" };
-      if (meta.name === "PSAL_01") return { ...meta, original_name: "sal" };
-      return meta;
-    }),
-  };
-  const { data } = figureFrom(shortNames, "TimeSeriesProfile", [
-    "TE90_01",
-    "PSAL_01",
-    "FLOR_01",
-  ]);
-  assert.ok(data[0].hovertemplate.startsWith("temperature: "));
-  assert.ok(data[1].hovertemplate.startsWith("sal: "));
-  assert.ok(data[2].hovertemplate.startsWith("Fluorescence: "));
 });
 
 test("a renamed variable is renamed in the hover too", () => {
