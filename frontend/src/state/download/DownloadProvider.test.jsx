@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
@@ -48,10 +48,91 @@ describe("DownloadProvider", () => {
     installMockFetch();
   });
 
-  it("seeds email from the remembered cookie, or nothing", async () => {
-    document.cookie = "email=diver@example.com; path=/";
+  it("seeds email from a remembered address, with remembering already on", async () => {
+    window.localStorage.setItem(
+      "cde.email",
+      JSON.stringify("diver@example.com"),
+    );
     await renderReady();
     expect(download.email).toBe("diver@example.com");
+    expect(download.rememberEmail).toBe(true);
+  });
+
+  it("starts empty with remembering off", async () => {
+    await renderReady();
+    expect(download.email).toBe("");
+    expect(download.rememberEmail).toBe(false);
+  });
+
+  describe("submitting", () => {
+    let requests;
+    beforeEach(() => {
+      requests = [];
+      const realFetch = global.fetch;
+      global.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/download?")) {
+          requests.push({ url, init });
+          return Promise.resolve(new Response(null, { status: 200 }));
+        }
+        return realFetch(input, init);
+      };
+    });
+
+    async function submit(remember) {
+      await renderReady();
+      act(() => {
+        selection.setPointsToDownload([{ pk: 1 }]);
+        download.setEmail("diver@example.com");
+        download.setRememberEmail(remember);
+      });
+      act(() => download.handleSubmission());
+      await waitFor(() => expect(requests).toHaveLength(1));
+    }
+
+    it("POSTs the address in the body, never in the URL", async () => {
+      await submit(false);
+      const [{ url, init }] = requests;
+      expect(url).not.toContain("example.com");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body)).toEqual({ email: "diver@example.com" });
+    });
+
+    it("keeps nothing on the device unless asked to", async () => {
+      await submit(false);
+      expect(JSON.parse(window.localStorage.getItem("cde.email"))).toBe("");
+    });
+
+    it("remembers the address when asked, and forgets it when unticked", async () => {
+      await submit(true);
+      expect(JSON.parse(window.localStorage.getItem("cde.email"))).toBe(
+        "diver@example.com",
+      );
+      act(() => download.setRememberEmail(false));
+      expect(JSON.parse(window.localStorage.getItem("cde.email"))).toBe("");
+    });
+
+    it("counts the submission in Plausible, without the address", async () => {
+      window.plausible = vi.fn();
+      try {
+        await submit(false);
+        expect(window.plausible).toHaveBeenCalledWith("Download submitted", {
+          props: { datasets: "1", language: "en" },
+        });
+      } finally {
+        delete window.plausible;
+      }
+    });
+
+    it("submits even when Plausible is blocked", async () => {
+      expect(window.plausible).toBeUndefined();
+      await submit(false);
+    });
+
+    it("sets no cookie", async () => {
+      await submit(true);
+      expect(document.cookie).toBe("");
+    });
   });
 
   it("validates the email as it's edited", async () => {

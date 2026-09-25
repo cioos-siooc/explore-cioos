@@ -36,7 +36,6 @@ const EMPTY_TILEJSON = JSON.stringify({
 });
 
 const TELEMETRY_HOSTS = ["ingest.sentry.io", "plausible.cioos.ca"];
-const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
 /**
  * Install the offline network for one browser context.
@@ -54,7 +53,17 @@ export async function installMockApi(context, { appOrigin, apiOrigin }) {
   // Registered first => runs last => the backstop.
   await context.route("**/*", (route) => {
     const url = new URL(route.request().url());
-    // The app's own bundle, styles, fonts and images.
+    // Webfonts. Served empty so the app falls back to the system stack, the
+    // same way for every run: real Montserrat/Quicksand/Sora arriving late
+    // would reflow the layout mid-capture in every screenshot baseline.
+    if (url.origin === appOrigin && /\.woff2?$/.test(url.pathname)) {
+      return route.fulfill({
+        status: 200,
+        contentType: "font/woff2",
+        body: "",
+      });
+    }
+    // The app's own bundle, styles and images.
     if (url.origin === appOrigin) return route.continue();
     // Telemetry. Sentry is initialised in every environment (App.jsx) but only
     // enabled in production; plausible is loaded by the page. Neither belongs in
@@ -64,13 +73,6 @@ export async function installMockApi(context, { appOrigin, apiOrigin }) {
       // resource" to the console, which the console guard would report as a
       // failure on every single spec.
       return route.fulfill({ status: 204, body: "" });
-    }
-    // Webfonts. Served empty so the app falls back to the system stack, the
-    // same way for every run: fetching real Montserrat/Quicksand/Sora would put
-    // a network round trip and a third-party asset inside every screenshot
-    // baseline, and a font that arrives late reflows the layout mid-capture.
-    if (FONT_HOSTS.some((host) => url.host.endsWith(host))) {
-      return route.fulfill({ status: 200, contentType: "text/css", body: "" });
     }
     unexpected.push(route.request().url());
     return route.abort("blockedbyclient");

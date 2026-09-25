@@ -139,7 +139,7 @@ function Stat({ value, label, language }) {
 
 export default function IntroModal({ showModal, setShowModal }) {
   const { t, i18n } = useTranslation();
-  const { setShowSelectionHelpModal } = useUI();
+  const { setShowSelectionHelpModal, setShowPrivacyModal } = useUI();
   const { tipsEnabled, setTipsEnabled, startTour } = useTips();
   const { totalNumberOfDatasets, orgsSelected } = useFilters();
   const close = () => setShowModal(false);
@@ -333,7 +333,16 @@ export default function IntroModal({ showModal, setShowModal }) {
               </p>
             </section>
           </div>
-          <p className="introSources">{t("introSources")}</p>
+          <p className="introSources">
+            {t("introSources")}{" "}
+            <button
+              type="button"
+              className="introLink"
+              onClick={() => setShowPrivacyModal(true)}
+            >
+              {t("privacyLinkText")}
+            </button>
+          </p>
         </footer>
       </Modal.Body>
     </Modal>
