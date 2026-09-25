@@ -497,7 +497,7 @@
   .filtersPanelList {
     flex: 1 1 auto;
     width: 100%;
-    padding: 8px 10px;
+    padding: 4px 6px;
     border-right: none;
   }
 
@@ -516,24 +516,24 @@
      the long option lists every pixel of it. */
   .filtersPanel .filterOptions {
     inset: 0;
-    padding: 10px 12px 12px;
+    padding: 6px 10px 8px;
   }
 
   .filtersPanelPlaceholder {
     display: none;
   }
 
-  /* Touch targets. 44px is the floor on a phone and every row here was sized
-     for a pointer — the option rows worst of all, at 34px. */
+  /* Touch targets: 44px is the floor on a phone. The padding stays tight so
+     the rows sit at that floor rather than above it. */
   .filtersPanelList .filterHeader {
-    min-height: 48px;
-    padding: 6px 10px;
+    min-height: 44px;
+    padding: 2px 8px;
   }
 
   .filtersPanel .filterOptionsBody .optionButton {
     min-height: 44px;
-    padding: 10px 8px;
-    margin: 0 0 2px;
+    padding: 6px 8px;
+    margin: 0;
   }
 
   /* The pane covers the list, so its options are the surface's own scroll. */
@@ -541,15 +541,14 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Clear of the home indicator, and roomy enough to be the reset target for
-     the whole surface rather than a caption-sized link. */
+  /* Clear of the home indicator. */
   .filtersPanelFooter {
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
   }
 
   .filtersPanelReset {
     min-height: 44px;
-    padding: 0 18px;
+    padding: 0 14px;
   }
 
   /* A status line, not a heading — and at the smaller step it shares the row

@@ -9,17 +9,24 @@ export const DESKTOP_WIDTH = 1600;
 export const TABLET_WIDTH = 1024;
 export const MOBILE_WIDTH = 390;
 
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+const TOUCH_QUERY = "(hover: none)";
+
 let currentWidth = DESKTOP_WIDTH;
+let touchScreen = false;
 const liveQueries = new Set();
 
-// Only the two forms this codebase writes. Anything else is a typo in a test,
-// and answering it `false` would hide that.
+// Only the forms this codebase writes. Anything else is a typo in a test, and
+// answering it `false` would hide that. Reduced motion is off, as on most
+// machines, so animations run their real course under test.
 function evaluate(query) {
+  if (query.trim() === REDUCED_MOTION_QUERY) return false;
+  if (query.trim() === TOUCH_QUERY) return touchScreen;
   const match = /^\(\s*(min|max)-width:\s*(\d+)px\s*\)$/.exec(query.trim());
   if (!match) {
     throw new Error(
       `Unsupported media query in test: "${query}". ` +
-        "Only (min-width: Npx) and (max-width: Npx) are handled — see src/test/viewport.js.",
+        "Only (min-width: Npx), (max-width: Npx), (hover: none) and reduced motion are handled — see src/test/viewport.js.",
     );
   }
   const [, bound, px] = match;
@@ -64,7 +71,13 @@ export function setViewportWidth(width) {
   liveQueries.forEach((mql) => mql.dispatch());
 }
 
+export function setTouchScreen(touch) {
+  touchScreen = touch;
+  liveQueries.forEach((mql) => mql.dispatch());
+}
+
 export function resetViewport() {
   currentWidth = DESKTOP_WIDTH;
+  touchScreen = false;
   liveQueries.clear();
 }

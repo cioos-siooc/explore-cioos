@@ -1,0 +1,44 @@
+.cioosSkeleton {
+  display: block;
+  width: 100%;
+  height: 0.9em;
+  border-radius: var(--cioos-radius-sm);
+  background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 70%) 50%,
+      transparent 100%
+    )
+    no-repeat var(--cioos-surface-2);
+  background-size: 50% 100%;
+  animation: cioos-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* The box is the whole line; the bar painted in it is the height of the
+   text's glyphs. The em fallback covers browsers without the lh unit. */
+.cioosSkeletonText {
+  height: 1.25em;
+  height: 1lh;
+  padding-block: 0.2em;
+  padding-block: calc((1lh - 0.9em) / 2);
+  background-clip: content-box;
+}
+
+@keyframes cioos-skeleton-shimmer {
+  from {
+    background-position: -100% 0;
+  }
+
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* theme.css crushes every animation with !important, which would freeze the
+   highlight mid-block; drop it so the block sits flat instead. */
+@media (prefers-reduced-motion: reduce) {
+  .cioosSkeleton {
+    animation: none !important;
+    background-image: none;
+  }
+}

@@ -300,6 +300,17 @@
 
     /* A sheet on the bottom edge rises from it and drops back behind it. */
     transform: translateY(100%);
+
+    /* Same phone type scale as the datasets sheet (Sidebar/styles.css): the
+       rows are its cards, and at theme.css's step-up the title and its meta
+       came out the same size and the meta wrapped each row to four lines. */
+    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-2xs: 10px;
+    --cioos-font-size-xs: 11px;
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-base: 13px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
   }
 
   .featureCard.open {
@@ -313,8 +324,24 @@
 
   /* Comfortable touch targets: the desktop rows are sized for a cursor. */
   .featureCardRow {
+    /* An explicit min-height replaces the flex item's content-sized minimum,
+       so without this a full list squeezed each row to 44px and its meta
+       spilled out under the next one. */
+    flex-shrink: 0;
     min-height: 44px;
     padding: var(--cioos-space-sm) var(--cioos-space-md);
+  }
+
+  /* The list card's title size, a step above the meta under it, on one line
+     so more rows fit the sheet; the full title is the row's tooltip. */
+  .featureCardRowTitle {
+    -webkit-line-clamp: 1;
+    font-size: var(--cioos-font-size-base);
+  }
+
+  .featureCardRowAdd,
+  .featureCardRowIcon {
+    min-height: calc(var(--cioos-font-size-base) * 1.35);
   }
 }
 

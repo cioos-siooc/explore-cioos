@@ -37,6 +37,7 @@ import LegendHelpModal, { LEGEND_HELP_SECTIONS } from "./LegendHelpModal.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 import "./styles.css";
 import classNames from "classnames";
@@ -86,6 +87,9 @@ function depthPosition(metres) {
 // The hex entry's icon colour: a cell from the middle of the ramp, which is what
 // an average hexagon looks like on the map. Picking an end of the ramp would have
 // made the icon claim a count.
+// The tips whose control is on this card (see tipHighlight's callers here).
+const LEGEND_TIPS = ["griddedCoverage", "nonna"];
+
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)];
 
 // Choose which stop indices get a tick label. Keeps every stop when there are
@@ -152,6 +156,15 @@ export default function Legend({
   // keys move behind it, opening centred over the map when they are asked for.
   // That is the right trade for a legend: it is read in glances, not kept open.
   const compact = useMediaQuery(MOBILE_QUERY);
+  const { activeTip } = useTips();
+  // A tip about something on the card opens it as the tip arrives, so there is
+  // something to point at (see tipHighlight) — once, so the card still folds
+  // away while the tip is up.
+  const [tipOpenedFor, setTipOpenedFor] = useState(activeTip);
+  if (activeTip !== tipOpenedFor) {
+    setTipOpenedFor(activeTip);
+    if (LEGEND_TIPS.includes(activeTip)) setLegendOpen(true);
+  }
   const [detailOpen, setDetailOpen] = useState(false);
   // Which explanation is open, by its LEGEND_HELP_SECTIONS key — one dialog for
   // every ⓘ on the card, whether it sits on a group label or on one of the
@@ -244,6 +257,7 @@ export default function Legend({
                 title={control.label}
                 checked={control.checked}
                 onChange={control.onChange}
+                tipTarget={control.tipTarget}
               />
             )}
             {typeof label === "string" ? (
@@ -597,6 +611,7 @@ export default function Legend({
             label={control.label}
             checked={control.checked}
             onChange={control.onChange}
+            tipTarget={control.tipTarget}
           />
         ))}
       </div>
