@@ -12,11 +12,8 @@
 .tipCard {
   left: 12px;
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
-  display: flex;
-  align-items: flex-start;
-  gap: var(--cioos-space-sm);
   width: min(360px, calc(100vw - 24px));
-  padding: var(--cioos-space-sm) var(--cioos-space-sm) var(--cioos-space-sm)
+  padding: var(--cioos-space-xs) var(--cioos-space-xs) var(--cioos-space-sm)
     var(--cioos-space-md);
   background-color: var(--cioos-white);
   border: 1px solid var(--cioos-hairline);
@@ -64,42 +61,60 @@
   cursor: pointer;
 }
 
+.tipCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .tipCardIcon {
   flex: none;
-  margin-top: 2px;
+  margin-right: var(--cioos-space-xs);
   color: var(--cioos-primary);
 }
 
-.tipCardBody {
-  flex: 1;
-  min-width: 0;
-}
-
 .tipCardHeading {
+  margin-right: auto;
   font-family: var(--cioos-font-display);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: var(--cioos-navy);
 }
 
-.tipCardBody p {
-  margin: 2px 0 4px;
+.tipCardStep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-ink-80);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .tipCardStep:hover {
+    background-color: var(--cioos-surface-2);
+    color: var(--cioos-ink);
+  }
+}
+
+.tipCardStep:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.tipCardText {
+  margin: 0 var(--cioos-space-sm) var(--cioos-space-xs) 0;
+  line-height: 1.5;
 }
 
 .tipGlyph {
   vertical-align: -2px;
   color: var(--cioos-primary);
-}
-
-.tipCardTour {
-  display: flex;
-  align-items: center;
-  gap: var(--cioos-space-md);
-}
-
-.tipCardCount {
-  margin-right: auto;
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
 }
 
 .tipCardLink {
