@@ -163,7 +163,7 @@ function Stat({ value, label, language }) {
 
 export default function IntroModal({ showModal, setShowModal }) {
   const { t, i18n } = useTranslation();
-  const { setShowSelectionHelpModal } = useUI();
+  const { setShowSelectionHelpModal, setShowPrivacyModal } = useUI();
   const { tipsEnabled, setTipsEnabled, startTour } = useTips();
   const {
     totalNumberOfDatasets,
@@ -346,6 +346,15 @@ export default function IntroModal({ showModal, setShowModal }) {
                 aria-hidden="true"
               />
               {t("introReopenText")}
+            </p>
+            <p>
+              <button
+                type="button"
+                className="introLink"
+                onClick={() => setShowPrivacyModal(true)}
+              >
+                {t("privacyLinkText")}
+              </button>
             </p>
             <Switch
               id="introTipsToggle"

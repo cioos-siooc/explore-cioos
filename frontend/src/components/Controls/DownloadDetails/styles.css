@@ -409,6 +409,27 @@
   color: var(--cioos-ink-60);
 }
 
+.downloadSubmit .form-switch {
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+}
+
+.downloadEmailNotice {
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.25;
+  color: var(--cioos-ink-80);
+}
+
+.downloadEmailNoticeLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .downloadSubmit .submissionFeedback.success {
   color: var(--cioos-primary-700);
 }
