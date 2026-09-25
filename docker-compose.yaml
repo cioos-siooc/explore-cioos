@@ -339,7 +339,7 @@ services:
     # Non-conda image: ships asyncpg, so Prefect can use Postgres as its
     # metadata DB. SQLite (the default) throws "database is locked" under the
     # concurrent access from scaled / remote workers — Postgres handles it.
-    image: prefecthq/prefect:3.6-python3.12
+    image: prefecthq/prefect:3.8-python3.12
     # On startup, create the dedicated `prefect` database in the shared `db`
     # Postgres if it doesn't exist (idempotent; works on fresh AND existing
     # volumes, including Coolify where initdb scripts won't re-run), then start
