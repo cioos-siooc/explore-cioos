@@ -148,9 +148,24 @@ describe("the intro modal", () => {
     await waitFor(() => expect(state()).toBe("shown"));
   });
 
-  it("stays away once the cookie says it has been seen", async () => {
-    document.cookie = "introModalOpen=false; path=/";
+  it("stays away once it has been closed", async () => {
+    window.localStorage.setItem("cde.introSeen", "true");
     renderWithProviders(<IntroProbe />, { providers: "app" });
     await waitFor(() => expect(state()).toBe("hidden"));
+  });
+
+  it("is only marked seen when closed, not merely shown", async () => {
+    let ui;
+    function CloseProbe() {
+      ui = useUI();
+      return <IntroProbe />;
+    }
+    renderWithProviders(<CloseProbe />, { providers: "app" });
+    await waitFor(() => expect(state()).toBe("shown"));
+    expect(window.localStorage.getItem("cde.introSeen")).toBe("false");
+
+    act(() => ui.setShowIntroModal(false));
+    expect(window.localStorage.getItem("cde.introSeen")).toBe("true");
+    expect(document.cookie).toBe("");
   });
 });

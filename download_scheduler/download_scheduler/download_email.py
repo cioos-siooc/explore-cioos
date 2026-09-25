@@ -15,7 +15,7 @@ def send_email(mail_to, mail_message_body, mail_subject):
     if "GMAIL_USER" not in envs:
         logger.error("GMAIL auth not configured")
         return
-    logger.debug("Emailing: {}", mail_to)
+    logger.debug("Emailing download result")
     gmail_user = envs["GMAIL_USER"]
     if not gmail_user:
         logger.error("GMAIL_USER not set")

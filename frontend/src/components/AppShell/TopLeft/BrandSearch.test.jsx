@@ -55,7 +55,7 @@ describe("BrandSearch", () => {
   // top bar's own segments use (see .topBarButton.active) — here for the one
   // brand-row button that opens a modal of its own.
   it("goes solid-primary while the intro modal it opens is on screen", async () => {
-    document.cookie = "introModalOpen=false; path=/";
+    window.localStorage.setItem("cde.introSeen", "true");
     const { user } = renderBrand();
 
     const infoButton = screen.getByTitle("About this tool");

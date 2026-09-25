@@ -151,16 +151,6 @@
   gap: var(--cioos-space-sm);
 }
 
-.introHeroActions .introCta {
-  margin-right: var(--cioos-space-xs);
-}
-
-/* The sources wrap as one group, so a narrow screen never strands one pill. */
-.introSources {
-  display: flex;
-  gap: var(--cioos-space-sm);
-}
-
 /* Stacked down the right edge, divided from the copy by a hairline. */
 .introStats {
   position: relative;
@@ -193,15 +183,6 @@
   color: rgb(255 255 255 / 75%);
 }
 
-.introSource {
-  padding: 4px 12px;
-  border: 1px solid rgb(255 255 255 / 35%);
-  border-radius: var(--cioos-radius-pill);
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .introCta {
   position: relative;
   padding: 12px 24px;
@@ -226,7 +207,7 @@
    of tiles whose arrow nudges forward on hover — they go somewhere. */
 .introShowcases {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--cioos-space-sm);
   margin: 0;
   padding: 0;
@@ -297,8 +278,10 @@
   transform: translateX(3px);
 }
 
-/* The three things the tool does, as cards that arrive one after another. */
+/* The three steps of using the tool, numbered, as cards that arrive one after
+   another. */
 .introFeatures {
+  counter-reset: intro-step;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--cioos-space-md);
@@ -323,6 +306,11 @@
 .introFeature:hover {
   transform: translateY(-3px);
   box-shadow: var(--cioos-shadow-lift);
+}
+
+.introFeature h3::before {
+  counter-increment: intro-step;
+  content: counter(intro-step) ". ";
 }
 
 .introFeature h3 {
@@ -356,85 +344,83 @@
   }
 }
 
-/* The footer: a tip on one side, the housekeeping (feedback, how to come
-   back here, the tips switch) on the other. Two columns keep the tip to a
-   readable measure instead of a line the width of the dialog. */
+/* The housekeeping, as three matching cards: tips, feedback, and how to come
+   back here. Each names its control by the glyph the user will look for. */
 .introFooter {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: var(--cioos-space-lg);
-  align-items: start;
-  margin-top: var(--cioos-space-lg);
-  padding-top: var(--cioos-space-md);
+  margin-top: var(--cioos-space-xl);
+  padding-top: var(--cioos-space-lg);
   border-top: 1px solid var(--cioos-hairline);
 }
 
-.introTip {
-  max-width: 60ch;
-  padding: var(--cioos-space-sm) var(--cioos-space-md);
-  border-radius: var(--cioos-radius);
+.introFooterCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--cioos-space-md);
+}
+
+.introFooterCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--cioos-space-sm);
+  padding: var(--cioos-space-md) var(--cioos-space-lg);
+  border-radius: var(--cioos-radius-lg);
   background-color: var(--cioos-surface-2);
 }
 
-.introTipHeading {
+.introFooterCard p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.introFooterHeading {
   display: flex;
   align-items: center;
   gap: var(--cioos-space-xs);
-  margin: 0 0 var(--cioos-space-xs);
+  margin: 0;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-md);
   font-weight: 600;
   color: var(--cioos-navy);
 }
 
-/* The tip itself is the way into the tour: a button that reads as the
-   paragraph it replaces, with its call to action trailing the text. */
-.introTipShow {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  line-height: 1.55;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-  animation: intro-fade 0.3s ease-out;
+.introFooterHeading svg {
+  color: var(--cioos-primary);
 }
 
-.introTipShowLabel {
+.introFooterAction {
   display: inline-flex;
+  margin-top: auto;
   align-items: center;
-  gap: 4px;
-  margin-left: var(--cioos-space-xs);
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-white);
   font-weight: 600;
   color: var(--cioos-primary-700);
-  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
 }
 
-.introTipShow:hover .introTipShowLabel,
-.introTipShow:focus-visible .introTipShowLabel {
-  text-decoration: underline;
+.introFooterAction:hover,
+.introFooterAction:focus-visible {
+  background: var(--cioos-primary);
+  color: var(--cioos-white);
 }
 
-@keyframes intro-fade {
-  from {
-    opacity: 0;
-  }
+.introGlyph {
+  vertical-align: -2px;
+  color: var(--cioos-primary);
 }
 
-.introTipNav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: var(--cioos-space-xs);
-}
-
-.introTipCount {
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
+.introSources {
+  margin: var(--cioos-space-md) 0 0;
+  font-size: var(--cioos-font-size-sm);
+  text-align: center;
+  color: var(--cioos-ink-80);
 }
 
 .introLink {
@@ -445,39 +431,6 @@
   color: var(--cioos-primary-700);
   text-decoration: underline;
   cursor: pointer;
-}
-
-.introFooterLinks p {
-  display: flex;
-  align-items: center;
-  margin: var(--cioos-space-xs) 0;
-}
-
-.introFooterIcon {
-  flex: none;
-  margin: 0 21px 0 6px;
-  color: var(--cioos-primary);
-}
-
-/* Inline icon button that opens the Sentry feedback dialog; sits beside the
-   feedback sentence, so it stays flush with the text rather than reading as a
-   chrome control. */
-.feedbackButton {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  margin-right: 15px;
-  padding: 6px;
-  border: 0;
-  border-radius: 10px;
-  background-color: transparent;
-  color: var(--cioos-primary);
-  cursor: pointer;
-}
-
-.feedbackButton:hover {
-  background-color: var(--cioos-surface-2);
 }
 
 /* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
@@ -511,15 +464,14 @@
 @media (max-width: 992px) {
   .introFeatures,
   .introShowcases,
-  .introFooter {
+  .introFooterCards {
     grid-template-columns: 1fr;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .introHeroWaves,
-  .introFeature,
-  .introTipShow {
+  .introFeature {
     animation: none;
   }
 

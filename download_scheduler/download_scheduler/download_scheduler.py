@@ -463,6 +463,37 @@ def poll_once():
     return serving
 
 
+# The address is kept only as long as the job needs it, plus a week for a user
+# who writes back about a download (the privacy notice promises 7 days). Jobs
+# still queued or running keep theirs: run_download reads it to send the result.
+# The domain stays, for usage statistics; COALESCE covers a job queued before
+# web-api started recording it.
+FORGET_EMAILS_SQL = text(
+    """
+    UPDATE cde.download_jobs
+    SET email = NULL,
+        email_domain = COALESCE(email_domain, lower(split_part(email, '@', 2))),
+        downloader_input = (downloader_input::jsonb #- '{user_query,email}')::text
+    WHERE email IS NOT NULL
+      AND status NOT IN ('open', 'downloading')
+      AND COALESCE(time_complete, time) < NOW() - INTERVAL '7 days'
+    """
+)
+
+
+def forget_expired_emails():
+    """Clear the email from finished jobs past retention; never raises."""
+    try:
+        with engine.begin() as conn:
+            forgotten = conn.execute(FORGET_EMAILS_SQL).rowcount
+    except Exception:
+        logger.exception("Could not clear expired download emails")
+        sentry_sdk.capture_exception()
+        return
+    if forgotten:
+        logger.info("Cleared the email from {} expired download jobs", forgotten)
+
+
 def update_download_jobs(pk, row, session=None):
     """Update one download_jobs row. Values are bound, never interpolated.
 

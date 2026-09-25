@@ -64,9 +64,9 @@ function Probe() {
   );
 }
 
-// A returning visitor: the intro cookie is what says the intro has been seen.
+// A returning visitor: one who has closed the intro before.
 function returningVisitor() {
-  document.cookie = "introModalOpen=false; path=/";
+  window.localStorage.setItem("cde.introSeen", "true");
 }
 
 const renderProbe = () => renderWithProviders(<Probe />, { providers: "app" });
