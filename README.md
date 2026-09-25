@@ -280,12 +280,20 @@ PR, and deletes the preview when the PR closes. The settings live on the
   `explore-pr-{{pr_id}}.cool.juno.cioos.ca`. It has to be one level under
   `cool.juno.cioos.ca`, because the wildcard certificate doesn't cover a second
   level.
-- Preview build variables: `API_URL=https://explore-v2.cool.juno.cioos.ca/api`,
-  `BASE_URL=/` and `ENVIRONMENT=preview`.
+- Preview build variables: `API_URL=/api`, `BASE_URL=/` and
+  `ENVIRONMENT=preview`.
+- Preview runtime variables: `API_PROXY_HOST=explore-v2.cool.juno.cioos.ca` and
+  `API_PROXY_UPSTREAM=https://coolify-proxy`.
+
+dev-v2 sits behind Cloudflare Access, which answers cross-origin API calls with
+a login redirect. So the preview's nginx proxies `/api` to dev-v2 through
+Coolify's Traefik on the server's internal network, and the browser only ever
+calls its own origin. `frontend/api-proxy.sh` writes that proxy at container
+start, and only when `API_PROXY_HOST` is set. A PR branch only gets the proxy
+once it contains that script, so merge `development-v2` into older branches.
 
 Preview deployments are off on the dev-v2 compose stack itself, so PRs don't
-build full copies of the stack. The dev-v2 web-api must keep `CORS_ORIGINS=*`,
-because previews call it from their own origin.
+build full copies of the stack.
 
 ### Self-hosted production
 
