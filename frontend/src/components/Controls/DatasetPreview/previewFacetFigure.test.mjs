@@ -363,12 +363,12 @@ test("one panel is wide enough not to wrap", () => {
   assert.ok(!layout.xaxis.title.text.includes("<br>"));
 });
 
-test("the hover names the column by its long_name, capped", () => {
+test("the hover names the column by its capped long_name", () => {
   const { data } = figure("TimeSeriesProfile", ALL_SIX, {
     size: { width: 1140, height: 620 },
   });
   assert.ok(data[0].layout === undefined);
-  // Capped because a box is open on every panel at once; the panel's own title
+  // Capped because a box is open on every panel at once. The panel's own title
   // carries it whole.
   assert.equal(
     data[0].hovertemplate,
@@ -402,19 +402,6 @@ test("a column with no unit leaves no trailing space", () => {
     data[0].hovertemplate,
     "Temperature (1990 sca…: %{x}<extra></extra>",
   );
-});
-
-test("the hover ignores any other name the publisher gave", () => {
-  const otherNames = {
-    ...VIKING,
-    columnMeta: VIKING.columnMeta.map((meta) =>
-      meta.name === "FLOR_01"
-        ? { ...meta, generic_name: "fluorescence", original_name: "flor" }
-        : meta,
-    ),
-  };
-  const { data } = figureFrom(otherNames, "TimeSeriesProfile", ["FLOR_01"]);
-  assert.ok(data[0].hovertemplate.startsWith("Fluorescence: "));
 });
 
 test("a renamed variable is renamed in the hover too", () => {

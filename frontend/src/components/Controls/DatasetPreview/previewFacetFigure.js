@@ -259,8 +259,9 @@ export function buildFigure({
       : custom;
   };
 
-  // What the hover calls a column: the user's rename, else its long_name. Capped because a box is open on every panel at once and
-  // one 125-character long_name would stretch it across the figure.
+  // What the hover calls a column: the user's rename, else its long_name. Capped
+  // because a box is open on every panel at once and one 125-character long_name
+  // would stretch it across the figure.
   const hoverNameFor = (columnName) => {
     const custom = labels[columnName] && labels[columnName].trim();
     const name =
