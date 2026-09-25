@@ -60,6 +60,9 @@ create_pdf = False
 
 # In production, this is mapped to a WAF via a host mounted volume
 output_folder = "./downloads"
+# Touched after every served poll. The container HEALTHCHECK reads its age, and
+# nginx serves it at /downloads/healthz, which proves the volume is shared.
+heartbeat_file = pathlib.Path(output_folder) / "healthz"
 
 
 if "CREATE_PDF" in envs:
@@ -449,6 +452,15 @@ def process_next_job():
             logger.exception("Could not mark job {} as failed", row["pk"])
 
     return True
+
+
+def poll_once():
+    """process_next_job, plus the heartbeat when the queue is being served."""
+    serving = process_next_job()
+    if serving:
+        heartbeat_file.parent.mkdir(parents=True, exist_ok=True)
+        heartbeat_file.touch()
+    return serving
 
 
 def update_download_jobs(pk, row, session=None):
