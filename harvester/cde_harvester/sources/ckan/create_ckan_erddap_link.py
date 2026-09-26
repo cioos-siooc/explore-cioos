@@ -2,6 +2,7 @@
 
 
 import re
+from urllib.parse import urlencode
 
 import diskcache as dc
 import pandas as pd
@@ -58,7 +59,7 @@ def split_erddap_url(url):
     https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/fr/tabledap/cnodc_msc50_pacific.html
     """
 
-    pattern = re.compile(r"/erddap/(?:[a-z]{2}/)?tabledap/")
+    pattern = re.compile(r"/erddap/(?:[a-z]{2}/)?(?:tabledap|griddap)/")
     match = pattern.search(url)
     if match:
         erddap_host, f = re.split(pattern, url, maxsplit=1)
@@ -66,8 +67,16 @@ def split_erddap_url(url):
         error_message = f"Invalid URL format: {url}"
         raise ValueError(error_message)
 
-    dataset_id = f.split(".html")[0]
+    # ERDDAP datasetIDs have no dots, so this drops any extension, query or fragment.
+    dataset_id = re.match(r"[^/?#.]*", f).group()
+    if not dataset_id:
+        raise ValueError(f"Invalid URL format: {url}")
     return (erddap_host, dataset_id)
+
+
+def erddap_join_key(url):
+    """Scheme/case-insensitive key so http/https variants of one server still join."""
+    return re.sub(r"^https?://", "", url.strip().lower()).rstrip("/")
 
 
 def unescape_ascii_list(values):
@@ -91,19 +100,19 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         records = records[0:limit]
     out = []
     for record_full in records:
-        resources = record_full["resources"]
-        erddap_url = ""
-        for resource in resources:
-            if "tabledap" in resource["url"]:
-                erddap_url = resource["url"]
+        # A record can list several datasets; keep every ERDDAP resource.
+        links = []
+        for resource in record_full["resources"]:
+            url = resource["url"]
+            try:
+                (erddap_host, dataset_id) = split_erddap_url(url)
+            except ValueError:
                 continue
-        if not erddap_url:
-            continue
-
-        (erddap_host, dataset_id) = split_erddap_url(erddap_url)
-
-        # dataset_ids could be None if user wants all
-        if dataset_ids and dataset_id not in dataset_ids:
+            # dataset_ids could be None if user wants all
+            if dataset_ids and dataset_id not in dataset_ids:
+                continue
+            links.append((erddap_host, dataset_id, "?" in url))
+        if not links:
             continue
 
         # retreive the data for each record
@@ -138,16 +147,17 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         # remove duplicates, empty strings
         organizations = list(filter(None, set(organizations)))
 
-        out.append(
-            [
-                erddap_host + "/erddap",
-                dataset_id,
-                record_full["id"],
-                organizations,
-                ckan_record_text,
-            ],
-        )
-        # compile a dataframe
+        for erddap_host, dataset_id, is_subset in links:
+            out.append(
+                [
+                    erddap_host + "/erddap",
+                    dataset_id,
+                    record_full["id"],
+                    organizations,
+                    ckan_record_text,
+                    is_subset,
+                ],
+            )
 
     line = {
         "erddap_url": [x[0].strip("/") for x in out],
@@ -158,14 +168,20 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "title_fr": [x[4]["title_fr"] for x in out],
         # "ckan_summary": [x[4]["ckan_summary"] for x in out],
         # "ckan_summary_fr": [x[4]["ckan_summary_fr"] for x in out],
+        "is_subset": [x[5] for x in out],
     }
 
     df = pd.DataFrame(line)
 
     if not df.empty:
-        df = df.drop_duplicates(subset="dataset_id")
-
-    return df
+        # When several records cite one dataset, prefer one linking the whole
+        # dataset over a per-cruise record linking a query-string subset of it.
+        df = (
+            df.sort_values("is_subset", kind="stable")
+            .drop_duplicates(subset=["erddap_url", "dataset_id"])
+            .sort_index()
+        )
+    return df.drop(columns="is_subset")
 
 
 def list_ckan_records_with_erddap_urls(cache_requests):
@@ -184,9 +200,12 @@ def list_ckan_records_with_erddap_urls(cache_requests):
     records_total = []
     session = _build_ckan_session()
     while records_remaining:
+        # Search the indexed resource URLs: free-text "erddap" misses records
+        # (most of OGSL's) that only mention ERDDAP in a resource link.
         erddap_datasets_query = (
             CKAN_API_URL
-            + f"/action/package_search?rows={row_page_limit}&start={row_start}&q=erddap"
+            + "/action/package_search?"
+            + urlencode({"rows": row_page_limit, "start": row_start, "q": "res_url:*erddap*"})
         )
         logger.info(erddap_datasets_query)
         # print(erddap_datasets_query)
