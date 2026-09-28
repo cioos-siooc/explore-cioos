@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useChanged } from "../../utilities.jsx";
@@ -14,17 +14,20 @@ import FiltersModal from "./Modals/FiltersModal.jsx";
 import DownloadModal from "./Modals/DownloadModal.jsx";
 import CoverageModal from "./Modals/CoverageModal.jsx";
 import SelectionHelpModal from "./Modals/SelectionHelpModal.jsx";
+import PrivacyModal from "./Modals/PrivacyModal.jsx";
 import PreviewHost from "./Panels/PreviewHost.jsx";
 import Loading from "../Controls/Loading/Loading.jsx";
 import Legend from "../Controls/Legend/Legend.jsx";
 import DepthBar from "../Controls/DepthBar/DepthBar.jsx";
 import TimeBar from "../Controls/TimeBar/TimeBar.jsx";
-import WmsLegend from "../Controls/WmsLegend/WmsLegend.jsx";
 import IntroModal from "../Controls/IntroModal/IntroModal.jsx";
+import TipCard from "../Controls/Tips/TipCard.jsx";
 import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
+import { useTips } from "../../state/tips/TipsProvider.jsx";
+import { bathymetryLegendMinZoom } from "../config.js";
 import "./styles.css";
 
 // The map-first shell: full-bleed map with a centered top bar (brand on the
@@ -46,15 +49,20 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
-    activeWmsOverlay,
-    setActiveWmsOverlay,
     tracksMode,
     toggleTrackLines,
     dataLayers,
   } = useMapState();
   const { startDate, endDate, timeFilterActive } = useFilters();
-  const { showIntroModal, setShowIntroModal, sidebarOpen } = useUI();
-  const { inspectDataset, platformsAvailable } = useSelection();
+  const { showIntroModal, setShowIntroModal } = useUI();
+  const { platformsAvailable } = useSelection();
+  const { offerTip } = useTips();
+
+  // Zoomed in far enough that the CHS NONNA soundings take over the seafloor.
+  const nonnaShown = bathymetryVisible && zoom >= bathymetryLegendMinZoom;
+  useEffect(() => {
+    if (nonnaShown) offerTip("nonna");
+  }, [nonnaShown, offerTip]);
 
   const [splashMounted, setSplashMounted] = useState(firstPaintPending);
 
@@ -64,13 +72,6 @@ export default function AppShell() {
   // in step if a later wait ever earns a splash of its own.
   if (useChanged(firstPaintPending) && firstPaintPending)
     setSplashMounted(true);
-
-  // The griddap legend lives inside the dataset page while that page is open
-  // (see GriddapDetails); otherwise it pins itself to the top-left corner of
-  // the map, over the datasets column rather than inside it — see its
-  // stylesheet for why it overlaps instead of stacking.
-  const wmsLegendIsInline =
-    sidebarOpen && activeWmsOverlay?.pk === inspectDataset?.pk;
 
   // The switches that ride on the legend entries they key, rather than sitting
   // in the layers list below: each of these turns off exactly what one legend
@@ -92,6 +93,7 @@ export default function AppShell() {
       label: t("layersBathymetry"),
       checked: bathymetryVisible,
       onChange: () => setBathymetryVisible(!bathymetryVisible),
+      tipTarget: "nonna",
     },
     tracks: {
       key: "tracks",
@@ -110,6 +112,7 @@ export default function AppShell() {
       label: t("layersGriddedCoverage"),
       checked: griddapCoverageVisible,
       onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible),
+      tipTarget: "griddedCoverage",
     },
   ];
 
@@ -158,6 +161,7 @@ export default function AppShell() {
       <ActivityIndicator />
       <Sidebar />
       <TopControls />
+      <TipCard />
       <FiltersModal />
       <DownloadModal />
       <CoverageModal />
@@ -186,15 +190,9 @@ export default function AppShell() {
           below). */}
       <TimeBar />
       <DepthBar />
-      {activeWmsOverlay && !wmsLegendIsInline && (
-        <WmsLegend
-          overlay={activeWmsOverlay}
-          variant="floating"
-          onClose={() => setActiveWmsOverlay()}
-          setActiveWmsOverlay={setActiveWmsOverlay}
-        />
-      )}
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
+      {/* After the intro and the download window, both of which link to it. */}
+      <PrivacyModal />
       <PreviewHost />
     </>
   );

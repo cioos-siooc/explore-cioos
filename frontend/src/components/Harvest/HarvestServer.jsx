@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
+import { HarvestTableSkeleton } from "./HarvestSkeleton.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import HarvestModeBadge from "./HarvestModeBadge.jsx";
 import HarvestRealtimeBadge from "./HarvestRealtimeBadge.jsx";
@@ -166,7 +167,7 @@ export default function HarvestServer() {
       </div>
 
       {loading ? (
-        <div className="harvest-loading">{t("harvest.loading.datasets")}</div>
+        <HarvestTableSkeleton label={t("harvest.loading.datasets")} />
       ) : (
         <table className="harvest-table">
           <thead>

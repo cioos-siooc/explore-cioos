@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Check2, Clipboard } from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
+import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import useElementSize from "../../ui/useElementSize.js";
 
-import Loading from "../Loading/Loading.jsx";
 import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import "./styles.css";
@@ -13,7 +13,7 @@ import "./styles.css";
 // Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
 // It now downloads on the first record opened rather than on the first Plot
 // click, since the plot is the default view — but it stays a separate chunk
-// behind the Loading fallback below, and the /preview fetch runs alongside it.
+// behind the skeleton fallback below, and the /preview fetch runs alongside it.
 const DatasetPreviewPlot = lazy(
   () => import("../DatasetPreviewPlot/DatasetPreviewPlot.jsx"),
 );
@@ -113,6 +113,12 @@ export default function DatasetPreview({
   };
   const dataIsReady = !recordLoading && datasetPreview?.table?.rows;
 
+  const plotSkeleton = (
+    <SkeletonGroup className="datasetPreviewPlotLoading">
+      <Skeleton radius="var(--cioos-radius)" />
+    </SkeletonGroup>
+  );
+
   return (
     <Modal
       className="dataPreviewModal"
@@ -177,7 +183,15 @@ export default function DatasetPreview({
           <Modal.Body>
             <div className="tableAndPlotGridItem tableAndPlot" ref={scrollRef}>
               {recordLoading ? (
-                <Loading variant="inline" />
+                selectedVis === "table" ? (
+                  <SkeletonGroup className="datasetPreviewTableSkeleton">
+                    {Array.from({ length: 36 }, (_, i) => (
+                      <Skeleton key={i} height={i < 4 ? "1.2em" : undefined} />
+                    ))}
+                  </SkeletonGroup>
+                ) : (
+                  plotSkeleton
+                )
               ) : (
                 <>
                   {datasetPreview?.table?.rows ? (
@@ -188,17 +202,10 @@ export default function DatasetPreview({
                           data={data}
                         />
                       ) : plan ? (
-                        // The fallback reserves height on purpose: Loading is an
-                        // absolutely-positioned scrim contributing none of its
-                        // own, so without this the plot mounted into a collapsed
-                        // box and Plotly measured it at zero.
-                        <Suspense
-                          fallback={
-                            <div className="datasetPreviewPlotLoading">
-                              <Loading variant="inline" />
-                            </div>
-                          }
-                        >
+                        // The fallback reserves height on purpose: without it the
+                        // plot mounted into a collapsed box and Plotly measured
+                        // it at zero.
+                        <Suspense fallback={plotSkeleton}>
                           <DatasetPreviewPlot
                             inspectRecordID={inspectRecordID}
                             data={data}

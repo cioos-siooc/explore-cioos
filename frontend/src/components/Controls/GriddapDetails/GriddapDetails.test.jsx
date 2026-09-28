@@ -37,7 +37,7 @@ describe("GriddapDetails", () => {
     );
     expect(
       screen.getByText(
-        "Map preview is not available for this dataset — access it on ERDDAP",
+        "Map preview is not available for this dataset. Access it on ERDDAP.",
       ),
     ).toBeInTheDocument();
   });

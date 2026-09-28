@@ -24,8 +24,8 @@ import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 // so theirs is the coverage bbox (see shapeQuery.js).
 //
 // `framed` is true once the map already shows that extent: there is nothing
-// left to do, and the button hides itself rather than sit there inviting a
-// no-op click. Panning or zooming away brings it back.
+// left to do, and the button disables itself rather than invite a no-op
+// click. Panning or zooming away brings it back.
 export function useZoomToDataset() {
   const { inspectDataset } = useSelection();
   const { zoomToGeometry, mapInstance, mapView } = useMapState();
@@ -62,7 +62,7 @@ export default function ZoomToDataset() {
       className="zoomToDatasetButton"
       onClick={zoomToDataset}
       title={t("zoomToDatasetTitle")}
-      disabled={canZoom || !framed}
+      disabled={!canZoom || framed}
     >
       <ZoomIn size={15} aria-hidden="true" />
       {t("zoomToDatasetText")}

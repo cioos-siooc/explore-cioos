@@ -1,12 +1,16 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { CheckSquare, Square } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import Spinner from "../../../ui/Spinner.jsx";
 import { server } from "../../../../config.js";
 import reportError from "../../../../state/reportError.js";
 
+import {
+  ExcludedLabel,
+  OptionStateIcon,
+  optionStateClass,
+} from "../MultiCheckboxFilter/OptionState.jsx";
 import "../styles.css";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
@@ -55,12 +59,14 @@ const TOO_BROAD_RANKS = new Set([
 // are the catalogue's own facets, held in state and searched in the browser,
 // while this one is a typeahead against WoRMS by way of /scientificNames, so
 // what is offered changes with what is typed into the panel's search box. That
-// is why the picked names are pinned to the top of the list rather than left to
-// the search: an option that vanished from the list the moment the search moved
-// on would be one the user could no longer untick.
+// is why the picked names (included or excluded) are pinned to the top of the
+// list rather than left to the search: an option that vanished from the list the
+// moment the search moved on would be one the user could no longer clear.
 export default function ScientificNameFilter({
   scientificNamesSelected,
   setScientificNamesSelected,
+  scientificNamesExcluded,
+  setScientificNamesExcluded,
   searchTerms,
 }) {
   const { t, i18n } = useTranslation();
@@ -120,7 +126,10 @@ export default function ScientificNameFilter({
   // when the names were restored from the URL). Re-runs when the locale changes so
   // a user toggling the site language gets locale-appropriate subtitles.
   useEffect(() => {
-    const unknown = scientificNamesSelected.filter((n) => !detailsByName[n]);
+    const unknown = [
+      ...scientificNamesSelected,
+      ...scientificNamesExcluded,
+    ].filter((n) => !detailsByName[n]);
     if (unknown.length === 0) return;
     const controller = new AbortController();
     const names = encodeURIComponent(unknown.join(","));
@@ -138,59 +147,70 @@ export default function ScientificNameFilter({
     // detailsByName is read to find the names still missing, and written by
     // mergeDetails below — listing it would feed this effect its own output.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scientificNamesSelected, lang]);
+  }, [scientificNamesSelected, scientificNamesExcluded, lang]);
 
-  const toggleName = (name) => {
+  // Same include -> exclude -> clear cycle as the other lists, over two plain
+  // name lists instead of per-option flags.
+  const cycleName = (name) => {
     if (scientificNamesSelected.includes(name)) {
       setScientificNamesSelected(
         scientificNamesSelected.filter((n) => n !== name),
+      );
+      setScientificNamesExcluded([...scientificNamesExcluded, name]);
+    } else if (scientificNamesExcluded.includes(name)) {
+      setScientificNamesExcluded(
+        scientificNamesExcluded.filter((n) => n !== name),
       );
     } else {
       setScientificNamesSelected([...scientificNamesSelected, name]);
     }
   };
 
+  const picked = [...scientificNamesSelected, ...scientificNamesExcluded];
   // The picked names first, then whatever the search is offering that isn't
   // already picked.
   const options = [
-    ...scientificNamesSelected.map((scientificName) => ({
+    ...picked.map((scientificName) => ({
       scientificName,
       ...detailsByName[scientificName],
-      isSelected: true,
+      isSelected: scientificNamesSelected.includes(scientificName),
+      isExcluded: scientificNamesExcluded.includes(scientificName),
     })),
     ...suggestions
       .filter(
         (s) =>
-          !scientificNamesSelected.includes(s.scientificName) &&
-          !TOO_BROAD_RANKS.has(s.rank),
+          !picked.includes(s.scientificName) && !TOO_BROAD_RANKS.has(s.rank),
       )
-      .map((s) => ({ ...s, isSelected: false })),
+      .map((s) => ({ ...s, isSelected: false, isExcluded: false })),
   ];
 
   return (
     <div className="multiCheckboxFilter scientificNameFilter">
-      {options.map(({ scientificName, vernacular, rank, isSelected }) => (
-        <div
-          key={scientificName}
-          className={`optionButton ${isSelected ? "selected" : ""}`}
-          title={vernacular || scientificName}
-          onClick={() => toggleName(scientificName)}
-        >
-          {isSelected ? <CheckSquare /> : <Square />}
-          <span className="optionName">
-            <span className="scientificNameOptionName">{scientificName}</span>
-            {(rank || vernacular) && (
-              <span className="scientificNameOptionDetail">
-                {rank && (
-                  <span className="scientificNameOptionRank">{rank}</span>
-                )}
-                {rank && vernacular && " · "}
-                {vernacular}
-              </span>
-            )}
-          </span>
-        </div>
-      ))}
+      {options.map(
+        ({ scientificName, vernacular, rank, isSelected, isExcluded }) => (
+          <div
+            key={scientificName}
+            className={optionStateClass({ isSelected, isExcluded })}
+            title={vernacular || scientificName}
+            onClick={() => cycleName(scientificName)}
+          >
+            <OptionStateIcon isSelected={isSelected} isExcluded={isExcluded} />
+            <span className="optionName">
+              <span className="scientificNameOptionName">{scientificName}</span>
+              {(rank || vernacular) && (
+                <span className="scientificNameOptionDetail">
+                  {rank && (
+                    <span className="scientificNameOptionRank">{rank}</span>
+                  )}
+                  {rank && vernacular && " · "}
+                  {vernacular}
+                </span>
+              )}
+            </span>
+            <ExcludedLabel isExcluded={isExcluded} />
+          </div>
+        ),
+      )}
       {loading && (
         <div className="scientificNameLoading">
           <Spinner size="sm" />

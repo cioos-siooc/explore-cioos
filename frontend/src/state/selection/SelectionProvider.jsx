@@ -135,9 +135,14 @@ export default function SelectionProvider({ children }) {
   // jumping straight into the preview the user hasn't asked to see yet.
   const [highlightedRecord, setHighlightedRecord] = useState();
 
-  // Both of those as a share link carries them: the subset of the dataset the
-  // link points at — a record (?record=<profile_id>) or a platform
-  // (?track=<trajectory_id>) — waiting for the dataset itself to resolve out
+  // One profile / time-series record the dataset page's "Show on map" rings on
+  // the map — what selectedTrajectory is to a trajectory:
+  // {datasetPk, recordId, frameView} | undefined.
+  const [mappedRecord, setMappedRecord] = useState();
+
+  // All of those as a share link carries them: the subset of the dataset the
+  // link points at — a record (?record=<profile_id>), a platform
+  // (?track=<trajectory_id>) or a record shown on the map (?onMap=<id>) — waiting for the dataset itself to resolve out
   // of pointsData, since neither means anything without the page they are
   // highlighted on. Consumed once, by the effect below.
   const [pendingHighlight, setPendingHighlight] = useState(() => {
@@ -147,8 +152,9 @@ export default function SelectionProvider({ children }) {
     const track = initialParams.has("track")
       ? initialParams.get("track")
       : undefined;
-    return record !== undefined || track !== undefined
-      ? { record, track }
+    const onMap = initialParams.get("onMap") || undefined;
+    return record !== undefined || track !== undefined || onMap !== undefined
+      ? { record, track, onMap }
       : undefined;
   });
 
@@ -169,6 +175,12 @@ export default function SelectionProvider({ children }) {
   // removable chip in ActiveFilterChips.
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
     () => initialParams.get("search") || "",
+  );
+  // The datasets sidebar's own search box. Unlike the title search above it is
+  // not a filter: it only narrows the list being read (listedDatasets below),
+  // never the map, the counters or the downloads.
+  const [listSearchText, setListSearchText] = useState(
+    () => initialParams.get("listSearch") || "",
   );
   const [combinedQueries, setCombinedQueries] = useState([]);
   // "Only in view": restrict the list to datasets whose extent overlaps the
@@ -278,6 +290,14 @@ export default function SelectionProvider({ children }) {
     dataLayers,
     i18n.language,
   ]);
+
+  const listedDatasets = useMemo(() => {
+    if (isEmpty(listSearchText)) return filteredDatasets;
+    const query = listSearchText.toLowerCase();
+    return filteredDatasets.filter((row) =>
+      datasetMatchesSearch(row, query, i18n.language),
+    );
+  }, [filteredDatasets, listSearchText, i18n.language]);
 
   // filteredDatasets as a pk list, for the queries that ask a question about
   // the filtered data rather than draw it (the coverage figure). Everything
@@ -755,6 +775,9 @@ export default function SelectionProvider({ children }) {
     setHighlightedRecord((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current,
     );
+    setMappedRecord((current) =>
+      current && current.datasetPk !== inspectDataset?.pk ? undefined : current,
+    );
   }, [inspectDataset, setActiveWmsOverlay]);
 
   // The share link's highlight, once its dataset is in hand. Declared after the
@@ -762,7 +785,7 @@ export default function SelectionProvider({ children }) {
   // second and its highlight isn't the stale value that one clears.
   useEffect(() => {
     if (!pendingHighlight || !inspectDataset) return;
-    const { record, track } = pendingHighlight;
+    const { record, track, onMap } = pendingHighlight;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setPendingHighlight(undefined);
     if (record !== undefined) {
@@ -776,6 +799,9 @@ export default function SelectionProvider({ children }) {
         datasetTitle: inspectDataset.title,
         trajectoryId: track,
       });
+    }
+    if (onMap !== undefined) {
+      setMappedRecord({ datasetPk: inspectDataset.pk, recordId: onMap });
     }
   }, [pendingHighlight, inspectDataset]);
 
@@ -840,6 +866,8 @@ export default function SelectionProvider({ children }) {
     selectTrajectoryFromMap,
     highlightedRecord,
     setHighlightedRecord,
+    mappedRecord,
+    setMappedRecord,
     pointsData,
     inspectDataset,
     setInspectDataset,
@@ -866,7 +894,10 @@ export default function SelectionProvider({ children }) {
     setDatasetPreview,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
+    listSearchText,
+    setListSearchText,
     filteredDatasets,
+    listedDatasets,
     filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,

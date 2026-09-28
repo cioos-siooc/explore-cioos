@@ -47,6 +47,27 @@ describe("ActiveFilterChips", () => {
     );
   });
 
+  it("marks an excluded value with a NOT tag, apart from the included ones", async () => {
+    open("eovs=oxygen&excludeEovs=subSurfaceTemperature&excludeLayers=grid");
+    await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));
+
+    const [included, excluded] = within(group("eovs")).getAllByTestId(
+      "filter-chip-item",
+    );
+    expect(included).toHaveAttribute("data-excluded", "false");
+    expect(included).not.toHaveTextContent(/not/i);
+    expect(excluded).toHaveAttribute("data-excluded", "true");
+    expect(excluded.querySelector(".activeFilterItemNot")).toHaveTextContent(
+      "not",
+    );
+    // Its remove button names the whole thing, "not" included.
+    expect(within(excluded).getByRole("button")).toHaveAccessibleName(/: not /);
+    // Geometry chips follow the same rule.
+    expect(
+      within(group("dataLayers")).getByTestId("filter-chip-item"),
+    ).toHaveAttribute("data-excluded", "true");
+  });
+
   it("gives one group per filter and one item per chosen value", async () => {
     open("eovs=oxygen,subSurfaceTemperature&platforms=mooring");
     await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));

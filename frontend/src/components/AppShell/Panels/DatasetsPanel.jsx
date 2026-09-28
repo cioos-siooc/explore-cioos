@@ -1,8 +1,10 @@
 import * as React from "react";
 
 import DatasetsTable from "../../Controls/DatasetsTable/DatasetsTable.jsx";
+import { DatasetCardSkeleton } from "../../Controls/DatasetsTable/DatasetCard.jsx";
 import DatasetInspector from "../../Controls/DatasetInspector/DatasetInspector.jsx";
 import Loading from "../../Controls/Loading/Loading.jsx";
+import { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
@@ -12,7 +14,7 @@ import "./styles.css";
 export default function DatasetsPanel() {
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState();
   const {
-    filteredDatasets,
+    listedDatasets,
     inspectDataset,
     setInspectDataset,
     returnToDatasetList,
@@ -33,7 +35,11 @@ export default function DatasetsPanel() {
   if (!initialPointsQueryComplete) {
     return (
       <div className="datasetsPanel" data-testid="datasets-panel">
-        <Loading variant="inline" />
+        <SkeletonGroup className="datasetsCardList">
+          {Array.from({ length: 6 }, (_, i) => (
+            <DatasetCardSkeleton key={i} />
+          ))}
+        </SkeletonGroup>
       </div>
     );
   }
@@ -74,7 +80,7 @@ export default function DatasetsPanel() {
           <DatasetsTable
             handleSelectDataset={handleSelectDataset}
             setInspectDataset={setInspectDataset}
-            datasets={filteredDatasets}
+            datasets={listedDatasets}
             setHoveredDataset={setHoveredDataset}
             datasetsInViewPks={datasetsInViewPks}
           />

@@ -67,6 +67,15 @@ test("the shared filter params are accepted when valid", async () => {
     "metric=days",
     "profileTypes=Profile,TimeSeries",
     "trajectoryTypes=Trajectory",
+    "eovsMatch=all",
+    "excludeOrganizations=3",
+    "excludePlatforms=mooring",
+    "excludeObisNodes=OBIS USA",
+    "excludeErddapServers=https://erddap.example",
+    "excludeEovs=salinity",
+    "organizationsMatch=all",
+    "scientificNamesMatch=any",
+    "excludeScientificNames=Gadus morhua",
   ].join("&");
   assert.strictEqual(
     await statusOf(pipeline({ cacheFor: null }), `/probe?${query}`),
@@ -85,6 +94,15 @@ test("params that used to reach the query unvalidated are now rejected", async (
     `platforms=${"x".repeat(4001)}`,
     `obisNodes=${"x".repeat(4001)}`,
     `erddapServers=${"x".repeat(4001)}`,
+    "eovsMatch=every",
+    "excludeOrganizations=1;DROP",
+    `excludePlatforms=${"x".repeat(4001)}`,
+    `excludeObisNodes=${"x".repeat(4001)}`,
+    `excludeErddapServers=${"x".repeat(4001)}`,
+    "excludeEovs=salinity;DROP",
+    "organizationsMatch=most",
+    "scientificNamesMatch=1",
+    "excludeScientificNames=Gadus;morhua",
   ]) {
     assert.strictEqual(
       await statusOf(stages, `/probe?${query}`),

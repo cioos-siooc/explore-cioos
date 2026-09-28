@@ -59,6 +59,74 @@ describe("FilterProvider", () => {
     expect(otherPlatform.isSelected).toBe(false);
   });
 
+  it("seeds exclusions and the EOV match mode from the URL", async () => {
+    await renderLoaded({
+      url: "/?excludePlatforms=mooring&eovs=oxygen,salinity&eovsMatch=all",
+    });
+    const mooring = latest.platformsSelected.find((p) => p.title === "mooring");
+    expect(mooring).toMatchObject({ isSelected: false, isExcluded: true });
+    expect(latest.eovsMatchAll).toBe(true);
+    // The same URL comes back out, so a share link round-trips.
+    await waitFor(() => expect(latest.query.eovsMatchAll).toBe(true));
+  });
+
+  it("an excluded option is a 'not' chip, and reset clears exclusions and the match mode", async () => {
+    await renderLoaded({ url: "/?excludePlatforms=mooring&eovsMatch=all" });
+    const platformsChip = latest
+      .buildActiveFilters({
+        timeframesBadgeTitle: "",
+        depthRangeBadgeTitle: "",
+      })
+      .find((c) => c.key === "platforms");
+    expect(platformsChip.items).toMatchObject([
+      { label: "Mooring", excluded: true },
+    ]);
+
+    act(() => latest.resetFilters());
+    await waitFor(() => {
+      expect(latest.platformsSelected.some((p) => p.isExcluded)).toBe(false);
+      expect(latest.eovsMatchAll).toBe(false);
+    });
+  });
+
+  it("seeds every list's exclusions and match mode from the URL, and reset clears them", async () => {
+    await renderLoaded({
+      url: "/?excludeEovs=oxygen&organizationsMatch=all&scientificNamesMatch=all&excludeScientificNames=Orcinus%20orca",
+    });
+    const oxygen = latest.eovsSelected.find((e) => e.title === "oxygen");
+    expect(oxygen).toMatchObject({ isSelected: false, isExcluded: true });
+    expect(latest.orgsMatchAll).toBe(true);
+    expect(latest.scientificNamesMatchAll).toBe(true);
+    expect(latest.scientificNamesExcluded).toEqual(["Orcinus orca"]);
+    const speciesChip = latest
+      .buildActiveFilters({
+        timeframesBadgeTitle: "",
+        depthRangeBadgeTitle: "",
+      })
+      .find((c) => c.key === "scientificName");
+    expect(speciesChip.items).toMatchObject([
+      { label: "Orcinus orca", excluded: true },
+    ]);
+
+    act(() => latest.resetFilters());
+    await waitFor(() => {
+      expect(latest.eovsSelected.some((e) => e.isExcluded)).toBe(false);
+      expect(latest.orgsMatchAll).toBe(false);
+      expect(latest.scientificNamesMatchAll).toBe(false);
+      expect(latest.scientificNamesExcluded).toEqual([]);
+    });
+  });
+
+  it("excluding every OBIS node hides OBIS like the source filter does", async () => {
+    await renderLoaded();
+    act(() => {
+      latest.setObisNodesSelected(
+        latest.obisNodesSelected.map((n) => ({ ...n, isExcluded: true })),
+      );
+    });
+    await waitFor(() => expect(latest.showObis).toBe(false));
+  });
+
   it("seeds time and depth range from the URL", async () => {
     await renderLoaded({
       url: "/?timeMin=2010-01-01&timeMax=2020-01-01&depthMin=10&depthMax=500",

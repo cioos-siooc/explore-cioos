@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 // single namespace in localStorage — and overridable by the share link the app
 // was opened at.
 //
+// This module is the only place the app keeps anything in the browser, and it
+// uses localStorage rather than cookies: a cookie rides along on every request
+// to the server, and none of this is the server's business. The privacy notice
+// (PrivacyModal) describes what is kept here, so a new key belongs there too.
+//
 // Storage is best-effort: private-mode Safari and blocked third-party storage
 // both throw on access, and a preference is never worth crashing the app over,
 // so failures fall back to the in-memory default.
@@ -38,9 +43,6 @@ function persist(key, value) {
 // read 'false'/'true', and the projection maps `globe=true` onto its two named
 // values. So the link says what the user sees rather than naming internal
 // state, and a junk param lands on the default instead of somewhere unexpected.
-//
-// There was a plain localStorage-only variant of this alongside it. Every
-// preference the map has is shareable now, so it had no callers left.
 export function useUrlSeededPersistentState(key, param, defaultValue, parse) {
   const [value, setValue] = useState(() => {
     const raw = new URL(window.location.href).searchParams.get(param);
@@ -52,4 +54,30 @@ export function useUrlSeededPersistentState(key, param, defaultValue, parse) {
   }, [key, value]);
 
   return [value, setValue];
+}
+
+// For the preferences that describe the viewer rather than the map (which tips
+// they have already seen, whether they want tips at all), so a share link has
+// no business carrying them.
+export function usePersistentState(key, defaultValue) {
+  const [value, setValue] = useState(() => read(key, defaultValue));
+
+  useEffect(() => {
+    persist(key, value);
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
+// Cookies earlier versions set: the remembered download address and the
+// intro's seen flag, now in localStorage, and i18next's copy of the language,
+// which it also keeps there. Expired on load so the address stops travelling
+// with every request instead of lingering until its month runs out.
+const LEGACY_COOKIES = ["email", "introModalOpen", "i18next"];
+
+export function clearLegacyCookies() {
+  for (const name of LEGACY_COOKIES) {
+    document.cookie = `${name}=; max-age=0`;
+    document.cookie = `${name}=; max-age=0; path=/`;
+  }
 }

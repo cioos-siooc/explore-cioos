@@ -19,7 +19,7 @@ import {
   defaultStartDepth,
   defaultEndDepth,
 } from "../components/config.js";
-import { DATA_LAYER_LABEL_KEYS, selectedDataLayerKeys } from "./dataLayers.js";
+import { DATA_LAYER_LABEL_KEYS, chosenDataLayerKeys } from "./dataLayers.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
@@ -102,7 +102,7 @@ export default function useActiveFilters() {
   const { t } = useTranslation();
   const { buildActiveFilters, startDate, endDate, startDepth, endDepth } =
     useFilters();
-  const { dataLayers, toggleDataLayer, resetDataLayers } = useMapState();
+  const { dataLayerChoices, clearDataLayer, resetDataLayers } = useMapState();
   const { setShowFiltersModal, setOpenFilter } = useUI();
 
   const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
@@ -117,11 +117,9 @@ export default function useActiveFilters() {
     "(m)",
   );
 
-  // The geometry selection, announced the same way every other filter's is: one
-  // item per chosen value, and nothing at all while the filter is unfiltered
-  // (every geometry drawn). Dropping an item unticks that geometry; dropping
-  // the last one returns to all, via commitDataLayers.
-  const chosenDataLayers = selectedDataLayerKeys(dataLayers);
+  // The geometry picks, announced the same way every other filter's are: one
+  // item per included or excluded geometry, which dropping clears.
+  const chosenDataLayers = chosenDataLayerKeys(dataLayerChoices);
 
   return [
     chosenDataLayers.length > 0 && {
@@ -131,7 +129,8 @@ export default function useActiveFilters() {
       items: chosenDataLayers.map((key) => ({
         id: key,
         label: t(DATA_LAYER_LABEL_KEYS[key]),
-        remove: () => toggleDataLayer(key),
+        excluded: dataLayerChoices[key] === "exclude",
+        remove: () => clearDataLayer(key),
       })),
     },
     ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),

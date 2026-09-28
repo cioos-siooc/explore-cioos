@@ -18,18 +18,20 @@ export function filterRows(rows, filterText) {
   );
 }
 
-// Controlled search input styled like the DatasetsTable sidebar search.
+// The search box every list in the app shares — the datasets list, a dataset
+// page's records, a record's preview table — so each looks and behaves alike.
 export default function TableFilter({ value, onChange, placeholder }) {
   return (
-    <div className="tableFilterWrap">
+    <label className="tableFilterWrap">
       <Search size={13} aria-hidden="true" />
       <input
         className="tableFilterInput"
-        type="text"
+        type="search"
         value={value}
         placeholder={placeholder}
+        aria-label={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
-    </div>
+    </label>
   );
 }

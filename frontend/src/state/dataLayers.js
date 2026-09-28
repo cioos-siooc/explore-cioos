@@ -62,43 +62,41 @@ export const ALL_DATA_LAYERS = Object.fromEntries(
 
 // What a first visit shows: everything. This filter works like the catalogue
 // filters beside it — "nothing picked" means unfiltered, not empty — and the
-// unfiltered answer for a geometry selector is every geometry. Opting one or
-// two of them out of the default was the map quietly under-reporting what the
-// catalogue holds before the user had asked for anything.
-//
-// All-on is therefore also the neutral state the UI presents as no selection
-// (see isDataLayerChecked): a fully drawn map isn't a filter, so the pane shows
-// no ticks, the badge shows the plain filter name, and no chip appears.
+// unfiltered answer for a geometry selector is every geometry.
 export const DEFAULT_DATA_LAYERS = ALL_DATA_LAYERS;
 
-// Is the map drawing every geometry — i.e. is this filter doing nothing? The
-// same question as "is the selection empty" on the other filters.
+// Is the map drawing every geometry? Only a non-default selection is worth
+// writing to the URL, and nothing else about the drawn map is default-ish.
 export const allDataLayersOn = (dataLayers) =>
   !dataLayers || DATA_LAYER_KEYS.every((key) => dataLayers[key]);
 
-// What the checkbox shows. Everything-on is the unfiltered state, so it draws
-// as no selection at all rather than as six ticks; once the user narrows, the
-// ticks are the geometries they kept.
-export const isDataLayerChecked = (dataLayers, key) =>
-  !allDataLayersOn(dataLayers) && Boolean(dataLayers?.[key]);
+// What the user picked, as {key: "include" | "exclude"} with unpicked keys
+// absent — the same include -> exclude -> clear model as the catalogue lists.
+// The drawn map below is derived from it, so the map, the datasets list and
+// the URL keep reading one {key: drawn} object.
+export const nextDataLayerChoice = (choice) =>
+  choice === "include"
+    ? "exclude"
+    : choice === "exclude"
+      ? undefined
+      : "include";
 
-// The geometries a narrowed selection keeps, in render order. Empty when the
-// filter is doing nothing.
-export const selectedDataLayerKeys = (dataLayers) =>
-  allDataLayersOn(dataLayers)
-    ? []
-    : DATA_LAYER_KEYS.filter((key) => dataLayers[key]);
+// Drawn = one of the included geometries (or any, when none is included) and
+// not an excluded one.
+export function dataLayersFromChoices(choices) {
+  const anyIncluded = DATA_LAYER_KEYS.some((key) => choices[key] === "include");
+  return Object.fromEntries(
+    DATA_LAYER_KEYS.map((key) => [
+      key,
+      choices[key] !== "exclude" &&
+        (!anyIncluded || choices[key] === "include"),
+    ]),
+  );
+}
 
-// Apply a selection, folding "nothing left" back to "everything" — unticking
-// the last box lands on the unfiltered map, the way clearing any other filter
-// does, instead of on a blank one that no control could recover from.
-export const commitDataLayers = (next) =>
-  DATA_LAYER_KEYS.some((key) => next[key]) ? next : { ...ALL_DATA_LAYERS };
-
-// Narrow to a single geometry — what ticking a box means while everything is
-// on, matching the other filters' first pick.
-export const onlyDataLayer = (key) =>
-  Object.fromEntries(DATA_LAYER_KEYS.map((k) => [k, k === key]));
+// The picked geometries, in render order.
+export const chosenDataLayerKeys = (choices) =>
+  DATA_LAYER_KEYS.filter((key) => choices[key]);
 
 // Whether the trajectory layers draw their track lines, which is the one
 // trajectory-specific display choice left (their cells are hexes like every
@@ -148,11 +146,3 @@ export function datasetInDataLayers(row, dataLayers) {
   const key = dataLayerKeyForDataset(row);
   return key === undefined || dataLayers[key] !== false;
 }
-
-// Is this the default selection? Only a non-default selection is worth writing
-// to the URL (see useUrlSync), and an absent ?layers= restores the default.
-// Everything-on IS the default now, so this is the same question as
-// allDataLayersOn — kept as its own name because the callers mean different
-// things by it (one asks "is this shareable state", the other "is this filter
-// doing anything").
-export const dataLayersAreDefault = allDataLayersOn;

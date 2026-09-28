@@ -4,16 +4,19 @@ import {
   abbreviateString,
   applyDatasetPKs,
   capitalizeFirstLetter,
+  coverPadding,
   createDataFilterQueryString,
   createSelectionQueryString,
   escapeHtml,
   formatDatasetCount,
   getCurrentRangeLevel,
+  nextOptionState,
   polygonIsRectangle,
   polygonToWkt,
   quantizeCountRange,
   rangesEqual,
   rangeLevelHasData,
+  revealOffset,
   selectionFromSearchParams,
   splitAtAntimeridian,
   splitTrackRuns,
@@ -40,6 +43,12 @@ function makeQuery(overrides = {}) {
 }
 
 const selected = (title, extra = {}) => ({ title, isSelected: true, ...extra });
+const excluded = (title, extra = {}) => ({
+  title,
+  isSelected: false,
+  isExcluded: true,
+  ...extra,
+});
 const unselected = (title, extra = {}) => ({
   title,
   isSelected: false,
@@ -153,6 +162,121 @@ describe("createDataFilterQueryString", () => {
       expect(params.get("erddapServers")).toBe("https://erddap0.example");
       expect(params.has("includeObis")).toBe(false);
     });
+
+    it("sends excluded sources on their own, without hiding OBIS", () => {
+      // An exclusion narrows; it must not trip the servers-only rule above,
+      // which would drop every OBIS row the user did not exclude.
+      const params = new URLSearchParams(
+        createDataFilterQueryString(
+          makeQuery({
+            erddapServersSelected: [
+              excluded("s0", { url: "https://erddap0.example" }),
+              unselected("s1", { url: "https://erddap1.example" }),
+            ],
+            obisNodesSelected: [
+              excluded("OBIS USA"),
+              unselected("OBIS Canada"),
+            ],
+          }),
+        ),
+      );
+      expect(params.get("excludeErddapServers")).toBe(
+        "https://erddap0.example",
+      );
+      expect(params.get("excludeObisNodes")).toBe("OBIS USA");
+      expect(params.has("erddapServers")).toBe(false);
+      expect(params.has("obisNodes")).toBe(false);
+      expect(params.has("includeObis")).toBe(false);
+    });
+  });
+
+  it("sends included and excluded options of one filter side by side", () => {
+    const params = new URLSearchParams(
+      createDataFilterQueryString(
+        makeQuery({
+          platformsSelected: [selected("glider"), excluded("mooring")],
+          orgsSelected: [excluded("Org", { pk: 7 })],
+          datasetsSelected: [
+            excluded("Set", { pk: 11 }),
+            unselected("B", { pk: 12 }),
+          ],
+        }),
+      ),
+    );
+    expect(params.get("platforms")).toBe("glider");
+    expect(params.get("excludePlatforms")).toBe("mooring");
+    expect(params.get("excludeOrganizations")).toBe("7");
+    expect(params.get("excludeDatasetPKs")).toBe("11");
+    expect(params.has("organizations")).toBe(false);
+    expect(params.has("datasetPKs")).toBe(false);
+  });
+
+  it("asks for all EOVs only when there is more than one to match", () => {
+    // With one EOV "all" and "any" are the same selection; sending the flag
+    // anyway would give it a second URL and cache key.
+    const eovs = (...titles) => titles.map((title) => selected(title));
+    const paramsFor = (eovsSelected, eovsMatchAll) =>
+      new URLSearchParams(
+        createDataFilterQueryString(makeQuery({ eovsSelected, eovsMatchAll })),
+      );
+    expect(paramsFor(eovs("oxygen", "salinity"), true).get("eovsMatch")).toBe(
+      "all",
+    );
+    expect(paramsFor(eovs("oxygen"), true).has("eovsMatch")).toBe(false);
+    expect(paramsFor(eovs("oxygen", "salinity"), false).has("eovsMatch")).toBe(
+      false,
+    );
+  });
+
+  it("every multi-valued list sends its match mode and its exclusions", () => {
+    const params = new URLSearchParams(
+      createDataFilterQueryString(
+        makeQuery({
+          eovsSelected: [excluded("salinity")],
+          orgsSelected: [
+            selected("A", { pk: 1 }),
+            selected("B", { pk: 2 }),
+            unselected("C", { pk: 3 }),
+          ],
+          orgsMatchAll: true,
+          scientificNamesSelected: ["Gadus morhua", "Clupea harengus"],
+          scientificNamesExcluded: ["Orcinus orca"],
+          scientificNamesMatchAll: true,
+        }),
+      ),
+    );
+    expect(params.get("excludeEovs")).toBe("salinity");
+    expect(params.get("organizations")).toBe("1,2");
+    expect(params.get("organizationsMatch")).toBe("all");
+    expect(params.get("scientificNamesMatch")).toBe("all");
+    expect(params.get("excludeScientificNames")).toBe("Orcinus orca");
+  });
+
+  it("every org ticked is still a filter when all of them must match", () => {
+    const orgsSelected = [selected("A", { pk: 1 }), selected("B", { pk: 2 })];
+    const paramsFor = (orgsMatchAll) =>
+      new URLSearchParams(
+        createDataFilterQueryString(makeQuery({ orgsSelected, orgsMatchAll })),
+      );
+    expect(paramsFor(false).has("organizations")).toBe(false);
+    expect(paramsFor(true).get("organizations")).toBe("1,2");
+  });
+});
+
+describe("nextOptionState", () => {
+  it("cycles neutral -> include -> exclude -> neutral", () => {
+    const neutral = { pk: 1, isSelected: false };
+    const included = nextOptionState(neutral);
+    expect(included).toMatchObject({ isSelected: true, isExcluded: false });
+    const excludedOption = nextOptionState(included);
+    expect(excludedOption).toMatchObject({
+      isSelected: false,
+      isExcluded: true,
+    });
+    expect(nextOptionState(excludedOption)).toMatchObject({
+      isSelected: false,
+      isExcluded: false,
+    });
   });
 });
 
@@ -250,6 +374,16 @@ describe("applyDatasetPKs", () => {
   it("sends neither list when the narrowing drops nothing", () => {
     const all = [1, 2, 3];
     expect(applyDatasetPKs("eovs=oxygen", [1, 2, 3], all)).toBe("eovs=oxygen");
+  });
+
+  it("keeps the datasets the filters already exclude", () => {
+    // The Datasets filter can exclude on its own; the list's narrowing must add
+    // to that exclusion, not overwrite it.
+    const all = Array.from({ length: 10 }, (_, i) => i + 1);
+    const params = new URLSearchParams(
+      applyDatasetPKs("excludeDatasetPKs=42", all.slice(1), all),
+    );
+    expect(params.get("excludeDatasetPKs")).toBe("42,1");
   });
 
   it("asks for nothing at all when the list is empty", () => {
@@ -394,6 +528,65 @@ describe("track geometry", () => {
     const times = [t0, t0 + 3600e3, t0 + 400 * day, t0 + 400 * day + 3600e3];
     const runs = splitTrackRuns(coords, times);
     expect(runs.length).toBeGreaterThan(1);
+  });
+});
+
+describe("revealing a feature from under the panels", () => {
+  const canvas = { left: 0, top: 0, right: 1366, bottom: 768 };
+
+  it("gives the left column the left edge", () => {
+    const sidebar = { left: 12, top: 12, right: 432, bottom: 756 };
+    expect(coverPadding(canvas, [sidebar])).toEqual({
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 432,
+    });
+  });
+
+  it("gives a phone's bottom sheet the bottom edge", () => {
+    const phone = { left: 0, top: 0, right: 390, bottom: 844 };
+    const sheet = { left: 0, top: 422, right: 390, bottom: 844 };
+    expect(coverPadding(phone, [sheet])).toEqual({
+      top: 0,
+      right: 0,
+      bottom: 422,
+      left: 0,
+    });
+  });
+
+  it("keeps the widest inset when two panels share an edge", () => {
+    const card = { left: 12, top: 400, right: 432, bottom: 756 };
+    const miniCard = { left: 12, top: 80, right: 300, bottom: 200 };
+    expect(coverPadding(canvas, [card, miniCard]).left).toBe(432);
+  });
+
+  it("ignores a panel parked off the canvas", () => {
+    const parked = { left: -450, top: 12, right: -30, bottom: 756 };
+    expect(coverPadding(canvas, [parked])).toEqual({
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    });
+  });
+
+  const free = { left: 432, top: 0, right: 1366, bottom: 768 };
+
+  it("does not pan a box already clear of the panel", () => {
+    const box = { left: 600, top: 300, right: 620, bottom: 320 };
+    expect(revealOffset(box, free, 24)).toEqual([0, 0]);
+  });
+
+  it("pans just far enough to clear the panel", () => {
+    const box = { left: 200, top: 750, right: 220, bottom: 770 };
+    // panBy moves the camera, so the content travels the opposite way.
+    expect(revealOffset(box, free, 24)).toEqual([-256, 26]);
+  });
+
+  it("gives up on a box too big to fit beside the panel", () => {
+    const box = { left: 100, top: 100, right: 1300, bottom: 300 };
+    expect(revealOffset(box, free, 24)).toBeNull();
   });
 });
 

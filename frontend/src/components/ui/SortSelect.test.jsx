@@ -52,7 +52,7 @@ describe("SortSelect", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Sorted ascending — tap to reverse" }),
+      screen.getByRole("button", { name: "Sorted ascending (tap to reverse)" }),
     ).toBeInTheDocument();
   });
 

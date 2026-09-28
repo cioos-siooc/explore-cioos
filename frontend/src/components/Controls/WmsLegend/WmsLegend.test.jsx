@@ -80,14 +80,25 @@ describe("WmsLegend", () => {
     });
   });
 
-  it("on a phone-width floating card, renders as a peek button until opened", () => {
+  it("in the map card, leaves the way out to the card and has no close of its own", () => {
+    renderWithProviders(
+      <WmsLegend
+        overlay={OVERLAY}
+        setActiveWmsOverlay={() => {}}
+        variant="card"
+      />,
+    );
+    expect(screen.queryByTitle("Hide overlay")).not.toBeInTheDocument();
+  });
+
+  it("in the map card at phone width, renders as a peek button until opened", () => {
     setViewportWidth(MOBILE_WIDTH);
     renderWithProviders(
       <WmsLegend
         overlay={OVERLAY}
         onClose={() => {}}
         setActiveWmsOverlay={() => {}}
-        variant="floating"
+        variant="card"
       />,
     );
     expect(document.querySelector(".wmsLegendPeek")).toBeInTheDocument();

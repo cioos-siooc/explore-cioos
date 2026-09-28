@@ -106,16 +106,33 @@ describe("MapStateProvider", () => {
     expect(latest.dataLayers.grid).toBe(false);
   });
 
-  it("toggleDataLayer narrows to one layer from the everything-on default", async () => {
+  it("seeds excluded geometries from ?excludeLayers=", async () => {
+    await renderReady({ url: "/?excludeLayers=grid" });
+    expect(latest.dataLayerChoices).toEqual({ grid: "exclude" });
+    expect(latest.dataLayers.grid).toBe(false);
+    expect(latest.dataLayers.profile).toBe(true);
+  });
+
+  it("reads an older link's empty ?layers= as every geometry excluded", async () => {
+    await renderReady({ url: "/?layers=" });
+    expect(Object.values(latest.dataLayers).some(Boolean)).toBe(false);
+  });
+
+  it("cycleDataLayer walks include -> exclude -> clear", async () => {
     await renderReady();
-    act(() => latest.toggleDataLayer("grid"));
+    act(() => latest.cycleDataLayer("grid"));
     expect(latest.dataLayers.grid).toBe(true);
     expect(latest.dataLayers.profile).toBe(false);
+    act(() => latest.cycleDataLayer("grid"));
+    expect(latest.dataLayers.grid).toBe(false);
+    expect(latest.dataLayers.profile).toBe(true);
+    act(() => latest.cycleDataLayer("grid"));
+    expect(latest.dataLayerChoices).toEqual({});
   });
 
   it("resetDataLayers restores the everything-on default", async () => {
     await renderReady();
-    act(() => latest.toggleDataLayer("grid"));
+    act(() => latest.cycleDataLayer("grid"));
     act(() => latest.resetDataLayers());
     expect(Object.values(latest.dataLayers).every(Boolean)).toBe(true);
   });

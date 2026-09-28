@@ -1,9 +1,10 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import useActiveFilters from "../../../state/useActiveFilters.js";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 // How many values a group shows before folding the rest behind a "+N" chip —
 // short enough that a group's own values stay on the one row its label pill
@@ -27,6 +28,11 @@ const MAX_VISIBLE_VALUES = 2;
 export default function ActiveFilterChips() {
   const { t } = useTranslation();
   const activeFilters = useActiveFilters();
+  const { offerTip } = useTips();
+  const filtering = activeFilters.length > 0;
+  useEffect(() => {
+    if (filtering) offerTip("shareLink");
+  }, [filtering, offerTip]);
 
   // Which groups currently show every value rather than the folded MAX_VISIBLE_VALUES —
   // toggled by the button at the end of the group's own row, so opening one
@@ -92,32 +98,48 @@ export default function ActiveFilterChips() {
                 <span className="activeFilterGroupLabelText">{f.label}</span>
               </button>
             </span>
-            {shownItems.map((item) => (
-              <span
-                key={item.id}
-                className="activeFilterItem"
-                data-testid="filter-chip-item"
-                data-item-id={item.id}
-              >
-                <span className="activeFilterItemLabel" title={item.label}>
-                  {item.label}
-                </span>
-                <button
-                  type="button"
-                  className="activeFilterItemRemove"
-                  data-testid="filter-chip-item-remove"
-                  onClick={item.remove}
-                  title={t("activeFilterRemoveItemTitle")}
-                  // Every chip's X carried the same accessible name, so
-                  // "Remove filter" matched all of them at once — ambiguous for
-                  // a test and useless to a screen reader reading the page's
-                  // buttons. Composed here rather than as a new i18n key.
-                  aria-label={`${t("activeFilterRemoveItemTitle")}: ${item.label}`}
+            {shownItems.map((item) => {
+              // Spelled out in full for the tooltip and the screen reader; the
+              // chip shows the "not" as its own tag so it reads at a glance.
+              const fullLabel = item.excluded
+                ? t("filterExcludedOption", { title: item.label })
+                : item.label;
+              return (
+                <span
+                  key={item.id}
+                  className={`activeFilterItem ${item.excluded ? "excluded" : ""}`}
+                  data-testid="filter-chip-item"
+                  data-item-id={item.id}
+                  data-excluded={Boolean(item.excluded)}
                 >
-                  <X size={14} aria-hidden="true" />
-                </button>
-              </span>
-            ))}
+                  {item.excluded && (
+                    <span className="activeFilterItemNot" aria-hidden="true">
+                      {t("filterNotTag")}
+                    </span>
+                  )}
+                  <span className="activeFilterItemLabel" title={fullLabel}>
+                    <span className="sr-only">
+                      {item.excluded && `${t("filterNotTag")} `}
+                    </span>
+                    {item.label}
+                  </span>
+                  <button
+                    type="button"
+                    className="activeFilterItemRemove"
+                    data-testid="filter-chip-item-remove"
+                    onClick={item.remove}
+                    title={t("activeFilterRemoveItemTitle")}
+                    // Every chip's X carried the same accessible name, so
+                    // "Remove filter" matched all of them at once — ambiguous for
+                    // a test and useless to a screen reader reading the page's
+                    // buttons. Composed here rather than as a new i18n key.
+                    aria-label={`${t("activeFilterRemoveItemTitle")}: ${fullLabel}`}
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </span>
+              );
+            })}
             {hiddenCount > 0 && (
               <button
                 type="button"

@@ -11,7 +11,6 @@ import {
   Check2Circle,
   Eye,
   EyeSlash,
-  Search,
   XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -19,6 +18,7 @@ import classNames from "classnames";
 
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   GROUP_NONE,
   HIDEABLE_DIMENSIONS,
@@ -33,6 +33,7 @@ import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
+import TableFilter from "../../ui/TableFilter.jsx";
 import "./styles.css";
 
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
@@ -60,13 +61,12 @@ export default function DatasetsTable({
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
-  // Lifted to SelectionProvider so it can surface as a removable chip
-  // (ActiveFilterChips) alongside the rest of the active filters. The grouping
-  // lives there too: the hidden groups decide what the map draws, and both are
-  // carried in the URL.
+  // The search, grouping and hidden groups live in SelectionProvider: they
+  // outlive this list while a dataset page replaces it, the hidden groups
+  // decide what the map draws, and all of them are carried in the URL.
   const {
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
+    listSearchText,
+    setListSearchText,
     groupBy: selectedGroupBy,
     setGroupBy,
     hiddenGroups,
@@ -79,13 +79,10 @@ export default function DatasetsTable({
     // not whether it is in the order at all.
     handleSelectDataset: removeFromSelection,
   } = useSelection();
-  // The same free-text search the top bar and the Filters modal write, and it
-  // narrows the map as well as this list — so the box below goes on Enter or
-  // on its magnifier (useSearchInput) rather than on a pause mid-word.
-  const [searchText, setSearchText, submitSearch] = useSearchInput(
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
-    { trigger: "submit" },
+  // Narrows only this list (see listedDatasets), so it can follow the typing.
+  const [searchText, setSearchText] = useSearchInput(
+    listSearchText,
+    setListSearchText,
   );
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
@@ -97,6 +94,7 @@ export default function DatasetsTable({
     if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET;
     return new Set(featureQuery.datasetPks.map(Number));
   }, [featureQuery, isDownloadModal]);
+  const { tipHighlight } = useTips();
 
   // The download modal is a flat review list — it never groups, whatever the
   // sidebar is grouped by.
@@ -180,9 +178,8 @@ export default function DatasetsTable({
     [t],
   );
 
-  // Search filtering happens upstream (SelectionProvider's filteredDatasets),
-  // so it's reflected in the shared dataset counters too — this just sorts
-  // whatever it's handed.
+  // Search filtering happens upstream (SelectionProvider's listedDatasets) —
+  // this just sorts whatever it's handed.
   const visibleRows = useMemo(() => {
     const field = sortFields.find((f) => f.id === sort.field);
     const factor = sort.dir === "asc" ? 1 : -1;
@@ -308,6 +305,15 @@ export default function DatasetsTable({
     collapsedGroups,
   ]);
 
+  // The what's here tip points at one of the click's datasets that can be
+  // ticked in, while this list rather than the card holds them (see Sidebar).
+  const whatsHereTarget = pageItems.find(
+    (item) =>
+      !item.header &&
+      item.row.cdm_data_type !== "Grid" &&
+      pinnedPks.has(Number(item.row.pk)),
+  );
+
   const toggleGroupCollapsed = (group) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -342,12 +348,17 @@ export default function DatasetsTable({
     if (listRef.current) listRef.current.scrollTop = 0;
   };
 
+  const sortControl = (
+    <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
+  );
+
   const controls = (
     <div className="datasetsCardControls" data-testid="datasets-controls">
-      <div className="datasetsCardToolbar">
-        {isDownloadModal && (
-          // The same checkbox the rows below carry, so the control that ticks
-          // them all reads as one of them rather than as a pill that lights up.
+      {isDownloadModal ? (
+        <>
+          {/* The same checkbox the rows below carry, so the control that ticks
+              them all reads as one of them rather than as a pill that lights
+              up. */}
           <label
             className="selectAllToggle"
             title={t("datasetsTableHeaderSelectAllTitle")}
@@ -359,71 +370,48 @@ export default function DatasetsTable({
             />
             {t("datasetsTableHeaderSelectAllTitle")}
           </label>
-        )}
-        {!isDownloadModal && (
-          // A form, so Enter searches natively and the magnifier is that same
-          // submit rather than a decorative icon with a handler bolted on.
-          <form
-            className="datasetsTableSearchWrap"
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitSearch();
-            }}
-          >
+          {/* The format pickers (DownloadFormats) are settings of the same
+              kind as the sort: they change what every Download button on the
+              cards below asks the server for. */}
+          <div className="datasetsCardArrange">
+            {sortControl}
+            {downloadFormatControls}
+          </div>
+        </>
+      ) : (
+        // Search, sort and grouping on one row: every row spent here is a
+        // dataset card the sidebar does not show.
+        <div className="datasetsCardToolbar">
+          <TableFilter
+            value={searchText}
+            onChange={setSearchText}
+            placeholder={t("datasetsListSearchPlaceholder")}
+          />
+          {sortControl}
+          <SelectPill
+            label={t("datasetsCardGroupByLabel")}
+            value={groupBy}
+            options={groupByOptions}
+            onChange={setGroupBy}
+          />
+          {hiddenGroups.size > 0 && (
             <button
-              type="submit"
-              className="datasetsTableSearchSubmit"
-              title={t("filterSearchSubmitTitle")}
-              aria-label={t("filterSearchSubmitTitle")}
+              type="button"
+              className="datasetsCardShowAllGroups"
+              onClick={showAllGroups}
+              title={t("datasetsCardGroupShowAllText", {
+                count: hiddenGroups.size,
+              })}
+              aria-label={t("datasetsCardGroupShowAllText", {
+                count: hiddenGroups.size,
+              })}
             >
-              <Search size={13} aria-hidden="true" />
+              <Eye size={13} aria-hidden="true" />
+              {hiddenGroups.size}
             </button>
-            <input
-              className="datasetsTableSearch"
-              type="text"
-              value={searchText}
-              placeholder={t("datasetInspectorFilterText")}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
-          </form>
-        )}
-      </div>
-
-      {/* How the list is arranged: what it is sorted on and what it is grouped
-          by, as the same pill so the pair reads as one row of settings. The
-          download modal adds its format pickers here (DownloadFormats), which
-          are settings of the same kind: they change what every Download button
-          on the cards below asks the server for. */}
-      <div className="datasetsCardArrange">
-        <SortSelect fields={sortFields} sort={sort} onChange={setSort} />
-        {isDownloadModal && downloadFormatControls}
-        {!isDownloadModal && (
-          <>
-            <SelectPill
-              label={t("datasetsCardGroupByLabel")}
-              value={groupBy}
-              options={groupByOptions}
-              onChange={setGroupBy}
-            />
-            {hiddenGroups.size > 0 && (
-              <button
-                type="button"
-                className="datasetsCardShowAllGroups"
-                onClick={showAllGroups}
-                title={t("datasetsCardGroupShowAllText", {
-                  count: hiddenGroups.size,
-                })}
-                aria-label={t("datasetsCardGroupShowAllText", {
-                  count: hiddenGroups.size,
-                })}
-              >
-                <Eye size={13} aria-hidden="true" />
-                {hiddenGroups.size}
-              </button>
-            )}
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* What the size pill and the tick/cross on each card below mean. It
           belongs on this row rather than under the list: it is a key to the
@@ -506,6 +494,9 @@ export default function DatasetsTable({
                     item.group !== undefined && hiddenGroups.has(item.group)
                   }
                   fromMapClick={pinnedPks.has(Number(item.row.pk))}
+                  tipHighlight={tipHighlight(
+                    item === whatsHereTarget && "whatsHere",
+                  )}
                   t={t}
                   i18n={i18n}
                 />

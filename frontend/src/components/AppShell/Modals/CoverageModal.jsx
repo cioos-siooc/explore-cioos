@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { BarChartLine } from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
+import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -33,6 +34,67 @@ const COUNT_OPTIONS = ["datasets", "features", "days"];
 // cost. Bounded because the key includes the dataset list, which changes as
 // the map is panned; oldest is evicted first.
 const MAX_CACHED_RESPONSES = 20;
+
+// The figure's outline while it loads: the usual shape of the record — almost
+// nothing early on, a slow climb, a surge in recent decades and a dip in the
+// still-incomplete last years — as (position, height %) control points.
+const SKELETON_CURVE = [
+  [0, 0],
+  [0.12, 0],
+  [0.13, 2],
+  [0.2, 3],
+  [0.23, 5],
+  [0.28, 10],
+  [0.45, 10],
+  [0.55, 15],
+  [0.6, 22],
+  [0.72, 32],
+  [0.8, 45],
+  [0.88, 62],
+  [0.95, 100],
+  [0.98, 50],
+  [1, 22],
+];
+const SKELETON_BAR_COUNT = 120;
+const SKELETON_BAR_HEIGHTS = Array.from(
+  { length: SKELETON_BAR_COUNT },
+  (_, i) => {
+    const x = i / (SKELETON_BAR_COUNT - 1);
+    const k = SKELETON_CURVE.findIndex(([at]) => at >= x);
+    const [x1, y1] = SKELETON_CURVE[Math.max(k - 1, 0)];
+    const [x2, y2] = SKELETON_CURVE[k];
+    const y = x2 === x1 ? y2 : y1 + ((y2 - y1) * (x - x1)) / (x2 - x1);
+    // Fixed jitter so neighbouring bars differ like real ones do.
+    const jitter = 1 + 0.12 * Math.sin(i * 2.7);
+    return Math.min(100, y * jitter);
+  },
+);
+const histogramSkeleton = (
+  <SkeletonGroup className="coverageSkeleton">
+    <div className="coverageSkeletonLegend">
+      {[70, 90, 55, 75, 60].map((width, i) => (
+        <div key={i} className="coverageSkeletonLegendRow">
+          <Skeleton width="12px" height="12px" radius="2px" />
+          <Skeleton width={`${width}%`} />
+        </div>
+      ))}
+    </div>
+    <div className="coverageSkeletonBars">
+      {SKELETON_BAR_HEIGHTS.map((height, i) => (
+        <Skeleton key={i} height={`${height}%`} radius="0" />
+      ))}
+    </div>
+  </SkeletonGroup>
+);
+
+function CoverageOption({ label, help }) {
+  return (
+    <span className="coverageOption">
+      <span className="coverageOptionLabel">{label}</span>
+      <span className="coverageOptionHelp">{help}</span>
+    </span>
+  );
+}
 
 // The dataset-coverage figure, launched from the top bar: a histogram of how
 // many datasets match the applied filters over time, with the bars split by a
@@ -148,67 +210,79 @@ export default function CoverageModal() {
       </Modal.Header>
       <Modal.Body>
         <div className="coverageToolbar">
-          <span className="coverageToolbarLabel">
-            {t("coverageCountByLabel")}
-          </span>
-          <DropdownButton
-            data-testid="coverage-count-dropdown"
-            title={t(`coverageMetric_${count}`)}
-          >
-            {COUNT_OPTIONS.map((option) => (
-              <Dropdown.Item
-                key={option}
-                data-testid="coverage-count-option"
-                active={option === count}
-                onClick={() => setCount(option)}
-              >
-                {t(`coverageMetric_${option}`)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-          <span className="coverageToolbarLabel">
-            {t("coverageColorByLabel")}
-          </span>
-          <DropdownButton
-            data-testid="coverage-group-dropdown"
-            title={t(`coverageGroup_${groupBy}`)}
-          >
-            {GROUP_OPTIONS.map((option) => (
-              <Dropdown.Item
-                key={option}
-                data-testid="coverage-group-option"
-                active={option === groupBy}
-                onClick={() => setGroupBy(option)}
-              >
-                {t(`coverageGroup_${option}`)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-        </div>
-        {/* Organizations are the one multi-valued dimension: a dataset in two
-            of them lands in both series, so the stack total is not the
-            dataset count. Say so rather than let the axis imply otherwise. */}
-        {groupBy === "organization" && (
-          <div className="coverageToolbarNote">
-            {t("coverageOrganizationNote")}
+          <div className="coverageToolbarNotes">
+            {/* Organizations are the one multi-valued dimension: a dataset in
+                two of them lands in both series, so the stack total is not
+                the dataset count. Say so rather than let the axis imply
+                otherwise. */}
+            {groupBy === "organization" && (
+              <div className="coverageToolbarNote">
+                {t("coverageOrganizationNote")}
+              </div>
+            )}
+            {/* Days are per-feature and added up, so a bar measures
+                observation effort and routinely exceeds the number of
+                calendar days in its period. Deliberately unlike the map's
+                days ramp, which unions. */}
+            {count === "days" && (
+              <div className="coverageToolbarNote">{t("coverageDaysNote")}</div>
+            )}
           </div>
-        )}
-        {/* Days are per-feature and added up, so a bar measures observation
-            effort and routinely exceeds the number of calendar days in its
-            period. Deliberately unlike the map's days ramp, which unions. */}
-        {count === "days" && (
-          <div className="coverageToolbarNote">{t("coverageDaysNote")}</div>
-        )}
+          <div className="coverageToolbarControls">
+            <span className="coverageToolbarLabel">
+              {t("coverageCountByLabel")}
+            </span>
+            <DropdownButton
+              data-testid="coverage-count-dropdown"
+              title={t(`coverageMetric_${count}`)}
+              menuClassName="coverageOptionMenu"
+              align="end"
+            >
+              {COUNT_OPTIONS.map((option) => (
+                <Dropdown.Item
+                  key={option}
+                  data-testid="coverage-count-option"
+                  active={option === count}
+                  onClick={() => setCount(option)}
+                >
+                  <CoverageOption
+                    label={t(`coverageMetric_${option}`)}
+                    help={t(`coverageMetricHelp_${option}`)}
+                  />
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+            <span className="coverageToolbarLabel">
+              {t("coverageColorByLabel")}
+            </span>
+            <DropdownButton
+              data-testid="coverage-group-dropdown"
+              title={t(`coverageGroup_${groupBy}`)}
+              menuClassName="coverageOptionMenu"
+              align="end"
+            >
+              {GROUP_OPTIONS.map((option) => (
+                <Dropdown.Item
+                  key={option}
+                  data-testid="coverage-group-option"
+                  active={option === groupBy}
+                  onClick={() => setGroupBy(option)}
+                >
+                  <CoverageOption
+                    label={t(`coverageGroup_${option}`)}
+                    help={t(`coverageGroupHelp_${option}`)}
+                  />
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+          </div>
+        </div>
         <div className="coveragePlotArea">
           {/* A refetch keeps the bars it already has, dimmed, rather than
               blanking to an empty area: switching Count or Colour-by changes
               one facet of the same figure, and these queries take seconds when
               the API's cache is cold. */}
-          {loading && !showStalePlot && (
-            <div className="coverageModalStatus">
-              <Spinner size="lg" />
-            </div>
-          )}
+          {loading && !showStalePlot && histogramSkeleton}
           {!loading && error && (
             <div className="coverageModalStatus">
               {t("coverageErrorMessage")}
@@ -220,13 +294,7 @@ export default function CoverageModal() {
             </div>
           )}
           {(showStalePlot || (!loading && !error && histogram && !isEmpty)) && (
-            <Suspense
-              fallback={
-                <div className="coverageModalStatus">
-                  <Spinner size="lg" />
-                </div>
-              }
-            >
+            <Suspense fallback={histogramSkeleton}>
               <div
                 className={
                   loading ? "coveragePlotStale" : "coveragePlotCurrent"

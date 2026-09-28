@@ -42,4 +42,28 @@ describe("DataLayersFilter", () => {
     await waitFor(() => expect(latest.dataLayers.grid).toBe(true));
     expect(latest.dataLayers.profile).toBe(false);
   });
+
+  it("a second click excludes the layer, a third clears it", async () => {
+    let latest;
+    function Probe() {
+      latest = useMapState();
+      return null;
+    }
+    const { user } = await renderReady(
+      <>
+        <DataLayersFilter />
+        <Probe />
+      </>,
+    );
+    const row = () => screen.getByText("Gridded data").closest(".optionButton");
+    await user.click(row());
+    await user.click(row());
+    await waitFor(() => expect(row()).toHaveClass("excluded"));
+    expect(row()).toHaveTextContent("(excluded)");
+    expect(latest.dataLayers.grid).toBe(false);
+    expect(latest.dataLayers.profile).toBe(true);
+    await user.click(row());
+    await waitFor(() => expect(row()).not.toHaveClass("excluded"));
+    expect(Object.values(latest.dataLayers).every(Boolean)).toBe(true);
+  });
 });

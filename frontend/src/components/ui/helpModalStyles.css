@@ -170,3 +170,14 @@
   box-shadow: var(--cioos-focus);
   border-radius: var(--cioos-radius-sm);
 }
+
+/* Phones: theme.css steps the type up because phone surfaces go full-screen,
+   but this one stays a card over the map, so it drops below even the desktop
+   sizes to fit the small screen. */
+@media (max-width: 700px) {
+  .helpModal {
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
+  }
+}

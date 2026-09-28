@@ -3,13 +3,14 @@ import { describe, it, expect } from "vitest";
 import { buildTileSuffix } from "./tileQuery.js";
 import {
   ALL_DATA_LAYERS,
-  onlyDataLayer,
+  dataLayersFromChoices,
   PROFILE_TYPE_KEYS,
   TRAJECTORY_TYPE_KEYS,
 } from "../../state/dataLayers.js";
 import { HEX_METRIC } from "../config";
 
 const params = (suffix) => new URLSearchParams(suffix);
+const onlyDataLayer = (key) => dataLayersFromChoices({ [key]: "include" });
 
 describe("the metric is always on the wire", () => {
   it("writes it even for an empty query and no layers", () => {

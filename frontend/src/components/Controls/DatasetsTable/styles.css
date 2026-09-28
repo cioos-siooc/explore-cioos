@@ -10,38 +10,26 @@
   text-align: left;
 }
 
-/* --- Controls: search, then how the list is arranged (sort and grouping, both
-   ui/SelectPill.jsx). The download modal also puts its local select-all beside
-   the sort control. --- */
+/* --- Controls: in the sidebar one row of search, sort and grouping (both
+   ui/SelectPill.jsx); in the download modal select-all, sort and the format
+   pickers. --- */
 .datasetsCardControls {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
 }
 
+/* Wraps only when the search box would drop below a usable width — the
+   narrowest phone, or long French captions. */
 .datasetsCardToolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  width: 100%;
-}
-
-/* In the download modal the toolbar has no search box and the arrange row no
-   grouping pill, so the two rows hold one control each — and a row spent here
-   is a dataset the list does not show, in a panel that also has to fit a
-   filter band, a legend and an order bar. One row instead. */
-.datasetsTable.downloadModal .datasetsCardControls {
-  flex-flow: row wrap;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.datasetsTable.downloadModal .datasetsCardToolbar {
-  width: auto;
 }
 
 /* Keeps its label at every width, unlike the two pills below it: it is the one
@@ -111,62 +99,7 @@
   color: var(--cioos-ink);
 }
 
-.datasetsTableSearchWrap {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  padding: 0 10px;
-  background-color: var(--cioos-white);
-  color: var(--cioos-ink-40);
-}
-
-.datasetsTableSearchWrap:focus-within {
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
-.datasetsTableSearchWrap svg {
-  flex: 0 0 auto;
-}
-
-/* The magnifier submits the search (the field never publishes on a pause), so
-   it is a button — stripped back to the icon it already looked like. */
-.datasetsTableSearchSubmit {
-  display: inline-flex;
-  flex: 0 0 auto;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.datasetsTableSearchSubmit:hover {
-  color: var(--cioos-ink);
-}
-
-.datasetsTableSearchSubmit:focus-visible {
-  outline: none;
-  border-radius: var(--cioos-radius-sm);
-  box-shadow: var(--cioos-focus);
-}
-
-.datasetsTableSearch {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: none;
-  padding: 5px 0;
-  outline: none;
-  background: transparent;
-  color: var(--cioos-ink);
-}
-
-/* Sort and grouping. Wrapping is the safety valve for a long localized option
-   ("Ocean variable", "Variable oceanique") on the narrowest phone. */
+/* The download modal's sort and format pickers. */
 .datasetsCardArrange {
   display: flex;
   flex-wrap: wrap;
@@ -183,10 +116,6 @@
   flex-flow: row wrap;
   align-items: center;
   gap: 6px 12px;
-}
-
-.datasetsTable.downloadModal .datasetsCardToolbar {
-  width: auto;
 }
 
 /* --- One dataset per row, full width. The card reflows to use that width
@@ -608,7 +537,7 @@
   flex-wrap: wrap;
   gap: 4px 12px;
   font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .datasetCardMetaItem {

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEffect } from "react";
 import { Globe, InfoCircle, Map } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -8,6 +9,7 @@ import LanguageSelector from "../../Controls/LanguageSelector/LanguageSelector.j
 import FeedbackButton from "../../Controls/FeedbackButton/FeedbackButton.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
 // The brand card: logo, the two-line app title lockup, and the minor actions
@@ -15,10 +17,13 @@ import "./styles.css";
 // drawn rather than loaded, and is also the app's loading indicator — see
 // CioosLogo. The centered top bar passes the merged Datasets/Filters control
 // in as children, so it renders as a second row welded into this same card.
+const GLOBE_TIP_MAX_ZOOM = 2;
+
 export default function BrandSearch({ children }) {
   const { t, i18n } = useTranslation();
   const { showIntroModal, setShowIntroModal } = useUI();
-  const { projection, setProjection } = useMapState();
+  const { projection, setProjection, zoom } = useMapState();
+  const { offerTip, tipHighlight } = useTips();
 
   const isFrench = i18n.language === "fr";
   // The org's own site, one per language — CIOOS at the English domain, SIOOC
@@ -27,6 +32,12 @@ export default function BrandSearch({ children }) {
   // this one splits them since the French domain exists and works.
   const websiteUrl = isFrench ? "https://siooc.ca/" : "https://cioos.ca/";
   const globeOn = projection === "globe";
+  // Zoomed out past the default whole-Canada view on the flat map: the point
+  // where the globe starts to read better.
+  const wholeWorld = !globeOn && zoom < GLOBE_TIP_MAX_ZOOM;
+  useEffect(() => {
+    if (wholeWorld) offerTip("globe");
+  }, [wholeWorld, offerTip]);
   // Named by what pressing it does, and drawn as where it takes you — the icon
   // is the other projection, not the current one.
   const projectionLabel = t(
@@ -61,7 +72,10 @@ export default function BrandSearch({ children }) {
             )}
           </h1>
           <div className="brandMinorItems">
-            <FeedbackButton className="brandMinorItem" size={20} />
+            <FeedbackButton
+              className="brandMinorItem brandFeedback"
+              size={20}
+            />
             <button
               type="button"
               className={classNames("brandMinorItem", {
@@ -78,6 +92,7 @@ export default function BrandSearch({ children }) {
               type="button"
               className="brandMinorItem"
               onClick={() => setProjection(globeOn ? "mercator" : "globe")}
+              data-tip-highlight={tipHighlight("globe")}
               title={projectionLabel}
               aria-label={projectionLabel}
             >

@@ -1,20 +1,23 @@
 import * as React from "react";
-import { CheckSquare, Square } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import {
   DATA_LAYER_HINT_KEYS,
   DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
-  isDataLayerChecked,
 } from "../../../../state/dataLayers.js";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
+import {
+  ExcludedLabel,
+  OptionStateIcon,
+  optionStateClass,
+} from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
-// Which observation geometries the map draws. It behaves as every other filter
-// does, down to the semantics and not just the idiom: no ticks means unfiltered
-// (all seven drawn), ticking narrows to what is ticked, and unticking the last
-// one returns to all. The selection gates the datasets list and its counts for
+// Which observation geometries the map draws. It behaves as every other list
+// filter does: a click cycles include -> exclude -> clear, nothing picked means
+// unfiltered (all seven drawn), and the map draws the included geometries (or
+// all of them, when none is included) minus the excluded ones. The selection gates the datasets list and its counts for
 // every row (see datasetInDataLayers), and additionally gates the map's point/
 // hex tiles for the six point- and path-sampling rows — grid has no tile
 // equivalent to narrow, since griddap coverage is its own map layer.
@@ -31,23 +34,36 @@ import "./styles.css";
 // selected. They live on the legend entries they key (see Legend.jsx).
 export default function DataLayersFilter() {
   const { t } = useTranslation();
-  const { dataLayers, toggleDataLayer } = useMapState();
+  const { dataLayerChoices, cycleDataLayer } = useMapState();
 
   return (
     <div className="multiCheckboxFilter dataLayersFilter">
       {DATA_LAYER_KEYS.map((key) => {
-        const checked = isDataLayerChecked(dataLayers, key);
+        const state = {
+          isSelected: dataLayerChoices[key] === "include",
+          isExcluded: dataLayerChoices[key] === "exclude",
+        };
         return (
           <div
             key={key}
-            className={`optionButton ${checked ? "selected" : ""}`}
-            onClick={() => toggleDataLayer(key)}
+            className={optionStateClass(state)}
+            role="checkbox"
+            aria-checked={state.isSelected}
+            tabIndex={0}
+            onClick={() => cycleDataLayer(key)}
+            onKeyDown={(event) => {
+              if (event.key === " " || event.key === "Enter") {
+                event.preventDefault();
+                cycleDataLayer(key);
+              }
+            }}
           >
-            {checked ? <CheckSquare /> : <Square />}
+            <OptionStateIcon {...state} />
             <span className="optionName">
               {t(DATA_LAYER_LABEL_KEYS[key])}
               <span className="optionHint">{t(DATA_LAYER_HINT_KEYS[key])}</span>
             </span>
+            <ExcludedLabel {...state} />
           </div>
         );
       })}

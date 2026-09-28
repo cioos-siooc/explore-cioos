@@ -1,0 +1,23 @@
+/* Offset below-right of the pointer so it never covers the spot being
+   clicked, and click-through so it can't swallow one either. */
+.drawHint {
+  position: fixed;
+  z-index: var(--cioos-z-dock, 35);
+  max-width: 260px;
+  padding: 4px var(--cioos-space-sm);
+  transform: translate(16px, 16px);
+  pointer-events: none;
+  background-color: var(--cioos-navy);
+  border-radius: var(--cioos-radius);
+  box-shadow: var(--cioos-shadow-float);
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-white);
+}
+
+.drawHintDocked {
+  text-align: center;
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+}

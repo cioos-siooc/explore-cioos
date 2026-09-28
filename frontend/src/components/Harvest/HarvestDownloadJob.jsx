@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
+import { HarvestTableSkeleton } from "./HarvestSkeleton.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import {
   datasetBadgeClass,
@@ -36,7 +37,7 @@ export default function HarvestDownloadJob() {
   if (loading) {
     return (
       <HarvestLayout breadcrumbs={breadcrumbs}>
-        <div className="harvest-loading">{t("harvest.loading")}</div>
+        <HarvestTableSkeleton label={t("harvest.loading")} />
       </HarvestLayout>
     );
   }

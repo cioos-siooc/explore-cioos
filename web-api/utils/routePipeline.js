@@ -42,19 +42,35 @@ function filterValidators() {
       .isInt({ min: -999999, max: 999999 })
       .optional(),
     // comma separated list of pks, eg pointPKs=12342,34534,456456
-    check(["organizations", "datasetPKs", "excludeDatasetPKs", "pointPKs"])
+    check([
+      "organizations",
+      "excludeOrganizations",
+      "datasetPKs",
+      "excludeDatasetPKs",
+      "pointPKs",
+    ])
       .matches(/^[0-9,]*$/)
       .optional(),
-    check("eovs")
+    check(["eovs", "excludeEovs"])
       .matches(/^[a-zA-Z,]*$/)
       .optional(),
-    check("scientificNames")
+    check(["eovsMatch", "organizationsMatch", "scientificNamesMatch"])
+      .isIn(["any", "all"])
+      .optional(),
+    check(["scientificNames", "excludeScientificNames"])
       // letters, digits, space, period, comma, apostrophe, parens, hyphen
       // (accommodates subgenus notation like "Halichondria (Halichondria) phakellioides")
       .matches(/^[A-Za-z0-9 .,'()-]*$/)
       .isLength({ max: 4000 })
       .optional(),
-    check(["platforms", "obisNodes", "erddapServers"])
+    check([
+      "platforms",
+      "obisNodes",
+      "erddapServers",
+      "excludePlatforms",
+      "excludeObisNodes",
+      "excludeErddapServers",
+    ])
       .isLength({ max: MAX_LIST_LENGTH })
       .optional(),
     // Source and layer switches. Only "false" is ever meaningful (the routes

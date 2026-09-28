@@ -10,9 +10,21 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
       return {
         ...option,
         isSelected,
+        isExcluded: false,
       };
     }),
   );
+}
+
+// The click cycle of a list filter option: neutral -> include ->
+// exclude -> neutral. The two flags are mutually exclusive, and `isSelected`
+// keeps meaning "included" everywhere it was already read.
+export function nextOptionState(option) {
+  if (option.isSelected)
+    return { ...option, isSelected: false, isExcluded: true };
+  if (option.isExcluded)
+    return { ...option, isSelected: false, isExcluded: false };
+  return { ...option, isSelected: true, isExcluded: false };
 }
 
 /*
@@ -43,12 +55,14 @@ export function generateMultipleSelectBadgeTitle(
 ) {
   if (optionsSelected) {
     const optionsSelectedFiltered = optionsSelected.filter(
-      (option) => option.isSelected,
+      (option) => option.isSelected || option.isExcluded,
     );
     if (optionsSelectedFiltered.length === 0) {
       return t(badgeTitle);
     } else if (optionsSelectedFiltered.length === 1) {
-      return capitalizeFirstLetter(t(optionsSelectedFiltered[0].title));
+      const [option] = optionsSelectedFiltered;
+      const title = capitalizeFirstLetter(t(option.title));
+      return option.isExcluded ? t("filterExcludedOption", { title }) : title;
     } else {
       // More than 0 or 1 options are selected
       const mapping = {
@@ -118,9 +132,13 @@ export function createDataFilterQueryString(query) {
     platformsSelected,
     datasetsSelected,
     scientificNamesSelected,
+    scientificNamesExcluded,
     obisNodesSelected,
     erddapServersSelected,
     realtimeOnly,
+    eovsMatchAll,
+    orgsMatchAll,
+    scientificNamesMatchAll,
   } = query;
 
   // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
@@ -141,6 +159,28 @@ export function createDataFilterQueryString(query) {
     .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
     .map((eov) => eov.title)
     .join(); // create the comma delimited list of eovs
+  // With a single include "all" and "any" are the same selection, so the param
+  // is left off rather than giving one selection two URLs and two cache keys.
+  const matchParam = (matchAll, includedCount) =>
+    matchAll && includedCount > 1 ? "all" : "";
+  const eovsMatch = matchParam(
+    eovsMatchAll,
+    eovsSelected.filter((eov) => eov.isSelected).length,
+  );
+  const organizationsMatch = matchParam(
+    orgsMatchAll,
+    orgsSelected.filter((org) => org.isSelected).length,
+  );
+  const scientificNamesMatch = matchParam(
+    scientificNamesMatchAll,
+    scientificNamesSelected?.length ?? 0,
+  );
+
+  const excludedList = (options, value) =>
+    (options || [])
+      .filter((option) => option.isExcluded)
+      .map(value)
+      .join(",");
 
   if (platformsSelected.every((e) => e.isSelected)) {
     platforms = "";
@@ -160,7 +200,8 @@ export function createDataFilterQueryString(query) {
       .join(); // create the comma delimited list of dataset pks
   }
 
-  if (orgsSelected.every((e) => e.isSelected)) {
+  // Every org ticked only means "no filter" when any one of them will do.
+  if (!organizationsMatch && orgsSelected.every((e) => e.isSelected)) {
     orgPKs = "";
   } else {
     orgPKs = orgsSelected
@@ -170,10 +211,8 @@ export function createDataFilterQueryString(query) {
   }
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults;
 
-  const scientificNames =
-    scientificNamesSelected && scientificNamesSelected.length
-      ? scientificNamesSelected.map(encodeURIComponent).join(",")
-      : "";
+  const namesList = (names) => (names || []).map(encodeURIComponent).join(",");
+  const scientificNames = namesList(scientificNamesSelected);
 
   // Combined "Data Source" filter (ERDDAP servers + OBIS nodes). No selection
   // — or everything selected — means no source filtering. A server-only
@@ -217,16 +256,28 @@ export function createDataFilterQueryString(query) {
   const apiMappedQuery = {
     // These properties are specified by the API's schema
     eovs,
+    eovsMatch,
+    excludeEovs: excludedList(eovsSelected, (e) => e.title),
     platforms,
+    excludePlatforms: excludedList(platformsSelected, (p) => p.title),
     datasetPKs,
+    excludeDatasetPKs: excludedList(datasetsSelected, (d) => d.pk),
     organizations: orgPKs,
+    organizationsMatch,
+    excludeOrganizations: excludedList(orgsSelected, (o) => o.pk),
     erddapServers,
+    excludeErddapServers: excludedList(erddapServersSelected, (s) => s.url),
+    excludeObisNodes: excludedList(obisNodesSelected, (n) =>
+      encodeURIComponent(n.title),
+    ),
     timeMin: startDate,
     timeMax: endDate,
     depthMin: startDepth,
     depthMax: endDepth,
     includeObis,
     scientificNames,
+    scientificNamesMatch,
+    excludeScientificNames: namesList(scientificNamesExcluded),
     obisNodes,
     // Only ever sent when on; objectToURL drops empty strings, so the default
     // leaves the URL (and the API request) untouched.
@@ -617,20 +668,27 @@ export function boundsIntersect(a, b) {
   return aw <= be && ae >= bw && as <= bn && an >= bs;
 }
 
-// Camera the "zoom to dataset" action asks for: the extent centred in the map
-// canvas with an even margin on every side. The datasets sidebar floats over
-// the canvas's left edge, but the fit deliberately ignores it — the sidebar is
-// a transparent column the user can collapse, and steering the camera around
-// it threw the extent off to the right of the screen. maxZoom keeps a
-// pin-sized extent from slamming the camera to street level.
+// Camera the "zoom to dataset" action asks for: the extent centred in the part
+// of the canvas no panel covers (see mapCoverPadding), with an even margin on
+// every side. maxZoom keeps a pin-sized extent from slamming the camera to
+// street level.
 //
 // Shared with ZoomToDataset, which asks the map what camera these bounds would
 // produce and compares it to the live one — that comparison is how the button
 // knows the view is already right, and it only agrees if the padding matches.
 const ZOOM_TO_DATASET_BASE_PADDING = 60;
 
-export function zoomToDatasetCamera() {
-  return { padding: ZOOM_TO_DATASET_BASE_PADDING, maxZoom: 9 };
+export function zoomToDatasetCamera(map) {
+  const cover = mapCoverPadding(map);
+  return {
+    padding: {
+      top: cover.top + ZOOM_TO_DATASET_BASE_PADDING,
+      right: cover.right + ZOOM_TO_DATASET_BASE_PADDING,
+      bottom: cover.bottom + ZOOM_TO_DATASET_BASE_PADDING,
+      left: cover.left + ZOOM_TO_DATASET_BASE_PADDING,
+    },
+    maxZoom: 9,
+  };
 }
 
 // True when the map is already showing `bounds` the way zoomToGeometry would
@@ -638,11 +696,86 @@ export function zoomToDatasetCamera() {
 // (within a few dozen screen pixels, so the tolerance scales with the view).
 export function boundsAreFramed(map, bounds) {
   if (!map || !bounds) return false;
-  const camera = map.cameraForBounds(bounds, zoomToDatasetCamera());
+  const camera = map.cameraForBounds(bounds, zoomToDatasetCamera(map));
   if (!camera) return false;
   if (Math.abs(map.getZoom() - camera.zoom) > 0.2) return false;
   const offset = map.project(camera.center).dist(map.project(map.getCenter()));
   return offset < 40;
+}
+
+// An element's viewport rect with its transforms ignored, so a panel still
+// sliding in reads where it will come to rest rather than where it is mid-flight.
+export function layoutRect(element) {
+  let left = 0;
+  let top = 0;
+  for (let el = element; el; el = el.offsetParent) {
+    left += el.offsetLeft;
+    top += el.offsetTop;
+  }
+  return {
+    left,
+    top,
+    right: left + element.offsetWidth,
+    bottom: top + element.offsetHeight,
+  };
+}
+
+// The map padding that keeps clear of the panels floating over it. Each panel
+// gives up whichever canvas edge costs the least free area: the left column
+// takes the left, a phone's bottom sheet the bottom.
+export function coverPadding(canvas, covers) {
+  const width = canvas.right - canvas.left;
+  const height = canvas.bottom - canvas.top;
+  const padding = { top: 0, right: 0, bottom: 0, left: 0 };
+  covers.forEach((rect) => {
+    const left = Math.max(0, rect.left - canvas.left);
+    const top = Math.max(0, rect.top - canvas.top);
+    const right = Math.min(width, rect.right - canvas.left);
+    const bottom = Math.min(height, rect.bottom - canvas.top);
+    if (right <= left || bottom <= top) return;
+    const [side, inset] = [
+      ["left", right, right * height],
+      ["right", width - left, (width - left) * height],
+      ["top", bottom, bottom * width],
+      ["bottom", height - top, (height - top) * width],
+    ].sort((a, b) => a[2] - b[2])[0];
+    padding[side] = Math.max(padding[side], inset);
+  });
+  return padding;
+}
+
+const MIN_FREE_MAP_SIZE = 120;
+
+// coverPadding for the panels on screen now — each marks itself with
+// data-map-cover while it is. None at all when they leave too little map to
+// frame anything in, as a phone's full-screen sidebar does.
+export function mapCoverPadding(map) {
+  const none = { top: 0, right: 0, bottom: 0, left: 0 };
+  if (!map) return none;
+  const canvas = map.getCanvas().getBoundingClientRect();
+  const padding = coverPadding(
+    canvas,
+    [...document.querySelectorAll("[data-map-cover]")].map(layoutRect),
+  );
+  const freeWidth = canvas.width - padding.left - padding.right;
+  const freeHeight = canvas.height - padding.top - padding.bottom;
+  return freeWidth < MIN_FREE_MAP_SIZE || freeHeight < MIN_FREE_MAP_SIZE
+    ? none
+    : padding;
+}
+
+// The smallest pan that brings screen box `box` inside `free`, `margin` clear
+// of its edges; null when the box is too big to fit there at this zoom.
+export function revealOffset(box, free, margin) {
+  const shift = (lo, hi, freeLo, freeHi) => {
+    if (hi - lo > freeHi - freeLo - 2 * margin) return null;
+    if (lo < freeLo + margin) return lo - freeLo - margin;
+    if (hi > freeHi - margin) return hi - freeHi + margin;
+    return 0;
+  };
+  const dx = shift(box.left, box.right, free.left, free.right);
+  const dy = shift(box.top, box.bottom, free.top, free.bottom);
+  return dx === null || dy === null ? null : [dx, dy];
 }
 
 const unique = (arr) => [...new Set(arr)];
@@ -759,8 +892,13 @@ export function applyDatasetPKs(queryString, datasetPKs, allDatasetPKs) {
   const dropped = (allDatasetPKs || []).filter((pk) => !kept.has(pk));
   if (allDatasetPKs && dropped.length < datasetPKs.length) {
     // Nothing dropped is no narrowing at all — say nothing rather than send an
-    // empty param the API would have to decide the meaning of.
-    if (dropped.length > 0) params.set("excludeDatasetPKs", dropped.join(","));
+    // empty param the API would have to decide the meaning of. The query may
+    // already exclude datasets of its own (the Datasets filter), and those
+    // must survive this narrowing rather than be overwritten by it.
+    const alreadyExcluded = params.get("excludeDatasetPKs")?.split(",") ?? [];
+    const excluded = [...new Set([...alreadyExcluded, ...dropped.map(String)])];
+    if (excluded.length > 0)
+      params.set("excludeDatasetPKs", excluded.join(","));
   } else {
     params.set(
       "datasetPKs",

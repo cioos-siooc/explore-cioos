@@ -6,7 +6,7 @@ FROM nginx:1.27.4
 # in exim4 and its dependency tree (libunbound, libgnutls-dane, libtirpc, …).
 # That took >14 minutes on a loaded build host and never finished, so the layer
 # never cached and every deploy paid it again.
-# curl is here only for HEALTHCHECK below — the debian nginx image ships no
+# curl is here only for healthcheck.sh below — the debian nginx image ships no
 # HTTP client at all, and this service is what the whole site is reached
 # through, so it is the one that most needs a readiness signal.
 RUN apt-get update \
@@ -26,16 +26,20 @@ RUN chmod +x /start.sh
 
 WORKDIR /etc/nginx/
 
-# Hits the local /healthz stub in nginx.conf, which is answered by nginx
-# itself and does NOT proxy to web-api or frontend — an upstream being down
-# is a 502 to report, not a reason to declare the proxy dead and have the
-# orchestrator restart it.
+COPY healthcheck.sh /healthcheck.sh
+RUN chmod +x /healthcheck.sh
+
+# End to end: nginx itself, the SPA and API through the proxy (the API's
+# /health/ready covers Postgres and the download queue), and the scheduler's
+# heartbeat in the downloads volume. Deep on purpose, because nothing
+# depends_on nginx; web-api's own check stays shallow since nginx gates on it.
+# The grace covers a fresh deploy's scheduler writing its first heartbeat.
 #
 # No USER: start.sh runs cron and logrotate, and nginx binds :4000 and
 # writes the /var/log/nginx volume. The master process already drops its
 # workers to the `nginx` user (nginx.conf:1).
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:4000/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+  CMD /healthcheck.sh
 
 # Start cron, goaccess and nginx
 CMD ["/start.sh"]
