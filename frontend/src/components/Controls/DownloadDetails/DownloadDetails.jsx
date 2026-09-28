@@ -11,6 +11,7 @@ import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 
 import {
+  applyDatasetPKs,
   createDataFilterQueryString,
   formatSizeEstimate,
 } from "../../../utilities.jsx";
@@ -108,18 +109,19 @@ export default function DownloadDetails({
     setEstimatesLoading(true);
     setDownloadSizeEstimates();
 
-    const unfilteredUrl = `${server}/downloadEstimate?&datasetPKs=${pointsData
-      .map((ds) => ds.pk)
-      .join(",")}`;
+    const datasetPKs = pointsData.map((ds) => ds.pk);
+    // A Datasets filter already writes datasetPKs; applyDatasetPKs replaces it,
+    // because a repeated key reaches the API as an array and 500s.
+    const estimateUrl = (filterQuery) =>
+      `${server}/downloadEstimate?${applyDatasetPKs(filterQuery, datasetPKs)}`;
+    const unfilteredUrl = estimateUrl("");
     // The download can be narrowed by any of the active filters; when none of
     // them applies, the unfiltered estimate is the estimate.
     const isFiltered =
       filterDownloadByPolygon || filterDownloadByTime || filterDownloadByDepth;
     let filteredUrl = unfilteredUrl;
     if (isFiltered) {
-      if (polygon && filterDownloadByPolygon) {
-        filteredUrl += `&polygon=${JSON.stringify(polygon)}`;
-      }
+      let filterQuery = "";
       if (query) {
         const tempQuery = { ...query };
         if (!filterDownloadByTime) {
@@ -130,7 +132,11 @@ export default function DownloadDetails({
           tempQuery.startDepth = defaultStartDepth;
           tempQuery.endDepth = defaultEndDepth;
         }
-        filteredUrl += `&${createDataFilterQueryString(tempQuery)}`;
+        filterQuery = createDataFilterQueryString(tempQuery);
+      }
+      filteredUrl = estimateUrl(filterQuery);
+      if (polygon && filterDownloadByPolygon) {
+        filteredUrl += `&polygon=${JSON.stringify(polygon)}`;
       }
     }
 
