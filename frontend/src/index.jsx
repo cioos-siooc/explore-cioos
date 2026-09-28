@@ -19,6 +19,19 @@ import HarvestRun from "./components/Harvest/HarvestRun.jsx";
 import HarvestDownloads from "./components/Harvest/HarvestDownloads.jsx";
 import HarvestDownloadJob from "./components/Harvest/HarvestDownloadJob.jsx";
 import { BrowserRouter, Route } from "react-router-dom";
+import { clearLegacyCookies } from "./state/usePersistentState.js";
+
+// Served from this origin rather than Google Fonts, which would hand every
+// visitor's IP address to Google (see PrivacyModal). The weights index.html
+// used to request.
+import "@fontsource/montserrat/300.css";
+import "@fontsource/montserrat/400.css";
+import "@fontsource/montserrat/500.css";
+import "@fontsource/montserrat/600.css";
+import "@fontsource/quicksand/300.css";
+import "@fontsource/quicksand/600.css";
+import "@fontsource/sora/600.css";
+import "@fontsource/sora/700.css";
 
 // CIOOS National design tokens + base typography. Imported first so the
 // var(--cioos-*) tokens and base font rules are available to every component.
@@ -33,6 +46,8 @@ const resources = {
   },
 };
 
+clearLegacyCookies();
+
 const urlLanguage = new URL(window.location.href).searchParams.get("lang");
 
 // Tutorial for setting up translations using the i18next npm module (and related npm modules)
@@ -46,13 +61,13 @@ i18n
     supportedLngs: ["en", "fr"],
     // A ?lang= in the link always wins; without one the detector falls back to
     // the last language the user chose here (localStorage), so the choice
-    // survives a reload. Both caches are written on every changeLanguage.
+    // survives a reload.
     lng: urlLanguage || undefined,
     fallbackLng: ["en", "fr"],
     detection: {
-      order: ["querystring", "localStorage", "cookie", "htmlTag"],
+      order: ["querystring", "localStorage", "htmlTag"],
       lookupQuerystring: "lang",
-      caches: ["localStorage", "cookie"],
+      caches: ["localStorage"],
     },
     react: { useSuspense: true },
   });

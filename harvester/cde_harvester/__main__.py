@@ -22,6 +22,7 @@ from cde_harvester.core.observability import (
 from cde_harvester.core.schemas import HarvestAttemptSchema
 from cde_harvester.sources import resolve_source
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
+    erddap_join_key,
     get_ckan_records,
     unescape_ascii,
     unescape_ascii_list,
@@ -200,11 +201,28 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
+        erddap_datasets["_erddap_key"] = erddap_datasets["erddap_url"].map(erddap_join_key)
+        if df_ckan.empty:
+            df_ckan = pd.DataFrame(columns=["erddap_url", "dataset_id", "ckan_id",
+                                            "ckan_organizations", "ckan_title", "title_fr"])
+        ckan_by_key = df_ckan.assign(
+            _erddap_key=df_ckan["erddap_url"].map(erddap_join_key)
+        ).drop(columns="erddap_url")
         erddap_datasets = (
-            erddap_datasets.set_index(["erddap_url", "dataset_id"])
-            .join(df_ckan.set_index(["erddap_url", "dataset_id"]), how="left")
+            erddap_datasets.set_index(["_erddap_key", "dataset_id"])
+            .join(ckan_by_key.set_index(["_erddap_key", "dataset_id"]), how="left")
             .reset_index()
+            .drop(columns="_erddap_key")
         )
+
+        unmatched = erddap_datasets[erddap_datasets["ckan_id"].isna()]
+        if unmatched.empty:
+            logger.info("Every ERDDAP dataset matched a CKAN record")
+        else:
+            logger.warning(
+                f"{len(unmatched)} ERDDAP datasets have no CKAN record: "
+                + ", ".join(unmatched["erddap_url"] + "/" + unmatched["dataset_id"])
+            )
 
         logger.info("Cleaning up ERDDAP data")
         erddap_datasets = erddap_datasets.replace(np.nan, None)

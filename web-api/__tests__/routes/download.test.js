@@ -1,5 +1,5 @@
 /**
- * GET /download
+ * POST /download
  *
  * Creates a download job when datasets are found for the given filters.
  * Validation via requiredShapeMiddleware (shape checks) and express-validator (email).
@@ -51,8 +51,9 @@ const MATCHING_DATASETS = [
   },
 ];
 
+const EMAIL = { email: "user@example.com" };
+
 const BASE_QUERY = {
-  email: "user@example.com",
   latMin: "45",
   latMax: "55",
   lonMin: "-130",
@@ -68,25 +69,43 @@ beforeEach(() => {
 
 afterEach(() => jest.clearAllMocks());
 
-describe("GET /download — happy path", () => {
+describe("POST /download — happy path", () => {
   it("returns 200 when datasets are found", async () => {
-    const res = await request(app).get("/download").query(BASE_QUERY);
+    const res = await request(app)
+      .post("/download")
+      .query(BASE_QUERY)
+      .send(EMAIL);
     expect(res.status).toBe(200);
   });
 
   it("returns { count: N } matching the number of datasets", async () => {
-    const res = await request(app).get("/download").query(BASE_QUERY);
+    const res = await request(app)
+      .post("/download")
+      .query(BASE_QUERY)
+      .send(EMAIL);
     expect(res.body).toHaveProperty("count", 1);
   });
 
   it("inserts a row into cde.download_jobs", async () => {
-    await request(app).get("/download").query(BASE_QUERY);
+    await request(app).post("/download").query(BASE_QUERY).send(EMAIL);
     const qb = db.mock.results.find((r) => r.value?.insert);
     expect(qb?.value?.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "user@example.com",
+        email_domain: "example.com",
         downloader_input: expect.any(Object),
       }),
+    );
+  });
+
+  it("records the domain in lower case, for statistics that outlive the address", async () => {
+    await request(app)
+      .post("/download")
+      .query(BASE_QUERY)
+      .send({ email: "Someone@DFO-MPO.gc.ca" });
+    const qb = db.mock.results.find((r) => r.value?.insert);
+    expect(qb?.value?.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ email_domain: "dfo-mpo.gc.ca" }),
     );
   });
 
@@ -104,35 +123,35 @@ describe("GET /download — happy path", () => {
       orderByRaw: jest.fn().mockReturnThis(),
     });
 
-    const res = await request(app).get("/download").query(BASE_QUERY);
+    const res = await request(app)
+      .post("/download")
+      .query(BASE_QUERY)
+      .send(EMAIL);
     expect(res.status).toBe(200);
     expect(insertMock).not.toHaveBeenCalled();
   });
 });
 
-describe("GET /download — shape validation", () => {
+describe("POST /download — shape validation", () => {
   it("returns 400 when only latMin is provided (partial bounding box)", async () => {
     const res = await request(app)
-      .get("/download")
-      .query({ email: "user@example.com", latMin: "45" });
+      .post("/download")
+      .query({ latMin: "45" })
+      .send(EMAIL);
     expect(res.status).toBe(400);
   });
 
   it("returns 400 for partial bounding box with three of four coords", async () => {
-    const res = await request(app).get("/download").query({
-      email: "user@example.com",
-      latMin: "45",
-      latMax: "55",
-      lonMin: "-130",
-    }); // missing lonMax
+    const res = await request(app)
+      .post("/download")
+      .query({ latMin: "45", latMax: "55", lonMin: "-130" }) // missing lonMax
+      .send(EMAIL);
     expect(res.status).toBe(400);
   });
 
   it("accepts request with no shape (all filters optional)", async () => {
     // shape validation passes when neither polygon nor lat/lon bounds are given
-    const res = await request(app)
-      .get("/download")
-      .query({ email: "user@example.com" });
+    const res = await request(app).post("/download").send(EMAIL);
     expect(res.status).toBe(200);
   });
 
@@ -145,16 +164,20 @@ describe("GET /download — shape validation", () => {
       [-130, 45],
     ]);
     const res = await request(app)
-      .get("/download")
-      .query({ email: "user@example.com", polygon });
+      .post("/download")
+      .query({ polygon })
+      .send(EMAIL);
     expect(res.status).toBe(200);
   });
 });
 
-describe("GET /download — error handling", () => {
+describe("POST /download — error handling", () => {
   it("returns 500 with error message when db.raw throws", async () => {
     db.raw = jest.fn().mockRejectedValue(new Error("DB connection lost"));
-    const res = await request(app).get("/download").query(BASE_QUERY);
+    const res = await request(app)
+      .post("/download")
+      .query(BASE_QUERY)
+      .send(EMAIL);
     expect(res.status).toBe(500);
     expect(res.body).toHaveProperty("error");
   });
