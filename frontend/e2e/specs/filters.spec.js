@@ -1,5 +1,6 @@
 import { expect, test } from "../support/test.js";
-import { openApp } from "../support/appPage.js";
+import { openApp, waitForMapReady } from "../support/appPage.js";
+import { DEFAULT_VIEW } from "../support/constants.js";
 
 test.describe("filters", () => {
   test("open as a modal from the top bar", async ({ page }) => {
@@ -9,6 +10,26 @@ test.describe("filters", () => {
     await page.getByTestId("topbar-filters-button").click();
     await expect(page.getByTestId("filters-modal")).toBeVisible();
     await expect(page.getByTestId("filters-panel-list")).toBeVisible();
+  });
+
+  test("names every filter row in full, French included", async ({ page }) => {
+    // Not openApp: DEFAULT_VIEW already carries lang=en, and the first lang wins.
+    await page.goto(`/${DEFAULT_VIEW.replace("lang=en", "lang=fr")}`);
+    await waitForMapReady(page);
+    await page.getByTestId("topbar-filters-button").click();
+
+    const list = page.getByTestId("filters-panel-list");
+    await expect(
+      list.locator('[data-filter-name="layerSelectorLabel"] .badgeTitle'),
+    ).toHaveText("Géométrie des jeux de données");
+    const clipped = await list
+      .locator(".badgeTitle")
+      .evaluateAll((els) =>
+        els
+          .filter((el) => el.scrollWidth - el.clientWidth > 1)
+          .map((el) => el.textContent),
+      );
+    expect(clipped, "filter names cut off by the list column").toEqual([]);
   });
 
   test("applying one narrows the map and says so", async ({ page }) => {
