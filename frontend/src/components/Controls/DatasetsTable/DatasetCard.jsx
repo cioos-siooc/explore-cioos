@@ -24,6 +24,7 @@ import platformColors from "../../platformColors";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
+import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import Skeleton from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
@@ -426,9 +427,7 @@ export function DatasetCardMeta({ row, t, i18n }) {
   );
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
-    : (row.cdm_data_type || "")
-        .replace("TimeSeriesProfile", "Time series / Profile")
-        .replace("TimeSeries", "Time series");
+    : cdmDataTypeLabel(row.cdm_data_type, t) || "";
   const locationsLabel = isGrid
     ? formatGridSize(row.grid_dimensions) || "—"
     : row.profiles_count !== row.n_profiles

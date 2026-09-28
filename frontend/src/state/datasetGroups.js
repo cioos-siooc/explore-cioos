@@ -5,6 +5,8 @@
 // both of which have to survive a language switch. Labels are derived from the
 // key at render time.
 
+import { cdmDataTypeLabel } from "./dataLayers.js";
+
 export const GROUP_NONE = "none";
 
 // Keys with no natural value behind them. Prefixed so they can't collide with
@@ -85,9 +87,7 @@ export function groupLabel(key, groupBy, t) {
   if (key === UNCATEGORIZED_KEY) return t("datasetsCardGroupUncategorizedText");
   switch (groupBy) {
     case "type":
-      return key
-        .replace("TimeSeriesProfile", "Time series / Profile")
-        .replace("TimeSeries", "Time series");
+      return cdmDataTypeLabel(key, t);
     case "source":
       return key === "obis" ? "OBIS" : "ERDDAP";
     case "inView":

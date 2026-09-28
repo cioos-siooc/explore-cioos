@@ -25,7 +25,20 @@ describe("DatasetCard", () => {
   it("renders the title and type", () => {
     render(<DatasetCard row={ROW} t={t} i18n={i18n} />);
     expect(screen.getByText("Green Bay LoRaWAN Buoy 4")).toBeInTheDocument();
-    expect(screen.getByText("Time series")).toBeInTheDocument();
+    expect(screen.getByText("layerTimeseries")).toBeInTheDocument();
+  });
+
+  it("shows a type no geometry switch names as it is", () => {
+    render(
+      <DatasetCard
+        row={{ ...ROW, source_type: "obis", cdm_data_type: "Point" }}
+        t={t}
+        i18n={i18n}
+      />,
+    );
+    expect(screen.getByTitle("datasetsTableHeaderTypeText").textContent).toBe(
+      "Point",
+    );
   });
 
   it("is a clickable, keyboard-operable button when onInspect is given", async () => {

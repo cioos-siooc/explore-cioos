@@ -8,6 +8,7 @@ import frLocale from "plotly.js-locales/fr";
 
 import erddapServers from "../../../erddapServers.json";
 import { escapeHtml, formatErddapServerName } from "../../../utilities";
+import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 
 Plotly.register(frLocale);
@@ -44,11 +45,12 @@ const MONTH_MS = YEAR_MS / 12;
 // and which can arrive null for a dataset with no erddap_url, so the shared
 // helper's own null handling matters here. Source series carry their platform
 // so an ERDDAP server and an OBIS node with similar names stay distinguishable.
-function seriesLabel(key, kind, language) {
+function seriesLabel(key, kind, language, t) {
   if (kind === "erddap")
     return `${formatErddapServerName(key, language, erddapServers)} (ERDDAP)`;
   if (kind === "obis") return `${key} (OBIS)`;
-  // Platforms, data types and organization names are already display-ready.
+  if (kind === "dataType") return cdmDataTypeLabel(key, t);
+  // Platforms and organization names are already display-ready.
   return key;
 }
 
@@ -134,7 +136,7 @@ export default function CoverageHistogramPlot({ histogram }) {
     // Stacking order = trace order; the largest series (first) sits at the
     // bottom of every bar.
     const built = top.map((s, index) => ({
-      name: seriesLabel(s.key, s.kind, i18n.language),
+      name: seriesLabel(s.key, s.kind, i18n.language, t),
       color: SERIES_COLORS[index % SERIES_COLORS.length],
       y: counts.get(s.key),
     }));
