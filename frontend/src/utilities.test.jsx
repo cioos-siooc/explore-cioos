@@ -9,6 +9,7 @@ import {
   createSelectionQueryString,
   escapeHtml,
   formatDatasetCount,
+  formatErddapServerName,
   getCurrentRangeLevel,
   nextOptionState,
   polygonIsRectangle,
@@ -23,6 +24,7 @@ import {
   validateEmail,
 } from "./utilities.jsx";
 import { defaultQuery } from "./components/config.js";
+import erddapServers from "./erddapServers.json";
 
 // The filter query object the app carries. defaultQuery holds only the fields
 // createDataFilterQueryString compares against defaults; the *Selected arrays
@@ -426,6 +428,27 @@ describe("string and count helpers", () => {
     expect(formatDatasetCount(3, 12)).toBe("3 / 12");
     // Before the total is known there is only one number to show.
     expect(formatDatasetCount(3, undefined)).toBe("3");
+  });
+});
+
+describe("formatErddapServerName", () => {
+  // The lookup is an exact match, so this pins the key form the harvester
+  // stores: https, with the config's trailing slash stripped.
+  it("names the MEDS server under the key the harvester stores, in both languages", () => {
+    const url = "https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap";
+    expect(formatErddapServerName(url, "en", erddapServers)).toBe("DFO MEDS");
+    expect(formatErddapServerName(url, "fr", erddapServers)).toBe("MPO SDMM");
+  });
+
+  it("falls back to the hostname for a server it has no label for", () => {
+    expect(
+      formatErddapServerName(
+        "https://erddap.example.org/erddap",
+        "en",
+        erddapServers,
+      ),
+    ).toBe("erddap.example.org");
+    expect(formatErddapServerName(null, "en", erddapServers)).toBe("");
   });
 });
 
