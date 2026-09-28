@@ -1,5 +1,6 @@
 const db = require("../db");
 const { changePKtoPkURL } = require("./misc");
+const { CKAN_DATASET_URL_PREFIX } = require("./ckan");
 
 const createDBFilter = require("./dbFilter");
 const {
@@ -203,8 +204,7 @@ async function buildShapeSql(
                            THEN d.erddap_url || '/griddap/' || d.dataset_id || '.html'
                            ELSE d.erddap_url || '/tabledap/' || d.dataset_id || '.html'
                   END AS erddap_url,
-                  'https://catalogue.cioos.ca/dataset/'
-                           || ckan_id AS ckan_url,
+                  :ckanDatasetUrlPrefix || ckan_id AS ckan_url,
                   d.wms_url,
                   d.grid_variables,
                   d.grid_dimensions,
@@ -287,6 +287,9 @@ FROM   sub
     obisFilters: filters.obisOnly,
     profileFilters: filters.profileOnly,
     depthVariableProbe: DEPTH_VARIABLE_PROBE,
+    // Bound rather than inlined: a CKAN_URL carrying a port (http://host:8080)
+    // would put a ':8080' into the SQL, which knex reads as a named binding.
+    ckanDatasetUrlPrefix: CKAN_DATASET_URL_PREFIX,
     timeMin,
     timeMax,
     ...(doEstimate ? { depthMin, depthMax, adder: 0, multiplier: 10 } : {}),

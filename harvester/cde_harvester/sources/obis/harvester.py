@@ -23,7 +23,7 @@ from cde_harvester.core.schemas import (
     VariableSchema,
 )
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
-from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.sources.ckan.create_ckan_erddap_link import ckan_obis_links
 from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
 from prefect import task
@@ -148,12 +148,15 @@ class OBISHarvester(BaseHarvester):
     CELLS_FLUSH_EVERY = 50
 
     def __init__(self, limit_dataset_ids=None, folder="./obis", prefect_logger=None,
-                 geo_filter=None, run_id=None):
+                 geo_filter=None, run_id=None, ckan_catalogue=None):
         self.limit_dataset_ids = limit_dataset_ids or []
         self.folder = folder
         self.logger = prefect_logger or logger
         self.geo_filter = geo_filter or ObisGeoFilter(mode="canada")
         self.run_id = run_id
+        # The run's CKAN catalogue snapshot. None means no metadata enrichment
+        # is available; harvesting still proceeds (see _enrich_with_ckan).
+        self.ckan_catalogue = ckan_catalogue
 
     def harvest(self) -> HarvestResult:
         if not self.limit_dataset_ids:
@@ -338,9 +341,23 @@ class OBISHarvester(BaseHarvester):
             )
 
     def _enrich_with_ckan(self, df_datasets):
-        """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
-        self.logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
-        df_ckan = get_ckan_obis_records(df_datasets["dataset_id"].tolist(), cache_folder=self.folder)
+        """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs.
+
+        Reads the run's catalogue snapshot rather than issuing one
+        package_search per dataset: a single CKAN instance describes every
+        source, so the records were already fetched once for the coverage
+        report. A dataset with no CKAN record keeps its OBIS title and EOVs and
+        stays in the harvest — CDE serves OBIS data that CKAN does not
+        describe, and that is not an error.
+        """
+        df_ckan = ckan_obis_links(
+            self.ckan_catalogue if self.ckan_catalogue is not None else pd.DataFrame()
+        )
+        matched = df_ckan["dataset_id"].isin(df_datasets["dataset_id"]).sum() if not df_ckan.empty else 0
+        self.logger.info(
+            "Matched %d / %d OBIS datasets to a CKAN record",
+            int(matched), len(df_datasets),
+        )
 
         if df_ckan.empty:
             df_datasets["title_fr"] = None
@@ -814,7 +831,7 @@ class OBISHarvester(BaseHarvester):
 
 @task(task_run_name="harvest-obis")
 def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_id=None,
-                 discovery=None):
+                 discovery=None, ckan_catalogue=None):
     """Run the OBIS harvester.
 
     When no explicit ``limit_dataset_ids`` are given and ``discovery`` is
@@ -844,6 +861,7 @@ def harvest_obis(limit_dataset_ids=None, folder="./obis/", geo_filter=None, run_
         prefect_logger=prefect_logger,
         geo_filter=geo_filter,
         run_id=run_id,
+        ckan_catalogue=ckan_catalogue,
     )
     return harvester.harvest()
 

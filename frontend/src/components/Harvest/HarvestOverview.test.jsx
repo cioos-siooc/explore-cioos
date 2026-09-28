@@ -43,12 +43,25 @@ const DOWNLOADS_SUMMARY = {
   last_request_at: "2024-03-02T00:00:00Z",
 };
 
+const COVERAGE = {
+  summary: {
+    n_app_total: 120,
+    n_erddap_not_in_app: 7,
+    n_ckan_not_in_app: 4,
+    n_erddap_without_ckan: 2,
+  },
+  sources: [],
+  ckanUrl: "https://catalogue.example.ca",
+  bucketLimit: 500,
+};
+
 function stubRoutes(overrides = {}) {
   installMockHarvestFetch({
     "/servers": SERVERS,
     "/runs/recent": RUNS,
     "/reasons": REASONS,
     "/downloads/summary": DOWNLOADS_SUMMARY,
+    "/coverage": COVERAGE,
     ...overrides,
   });
 }
@@ -121,5 +134,18 @@ describe("HarvestOverview", () => {
       "href",
       "/harvest/server/erddap-example-com-erddap",
     );
+  });
+
+  it("shows the coverage gap counts and links to the full report", async () => {
+    renderWithProviders(<HarvestOverview />);
+    expect(
+      await screen.findByText(/7.*in ERDDAP, not in CDE/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/2.*served from ERDDAP with no CKAN record/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /coverage report/i }),
+    ).toHaveAttribute("href", "/harvest/coverage");
   });
 });

@@ -30,10 +30,11 @@ def stub_harvester(monkeypatch):
 
     class FakeHarvester:
         def __init__(self, limit_dataset_ids, folder, prefect_logger=None,
-                     geo_filter=None, run_id=None):
+                     geo_filter=None, run_id=None, ckan_catalogue=None):
             created["ids"] = limit_dataset_ids
             created["folder"] = folder
             created["geo_filter"] = geo_filter
+            created["ckan_catalogue"] = ckan_catalogue
 
         def harvest(self):
             return "harvest-result"

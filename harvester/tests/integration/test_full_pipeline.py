@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 from cde_harvester.__main__ import (
-    get_ckan_records,
+    fetch_ckan_catalogue,
     merge_and_write_csvs,
 )
 from cde_harvester.__main__ import (
@@ -48,12 +48,48 @@ def _erddap_session_get(url, **kwargs):
     return MockResponse(text=text, url=url)
 
 
+# A populated CKAN catalogue that describes some OTHER dataset. CKAN genuinely
+# does not hold a record for every ERDDAP dataset CDE harvests, and those
+# datasets must still reach the app — so this is the fixture for that case, not
+# an empty catalogue (which main() refuses outright).
+CKAN_UNRELATED_RESPONSE = {
+    "result": {
+        "count": 1,
+        "results": [
+            {
+                "id": "ckan-uuid-999",
+                "name": "some-other-record",
+                "title_translated": {"en": "A Different Dataset", "fr": "Un autre"},
+                "cited-responsible-party": [{"organisation-name": "Someone Else"}],
+                "resources": [
+                    {
+                        "url": (
+                            "https://test.erddap.com/erddap/tabledap/"
+                            "a_completely_different_id.html"
+                        ),
+                        "format": "ERDDAP tabledap",
+                    }
+                ],
+            }
+        ],
+    }
+}
+
+
+# fetch_ckan_catalogue asks the OBIS harvest source for its record ids before
+# walking the catalogue, so that response comes first. Empty is what the
+# national catalogue actually returns: it holds no OBIS records.
+CKAN_NO_OBIS_RECORDS = {"result": {"count": 0, "results": []}}
+
+
 def _ckan_side_effects():
+    obis = MagicMock()
+    obis.json.return_value = CKAN_NO_OBIS_RECORDS
     page1 = MagicMock()
     page1.json.return_value = CKAN_PACKAGE_SEARCH_RESPONSE
     page2 = MagicMock()
     page2.json.return_value = CKAN_EMPTY_RESPONSE
-    return [page1, page2]
+    return [obis, page1, page2]
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +195,7 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     Patches:
       - harvest_erddap.submit → returns a synchronous mock future holding
         the pre-collected HarvestResult so main() doesn't re-harvest
-      - get_ckan_records.submit / merge_and_write_csvs.submit → run their
+      - fetch_ckan_catalogue.submit / merge_and_write_csvs.submit → run their
         wrapped fns synchronously (no flow context / task runner needed)
       - get_run_logger → stdlib logger (no Prefect context needed)
       - CKAN requests → fixture data
@@ -189,11 +225,13 @@ def written_csv_folder(tmp_path_factory, harvest_result):
         patch(
             "cde_harvester.__main__.harvest_erddap"
         ) as mock_harvest_task,
-        # get_ckan_records feeds a real DataFrame into merge; merge writes the
-        # CSVs the assertions read. Run both synchronously so the test drives the
-        # real merge + CSV-write logic without a flow context.
+        # fetch_ckan_catalogue feeds a real DataFrame into merge; merge writes
+        # the CSVs the assertions read. Run both synchronously so the test drives
+        # the real merge + CSV-write logic without a flow context.
         patch.object(
-            get_ckan_records, "submit", _submit_without_flow(get_ckan_records)
+            fetch_ckan_catalogue,
+            "submit",
+            _submit_without_flow(fetch_ckan_catalogue, as_future=True),
         ),
         patch.object(
             merge_and_write_csvs,
@@ -225,6 +263,112 @@ def written_csv_folder(tmp_path_factory, harvest_result):
     return folder
 
 
+@pytest.fixture(scope="module")
+def written_csv_folder_unmatched_ckan(tmp_path_factory, harvest_result):
+    """Same pipeline, but with a CKAN catalogue holding no record for our dataset.
+
+    Guards the invariant that an ERDDAP dataset CKAN does not describe still
+    lands in datasets.csv, keeping its ERDDAP title and organizations. The CKAN
+    join is a LEFT join with fallbacks precisely so the catalogue can never gate
+    what CDE serves.
+    """
+    profiles, datasets, variables, skipped = harvest_result
+    folder = str(tmp_path_factory.mktemp("csv_phase_unmatched"))
+
+    hr = HarvestResult(profiles=profiles, datasets=datasets,
+                       variables=variables, skipped=skipped)
+    mock_future = MagicMock()
+    mock_future.result.return_value = hr
+
+    with (
+        patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
+        patch(
+            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+        ) as mock_ckan_session_builder,
+        patch(
+            "cde_harvester.__main__.get_run_logger",
+            return_value=logging.getLogger("test"),
+        ),
+        patch("cde_harvester.__main__.harvest_erddap") as mock_harvest_task,
+        patch.object(
+            fetch_ckan_catalogue,
+            "submit",
+            _submit_without_flow(fetch_ckan_catalogue, as_future=True),
+        ),
+        patch.object(
+            merge_and_write_csvs,
+            "submit",
+            _submit_without_flow(merge_and_write_csvs, as_future=True),
+        ),
+    ):
+        mock_session = MagicMock()
+        mock_session.get.side_effect = _erddap_session_get
+        mock_session_cls.return_value = mock_session
+
+        obis = MagicMock()
+        obis.json.return_value = CKAN_NO_OBIS_RECORDS
+        unrelated = MagicMock()
+        unrelated.json.return_value = CKAN_UNRELATED_RESPONSE
+        ckan_session = MagicMock()
+        ckan_session.get.side_effect = [obis, unrelated]
+        mock_ckan_session_builder.return_value = ckan_session
+
+        mock_harvest_task.submit.return_value = mock_future
+
+        harvester_main(
+            erddap_urls=ERDDAP_URL,
+            cache_requests=False,
+            folder=folder,
+            dataset_ids=DATASET_ID,
+        )
+
+    return folder
+
+
+class TestErddapDatasetWithoutCkanRecord:
+    """CKAN does not describe every ERDDAP dataset; those still reach the app."""
+
+    def test_dataset_still_written(self, written_csv_folder_unmatched_ckan):
+        df = pd.read_csv(
+            os.path.join(written_csv_folder_unmatched_ckan, "datasets.csv")
+        )
+        assert DATASET_ID in df["dataset_id"].values
+
+    def test_keeps_its_erddap_title(self, written_csv_folder_unmatched_ckan):
+        df = pd.read_csv(
+            os.path.join(written_csv_folder_unmatched_ckan, "datasets.csv")
+        )
+        row = df[df["dataset_id"] == DATASET_ID].iloc[0]
+        # The ERDDAP global attribute, not the unrelated CKAN record's title.
+        assert row["title"] == "Test Temperature Dataset"
+        assert "A Different Dataset" not in str(row["title"])
+
+    def test_has_no_ckan_id(self, written_csv_folder_unmatched_ckan):
+        df = pd.read_csv(
+            os.path.join(written_csv_folder_unmatched_ckan, "datasets.csv")
+        )
+        row = df[df["dataset_id"] == DATASET_ID].iloc[0]
+        assert pd.isna(row["ckan_id"])
+
+    def test_keeps_its_erddap_organizations(self, written_csv_folder_unmatched_ckan):
+        df = pd.read_csv(
+            os.path.join(written_csv_folder_unmatched_ckan, "datasets.csv")
+        )
+        row = df[df["dataset_id"] == DATASET_ID].iloc[0]
+        orgs = ast.literal_eval(row["organizations"])
+        assert isinstance(orgs, list)
+        assert "Someone Else" not in orgs
+
+    def test_catalogue_snapshot_still_records_the_other_record(
+        self, written_csv_folder_unmatched_ckan
+    ):
+        """The unmatched CKAN record is still censused — it is a reportable gap."""
+        df = pd.read_csv(
+            os.path.join(written_csv_folder_unmatched_ckan, "ckan_records.csv")
+        )
+        assert "a_completely_different_id" in df["dataset_id"].values
+
+
 class TestCsvFilesWritten:
     def test_datasets_csv_exists(self, written_csv_folder):
         assert os.path.exists(os.path.join(written_csv_folder, "datasets.csv"))
@@ -246,6 +390,23 @@ class TestCsvFilesWritten:
     def test_datasets_csv_array_columns_parse_correctly(self, written_csv_folder):
         df = pd.read_csv(os.path.join(written_csv_folder, "datasets.csv"))
         for col in ["eovs", "organizations", "profile_variables"]:
+            parsed = df[col].apply(ast.literal_eval)
+            assert all(isinstance(v, list) for v in parsed)
+
+    def test_ckan_records_csv_written(self, written_csv_folder):
+        """The catalogue snapshot the db-loader replaces cde.ckan_records with."""
+        path = os.path.join(written_csv_folder, "ckan_records.csv")
+        assert os.path.exists(path)
+        df = pd.read_csv(path)
+        assert not df.empty
+        for col in ["ckan_id", "erddap_url", "dataset_id", "obis_dataset_id",
+                    "n_resources", "snapshot_at"]:
+            assert col in df.columns
+
+    def test_ckan_records_array_columns_parse_correctly(self, written_csv_folder):
+        """The loader ast.literal_eval()s these back into PostgreSQL arrays."""
+        df = pd.read_csv(os.path.join(written_csv_folder, "ckan_records.csv"))
+        for col in ["organizations", "eovs"]:
             parsed = df[col].apply(ast.literal_eval)
             assert all(isinstance(v, list) for v in parsed)
 

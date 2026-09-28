@@ -11,6 +11,23 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+# The CIOOS metadata catalogue. One instance describes every source CDE
+# harvests — ERDDAP datasets (via a tabledap resource) and OBIS datasets (via
+# an xml_location_url) alike — so there is a single knob rather than the two
+# divergent hardcoded hosts this replaced. Override per-deployment with
+# CKAN_URL; the web-api reads the same variable to build public record links.
+DEFAULT_CKAN_URL = "https://catalogue.cioos.ca"
+
+
+def ckan_url() -> str:
+    """Base URL of the CKAN instance, without a trailing slash."""
+    return (os.getenv("CKAN_URL") or DEFAULT_CKAN_URL).strip().rstrip("/")
+
+
+def ckan_api_url() -> str:
+    """Base URL of the CKAN Action API (``/api/3``)."""
+    return f"{ckan_url()}/api/3"
+
 
 def load_config(config_file):
     # get config settings from file, eg harvest_config.yaml

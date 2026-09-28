@@ -42,6 +42,11 @@ OBIS_ARRAY_DTYPES = {
     "aphia_ids": ARRAY(INTEGER),
 }
 
+CKAN_RECORD_ARRAY_DTYPES = {
+    "organizations": ARRAY(TEXT),
+    "eovs": ARRAY(TEXT),
+}
+
 
 class ProfileSchema(pa.DataFrameModel):
     """Schema for the profiles DataFrame.
@@ -251,6 +256,31 @@ class SkippedDatasetSchema(pa.DataFrameModel):
     erddap_url: Series[str]
     dataset_id: Series[str]
     reason_code: Series[str]
+
+    class Config:
+        coerce = True
+        strict = False
+
+
+class CkanRecordSchema(pa.DataFrameModel):
+    """Schema for the CKAN catalogue snapshot (one row per record per data link).
+
+    Mirrors cde.ckan_records in the database. Every link column is nullable:
+    a CKAN record describing nothing CDE can read is still a row, which is what
+    makes the snapshot a census of the catalogue rather than of the matches.
+    """
+
+    ckan_id: Series[str]
+    ckan_name: Series[str] = pa.Field(nullable=True)
+    title: Series[str] = pa.Field(nullable=True)
+    title_fr: Series[str] = pa.Field(nullable=True)
+    organizations: Series[object] = pa.Field(nullable=True)
+    eovs: Series[object] = pa.Field(nullable=True)
+    erddap_url: Series[str] = pa.Field(nullable=True)
+    dataset_id: Series[str] = pa.Field(nullable=True)
+    obis_dataset_id: Series[str] = pa.Field(nullable=True)
+    n_resources: Series[int] = pa.Field(nullable=True)
+    snapshot_at: Series[pa.DateTime]
 
     class Config:
         coerce = True
