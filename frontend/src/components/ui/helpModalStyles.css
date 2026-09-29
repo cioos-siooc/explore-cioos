@@ -174,7 +174,7 @@
 /* Phones: theme.css steps the type up because phone surfaces go full-screen,
    but this one stays a card over the map, so it drops below even the desktop
    sizes to fit the small screen. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .helpModal {
     --cioos-font-size-sm: 11px;
     --cioos-font-size-md: 14px;

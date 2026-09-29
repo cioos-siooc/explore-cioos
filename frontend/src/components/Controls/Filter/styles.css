@@ -354,7 +354,7 @@
  * typed fields at least 16px, below which Safari zooms the whole page in
  * when one takes focus.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .filterSearch {
     min-height: 44px;
 

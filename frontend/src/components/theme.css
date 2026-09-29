@@ -290,7 +290,10 @@
                         the map its edges back, the filter chips collapse, and
                         the type scale steps up (below). Mirrored in JS as
                         MOBILE_QUERY (state/ui/useMediaQuery.js) for the parts
-                        that change markup rather than layout.
+                        that change markup rather than layout. Written
+                        `(max-width: 700px), (max-height: 500px)`: a phone held
+                        landscape is too short for the floating chrome, which
+                        otherwise leaves the datasets list no rows at all.
      900px   tablet     the legend moves out of the top-right corner
      992px   tablet     legacy Bootstrap rung, modal + intro layout only
      1200px  laptop     the WMS legend goes compact; the tip card moves from the
@@ -310,7 +313,7 @@
 
    The panel also takes over the full viewport, so the dataset details and the
    record table stay usable instead of overflowing a fixed column. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   :root {
     --cioos-panel-w: 100vw;
     --cioos-header-height: var(--cioos-header-height-mobile);
@@ -476,6 +479,39 @@ h6 {
   clip-path: inset(50%);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* Touch: the map's small controls keep their size and gain an invisible 44px
+   hit area centred on them, so a fingertip lands without the chrome growing.
+   A box already past 44px keeps its own edges (the min()). */
+@media (pointer: coarse) {
+  :is(
+      .closeButton,
+      .datasetCardSelect,
+      .pagerStep,
+      .pagerPage,
+      .brandMinorItem,
+      .legendInfoButton,
+      .sidebarFooterHintMore,
+      .railStep
+    ) {
+    position: relative;
+  }
+
+  :is(
+      .closeButton,
+      .datasetCardSelect,
+      .pagerStep,
+      .pagerPage,
+      .brandMinorItem,
+      .legendInfoButton,
+      .sidebarFooterHintMore,
+      .railStep
+    )::before {
+    content: "";
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
 }
 
 /* Honour reduced-motion: the panel/legend slide transitions are decorative. */

@@ -603,7 +603,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   /* At this width the panel is the whole screen and the fixed frame has
      nothing left to give the card list once the band, the toolbar, the legend
      and the order bar have taken theirs. So the frame goes: the modal body

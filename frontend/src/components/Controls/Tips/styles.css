@@ -34,7 +34,7 @@
 /* Phones: the map legend holds the bottom-left, so the tip takes the
    bottom-right. Opened, the card keeps to a reading width rather than the
    full screen. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .tipCard,
   .tipBadge {
     right: 12px;

@@ -121,7 +121,7 @@
 
 /* Phones: the top bar is a full-width header whose rows stretch; the card
    hangs under it inset from the edges, like the chips. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .datasetMapCard,
   .datasetMapCard.withOverlay {
     width: auto;

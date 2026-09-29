@@ -718,7 +718,7 @@ button.listCardId:focus-visible {
    the map, so what it gives up is padding and the label gutter — not type size.
    The 0.9em this used to shrink the body to was paying for a width the page no
    longer has to fit. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .datasetInspectorBody {
     padding: 0 10px 20px;
   }

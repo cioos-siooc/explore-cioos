@@ -436,7 +436,7 @@
 /* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
    brand and tagline are on the app's own header, and here they would only
    crowd the title and the close button; the hero stacks. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .introBrand,
   .introModal .tagLine {
     display: none;

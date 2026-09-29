@@ -283,7 +283,7 @@
  * from the keyboard), and the row packs back together without the room five
  * standing captions needed.
  * ------------------------------------------------------------------ */
-@media (min-width: 701px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 701px) and (min-height: 501px) and (hover: hover) and (pointer: fine) {
   .quickFilters {
     gap: 8px 18px;
     padding-bottom: 8px;
@@ -309,7 +309,7 @@
  * would pull this row's buttons apart across the screen. It keeps its own
  * width instead and stays centered under the header.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .quickFilters {
     align-self: center;
     max-width: calc(100vw - 16px);

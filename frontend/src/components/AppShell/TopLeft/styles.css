@@ -173,7 +173,7 @@
  * room to justify — the only edge left to draw is the one along the
  * bottom, where the map starts.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .brandCard {
     width: 100%;
     border-width: 0 0 1px;

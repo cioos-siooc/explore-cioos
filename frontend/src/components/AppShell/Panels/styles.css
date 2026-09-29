@@ -479,7 +479,7 @@
  * Mobile: the filters master and detail become two screens, one filter
  * at a time, and everything in them becomes a touch target.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   /* The download panel scrolls as one column here — see the note in
      DownloadDetails/styles.css. */
   .downloadPanel {

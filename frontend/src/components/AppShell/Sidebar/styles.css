@@ -431,7 +431,7 @@
  * Closed, the card is parked below the bottom edge and inert (see the
  * base rule above), so the map has the whole screen back.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   /* One step over the top bar — the one piece of chrome that outranks this
      column everywhere else, and the last thing between it and the whole
      screen. Deliberately not higher: the map's "what's here" card sits two

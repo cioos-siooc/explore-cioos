@@ -440,7 +440,7 @@
  * no strip of map above or beside it. See the TopLeft stylesheet for the
  * card's own side of this (square corners, no side borders, no tilt).
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .topBar {
     top: 0;
     left: 0;

@@ -464,7 +464,7 @@
 
 /* Phones: the text around the figure steps back down from theme.css's phone
    sizes so the chart keeps as much of the small screen as it can. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .coverageModal {
     --cioos-font-size-sm: 11px;
     --cioos-font-size-md: 14px;
@@ -506,7 +506,7 @@
  * the close button in the header's top-right corner is the way out of
  * either, as it is for the datasets surface beside them.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .filtersModal .filtersModalDialog,
   .downloadModal .downloadModalDialog {
     width: 100vw;
