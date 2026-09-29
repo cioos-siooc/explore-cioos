@@ -77,6 +77,7 @@ export default function DatasetsTable({
     // narrower: whether this batch includes a dataset already in the order,
     // not whether it is in the order at all.
     handleSelectDataset: removeFromSelection,
+    pointsError,
   } = useSelection();
   // Narrows only this list (see listedDatasets), so it can follow the typing.
   const [searchText, setSearchText] = useSearchInput(
@@ -460,7 +461,11 @@ export default function DatasetsTable({
       <div className="datasetsCardList" ref={listRef}>
         {visibleRows.length === 0 ? (
           <div className="datasetsCardEmpty">
-            {t("datasetsCardNoResultsText")}
+            {t(
+              pointsError && !isDownloadModal
+                ? "datasetsCardLoadFailedText"
+                : "datasetsCardNoResultsText",
+            )}
           </div>
         ) : (
           pageItems.map((item) => {
