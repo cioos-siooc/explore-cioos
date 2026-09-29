@@ -3,7 +3,7 @@
 // Imported first: Sentry.init must run before the rest of the app is
 // evaluated, and SentryRoutes is only instrumented once it has.
 import { SentryRoutes } from "./sentry.js";
-import React, { Suspense } from "react";
+import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
@@ -12,12 +12,6 @@ import Loading from "./components/Controls/Loading/Loading.jsx";
 import translationEN from "./locales/en/translation.json";
 import translationFR from "./locales/fr/translation.json";
 import App from "./components/App.jsx";
-import HarvestOverview from "./components/Harvest/HarvestOverview.jsx";
-import HarvestServer from "./components/Harvest/HarvestServer.jsx";
-import HarvestDataset from "./components/Harvest/HarvestDataset.jsx";
-import HarvestRun from "./components/Harvest/HarvestRun.jsx";
-import HarvestDownloads from "./components/Harvest/HarvestDownloads.jsx";
-import HarvestDownloadJob from "./components/Harvest/HarvestDownloadJob.jsx";
 import { BrowserRouter, Route } from "react-router-dom";
 import { clearLegacyCookies } from "./state/usePersistentState.js";
 
@@ -36,6 +30,24 @@ import "@fontsource/sora/600.css";
 // CIOOS National design tokens + base typography. Imported first so the
 // var(--cioos-*) tokens and base font rules are available to every component.
 import "./components/theme.css";
+
+// The admin views are a separate audience; map visitors never download them.
+const HarvestOverview = lazy(
+  () => import("./components/Harvest/HarvestOverview.jsx"),
+);
+const HarvestServer = lazy(
+  () => import("./components/Harvest/HarvestServer.jsx"),
+);
+const HarvestDataset = lazy(
+  () => import("./components/Harvest/HarvestDataset.jsx"),
+);
+const HarvestRun = lazy(() => import("./components/Harvest/HarvestRun.jsx"));
+const HarvestDownloads = lazy(
+  () => import("./components/Harvest/HarvestDownloads.jsx"),
+);
+const HarvestDownloadJob = lazy(
+  () => import("./components/Harvest/HarvestDownloadJob.jsx"),
+);
 
 const resources = {
   en: {

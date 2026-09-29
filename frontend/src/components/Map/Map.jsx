@@ -9,7 +9,6 @@ import * as helpers from "@turf/helpers";
 import turfBboxPolygon from "@turf/bbox-polygon";
 import turfPointsWithinPolygon from "@turf/points-within-polygon";
 import turfBbox from "@turf/bbox";
-import turfUnion from "@turf/union";
 
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
@@ -73,6 +72,17 @@ import { buildTileSuffix } from "./tileQuery.js";
 import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
 import { featureHasDataset, focusedPointFeatures } from "./focusedPoints.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
+
+// @turf/union (and the bignumber/polyclip it pulls in) only merges click
+// highlights, so it loads once the map is up rather than with the entry
+// bundle. A click before then highlights the unmerged pieces instead.
+let turfUnion = null;
+const loadTurfUnion = () =>
+  import("@turf/union")
+    .then((module) => {
+      turfUnion = module.default;
+    })
+    .catch(() => {});
 
 // direct_select's own dragVertex/toDisplayFeatures, captured once here at
 // module load — before the component below patches these modes on every
@@ -3389,6 +3399,7 @@ export default function CreateMap({
 
     // The draw control only connects on 'load', so the shape has to wait for it.
     map.current.once("load", () => {
+      loadTurfUnion();
       // A share link can carry the spatial selection (rectangle bounds or a
       // polygon ring). SelectionProvider has already seeded it into the app
       // state — this puts the shape back into the draw control so it is drawn,
@@ -3947,23 +3958,27 @@ export default function CreateMap({
             filter: ["==", ["get", "pk"], feature.properties.pk],
           });
           const parts = fragments.length ? fragments : [feature];
-          let merged = parts[0];
-          for (let i = 1; i < parts.length; i++) {
-            try {
-              // @turf/union 7 takes ONE FeatureCollection, not two
-              // features. Still folded pairwise rather than unioning the
-              // whole collection in one call, so a single degenerate
-              // fragment costs only itself (see catch below).
-              merged =
-                turfUnion(helpers.featureCollection([merged, parts[i]])) ||
-                merged;
-            } catch {
-              // A degenerate fragment (e.g. a sliver from the MVT buffer
-              // overlap) fails to union — keep what merged so far rather
-              // than losing the highlight entirely.
+          if (!turfUnion) {
+            cellFeatures.push(...parts);
+          } else {
+            let merged = parts[0];
+            for (let i = 1; i < parts.length; i++) {
+              try {
+                // @turf/union 7 takes ONE FeatureCollection, not two
+                // features. Still folded pairwise rather than unioning the
+                // whole collection in one call, so a single degenerate
+                // fragment costs only itself (see catch below).
+                merged =
+                  turfUnion(helpers.featureCollection([merged, parts[i]])) ||
+                  merged;
+              } catch {
+                // A degenerate fragment (e.g. a sliver from the MVT buffer
+                // overlap) fails to union — keep what merged so far rather
+                // than losing the highlight entirely.
+              }
             }
+            cellFeatures.push(merged);
           }
-          cellFeatures.push(merged);
         }
         // The bucket this feature stands for, so the card can ask the API what
         // each dataset in it contributes. A tile carries only the bucket TOTAL
@@ -4040,7 +4055,7 @@ export default function CreateMap({
       // ('outline'), so every box in the stack still draws its own border.
       // Everything else is drawn by all of them ('both').
       let mergedGrid = gridFeatures[0] || null;
-      for (let i = 1; i < gridFeatures.length; i++) {
+      for (let i = 1; turfUnion && i < gridFeatures.length; i++) {
         try {
           // One FeatureCollection per call — see the note in the hex
           // fragment union above.
