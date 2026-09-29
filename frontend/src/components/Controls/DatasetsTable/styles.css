@@ -655,18 +655,6 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
-/* The one link that fetches data rather than opening a page. Its download
-   glyph is what says so — a filled pill here read as the card's primary
-   action, which it is not: the card's action is the checkbox at the other end
-   of the title, and three links in a row should look like three links. */
-.datasetCardSourceLink.download {
-  text-decoration: none;
-}
-
-.datasetCardSourceLink.download:hover {
-  text-decoration: underline;
-}
-
 /* The three parts of one offer. A tighter gap than .datasetCardSources' own,
    so the warning and the copy read as belonging to the link between them
    rather than as two more entries in the row of links. */
@@ -685,7 +673,7 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-warn);
 }
 
-.datasetCardCopyLink {
+.datasetCardIconLink {
   display: inline-flex;
   align-items: center;
   padding: 3px;
@@ -698,13 +686,13 @@ button.datasetCardTitle:focus-visible {
 }
 
 @media (hover: hover) {
-  .datasetCardCopyLink:hover {
+  .datasetCardIconLink:hover {
     color: var(--cioos-primary-700);
     background-color: var(--cioos-surface-2);
   }
 }
 
-.datasetCardCopyLink:focus-visible {
+.datasetCardIconLink:focus-visible {
   outline: 2px solid var(--cioos-primary-700);
   outline-offset: 1px;
 }

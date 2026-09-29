@@ -311,20 +311,29 @@ export default function DatasetCard({
                     </span>
                   </Tooltip>
                 )}
-                <a
-                  className="datasetCardSourceLink download"
-                  href={downloadLink.url}
-                  download={downloadLink.filename}
-                  title={downloadLink.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Download size={12} aria-hidden="true" />
-                  {t("datasetCardDirectDownloadText", {
+                {/* Icon-only, like the copy beside it: the format is set once
+                    in the footer, so spelling it on every card is noise. The
+                    tooltip and the accessible name still say what arrives. */}
+                <Tooltip
+                  placement="top"
+                  content={t("datasetCardDirectDownloadText", {
                     format: downloadLink.format.label,
                   })}
-                </a>
+                >
+                  <a
+                    className="datasetCardIconLink"
+                    href={downloadLink.url}
+                    download={downloadLink.filename}
+                    aria-label={t("datasetCardDirectDownloadText", {
+                      format: downloadLink.format.label,
+                    })}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Download size={13} aria-hidden="true" />
+                  </a>
+                </Tooltip>
                 {/* The URL, for the script or the note it is going into. It
                     replaces the query this card used to print in full: a URL
                     that is read is almost always a URL that is about to be
@@ -341,7 +350,7 @@ export default function DatasetCard({
                 >
                   <button
                     type="button"
-                    className="datasetCardCopyLink"
+                    className="datasetCardIconLink"
                     aria-label={t("datasetCardCopyLinkText")}
                     onClick={(e) => {
                       // The card's own click opens the dataset page.

@@ -163,34 +163,21 @@ describe("DownloadDetails", () => {
     ).toHaveAttribute("title", "Size estimate unavailable");
   });
 
-  it("keeps the direct links behind a button until asked for", async () => {
-    const { user } = renderDetails();
-    expect(screen.queryByTestId("direct-links")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("direct-links-reveal"));
+  it("shows the direct links and each card's download link up front", () => {
+    renderDetails({
+      pointsToReview: [
+        makePoint({
+          pk: EST_SMALL.pk,
+          dataset_id: "small",
+          erddap_url: "https://example.org/erddap/tabledap/small.html",
+        }),
+      ],
+    });
     expect(screen.getByTestId("direct-links")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Hide" }));
-    expect(screen.queryByTestId("direct-links")).not.toBeInTheDocument();
-  });
-
-  it("opens the direct links by itself when a dataset is over the 1GB ceiling", async () => {
-    installMockFetch();
-    const realFetch = global.fetch;
-    global.fetch = (input, init) => {
-      const url = typeof input === "string" ? input : input.url;
-      if (url.includes("/downloadEstimate")) {
-        return Promise.resolve(
-          Response.json([
-            { pk: EST_SMALL.pk, size: EST_SMALL.size },
-            { pk: EST_LARGE.pk, size: 2e9 },
-          ]),
-        );
-      }
-      return realFetch(input, init);
-    };
-    renderDetails();
-    expect(await screen.findByTestId("direct-links")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Hide" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("download-formats")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Download / })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/tabledap/small."),
+    );
   });
 });

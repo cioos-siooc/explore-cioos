@@ -57,7 +57,6 @@ export default function DatasetsTable({
   // card can show the query its own dataset would be fetched with. Built by
   // DownloadDetails, which owns the format choice the strip below shares.
   downloadLinksByPk,
-  downloadFormatControls,
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
@@ -370,13 +369,7 @@ export default function DatasetsTable({
             />
             {t("datasetsTableHeaderSelectAllTitle")}
           </label>
-          {/* The format pickers (DownloadFormats) are settings of the same
-              kind as the sort: they change what every Download button on the
-              cards below asks the server for. */}
-          <div className="datasetsCardArrange">
-            {sortControl}
-            {downloadFormatControls}
-          </div>
+          <div className="datasetsCardArrange">{sortControl}</div>
         </>
       ) : (
         // Search, sort and grouping on one row: every row spent here is a

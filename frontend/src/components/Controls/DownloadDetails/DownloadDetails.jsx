@@ -2,7 +2,6 @@ import * as React from "react";
 import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
-import { BoxArrowUpRight } from "react-bootstrap-icons";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
 import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
@@ -68,10 +67,9 @@ export default function DownloadDetails({
   // links in bulk, and every card in the list, which shows the one query its
   // own dataset would be fetched with. Building the links once here is what
   // keeps the two in step — a card promising a .csv under a footer set to
-  // Parquet would be a lie about the same order. The picker itself sits on the
-  // list's toolbar (DownloadFormats), which is the one place above both.
+  // Parquet would be a lie about the same order. The picker itself sits in the
+  // footer's direct-links column.
   const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
-  const [linksOpen, setLinksOpen] = useState(false);
   const [obisFormat, setObisFormat] = useState(defaultObisFormat);
   const [pointsData, setPointsData] = useState(
     pointsToReview
@@ -324,12 +322,6 @@ export default function DownloadDetails({
     [links],
   );
 
-  // Most orders only need the email path, so the format picker and every link
-  // wait behind one button — unless a dataset is over the 1 GB ceiling, where
-  // a link is the only way to get it.
-  const anyTooLarge = pointsData.some((point) => point.downloadDisabled);
-  const showLinks = linksOpen || anyTooLarge;
-
   return (
     <div className="container downloadDetails">
       {/* One row of chrome: what the order narrows by. Every row spent here is
@@ -361,18 +353,7 @@ export default function DownloadDetails({
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
-            downloadLinksByPk={showLinks ? linksByPk : undefined}
-            downloadFormatControls={
-              showLinks && (
-                <DownloadFormats
-                  links={links}
-                  erddapFormat={erddapFormat}
-                  setErddapFormat={setErddapFormat}
-                  obisFormat={obisFormat}
-                  setObisFormat={setObisFormat}
-                />
-              )
-            }
+            downloadLinksByPk={linksByPk}
           />
         </div>
       </div>
@@ -382,7 +363,7 @@ export default function DownloadDetails({
           ways to ship the first, so they sit beside it rather than under it —
           neither is a mode of the modal, and a user weighing one against the
           other can read both without scrolling. */}
-      <div className={`downloadFooter${showLinks ? "" : " linksCollapsed"}`}>
+      <div className="downloadFooter">
         <div className="downloadFooterSection">
           <span className="downloadFooterTitle">
             {t("downloadDetailsSelectionTitle")}
@@ -438,30 +419,19 @@ export default function DownloadDetails({
             queue. Beside the summary rather than behind a tab, because one of
             the things it answers ("this dataset is too large for the zip") is
             only legible next to the figures that say so. */}
-        {showLinks ? (
-          <DirectDownloadLinks
-            links={links}
-            constraints={constraints}
-            onHide={anyTooLarge ? undefined : () => setLinksOpen(false)}
-          />
-        ) : (
-          <div className="downloadFooterSection directLinksCollapsed">
-            <span className="downloadFooterTitle">{t("directLinksTitle")}</span>
-            <p className="directLinksRevealHint">
-              {t("directLinksRevealHint")}
-            </p>
-            <button
-              type="button"
-              className="directLinksButton"
-              data-testid="direct-links-reveal"
-              aria-expanded={false}
-              onClick={() => setLinksOpen(true)}
-            >
-              <BoxArrowUpRight size={14} aria-hidden="true" />
-              {t("directLinksReveal")}
-            </button>
-          </div>
-        )}
+        <DirectDownloadLinks
+          links={links}
+          constraints={constraints}
+          formatControls={
+            <DownloadFormats
+              links={links}
+              erddapFormat={erddapFormat}
+              setErddapFormat={setErddapFormat}
+              obisFormat={obisFormat}
+              setObisFormat={setObisFormat}
+            />
+          }
+        />
       </div>
     </div>
   );
