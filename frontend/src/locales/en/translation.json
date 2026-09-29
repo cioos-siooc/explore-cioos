@@ -632,6 +632,7 @@
   "brandFullName": "Canadian Integrated\nOcean Observing System",
   "downloadSizeUnavailable": "—",
   "downloadSizeUnavailableTitle": "Size estimate unavailable",
+  "downloadSizePartialTitle": "Leaves out datasets without a size estimate",
   "dockDownloadCountTitle": "{{count}} datasets selected for download",
   "dockIntroButtonTitle": "About this tool",
   "dockDownloadEmptyMessage": "Select datasets from the dataset list or on the map to build a download.",

@@ -9,10 +9,12 @@ import {
   createSelectionQueryString,
   escapeHtml,
   formatDatasetCount,
+  formatSizeEstimate,
   getCurrentRangeLevel,
   toggleOptionExcluded,
   toggleOptionIncluded,
   polygonIsRectangle,
+  sumSizeEstimates,
   polygonToWkt,
   quantizeCountRange,
   rangesEqual,
@@ -620,5 +622,34 @@ describe("createDataFilterQueryString — realtime", () => {
         createDataFilterQueryString({ ...base, realtimeOnly }),
       ).not.toMatch(/realtimeOnly/);
     }
+  });
+});
+
+describe("formatSizeEstimate", () => {
+  it("marks an estimate with a tilde", () => {
+    expect(formatSizeEstimate(1024)).toBe("~1KB");
+    expect(formatSizeEstimate(0)).toBe("~0B");
+  });
+
+  it("shows a missing estimate as a dash, not zero bytes", () => {
+    expect(formatSizeEstimate(null)).toBe("—");
+    expect(formatSizeEstimate(undefined)).toBe("—");
+  });
+});
+
+describe("sumSizeEstimates", () => {
+  it("sums known sizes", () => {
+    expect(sumSizeEstimates([1, 2])).toEqual({ size: 3, partial: false });
+  });
+
+  it("leaves out missing sizes and flags the total as partial", () => {
+    expect(sumSizeEstimates([5, null])).toEqual({ size: 5, partial: true });
+  });
+
+  it("has no total when no size is known", () => {
+    expect(sumSizeEstimates([null, null])).toEqual({
+      size: null,
+      partial: false,
+    });
   });
 });

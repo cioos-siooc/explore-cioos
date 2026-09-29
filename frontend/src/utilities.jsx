@@ -40,11 +40,21 @@ export const toggleOptionExcluded = (option) => ({
  * rather than being stated once in a legend: the figures are read one card at
  * a time, and a bare "1.2GB" beside a dataset reads as a fact about that file.
  *
- * `bytes()` returns null for a null or NaN input, which is how a dataset the
- * estimate response did not cover arrives here.
+ * A null size is one the estimate could not give (OBIS datasets, or a dataset
+ * the response did not cover): it reads as a dash, never as zero bytes.
  */
 export function formatSizeEstimate(size) {
-  return `~${bytes(size) || "0B"}`;
+  return Number.isFinite(size) ? `~${bytes(size)}` : "—";
+}
+
+// Sums sizes, leaving out the ones with no estimate and flagging that it did,
+// so a total never passes an undercount off as the whole selection.
+export function sumSizeEstimates(sizes) {
+  const known = sizes.filter(Number.isFinite);
+  return {
+    size: known.length ? known.reduce((total, size) => total + size, 0) : null,
+    partial: known.length > 0 && known.length < sizes.length,
+  };
 }
 
 export function capitalizeFirstLetter(string) {

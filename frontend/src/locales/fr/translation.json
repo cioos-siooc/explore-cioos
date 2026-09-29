@@ -633,6 +633,7 @@
   "brandFullName": "Système intégré d’observation\nDes océans du Canada",
   "downloadSizeUnavailable": "—",
   "downloadSizeUnavailableTitle": "Estimation de taille indisponible",
+  "downloadSizePartialTitle": "N'inclut pas les jeux de données sans estimation de taille",
   "dockDownloadCountTitle": "{{count}} jeux de données sélectionnés pour téléchargement",
   "dockIntroButtonTitle": "À propos de cet outil",
   "dockDownloadEmptyMessage": "Sélectionnez des jeux de données dans la liste ou sur la carte pour préparer un téléchargement.",

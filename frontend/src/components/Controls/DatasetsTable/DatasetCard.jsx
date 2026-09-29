@@ -196,6 +196,11 @@ export default function DatasetCard({
                         downloadable:
                           row?.sizeEstimate?.filteredSize < 1000000000,
                       })}
+                      title={
+                        Number.isFinite(row?.sizeEstimate?.filteredSize)
+                          ? undefined
+                          : t("downloadSizeUnavailableTitle")
+                      }
                     >
                       {formatSizeEstimate(row?.sizeEstimate?.filteredSize)}
                     </span>
