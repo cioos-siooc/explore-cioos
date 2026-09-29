@@ -213,7 +213,7 @@
   gap: 8px;
   margin: 0;
   padding: 8px 16px;
-  font-size: var(--cioos-font-size-sm, 13px);
+  font-size: var(--cioos-font-size-sm);
   cursor: pointer;
 }
 

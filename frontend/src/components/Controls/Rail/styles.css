@@ -116,6 +116,7 @@
 }
 
 .railTick {
+  font-variant-numeric: tabular-nums;
   position: absolute;
   top: 0;
   transform: translateX(-50%);

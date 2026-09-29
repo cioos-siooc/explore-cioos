@@ -95,7 +95,7 @@
 
 .featureCardHeadingTitle {
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
@@ -214,7 +214,7 @@ button.featureCardRowTitle:focus-visible {
   min-width: 0;
   overflow: hidden;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-sm);
   line-height: 1.35;
 }

@@ -47,7 +47,7 @@
 .introTitleName {
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-xl);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--cioos-navy);
 }
 
@@ -132,7 +132,7 @@
   margin: 0 0 var(--cioos-space-xs);
   font-family: var(--cioos-font-display);
   font-size: clamp(1.4rem, 1rem + 1.2vw, 1.9rem);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   color: var(--cioos-white);
 }
@@ -171,7 +171,7 @@
 .introStatValue {
   font-family: var(--cioos-font-display);
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--cioos-teal-light);

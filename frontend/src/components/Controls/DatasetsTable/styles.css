@@ -360,7 +360,7 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-ink);
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
   text-align: left;
   cursor: pointer;
 }
@@ -520,7 +520,7 @@ button.datasetCardTitle:focus-visible {
   flex: 1 1 auto;
   min-width: 0;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-base);
   line-height: 1.25;
   color: var(--cioos-ink);
@@ -538,7 +538,7 @@ button.datasetCardTitle:focus-visible {
   border-radius: var(--cioos-radius-pill);
   background: var(--cioos-live);
   color: var(--cioos-white);
-  font-size: 0.68rem;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
@@ -553,6 +553,7 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetCardMetaItem {
+  font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -742,7 +743,7 @@ button.datasetCardTitle:focus-visible {
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-surface-2);
   color: var(--cioos-ink-60);
-  font-size: 0.72rem;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -759,7 +760,7 @@ button.datasetCardTitle:focus-visible {
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-surface-2);
   color: var(--cioos-ink-60);
-  font-size: 0.76rem;
+  font-size: var(--cioos-font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -802,7 +803,7 @@ button.datasetCardTitle:focus-visible {
   gap: 6px;
   align-items: flex-start;
   color: var(--cioos-warn);
-  font-size: 0.74rem;
+  font-size: var(--cioos-font-size-sm);
   line-height: 1.35;
 }
 

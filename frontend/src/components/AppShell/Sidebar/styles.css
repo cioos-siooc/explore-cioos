@@ -147,7 +147,7 @@
 .datasetsHeaderLabel {
   flex-shrink: 0;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
@@ -161,6 +161,7 @@
 }
 
 .datasetsHeaderCount {
+  font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
@@ -284,7 +285,7 @@
   overflow: hidden;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-2xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -405,6 +406,7 @@
 }
 
 .sidebarDownloadCount {
+  font-variant-numeric: tabular-nums;
   font-size: var(--cioos-font-size-xs);
   font-weight: 400;
   white-space: nowrap;

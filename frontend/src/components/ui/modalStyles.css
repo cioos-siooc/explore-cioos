@@ -68,7 +68,7 @@ body.cioos-modal-open {
 
 .modal-title {
   font-family: var(--cioos-font-display, sans-serif);
-  font-size: var(--cioos-font-size-lg, 18px);
+  font-size: var(--cioos-font-size-lg);
   line-height: 1.4;
 }
 

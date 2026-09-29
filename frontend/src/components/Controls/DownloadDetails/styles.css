@@ -52,8 +52,8 @@
   gap: 8px;
   margin: 0;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-weight: 600;
+  font-size: var(--cioos-font-size-lg);
   color: var(--cioos-navy);
 }
 
@@ -97,7 +97,7 @@
   flex: 0 0 auto;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--cioos-ink-60);
@@ -276,7 +276,7 @@
   max-width: 100%;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -315,15 +315,16 @@
 }
 
 .downloadSummaryValue {
+  font-variant-numeric: tabular-nums;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
-  font-size: 20px;
+  font-weight: 600;
+  font-size: var(--cioos-font-size-lg);
   line-height: 1.1;
   color: var(--cioos-navy);
 }
 
 .downloadSummaryValueMuted {
-  font-size: 15px;
+  font-size: var(--cioos-font-size-base);
   font-weight: 600;
   color: var(--cioos-ink-40);
 }

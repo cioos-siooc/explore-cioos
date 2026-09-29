@@ -74,6 +74,6 @@
      logo's — a long label would otherwise wrap inside the wordmark's column. */
   width: max-content;
   max-width: 80vw;
-  font-size: var(--cioos-font-size-xs, 11px);
+  font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
 }

@@ -55,7 +55,7 @@
   padding: 5px 9px;
   border: none;
   background: transparent;
-  font-family: var(--cioos-font-display);
+  font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -309,6 +309,7 @@
 }
 
 .legendColorBarTicks .legendTick {
+  font-variant-numeric: tabular-nums;
   position: absolute;
   top: 0;
   font-size: var(--cioos-font-size-3xs);
