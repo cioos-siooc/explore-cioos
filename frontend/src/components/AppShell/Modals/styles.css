@@ -263,7 +263,21 @@
   flex-direction: column;
   gap: 2px;
   font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
+}
+
+/* How to read the bars, not a footnote: the info glyph marks it as such. */
+.coverageToolbarNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.35;
+}
+
+.coverageToolbarNote svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--cioos-info);
 }
 
 .coverageToolbarControls {
@@ -421,6 +435,16 @@
   height: 100%;
   color: var(--cioos-ink-60);
   font-size: var(--cioos-font-size-md);
+}
+
+.coverageModalError {
+  gap: 8px;
+  color: var(--cioos-ink);
+}
+
+.coverageModalError svg {
+  flex: 0 0 auto;
+  color: var(--cioos-error);
 }
 
 @media (max-width: 600px) {

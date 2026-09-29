@@ -382,21 +382,31 @@
 }
 
 .submitRequestButton:disabled {
-  background-color: var(--cioos-hairline);
-  color: var(--cioos-ink-40);
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
   cursor: not-allowed;
 }
 
 /* Holds its line whether or not there is anything to say, so a submission's
-   result does not shove the column it lands in. */
+   result does not shove the column it lands in. The padding is reserved too;
+   only the ground appears with a result. */
 .downloadSubmit .submissionFeedback {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
-  min-height: 18px;
+  gap: 6px;
+  min-height: 26px;
+  padding: 4px 8px;
+  margin: 0 -8px;
+  border-radius: var(--cioos-radius-sm);
   font-size: var(--cioos-font-size-sm);
   line-height: 1.25;
   color: var(--cioos-ink-60);
+}
+
+.downloadSubmit .submissionFeedback svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .downloadSubmit .form-switch {
@@ -420,12 +430,27 @@
   cursor: pointer;
 }
 
+/* The result on its status ground. Ink carries the sentence and the glyph the
+   hue, as .directLinksWarning does, since neither hue clears 4.5:1 as text on
+   its own tint. */
 .downloadSubmit .submissionFeedback.success {
-  color: var(--cioos-primary-700);
+  background-color: var(--cioos-success-bg);
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+.downloadSubmit .submissionFeedback.success svg {
+  color: var(--cioos-primary-800);
 }
 
 .downloadSubmit .submissionFeedback.error {
-  color: var(--cioos-error);
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+.downloadSubmit .submissionFeedback.error svg {
+  color: var(--cioos-error-700);
 }
 
 /* --- Column 3: the same order taken from the source instead of the queue.
