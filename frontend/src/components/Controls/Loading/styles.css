@@ -77,3 +77,11 @@
   font-size: var(--cioos-font-size-xs, 11px);
   color: var(--cioos-ink-60);
 }
+
+/* The mark on its disc matches the map's loading spinner (.cioosSpinner-lg)
+   rather than following the lockup's type, so the spinner the splash hands
+   over to is the same size. */
+.loading-brand .cioosLogo-stacked .cioosSpinner {
+  width: 56px;
+  height: 56px;
+}
