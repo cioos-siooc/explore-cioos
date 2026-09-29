@@ -8,7 +8,6 @@ import {
   PinMap,
   PinMapFill,
 } from "react-bootstrap-icons";
-// import platformColors from '../../platformColors'
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
@@ -29,6 +28,7 @@ import {
   formatRange,
 } from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
+import { DatasetPlatformIcon } from "../DatasetsTable/DatasetCard.jsx";
 import ListCard, {
   CardField,
   CardTags,
@@ -185,9 +185,6 @@ export default function DatasetInspector({
   const [loading, setLoading] = useState(hasRecordList);
   useActivityTask("activityRecordListText", loading);
 
-  // const platformColor = platformColors.filter(
-  //   (pc) => pc.platform === dataset.platform
-  // )
   const isTrajectoryDataset =
     dataset.source_type !== "obis" &&
     (dataset.cdm_data_type || "").includes("Trajectory");
@@ -576,7 +573,18 @@ export default function DatasetInspector({
               {/* Nullable in the schema; an empty chip under a label reads as
                   a broken field. */}
               {dataset.platform ? (
-                <span className="metadataChip">{t(dataset.platform)}</span>
+                <span className="metadataChip">
+                  <span className="metadataPlatformGlyph" aria-hidden="true">
+                    <DatasetPlatformIcon
+                      platform={dataset.platform}
+                      cdmDataType={dataset.cdm_data_type}
+                      sourceType={dataset.source_type}
+                      t={t}
+                      decorative
+                    />
+                  </span>
+                  {t(dataset.platform)}
+                </span>
               ) : (
                 <span className="metadataEmpty">—</span>
               )}

@@ -4,6 +4,7 @@ description: Canada's ocean data on one map; calm instruments laid over a chart.
 colors:
   coastal-teal: "#52a79b"
   coastal-teal-deep: "#3c8377"
+  coastal-teal-deeper: "#2f6f65"
   shallows: "#c6e3df"
   deep-water-navy: "#152f37"
   beach-sand: "#f3f0ec"
@@ -148,6 +149,7 @@ A coastal palette with navy ink, a single teal accent, and a small set of data h
 ### Primary
 - **Coastal Teal** (`coastal-teal`): the one interactive accent. Primary buttons, the open tab segment, focus rings (at 55% alpha), toggle tracks, icons in the tab strip, the selected card border.
 - **Coastal Teal Deep** (`coastal-teal-deep`): hover and pressed for teal fills; link text and teal text on light surfaces, where the base teal is too light for body contrast.
+- **Coastal Teal Deeper** (`coastal-teal-deeper`, `--cioos-primary-800`): a solid teal fill that has to carry white body-size text, where deep falls just short of AA (4.46:1). The open row in the Filters list.
 - **Shallows** (`shallows`): the "has a value" wash. Applied tab segments, active filter chips, the success background, and the pale head of the hex ramp.
 
 ### Neutral

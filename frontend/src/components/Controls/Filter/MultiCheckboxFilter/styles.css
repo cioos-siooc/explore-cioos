@@ -80,6 +80,10 @@
   background-color: var(--cioos-teal-light);
 }
 
+.multiCheckboxFilter .optionButton.selected .optionToggle > svg:first-child {
+  color: var(--cioos-primary-700);
+}
+
 .multiCheckboxFilter .optionButton.excluded {
   background-color: var(--cioos-error-bg);
 }

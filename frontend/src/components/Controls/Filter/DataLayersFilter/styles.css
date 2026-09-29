@@ -5,11 +5,6 @@
 .dataLayersFilter .optionHint {
   display: block;
   font-size: 0.82em;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-80);
   margin-top: 1px;
-}
-
-/* Keep the hint readable on the selected row's tinted background. */
-.dataLayersFilter .optionButton.selected .optionHint {
-  color: var(--cioos-ink-60, var(--cioos-ink-40));
 }

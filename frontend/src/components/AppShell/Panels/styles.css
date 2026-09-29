@@ -223,23 +223,20 @@
   border-color: var(--cioos-primary);
 }
 
-/* Is the one being edited: a filled row with a bar on the leading edge, so the
-   pane on the right is unambiguously attached to a row on the left. Distinct
-   from .active because a row can be either, both, or neither — the bar is the
-   part that only ever means "you are here". */
-.filtersPanelList .filterHeader.open {
-  background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-primary);
-  box-shadow: inset 3px 0 0 0 var(--cioos-primary);
+/* Is the one being edited: solid teal, the chrome's "open" state (the same
+   turn the top bar's open tab makes), so it cannot be mistaken for a row that
+   merely has a selection — that one only takes the pale wash above. Open wins
+   over applied: the pane beside it shows what is set. */
+.filtersPanelList .filterHeader.open,
+.filtersPanelList .filterHeader.open:hover {
+  background-color: var(--cioos-primary-800);
+  border-color: var(--cioos-primary-800);
+  color: var(--cioos-white);
   font-weight: 700;
 }
 
-.filtersPanelList .filterHeader.open.active {
-  background-color: var(--cioos-teal-light);
-}
-
-.filtersPanelList .filterHeader.open:hover {
-  background-color: var(--cioos-teal-light);
+.filtersPanelList .filterHeader.open > svg {
+  color: var(--cioos-white);
 }
 
 /* The open filter's options fill the detail pane to the right of the list
@@ -270,7 +267,7 @@
 .filtersPanel .filterOptionsCaption {
   flex: 0 0 auto;
   margin: 0 0 8px;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   font-size: var(--cioos-font-size-sm);
   line-height: 1.35;
 }

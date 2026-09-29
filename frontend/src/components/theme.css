@@ -18,6 +18,9 @@
   /* --- National primary --- */
   --cioos-primary: #52a79b;
   --cioos-primary-700: #3c8377; /* hover/pressed — darker teal */
+  /* A solid teal fill that carries white text: -700 falls just short of AA
+     (4.46:1) at body size. */
+  --cioos-primary-800: #2f6f65;
 
   /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
   --cioos-ink: #152f37; /* body + heading text */

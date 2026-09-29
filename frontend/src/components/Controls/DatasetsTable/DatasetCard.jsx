@@ -401,12 +401,19 @@ export function DatasetCardSkeleton() {
   );
 }
 
-export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
+// `decorative` drops the tooltip for a spot whose own text already names it.
+export function DatasetPlatformIcon({
+  platform,
+  cdmDataType,
+  sourceType,
+  t,
+  decorative,
+}) {
   // Grid amber, the colour the map draws gridded coverage in.
   if (cdmDataType === "Grid") {
     return (
       <Grid3x3Gap
-        title={t("griddapTypeLabel")}
+        title={decorative ? undefined : t("griddapTypeLabel")}
         color="var(--cioos-grid-700)"
         size={13}
       />
@@ -419,7 +426,7 @@ export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
   return (
     <Icon
       className="platformGlyph"
-      title={t(platform)}
+      title={decorative ? undefined : t(platform)}
       fill={platformColorOf(platform)}
       size={13}
     />
