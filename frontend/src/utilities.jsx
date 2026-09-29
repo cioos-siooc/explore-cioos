@@ -381,9 +381,10 @@ export function generateColorStops(colorScale, range) {
 // The dataset count shown on the Datasets entry points: "filtered / total"
 // while a filter narrows the catalog, and just the total once nothing is
 // filtered out (or before the total is known).
-export function formatDatasetCount(filtered, total) {
-  if (!total || filtered === total) return String(total || filtered);
-  return `${filtered} / ${total}`;
+export function formatDatasetCount(filtered, total, locale) {
+  const format = (n) => n.toLocaleString(locale);
+  if (!total || filtered === total) return format(total || filtered);
+  return `${format(filtered)} / ${format(total)}`;
 }
 
 // The instants either list carries, formatted as the UTC they are: the record

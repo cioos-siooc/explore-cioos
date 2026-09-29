@@ -434,6 +434,7 @@ describe("string and count helpers", () => {
     expect(formatDatasetCount(3, 12)).toBe("3 / 12");
     // Before the total is known there is only one number to show.
     expect(formatDatasetCount(3, undefined)).toBe("3");
+    expect(formatDatasetCount(1234, 5678, "en")).toBe("1,234 / 5,678");
   });
 });
 

@@ -50,6 +50,12 @@ clearLegacyCookies();
 
 const urlLanguage = new URL(window.location.href).searchParams.get("lang");
 
+// Screen readers pick their voice from <html lang>, so French must not be read
+// with English pronunciation.
+i18n.on("languageChanged", (lng) => {
+  document.documentElement.lang = lng;
+});
+
 // Tutorial for setting up translations using the i18next npm module (and related npm modules)
 // https://www.youtube.com/watch?v=w04LXKlusCQ
 i18n
