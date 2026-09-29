@@ -484,37 +484,55 @@ h6 {
   border-width: 0;
 }
 
-/* Touch: the map's small controls keep their size and gain an invisible 44px
-   hit area centred on them, so a fingertip lands without the chrome growing.
-   A box already past 44px keeps its own edges (the min()). */
-@media (pointer: coarse) {
-  :is(
-      .closeButton,
-      .datasetCardSelect,
-      .pagerStep,
-      .pagerPage,
-      .brandMinorItem,
-      .legendInfoButton,
-      .sidebarFooterHintMore,
-      .railStep
-    ) {
-    position: relative;
-  }
+/* Small controls keep their drawn size and gain an invisible hit area centred
+   on them: 24px for a mouse (WCAG 2.5.8), 44px for a fingertip. A box already
+   past that keeps its own edges (the min()). */
+:root {
+  --cioos-hit-half: 12px;
+}
 
-  :is(
-      .closeButton,
-      .datasetCardSelect,
-      .pagerStep,
-      .pagerPage,
-      .brandMinorItem,
-      .legendInfoButton,
-      .sidebarFooterHintMore,
-      .railStep
-    )::before {
-    content: "";
-    position: absolute;
-    inset: min(0px, calc(50% - 22px));
+@media (pointer: coarse) {
+  :root {
+    --cioos-hit-half: 22px;
   }
+}
+
+:is(
+    .closeButton,
+    .datasetCardSelect,
+    .pagerStep,
+    .pagerPage,
+    .brandMinorItem,
+    .legendInfoButton,
+    .legendCreditsButton,
+    .sidebarFooterHintMore,
+    .railStep,
+    .sortSelectDirection,
+    .topBarCountsInView
+  ) {
+  position: relative;
+}
+
+/* Rail handles are already absolutely positioned; switches draw their thumb
+   with ::before, so theirs goes on ::after. */
+:is(
+    .closeButton,
+    .datasetCardSelect,
+    .pagerStep,
+    .pagerPage,
+    .brandMinorItem,
+    .legendInfoButton,
+    .legendCreditsButton,
+    .sidebarFooterHintMore,
+    .railStep,
+    .sortSelectDirection,
+    .topBarCountsInView,
+    .railHandle
+  )::before,
+.form-switch .form-check-input::after {
+  content: "";
+  position: absolute;
+  inset: min(0px, calc(50% - var(--cioos-hit-half)));
 }
 
 /* Honour reduced-motion: the panel/legend slide transitions are decorative. */
