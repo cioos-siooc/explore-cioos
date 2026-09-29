@@ -7,10 +7,7 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-
-  /* The rail opens on only the main filters, so it no longer sets a height
-     the open filter's options (and the how-to) have room in; this does. */
-  min-height: min(460px, 60vh);
+  min-height: 340px;
 }
 
 /* Positioned: the detail pane and the placeholder that stands in for it are
@@ -363,37 +360,6 @@
 .filtersPanel .filterSection + .filterSection {
   margin-top: 4px;
   border-top: 1px solid var(--cioos-hairline);
-  padding-top: 4px;
-}
-
-.filtersPanelMore {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  margin-top: 4px;
-  padding: 8px 12px;
-  border: 0;
-  border-top: 1px solid var(--cioos-hairline);
-  background: none;
-  font: inherit;
-  font-weight: 600;
-  color: var(--cioos-primary-700);
-  cursor: pointer;
-}
-
-.filtersPanelMore:hover {
-  background-color: var(--cioos-surface-2);
-}
-
-.filtersPanelMore:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-/* The first section under the toggle takes the hairline the toggle already
-   drew above itself. */
-.filtersPanelMore + .filterSection {
   padding-top: 4px;
 }
 
