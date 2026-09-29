@@ -5,7 +5,6 @@ import { act, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
-import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { TIPS } from "../../../state/tips/TipsProvider.jsx";
 import TipCard from "../Tips/TipCard.jsx";
@@ -19,9 +18,7 @@ vi.mock("@sentry/react", () => ({ getFeedback: () => undefined }));
 // switch), so it renders under the app's providers, with the same open flag
 // the app hands it.
 function Harness({ setShowModal = () => {} }) {
-  const { showSelectionHelpModal, showDownloadModal, showCoverageModal } =
-    useUI();
-  const { pointsToReview } = useSelection();
+  const { showSelectionHelpModal, showCoverageModal } = useUI();
   const { bathymetryVisible } = useMapState();
   return (
     <>
@@ -29,13 +26,9 @@ function Harness({ setShowModal = () => {} }) {
       <span data-testid="selection-help">
         {showSelectionHelpModal ? "open" : "closed"}
       </span>
-      <span data-testid="download-modal">
-        {showDownloadModal ? "open" : "closed"}
-      </span>
       <span data-testid="coverage-modal">
         {showCoverageModal ? "open" : "closed"}
       </span>
-      <span data-testid="download-count">{pointsToReview?.length ?? 0}</span>
       <span data-testid="bathymetry">{bathymetryVisible ? "on" : "off"}</span>
       <TipCard />
     </>
@@ -44,8 +37,6 @@ function Harness({ setShowModal = () => {} }) {
 
 const renderIntro = (props) =>
   renderWithProviders(<Harness {...props} />, { providers: "app" });
-
-const tip = () => screen.getByTestId("intro-tip").textContent;
 
 describe("IntroModal", () => {
   beforeEach(() => {
@@ -60,19 +51,14 @@ describe("IntroModal", () => {
     expect(screen.queryByText("CIOOS Data Explorer")).not.toBeInTheDocument();
   });
 
-  it("leads with the hero and the three things the tool does", () => {
+  it("leads with the hero and the three steps of using the tool", () => {
     renderIntro();
     expect(
-      screen.getByRole("heading", { level: 2, name: /all on one map/ }),
+      screen.getByRole("heading", { level: 2, name: /on one map/ }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/ERDDAP™ servers and OBIS/)).toBeInTheDocument();
     expect(
       screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent),
-    ).toEqual([
-      "Explore the map",
-      "Search across everything",
-      "Download it, or take the link",
-    ]);
+    ).toEqual(["Look at the map", "Narrow it down", "Get the data"]);
   });
 
   it("shows the catalogue's live size once it has loaded", async () => {
@@ -93,20 +79,7 @@ describe("IntroModal", () => {
   });
 
   describe("See it in action", () => {
-    it("Build a download adds a dataset and opens the order window", async () => {
-      const setShowModal = vi.fn();
-      const { user } = renderIntro({ setShowModal });
-      await user.click(
-        await screen.findByRole("button", { name: /Build a download/ }),
-      );
-      expect(setShowModal).toHaveBeenCalledWith(false);
-      expect(screen.getByTestId("download-modal")).toHaveTextContent("open");
-      await waitFor(() =>
-        expect(screen.getByTestId("download-count")).toHaveTextContent("1"),
-      );
-    });
-
-    it("Seafloor depth up close turns the NONNA layer on", async () => {
+    it("See the seafloor in Halifax Harbour turns the NONNA layer on", async () => {
       window.localStorage.setItem(
         "cde.bathymetryVisible",
         JSON.stringify(false),
@@ -115,39 +88,33 @@ describe("IntroModal", () => {
       const { user } = renderIntro({ setShowModal });
       expect(screen.getByTestId("bathymetry")).toHaveTextContent("off");
       await user.click(
-        screen.getByRole("button", { name: /Seafloor depth up close/ }),
+        screen.getByRole("button", {
+          name: /See the seafloor in Halifax Harbour/,
+        }),
       );
       expect(setShowModal).toHaveBeenCalledWith(false);
       expect(screen.getByTestId("bathymetry")).toHaveTextContent("on");
     });
 
-    it("When was data collected? opens the time coverage chart", async () => {
+    it("When was the data collected? opens the time coverage chart", async () => {
       const setShowModal = vi.fn();
       const { user } = renderIntro({ setShowModal });
       await user.click(
-        screen.getByRole("button", { name: /When was data collected/ }),
+        screen.getByRole("button", { name: /When was the data collected/ }),
       );
       expect(setShowModal).toHaveBeenCalledWith(false);
       expect(screen.getByTestId("coverage-modal")).toHaveTextContent("open");
     });
 
-    it("Stations up close closes the dialog to show the map", async () => {
+    it("Zoom into the Gulf of St. Lawrence closes the dialog to show the map", async () => {
       const setShowModal = vi.fn();
       const { user } = renderIntro({ setShowModal });
       await user.click(
-        screen.getByRole("button", { name: /Stations up close/ }),
+        screen.getByRole("button", {
+          name: /Zoom into the Gulf of St. Lawrence/,
+        }),
       );
       expect(setShowModal).toHaveBeenCalledWith(false);
-    });
-
-    // The recorded fixtures carry no gridded dataset with a WMS server, which
-    // is the case the rule exists for: no link to a view that can't be shown.
-    it("leaves out the gridded link when nothing in the catalogue has WMS", async () => {
-      renderIntro();
-      await screen.findByRole("button", { name: /Build a download/ });
-      expect(
-        screen.queryByRole("button", { name: /Gridded data on the map/ }),
-      ).toBeNull();
     });
   });
 
@@ -159,27 +126,37 @@ describe("IntroModal", () => {
     expect(screen.getByTestId("selection-help")).toHaveTextContent("open");
   });
 
-  it("pages through the tips, wrapping round at the end", async () => {
-    const { user } = renderIntro();
-    const first = tip();
-    expect(first).toMatch(`Tip 1 of ${TIPS.length}`);
-    await user.click(screen.getByRole("button", { name: "Next tip" }));
-    expect(tip()).toMatch(`Tip 2 of ${TIPS.length}`);
-    for (let i = 1; i < TIPS.length; i += 1)
-      await user.click(screen.getByRole("button", { name: "Next tip" }));
-    expect(tip()).toBe(first);
-  });
-
-  it("clicking a tip closes the dialog and starts the tour on it", async () => {
+  it("Take a quick tour closes the dialog and starts the tour at the first tip", async () => {
     const setShowModal = vi.fn();
     const { user } = renderIntro({ setShowModal });
-    await user.click(screen.getByRole("button", { name: "Next tip" }));
-    await user.click(
-      screen.getByRole("button", { name: /Show me on the map/ }),
-    );
+    await user.click(screen.getByRole("button", { name: "Take a quick tour" }));
     expect(setShowModal).toHaveBeenCalledWith(false);
     expect(screen.getByTestId("tip-card")).toHaveTextContent(
-      `Tip 2 of ${TIPS.length}`,
+      `Tip 1 of ${TIPS.length}`,
+    );
+  });
+
+  it("points at the real buttons: the tips lightbulb and the About ⓘ", () => {
+    renderIntro();
+    expect(
+      screen.getByRole("img", { name: "A tip is available" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "About this tool" }),
+    ).toBeInTheDocument();
+  });
+
+  it("the feedback card has a labelled Send feedback button", () => {
+    renderIntro();
+    expect(
+      screen.getByRole("button", { name: "Send feedback" }),
+    ).toBeInTheDocument();
+  });
+
+  it("names both data sources, ERDDAP™ and OBIS", () => {
+    renderIntro();
+    expect(screen.getByText(/Data comes from ERDDAP™/)).toHaveTextContent(
+      "OBIS",
     );
   });
 

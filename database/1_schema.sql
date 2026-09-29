@@ -611,7 +611,8 @@ CREATE TABLE download_jobs (
     pk SERIAL PRIMARY KEY,
     time timestamp with time zone DEFAULT now(),
     job_id text,
-    email text,
+    email text,                                -- cleared 7 days after the job finishes
+    email_domain text,                         -- kept, for usage statistics
     status text DEFAULT 'open'::text,
     time_total interval generated always as (time_complete - "time") stored,
     download_size numeric,

@@ -26,6 +26,10 @@
     "aria-valid-attr-value": 1,
     "nested-interactive": 25
   },
+  "privacy notice": {
+    "aria-valid-attr-value": 1,
+    "nested-interactive": 25
+  },
   "mobile datasets sheet": {
     "color-contrast": 14,
     "nested-interactive": 25

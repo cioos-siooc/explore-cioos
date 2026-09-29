@@ -34,7 +34,6 @@ const polygon = [
   [longitude - delta, latitude - delta],
 ];
 const query = new URLSearchParams({
-  email: "ci@example.invalid",
   polygon: JSON.stringify(polygon),
   timeMin: new Date(timeMin.getTime() - timeDelta).toISOString(),
   timeMax: new Date(timeMax.getTime() + timeDelta).toISOString(),
@@ -42,7 +41,11 @@ const query = new URLSearchParams({
 const url = `${API_URL}/download?${query}`;
 console.log("Submitting download request:", url);
 
-const response = await fetch(url);
+const response = await fetch(url, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email: "ci@example.invalid" }),
+});
 assert.equal(response.ok, true, `${url} returned HTTP ${response.status}`);
 const result = await response.json();
 assert.ok(

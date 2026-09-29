@@ -57,7 +57,9 @@ describe("CoverageModal", () => {
     await user.click(screen.getByTestId("coverage-count-dropdown-toggle"));
     const option = screen
       .getAllByTestId("coverage-count-option")
-      .find((el) => el.textContent === label);
+      .find(
+        (el) => el.querySelector(".coverageOptionLabel").textContent === label,
+      );
     await user.click(option);
   }
 

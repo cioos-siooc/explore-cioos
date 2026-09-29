@@ -16,19 +16,13 @@ import {
 import {
   createDataFilterQueryString,
   validateEmail,
-  getCookieValue,
   useChanged,
 } from "../../utilities.jsx";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
+import { usePersistentState } from "../usePersistentState.js";
 
 const DownloadContext = createContext();
-
-// Remember the address for a month so the next download does not have to be
-// retyped. Read back by getCookieValue when the provider mounts.
-function rememberEmail(email) {
-  document.cookie = `email=${email}; Secure; max-age=${60 * 60 * 24 * 31}`;
-}
 
 export function useDownload() {
   return useContext(DownloadContext);
@@ -39,7 +33,11 @@ export default function DownloadProvider({ children }) {
   const { query, startDate, endDate, startDepth, endDepth } = useFilters();
   const { polygon, pointsToDownload } = useSelection();
 
-  const [email, setEmail] = useState(getCookieValue("email"));
+  // The address is kept on this device only when the user asks for it, and
+  // unticking the box forgets it at once.
+  const [savedEmail, setSavedEmail] = usePersistentState("email", "");
+  const [email, setEmail] = useState(savedEmail);
+  const [rememberEmail, setRememberEmailState] = useState(Boolean(savedEmail));
   const [submissionState, setSubmissionState] = useState();
 
   // Whether each filter is carried into the download. These are checkboxes the
@@ -109,9 +107,22 @@ export default function DownloadProvider({ children }) {
     setSubmissionState(undefined);
   }
 
+  function setRememberEmail(remember) {
+    setRememberEmailState(remember);
+    if (!remember) setSavedEmail("");
+  }
+
   function handleSubmission() {
     setSubmissionState("submitted");
-    if (validateEmail(email)) rememberEmail(email);
+    if (rememberEmail && validateEmail(email)) setSavedEmail(email);
+    // Cookieless and anonymous (see PrivacyModal). Absent when the script is
+    // blocked or has not loaded, which only costs the count.
+    window.plausible?.("Download submitted", {
+      props: {
+        datasets: String(pointsToDownload.length),
+        language: i18n.language,
+      },
+    });
     // Submitting is what the click does, so it happens here rather than in an
     // effect watching for the state to become "submitted".
     submitRequest();
@@ -137,11 +148,17 @@ export default function DownloadProvider({ children }) {
       downloadQuery,
     )}&datasetPKs=${pointsToDownload
       .map((point) => point.pk)
-      .join(",")}&email=${email}&lang=${i18n.language}`;
+      .join(",")}&lang=${i18n.language}`;
     if (polygon && filterDownloadByPolygon) {
       url += `&polygon=${JSON.stringify(polygon)}`;
     }
-    fetch(url)
+    // The address goes in the body: a URL is written to access logs and
+    // recorded by Sentry's request tracing, and a body is not.
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    })
       .then((response) => {
         if (response.ok) {
           setSubmissionState("successful");
@@ -159,6 +176,8 @@ export default function DownloadProvider({ children }) {
     email,
     setEmail,
     emailValid,
+    rememberEmail,
+    setRememberEmail,
     submissionState,
     setSubmissionState,
     submissionFeedback,
