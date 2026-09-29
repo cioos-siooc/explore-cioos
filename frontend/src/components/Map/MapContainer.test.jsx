@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
@@ -192,5 +192,26 @@ describe("MapContainer", () => {
     await waitFor(() =>
       expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk),
     );
+  });
+
+  it("shows the map spinner while a data layer loads, not the basemap", async () => {
+    await renderReady();
+    act(() => latestMapProps.onFirstPaint());
+
+    act(() => latestMapProps.setLoadingLayers(["bathymetry"]));
+    expect(screen.queryByTestId("map-loading-spinner")).toBeNull();
+
+    act(() => latestMapProps.setLoadingLayers(["bathymetry", "observations"]));
+    expect(screen.getByTestId("map-loading-spinner")).toBeInTheDocument();
+
+    act(() => latestMapProps.setLoadingLayers([]));
+    expect(screen.queryByTestId("map-loading-spinner")).toBeNull();
+  });
+
+  it("leaves the first load to the splash", async () => {
+    await renderReady();
+    act(() => latestMapProps.setLoadingLayers(["observations"]));
+    expect(latestMapState.firstPaintPending).toBe(true);
+    expect(screen.queryByTestId("map-loading-spinner")).toBeNull();
   });
 });

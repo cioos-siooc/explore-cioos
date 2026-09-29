@@ -115,3 +115,15 @@
   height: 1.6em;
   height: 1lh;
 }
+
+/* The mark on its own disc, for where it floats over the map: it reads over a
+   dark sea as well as over land. The map's loading spinner and the splash's
+   mark share it, so the first load and every later one wear the same mark. */
+.cioosSpinnerDisc {
+  display: inline-flex;
+  padding: var(--cioos-space-md, 12px);
+  background-color: rgb(255 255 255 / 78%);
+  border-radius: 50%;
+  box-shadow: var(--cioos-shadow-float);
+  color: var(--cioos-primary);
+}
