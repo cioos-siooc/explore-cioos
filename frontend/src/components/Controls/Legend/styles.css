@@ -505,13 +505,12 @@
  * from the 700px rule above, which this width is inside.
  * ------------------------------------------------------------------ */
 
-/* The card drops below even the desktop type sizes: it is a glance over the
-   map, and the full keys are a tap away in the dialog, which keeps the larger
-   type. */
+/* The card holds the desktop type sizes instead of the phone step-up: it is a
+   glance over the map, and the full keys are a tap away in the dialog. */
 .legendCompact {
-  --cioos-font-size-3xs: 9px;
-  --cioos-font-size-2xs: 9px;
-  --cioos-font-size-xs: 10px;
+  --cioos-font-size-3xs: 10px;
+  --cioos-font-size-2xs: 10px;
+  --cioos-font-size-xs: 11px;
 
   min-width: 96px;
   max-width: 136px;

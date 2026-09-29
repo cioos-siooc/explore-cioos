@@ -233,7 +233,11 @@
   }
 
   .brandTitle[lang="fr"] span {
-    font-size: min(var(--cioos-font-size-2xs), 2.6vw);
+    font-size: clamp(
+      var(--cioos-font-size-3xs),
+      2.6vw,
+      var(--cioos-font-size-2xs)
+    );
   }
 
   /* Scaled with the viewport rather than held at the rung's mobile size, the

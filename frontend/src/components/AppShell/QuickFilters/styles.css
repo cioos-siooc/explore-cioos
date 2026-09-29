@@ -314,9 +314,9 @@
     align-self: center;
     max-width: calc(100vw - 16px);
 
-    /* Sized for six 40px buttons filling a 360px screen exactly; the five
-       left now fit with room to spare. */
-    gap: 20px 19px;
+    /* Five 40px buttons across a 360px screen, spaced so neighbouring
+       captions at the phone size ("Visibles", "Temps réel") clear each other. */
+    gap: 20px 30px;
     padding-bottom: 16px;
   }
 
@@ -327,10 +327,7 @@
     display: none;
   }
 
-  /* Held at the desktop size rather than the mobile rung's: at the larger one
-     neighbouring captions run into each other on a 360px screen. */
   .quickFilterCaption {
-    padding: 3px 2px;
-    font-size: var(--cioos-font-size-3xs);
+    padding: 3px 4px;
   }
 }
