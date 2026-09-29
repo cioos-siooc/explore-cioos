@@ -454,6 +454,14 @@ h6 {
   box-shadow: var(--cioos-focus);
 }
 
+/* A platform dot or hexagon, wherever it is drawn outside the map: the map
+   rings its markers in dark ink, and the pale hues (float yellow, aircraft
+   mint) vanish on white without the same edge. Stroke is in viewBox units. */
+.platformGlyph path {
+  stroke: var(--cioos-ink-60);
+  stroke-width: 1;
+}
+
 /* Screen reader only: hide content visually but keep it accessible */
 .sr-only {
   position: absolute;

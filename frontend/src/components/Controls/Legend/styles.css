@@ -60,7 +60,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   cursor: pointer;
 }
 
@@ -109,8 +109,8 @@
   margin: 0;
 }
 
-/* The group's name. Upper case and the darker ink; the sub-captions inside it
-   are sentence case and lighter, which is the whole of the hierarchy at 10px —
+/* The group's name. Upper case and full ink; the sub-captions inside it
+   are sentence case and ink-80, which is the whole of the hierarchy at 10px —
    two uppercase levels would have looked like one. */
 .legendGroupLabel {
   /* Shrinks to its words rather than taking the row: the ⓘ that follows reads
@@ -121,7 +121,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink);
 
   /* Wraps rather than nowrap: the card is capped at 190px and the longer French
      labels ran past it, where the card's overflow simply cut them off. */
@@ -170,7 +170,7 @@
   font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-80);
   margin-bottom: 2px;
   line-height: 1.25;
 }
@@ -313,7 +313,7 @@
   top: 0;
   font-size: var(--cioos-font-size-3xs);
   line-height: 1;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   white-space: nowrap;
   transform: translateX(-50%);
 }

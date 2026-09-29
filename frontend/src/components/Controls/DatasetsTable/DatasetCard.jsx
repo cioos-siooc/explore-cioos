@@ -402,23 +402,35 @@ export function DatasetCardSkeleton() {
 }
 
 export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
+  // Grid amber, the colour the map draws gridded coverage in.
   if (cdmDataType === "Grid") {
     return (
-      <Grid3x3Gap title={t("griddapTypeLabel")} color="#52a79b" size={13} />
+      <Grid3x3Gap
+        title={t("griddapTypeLabel")}
+        color="var(--cioos-grid-700)"
+        size={13}
+      />
     );
   }
   const Icon =
     cdmDataType === "Trajectory" || sourceType === "obis"
       ? HexagonFill
       : CircleFill;
-  const platformColor = platformColors.find((pc) => pc.platform === platform);
   return (
     <Icon
+      className="platformGlyph"
       title={t(platform)}
-      fill={platformColor?.color || "#000000"}
+      fill={platformColorOf(platform)}
       size={13}
     />
   );
+}
+
+function platformColorOf(platform) {
+  return (
+    platformColors.find((pc) => pc.platform === platform) ??
+    platformColors.find((pc) => pc.platform === "unknown")
+  ).color;
 }
 
 // The same names the map's geometry filter gives these types (dataLayers.js).
