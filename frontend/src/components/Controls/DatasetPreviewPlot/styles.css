@@ -41,7 +41,7 @@
 .dropdownEmptyNote {
   display: block;
   padding: 8px 16px;
-  color: var(--cioos-text-muted, #666);
+  color: var(--cioos-ink-80);
 }
 
 /* One control per row: caption on the left, dropdown button on the right. */
@@ -99,7 +99,7 @@
 
 .datasetPreviewPlotEmpty {
   padding: 24px 8px;
-  color: var(--cioos-text-muted, #666);
+  color: var(--cioos-ink-80);
 }
 
 /* The variable pickers can list every column, but the menu height cap lives in
@@ -123,12 +123,12 @@
   border: none;
   text-align: left;
   cursor: pointer;
-  color: #333;
+  color: var(--cioos-ink);
   font-size: var(--cioos-font-size-xs);
 }
 
 .labelEditorToggle:hover {
-  color: #52a79b;
+  color: var(--cioos-primary-800);
 }
 
 .labelEditor {
@@ -146,7 +146,7 @@
 
 .labelEditorRow label {
   font-size: var(--cioos-font-size-2xs);
-  color: #555;
+  color: var(--cioos-ink-80);
 }
 
 /* The colour chip and the rename field share a line; the chip is intrinsically

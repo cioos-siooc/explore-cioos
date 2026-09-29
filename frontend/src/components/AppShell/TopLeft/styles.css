@@ -161,9 +161,11 @@
   color: var(--cioos-on-primary);
 }
 
+/* Text, not an icon: ink-60 is 4.2:1 at this size. */
 .brandLanguage {
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
+  color: var(--cioos-ink-80);
 }
 
 /* ------------------------------------------------------------------
