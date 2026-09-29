@@ -535,12 +535,3 @@ h6 {
   inset: min(0px, calc(50% - var(--cioos-hit-half)));
 }
 
-/* Honour reduced-motion: the panel/legend slide transitions are decorative. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0.001ms !important;
-    animation-duration: 0.001ms !important;
-  }
-}

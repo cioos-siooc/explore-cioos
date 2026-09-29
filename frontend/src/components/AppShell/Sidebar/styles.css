@@ -423,6 +423,20 @@
   }
 }
 
+/* Reduced motion: the count still signals the change, as a flash instead of
+   a swell. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebarDownloadButton:not(:disabled) .sidebarDownloadCount {
+    animation: sidebarCountFlash 450ms ease-out;
+  }
+}
+
+@keyframes sidebarCountFlash {
+  from {
+    opacity: 0.2;
+  }
+}
+
 /* ------------------------------------------------------------------
  * Mobile: the card is the screen. It covers the map edge to edge — the
  * top bar included, which is what separates "I am reading the list" from

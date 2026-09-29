@@ -108,6 +108,36 @@
   }
 }
 
+/* Reduced motion: the row takes its height at once and only fades. The name
+   keeps the topBar prefix TopBarRow waits on. */
+@media (prefers-reduced-motion: reduce) {
+  .topBarRow.entering,
+  .topBarRow.leaving {
+    animation: topBarRowFadeIn 150ms ease-out both;
+  }
+
+  .topBarRow.leaving {
+    animation-name: topBarRowFadeOut;
+  }
+
+  .topBarRow.entering > .topBarRowInner,
+  .topBarRow.leaving > .topBarRowInner {
+    animation: none;
+  }
+}
+
+@keyframes topBarRowFadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes topBarRowFadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
 .topBar > * {
   pointer-events: auto;
 }

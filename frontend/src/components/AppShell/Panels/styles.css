@@ -438,10 +438,17 @@
   }
 }
 
+/* Reduced motion: the swap still fades, without the sideways slide. */
 @media (prefers-reduced-motion: reduce) {
   .datasetsPanelDetail,
   .datasetsPanelList {
-    animation: none;
+    animation-name: datasetsFadeIn;
+  }
+}
+
+@keyframes datasetsFadeIn {
+  from {
+    opacity: 0;
   }
 }
 
