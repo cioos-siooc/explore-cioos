@@ -250,6 +250,15 @@ services:
         condition: service_healthy
     restart: unless-stopped
     command: ["./worker-entrypoint.sh"]
+    healthcheck:
+      # Prefect's worker webserver (--with-healthcheck in worker-entrypoint.sh).
+      # In compose, not the image: the image's own CMD runs no worker. The long
+      # grace covers deployment registration, which runs before the worker.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
     volumes:
       # NOTE: the harvest config is NOT bind-mounted here, and the image does
       # NOT bake one — it must be provided at runtime (startup fails with
@@ -330,7 +339,7 @@ services:
     # Non-conda image: ships asyncpg, so Prefect can use Postgres as its
     # metadata DB. SQLite (the default) throws "database is locked" under the
     # concurrent access from scaled / remote workers — Postgres handles it.
-    image: prefecthq/prefect:3.6-python3.12
+    image: prefecthq/prefect:3.8-python3.12
     # On startup, create the dedicated `prefect` database in the shared `db`
     # Postgres if it doesn't exist (idempotent; works on fresh AND existing
     # volumes, including Coolify where initdb scripts won't re-run), then start

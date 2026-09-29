@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 // single namespace in localStorage — and overridable by the share link the app
 // was opened at.
 //
+// This module is the only place the app keeps anything in the browser, and it
+// uses localStorage rather than cookies: a cookie rides along on every request
+// to the server, and none of this is the server's business. The privacy notice
+// (PrivacyModal) describes what is kept here, so a new key belongs there too.
+//
 // Storage is best-effort: private-mode Safari and blocked third-party storage
 // both throw on access, and a preference is never worth crashing the app over,
 // so failures fall back to the in-memory default.
@@ -62,4 +67,17 @@ export function usePersistentState(key, defaultValue) {
   }, [key, value]);
 
   return [value, setValue];
+}
+
+// Cookies earlier versions set: the remembered download address and the
+// intro's seen flag, now in localStorage, and i18next's copy of the language,
+// which it also keeps there. Expired on load so the address stops travelling
+// with every request instead of lingering until its month runs out.
+const LEGACY_COOKIES = ["email", "introModalOpen", "i18next"];
+
+export function clearLegacyCookies() {
+  for (const name of LEGACY_COOKIES) {
+    document.cookie = `${name}=; max-age=0`;
+    document.cookie = `${name}=; max-age=0; path=/`;
+  }
 }

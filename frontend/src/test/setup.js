@@ -67,9 +67,9 @@ Element.prototype.scrollIntoView ??= () => {};
 // Vitest reuses one jsdom global for every test in a file, and this app writes
 // to three pieces of shared browser state that would otherwise leak between
 // them: the address (every provider seeds from window.location, and useUrlSync
-// rewrites it), localStorage (usePersistentState's cde.* preferences) and
-// document.cookie (UIProvider's introModalOpen, which decides whether the intro
-// modal is on screen at all).
+// rewrites it), localStorage (usePersistentState's cde.* preferences, among
+// them whether the intro modal is on screen at all) and document.cookie (the
+// legacy cookies clearLegacyCookies expires).
 afterEach(() => {
   cleanup();
   resetViewport();

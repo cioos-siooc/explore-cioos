@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 
 import {
+  clearLegacyCookies,
   usePersistentState,
   useUrlSeededPersistentState,
 } from "./usePersistentState.js";
@@ -101,5 +102,15 @@ describe("usePersistentState", () => {
     expect(JSON.parse(window.localStorage.getItem("cde.seenTips"))).toEqual([
       "shareLink",
     ]);
+  });
+});
+
+describe("clearLegacyCookies", () => {
+  it("expires the cookies earlier versions set, the email among them", () => {
+    document.cookie = "email=diver@example.com";
+    document.cookie = "introModalOpen=false; path=/";
+    document.cookie = "i18next=fr; path=/";
+    clearLegacyCookies();
+    expect(document.cookie).toBe("");
   });
 });

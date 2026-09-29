@@ -97,7 +97,8 @@ const noopRes = () => ({
 async function sqlFrom(name, query = {}) {
   captured.length = 0;
   const req = {
-    query: { email: "a@b.c", ...query },
+    query,
+    body: { email: "a@b.c" },
     params: { z: "6", x: "20", y: "20" },
   };
   await handlerFor(name)(req, noopRes(), () => {});

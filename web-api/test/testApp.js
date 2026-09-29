@@ -33,8 +33,8 @@ const redisStub = require("./redisStub");
  * install test/axiosStub.js yourself, BEFORE calling createTestApp — same
  * ordering rule, since axios is required by those route files too.
  */
-function createTestApp() {
-  redisStub.install();
+function createTestApp({ redisClient } = {}) {
+  redisStub.install({ client: redisClient });
   const db = dbStub.install();
   const app = require("../app");
   return { app, agent: request(app), db, resetCache: () => apicache.clear() };

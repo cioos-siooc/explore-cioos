@@ -55,7 +55,7 @@ describe("AppShell (composition)", () => {
     // A returning visitor, so the intro isn't sitting over the page (jsdom
     // doesn't stop clicks behind it) and its own headings stay out of the query
     // below.
-    document.cookie = "introModalOpen=false; path=/";
+    window.localStorage.setItem("cde.introSeen", "true");
     renderWithProviders(<AppShell />, { providers: "app" });
     await waitFor(() =>
       expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
@@ -95,7 +95,7 @@ describe("AppShell (composition)", () => {
 
   it("closes a dataset page and the sidebar from the banner's close button", async () => {
     const user = userEvent.setup();
-    document.cookie = "introModalOpen=false; path=/";
+    window.localStorage.setItem("cde.introSeen", "true");
     renderWithProviders(<AppShell />, {
       providers: "app",
       url: `/?dataset=${pointQueryFixture[0].dataset_id}`,
@@ -120,7 +120,7 @@ describe("AppShell (composition)", () => {
     // dropped the dataset on the way to the list.
     async function minimize() {
       const user = userEvent.setup();
-      document.cookie = "introModalOpen=false; path=/";
+      window.localStorage.setItem("cde.introSeen", "true");
       const row = pointQueryFixture[0];
       renderWithProviders(<AppShell />, {
         providers: "app",

@@ -14,6 +14,7 @@ import FiltersModal from "./Modals/FiltersModal.jsx";
 import DownloadModal from "./Modals/DownloadModal.jsx";
 import CoverageModal from "./Modals/CoverageModal.jsx";
 import SelectionHelpModal from "./Modals/SelectionHelpModal.jsx";
+import PrivacyModal from "./Modals/PrivacyModal.jsx";
 import PreviewHost from "./Panels/PreviewHost.jsx";
 import Loading from "../Controls/Loading/Loading.jsx";
 import Legend from "../Controls/Legend/Legend.jsx";
@@ -190,6 +191,8 @@ export default function AppShell() {
       <TimeBar />
       <DepthBar />
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
+      {/* After the intro and the download window, both of which link to it. */}
+      <PrivacyModal />
       <PreviewHost />
     </>
   );

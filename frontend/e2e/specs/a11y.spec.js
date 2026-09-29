@@ -37,11 +37,16 @@ const STATES = {
     await openApp(page, "eovs=oxygen&platforms=mooring");
     await page.getByTestId("filter-chip-group").first().waitFor();
   },
-  "intro modal": async (page, context) => {
-    // The one surface that needs the cookie cleared, since it is what the rest
-    // of the suite sets to get the modal out of the way.
-    await context.clearCookies();
+  "intro modal": async (page) => {
     await openApp(page);
+    await page.getByRole("button", { name: "About this tool" }).click();
+    await page.getByTestId("intro-tips").waitFor();
+  },
+  "privacy notice": async (page) => {
+    await openApp(page);
+    await page.getByRole("button", { name: "About this tool" }).click();
+    await page.getByRole("button", { name: "Privacy", exact: true }).click();
+    await page.getByTestId("privacy-modal").waitFor();
   },
 };
 
