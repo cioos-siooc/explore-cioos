@@ -20,7 +20,7 @@ on:
           - production
 
 permissions:
-  actions: write
+  actions: read
   contents: read
 
 jobs:
@@ -89,23 +89,10 @@ jobs:
             printf 'target=%s\n' "$TARGET"
           } >> "$GITHUB_OUTPUT"
 
-  queue-deploy:
-    name: Queue tested release
-    needs: release
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy from the master workflow ref
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.release.outputs.tag }}
-          TARGET: ${{ needs.release.outputs.target }}
-        run: gh workflow run deploy.yml --ref master -f tag="$TAG" -f environment="$TARGET"
-
   staging:
     name: Deploy staging
     needs: release
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'staging'
+    if: needs.release.outputs.target == 'staging'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     environment: staging
@@ -122,7 +109,7 @@ jobs:
           deploy_path: /srv/services/explore-cioos-staging
           stack_name: explore-cioos-staging
           compose_files: docker-compose.yaml docker-compose.production.yaml
-          op_secret_files: .env.staging.sample:.env
+          op_secret_files: .env.staging:.env
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"
@@ -130,7 +117,7 @@ jobs:
   production:
     name: Deploy production
     needs: release
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
+    if: needs.release.outputs.target == 'production'
     timeout-minutes: 15
     runs-on: ubuntu-latest
     environment: production
@@ -141,7 +128,7 @@ jobs:
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
           wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
-          ssh_host: "${{ secrets.SERVER_IP }}"
+          ssh_host: ${{ secrets.SERVER_IP }}
           ssh_username: runner
           ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
           deploy_path: /srv/services/explore-cioos
