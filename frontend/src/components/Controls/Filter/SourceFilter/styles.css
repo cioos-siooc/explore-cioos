@@ -1,6 +1,11 @@
-.sourceFilter .obisGroupButton {
+.sourceFilter .obisGroupRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.sourceFilter .obisGroupRow .obisGroupButton {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .sourceFilter .obisGroupButton svg {
@@ -12,7 +17,11 @@
 }
 
 .sourceFilter .obisGroupChevron {
-  padding: 0 8px;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
 
 .sourceFilter .obisGroupChevron:hover {

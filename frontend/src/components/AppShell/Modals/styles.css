@@ -458,6 +458,15 @@
   overflow: hidden;
 }
 
+/* A flex column so the panel's flex-basis resolves against a height the
+   dialog's max-height actually caps: a height: 100% panel here had nothing
+   definite to be 100% of, grew to its list, and pushed the footer (count and
+   Clear all) below the clipped edge. */
+.filtersModal .modal-body {
+  display: flex;
+  flex-direction: column;
+}
+
 @media (max-height: 560px) {
   .filtersModal .modal-content,
   .downloadModal .modal-content {
@@ -489,7 +498,7 @@
   .filtersModal {
     font-size: var(--cioos-font-size-base);
 
-    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-3xs: 10px;
     --cioos-font-size-2xs: 10px;
     --cioos-font-size-xs: 11px;
     --cioos-font-size-sm: 11px;

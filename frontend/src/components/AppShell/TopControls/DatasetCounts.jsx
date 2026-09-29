@@ -41,7 +41,10 @@ export default function DatasetCounts() {
         <Spinner size="xs" className="countSpinner" />
       ) : (
         <>
+          {/* Announced when a filter changes the tally; the in-view count
+              beside it is left out, since every pan would repeat it. */}
           <span
+            role="status"
             title={t("dockDatasetsCountTitle", {
               filtered: filteredCount,
               total: totalCount,

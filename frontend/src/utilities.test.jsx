@@ -10,7 +10,8 @@ import {
   escapeHtml,
   formatDatasetCount,
   getCurrentRangeLevel,
-  nextOptionState,
+  toggleOptionExcluded,
+  toggleOptionIncluded,
   polygonIsRectangle,
   polygonToWkt,
   quantizeCountRange,
@@ -263,18 +264,25 @@ describe("createDataFilterQueryString", () => {
   });
 });
 
-describe("nextOptionState", () => {
-  it("cycles neutral -> include -> exclude -> neutral", () => {
-    const neutral = { pk: 1, isSelected: false };
-    const included = nextOptionState(neutral);
+describe("toggleOptionIncluded / toggleOptionExcluded", () => {
+  const neutral = { pk: 1, isSelected: false, isExcluded: false };
+
+  it("each toggles its own state on and off", () => {
+    const included = toggleOptionIncluded(neutral);
     expect(included).toMatchObject({ isSelected: true, isExcluded: false });
-    const excludedOption = nextOptionState(included);
-    expect(excludedOption).toMatchObject({
+    expect(toggleOptionIncluded(included)).toMatchObject(neutral);
+    const excluded = toggleOptionExcluded(neutral);
+    expect(excluded).toMatchObject({ isSelected: false, isExcluded: true });
+    expect(toggleOptionExcluded(excluded)).toMatchObject(neutral);
+  });
+
+  it("switching to one clears the other", () => {
+    expect(toggleOptionExcluded(toggleOptionIncluded(neutral))).toMatchObject({
       isSelected: false,
       isExcluded: true,
     });
-    expect(nextOptionState(excludedOption)).toMatchObject({
-      isSelected: false,
+    expect(toggleOptionIncluded(toggleOptionExcluded(neutral))).toMatchObject({
+      isSelected: true,
       isExcluded: false,
     });
   });

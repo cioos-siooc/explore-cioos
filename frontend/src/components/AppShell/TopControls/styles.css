@@ -470,10 +470,23 @@
     align-items: stretch;
   }
 
-  /* The chips hang under the full-width header, so they take its width too. */
+  /* The chips hang under the full-width header, so they take its width too —
+     on one line that scrolls sideways, since every wrapped line here was a
+     line of map lost. */
   .activeFiltersPanel {
     width: 100%;
-    padding: 0 8px;
+    padding: 2px 8px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .activeFiltersPanel .activeFilterGroup {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    max-width: none;
   }
 
   /* The header meets the screen edges square, so the tab strip's outer corners

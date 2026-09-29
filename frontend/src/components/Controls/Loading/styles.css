@@ -50,7 +50,7 @@
    full-screen interstitial — it has all the room in the world, and wants less
    of it than that, on a phone most of all. */
 .loading-brand .cioosLogo-stacked {
-  font-size: var(--cioos-font-size-3xs, 9px);
+  font-size: var(--cioos-font-size-3xs);
 }
 
 /* The anchor the lockup keeps: sized by the logo alone, with the list of waits

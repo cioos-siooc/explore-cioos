@@ -191,7 +191,7 @@
      the rest of the scale was tuned: the mobile bump below can only reach sizes
      that are on the scale. Nothing should set a font-size in px outside this
      block — reach for the nearest rung instead. */
-  --cioos-font-size-3xs: 9px;
+  --cioos-font-size-3xs: 10px;
   --cioos-font-size-2xs: 10px;
   --cioos-font-size-xs: 11px;
   --cioos-font-size-sm: 12px;

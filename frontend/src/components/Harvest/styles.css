@@ -23,7 +23,7 @@
 .harvest-root {
   min-height: 100vh;
   background: var(--cioos-sand);
-  font-family: Montserrat, sans-serif;
+  font-family: var(--cioos-font-body);
   color: var(--cioos-ink);
 }
 

@@ -19,13 +19,19 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
 // The click cycle of a list filter option: neutral -> include ->
 // exclude -> neutral. The two flags are mutually exclusive, and `isSelected`
 // keeps meaning "included" everywhere it was already read.
-export function nextOptionState(option) {
-  if (option.isSelected)
-    return { ...option, isSelected: false, isExcluded: true };
-  if (option.isExcluded)
-    return { ...option, isSelected: false, isExcluded: false };
-  return { ...option, isSelected: true, isExcluded: false };
-}
+// A list filter's option is included by clicking it and excluded by its own
+// button (see FilterOption); each click toggles one state and clears the other.
+export const toggleOptionIncluded = (option) => ({
+  ...option,
+  isSelected: !option.isSelected,
+  isExcluded: false,
+});
+
+export const toggleOptionExcluded = (option) => ({
+  ...option,
+  isSelected: false,
+  isExcluded: !option.isExcluded,
+});
 
 /*
  * A download size as the modal shows it. Every byte figure there comes from

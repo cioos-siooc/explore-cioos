@@ -37,7 +37,7 @@ import "./styles.css";
  * but the copy button's flash: what it exports and what the cards show are the
  * same links.
  */
-export default function DirectDownloadLinks({ links, constraints }) {
+export default function DirectDownloadLinks({ links, constraints, onHide }) {
   const { t } = useTranslation();
   const [copyState, copy] = useCopyToClipboard("direct download links");
 
@@ -73,6 +73,16 @@ export default function DirectDownloadLinks({ links, constraints }) {
             ? t("directLinksEmpty")
             : t("directLinksCount", { count: links.length })}
         </span>
+        {onHide && (
+          <button
+            type="button"
+            className="directLinksHide"
+            aria-expanded={true}
+            onClick={onHide}
+          >
+            {t("directLinksHide")}
+          </button>
+        )}
       </span>
 
       <div className="directLinksActions">

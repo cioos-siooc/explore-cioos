@@ -2521,6 +2521,9 @@ export default function CreateMap({
       // the discrete GPU on dual-GPU laptops. The map is circles and fills —
       // the integrated GPU renders it fine, so hint 'low-power'.
       canvasContextAttributes: { powerPreference: "low-power" },
+      // The canvas can't be browsed by keyboard or screen reader; its label
+      // points to the list that holds the same datasets.
+      locale: { "Map.Title": t("mapCanvasLabel") },
       // No attribution in the map's own corner: the per-source attributions are
       // gathered by an AttributionControl the legend card builds and parents
       // itself (see LegendFooter.jsx).
@@ -4586,7 +4589,9 @@ export default function CreateMap({
   // is baked into buildBasemapStyle at construction, so this only fires on
   // runtime changes.
   useEffect(() => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current) return;
+    map.current.getCanvas().setAttribute("aria-label", t("mapCanvasLabel"));
+    if (!map.current.isStyleLoaded()) return;
     LABEL_LAYER_IDS.forEach((id) => {
       if (map.current.getLayer(id)) {
         map.current.setLayoutProperty(
@@ -4596,7 +4601,7 @@ export default function CreateMap({
         );
       }
     });
-  }, [i18n.language]);
+  }, [i18n.language, t]);
 
   return (
     <div

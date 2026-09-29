@@ -162,4 +162,35 @@ describe("DownloadDetails", () => {
       document.querySelector(".downloadSummaryValue[title]"),
     ).toHaveAttribute("title", "Size estimate unavailable");
   });
+
+  it("keeps the direct links behind a button until asked for", async () => {
+    const { user } = renderDetails();
+    expect(screen.queryByTestId("direct-links")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("direct-links-reveal"));
+    expect(screen.getByTestId("direct-links")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hide" }));
+    expect(screen.queryByTestId("direct-links")).not.toBeInTheDocument();
+  });
+
+  it("opens the direct links by itself when a dataset is over the 1GB ceiling", async () => {
+    installMockFetch();
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/downloadEstimate")) {
+        return Promise.resolve(
+          Response.json([
+            { pk: EST_SMALL.pk, size: EST_SMALL.size },
+            { pk: EST_LARGE.pk, size: 2e9 },
+          ]),
+        );
+      }
+      return realFetch(input, init);
+    };
+    renderDetails();
+    expect(await screen.findByTestId("direct-links")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Hide" }),
+    ).not.toBeInTheDocument();
+  });
 });

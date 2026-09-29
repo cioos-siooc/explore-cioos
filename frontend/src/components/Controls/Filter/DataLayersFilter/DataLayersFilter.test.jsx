@@ -43,7 +43,7 @@ describe("DataLayersFilter", () => {
     expect(latest.dataLayers.profile).toBe(false);
   });
 
-  it("a second click excludes the layer, a third clears it", async () => {
+  it("its exclude button excludes the layer, and a second press clears it", async () => {
     let latest;
     function Probe() {
       latest = useMapState();
@@ -56,13 +56,16 @@ describe("DataLayersFilter", () => {
       </>,
     );
     const row = () => screen.getByText("Gridded data").closest(".optionButton");
-    await user.click(row());
-    await user.click(row());
+    const exclude = () =>
+      screen.getByRole("button", { name: "Exclude: Gridded data" });
+    await user.click(screen.getByRole("checkbox", { name: /Gridded data/ }));
+    await user.click(exclude());
     await waitFor(() => expect(row()).toHaveClass("excluded"));
     expect(row()).toHaveTextContent("(excluded)");
+    expect(exclude()).toHaveAttribute("aria-pressed", "true");
     expect(latest.dataLayers.grid).toBe(false);
     expect(latest.dataLayers.profile).toBe(true);
-    await user.click(row());
+    await user.click(exclude());
     await waitFor(() => expect(row()).not.toHaveClass("excluded"));
     expect(Object.values(latest.dataLayers).every(Boolean)).toBe(true);
   });

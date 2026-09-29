@@ -508,7 +508,7 @@
    map, and the full keys are a tap away in the dialog, which keeps the larger
    type. */
 .legendCompact {
-  --cioos-font-size-3xs: 8px;
+  --cioos-font-size-3xs: 9px;
   --cioos-font-size-2xs: 9px;
   --cioos-font-size-xs: 10px;
 

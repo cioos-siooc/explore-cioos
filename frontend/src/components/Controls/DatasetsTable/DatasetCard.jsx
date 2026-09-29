@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   Download,
   ExclamationTriangleFill,
+  PlusCircle,
   Grid3x3Gap,
   HexagonFill,
   Check2Circle,
@@ -82,15 +83,6 @@ export default function DatasetCard({
 
   const clickable = typeof onInspect === "function";
   const handleCardClick = clickable ? () => onInspect(row) : undefined;
-  const handleKeyDown = clickable
-    ? (e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onInspect(row);
-        }
-      }
-    : undefined;
 
   const selectTitle = isGrid
     ? t("griddapNotDownloadableTooltip")
@@ -112,20 +104,13 @@ export default function DatasetCard({
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHoverEnd()}
-      role={clickable ? "button" : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onKeyDown={handleKeyDown}
     >
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
-          {/* Whether this dataset is in the download: first thing on the
-              title's line, ahead of the platform dot. The glyph says which way
-              the click goes rather than colouring a ground — a download sign
-              while the dataset is out, the filled circle of a ticked box once
-              it is in. Both read at a glance down the left edge of the list,
-              which is what asking "which of these have I picked?" amounts to.
-              role=checkbox because that is what it is; a button carries the
-              icon a native input cannot. */}
+          {/* A plus while out, a filled tick once in — not a download sign,
+              which promised a file this click never delivers. role=checkbox
+              because that is what it is; a button carries the icon a native
+              input cannot. */}
           <button
             type="button"
             role="checkbox"
@@ -134,13 +119,13 @@ export default function DatasetCard({
             title={selectTitle}
             onClick={handleSelect}
             disabled={selectDisabled}
-            aria-label={t("datasetsCardSelectForDownloadText")}
+            aria-label={`${t("datasetsCardSelectForDownloadText")}: ${row.title}`}
             data-tip-highlight={tipHighlight}
           >
             {selected ? (
               <CheckCircleFill size={16} aria-hidden="true" />
             ) : (
-              <Download size={16} aria-hidden="true" />
+              <PlusCircle size={16} aria-hidden="true" />
             )}
           </button>
 
@@ -154,9 +139,22 @@ export default function DatasetCard({
               t={t}
             />
           </span>
-          <span className="datasetCardTitle" title={row.title}>
-            {row.title}
-          </span>
+          {/* The card's keyboard and screen-reader target: the whole card
+              can't be a button because it holds the checkbox and links. Its
+              click bubbles to the card's own handler. */}
+          {clickable ? (
+            <button
+              type="button"
+              className="datasetCardTitle"
+              title={row.title}
+            >
+              {row.title}
+            </button>
+          ) : (
+            <span className="datasetCardTitle" title={row.title}>
+              {row.title}
+            </span>
+          )}
 
           {/* Size and CDE-downloadable status, on the title's line rather than
               a row of their own. Both are a glyph and a few characters wide,
@@ -414,6 +412,15 @@ export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
   );
 }
 
+// The same names the map's geometry filter gives these types (dataLayers.js).
+const CDM_TYPE_LABEL_KEYS = {
+  Profile: "layerProfile",
+  TimeSeries: "layerTimeseries",
+  TimeSeriesProfile: "layerTimeseriesProfile",
+  Trajectory: "layerTrajectories",
+  TrajectoryProfile: "layerTrajectoryProfile",
+};
+
 // The card's second row: where the dataset lives, what kind it is, how many
 // locations and days it holds, and whether it is live. Shared with the map's
 // "what's here" card so a dataset reads the same in both lists.
@@ -426,9 +433,9 @@ export function DatasetCardMeta({ row, t, i18n }) {
   );
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
-    : (row.cdm_data_type || "")
-        .replace("TimeSeriesProfile", "Time series / Profile")
-        .replace("TimeSeries", "Time series");
+    : CDM_TYPE_LABEL_KEYS[row.cdm_data_type]
+      ? t(CDM_TYPE_LABEL_KEYS[row.cdm_data_type])
+      : row.cdm_data_type || "";
   const locationsLabel = isGrid
     ? formatGridSize(row.grid_dimensions) || "—"
     : row.profiles_count !== row.n_profiles
@@ -437,7 +444,7 @@ export function DatasetCardMeta({ row, t, i18n }) {
 
   return (
     <span className="datasetCardMeta">
-      <span className="datasetCardMetaItem" title="ERDDAP™ Server">
+      <span className="datasetCardMetaItem" title={t("coverageGroup_source")}>
         <Server size={13} aria-hidden="true" />
         {serverName}
       </span>

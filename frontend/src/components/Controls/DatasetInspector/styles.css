@@ -497,10 +497,21 @@
   align-items: center;
 }
 
-.listCard:focus-visible {
-  outline: none;
+.listCard:has(.listCardId:focus-visible) {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
+}
+
+button.listCardId {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.listCardId:focus-visible {
+  outline: none;
 }
 
 /* The record a map click resolved to, held at the top of the list: the same

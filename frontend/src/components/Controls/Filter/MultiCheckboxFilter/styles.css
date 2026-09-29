@@ -13,15 +13,59 @@
 }
 
 .multiCheckboxFilter .optionButton {
+  display: flex;
+  align-items: flex-start;
   padding-left: 5px;
   margin: 0 0 10px;
   cursor: pointer;
   line-height: 30px;
 
-  /* The include/exclude cycle is repeated clicks, which would otherwise
-     select the option's text. */
+  /* Quick repeated clicks would otherwise select the option's text. */
   user-select: none;
   -webkit-user-select: none;
+}
+
+.multiCheckboxFilter .optionToggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: inherit;
+  border-radius: inherit;
+}
+
+.multiCheckboxFilter .optionToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Quiet until wanted: ink-40 at rest, the error red once pressed. */
+.multiCheckboxFilter .optionExclude {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-width: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--cioos-radius-sm);
+  background: none;
+  color: var(--cioos-ink-40);
+  cursor: pointer;
+}
+
+.multiCheckboxFilter .optionExclude:hover {
+  color: var(--cioos-error);
+}
+
+.multiCheckboxFilter .optionExclude:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.multiCheckboxFilter .optionButton.excluded .optionExclude {
+  color: var(--cioos-error);
 }
 
 .multiCheckboxFilter .optionButton {
@@ -44,7 +88,7 @@
   text-decoration: line-through;
 }
 
-.multiCheckboxFilter .optionButton.excluded > svg:first-child {
+.multiCheckboxFilter .optionButton.excluded .optionToggle > svg:first-child {
   color: var(--cioos-error);
 }
 

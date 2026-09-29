@@ -309,10 +309,22 @@
   background-color: var(--cioos-surface-2);
 }
 
-.datasetCard.clickable:focus-visible {
-  outline: none;
+/* The title button is what takes focus; the ring goes on the whole card. */
+.datasetCard.clickable:has(.datasetCardTitle:focus-visible) {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
+}
+
+button.datasetCardTitle {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.datasetCardTitle:focus-visible {
+  outline: none;
 }
 
 .datasetCard.selected {

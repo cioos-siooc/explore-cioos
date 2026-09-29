@@ -174,9 +174,20 @@
   }
 }
 
-.featureCardRow.clickable:focus-visible {
+.featureCardRow.clickable:has(.featureCardRowTitle:focus-visible) {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
+}
+
+button.featureCardRowTitle {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.featureCardRowTitle:focus-visible {
   outline: none;
 }
 
@@ -304,7 +315,7 @@
     /* Same phone type scale as the datasets sheet (Sidebar/styles.css): the
        rows are its cards, and at theme.css's step-up the title and its meta
        came out the same size and the meta wrapped each row to four lines. */
-    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-3xs: 10px;
     --cioos-font-size-2xs: 10px;
     --cioos-font-size-xs: 11px;
     --cioos-font-size-sm: 11px;

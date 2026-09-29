@@ -248,6 +248,35 @@
   background-color: var(--cioos-white);
 }
 
+/* Collapsed, the links column is one button and a line; the email column
+   takes the width the export buttons would have needed. */
+@media (min-width: 1041px) {
+  .downloadFooter.linksCollapsed {
+    grid-template-columns: auto minmax(240px, 1.7fr) minmax(200px, 1fr);
+  }
+}
+
+.directLinksRevealHint {
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.25;
+  color: var(--cioos-ink-80);
+}
+
+.directLinksHide {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .downloadFooterSection {
   display: flex;
   flex-direction: column;
@@ -552,7 +581,8 @@
     grid-template-columns: auto minmax(240px, 1fr);
   }
 
-  .downloadFooter .directLinks {
+  .downloadFooter .directLinks,
+  .downloadFooter .directLinksCollapsed {
     grid-column: 1 / -1;
     border-left: none;
     border-top: 1px solid var(--cioos-hairline);
