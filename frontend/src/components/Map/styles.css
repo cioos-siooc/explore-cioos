@@ -102,3 +102,13 @@
     min-width: auto;
   }
 }
+
+/* Centred on the map and click-through; the disc is .cioosSpinnerDisc. */
+.mapLoadingSpinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: var(--cioos-z-map-controls, 2);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
