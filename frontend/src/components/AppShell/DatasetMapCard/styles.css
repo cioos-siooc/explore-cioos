@@ -95,7 +95,7 @@
 .datasetMapCardButton.primary {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .datasetMapCardButton.primary > svg {
@@ -111,6 +111,7 @@
   .datasetMapCardButton.primary:hover {
     border-color: var(--cioos-primary-700);
     background-color: var(--cioos-primary-700);
+    color: var(--cioos-white);
   }
 }
 

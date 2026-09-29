@@ -241,7 +241,7 @@
    the app already uses for "selected" (dropdown-item.active, filter chips). */
 .topBar .topBarActions .topBarButton.applied {
   background-color: var(--cioos-teal-light);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .topBarButton.applied svg {
@@ -264,7 +264,7 @@
   position: relative;
   z-index: 1;
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   transform: var(--cioos-perspective);
   box-shadow:
     inset 0 0 0 1px rgb(255 255 255 / 55%),
@@ -272,7 +272,7 @@
 }
 
 .topBarButton.active svg {
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .topBar .topBarActions .topBarButton:focus-visible {
@@ -398,7 +398,7 @@
 }
 
 .topBarCountsInView:hover {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
 }
 
 .topBarCountsInView:focus-visible {
@@ -421,18 +421,18 @@
   padding: 1px 8px;
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   line-height: 1.6;
   white-space: nowrap;
 }
 
-/* On the active (teal) tab the badge stays white too — a translucent white
-   pill keeps the number legible without a dark-on-white patch. */
+/* On the active (teal) tab a translucent white pill keeps the badge distinct
+   from the solid fill around it. */
 .topBarButton.active .topBarCount {
   background-color: rgb(255 255 255 / 24%);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 /* ------------------------------------------------------------------
@@ -665,7 +665,7 @@
 }
 
 .activeFilterGroupLabel:hover {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
   text-decoration: underline;
 }
 
@@ -711,7 +711,7 @@
 
 .activeFilterItemRemove:hover {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 /* An excluded value: the error red the filter rows use for the same state,
@@ -757,7 +757,7 @@
 
 .activeFilterMoreButton:hover {
   background-color: var(--cioos-teal-light);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .activeFilterMoreButton:focus-visible {

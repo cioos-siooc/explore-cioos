@@ -69,7 +69,7 @@
 
 .quickFilterButton:hover {
   background-color: var(--cioos-surface-2);
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
 }
 
 /* Set: the same solid-primary fill and raised chip the top bar's own segments
@@ -80,7 +80,7 @@
 .quickFilterButton.applied {
   border-color: transparent;
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   transform: var(--cioos-perspective);
   box-shadow:
     inset 0 0 0 1px rgb(255 255 255 / 55%),
@@ -234,7 +234,7 @@
 }
 
 .quickFilterSearch.expanded .quickFilterButton:hover {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
 }
 
 .quickFilterSearch.expanded .quickFilterButton:focus-visible {

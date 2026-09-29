@@ -79,7 +79,7 @@
 }
 
 .harvest-breadcrumb a {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
   text-decoration: none;
 }
 
@@ -523,7 +523,7 @@
 }
 
 a.harvest-link {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
   text-decoration: none;
 }
 

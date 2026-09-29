@@ -190,7 +190,7 @@
   border-radius: var(--cioos-radius);
   background: var(--cioos-primary);
   font-weight: 600;
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
@@ -408,7 +408,7 @@
 .introFooterAction:hover,
 .introFooterAction:focus-visible {
   background: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .introGlyph {

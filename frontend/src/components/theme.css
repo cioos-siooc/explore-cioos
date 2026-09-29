@@ -17,10 +17,13 @@
 
   /* --- National primary --- */
   --cioos-primary: #52a79b;
-  --cioos-primary-700: #3c8377; /* hover/pressed — darker teal */
-  /* A solid teal fill that carries white text: -700 falls just short of AA
-     (4.46:1) at body size. */
-  --cioos-primary-800: #2f6f65;
+
+  /* White on the brand teal is 2.85:1, so a brand-teal fill carries navy
+     text (4.9:1). -700 is the hover fill and teal text on white or the teal
+     washes (≥4.5:1); -800 is teal text on shallows. */
+  --cioos-on-primary: var(--cioos-ink);
+  --cioos-primary-700: #2f6f65;
+  --cioos-primary-800: #295f57;
 
   /* --- Derived neutrals (navy-tinted, never pure grey/black) --- */
   --cioos-ink: #152f37; /* body + heading text */

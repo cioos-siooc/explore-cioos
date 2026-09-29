@@ -153,12 +153,12 @@
    needed. */
 .brandMinorItem.active {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .brandMinorItem.active:hover {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .brandLanguage {

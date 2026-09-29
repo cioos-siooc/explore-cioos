@@ -3,8 +3,8 @@ name: CIOOS Data Explorer
 description: Canada's ocean data on one map; calm instruments laid over a chart.
 colors:
   coastal-teal: "#52a79b"
-  coastal-teal-deep: "#3c8377"
-  coastal-teal-deeper: "#2f6f65"
+  coastal-teal-deep: "#2f6f65"
+  coastal-teal-deeper: "#295f57"
   shallows: "#c6e3df"
   deep-water-navy: "#152f37"
   beach-sand: "#f3f0ec"
@@ -70,11 +70,12 @@ spacing:
 components:
   button-primary:
     backgroundColor: "{colors.coastal-teal}"
-    textColor: "{colors.white}"
+    textColor: "{colors.deep-water-navy}"
     rounded: "{rounded.md}"
     padding: "6px 14px"
   button-primary-hover:
     backgroundColor: "{colors.coastal-teal-deep}"
+    textColor: "{colors.white}"
   button-primary-disabled:
     backgroundColor: "{colors.surface-wash}"
     textColor: "{colors.ink-60}"
@@ -85,10 +86,10 @@ components:
     padding: "4px 10px"
   tab-segment-applied:
     backgroundColor: "{colors.shallows}"
-    textColor: "{colors.coastal-teal-deep}"
+    textColor: "{colors.coastal-teal-deeper}"
   tab-segment-active:
     backgroundColor: "{colors.coastal-teal}"
-    textColor: "{colors.white}"
+    textColor: "{colors.deep-water-navy}"
   chip-filter:
     backgroundColor: "{colors.shallows}"
     textColor: "{colors.deep-water-navy}"
@@ -147,9 +148,9 @@ The feel is calm and precise. Controls rest quietly in hairlines and translucent
 A coastal palette with navy ink, a single teal accent, and a small set of data hues that each keep one meaning.
 
 ### Primary
-- **Coastal Teal** (`coastal-teal`): the one interactive accent. Primary buttons, the open tab segment, focus rings (at 55% alpha), toggle tracks, icons in the tab strip, the selected card border.
-- **Coastal Teal Deep** (`coastal-teal-deep`): hover and pressed for teal fills; link text and teal text on light surfaces, where the base teal is too light for body contrast.
-- **Coastal Teal Deeper** (`coastal-teal-deeper`, `--cioos-primary-800`): a solid teal fill that has to carry white body-size text, where deep falls just short of AA (4.46:1). The open row in the Filters list.
+- **Coastal Teal** (`coastal-teal`): the one interactive accent. Primary buttons, the open tab segment, focus rings (at 55% alpha), toggle tracks, icons in the tab strip, the selected card border. As a fill it carries navy text (`--cioos-on-primary`, 4.9:1); white on it is 2.85:1. It is too light to be text itself.
+- **Coastal Teal Deep** (`coastal-teal-deep`, `--cioos-primary-700`): hover and pressed for teal fills, where the text turns white (5.9:1); link text and teal text on white, sand, surface wash and the translucent teal washes (all ≥4.5:1). Text hovers deepen to deeper rather than lightening to the base teal.
+- **Coastal Teal Deeper** (`coastal-teal-deeper`, `--cioos-primary-800`): teal text on the shallows wash (applied tab, active pager page, success pills), where deep is 4.3:1; the hover of teal text; the open row in the Filters list.
 - **Shallows** (`shallows`): the "has a value" wash. Applied tab segments, active filter chips, the success background, and the pale head of the hex ramp.
 
 ### Neutral
@@ -177,6 +178,8 @@ A coastal palette with navy ink, a single teal accent, and a small set of data h
 **The One Voice Rule.** Coastal teal is the only colour the chrome uses to say "interactive, selected or open". A second accent in the chrome is a bug.
 
 **The One Meaning Rule.** A data hue means exactly one thing, and it means the same thing on the map, in the legend and in the panel that controls it. Never borrow violet, amber or goldenrod for decoration, and never add a second hue for coverage density: darkness is the count.
+
+**The Navy-On-Teal Rule.** Text on a brand-teal fill is navy, never white. White text needs coastal teal deep or darker behind it.
 
 **The Navy-Tinted Rule.** Neutrals are navy at reduced alpha or navy-tinted tints. Pure grey (`#888`) and pure black never appear.
 
@@ -242,8 +245,8 @@ Softly rounded, never sharp and never bubbly. Floating panels, modals and the br
 ### Buttons
 Calm at rest, solid only when it matters.
 - **Shape:** gently rounded (8px).
-- **Primary:** coastal teal fill, white 700-weight text, 1px coastal-teal-deep border. The sidebar's Download stacks its label over the selection count, which pulses when it changes.
-- **Hover / Focus:** fill deepens to coastal teal deep (0.15s ease-out); focus is the teal shadow ring, never the browser outline.
+- **Primary:** coastal teal fill, navy 700-weight text, 1px coastal-teal-deep border. The sidebar's Download stacks its label over the selection count, which pulses when it changes.
+- **Hover / Focus:** fill deepens to coastal teal deep and the text turns white (0.15s ease-out); focus is the teal shadow ring, never the browser outline.
 - **Disabled:** surface-wash fill, hairline border, ink-60 text, instead of fading the teal (faded teal left white text unreadable).
 - **Secondary:** white pill with hairline border and teal-deep text (e.g. "Clear all").
 
@@ -251,8 +254,8 @@ Calm at rest, solid only when it matters.
 The Datasets / Time coverage / Filters segments welded to the brand card's base.
 - **Rest:** a translucent teal wash (14%) with coastal-teal-deep 600-weight text and teal icons; hairline welds between segments.
 - **Hover:** wash deepens to 24%.
-- **Applied** (a value set, UI closed): shallows fill.
-- **Active** (its panel open): solid coastal teal, white text, a white inner ring and the small 3D lift, so two adjacent active segments still read as separate buttons.
+- **Applied** (a value set, UI closed): shallows fill, coastal-teal-deeper text.
+- **Active** (its panel open): solid coastal teal, navy text and icon, a white inner ring and the small 3D lift, so two adjacent active segments still read as separate buttons.
 - Labels wrap, never truncate; French uses a non-breaking space so "Jeux / de données" breaks cleanly.
 
 ### Chips

@@ -248,7 +248,7 @@ button.featureCardRowTitle:focus-visible {
 }
 
 .featureCardRowAdd.isSelected {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
   cursor: default;
 }
 

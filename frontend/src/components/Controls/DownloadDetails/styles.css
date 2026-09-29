@@ -372,7 +372,7 @@
   border: none;
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   font-weight: 600;
   white-space: nowrap;
   transition: background-color var(--cioos-transition-fast);
@@ -380,6 +380,7 @@
 
 .submitRequestButton:hover:not(:disabled) {
   background-color: var(--cioos-primary-700);
+  color: var(--cioos-white);
 }
 
 .submitRequestButton:disabled {

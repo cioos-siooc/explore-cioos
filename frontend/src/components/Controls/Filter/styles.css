@@ -119,7 +119,7 @@
 
 .filterOptionsActions button:hover {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 /* The field and its clear button as one positioned unit — see Filter.jsx. */

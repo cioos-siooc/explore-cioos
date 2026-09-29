@@ -378,13 +378,14 @@
   background-color: var(--cioos-primary);
   font: inherit;
   font-weight: 700;
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   cursor: pointer;
   transition: background-color var(--cioos-transition-fast);
 }
 
 .sidebarDownloadButton:hover:not(:disabled) {
   background-color: var(--cioos-primary-700);
+  color: var(--cioos-white);
 }
 
 /* A washed-out fill instead of a faded one: the teal at 45% left its white

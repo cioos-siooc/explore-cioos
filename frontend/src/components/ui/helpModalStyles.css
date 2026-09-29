@@ -162,7 +162,7 @@
 }
 
 .helpModalLink:hover {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
 }
 
 .helpModalLink:focus-visible {

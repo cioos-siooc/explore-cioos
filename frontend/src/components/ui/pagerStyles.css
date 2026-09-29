@@ -73,7 +73,7 @@
 .pagerPage.active {
   background-color: var(--cioos-teal-light);
   border-color: var(--cioos-primary);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
   cursor: default;
 }
 

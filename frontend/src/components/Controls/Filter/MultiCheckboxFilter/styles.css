@@ -118,7 +118,7 @@
 .multiCheckboxFilter .searchResultsButton:hover {
   cursor: pointer;
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .multiCheckboxFilter .optionColorCircle {
