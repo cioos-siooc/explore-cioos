@@ -380,7 +380,6 @@
 
 .submitRequestButton:hover:not(:disabled) {
   background-color: var(--cioos-primary-700);
-  color: var(--cioos-white);
 }
 
 .submitRequestButton:disabled {

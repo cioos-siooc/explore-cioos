@@ -1,11 +1,11 @@
 {
   "default view": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 8
+    "color-contrast": 9
   },
   "datasets list open": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 8
+    "color-contrast": 9
   },
   "filters modal": {
     "aria-valid-attr-value": 1
@@ -15,7 +15,7 @@
   },
   "active filter chips": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 8
+    "color-contrast": 9
   },
   "intro modal": {
     "aria-valid-attr-value": 1
@@ -24,6 +24,6 @@
     "aria-valid-attr-value": 1
   },
   "mobile datasets sheet": {
-    "color-contrast": 6
+    "color-contrast": 7
   }
 }

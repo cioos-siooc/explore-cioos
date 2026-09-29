@@ -385,7 +385,6 @@
 
 .sidebarDownloadButton:hover:not(:disabled) {
   background-color: var(--cioos-primary-700);
-  color: var(--cioos-white);
 }
 
 /* A washed-out fill instead of a faded one: the teal at 45% left its white

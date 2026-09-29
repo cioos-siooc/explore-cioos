@@ -111,7 +111,6 @@
   .datasetMapCardButton.primary:hover {
     border-color: var(--cioos-primary-700);
     background-color: var(--cioos-primary-700);
-    color: var(--cioos-white);
   }
 }
 

@@ -18,10 +18,10 @@
   /* --- National primary --- */
   --cioos-primary: #52a79b;
 
-  /* White on the brand teal is 2.85:1, so a brand-teal fill carries navy
-     text (4.9:1). -700 is the hover fill and teal text on white or the teal
+  /* White on the brand teal is 2.85:1 — a deliberate brand choice over the
+     AA navy. -700 is the hover fill and teal text on white or the teal
      washes (≥4.5:1); -800 is teal text on shallows. */
-  --cioos-on-primary: var(--cioos-ink);
+  --cioos-on-primary: var(--cioos-white);
   --cioos-primary-700: #2f6f65;
   --cioos-primary-800: #295f57;
 
