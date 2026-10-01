@@ -260,6 +260,41 @@ environment; check it with `echo "$HARVEST_CONFIG_B64" | base64 -d`) or as a
 Coolify **Persistent Storage file mount** at `/app/harvester/harvest_config.yaml`
 if you want it editable in the UI.
 
+### Frontend PR previews (Coolify)
+
+Every PR into `development-v2` that touches `frontend/**` gets a
+frontend-only preview at `https://explore-pr-<N>.cool.juno.cioos.ca`. It runs
+against the dev-v2 API, and through it the dev-v2 database, Redis cache and
+download queue. Downloads requested from a preview are real jobs on dev-v2.
+
+Coolify's GitHub App does all of this: it builds the preview when a PR opens,
+redeploys it on each push that touches `frontend/`, comments the link on the
+PR, and deletes the preview when the PR closes. The settings live on the
+`explore-cioos-frontend-previews` application in the explore-cioos project:
+
+- Source is the `cioos-co-juno-coolify` GitHub App, branch `development-v2`.
+- Build pack **Dockerfile**, base directory `/frontend`, port 80.
+- Watch paths `frontend/**`.
+- Auto-deploy off, so the application's own deployment never runs.
+- Preview Deployments on, with URL template
+  `explore-pr-{{pr_id}}.cool.juno.cioos.ca`. It has to be one level under
+  `cool.juno.cioos.ca`, because the wildcard certificate doesn't cover a second
+  level.
+- Preview build variables: `API_URL=/api`, `BASE_URL=/` and
+  `ENVIRONMENT=preview`.
+- Preview runtime variables: `API_PROXY_HOST=explore-v2.cool.juno.cioos.ca` and
+  `API_PROXY_UPSTREAM=https://coolify-proxy`.
+
+dev-v2 sits behind Cloudflare Access, which answers cross-origin API calls with
+a login redirect. So the preview's nginx proxies `/api` to dev-v2 through
+Coolify's Traefik on the server's internal network, and the browser only ever
+calls its own origin. `frontend/api-proxy.sh` writes that proxy at container
+start, and only when `API_PROXY_HOST` is set. A PR branch only gets the proxy
+once it contains that script, so merge `development-v2` into older branches.
+
+Preview deployments are off on the dev-v2 compose stack itself, so PRs don't
+build full copies of the stack.
+
 ### Self-hosted production
 
 `docker-compose.production.yaml` is an **overlay** on `docker-compose.yaml`,

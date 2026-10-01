@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import classNames from "classnames";
 import { useTranslation } from "react-i18next";
 
+import Skeleton from "../../ui/Skeleton.jsx";
 import "./styles.css";
 
 // One row of a dataset page's record list, as a card: the item's
@@ -55,6 +56,32 @@ export default function ListCard({
         )}
       </div>
       <dl className="listCardFields">{children}</dl>
+    </div>
+  );
+}
+
+// A record card's outline while the list is on its way, built in the card's
+// own text classes: the id, then the three fields a record carries.
+export function ListCardSkeleton() {
+  return (
+    <div className="listCard listCardSkeleton" aria-hidden="true">
+      <div className="listCardHead">
+        <span className="listCardId">
+          <Skeleton text width="40%" />
+        </span>
+      </div>
+      <div className="listCardFields">
+        {["70%", "50%", "60%"].map((width) => (
+          <div key={width} className="listCardField">
+            <span className="listCardFieldLabel">
+              <Skeleton text width="64px" />
+            </span>
+            <span className="listCardFieldValue">
+              <Skeleton text width={width} />
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

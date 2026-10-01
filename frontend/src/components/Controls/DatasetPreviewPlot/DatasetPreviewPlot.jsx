@@ -98,6 +98,10 @@ export default function DatasetPreviewPlot() {
   const panelChoices = panelCandidatesFor(variables, sharedAxis);
   const sharedCandidates = sharedCandidatesFor(variables);
   const directions = axisDirectionsFor(plan.orientation);
+  const axisCaptionFor = (direction) =>
+    direction === "horizontal"
+      ? t("datasetPreviewPlotXAxis")
+      : t("datasetPreviewPlotYAxis");
 
   // The figure's box and the title that shapes it. One call because the three
   // have to be derived in that order — see plotBoxFor.
@@ -252,8 +256,7 @@ export default function DatasetPreviewPlot() {
         </ControlRow>
 
         <ControlRow
-          caption={t("datasetPreviewPlotXAxis")}
-          direction={directions.x}
+          caption={axisCaptionFor(directions.x)}
           tooltip={labelOf(sharedAxis)}
         >
           <DropdownButton
@@ -273,8 +276,8 @@ export default function DatasetPreviewPlot() {
         </ControlRow>
 
         <ControlRow
-          caption={t("datasetPreviewPlotYAxis")}
-          direction={directions.y}
+          caption={axisCaptionFor(directions.y)}
+          hint={t("datasetPreviewPlotAddRemovePlots")}
           tooltip={panels.map(labelOf).join(", ")}
         >
           <VariablePicker
@@ -286,8 +289,6 @@ export default function DatasetPreviewPlot() {
           />
         </ControlRow>
 
-        {/* No direction glyph: colour has no direction, and a glyph here would
-            imply a third axis rather than a shading of the two. */}
         <ControlRow
           caption={t("datasetPreviewPlotColorBy")}
           tooltip={

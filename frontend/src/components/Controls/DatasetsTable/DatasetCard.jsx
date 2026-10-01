@@ -24,6 +24,7 @@ import platformColors from "../../platformColors";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
+import Skeleton from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
@@ -369,6 +370,30 @@ export default function DatasetCard({
 // The dataset's glyph, shaped like what the map draws for it: a grid for a
 // gridded footprint, a hexagon for trajectories and OBIS (shown as hex cells),
 // a dot for everything drawn as markers. Coloured by platform.
+// A sidebar card's outline while the first results are on their way, built in
+// the card's own text classes so it lands at the height of a card with a
+// two-line title.
+export function DatasetCardSkeleton() {
+  return (
+    <div className="datasetCard" aria-hidden="true">
+      <div className="datasetCardBody">
+        <div className="datasetCardHeadline">
+          <span className="datasetCardSelect">
+            <Skeleton width="16px" height="16px" radius="50%" />
+          </span>
+          <span className="datasetCardTitle">
+            <Skeleton text />
+            <Skeleton text width="60%" />
+          </span>
+        </div>
+        <div className="datasetCardMeta">
+          <Skeleton text width="45%" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
   if (cdmDataType === "Grid") {
     return (

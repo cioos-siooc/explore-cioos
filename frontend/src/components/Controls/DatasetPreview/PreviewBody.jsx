@@ -2,7 +2,7 @@ import * as React from "react";
 import { Suspense, lazy, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import Loading from "../Loading/Loading.jsx";
+import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
 import { usePreviewPlot } from "./PreviewPlotProvider.jsx";
 import { plotBlockerFor, PLOT_BLOCKED } from "./previewFacetPlan.js";
@@ -11,6 +11,21 @@ import { PREVIEW_ERROR } from "./previewErrors.js";
 // Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
 const DatasetPreviewPlot = lazy(
   () => import("../DatasetPreviewPlot/DatasetPreviewPlot.jsx"),
+);
+
+const plotSkeleton = (
+  <SkeletonGroup className="datasetPreviewPlotLoading">
+    <Skeleton radius="var(--cioos-radius)" />
+  </SkeletonGroup>
+);
+
+// A header row and a few body rows, four columns wide.
+const tableSkeleton = (
+  <SkeletonGroup className="datasetPreviewTableSkeleton">
+    {Array.from({ length: 36 }, (_, i) => (
+      <Skeleton key={i} height={i < 4 ? "1.2em" : undefined} />
+    ))}
+  </SkeletonGroup>
 );
 
 // What each refusal reads as, and what the axis search was looking for. The
@@ -86,7 +101,9 @@ export default function PreviewBody({
     [plan, inspectDataset, variables, plotData],
   );
 
-  if (recordLoading) return <Loading variant="inline" />;
+  if (recordLoading) {
+    return selectedVis === "table" ? tableSkeleton : plotSkeleton;
+  }
 
   if (!datasetPreview?.table?.rows) {
     return (
@@ -108,16 +125,9 @@ export default function PreviewBody({
   if (!plan) return plotBlocker ? <PlotBlocked blocker={plotBlocker} /> : null;
 
   return (
-    // The fallback reserves height on purpose: Loading is an absolutely
-    // positioned scrim contributing none of its own, so without this the plot
-    // mounts into a collapsed box and Plotly measures it at zero.
-    <Suspense
-      fallback={
-        <div className="datasetPreviewPlotLoading">
-          <Loading variant="inline" />
-        </div>
-      }
-    >
+    // The fallback reserves height on purpose: without it the plot mounts into
+    // a collapsed box and Plotly measures it at zero.
+    <Suspense fallback={plotSkeleton}>
       <DatasetPreviewPlot />
     </Suspense>
   );

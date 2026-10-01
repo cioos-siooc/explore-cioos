@@ -123,12 +123,10 @@ const CDM_LAYOUTS = {
 const layoutFor = (dataset) =>
   CDM_LAYOUTS[(dataset && dataset.cdm_data_type) || ""] || null;
 
-// Which way round the two axis controls are drawn. X is the axis every panel is
-// drawn against and Y is the panels themselves, in BOTH layouts — the names are
-// about the data, so they do not swap when the panels do. What the orientation
-// decides is the direction each one runs in: a profile's shared depth axis is
-// the vertical one with the panels across it, a trajectory's shared track axis
-// is the horizontal one with the panels stacked up it.
+// Which direction each axis control runs in, which picks its caption: X is
+// always the horizontal one and Y the vertical one. A profile's shared depth
+// axis is the vertical one with the panels across it, a trajectory's shared
+// track axis is the horizontal one with the panels stacked up it.
 export function axisDirectionsFor(orientation) {
   return orientation === COLUMNS
     ? { x: "vertical", y: "horizontal" }

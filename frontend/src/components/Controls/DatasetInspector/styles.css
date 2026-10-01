@@ -488,6 +488,15 @@
   background-color: var(--cioos-surface-2);
 }
 
+.listCardSkeleton {
+  pointer-events: none;
+}
+
+/* A bar has no text baseline to align on. */
+.listCardSkeleton .listCardField {
+  align-items: center;
+}
+
 .listCard:focus-visible {
   outline: none;
   border-color: var(--cioos-primary);
@@ -684,12 +693,6 @@
 .datasetInspector .optionColorCircle {
   margin-right: 5px;
   margin-bottom: 5px;
-}
-
-.datasetInspectorLoadingContainer {
-  position: relative;
-  height: 200px;
-  width: 100%;
 }
 
 /* Mobile: the page has the whole screen here rather than a 420px column beside

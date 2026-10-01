@@ -85,10 +85,9 @@
   font-size: 0.9em;
 }
 
-/* The direction the plot draws this axis in. Beside the name rather than in a
-   tooltip, because ui/Tooltip portals its bubble with no aria-describedby. */
-.controlCaptionDirection {
+.controlCaptionHint {
   color: var(--cioos-text-muted, #666);
+  white-space: nowrap;
 }
 
 /* The toggle grows with the pane, which takes three boxes agreeing: this wrap

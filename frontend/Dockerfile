@@ -49,6 +49,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
 FROM nginx:1.27.4-alpine
 COPY --from=build-deps /usr/src/app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chmod=755 api-proxy.sh /docker-entrypoint.d/40-api-proxy.sh
 EXPOSE 80
 
 # Serves the built SPA; index.html is the only guaranteed path.

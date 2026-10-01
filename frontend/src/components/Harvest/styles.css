@@ -508,10 +508,11 @@
   margin-bottom: 1rem;
 }
 
-.harvest-loading {
-  padding: 2rem;
-  text-align: center;
-  color: var(--harvest-muted);
+.harvest-skeleton {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  pointer-events: none;
 }
 
 .harvest-fetch-error {

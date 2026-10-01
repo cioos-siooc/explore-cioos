@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState } from "react";
-import { Lightbulb } from "react-bootstrap-icons";
+import { ChevronLeft, ChevronRight, Lightbulb } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import CloseButton from "../../ui/CloseButton.jsx";
@@ -52,42 +52,44 @@ export default function TipCard() {
         if (e.key === "Escape") dismissTip();
       }}
     >
-      <Lightbulb className="tipCardIcon" size={18} aria-hidden="true" />
-      <div className="tipCardBody">
-        <span className="tipCardHeading">{t("tipCardHeading")}</span>
-        <p>
-          <TipText tip={activeTip} />
-        </p>
-        {touring ? (
-          <div className="tipCardTour">
-            <span className="tipCardCount">
-              {t("tipCounter", {
-                n: TIPS.indexOf(activeTip) + 1,
-                total: TIPS.length,
-              })}
-            </span>
-            <button
-              type="button"
-              className="tipCardLink"
-              onClick={() => stepTour(-1)}
-            >
-              {t("tipPrevious")}
-            </button>
-            <button
-              type="button"
-              className="tipCardLink"
-              onClick={() => stepTour(1)}
-            >
-              {t("tipNext")}
-            </button>
-          </div>
-        ) : (
-          <button type="button" className="tipCardLink" onClick={disableTips}>
-            {t("tipsDisable")}
-          </button>
-        )}
+      {/* The header row holds the counter, the steps and the close, so they
+          stay put whatever the length of the text beneath them. */}
+      <div className="tipCardHeader">
+        <Lightbulb className="tipCardIcon" size={16} aria-hidden="true" />
+        <span className="tipCardHeading">
+          {t("tipCounter", {
+            n: TIPS.indexOf(activeTip) + 1,
+            total: TIPS.length,
+          })}
+        </span>
+        <button
+          type="button"
+          className="tipCardStep"
+          title={t("tipPrevious")}
+          aria-label={t("tipPrevious")}
+          onClick={() => stepTour(-1)}
+        >
+          <ChevronLeft size={14} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="tipCardStep"
+          title={t("tipNext")}
+          aria-label={t("tipNext")}
+          onClick={() => stepTour(1)}
+        >
+          <ChevronRight size={14} aria-hidden="true" />
+        </button>
+        <CloseButton label={t("tipCardClose")} onClick={dismissTip} />
       </div>
-      <CloseButton label={t("tipCardClose")} onClick={dismissTip} />
+      <p className="tipCardText">
+        <TipText tip={activeTip} />
+      </p>
+      {!touring && (
+        <button type="button" className="tipCardLink" onClick={disableTips}>
+          {t("tipsDisable")}
+        </button>
+      )}
       <TipPointer />
     </div>
   );

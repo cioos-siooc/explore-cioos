@@ -154,8 +154,6 @@ export function trackIndexFor(dataset, variables, data, label = "Position") {
       type: "int",
       isNumeric: true,
       longName: label,
-      genericName: null,
-      originalName: null,
       standardName: null,
       cfRole: null,
       axis: null,
