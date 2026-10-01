@@ -199,7 +199,7 @@ class ERDDAP:
         if is_timestamp:
             return pd.to_datetime(series, unit="s", utc=True)
 
-        return pd.to_datetime(series, errors="coerce", utc=True)
+        return pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
 
     def erddap_csv_to_df(self, url, skiprows=(1,), dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
