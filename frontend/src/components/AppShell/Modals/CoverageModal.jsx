@@ -84,6 +84,12 @@ const histogramSkeleton = (
         <Skeleton key={i} height={`${height}%`} radius="0" />
       ))}
     </div>
+    {/* The query takes seconds when the API's cache is cold; the bars alone
+        read as a finished figure that failed to draw. The group is the
+        status, so the mark is decoration. */}
+    <div className="coverageModalStatus coveragePlotBusy">
+      <Spinner size="lg" role="presentation" />
+    </div>
   </SkeletonGroup>
 );
 
