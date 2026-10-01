@@ -163,6 +163,7 @@ export default function DatasetInspector({
     [offerTip, isTrajectory, isRealtime],
   );
   const [datasetRecords, setDatasetRecords] = useState();
+  const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
   const inspectorRef = useRef(null);
   const isGrid = dataset.cdm_data_type === "Grid";
   // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
@@ -231,6 +232,37 @@ export default function DatasetInspector({
     // is reopened instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset, hasRecordList]);
+
+  // Trajectory datasets: /trajectories/platforms is the only source for how many
+  // fixes a track holds. It used to back a second card list of its own, whose
+  // ids were the record list's ids over again — so the page offered the same
+  // trajectory twice, and the copy the user reached only drew the track, never
+  // the plot. One list now, and this is what keeps its Track fixes field.
+  useEffect(() => {
+    if (!isTrajectoryDataset) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTrajectoryPlatforms();
+      return;
+    }
+    fetch(`${server}/trajectories/platforms?datasetPKs=${dataset.pk}`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((platforms) => setTrajectoryPlatforms(platforms))
+      .catch((error) => {
+        reportError("trajectory platforms fetch failed", error);
+        setTrajectoryPlatforms([]);
+      });
+  }, [dataset, isTrajectoryDataset]);
+
+  const trackFixesById = useMemo(
+    () =>
+      new Map(
+        (trajectoryPlatforms || []).map((row) => [
+          row.trajectory_id,
+          row.n_points,
+        ]),
+      ),
+    [trajectoryPlatforms],
+  );
 
   // Browser Back needs no handling here: the open dataset lives in the URL
   // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
@@ -353,8 +385,21 @@ export default function DatasetInspector({
         type: "number",
         value: (row) => row.depth_max,
       },
+      // Only a trajectory's records have one, and only once its platforms have
+      // landed — the field is absent everywhere else, so offering the sort
+      // would be offering an order over nothing.
+      ...(isTrajectoryDataset
+        ? [
+            {
+              id: "fixes",
+              label: t("trajectoryPlatformFixesText"),
+              type: "number",
+              value: (row) => trackFixesById.get(row.profile_id),
+            },
+          ]
+        : []),
     ],
-    [t, recordIdField.label],
+    [t, recordIdField.label, isTrajectoryDataset, trackFixesById],
   );
 
   // A record picked on the map (rather than from this list) is pinned to the
@@ -797,6 +842,11 @@ export default function DatasetInspector({
                       <CardField label={t("datasetInspectorDepthRangeText")}>
                         {formatRange(row.depth_min, row.depth_max, "m")}
                       </CardField>
+                      {isTrajectoryDataset && (
+                        <CardField label={t("trajectoryPlatformFixesText")}>
+                          {trackFixesById.get(row.profile_id)?.toLocaleString()}
+                        </CardField>
+                      )}
                       {eovs?.length > 0 && (
                         <CardField
                           label={t("datasetInspectorOceanVariablesText")}

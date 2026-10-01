@@ -1,22 +1,17 @@
-import React, { useState, useMemo, Suspense, lazy } from "react";
+import * as React from "react";
+import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Check2, Clipboard } from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
-import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import useElementSize from "../../ui/useElementSize.js";
 
-import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx";
+import PreviewBody from "./PreviewBody.jsx";
+import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
+import usePreviewProfiles from "./usePreviewProfiles.js";
+import { PANE_DEFAULT_PX } from "./previewPaneLayout.js";
 import "./styles.css";
-
-// Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
-// It now downloads on the first record opened rather than on the first Plot
-// click, since the plot is the default view — but it stays a separate chunk
-// behind the skeleton fallback below, and the /preview fetch runs alongside it.
-const DatasetPreviewPlot = lazy(
-  () => import("../DatasetPreviewPlot/DatasetPreviewPlot.jsx"),
-);
 
 const NO_CUSTOM_LABELS = {};
 // Never equal to a linkKey (which is a query string, and may be ""), so the
@@ -25,6 +20,7 @@ const NO_LINK_COPIED = Symbol("no link copied");
 
 export default function DatasetPreview({
   datasetPreview,
+  previewError,
   inspectDataset,
   inspectRecordID,
   setInspectRecordID,
@@ -35,13 +31,12 @@ export default function DatasetPreview({
   const { t } = useTranslation();
 
   // The response arrives as parallel arrays; the table wants row objects. That
-  // is a reading of the response, so it is derived rather than copied into
-  // state by an effect — which also means there is nothing to clear when the
-  // modal closes.
-  const data = useMemo(() => {
+  // is a reading of the response, so it is derived rather than copied into state
+  // by an effect — which also means there is nothing to clear on close.
+  const rows = useMemo(() => {
     const columnNames = datasetPreview?.table?.columnNames || [];
-    const rows = datasetPreview?.table?.rows || [];
-    return rows.map((row) =>
+    const table = datasetPreview?.table?.rows || [];
+    return table.map((row) =>
       columnNames.reduce(
         (merged, key, index) => ({ ...merged, [key]: row[index] }),
         {},
@@ -50,58 +45,66 @@ export default function DatasetPreview({
   }, [datasetPreview]);
 
   // What is being looked at and how it is drawn — all of it in the query string,
-  // so a link reproduces the plot and Back closes it. Each param is written only
-  // when it differs from what this dataset type opens on, so an untouched plot
-  // adds nothing to the URL. See usePreviewPlotParams.
-  const {
-    variables,
-    variablesByName,
-    plan,
-    selectedVis,
-    setSelectedVis,
-    sharedAxis,
-    setSharedAxis,
-    panels,
-    setPanels,
-    togglePanel,
-    variableColors,
-    setVariableColor,
-    plotType,
-    setPlotType,
-    uirevision,
-    linkKey,
-  } = usePreviewPlotParams(inspectDataset, datasetPreview?.table, data);
+  // so a link reproduces the plot and Back closes it. Only the six the header
+  // and the body need are read here; the rest goes to the plot through the
+  // provider below.
+  const plotParams = usePreviewPlotParams(
+    inspectDataset,
+    datasetPreview?.table,
+    rows,
+  );
+  const { selectedVis, setSelectedVis, linkKey } = plotParams;
 
-  // Per-column display names. Lifted out of the plot so they survive the
-  // Table/Plot flip (which unmounts it) like everything else now does, but
-  // deliberately NOT in the URL: free text is what makes a query string
-  // unreadable, and a rename is a private annotation rather than a view.
+  // Fetched separately from the rows and independent of them: a record whose
+  // list fails simply gets no slider.
+  const profiles = usePreviewProfiles(
+    inspectDataset?.dataset_id,
+    inspectRecordID,
+  );
+
+  // Per-column display names. Deliberately NOT in the URL: free text is what
+  // makes a query string unreadable, and a rename is a private annotation rather
+  // than a view.
   const [customLabels, setCustomLabels] = useState(NO_CUSTOM_LABELS);
 
   // Which URL the Copy button is currently claiming. Held as the copied key
   // rather than a boolean so "still the link they copied?" is derived from the
-  // URL instead of re-synced to it: anything that changes the query string —
-  // a panel added, the shared axis moved, the map panned behind the modal —
-  // makes this stale by definition, with no effect to run and no render where
-  // the button claims a link that is no longer there.
+  // URL instead of re-synced to it: anything that changes the query string makes
+  // this stale by definition, with no effect to run.
   const [copiedLinkKey, setCopiedLinkKey] = useState(NO_LINK_COPIED);
   const linkCopied = copiedLinkKey === linkKey;
 
-  // The modal's ONE scroll container. Measured here because its height is set by
-  // the modal (flex, capped at the viewport) and does not move when the plot
-  // grows — which is what makes it safe to feed into the plot's height. See
-  // useElementSize.
+  // A viewing preference like the disclosure triangle in the plot, not a view of
+  // the data — so not in the URL, and not reset per record.
+  const [paneWidth, setPaneWidth] = useState(PANE_DEFAULT_PX);
+
+  // The Table view's scroll container, and the CEILING on the plot's height.
+  // Measured here because its height is set by the modal (flex, capped at the
+  // viewport) and does not move when the plot grows, which is what makes it safe
+  // to feed into the plot's height.
   const [scrollRef, scrollSize] = useElementSize();
 
   // A different record is a different plot: drop the previous one's names.
   // Adjusted during render rather than from an effect — React discards this
   // render and immediately re-runs with the cleared labels, so the new record
-  // never paints under the old record's names the way an effect would let it.
+  // never paints under the old record's names.
   const [labelledRecordID, setLabelledRecordID] = useState(inspectRecordID);
   if (labelledRecordID !== inspectRecordID) {
     setLabelledRecordID(inspectRecordID);
     setCustomLabels(NO_CUSTOM_LABELS);
   }
+
+  const plotValue = {
+    ...plotParams,
+    inspectDataset,
+    inspectRecordID,
+    profiles,
+    customLabels,
+    setCustomLabels,
+    paneWidth,
+    setPaneWidth,
+    availableHeight: scrollSize.height,
+  };
 
   const onModalClose = () => {
     // One call, one history entry: setInspectRecordID clears ?preview= and every
@@ -113,12 +116,6 @@ export default function DatasetPreview({
   };
   const dataIsReady = !recordLoading && datasetPreview?.table?.rows;
 
-  const plotSkeleton = (
-    <SkeletonGroup className="datasetPreviewPlotLoading">
-      <Skeleton radius="var(--cioos-radius)" />
-    </SkeletonGroup>
-  );
-
   return (
     <Modal
       className="dataPreviewModal"
@@ -128,7 +125,7 @@ export default function DatasetPreview({
       centered
     >
       {inspectDataset && inspectRecordID && (
-        <>
+        <PreviewPlotProvider value={plotValue}>
           <Modal.Header closeButton className="tableAndPlotGridContainer">
             {dataIsReady && (
               <>
@@ -182,68 +179,15 @@ export default function DatasetPreview({
           </Modal.Header>
           <Modal.Body>
             <div className="tableAndPlotGridItem tableAndPlot" ref={scrollRef}>
-              {recordLoading ? (
-                selectedVis === "table" ? (
-                  <SkeletonGroup className="datasetPreviewTableSkeleton">
-                    {Array.from({ length: 36 }, (_, i) => (
-                      <Skeleton key={i} height={i < 4 ? "1.2em" : undefined} />
-                    ))}
-                  </SkeletonGroup>
-                ) : (
-                  plotSkeleton
-                )
-              ) : (
-                <>
-                  {datasetPreview?.table?.rows ? (
-                    <>
-                      {selectedVis === "table" ? (
-                        <DatasetPreviewTable
-                          datasetPreview={datasetPreview}
-                          data={data}
-                        />
-                      ) : plan ? (
-                        // The fallback reserves height on purpose: without it the
-                        // plot mounted into a collapsed box and Plotly measured
-                        // it at zero.
-                        <Suspense fallback={plotSkeleton}>
-                          <DatasetPreviewPlot
-                            inspectRecordID={inspectRecordID}
-                            data={data}
-                            variables={variables}
-                            variablesByName={variablesByName}
-                            plan={plan}
-                            sharedAxis={sharedAxis}
-                            setSharedAxis={setSharedAxis}
-                            panels={panels}
-                            togglePanel={togglePanel}
-                            setPanels={setPanels}
-                            variableColors={variableColors}
-                            setVariableColor={setVariableColor}
-                            plotType={plotType}
-                            setPlotType={setPlotType}
-                            customLabels={customLabels}
-                            setCustomLabels={setCustomLabels}
-                            uirevision={uirevision}
-                            availableHeight={scrollSize.height}
-                          />
-                        </Suspense>
-                      ) : (
-                        // Reachable only via ?vis=plot on a type with no layout
-                        // (Grid), or a dataset whose columns are all coordinates
-                        // and ids. The table is still right there in the header.
-                        <p>{t("datasetPreviewPlotNotPlottable")}</p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <p>{t("datasetPreviewNoData")}</p>
-                    </>
-                  )}
-                </>
-              )}
+              <PreviewBody
+                recordLoading={recordLoading}
+                datasetPreview={datasetPreview}
+                rows={rows}
+                previewError={previewError}
+              />
             </div>
           </Modal.Body>
-        </>
+        </PreviewPlotProvider>
       )}
     </Modal>
   );

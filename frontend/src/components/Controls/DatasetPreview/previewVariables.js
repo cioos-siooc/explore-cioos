@@ -27,8 +27,8 @@ const NUMERIC_TYPES = new Set([
 ]);
 
 // Units that identify a coordinate no matter what the column is called. 'UTC' is
-// how ERDDAP marks a time column in columnUnits — more reliable than matching
-// the name 'time', which is what this replaces.
+// how ERDDAP marks a time column in columnUnits, which is more reliable than
+// matching the name 'time'.
 const TIME_UNITS = new Set(["UTC"]);
 // ERDDAP also states a time column's units as its format string. mpoEaeTemperature
 // publishes `year` with units "CCYY-MM-DD"; without this it reads as a plottable
@@ -68,7 +68,13 @@ const ID_NAME = /(_id|[a-z0-9]ID)$/;
 
 // ioos_category is authoritative where it is declared (~48% of variables).
 const ID_CATEGORIES = new Set(["Identifier"]);
-const COORDINATE_CATEGORIES = new Set(["Time", "Location"]);
+// "Location" is deliberately NOT here: it says what a column is ABOUT, not that
+// it is an axis. Every column in the catalogue that really is a horizontal
+// coordinate also declares axis, a CF standard_name, or degrees units, so the
+// category added nothing there — while it classified ismerOsl002's `distance`
+// (the along-transect abscissa, units m, no axis, no standard_name) as a
+// coordinate, which left that record with no measurement to draw at all.
+const COORDINATE_CATEGORIES = new Set(["Time"]);
 
 const trimmed = (value) =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -153,7 +159,7 @@ export function variablesFrom(table, dataset) {
   const variables = columnNames.map((columnName, index) => {
     const meta = (columnMeta && columnMeta[index]) || null;
     const type = trimmed(columnTypes[index]) || (meta && trimmed(meta.type));
-    const variable = {
+    return {
       columnName,
       // columnUnits is ERDDAP's own answer for THIS query, so it wins over the
       // harvest, which may predate a units change.
@@ -172,11 +178,17 @@ export function variablesFrom(table, dataset) {
       positive: meta && trimmed(meta.positive),
       ioosCategory: meta && trimmed(meta.ioos_category),
       palette: meta && trimmed(meta.colorBarPalette),
+      // Read by previewColorScales.js for the colour dimension's ramp.
       colorBarScale: meta && trimmed(meta.colorBarScale),
+      // Deliberately unread, now that the colour dimension could read them:
+      // ERDDAP's colorBar bounds are per standard_name across a whole catalogue
+      // (0-8000 for depth, 0-32 for temperature), and one record spans a sliver
+      // of that — honouring them would flatten every profile to two adjacent
+      // shades of its ramp. Kept because they describe the column, and the next
+      // reader should see the decision rather than assume an oversight.
       cmin: meta ? numberOr(meta.colorBarMinimum, undefined) : undefined,
       cmax: meta ? numberOr(meta.colorBarMaximum, undefined) : undefined,
     };
-    return variable;
   });
 
   return variables.map((variable) => ({
@@ -186,16 +198,14 @@ export function variablesFrom(table, dataset) {
 }
 
 // "Temperature (1990 scale) ( degree_C )" once a harvest has run, "TE90_01
-// ( degree_C )" before it. standard_name sits between the two because it is at
-// least words, where a column name is often a BODC P01 code.
+// ( degree_C )" before it.
 export function labelFor(variable) {
   if (!variable) return "";
-  const name =
-    variable.longName || variable.standardName || variable.columnName;
+  const name = shortLabelFor(variable);
   return variable.unit ? `${name} ( ${variable.unit} )` : name;
 }
 
-// Same precedence without the unit — for a dropdown, where the unit is noise.
+// Without the unit — for a dropdown, where the unit is noise.
 export function shortLabelFor(variable) {
   if (!variable) return "";
   return variable.longName || variable.columnName;
@@ -222,6 +232,20 @@ export function measurementsOf(variables) {
 // actually on screen.
 export function idVariablesFor(variables) {
   return (variables || []).filter((variable) => variable.cfRole);
+}
+
+// A time column, however ERDDAP spelled it. Separate from `kind === 'coordinate'`
+// because time is the one coordinate that arrives as TEXT: tabledap serves it as
+// an ISO string, so anything that wants to order it — the colour dimension — has
+// to parse it first, and has to know when to.
+export function isTimeLike(variable) {
+  if (!variable) return false;
+  return Boolean(
+    variable.axis === "T" ||
+    variable.standardName === "time" ||
+    TIME_UNITS.has(variable.unit) ||
+    (variable.unit && TIME_FORMAT_UNIT.test(variable.unit)),
+  );
 }
 
 // A depth axis has to be drawn downwards. `positive` is the only attribute that

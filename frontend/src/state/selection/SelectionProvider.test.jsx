@@ -232,6 +232,53 @@ describe("SelectionProvider", () => {
     expect(latest.datasetPreview).toBeDefined();
   });
 
+  const previewUrls = () =>
+    fetch.mock.calls
+      .map(([input]) => (typeof input === "string" ? input : input.url))
+      .filter((url) => url.includes("/preview?"));
+
+  it("a chosen profile rides the preview fetch as `at`", async () => {
+    // The one plot param that changes what is FETCHED rather than how it is
+    // drawn, which is why the provider reads it at all.
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+    expect(previewUrls().at(-1)).toContain("at=cast-1");
+  });
+
+  it("no chosen profile asks for the record exactly as it always did", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+    expect(previewUrls().at(-1)).not.toContain("at=");
+  });
+
+  it("opening another record drops the profile chosen for the previous one", async () => {
+    // A cast id belongs to the station it came from; carried across, it names a
+    // profile the new station never took and /preview answers NO_DATA.
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+
+    act(() => latest.setInspectRecordID("STATION_002"));
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("preview")).toBe(
+        "STATION_002",
+      ),
+    );
+    expect(new URLSearchParams(window.location.search).get("pstep")).toBeNull();
+    await waitFor(() =>
+      expect(previewUrls().at(-1)).toContain("profile=STATION_002"),
+    );
+    expect(previewUrls().at(-1)).not.toContain("at=");
+  });
+
   it("groups by a dimension and hides datasets belonging only to hidden groups", async () => {
     await renderLoaded();
     act(() => latest.setGroupBy("platform"));
