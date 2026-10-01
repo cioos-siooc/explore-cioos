@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 import requests
@@ -186,7 +186,7 @@ class OBISHarvester(BaseHarvester):
                 "reason_code": reason_code,
                 "error_message": error_message,
                 "duration_ms": duration_ms,
-                "attempted_at": datetime.now(timezone.utc),
+                "attempted_at": datetime.now(UTC),
                 "query_urls": "\n".join(query_urls),
             })
 

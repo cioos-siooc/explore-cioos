@@ -1,4 +1,4 @@
-FROM nginx:1.27.4
+FROM nginx:1.30.5
 
 # cron is named explicitly because start.sh runs it — it would otherwise only
 # arrive as a recommend of logrotate. --no-install-recommends is what keeps the

@@ -6,7 +6,7 @@ readme = "README.md"
 # Upper bound matches every member project (harvester, downloader,
 # download_scheduler) and .python-version. Unbounded, the root lock
 # resolved markers for 3.11-3.13 that no image can satisfy.
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "download-scheduler",
     "harvester",
@@ -40,12 +40,12 @@ markers = [
 # that way deliberately. 120 is a ceiling for runaway lines, not a reformat
 # mandate — no formatter is configured and none is implied.
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 # E/W/F   pycodestyle + pyflakes: the real errors.
 # I       import sorting (46 files were unsorted).
-# UP      pyupgrade: this code targets 3.10, some of it was written for 2.7.
+# UP      pyupgrade: this code targets 3.11, some of it was written for 2.7.
 # B       bugbear: mutable defaults, unstrict zip, warn without stacklevel.
 # C4      comprehension misuse.
 # LOG     logging misuse (root-logger calls).
