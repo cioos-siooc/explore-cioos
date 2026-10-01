@@ -34,7 +34,14 @@ export default function CioosLogo({ layout = "inline", className = "" }) {
         idle ? " cioosLogo-idle" : ""
       } ${className}`.trim()}
     >
-      <Spinner size={stacked ? "lg" : "md"} role="presentation" />
+      {stacked ? (
+        // The splash: the same disc the map's loading spinner wears.
+        <span className="cioosSpinnerDisc">
+          <Spinner size="lg" role="presentation" />
+        </span>
+      ) : (
+        <Spinner size="md" role="presentation" />
+      )}
       <span className="cioosLogoWordmark">
         <span className="cioosLogoName">{t("brandName")}</span>
         {stacked && (
