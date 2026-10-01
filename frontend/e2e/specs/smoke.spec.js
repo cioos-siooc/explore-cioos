@@ -28,6 +28,13 @@ test.describe("the app boots", () => {
     expect(mockApi).toEqual([]);
   });
 
+  test("leaves no cookie behind", async ({ page, context }) => {
+    // The privacy notice promises it; a cookie would also ride along on every
+    // request to the API.
+    await openApp(page);
+    expect(await context.cookies()).toEqual([]);
+  });
+
   test("reproduces the view named in the address", async ({ page }) => {
     await openApp(page, "eovs=oxygen");
     await expect(page.getByTestId("active-filter-chips")).toBeVisible();

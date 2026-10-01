@@ -14,8 +14,9 @@ test.beforeEach(() => {
   resetCache();
 });
 
+const EMAIL = { email: "diver@example.com" };
+
 const VALID_QUERY = {
-  email: "diver@example.com",
   latMin: "40",
   latMax: "50",
   lonMin: "-70",
@@ -29,7 +30,7 @@ test("queues a download job and returns the matched count", async () => {
   ]);
   db.queueRows({}); // the .insert() into cde.download_jobs
 
-  const res = await agent.get("/download").query(VALID_QUERY);
+  const res = await agent.post("/download").query(VALID_QUERY).send(EMAIL);
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { count: 2 });
@@ -40,7 +41,7 @@ test("nothing matched: returns count 0 and never inserts a job", async () => {
   shapeQuery.queueResult([]);
   db.queueRaw([{ json_agg: null }]);
 
-  const res = await agent.get("/download").query(VALID_QUERY);
+  const res = await agent.post("/download").query(VALID_QUERY).send(EMAIL);
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { count: 0 });
@@ -56,11 +57,14 @@ test("a taxon selection with OBIS disabled queues nothing at all, without a bran
   // runs.
   shapeQuery.queueResult([]);
   db.queueRaw([{ aphia_id: 126436 }]);
-  const res = await agent.get("/download").query({
-    ...VALID_QUERY,
-    scientificNames: "Gadus morhua",
-    includeObis: "false",
-  });
+  const res = await agent
+    .post("/download")
+    .query({
+      ...VALID_QUERY,
+      scientificNames: "Gadus morhua",
+      includeObis: "false",
+    })
+    .send(EMAIL);
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { count: 0 });
@@ -69,9 +73,31 @@ test("a taxon selection with OBIS disabled queues nothing at all, without a bran
 
 test("requires a valid email", async () => {
   const res = await agent
-    .get("/download")
-    .query({ ...VALID_QUERY, email: "not-an-email" });
+    .post("/download")
+    .query(VALID_QUERY)
+    .send({ email: "not-an-email" });
   assert.equal(res.status, 400);
+});
+
+test("ignores an email in the query string — it belongs in the body", async () => {
+  const res = await agent.post("/download").query({ ...VALID_QUERY, ...EMAIL });
+  assert.equal(res.status, 400);
+});
+
+test("keeps the email out of the log line", async () => {
+  shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
+  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
+  db.queueRows({});
+  const logged = [];
+  const log = console.log;
+  console.log = (...args) => logged.push(args.join(" "));
+  try {
+    await agent.post("/download").query(VALID_QUERY).send(EMAIL);
+  } finally {
+    console.log = log;
+  }
+  assert.ok(logged.length > 0);
+  assert.ok(logged.every((line) => !line.includes(EMAIL.email)));
 });
 
 // The route's own comment claims "requires a shape (either polygon or
@@ -83,17 +109,16 @@ test("requires a valid email", async () => {
 test("with no shape at all, still accepted — queues against an unbounded selection", async () => {
   shapeQuery.queueResult([]);
   db.queueRaw([{ json_agg: null }]);
-  const res = await agent
-    .get("/download")
-    .query({ email: "diver@example.com" });
+  const res = await agent.post("/download").send(EMAIL);
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { count: 0 });
 });
 
 test("rejects a half-specified bounding box", async () => {
   const res = await agent
-    .get("/download")
-    .query({ email: "diver@example.com", latMin: "40", latMax: "50" });
+    .post("/download")
+    .query({ latMin: "40", latMax: "50" })
+    .send(EMAIL);
   assert.equal(res.status, 400);
 });
 
@@ -101,13 +126,13 @@ test("is never cached — two identical requests both queue a job", async () => 
   shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
   db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
   db.queueRows({});
-  const first = await agent.get("/download").query(VALID_QUERY);
+  const first = await agent.post("/download").query(VALID_QUERY).send(EMAIL);
   assert.equal(first.status, 200);
 
   shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
   db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
   db.queueRows({});
-  const second = await agent.get("/download").query(VALID_QUERY);
+  const second = await agent.post("/download").query(VALID_QUERY).send(EMAIL);
   assert.equal(second.status, 200);
   assert.deepEqual(second.body, { count: 1 });
 });

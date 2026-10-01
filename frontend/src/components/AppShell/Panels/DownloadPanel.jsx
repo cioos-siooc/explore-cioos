@@ -4,9 +4,11 @@ import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
 import DownloadDetails from "../../Controls/DownloadDetails/DownloadDetails.jsx";
+import Switch from "../../ui/Switch.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useDownload } from "../../../state/download/DownloadProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 /*
@@ -33,6 +35,7 @@ import "./styles.css";
  */
 export default function DownloadPanel() {
   const { t } = useTranslation();
+  const { setShowPrivacyModal } = useUI();
   const { query, timeFilterActive, depthFilterActive } = useFilters();
   const {
     polygon,
@@ -44,6 +47,8 @@ export default function DownloadPanel() {
   const {
     email,
     emailValid,
+    rememberEmail,
+    setRememberEmail,
     submissionState,
     setSubmissionState,
     submissionFeedback,
@@ -130,6 +135,22 @@ export default function DownloadPanel() {
                 t("submitRequestButtonSubmitText")}
             </button>
           </div>
+          <Switch
+            id="downloadRememberEmail"
+            label={t("downloadRememberEmailLabel")}
+            checked={rememberEmail}
+            onChange={() => setRememberEmail(!rememberEmail)}
+          />
+          <p className="downloadEmailNotice">
+            {t("downloadEmailNotice")}{" "}
+            <button
+              type="button"
+              className="downloadEmailNoticeLink"
+              onClick={() => setShowPrivacyModal(true)}
+            >
+              {t("privacyLinkText")}
+            </button>
+          </p>
           <div
             className={classNames("submissionFeedback", {
               success: submissionState === "successful",

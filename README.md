@@ -7,6 +7,9 @@
 CDE harvests oceanographic dataset metadata from ERDDAP, OBIS and CKAN into
 PostgreSQL/PostGIS and serves a map-first search and download UI over it.
 
+How the app handles personal information (no cookies, email retention, the
+third-party services it uses) is in [PRIVACY.md](PRIVACY.md).
+
 ## Architecture
 
 ```mermaid
@@ -322,3 +325,45 @@ Everything else is inherited.
 3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
    [Harvest configuration](#harvest-configuration)).
 4. Start: `sudo docker compose up -d --build`.
+
+### Monitoring
+
+Every long-running service has a Docker healthcheck. They answer different
+questions:
+
+| Service                  | Healthy means                                                                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `db`, `redis`, `prefect` | the server accepts connections                                                                                                                       |
+| `web-api`, `frontend`    | the process serves HTTP (deliberately not the DB: nginx waits on these)                                                                              |
+| `scheduler`              | its poll loop touched `downloads/healthz` in the last 60 min                                                                                         |
+| `prefect_worker`         | the worker is polling its pool (`--with-healthcheck`, `:8080/health`)                                                                                |
+| `nginx`                  | end to end: `/healthz`, `/` (frontend), `/api/health/ready` (DB + download queue) and `/downloads/healthz` (downloads volume), all through the proxy |
+
+On the host:
+
+```sh
+docker compose ps                                        # (healthy) / (unhealthy) per service
+docker inspect --format '{{json .State.Health}}' <container>   # last probe outputs; nginx names the failing path
+curl -s https://<site>/api/health/ready                  # per-check JSON: db, redis, downloadQueue
+```
+
+`/api/health/ready` answers 503 when Postgres is unreachable or an `open`
+download job has waited over 5 minutes (no scheduler is consuming the queue).
+A Redis outage only reports `degraded` with a 200, because the API falls back to
+an in-memory cache. Docker does not restart unhealthy containers; the status is
+for you and for Coolify, which shows it per service and can notify on changes.
+
+Recommended alerting:
+
+- **Sentry Uptime Monitoring** on `https://<site>/api/health/ready`. One monitor
+  covers the proxy, API, database and download pipeline from outside; add one
+  on `/` for the frontend. Cloudflare may block the checker, so add a WAF skip
+  rule for that path if the monitor fails while the site works.
+- **Sentry errors**: web-api, the frontend and the scheduler report exceptions
+  when `SENTRY_DSN` is set. This catches failures that throw, not services that
+  are silently down; the uptime monitor covers those.
+- **Prefect UI** for harvests and downloads: failed harvest and `Download Job`
+  flow runs show up red (see [Downloads](#downloads)). Enable Prefect
+  automations if you want notifications on failed runs.
+- **Coolify notifications** (email/Slack/Discord) for containers going unhealthy
+  or exiting.

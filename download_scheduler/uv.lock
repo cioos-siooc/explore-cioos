@@ -70,7 +70,7 @@ wheels = [
 
 [[package]]
 name = "apprise"
-version = "1.12.0"
+version = "1.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -81,9 +81,9 @@ dependencies = [
     { name = "requests-oauthlib" },
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/f7/95a52cda9355f32c5db9ef77bac18e85977472d29c555fafd825cf60c309/apprise-1.12.0.tar.gz", hash = "sha256:ffe9860d99cbde05fd156c610d4bcb49d953200c4ed3cb2db001ed50722fc142", size = 2477874, upload-time = "2026-07-04T16:15:36.67Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/81/44/5965c245998c72022297e2b515d9594281a97ed1442b3fa022c2c2324102/apprise-1.13.1.tar.gz", hash = "sha256:e7689dda71aaf739244d6c8690de13cb1361b8d0a79980fb48bb397455ca0bdd", size = 2520230, upload-time = "2026-08-31T02:12:01.472Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d3/e9/acfea54abdd66a059ff82995d3703eca3a27df3dc1bdc6afaf8a30a854fe/apprise-1.12.0-py3-none-any.whl", hash = "sha256:28edabfec5a9d5dbcd9aa28bdfd8928ecb68764e40214b6e648eab6d974b5a93", size = 1797824, upload-time = "2026-07-04T16:15:34.228Z" },
+    { url = "https://files.pythonhosted.org/packages/45/7d/6852bd3fc2eb48fa432cb22f5df11d1c902137dcecab93e0d8319b8c8e16/apprise-1.13.1-py3-none-any.whl", hash = "sha256:2ded6d00562dd2ae9eb6f1e6cc8d3fb66e06f7ede6efac0ad029031b633780f4", size = 1826431, upload-time = "2026-08-31T02:11:58.263Z" },
 ]
 
 [[package]]
@@ -627,8 +627,8 @@ requires-dist = [
     { name = "numpy", specifier = "<2.0.0" },
     { name = "pandas", specifier = "<2.0.0" },
     { name = "pandera", specifier = ">=0.18.0,<0.19.0" },
-    { name = "prefect", specifier = ">=3.6.23" },
-    { name = "prefect-docker", specifier = ">=0.6.0" },
+    { name = "prefect", specifier = ">=3.8.6" },
+    { name = "prefect-docker", specifier = ">=0.7.4" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "pyyaml", specifier = ">=6.0.1" },
@@ -1074,7 +1074,7 @@ wheels = [
 
 [[package]]
 name = "prefect"
-version = "3.7.8"
+version = "3.8.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1134,14 +1134,14 @@ dependencies = [
     { name = "uvicorn" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/56/03/905ed55a75d5dafa7caf2150ccda295c01ad750e25bc1c4555db2d0ca80e/prefect-3.7.8.tar.gz", hash = "sha256:f8e363d44b92ca11abae3a9307bf1325236c3387cd5969694e7b03a5179ab6d8", size = 14160532, upload-time = "2026-07-09T22:02:40.064Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/9b/79ab0ea9eac4f93675033516b76ecf9e30309ff82369e84ce04b24364fea/prefect-3.8.6.tar.gz", hash = "sha256:46c71c36a46660fbfa9f21c4cdf7541d530706c55b2bc5b61bb9b5425761526c", size = 14721653, upload-time = "2026-09-15T00:34:46.881Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/5c/47d17acb87e352fbf1e39f2d0170a25bc40e4e3fd6fb6fa36f2230263350/prefect-3.7.8-py3-none-any.whl", hash = "sha256:6816c7f938c4a78b0b6b6f74e254a77472cb2773ad4a62462452ccfadbf9acbf", size = 15097251, upload-time = "2026-07-09T22:02:36.69Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/78/96e76c84b8ce67647d7423269fa695775c30251b66a84b6f796b7a1daa97/prefect-3.8.6-py3-none-any.whl", hash = "sha256:4d2bba656e031bbb749966e0fca4f0c9311a62c520082e8e3e5514d9b47b034a", size = 15652543, upload-time = "2026-09-15T00:34:43.778Z" },
 ]
 
 [[package]]
 name = "prefect-docker"
-version = "0.7.3"
+version = "0.7.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docker" },
@@ -1149,9 +1149,9 @@ dependencies = [
     { name = "prefect" },
     { name = "python-on-whales" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/71/0d/3cca530e35ecfa604d519e203721ce55ca702b900bbb5532ffea89bf3d2f/prefect_docker-0.7.3.tar.gz", hash = "sha256:be9e826343e0128f8d4a35ec6411e3af7866474bedb0c493ad150c2c503c7e13", size = 48384, upload-time = "2026-07-15T18:15:53.542Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/55/35e245d41e091bf87207a9e6ee0049620fdb18a6420094ea639f71bac31f/prefect_docker-0.7.4.tar.gz", hash = "sha256:cfd4bd5f36d493472a4aa33b48695330a1ba70d022fdf8efc9aba8f9eea20cb3", size = 50648, upload-time = "2026-09-08T18:33:13.371Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/be/96281100923c9c09927ab1cf5768fd573475b2f4d3f86252faa8f1f21836/prefect_docker-0.7.3-py3-none-any.whl", hash = "sha256:6c0106e0c8284b72ee54ee65ccd4efa3c4ca3205d8b5c65d647d30423aefa968", size = 32263, upload-time = "2026-07-15T18:15:52.424Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/bf/ac92a81ba57ab290455e662efe0c2af1d39b81dc47c8048fb7d41ee6266f/prefect_docker-0.7.4-py3-none-any.whl", hash = "sha256:93d743696b79739ce24990796cb9d366516236dd81f3350e57b7f6205af58dc8", size = 32463, upload-time = "2026-09-08T18:33:12.248Z" },
 ]
 
 [[package]]

@@ -15,7 +15,9 @@ Either pointPKs or polygon is required. If any other variable is left out it wil
 
 ## /download
 
-Downloader requires a polygon
+`POST`. Downloader requires a polygon. The filters below go in the query
+string; the recipient goes in the JSON body, `{"email": "..."}`, so it stays
+out of access logs and traces.
 
 - timeMin,
 - timeMax,

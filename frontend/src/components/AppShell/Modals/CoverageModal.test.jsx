@@ -57,7 +57,9 @@ describe("CoverageModal", () => {
     await user.click(screen.getByTestId("coverage-count-dropdown-toggle"));
     const option = screen
       .getAllByTestId("coverage-count-option")
-      .find((el) => el.textContent === label);
+      .find(
+        (el) => el.querySelector(".coverageOptionLabel").textContent === label,
+      );
     await user.click(option);
   }
 
@@ -107,6 +109,27 @@ describe("CoverageModal", () => {
       "aria-busy",
       "true",
     );
+
+    release();
+    await waitFor(() =>
+      expect(document.querySelector(".coveragePlotCurrent")).not.toBeNull(),
+    );
+  });
+
+  it("shows the CIOOS spinner over the skeleton on a first load", async () => {
+    const realFetch = global.fetch;
+    let release;
+    const pending = new Promise((resolve) => {
+      release = resolve;
+    });
+    global.fetch = (...args) =>
+      String(args[0]).includes("/coverageHistogram")
+        ? pending.then(() => realFetch(...args))
+        : realFetch(...args);
+    open();
+
+    const skeleton = await screen.findByTestId("skeleton");
+    expect(skeleton.querySelector(".cioosSpinner")).not.toBeNull();
 
     release();
     await waitFor(() =>
