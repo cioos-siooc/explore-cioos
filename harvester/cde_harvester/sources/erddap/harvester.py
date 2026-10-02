@@ -5,7 +5,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -84,7 +84,7 @@ def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
         "reason_code": reason_code,
         "error_message": error_message,
         "duration_ms": duration_ms,
-        "attempted_at": datetime.now(timezone.utc),
+        "attempted_at": datetime.now(UTC),
         "query_urls": "\n".join(urls) if urls else None,
         "warnings": warnings,
     }
@@ -418,7 +418,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
             )
             return DatasetHarvestResult(
                 status="skipped_unchanged",
-                verified_at=datetime.now(timezone.utc),
+                verified_at=datetime.now(UTC),
                 attempt=_build_attempt(
                     run_id, erddap_url, dataset_id,
                     status="skipped",

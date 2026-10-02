@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -123,7 +123,7 @@ class Dataset:
 
     def get_df(self):
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
@@ -260,9 +260,9 @@ class Dataset:
         # parse_erddap_date returns tz-aware UTC; the fallback must match or
         # the subtraction below raises tz-naive/tz-aware TypeError.
         if str(time_min) == "NaT":
-            time_min = datetime.now(timezone.utc).isoformat()
+            time_min = datetime.now(UTC).isoformat()
         if str(time_max) == "NaT":
-            time_max = datetime.now(timezone.utc).isoformat()
+            time_max = datetime.now(UTC).isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
 
         # Estimate records count per profile using time_coverage_resolution

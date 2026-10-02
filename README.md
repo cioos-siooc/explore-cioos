@@ -142,7 +142,7 @@ docker exec <prefect_worker> sh -c "cd /app/harvester && uv run prefect deployme
 ```
 
 Prefer this to deleting the Postgres volume. If you must delete it, it is named
-for the compose project (e.g. `explore-cioos-production_postgres-data`) — check
+for the compose project (e.g. `explore-cioos-production_postgres18-data`) — check
 `docker volume ls` first. Redis has no volume; restarting it clears the cache.
 
 ## Downloads
