@@ -156,6 +156,37 @@ describe("DatasetInspector", () => {
     );
   });
 
+  it("says a failed feature list failed, and retries it", async () => {
+    const fixtureFetch = globalThis.fetch;
+    let failing = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input) =>
+        String(input).includes("/datasetRecordsList?")
+          ? failing
+            ? new Response("<html>504</html>", { status: 504 })
+            : new Response(
+                JSON.stringify({ profiles: [{ profile_id: "station-7" }] }),
+                {
+                  status: 200,
+                  headers: { "content-type": "application/json" },
+                },
+              )
+          : fixtureFetch(input),
+      ),
+    );
+    const { user } = await renderReady();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The features could not be loaded.");
+    expect(
+      screen.queryByText("No features match your search."),
+    ).not.toBeInTheDocument();
+
+    failing = false;
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("station-7")).toBeInTheDocument();
+  });
+
   it("falls back to the generic Feature ID label when the dataset names no cf_role variable", async () => {
     await renderReady();
     await waitFor(() =>

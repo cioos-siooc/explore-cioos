@@ -560,7 +560,7 @@ export default function Legend({
               {platformSwatches.map((pc) => (
                 <div className="legendItem" key={pc.platform}>
                   <CircleFill
-                    className="legendSwatch"
+                    className="legendSwatch platformGlyph"
                     size={10}
                     fill={pc.color}
                     aria-hidden="true"

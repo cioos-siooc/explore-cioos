@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeAll, describe, it, expect, vi } from "vitest";
 
 import {
   GRIDDAP_PRIORITY_ZOOM,
@@ -11,6 +11,7 @@ import {
   griddapOutranksHexesIn,
   griddapTitle,
   isOnAPointIn,
+  loadTurfUnion,
   trackFeatureIn,
   trackItemsIn,
 } from "./hitTest.js";
@@ -254,6 +255,9 @@ describe("trackItemsIn", () => {
 });
 
 describe("buildFeatureQuery", () => {
+  // The union loads once the map is up, not with the module.
+  beforeAll(loadTurfUnion);
+
   const lngLat = { lng: -63.5, lat: 44.6 };
   const context = (overrides = {}) => ({
     zoom: 6.7,

@@ -163,6 +163,15 @@ export default function SelectionProvider({ children }) {
   const [selectionLoading, setSelectionLoading] = useState(true);
   const [initialPointsQueryComplete, setInitialPointsQueryComplete] =
     useState(false);
+  // Keeps a failed /pointQuery from reading as "no datasets match": the list
+  // and the error banner both tell the two apart. Bumping the attempt re-runs
+  // the query for the same filters.
+  const [pointsError, setPointsError] = useState(false);
+  const [pointsAttempt, setPointsAttempt] = useState(0);
+  const retryPointQuery = useCallback(
+    () => setPointsAttempt((attempt) => attempt + 1),
+    [],
+  );
   // True from the moment a record is asked for until its payload lands, so the
   // modal opens on a spinner instead of flashing "no data". Seeded from the URL
   // because a shared link arrives with the record already open.
@@ -298,6 +307,16 @@ export default function SelectionProvider({ children }) {
       datasetMatchesSearch(row, query, i18n.language),
     );
   }, [filteredDatasets, listSearchText, i18n.language]);
+
+  // Over filteredDatasets rather than pointsData: the title search and the
+  // data-layer switches narrow only client-side, so the raw in-view set still
+  // counted every dataset they took out ("0/N datasets (917 in view)"). Not
+  // over listedDatasets: the sidebar's own search never moves the counters.
+  const inViewCount = useMemo(
+    () =>
+      filteredDatasets.filter((row) => datasetsInViewPks.has(row.pk)).length,
+    [filteredDatasets, datasetsInViewPks],
+  );
 
   // filteredDatasets as a pk list, for the queries that ask a question about
   // the filtered data rather than draw it (the coverage figure). Everything
@@ -694,13 +713,15 @@ export default function SelectionProvider({ children }) {
             signal: controller.signal,
           });
           if (!current) return;
-          const data = response.ok ? await response.json() : [];
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
           // Aborting a fetch after its response arrived does not necessarily
           // cancel response.json(), so check again before publishing it.
           if (!current) return;
           setPointsData(
             data.map((point) => datasetInLanguage(point, languageRef.current)),
           );
+          setPointsError(false);
           setInitialPointsQueryComplete(true);
         } catch (error) {
           if (!current || error.name === "AbortError") return;
@@ -708,6 +729,7 @@ export default function SelectionProvider({ children }) {
           // than an endless spinner
           reportError("pointQuery failed", error);
           setPointsData([]);
+          setPointsError(true);
           setInitialPointsQueryComplete(true);
         }
       }
@@ -718,7 +740,7 @@ export default function SelectionProvider({ children }) {
         controller.abort();
       };
     }
-  }, [query, polygon, catalogLoaded]);
+  }, [query, polygon, catalogLoaded, pointsAttempt]);
 
   useEffect(() => {
     // Translating a response after a locale change requires replacing the
@@ -876,6 +898,8 @@ export default function SelectionProvider({ children }) {
     selectedPks,
     selectionLoading,
     initialPointsQueryComplete,
+    pointsError,
+    retryPointQuery,
     inspectRecordID,
     setInspectRecordID,
     // Derived, not stored: the record param IS the open state, the same way
@@ -901,7 +925,7 @@ export default function SelectionProvider({ children }) {
     filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,
-    inViewCount: datasetsInViewPks.size,
+    inViewCount,
     onlyInView,
     setOnlyInView,
     groupBy,

@@ -2,12 +2,16 @@ import * as React from "react";
 
 import DrawHint from "./DrawHint/DrawHint.jsx";
 import Map from "./Map.jsx";
+import Spinner from "../ui/Spinner.jsx";
 import { server } from "../../config";
 import fetchJson from "../../state/fetchJson.js";
 import reportError from "../../state/reportError.js";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../state/tips/TipsProvider.jsx";
+
+// Map.jsx's WATCHED_MAP_LAYERS ids that draw data rather than basemap.
+const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
 
 // Single adapter between the state providers and the imperative Map
 // component — Map.js keeps its prop-based interface untouched.
@@ -19,6 +23,8 @@ export default function MapContainer() {
     reportFirstPaint,
     setLoadingLayers,
     mapView,
+    loadingLayers,
+    firstPaintPending,
     setMapView,
     rangeLevels,
     coverageRangeLevels,
@@ -57,6 +63,13 @@ export default function MapContainer() {
     pointsData,
     combinedQueries,
   } = useSelection();
+
+  // The layers that carry the data, as opposed to the basemap under it: a
+  // seafloor raster still arriving doesn't make what's on screen any less the
+  // answer. The splash covers the first load on its own.
+  const dataLoading =
+    !firstPaintPending &&
+    loadingLayers.some((id) => DATA_LAYER_IDS.includes(id));
 
   // The generic click path (a hex, a coverage cell, a track, a grid, or a
   // cluster of markers too ambiguous for onMarkerClick below) reports what it
@@ -168,6 +181,16 @@ export default function MapContainer() {
         onFirstPaint={reportFirstPaint}
       />
       <DrawHint map={mapInstance} />
+      {/* The bottom activity panel names what is loading; this is the mark
+          over the map itself, where the eye is. */}
+      {dataLoading && (
+        <div
+          className="mapLoadingSpinner cioosSpinnerDisc"
+          data-testid="map-loading-spinner"
+        >
+          <Spinner size="lg" role="presentation" />
+        </div>
+      )}
     </>
   );
 }

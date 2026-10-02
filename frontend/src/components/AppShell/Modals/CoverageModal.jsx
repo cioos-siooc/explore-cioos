@@ -1,7 +1,11 @@
 import * as React from "react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BarChartLine } from "react-bootstrap-icons";
+import {
+  BarChartLine,
+  ExclamationCircle,
+  InfoCircle,
+} from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
@@ -83,6 +87,12 @@ const histogramSkeleton = (
       {SKELETON_BAR_HEIGHTS.map((height, i) => (
         <Skeleton key={i} height={`${height}%`} radius="0" />
       ))}
+    </div>
+    {/* The query takes seconds when the API's cache is cold; the bars alone
+        read as a finished figure that failed to draw. The group is the
+        status, so the mark is decoration. */}
+    <div className="coverageModalStatus coveragePlotBusy">
+      <Spinner size="lg" role="presentation" />
     </div>
   </SkeletonGroup>
 );
@@ -217,6 +227,7 @@ export default function CoverageModal() {
                 otherwise. */}
             {groupBy === "organization" && (
               <div className="coverageToolbarNote">
+                <InfoCircle aria-hidden="true" />
                 {t("coverageOrganizationNote")}
               </div>
             )}
@@ -225,7 +236,10 @@ export default function CoverageModal() {
                 calendar days in its period. Deliberately unlike the map's
                 days ramp, which unions. */}
             {count === "days" && (
-              <div className="coverageToolbarNote">{t("coverageDaysNote")}</div>
+              <div className="coverageToolbarNote">
+                <InfoCircle aria-hidden="true" />
+                {t("coverageDaysNote")}
+              </div>
             )}
           </div>
           <div className="coverageToolbarControls">
@@ -284,7 +298,8 @@ export default function CoverageModal() {
               the API's cache is cold. */}
           {loading && !showStalePlot && histogramSkeleton}
           {!loading && error && (
-            <div className="coverageModalStatus">
+            <div className="coverageModalStatus coverageModalError">
+              <ExclamationCircle aria-hidden="true" />
               {t("coverageErrorMessage")}
             </div>
           )}

@@ -134,9 +134,8 @@ describe("UrlSync", () => {
     await waitFor(() =>
       expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
     );
-    act(() => hooks.mapState.cycleDataLayer("profile"));
-    act(() => hooks.mapState.cycleDataLayer("grid"));
-    act(() => hooks.mapState.cycleDataLayer("grid"));
+    act(() => hooks.mapState.toggleDataLayer("profile", "include"));
+    act(() => hooks.mapState.toggleDataLayer("grid", "exclude"));
     await waitFor(() => {
       expect(params().get("layers")).toBe("profile");
       expect(params().get("excludeLayers")).toBe("grid");

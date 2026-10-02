@@ -1,5 +1,4 @@
 import * as helpers from "@turf/helpers";
-import turfUnion from "@turf/union";
 import turfPointsWithinPolygon from "@turf/points-within-polygon";
 
 import { pointRadiusFor } from "./pointRadius.js";
@@ -13,6 +12,17 @@ import { pointRadiusFor } from "./pointRadius.js";
 // the hits. The three map methods the rules need (the zoom, `project`, and the
 // re-query that gathers a hex's tile fragments) arrive as a scalar and two
 // functions.
+
+// @turf/union (and the bignumber/polyclip it pulls in) only merges click
+// highlights, so it loads once the map is up rather than with the entry
+// bundle. A click before then highlights the unmerged pieces instead.
+let turfUnion = null;
+export const loadTurfUnion = () =>
+  import("@turf/union")
+    .then((module) => {
+      turfUnion = module.default;
+    })
+    .catch(() => {});
 
 // Zoom at which griddap coverage rectangles take hover/click priority over
 // the hex aggregates (which stop being drawn at hexMaxZoom anyway).
@@ -242,22 +252,27 @@ export const buildFeatureQuery = (
         filter: ["==", ["get", "pk"], feature.properties.pk],
       });
       const parts = fragments.length ? fragments : [feature];
-      let merged = parts[0];
-      for (let i = 1; i < parts.length; i++) {
-        try {
-          // @turf/union 7 takes ONE FeatureCollection, not two
-          // features. Still folded pairwise rather than unioning the
-          // whole collection in one call, so a single degenerate
-          // fragment costs only itself (see catch below).
-          merged =
-            turfUnion(helpers.featureCollection([merged, parts[i]])) || merged;
-        } catch {
-          // A degenerate fragment (e.g. a sliver from the MVT buffer
-          // overlap) fails to union — keep what merged so far rather
-          // than losing the highlight entirely.
+      if (!turfUnion) {
+        cellFeatures.push(...parts);
+      } else {
+        let merged = parts[0];
+        for (let i = 1; i < parts.length; i++) {
+          try {
+            // @turf/union 7 takes ONE FeatureCollection, not two
+            // features. Still folded pairwise rather than unioning the
+            // whole collection in one call, so a single degenerate
+            // fragment costs only itself (see catch below).
+            merged =
+              turfUnion(helpers.featureCollection([merged, parts[i]])) ||
+              merged;
+          } catch {
+            // A degenerate fragment (e.g. a sliver from the MVT buffer
+            // overlap) fails to union — keep what merged so far rather
+            // than losing the highlight entirely.
+          }
         }
+        cellFeatures.push(merged);
       }
-      cellFeatures.push(merged);
     }
     // The bucket this feature stands for, so the card can ask the API what
     // each dataset in it contributes. A tile carries only the bucket TOTAL
@@ -332,7 +347,7 @@ export const buildFeatureQuery = (
   // ('outline'), so every box in the stack still draws its own border.
   // Everything else is drawn by all of them ('both').
   let mergedGrid = gridFeatures[0] || null;
-  for (let i = 1; i < gridFeatures.length; i++) {
+  for (let i = 1; turfUnion && i < gridFeatures.length; i++) {
     try {
       // One FeatureCollection per call — see the note in the hex
       // fragment union above.

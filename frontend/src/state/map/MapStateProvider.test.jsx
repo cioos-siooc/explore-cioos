@@ -119,21 +119,21 @@ describe("MapStateProvider", () => {
     expect(Object.values(latest.dataLayers).some(Boolean)).toBe(false);
   });
 
-  it("cycleDataLayer walks include -> exclude -> clear", async () => {
+  it("toggleDataLayer includes, switches to exclude, and clears", async () => {
     await renderReady();
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "include"));
     expect(latest.dataLayers.grid).toBe(true);
     expect(latest.dataLayers.profile).toBe(false);
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "exclude"));
     expect(latest.dataLayers.grid).toBe(false);
     expect(latest.dataLayers.profile).toBe(true);
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "exclude"));
     expect(latest.dataLayerChoices).toEqual({});
   });
 
   it("resetDataLayers restores the everything-on default", async () => {
     await renderReady();
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "include"));
     act(() => latest.resetDataLayers());
     expect(Object.values(latest.dataLayers).every(Boolean)).toBe(true);
   });

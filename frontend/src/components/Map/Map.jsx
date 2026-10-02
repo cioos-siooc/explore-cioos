@@ -75,6 +75,7 @@ import {
   griddapOutranksHexesIn,
   griddapTitle,
   isOnAPointIn,
+  loadTurfUnion,
   selectedTrackLayers,
   trackClickLayers,
   trackItemsIn,
@@ -312,6 +313,15 @@ const drawControlOptions = {
 // pan across a coastline doesn't renumber the legend halfway through, short
 // enough to feel like it belongs to the movement that caused it.
 const VIEWPORT_RAMP_DEBOUNCE_MS = 400;
+
+// Partial opacity so coincident tracks compound: many voyages ply the same
+// shipping corridor (27 St. Lawrence voyages in a 90-day window overlap into
+// what full opacity renders as ONE line), and stacked translucent lines read as
+// a visibly busier corridor.
+const TRACK_LINE_OPACITY = 0.55;
+// How much of a data layer stays visible while it still shows the previous
+// filters' tiles (see markDataStale).
+const DATA_STALE_OPACITY = 0.25;
 // direct_select fires draw.update on every mousemove/touchmove tick of a drag
 // (a dragged vertex or a dragged whole-shape), not just once at drag-end.
 // setPolygon feeds SelectionProvider's /pointQuery fetch, so committing it on
@@ -385,7 +395,8 @@ function buildHeadArrowImage(fillColor, strokeColor = "#ffffff") {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext("2d");
+  // A CPU canvas: getImageData on a GPU one stalls on the map's shader work.
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.beginPath();
   ctx.moveTo(size / 2, 1.5 * ratio); // apex (north)
   ctx.lineTo(size - 2.5 * ratio, size - 2.5 * ratio);
@@ -712,7 +723,7 @@ export default function CreateMap({
     // any tile is still in flight, and on this deployment the coverage/track
     // tiles are heavy enough that the map is rarely idle — gating on it
     // silently dropped filter changes that landed mid-load. The sources are
-    // created together in the 'load' handler, so their presence is the real
+    // created together in the 'style.load' handler, so their presence is the real
     // precondition, and setTiles works fine while other tiles load.
     if (
       !map.current ||
@@ -786,10 +797,9 @@ export default function CreateMap({
   // decides when to reveal them (see refreshViewportHexRange). A transparent
   // fill is still a rendered one.
   //
-  // One-way, and deliberately so. Later changes that re-ramp the hexes — a
-  // filter change, a pan into new tiles — repaint a map the user is already
-  // reading, where a fade to nothing and back would be the more jarring of the
-  // two. This is about the first sight of the map only.
+  // One-way: later changes never take the layers back to nothing. A filter
+  // change dims them instead (see markDataStale), since the map is still worth
+  // reading for where the data is while the new tiles are on their way.
   //
   // The features appear the moment their final ramp is ready. The hexes used to
   // fade up over MapLibre's default 300ms transition, back when their opacity was
@@ -801,47 +811,57 @@ export default function CreateMap({
     if (dataRevealed.current || !map.current) return;
     dataRevealed.current = true;
     reportFirstPaint();
+    applyObservationOpacity(1);
+  }
+
+  // The count-ramp layers' opacity, times `scale`: 1 once revealed, and
+  // DATA_STALE_OPACITY while the tiles on screen are for the previous filters.
+  function applyObservationOpacity(scale) {
     if (map.current.getLayer("hexes")) {
       map.current.setPaintProperty(
         "hexes",
         "fill-opacity",
-        hexOpacityExpression(),
+        hexOpacityExpression(scale),
       );
     }
     if (map.current.getLayer("coverage-hexes")) {
       map.current.setPaintProperty(
         "coverage-hexes",
         "fill-opacity",
-        coverageHexOpacityExpression(),
+        coverageHexOpacityExpression(scale),
       );
     }
     if (map.current.getLayer("coverage-hex-outlines")) {
       map.current.setPaintProperty(
         "coverage-hex-outlines",
         "line-opacity",
-        coverageHexOutlineOpacityExpression(),
+        coverageHexOutlineOpacityExpression(scale),
       );
     }
     if (map.current.getLayer("points")) {
-      map.current.setPaintProperty("points", "circle-opacity", circleOpacity);
+      map.current.setPaintProperty(
+        "points",
+        "circle-opacity",
+        circleOpacity * scale,
+      );
     }
     if (map.current.getLayer("points-halo")) {
       map.current.setPaintProperty(
         "points-halo",
         "circle-opacity",
-        pointsHaloOpacity(),
+        pointsHaloOpacity(scale),
       );
     }
     if (map.current.getLayer("focused-points")) {
       map.current.setPaintProperty(
         "focused-points",
         "circle-opacity",
-        circleOpacity,
+        circleOpacity * scale,
       );
       map.current.setPaintProperty(
         "focused-points-halo",
         "circle-opacity",
-        0.9,
+        0.9 * scale,
       );
     }
   }
@@ -905,6 +925,54 @@ export default function CreateMap({
     );
   }
 
+  // setTiles reloads in place: the previous filters' tiles stay painted until
+  // each is replaced, which on a cold query is seconds of an answer to a
+  // question no longer being asked. Those layers are dimmed until their
+  // sources have everything the new query asks for. Opacity is zoom-only on
+  // all of them, so the swap costs no worker relayout.
+  const staleData = useRef({ observations: false, tracks: false });
+  const STALE_GROUPS = {
+    observations: { sources: HEX_SOURCE_IDS, apply: applyObservationOpacity },
+    tracks: { sources: ["tracks"], apply: applyTrackOpacity },
+  };
+
+  function applyTrackOpacity(scale) {
+    if (!map.current.getLayer("track-lines")) return;
+    map.current.setPaintProperty(
+      "track-lines",
+      "line-opacity",
+      TRACK_LINE_OPACITY * scale,
+    );
+    map.current.setPaintProperty("track-heads", "icon-opacity", scale);
+    map.current.setPaintProperty("track-heads-fixed", "circle-opacity", scale);
+    map.current.setPaintProperty(
+      "track-heads-fixed",
+      "circle-stroke-opacity",
+      scale,
+    );
+  }
+
+  // Before the first reveal the layers are already invisible, and that gate
+  // owns them.
+  function markDataStale(group) {
+    if (!dataRevealed.current || staleData.current[group]) return;
+    staleData.current[group] = true;
+    STALE_GROUPS[group].apply(DATA_STALE_OPACITY);
+  }
+
+  function settleStaleData() {
+    if (!map.current) return;
+    Object.entries(STALE_GROUPS).forEach(([group, { sources, apply }]) => {
+      if (!staleData.current[group]) return;
+      const loaded = sources.every(
+        (id) => !map.current.getSource(id) || map.current.isSourceLoaded(id),
+      );
+      if (!loaded) return;
+      staleData.current[group] = false;
+      apply(1);
+    });
+  }
+
   const [boxSelectStartCoords, setBoxSelectStartCoords] = useState();
   const [boxSelectEndCoords, setBoxSelectEndCoords] = useState();
 
@@ -961,8 +1029,8 @@ export default function CreateMap({
   // fades it back rather than leaving grey dots ringed in white. Only halfway
   // back: the other datasets stay on the map to be seen, just quietly, and the
   // casing is what keeps a grey dot legible over a dark sea.
-  function pointsHaloOpacity() {
-    return ["case", IS_DIMMED, 0.5, 0.9];
+  function pointsHaloOpacity(scale = 1) {
+    return ["case", IS_DIMMED, 0.5 * scale, 0.9 * scale];
   }
 
   // setFeatureState addresses a source and source-layer, not a style layer, so
@@ -1083,15 +1151,26 @@ export default function CreateMap({
   // ramp's own alpha (toRampStops), so this layer opacity is free to be a plain
   // number per zoom: MapLibre multiplies the two, and the count-driven half is
   // recomputed only when the domain moves rather than on every settled camera.
-  function hexOpacityExpression() {
-    return ["interpolate", ["linear"], ["zoom"], ...HEX_OPACITY_STOPS.flat()];
-  }
-  function coverageHexOpacityExpression() {
+  //
+  // `scale` dims the whole layer (see markDataStale). It multiplies the stops
+  // rather than wrapping the interpolate, which MapLibre rejects for the same
+  // top-level-zoom reason as the outline below.
+  const scaleStops = (stops, scale) =>
+    stops.flatMap(([zoom, opacity]) => [zoom, opacity * scale]);
+  function hexOpacityExpression(scale = 1) {
     return [
       "interpolate",
       ["linear"],
       ["zoom"],
-      ...COVERAGE_HEX_OPACITY_STOPS.flat(),
+      ...scaleStops(HEX_OPACITY_STOPS, scale),
+    ];
+  }
+  function coverageHexOpacityExpression(scale = 1) {
+    return [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      ...scaleStops(COVERAGE_HEX_OPACITY_STOPS, scale),
     ];
   }
 
@@ -1109,7 +1188,7 @@ export default function CreateMap({
   // expression that is not the input to a top-level step/interpolate — a
   // throwing setPaintProperty would abort the rest of the paint pass and leave
   // the hex layers stuck at the opacity 0 they are created with.
-  function coverageHexOutlineOpacityExpression() {
+  function coverageHexOutlineOpacityExpression(scale = 1) {
     return [
       "interpolate",
       ["linear"],
@@ -1120,8 +1199,8 @@ export default function CreateMap({
       [
         "case",
         IS_DIMMED,
-        COVERAGE_HEX_OUTLINE_OPACITY * 0.35,
-        COVERAGE_HEX_OUTLINE_OPACITY,
+        COVERAGE_HEX_OUTLINE_OPACITY * 0.35 * scale,
+        COVERAGE_HEX_OUTLINE_OPACITY * scale,
       ],
     ];
   }
@@ -1522,7 +1601,7 @@ export default function CreateMap({
   // Latest spatial filter, readable from the debounced moveend handler (which
   // would otherwise capture the polygon as of the overlay's last render).
   const polygonRef = useRef(null);
-  // For the 'load' handler: an overlay set before the style loaded hid layers
+  // For the 'style.load' handler: an overlay set before the style loaded hid layers
   // that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
   const revealedWmsPk = useRef();
@@ -1625,7 +1704,7 @@ export default function CreateMap({
   // event handlers) restores the user's toggle instead of forcing layers on.
   const dataLayersVisibleRef = useRef(true);
   // Same, for the depth rasters: the style's layers are created visible, so the
-  // 'load' handler needs the current switch state to apply it.
+  // 'style.load' handler needs the current switch state to apply it.
   const bathymetryVisibleRef = useRef(true);
 
   function setLayersVisibility(layerIds, visible) {
@@ -2013,7 +2092,7 @@ export default function CreateMap({
 
   useEffect(() => {
     // Guard on source existence, not map.loaded(): the sources and layers are
-    // all created together in the 'load' handler, so getSource('cde-tiles')
+    // all created together in the 'style.load' handler, so getSource('cde-tiles')
     // being present means the layers this effect touches (points-highlighted)
     // exist too. loaded() additionally requires no tiles in flight, which on a
     // heavy trajectory deployment dropped filter changes that arrived while
@@ -2029,6 +2108,11 @@ export default function CreateMap({
     // invalidateHexRamp).
     invalidateHexRamp();
     refreshCombinedSources(mapQueryString);
+    markDataStale("observations");
+    // The tracks effect below refetches them for the same change.
+    if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayersRef.current)) {
+      markDataStale("tracks");
+    }
     setLoading(true);
     doFinalCheck.current = true;
 
@@ -2057,12 +2141,14 @@ export default function CreateMap({
     // held measurement goes with it.
     invalidateHexRamp();
     refreshCombinedSources(mapQueryString);
+    markDataStale("observations");
     if (tracksModeRef.current && anyTrajectoryLayerOn(dataLayers)) {
       refreshTracksSource(
         mapQueryString,
         scrubTimeRef.current,
         trailingDaysRef.current,
       );
+      markDataStale("tracks");
     }
     applyLayerVisibility();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2111,10 +2197,10 @@ export default function CreateMap({
       // load that adds it rather than dropping the selection: this effect is
       // keyed on the selection alone, so nothing re-runs it once the map
       // catches up, and the track never appeared. Registered from here, so it
-      // runs after the handler that adds the sources ('load' fires its
+      // runs after the handler that adds the sources ('style.load' fires its
       // listeners in registration order).
       if (!map.current.getSource("selected-track")) {
-        map.current.once("load", renderSelectedTrack);
+        map.current.once("style.load", renderSelectedTrack);
         return;
       }
       const source = map.current.getSource("selected-track");
@@ -2290,10 +2376,10 @@ export default function CreateMap({
     return () => {
       superseded = true;
       abortController.abort();
-      // Including a retry still waiting on 'load' — a selection replaced while
+      // Including a retry still waiting on 'style.load' — a selection replaced while
       // the map was still coming up must not draw over the one that replaced
       // it. (Evented.off clears once-listeners too.)
-      map.current?.off("load", renderSelectedTrack);
+      map.current?.off("style.load", renderSelectedTrack);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrajectory, mapQueryString]);
@@ -2310,7 +2396,7 @@ export default function CreateMap({
       // style has added the source.
       const source = map.current.getSource("mapped-record");
       if (!source) {
-        map.current.once("load", renderMappedRecord);
+        map.current.once("style.load", renderMappedRecord);
         return;
       }
       source.setData(emptyFeatureCollection);
@@ -2352,7 +2438,7 @@ export default function CreateMap({
     renderMappedRecord();
     return () => {
       abortController.abort();
-      map.current?.off("load", renderMappedRecord);
+      map.current?.off("style.load", renderMappedRecord);
     };
   }, [mappedRecord]);
 
@@ -2931,7 +3017,7 @@ export default function CreateMap({
         // the same shipping corridor (27 St. Lawrence voyages in a 90-day
         // window overlap into what full opacity renders as ONE line), and
         // stacked translucent lines read as a visibly busier corridor.
-        "line-opacity": 0.55,
+        "line-opacity": TRACK_LINE_OPACITY,
       },
     });
 
@@ -3624,7 +3710,7 @@ export default function CreateMap({
       //
       // The getLayer guard matters now that this runs on every click rather than
       // only the ones five other handlers let through: the data layers are added
-      // on the map's 'load', and a click before that lands here with nothing
+      // on the map's 'style.load', and a click before that lands here with nothing
       // under it — setFilter on a layer that doesn't exist yet throws.
       // Only the spatial selection. This used to clear pointsToReview too, from
       // when that meant "the datasets inside the drawn shape"; it is the
@@ -3697,6 +3783,9 @@ export default function CreateMap({
       // the discrete GPU on dual-GPU laptops. The map is circles and fills —
       // the integrated GPU renders it fine, so hint 'low-power'.
       canvasContextAttributes: { powerPreference: "low-power" },
+      // The canvas can't be browsed by keyboard or screen reader; its label
+      // points to the list that holds the same datasets.
+      locale: { "Map.Title": t("mapCanvasLabel") },
       // No attribution in the map's own corner: the per-source attributions are
       // gathered by an AttributionControl the legend card builds and parents
       // itself (see LegendFooter.jsx).
@@ -3721,7 +3810,9 @@ export default function CreateMap({
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation();
 
-    map.current.on("load", () => {
+    // 'style.load', not 'load': 'load' waits for every basemap tile, and the
+    // EMODnet rasters take seconds, so the data tiles queued behind them.
+    map.current.once("style.load", () => {
       setColorStopsRef.current();
       addObservationLayers();
       addGriddapLayers();
@@ -3747,7 +3838,11 @@ export default function CreateMap({
       if (!bathymetryVisibleRef.current) {
         setLayersVisibility(bathymetryLayerIds, false);
       }
+    });
 
+    // The draw control only connects on 'load', so the shape has to wait for it.
+    map.current.once("load", () => {
+      loadTurfUnion();
       // A share link can carry the spatial selection (rectangle bounds or a
       // polygon ring). SelectionProvider has already seeded it into the app
       // state, which is the polygon prop this mount-time closure holds — this
@@ -4075,17 +4170,21 @@ export default function CreateMap({
   // never fully settles would otherwise never measure.
   useEffect(() => {
     if (!map.current) return;
-    const measure = debounce(
-      () => refreshViewportHexRange(),
-      VIEWPORT_RAMP_DEBOUNCE_MS,
-    );
+    // Un-dimming stale layers rides the same pass, so the new tiles come up
+    // at full strength in the colours they keep rather than just before them.
+    const measureAndSettle = () => {
+      refreshViewportHexRange();
+      settleStaleData();
+    };
+    const measure = debounce(measureAndSettle, VIEWPORT_RAMP_DEBOUNCE_MS);
     const measureNow = () => {
       measure.cancel();
-      refreshViewportHexRange();
+      measureAndSettle();
     };
     const onDataSourceLoaded = (e) => {
-      if (!e.isSourceLoaded || !HEX_SOURCE_IDS.includes(e.sourceId)) return;
-      measure();
+      if (!e.isSourceLoaded) return;
+      if (HEX_SOURCE_IDS.includes(e.sourceId)) measure();
+      else if (e.sourceId === "tracks") settleStaleData();
     };
     map.current.on("moveend", measure);
     map.current.on("sourcedata", onDataSourceLoaded);
@@ -4103,7 +4202,9 @@ export default function CreateMap({
   // is baked into buildBasemapStyle at construction, so this only fires on
   // runtime changes.
   useEffect(() => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current) return;
+    map.current.getCanvas().setAttribute("aria-label", t("mapCanvasLabel"));
+    if (!map.current.isStyleLoaded()) return;
     LABEL_LAYER_IDS.forEach((id) => {
       if (map.current.getLayer(id)) {
         map.current.setLayoutProperty(
@@ -4113,7 +4214,7 @@ export default function CreateMap({
         );
       }
     });
-  }, [i18n.language]);
+  }, [i18n.language, t]);
 
   return (
     <div
