@@ -25,6 +25,7 @@ import platformColors from "../../platformColors";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
+import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import Skeleton from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
@@ -445,15 +446,6 @@ function platformColorOf(platform) {
   ).color;
 }
 
-// The same names the map's geometry filter gives these types (dataLayers.js).
-const CDM_TYPE_LABEL_KEYS = {
-  Profile: "layerProfile",
-  TimeSeries: "layerTimeseries",
-  TimeSeriesProfile: "layerTimeseriesProfile",
-  Trajectory: "layerTrajectories",
-  TrajectoryProfile: "layerTrajectoryProfile",
-};
-
 // The card's second row: where the dataset lives, what kind it is, how many
 // locations and days it holds, and whether it is live. Shared with the map's
 // "what's here" card so a dataset reads the same in both lists.
@@ -466,9 +458,7 @@ export function DatasetCardMeta({ row, t, i18n }) {
   );
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
-    : CDM_TYPE_LABEL_KEYS[row.cdm_data_type]
-      ? t(CDM_TYPE_LABEL_KEYS[row.cdm_data_type])
-      : row.cdm_data_type || "";
+    : cdmDataTypeLabel(row.cdm_data_type, t) || "";
   const locationsLabel = isGrid
     ? formatGridSize(row.grid_dimensions) || "—"
     : row.profiles_count !== row.n_profiles

@@ -4,6 +4,7 @@ import {
   DEFAULT_DATA_LAYERS,
   allDataLayersOn,
   anyTrajectoryLayerOn,
+  cdmDataTypeLabel,
   chosenDataLayerKeys,
   dataLayerKeyForDataset,
   dataLayersFromChoices,
@@ -122,5 +123,27 @@ describe("mapping a dataset row onto a switch", () => {
     const selection = onlyDataLayer("grid");
     expect(datasetInDataLayers(grid, selection)).toBe(true);
     expect(datasetInDataLayers(profile, selection)).toBe(false);
+  });
+});
+
+describe("naming a cdm_data_type", () => {
+  const t = (key) => key;
+
+  it("uses the geometry switch's label for every harvested type", () => {
+    expect(cdmDataTypeLabel("Profile", t)).toBe("layerProfile");
+    expect(cdmDataTypeLabel("TimeSeries", t)).toBe("layerTimeseries");
+    expect(cdmDataTypeLabel("TimeSeriesProfile", t)).toBe(
+      "layerTimeseriesProfile",
+    );
+    expect(cdmDataTypeLabel("Trajectory", t)).toBe("layerTrajectories");
+    expect(cdmDataTypeLabel("TrajectoryProfile", t)).toBe(
+      "layerTrajectoryProfile",
+    );
+    expect(cdmDataTypeLabel("Grid", t)).toBe("layerGrid");
+  });
+
+  it("shows a type no switch names as it is", () => {
+    expect(cdmDataTypeLabel("Point", t)).toBe("Point");
+    expect(cdmDataTypeLabel(undefined, t)).toBeUndefined();
   });
 });

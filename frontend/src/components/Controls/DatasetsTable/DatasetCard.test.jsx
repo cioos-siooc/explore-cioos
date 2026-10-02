@@ -28,6 +28,19 @@ describe("DatasetCard", () => {
     expect(screen.getByText("layerTimeseries")).toBeInTheDocument();
   });
 
+  it("shows a type no geometry switch names as it is", () => {
+    render(
+      <DatasetCard
+        row={{ ...ROW, source_type: "obis", cdm_data_type: "Point" }}
+        t={t}
+        i18n={i18n}
+      />,
+    );
+    expect(screen.getByTitle("datasetsTableHeaderTypeText").textContent).toBe(
+      "Point",
+    );
+  });
+
   it("opens on a click anywhere, and from the keyboard through its title button", async () => {
     const user = userEvent.setup();
     const onInspect = vi.fn();

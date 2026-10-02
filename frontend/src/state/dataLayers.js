@@ -136,6 +136,14 @@ export function dataLayerKeyForDataset(row) {
   return TYPE_TO_KEY.get(row.cdm_data_type);
 }
 
+// A cdm_data_type in the geometry filter's own words, so a type reads the same
+// on a card, a group heading and the coverage chart as in the filter. A type
+// no switch names (e.g. OBIS 'Point', the same word in French) is shown as-is.
+export function cdmDataTypeLabel(type, t) {
+  const key = dataLayerKeyForDataset({ cdm_data_type: type });
+  return key ? t(DATA_LAYER_LABEL_KEYS[key]) : type;
+}
+
 // Is this dataset drawn under the current layer selection?
 export function datasetInDataLayers(row, dataLayers) {
   if (!dataLayers) return true;
