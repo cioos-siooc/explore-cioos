@@ -210,6 +210,37 @@ describe("DownloadDetails", () => {
     ).toHaveAttribute("title", "Size estimate unavailable");
   });
 
+  it("asks /downloadEstimate for the basket once, with no empty parameter, even under a Datasets filter", async () => {
+    const urls = [];
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/downloadEstimate")) urls.push(url);
+      return realFetch(input, init);
+    };
+    renderDetails({
+      timeFilterActive: true,
+      filterDownloadByTime: true,
+      query: {
+        ...QUERY,
+        datasetsSelected: [
+          { pk: EST_SMALL.pk, isSelected: true },
+          { pk: EST_LARGE.pk, isSelected: false },
+        ],
+      },
+    });
+    await waitFor(() => expect(urls.length).toBeGreaterThanOrEqual(2));
+    for (const url of urls) {
+      expect(url).not.toMatch(/\?&|&&|&$/);
+      expect(new URL(url).searchParams.getAll("datasetPKs")).toEqual([
+        `${EST_SMALL.pk},${EST_LARGE.pk}`,
+      ]);
+    }
+    expect(urls.some((url) => new URL(url).searchParams.has("timeMax"))).toBe(
+      true,
+    );
+  });
+
   it("shows the direct links and each card's download link up front", () => {
     renderDetails({
       pointsToReview: [
