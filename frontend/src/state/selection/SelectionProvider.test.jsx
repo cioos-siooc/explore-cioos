@@ -229,6 +229,50 @@ describe("SelectionProvider", () => {
     ).toBeNull();
   });
 
+  it("inViewCount counts the filtered datasets in view — the title search moves it, the list search does not", async () => {
+    // The fixture rows carry no bbox; give every one the same point so a
+    // world-sized viewport has them all in view.
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row) => ({
+        ...row,
+        filtered_bbox_geojson: { type: "Point", coordinates: [-63, 44] },
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    await renderLoaded();
+    act(() =>
+      latestMapState.setMapView((view) => ({
+        ...view,
+        bounds: [
+          [-180, -90],
+          [180, 90],
+        ],
+      })),
+    );
+    await waitFor(() =>
+      expect(latest.inViewCount).toBe(latest.pointsData.length),
+    );
+
+    const needle = latest.pointsData[0].title.slice(0, 6);
+    act(() => latest.setDatasetTitleSearchText(needle));
+    await waitFor(() =>
+      expect(latest.inViewCount).toBe(latest.filteredDatasets.length),
+    );
+    expect(latest.inViewCount).toBeLessThan(latest.pointsData.length);
+
+    act(() => latest.setDatasetTitleSearchText("zzzzqqq"));
+    await waitFor(() => expect(latest.inViewCount).toBe(0));
+
+    act(() => latest.setDatasetTitleSearchText(""));
+    act(() => latest.setListSearchText("zzzzqqq"));
+    await waitFor(() => expect(latest.listedDatasets).toHaveLength(0));
+    expect(latest.inViewCount).toBe(latest.pointsData.length);
+  });
+
   it("\"only in view\" narrows the coverage figure's dataset list, not the map's", async () => {
     await renderLoaded();
     expect(latest.filteredDatasetPks).toBeUndefined();

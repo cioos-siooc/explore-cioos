@@ -14,6 +14,7 @@ import {
   defaultEndDepth,
 } from "../../components/config.js";
 import {
+  applyDatasetPKs,
   createDataFilterQueryString,
   validateEmail,
   useChanged,
@@ -152,11 +153,12 @@ export default function DownloadProvider({ children }) {
       downloadQuery.startDepth = defaultStartDepth;
       downloadQuery.endDepth = defaultEndDepth;
     }
-    let url = `${server}/download?${createDataFilterQueryString(
-      downloadQuery,
-    )}&datasetPKs=${pointsToDownload
-      .map((point) => point.pk)
-      .join(",")}&lang=${i18n.language}`;
+    // A Datasets filter already writes datasetPKs; applyDatasetPKs replaces it,
+    // because a repeated key reaches the API as an array and 500s.
+    let url = `${server}/download?${applyDatasetPKs(
+      createDataFilterQueryString(downloadQuery),
+      pointsToDownload.map((point) => point.pk),
+    )}&lang=${i18n.language}`;
     if (polygon && filterDownloadByPolygon) {
       url += `&polygon=${JSON.stringify(polygon)}`;
     }

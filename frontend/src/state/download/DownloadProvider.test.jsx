@@ -35,8 +35,8 @@ function Probe() {
   return <span data-testid="state">{ready ? "ready" : "loading"}</span>;
 }
 
-async function renderReady() {
-  const result = renderWithProviders(<Probe />, { providers: "app" });
+async function renderReady(url = "/") {
+  const result = renderWithProviders(<Probe />, { providers: "app", url });
   await waitFor(() =>
     expect(screen.getByTestId("state")).toHaveTextContent("ready"),
   );
@@ -132,6 +132,37 @@ describe("DownloadProvider", () => {
     it("sets no cookie", async () => {
       await submit(true);
       expect(document.cookie).toBe("");
+    });
+
+    it('opens the query string with a parameter, not an empty "&"', async () => {
+      await submit(false);
+      const [{ url }] = requests;
+      expect(url).not.toMatch(/\?&|&&|&$/);
+      const params = new URL(url).searchParams;
+      expect(params.get("datasetPKs")).toBe("1");
+      expect(params.get("lang")).toBe("en");
+    });
+
+    it("names the basket once when the Datasets filter is also narrowing", async () => {
+      await renderReady("/?datasetPKs=2337");
+      // query is debounced: submitting before it lands sends no Datasets
+      // filter at all, and there is then nothing for the basket to collide with.
+      await waitFor(
+        () =>
+          expect(filters.query.datasetsSelected.some((d) => d.isSelected)).toBe(
+            true,
+          ),
+        { timeout: 2000 },
+      );
+      act(() => {
+        selection.setPointsToDownload([{ pk: 2337 }]);
+        download.setEmail("diver@example.com");
+      });
+      act(() => download.handleSubmission());
+      await waitFor(() => expect(requests).toHaveLength(1));
+      expect(
+        new URL(requests[0].url).searchParams.getAll("datasetPKs"),
+      ).toEqual(["2337"]);
     });
   });
 
