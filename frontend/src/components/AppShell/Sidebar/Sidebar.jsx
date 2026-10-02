@@ -5,6 +5,7 @@ import {
   FileEarmarkText,
   ListUl,
   Map as MapIcon,
+  PlusCircle,
   QuestionCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -170,7 +171,7 @@ export default function Sidebar() {
             className="sidebarFooterHint"
             title={t("sidebarSelectionHintTitle")}
           >
-            <Download
+            <PlusCircle
               className="sidebarFooterHintIcon"
               size={13}
               aria-hidden="true"
@@ -198,7 +199,9 @@ export default function Sidebar() {
             <Download size={16} aria-hidden="true" />
             <span className="sidebarDownloadText">
               {t("downloadModalButtonText")}
-              <span className="sidebarDownloadCount">
+              {/* Keyed on the count so each add or removal replays the pulse,
+                  tying the card's + to the button it fed. */}
+              <span className="sidebarDownloadCount" key={selectedCount}>
                 {t("sidebarCountsSelected", { count: selectedCount })}
               </span>
             </span>

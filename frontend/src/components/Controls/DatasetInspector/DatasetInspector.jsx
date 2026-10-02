@@ -8,7 +8,6 @@ import {
   PinMap,
   PinMapFill,
 } from "react-bootstrap-icons";
-// import platformColors from '../../platformColors'
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
@@ -29,6 +28,7 @@ import {
   formatRange,
 } from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
+import { DatasetPlatformIcon } from "../DatasetsTable/DatasetCard.jsx";
 import ListCard, {
   CardField,
   CardTags,
@@ -163,6 +163,8 @@ export default function DatasetInspector({
     [offerTip, isTrajectory, isRealtime],
   );
   const [datasetRecords, setDatasetRecords] = useState();
+  const [recordsError, setRecordsError] = useState(false);
+  const [recordsAttempt, setRecordsAttempt] = useState(0);
   const inspectorRef = useRef(null);
   const isGrid = dataset.cdm_data_type === "Grid";
   // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
@@ -185,9 +187,6 @@ export default function DatasetInspector({
   const [loading, setLoading] = useState(hasRecordList);
   useActivityTask("activityRecordListText", loading);
 
-  // const platformColor = platformColors.filter(
-  //   (pc) => pc.platform === dataset.platform
-  // )
   const isTrajectoryDataset =
     dataset.source_type !== "obis" &&
     (dataset.cdm_data_type || "").includes("Trajectory");
@@ -211,13 +210,16 @@ export default function DatasetInspector({
         return response.json();
       })
       .then((data) => {
-        if (!cancelled) setDatasetRecords(data);
+        if (cancelled) return;
+        setDatasetRecords(data);
+        setRecordsError(false);
       })
       .catch((error) => {
-        // An error response used to leave the spinner running forever. Land on
-        // an empty record table instead — the rest of the page still reads.
+        // Said as a failure with a retry, not as an empty table, which would
+        // read as "this dataset has no records"; the rest of the page still
+        // reads.
         reportError("datasetRecordsList fetch failed", error);
-        if (!cancelled) setDatasetRecords([]);
+        if (!cancelled) setRecordsError(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -230,7 +232,7 @@ export default function DatasetInspector({
     // filter change while the page is open; the list is refreshed when the page
     // is reopened instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset, hasRecordList]);
+  }, [dataset, hasRecordList, recordsAttempt]);
 
   // Browser Back needs no handling here: the open dataset lives in the URL
   // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
@@ -576,7 +578,18 @@ export default function DatasetInspector({
               {/* Nullable in the schema; an empty chip under a label reads as
                   a broken field. */}
               {dataset.platform ? (
-                <span className="metadataChip">{t(dataset.platform)}</span>
+                <span className="metadataChip">
+                  <span className="metadataPlatformGlyph" aria-hidden="true">
+                    <DatasetPlatformIcon
+                      platform={dataset.platform}
+                      cdmDataType={dataset.cdm_data_type}
+                      sourceType={dataset.source_type}
+                      t={t}
+                      decorative
+                    />
+                  </span>
+                  {t(dataset.platform)}
+                </span>
               ) : (
                 <span className="metadataEmpty">—</span>
               )}
@@ -726,6 +739,17 @@ export default function DatasetInspector({
                   <ListCardSkeleton key={i} />
                 ))}
               </SkeletonGroup>
+            ) : recordsError ? (
+              <div className="cardListEmpty" role="alert">
+                {t("datasetInspectorRecordsLoadFailedText")}{" "}
+                <button
+                  type="button"
+                  className="recordShowAll"
+                  onClick={() => setRecordsAttempt((attempt) => attempt + 1)}
+                >
+                  {t("apiErrorRetryButton")}
+                </button>
+              </div>
             ) : (
               <CardList
                 items={datasetRecords?.profiles}

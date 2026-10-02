@@ -140,7 +140,7 @@ describe("ScientificNameFilter", () => {
     expect(setScientificNamesSelected).toHaveBeenCalledWith(["Orcinus orca"]);
   });
 
-  it("clicking an included name excludes it", async () => {
+  it("the exclude button moves an included name to the excluded list", async () => {
     const user = userEvent.setup();
     const setScientificNamesSelected = vi.fn();
     const setScientificNamesExcluded = vi.fn();
@@ -153,13 +153,15 @@ describe("ScientificNameFilter", () => {
         searchTerms=""
       />,
     );
-    const option = await screen.findByText("Orcinus orca");
-    await user.click(option);
-    expect(setScientificNamesSelected).toHaveBeenCalledWith([]);
+    await screen.findByText("Orcinus orca");
+    await user.click(
+      screen.getByRole("button", { name: "Exclude: Orcinus orca" }),
+    );
     expect(setScientificNamesExcluded).toHaveBeenCalledWith(["Orcinus orca"]);
+    expect(setScientificNamesSelected).toHaveBeenCalledWith([]);
   });
 
-  it("an excluded name stays pinned, reads as excluded, and clears on click", async () => {
+  it("an excluded name stays pinned, reads as excluded, and its exclude button clears it", async () => {
     const user = userEvent.setup();
     const setScientificNamesSelected = vi.fn();
     const setScientificNamesExcluded = vi.fn();
@@ -176,9 +178,29 @@ describe("ScientificNameFilter", () => {
     const row = option.closest(".optionButton");
     expect(row).toHaveClass("excluded");
     expect(row).toHaveTextContent("(excluded)");
-    await user.click(option);
+    await user.click(
+      screen.getByRole("button", { name: "Exclude: Orcinus orca" }),
+    );
     expect(setScientificNamesExcluded).toHaveBeenCalledWith([]);
     expect(setScientificNamesSelected).not.toHaveBeenCalled();
+  });
+
+  it("clicking an excluded name includes it instead", async () => {
+    const user = userEvent.setup();
+    const setScientificNamesSelected = vi.fn();
+    const setScientificNamesExcluded = vi.fn();
+    renderWithProviders(
+      <ScientificNameFilter
+        scientificNamesSelected={[]}
+        setScientificNamesSelected={setScientificNamesSelected}
+        scientificNamesExcluded={["Orcinus orca"]}
+        setScientificNamesExcluded={setScientificNamesExcluded}
+        searchTerms=""
+      />,
+    );
+    await user.click(await screen.findByText("Orcinus orca"));
+    expect(setScientificNamesSelected).toHaveBeenCalledWith(["Orcinus orca"]);
+    expect(setScientificNamesExcluded).toHaveBeenCalledWith([]);
   });
 
   it("pins already-selected names at the top, ahead of new suggestions", async () => {

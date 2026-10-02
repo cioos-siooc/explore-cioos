@@ -95,14 +95,8 @@ describe("HarvestOverview", () => {
       "/downloads/summary": { ...DOWNLOADS_SUMMARY, n_stuck: 3 },
     });
     renderWithProviders(<HarvestOverview />);
-    // Note: translation.json's "_plural" suffix is i18next v3 pluralization;
-    // this app's i18next (v25, default compatibilityJSON 'v4') expects
-    // "_other" for English instead, so the _plural key is never selected and
-    // the base (singular-worded) string renders whatever the count — a real
-    // product bug, not a test quirk. Asserting the singular text here
-    // documents current behaviour rather than the intended one.
     expect(
-      await screen.findByText(/3 download request is queued/),
+      await screen.findByText(/3 download requests are queued/),
     ).toBeInTheDocument();
   });
 

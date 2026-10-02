@@ -100,11 +100,11 @@
 }
 
 .wmsLegendVariable {
-  font-size: 0.9em;
+  font-size: var(--cioos-font-size-2xs);
 }
 
 .wmsLegendUnavailable {
-  font-size: 0.8em;
+  font-size: var(--cioos-font-size-2xs);
   color: var(--cioos-ink-60);
   font-style: italic;
 }

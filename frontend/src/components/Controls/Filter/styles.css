@@ -119,7 +119,7 @@
 
 .filterOptionsActions button:hover {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 /* The field and its clear button as one positioned unit — see Filter.jsx. */
@@ -354,7 +354,7 @@
  * typed fields at least 16px, below which Safari zooms the whole page in
  * when one takes focus.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .filterSearch {
     min-height: 44px;
 

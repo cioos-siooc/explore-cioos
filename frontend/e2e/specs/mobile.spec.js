@@ -91,3 +91,32 @@ test("names every quick filter under its button, and still fits the width", asyn
   );
   expect(overflow, "the page scrolls horizontally").toBeLessThanOrEqual(0);
 });
+
+// A phone held landscape is wide enough to miss the width rung but too short
+// for the floating chrome: the list sat under the top bar with no rows at all.
+test.describe("a phone held landscape", () => {
+  test.use({ viewport: { width: 844, height: 390 } });
+
+  test("gets the full-screen datasets sheet with rows in it", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.getByTestId("topbar-datasets-button").click();
+
+    const sidebar = page.getByTestId("sidebar");
+    const sheet = await sidebar.boundingBox();
+    expect(sheet.width).toBeGreaterThan(page.viewportSize().width * 0.9);
+    await expect(sidebar.getByTestId("dataset-card").first()).toBeInViewport();
+  });
+
+  test("keeps the filters footer on screen", async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId("topbar-filters-button").click();
+
+    await expect(
+      page.getByTestId("filters-modal").getByRole("button", {
+        name: "Clear all",
+      }),
+    ).toBeInViewport();
+  });
+});
