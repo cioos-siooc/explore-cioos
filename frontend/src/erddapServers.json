@@ -53,5 +53,10 @@
     "url": "https://seagull-erddap.glos.org/erddap",
     "label_en": "GLOS",
     "label_fr": "GLOS"
+  },
+  {
+    "url": "https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap",
+    "label_en": "DFO MEDS",
+    "label_fr": "MPO SDMM"
   }
 ]

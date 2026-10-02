@@ -974,6 +974,10 @@ def main(folder, incremental=False):
         # from here rather than unioning feature ranges per request.
         with _timed("refresh_dataset_day_ranges", logger):
             transaction.execute(text("SELECT refresh_dataset_day_ranges();"))
+        # The coarse tiles and the legend's zoom0 ramp read this rollup for
+        # dataset-level selections instead of every feature row.
+        with _timed("refresh_hexes_zoom_0_rollup", logger):
+            transaction.execute(text("SELECT refresh_hexes_zoom_0_rollup();"))
 
         # Harvest audit: append-only. Same writes in both incremental and
         # full-reload paths since these tables are never truncated.

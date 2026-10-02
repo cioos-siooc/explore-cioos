@@ -25,27 +25,42 @@ describe("DatasetCard", () => {
   it("renders the title and type", () => {
     render(<DatasetCard row={ROW} t={t} i18n={i18n} />);
     expect(screen.getByText("Green Bay LoRaWAN Buoy 4")).toBeInTheDocument();
-    expect(screen.getByText("Time series")).toBeInTheDocument();
+    expect(screen.getByText("layerTimeseries")).toBeInTheDocument();
   });
 
-  it("is a clickable, keyboard-operable button when onInspect is given", async () => {
+  it("shows a type no geometry switch names as it is", () => {
+    render(
+      <DatasetCard
+        row={{ ...ROW, source_type: "obis", cdm_data_type: "Point" }}
+        t={t}
+        i18n={i18n}
+      />,
+    );
+    expect(screen.getByTitle("datasetsTableHeaderTypeText").textContent).toBe(
+      "Point",
+    );
+  });
+
+  it("opens on a click anywhere, and from the keyboard through its title button", async () => {
     const user = userEvent.setup();
     const onInspect = vi.fn();
     render(<DatasetCard row={ROW} t={t} i18n={i18n} onInspect={onInspect} />);
     const card = screen.getByTestId("dataset-card");
-    expect(card).toHaveAttribute("role", "button");
+    expect(card).not.toHaveAttribute("role");
     await user.click(card);
     expect(onInspect).toHaveBeenCalledWith(ROW);
 
     onInspect.mockClear();
-    card.focus();
+    screen.getByRole("button", { name: ROW.title }).focus();
     await user.keyboard("{Enter}");
     expect(onInspect).toHaveBeenCalledWith(ROW);
   });
 
-  it("is not a button, and has no role, without onInspect", () => {
+  it("has no title button without onInspect", () => {
     render(<DatasetCard row={ROW} t={t} i18n={i18n} />);
-    expect(screen.getByTestId("dataset-card")).not.toHaveAttribute("role");
+    expect(
+      screen.queryByRole("button", { name: ROW.title }),
+    ).not.toBeInTheDocument();
   });
 
   it("the select checkbox calls onSelect without also triggering onInspect", async () => {
@@ -63,7 +78,7 @@ describe("DatasetCard", () => {
     );
     await user.click(
       screen.getByRole("checkbox", {
-        name: "datasetsCardSelectForDownloadText",
+        name: "datasetsCardSelectForDownloadText: Green Bay LoRaWAN Buoy 4",
       }),
     );
     expect(onSelect).toHaveBeenCalledWith(ROW);
@@ -75,7 +90,7 @@ describe("DatasetCard", () => {
     render(<DatasetCard row={grid} t={t} i18n={i18n} onSelect={() => {}} />);
     expect(
       screen.getByRole("checkbox", {
-        name: "datasetsCardSelectForDownloadText",
+        name: "datasetsCardSelectForDownloadText: Green Bay LoRaWAN Buoy 4",
       }),
     ).toBeDisabled();
   });
@@ -227,7 +242,7 @@ describe("DatasetCard", () => {
       );
       expect(
         screen.getByRole("checkbox", {
-          name: "datasetsCardSelectForDownloadText",
+          name: "datasetsCardSelectForDownloadText: Green Bay LoRaWAN Buoy 4",
         }),
       ).toBeDisabled();
     });

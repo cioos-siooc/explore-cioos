@@ -199,7 +199,10 @@ export default function Filter({
                   rel="noreferrer"
                 >
                   Info&nbsp;
-                  <BoxArrowUpRight color="#52A79B" size={17.5} />
+                  <BoxArrowUpRight
+                    color="var(--cioos-primary-700)"
+                    size={17.5}
+                  />
                 </a>
               )}
             </div>

@@ -125,7 +125,7 @@ describe("FeatureCard", () => {
       });
     });
     const meta = screen.getByTitle(row.title).querySelector(".datasetCardMeta");
-    expect(meta).toHaveTextContent("Time series / Profile");
+    expect(meta).toHaveTextContent("Time series profile");
     expect(meta).toHaveTextContent(String(row.profiles_count));
   });
 

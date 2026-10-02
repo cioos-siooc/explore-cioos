@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   Download,
   ExclamationTriangleFill,
+  PlusCircle,
   Grid3x3Gap,
   HexagonFill,
   Check2Circle,
@@ -24,6 +25,7 @@ import platformColors from "../../platformColors";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
+import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import Skeleton from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
@@ -82,15 +84,6 @@ export default function DatasetCard({
 
   const clickable = typeof onInspect === "function";
   const handleCardClick = clickable ? () => onInspect(row) : undefined;
-  const handleKeyDown = clickable
-    ? (e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onInspect(row);
-        }
-      }
-    : undefined;
 
   const selectTitle = isGrid
     ? t("griddapNotDownloadableTooltip")
@@ -112,20 +105,13 @@ export default function DatasetCard({
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}
       onMouseLeave={() => onHoverEnd()}
-      role={clickable ? "button" : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onKeyDown={handleKeyDown}
     >
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
-          {/* Whether this dataset is in the download: first thing on the
-              title's line, ahead of the platform dot. The glyph says which way
-              the click goes rather than colouring a ground — a download sign
-              while the dataset is out, the filled circle of a ticked box once
-              it is in. Both read at a glance down the left edge of the list,
-              which is what asking "which of these have I picked?" amounts to.
-              role=checkbox because that is what it is; a button carries the
-              icon a native input cannot. */}
+          {/* A plus while out, a filled tick once in — not a download sign,
+              which promised a file this click never delivers. role=checkbox
+              because that is what it is; a button carries the icon a native
+              input cannot. */}
           <button
             type="button"
             role="checkbox"
@@ -134,13 +120,13 @@ export default function DatasetCard({
             title={selectTitle}
             onClick={handleSelect}
             disabled={selectDisabled}
-            aria-label={t("datasetsCardSelectForDownloadText")}
+            aria-label={`${t("datasetsCardSelectForDownloadText")}: ${row.title}`}
             data-tip-highlight={tipHighlight}
           >
             {selected ? (
               <CheckCircleFill size={16} aria-hidden="true" />
             ) : (
-              <Download size={16} aria-hidden="true" />
+              <PlusCircle size={16} aria-hidden="true" />
             )}
           </button>
 
@@ -154,9 +140,22 @@ export default function DatasetCard({
               t={t}
             />
           </span>
-          <span className="datasetCardTitle" title={row.title}>
-            {row.title}
-          </span>
+          {/* The card's keyboard and screen-reader target: the whole card
+              can't be a button because it holds the checkbox and links. Its
+              click bubbles to the card's own handler. */}
+          {clickable ? (
+            <button
+              type="button"
+              className="datasetCardTitle"
+              title={row.title}
+            >
+              {row.title}
+            </button>
+          ) : (
+            <span className="datasetCardTitle" title={row.title}>
+              {row.title}
+            </span>
+          )}
 
           {/* Size and CDE-downloadable status, on the title's line rather than
               a row of their own. Both are a glyph and a few characters wide,
@@ -198,6 +197,11 @@ export default function DatasetCard({
                         downloadable:
                           row?.sizeEstimate?.filteredSize < 1000000000,
                       })}
+                      title={
+                        Number.isFinite(row?.sizeEstimate?.filteredSize)
+                          ? undefined
+                          : t("downloadSizeUnavailableTitle")
+                      }
                     >
                       {formatSizeEstimate(row?.sizeEstimate?.filteredSize)}
                     </span>
@@ -313,20 +317,29 @@ export default function DatasetCard({
                     </span>
                   </Tooltip>
                 )}
-                <a
-                  className="datasetCardSourceLink download"
-                  href={downloadLink.url}
-                  download={downloadLink.filename}
-                  title={downloadLink.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Download size={12} aria-hidden="true" />
-                  {t("datasetCardDirectDownloadText", {
+                {/* Icon-only, like the copy beside it: the format is set once
+                    in the footer, so spelling it on every card is noise. The
+                    tooltip and the accessible name still say what arrives. */}
+                <Tooltip
+                  placement="top"
+                  content={t("datasetCardDirectDownloadText", {
                     format: downloadLink.format.label,
                   })}
-                </a>
+                >
+                  <a
+                    className="datasetCardIconLink"
+                    href={downloadLink.url}
+                    download={downloadLink.filename}
+                    aria-label={t("datasetCardDirectDownloadText", {
+                      format: downloadLink.format.label,
+                    })}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Download size={13} aria-hidden="true" />
+                  </a>
+                </Tooltip>
                 {/* The URL, for the script or the note it is going into. It
                     replaces the query this card used to print in full: a URL
                     that is read is almost always a URL that is about to be
@@ -343,7 +356,7 @@ export default function DatasetCard({
                 >
                   <button
                     type="button"
-                    className="datasetCardCopyLink"
+                    className="datasetCardIconLink"
                     aria-label={t("datasetCardCopyLinkText")}
                     onClick={(e) => {
                       // The card's own click opens the dataset page.
@@ -394,24 +407,43 @@ export function DatasetCardSkeleton() {
   );
 }
 
-export function DatasetPlatformIcon({ platform, cdmDataType, sourceType, t }) {
+// `decorative` drops the tooltip for a spot whose own text already names it.
+export function DatasetPlatformIcon({
+  platform,
+  cdmDataType,
+  sourceType,
+  t,
+  decorative,
+}) {
+  // Grid amber, the colour the map draws gridded coverage in.
   if (cdmDataType === "Grid") {
     return (
-      <Grid3x3Gap title={t("griddapTypeLabel")} color="#52a79b" size={13} />
+      <Grid3x3Gap
+        title={decorative ? undefined : t("griddapTypeLabel")}
+        color="var(--cioos-grid-700)"
+        size={13}
+      />
     );
   }
   const Icon =
     cdmDataType === "Trajectory" || sourceType === "obis"
       ? HexagonFill
       : CircleFill;
-  const platformColor = platformColors.find((pc) => pc.platform === platform);
   return (
     <Icon
-      title={t(platform)}
-      fill={platformColor?.color || "#000000"}
+      className="platformGlyph"
+      title={decorative ? undefined : t(platform)}
+      fill={platformColorOf(platform)}
       size={13}
     />
   );
+}
+
+function platformColorOf(platform) {
+  return (
+    platformColors.find((pc) => pc.platform === platform) ??
+    platformColors.find((pc) => pc.platform === "unknown")
+  ).color;
 }
 
 // The card's second row: where the dataset lives, what kind it is, how many
@@ -426,9 +458,7 @@ export function DatasetCardMeta({ row, t, i18n }) {
   );
   const typeLabel = isGrid
     ? t("griddapTypeLabel")
-    : (row.cdm_data_type || "")
-        .replace("TimeSeriesProfile", "Time series / Profile")
-        .replace("TimeSeries", "Time series");
+    : cdmDataTypeLabel(row.cdm_data_type, t) || "";
   const locationsLabel = isGrid
     ? formatGridSize(row.grid_dimensions) || "—"
     : row.profiles_count !== row.n_profiles
@@ -437,7 +467,7 @@ export function DatasetCardMeta({ row, t, i18n }) {
 
   return (
     <span className="datasetCardMeta">
-      <span className="datasetCardMetaItem" title="ERDDAP™ Server">
+      <span className="datasetCardMetaItem" title={t("coverageGroup_source")}>
         <Server size={13} aria-hidden="true" />
         {serverName}
       </span>

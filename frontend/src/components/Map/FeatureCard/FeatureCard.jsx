@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircleFill, Download, GeoAlt } from "react-bootstrap-icons";
+import { CheckCircleFill, GeoAlt, PlusCircle } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -229,7 +229,7 @@ export default function FeatureCard() {
             )}
             {!empty && (
               <span className="featureCardHeadingCounter">
-                {t("featureCardSummary", { n: rows.length })}
+                {t("featureCardSummary", { count: rows.length })}
               </span>
             )}
           </span>
@@ -283,27 +283,14 @@ export default function FeatureCard() {
                   })}
                   key={`${entry.kind}:${entry.pk}:${entry.trajectoryId ?? ""}`}
                   title={entry.title}
-                  role={entry.openable ? "button" : undefined}
-                  tabIndex={entry.openable ? 0 : undefined}
                   onClick={
                     entry.openable ? () => openDataset(entry) : undefined
                   }
-                  onKeyDown={
-                    entry.openable
-                      ? (e) => {
-                          if (e.target !== e.currentTarget) return;
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            openDataset(entry);
-                          }
-                        }
-                      : undefined
-                  }
                 >
                   <span className="featureCardRowHeadline">
-                    {/* Ticks the dataset into the download selection — the
-                        same thing its checkbox in the list does, with the same
-                        glyphs: a download sign while out, a tick once in. */}
+                    {/* Ticks the dataset into the download selection, with the
+                        list checkbox's glyphs: a plus while out, a tick once
+                        in. */}
                     <button
                       type="button"
                       className={classNames("featureCardRowAdd", {
@@ -328,17 +315,30 @@ export default function FeatureCard() {
                             ? t("featureCardAlreadyAdded")
                             : t("featureCardAddOne")
                       }
+                      aria-label={`${
+                        entry.inSelection
+                          ? t("featureCardAlreadyAdded")
+                          : t("featureCardAddOne")
+                      }: ${entry.title}`}
                     >
                       {entry.inSelection ? (
                         <CheckCircleFill size={16} aria-hidden="true" />
                       ) : (
-                        <Download size={16} aria-hidden="true" />
+                        <PlusCircle size={16} aria-hidden="true" />
                       )}
                     </button>
                     <span className="featureCardRowIcon">
                       {kindIcon(entry)}
                     </span>
-                    <span className="featureCardRowTitle">{entry.title}</span>
+                    {/* The row's keyboard target, as on DatasetCard: the row
+                        holds the add button, so it can't be a button itself. */}
+                    {entry.openable ? (
+                      <button type="button" className="featureCardRowTitle">
+                        {entry.title}
+                      </button>
+                    ) : (
+                      <span className="featureCardRowTitle">{entry.title}</span>
+                    )}
                   </span>
                   {entry.row && (
                     <DatasetCardMeta row={entry.row} t={t} i18n={i18n} />
