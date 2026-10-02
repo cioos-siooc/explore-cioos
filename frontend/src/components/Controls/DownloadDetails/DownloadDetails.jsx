@@ -11,8 +11,10 @@ import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 
 import {
+  applyDatasetPKs,
   createDataFilterQueryString,
   formatSizeEstimate,
+  useChanged,
   sumSizeEstimates,
 } from "../../../utilities.jsx";
 import {
@@ -81,6 +83,14 @@ export default function DownloadDetails({
         return { ...ptr, downloadDisabled: false };
       }),
   );
+  // The × on a card takes the dataset out of the selection itself
+  // (SelectionProvider), not out of this copy of it. Pruned rather than
+  // re-seeded, so the rows left keep their estimates and batch ticks.
+  const reviewPks = pointsToReview.map((ptr) => ptr.pk).join(",");
+  if (useChanged(reviewPks)) {
+    const livePks = new Set(pointsToReview.map((ptr) => ptr.pk));
+    setPointsData(pointsData.filter((point) => livePks.has(point.pk)));
+  }
   const [dataTotal, setDataTotal] = useState(0);
   const [downloadSizeEstimates, setDownloadSizeEstimates] = useState();
   // Three states, not two: estimates in flight (spinner), estimates in
@@ -109,18 +119,19 @@ export default function DownloadDetails({
     setEstimatesLoading(true);
     setDownloadSizeEstimates();
 
-    const unfilteredUrl = `${server}/downloadEstimate?&datasetPKs=${pointsData
-      .map((ds) => ds.pk)
-      .join(",")}`;
+    const datasetPKs = pointsData.map((ds) => ds.pk);
+    // A Datasets filter already writes datasetPKs; applyDatasetPKs replaces it,
+    // because a repeated key reaches the API as an array and 500s.
+    const estimateUrl = (filterQuery) =>
+      `${server}/downloadEstimate?${applyDatasetPKs(filterQuery, datasetPKs)}`;
+    const unfilteredUrl = estimateUrl("");
     // The download can be narrowed by any of the active filters; when none of
     // them applies, the unfiltered estimate is the estimate.
     const isFiltered =
       filterDownloadByPolygon || filterDownloadByTime || filterDownloadByDepth;
     let filteredUrl = unfilteredUrl;
     if (isFiltered) {
-      if (polygon && filterDownloadByPolygon) {
-        filteredUrl += `&polygon=${JSON.stringify(polygon)}`;
-      }
+      let filterQuery = "";
       if (query) {
         const tempQuery = { ...query };
         if (!filterDownloadByTime) {
@@ -131,7 +142,11 @@ export default function DownloadDetails({
           tempQuery.startDepth = defaultStartDepth;
           tempQuery.endDepth = defaultEndDepth;
         }
-        filteredUrl += `&${createDataFilterQueryString(tempQuery)}`;
+        filterQuery = createDataFilterQueryString(tempQuery);
+      }
+      filteredUrl = estimateUrl(filterQuery);
+      if (polygon && filterDownloadByPolygon) {
+        filteredUrl += `&polygon=${JSON.stringify(polygon)}`;
       }
     }
 

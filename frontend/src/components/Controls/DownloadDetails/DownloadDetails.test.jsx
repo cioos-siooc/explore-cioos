@@ -33,31 +33,39 @@ const QUERY = {
   erddapServersSelected: [],
 };
 
-function renderDetails(props) {
-  return renderWithProviders(
+// Module-level so a rerender passes the same callbacks, as the app does:
+// setSubmissionState is a dependency of the estimate effect, and a fresh
+// function would refetch the estimates.
+const noop = () => {};
+
+function detailsElement(props) {
+  return (
     <DownloadDetails
       pointsToReview={[
         makePoint({ pk: EST_SMALL.pk, title: "Small dataset" }),
         makePoint({ pk: EST_LARGE.pk, title: "Large dataset" }),
       ]}
-      setPointsToDownload={() => {}}
-      setHoveredDataset={() => {}}
+      setPointsToDownload={noop}
+      setHoveredDataset={noop}
       polygon={undefined}
       query={QUERY}
       timeFilterActive={false}
       filterDownloadByTime={false}
-      setFilterDownloadByTime={() => {}}
+      setFilterDownloadByTime={noop}
       depthFilterActive={false}
       filterDownloadByDepth={false}
-      setFilterDownloadByDepth={() => {}}
+      setFilterDownloadByDepth={noop}
       polygonFilterActive={false}
       filterDownloadByPolygon={false}
-      setFilterDownloadByPolygon={() => {}}
-      setSubmissionState={() => {}}
+      setFilterDownloadByPolygon={noop}
+      setSubmissionState={noop}
       {...props}
-    />,
-    { providers: "app" },
+    />
   );
+}
+
+function renderDetails(props) {
+  return renderWithProviders(detailsElement(props), { providers: "app" });
 }
 
 describe("DownloadDetails", () => {
@@ -140,6 +148,45 @@ describe("DownloadDetails", () => {
     expect(selectAll).toBeInTheDocument();
   });
 
+  it("follows the selection when a dataset is removed from it while open", async () => {
+    const small = makePoint({ pk: EST_SMALL.pk, title: "Small dataset" });
+    const large = makePoint({ pk: EST_LARGE.pk, title: "Large dataset" });
+    const setPointsToDownload = vi.fn();
+    const { rerender } = renderDetails({
+      pointsToReview: [small, large],
+      setPointsToDownload,
+    });
+    await waitFor(() =>
+      expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
+        "2 / 2",
+      ),
+    );
+    const estimateRequests = () =>
+      global.fetch.mock.calls.filter(([url]) =>
+        String(url).includes("/downloadEstimate"),
+      ).length;
+    const requestsBefore = estimateRequests();
+
+    rerender(detailsElement({ pointsToReview: [small], setPointsToDownload }));
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("dataset-card")).toHaveLength(1),
+    );
+    expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
+      "1 / 1",
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: "Remove from the download selection: Large dataset",
+      }),
+    ).not.toBeInTheDocument();
+    // What the submit sends.
+    expect(setPointsToDownload).toHaveBeenLastCalledWith([
+      expect.objectContaining({ pk: EST_SMALL.pk }),
+    ]);
+    expect(estimateRequests()).toBe(requestsBefore);
+  });
+
   it("reports the error and stops the spinner when /downloadEstimate fails", async () => {
     installMockFetch();
     const realFetch = global.fetch;
@@ -161,6 +208,37 @@ describe("DownloadDetails", () => {
     expect(
       document.querySelector(".downloadSummaryValue[title]"),
     ).toHaveAttribute("title", "Size estimate unavailable");
+  });
+
+  it("asks /downloadEstimate for the basket once, with no empty parameter, even under a Datasets filter", async () => {
+    const urls = [];
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/downloadEstimate")) urls.push(url);
+      return realFetch(input, init);
+    };
+    renderDetails({
+      timeFilterActive: true,
+      filterDownloadByTime: true,
+      query: {
+        ...QUERY,
+        datasetsSelected: [
+          { pk: EST_SMALL.pk, isSelected: true },
+          { pk: EST_LARGE.pk, isSelected: false },
+        ],
+      },
+    });
+    await waitFor(() => expect(urls.length).toBeGreaterThanOrEqual(2));
+    for (const url of urls) {
+      expect(url).not.toMatch(/\?&|&&|&$/);
+      expect(new URL(url).searchParams.getAll("datasetPKs")).toEqual([
+        `${EST_SMALL.pk},${EST_LARGE.pk}`,
+      ]);
+    }
+    expect(urls.some((url) => new URL(url).searchParams.has("timeMax"))).toBe(
+      true,
+    );
   });
 
   it("shows the direct links and each card's download link up front", () => {
