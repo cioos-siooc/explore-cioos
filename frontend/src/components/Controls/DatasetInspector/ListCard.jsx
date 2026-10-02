@@ -10,9 +10,10 @@ import "./styles.css";
 // This is the shape that survives the sidebar's width — see CardList.jsx for
 // why these lists are cards at all.
 //
-// A div rather than a <button> (with the keyboard handling a button would have
-// given for free) because the card's body is a description list, which a
-// button may not contain. Same treatment DatasetCard uses.
+// A div rather than a <button> because the card holds a description list and
+// possibly an action button, neither of which a button may contain. The id is
+// the keyboard target instead; its click bubbles to the card. Same treatment
+// DatasetCard uses.
 export default function ListCard({
   id,
   // Drawn on the map right now (a trajectory whose track is shown).
@@ -26,24 +27,15 @@ export default function ListCard({
   onClick,
   children,
 }) {
-  const handleKeyDown = (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    e.preventDefault();
-    onClick();
-  };
-
   return (
     <div
       className={classNames("listCard", { selected, pinned })}
-      role="button"
-      tabIndex={0}
       onClick={onClick}
-      onKeyDown={handleKeyDown}
     >
       <div className="listCardHead">
-        <span className="listCardId" title={id}>
+        <button type="button" className="listCardId" title={id}>
           {id}
-        </span>
+        </button>
         {action && (
           // Kept from reaching the card, whose click would open the preview too.
           <span

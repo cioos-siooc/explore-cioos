@@ -108,8 +108,8 @@ export default function DownloadPanel() {
               className="emailAddress"
               type="email"
               value={email}
-              placeholder="email@email.com"
-              aria-label="Email"
+              placeholder={t("downloadEmailPlaceholder")}
+              autoComplete="email"
               onInput={(e) => handleEmailChange(e.target.value)}
             />
             <button
@@ -156,6 +156,7 @@ export default function DownloadPanel() {
               success: submissionState === "successful",
               error: submissionState === "failed",
             })}
+            role="status"
           >
             {submissionFeedback && (
               <>

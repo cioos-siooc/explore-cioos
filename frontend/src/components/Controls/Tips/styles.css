@@ -34,7 +34,7 @@
 /* Phones: the map legend holds the bottom-left, so the tip takes the
    bottom-right. Opened, the card keeps to a reading width rather than the
    full screen. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .tipCard,
   .tipBadge {
     right: 12px;
@@ -177,7 +177,7 @@
   box-shadow:
     0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
     var(--cioos-shadow-float);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   animation: tipPointerNudge 1.2s ease-in-out infinite;
 }
 

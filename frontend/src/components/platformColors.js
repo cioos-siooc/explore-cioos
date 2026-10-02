@@ -9,7 +9,9 @@ const platformColors = [
   },
   {
     platform: "surface vessel",
-    color: "#179f00", // "#4ea53f",
+    // Darker than the red of "land or seafloor" so the two stay apart for
+    // red-green colour blindness, where only their lightness differs.
+    color: "#0e6b00",
   },
   {
     platform: "cryosphere",

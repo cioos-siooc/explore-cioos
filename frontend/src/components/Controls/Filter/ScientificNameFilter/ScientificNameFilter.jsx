@@ -6,11 +6,7 @@ import Spinner from "../../../ui/Spinner.jsx";
 import { server } from "../../../../config.js";
 import reportError from "../../../../state/reportError.js";
 
-import {
-  ExcludedLabel,
-  OptionStateIcon,
-  optionStateClass,
-} from "../MultiCheckboxFilter/OptionState.jsx";
+import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
 import "../styles.css";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
@@ -149,22 +145,35 @@ export default function ScientificNameFilter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scientificNamesSelected, scientificNamesExcluded, lang]);
 
-  // Same include -> exclude -> clear cycle as the other lists, over two plain
-  // name lists instead of per-option flags.
-  const cycleName = (name) => {
-    if (scientificNamesSelected.includes(name)) {
-      setScientificNamesSelected(
-        scientificNamesSelected.filter((n) => n !== name),
-      );
-      setScientificNamesExcluded([...scientificNamesExcluded, name]);
-    } else if (scientificNamesExcluded.includes(name)) {
-      setScientificNamesExcluded(
-        scientificNamesExcluded.filter((n) => n !== name),
-      );
+  // The same include / exclude toggles as the other lists, over two plain
+  // name lists instead of per-option flags: putting a name in one list takes
+  // it out of the other.
+  const toggleIn = (name, list, setList, otherList, setOtherList) => {
+    if (list.includes(name)) {
+      setList(list.filter((n) => n !== name));
     } else {
-      setScientificNamesSelected([...scientificNamesSelected, name]);
+      setList([...list, name]);
+      if (otherList.includes(name)) {
+        setOtherList(otherList.filter((n) => n !== name));
+      }
     }
   };
+  const includeName = (name) =>
+    toggleIn(
+      name,
+      scientificNamesSelected,
+      setScientificNamesSelected,
+      scientificNamesExcluded,
+      setScientificNamesExcluded,
+    );
+  const excludeName = (name) =>
+    toggleIn(
+      name,
+      scientificNamesExcluded,
+      setScientificNamesExcluded,
+      scientificNamesSelected,
+      setScientificNamesSelected,
+    );
 
   const picked = [...scientificNamesSelected, ...scientificNamesExcluded];
   // The picked names first, then whatever the search is offering that isn't
@@ -188,13 +197,15 @@ export default function ScientificNameFilter({
     <div className="multiCheckboxFilter scientificNameFilter">
       {options.map(
         ({ scientificName, vernacular, rank, isSelected, isExcluded }) => (
-          <div
+          <FilterOption
             key={scientificName}
-            className={optionStateClass({ isSelected, isExcluded })}
+            label={scientificName}
+            isSelected={isSelected}
+            isExcluded={isExcluded}
+            onInclude={() => includeName(scientificName)}
+            onExclude={() => excludeName(scientificName)}
             title={vernacular || scientificName}
-            onClick={() => cycleName(scientificName)}
           >
-            <OptionStateIcon isSelected={isSelected} isExcluded={isExcluded} />
             <span className="optionName">
               <span className="scientificNameOptionName">{scientificName}</span>
               {(rank || vernacular) && (
@@ -207,8 +218,7 @@ export default function ScientificNameFilter({
                 </span>
               )}
             </span>
-            <ExcludedLabel isExcluded={isExcluded} />
-          </div>
+          </FilterOption>
         ),
       )}
       {loading && (

@@ -69,7 +69,7 @@
 
 .quickFilterButton:hover {
   background-color: var(--cioos-surface-2);
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
 }
 
 /* Set: the same solid-primary fill and raised chip the top bar's own segments
@@ -80,7 +80,7 @@
 .quickFilterButton.applied {
   border-color: transparent;
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   transform: var(--cioos-perspective);
   box-shadow:
     inset 0 0 0 1px rgb(255 255 255 / 55%),
@@ -104,7 +104,7 @@
    button here gets. */
 .quickFilterReset {
   margin-left: 4px;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .quickFilterReset:disabled {
@@ -234,7 +234,7 @@
 }
 
 .quickFilterSearch.expanded .quickFilterButton:hover {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
 }
 
 .quickFilterSearch.expanded .quickFilterButton:focus-visible {
@@ -283,7 +283,7 @@
  * from the keyboard), and the row packs back together without the room five
  * standing captions needed.
  * ------------------------------------------------------------------ */
-@media (min-width: 701px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 701px) and (min-height: 501px) and (hover: hover) and (pointer: fine) {
   .quickFilters {
     gap: 8px 18px;
     padding-bottom: 8px;
@@ -309,14 +309,14 @@
  * would pull this row's buttons apart across the screen. It keeps its own
  * width instead and stays centered under the header.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .quickFilters {
     align-self: center;
     max-width: calc(100vw - 16px);
 
-    /* Sized for six 40px buttons filling a 360px screen exactly; the five
-       left now fit with room to spare. */
-    gap: 20px 19px;
+    /* Five 40px buttons across a 360px screen, spaced so neighbouring
+       captions at the phone size ("Visibles", "Temps réel") clear each other. */
+    gap: 20px 30px;
     padding-bottom: 16px;
   }
 
@@ -327,10 +327,7 @@
     display: none;
   }
 
-  /* Held at the desktop size rather than the mobile rung's: at the larger one
-     neighbouring captions run into each other on a 360px screen. */
   .quickFilterCaption {
-    padding: 3px 2px;
-    font-size: var(--cioos-font-size-3xs);
+    padding: 3px 4px;
   }
 }

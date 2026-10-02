@@ -46,6 +46,6 @@
 }
 
 .form-switch .form-check-label {
-  font-size: var(--cioos-font-size-sm, 13px);
+  font-size: var(--cioos-font-size-sm);
   cursor: pointer;
 }
