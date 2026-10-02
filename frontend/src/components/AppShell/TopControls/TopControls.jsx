@@ -123,9 +123,7 @@ export default function TopControls() {
             // "Time coverage", not the "Time" the label would otherwise want
             // to be: that is already the time *filter's* own name
             // (timeframeFilterName), and it names a chip that can be on screen
-            // at the same moment. The feature's full name — also the modal's
-            // title — stays on the accessible name and the tooltip.
-            aria-label={t("coverageButton")}
+            // at the same moment.
             title={t("coverageButtonTitle")}
           >
             <BarChartLine size={18} aria-hidden="true" />

@@ -25,6 +25,12 @@ import { usePersistentState } from "../usePersistentState.js";
 
 const DownloadContext = createContext();
 
+const FAILURE_TEXT_KEYS = {
+  network: "submissionStateTextFailedNetwork",
+  rejected: "submissionStateTextFailedRejected",
+  server: "submissionStateTextFailedServer",
+};
+
 export function useDownload() {
   return useContext(DownloadContext);
 }
@@ -40,6 +46,8 @@ export default function DownloadProvider({ children }) {
   const [email, setEmail] = useState(savedEmail);
   const [rememberEmail, setRememberEmailState] = useState(Boolean(savedEmail));
   const [submissionState, setSubmissionState] = useState();
+  // Why the last submission failed: "network", "rejected" (4xx) or "server".
+  const [failureReason, setFailureReason] = useState();
 
   // Whether each filter is carried into the download. These are checkboxes the
   // user owns, so they are state — but they start out matching the filters that
@@ -89,17 +97,17 @@ export default function DownloadProvider({ children }) {
       case "successful":
         return {
           icon: <Check2Circle size={18} className="success" />,
-          text: t("submissionStateTextSuccess"), // Request successful. Download link will be sent to: ' + email
+          text: t("submissionStateTextSuccess", { email }),
         };
       case "failed":
         return {
           icon: <XCircle size={18} className="error" />,
-          text: t("submissionStateTextFailed"), // 'Request failed'
+          text: t(FAILURE_TEXT_KEYS[failureReason]),
         };
       default:
         return undefined;
     }
-  }, [submissionState, t]);
+  }, [submissionState, failureReason, email, t]);
 
   function handleEmailChange(value) {
     setEmail(value);
@@ -165,10 +173,12 @@ export default function DownloadProvider({ children }) {
         if (response.ok) {
           setSubmissionState("successful");
         } else {
+          setFailureReason(response.status < 500 ? "rejected" : "server");
           setSubmissionState("failed");
         }
       })
       .catch((error) => {
+        setFailureReason("network");
         setSubmissionState("failed");
         reportError("download submission failed", error);
       });

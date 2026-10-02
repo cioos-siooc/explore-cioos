@@ -44,7 +44,7 @@ import {
   DATA_LAYER_KEYS,
   DEFAULT_TRACKS_MODE,
   dataLayersFromChoices,
-  nextDataLayerChoice,
+  toggledDataLayerChoice,
 } from "../dataLayers.js";
 
 const MapStateContext = createContext();
@@ -327,8 +327,12 @@ export default function MapStateProvider({ children }) {
     const { [key]: _previous, ...others } = dataLayerChoices;
     setDataLayerChoices(choice ? { ...others, [key]: choice } : others);
   }
-  const cycleDataLayer = (key) =>
-    setDataLayerChoice(key, nextDataLayerChoice(dataLayerChoices[key]));
+  // target is "include" or "exclude"; asking for the current one clears it.
+  const toggleDataLayer = (key, target) =>
+    setDataLayerChoice(
+      key,
+      toggledDataLayerChoice(dataLayerChoices[key], target),
+    );
   const clearDataLayer = (key) => setDataLayerChoice(key, undefined);
 
   // Whether the trajectory data draws its track lines. It belongs to Trajectory
@@ -539,7 +543,7 @@ export default function MapStateProvider({ children }) {
     setTrailingDays,
     dataLayers,
     dataLayerChoices,
-    cycleDataLayer,
+    toggleDataLayer,
     clearDataLayer,
     resetDataLayers,
     griddapCoverage,

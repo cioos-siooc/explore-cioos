@@ -20,7 +20,7 @@
    scales the mark along with the text instead of leaving it behind. */
 .cioosLogo-inline {
   gap: 0.35em;
-  font-size: var(--cioos-font-size-xl, 26px);
+  font-size: var(--cioos-font-size-xl);
 }
 
 /* The wordmark's own proportion is a mark 2.35x the name's font size (a 94.76
@@ -41,7 +41,7 @@
 
   /* The full name's size. The name is a multiple of it, so the lockup keeps
      the wordmark's proportions at whatever size this is set to. */
-  font-size: var(--cioos-font-size-sm, 12px);
+  font-size: var(--cioos-font-size-sm);
 }
 
 /* …and so is the mark, rather than the fixed pixel size .cioosSpinner-lg would

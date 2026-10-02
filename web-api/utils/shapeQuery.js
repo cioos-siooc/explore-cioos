@@ -159,6 +159,44 @@ async function buildShapeSql(
         WHERE  :filters
   ),
   ${getRecordsList ? recordsCte : ""}
+  -- Aggregated on the integer key before the dataset metadata joins back in:
+  -- grouping on d.pk instead made the planner sort every matched feature
+  -- (~1.2M wide rows, spilled to disk) to produce ~2.8k groups.
+  per_dataset AS
+        (SELECT   p.dataset_pk,
+                  count(*)::integer AS profiles_count,
+                  -- Extent of the features this query actually matched (profile
+                  -- bboxes / obis + trajectory cells / the grid footprint), so
+                  -- the frontend can frame the dataset as currently filtered
+                  -- rather than its full-catalogue footprint. Degenerate (a
+                  -- point) for a single-location dataset — fitBounds handles it.
+                  ST_Extent(p.search_geom) AS filtered_extent
+                  -- estimated records = sum(days of this query that the feature holds data on
+                  --   * records per day of data
+                  --   * fraction of the depth range the query overlaps)
+                  ${
+                    doEstimate
+                      ? `,SUM(
+                  -- Days of the query window this feature actually holds data on.
+                  -- records_per_day is a rate over days WITH DATA, so the day factor
+                  -- has to be too: multiplying it by an elapsed span over-counts a
+                  -- seasonal station by the ratio between the two. day_ranges is the
+                  -- feature's day set; where it is unknown (a dataset not re-harvested
+                  -- since the day sets landed) the span is still the best available
+                  -- answer, and matches the rate that was derived from it.
+                  -- Zero becomes one, as before, so a row the filter kept never
+                  -- estimates as no data at all.
+                  coalesce(nullif(
+                    CASE WHEN coalesce(array_length(p.day_ranges, 1), 0) > 0
+                         THEN day_range_overlap_days(p.day_ranges, daterange(:timeMin::date, (:timeMax::date) + 1))
+                         ELSE date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max)))
+                    END, 0), 1) * p.records_per_day *
+                  -- depth multiplier - fraction of depth range that this query overlaps with profile depth range
+                  coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
+                      : ""
+                  }
+         FROM     filtered p
+         GROUP BY p.dataset_pk),
   sub AS
         (SELECT   d.pk,
                   d.pk_url,
@@ -179,7 +217,7 @@ async function buildShapeSql(
                   json_build_object('en',title,'fr',title_fr)     title_translated,
                   d.eovs                                          eovs,
                   organizations,
-                  count(p.*)::integer profiles_count,
+                  p.profiles_count,
                   d.source_type,
                   -- Whether the dataset exposes a variable literally named
                   -- 'depth'. tabledap 400s on a depth>= constraint for a
@@ -238,43 +276,13 @@ async function buildShapeSql(
                   CASE WHEN d.cdm_data_type = 'Grid'
                            THEN ST_AsGeoJSON(ST_Transform(d.coverage_bbox, 4326), 6)::json
                   END AS coverage_bbox_geojson,
-                  -- Extent of the features this query actually matched (profile
-                  -- bboxes / obis + trajectory cells / the grid footprint), so
-                  -- the frontend can frame the dataset as currently filtered
-                  -- rather than its full-catalogue footprint. Degenerate (a
-                  -- point) for a single-location dataset — fitBounds handles it.
                   ST_AsGeoJSON(
-                    ST_Transform(ST_SetSRID(ST_Extent(p.search_geom)::geometry, 3857), 4326), 6
+                    ST_Transform(ST_SetSRID(p.filtered_extent::geometry, 3857), 4326), 6
                   )::json AS filtered_bbox_geojson
-                  -- estimated records = sum(days of this query that the feature holds data on
-                  --   * records per day of data
-                  --   * fraction of the depth range the query overlaps)
-                  ${
-                    doEstimate
-                      ? `,SUM(
-                  -- Days of the query window this feature actually holds data on.
-                  -- records_per_day is a rate over days WITH DATA, so the day factor
-                  -- has to be too: multiplying it by an elapsed span over-counts a
-                  -- seasonal station by the ratio between the two. day_ranges is the
-                  -- feature's day set; where it is unknown (a dataset not re-harvested
-                  -- since the day sets landed) the span is still the best available
-                  -- answer, and matches the rate that was derived from it.
-                  -- Zero becomes one, as before, so a row the filter kept never
-                  -- estimates as no data at all.
-                  coalesce(nullif(
-                    CASE WHEN coalesce(array_length(p.day_ranges, 1), 0) > 0
-                         THEN day_range_overlap_days(p.day_ranges, daterange(:timeMin::date, (:timeMax::date) + 1))
-                         ELSE date_part('days',range_intersection_length(tstzrange(:timeMin,:timeMax),tstzrange(p.time_min,p.time_max)))
-                    END, 0), 1) * p.records_per_day *
-                  -- depth multiplier - fraction of depth range that this query overlaps with profile depth range
-                  coalesce(nullif(range_intersection_length(numrange(:depthMin,:depthMax),numrange(p.depth_min::NUMERIC,p.depth_max::NUMERIC)),0),1) / (coalesce(nullif(p.depth_max-p.depth_min,0),1)) ) AS records_count`
-                      : ""
-                  }
-
-         FROM     filtered p
+                  ${doEstimate ? ",p.records_count" : ""}
+         FROM     per_dataset p
          JOIN     cde.datasets d
-         ON       p.dataset_pk = d.pk
-         GROUP BY d.pk)
+         ON       p.dataset_pk = d.pk)
 SELECT sub.*
        ${getRecordsList ? ",coalesce(records.profiles, '[]'::json) AS profiles" : ""}
        ${doEstimate ? ",round(:adder + records_count * num_columns * :multiplier) AS SIZE" : ""}

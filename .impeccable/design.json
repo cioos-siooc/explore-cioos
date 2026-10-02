@@ -1,0 +1,471 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T18:33:22+00:00",
+  "title": "Design System: CIOOS Data Explorer",
+  "extensions": {
+    "colorMeta": {
+      "coastal-teal": {
+        "role": "primary",
+        "displayName": "Coastal Teal",
+        "canonical": "#52a79b",
+        "tonalRamp": [
+          "#152F37",
+          "#1D3E43",
+          "#244F4F",
+          "#2B5F5C",
+          "#3C8277",
+          "#55A598",
+          "#8DC4BC",
+          "#C6E3DF"
+        ]
+      },
+      "coastal-teal-deep": {
+        "role": "primary",
+        "displayName": "Coastal Teal Deep",
+        "canonical": "#3c8377",
+        "tonalRamp": [
+          "#00130d",
+          "#003027",
+          "#004e44",
+          "#266f63",
+          "#4b9185",
+          "#6eb5a7",
+          "#92d9cc",
+          "#b7fff1"
+        ]
+      },
+      "shallows": {
+        "role": "primary",
+        "displayName": "Shallows",
+        "canonical": "#c6e3df",
+        "tonalRamp": [
+          "#000f0d",
+          "#112a27",
+          "#2f4845",
+          "#4d6764",
+          "#6e8985",
+          "#90aca8",
+          "#b4d0cc",
+          "#d8f6f2"
+        ]
+      },
+      "deep-water-navy": {
+        "role": "neutral",
+        "displayName": "Deep Water Navy",
+        "canonical": "#152f37",
+        "tonalRamp": [
+          "#152F37",
+          "#1D3E43",
+          "#244F4F",
+          "#2B5F5C",
+          "#3C8277",
+          "#55A598",
+          "#8DC4BC",
+          "#C6E3DF"
+        ]
+      },
+      "beach-sand": {
+        "role": "neutral",
+        "displayName": "Beach Sand",
+        "canonical": "#f3f0ec",
+        "tonalRamp": [
+          "#0d0b08",
+          "#272522",
+          "#44423e",
+          "#63615d",
+          "#84827e",
+          "#a7a4a1",
+          "#cbc9c5",
+          "#f1eeea"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#dce8e5",
+        "tonalRamp": [
+          "#060d0b",
+          "#1e2725",
+          "#3b4442",
+          "#596461",
+          "#7a8582",
+          "#9da8a5",
+          "#c0ccc9",
+          "#e5f2ef"
+        ]
+      },
+      "surface-wash": {
+        "role": "neutral",
+        "displayName": "Surface Wash",
+        "canonical": "#eef6f4",
+        "tonalRamp": [
+          "#070c0b",
+          "#212725",
+          "#3d4442",
+          "#5c6361",
+          "#7d8482",
+          "#9fa7a5",
+          "#c3cbc9",
+          "#e9f0ee"
+        ]
+      },
+      "coral-error": {
+        "role": "error",
+        "displayName": "Coral Error",
+        "canonical": "#e25563",
+        "tonalRamp": [
+          "#310000",
+          "#560008",
+          "#7b0f24",
+          "#a13742",
+          "#c85a62",
+          "#f07e84",
+          "#ffa2a7",
+          "#ffc7cb"
+        ]
+      },
+      "ochre-warn": {
+        "role": "warning",
+        "displayName": "Ochre Warn",
+        "canonical": "#b07a00",
+        "tonalRamp": [
+          "#250000",
+          "#451400",
+          "#663400",
+          "#895500",
+          "#ac7700",
+          "#d19a38",
+          "#f7be60",
+          "#ffe486"
+        ]
+      },
+      "info-blue": {
+        "role": "info",
+        "displayName": "Info Blue",
+        "canonical": "#0f6d8e",
+        "tonalRamp": [
+          "#000d2a",
+          "#002b49",
+          "#004a69",
+          "#096b8c",
+          "#3b8daf",
+          "#60b1d4",
+          "#85d5fa",
+          "#aafbff"
+        ]
+      },
+      "realtime-orange": {
+        "role": "status",
+        "displayName": "Realtime Orange",
+        "canonical": "#c2410c",
+        "tonalRamp": [
+          "#310000",
+          "#560000",
+          "#7b1700",
+          "#a03d1a",
+          "#c7603f",
+          "#ee8361",
+          "#ffa884",
+          "#ffcda8"
+        ]
+      },
+      "track-violet": {
+        "role": "data",
+        "displayName": "Track Violet",
+        "canonical": "#6749ac",
+        "tonalRamp": [
+          "#15003e",
+          "#2d0460",
+          "#492b83",
+          "#674da8",
+          "#886fcd",
+          "#aa92f4",
+          "#ceb7ff",
+          "#f4dcff"
+        ]
+      },
+      "grid-amber": {
+        "role": "data",
+        "displayName": "Grid Amber",
+        "canonical": "#fbb03b",
+        "tonalRamp": [
+          "#280000",
+          "#4a0d00",
+          "#6c2f00",
+          "#8f5100",
+          "#b37300",
+          "#d9962a",
+          "#ffba56",
+          "#ffe07d"
+        ]
+      },
+      "click-goldenrod": {
+        "role": "data",
+        "displayName": "Click Goldenrod",
+        "canonical": "#daa520",
+        "tonalRamp": [
+          "#230000",
+          "#431600",
+          "#643600",
+          "#865700",
+          "#a97900",
+          "#ce9c20",
+          "#f4c150",
+          "#ffe678"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Modal titles and panel headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section headings inside panels and the intro window."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Dataset titles, filter rows, prose."
+      },
+      "body-sm": {
+        "displayName": "Body small",
+        "purpose": "Card metadata, counts, footer hints."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase letter-spaced section labels (LEGEND, SORT)."
+      },
+      "brand": {
+        "displayName": "Brand",
+        "purpose": "CIOOS/SIOOC wordmark and loading splash only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-3d",
+        "value": "inset 0 1px 0 rgb(255 255 255 / 90%), inset 0 -2px 3px rgb(21 47 55 / 8%), 0 1px 2px rgb(21 47 55 / 14%), 0 4px 8px rgb(21 47 55 / 16%), 0 10px 20px rgb(21 47 55 / 18%), 0 20px 40px rgb(21 47 55 / 20%)",
+        "purpose": "Surfaces resting on the map: brand card, sidebar, legend."
+      },
+      {
+        "name": "shadow-3d-sm",
+        "value": "inset 0 1px 0 rgb(255 255 255 / 90%), inset 0 -1px 2px rgb(21 47 55 / 8%), 0 1px 2px rgb(21 47 55 / 14%), 0 3px 6px rgb(21 47 55 / 16%), 0 6px 14px rgb(21 47 55 / 18%)",
+        "purpose": "Active tab segment and pills over the map."
+      },
+      {
+        "name": "shadow-card",
+        "value": "0 2px 8px rgb(21 47 55 / 8%)",
+        "purpose": "Dataset cards inside the sidebar."
+      },
+      {
+        "name": "shadow-float",
+        "value": "0 4px 16px rgb(21 47 55 / 16%)",
+        "purpose": "Modals."
+      },
+      {
+        "name": "shadow-md",
+        "value": "0 2px 8px rgb(21 47 55 / 8%)",
+        "purpose": "Dropdowns and small menus."
+      },
+      {
+        "name": "focus",
+        "value": "0 0 0 3px rgb(82 167 155 / 55%)",
+        "purpose": "Keyboard focus ring."
+      },
+      {
+        "name": "map-click-glow",
+        "value": "0 0 0 2px rgb(218 165 32 / 35%), 0 0 10px 1px rgb(218 165 32 / 35%)",
+        "purpose": "The card or row the last map click found."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-fast",
+        "value": "0.15s ease-out",
+        "purpose": "Hover and state colour changes."
+      },
+      {
+        "name": "transition-normal",
+        "value": "0.2s ease-in-out",
+        "purpose": "Panel and control transitions."
+      },
+      {
+        "name": "transition-slow",
+        "value": "0.3s ease-in-out",
+        "purpose": "Sidebar and legend slides."
+      },
+      {
+        "name": "count-pulse",
+        "value": "450ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Download count pulse when the selection changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-phone",
+        "value": "600px"
+      },
+      {
+        "name": "mobile",
+        "value": "700px"
+      },
+      {
+        "name": "tablet-legend",
+        "value": "900px"
+      },
+      {
+        "name": "tablet-modal",
+        "value": "992px"
+      },
+      {
+        "name": "laptop",
+        "value": "1200px"
+      },
+      {
+        "name": "desktop-sidebar",
+        "value": "1400px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The Download action and other primary CTAs; label stacked over its count.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5\"/><path d=\"M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z\"/></svg><span class=\"ds-btn-text\">Download<small>3 selected</small></span></button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--cioos-primary-700, #3c8377);border-radius:var(--cioos-radius, 8px);background:var(--cioos-primary, #52a79b);color:#fff;font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-weight:700;cursor:pointer;transition:background-color .15s ease-out}.ds-btn-primary:hover{background:var(--cioos-primary-700, #3c8377)}.ds-btn-primary:focus-visible{outline:none;box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}.ds-btn-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}.ds-btn-text small{font-size:11px;font-weight:400}"
+    },
+    {
+      "name": "Primary Button (disabled)",
+      "kind": "button",
+      "refersTo": "button-primary-disabled",
+      "description": "Disabled primary: washed surface, not faded teal.",
+      "html": "<button class=\"ds-btn-primary-off\" disabled><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5\"/><path d=\"M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z\"/></svg><span class=\"ds-btn-text\">Download<small>0 selected</small></span></button>",
+      "css": ".ds-btn-primary-off{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:var(--cioos-radius, 8px);background:var(--cioos-surface-2, #eef6f4);color:var(--cioos-ink-60, rgb(21 47 55 / 62%));font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-weight:700;cursor:default}.ds-btn-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}.ds-btn-text small{font-size:11px;font-weight:400}"
+    },
+    {
+      "name": "Secondary Pill Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet secondary action, e.g. Clear all.",
+      "html": "<button class=\"ds-btn-secondary\">Clear all</button>",
+      "css": ".ds-btn-secondary{padding:6px 14px;border:1px solid var(--cioos-primary, #52a79b);border-radius:999px;background:#fff;color:var(--cioos-primary-700, #3c8377);font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-size:12px;font-weight:500;cursor:pointer;transition:background-color .15s ease-out}.ds-btn-secondary:hover{background:var(--cioos-surface-2, #eef6f4)}.ds-btn-secondary:focus-visible{outline:none;box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}"
+    },
+    {
+      "name": "Tab Strip",
+      "kind": "nav",
+      "refersTo": "tab-segment",
+      "description": "Signature: Datasets / Time coverage / Filters welded under the brand card; rest, applied and active states.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab-active\">Datasets</button><button class=\"ds-tab\">Time coverage</button><button class=\"ds-tab ds-tab-applied\">Filters <span class=\"ds-tab-count\">2</span></button></div>",
+      "css": ".ds-tabs{display:grid;grid-template-columns:repeat(3,1fr);width:480px;max-width:100%;overflow:hidden;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:0 0 16px 16px;background:#fff;font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif)}.ds-tab{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:4px 10px;border:0;border-left:1px solid rgb(82 167 155 / 32%);background:rgb(82 167 155 / 14%);color:var(--cioos-primary-700, #3c8377);font:inherit;font-weight:600;cursor:pointer;transition:background-color .15s ease-out,color .15s ease-out}.ds-tab:first-child{border-left:0}.ds-tab:hover{background:rgb(82 167 155 / 24%)}.ds-tab:focus-visible{outline:none;box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}.ds-tab-applied{background:var(--cioos-teal-light, #c6e3df)}.ds-tab-active,.ds-tab-active:hover{position:relative;z-index:1;background:var(--cioos-primary, #52a79b);color:#fff;box-shadow:inset 0 0 0 1px rgb(255 255 255 / 55%),var(--cioos-shadow-3d-sm, 0 1px 2px rgb(21 47 55 / 14%), 0 3px 6px rgb(21 47 55 / 16%))}.ds-tab-count{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:var(--cioos-primary, #52a79b);color:#fff;font-size:12px}"
+    },
+    {
+      "name": "Active Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "A set filter value under the top bar; include and excluded variants.",
+      "html": "<span class=\"ds-chip\">Oxygen<button class=\"ds-chip-x\" aria-label=\"Remove\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708\"/></svg></button></span> <span class=\"ds-chip ds-chip-not\"><b>Not</b>Mooring<button class=\"ds-chip-x\" aria-label=\"Remove\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708\"/></svg></button></span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:2px;padding:2px 2px 2px 9px;border:1px solid var(--cioos-primary, #52a79b);border-radius:16px;background:var(--cioos-teal-light, #c6e3df);color:var(--cioos-ink, #152f37);font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-size:12px;font-weight:600}.ds-chip-x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--cioos-ink-60, rgb(21 47 55 / 62%));cursor:pointer;transition:background-color .15s ease-out,color .15s ease-out}.ds-chip-x:hover{background:var(--cioos-primary, #52a79b);color:#fff}.ds-chip-x:focus-visible{outline:none;box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}.ds-chip-not{border-color:var(--cioos-error, #e25563);background:var(--cioos-error-bg, #fbe3e6)}.ds-chip-not b{margin-right:3px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--cioos-error-700, #b3263a)}.ds-chip-not .ds-chip-x:hover{background:var(--cioos-error, #e25563)}"
+    },
+    {
+      "name": "Quick Filter",
+      "kind": "button",
+      "refersTo": "quick-filter",
+      "description": "Round quick-filter button with a pill caption beneath.",
+      "html": "<span class=\"ds-qf-wrap\"><button class=\"ds-qf\" aria-label=\"Search\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0\"/></svg></button><span class=\"ds-qf-cap\">Search</span></span>",
+      "css": ".ds-qf-wrap{display:inline-flex;flex-direction:column;align-items:center;gap:4px;font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif)}.ds-qf{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:50%;background:#fff;color:var(--cioos-ink, #152f37);box-shadow:var(--cioos-shadow-3d-sm, 0 1px 2px rgb(21 47 55 / 14%), 0 3px 6px rgb(21 47 55 / 16%));cursor:pointer;transition:background-color .15s ease-out}.ds-qf:hover{background:var(--cioos-surface-2, #eef6f4)}.ds-qf:focus-visible{outline:none;box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}.ds-qf-cap{padding:3px 6px;border-radius:999px;background:#fff;font-size:10px;font-weight:600;line-height:1;color:var(--cioos-ink, #152f37)}"
+    },
+    {
+      "name": "Dataset Card",
+      "kind": "card",
+      "refersTo": "card-dataset",
+      "description": "A dataset row in the sidebar; hover, selected and map-click states.",
+      "html": "<article class=\"ds-card\"><button class=\"ds-card-title\"><span class=\"ds-dot\"></span>BC Estuary Water Quality Monitoring Data - Asseek (Provisional)</button><div class=\"ds-card-meta\"><span>catalogue.hakai.org</span><span>Time series / Profile</span><span>11</span></div></article>",
+      "css": ".ds-card{display:flex;flex-direction:column;gap:6px;width:380px;max-width:100%;padding:10px 12px;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:var(--cioos-radius, 8px);background:#fff;box-shadow:var(--cioos-shadow-card, 0 2px 8px rgb(21 47 55 / 8%));font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);color:var(--cioos-ink, #152f37);transition:box-shadow .15s ease-out,border-color .15s ease-out,background-color .15s ease-out}.ds-card:hover{border-color:var(--cioos-primary, #52a79b);background:var(--cioos-surface-2, #eef6f4)}.ds-card:has(.ds-card-title:focus-visible){border-color:var(--cioos-primary, #52a79b);box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}.ds-card-title{display:flex;gap:8px;align-items:baseline;padding:0;border:0;background:none;font:inherit;font-size:14px;line-height:1.3;text-align:left;color:inherit;cursor:pointer}.ds-card-title:focus-visible{outline:none}.ds-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:#0e6b00}.ds-card-meta{display:flex;gap:14px;padding-left:18px;font-size:12px;color:var(--cioos-ink-80, rgb(21 47 55 / 82%))}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Email and list-filter fields.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Filter this list\" aria-label=\"Filter this list\">",
+      "css": ".ds-input{width:260px;padding:8px 12px;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:var(--cioos-radius-sm, 6px);background:#fff;color:var(--cioos-ink, #152f37);font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-size:14px;transition:border-color .15s ease-out}.ds-input::placeholder{color:var(--cioos-ink-60, rgb(21 47 55 / 62%))}.ds-input:focus{outline:none;border-color:var(--cioos-primary, #52a79b);box-shadow:var(--cioos-focus, 0 0 0 3px rgb(82 167 155 / 55%))}"
+    },
+    {
+      "name": "Floating Panel",
+      "kind": "custom",
+      "refersTo": "panel-floating",
+      "description": "A raised instrument resting on the map (brand card, legend, sidebar).",
+      "html": "<section class=\"ds-panel\"><h3 class=\"ds-panel-label\">Legend</h3><p class=\"ds-panel-body\">Days of data</p><div class=\"ds-ramp\"></div></section>",
+      "css": ".ds-panel{width:200px;padding:12px;border:1px solid var(--cioos-hairline, #dce8e5);border-radius:var(--cioos-radius-lg, 16px);background:#fff;box-shadow:var(--cioos-shadow-3d, 0 1px 2px rgb(21 47 55 / 14%), 0 4px 8px rgb(21 47 55 / 16%), 0 10px 20px rgb(21 47 55 / 18%));transform:var(--cioos-perspective, perspective(800px) translateZ(0));font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);color:var(--cioos-ink, #152f37)}.ds-panel-label{margin:0 0 6px;font-family:var(--cioos-font-body, Montserrat, system-ui, sans-serif);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cioos-ink-80, rgb(21 47 55 / 82%))}.ds-panel-body{margin:0 0 6px;font-size:12px}.ds-ramp{height:8px;border-radius:2px;background:linear-gradient(90deg,#C6E3DF,#6EB5AA,#3C8277,#244F4F,#152F37)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Chart Table",
+    "overview": "The map is the document; everything else is an instrument resting on it. Like a navigator's chart table, the ocean fills the whole surface and the tools sit on top of it: the brand bar with its tab strip, the datasets sidebar, the legend, the \"what's here\" card. They are white, raised and few. They sit on the map without covering it, so the eye returns to the water.\n\nColour works the same way. The chrome is almost entirely navy ink on white and beach sand, with coastal teal as the one voice for \"this is interactive, selected or open\". Every other hue belongs to the data and means one thing wherever it appears: violet is a trajectory track, amber is gridded coverage, goldenrod is what the last map click found. The hex coverage ramp runs from the shallows to deep water navy, so a cell's darkness reads as depth of data.\n\nThe feel is calm and precise. Controls rest quietly in hairlines and translucent teal washes, and turn solid teal only when open or primary. The density suits a working tool without becoming a GIS console. It is plain and friendly like the product's voice, and bilingual widths are respected. It must never drift back toward the generic Bootstrap admin look it replaced (grey cards, blue buttons, stock form chrome).",
+    "keyCharacteristics": [
+      "Full-bleed map with floating white instruments over it; no page chrome around the map.",
+      "Coastal teal is the only interactive accent; data hues are reserved and consistent across map, legend and panels.",
+      "Raised 3D only on surfaces that touch the map; flat hairline surfaces inside them.",
+      "Sora headings, Montserrat body, Quicksand for the wordmark alone.",
+      "Navy-tinted neutrals everywhere; no pure grey or black.",
+      "One mobile rung (700px) where every surface goes full-screen and type steps up."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Coastal teal is the only colour the chrome uses to say \"interactive, selected or open\". A second accent in the chrome is a bug.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Meaning Rule",
+        "body": "A data hue means exactly one thing, and it means the same thing on the map, in the legend and in the panel that controls it. Never borrow violet, amber or goldenrod for decoration, and never add a second hue for coverage density: darkness is the count.",
+        "section": "colors"
+      },
+      {
+        "name": "The Navy-Tinted Rule",
+        "body": "Neutrals are navy at reduced alpha or navy-tinted tints. Pure grey (`#888`) and pure black never appear.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ladder Rule",
+        "body": "No font-size in px outside the token ladder in `theme.css`; reach for the nearest rung. The mobile step-up can only reach sizes on the scale.",
+        "section": "typography"
+      },
+      {
+        "name": "The Wordmark Rule",
+        "body": "Quicksand appears only in the CIOOS logo lockup and the loading splash.",
+        "section": "typography"
+      },
+      {
+        "name": "The Raised-Over-Map Rule",
+        "body": "Only surfaces that rest directly on the map get the 3D lift. Anything nested inside them is flat with hairlines. A 3D shadow inside a panel is a bug.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Shadow-Not-Border Rule",
+        "body": "State emphasis (focus, map-click, selection glow) is drawn with box-shadow rings, never a thicker border, so a state change never reflows a list.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** reference `var(--cioos-*)` tokens from `frontend/src/components/theme.css` for every colour, radius, shadow and size; no hardcoded hex in component stylesheets.",
+      "**Do** keep coastal teal the only interactive accent, and deepen it to coastal teal deep for hover and for teal text on light grounds.",
+      "**Do** give a new map layer one hue and use that exact hue in its legend swatch and its control, defined as a paired token in `theme.css` plus its `config.js` counterpart.",
+      "**Do** use the raised 3D shadow only on surfaces resting on the map, and hairlines inside them.",
+      "**Do** draw focus and state emphasis as box-shadow rings (`--cioos-focus`) so nothing reflows.",
+      "**Do** size every surface for the French strings first; fixed widths must hold \"Jeux de données\" and \"EXPLORATEUR\".",
+      "**Do** use an existing breakpoint rung (600 / 700 / 900 / 992 / 1200 / 1400)."
+    ],
+    "donts": [
+      "**Don't** drift toward a generic Bootstrap admin look: grey cards, blue buttons, stock form chrome, default outlines.",
+      "**Don't** introduce a second accent colour in the chrome, or reuse a data hue (violet, amber, goldenrod, platform colours) decoratively.",
+      "**Don't** add a second colour ramp for coverage; density is darkness on the one teal-to-navy ramp.",
+      "**Don't** use pure grey or pure black; neutrals are navy-tinted.",
+      "**Don't** set a font-size in px outside the token ladder, or use Quicksand outside the logo.",
+      "**Don't** fade a primary button to show it is disabled; switch it to the surface wash with ink-60 text.",
+      "**Don't** carry meaning by colour alone; pair a data hue with a label, icon or tooltip."
+    ]
+  }
+}

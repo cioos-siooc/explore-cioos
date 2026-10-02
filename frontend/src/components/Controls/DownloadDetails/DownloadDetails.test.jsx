@@ -193,4 +193,22 @@ describe("DownloadDetails", () => {
       true,
     );
   });
+
+  it("shows the direct links and each card's download link up front", () => {
+    renderDetails({
+      pointsToReview: [
+        makePoint({
+          pk: EST_SMALL.pk,
+          dataset_id: "small",
+          erddap_url: "https://example.org/erddap/tabledap/small.html",
+        }),
+      ],
+    });
+    expect(screen.getByTestId("direct-links")).toBeInTheDocument();
+    expect(screen.getByTestId("download-formats")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Download / })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/tabledap/small."),
+    );
+  });
 });

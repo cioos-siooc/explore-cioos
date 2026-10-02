@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { formatDatasetCount } from "../utilities.jsx";
@@ -18,6 +20,7 @@ import { formatDatasetCount } from "../utilities.jsx";
 // previous counts stay on screen (dimmed) instead of collapsing back to a
 // spinner, so a filter tweak doesn't make the numbers flicker.
 export default function useDatasetCounts() {
+  const { i18n } = useTranslation();
   const { totalNumberOfDatasets, catalogLoaded } = useFilters();
   const { filteredDatasets, selectionLoading, initialPointsQueryComplete } =
     useSelection();
@@ -39,6 +42,10 @@ export default function useDatasetCounts() {
     // "filtered / total" split is noise, so state the single number alone.
     allDatasetsShown:
       !totalNumberOfDatasets || filteredCount === totalNumberOfDatasets,
-    label: formatDatasetCount(filteredCount, totalNumberOfDatasets),
+    label: formatDatasetCount(
+      filteredCount,
+      totalNumberOfDatasets,
+      i18n.language,
+    ),
   };
 }

@@ -1,6 +1,6 @@
 /* The shared dismiss control — see CloseButton.jsx. The glyph is sized here
    rather than through the icon's own `size` prop, so the box and what sits in
-   it are one decision: a 36px X in a 44px box, big enough to be the obvious
+   it are one decision: a 36px X over a 28px box, big enough to be the obvious
    way out of a surface rather than a corner speck. */
 .closeButton {
   display: inline-flex;
@@ -42,9 +42,9 @@
 
 /* Phones: every surface this sits on is full-screen there, and this is the way
    out of it — full ink, and pulled back into the row's own padding so a target
-   this size still reads as a corner control. It needs no growing here: the
-   box is already the 44px touch minimum at every width. */
-@media (max-width: 700px) {
+   this size still reads as a corner control. Its touch hit area comes from
+   the coarse-pointer rule in theme.css. */
+@media (max-width: 700px), (max-height: 500px) {
   .closeButton {
     margin-right: -6px;
     color: var(--cioos-ink);

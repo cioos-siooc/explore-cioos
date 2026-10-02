@@ -1,4 +1,5 @@
 const { FINE } = require("./hexTiers");
+const { metricValueExpr, metricJoin } = require("./hexMetric");
 
 /*
  * What a selection is.
@@ -134,6 +135,25 @@ const DATASET_HAS_FEATURES = `(EXISTS (SELECT 1 FROM cde.profiles p WHERE p.data
         OR EXISTS (SELECT 1 FROM cde.obis_cells o WHERE o.dataset_pk = d.pk)
         OR (d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL))`;
 
+/*
+ * The coarse hex tier read from cde.hexes_zoom_0_rollup (see 1_schema.sql)
+ * instead of the three feature tables, for selections whose filters are all
+ * dataset-level (createDBFilter's datasetLevelOnly) — nothing else can be
+ * answered from a per-(hex, dataset) row. Yields dataset_pk, the hex pk under
+ * `hexAs`, and metric_value, the same as the raw branches it replaces.
+ *
+ * @param {string[]} sourceConds  one condition per included source, each
+ *                                starting `source = '<name>'`; none = no rows
+ */
+function coarseRollupBranch(metric, sourceConds, hexAs) {
+  const where = sourceConds.length
+    ? sourceConds.map((c) => `(${c})`).join(" OR ")
+    : "FALSE";
+  return `SELECT dataset_pk, hex_pk AS ${hexAs}, ${metricValueExpr("hexes_zoom_0_rollup", metric)}
+        FROM cde.hexes_zoom_0_rollup ${metricJoin("hexes_zoom_0_rollup", metric)}
+        WHERE ${where}`;
+}
+
 // ---------------------------------------------------------------------------
 // Assembly
 
@@ -167,5 +187,6 @@ module.exports = {
   GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
   GRIDDAP_FROM,
   DATASET_HAS_FEATURES,
+  coarseRollupBranch,
   unionBranches,
 };
