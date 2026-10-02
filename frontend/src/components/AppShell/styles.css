@@ -16,6 +16,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
+
+  /* Sized to its text, not to the half-viewport that left: 50% leaves a fixed
+     box to shrink into — which wrapped it a word per line on phones. */
+  width: max-content;
   max-width: calc(100vw - 24px);
   padding: 10px 16px;
   background-color: var(--cioos-error-bg);

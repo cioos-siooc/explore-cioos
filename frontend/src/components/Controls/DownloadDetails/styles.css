@@ -52,8 +52,8 @@
   gap: 8px;
   margin: 0;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-weight: 600;
+  font-size: var(--cioos-font-size-lg);
   color: var(--cioos-navy);
 }
 
@@ -86,15 +86,8 @@
   min-width: 0;
 }
 
-/* The chips take the row's slack: there can be three of them, each as wide as
-   the shape or date range it names, while the format pills are two at most. */
 .filterDownloadToggles {
   flex: 1 1 auto;
-}
-
-.downloadFormats {
-  flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .downloadBandLabel {
@@ -104,7 +97,7 @@
   flex: 0 0 auto;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--cioos-ink-60);
@@ -194,9 +187,8 @@
   min-height: 0;
 }
 
-/* --- Format pickers, rendered onto the datasets toolbar above the list
-   (see DownloadFormats). Styled here because that is where they are built:
-   the toolbar only provides the row. --- */
+/* --- Format pickers, in the footer's direct-links column
+   (see DownloadFormats). --- */
 .downloadFormats {
   display: inline-flex;
   flex-wrap: wrap;
@@ -238,11 +230,9 @@
   flex: 0 0 auto;
   display: grid;
 
-  /* The links column is weighted well above the email one because its row of
-     four export buttons is the widest indivisible thing in the footer: a
-     column narrower than that wraps the last button onto a line of its own and
-     spends a row on it. The summary takes what its two figures need. */
-  grid-template-columns: auto minmax(240px, 1fr) minmax(330px, 1.7fr);
+  /* The email column gets the weight: the links column is two pickers and two
+     buttons, which wrap cleanly. The summary takes what its figures need. */
+  grid-template-columns: auto minmax(240px, 1.5fr) minmax(260px, 1fr);
   align-items: stretch;
   border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
@@ -286,7 +276,7 @@
   max-width: 100%;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -325,15 +315,16 @@
 }
 
 .downloadSummaryValue {
+  font-variant-numeric: tabular-nums;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
-  font-size: 20px;
+  font-weight: 600;
+  font-size: var(--cioos-font-size-lg);
   line-height: 1.1;
   color: var(--cioos-navy);
 }
 
 .downloadSummaryValueMuted {
-  font-size: 15px;
+  font-size: var(--cioos-font-size-base);
   font-weight: 600;
   color: var(--cioos-ink-40);
 }
@@ -381,7 +372,7 @@
   border: none;
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   font-weight: 600;
   white-space: nowrap;
   transition: background-color var(--cioos-transition-fast);
@@ -392,21 +383,31 @@
 }
 
 .submitRequestButton:disabled {
-  background-color: var(--cioos-hairline);
-  color: var(--cioos-ink-40);
+  border: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
   cursor: not-allowed;
 }
 
 /* Holds its line whether or not there is anything to say, so a submission's
-   result does not shove the column it lands in. */
+   result does not shove the column it lands in. The padding is reserved too;
+   only the ground appears with a result. */
 .downloadSubmit .submissionFeedback {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
-  min-height: 18px;
+  gap: 6px;
+  min-height: 26px;
+  padding: 4px 8px;
+  margin: 0 -8px;
+  border-radius: var(--cioos-radius-sm);
   font-size: var(--cioos-font-size-sm);
   line-height: 1.25;
   color: var(--cioos-ink-60);
+}
+
+.downloadSubmit .submissionFeedback svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 .downloadSubmit .form-switch {
@@ -430,12 +431,27 @@
   cursor: pointer;
 }
 
+/* The result on its status ground. Ink carries the sentence and the glyph the
+   hue, as .directLinksWarning does, since neither hue clears 4.5:1 as text on
+   its own tint. */
 .downloadSubmit .submissionFeedback.success {
-  color: var(--cioos-primary-700);
+  background-color: var(--cioos-success-bg);
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+.downloadSubmit .submissionFeedback.success svg {
+  color: var(--cioos-primary-800);
 }
 
 .downloadSubmit .submissionFeedback.error {
-  color: var(--cioos-error);
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-ink);
+  font-weight: 600;
+}
+
+.downloadSubmit .submissionFeedback.error svg {
+  color: var(--cioos-error-700);
 }
 
 /* --- Column 3: the same order taken from the source instead of the queue.
@@ -497,6 +513,18 @@
   color: var(--cioos-ink-40);
 }
 
+/* The "Save as" toggle wears .directLinksButton, but ui/Dropdown's
+   `.dropdown .btn` outranks it. */
+.directLinksSave .btn.directLinksButton {
+  padding: 0 14px;
+  font-size: var(--cioos-font-size-sm);
+}
+
+.directLinksSave .btn.directLinksButton:disabled {
+  background-color: var(--cioos-white);
+  cursor: not-allowed;
+}
+
 /* Caveats about the links as built. Pushed to the foot of the column so they
    stay the last thing in it however many there are. */
 .directLinksNotes {
@@ -546,7 +574,7 @@
 }
 
 /* --- Collapse. The links column is the one that stops fitting first (two
-   pickers and four buttons), so it is the one that leaves the row. --- */
+   pickers and two buttons), so it is the one that leaves the row. --- */
 @media (max-width: 1040px) {
   .downloadFooter {
     grid-template-columns: auto minmax(240px, 1fr);
@@ -576,7 +604,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   /* At this width the panel is the whole screen and the fixed frame has
      nothing left to give the card list once the band, the toolbar, the legend
      and the order bar have taken theirs. So the frame goes: the modal body

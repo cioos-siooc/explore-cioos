@@ -9,7 +9,6 @@ import * as helpers from "@turf/helpers";
 import turfBboxPolygon from "@turf/bbox-polygon";
 import turfPointsWithinPolygon from "@turf/points-within-polygon";
 import turfBbox from "@turf/bbox";
-import turfUnion from "@turf/union";
 
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
@@ -73,6 +72,17 @@ import { buildTileSuffix } from "./tileQuery.js";
 import { GRIDDAP_PRIORITY_ZOOM, griddapOutranksHexesIn } from "./hitTest.js";
 import { featureHasDataset, focusedPointFeatures } from "./focusedPoints.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
+
+// @turf/union (and the bignumber/polyclip it pulls in) only merges click
+// highlights, so it loads once the map is up rather than with the entry
+// bundle. A click before then highlights the unmerged pieces instead.
+let turfUnion = null;
+const loadTurfUnion = () =>
+  import("@turf/union")
+    .then((module) => {
+      turfUnion = module.default;
+    })
+    .catch(() => {});
 
 // direct_select's own dragVertex/toDisplayFeatures, captured once here at
 // module load — before the component below patches these modes on every
@@ -187,7 +197,8 @@ function buildHeadArrowImage(fillColor, strokeColor = "#ffffff") {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext("2d");
+  // A CPU canvas: getImageData on a GPU one stalls on the map's shader work.
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.beginPath();
   ctx.moveTo(size / 2, 1.5 * ratio); // apex (north)
   ctx.lineTo(size - 2.5 * ratio, size - 2.5 * ratio);
@@ -769,7 +780,7 @@ export default function CreateMap({
     // any tile is still in flight, and on this deployment the coverage/track
     // tiles are heavy enough that the map is rarely idle — gating on it
     // silently dropped filter changes that landed mid-load. The sources are
-    // created together in the 'load' handler, so their presence is the real
+    // created together in the 'style.load' handler, so their presence is the real
     // precondition, and setTiles works fine while other tiles load.
     if (
       !map.current ||
@@ -1732,7 +1743,7 @@ export default function CreateMap({
   // Latest spatial filter, readable from the debounced moveend handler (which
   // would otherwise capture the polygon as of the overlay's last render).
   const polygonRef = useRef(null);
-  // For the 'load' handler: an overlay set before the style loaded hid layers
+  // For the 'style.load' handler: an overlay set before the style loaded hid layers
   // that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
   const revealedWmsPk = useRef();
@@ -1858,7 +1869,7 @@ export default function CreateMap({
   // event handlers) restores the user's toggle instead of forcing layers on.
   const dataLayersVisibleRef = useRef(true);
   // Same, for the depth rasters: the style's layers are created visible, so the
-  // 'load' handler needs the current switch state to apply it.
+  // 'style.load' handler needs the current switch state to apply it.
   const bathymetryVisibleRef = useRef(true);
 
   function setLayersVisibility(layerIds, visible) {
@@ -2230,7 +2241,7 @@ export default function CreateMap({
 
   useEffect(() => {
     // Guard on source existence, not map.loaded(): the sources and layers are
-    // all created together in the 'load' handler, so getSource('cde-tiles')
+    // all created together in the 'style.load' handler, so getSource('cde-tiles')
     // being present means the layers this effect touches (points-highlighted)
     // exist too. loaded() additionally requires no tiles in flight, which on a
     // heavy trajectory deployment dropped filter changes that arrived while
@@ -2335,10 +2346,10 @@ export default function CreateMap({
       // load that adds it rather than dropping the selection: this effect is
       // keyed on the selection alone, so nothing re-runs it once the map
       // catches up, and the track never appeared. Registered from here, so it
-      // runs after the handler that adds the sources ('load' fires its
+      // runs after the handler that adds the sources ('style.load' fires its
       // listeners in registration order).
       if (!map.current.getSource("selected-track")) {
-        map.current.once("load", renderSelectedTrack);
+        map.current.once("style.load", renderSelectedTrack);
         return;
       }
       const source = map.current.getSource("selected-track");
@@ -2514,10 +2525,10 @@ export default function CreateMap({
     return () => {
       superseded = true;
       abortController.abort();
-      // Including a retry still waiting on 'load' — a selection replaced while
+      // Including a retry still waiting on 'style.load' — a selection replaced while
       // the map was still coming up must not draw over the one that replaced
       // it. (Evented.off clears once-listeners too.)
-      map.current?.off("load", renderSelectedTrack);
+      map.current?.off("style.load", renderSelectedTrack);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrajectory, mapQueryString]);
@@ -2534,7 +2545,7 @@ export default function CreateMap({
       // style has added the source.
       const source = map.current.getSource("mapped-record");
       if (!source) {
-        map.current.once("load", renderMappedRecord);
+        map.current.once("style.load", renderMappedRecord);
         return;
       }
       source.setData(emptyFeatureCollection);
@@ -2576,7 +2587,7 @@ export default function CreateMap({
     renderMappedRecord();
     return () => {
       abortController.abort();
-      map.current?.off("load", renderMappedRecord);
+      map.current?.off("style.load", renderMappedRecord);
     };
   }, [mappedRecord]);
 
@@ -2605,6 +2616,9 @@ export default function CreateMap({
       // the discrete GPU on dual-GPU laptops. The map is circles and fills —
       // the integrated GPU renders it fine, so hint 'low-power'.
       canvasContextAttributes: { powerPreference: "low-power" },
+      // The canvas can't be browsed by keyboard or screen reader; its label
+      // points to the list that holds the same datasets.
+      locale: { "Map.Title": t("mapCanvasLabel") },
       // No attribution in the map's own corner: the per-source attributions are
       // gathered by an AttributionControl the legend card builds and parents
       // itself (see LegendFooter.jsx).
@@ -2633,7 +2647,9 @@ export default function CreateMap({
     // disable map rotation using touch rotation gesture
     map.current.touchZoomRotate.disableRotation();
 
-    map.current.on("load", () => {
+    // 'style.load', not 'load': 'load' waits for every basemap tile, and the
+    // EMODnet rasters take seconds, so the data tiles queued behind them.
+    map.current.once("style.load", () => {
       setColorStops();
 
       const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
@@ -3379,7 +3395,11 @@ export default function CreateMap({
       if (!bathymetryVisibleRef.current) {
         setLayersVisibility(bathymetryLayerIds, false);
       }
+    });
 
+    // The draw control only connects on 'load', so the shape has to wait for it.
+    map.current.once("load", () => {
+      loadTurfUnion();
       // A share link can carry the spatial selection (rectangle bounds or a
       // polygon ring). SelectionProvider has already seeded it into the app
       // state — this puts the shape back into the draw control so it is drawn,
@@ -3938,23 +3958,27 @@ export default function CreateMap({
             filter: ["==", ["get", "pk"], feature.properties.pk],
           });
           const parts = fragments.length ? fragments : [feature];
-          let merged = parts[0];
-          for (let i = 1; i < parts.length; i++) {
-            try {
-              // @turf/union 7 takes ONE FeatureCollection, not two
-              // features. Still folded pairwise rather than unioning the
-              // whole collection in one call, so a single degenerate
-              // fragment costs only itself (see catch below).
-              merged =
-                turfUnion(helpers.featureCollection([merged, parts[i]])) ||
-                merged;
-            } catch {
-              // A degenerate fragment (e.g. a sliver from the MVT buffer
-              // overlap) fails to union — keep what merged so far rather
-              // than losing the highlight entirely.
+          if (!turfUnion) {
+            cellFeatures.push(...parts);
+          } else {
+            let merged = parts[0];
+            for (let i = 1; i < parts.length; i++) {
+              try {
+                // @turf/union 7 takes ONE FeatureCollection, not two
+                // features. Still folded pairwise rather than unioning the
+                // whole collection in one call, so a single degenerate
+                // fragment costs only itself (see catch below).
+                merged =
+                  turfUnion(helpers.featureCollection([merged, parts[i]])) ||
+                  merged;
+              } catch {
+                // A degenerate fragment (e.g. a sliver from the MVT buffer
+                // overlap) fails to union — keep what merged so far rather
+                // than losing the highlight entirely.
+              }
             }
+            cellFeatures.push(merged);
           }
-          cellFeatures.push(merged);
         }
         // The bucket this feature stands for, so the card can ask the API what
         // each dataset in it contributes. A tile carries only the bucket TOTAL
@@ -4031,7 +4055,7 @@ export default function CreateMap({
       // ('outline'), so every box in the stack still draws its own border.
       // Everything else is drawn by all of them ('both').
       let mergedGrid = gridFeatures[0] || null;
-      for (let i = 1; i < gridFeatures.length; i++) {
+      for (let i = 1; turfUnion && i < gridFeatures.length; i++) {
         try {
           // One FeatureCollection per call — see the note in the hex
           // fragment union above.
@@ -4271,7 +4295,7 @@ export default function CreateMap({
       //
       // The getLayer guard matters now that this runs on every click rather than
       // only the ones five other handlers let through: the data layers are added
-      // on the map's 'load', and a click before that lands here with nothing
+      // on the map's 'style.load', and a click before that lands here with nothing
       // under it — setFilter on a layer that doesn't exist yet throws.
       // Only the spatial selection. This used to clear pointsToReview too, from
       // when that meant "the datasets inside the drawn shape"; it is the
@@ -4670,7 +4694,9 @@ export default function CreateMap({
   // is baked into buildBasemapStyle at construction, so this only fires on
   // runtime changes.
   useEffect(() => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current) return;
+    map.current.getCanvas().setAttribute("aria-label", t("mapCanvasLabel"));
+    if (!map.current.isStyleLoaded()) return;
     LABEL_LAYER_IDS.forEach((id) => {
       if (map.current.getLayer(id)) {
         map.current.setLayoutProperty(
@@ -4680,7 +4706,7 @@ export default function CreateMap({
         );
       }
     });
-  }, [i18n.language]);
+  }, [i18n.language, t]);
 
   return (
     <div

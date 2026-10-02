@@ -93,11 +93,12 @@ describe("groupLabel", () => {
     );
   });
 
-  it("spaces out a compound cdm_data_type for the type dimension", () => {
+  it("labels a type group with the geometry filter's words", () => {
     expect(groupLabel("TimeSeriesProfile", "type", t)).toBe(
-      "Time series / Profile",
+      "layerTimeseriesProfile",
     );
-    expect(groupLabel("TimeSeries", "type", t)).toBe("Time series");
+    expect(groupLabel("TimeSeries", "type", t)).toBe("layerTimeseries");
+    expect(groupLabel("Point", "type", t)).toBe("Point");
   });
 
   it("uppercases OBIS but title-cases ERDDAP for the source dimension", () => {

@@ -71,15 +71,11 @@ export const allDataLayersOn = (dataLayers) =>
   !dataLayers || DATA_LAYER_KEYS.every((key) => dataLayers[key]);
 
 // What the user picked, as {key: "include" | "exclude"} with unpicked keys
-// absent — the same include -> exclude -> clear model as the catalogue lists.
+// absent — the same include / exclude model as the catalogue lists.
 // The drawn map below is derived from it, so the map, the datasets list and
 // the URL keep reading one {key: drawn} object.
-export const nextDataLayerChoice = (choice) =>
-  choice === "include"
-    ? "exclude"
-    : choice === "exclude"
-      ? undefined
-      : "include";
+export const toggledDataLayerChoice = (choice, target) =>
+  choice === target ? undefined : target;
 
 // Drawn = one of the included geometries (or any, when none is included) and
 // not an excluded one.
@@ -138,6 +134,14 @@ export function dataLayerKeyForDataset(row) {
   if (row.source_type === "obis") return "obis";
   if (row.cdm_data_type === "Grid") return "grid";
   return TYPE_TO_KEY.get(row.cdm_data_type);
+}
+
+// A cdm_data_type in the geometry filter's own words, so a type reads the same
+// on a card, a group heading and the coverage chart as in the filter. A type
+// no switch names (e.g. OBIS 'Point', the same word in French) is shown as-is.
+export function cdmDataTypeLabel(type, t) {
+  const key = dataLayerKeyForDataset({ cdm_data_type: type });
+  return key ? t(DATA_LAYER_LABEL_KEYS[key]) : type;
 }
 
 // Is this dataset drawn under the current layer selection?
