@@ -164,7 +164,7 @@ describe("DownloadProvider", () => {
     );
     await waitFor(() =>
       expect(download.submissionFeedback?.text).toBe(
-        i18n.t("submissionStateTextSuccess"),
+        i18n.t("submissionStateTextSuccess", { email: "diver@example.com" }),
       ),
     );
   });
@@ -187,8 +187,38 @@ describe("DownloadProvider", () => {
     act(() => download.handleSubmission());
     await waitFor(() =>
       expect(download.submissionFeedback?.text).toBe(
-        i18n.t("submissionStateTextFailed"),
+        i18n.t("submissionStateTextFailedServer"),
       ),
+    );
+  });
+
+  it.each([
+    [
+      "the API rejects the request",
+      () => new Response(null, { status: 400 }),
+      "submissionStateTextFailedRejected",
+    ],
+    [
+      "the API can't be reached",
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      "submissionStateTextFailedNetwork",
+    ],
+  ])("names the cause when %s", async (_, respond, key) => {
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/download?")) return Promise.resolve().then(respond);
+      return realFetch(input, init);
+    };
+
+    const { i18n } = await renderReady();
+    act(() => {
+      selection.setPointsToDownload([{ pk: 1 }]);
+      download.setEmail("diver@example.com");
+    });
+    act(() => download.handleSubmission());
+    await waitFor(() =>
+      expect(download.submissionFeedback?.text).toBe(i18n.t(key)),
     );
   });
 

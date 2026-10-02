@@ -21,7 +21,7 @@ const dsn = process.env.SENTRY_DSN;
 
 // Gated on the DSN, the same way web-api's instrument.js is: no DSN configured
 // means no client transport, so nothing is sent, no integration is set up, and
-// both the feedback dialog and route tracing stay inert. FeedbackButton and
+// both the feedback dialog and route tracing stay inert. sentryFeedback.js and
 // SentryRoutes below each handle that case.
 Sentry.init({
   dsn,
@@ -42,26 +42,6 @@ Sentry.init({
       useNavigationType,
       createRoutesFromChildren,
       matchRoutes,
-    }),
-    // The feedback form replaces the old Google Form survey. autoInject is off:
-    // FeedbackButton opens the dialog from the existing chat icons instead of
-    // Sentry's own floating button.
-    Sentry.feedbackIntegration({
-      autoInject: false,
-      showBranding: false,
-      // Sentry is hosted in the US; the name adds nothing a reply needs, and
-      // the email field stays optional (see PrivacyModal).
-      showName: false,
-      colorScheme: "light",
-      themeLight: {
-        foreground: "var(--cioos-ink)",
-        background: "var(--cioos-white)",
-        accentBackground: "var(--cioos-primary)",
-        accentForeground: "var(--cioos-white)",
-        successColor: "var(--cioos-success)",
-        errorColor: "var(--cioos-error)",
-        boxShadow: "var(--cioos-shadow-float)",
-      },
     }),
   ],
 

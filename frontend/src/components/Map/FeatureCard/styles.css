@@ -95,7 +95,7 @@
 
 .featureCardHeadingTitle {
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
@@ -174,9 +174,20 @@
   }
 }
 
-.featureCardRow.clickable:focus-visible {
+.featureCardRow.clickable:has(.featureCardRowTitle:focus-visible) {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
+}
+
+button.featureCardRowTitle {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.featureCardRowTitle:focus-visible {
   outline: none;
 }
 
@@ -203,7 +214,7 @@
   min-width: 0;
   overflow: hidden;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-sm);
   line-height: 1.35;
 }
@@ -237,7 +248,7 @@
 }
 
 .featureCardRowAdd.isSelected {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
   cursor: default;
 }
 
@@ -286,7 +297,7 @@
    fall back on: this card is the only way a touch user sees any of it.
    Matches the datasets sheet's own breakpoint (Sidebar/styles.css).
    ------------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .featureCard {
     position: fixed;
     inset: auto 0 0;
@@ -304,7 +315,7 @@
     /* Same phone type scale as the datasets sheet (Sidebar/styles.css): the
        rows are its cards, and at theme.css's step-up the title and its meta
        came out the same size and the meta wrapped each row to four lines. */
-    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-3xs: 10px;
     --cioos-font-size-2xs: 10px;
     --cioos-font-size-xs: 11px;
     --cioos-font-size-sm: 11px;

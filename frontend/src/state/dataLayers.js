@@ -71,15 +71,11 @@ export const allDataLayersOn = (dataLayers) =>
   !dataLayers || DATA_LAYER_KEYS.every((key) => dataLayers[key]);
 
 // What the user picked, as {key: "include" | "exclude"} with unpicked keys
-// absent — the same include -> exclude -> clear model as the catalogue lists.
+// absent — the same include / exclude model as the catalogue lists.
 // The drawn map below is derived from it, so the map, the datasets list and
 // the URL keep reading one {key: drawn} object.
-export const nextDataLayerChoice = (choice) =>
-  choice === "include"
-    ? "exclude"
-    : choice === "exclude"
-      ? undefined
-      : "include";
+export const toggledDataLayerChoice = (choice, target) =>
+  choice === target ? undefined : target;
 
 // Drawn = one of the included geometries (or any, when none is included) and
 // not an excluded one.

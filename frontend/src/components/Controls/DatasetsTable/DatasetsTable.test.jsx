@@ -107,13 +107,13 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       i18n.addResourceBundle("fr", "translation", translationFR);
       await i18n.changeLanguage("fr");
     });
-    expect(screen.getAllByTitle("Genre").map((el) => el.textContent)).toEqual([
+    expect(screen.getAllByTitle("Type").map((el) => el.textContent)).toEqual([
       "Profil",
       "Série temporelle",
       "Profil de trajectoire",
     ]);
 
-    await user.selectOptions(await screen.findByLabelText("Tri"), "Genre");
+    await user.selectOptions(await screen.findByLabelText("Tri"), "Type");
     expect(
       screen
         .getAllByTestId("dataset-card")
@@ -184,7 +184,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     const betaCard = cards.find((c) => c.textContent.includes("Beta station"));
     await user.click(
       screen
-        .getAllByRole("checkbox", { name: "Add to selection" })
+        .getAllByRole("checkbox", { name: /^Add to selection/ })
         .find((b) => betaCard.contains(b)),
     );
     expect(handleSelectDataset).toHaveBeenCalledWith(
@@ -221,7 +221,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       { providers: "app" },
     );
     await screen.findAllByTestId("dataset-card");
-    await user.selectOptions(screen.getByLabelText("Group"), "platform");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
     await waitFor(() => {
       expect(
         document.querySelector(".datasetsCardGroupHeader"),

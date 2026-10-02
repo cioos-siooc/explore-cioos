@@ -13,6 +13,7 @@ import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import {
   createDataFilterQueryString,
   formatSizeEstimate,
+  sumSizeEstimates,
 } from "../../../utilities.jsx";
 import {
   defaultEndDate,
@@ -67,8 +68,8 @@ export default function DownloadDetails({
   // links in bulk, and every card in the list, which shows the one query its
   // own dataset would be fetched with. Building the links once here is what
   // keeps the two in step — a card promising a .csv under a footer set to
-  // Parquet would be a lie about the same order. The picker itself sits on the
-  // list's toolbar (DownloadFormats), which is the one place above both.
+  // Parquet would be a lie about the same order. The picker itself sits in the
+  // footer's direct-links column.
   const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
   const [obisFormat, setObisFormat] = useState(defaultObisFormat);
   const [pointsData, setPointsData] = useState(
@@ -181,24 +182,20 @@ export default function DownloadDetails({
 
   useEffect(() => {
     if (downloadSizeEstimates) {
-      let tempDataTotal = 0;
-      let tempDataDownloadable = 0;
       const estimateByPk = new Map(
         downloadSizeEstimates.map((dse) => [dse.pk, dse]),
       );
       const tempData = pointsData.map((ds) => {
-        // A dataset the estimate response didn't cover reads as 0 bytes rather
-        // than throwing — it stays listed, just without a usable size.
+        // A dataset the estimate response didn't cover stays listed, just
+        // without a size.
         const tempDS = estimateByPk.get(ds.pk) || {
-          size: 0,
-          unfilteredSize: 0,
+          size: null,
+          unfilteredSize: null,
         };
         const estimates = {
           filteredSize: tempDS.size,
           unfilteredSize: tempDS.unfilteredSize,
         };
-        tempDataTotal = tempDataTotal + tempDS.unfilteredSize;
-        tempDataDownloadable = tempDataDownloadable + tempDS.size;
         return {
           ...ds,
           selected: estimates.filteredSize < 1000000000,
@@ -209,10 +206,6 @@ export default function DownloadDetails({
       });
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPointsData(tempData);
-      setDataTotal({
-        unfilteredSize: tempDataTotal,
-        filteredSize: tempDataDownloadable,
-      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [downloadSizeEstimates]);
@@ -223,19 +216,20 @@ export default function DownloadDetails({
         pointsData.filter((point) => point.selected && !point.downloadDisabled),
       );
       if (downloadSizeEstimates) {
-        let tempDataTotal = 0;
-        let tempDataDownloadable = 0;
-        pointsData.forEach((point) => {
-          tempDataTotal = tempDataTotal + point.sizeEstimate.unfilteredSize;
-          if (point.selected) {
-            tempDataDownloadable =
-              tempDataDownloadable + point.sizeEstimate.filteredSize;
-          }
-        });
+        const filtered = sumSizeEstimates(
+          pointsData
+            .filter((point) => point.selected)
+            .map((point) => point.sizeEstimate.filteredSize),
+        );
+        const unfiltered = sumSizeEstimates(
+          pointsData.map((point) => point.sizeEstimate.unfilteredSize),
+        );
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setDataTotal({
-          unfilteredSize: tempDataTotal,
-          filteredSize: tempDataDownloadable,
+          filteredSize: filtered.size,
+          unfilteredSize: unfiltered.size,
+          filteredPartial: filtered.partial,
+          unfilteredPartial: unfiltered.partial,
         });
       }
     }
@@ -354,15 +348,6 @@ export default function DownloadDetails({
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
             downloadLinksByPk={linksByPk}
-            downloadFormatControls={
-              <DownloadFormats
-                links={links}
-                erddapFormat={erddapFormat}
-                setErddapFormat={setErddapFormat}
-                obisFormat={obisFormat}
-                setObisFormat={setObisFormat}
-              />
-            }
           />
         </div>
       </div>
@@ -400,11 +385,19 @@ export default function DownloadDetails({
               {estimatesLoading ? (
                 <Spinner size="sm" className="datasetSizeTotalSpinner" />
               ) : downloadSizeEstimates ? (
-                <span className="downloadSummaryValue">
+                <span
+                  className="downloadSummaryValue"
+                  title={
+                    dataTotal.filteredPartial || dataTotal.unfilteredPartial
+                      ? t("downloadSizePartialTitle")
+                      : undefined
+                  }
+                >
                   {formatSizeEstimate(dataTotal.filteredSize)}
+                  {dataTotal.filteredPartial && "+"}
                   <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
                     dataTotal.unfilteredSize,
-                  )}`}</span>
+                  )}${dataTotal.unfilteredPartial ? "+" : ""}`}</span>
                 </span>
               ) : (
                 <span
@@ -428,7 +421,19 @@ export default function DownloadDetails({
             queue. Beside the summary rather than behind a tab, because one of
             the things it answers ("this dataset is too large for the zip") is
             only legible next to the figures that say so. */}
-        <DirectDownloadLinks links={links} constraints={constraints} />
+        <DirectDownloadLinks
+          links={links}
+          constraints={constraints}
+          formatControls={
+            <DownloadFormats
+              links={links}
+              erddapFormat={erddapFormat}
+              setErddapFormat={setErddapFormat}
+              obisFormat={obisFormat}
+              setObisFormat={setObisFormat}
+            />
+          }
+        />
       </div>
     </div>
   );

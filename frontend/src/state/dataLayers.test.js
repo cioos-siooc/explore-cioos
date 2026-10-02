@@ -9,7 +9,7 @@ import {
   dataLayerKeyForDataset,
   dataLayersFromChoices,
   datasetInDataLayers,
-  nextDataLayerChoice,
+  toggledDataLayerChoice,
 } from "./dataLayers.js";
 
 const onlyDataLayer = (key) => dataLayersFromChoices({ [key]: "include" });
@@ -29,10 +29,11 @@ describe("the unfiltered state is everything-on", () => {
 });
 
 describe("choices, like every other list filter", () => {
-  it("cycles include -> exclude -> clear", () => {
-    expect(nextDataLayerChoice(undefined)).toBe("include");
-    expect(nextDataLayerChoice("include")).toBe("exclude");
-    expect(nextDataLayerChoice("exclude")).toBeUndefined();
+  it("toggles to the asked-for choice, or clears it when already there", () => {
+    expect(toggledDataLayerChoice(undefined, "include")).toBe("include");
+    expect(toggledDataLayerChoice("include", "exclude")).toBe("exclude");
+    expect(toggledDataLayerChoice("include", "include")).toBeUndefined();
+    expect(toggledDataLayerChoice("exclude", "exclude")).toBeUndefined();
   });
 
   it("draws only the included geometries once any is included", () => {
