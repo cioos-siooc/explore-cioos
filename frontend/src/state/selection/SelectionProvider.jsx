@@ -308,6 +308,16 @@ export default function SelectionProvider({ children }) {
     );
   }, [filteredDatasets, listSearchText, i18n.language]);
 
+  // Over filteredDatasets rather than pointsData: the title search and the
+  // data-layer switches narrow only client-side, so the raw in-view set still
+  // counted every dataset they took out ("0/N datasets (917 in view)"). Not
+  // over listedDatasets: the sidebar's own search never moves the counters.
+  const inViewCount = useMemo(
+    () =>
+      filteredDatasets.filter((row) => datasetsInViewPks.has(row.pk)).length,
+    [filteredDatasets, datasetsInViewPks],
+  );
+
   // filteredDatasets as a pk list, for the queries that ask a question about
   // the filtered data rather than draw it (the coverage figure). Everything
   // the list narrows by — the search box, "only in view", the data-layer
@@ -915,7 +925,7 @@ export default function SelectionProvider({ children }) {
     filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,
-    inViewCount: datasetsInViewPks.size,
+    inViewCount,
     onlyInView,
     setOnlyInView,
     groupBy,
