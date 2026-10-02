@@ -6,7 +6,6 @@ import Spinner from "../ui/Spinner.jsx";
 import { server } from "../../config";
 import fetchJson from "../../state/fetchJson.js";
 import reportError from "../../state/reportError.js";
-import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../state/tips/TipsProvider.jsx";
@@ -17,13 +16,13 @@ const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
 // Single adapter between the state providers and the imperative Map
 // component — Map.js keeps its prop-based interface untouched.
 export default function MapContainer() {
-  const { setDatasetsSelected } = useFilters();
   const { offerTip } = useTips();
   const {
     mapQueryString,
     setLoading,
     reportFirstPaint,
     setLoadingLayers,
+    mapView,
     loadingLayers,
     firstPaintPending,
     setMapView,
@@ -150,6 +149,7 @@ export default function MapContainer() {
         setLoading={setLoading}
         setLoadingLayers={setLoadingLayers}
         mapQueryString={mapQueryString}
+        initialView={mapView}
         setMapView={setMapView}
         rangeLevels={rangeLevels}
         coverageRangeLevels={coverageRangeLevels}
@@ -163,7 +163,6 @@ export default function MapContainer() {
         setHoveredDataset={setHoveredDataset}
         hoveredDataset={hoveredDataset}
         inspectDataset={inspectDataset}
-        setDatasetsSelected={setDatasetsSelected}
         tracksMode={tracksMode}
         scrubTime={debouncedScrubTime}
         trailingDays={trailingDays}

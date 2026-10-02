@@ -1,4 +1,9 @@
-import { HEX_METRIC } from "../config";
+import {
+  HEX_METRIC,
+  TRAIL_ALL,
+  effectiveTrailingDays,
+  tracksMinDate,
+} from "../config";
 import {
   PROFILE_TYPE_KEYS,
   TRAJECTORY_TYPE_KEYS,
@@ -45,4 +50,45 @@ export function buildTileSuffix(baseQuery, dataLayers) {
   }
   const s = params.toString();
   return s ? `?${s}` : "";
+}
+
+// The time filter as two instants, read back out of the map query string —
+// the same timeMin/timeMax the hexes, the points, the counts and the record
+// lists are filtered by (createDataFilterQueryString writes them, and leaves
+// them out entirely while the range is still the full default one). Bounds are
+// the API's own: date-only strings at UTC midnight, both ends inclusive, so a
+// track is clipped to exactly the span the numbers beside it are counted over.
+//
+// Not to be confused with tracksTimeWindow below, which is the scrub bar's
+// trailing window — the tracks TILES are drawn for that and deliberately
+// ignore this filter (see buildTracksTileUrl and TrajectoryDate.jsx).
+export function filterTimeWindow(queryString) {
+  const params = new URLSearchParams(queryString);
+  const instant = (value) => {
+    const ms = value ? Date.parse(value) : NaN;
+    return Number.isNaN(ms) ? undefined : ms;
+  };
+  return {
+    min: instant(params.get("timeMin")),
+    max: instant(params.get("timeMax")),
+  };
+}
+
+// UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
+// or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
+// up to the scrub date; see config.js). Day snapping keeps the tile URLs
+// stable so the server's URL-keyed tile cache gets hits across scrubs and
+// users. The requested trail is clamped by zoom first — a long window costs
+// far more zoomed out, where one tile can carry the whole catalogue (see
+// effectiveTrailingDays).
+export function tracksTimeWindow(scrub, trailing, zoom) {
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const days = effectiveTrailingDays(trailing, zoom);
+  const end = new Date(`${scrub}T00:00:00Z`).getTime();
+  const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
+  const timeMin =
+    days === TRAIL_ALL
+      ? `${tracksMinDate}T00:00:00Z`
+      : `${new Date(end - days * MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
+  return { timeMin, timeMax };
 }

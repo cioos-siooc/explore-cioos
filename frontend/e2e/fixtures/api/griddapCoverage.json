@@ -1,4 +1,51 @@
 {
   "type": "FeatureCollection",
-  "features": []
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-63.69916564057752, 42.9907138677953],
+            [-63.23305521352583, 42.9907138677953],
+            [-63.23305521352583, 42.648825399960685],
+            [-63.69916564057752, 42.648825399960685],
+            [-63.69916564057752, 42.9907138677953]
+          ]
+        ]
+      },
+      "properties": {
+        "pk": 920001,
+        "dataset_id": "synthetic_grid_920001",
+        "title_translated": {
+          "en": "Synthetic grid A",
+          "fr": "Synthetic grid A"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-63.466110427051674, 43.160948976876746],
+            [-62.766944786474156, 43.160948976876746],
+            [-62.766944786474156, 42.76299826180753],
+            [-63.466110427051674, 42.76299826180753],
+            [-63.466110427051674, 43.160948976876746]
+          ]
+        ]
+      },
+      "properties": {
+        "pk": 920002,
+        "dataset_id": "synthetic_grid_920002",
+        "title_translated": {
+          "en": "Synthetic grid B",
+          "fr": "Synthetic grid B"
+        }
+      }
+    }
+  ]
 }
