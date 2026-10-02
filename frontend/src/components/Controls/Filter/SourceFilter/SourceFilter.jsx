@@ -9,12 +9,12 @@ import {
   XSquare,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
-import { capitalizeFirstLetter, nextOptionState } from "../../../../utilities";
 import {
-  ExcludedLabel,
-  OptionStateIcon,
-  optionStateClass,
-} from "../MultiCheckboxFilter/OptionState.jsx";
+  capitalizeFirstLetter,
+  toggleOptionExcluded,
+  toggleOptionIncluded,
+} from "../../../../utilities";
+import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
 // Combined data-source filter: ERDDAP servers as a flat list, plus a single
@@ -64,31 +64,25 @@ export default function SourceFilter({
     (node) => node.isSelected || node.isExcluded,
   );
 
-  function toggleServer(pk) {
+  function updateServer(pk, toggle) {
     setErddapServersSelected(
       erddapServersSelected.map((server) =>
-        server.pk === pk ? nextOptionState(server) : server,
+        server.pk === pk ? toggle(server) : server,
       ),
     );
   }
 
-  function toggleNode(pk) {
+  function updateNode(pk, toggle) {
     setObisNodesSelected(
-      obisNodesSelected.map((node) =>
-        node.pk === pk ? nextOptionState(node) : node,
-      ),
+      obisNodesSelected.map((node) => (node.pk === pk ? toggle(node) : node)),
     );
   }
 
-  // The group runs the same cycle over every node at once; a mixed group
-  // starts it from the top, so the first click always means "all of OBIS".
-  function toggleAllNodes() {
+  // The group sets every node at once; a mixed group goes to all-included (or
+  // all-excluded) first, so the first click always means "all of OBIS".
+  function setAllNodes({ isSelected, isExcluded }) {
     setObisNodesSelected(
-      obisNodesSelected.map((node) => ({
-        ...node,
-        isSelected: !allNodesSelected && !allNodesExcluded,
-        isExcluded: allNodesSelected,
-      })),
+      obisNodesSelected.map((node) => ({ ...node, isSelected, isExcluded })),
     );
   }
 
@@ -105,61 +99,81 @@ export default function SourceFilter({
   return (
     <div className="multiCheckboxFilter sourceFilter">
       {serversShown.map((server) => (
-        <div
+        <FilterOption
           key={server.pk}
-          className={optionStateClass(server)}
+          label={server.title}
+          isSelected={server.isSelected}
+          isExcluded={server.isExcluded}
+          onInclude={() => updateServer(server.pk, toggleOptionIncluded)}
+          onExclude={() => updateServer(server.pk, toggleOptionExcluded)}
           title={server.title}
-          onClick={() => toggleServer(server.pk)}
         >
-          <OptionStateIcon {...server} />
           <span className="optionName">
             {capitalizeFirstLetter(server.title)}
           </span>
-          <ExcludedLabel {...server} />
-        </div>
+        </FilterOption>
       ))}
       {showObisGroup && (
         <>
-          <div
-            className={`optionButton obisGroupButton ${
-              allNodesSelected ? "selected" : ""
-            } ${allNodesExcluded ? "excluded" : ""}`}
-            title={t("sourceFilterObisGroupTooltip")}
-            onClick={() => toggleAllNodes()}
-          >
-            {allNodesSelected ? (
-              <CheckSquare />
-            ) : allNodesExcluded ? (
-              <XSquare />
-            ) : someNodesSet ? (
-              <DashSquare />
-            ) : (
-              <Square />
-            )}
-            <span className="optionName">OBIS</span>
-            <span
+          {/* The chevron sits beside the group's row, not in it: inside, it
+              would be a button nested in the checkbox. */}
+          <div className="obisGroupRow">
+            <FilterOption
+              className="obisGroupButton"
+              label="OBIS"
+              isSelected={allNodesSelected}
+              isExcluded={allNodesExcluded}
+              onInclude={() =>
+                setAllNodes({
+                  isSelected: !allNodesSelected,
+                  isExcluded: false,
+                })
+              }
+              onExclude={() =>
+                setAllNodes({
+                  isSelected: false,
+                  isExcluded: !allNodesExcluded,
+                })
+              }
+              title={t("sourceFilterObisGroupTooltip")}
+              icon={
+                allNodesSelected ? (
+                  <CheckSquare />
+                ) : allNodesExcluded ? (
+                  <XSquare />
+                ) : someNodesSet ? (
+                  <DashSquare />
+                ) : (
+                  <Square />
+                )
+              }
+            >
+              <span className="optionName">OBIS</span>
+            </FilterOption>
+            <button
+              type="button"
               className="obisGroupChevron"
-              onClick={(e) => {
-                e.stopPropagation();
-                setObisExpanded(!obisExpanded);
-              }}
+              aria-expanded={obisChildrenVisible}
+              aria-label={t("sourceFilterObisExpandLabel")}
+              onClick={() => setObisExpanded(!obisExpanded)}
             >
               {obisChildrenVisible ? <ChevronDown /> : <ChevronRight />}
-            </span>
+            </button>
           </div>
           {obisChildrenVisible && (
             <div className="obisGroupChildren">
               {nodesShown.map((node) => (
-                <div
+                <FilterOption
                   key={node.pk}
-                  className={optionStateClass(node)}
+                  label={node.title}
+                  isSelected={node.isSelected}
+                  isExcluded={node.isExcluded}
+                  onInclude={() => updateNode(node.pk, toggleOptionIncluded)}
+                  onExclude={() => updateNode(node.pk, toggleOptionExcluded)}
                   title={node.title}
-                  onClick={() => toggleNode(node.pk)}
                 >
-                  <OptionStateIcon {...node} />
                   <span className="optionName">{node.title}</span>
-                  <ExcludedLabel {...node} />
-                </div>
+                </FilterOption>
               ))}
             </div>
           )}

@@ -114,9 +114,12 @@ async function shapeSql(query = {}, opts = {}) {
   return knex.raw(sql, params).toString().replace(/\s+/g, " ");
 }
 
-const readsProfiles = (sql) => /FROM cde\.profiles/.test(sql);
-const readsTrajectory = (sql) => /FROM cde\.trajectory_hexes/.test(sql);
-const readsObis = (sql) => /FROM cde\.obis_cells/.test(sql);
+// A source is also read through cde.hexes_zoom_0_rollup, by its `source` key.
+const readsProfiles = (sql) =>
+  /FROM cde\.profiles|source = 'profiles'/.test(sql);
+const readsTrajectory = (sql) =>
+  /FROM cde\.trajectory_hexes|source = 'trajectory'/.test(sql);
+const readsObis = (sql) => /FROM cde\.obis_cells|source = 'obis'/.test(sql);
 // A branch present only as the shape of the empty result set is not in the
 // selection — it is wrapped in a subquery that yields nothing.
 const stripEmptyGuard = (sql) =>

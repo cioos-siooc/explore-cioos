@@ -48,6 +48,33 @@ describe("SelectionProvider", () => {
     expect(row.title).toBe(pointQueryFixture[0].title_translated.en);
   });
 
+  it("flags a failed /pointQuery instead of reporting no matches, and retries it", async () => {
+    const realFetch = globalThis.fetch;
+    let failing = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (failing && url.includes("/pointQuery")) {
+          return Promise.resolve(
+            new Response("<html>504</html>", { status: 504 }),
+          );
+        }
+        return realFetch(input, init);
+      }),
+    );
+    await renderLoaded();
+    expect(latest.pointsError).toBe(true);
+    expect(latest.pointsData).toHaveLength(0);
+
+    failing = false;
+    act(() => latest.retryPointQuery());
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length),
+    );
+    expect(latest.pointsError).toBe(false);
+  });
+
   it("keeps the latest time-filtered results when an older request finishes last", async () => {
     await renderLoaded();
     vi.useFakeTimers();
@@ -200,6 +227,50 @@ describe("SelectionProvider", () => {
     expect(
       new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
     ).toBeNull();
+  });
+
+  it("inViewCount counts the filtered datasets in view — the title search moves it, the list search does not", async () => {
+    // The fixture rows carry no bbox; give every one the same point so a
+    // world-sized viewport has them all in view.
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row) => ({
+        ...row,
+        filtered_bbox_geojson: { type: "Point", coordinates: [-63, 44] },
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    await renderLoaded();
+    act(() =>
+      latestMapState.setMapView((view) => ({
+        ...view,
+        bounds: [
+          [-180, -90],
+          [180, 90],
+        ],
+      })),
+    );
+    await waitFor(() =>
+      expect(latest.inViewCount).toBe(latest.pointsData.length),
+    );
+
+    const needle = latest.pointsData[0].title.slice(0, 6);
+    act(() => latest.setDatasetTitleSearchText(needle));
+    await waitFor(() =>
+      expect(latest.inViewCount).toBe(latest.filteredDatasets.length),
+    );
+    expect(latest.inViewCount).toBeLessThan(latest.pointsData.length);
+
+    act(() => latest.setDatasetTitleSearchText("zzzzqqq"));
+    await waitFor(() => expect(latest.inViewCount).toBe(0));
+
+    act(() => latest.setDatasetTitleSearchText(""));
+    act(() => latest.setListSearchText("zzzzqqq"));
+    await waitFor(() => expect(latest.listedDatasets).toHaveLength(0));
+    expect(latest.inViewCount).toBe(latest.pointsData.length);
   });
 
   it("\"only in view\" narrows the coverage figure's dataset list, not the map's", async () => {

@@ -4,11 +4,12 @@ import {
   DEFAULT_DATA_LAYERS,
   allDataLayersOn,
   anyTrajectoryLayerOn,
+  cdmDataTypeLabel,
   chosenDataLayerKeys,
   dataLayerKeyForDataset,
   dataLayersFromChoices,
   datasetInDataLayers,
-  nextDataLayerChoice,
+  toggledDataLayerChoice,
 } from "./dataLayers.js";
 
 const onlyDataLayer = (key) => dataLayersFromChoices({ [key]: "include" });
@@ -28,10 +29,11 @@ describe("the unfiltered state is everything-on", () => {
 });
 
 describe("choices, like every other list filter", () => {
-  it("cycles include -> exclude -> clear", () => {
-    expect(nextDataLayerChoice(undefined)).toBe("include");
-    expect(nextDataLayerChoice("include")).toBe("exclude");
-    expect(nextDataLayerChoice("exclude")).toBeUndefined();
+  it("toggles to the asked-for choice, or clears it when already there", () => {
+    expect(toggledDataLayerChoice(undefined, "include")).toBe("include");
+    expect(toggledDataLayerChoice("include", "exclude")).toBe("exclude");
+    expect(toggledDataLayerChoice("include", "include")).toBeUndefined();
+    expect(toggledDataLayerChoice("exclude", "exclude")).toBeUndefined();
   });
 
   it("draws only the included geometries once any is included", () => {
@@ -121,5 +123,27 @@ describe("mapping a dataset row onto a switch", () => {
     const selection = onlyDataLayer("grid");
     expect(datasetInDataLayers(grid, selection)).toBe(true);
     expect(datasetInDataLayers(profile, selection)).toBe(false);
+  });
+});
+
+describe("naming a cdm_data_type", () => {
+  const t = (key) => key;
+
+  it("uses the geometry switch's label for every harvested type", () => {
+    expect(cdmDataTypeLabel("Profile", t)).toBe("layerProfile");
+    expect(cdmDataTypeLabel("TimeSeries", t)).toBe("layerTimeseries");
+    expect(cdmDataTypeLabel("TimeSeriesProfile", t)).toBe(
+      "layerTimeseriesProfile",
+    );
+    expect(cdmDataTypeLabel("Trajectory", t)).toBe("layerTrajectories");
+    expect(cdmDataTypeLabel("TrajectoryProfile", t)).toBe(
+      "layerTrajectoryProfile",
+    );
+    expect(cdmDataTypeLabel("Grid", t)).toBe("layerGrid");
+  });
+
+  it("shows a type no switch names as it is", () => {
+    expect(cdmDataTypeLabel("Point", t)).toBe("Point");
+    expect(cdmDataTypeLabel(undefined, t)).toBeUndefined();
   });
 });

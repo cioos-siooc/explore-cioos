@@ -2,13 +2,13 @@ import * as React from "react";
 import { CheckSquare, CircleFill, Square } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import Tooltip from "../../../ui/Tooltip.jsx";
-import { capitalizeFirstLetter, nextOptionState } from "../../../../utilities";
-import platformColors from "../../../platformColors";
 import {
-  ExcludedLabel,
-  OptionStateIcon,
-  optionStateClass,
-} from "./OptionState.jsx";
+  capitalizeFirstLetter,
+  toggleOptionExcluded,
+  toggleOptionIncluded,
+} from "../../../../utilities";
+import platformColors from "../../../platformColors";
+import { FilterOption } from "./OptionState.jsx";
 import "./styles.css";
 
 export default function MultiCheckboxFilter({
@@ -38,11 +38,9 @@ export default function MultiCheckboxFilter({
   const universe = allOptions || optionsSelected;
   const isChecked = (option) => option.isSelected;
 
-  function toggleOption(option) {
+  function updateOption(option, toggle) {
     setOptionsSelected(
-      universe.map((opt) =>
-        opt.pk === option.pk ? nextOptionState(opt) : opt,
-      ),
+      universe.map((opt) => (opt.pk === option.pk ? toggle(opt) : opt)),
     );
   }
 
@@ -126,35 +124,21 @@ export default function MultiCheckboxFilter({
               delay={150}
               content={hoverText}
             >
-              <div
-                className={optionStateClass(option)}
-                key={index}
+              <FilterOption
+                label={capitalizeFirstLetter(title)}
+                isSelected={option.isSelected}
+                isExcluded={option.isExcluded}
+                onInclude={() => updateOption(option, toggleOptionIncluded)}
+                onExclude={() => updateOption(option, toggleOptionExcluded)}
                 title={hoverText ? "" : t(title)}
-                // A checkbox in everything but tag name: it was a bare div, so
-                // it announced no name, no role and no state, and could not be
-                // reached or toggled from the keyboard at all.
-                role="checkbox"
-                aria-checked={isChecked(option)}
-                tabIndex={0}
                 data-testid="filter-option"
                 data-option-pk={option.pk}
                 data-selected={isChecked(option)}
                 data-excluded={Boolean(option.isExcluded)}
-                onClick={() => toggleOption(option)}
-                onKeyDown={(event) => {
-                  if (event.key === " " || event.key === "Enter") {
-                    // Space would otherwise scroll the flyout out from under
-                    // the option being ticked.
-                    event.preventDefault();
-                    toggleOption(option);
-                  }
-                }}
               >
-                <OptionStateIcon {...option} />
                 <span className="optionName">
                   {capitalizeFirstLetter(title)}
                 </span>
-                <ExcludedLabel {...option} />
                 {colored && (
                   <CircleFill
                     className="optionColorCircle"
@@ -162,7 +146,7 @@ export default function MultiCheckboxFilter({
                     size="15"
                   />
                 )}
-              </div>
+              </FilterOption>
             </Tooltip>
           );
         })

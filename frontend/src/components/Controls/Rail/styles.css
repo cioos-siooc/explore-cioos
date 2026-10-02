@@ -116,6 +116,7 @@
 }
 
 .railTick {
+  font-variant-numeric: tabular-nums;
   position: absolute;
   top: 0;
   transform: translateX(-50%);
@@ -348,5 +349,5 @@
 
 .railReset:hover {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }

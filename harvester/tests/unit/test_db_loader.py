@@ -197,6 +197,10 @@ class TestDbLoaderMainFullReload:
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
         assert any("refresh_dataset_day_ranges" in s for s in sql_calls)
 
+    def test_refresh_hexes_zoom_0_rollup_called(self, harvest_folder, mock_engine, mocker):
+        sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
+        assert any("refresh_hexes_zoom_0_rollup" in s for s in sql_calls)
+
 
 # ---------------------------------------------------------------------------
 # main() — incremental mode
@@ -214,6 +218,10 @@ class TestDbLoaderMainIncremental:
     def test_refresh_dataset_day_ranges_called(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
         assert any("refresh_dataset_day_ranges" in s for s in sql_calls)
+
+    def test_refresh_hexes_zoom_0_rollup_called(self, harvest_folder, mock_engine, mocker):
+        sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
+        assert any("refresh_hexes_zoom_0_rollup" in s for s in sql_calls)
 
     def test_drop_constraints_not_called_in_incremental(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
