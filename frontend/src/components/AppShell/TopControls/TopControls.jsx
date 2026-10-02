@@ -2,10 +2,9 @@ import * as React from "react";
 import { useRef } from "react";
 import {
   BarChartLine,
-  ChevronDown,
-  ChevronUp,
   Filter,
   ListUl,
+  ThreeDots,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -144,9 +143,15 @@ export default function TopControls() {
               type="button"
               className="topBarFiltersOpen"
               data-testid="topbar-filters-button"
-              onClick={() => setShowFiltersModal(true)}
-              aria-pressed={showFiltersModal}
-              title={t("dockFiltersCountTitle", { count: activeFilterCount })}
+              onClick={() =>
+                setQuickFiltersCollapsed((collapsed) => !collapsed)
+              }
+              aria-expanded={!quickFiltersCollapsed}
+              title={
+                quickFiltersCollapsed
+                  ? t("quickFiltersShow")
+                  : t("quickFiltersHide")
+              }
             >
               <Filter size={18} aria-hidden="true" />
               <span className="topBarButtonLabel">
@@ -158,34 +163,16 @@ export default function TopControls() {
                 </span>
               )}
             </button>
-            {/* Show/Hide for the quick-filter row and the active-filter
-                chips beneath it (see QuickFilters, ActiveFilterChips) — one
-                toggle for both, riding on the button that already names
-                whether any filter is set. */}
             <button
               type="button"
               className="topBarFiltersToggle"
-              data-testid="quick-filters-toggle"
-              onClick={() =>
-                setQuickFiltersCollapsed((collapsed) => !collapsed)
-              }
-              aria-expanded={!quickFiltersCollapsed}
-              aria-label={
-                quickFiltersCollapsed
-                  ? t("quickFiltersShow")
-                  : t("quickFiltersHide")
-              }
-              title={
-                quickFiltersCollapsed
-                  ? t("quickFiltersShow")
-                  : t("quickFiltersHide")
-              }
+              data-testid="topbar-filters-more"
+              onClick={() => setShowFiltersModal(true)}
+              aria-pressed={showFiltersModal}
+              aria-label={t("quickFilterMoreTitle")}
+              title={t("dockFiltersCountTitle", { count: activeFilterCount })}
             >
-              {quickFiltersCollapsed ? (
-                <ChevronDown size={16} aria-hidden="true" />
-              ) : (
-                <ChevronUp size={16} aria-hidden="true" />
-              )}
+              <ThreeDots size={16} aria-hidden="true" />
             </button>
           </div>
         </div>

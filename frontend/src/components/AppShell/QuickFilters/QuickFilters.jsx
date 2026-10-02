@@ -7,6 +7,7 @@ import {
   Eye,
   Pentagon,
   Search,
+  ThreeDots,
   Trash,
   X,
 } from "react-bootstrap-icons";
@@ -20,6 +21,7 @@ import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 // The quick filters: the one-click ones that act on the map or are a single
@@ -61,13 +63,13 @@ export default function QuickFilters() {
   const activeFilterCount = useActiveFilters().length;
   const { resetFilters, realtimeOnly, setRealtimeOnly } = useFilters();
   const { offerTip, tipHighlight } = useTips();
+  const { setShowFiltersModal } = useUI();
   // Zoomed in to a local area, the whole-catalogue list stops matching the map.
   const zoomedIn = isMarkerTier(zoom) && !onlyInView;
   useEffect(() => {
     if (zoomedIn) offerTip("inView");
   }, [zoomedIn, offerTip]);
 
-  const labelId = useId();
   const searchInputId = useId();
   const inputRef = useRef(null);
   const searchButtonRef = useRef(null);
@@ -132,14 +134,9 @@ export default function QuickFilters() {
     <div
       className="quickFilters"
       role="group"
-      aria-labelledby={labelId}
+      aria-label={t("topBarQuickFiltersLabel")}
       data-testid="quick-filters"
     >
-      <span id={labelId} className="quickFiltersLabel">
-        <span className="quickFiltersLabelText">
-          {t("topBarQuickFiltersLabel")}
-        </span>
-      </span>
       {/* A form, so Enter searches natively and the magnifier is that same
           submit rather than a second code path. Collapsed, that magnifier is
           instead the button that opens the field. */}
@@ -336,6 +333,19 @@ export default function QuickFilters() {
         <BroadcastPin size={18} aria-hidden="true" />
         <span className="quickFilterCaption" aria-hidden="true">
           {t("quickFilterCaptionRealtime")}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="quickFilterButton"
+        data-testid="quick-filter-more"
+        onClick={() => setShowFiltersModal(true)}
+        title={t("quickFilterMoreTitle")}
+        aria-label={t("quickFilterMoreTitle")}
+      >
+        <ThreeDots size={18} aria-hidden="true" />
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCaptionMore")}
         </span>
       </button>
       {/* One reset for everything this row and the chips below can set —
