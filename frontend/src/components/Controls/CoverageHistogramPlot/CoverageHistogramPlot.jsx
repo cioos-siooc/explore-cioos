@@ -7,6 +7,7 @@ import createPlotlyComponent from "react-plotly.js/factory";
 import frLocale from "plotly.js-locales/fr";
 
 import erddapServers from "../../../erddapServers.json";
+import platformColors from "../../platformColors";
 import { escapeHtml, formatErddapServerName } from "../../../utilities";
 import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 
@@ -16,19 +17,22 @@ const Plot = createPlotlyComponent(Plotly);
 // At most this many series get their own color; the rest fold into "Other".
 const MAX_SERIES = 7;
 
-// Validated CVD-safe categorical palette (dataviz skill, light-surface slots
-// 1–7, in the order that maximises adjacent separation). "Other" uses a
-// neutral gray so it never impersonates a real series.
+// Coastal categorical palette, in slot order: deep teal, sky, sea-urchin rose,
+// kelp, deep-sea blue, driftwood, anemone. Stacking follows slot order, and the
+// order is what keeps neighbouring segments apart under colour blindness
+// (validated adjacent-pair, not all-pair — don't reshuffle it). It stays off the
+// hues the map reserves: track violet, grid amber, click goldenrod and error
+// coral. "Other" is a navy-tinted neutral so it never impersonates a series.
 const SERIES_COLORS = [
-  "#2a78d6", // blue
-  "#008300", // green
-  "#e87ba4", // magenta
-  "#eda100", // yellow
-  "#1baf7a", // aqua
-  "#eb6834", // orange
-  "#4a3aa7", // violet
+  "#008b7d",
+  "#53b6eb",
+  "#b83b76",
+  "#85b749",
+  "#2b519c",
+  "#be753f",
+  "#e398ca",
 ];
-const OTHER_COLOR = "#9a9a92";
+const OTHER_COLOR = "#a7b8bc";
 
 // Below the width at which the coverage dialog stops growing (1040px + its
 // 24px gutter), bars get too thin for their white outlines: Plotly strokes
@@ -133,9 +137,15 @@ export default function CoverageHistogramPlot({ histogram }) {
 
     // Stacking order = trace order; the largest series (first) sits at the
     // bottom of every bar.
-    const built = top.map((s, index) => ({
+    // A platform wears its map colour, so the figure and the markers agree;
+    // anything the platform key lacks takes the next palette slot.
+    const platformColor = (s) =>
+      s.kind === "platform" &&
+      platformColors.find(({ platform }) => platform === s.key)?.color;
+    let nextSlot = 0;
+    const built = top.map((s) => ({
       name: seriesLabel(s.key, s.kind, i18n.language),
-      color: SERIES_COLORS[index % SERIES_COLORS.length],
+      color: platformColor(s) || SERIES_COLORS[nextSlot++],
       y: counts.get(s.key),
     }));
     if (hasOther) {

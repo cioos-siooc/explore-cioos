@@ -2,8 +2,8 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowsExpand,
-  BroadcastPin,
   Building,
+  Cursor,
   CalendarWeek,
   FileEarmarkSpreadsheet,
   Server,
@@ -58,7 +58,7 @@ function filterNameForKey(key, t) {
 // from read as the same filter at a glance.
 const ICON_FOR_KEY = {
   eovs: Water,
-  platforms: BroadcastPin,
+  platforms: Cursor,
   orgs: Building,
   datasets: FileEarmarkSpreadsheet,
   sources: Server,

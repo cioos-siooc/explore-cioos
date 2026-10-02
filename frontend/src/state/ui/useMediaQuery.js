@@ -5,10 +5,11 @@ import { useCallback, useSyncExternalStore } from "react";
 // edge-to-edge, the datasets list and the modals take the whole screen, the
 // legend collapses to a button, and the time/depth bars give the map its edges
 // back (their filters stay reachable in the Filters modal). It is the 700px
-// rung documented in theme.css — THE mobile rung for the map's own chrome —
+// rung documented in theme.css, which a phone held landscape also takes by its
+// height — THE mobile rung for the map's own chrome —
 // spelled here as a query so the components that branch on it in JS and the
 // stylesheets that branch on it in CSS cannot drift apart.
-export const MOBILE_QUERY = "(max-width: 700px)";
+export const MOBILE_QUERY = "(max-width: 700px), (max-height: 500px)";
 
 // A screen driven by touch alone: no pointer to follow, and no keyboard to
 // press Esc or Enter on.

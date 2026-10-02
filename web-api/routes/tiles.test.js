@@ -56,6 +56,51 @@ test("GET /tiles/:z/:x/:y.mvt an OBIS-only selection drops the profiles/trajecto
   assert.doesNotMatch(sql, /FROM cde\.trajectory_hexes/);
 });
 
+const ROLLUP = /FROM cde\.hexes_zoom_0_rollup/;
+
+test("GET /tiles/:z/:x/:y.mvt reads the coarse rollup for a dataset-level selection", async () => {
+  db.queueRaw([{ st_asmvt: FAKE_TILE }]);
+  await agent.get("/tiles/2/1/1.mvt").query({
+    metric: "days",
+    erddapServers: "https://e",
+    includeObis: "false",
+  });
+  const sql = db.queries[0];
+  assert.match(sql, ROLLUP);
+  assert.doesNotMatch(sql, /FROM cde\.(profiles|trajectory_hexes|obis_cells)/);
+  assert.match(sql, /source = 'profiles'/);
+  assert.match(sql, /source = 'trajectory'/);
+  assert.doesNotMatch(sql, /source = 'obis'/);
+  assert.match(sql, /unnest\(day_ranges\) metric_days\(day\)/);
+});
+
+test("GET /tiles/:z/:x/:y.mvt carries the type toggles into the rollup", async () => {
+  db.queueRaw([{ st_asmvt: FAKE_TILE }]);
+  await agent
+    .get("/tiles/2/1/1.mvt")
+    .query({ profileTypes: "Profile", includeTrajectory: "false" });
+  const sql = db.queries[0];
+  assert.match(
+    sql,
+    /source = 'profiles' AND dataset_pk IN \(SELECT pk FROM cde\.datasets WHERE cdm_data_type IN \('Profile'\)\)/,
+  );
+  assert.doesNotMatch(sql, /source = 'trajectory'/);
+});
+
+test("GET /tiles/:z/:x/:y.mvt falls back to the feature tables off the coarse tier or for a feature-level filter", async () => {
+  for (const [path, query] of [
+    ["/tiles/2/1/1.mvt", { timeMin: "2020-01-01T00:00:00Z" }],
+    ["/tiles/2/1/1.mvt", { depthMax: "100" }],
+    ["/tiles/5/10/10.mvt", {}],
+  ]) {
+    db.reset();
+    db.queueRaw([{ st_asmvt: FAKE_TILE }]);
+    await agent.get(path).query(query);
+    assert.doesNotMatch(db.queries[0], ROLLUP, path);
+    assert.match(db.queries[0], /FROM cde\.profiles/, path);
+  }
+});
+
 test("GET /tiles/cells/:z/:x/:y.mvt returns a binary MVT tile", async () => {
   db.queueRaw([{ st_asmvt: FAKE_TILE }]);
 

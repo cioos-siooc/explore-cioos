@@ -9,7 +9,7 @@
   gap: 6px;
   padding: 8px 12px;
   font-family: var(--cioos-font-body, sans-serif);
-  font-size: var(--cioos-font-size-sm, 13px);
+  font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink, #152f37);
   background-color: var(--cioos-white, #fff);
   border: 1px solid var(--cioos-hairline, #dce8e5);
@@ -23,7 +23,7 @@
 
 .dropdown .btn-sm {
   padding: 6px 12px;
-  font-size: var(--cioos-font-size-xs, 11px);
+  font-size: var(--cioos-font-size-xs);
 }
 
 .dropdown .dropdown-toggle::after {
@@ -63,7 +63,7 @@
   border: 0;
   background: none;
   font-family: var(--cioos-font-body, sans-serif);
-  font-size: var(--cioos-font-size-sm, 13px);
+  font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink, #152f37);
   text-align: left;
   white-space: nowrap;
