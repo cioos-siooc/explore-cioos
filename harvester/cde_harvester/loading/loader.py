@@ -303,7 +303,7 @@ def prepare_trajectory_days_dataframe(trajectory_days):
     days["trajectory_id"] = days["trajectory_id"].fillna("").astype(str)
     # date, not timestamp: the day column is a DATE in the DB, and a stray
     # time-of-day would split one day into two rows.
-    days["day"] = pd.to_datetime(days["day"], errors="coerce", utc=True).dt.date
+    days["day"] = pd.to_datetime(days["day"], errors="coerce", utc=True, format="ISO8601").dt.date
 
     key_cols = ["erddap_url", "dataset_id", "trajectory_id", "day"]
     agg = (
@@ -333,7 +333,7 @@ def prepare_trajectory_points_dataframe(trajectory_points):
     """
     points = trajectory_points.copy()
     points["trajectory_id"] = points["trajectory_id"].fillna("").astype(str)
-    points["time"] = pd.to_datetime(points["time"], errors="coerce", utc=True)
+    points["time"] = pd.to_datetime(points["time"], errors="coerce", utc=True, format="ISO8601")
     points = points.dropna(subset=["time", "latitude", "longitude"])
     if "profile_id" in points.columns:
         points["profile_id"] = points["profile_id"].astype("string")
@@ -475,7 +475,7 @@ def main(folder, incremental=False):
     for col in ("coverage_time_min", "coverage_time_max"):
         if col not in datasets.columns:
             datasets[col] = pd.NaT
-        datasets[col] = pd.to_datetime(datasets[col], utc=True, errors="coerce")
+        datasets[col] = pd.to_datetime(datasets[col], utc=True, errors="coerce", format="ISO8601")
     for col in (
         "coverage_lat_min", "coverage_lat_max",
         "coverage_lon_min", "coverage_lon_max",

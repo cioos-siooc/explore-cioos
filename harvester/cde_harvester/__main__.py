@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -398,7 +398,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
     # handler below always has them even if source resolution raises.
     run_scope = "single" if source else "full"
     triggered_source = source or None
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     git_sha = _resolve_git_sha()
     run_status = "ok"
     run_error_message = None
@@ -512,7 +512,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             folder=folder,
             run_id=run_id,
             started_at=started_at,
-            finished_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(UTC),
             git_sha=git_sha,
             status=run_status,
             error_message=run_error_message,
@@ -539,7 +539,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
             folder=folder,
             run_id=run_id,
             started_at=started_at,
-            finished_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(UTC),
             git_sha=git_sha,
             status="failed",
             error_message="No datasets harvested from any source",
@@ -620,7 +620,7 @@ def main(erddap_urls, cache_requests, folder, dataset_ids,
         folder=folder,
         run_id=run_id,
         started_at=started_at,
-        finished_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(UTC),
         git_sha=git_sha,
         status=run_status,
         error_message=run_error_message,

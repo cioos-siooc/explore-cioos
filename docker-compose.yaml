@@ -74,7 +74,11 @@ services:
       - "POSTGRES_PASSWORD=${DB_PASSWORD:?required — run ./scripts/init-dev-env.sh, or set it in .env}"
       - "POSTGRES_USER=${DB_USER:-postgres}"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Postgres 18 images keep PGDATA in a versioned subdirectory
+      # (/var/lib/postgresql/18/docker) and refuse a mount at .../data. The
+      # volume is named for the major so a pre-18 volume is never opened by
+      # an 18 server; dump/restore or re-harvest into the new one.
+      - postgres18-data:/var/lib/postgresql
     healthcheck:
       # Probe over TCP (-h 127.0.0.1), NOT the default Unix socket. On a fresh
       # volume the entrypoint runs initdb + /docker-entrypoint-initdb.d/*.sql
@@ -100,7 +104,7 @@ services:
   # the volume and re-harvesting. 1_schema.sql is NEVER applied here (it DROPs
   # tables). Exits cleanly once done ("Exited (0)").
   db_migrate:
-    image: postgres:13-alpine
+    image: postgres:18-alpine
     depends_on:
       db:
         condition: service_healthy
@@ -339,7 +343,7 @@ services:
     # Non-conda image: ships asyncpg, so Prefect can use Postgres as its
     # metadata DB. SQLite (the default) throws "database is locked" under the
     # concurrent access from scaled / remote workers — Postgres handles it.
-    image: prefecthq/prefect:3.8-python3.12
+    image: prefecthq/prefect:3.8-python3.14
     # On startup, create the dedicated `prefect` database in the shared `db`
     # Postgres if it doesn't exist (idempotent; works on fresh AND existing
     # volumes, including Coolify where initdb scripts won't re-run), then start
@@ -425,8 +429,8 @@ services:
 
   redis:
     # Pinned. `redis:alpine` is a floating tag: the cache could cross a major
-    # version on any rebuild. 7.4 is the line these deployments have been on.
-    image: redis:7.4-alpine
+    # version on any rebuild.
+    image: redis:8.10-alpine
     expose:
       - "6379"
     healthcheck:
@@ -437,7 +441,7 @@ services:
 
 
 volumes:
-  postgres-data:
+  postgres18-data:
   prefect_data:
   nginx_logs:
   nginx_logrotate:

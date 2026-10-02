@@ -7,7 +7,7 @@ applicable — a schema change touches two places: this file and 1_schema.sql
 volume reset + re-harvest, there are no incremental table migrations).
 """
 
-import pandera as pa
+import pandera.pandas as pa
 from pandera.typing import Series
 from sqlalchemy.dialects.postgresql import ARRAY, DATERANGE, INTEGER, JSONB, TEXT
 

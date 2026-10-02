@@ -21,7 +21,7 @@ test.describe("filters", () => {
     const list = page.getByTestId("filters-panel-list");
     await expect(
       list.locator('[data-filter-name="layerSelectorLabel"] .badgeTitle'),
-    ).toHaveText("Géométrie des jeux de données");
+    ).toHaveText("Type d'observation");
     const clipped = await list
       .locator(".badgeTitle")
       .evaluateAll((els) =>
