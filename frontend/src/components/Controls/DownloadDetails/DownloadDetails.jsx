@@ -14,6 +14,7 @@ import {
   applyDatasetPKs,
   createDataFilterQueryString,
   formatSizeEstimate,
+  useChanged,
   sumSizeEstimates,
 } from "../../../utilities.jsx";
 import {
@@ -82,6 +83,14 @@ export default function DownloadDetails({
         return { ...ptr, downloadDisabled: false };
       }),
   );
+  // The × on a card takes the dataset out of the selection itself
+  // (SelectionProvider), not out of this copy of it. Pruned rather than
+  // re-seeded, so the rows left keep their estimates and batch ticks.
+  const reviewPks = pointsToReview.map((ptr) => ptr.pk).join(",");
+  if (useChanged(reviewPks)) {
+    const livePks = new Set(pointsToReview.map((ptr) => ptr.pk));
+    setPointsData(pointsData.filter((point) => livePks.has(point.pk)));
+  }
   const [dataTotal, setDataTotal] = useState(0);
   const [downloadSizeEstimates, setDownloadSizeEstimates] = useState();
   // Three states, not two: estimates in flight (spinner), estimates in

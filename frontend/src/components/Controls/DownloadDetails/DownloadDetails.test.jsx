@@ -33,31 +33,39 @@ const QUERY = {
   erddapServersSelected: [],
 };
 
-function renderDetails(props) {
-  return renderWithProviders(
+// Module-level so a rerender passes the same callbacks, as the app does:
+// setSubmissionState is a dependency of the estimate effect, and a fresh
+// function would refetch the estimates.
+const noop = () => {};
+
+function detailsElement(props) {
+  return (
     <DownloadDetails
       pointsToReview={[
         makePoint({ pk: EST_SMALL.pk, title: "Small dataset" }),
         makePoint({ pk: EST_LARGE.pk, title: "Large dataset" }),
       ]}
-      setPointsToDownload={() => {}}
-      setHoveredDataset={() => {}}
+      setPointsToDownload={noop}
+      setHoveredDataset={noop}
       polygon={undefined}
       query={QUERY}
       timeFilterActive={false}
       filterDownloadByTime={false}
-      setFilterDownloadByTime={() => {}}
+      setFilterDownloadByTime={noop}
       depthFilterActive={false}
       filterDownloadByDepth={false}
-      setFilterDownloadByDepth={() => {}}
+      setFilterDownloadByDepth={noop}
       polygonFilterActive={false}
       filterDownloadByPolygon={false}
-      setFilterDownloadByPolygon={() => {}}
-      setSubmissionState={() => {}}
+      setFilterDownloadByPolygon={noop}
+      setSubmissionState={noop}
       {...props}
-    />,
-    { providers: "app" },
+    />
   );
+}
+
+function renderDetails(props) {
+  return renderWithProviders(detailsElement(props), { providers: "app" });
 }
 
 describe("DownloadDetails", () => {
@@ -138,6 +146,45 @@ describe("DownloadDetails", () => {
     // Selecting all off then on again should not throw and the button stays
     // present — the toggle round-trips through DatasetsTable's own state.
     expect(selectAll).toBeInTheDocument();
+  });
+
+  it("follows the selection when a dataset is removed from it while open", async () => {
+    const small = makePoint({ pk: EST_SMALL.pk, title: "Small dataset" });
+    const large = makePoint({ pk: EST_LARGE.pk, title: "Large dataset" });
+    const setPointsToDownload = vi.fn();
+    const { rerender } = renderDetails({
+      pointsToReview: [small, large],
+      setPointsToDownload,
+    });
+    await waitFor(() =>
+      expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
+        "2 / 2",
+      ),
+    );
+    const estimateRequests = () =>
+      global.fetch.mock.calls.filter(([url]) =>
+        String(url).includes("/downloadEstimate"),
+      ).length;
+    const requestsBefore = estimateRequests();
+
+    rerender(detailsElement({ pointsToReview: [small], setPointsToDownload }));
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("dataset-card")).toHaveLength(1),
+    );
+    expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
+      "1 / 1",
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: "Remove from the download selection: Large dataset",
+      }),
+    ).not.toBeInTheDocument();
+    // What the submit sends.
+    expect(setPointsToDownload).toHaveBeenLastCalledWith([
+      expect.objectContaining({ pk: EST_SMALL.pk }),
+    ]);
+    expect(estimateRequests()).toBe(requestsBefore);
   });
 
   it("reports the error and stops the spinner when /downloadEstimate fails", async () => {
