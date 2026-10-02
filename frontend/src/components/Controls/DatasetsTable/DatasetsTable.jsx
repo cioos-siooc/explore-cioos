@@ -19,6 +19,7 @@ import classNames from "classnames";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
+import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
   GROUP_NONE,
   HIDEABLE_DIMENSIONS,
@@ -157,7 +158,9 @@ export default function DatasetsTable({
           return (row.title || "").toLowerCase();
         case "type":
           return (
-            isGrid ? t("griddapTypeLabel") : row.cdm_data_type || ""
+            isGrid
+              ? t("griddapTypeLabel")
+              : cdmDataTypeLabel(row.cdm_data_type, t) || ""
           ).toLowerCase();
         case "platform":
           return (

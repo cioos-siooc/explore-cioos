@@ -1,7 +1,7 @@
 import * as React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
 
+import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import platformColors from "../../platformColors";
 import CoverageHistogramPlot from "./CoverageHistogramPlot.jsx";
 
@@ -18,9 +18,9 @@ vi.mock("plotly.js-basic-dist-min", () => ({ default: { register: vi.fn() } }));
 const colorOf = (platform) =>
   platformColors.find((pc) => pc.platform === platform).color;
 
-function traceColors(series) {
+function traces(series) {
   plotProps.mockClear();
-  render(
+  renderWithProviders(
     <CoverageHistogramPlot
       histogram={{
         count: "datasets",
@@ -30,10 +30,21 @@ function traceColors(series) {
       }}
     />,
   );
-  return plotProps.mock.lastCall[0].data.map((trace) => trace.marker.color);
+  return plotProps.mock.lastCall[0].data;
 }
 
+const traceColors = (series) =>
+  traces(series).map((trace) => trace.marker.color);
+
 describe("CoverageHistogramPlot", () => {
+  it("names data-type series the way the geometry filter does", () => {
+    const names = traces([
+      { key: "TimeSeries", kind: "dataType" },
+      { key: "Grid", kind: "dataType" },
+    ]).map((trace) => trace.name);
+    expect(names).toEqual(["Time series", "Gridded data"]);
+  });
+
   it("paints each platform in its map colour whatever its rank", () => {
     const colors = traceColors([
       { key: "surface vessel", kind: "platform" },

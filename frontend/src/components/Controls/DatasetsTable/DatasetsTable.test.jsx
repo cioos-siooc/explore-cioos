@@ -7,6 +7,7 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import translationFR from "../../../locales/fr/translation.json";
 
 function makeRow(overrides) {
   return {
@@ -84,6 +85,40 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       cards.map((c) => c.querySelector(".datasetCardTitle").textContent),
     ).toEqual(["Long", "Grid", "Short"]);
     expect(cards[0]).toHaveTextContent("3,650");
+  });
+
+  it("labels and sorts types in the reader's language", async () => {
+    const { i18n, user } = renderWithProviders(
+      <DatasetsTable
+        datasets={[
+          makeRow({ pk: 1, title: "A", cdm_data_type: "Profile" }),
+          makeRow({ pk: 2, title: "B", cdm_data_type: "TimeSeries" }),
+          makeRow({ pk: 3, title: "C", cdm_data_type: "TrajectoryProfile" }),
+        ]}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    // The test i18n instance only carries the English bundle.
+    await act(async () => {
+      i18n.addResourceBundle("fr", "translation", translationFR);
+      await i18n.changeLanguage("fr");
+    });
+    expect(screen.getAllByTitle("Type").map((el) => el.textContent)).toEqual([
+      "Profil",
+      "Série temporelle",
+      "Profil de trajectoire",
+    ]);
+
+    await user.selectOptions(await screen.findByLabelText("Tri"), "Type");
+    expect(
+      screen
+        .getAllByTestId("dataset-card")
+        .map((c) => c.querySelector(".datasetCardTitle").textContent),
+    ).toEqual(["A", "C", "B"]);
   });
 
   // The box narrows only the list (SelectionProvider's listedDatasets, which
