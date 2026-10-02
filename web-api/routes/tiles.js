@@ -24,6 +24,7 @@ const {
   erddapVisible,
   obisVisible,
   DRAWN_AS_POINT,
+  coarseRollupBranch,
   unionBranches,
 } = require("../utils/selection");
 
@@ -73,6 +74,16 @@ function tileCellPrefilter(z) {
 // check here is belt-and-braces rather than a live case.
 function trajectoryTypePredicate(types) {
   if (!types.length || types.length === ALL_TRAJECTORY_TYPES.length) return "";
+  return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
+    .map((t) => `'${t}'`)
+    .join(",")}))`;
+}
+
+// The profile-type counterpart of trajectoryTypePredicate: '' when every
+// profile type is requested (values allowlisted in utils/dataTypes.js, so
+// safe to inline).
+function profileTypePredicate(types) {
+  if (!types.length || types.length === ALL_PROFILE_TYPES.length) return "";
   return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
     .map((t) => `'${t}'`)
     .join(",")}))`;
@@ -135,12 +146,10 @@ function mainBranchesSQL(query, { metric, hexTier, isHexGrid, prefilterFor }) {
   // branch to datasets of those cdm_data_types (values allowlisted in
   // utils/dataTypes.js → safe to inline). All-three or none → no type filter
   // (none never reaches the branch).
-  const profilesTypeFilter =
-    profileTypes.length && profileTypes.length < ALL_PROFILE_TYPES.length
-      ? ` AND dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${profileTypes
-          .map((t) => `'${t}'`)
-          .join(",")}))`
-      : "";
+  const profilesTypePredicate = profileTypePredicate(profileTypes);
+  const profilesTypeFilter = profilesTypePredicate
+    ? ` AND ${profilesTypePredicate}`
+    : "";
   const profilesPrefilter = prefilterFor("profiles");
   const profilesBranch = `SELECT point_pk, dataset_pk, :zoomPKColumn: as zoom_pk, geom as point_geom, ${metricValueExpr("profiles", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
@@ -181,6 +190,35 @@ function mainBranchesSQL(query, { metric, hexTier, isHexGrid, prefilterFor }) {
   if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
   if (includeObis && isHexGrid) branches.push(obisBranch);
   return unionBranches(branches, profilesBranch);
+}
+
+// mainBranchesSQL at the coarse hex tier, read from the rollup — the same
+// sources under the same toggles, for a dataset-level-only selection.
+function coarseRollupBranchesSQL(query, { metric }) {
+  const {
+    profileTypes,
+    trajectoryTypes,
+    includeObis,
+    includeProfiles,
+    includeTrajectory,
+  } = requestedSources(query);
+  const conds = [];
+  if (includeProfiles) {
+    conds.push(
+      ["source = 'profiles'", profileTypePredicate(profileTypes)]
+        .filter(Boolean)
+        .join(" AND "),
+    );
+  }
+  if (includeTrajectory) {
+    conds.push(
+      ["source = 'trajectory'", trajectoryTypePredicate(trajectoryTypes)]
+        .filter(Boolean)
+        .join(" AND "),
+    );
+  }
+  if (includeObis) conds.push("source = 'obis'");
+  return coarseRollupBranch(metric, conds, "zoom_pk");
 }
 
 // The `combined` CTE behind /tiles/cells and /tiles/datasets?source=cells:
@@ -293,12 +331,15 @@ router.get(
     // same metric must reach /legend, or the ramp domain won't match the tiles.
     const metric = parseMetric(req.query.metric);
 
-    const combinedInner = mainBranchesSQL(req.query, {
-      metric,
-      hexTier,
-      isHexGrid,
-      prefilterFor: () => cellPrefilter,
-    });
+    const combinedInner =
+      hexTier === 0 && filters.datasetLevelOnly
+        ? coarseRollupBranchesSQL(req.query, { metric })
+        : mainBranchesSQL(req.query, {
+            metric,
+            hexTier,
+            isHexGrid,
+            prefilterFor: () => cellPrefilter,
+          });
 
     // `count` is the same quantity at both tiers — the aggregated metric. It
     // used to be count(distinct point_pk) at hex zoom and a sum at point zoom,

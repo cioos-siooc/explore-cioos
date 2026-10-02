@@ -498,40 +498,39 @@ h6 {
 }
 
 :is(
-    .closeButton,
-    .datasetCardSelect,
-    .pagerStep,
-    .pagerPage,
-    .brandMinorItem,
-    .legendInfoButton,
-    .legendCreditsButton,
-    .sidebarFooterHintMore,
-    .railStep,
-    .sortSelectDirection,
-    .topBarCountsInView
-  ) {
+  .closeButton,
+  .datasetCardSelect,
+  .pagerStep,
+  .pagerPage,
+  .brandMinorItem,
+  .legendInfoButton,
+  .legendCreditsButton,
+  .sidebarFooterHintMore,
+  .railStep,
+  .sortSelectDirection,
+  .topBarCountsInView
+) {
   position: relative;
 }
 
 /* Rail handles are already absolutely positioned; switches draw their thumb
    with ::before, so theirs goes on ::after. */
 :is(
-    .closeButton,
-    .datasetCardSelect,
-    .pagerStep,
-    .pagerPage,
-    .brandMinorItem,
-    .legendInfoButton,
-    .legendCreditsButton,
-    .sidebarFooterHintMore,
-    .railStep,
-    .sortSelectDirection,
-    .topBarCountsInView,
-    .railHandle
-  )::before,
+  .closeButton,
+  .datasetCardSelect,
+  .pagerStep,
+  .pagerPage,
+  .brandMinorItem,
+  .legendInfoButton,
+  .legendCreditsButton,
+  .sidebarFooterHintMore,
+  .railStep,
+  .sortSelectDirection,
+  .topBarCountsInView,
+  .railHandle
+)::before,
 .form-switch .form-check-input::after {
   content: "";
   position: absolute;
   inset: min(0px, calc(50% - var(--cioos-hit-half)));
 }
-
