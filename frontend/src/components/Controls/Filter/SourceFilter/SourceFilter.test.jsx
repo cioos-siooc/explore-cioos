@@ -44,7 +44,7 @@ describe("SourceFilter", () => {
     expect(names).toContain("OBIS");
   });
 
-  it("clicking a server advances only its own include/exclude state", async () => {
+  it("clicking a server toggles only its own inclusion, and its button only its exclusion", async () => {
     const setErddapServersSelected = vi.fn();
     const { user } = renderWithProviders(
       <SourceFilter
@@ -54,8 +54,15 @@ describe("SourceFilter", () => {
         setObisNodesSelected={() => {}}
       />,
     );
-    // Alpha starts included, so the next click in the cycle excludes it.
+    // Alpha starts included, so clicking it unticks it.
     await user.click(screen.getByText("Alpha ERDDAP"));
+    expect(setErddapServersSelected).toHaveBeenLastCalledWith([
+      { pk: 1, title: "Zeta ERDDAP", isSelected: false },
+      { pk: 2, title: "Alpha ERDDAP", isSelected: false, isExcluded: false },
+    ]);
+    await user.click(
+      screen.getByRole("button", { name: "Exclude: Alpha ERDDAP" }),
+    );
     expect(setErddapServersSelected).toHaveBeenLastCalledWith([
       { pk: 1, title: "Zeta ERDDAP", isSelected: false },
       { pk: 2, title: "Alpha ERDDAP", isSelected: false, isExcluded: true },
@@ -93,14 +100,14 @@ describe("SourceFilter", () => {
         setObisNodesSelected={setObisNodesSelected}
       />,
     );
-    await user.click(document.querySelector(".obisGroupButton"));
+    await user.click(document.querySelector(".obisGroupButton .optionToggle"));
     expect(setObisNodesSelected).toHaveBeenCalledWith([
       { pk: 10, title: "OBIS Canada", isSelected: true, isExcluded: false },
       { pk: 11, title: "OBIS US", isSelected: true, isExcluded: false },
     ]);
   });
 
-  it("the OBIS group cycles every node through include, exclude and clear", async () => {
+  it("the OBIS group includes or excludes every node at once", async () => {
     function Harness() {
       const [nodes, setNodes] = React.useState([
         { pk: 10, title: "OBIS Canada", isSelected: true },
@@ -120,13 +127,15 @@ describe("SourceFilter", () => {
     const state = () =>
       ["selected", "excluded"].filter((c) => group().classList.contains(c));
 
-    // A mixed group starts the cycle from the top.
+    const exclude = () => screen.getByRole("button", { name: "Exclude: OBIS" });
+
+    // A mixed group goes to all-included first.
     expect(state()).toEqual([]);
-    await user.click(group());
+    await user.click(group().querySelector(".optionToggle"));
     expect(state()).toEqual(["selected"]);
-    await user.click(group());
+    await user.click(exclude());
     expect(state()).toEqual(["excluded"]);
-    await user.click(group());
+    await user.click(exclude());
     expect(state()).toEqual([]);
   });
 

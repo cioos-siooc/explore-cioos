@@ -28,7 +28,7 @@
    beside it stays the thing being read. */
 .selectPillLabel {
   flex: 0 0 auto;
-  font-family: var(--cioos-font-display);
+  font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-2xs);
   font-weight: 700;
   text-transform: uppercase;

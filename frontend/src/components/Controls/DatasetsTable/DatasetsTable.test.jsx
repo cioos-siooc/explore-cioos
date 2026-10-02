@@ -149,7 +149,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     const betaCard = cards.find((c) => c.textContent.includes("Beta station"));
     await user.click(
       screen
-        .getAllByRole("checkbox", { name: "Add to selection" })
+        .getAllByRole("checkbox", { name: /^Add to selection/ })
         .find((b) => betaCard.contains(b)),
     );
     expect(handleSelectDataset).toHaveBeenCalledWith(
@@ -186,7 +186,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       { providers: "app" },
     );
     await screen.findAllByTestId("dataset-card");
-    await user.selectOptions(screen.getByLabelText("Group"), "platform");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
     await waitFor(() => {
       expect(
         document.querySelector(".datasetsCardGroupHeader"),

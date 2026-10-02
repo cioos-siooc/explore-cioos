@@ -1,37 +1,29 @@
 {
   "default view": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 21,
-    "nested-interactive": 25
+    "color-contrast": 9
   },
   "datasets list open": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 21,
-    "nested-interactive": 25
+    "color-contrast": 9
   },
   "filters modal": {
-    "aria-valid-attr-value": 1,
-    "nested-interactive": 25
+    "aria-valid-attr-value": 1
   },
   "filter options open": {
-    "aria-valid-attr-value": 1,
-    "nested-interactive": 25
+    "aria-valid-attr-value": 1
   },
   "active filter chips": {
     "aria-valid-attr-value": 1,
-    "color-contrast": 21,
-    "nested-interactive": 25
+    "color-contrast": 9
   },
   "intro modal": {
-    "aria-valid-attr-value": 1,
-    "nested-interactive": 25
+    "aria-valid-attr-value": 1
   },
   "privacy notice": {
-    "aria-valid-attr-value": 1,
-    "nested-interactive": 25
+    "aria-valid-attr-value": 1
   },
   "mobile datasets sheet": {
-    "color-contrast": 14,
-    "nested-interactive": 25
+    "color-contrast": 7
   }
 }

@@ -8,6 +8,10 @@
 
 **Never build from scratch what a dependency already does** — reach for what is installed (`@turf/*`, `lodash-es`, `d3-scale`, `maplibre-gl`, `@mapbox/mapbox-gl-draw`, `react-data-table-component`, `react-plotly.js`, `react-bootstrap-icons`, `react-i18next`, `react-router-dom`), or a well-scoped new dependency, before writing custom code.
 
+## Design work
+
+UI design, critique and polish go through the `impeccable` skill. It isn't vendored here; install it user-level (`~/.claude/skills/impeccable`). Its committed context is `DESIGN.md`, `PRODUCT.md` and `.impeccable/design.json` at the repo root — keep them in sync with `src/components/theme.css`; per-machine state under `.impeccable/` stays untracked.
+
 ## Frontend-only dev
 
 Another instance/machine already has the backend stack running — don't spin up a second one, point at theirs:

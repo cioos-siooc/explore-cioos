@@ -9,9 +9,12 @@ import {
   createSelectionQueryString,
   escapeHtml,
   formatDatasetCount,
+  formatSizeEstimate,
   getCurrentRangeLevel,
-  nextOptionState,
+  toggleOptionExcluded,
+  toggleOptionIncluded,
   polygonIsRectangle,
+  sumSizeEstimates,
   polygonToWkt,
   quantizeCountRange,
   rangesEqual,
@@ -263,18 +266,25 @@ describe("createDataFilterQueryString", () => {
   });
 });
 
-describe("nextOptionState", () => {
-  it("cycles neutral -> include -> exclude -> neutral", () => {
-    const neutral = { pk: 1, isSelected: false };
-    const included = nextOptionState(neutral);
+describe("toggleOptionIncluded / toggleOptionExcluded", () => {
+  const neutral = { pk: 1, isSelected: false, isExcluded: false };
+
+  it("each toggles its own state on and off", () => {
+    const included = toggleOptionIncluded(neutral);
     expect(included).toMatchObject({ isSelected: true, isExcluded: false });
-    const excludedOption = nextOptionState(included);
-    expect(excludedOption).toMatchObject({
+    expect(toggleOptionIncluded(included)).toMatchObject(neutral);
+    const excluded = toggleOptionExcluded(neutral);
+    expect(excluded).toMatchObject({ isSelected: false, isExcluded: true });
+    expect(toggleOptionExcluded(excluded)).toMatchObject(neutral);
+  });
+
+  it("switching to one clears the other", () => {
+    expect(toggleOptionExcluded(toggleOptionIncluded(neutral))).toMatchObject({
       isSelected: false,
       isExcluded: true,
     });
-    expect(nextOptionState(excludedOption)).toMatchObject({
-      isSelected: false,
+    expect(toggleOptionIncluded(toggleOptionExcluded(neutral))).toMatchObject({
+      isSelected: true,
       isExcluded: false,
     });
   });
@@ -426,6 +436,7 @@ describe("string and count helpers", () => {
     expect(formatDatasetCount(3, 12)).toBe("3 / 12");
     // Before the total is known there is only one number to show.
     expect(formatDatasetCount(3, undefined)).toBe("3");
+    expect(formatDatasetCount(1234, 5678, "en")).toBe("1,234 / 5,678");
   });
 });
 
@@ -611,5 +622,34 @@ describe("createDataFilterQueryString — realtime", () => {
         createDataFilterQueryString({ ...base, realtimeOnly }),
       ).not.toMatch(/realtimeOnly/);
     }
+  });
+});
+
+describe("formatSizeEstimate", () => {
+  it("marks an estimate with a tilde", () => {
+    expect(formatSizeEstimate(1024)).toBe("~1KB");
+    expect(formatSizeEstimate(0)).toBe("~0B");
+  });
+
+  it("shows a missing estimate as a dash, not zero bytes", () => {
+    expect(formatSizeEstimate(null)).toBe("—");
+    expect(formatSizeEstimate(undefined)).toBe("—");
+  });
+});
+
+describe("sumSizeEstimates", () => {
+  it("sums known sizes", () => {
+    expect(sumSizeEstimates([1, 2])).toEqual({ size: 3, partial: false });
+  });
+
+  it("leaves out missing sizes and flags the total as partial", () => {
+    expect(sumSizeEstimates([5, null])).toEqual({ size: 5, partial: true });
+  });
+
+  it("has no total when no size is known", () => {
+    expect(sumSizeEstimates([null, null])).toEqual({
+      size: null,
+      partial: false,
+    });
   });
 });

@@ -19,13 +19,19 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
 // The click cycle of a list filter option: neutral -> include ->
 // exclude -> neutral. The two flags are mutually exclusive, and `isSelected`
 // keeps meaning "included" everywhere it was already read.
-export function nextOptionState(option) {
-  if (option.isSelected)
-    return { ...option, isSelected: false, isExcluded: true };
-  if (option.isExcluded)
-    return { ...option, isSelected: false, isExcluded: false };
-  return { ...option, isSelected: true, isExcluded: false };
-}
+// A list filter's option is included by clicking it and excluded by its own
+// button (see FilterOption); each click toggles one state and clears the other.
+export const toggleOptionIncluded = (option) => ({
+  ...option,
+  isSelected: !option.isSelected,
+  isExcluded: false,
+});
+
+export const toggleOptionExcluded = (option) => ({
+  ...option,
+  isSelected: false,
+  isExcluded: !option.isExcluded,
+});
 
 /*
  * A download size as the modal shows it. Every byte figure there comes from
@@ -34,11 +40,21 @@ export function nextOptionState(option) {
  * rather than being stated once in a legend: the figures are read one card at
  * a time, and a bare "1.2GB" beside a dataset reads as a fact about that file.
  *
- * `bytes()` returns null for a null or NaN input, which is how a dataset the
- * estimate response did not cover arrives here.
+ * A null size is one the estimate could not give (OBIS datasets, or a dataset
+ * the response did not cover): it reads as a dash, never as zero bytes.
  */
 export function formatSizeEstimate(size) {
-  return `~${bytes(size) || "0B"}`;
+  return Number.isFinite(size) ? `~${bytes(size)}` : "—";
+}
+
+// Sums sizes, leaving out the ones with no estimate and flagging that it did,
+// so a total never passes an undercount off as the whole selection.
+export function sumSizeEstimates(sizes) {
+  const known = sizes.filter(Number.isFinite);
+  return {
+    size: known.length ? known.reduce((total, size) => total + size, 0) : null,
+    partial: known.length > 0 && known.length < sizes.length,
+  };
 }
 
 export function capitalizeFirstLetter(string) {
@@ -375,9 +391,10 @@ export function generateColorStops(colorScale, range) {
 // The dataset count shown on the Datasets entry points: "filtered / total"
 // while a filter narrows the catalog, and just the total once nothing is
 // filtered out (or before the total is known).
-export function formatDatasetCount(filtered, total) {
-  if (!total || filtered === total) return String(total || filtered);
-  return `${filtered} / ${total}`;
+export function formatDatasetCount(filtered, total, locale) {
+  const format = (n) => n.toLocaleString(locale);
+  if (!total || filtered === total) return format(total || filtered);
+  return `${format(filtered)} / ${format(total)}`;
 }
 
 // The instants either list carries, formatted as the UTC they are: the record

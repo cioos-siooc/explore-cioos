@@ -54,7 +54,7 @@
 
 .griddapDimensionName,
 .griddapVariableLabel {
-  font-size: 0.85em;
+  font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   color: var(--cioos-ink);
   overflow-wrap: anywhere;
@@ -62,7 +62,7 @@
 
 .griddapDimensionNodes {
   flex-shrink: 0;
-  font-size: 0.72em;
+  font-size: var(--cioos-font-size-2xs);
   color: var(--cioos-ink-60);
   white-space: nowrap;
 }
@@ -73,7 +73,7 @@
   align-items: baseline;
   gap: 5px;
   margin-top: 2px;
-  font-size: 0.78em;
+  font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink);
 }
 
@@ -89,14 +89,14 @@
 }
 
 .griddapVariableUnits {
-  font-size: 0.75em;
+  font-size: var(--cioos-font-size-xs);
   white-space: nowrap;
 }
 
 .griddapDimensionSpacing,
 .griddapVariableName {
   margin-top: 2px;
-  font-size: 0.72em;
+  font-size: var(--cioos-font-size-2xs);
   color: var(--cioos-ink-60);
   overflow-wrap: anywhere;
 }
@@ -118,7 +118,7 @@
 }
 
 .griddapTimeShown {
-  font-size: 0.85em;
+  font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
 }
 
@@ -131,7 +131,7 @@
 
 .griddapLegendUnavailable,
 .griddapNoWms {
-  font-size: 0.9em;
+  font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
   font-style: italic;
 }

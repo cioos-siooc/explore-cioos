@@ -111,6 +111,10 @@ function open(props = {}) {
 }
 
 const button = (name) => screen.getByRole("button", { name });
+async function saveAs(user, name) {
+  await user.click(button(/save as/i));
+  await user.click(button(name));
+}
 const savedText = () => saved.at(-1).text();
 
 describe("DirectDownloadLinks", () => {
@@ -133,7 +137,7 @@ describe("DirectDownloadLinks", () => {
 
   it("writes a curl script carrying the map's filters", async () => {
     const { user } = open();
-    await user.click(button(/curl script/i));
+    await saveAs(user, /curl script/i);
 
     const script = await savedText();
     expect(script.split("\n")[0]).toBe("#!/usr/bin/env bash");
@@ -152,7 +156,7 @@ describe("DirectDownloadLinks", () => {
       screen.getByTestId("direct-links-erddap-format").querySelector("select"),
       "parquet",
     );
-    await user.click(button(/curl script/i));
+    await saveAs(user, /curl script/i);
 
     const script = await savedText();
     expect(script).toContain("/tabledap/ios_ctd_profiles.parquet?");
@@ -163,7 +167,7 @@ describe("DirectDownloadLinks", () => {
 
   it("fetches the catalogue record beside the data", async () => {
     const { user } = open();
-    await user.click(button(/curl script/i));
+    await saveAs(user, /curl script/i);
 
     const script = await savedText();
     expect(script).toContain(
@@ -174,7 +178,7 @@ describe("DirectDownloadLinks", () => {
 
   it("has nothing extra to fetch for a dataset with no catalogue record", async () => {
     const { user } = open({ rows: [obisRow] });
-    await user.click(button(/curl script/i));
+    await saveAs(user, /curl script/i);
     expect(await savedText()).not.toContain("package_show");
   });
 
@@ -222,7 +226,7 @@ describe("DirectDownloadLinks", () => {
     expect(screen.getByTestId("direct-links")).toHaveTextContent(
       "No datasets selected",
     );
-    expect(button(/curl script/i)).toBeDisabled();
+    expect(button(/save as/i)).toBeDisabled();
     expect(button(/copy urls/i)).toBeDisabled();
   });
 });

@@ -153,17 +153,19 @@
    needed. */
 .brandMinorItem.active {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .brandMinorItem.active:hover {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
+/* Text, not an icon: ink-60 is 4.2:1 at this size. */
 .brandLanguage {
   font-size: var(--cioos-font-size-sm);
   font-weight: 700;
+  color: var(--cioos-ink-80);
 }
 
 /* ------------------------------------------------------------------
@@ -173,7 +175,7 @@
  * room to justify — the only edge left to draw is the one along the
  * bottom, where the map starts.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .brandCard {
     width: 100%;
     border-width: 0 0 1px;
@@ -233,7 +235,11 @@
   }
 
   .brandTitle[lang="fr"] span {
-    font-size: min(var(--cioos-font-size-2xs), 2.6vw);
+    font-size: clamp(
+      var(--cioos-font-size-3xs),
+      2.6vw,
+      var(--cioos-font-size-2xs)
+    );
   }
 
   /* Scaled with the viewport rather than held at the rung's mobile size, the
