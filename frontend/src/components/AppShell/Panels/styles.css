@@ -196,12 +196,16 @@
   padding: 5px 12px;
 }
 
+/* Wraps rather than nowrap: the column is a fixed 280px and the longer French
+   names ran past it. The 28px floor keeps one-line rows as tall as before. */
 .filtersPanelList .filterHeader .badgeTitle {
   flex: 1;
+  min-width: 0;
+  height: auto;
+  min-height: 28px;
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .filtersPanelList .filterHeader:hover {
