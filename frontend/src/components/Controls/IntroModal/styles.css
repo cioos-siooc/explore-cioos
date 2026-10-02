@@ -1,6 +1,6 @@
 /* Modal chrome. The header is the brand lockup the app's own header wears
-   (the drawn mark and name), a divider, and the dialog's title stacked under a
-   small "About" eyebrow. */
+   (the drawn mark and name), a divider, and the dialog's title over the
+   tagline. */
 .introModal .modal-content {
   border: none;
   overflow: hidden;
@@ -33,15 +33,6 @@
   flex-direction: column;
   min-width: 0;
   line-height: 1.2;
-}
-
-.introEyebrow {
-  font-family: var(--cioos-font-body);
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--cioos-primary-700);
 }
 
 .introTitleName {
@@ -390,6 +381,7 @@
 
 .introFooterAction {
   display: inline-flex;
+  align-self: flex-end;
   margin-top: auto;
   align-items: center;
   gap: 6px;
