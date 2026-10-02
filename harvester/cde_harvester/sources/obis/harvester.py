@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 import requests
@@ -186,7 +186,7 @@ class OBISHarvester(BaseHarvester):
                 "reason_code": reason_code,
                 "error_message": error_message,
                 "duration_ms": duration_ms,
-                "attempted_at": datetime.now(timezone.utc),
+                "attempted_at": datetime.now(UTC),
                 "query_urls": "\n".join(query_urls),
             })
 
@@ -493,7 +493,7 @@ class OBISHarvester(BaseHarvester):
         # there the values are all None anyway.
         day_source = df["date_start"]
         if not pd.api.types.is_datetime64_any_dtype(day_source):
-            day_source = pd.to_datetime(day_source, errors="coerce", utc=True)
+            day_source = pd.to_datetime(day_source, errors="coerce", utc=True, format="ISO8601")
         df["day"] = day_source.dt.floor("D")
 
         # Snap coordinates to a ~5 nautical mile grid (1/12 degree)
@@ -534,8 +534,8 @@ class OBISHarvester(BaseHarvester):
         # Normalize here, not in _finalize_cells: duckdb's pandas dtype for a
         # chunk depends on whether that chunk happened to contain a NULL
         # (int64 vs Int64), so partials must be made uniform before they meet.
-        cells["time_min"] = pd.to_datetime(cells["time_min"], errors="coerce", utc=True)
-        cells["time_max"] = pd.to_datetime(cells["time_max"], errors="coerce", utc=True)
+        cells["time_min"] = pd.to_datetime(cells["time_min"], errors="coerce", utc=True, format="ISO8601")
+        cells["time_max"] = pd.to_datetime(cells["time_max"], errors="coerce", utc=True, format="ISO8601")
 
         return cells
 

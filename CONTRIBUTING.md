@@ -11,16 +11,16 @@ file covers what a change has to satisfy before it merges. For what the system
 | -------------------- | ------------------------------------------- | --------------- |
 | `frontend/`          | Vite + React SPA                            | JS (ESM)        |
 | `web-api/`           | Express JSON + vector-tile API              | JS (CommonJS)   |
-| `harvester/`         | ERDDAP/OBIS/CKAN harvest, Prefect flows     | Python 3.10     |
-| `downloader/`        | Builds a user's download from ERDDAP/OBIS   | Python 3.10     |
-| `download_scheduler/`| Drains the download queue, emails the user  | Python 3.10     |
+| `harvester/`         | ERDDAP/OBIS/CKAN harvest, Prefect flows     | Python 3.13     |
+| `downloader/`        | Builds a user's download from ERDDAP/OBIS   | Python 3.13     |
+| `download_scheduler/`| Drains the download queue, emails the user  | Python 3.13     |
 | `database/`          | Numbered SQL: schema + functions            | SQL             |
 | `nginx/`, `test/`    | Edge proxy; integration smoke tests         | conf, JS        |
 
 ## Setup
 
-Python uses [uv](https://docs.astral.sh/uv/); the repo pins 3.10
-(`.python-version`) and every project bounds itself to `>=3.10,<3.11`.
+Python uses [uv](https://docs.astral.sh/uv/); the repo pins 3.13
+(`.python-version`) and every project bounds itself to `>=3.13,<3.14`.
 
 ```sh
 uv sync                      # root workspace (harvester + download_scheduler)

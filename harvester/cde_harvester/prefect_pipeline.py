@@ -6,7 +6,7 @@ import shutil
 import sys
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -111,7 +111,7 @@ PRUNE_GRACE_SECONDS = 6 * 3600
 def _timestamp():
     # UTC: these name the per-run output folders, which are compared and
     # pruned by timestamp order (see PRUNE_GRACE_SECONDS).
-    return datetime.now(timezone.utc).strftime(TIMESTAMP_FMT)
+    return datetime.now(UTC).strftime(TIMESTAMP_FMT)
 
 
 def _server_run_folder(base_folder, slug, timestamp):

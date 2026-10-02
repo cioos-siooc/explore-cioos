@@ -6,7 +6,7 @@ reshaping is delegated to the handler's ``adjust_feature_identity`` hook —
 this module contains no cdm_data_type branches.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 import requests
@@ -348,7 +348,7 @@ def extract_features(dataset, handler):
 
             # For ongoing datasets
             if "NaN" in max:
-                max = datetime.now(timezone.utc).isoformat()
+                max = datetime.now(UTC).isoformat()
 
             if llat_variable in vertical_variables:
                 min = float(min)
