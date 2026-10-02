@@ -16,14 +16,6 @@ import reportError from "../reportError.js";
 import platformsJSONfile from "../../platforms.json";
 import eovsJSONfile from "../../eovs.json";
 import erddapServersJSONfile from "../../erddapServers.json";
-
-// An ERDDAP server's display name in the current language. erddapServers.json
-// is the label source; a server we carry no metadata for shows its URL.
-function erddapServerTitle(url, language) {
-  const metadata = erddapServersJSONfile.find((s) => s.url === url);
-  if (!metadata) return url;
-  return language === "fr" ? metadata.label_fr : metadata.label_en;
-}
 import { server } from "../../config.js";
 import {
   defaultEovsSelected,
@@ -44,6 +36,7 @@ import {
   useDebounce,
   setAllOptionsIsSelectedTo,
   createDataFilterQueryString,
+  formatErddapServerName,
 } from "../../utilities.jsx";
 
 const FilterContext = createContext();
@@ -111,7 +104,11 @@ export default function FilterProvider({ children }) {
     () =>
       erddapServerSelections.map((server) => ({
         ...server,
-        title: erddapServerTitle(server.url, i18n.language),
+        title: formatErddapServerName(
+          server.url,
+          i18n.language,
+          erddapServersJSONfile,
+        ),
       })),
     [erddapServerSelections, i18n.language],
   );
