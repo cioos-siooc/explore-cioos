@@ -214,6 +214,8 @@
   "quickFilterCaptionInView": "Visibles",
   "quickFilterCaptionRealtime": "Temps réel",
   "quickFilterCaptionReset": "Effacer",
+  "quickFilterMoreTitle": "Plus de filtres",
+  "quickFilterCaptionMore": "Plus",
   "datasetsCardInViewCountText": "{{count}} jeux de données dans la vue actuelle de la carte",
   "datasetsCardGroupByLabel": "Regrouper par",
   "datasetsCardGroupNoneText": "Aucun",

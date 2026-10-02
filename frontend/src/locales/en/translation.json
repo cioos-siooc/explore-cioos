@@ -214,6 +214,8 @@
   "quickFilterCaptionInView": "In view",
   "quickFilterCaptionRealtime": "Real-time",
   "quickFilterCaptionReset": "Reset",
+  "quickFilterMoreTitle": "More filters",
+  "quickFilterCaptionMore": "More",
   "datasetsCardInViewCountText": "{{count}} datasets in the current map view",
   "datasetsCardGroupByLabel": "Group by",
   "datasetsCardGroupNoneText": "None",
