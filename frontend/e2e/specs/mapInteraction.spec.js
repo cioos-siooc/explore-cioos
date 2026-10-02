@@ -27,6 +27,11 @@ import {
 // instead (e2e/support/syntheticScene.js, encoded by build-synthetic-tiles.mjs):
 // those tests open at its centre and aim at pixel offsets from there.
 
+// Every pointer event here waits on a SwiftShader frame: on a two-core runner
+// the map takes ~12s to be ready and each drawing click ~2s, which leaves the
+// multi-gesture tests no room inside the default 30s.
+test.slow();
+
 // Centroid of hex pk 23357 off Vancouver Island, inside that hex alone: 18
 // days of data, and two of its four datasets are in the recorded pointQuery —
 // the card lists only datasets in the current results.
@@ -353,16 +358,18 @@ test.describe("drawing a spatial filter", () => {
     // Only a shape the draw control holds has corners to drag: moving one
     // rewrites the bounds, and the rectangle mode drags its neighbours along
     // so it never turns into a free-form polygon.
+    // One drag, not a retried one: the bounds land a debounce after mouseup,
+    // and a second drag would start from where the corner used to be.
     const corner = await sceneAt(page, [100, -60]);
     const target = await sceneAt(page, [130, -90]);
-    await expect(async () => {
-      await page.mouse.move(corner.x, corner.y);
-      await page.mouse.down();
-      await page.mouse.move(target.x, target.y, { steps: 8 });
-      await page.mouse.up();
-      const params = new URL(page.url()).searchParams;
-      near(params.get("lonMax"), lngLatAt([130, -90])[0]);
-    }).toPass({ timeout: 20_000 });
+    await page.mouse.move(corner.x, corner.y);
+    await page.mouse.down();
+    await page.mouse.move(target.x, target.y, { steps: 8 });
+    await page.mouse.up();
+    const lonMax = () => new URL(page.url()).searchParams.get("lonMax");
+    await expect
+      .poll(() => Math.abs(lonMax() - lngLatAt([130, -90])[0]))
+      .toBeLessThan(0.02);
     const params = new URL(page.url()).searchParams;
     near(params.get("latMax"), lngLatAt([130, -90])[1]);
     near(params.get("lonMin"), west);
