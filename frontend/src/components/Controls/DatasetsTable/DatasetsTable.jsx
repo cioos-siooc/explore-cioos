@@ -57,7 +57,6 @@ export default function DatasetsTable({
   // card can show the query its own dataset would be fetched with. Built by
   // DownloadDetails, which owns the format choice the strip below shares.
   downloadLinksByPk,
-  downloadFormatControls,
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
@@ -78,6 +77,7 @@ export default function DatasetsTable({
     // narrower: whether this batch includes a dataset already in the order,
     // not whether it is in the order at all.
     handleSelectDataset: removeFromSelection,
+    pointsError,
   } = useSelection();
   // Narrows only this list (see listedDatasets), so it can follow the typing.
   const [searchText, setSearchText] = useSearchInput(
@@ -370,13 +370,7 @@ export default function DatasetsTable({
             />
             {t("datasetsTableHeaderSelectAllTitle")}
           </label>
-          {/* The format pickers (DownloadFormats) are settings of the same
-              kind as the sort: they change what every Download button on the
-              cards below asks the server for. */}
-          <div className="datasetsCardArrange">
-            {sortControl}
-            {downloadFormatControls}
-          </div>
+          <div className="datasetsCardArrange">{sortControl}</div>
         </>
       ) : (
         // Search, sort and grouping on one row: every row spent here is a
@@ -467,7 +461,11 @@ export default function DatasetsTable({
       <div className="datasetsCardList" ref={listRef}>
         {visibleRows.length === 0 ? (
           <div className="datasetsCardEmpty">
-            {t("datasetsCardNoResultsText")}
+            {t(
+              pointsError && !isDownloadModal
+                ? "datasetsCardLoadFailedText"
+                : "datasetsCardNoResultsText",
+            )}
           </div>
         ) : (
           pageItems.map((item) => {

@@ -214,4 +214,25 @@ describe("AppShell (composition)", () => {
       ).toBeTruthy();
     });
   });
+
+  it("shows the API error banner and a load-failed list when /pointQuery fails", async () => {
+    installMockFetch();
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/pointQuery")) {
+        return Promise.resolve(new Response(null, { status: 500 }));
+      }
+      return realFetch(input, init);
+    };
+    renderWithProviders(<AppShell />, { providers: "app" });
+    expect(
+      await screen.findByText(
+        "The data service is not responding, so the dataset list could not be loaded.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No datasets match your search."),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -48,6 +48,33 @@ describe("SelectionProvider", () => {
     expect(row.title).toBe(pointQueryFixture[0].title_translated.en);
   });
 
+  it("flags a failed /pointQuery instead of reporting no matches, and retries it", async () => {
+    const realFetch = globalThis.fetch;
+    let failing = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (failing && url.includes("/pointQuery")) {
+          return Promise.resolve(
+            new Response("<html>504</html>", { status: 504 }),
+          );
+        }
+        return realFetch(input, init);
+      }),
+    );
+    await renderLoaded();
+    expect(latest.pointsError).toBe(true);
+    expect(latest.pointsData).toHaveLength(0);
+
+    failing = false;
+    act(() => latest.retryPointQuery());
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length),
+    );
+    expect(latest.pointsError).toBe(false);
+  });
+
   it("keeps the latest time-filtered results when an older request finishes last", async () => {
     await renderLoaded();
     vi.useFakeTimers();

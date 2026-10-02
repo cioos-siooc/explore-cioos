@@ -23,7 +23,7 @@
 .harvest-root {
   min-height: 100vh;
   background: var(--cioos-sand);
-  font-family: Montserrat, sans-serif;
+  font-family: var(--cioos-font-body);
   color: var(--cioos-ink);
 }
 
@@ -79,7 +79,7 @@
 }
 
 .harvest-breadcrumb a {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
   text-decoration: none;
 }
 
@@ -523,7 +523,7 @@
 }
 
 a.harvest-link {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
   text-decoration: none;
 }
 

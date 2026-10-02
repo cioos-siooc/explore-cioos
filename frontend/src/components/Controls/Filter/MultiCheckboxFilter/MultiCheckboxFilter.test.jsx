@@ -150,9 +150,9 @@ describe("MultiCheckboxFilter", () => {
     ]);
   });
 
-  it("an option cycles include -> exclude -> clear", async () => {
+  it("the row includes and its exclude button excludes, each undoing itself", async () => {
     const user = userEvent.setup();
-    // Stateful, so the three clicks walk the cycle rather than each starting
+    // Stateful, so the clicks build on each other rather than each starting
     // from the initial props.
     function Harness() {
       const [options, setOptions] = React.useState([
@@ -168,23 +168,29 @@ describe("MultiCheckboxFilter", () => {
     }
     render(<Harness />);
     const option = () => screen.getByTestId("filter-option");
+    const exclude = () => screen.getByRole("button", { name: /: Glider$/ });
 
     await user.click(option());
     expect(option()).toHaveAttribute("aria-checked", "true");
     expect(option()).toHaveAttribute("data-excluded", "false");
 
-    await user.click(option());
+    await user.click(exclude());
     expect(option()).toHaveAttribute("aria-checked", "false");
     expect(option()).toHaveAttribute("data-excluded", "true");
+    expect(exclude()).toHaveAttribute("aria-pressed", "true");
     // aria-checked cannot say "excluded", so it is announced as text.
     expect(option()).toHaveTextContent("(excluded)");
 
+    await user.click(exclude());
+    expect(option()).toHaveAttribute("data-excluded", "false");
+
+    await user.click(option());
     await user.click(option());
     expect(option()).toHaveAttribute("aria-checked", "false");
     expect(option()).toHaveAttribute("data-excluded", "false");
   });
 
-  it("clicking an included option excludes it rather than unticking it", async () => {
+  it("clicking an included option unticks it", async () => {
     const user = userEvent.setup();
     const setOptionsSelected = vi.fn();
     render(
@@ -200,7 +206,7 @@ describe("MultiCheckboxFilter", () => {
     await user.click(ticked);
     expect(setOptionsSelected).toHaveBeenCalledWith([
       { pk: 1, title: "seaSurfaceTemperature", isSelected: false },
-      { pk: 2, title: "salinity", isSelected: false, isExcluded: true },
+      { pk: 2, title: "salinity", isSelected: false, isExcluded: false },
     ]);
   });
 });

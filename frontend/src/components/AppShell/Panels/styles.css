@@ -6,8 +6,8 @@
 .filtersPanel {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 340px;
-  height: 100%;
 }
 
 /* Positioned: the detail pane and the placeholder that stands in for it are
@@ -26,9 +26,9 @@
   padding: 8px 10px;
   border-right: 1px solid var(--cioos-hairline);
 
-  /* Fallback for a viewport too short for the modal to fit every row at once
-     (see the .filtersModal .modal-content max-height) — the common case now
-     fits without this ever engaging. */
+  /* Scrolls when the modal's max-height is shorter than every row (the
+     body is a flex column, so the panel shrinks to it instead of pushing
+     the footer out of the clipped dialog). */
   overflow-y: auto;
 }
 
@@ -95,7 +95,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 4px;
   text-align: center;
   padding: 16px 24px;
@@ -118,7 +118,7 @@
 .filtersPanelPlaceholderTitle {
   margin: 0;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-lg);
   color: var(--cioos-navy);
 }
@@ -223,23 +223,20 @@
   border-color: var(--cioos-primary);
 }
 
-/* Is the one being edited: a filled row with a bar on the leading edge, so the
-   pane on the right is unambiguously attached to a row on the left. Distinct
-   from .active because a row can be either, both, or neither — the bar is the
-   part that only ever means "you are here". */
-.filtersPanelList .filterHeader.open {
-  background-color: var(--cioos-surface-2);
-  border-color: var(--cioos-primary);
-  box-shadow: inset 3px 0 0 0 var(--cioos-primary);
+/* Is the one being edited: solid teal, the chrome's "open" state (the same
+   turn the top bar's open tab makes), so it cannot be mistaken for a row that
+   merely has a selection — that one only takes the pale wash above. Open wins
+   over applied: the pane beside it shows what is set. */
+.filtersPanelList .filterHeader.open,
+.filtersPanelList .filterHeader.open:hover {
+  background-color: var(--cioos-primary-800);
+  border-color: var(--cioos-primary-800);
+  color: var(--cioos-white);
   font-weight: 700;
 }
 
-.filtersPanelList .filterHeader.open.active {
-  background-color: var(--cioos-teal-light);
-}
-
-.filtersPanelList .filterHeader.open:hover {
-  background-color: var(--cioos-teal-light);
+.filtersPanelList .filterHeader.open > svg {
+  color: var(--cioos-white);
 }
 
 /* The open filter's options fill the detail pane to the right of the list
@@ -270,7 +267,7 @@
 .filtersPanel .filterOptionsCaption {
   flex: 0 0 auto;
   margin: 0 0 8px;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   font-size: var(--cioos-font-size-sm);
   line-height: 1.35;
 }
@@ -331,7 +328,7 @@
    in em, because a fixed pixel nudge stops being centred the moment the label
    or the icon changes size. align-items alone can't do this: it would centre
    the box against the whole (possibly three-line) label. */
-.filtersPanel .filterOptionsBody .optionButton > svg {
+.filtersPanel .filterOptionsBody .optionToggle > svg {
   flex: 0 0 auto;
   margin-top: 0.175em;
 }
@@ -366,7 +363,7 @@
 .filtersPanel .filterSectionHeading {
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cioos-ink-60);
@@ -441,10 +438,17 @@
   }
 }
 
+/* Reduced motion: the swap still fades, without the sideways slide. */
 @media (prefers-reduced-motion: reduce) {
   .datasetsPanelDetail,
   .datasetsPanelList {
-    animation: none;
+    animation-name: datasetsFadeIn;
+  }
+}
+
+@keyframes datasetsFadeIn {
+  from {
+    opacity: 0;
   }
 }
 
@@ -482,7 +486,7 @@
  * Mobile: the filters master and detail become two screens, one filter
  * at a time, and everything in them becomes a touch target.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   /* The download panel scrolls as one column here — see the note in
      DownloadDetails/styles.css. */
   .downloadPanel {

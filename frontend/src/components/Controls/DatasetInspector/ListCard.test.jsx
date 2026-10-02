@@ -22,7 +22,7 @@ describe("ListCard", () => {
     expect(screen.getByText("10 m")).toBeInTheDocument();
   });
 
-  it("is clickable and keyboard-operable (Enter/Space)", async () => {
+  it("opens on a click anywhere, and from the keyboard through its id button", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     renderWithProviders(
@@ -30,10 +30,9 @@ describe("ListCard", () => {
         x
       </ListCard>,
     );
-    const card = screen.getByRole("button");
-    await user.click(card);
+    await user.click(screen.getByText("x"));
     expect(onClick).toHaveBeenCalledTimes(1);
-    card.focus();
+    screen.getByRole("button", { name: "rec-1" }).focus();
     await user.keyboard("{Enter}");
     expect(onClick).toHaveBeenCalledTimes(2);
     await user.keyboard(" ");
@@ -46,7 +45,10 @@ describe("ListCard", () => {
         x
       </ListCard>,
     );
-    expect(screen.getByRole("button")).toHaveClass("selected", "pinned");
+    expect(document.querySelector(".listCard")).toHaveClass(
+      "selected",
+      "pinned",
+    );
   });
 
   it("keeps its action's click and keys from reaching the card", async () => {
