@@ -87,3 +87,9 @@ obis_harvest*.png
 # generated archives inside it.
 /downloads/*
 !/downloads/README.md
+
+# Impeccable skill: per-machine state and point-in-time critiques (design.json is shared)
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+.impeccable/critique/
+frontend/.impeccable/

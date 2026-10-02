@@ -69,7 +69,7 @@
 
 .filtersModal .filtersModalTitleHeading {
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
@@ -184,7 +184,7 @@
 
 .downloadModalTitleHeading {
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
@@ -263,7 +263,21 @@
   flex-direction: column;
   gap: 2px;
   font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
+}
+
+/* How to read the bars, not a footnote: the info glyph marks it as such. */
+.coverageToolbarNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.35;
+}
+
+.coverageToolbarNote svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--cioos-info);
 }
 
 .coverageToolbarControls {
@@ -423,6 +437,16 @@
   font-size: var(--cioos-font-size-md);
 }
 
+.coverageModalError {
+  gap: 8px;
+  color: var(--cioos-ink);
+}
+
+.coverageModalError svg {
+  flex: 0 0 auto;
+  color: var(--cioos-error);
+}
+
 @media (max-width: 600px) {
   .coverageModal .coverageModalDialog {
     width: 100vw;
@@ -440,7 +464,7 @@
 
 /* Phones: the text around the figure steps back down from theme.css's phone
    sizes so the chart keeps as much of the small screen as it can. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .coverageModal {
     --cioos-font-size-sm: 11px;
     --cioos-font-size-md: 14px;
@@ -458,6 +482,15 @@
   overflow: hidden;
 }
 
+/* A flex column so the panel's flex-basis resolves against a height the
+   dialog's max-height actually caps: a height: 100% panel here had nothing
+   definite to be 100% of, grew to its list, and pushed the footer (count and
+   Clear all) below the clipped edge. */
+.filtersModal .modal-body {
+  display: flex;
+  flex-direction: column;
+}
+
 @media (max-height: 560px) {
   .filtersModal .modal-content,
   .downloadModal .modal-content {
@@ -473,7 +506,7 @@
  * the close button in the header's top-right corner is the way out of
  * either, as it is for the datasets surface beside them.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .filtersModal .filtersModalDialog,
   .downloadModal .downloadModalDialog {
     width: 100vw;
@@ -489,7 +522,7 @@
   .filtersModal {
     font-size: var(--cioos-font-size-base);
 
-    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-3xs: 10px;
     --cioos-font-size-2xs: 10px;
     --cioos-font-size-xs: 11px;
     --cioos-font-size-sm: 11px;

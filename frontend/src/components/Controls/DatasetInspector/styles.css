@@ -53,7 +53,7 @@
   margin: 0;
   padding: 2px 0;
   font-family: var(--cioos-font-display);
-  font-size: 1.05rem;
+  font-size: var(--cioos-font-size-md);
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -72,7 +72,7 @@
   border-radius: var(--cioos-radius-pill);
   background: var(--cioos-live);
   color: var(--cioos-white);
-  font-size: 0.72rem;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
@@ -101,7 +101,7 @@
   min-height: 28px;
   padding: 3px 10px;
   font-family: inherit;
-  font-size: 0.78rem;
+  font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
@@ -154,7 +154,7 @@
 .datasetTitleAction.active {
   background-color: var(--cioos-primary);
   border-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 .datasetTitleAction.active:hover,
@@ -168,11 +168,11 @@
 .metadataLabel {
   display: block;
   margin-bottom: 6px;
-  font-size: 0.72rem;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 /* --- Metadata record sheet ---
@@ -208,7 +208,7 @@
 .datasetMetaSheet .metadataLabel {
   flex: 0 0 auto;
   margin-bottom: 0;
-  font-size: 0.65rem;
+  font-size: var(--cioos-font-size-2xs);
   line-height: 1.2;
 }
 
@@ -266,26 +266,26 @@
 }
 
 .gridNodeFactorValue {
-  font-size: 0.85rem;
+  font-size: var(--cioos-font-size-base);
   font-weight: 600;
   color: var(--cioos-ink);
 }
 
 .gridNodeFactorName {
-  font-size: 0.62rem;
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--cioos-ink-60);
 }
 
 .gridNodeOperator {
-  font-size: 0.8rem;
+  font-size: var(--cioos-font-size-sm);
   font-weight: 400;
   color: var(--cioos-ink-60);
 }
 
 .gridNodeTotal {
-  font-size: 1.05rem;
+  font-size: var(--cioos-font-size-md);
   font-weight: 700;
   color: var(--cioos-ink);
   white-space: nowrap;
@@ -305,7 +305,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
-  font-size: 0.78rem;
+  font-size: var(--cioos-font-size-sm);
   line-height: 1.3;
 }
 
@@ -314,11 +314,24 @@
   color: var(--cioos-ink);
 }
 
+/* Platform: the dot or hexagon the map draws this platform's markers in, so
+   the row names the colour to look for. A line box of its own rather than a
+   flex box, so the chip keeps its text baseline and stays level with its
+   label. */
+.metadataPlatformGlyph {
+  margin-right: 6px;
+  line-height: 1;
+}
+
+.metadataPlatformGlyph svg {
+  vertical-align: -0.1em;
+}
+
 /* A field the harvest left empty (an OBIS dataset's ocean variables, a
    dataset with no platform code): the dash holds the row's shape without
    pretending there is a value to read. */
 .datasetMetaSheet .metadataEmpty {
-  font-size: 0.78rem;
+  font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
 }
 
@@ -357,14 +370,14 @@
 .recordSectionHeader strong {
   display: block;
   font-family: var(--cioos-font-display);
-  font-size: 1rem;
+  font-size: var(--cioos-font-size-md);
 }
 
 .recordHint {
   display: block;
   margin-top: 2px;
-  font-size: 0.85rem;
-  color: var(--cioos-ink-60);
+  font-size: var(--cioos-font-size-base);
+  color: var(--cioos-ink-80);
 }
 
 /* Explains the accent conditionalRowStyles puts on the record pinned to the
@@ -418,15 +431,15 @@
   margin-top: 2px;
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .recordIdVariable {
   margin-left: 6px;
   font-family: ui-monospace, monospace;
-  font-size: 0.68rem;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 400;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-80);
   overflow-wrap: anywhere;
 }
 
@@ -497,10 +510,21 @@
   align-items: center;
 }
 
-.listCard:focus-visible {
-  outline: none;
+.listCard:has(.listCardId:focus-visible) {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
+}
+
+button.listCardId {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.listCardId:focus-visible {
+  outline: none;
 }
 
 /* The record a map click resolved to, held at the top of the list: the same
@@ -615,11 +639,11 @@
 .listCardFieldLabel {
   flex: 0 0 auto;
   min-width: 96px;
-  font-size: 0.65rem;
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .listCardFieldValue {
@@ -664,7 +688,7 @@
   background-color: var(--cioos-surface-2);
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
 }
 
 .listCardTagsMore {
@@ -690,16 +714,11 @@
   box-shadow: var(--cioos-focus);
 }
 
-.datasetInspector .optionColorCircle {
-  margin-right: 5px;
-  margin-bottom: 5px;
-}
-
 /* Mobile: the page has the whole screen here rather than a 420px column beside
    the map, so what it gives up is padding and the label gutter — not type size.
    The 0.9em this used to shrink the body to was paying for a width the page no
    longer has to fit. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .datasetInspectorBody {
     padding: 0 10px 20px;
   }

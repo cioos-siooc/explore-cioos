@@ -5,11 +5,19 @@ import { screen } from "@testing-library/react";
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import FeedbackButton from "./FeedbackButton.jsx";
 
-const { getFeedback } = vi.hoisted(() => ({ getFeedback: vi.fn() }));
-vi.mock("@sentry/react", () => ({ getFeedback }));
+const sentry = vi.hoisted(() => ({
+  getFeedback: vi.fn(),
+  isEnabled: vi.fn(),
+  addIntegration: vi.fn(),
+  feedbackIntegration: vi.fn((options) => ({ name: "Feedback", options })),
+}));
+const { getFeedback } = sentry;
+vi.mock("@sentry/react", () => sentry);
 
 beforeEach(() => {
+  Object.values(sentry).forEach((fn) => fn.mockClear());
   getFeedback.mockReset();
+  sentry.isEnabled.mockReturnValue(false);
 });
 
 describe("FeedbackButton", () => {
@@ -26,7 +34,28 @@ describe("FeedbackButton", () => {
     getFeedback.mockReturnValue(undefined);
     const { user } = renderWithProviders(<FeedbackButton />);
     await user.click(screen.getByRole("button"));
-    expect(getFeedback).toHaveBeenCalled();
+    await vi.waitFor(() => expect(getFeedback).toHaveBeenCalled());
+    expect(sentry.addIntegration).not.toHaveBeenCalled();
+  });
+
+  it("adds the feedback integration on the first click when Sentry is on", async () => {
+    const form = {
+      removeFromDom: vi.fn(),
+      appendToDom: vi.fn(),
+      open: vi.fn(),
+    };
+    const feedback = { createForm: vi.fn().mockResolvedValue(form) };
+    sentry.isEnabled.mockReturnValue(true);
+    getFeedback.mockReturnValueOnce(undefined).mockReturnValue(feedback);
+
+    const { user } = renderWithProviders(<FeedbackButton />);
+    await user.click(screen.getByRole("button"));
+
+    expect(sentry.feedbackIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({ autoInject: false, showName: false }),
+    );
+    expect(sentry.addIntegration).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(form.open).toHaveBeenCalled());
   });
 
   it("builds and opens the Sentry feedback form, translating every label", async () => {
@@ -41,6 +70,7 @@ describe("FeedbackButton", () => {
     const { user } = renderWithProviders(<FeedbackButton />);
     await user.click(screen.getByRole("button"));
 
+    await vi.waitFor(() => expect(form.open).toHaveBeenCalled());
     expect(createForm).toHaveBeenCalledWith(
       expect.objectContaining({
         formTitle: "Send us feedback",

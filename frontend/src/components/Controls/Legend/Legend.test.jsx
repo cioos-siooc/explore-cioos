@@ -112,7 +112,7 @@ describe("Legend", () => {
 
   it("gives the hexes and the markers explainers of their own", async () => {
     const { user } = renderLegend({ zoom: 10 });
-    await user.click(screen.getByLabelText("About Hexes"));
+    await user.click(screen.getByLabelText("About Hexagons"));
     expect(await screen.findByTestId("legend-help-modal")).toHaveTextContent(
       "summed into hexagonal cells",
     );
