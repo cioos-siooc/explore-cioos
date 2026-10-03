@@ -789,5 +789,18 @@
   "filterOptionExcludeTitle": "Exclude: leave out datasets that match this",
   "filterOptionUnexcludeTitle": "Stop excluding this",
   "filterMatchAll": "all",
-  "filterMatchAllLabel": "Match all included options"
+  "filterMatchAllLabel": "Match all included options",
+  "filterSearchLabel": "Search filters",
+  "filterSearchPlaceholder": "Search variables, platforms, organizations, species…",
+  "filterSearchTitleOption": "Titles containing “{{term}}”",
+  "filterSearchNoResults": "No filter matches “{{term}}”",
+  "filterSearchHint": "Start with - or not to exclude · ranges like 2010-2020 or 0-200m",
+  "filterSearchActionAdd": "Add",
+  "filterSearchActionRemove": "Remove",
+  "filterSearchOpenTitle": "Search filters (Ctrl+K)",
+  "filterSearchIntro": "Find any filter by name: ocean variables, platforms, organizations, data sources, species, dataset titles, dates (2010-2020, since 2015-06, last 3 months) or depths (0-200m, below 1000m). Select a result to apply it; select it again to remove it. Start with - or not to exclude.",
+  "filterSearchOpenInPanel": "Open in Filters",
+  "filterSearchKeysNavigate": "navigate",
+  "filterSearchKeysSelect": "select",
+  "filterSearchKeysClose": "close"
 }

@@ -790,5 +790,18 @@
   "filterOptionExcludeTitle": "Exclure : retirer les jeux de données qui y correspondent",
   "filterOptionUnexcludeTitle": "Ne plus exclure",
   "filterMatchAll": "toutes",
-  "filterMatchAllLabel": "Correspondre à toutes les options incluses"
+  "filterMatchAllLabel": "Correspondre à toutes les options incluses",
+  "filterSearchLabel": "Rechercher des filtres",
+  "filterSearchPlaceholder": "Rechercher variables, plateformes, organisations, espèces…",
+  "filterSearchTitleOption": "Titres contenant « {{term}} »",
+  "filterSearchNoResults": "Aucun filtre ne correspond à « {{term}} »",
+  "filterSearchHint": "Commencez par - ou sauf pour exclure · plages comme 2010-2020 ou 0-200m",
+  "filterSearchActionAdd": "Ajouter",
+  "filterSearchActionRemove": "Retirer",
+  "filterSearchOpenTitle": "Rechercher des filtres (Ctrl+K)",
+  "filterSearchIntro": "Trouvez n'importe quel filtre par son nom : variables océaniques, plateformes, organisations, sources de données, espèces, titres de jeux de données, dates (2010-2020, depuis 2015-06, les 3 derniers mois) ou profondeurs (0-200m, sous 1000m). Sélectionnez un résultat pour l'appliquer; sélectionnez-le de nouveau pour le retirer. Commencez par - ou sauf pour exclure.",
+  "filterSearchOpenInPanel": "Ouvrir dans Filtres",
+  "filterSearchKeysNavigate": "naviguer",
+  "filterSearchKeysSelect": "sélectionner",
+  "filterSearchKeysClose": "fermer"
 }

@@ -816,6 +816,7 @@ export default function FilterProvider({ children }) {
     totalNumberOfDatasets,
     resetFilters,
     buildActiveFilters,
+    optionLabel,
     catalogError,
     catalogLoaded,
     loadCatalog,

@@ -79,6 +79,8 @@ export default function UIProvider({ children }) {
     if (!showIntroModal) setIntroSeen(true);
   }, [showIntroModal, setIntroSeen]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  // The search palette over every filter (see FilterSearch).
+  const [showFilterSearch, setShowFilterSearch] = useState(false);
 
   // A drawn box or polygon surfaces the matching datasets — on wide screens
   // only: narrower, the list would cover the shape just drawn, and the top-bar
@@ -134,6 +136,8 @@ export default function UIProvider({ children }) {
     setShowIntroModal,
     showPrivacyModal,
     setShowPrivacyModal,
+    showFilterSearch,
+    setShowFilterSearch,
   };
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
