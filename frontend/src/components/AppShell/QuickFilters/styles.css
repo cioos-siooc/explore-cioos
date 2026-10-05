@@ -100,34 +100,18 @@
   background-color: var(--cioos-error-700);
 }
 
-/* Pinned to the circle's top-right edge, over the border, the way a
-   notification count sits on an icon. Anchored by its centre, so a longer
-   count grows both ways rather than off to one side. */
-.quickFilterBadge {
-  position: absolute;
-  top: -6px;
-  left: calc(100% - 4px);
-  transform: translateX(-50%);
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: 9px;
-  background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+/* Under the icon, inside the circle: the button stacks the two and stays
+   centred on the icon alone when there is no count. */
+.quickFilterButton:has(.quickFilterCount) {
+  flex-direction: column;
+  gap: 1px;
+}
+
+.quickFilterCount {
   font-size: var(--cioos-font-size-3xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 16px;
-  text-align: center;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.quickFilterButton.applied .quickFilterBadge {
-  border-color: rgb(255 255 255 / 55%);
-  background-color: var(--cioos-primary);
-  color: var(--cioos-on-primary);
+  line-height: 1;
 }
 
 /* Hung below the circle rather than inside it, so the circles keep their size
@@ -249,9 +233,6 @@
     padding-bottom: 16px;
   }
 
-  /* No room beside the buttons, and a line of its own is too high a price
-     for a heading the captions already spell out. Still names the group:
-     aria-labelledby reads a hidden label. */
   .quickFilterCaption {
     padding: 3px 4px;
   }

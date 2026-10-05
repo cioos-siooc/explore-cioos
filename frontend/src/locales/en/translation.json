@@ -208,6 +208,8 @@
   "quickFilterAreaClear": "Clear area",
   "quickFilterCaptionInView": "In view",
   "quickFilterCaptionRealtime": "Real-time",
+  "quickFilterCountDescription_one": "{{count, number}} dataset",
+  "quickFilterCountDescription_other": "{{count, number}} datasets",
   "quickFilterCaptionReset": "Reset",
   "datasetsCardInViewCountText": "{{count}} datasets in the current map view",
   "datasetsCardGroupByLabel": "Group by",

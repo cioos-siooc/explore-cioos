@@ -74,26 +74,22 @@ export default function QuickFilters() {
   const boxActive = hasShape && polygonIsRectangle(polygon);
   const polygonActive = hasShape && !boxActive;
 
-  // How many of the listed datasets each toggle keeps — already applied, the
-  // whole list. Not shown before the counts land, so it never flashes a zero.
-  // Compact ("2.1K") so a big count keeps the badge small; the exact number is
-  // what assistive tech reads.
-  function countBadge(count, id, testId) {
-    if (!countsReady) return null;
+  // A toggle that is off previews how many of the listed datasets it would
+  // keep, under its icon. Once on, the tally above already says it. Not before
+  // the counts land, so it never flashes a zero. Compact ("2.2K") to fit the
+  // circle; assistive tech gets the exact number.
+  function countPreview(applied, count, id, testId) {
+    if (applied || !countsReady) return null;
     return (
       <>
-        <span
-          className="quickFilterBadge"
-          data-testid={testId}
-          aria-hidden="true"
-        >
+        <span className="quickFilterCount" data-testid={testId}>
           {count.toLocaleString(i18n.language, {
             notation: "compact",
             maximumFractionDigits: 1,
           })}
         </span>
         <span id={id} className="sr-only">
-          {count.toLocaleString(i18n.language)}
+          {t("quickFilterCountDescription", { count })}
         </span>
       </>
     );
@@ -199,10 +195,17 @@ export default function QuickFilters() {
         aria-pressed={onlyInView}
         title={t("quickFilterInViewTitle")}
         aria-label={t("datasetsCardOnlyInViewText")}
-        aria-describedby={countsReady ? inViewCountId : undefined}
+        aria-describedby={
+          countsReady && !onlyInView ? inViewCountId : undefined
+        }
       >
         <Eye size={18} aria-hidden="true" />
-        {countBadge(inViewCount, inViewCountId, "quick-filter-in-view-count")}
+        {countPreview(
+          onlyInView,
+          inViewCount,
+          inViewCountId,
+          "quick-filter-in-view-count",
+        )}
         <span className="quickFilterCaption" aria-hidden="true">
           {t("quickFilterCaptionInView")}
         </span>
@@ -215,10 +218,13 @@ export default function QuickFilters() {
         aria-pressed={realtimeOnly}
         title={t("quickFilterRealtimeTitle")}
         aria-label={t("realtimeFilterOptionText")}
-        aria-describedby={countsReady ? realtimeCountId : undefined}
+        aria-describedby={
+          countsReady && !realtimeOnly ? realtimeCountId : undefined
+        }
       >
         <BroadcastPin size={18} aria-hidden="true" />
-        {countBadge(
+        {countPreview(
+          realtimeOnly,
           realtimeCount,
           realtimeCountId,
           "quick-filter-realtime-count",

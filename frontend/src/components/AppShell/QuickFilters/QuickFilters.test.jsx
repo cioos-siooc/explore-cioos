@@ -181,7 +181,7 @@ describe("QuickFilters", () => {
     ).toBeInTheDocument();
   });
 
-  it("badges the real-time button with how many listed datasets are real-time", async () => {
+  it("previews on the real-time button how many listed datasets it keeps, until it is on", async () => {
     const mockedFetch = globalThis.fetch;
     vi.stubGlobal("fetch", async (input) => {
       const response = await mockedFetch(input);
@@ -193,20 +193,33 @@ describe("QuickFilters", () => {
       }));
       return new Response(JSON.stringify(rows), { status: 200 });
     });
+    const { user } = renderRow();
     expect(screen.queryByTestId("quick-filter-realtime-count")).toBeNull();
-    renderRow();
 
-    const badge = await screen.findByTestId("quick-filter-realtime-count");
-    await waitFor(() => expect(badge).toHaveTextContent("3"));
-    expect(
-      screen.getByTestId("quick-filter-realtime"),
-    ).toHaveAccessibleDescription("3");
+    const count = await screen.findByTestId("quick-filter-realtime-count");
+    await waitFor(() => expect(count).toHaveTextContent("3"));
+    const button = screen.getByTestId("quick-filter-realtime");
+    expect(button).toHaveAccessibleDescription("3 datasets");
     expect(
       screen.getByTestId("quick-filter-in-view-count"),
     ).toBeInTheDocument();
+
+    await user.click(button);
+    expect(screen.queryByTestId("quick-filter-realtime-count")).toBeNull();
+    expect(button).not.toHaveAccessibleDescription(/3 datasets/);
   });
 
-  it("shortens a big count on the badge but describes the button with it in full", async () => {
+  it("shows the in-view count inside its button, under the icon", async () => {
+    renderRow();
+    const count = await screen.findByTestId("quick-filter-in-view-count");
+    const button = screen.getByTestId("quick-filter-in-view");
+    expect(button).toContainElement(count);
+    expect(button.querySelector(".quickFilterCaption")).not.toContainElement(
+      count,
+    );
+  });
+
+  it("shortens a big count on the button but describes the button with it in full", async () => {
     const mockedFetch = globalThis.fetch;
     vi.stubGlobal("fetch", async (input) => {
       const response = await mockedFetch(input);
@@ -222,11 +235,11 @@ describe("QuickFilters", () => {
     });
     renderRow();
 
-    const badge = await screen.findByTestId("quick-filter-realtime-count");
-    await waitFor(() => expect(badge).toHaveTextContent("2.2K"));
+    const count = await screen.findByTestId("quick-filter-realtime-count");
+    await waitFor(() => expect(count).toHaveTextContent("2.2K"));
     expect(
       screen.getByTestId("quick-filter-realtime"),
-    ).toHaveAccessibleDescription("2,150");
+    ).toHaveAccessibleDescription("2,150 datasets");
   });
 
   it("drops every quick filter at once", async () => {

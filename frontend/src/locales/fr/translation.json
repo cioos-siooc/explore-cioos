@@ -208,6 +208,8 @@
   "quickFilterAreaClear": "Effacer la zone",
   "quickFilterCaptionInView": "Visibles",
   "quickFilterCaptionRealtime": "Temps réel",
+  "quickFilterCountDescription_one": "{{count, number}} jeu de données",
+  "quickFilterCountDescription_other": "{{count, number}} jeux de données",
   "quickFilterCaptionReset": "Effacer",
   "datasetsCardInViewCountText": "{{count}} jeux de données dans la vue actuelle de la carte",
   "datasetsCardGroupByLabel": "Regrouper par",
