@@ -14,6 +14,7 @@ from sentry_sdk.crons import monitor
 
 from cde_harvester.core.config import load_config, resolve_obis_config
 from cde_harvester.core.day_sets import ranges_to_csv_cell
+from cde_harvester.core.errors import HASH_CKAN_UNAVAILABLE
 from cde_harvester.core.issues import report_issues
 from cde_harvester.core.observability import (
     init_sentry,
@@ -27,6 +28,7 @@ from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     unescape_ascii,
     unescape_ascii_list,
 )
+from cde_harvester.sources.ckan.state import load_previous_ckan
 from cde_harvester.sources.erddap.harvester import harvest_erddap
 from cde_harvester.sources.obis.discovery import ObisDiscoveryConfig
 from cde_harvester.sources.obis.geo_filter import DEFAULT_EXEMPT_NODE_IDS, ObisGeoFilter
@@ -199,14 +201,25 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
     if erddap_trajectory_points is None:
         erddap_trajectory_points = pd.DataFrame()
 
+    ckan_unavailable = df_ckan is None
+    if ckan_unavailable:
+        df_ckan = pd.DataFrame()
+
     # --- ERDDAP-specific post-processing ---
     if not erddap_datasets.empty:
         erddap_datasets["_erddap_key"] = erddap_datasets["erddap_url"].map(erddap_join_key)
-        if df_ckan.empty:
-            df_ckan = pd.DataFrame(columns=["erddap_url", "dataset_id", "ckan_id",
-                                            "ckan_organizations", "ckan_title", "title_fr"])
-        ckan_by_key = df_ckan.assign(
-            _erddap_key=df_ckan["erddap_url"].map(erddap_join_key)
+        ckan_links = df_ckan
+        if ckan_unavailable:
+            ckan_links = (
+                load_previous_ckan(erddap_datasets["erddap_url"].unique())
+                .rename(columns={"title": "ckan_title", "organizations": "ckan_organizations"})
+                .drop(columns="eovs")
+            )
+        if ckan_links.empty:
+            ckan_links = pd.DataFrame(columns=["erddap_url", "dataset_id", "ckan_id",
+                                               "ckan_organizations", "ckan_title", "title_fr"])
+        ckan_by_key = ckan_links.assign(
+            _erddap_key=ckan_links["erddap_url"].map(erddap_join_key)
         ).drop(columns="erddap_url")
         erddap_datasets = (
             erddap_datasets.set_index(["_erddap_key", "dataset_id"])
@@ -216,7 +229,17 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         )
 
         unmatched = erddap_datasets[erddap_datasets["ckan_id"].isna()]
-        if unmatched.empty:
+        if ckan_unavailable:
+            logger.warning(
+                f"CKAN unavailable: {len(erddap_datasets) - len(unmatched)} ERDDAP "
+                f"datasets keep their stored CKAN metadata, {len(unmatched)} have "
+                "none and are re-harvested next run"
+            )
+            # Nothing stored to fall back on; dropping the hash stops
+            # skip_unchanged from keeping them unenriched once CKAN is back.
+            erddap_datasets.loc[unmatched.index, "content_hash"] = None
+            erddap_datasets.loc[unmatched.index, "content_hash_reason"] = HASH_CKAN_UNAVAILABLE
+        elif unmatched.empty:
             logger.info("Every ERDDAP dataset matched a CKAN record")
         else:
             logger.warning(
