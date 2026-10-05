@@ -1,14 +1,12 @@
-/* A row of the top bar, under the brand card and no wider than it, in the
-   quick filters' place (see TopControls). Scrolls rather than running off the
-   bottom of the screen once a gridded dataset's legend is open in it. */
+/* A fixed width rather than the title's: shrink-wrapped, a short title left
+   the two buttons too narrow to sit side by side. Scrolls rather than running
+   off the screen once a gridded dataset's legend is open in it. */
 .datasetMapCard {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   box-sizing: border-box;
-  width: max-content;
-  max-width: min(var(--cioos-brand-width), calc(100vw - 24px));
-  max-height: calc(100vh - 200px);
+  width: min(320px, calc(100vw - 24px));
   overflow-y: auto;
   padding: 6px 6px 8px 10px;
   border: 1px solid var(--cioos-primary);
@@ -20,7 +18,35 @@
 /* Wide enough to show the WMS legend at the size ERDDAP drew it — see
    GRIDDAP_LEGEND_WIDTH in wmsUtilities. */
 .datasetMapCard.withOverlay {
-  width: 376px;
+  width: min(376px, calc(100vw - 24px));
+}
+
+/* The sidebar's corner, held above the time bar and clear of the top bar the
+   way the sidebar column is (Sidebar/styles.css). Parked off the left edge
+   while the "what's here" card holds the corner, on the same curve. */
+.datasetMapCard.corner {
+  position: fixed;
+  left: 12px;
+  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  z-index: calc(var(--cioos-z-shell, 30) - 2);
+  max-height: calc(
+    100vh - max(12px, var(--cioos-top-bar-space, 0px)) - 12px -
+      var(--cioos-time-bar-space, 0px)
+  );
+  transition:
+    transform 0.32s cubic-bezier(0.22, 0.8, 0.3, 1),
+    visibility 0.32s;
+}
+
+.datasetMapCard.corner.parked {
+  transform: translateX(calc(-100% - 16px));
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .datasetMapCard.corner {
+    transition: none;
+  }
 }
 
 .datasetMapCardHead {
@@ -34,7 +60,7 @@
 .datasetMapCardTitle {
   flex: 1 1 auto;
   min-width: 0;
-  padding-top: 5px;
+  padding-top: 4px;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -52,30 +78,29 @@
   align-self: flex-start;
 }
 
-/* Centred under the title, the two buttons a matched pair: the same width,
-   whichever label is longer. */
+/* Under the title, the two buttons a matched pair: the same width, whichever
+   label is longer. */
 .datasetMapCardActions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  padding-top: 2px;
+  gap: 6px;
+  padding-right: 4px;
 }
 
 /* The top bar's entry-point wash (see TopControls/styles.css), as a pill. */
 .datasetMapCardButton {
   display: inline-flex;
-  flex: 0 1 132px;
+  flex: 1 1 0;
+  min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 4px 14px;
+  gap: 5px;
+  min-height: 26px;
+  padding: 3px 10px;
   border: 1px solid rgb(82 167 155 / 45%);
   border-radius: var(--cioos-radius-pill);
   background-color: rgb(82 167 155 / 14%);
   font: inherit;
-  font-size: var(--cioos-font-size-sm);
+  font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--cioos-primary-700);
@@ -125,13 +150,11 @@
   .datasetMapCard,
   .datasetMapCard.withOverlay {
     width: auto;
-    max-width: none;
     max-height: 60vh;
     margin: 0 8px;
   }
 
   .datasetMapCardButton {
-    flex: 1 1 0;
     min-height: 36px;
   }
 }
