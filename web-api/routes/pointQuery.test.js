@@ -65,3 +65,22 @@ test("rejects an out-of-range depth filter", async () => {
   const res = await agent.get("/pointQuery").query({ depthMin: "abc" });
   assert.equal(res.status, 400);
 });
+
+test("/inView hands the viewport rectangle and filters to getDatasetPksInShape", async () => {
+  shapeQuery.queueResult([3, 7]);
+  const query = {
+    eovs: "oxygen",
+    latMin: "48.2",
+    latMax: "48.9",
+    lonMin: "-123.8",
+    lonMax: "-122.8",
+  };
+
+  const res = await agent.get("/pointQuery/inView").query(query);
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, [3, 7]);
+  assert.equal(shapeQuery.calls.length, 1);
+  assert.equal(shapeQuery.calls[0].pksOnly, true);
+  assert.deepEqual(shapeQuery.calls[0].query, query);
+});

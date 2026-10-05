@@ -33,7 +33,12 @@ const OBIS_DOWNLOAD_COLUMNS = 8;
  */
 async function buildShapeSql(
   query,
-  { doEstimate = true, getRecordsList = true, fetchAphiaIds } = {},
+  {
+    doEstimate = true,
+    getRecordsList = true,
+    pksOnly = false,
+    fetchAphiaIds,
+  } = {},
 ) {
   // Caller propagates ScientificNameSelectionTooBroadError as a 400.
   const filters = await createDBFilter(query, { fetchAphiaIds });
@@ -107,6 +112,27 @@ async function buildShapeSql(
   // download-estimate path (metadata-only, downloads happen on ERDDAP).
   if (includeProfiles && !doEstimate) branches.push(griddapBranch);
   const combinedInner = unionBranches(branches, profilesBranch);
+
+  // Which datasets have a matched feature at all — the map's "in view" set,
+  // asked with the viewport as the rectangle filter. Same join and filters as
+  // `filtered` below, without anything the dataset rows are built from.
+  if (pksOnly) {
+    return {
+      sql: `WITH combined AS (
+        ${combinedInner}
+  )
+  SELECT DISTINCT d.pk_url AS pk
+  FROM   combined p
+  JOIN   cde.datasets d
+  ON     p.dataset_pk = d.pk
+  WHERE  :filters`,
+      params: {
+        filters: filters.shared,
+        obisFilters: filters.obisOnly,
+        profileFilters: filters.profileOnly,
+      },
+    };
+  }
 
   // The record list is one row per *record* (profile / trajectory / OBIS
   // dataset), not one per matched feature. Trajectory and OBIS coverage is
@@ -332,4 +358,13 @@ async function getShapeQuery(query, doEstimate = true, getRecordsList = true) {
   return rows.rows.map(changePKtoPkURL);
 }
 
-module.exports = { getShapeQuery, buildShapeSql };
+async function getDatasetPksInShape(query) {
+  const { sql, params } = await buildShapeSql(query, {
+    doEstimate: false,
+    pksOnly: true,
+  });
+  const { rows } = await db.raw(sql, params);
+  return rows.map((row) => row.pk);
+}
+
+module.exports = { getShapeQuery, getDatasetPksInShape, buildShapeSql };

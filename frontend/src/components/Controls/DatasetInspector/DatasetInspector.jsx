@@ -5,6 +5,7 @@ import {
   CheckCircleFill,
   Download,
   FileEarmarkText,
+  GraphUp,
   PinMap,
   PinMapFill,
 } from "react-bootstrap-icons";
@@ -780,37 +781,49 @@ export default function DatasetInspector({
                         row.profile_id === highlightedRecord.profileId
                       }
                       selected={onMap}
-                      action={
-                        // A record with no id cannot be looked up again.
-                        (isTrajectoryDataset || row.profile_id) && (
-                          <button
-                            type="button"
-                            className="listCardMapButton"
-                            aria-pressed={onMap}
-                            data-tip-highlight={
-                              onMap && isTrajectoryDataset
-                                ? tipHighlight("trackDate")
-                                : undefined
-                            }
-                            title={t(
-                              onMap
-                                ? "datasetInspectorHideFromMapTitle"
-                                : isTrajectoryDataset
-                                  ? "trajectoryTrackShowTitle"
-                                  : "datasetInspectorShowOnMapTitle",
-                            )}
-                            onClick={() => toggleOnMap(row.profile_id)}
-                          >
-                            {onMap ? (
-                              <PinMapFill size={13} aria-hidden="true" />
-                            ) : (
-                              <PinMap size={13} aria-hidden="true" />
-                            )}
-                            {t("datasetInspectorShowOnMapText")}
-                          </button>
-                        )
+                      actions={
+                        <>
+                          {/* A record with no id cannot be looked up again. */}
+                          {row.profile_id && (
+                            <button
+                              type="button"
+                              className="listCardButton"
+                              title={t("datasetInspectorShowDataTitle")}
+                              onClick={() => setInspectRecordID(row.profile_id)}
+                            >
+                              <GraphUp size={13} aria-hidden="true" />
+                              {t("datasetInspectorShowDataText")}
+                            </button>
+                          )}
+                          {(isTrajectoryDataset || row.profile_id) && (
+                            <button
+                              type="button"
+                              className="listCardButton"
+                              aria-pressed={onMap}
+                              data-tip-highlight={
+                                onMap && isTrajectoryDataset
+                                  ? tipHighlight("trackDate")
+                                  : undefined
+                              }
+                              title={t(
+                                onMap
+                                  ? "datasetInspectorHideFromMapTitle"
+                                  : isTrajectoryDataset
+                                    ? "trajectoryTrackShowTitle"
+                                    : "datasetInspectorShowOnMapTitle",
+                              )}
+                              onClick={() => toggleOnMap(row.profile_id)}
+                            >
+                              {onMap ? (
+                                <PinMapFill size={13} aria-hidden="true" />
+                              ) : (
+                                <PinMap size={13} aria-hidden="true" />
+                              )}
+                              {t("datasetInspectorShowOnMapText")}
+                            </button>
+                          )}
+                        </>
                       }
-                      onClick={() => setInspectRecordID(row.profile_id)}
                     >
                       <CardField
                         label={t("datasetInspectorTimeframeText")}

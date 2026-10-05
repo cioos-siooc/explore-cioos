@@ -489,16 +489,10 @@
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
   box-shadow: var(--cioos-shadow-card);
-  cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast),
     box-shadow var(--cioos-transition-fast);
-}
-
-.listCard:hover {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
 }
 
 .listCardSkeleton {
@@ -508,23 +502,6 @@
 /* A bar has no text baseline to align on. */
 .listCardSkeleton .listCardField {
   align-items: center;
-}
-
-.listCard:has(.listCardId:focus-visible) {
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
-button.listCardId {
-  padding: 0;
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-button.listCardId:focus-visible {
-  outline: none;
 }
 
 /* The record a map click resolved to, held at the top of the list: the same
@@ -551,15 +528,6 @@ button.listCardId:focus-visible {
   background-color: var(--cioos-map-click-surface);
 }
 
-/* Holds the selected look against the generic row hover, which would otherwise
-   repaint the border and ground of the one row the map is drawing. The
-   goldenrod family has no darker shade to hover into, so hovering a selected
-   row simply leaves it as it is. */
-.listCard.selected:hover {
-  background-color: var(--cioos-map-click-surface);
-  border-color: var(--cioos-map-click);
-}
-
 .listCardHead {
   display: flex;
   align-items: flex-start;
@@ -571,13 +539,14 @@ button.listCardId:focus-visible {
   min-width: 0;
 }
 
-.listCardAction {
-  flex: 0 0 auto;
+.listCardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
 }
 
-/* A record's "Show on map": pressed in the same goldenrod its card and what
-   the map draws for it wear (.listCard.selected). */
-.listCardMapButton {
+.listCardButton {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -592,17 +561,19 @@ button.listCardId:focus-visible {
   cursor: pointer;
 }
 
-.listCardMapButton:hover {
+.listCardButton:hover {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-surface-2);
 }
 
-.listCardMapButton:focus-visible {
+.listCardButton:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
 
-.listCardMapButton[aria-pressed="true"] {
+/* A record's "Show on map", pressed in the same goldenrod its card and what
+   the map draws for it wear (.listCard.selected). */
+.listCardButton[aria-pressed="true"] {
   border-color: var(--cioos-map-click);
   background-color: var(--cioos-map-click);
   color: var(--cioos-ink);

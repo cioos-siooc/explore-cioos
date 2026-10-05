@@ -17,6 +17,7 @@ HASH_NO_FILE_LIST = "HASH_NO_FILE_LIST"                  # Croissant lists no fi
 HASH_CROISSANT_HTTP_ERROR = "HASH_CROISSANT_HTTP_ERROR"  # .croissant endpoint returned non-200
 HASH_CROISSANT_UNREADABLE = "HASH_CROISSANT_UNREADABLE"  # request/JSON parse failed (timeout, bad JSON)
 HASH_FEDERATED_UNRESOLVED = "HASH_FEDERATED_UNRESOLVED"  # federated source not resolved within 3 hops
+HASH_CKAN_UNAVAILABLE = "HASH_CKAN_UNAVAILABLE"  # CKAN was down; unhashed so the next run re-enriches it
 
 
 class ResponseTooLargeError(Exception):

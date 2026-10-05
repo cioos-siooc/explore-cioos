@@ -6,14 +6,12 @@ import Skeleton from "../../ui/Skeleton.jsx";
 import "./styles.css";
 
 // One row of a dataset page's record list, as a card: the item's
-// id on top and its fields as label/value pairs beneath, each on its own line.
-// This is the shape that survives the sidebar's width — see CardList.jsx for
-// why these lists are cards at all.
+// id on top, its fields as label/value pairs beneath, each on its own line, and
+// its actions along the bottom. This is the shape that survives the sidebar's
+// width — see CardList.jsx for why these lists are cards at all.
 //
-// A div rather than a <button> because the card holds a description list and
-// possibly an action button, neither of which a button may contain. The id is
-// the keyboard target instead; its click bubbles to the card. Same treatment
-// DatasetCard uses.
+// The card itself does nothing on click: every action it offers is a labelled
+// button, so nothing happens that the reader didn't ask for by name.
 export default function ListCard({
   id,
   // Drawn on the map right now (a trajectory whose track is shown).
@@ -21,33 +19,18 @@ export default function ListCard({
   // Held at the top of the list because the last map click found this item —
   // wearing the same goldenrod the map put on what was clicked.
   pinned,
-  // A control of its own beside the id (a trajectory's "show on map"), doing
-  // something other than the card's click.
-  action,
-  onClick,
+  actions,
   children,
 }) {
   return (
-    <div
-      className={classNames("listCard", { selected, pinned })}
-      onClick={onClick}
-    >
+    <div className={classNames("listCard", { selected, pinned })}>
       <div className="listCardHead">
-        <button type="button" className="listCardId" title={id}>
+        <span className="listCardId" title={id}>
           {id}
-        </button>
-        {action && (
-          // Kept from reaching the card, whose click would open the preview too.
-          <span
-            className="listCardAction"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            {action}
-          </span>
-        )}
+        </span>
       </div>
       <dl className="listCardFields">{children}</dl>
+      {actions && <div className="listCardActions">{actions}</div>}
     </div>
   );
 }
@@ -112,13 +95,7 @@ export function useExpandableList(items, limit) {
   const shown = expanded ? items : items.slice(0, limit);
   const hidden = items.length - shown.length;
 
-  // Toggles usually sit inside something else clickable (a record card opens
-  // its preview on click) — stop the event there so expanding the list isn't
-  // read as that click too.
-  const toggle = (e) => {
-    e.stopPropagation();
-    setExpanded(!expanded);
-  };
+  const toggle = () => setExpanded(!expanded);
 
   return { shown, hidden, expanded, toggle };
 }
@@ -149,7 +126,6 @@ export function CardTags({ values, limit = 3 }) {
           type="button"
           className="listCardTagsMore"
           onClick={toggle}
-          onKeyDown={(e) => e.stopPropagation()}
           aria-expanded={expanded}
           title={
             expanded

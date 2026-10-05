@@ -13,7 +13,7 @@ import ListCard, {
 describe("ListCard", () => {
   it("renders its id and children as a description list", () => {
     renderWithProviders(
-      <ListCard id="rec-1" onClick={() => {}}>
+      <ListCard id="rec-1">
         <CardField label="Depth">10 m</CardField>
       </ListCard>,
     );
@@ -22,44 +22,13 @@ describe("ListCard", () => {
     expect(screen.getByText("10 m")).toBeInTheDocument();
   });
 
-  it("opens on a click anywhere, and from the keyboard through its id button", async () => {
+  it("does nothing on a click of its own; only its action buttons act", async () => {
     const user = userEvent.setup();
-    const onClick = vi.fn();
-    renderWithProviders(
-      <ListCard id="rec-1" onClick={onClick}>
-        x
-      </ListCard>,
-    );
-    await user.click(screen.getByText("x"));
-    expect(onClick).toHaveBeenCalledTimes(1);
-    screen.getByRole("button", { name: "rec-1" }).focus();
-    await user.keyboard("{Enter}");
-    expect(onClick).toHaveBeenCalledTimes(2);
-    await user.keyboard(" ");
-    expect(onClick).toHaveBeenCalledTimes(3);
-  });
-
-  it("carries selected/pinned as classes", () => {
-    renderWithProviders(
-      <ListCard id="rec-1" selected pinned onClick={() => {}}>
-        x
-      </ListCard>,
-    );
-    expect(document.querySelector(".listCard")).toHaveClass(
-      "selected",
-      "pinned",
-    );
-  });
-
-  it("keeps its action's click and keys from reaching the card", async () => {
-    const user = userEvent.setup();
-    const onClick = vi.fn();
     const onAction = vi.fn();
     renderWithProviders(
       <ListCard
         id="rec-1"
-        onClick={onClick}
-        action={
+        actions={
           <button type="button" onClick={onAction}>
             act
           </button>
@@ -68,12 +37,24 @@ describe("ListCard", () => {
         x
       </ListCard>,
     );
-    const action = screen.getByRole("button", { name: "act" });
-    await user.click(action);
-    action.focus();
-    await user.keyboard("{Enter}");
-    expect(onAction).toHaveBeenCalledTimes(2);
-    expect(onClick).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    await user.click(screen.getByText("x"));
+    await user.click(screen.getByText("rec-1"));
+    expect(onAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "act" }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("carries selected/pinned as classes", () => {
+    renderWithProviders(
+      <ListCard id="rec-1" selected pinned>
+        x
+      </ListCard>,
+    );
+    expect(document.querySelector(".listCard")).toHaveClass(
+      "selected",
+      "pinned",
+    );
   });
 });
 
@@ -134,17 +115,5 @@ describe("CardTags", () => {
     await user.click(more);
     expect(screen.getByText("c")).toBeInTheDocument();
     expect(screen.getByText("d")).toBeInTheDocument();
-  });
-
-  it("stops propagation so the toggle doesn't also trigger a parent's onClick", async () => {
-    const user = userEvent.setup();
-    const onClick = vi.fn();
-    renderWithProviders(
-      <div onClick={onClick}>
-        <CardTags values={["a", "b", "c"]} limit={1} />
-      </div>,
-    );
-    await user.click(screen.getByText("+2"));
-    expect(onClick).not.toHaveBeenCalled();
   });
 });
