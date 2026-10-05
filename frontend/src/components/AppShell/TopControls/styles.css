@@ -371,43 +371,56 @@
 }
 
 /* ------------------------------------------------------------------
- * Quick-filter line — "23 in view · 41 real-time · Area", one centred line
- * of type between the brand lockup and the tab strip.
+ * Tally — two centred lines between the brand lockup and the tab strip:
+ * "123/150 datasets", then the quick filters ("23 in view · 41 real-time ·
+ * Area").
  * ------------------------------------------------------------------ */
 .topBarStatusRow {
   display: flex;
-  justify-content: center;
-  padding: 4px 10px 6px;
-}
-
-/* The dataset tally under the Datasets label: plain type rather than a badge,
-   quieter than the label it sits under. Under rather than beside it, since a
-   third of the card has no room for both on one line once the label is
-   French. */
-.topBarDatasetsText {
-  display: inline-flex;
   flex-direction: column;
   align-items: center;
-  min-width: 0;
+  padding: 0 14px 4px;
 }
 
-.topBarDatasetsCount {
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 700;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
+/* The tally reads as the lockup's caption, so the brand row gives up most of
+   its bottom padding to it. */
+.brandCardTop:has(+ .topBarStatusRow) {
+  padding-bottom: 2px;
+}
+
+.topBarCountsRow {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
   color: var(--cioos-ink-60);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   transition: opacity var(--cioos-transition-fast);
 }
 
-.topBarButton.active .topBarDatasetsCount {
-  color: var(--cioos-on-primary);
-  opacity: 0.8;
+/* The total and the filtered number stacked in one cell, the total hidden:
+   the cell is as wide as the wider of the two, the filtered one set flush
+   against the slash. */
+.topBarCountsFiltered {
+  display: inline-grid;
+  justify-items: end;
 }
 
-/* Dimmed while a refetch is in flight: the previous number stays on screen
+.topBarCountsFiltered > * {
+  grid-area: 1 / 1;
+}
+
+.topBarCountsFiltered > [aria-hidden] {
+  visibility: hidden;
+}
+
+/* Dimmed while a refetch is in flight: the previous numbers stay on screen
    rather than collapsing back to a spinner — see the sidebar counters. */
-.topBarDatasetsCount.updating {
+.topBarCountsRow.updating {
   opacity: 0.45;
 }
 
@@ -522,12 +535,14 @@
     height: 15px;
   }
 
+  /* Inset as the mobile brand row is. */
   .topBarStatusRow {
-    padding: 4px 8px;
+    padding: 0 10px 4px;
   }
 
-  .topBarDatasetsCount {
-    font-size: var(--cioos-font-size-2xs);
+  .topBarCountsRow {
+    min-height: 0;
+    font-size: var(--cioos-font-size-xs);
   }
 }
 

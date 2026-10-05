@@ -108,7 +108,7 @@
   "topBarCoverageLabel": "Couverture temporelle",
   "topBarQuickFiltersLabel": "Filtres rapides",
   "topBarCountsSummary": "{{filtered, number}}/{{total, number}} jeux de données",
-  "topBarDatasetsCount": "{{count, number}}",
+  "topBarCountsUnit": "jeux de données",
   "quickFilterCount": "{{count, number}}",
   "quickFilterCountedInView": "visibles",
   "quickFilterCountedRealtime": "temps réel",

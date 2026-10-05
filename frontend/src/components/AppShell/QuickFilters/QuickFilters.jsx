@@ -23,9 +23,10 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
 
 // The quick filters: the one-click ones that act on the map or are a single
-// toggle rather than a list of options, as one line of type in the brand card
-// (see TopControls) — "23 in view · 41 real-time · Area". Each counted one
-// names how many of the filtered datasets it would leave.
+// toggle rather than a list of options, read as the rest of the brand card's
+// tally line (see TopControls) — "2,167 datasets · 23 in view · 41 real-time
+// · Area". Each counted one names how many of the filtered datasets it would
+// leave, so the tally and the toggles are the same line rather than two.
 // Search has no button here: the Filters button, Ctrl/⌘+K and typing on the
 // map all open the search palette (see FilterSearch). Like every other filter,
 // what they have set is also named by a chip below (see ActiveFilterChips).

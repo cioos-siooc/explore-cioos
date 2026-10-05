@@ -44,16 +44,17 @@ function measureTopBarSpace(rect) {
   return rect.bottom + TOP_BAR_GAP;
 }
 
-// Centered top header. First layer: the brand bar. Second layer: the quick
-// filters (see QuickFilters). Third layer, a single segmented pill of three
-// equal-width peers — Datasets (opens/closes the left datasets sidebar, and
-// carries the dataset tally) and Coverage (opens the time-distribution
-// histogram) are the two ways to look at the current selection, and Filters
-// (opens the filters modal) is the one way to change it. Every segment
-// carries a dimmed-primary wash so they read as the map's primary entry
-// points.
+// Centered top header. First layer: the brand bar. Second layer: the dataset
+// tally (shown / in view / total), which is what the layer below acts on.
+// Third layer, a single segmented pill of three equal-width peers — Datasets
+// (opens/closes the left datasets sidebar) and Coverage (opens the
+// time-distribution histogram) are the two ways to look at the current
+// selection, and Filters (opens the filters modal) is the one way to change
+// it. Every segment carries a dimmed-primary wash so they read as the map's
+// primary entry points.
 //
-// The active-filter chips flow beneath the card,
+// The quick filters (see QuickFilters) share the tally's strip, since that is
+// the number they narrow. The active-filter chips flow beneath the card,
 // folded away by the small chevron riding on the far side of the Filters
 // segment: it reads as part of the button that already names the filter
 // state, rather than a fourth control among the chips it hides.
@@ -85,6 +86,7 @@ export default function TopControls() {
     <div className="topBar" ref={barRef} data-testid="top-bar">
       <BrandSearch>
         <div className="topBarStatusRow">
+          <DatasetCounts />
           <QuickFilters />
         </div>
         <div className="topBarActions" data-testid="top-bar-actions">
@@ -105,11 +107,8 @@ export default function TopControls() {
             }
           >
             <ListUl size={18} aria-hidden="true" />
-            <span className="topBarDatasetsText">
-              <span className="topBarButtonLabel">
-                {t("topBarDatasetsLabel")}
-              </span>
-              <DatasetCounts />
+            <span className="topBarButtonLabel">
+              {t("topBarDatasetsLabel")}
             </span>
           </button>
           <button

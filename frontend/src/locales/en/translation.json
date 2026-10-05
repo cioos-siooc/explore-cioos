@@ -108,7 +108,7 @@
   "topBarCoverageLabel": "Time coverage",
   "topBarQuickFiltersLabel": "Quick filters",
   "topBarCountsSummary": "{{filtered, number}}/{{total, number}} datasets",
-  "topBarDatasetsCount": "{{count, number}}",
+  "topBarCountsUnit": "datasets",
   "quickFilterCount": "{{count, number}}",
   "quickFilterCountedInView": "in view",
   "quickFilterCountedRealtime": "real-time",
