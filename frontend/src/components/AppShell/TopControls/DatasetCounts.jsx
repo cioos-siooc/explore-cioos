@@ -8,8 +8,9 @@ import useDatasetCounts from "../../../state/useDatasetCounts.js";
 // The dataset tally — "123/150 datasets" — centred between the brand lockup
 // and the Datasets/Filters tabs.
 //
-// The filtered number holds the total's width (a hidden copy of the total
-// sits under it), so filtering never shifts the line.
+// With nothing filtered out, the total alone: "150/150" said it twice. Once
+// filtered, the filtered number holds the total's width (a hidden copy of the
+// total sits under it), so further filtering never shifts the line.
 //
 // Until `ready` there is no count to show — not even a zero — so the strip is a
 // spinner. See useDatasetCounts.
@@ -20,6 +21,7 @@ export default function DatasetCounts() {
     updating: countsUpdating,
     filteredCount,
     total,
+    allDatasetsShown,
   } = useDatasetCounts();
 
   // A failed /datasets leaves no catalogue total; what came back filtered is
@@ -43,11 +45,18 @@ export default function DatasetCounts() {
             total: totalCount,
           })}
         >
-          <span className="topBarCountsFiltered">
-            <span aria-hidden="true">{format(totalCount)}</span>
-            <span>{format(filteredCount)}</span>
-          </span>
-          /{format(totalCount)} {t("topBarCountsUnit")}
+          {allDatasetsShown ? (
+            format(totalCount)
+          ) : (
+            <>
+              <span className="topBarCountsFiltered">
+                <span aria-hidden="true">{format(totalCount)}</span>
+                <span>{format(filteredCount)}</span>
+              </span>
+              /{format(totalCount)}
+            </>
+          )}{" "}
+          {t("topBarCountsUnit")}
         </span>
       )}
     </div>
