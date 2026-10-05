@@ -47,8 +47,9 @@ function measureTopBarSpace(rect) {
 // it. Every segment carries a dimmed-primary wash so they read as the map's
 // primary entry points.
 //
-// The quick filters (see QuickFilters) share the tally's strip, since that is
-// the number they narrow. The active-filter chips flow beneath the card.
+// Under the card, on the map rather than in it, the quick filters (see
+// QuickFilters) — the ones that act on the map instead of on a list of
+// options. The active-filter chips flow beneath those, staying centered.
 export default function TopControls() {
   const { t } = useTranslation();
   // The same list the chips below render, so the badge can never report a
@@ -64,8 +65,9 @@ export default function TopControls() {
   } = useUI();
   const { inspectDataset } = useSelection();
   const { tipHighlight } = useTips();
-  // A dataset page minimized to the map: the card naming it hangs under the
-  // brand card.
+  // A dataset page minimized to the map: the card naming it takes the quick
+  // filters' place under the brand card, since those act on the whole catalogue
+  // rather than on the one dataset the map is keyed to.
   const datasetMinimized = Boolean(inspectDataset) && !sidebarOpen;
 
   const barRef = useRef(null);
@@ -76,7 +78,6 @@ export default function TopControls() {
       <BrandSearch>
         <div className="topBarStatusRow">
           <DatasetCounts />
-          <QuickFilters />
         </div>
         <div className="topBarActions" data-testid="top-bar-actions">
           <button
@@ -144,8 +145,12 @@ export default function TopControls() {
           </button>
         </div>
       </BrandSearch>
-      <TopBarRow contentKey={datasetMinimized ? "dataset" : null}>
-        {datasetMinimized && <DatasetMapCard dataset={inspectDataset} />}
+      <TopBarRow contentKey={datasetMinimized ? "dataset" : "filters"}>
+        {datasetMinimized ? (
+          <DatasetMapCard dataset={inspectDataset} />
+        ) : (
+          <QuickFilters />
+        )}
       </TopBarRow>
       <TopBarRow contentKey="chips">
         <ActiveFilterChips />

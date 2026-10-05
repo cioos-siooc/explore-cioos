@@ -49,18 +49,6 @@ describe("ActiveFilterChips", () => {
     );
   });
 
-  it("ends the row with a Clear all that drops every filter", async () => {
-    const user = userEvent.setup({ delay: null });
-    open("eovs=oxygen&platforms=mooring");
-    await waitFor(() => expect(groups()).toHaveLength(2));
-
-    await user.click(screen.getByTestId("filter-chips-clear-all"));
-
-    await waitFor(() =>
-      expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
-    );
-  });
-
   it("marks an excluded value with a NOT tag, apart from the included ones", async () => {
     open("eovs=oxygen&excludeEovs=subSurfaceTemperature&excludeLayers=grid");
     await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));
@@ -183,8 +171,6 @@ describe("ActiveFilterChips", () => {
     expect(names.some((name) => name.includes("Oxygen"))).toBe(true);
   });
 
-  // Show/Hide lives on the main Filters button (see TopControls.test.jsx).
-
   // A quick filter's own button lights up instead (see QuickFilters).
   it("leaves the quick filters to their buttons", async () => {
     open(
@@ -199,7 +185,6 @@ describe("ActiveFilterChips", () => {
     expect(group("realtime")).toBeNull();
   });
 
-  // Their Clear all moves up into the quick-filter row (see QuickFilters).
   it("shows no row for quick filters alone", async () => {
     open("onlyInView=true&realtimeOnly=true");
     await waitFor(() =>

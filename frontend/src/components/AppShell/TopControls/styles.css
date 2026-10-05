@@ -1,8 +1,8 @@
 /* ------------------------------------------------------------------
  * TopBar — the centered top header floating over the map. First layer:
- * the brand bar, with the tally and quick filters (QuickFilters, which
- * brings its own stylesheet) and the merged Datasets/Filters segmented pill
- * welded in. The active-filter chips flow beneath. Everything stays centered
+ * the brand bar, with the tally and the merged Datasets/Filters segmented
+ * pill welded in. The quick filters (QuickFilters, which brings its own
+ * stylesheet) and the active-filter chips flow beneath. Everything stays centered
  * on the horizontal midline of the viewport.
  * ------------------------------------------------------------------ */
 .topBar {
@@ -311,9 +311,8 @@
 }
 
 /* ------------------------------------------------------------------
- * Tally — two centred lines between the brand lockup and the tab strip:
- * "123/150 datasets", then the quick filters ("23 in view · 41 real-time ·
- * Area").
+ * Tally — one centred line between the brand lockup and the tab strip:
+ * "123/150 datasets".
  * ------------------------------------------------------------------ */
 .topBarStatusRow {
   display: flex;
@@ -492,8 +491,7 @@
  * bar — one wrapping row of small pills. Each group is its
  * own flex chunk (name pill + its values) so a group's label never wraps away
  * from its own first value; the chunks themselves wrap onto new lines as the
- * row runs out of width. Show/Hide lives on the Filters button (see
- * TopControls); Clear all is the row's last chip.
+ * row runs out of width.
  * ------------------------------------------------------------------ */
 .activeFiltersPanel {
   display: flex;
@@ -514,44 +512,6 @@
   width: fit-content;
   max-width: calc(100vw - 48px);
   align-self: center;
-}
-
-/* Never squeezed by the phone's one scrolling line. */
-.activeFilterClearAll {
-  flex: 0 0 auto;
-}
-
-/* Drawn like a group's name pill, since it acts on whole groups too; its hover
-   takes the destructive-action red the groups' own remove buttons use. */
-.activeFilterClearAllButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 12px 3px 8px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-float);
-  font: inherit;
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--cioos-ink-80);
-  cursor: pointer;
-  transition:
-    background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast);
-}
-
-.activeFilterClearAllButton:hover {
-  border-color: transparent;
-  background-color: var(--cioos-error);
-  color: var(--cioos-white);
-}
-
-.activeFilterClearAllButton:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
 }
 
 /* One group: its name pill immediately followed by its own value chips,

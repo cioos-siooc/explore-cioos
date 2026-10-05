@@ -317,12 +317,6 @@ export default function SelectionProvider({ children }) {
       filteredDatasets.filter((row) => datasetsInViewPks.has(row.pk)).length,
     [filteredDatasets, datasetsInViewPks],
   );
-  // Real-time narrows server-side, so with it on this is the whole filtered
-  // count, and with it off how many it would leave.
-  const realtimeCount = useMemo(
-    () => filteredDatasets.filter((row) => row.is_realtime).length,
-    [filteredDatasets],
-  );
 
   // filteredDatasets as a pk list, for the queries that ask a question about
   // the filtered data rather than draw it (the coverage figure). Everything
@@ -932,7 +926,6 @@ export default function SelectionProvider({ children }) {
     platformsAvailable,
     datasetsInViewPks,
     inViewCount,
-    realtimeCount,
     onlyInView,
     setOnlyInView,
     groupBy,

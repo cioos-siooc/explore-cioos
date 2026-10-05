@@ -1,13 +1,11 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { ArrowCounterclockwise, X } from "react-bootstrap-icons";
+import { X } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
-import classNames from "classnames";
 
 import useActiveFilters, {
   QUICK_FILTER_KEYS,
 } from "../../../state/useActiveFilters.js";
-import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 // How many values a group shows before folding the rest behind a "+N" chip —
@@ -25,10 +23,8 @@ const MAX_VISIBLE_VALUES = 2;
 // button that clears the whole group — immediately followed by its chosen
 // values as lighter pills. Clicking the name jumps to that filter's page (the
 // Filters modal, or the search palette for the title search), and each value
-// can still be dropped on its own. Show/Hide lives on the main Filters button
-// instead of here (see TopControls) — one toggle for this row and the quick
-// filters above it, rather than each keeping its own. Clear all is the row's
-// last chip; with only quick filters set it sits in their row instead.
+// can still be dropped on its own. Clear all is the quick filters' Reset (see
+// QuickFilters).
 export default function ActiveFilterChips() {
   const { t } = useTranslation();
   const allFilters = useActiveFilters();
@@ -178,29 +174,6 @@ export default function ActiveFilterChips() {
           </li>
         );
       })}
-      <li className="activeFilterClearAll">
-        <ClearAllFiltersButton />
-      </li>
     </ul>
-  );
-}
-
-export function ClearAllFiltersButton({ className }) {
-  const { t } = useTranslation();
-  const [, resetAll] = useResetAllFilters();
-  return (
-    <button
-      type="button"
-      className={classNames("activeFilterClearAllButton", className)}
-      data-testid="filter-chips-clear-all"
-      onClick={resetAll}
-      title={t("resetFiltersButtonTooltipText")}
-      aria-label={t("filtersPanelResetAll")}
-    >
-      <ArrowCounterclockwise size={14} aria-hidden="true" />
-      <span className="activeFilterClearAllText">
-        {t("filtersPanelResetAll")}
-      </span>
-    </button>
   );
 }

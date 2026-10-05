@@ -5,10 +5,8 @@ import classNames from "classnames";
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 
-// The dataset tally — "123/150 datasets" — at the left of the strip it shares
-// with the quick filters, between the brand lockup and the Datasets/Filters
-// tabs. How many of those the viewport holds rides on the In view filter
-// instead (see QuickFilters).
+// The dataset tally — "123/150 datasets" — centred between the brand lockup
+// and the Datasets/Filters tabs.
 //
 // The filtered number holds the total's width (a hidden copy of the total
 // sits under it), so filtering never shifts the line.

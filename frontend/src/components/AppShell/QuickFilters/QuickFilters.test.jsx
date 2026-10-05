@@ -1,6 +1,6 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, beforeEach } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -32,7 +32,7 @@ describe("QuickFilters", () => {
   // The row writes nothing of its own: the Area menu sends the same one-shot
   // requestDraw the map already answers, asserted through that shared state
   // rather than through the markup.
-  function renderRow(url = "/", { withChips = false } = {}) {
+  function renderRow(url = "/") {
     const seen = { search: [], draw: [], onlyInView: [], realtimeOnly: [] };
     function Probe() {
       const { datasetTitleSearchText, onlyInView } = useSelection();
@@ -48,7 +48,6 @@ describe("QuickFilters", () => {
     renderWithProviders(
       <>
         <QuickFilters />
-        {withChips && <ActiveFilterChips />}
         <Probe />
       </>,
       { url, providers: "app" },
@@ -139,73 +138,6 @@ describe("QuickFilters", () => {
     expect(button).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("names how many datasets the view holds on the in-view button", async () => {
-    // The fixture rows carry no bbox; give every one the same point so a
-    // world-sized viewport has them all in view.
-    const mockedFetch = globalThis.fetch;
-    vi.stubGlobal("fetch", async (input) => {
-      const response = await mockedFetch(input);
-      const url = typeof input === "string" ? input : input.url;
-      if (!url.includes("/pointQuery")) return response;
-      const rows = (await response.json()).map((row) => ({
-        ...row,
-        filtered_bbox_geojson: { type: "Point", coordinates: [-63, 44] },
-      }));
-      return new Response(JSON.stringify(rows), { status: 200 });
-    });
-    const latest = {};
-    function ViewProbe() {
-      latest.setMapView = useMapState().setMapView;
-      latest.points = useSelection().pointsData;
-      return null;
-    }
-    renderWithProviders(
-      <>
-        <QuickFilters />
-        <ViewProbe />
-      </>,
-      { providers: "app" },
-    );
-    await waitFor(() => expect(latest.points.length).toBeGreaterThan(0));
-
-    act(() =>
-      latest.setMapView((view) => ({
-        ...view,
-        bounds: [
-          [-180, -90],
-          [180, 90],
-        ],
-      })),
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("quick-filter-in-view-count"),
-      ).toHaveTextContent(String(latest.points.length)),
-    );
-  });
-
-  it("names how many datasets are real-time on the real-time button", async () => {
-    const mockedFetch = globalThis.fetch;
-    vi.stubGlobal("fetch", async (input) => {
-      const response = await mockedFetch(input);
-      const url = typeof input === "string" ? input : input.url;
-      if (!url.includes("/pointQuery")) return response;
-      const rows = (await response.json()).map((row, i) => ({
-        ...row,
-        is_realtime: i < 2,
-      }));
-      return new Response(JSON.stringify(rows), { status: 200 });
-    });
-    renderRow();
-
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("quick-filter-realtime-count"),
-      ).toHaveTextContent("2"),
-    );
-  });
-
   it("toggles the real-time narrowing", async () => {
     const { user, seen } = renderRow();
     const button = screen.getByTestId("quick-filter-realtime");
@@ -232,45 +164,29 @@ describe("QuickFilters", () => {
     );
   });
 
-  it("holds Clear all in the row while only quick filters are set", async () => {
-    const { user, seen } = renderRow("/?onlyInView=true&realtimeOnly=true");
-    const row = screen.getByTestId("quick-filters");
-
-    await user.click(within(row).getByTestId("filter-chips-clear-all"));
-
-    await waitFor(() => {
-      expect(seen.onlyInView.at(-1)).toBe(false);
-      expect(seen.realtimeOnly.at(-1)).toBe(false);
-    });
-    expect(within(row).queryByTestId("filter-chips-clear-all")).toBeNull();
+  it("keeps the reset in place but disabled until something is set", () => {
+    renderRow();
+    expect(screen.getByTestId("quick-filter-reset")).toBeDisabled();
   });
 
-  it("leaves Clear all to the chips once another filter is set", async () => {
-    renderRow("/?realtimeOnly=true&eovs=oxygen", { withChips: true });
-    const chips = await screen.findByTestId("active-filter-chips");
-
-    expect(within(chips).getByTestId("filter-chips-clear-all")).toBeVisible();
-    expect(
-      within(screen.getByTestId("quick-filters")).queryByTestId(
-        "filter-chips-clear-all",
-      ),
-    ).toBeNull();
+  it("enables the reset once anything is set", () => {
+    renderRow("/?realtimeOnly=true");
+    expect(screen.getByTestId("quick-filter-reset")).toBeEnabled();
   });
 
-  it("is named as a group for assistive tech", () => {
+  it("is named by its visible label", () => {
     renderRow();
     expect(
       screen.getByRole("group", { name: "Quick filters" }),
     ).toBeInTheDocument();
   });
 
-  it("is cleared along with everything else by the chips' Clear all", async () => {
+  it("drops every quick filter at once", async () => {
     const { user, seen } = renderRow(
       `/?search=temperature&onlyInView=true&realtimeOnly=true`,
-      { withChips: true },
     );
 
-    await user.click(await screen.findByTestId("filter-chips-clear-all"));
+    await user.click(screen.getByTestId("quick-filter-reset"));
 
     await waitFor(() => {
       expect(seen.search.at(-1)).toBe("");
@@ -280,7 +196,10 @@ describe("QuickFilters", () => {
     });
   });
 
-  it("Clear all drops the modal filter along with the quick ones", async () => {
+  // There is only the one reset, for the modal filters the chips show and the
+  // quick ones together — mounted alongside ActiveFilterChips here rather than
+  // in that component's own tests, since it renders no reset of its own.
+  it("the single reset clears the modal filter along with the quick ones", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
@@ -293,7 +212,7 @@ describe("QuickFilters", () => {
       expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(1),
     );
 
-    await user.click(screen.getByTestId("filter-chips-clear-all"));
+    await user.click(screen.getByTestId("quick-filter-reset"));
 
     await waitFor(() =>
       expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(0),
