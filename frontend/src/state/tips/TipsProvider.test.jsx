@@ -14,7 +14,11 @@ import { TIPS, useTips } from "./TipsProvider.jsx";
 // time bar, …), plus a modal flag to hold them back with.
 function Probe() {
   const { offerTip, tipHighlight, startTour } = useTips();
-  const { setShowFiltersModal } = useUI();
+  const {
+    setShowFiltersModal,
+    quickFiltersCollapsed,
+    setQuickFiltersCollapsed,
+  } = useUI();
   return (
     <>
       <button type="button" onClick={() => offerTip("reshapeArea")}>
@@ -32,8 +36,14 @@ function Probe() {
       <button type="button" onClick={() => startTour("timeCoverage")}>
         start tour
       </button>
+      <button type="button" onClick={() => setQuickFiltersCollapsed(true)}>
+        fold quick filters
+      </button>
       <span data-testid="feature-query-request">
         {useMapState().featureQueryRequest?.lngLat.join(",") ?? "none"}
+      </span>
+      <span data-testid="quick-filters">
+        {quickFiltersCollapsed ? "folded" : "shown"}
       </span>
       <button type="button" onClick={() => setShowFiltersModal(true)}>
         open filters
@@ -287,6 +297,21 @@ describe("contextual tips", () => {
       expect(screen.getByTestId("feature-query-request")).not.toHaveTextContent(
         "none",
       );
+    });
+
+    it("sets up the step so its control is on screen", async () => {
+      returningVisitor();
+      const { user } = renderProbe();
+      await user.click(screen.getByText("fold quick filters"));
+      await user.click(screen.getByText("start tour"));
+      for (
+        let i = TIPS.indexOf("timeCoverage");
+        i > TIPS.indexOf("inView");
+        i -= 1
+      )
+        await user.click(screen.getByRole("button", { name: "Previous tip" }));
+      expect(card()).toHaveTextContent(/In view button/);
+      expect(screen.getByTestId("quick-filters")).toHaveTextContent("shown");
     });
   });
 });
