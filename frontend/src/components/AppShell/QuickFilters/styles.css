@@ -1,128 +1,104 @@
 /* ------------------------------------------------------------------
- * Quick filters — round buttons floating under the top bar, one per filter
- * that acts on the map rather than on a list of options. A layer of its own
- * rather than another band welded into the brand card: these are the map's
- * tools, and they read as sitting on the map with it.
+ * Quick filters — the rest of the brand card's tally line (see
+ * .topBarStatusRow), set as type rather than chrome: each is a phrase of the
+ * line — "23 in view" — dot-separated from the next, and pressable the way a
+ * link is, by its underline. Dotted while off; set, the underline goes solid
+ * and the phrase takes the primary colour.
  * ------------------------------------------------------------------ */
 .quickFilters {
-  position: relative;
   display: flex;
-
-  /* Wrapping is what holds the row inside the screen at every width rather
-     than pushing the page sideways. */
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-
-  /* Wide enough apart for the captions under each button, and the row's own
-     bottom padding holds them clear of the chips below. */
-  gap: 24px 30px;
-  padding-bottom: 13px;
+  gap: 2px 8px;
 }
 
 .quickFilterButton {
-  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid var(--cioos-hairline);
-
-  /* No --cioos-radius-circle in theme.css; every circle in the app draws its
-     own, as .brandMinorItem does. */
-  border-radius: 50%;
-  background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
+  gap: 4px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--cioos-ink-60);
   cursor: pointer;
-  box-shadow: var(--cioos-shadow-float);
-  transition:
-    background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast),
-    box-shadow var(--cioos-transition-fast);
+  transition: color var(--cioos-transition-fast);
+}
+
+.quickFilterButton > svg {
+  color: var(--cioos-primary);
 }
 
 .quickFilterButton:hover {
-  background-color: var(--cioos-surface-2);
   color: var(--cioos-primary-800);
 }
 
-/* Set: the same solid-primary fill and raised chip the top bar's own segments
-   wear when what they control is on (see .topBarButton.active) — a lightened
-   full-perimeter ring over the shared 3D shadow, so a lit button reads as
-   pressed and lifted rather than merely a different colour. Icons draw with
-   currentColor, so the fill alone recolors them. */
 .quickFilterButton.applied {
-  border-color: transparent;
-  background-color: var(--cioos-primary);
-  color: var(--cioos-on-primary);
-  transform: var(--cioos-perspective);
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 55%),
-    var(--cioos-shadow-3d-sm);
-}
-
-.quickFilterButton.applied:hover {
-  background-color: var(--cioos-primary-700);
-  color: var(--cioos-white);
+  color: var(--cioos-primary-700);
 }
 
 .quickFilterButton:focus-visible {
   outline: none;
+  border-radius: var(--cioos-radius-sm);
   box-shadow: var(--cioos-focus);
 }
 
-/* Hung below the circle rather than inside it, so the circles keep their size
-   and the row just spaces out to make room. The white pill keeps it legible
-   over whatever the map draws beneath. */
-.quickFilterCaption {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: var(--cioos-font-size-2xs);
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  color: var(--cioos-ink);
-  padding: 3px 6px;
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  pointer-events: none;
+.quickFilterCount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Clear all, while only quick filters are set: hung off the row's end, out of
-   the flow, so the buttons keep their centered place whether it shows or not.
-   Centered on the 40px buttons rather than on the row, whose bottom padding
-   is room for captions. */
+.quickFilterCaption {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.quickFilterButton.applied .quickFilterCaption {
+  text-decoration: underline solid 2px;
+}
+
+.quickFilterDot {
+  font-weight: 700;
+  color: var(--cioos-ink-40);
+}
+
+/* Clear all, while only quick filters are set: the line's last word, an icon
+   alone so the line holds — still named by its aria-label and title. */
 .quickFilters .quickFiltersClearAll {
-  position: absolute;
-  top: 20px;
-  left: calc(100% + 16px);
-  transform: translateY(-50%);
+  padding: 2px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--cioos-ink-60);
+}
+
+.quickFilters .quickFiltersClearAll:hover {
+  color: var(--cioos-primary-800);
+}
+
+.quickFiltersClearAll .activeFilterClearAllText {
+  display: none;
 }
 
 /* ------------------------------------------------------------------
  * The Area control: one button whose menu picks box or polygon. The menu
- * hangs where the caption sits, so the caption steps aside while it is open,
- * and it stacks above the active-filter chips that follow in the top bar.
+ * hangs over the tab strip below, so it stacks above it.
  * ------------------------------------------------------------------ */
 .quickFilterArea {
   position: relative;
   flex: 0 0 auto;
 }
 
-.quickFilterArea.open .quickFilterCaption {
-  display: none;
-}
-
 .quickFilterAreaMenu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -159,69 +135,4 @@
 .quickFilterAreaItem:focus-visible {
   outline: none;
   box-shadow: inset var(--cioos-focus);
-}
-
-/* ------------------------------------------------------------------
- * Large screen with a mouse: the buttons' titles and hover say what each one
- * does, so a caption shows only for the button being pointed at (or focused
- * from the keyboard), and the row packs back together without the room three
- * standing captions needed.
- * ------------------------------------------------------------------ */
-@media (min-width: 701px) and (min-height: 501px) and (hover: hover) and (pointer: fine) {
-  .quickFilters {
-    gap: 8px 18px;
-
-    /* Room for the hovered button's caption, so it doesn't land on the chips. */
-    padding-bottom: 13px;
-  }
-
-  .quickFilterCaption {
-    opacity: 0;
-    transition: opacity var(--cioos-transition-fast);
-  }
-
-  .quickFilterButton:hover .quickFilterCaption,
-  .quickFilterButton:focus-visible .quickFilterCaption {
-    opacity: 1;
-  }
-}
-
-/* ------------------------------------------------------------------
- * Mobile: the top bar is a full-bleed header stretching its children, which
- * would pull this row's buttons apart across the screen. It keeps its own
- * width instead and stays centered under the header.
- * ------------------------------------------------------------------ */
-@media (max-width: 700px), (max-height: 500px) {
-  .quickFilters {
-    align-self: center;
-    max-width: calc(100vw - 16px);
-
-    /* Three 40px buttons across a 360px screen, spaced so neighbouring
-       captions at the phone size ("Visibles", "Temps réel") clear each other. */
-    gap: 20px 30px;
-    padding-bottom: 18px;
-  }
-
-  .quickFilterCaption {
-    padding: 3px 4px;
-  }
-
-  /* No room beside the buttons for the words: a round icon button like
-     theirs, still named by its aria-label and title. */
-  .quickFilters .quickFiltersClearAll {
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border-radius: 50%;
-  }
-
-  .quickFiltersClearAll .activeFilterClearAllText {
-    display: none;
-  }
-
-  .quickFiltersClearAll svg {
-    width: 18px;
-    height: 18px;
-  }
 }

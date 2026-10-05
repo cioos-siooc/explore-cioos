@@ -53,13 +53,11 @@ function measureTopBarSpace(rect) {
 // it. Every segment carries a dimmed-primary wash so they read as the map's
 // primary entry points.
 //
-// Under the card, on the map rather than in it, the quick filters (see
-// QuickFilters) — the ones that act on the map instead of on a list of
-// options. The active-filter chips flow beneath those, staying centered.
-// Both of those rows fold away together, toggled by the small chevron riding
-// on the far side of the Filters segment: it reads as part of the button that
-// already names the filter state, rather than a fourth control among the
-// tools it hides.
+// The quick filters (see QuickFilters) share the tally's strip, since that is
+// the number they narrow. The active-filter chips flow beneath the card,
+// folded away by the small chevron riding on the far side of the Filters
+// segment: it reads as part of the button that already names the filter
+// state, rather than a fourth control among the chips it hides.
 export default function TopControls() {
   const { t } = useTranslation();
   // The same list the chips below render, so the badge can never report a
@@ -72,14 +70,13 @@ export default function TopControls() {
     setShowCoverageModal,
     sidebarOpen,
     setSidebarOpen,
-    quickFiltersCollapsed,
-    setQuickFiltersCollapsed,
+    filterChipsCollapsed,
+    setFilterChipsCollapsed,
   } = useUI();
   const { inspectDataset } = useSelection();
   const { tipHighlight } = useTips();
-  // A dataset page minimized to the map: the card naming it takes the quick
-  // filters' place under the brand card, since those act on the whole catalogue
-  // rather than on the one dataset the map is keyed to.
+  // A dataset page minimized to the map: the card naming it hangs under the
+  // brand card.
   const datasetMinimized = Boolean(inspectDataset) && !sidebarOpen;
 
   const barRef = useRef(null);
@@ -88,7 +85,10 @@ export default function TopControls() {
   return (
     <div className="topBar" ref={barRef} data-testid="top-bar">
       <BrandSearch>
-        <DatasetCounts />
+        <div className="topBarStatusRow">
+          <DatasetCounts />
+          <QuickFilters />
+        </div>
         <div className="topBarActions" data-testid="top-bar-actions">
           <button
             type="button"
@@ -158,30 +158,27 @@ export default function TopControls() {
                 </span>
               )}
             </button>
-            {/* Show/Hide for the quick-filter row and the active-filter
-                chips beneath it (see QuickFilters, ActiveFilterChips) — one
-                toggle for both, riding on the button that already names
+            {/* Show/Hide for the active-filter chips beneath the card (see
+                ActiveFilterChips), riding on the button that already names
                 whether any filter is set. */}
             <button
               type="button"
               className="topBarFiltersToggle"
-              data-testid="quick-filters-toggle"
-              onClick={() =>
-                setQuickFiltersCollapsed((collapsed) => !collapsed)
-              }
-              aria-expanded={!quickFiltersCollapsed}
+              data-testid="filter-chips-toggle"
+              onClick={() => setFilterChipsCollapsed((collapsed) => !collapsed)}
+              aria-expanded={!filterChipsCollapsed}
               aria-label={
-                quickFiltersCollapsed
+                filterChipsCollapsed
                   ? t("quickFiltersShow")
                   : t("quickFiltersHide")
               }
               title={
-                quickFiltersCollapsed
+                filterChipsCollapsed
                   ? t("quickFiltersShow")
                   : t("quickFiltersHide")
               }
             >
-              {quickFiltersCollapsed ? (
+              {filterChipsCollapsed ? (
                 <ChevronDown size={16} aria-hidden="true" />
               ) : (
                 <ChevronUp size={16} aria-hidden="true" />
@@ -190,22 +187,10 @@ export default function TopControls() {
           </div>
         </div>
       </BrandSearch>
-      <TopBarRow
-        contentKey={
-          datasetMinimized
-            ? "dataset"
-            : quickFiltersCollapsed
-              ? null
-              : "filters"
-        }
-      >
-        {datasetMinimized ? (
-          <DatasetMapCard dataset={inspectDataset} />
-        ) : (
-          <QuickFilters />
-        )}
+      <TopBarRow contentKey={datasetMinimized ? "dataset" : null}>
+        {datasetMinimized && <DatasetMapCard dataset={inspectDataset} />}
       </TopBarRow>
-      <TopBarRow contentKey={quickFiltersCollapsed ? null : "chips"}>
+      <TopBarRow contentKey={filterChipsCollapsed ? null : "chips"}>
         <ActiveFilterChips />
       </TopBarRow>
     </div>

@@ -66,11 +66,9 @@ export default function UIProvider({ children }) {
   const [showSelectionHelpModal, setShowSelectionHelpModal] = useState(false);
   // Which filter flyout is open inside the filters modal (one at a time).
   const [openFilter, setOpenFilter] = useState();
-  // The quick-filter row and the active-filter chips under it (see
-  // QuickFilters, ActiveFilterChips): shown by default, put away together by
-  // one toggle living on the main Filters button, rather than each row
-  // keeping its own.
-  const [quickFiltersCollapsed, setQuickFiltersCollapsed] = useState(false);
+  // The active-filter chips under the top bar (see ActiveFilterChips): shown
+  // by default, put away by the toggle living on the main Filters button.
+  const [filterChipsCollapsed, setFilterChipsCollapsed] = useState(false);
   // The intro opens by itself until it has been closed once, so a reload
   // before dismissing it still shows it.
   const [introSeen, setIntroSeen] = usePersistentState("introSeen", false);
@@ -137,8 +135,8 @@ export default function UIProvider({ children }) {
     setShowSelectionHelpModal,
     openFilter,
     setOpenFilter,
-    quickFiltersCollapsed,
-    setQuickFiltersCollapsed,
+    filterChipsCollapsed,
+    setFilterChipsCollapsed,
     showIntroModal,
     setShowIntroModal,
     showPrivacyModal,

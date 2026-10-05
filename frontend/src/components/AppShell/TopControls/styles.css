@@ -1,9 +1,9 @@
 /* ------------------------------------------------------------------
  * TopBar — the centered top header floating over the map. First layer:
- * the brand bar. Second layer: the merged Datasets/Filters segmented
- * pill. The quick-filter buttons flow beneath (QuickFilters, which brings
- * its own stylesheet), then the active-filter chips. Everything
- * stays centered on the horizontal midline of the viewport.
+ * the brand bar, with the tally and quick filters (QuickFilters, which
+ * brings its own stylesheet) and the merged Datasets/Filters segmented pill
+ * welded in. The active-filter chips flow beneath. Everything stays centered
+ * on the horizontal midline of the viewport.
  * ------------------------------------------------------------------ */
 .topBar {
   position: fixed;
@@ -371,27 +371,38 @@
 }
 
 /* ------------------------------------------------------------------
- * Dataset tally — one compact line of type between the brand lockup and the
- * tab strip: "123/150 datasets ( 23 in view )". Banded rather than floated on
- * the card face: a full-bleed strip ruled off top and bottom, so it is plainly
- * its own section and not a caption belonging to either neighbour. Kept to a
- * single line — it is a readout, and every pixel it takes comes off the map.
+ * Tally line — "123/150 datasets · 23 in view · 41 real-time · Area", the
+ * count and the quick filters as one centred line of type between the brand
+ * lockup and the tab strip. The filters wrap under the tally only when the
+ * card is too narrow to hold both.
  * ------------------------------------------------------------------ */
-.topBarCountsRow {
+.topBarStatusRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0 5px;
+  gap: 2px 8px;
+  padding: 4px 10px 6px;
+}
+
+.topBarCountsRow::after {
+  content: "·";
+  margin-left: 8px;
+  font-weight: 700;
+  color: var(--cioos-ink-40);
+}
+
+.topBarCountsRow {
+  display: flex;
+  align-items: center;
   min-height: 22px;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--cioos-hairline);
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: 0.01em;
   color: var(--cioos-ink-60);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   transition: opacity var(--cioos-transition-fast);
 }
 
@@ -399,49 +410,6 @@
    rather than collapsing back to a spinner — see the sidebar counters. */
 .topBarCountsRow.updating {
   opacity: 0.45;
-}
-
-/* The parenthetical travels as one unit, so the brackets never wrap away from
-   the number they hold. */
-.topBarCountsInViewWrap {
-  white-space: nowrap;
-}
-
-/* The in-view tally doubles as the switch that applies the narrowing, so it is
-   the one part of the line that looks pressable — a text link, no chrome, so
-   the strip stays a line of type. */
-.topBarCountsInView {
-  padding: 0;
-
-  /* Breathing room inside the brackets. A margin rather than padding so the
-     underline stays under the words and doesn't run out to the brackets. */
-  margin: 0 4px;
-  background: transparent;
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  font: inherit;
-  color: var(--cioos-primary-700);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color var(--cioos-transition-fast);
-}
-
-.topBarCountsInView:hover {
-  color: var(--cioos-primary-800);
-}
-
-.topBarCountsInView:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-/* Applied: bolder and no longer underlined — it now reads as the state the
-   list is in, with a second click to leave it. */
-.topBarCountsInView.active {
-  font-weight: 700;
-  color: var(--cioos-primary-700);
-  text-decoration: none;
 }
 
 /* Filters badge: the active-filter count, a single digit or two. */
@@ -555,20 +523,30 @@
     height: 15px;
   }
 
-  /* The tally is a readout between two dense rows: tight padding, and the
-     same type as the strip under it. */
+  /* A readout between two dense rows: tight padding, and the same type as
+     the strip under it. Wrapped, both lines centre rather than hugging
+     opposite edges. */
+  .topBarStatusRow {
+    justify-content: center;
+    padding: 4px 8px;
+  }
+
   .topBarCountsRow {
     min-height: 0;
-    padding: 2px 8px;
     font-size: var(--cioos-font-size-xs);
+  }
+
+  /* The filters always wrap under the tally here, which would leave the dot
+     hanging at the end of its line. */
+  .topBarCountsRow::after {
+    content: none;
   }
 }
 
 /* ------------------------------------------------------------------
- * Active-filter chips, flowing directly under QuickFilters as the next line
- * of the same floating toolbar rather than a boxed panel of its own: no
- * enclosing card, no header bar — one wrapping row of small pills, at the
- * same gap QuickFilters uses, so the two rows read as one. Each group is its
+ * Active-filter chips, flowing directly under the brand card as a floating
+ * row rather than a boxed panel of its own: no enclosing card, no header
+ * bar — one wrapping row of small pills. Each group is its
  * own flex chunk (name pill + its values) so a group's label never wraps away
  * from its own first value; the chunks themselves wrap onto new lines as the
  * row runs out of width. Show/Hide lives on the Filters button (see

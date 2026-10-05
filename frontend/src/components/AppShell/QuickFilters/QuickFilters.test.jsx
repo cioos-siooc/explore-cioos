@@ -1,6 +1,6 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -137,6 +137,73 @@ describe("QuickFilters", () => {
 
     await waitFor(() => expect(seen.onlyInView.at(-1)).toBe(true));
     expect(button).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("names how many datasets the view holds on the in-view button", async () => {
+    // The fixture rows carry no bbox; give every one the same point so a
+    // world-sized viewport has them all in view.
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row) => ({
+        ...row,
+        filtered_bbox_geojson: { type: "Point", coordinates: [-63, 44] },
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    const latest = {};
+    function ViewProbe() {
+      latest.setMapView = useMapState().setMapView;
+      latest.points = useSelection().pointsData;
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <QuickFilters />
+        <ViewProbe />
+      </>,
+      { providers: "app" },
+    );
+    await waitFor(() => expect(latest.points.length).toBeGreaterThan(0));
+
+    act(() =>
+      latest.setMapView((view) => ({
+        ...view,
+        bounds: [
+          [-180, -90],
+          [180, 90],
+        ],
+      })),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("quick-filter-in-view-count"),
+      ).toHaveTextContent(String(latest.points.length)),
+    );
+  });
+
+  it("names how many datasets are real-time on the real-time button", async () => {
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row, i) => ({
+        ...row,
+        is_realtime: i < 2,
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    renderRow();
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("quick-filter-realtime-count"),
+      ).toHaveTextContent("2"),
+    );
   });
 
   it("toggles the real-time narrowing", async () => {

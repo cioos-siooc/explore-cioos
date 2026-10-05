@@ -23,7 +23,7 @@ export default function useTourStages() {
   } = useSelection();
   const { zoomToGeometry, setBathymetryVisible, requestFeatureQueryAt } =
     useMapState();
-  const { setSidebarOpen, setQuickFiltersCollapsed } = useUI();
+  const { setSidebarOpen } = useUI();
 
   // Keeps an already-open page that fits rather than swapping it for another.
   const openDataset = (fits) => {
@@ -32,7 +32,6 @@ export default function useTourStages() {
     const dataset = pointsData.find(fits);
     if (dataset) setInspectDataset(dataset);
   };
-  const showQuickFilters = () => setQuickFiltersCollapsed(false);
 
   return {
     whatsHere: () => {
@@ -40,8 +39,6 @@ export default function useTourStages() {
       setSidebarOpen(false);
       showWhatsHere({ zoomToGeometry, requestFeatureQueryAt });
     },
-    reshapeArea: showQuickFilters,
-    inView: showQuickFilters,
     datasetNav: () => openDataset(() => true),
     realtime: () => openDataset((dataset) => dataset.is_realtime),
     trackDate: () => {

@@ -23,35 +23,30 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
 
 // The quick filters: the one-click ones that act on the map or are a single
-// toggle rather than a list of options, as round buttons floating under the top bar.
+// toggle rather than a list of options, read as the rest of the brand card's
+// tally line (see TopControls) — "2,167 datasets · 23 in view · 41 real-time
+// · Area". Each counted one names how many of the filtered datasets it would
+// leave, so the tally and the toggles are the same line rather than two.
 // Search has no button here: the Filters button, Ctrl/⌘+K and typing on the
-// map all open the search palette (see FilterSearch).
-//
-// They used to be scattered — search and the two draw tools behind an unlabeled
-// caret on the Filters segment, "only in view" hidden inside the parentheses of
-// the count readout. This row is their one control; like every other filter,
+// map all open the search palette (see FilterSearch). Like every other filter,
 // what they have set is also named by a chip below (see ActiveFilterChips).
 //
 // Box and polygon share one Area button whose small menu picks the shape (or
 // clears the one drawn), so the row carries one draw control rather than two.
+// It has no count: until a shape is drawn there is nothing to count.
 //
 // No armed-tool state: drawRequest is a *last* request rather than a current
 // one (see MapStateProvider), so like every other UI here the Area button
 // reads its lit state and icon off the shape on the map instead. Between
 // arming a draw and closing the shape, it is not lit.
 //
-// Each button carries a caption naming it: a touch screen has no hover to show
-// the title, and an icon alone was a guess.
-//
-// Show/Hide for this row and the active-filter chips beneath it (see
-// TopControls) lives on the main Filters button instead of here — one toggle
-// for both rather than each keeping its own. Clear all is the last chip (see
-// ActiveFilterChips); with only quick filters set there are no chips, so it
-// hangs off this row's end instead, outside the flow so the buttons hold still.
+// Clear all is the last chip (see ActiveFilterChips); with only quick filters
+// set there are no chips, so it closes this row instead.
 export default function QuickFilters() {
   const { t } = useTranslation();
   const { requestDraw, zoom } = useMapState();
-  const { polygon, onlyInView, setOnlyInView } = useSelection();
+  const { polygon, onlyInView, setOnlyInView, inViewCount, realtimeCount } =
+    useSelection();
   const { realtimeOnly, setRealtimeOnly } = useFilters();
   const { offerTip, tipHighlight } = useTips();
   const activeFilters = useActiveFilters();
@@ -97,6 +92,53 @@ export default function QuickFilters() {
       aria-label={t("topBarQuickFiltersLabel")}
       data-testid="quick-filters"
     >
+      <button
+        type="button"
+        className={classNames("quickFilterButton", { applied: onlyInView })}
+        data-testid="quick-filter-in-view"
+        data-tip-highlight={tipHighlight("inView")}
+        onClick={() => setOnlyInView(!onlyInView)}
+        aria-pressed={onlyInView}
+        title={t("quickFilterInViewTitle")}
+        aria-label={t("datasetsCardOnlyInViewText")}
+      >
+        <Eye size={14} aria-hidden="true" />
+        <span
+          className="quickFilterCount"
+          data-testid="quick-filter-in-view-count"
+        >
+          {t("quickFilterCount", { count: inViewCount })}
+        </span>
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCountedInView")}
+        </span>
+      </button>
+      <span className="quickFilterDot" aria-hidden="true">
+        ·
+      </span>
+      <button
+        type="button"
+        className={classNames("quickFilterButton", { applied: realtimeOnly })}
+        data-testid="quick-filter-realtime"
+        onClick={() => setRealtimeOnly(!realtimeOnly)}
+        aria-pressed={realtimeOnly}
+        title={t("quickFilterRealtimeTitle")}
+        aria-label={t("realtimeFilterOptionText")}
+      >
+        <BroadcastPin size={14} aria-hidden="true" />
+        <span
+          className="quickFilterCount"
+          data-testid="quick-filter-realtime-count"
+        >
+          {t("quickFilterCount", { count: realtimeCount })}
+        </span>
+        <span className="quickFilterCaption" aria-hidden="true">
+          {t("quickFilterCountedRealtime")}
+        </span>
+      </button>
+      <span className="quickFilterDot" aria-hidden="true">
+        ·
+      </span>
       <div
         ref={areaRef}
         className={classNames("quickFilterArea", { open: areaMenuOpen })}
@@ -123,9 +165,9 @@ export default function QuickFilters() {
           aria-label={t("spatialFilterFilterName")}
         >
           {polygonActive ? (
-            <Pentagon size={18} aria-hidden="true" />
+            <Pentagon size={14} aria-hidden="true" />
           ) : (
-            <BoundingBox size={18} aria-hidden="true" />
+            <BoundingBox size={14} aria-hidden="true" />
           )}
           <span className="quickFilterCaption" aria-hidden="true">
             {t("spatialFilterFilterName")}
@@ -175,35 +217,6 @@ export default function QuickFilters() {
           </div>
         )}
       </div>
-      <button
-        type="button"
-        className={classNames("quickFilterButton", { applied: onlyInView })}
-        data-testid="quick-filter-in-view"
-        data-tip-highlight={tipHighlight("inView")}
-        onClick={() => setOnlyInView(!onlyInView)}
-        aria-pressed={onlyInView}
-        title={t("quickFilterInViewTitle")}
-        aria-label={t("datasetsCardOnlyInViewText")}
-      >
-        <Eye size={18} aria-hidden="true" />
-        <span className="quickFilterCaption" aria-hidden="true">
-          {t("quickFilterCaptionInView")}
-        </span>
-      </button>
-      <button
-        type="button"
-        className={classNames("quickFilterButton", { applied: realtimeOnly })}
-        data-testid="quick-filter-realtime"
-        onClick={() => setRealtimeOnly(!realtimeOnly)}
-        aria-pressed={realtimeOnly}
-        title={t("quickFilterRealtimeTitle")}
-        aria-label={t("realtimeFilterOptionText")}
-      >
-        <BroadcastPin size={18} aria-hidden="true" />
-        <span className="quickFilterCaption" aria-hidden="true">
-          {t("quickFilterCaptionRealtime")}
-        </span>
-      </button>
       {onlyQuickFilters && (
         <ClearAllFiltersButton className="quickFiltersClearAll" />
       )}

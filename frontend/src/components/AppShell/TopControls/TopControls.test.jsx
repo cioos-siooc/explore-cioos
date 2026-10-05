@@ -32,8 +32,8 @@ describe("TopControls", () => {
   // The toggle rides on the far edge of the Filters segment rather than
   // opening it (see styles.css' .topBarFiltersToggle) — a real button beside
   // the one that opens the modal, not a second job for that same button.
-  describe("the quick-filters toggle on the Filters button", () => {
-    it("folds the quick-filter row and the active-filter chips away together", async () => {
+  describe("the filter-chips toggle on the Filters button", () => {
+    it("folds the active-filter chips away, leaving the quick filters in the card", async () => {
       const user = userEvent.setup({ delay: null });
       renderWithProviders(<TopControls />, {
         url: "/?eovs=oxygen",
@@ -44,18 +44,17 @@ describe("TopControls", () => {
       );
       expect(screen.getByTestId("quick-filters")).toBeInTheDocument();
 
-      const toggle = screen.getByTestId("quick-filters-toggle");
+      const toggle = screen.getByTestId("filter-chips-toggle");
       expect(toggle).toHaveAttribute("aria-expanded", "true");
 
       await user.click(toggle);
 
       expect(toggle).toHaveAttribute("aria-expanded", "false");
-      expect(screen.queryByTestId("quick-filters")).toBeNull();
+      expect(screen.getByTestId("quick-filters")).toBeInTheDocument();
       expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(0);
 
       await user.click(toggle);
 
-      expect(screen.getByTestId("quick-filters")).toBeInTheDocument();
       await waitFor(() =>
         expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(1),
       );
@@ -71,8 +70,8 @@ describe("TopControls", () => {
         expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(1),
       );
 
-      await user.click(screen.getByTestId("quick-filters-toggle"));
-      await user.click(screen.getByTestId("quick-filters-toggle"));
+      await user.click(screen.getByTestId("filter-chips-toggle"));
+      await user.click(screen.getByTestId("filter-chips-toggle"));
 
       await waitFor(() =>
         expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(1),
@@ -90,7 +89,7 @@ describe("TopControls", () => {
       const filtersButton = screen.getByTestId("topbar-filters-button");
       expect(filtersButton).toHaveAttribute("aria-pressed", "false");
 
-      await user.click(screen.getByTestId("quick-filters-toggle"));
+      await user.click(screen.getByTestId("filter-chips-toggle"));
 
       expect(filtersButton).toHaveAttribute("aria-pressed", "false");
 
