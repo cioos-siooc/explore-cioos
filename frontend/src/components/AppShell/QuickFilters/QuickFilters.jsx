@@ -13,6 +13,7 @@ import classNames from "classnames";
 
 import { polygonIsRectangle } from "../../../utilities.jsx";
 import { isMarkerTier } from "../../config.js";
+import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
@@ -37,9 +38,11 @@ import "./styles.css";
 // the title, and an icon alone was a guess. The reset is the one for both this
 // row and the active-filter chips beneath it.
 export default function QuickFilters() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { requestDraw, zoom } = useMapState();
-  const { polygon, onlyInView, setOnlyInView } = useSelection();
+  const { polygon, onlyInView, setOnlyInView, inViewCount, realtimeCount } =
+    useSelection();
+  const { ready: countsReady } = useDatasetCounts();
   const { realtimeOnly, setRealtimeOnly } = useFilters();
   const { offerTip, tipHighlight } = useTips();
   const [canReset, resetAll] = useResetAllFilters();
@@ -49,8 +52,9 @@ export default function QuickFilters() {
     if (zoomedIn) offerTip("inView");
   }, [zoomedIn, offerTip]);
 
-  const labelId = useId();
   const areaMenuId = useId();
+  const inViewCountId = useId();
+  const realtimeCountId = useId();
   const areaRef = useRef(null);
   const areaButtonRef = useRef(null);
   const [areaMenuOpen, setAreaMenuOpen] = useState(false);
@@ -70,6 +74,31 @@ export default function QuickFilters() {
   const boxActive = hasShape && polygonIsRectangle(polygon);
   const polygonActive = hasShape && !boxActive;
 
+  // How many of the listed datasets each toggle keeps — already applied, the
+  // whole list. Not shown before the counts land, so it never flashes a zero.
+  // Compact ("2.1K") so a big count keeps the badge small; the exact number is
+  // what assistive tech reads.
+  function countBadge(count, id, testId) {
+    if (!countsReady) return null;
+    return (
+      <>
+        <span
+          className="quickFilterBadge"
+          data-testid={testId}
+          aria-hidden="true"
+        >
+          {count.toLocaleString(i18n.language, {
+            notation: "compact",
+            maximumFractionDigits: 1,
+          })}
+        </span>
+        <span id={id} className="sr-only">
+          {count.toLocaleString(i18n.language)}
+        </span>
+      </>
+    );
+  }
+
   function chooseArea(mode) {
     requestDraw(mode);
     setAreaMenuOpen(false);
@@ -80,14 +109,9 @@ export default function QuickFilters() {
     <div
       className="quickFilters"
       role="group"
-      aria-labelledby={labelId}
+      aria-label={t("topBarQuickFiltersLabel")}
       data-testid="quick-filters"
     >
-      <span id={labelId} className="quickFiltersLabel">
-        <span className="quickFiltersLabelText">
-          {t("topBarQuickFiltersLabel")}
-        </span>
-      </span>
       <div
         ref={areaRef}
         className={classNames("quickFilterArea", { open: areaMenuOpen })}
@@ -175,8 +199,10 @@ export default function QuickFilters() {
         aria-pressed={onlyInView}
         title={t("quickFilterInViewTitle")}
         aria-label={t("datasetsCardOnlyInViewText")}
+        aria-describedby={countsReady ? inViewCountId : undefined}
       >
         <Eye size={18} aria-hidden="true" />
+        {countBadge(inViewCount, inViewCountId, "quick-filter-in-view-count")}
         <span className="quickFilterCaption" aria-hidden="true">
           {t("quickFilterCaptionInView")}
         </span>
@@ -189,8 +215,14 @@ export default function QuickFilters() {
         aria-pressed={realtimeOnly}
         title={t("quickFilterRealtimeTitle")}
         aria-label={t("realtimeFilterOptionText")}
+        aria-describedby={countsReady ? realtimeCountId : undefined}
       >
         <BroadcastPin size={18} aria-hidden="true" />
+        {countBadge(
+          realtimeCount,
+          realtimeCountId,
+          "quick-filter-realtime-count",
+        )}
         <span className="quickFilterCaption" aria-hidden="true">
           {t("quickFilterCaptionRealtime")}
         </span>

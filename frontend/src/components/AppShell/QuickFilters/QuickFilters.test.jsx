@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -174,11 +174,59 @@ describe("QuickFilters", () => {
     expect(screen.getByTestId("quick-filter-reset")).toBeEnabled();
   });
 
-  it("is named by its visible label", () => {
+  it("is named for assistive tech", () => {
     renderRow();
     expect(
       screen.getByRole("group", { name: "Quick filters" }),
     ).toBeInTheDocument();
+  });
+
+  it("badges the real-time button with how many listed datasets are real-time", async () => {
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row, i) => ({
+        ...row,
+        is_realtime: i < 3,
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    expect(screen.queryByTestId("quick-filter-realtime-count")).toBeNull();
+    renderRow();
+
+    const badge = await screen.findByTestId("quick-filter-realtime-count");
+    await waitFor(() => expect(badge).toHaveTextContent("3"));
+    expect(
+      screen.getByTestId("quick-filter-realtime"),
+    ).toHaveAccessibleDescription("3");
+    expect(
+      screen.getByTestId("quick-filter-in-view-count"),
+    ).toBeInTheDocument();
+  });
+
+  it("shortens a big count on the badge but describes the button with it in full", async () => {
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const [row] = await response.json();
+      const rows = Array.from({ length: 2150 }, (_, i) => ({
+        ...row,
+        pk: i + 1,
+        is_realtime: true,
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    renderRow();
+
+    const badge = await screen.findByTestId("quick-filter-realtime-count");
+    await waitFor(() => expect(badge).toHaveTextContent("2.2K"));
+    expect(
+      screen.getByTestId("quick-filter-realtime"),
+    ).toHaveAccessibleDescription("2,150");
   });
 
   it("drops every quick filter at once", async () => {
