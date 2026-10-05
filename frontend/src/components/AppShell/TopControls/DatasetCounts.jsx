@@ -5,12 +5,12 @@ import classNames from "classnames";
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 
-// The dataset tally — "123/150 datasets" — leading the strip it shares with
-// the quick filters, between the brand lockup and the Datasets/Filters tabs.
-// How many of those the viewport holds rides on the In view filter instead
-// (see QuickFilters).
+// The dataset tally, riding in the Datasets tab after its label: just the
+// filtered count, since a third of the card has no room for "2,167/2,168" in
+// French; the catalogue total is in its title. How many of those the viewport
+// holds rides on the In view filter instead (see QuickFilters).
 //
-// Until `ready` there is no count to show — not even a zero — so the strip is a
+// Until `ready` there is no count to show — not even a zero — so it is a
 // spinner. See useDatasetCounts.
 export default function DatasetCounts() {
   const { t } = useTranslation();
@@ -25,28 +25,22 @@ export default function DatasetCounts() {
   // then all we know it to be.
   const totalCount = total ?? filteredCount;
 
+  if (!countsReady) return <Spinner size="xs" className="countSpinner" />;
+
   return (
-    <div
-      className={classNames("topBarCountsRow", { updating: countsUpdating })}
+    // Announced when a filter changes the tally.
+    <span
+      role="status"
+      className={classNames("topBarDatasetsCount", {
+        updating: countsUpdating,
+      })}
       data-testid="dataset-counts"
+      title={t("dockDatasetsCountTitle", {
+        filtered: filteredCount,
+        total: totalCount,
+      })}
     >
-      {!countsReady ? (
-        <Spinner size="xs" className="countSpinner" />
-      ) : (
-        // Announced when a filter changes the tally.
-        <span
-          role="status"
-          title={t("dockDatasetsCountTitle", {
-            filtered: filteredCount,
-            total: totalCount,
-          })}
-        >
-          {t("topBarCountsSummary", {
-            filtered: filteredCount,
-            total: totalCount,
-          })}
-        </span>
-      )}
-    </div>
+      {t("topBarDatasetsCount", { count: filteredCount })}
+    </span>
   );
 }

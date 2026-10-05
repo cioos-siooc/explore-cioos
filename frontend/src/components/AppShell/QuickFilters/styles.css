@@ -1,9 +1,9 @@
 /* ------------------------------------------------------------------
- * Quick filters — the rest of the brand card's tally line (see
- * .topBarStatusRow), set as type rather than chrome: each is a phrase of the
- * line — "23 in view" — dot-separated from the next, and pressable the way a
- * link is, by its underline. Dotted while off; set, the underline goes solid
- * and the phrase takes the primary colour.
+ * Quick filters — a line of type in the brand card (see .topBarStatusRow)
+ * rather than chrome: each is a phrase of the line — "23 in view" —
+ * dot-separated from the next, and pressable the way a link is, by its
+ * underline. Dotted while off; set, the underline goes solid and the phrase
+ * takes the primary colour.
  * ------------------------------------------------------------------ */
 .quickFilters {
   display: flex;
