@@ -571,8 +571,8 @@
  * same gap QuickFilters uses, so the two rows read as one. Each group is its
  * own flex chunk (name pill + its values) so a group's label never wraps away
  * from its own first value; the chunks themselves wrap onto new lines as the
- * row runs out of width. Show/Hide and Clear-all live with the quick filters
- * instead (see QuickFilters/styles.css) rather than closing this row off.
+ * row runs out of width. Show/Hide lives on the Filters button (see
+ * TopControls); Clear all is the row's last chip.
  * ------------------------------------------------------------------ */
 .activeFiltersPanel {
   display: flex;
@@ -593,6 +593,44 @@
   width: fit-content;
   max-width: calc(100vw - 48px);
   align-self: center;
+}
+
+/* Never squeezed by the phone's one scrolling line. */
+.activeFilterClearAll {
+  flex: 0 0 auto;
+}
+
+/* Drawn like a group's name pill, since it acts on whole groups too; its hover
+   takes the destructive-action red the groups' own remove buttons use. */
+.activeFilterClearAllButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px 3px 8px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--cioos-ink-80);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+.activeFilterClearAllButton:hover {
+  border-color: transparent;
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+.activeFilterClearAllButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* One group: its name pill immediately followed by its own value chips,

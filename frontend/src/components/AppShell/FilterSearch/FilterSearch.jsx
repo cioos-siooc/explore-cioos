@@ -1,10 +1,9 @@
 import * as React from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   ArrowCounterclockwise,
-  BoundingBox,
-  BoxArrowUpRight,
   BroadcastPin,
+  ChevronRight,
   Search,
   SlashCircle,
   X,
@@ -21,16 +20,12 @@ import {
   parseFilterQuery,
   parsePartialRangeQuery,
 } from "../../../state/filterSearch.js";
-import {
-  filterNameForKey,
-  iconForKey,
-} from "../../../state/useActiveFilters.js";
-import useFilterSearchOptions from "../../../state/useFilterSearchOptions.js";
+import { iconForKey } from "../../../state/useActiveFilters.js";
+import useFilterModel from "../../../state/useFilterModel.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
-import Modal from "../../ui/Modal.jsx";
 import { TOO_BROAD_RANKS } from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
 import {
   ExcludedLabel,
@@ -76,10 +71,9 @@ function useScientificNameMatches(term, enabled) {
   return wanted && result.query === term ? result.items : [];
 }
 
+// The help rows and commands that are not a filter of their own.
 const GROUP_ICONS = {
-  text: Search,
   quick: BroadcastPin,
-  area: BoundingBox,
   reset: ArrowCounterclockwise,
   exclude: SlashCircle,
 };
@@ -89,25 +83,16 @@ function GroupIcon({ groupKey, size = 14 }) {
   return Icon ? <Icon size={size} aria-hidden="true" /> : iconForKey(groupKey);
 }
 
-// The Filters modal row an option is set from, for the detail pane's link.
-function panelFilterName(groupKey, option, t) {
-  if (groupKey === "text") return "textSearchFilterName";
-  if (groupKey === "area") return "spatialFilterFilterName";
-  if (option.id === "realtime") return t("realtimeFilterName");
-  if (option.id === "inView") return t("datasetsCardOnlyInViewText");
-  return filterNameForKey(groupKey, t);
-}
-
 const isTypingTarget = (el) =>
   el instanceof Element &&
   (el.isContentEditable ||
     el.closest("input, textarea, select, [contenteditable]") !== null);
 
-// Opened from anywhere with Ctrl/⌘+K, by the search button on the brand card,
-// or by just starting to type on the page: a letter or digit typed while no
-// field has focus and no dialog is up opens it holding that character. Not
-// symbols, which the map takes for zoom (+, -, =).
-function useFilterSearchShortcut(open) {
+// Opened from anywhere with Ctrl/⌘+K, by the Filters button, or by just
+// starting to type on the page: a letter or digit typed while no field has
+// focus and no dialog is up opens it holding that character. Not symbols,
+// which the map takes for zoom (+, -, =).
+export function useFilterSearchShortcut(open) {
   useEffect(() => {
     function onKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -134,45 +119,11 @@ function useFilterSearchShortcut(open) {
   }, [open]);
 }
 
-// A command palette over every filter: typing offers matching values from
-// every facet, selecting one applies it (a leading "-" excludes instead) and
-// selecting it again removes it, and the empty box lists what is applied. It
-// writes the same state the Filters modal and quick filters do, so it sits
-// beside them rather than replacing them.
-export default function FilterSearch() {
-  const {
-    showFilterSearch,
-    setShowFilterSearch,
-    filterSearchText,
-    openFilterSearch,
-  } = useUI();
-  const titleId = useId();
-  const inputRef = useRef(null);
-  useFilterSearchShortcut(openFilterSearch);
-
-  return (
-    <Modal
-      show={showFilterSearch}
-      onHide={() => setShowFilterSearch(false)}
-      className="filterSearchModal"
-      dialogClassName="filterSearchDialog"
-      aria-labelledby={titleId}
-      data-testid="filter-search"
-      initialFocusRef={inputRef}
-    >
-      <FilterSearchPalette
-        titleId={titleId}
-        initialText={filterSearchText}
-        inputRef={inputRef}
-      />
-    </Modal>
-  );
-}
-
 // One line per kind of search, drawn with its results group's icon; the
 // examples fill the box in.
 const HELP_ROWS = [
   { group: "text", help: "Filters", note: true },
+  { group: "text", help: "Titles", note: true },
   { group: "time", help: "Time" },
   { group: "depth", help: "Depth" },
   { group: "quick", help: "Toggles" },
@@ -180,7 +131,10 @@ const HELP_ROWS = [
   { group: "exclude", help: "Exclude" },
 ];
 
-function FilterSearchHelp({ showSpecies, onExample, onOpenFilters }) {
+// The sections of the filter list beside the search, as FiltersPanel groups them.
+const BROWSE_SECTIONS = ["What", "From", "WhenWhere", "Biodiversity"];
+
+function FilterSearchHelp({ showSpecies, onExample }) {
   const { t } = useTranslation();
   const examples = (help) => {
     const list = t(`filterSearchHelp${help}Examples`, { returnObjects: true });
@@ -221,31 +175,35 @@ function FilterSearchHelp({ showSpecies, onExample, onOpenFilters }) {
           </div>
         ))}
       </dl>
-      <p className="filterSearchHelpClassic">
-        {t("filterSearchHelpClassic")}{" "}
-        <button
-          type="button"
-          className="filterSearchPanelLink"
-          data-testid="filter-search-open-filters"
-          onClick={onOpenFilters}
-        >
-          {t("filterSearchOpenAllFilters")}
-          <BoxArrowUpRight size={12} aria-hidden="true" />
-        </button>
-      </p>
+      <div className="filterSearchHelpBrowse">
+        <p>{t("filterSearchHelpBrowse")}</p>
+        <dl className="filterSearchHelpSections">
+          {BROWSE_SECTIONS.filter(
+            (section) => showSpecies || section !== "Biodiversity",
+          ).map((section) => (
+            <div key={section} className="filterSearchHelpSection">
+              <dt>{t(`filterGroup${section}`)}</dt>
+              <dd>{t(`filterSearchHelpSection${section}`)}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </div>
   );
 }
 
-// Mounted per opening, so each one starts from an empty box.
-function FilterSearchPalette({ titleId, initialText, inputRef }) {
+// The Filters modal's home page: a search over every filter. Typing offers
+// matching values from every facet, selecting one applies it (a leading "-"
+// excludes instead) and selecting it again removes it, and the empty box
+// lists what is applied. It writes the same state every filter page does.
+// The text is the panel's, so it survives a visit to a filter's own page.
+export default function FilterSearch({ text, setText, inputRef }) {
   const { t } = useTranslation();
   const { obisDataAvailable } = useFilters();
   const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection();
-  const { setShowFilterSearch, setOpenFilter, setShowFiltersModal } = useUI();
+  const { setOpenFilter, setShowFiltersModal } = useUI();
   const [canReset, resetAll] = useResetAllFilters();
   const listId = useId();
-  const [text, setText] = useState(initialText);
   const [activeIndex, setActiveIndex] = useState(0);
   // What was selected since the box last changed. Selecting leaves the list as
   // it is, so several values can be picked in a row: the empty box would
@@ -253,10 +211,27 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
   const [touched, setTouched] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
-  const groups = useFilterSearchOptions(
-    useScientificNameMatches(term, obisDataAvailable),
-    exclude ? undefined : parsePartialRangeQuery(term),
-  );
+  const groups = [
+    ...useFilterModel(
+      useScientificNameMatches(term, obisDataAvailable),
+      exclude ? undefined : parsePartialRangeQuery(term),
+    ),
+    canReset && {
+      key: "reset",
+      label: t("quickFilterCaptionReset"),
+      options: [
+        {
+          id: "reset",
+          label: t("filterSearchClearAll"),
+          matchText: `${t("filterSearchClearAll")} ${t("quickFilterCaptionReset")}`,
+          includeOnly: true,
+          command: true,
+          action: t("quickFilterCaptionReset"),
+          toggle: resetAll,
+        },
+      ],
+    },
+  ].filter(Boolean);
   const pinned = groups.filter((g) => g.pinned);
 
   let shown = matchFilterOptions(
@@ -324,13 +299,7 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
       setTouched((prev) => new Set(prev).add(`${group.key}:${option.id}`));
       option.toggle(option.state ?? "include");
     } else option.toggle(targetFor(option));
-    if (option.closes) setShowFilterSearch(false);
-  }
-
-  function openInPanel(name) {
-    setShowFilterSearch(false);
-    setOpenFilter(name);
-    setShowFiltersModal(true);
+    if (option.closes) setShowFiltersModal(false);
   }
 
   function clearText() {
@@ -355,13 +324,11 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
     }
   }
 
-  const panelName =
-    current && panelFilterName(current.group.key, current.option, t);
   return (
-    <div className={classNames("filterSearch", { excluding: exclude })}>
-      <h2 id={titleId} className="sr-only">
-        {t("filterSearchLabel")}
-      </h2>
+    <div
+      className={classNames("filterSearchPage", { excluding: exclude })}
+      data-testid="filter-search"
+    >
       <div className="filterSearchField">
         <Search size={20} aria-hidden="true" />
         <input
@@ -422,6 +389,21 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
                 >
                   <GroupIcon groupKey={group.key} />
                   {group.label}
+                  {group.panelName && (
+                    <button
+                      type="button"
+                      className="filterSearchGroupOpen"
+                      data-testid="filter-search-open-panel"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setOpenFilter(group.panelName)}
+                      aria-label={t("filterSearchOpenInPanel", {
+                        filter: group.label,
+                      })}
+                    >
+                      {t("filterSearchAllOptions")}
+                      <ChevronRight size={12} aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
                 {group.options.map((option) => {
                   const i = flat.findIndex((f) => f.option === option);
@@ -501,56 +483,16 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
               setActiveIndex(0);
               inputRef.current?.focus();
             }}
-            onOpenFilters={() => openInPanel(undefined)}
           />
         )}
       </div>
-      <footer className="filterSearchFooter">
-        <span className="filterSearchFooterActions">
-          {panelName ? (
-            <button
-              type="button"
-              className="filterSearchPanelLink"
-              data-testid="filter-search-open-panel"
-              onClick={() => openInPanel(panelName)}
-            >
-              {t("filterSearchOpenInPanel")}: {current.group.label}
-              <BoxArrowUpRight size={12} aria-hidden="true" />
-            </button>
-          ) : term ? (
-            <button
-              type="button"
-              className="filterSearchPanelLink"
-              onClick={() => openInPanel(undefined)}
-            >
-              {t("filterSearchOpenAllFilters")}
-              <BoxArrowUpRight size={12} aria-hidden="true" />
-            </button>
-          ) : null}
-          {canReset && (
-            <button
-              type="button"
-              className="filterSearchClearAll"
-              data-testid="filter-search-clear-all"
-              onClick={() => {
-                resetAll();
-                setTouched(new Set());
-                inputRef.current?.focus();
-              }}
-            >
-              <ArrowCounterclockwise size={12} aria-hidden="true" />
-              {t("filterSearchClearAll")}
-            </button>
-          )}
-        </span>
-        <span className="filterSearchKeys" aria-hidden="true">
-          <kbd className="filterSearchKey">↑↓</kbd>
-          {t("filterSearchKeysNavigate")}
-          <kbd className="filterSearchKey">↵</kbd>
-          {current ? actionLabel(current.option) : t("filterSearchKeysSelect")}
-          <kbd className="filterSearchKey">Esc</kbd>
-          {t("filterSearchKeysClose")}
-        </span>
+      <footer className="filterSearchKeys" aria-hidden="true">
+        <kbd className="filterSearchKey">↑↓</kbd>
+        {t("filterSearchKeysNavigate")}
+        <kbd className="filterSearchKey">↵</kbd>
+        {current ? actionLabel(current.option) : t("filterSearchKeysSelect")}
+        <kbd className="filterSearchKey">Esc</kbd>
+        {t("filterSearchKeysClose")}
       </footer>
     </div>
   );

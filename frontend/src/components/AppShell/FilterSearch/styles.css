@@ -1,36 +1,35 @@
-/* A command palette: held near the top of the screen rather than centred, so
-   the box stays put while the results under it grow and shrink. */
-.filterSearchDialog.modal-dialog {
-  align-items: flex-start;
-  max-width: min(760px, calc(100vw - 32px));
-  min-height: 0;
-  margin-top: 12vh;
-}
-
-.filterSearchDialog .modal-content {
-  overflow: hidden;
-}
-
-.filterSearch {
+/* The Filters modal's search page, in the detail pane beside the list (the
+   same slot an open filter's options take; see Panels/styles.css): the box
+   stays put while the results under it scroll. */
+.filterSearchPage {
+  position: absolute;
+  inset: 12px 12px 12px 296px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
-  max-height: calc(88vh - 32px);
 }
 
 .filterSearchField {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 12px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--cioos-hairline);
+  padding: 0 14px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-md);
   color: var(--cioos-ink-60);
+}
+
+.filterSearchField:focus-within {
+  border-color: var(--cioos-primary-700);
+  box-shadow: var(--cioos-focus);
 }
 
 .filterSearchInput {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 16px 0;
+  padding: 12px 0;
   border: none;
   outline: none;
   background: transparent;
@@ -74,7 +73,8 @@
 }
 
 .filterSearchResults {
-  min-height: 120px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -86,7 +86,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px 4px;
+  padding: 10px 8px 4px;
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -94,11 +94,39 @@
   color: var(--cioos-ink-60);
 }
 
+/* To the filter's own page, for the options a search does not reach (its
+   whole list, the match-all switch, the date and depth pickers). */
+.filterSearchGroupOpen {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--cioos-radius-sm);
+  background: none;
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.filterSearchGroupOpen:hover {
+  text-decoration: underline;
+}
+
+.filterSearchGroupOpen:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 .filterSearchOption {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 8px;
+  margin: 0;
   padding: 7px 8px;
   border-radius: var(--cioos-radius-sm);
   font-size: var(--cioos-font-size-sm);
@@ -133,12 +161,14 @@
 
 /* Typing an exclusion ("-", "not"): the row Enter would act on, and its
    action, turn red, the colour excluded values carry everywhere. */
-.filterSearch.excluding .filterSearchOption.active {
+.filterSearchPage.excluding .filterSearchOption.active {
   background-color: var(--cioos-error-bg);
   box-shadow: inset 0 0 0 1px var(--cioos-error-700);
 }
 
-.filterSearch.excluding .filterSearchOption.active .filterSearchOptionAction {
+.filterSearchPage.excluding
+  .filterSearchOption.active
+  .filterSearchOptionAction {
   background-color: var(--cioos-error-700);
 }
 
@@ -218,14 +248,14 @@
 
 .filterSearchEmpty {
   margin: 0;
-  padding: 20px 16px;
+  padding: 20px 8px;
   font-size: var(--cioos-font-size-sm);
   line-height: 1.5;
   color: var(--cioos-ink-60);
 }
 
 .filterSearchHelp {
-  padding: 16px;
+  padding: 16px 8px;
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-80);
 }
@@ -299,85 +329,64 @@
   background-color: var(--cioos-teal-light);
 }
 
-.filterSearchHelpClassic {
+.filterSearchHelpBrowse {
   padding-top: 12px;
   border-top: 1px solid var(--cioos-hairline);
   color: var(--cioos-ink-60);
 }
 
-.filterSearchFooter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+.filterSearchHelpSections {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 4px 16px;
-  padding: 8px 16px;
-  border-top: 1px solid var(--cioos-hairline);
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
+  margin: 8px 0 0;
 }
 
-.filterSearchFooterActions {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 16px;
+.filterSearchHelpSection {
+  display: contents;
 }
 
-.filterSearchClearAll {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-sm);
-  background: none;
-  font: inherit;
+.filterSearchHelpSection dt {
   font-weight: 600;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-}
-
-.filterSearchClearAll:hover {
   color: var(--cioos-ink);
-  border-color: var(--cioos-ink-60);
 }
 
-.filterSearchClearAll:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-.filterSearchPanelLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-weight: 600;
-  color: var(--cioos-primary);
-  text-decoration: underline;
-  cursor: pointer;
+.filterSearchHelpSection dd {
+  margin: 0;
 }
 
 .filterSearchKeys {
-  display: inline-flex;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cioos-hairline);
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
 }
 
 .filterSearchKeys .filterSearchKey:not(:first-child) {
   margin-left: 8px;
 }
 
-/* Narrow: the key legend (no keyboard to speak of) gives its line back. */
-@media (max-width: 700px) {
-  .filterSearchDialog.modal-dialog {
-    margin-top: 8px;
+/* Phone: one column, so the search sits above the list rather than beside
+   it, and takes the whole surface only once something is typed (see
+   .filtersPanel.searching in Panels/styles.css). The key legend (no keyboard
+   to speak of) and the help give their room back to the list. */
+@media (max-width: 700px), (max-height: 500px) {
+  .filterSearchPage {
+    position: static;
+    flex: 0 0 auto;
+    padding: 8px 6px 0;
   }
 
+  .filtersPanel.searching .filterSearchPage {
+    flex: 1 1 auto;
+  }
+
+  .filtersPanel:not(.searching) .filterSearchResults,
   .filterSearchKeys {
     display: none;
   }

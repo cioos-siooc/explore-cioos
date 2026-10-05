@@ -79,14 +79,15 @@ export default function UIProvider({ children }) {
     if (!showIntroModal) setIntroSeen(true);
   }, [showIntroModal, setIntroSeen]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  // The search palette over every filter (see FilterSearch), and the text it
-  // opens holding.
-  const [showFilterSearch, setShowFilterSearch] = useState(false);
-  const [filterSearchText, setFilterSearchText] = useState("");
+  // The Filters modal opened on its search page (see FilterSearch) rather than
+  // on a filter, holding this text; null when it was opened any other way.
+  const [filterSearchText, setFilterSearchText] = useState(null);
   const openFilterSearch = useCallback((text = "") => {
     setFilterSearchText(text);
-    setShowFilterSearch(true);
+    setOpenFilter(undefined);
+    setShowFiltersModal(true);
   }, []);
+  if (!showFiltersModal && filterSearchText !== null) setFilterSearchText(null);
 
   // A drawn box or polygon surfaces the matching datasets — on wide screens
   // only: narrower, the list would cover the shape just drawn, and the top-bar
@@ -142,8 +143,6 @@ export default function UIProvider({ children }) {
     setShowIntroModal,
     showPrivacyModal,
     setShowPrivacyModal,
-    showFilterSearch,
-    setShowFilterSearch,
     filterSearchText,
     openFilterSearch,
   };

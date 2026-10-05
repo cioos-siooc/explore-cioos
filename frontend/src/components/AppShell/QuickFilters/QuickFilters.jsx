@@ -1,40 +1,36 @@
 import * as React from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  ArrowCounterclockwise,
   BoundingBox,
   BroadcastPin,
   Eye,
   Pentagon,
-  Search,
   Trash,
-  X,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { polygonIsRectangle } from "../../../utilities.jsx";
 import { isMarkerTier } from "../../config.js";
+import { ClearAllFiltersButton } from "../TopControls/ActiveFilterChips.jsx";
+import useActiveFilters, {
+  QUICK_FILTER_KEYS,
+} from "../../../state/useActiveFilters.js";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
-import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 // The quick filters: the one-click ones that act on the map or are a single
 // toggle rather than a list of options, as round buttons floating under the top bar.
-//
-// Search opens the search palette (see FilterSearch), which reaches every
-// filter, this row's included.
+// Search has no button here: the Filters button, Ctrl/⌘+K and typing on the
+// map all open the search palette (see FilterSearch).
 //
 // They used to be scattered — search and the two draw tools behind an unlabeled
 // caret on the Filters segment, "only in view" hidden inside the parentheses of
-// the count readout — and each also appeared as a chip below and as a row in
-// the Filters modal. One control, three homes. This row is the one home: they
-// are no longer in useActiveFilters (so the Filters badge counts only what the
-// modal it sits on can change) and no longer rows in that modal.
+// the count readout. This row is their one control; like every other filter,
+// what they have set is also named by a chip below (see ActiveFilterChips).
 //
 // Box and polygon share one Area button whose small menu picks the shape (or
 // clears the one drawn), so the row carries one draw control rather than two.
@@ -49,30 +45,25 @@ import "./styles.css";
 //
 // Show/Hide for this row and the active-filter chips beneath it (see
 // TopControls) lives on the main Filters button instead of here — one toggle
-// for both rather than each keeping its own. The reset button is one for
-// both rows — quick filters and the modal ones the chips show alike — rather
-// than a second button next to it clearing only half of what is set.
+// for both rather than each keeping its own. Clear all is the last chip (see
+// ActiveFilterChips); with only quick filters set there are no chips, so it
+// hangs off this row's end instead, outside the flow so the buttons hold still.
 export default function QuickFilters() {
   const { t } = useTranslation();
   const { requestDraw, zoom } = useMapState();
-  const {
-    polygon,
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
-    onlyInView,
-    setOnlyInView,
-  } = useSelection();
+  const { polygon, onlyInView, setOnlyInView } = useSelection();
   const { realtimeOnly, setRealtimeOnly } = useFilters();
-  const { openFilterSearch } = useUI();
-  const [canReset, resetAll] = useResetAllFilters();
   const { offerTip, tipHighlight } = useTips();
+  const activeFilters = useActiveFilters();
+  const onlyQuickFilters =
+    activeFilters.length > 0 &&
+    activeFilters.every((f) => QUICK_FILTER_KEYS.has(f.key));
   // Zoomed in to a local area, the whole-catalogue list stops matching the map.
   const zoomedIn = isMarkerTier(zoom) && !onlyInView;
   useEffect(() => {
     if (zoomedIn) offerTip("inView");
   }, [zoomedIn, offerTip]);
 
-  const labelId = useId();
   const areaMenuId = useId();
   const areaRef = useRef(null);
   const areaButtonRef = useRef(null);
@@ -103,66 +94,9 @@ export default function QuickFilters() {
     <div
       className="quickFilters"
       role="group"
-      aria-labelledby={labelId}
+      aria-label={t("topBarQuickFiltersLabel")}
       data-testid="quick-filters"
     >
-      <span id={labelId} className="quickFiltersLabel">
-        <span className="quickFiltersLabelText">
-          {t("topBarQuickFiltersLabel")}
-        </span>
-      </span>
-      {/* The search palette (see FilterSearch) covers titles as well as every
-          other filter, so this opens it rather than keeping a title-only field
-          of its own. A published title term stays named here, as nothing else
-          on screen does: the chips leave the quick filters out. */}
-      <div
-        className={classNames("quickFilterSearch", {
-          expanded: Boolean(datasetTitleSearchText),
-        })}
-      >
-        <button
-          type="button"
-          className={classNames("quickFilterButton", {
-            applied: Boolean(datasetTitleSearchText),
-          })}
-          data-testid="quick-filter-search"
-          onClick={() => openFilterSearch(datasetTitleSearchText)}
-          aria-haspopup="dialog"
-          title={t("filterSearchOpenTitle")}
-          aria-label={t("filterSearchOpenTitle")}
-        >
-          <Search size={18} aria-hidden="true" />
-          <span className="quickFilterCaption" aria-hidden="true">
-            {t("quickFilterCaptionSearch")}
-          </span>
-        </button>
-        {datasetTitleSearchText && (
-          <>
-            <button
-              type="button"
-              className="quickFilterSearchTerm"
-              data-testid="quick-filter-search-term"
-              onClick={() => openFilterSearch(datasetTitleSearchText)}
-              aria-haspopup="dialog"
-              title={t("quickFilterSearchEditTitle", {
-                term: datasetTitleSearchText,
-              })}
-            >
-              “{datasetTitleSearchText}”
-            </button>
-            <button
-              type="button"
-              className="quickFilterSearchClear"
-              data-testid="quick-filter-search-clear"
-              onClick={() => setDatasetTitleSearchText("")}
-              title={t("filterClearSearchTitle")}
-              aria-label={t("filterClearSearchTitle")}
-            >
-              <X size={16} aria-hidden="true" />
-            </button>
-          </>
-        )}
-      </div>
       <div
         ref={areaRef}
         className={classNames("quickFilterArea", { open: areaMenuOpen })}
@@ -270,24 +204,9 @@ export default function QuickFilters() {
           {t("quickFilterCaptionRealtime")}
         </span>
       </button>
-      {/* One reset for everything this row and the chips below can set —
-          quick filters and the modal ones alike — rather than two buttons
-          each clearing half of it. Disabled rather than removed while
-          nothing is set, so the row keeps its shape. */}
-      <button
-        type="button"
-        className="quickFilterButton quickFilterReset"
-        data-testid="quick-filter-reset"
-        disabled={!canReset}
-        onClick={resetAll}
-        title={t("resetFiltersButtonTooltipText")}
-        aria-label={t("resetFiltersButtonTooltipText")}
-      >
-        <ArrowCounterclockwise size={18} aria-hidden="true" />
-        <span className="quickFilterCaption" aria-hidden="true">
-          {t("quickFilterCaptionReset")}
-        </span>
-      </button>
+      {onlyQuickFilters && (
+        <ClearAllFiltersButton className="quickFiltersClearAll" />
+      )}
     </div>
   );
 }

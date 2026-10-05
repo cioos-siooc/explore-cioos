@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -8,7 +8,6 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import { useUI } from "../../../state/ui/UIProvider.jsx";
 import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
 import QuickFilters from "./QuickFilters.jsx";
 
@@ -30,11 +29,10 @@ describe("QuickFilters", () => {
     installMockFetch();
   });
 
-  // The row writes nothing of its own: the search clears the same
-  // datasetTitleSearchText the datasets list sets, and the Area menu sends
-  // the same one-shot requestDraw the map already answers. Both are asserted
-  // through that shared state rather than through the markup.
-  function renderRow(url = "/") {
+  // The row writes nothing of its own: the Area menu sends the same one-shot
+  // requestDraw the map already answers, asserted through that shared state
+  // rather than through the markup.
+  function renderRow(url = "/", { withChips = false } = {}) {
     const seen = { search: [], draw: [], onlyInView: [], realtimeOnly: [] };
     function Probe() {
       const { datasetTitleSearchText, onlyInView } = useSelection();
@@ -50,59 +48,13 @@ describe("QuickFilters", () => {
     renderWithProviders(
       <>
         <QuickFilters />
+        {withChips && <ActiveFilterChips />}
         <Probe />
       </>,
       { url, providers: "app" },
     );
     return { user, seen };
   }
-
-  // The magnifier opens the search palette (see FilterSearch) rather than a
-  // field of its own, holding the published term so it can be edited there.
-  it("opens the search palette, holding the published term", async () => {
-    const seenUI = [];
-    function UIProbe() {
-      const { showFilterSearch, filterSearchText } = useUI();
-      seenUI.push({ showFilterSearch, filterSearchText });
-      return null;
-    }
-    const user = userEvent.setup({ delay: null });
-    renderWithProviders(
-      <>
-        <QuickFilters />
-        <UIProbe />
-      </>,
-      { url: "/?search=temperature", providers: "app" },
-    );
-
-    await user.click(screen.getByTestId("quick-filter-search-term"));
-
-    expect(seenUI.at(-1)).toEqual({
-      showFilterSearch: true,
-      filterSearchText: "temperature",
-    });
-  });
-
-  it("names no term until one is published", () => {
-    renderRow();
-    expect(screen.queryByTestId("quick-filter-search-term")).toBeNull();
-    expect(screen.getByTestId("quick-filter-search")).not.toHaveClass(
-      "applied",
-    );
-  });
-
-  it("names a term carried in the link, and clears it", async () => {
-    const { user, seen } = renderRow("/?search=temperature");
-    expect(screen.getByTestId("quick-filter-search-term")).toHaveTextContent(
-      "temperature",
-    );
-    expect(screen.getByTestId("quick-filter-search")).toHaveClass("applied");
-
-    await user.click(screen.getByTestId("quick-filter-search-clear"));
-
-    await waitFor(() => expect(seen.search.at(-1)).toBe(""));
-    expect(screen.queryByTestId("quick-filter-search-term")).toBeNull();
-  });
 
   const openArea = async (user) =>
     user.click(screen.getByTestId("quick-filter-area"));
@@ -213,29 +165,45 @@ describe("QuickFilters", () => {
     );
   });
 
-  it("keeps the reset in place but disabled until something is set", () => {
-    renderRow();
-    expect(screen.getByTestId("quick-filter-reset")).toBeDisabled();
+  it("holds Clear all in the row while only quick filters are set", async () => {
+    const { user, seen } = renderRow("/?onlyInView=true&realtimeOnly=true");
+    const row = screen.getByTestId("quick-filters");
+
+    await user.click(within(row).getByTestId("filter-chips-clear-all"));
+
+    await waitFor(() => {
+      expect(seen.onlyInView.at(-1)).toBe(false);
+      expect(seen.realtimeOnly.at(-1)).toBe(false);
+    });
+    expect(within(row).queryByTestId("filter-chips-clear-all")).toBeNull();
   });
 
-  it("enables the reset once anything is set", () => {
-    renderRow("/?realtimeOnly=true");
-    expect(screen.getByTestId("quick-filter-reset")).toBeEnabled();
+  it("leaves Clear all to the chips once another filter is set", async () => {
+    renderRow("/?realtimeOnly=true&eovs=oxygen", { withChips: true });
+    const chips = await screen.findByTestId("active-filter-chips");
+
+    expect(within(chips).getByTestId("filter-chips-clear-all")).toBeVisible();
+    expect(
+      within(screen.getByTestId("quick-filters")).queryByTestId(
+        "filter-chips-clear-all",
+      ),
+    ).toBeNull();
   });
 
-  it("is named by its visible label", () => {
+  it("is named as a group for assistive tech", () => {
     renderRow();
     expect(
       screen.getByRole("group", { name: "Quick filters" }),
     ).toBeInTheDocument();
   });
 
-  it("drops every quick filter at once", async () => {
+  it("is cleared along with everything else by the chips' Clear all", async () => {
     const { user, seen } = renderRow(
       `/?search=temperature&onlyInView=true&realtimeOnly=true`,
+      { withChips: true },
     );
 
-    await user.click(screen.getByTestId("quick-filter-reset"));
+    await user.click(await screen.findByTestId("filter-chips-clear-all"));
 
     await waitFor(() => {
       expect(seen.search.at(-1)).toBe("");
@@ -245,13 +213,7 @@ describe("QuickFilters", () => {
     });
   });
 
-  // The reset button is the same one tested above (quick-filter-reset):
-  // there is only the one, for the modal filters the chips show and the
-  // quick ones together — mounted alongside ActiveFilterChips here rather
-  // than in that component's own tests, since it renders no reset of its
-  // own. The Show/Hide toggle for both rows now rides on the main Filters
-  // button instead (see TopControls.test.jsx).
-  it("the single reset clears the modal filter along with the quick ones", async () => {
+  it("Clear all drops the modal filter along with the quick ones", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
@@ -264,7 +226,7 @@ describe("QuickFilters", () => {
       expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(1),
     );
 
-    await user.click(screen.getByTestId("quick-filter-reset"));
+    await user.click(screen.getByTestId("filter-chips-clear-all"));
 
     await waitFor(() =>
       expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(0),

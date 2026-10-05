@@ -10,14 +10,14 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { defaultStartDate, defaultEndDate } from "../../config.js";
-import FilterSearch from "./FilterSearch.jsx";
+import FiltersModal from "../Modals/FiltersModal.jsx";
 
 describe("FilterSearch", () => {
   beforeEach(() => {
     installMockFetch();
   });
 
-  // The palette writes nothing of its own: every pick lands in the provider
+  // The search page writes nothing of its own: every pick lands in the provider
   // state the classic filters read, so it is asserted through that state.
   async function renderPalette(url = "/") {
     const seen = {};
@@ -36,7 +36,6 @@ describe("FilterSearch", () => {
       seen.draw = useMapState().drawRequest?.mode;
       const ui = useUI();
       seen.ui = {
-        showFilterSearch: ui.showFilterSearch,
         showFiltersModal: ui.showFiltersModal,
         openFilter: ui.openFilter,
       };
@@ -45,7 +44,7 @@ describe("FilterSearch", () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
-        <FilterSearch />
+        <FiltersModal />
         <Probe />
       </>,
       { url, providers: "app" },
@@ -65,7 +64,7 @@ describe("FilterSearch", () => {
 
   it("opens when typing starts on the page, holding what was typed", async () => {
     const user = userEvent.setup({ delay: null });
-    renderWithProviders(<FilterSearch />, { providers: "app" });
+    renderWithProviders(<FiltersModal />, { providers: "app" });
 
     await user.keyboard("oxy");
 
@@ -78,7 +77,7 @@ describe("FilterSearch", () => {
     renderWithProviders(
       <>
         <input aria-label="elsewhere" />
-        <FilterSearch />
+        <FiltersModal />
       </>,
       { providers: "app" },
     );
@@ -92,9 +91,9 @@ describe("FilterSearch", () => {
     expect(screen.queryByTestId("filter-search-input")).toBeNull();
   });
 
-  it("opens on Ctrl+K", async () => {
+  it("opens the Filters modal on its search page with Ctrl+K", async () => {
     const { seen } = await renderPalette();
-    expect(seen.ui.showFilterSearch).toBe(true);
+    expect(seen.ui).toEqual({ showFiltersModal: true, openFilter: undefined });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
@@ -132,9 +131,10 @@ describe("FilterSearch", () => {
   it("finds an ocean variable by its readable name in either language", async () => {
     const { user, box } = await renderPalette();
 
-    await user.type(box, "température sous");
+    await user.type(box, "carbone organique");
 
-    expect(option("Subsurface temperature")).toBeInTheDocument();
+    // Named as the Filters list names it, found by its French name.
+    expect(option("Dissolved Organic Carbon")).toBeInTheDocument();
   });
 
   it("finds a data portal by its display name", async () => {
@@ -197,7 +197,7 @@ describe("FilterSearch", () => {
     await user.click(option("Polygon"));
 
     expect(seen.draw).toBe("polygon");
-    expect(seen.ui.showFilterSearch).toBe(false);
+    expect(seen.ui.showFiltersModal).toBe(false);
   });
 
   it("lists a drawn area when empty, and clears it", async () => {
@@ -209,24 +209,23 @@ describe("FilterSearch", () => {
     await user.click(option("Bounding box"));
 
     expect(seen.draw).toBe("clear");
-    expect(seen.ui.showFilterSearch).toBe(true);
+    expect(seen.ui.showFiltersModal).toBe(true);
   });
 
-  it("clears every filter at once from its footer button", async () => {
+  it("clears every filter at once from the footer", async () => {
     const { user, seen, box } = await renderPalette(
       "/?eovs=oxygen&realtimeOnly=true&search=argo",
     );
     await waitFor(() => expect(seen.oxygen?.isSelected).toBe(true));
 
-    await user.click(screen.getByTestId("filter-search-clear-all"));
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
 
     expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
     expect(seen.realtimeOnly).toBe(false);
     expect(seen.search).toBe("");
     expect(seen.draw).toBe("clear");
-    expect(seen.ui.showFilterSearch).toBe(true);
-    expect(box).toHaveFocus();
-    expect(screen.queryByTestId("filter-search-clear-all")).toBeNull();
+    expect(seen.ui.showFiltersModal).toBe(true);
+    expect(box).toBeInTheDocument();
   });
 
   it("clears every filter when asked for by name", async () => {
@@ -237,11 +236,6 @@ describe("FilterSearch", () => {
     await user.click(option("Clear all filters"));
 
     expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
-  });
-
-  it("offers no clear-all button while nothing is set", async () => {
-    await renderPalette();
-    expect(screen.queryByTestId("filter-search-clear-all")).toBeNull();
   });
 
   it("opens empty again after being opened by typing", async () => {
@@ -266,7 +260,16 @@ describe("FilterSearch", () => {
   it("explains what can be searched when nothing is applied", async () => {
     const { user, box } = await renderPalette();
     const help = screen.getByTestId("filter-search-help");
-    for (const name of ["Dates", "Depths", "Quick filters", "Exclude"])
+    for (const name of [
+      "Dataset titles",
+      "Dates",
+      "Depths",
+      "Quick filters",
+      "Exclude",
+      "What",
+      "From",
+      "When & Where",
+    ])
       expect(within(help).getByText(name)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "last 3 months" }));
@@ -276,16 +279,24 @@ describe("FilterSearch", () => {
     expect(screen.queryByTestId("filter-search-help")).toBeNull();
   });
 
-  it("links to the classic Filters panel", async () => {
-    const { user, seen } = await renderPalette();
+  // The list beside the search is the way to a filter's own page; its Search
+  // row is the way back, finding the box as it was left.
+  it("goes to a filter's page and back, keeping what was typed", async () => {
+    const { user, seen, box } = await renderPalette();
+    await user.type(box, "oxyg");
 
-    await user.click(screen.getByTestId("filter-search-open-filters"));
-
+    await user.click(
+      screen.getByRole("button", { name: "See every Ocean Variables option" }),
+    );
     expect(seen.ui).toEqual({
-      showFilterSearch: false,
       showFiltersModal: true,
-      openFilter: undefined,
+      openFilter: "oceanVariablesFiltername",
     });
+    expect(screen.queryByTestId("filter-search-input")).toBeNull();
+
+    await user.click(screen.getByTestId("filters-panel-search"));
+    expect(seen.ui.openFilter).toBeUndefined();
+    expect(screen.getByTestId("filter-search-input")).toHaveValue("oxyg");
   });
 
   it("applies a typed time range, and a typed depth range", async () => {
@@ -312,24 +323,13 @@ describe("FilterSearch", () => {
     expect(options()[0]).toHaveTextContent("2022-01-01 – 2025-12-31");
   });
 
-  it("describes each result, and links the active one to its filter", async () => {
-    const { user, seen, box } = await renderPalette();
+  it("describes each result", async () => {
+    const { user, box } = await renderPalette();
 
     await user.type(box, "oxyg");
     expect(option("Oxygen")).toHaveTextContent(
       "The amount of dissolved oxygen in seawater.",
     );
-    await user.keyboard("{ArrowDown}");
-    expect(screen.getByTestId("filter-search-open-panel")).toHaveTextContent(
-      "Open in Filters: Ocean Variables",
-    );
-
-    await user.click(screen.getByTestId("filter-search-open-panel"));
-    expect(seen.ui).toEqual({
-      showFilterSearch: false,
-      showFiltersModal: true,
-      openFilter: "oceanVariablesFiltername",
-    });
   });
 
   it("empties the box on Escape, and closes on the next", async () => {
@@ -338,9 +338,9 @@ describe("FilterSearch", () => {
     await user.type(box, "zzzz");
     await user.keyboard("{Escape}");
     expect(box).toHaveValue("");
-    expect(seen.ui.showFilterSearch).toBe(true);
+    expect(seen.ui.showFiltersModal).toBe(true);
     await user.keyboard("{Escape}");
-    expect(seen.ui.showFilterSearch).toBe(false);
+    expect(seen.ui.showFiltersModal).toBe(false);
   });
 
   it("empties the box from its clear button, keeping the palette open", async () => {
@@ -352,7 +352,7 @@ describe("FilterSearch", () => {
 
     expect(box).toHaveValue("");
     expect(box).toHaveFocus();
-    expect(seen.ui.showFilterSearch).toBe(true);
+    expect(seen.ui.showFiltersModal).toBe(true);
     expect(screen.queryByTestId("filter-search-clear")).toBeNull();
   });
 });

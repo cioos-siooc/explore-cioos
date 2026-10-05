@@ -7,7 +7,11 @@ import {
   defaultEndDepth,
 } from "../components/config.js";
 import eovsJSONfile from "../eovs.json";
-import { polygonIsRectangle } from "../utilities.jsx";
+import {
+  generateRangeSelectBadgeTitle,
+  polygonIsRectangle,
+  setAllOptionsIsSelectedTo,
+} from "../utilities.jsx";
 import {
   DATA_LAYER_HINT_KEYS,
   DATA_LAYER_KEYS,
@@ -16,33 +20,35 @@ import {
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
-import useResetAllFilters from "./useResetAllFilters.js";
 
 const stateOf = (option) =>
   option.isSelected ? "include" : option.isExcluded ? "exclude" : undefined;
 
-// Every value any filter can take, as groups of
-// `{ id, label, description?, state, toggle }`
-// options for the search bar to match against. An option may also carry
-// `closes` (the palette closes once it is picked, as a draw happens on the map
-// behind it), `action` (the verb to show instead of Add / Remove) and
-// `command` (an action rather than a value, so it has no state to show). `toggle(target)` follows the
+// Every filter, as groups of `{ id, label, description?, state, toggle }`
+// options: the one description the chips, the Filters badge, the search
+// palette and reset all read, so none of them can disagree about what is set.
+// An option is applied when it has a `state`; `toggle(target)` follows the
 // geometry switches' rule (see toggledDataLayerChoice): asking for the state
 // an option is already in clears it. Each writes the same provider state the
 // classic filter UI does, so both stay in step and the URL carries either.
 //
-// scientificNameMatches are WoRMS hits for the current term, which only the
+// A group carries `panelName`, the Filters modal row it is set from, and
+// `clear`, which drops all of it. An option may also carry `closes` (the
+// palette closes once it is picked, as a draw happens on the map behind it),
+// `action` (the verb to show instead of Add / Remove) and `includeOnly` (it
+// cannot be excluded).
+//
+// scientificNameMatches are WoRMS hits for the palette's term, which only the
 // API can produce; the picked names are always offered so they can be removed.
-// typedRange is a time or depth range read off the term (see parseRangeQuery):
-// its group is `pinned`, offered as typed rather than matched against it.
-export default function useFilterSearchOptions(
-  scientificNameMatches = [],
-  typedRange,
-) {
+// typedRange is a time or depth range read off that term (see
+// parseRangeQuery): its group is `pinned`, offered as typed rather than
+// matched against it.
+export default function useFilterModel(scientificNameMatches = [], typedRange) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const filters = useFilters();
-  const { dataLayerChoices, toggleDataLayer, requestDraw } = useMapState();
+  const { dataLayerChoices, toggleDataLayer, resetDataLayers, requestDraw } =
+    useMapState();
   const {
     polygon,
     datasetTitleSearchText,
@@ -50,7 +56,10 @@ export default function useFilterSearchOptions(
     onlyInView,
     setOnlyInView,
   } = useSelection();
-  const [canReset, resetAll] = useResetAllFilters();
+
+  // "(all)" once a dataset has to carry every included value, not just one.
+  const matchAllLabel = (label, matchAll, includedCount) =>
+    matchAll && includedCount > 1 ? `${label} (${t("filterMatchAll")})` : label;
 
   const listOptions = (list, setList, translatable, idPrefix = "") =>
     list.map((option) => {
@@ -77,13 +86,49 @@ export default function useFilterSearchOptions(
       };
     });
 
-  const toggleOnly = (id, label, description, on, set) => ({
-    id,
+  const listGroup = (
+    key,
     label,
+    panelName,
+    list,
+    setList,
+    translatable,
+    matchAll = false,
+  ) => ({
+    key,
+    label: matchAllLabel(
+      label,
+      matchAll,
+      list.filter((o) => o.isSelected).length,
+    ),
+    panelName,
+    options: listOptions(list, setList, translatable),
+    clear: () => setAllOptionsIsSelectedTo(false, list, setList),
+  });
+
+  const toggleGroup = (
+    key,
+    label,
+    panelName,
+    optionLabel,
     description,
-    state: on ? "include" : undefined,
-    includeOnly: true,
-    toggle: () => set(!on),
+    on,
+    set,
+  ) => ({
+    key,
+    label,
+    panelName,
+    options: [
+      {
+        id: key,
+        label: optionLabel,
+        description,
+        state: on ? "include" : undefined,
+        includeOnly: true,
+        toggle: () => set(!on),
+      },
+    ],
+    clear: () => set(false),
   });
 
   const {
@@ -132,7 +177,7 @@ export default function useFilterSearchOptions(
     toggle: () => requestDraw(drawn ? "clear" : mode),
   });
 
-  const rangeGroup = (key, label, current, defaults, set, unit = "") => {
+  const rangeGroup = (key, label, current, defaults, set, unit) => {
     const typed = typedRange?.key === key;
     const [start, end] = typed ? [typedRange.start, typedRange.end] : current;
     const active = current[0] !== defaults[0] || current[1] !== defaults[1];
@@ -140,19 +185,26 @@ export default function useFilterSearchOptions(
     return {
       key,
       label,
+      panelName: label,
       pinned: typed,
       options:
         typed || active
           ? [
               {
                 id: key,
-                label: `${start} – ${end}${unit}`,
+                label: generateRangeSelectBadgeTitle(
+                  label,
+                  [start, end],
+                  defaults,
+                  unit,
+                ),
                 state: applied ? "include" : undefined,
                 includeOnly: true,
                 toggle: () => (applied ? set(...defaults) : set(start, end)),
               },
             ]
           : [],
+      clear: () => set(...defaults),
     };
   };
 
@@ -171,27 +223,26 @@ export default function useFilterSearchOptions(
             },
           ]
         : [],
+      clear: () => setDatasetTitleSearchText(""),
     },
-    {
-      key: "quick",
-      label: t("topBarQuickFiltersLabel"),
-      options: [
-        toggleOnly(
-          "realtime",
-          t("realtimeFilterOptionText"),
-          t("quickFilterRealtimeTitle"),
-          filters.realtimeOnly,
-          filters.setRealtimeOnly,
-        ),
-        toggleOnly(
-          "inView",
-          t("datasetsCardOnlyInViewText"),
-          t("quickFilterInViewTitle"),
-          onlyInView,
-          setOnlyInView,
-        ),
-      ],
-    },
+    toggleGroup(
+      "realtime",
+      t("realtimeFilterName"),
+      t("realtimeFilterName"),
+      t("realtimeFilterOptionText"),
+      t("quickFilterRealtimeTitle"),
+      filters.realtimeOnly,
+      filters.setRealtimeOnly,
+    ),
+    toggleGroup(
+      "inView",
+      t("datasetsCardOnlyInViewText"),
+      t("datasetsCardOnlyInViewText"),
+      t("inViewFilterOptionText"),
+      t("quickFilterInViewTitle"),
+      onlyInView,
+      setOnlyInView,
+    ),
     rangeGroup(
       "time",
       t("timeframeFilterName"),
@@ -211,51 +262,56 @@ export default function useFilterSearchOptions(
         filters.setStartDepth(start);
         filters.setEndDepth(end);
       },
-      " m",
+      "(m)",
     ),
-    {
-      key: "eovs",
-      label: t("oceanVariablesFiltername"),
-      // The catalogue names variables by code (subSurfaceTemperature); their
-      // readable names, in both languages, are in eovs.json. Both are matched,
-      // so a variable is found by its name in either language.
-      options: listOptions(
+    (() => {
+      // Shown by the same name the Filters list gives it, but matched on its
+      // eovs.json names too, so it is found by its name in either language.
+      const group = listGroup(
+        "eovs",
+        t("oceanVariablesFiltername"),
+        "oceanVariablesFiltername",
         filters.eovsSelected,
         filters.setEovsSelected,
         true,
-      ).map((option, i) => {
-        const eov = eovsJSONfile.find(
-          (e) => e.value === filters.eovsSelected[i].title,
-        );
-        if (!eov) return option;
-        return {
-          ...option,
-          label: eov[lang === "fr" ? "label FR" : "label EN"],
-          matchText: `${eov["label EN"]} ${eov["label FR"]}`,
-        };
-      }),
-    },
-    {
-      key: "platforms",
-      label: t("platformsFilterName"),
-      options: listOptions(
-        filters.platformsSelected,
-        filters.setPlatformsSelected,
-        true,
-      ),
-    },
-    {
-      key: "orgs",
-      label: t("organizationFilterName"),
-      options: listOptions(
-        filters.orgsSelected,
-        filters.setOrgsSelected,
-        false,
-      ),
-    },
+        filters.eovsMatchAll,
+      );
+      return {
+        ...group,
+        options: group.options.map((option, i) => {
+          const eov = eovsJSONfile.find(
+            (e) => e.value === filters.eovsSelected[i].title,
+          );
+          return eov
+            ? {
+                ...option,
+                matchText: `${eov["label EN"]} ${eov["label FR"]}`,
+              }
+            : option;
+        }),
+      };
+    })(),
+    listGroup(
+      "platforms",
+      t("platformsFilterName"),
+      "platformsFilterName",
+      filters.platformsSelected,
+      filters.setPlatformsSelected,
+      true,
+    ),
+    listGroup(
+      "orgs",
+      t("organizationFilterName"),
+      "organizationFilterName",
+      filters.orgsSelected,
+      filters.setOrgsSelected,
+      false,
+      filters.orgsMatchAll,
+    ),
     {
       key: "sources",
       label: t("sourceFilterName"),
+      panelName: "sourceFilterName",
       // pk values collide between the two lists, hence the prefixed ids.
       options: [
         ...listOptions(
@@ -271,10 +327,23 @@ export default function useFilterSearchOptions(
           "obis-",
         ),
       ],
+      clear: () => {
+        setAllOptionsIsSelectedTo(
+          false,
+          filters.erddapServersSelected,
+          filters.setErddapServersSelected,
+        );
+        setAllOptionsIsSelectedTo(
+          false,
+          filters.obisNodesSelected,
+          filters.setObisNodesSelected,
+        );
+      },
     },
     {
       key: "dataLayers",
       label: t("layerSelectorLabel"),
+      panelName: "layerSelectorLabel",
       options: DATA_LAYER_KEYS.map((key) => ({
         id: key,
         label: t(DATA_LAYER_LABEL_KEYS[key]),
@@ -282,31 +351,41 @@ export default function useFilterSearchOptions(
         state: dataLayerChoices[key],
         toggle: (target) => toggleDataLayer(key, target),
       })),
+      clear: resetDataLayers,
     },
     filters.obisDataAvailable && {
       key: "scientificName",
-      label: t("scientificNameFilterName"),
+      label: matchAllLabel(
+        t("scientificNameFilterName"),
+        filters.scientificNamesMatchAll,
+        picked.length,
+      ),
+      panelName: "scientificNameFilterName",
       options: [
         ...scientificNames.map((name) => scientificNameOption(name)),
         ...scientificNameMatches
           .filter((m) => !scientificNames.includes(m.scientificName))
           .map((m) => scientificNameOption(m.scientificName, m)),
       ],
+      clear: () => {
+        setScientificNamesSelected([]);
+        setScientificNamesExcluded([]);
+      },
     },
-    {
-      key: "datasets",
-      label: t("datasetsFilterName"),
-      options: listOptions(
-        filters.datasetsSelected,
-        filters.setDatasetsSelected,
-        true,
-      ),
-    },
+    listGroup(
+      "datasets",
+      t("datasetsFilterName"),
+      "datasetsFilterName",
+      filters.datasetsSelected,
+      filters.setDatasetsSelected,
+      true,
+    ),
     // After the catalogue's values, which a few loosely matched letters
     // ("oxyg" for "Polygon") should not push down.
     {
       key: "area",
       label: t("spatialFilterFilterName"),
+      panelName: "spatialFilterFilterName",
       options: [
         areaOption("box", t("drawBoundingBoxOption"), boxDrawn),
         areaOption(
@@ -315,21 +394,7 @@ export default function useFilterSearchOptions(
           Boolean(polygon) && !boxDrawn,
         ),
       ],
-    },
-    canReset && {
-      key: "reset",
-      label: t("quickFilterCaptionReset"),
-      options: [
-        {
-          id: "reset",
-          label: t("filterSearchClearAll"),
-          matchText: `${t("filterSearchClearAll")} ${t("quickFilterCaptionReset")}`,
-          includeOnly: true,
-          command: true,
-          action: t("quickFilterCaptionReset"),
-          toggle: resetAll,
-        },
-      ],
+      clear: () => requestDraw("clear"),
     },
   ].filter(Boolean);
 }
