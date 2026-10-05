@@ -4,13 +4,26 @@
  * in view" — dot-separated from the next, and pressable the way a link is,
  * by its underline. Dotted while off; set, the underline goes solid and the
  * phrase takes the primary colour.
+ *
+ * The row spans the card with real-time in its centre column and the other
+ * two hugging it from either side, so the set stays centred whatever their
+ * widths. Clear all shares the right column, pushed to the far edge.
  * ------------------------------------------------------------------ */
 .quickFilters {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto 1fr;
   align-items: center;
-  justify-content: center;
-  gap: 2px 8px;
+  align-self: stretch;
+  gap: 6px;
+}
+
+.quickFilters > :first-child {
+  justify-self: end;
+}
+
+.quickFilters > .quickFilterArea {
+  grid-area: 1 / 5;
+  justify-self: start;
 }
 
 .quickFilterButton {
@@ -68,9 +81,10 @@
   color: var(--cioos-ink-40);
 }
 
-/* Clear all, while only quick filters are set: the line's last word, an icon
-   alone so the line holds — still named by its aria-label and title. */
+/* Clear all, while only quick filters are set: the line's last word. */
 .quickFilters .quickFiltersClearAll {
+  grid-area: 1 / 5;
+  justify-self: end;
   padding: 2px;
   border: none;
   background: transparent;
@@ -80,10 +94,6 @@
 
 .quickFilters .quickFiltersClearAll:hover {
   color: var(--cioos-primary-800);
-}
-
-.quickFiltersClearAll .activeFilterClearAllText {
-  display: none;
 }
 
 /* ------------------------------------------------------------------

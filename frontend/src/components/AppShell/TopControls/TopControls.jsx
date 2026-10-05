@@ -1,12 +1,6 @@
 import * as React from "react";
 import { useRef } from "react";
-import {
-  BarChartLine,
-  ChevronDown,
-  ChevronUp,
-  Filter,
-  ListUl,
-} from "react-bootstrap-icons";
+import { BarChartLine, Filter, ListUl } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -54,10 +48,7 @@ function measureTopBarSpace(rect) {
 // primary entry points.
 //
 // The quick filters (see QuickFilters) share the tally's strip, since that is
-// the number they narrow. The active-filter chips flow beneath the card,
-// folded away by the small chevron riding on the far side of the Filters
-// segment: it reads as part of the button that already names the filter
-// state, rather than a fourth control among the chips it hides.
+// the number they narrow. The active-filter chips flow beneath the card.
 export default function TopControls() {
   const { t } = useTranslation();
   // The same list the chips below render, so the badge can never report a
@@ -70,8 +61,6 @@ export default function TopControls() {
     setShowCoverageModal,
     sidebarOpen,
     setSidebarOpen,
-    filterChipsCollapsed,
-    setFilterChipsCollapsed,
   } = useUI();
   const { inspectDataset } = useSelection();
   const { tipHighlight } = useTips();
@@ -131,66 +120,34 @@ export default function TopControls() {
               {t("topBarCoverageLabel")}
             </span>
           </button>
-          <div
-            className={classNames("topBarButton topBarFiltersSegment", {
+          <button
+            type="button"
+            className={classNames("topBarButton", {
               // Solid while the modal itself is open; once it's closed, any
               // applied filters keep the button in the lighter "applied"
               // wash instead of dropping all the way back to baseline.
               active: showFiltersModal,
               applied: !showFiltersModal && activeFilterCount > 0,
             })}
+            data-testid="topbar-filters-button"
+            onClick={() => setShowFiltersModal(true)}
+            aria-pressed={showFiltersModal}
+            title={t("dockFiltersCountTitle", { count: activeFilterCount })}
           >
-            <button
-              type="button"
-              className="topBarFiltersOpen"
-              data-testid="topbar-filters-button"
-              onClick={() => setShowFiltersModal(true)}
-              aria-pressed={showFiltersModal}
-              title={t("dockFiltersCountTitle", { count: activeFilterCount })}
-            >
-              <Filter size={18} aria-hidden="true" />
-              <span className="topBarButtonLabel">
-                {t("filtersMenuButton")}
+            <Filter size={18} aria-hidden="true" />
+            <span className="topBarButtonLabel">{t("filtersMenuButton")}</span>
+            {activeFilterCount > 0 && (
+              <span className="topBarCount" data-testid="topbar-filter-count">
+                {activeFilterCount}
               </span>
-              {activeFilterCount > 0 && (
-                <span className="topBarCount" data-testid="topbar-filter-count">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            {/* Show/Hide for the active-filter chips beneath the card (see
-                ActiveFilterChips), riding on the button that already names
-                whether any filter is set. */}
-            <button
-              type="button"
-              className="topBarFiltersToggle"
-              data-testid="filter-chips-toggle"
-              onClick={() => setFilterChipsCollapsed((collapsed) => !collapsed)}
-              aria-expanded={!filterChipsCollapsed}
-              aria-label={
-                filterChipsCollapsed
-                  ? t("quickFiltersShow")
-                  : t("quickFiltersHide")
-              }
-              title={
-                filterChipsCollapsed
-                  ? t("quickFiltersShow")
-                  : t("quickFiltersHide")
-              }
-            >
-              {filterChipsCollapsed ? (
-                <ChevronDown size={16} aria-hidden="true" />
-              ) : (
-                <ChevronUp size={16} aria-hidden="true" />
-              )}
-            </button>
-          </div>
+            )}
+          </button>
         </div>
       </BrandSearch>
       <TopBarRow contentKey={datasetMinimized ? "dataset" : null}>
         {datasetMinimized && <DatasetMapCard dataset={inspectDataset} />}
       </TopBarRow>
-      <TopBarRow contentKey={filterChipsCollapsed ? null : "chips"}>
+      <TopBarRow contentKey="chips">
         <ActiveFilterChips />
       </TopBarRow>
     </div>
