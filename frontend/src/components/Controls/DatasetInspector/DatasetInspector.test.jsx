@@ -262,13 +262,17 @@ describe("DatasetInspector", () => {
       expect(setInspectRecordID).not.toHaveBeenCalled();
     });
 
-    it("clicking the card itself opens its preview", async () => {
+    it("Show data opens its preview; clicking the card itself does nothing", async () => {
       const setInspectRecordID = vi.fn();
       const { user } = await renderReady({
         dataset: TRAJECTORY_DATASET,
         setInspectRecordID,
       });
-      await user.click(await screen.findByText("cruise-a"));
+      const card = (await screen.findByText("cruise-a")).closest(".listCard");
+      await user.click(screen.getByText("cruise-a"));
+      expect(setInspectRecordID).not.toHaveBeenCalled();
+
+      await user.click(within(card).getByRole("button", { name: /Show data/ }));
       expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a");
       expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
     });
