@@ -6,7 +6,7 @@ import os
 import shutil
 import sys
 import time
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -34,6 +34,7 @@ from cde_harvester.core.schema import (
     ensure_database,
     rebuild_schema,
 )
+from cde_harvester.loading import snapshot
 from cde_harvester.loading.loader import main as db_loader_main
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
@@ -663,7 +664,7 @@ def cde_load_run(
     with publish.fetched(run_url) as (folder, manifest):
         manifest = manifest or {}
         if manifest.get("kind") == "snapshot":
-            raise ValueError(f"{run_url} is a snapshot, not a harvest run")
+            raise ValueError(f"{run_url} is a snapshot; restore it with the Rebuild Database flow")
         if incremental is None:
             incremental = manifest.get("incremental", True)
 
@@ -791,6 +792,11 @@ def cde_harvest_all_run(
     for r in results:
         logger.info("Source %s -> %s [%s] (flow_run=%s)",
                     r["source"], r["deployment"], r["state"], r.get("flow_run_id"))
+
+    # Taken even when some sources failed: the database is still the site's
+    # consistent serving state, and this is the backup a fresh volume restores from.
+    snapshot_error = _publish_snapshot()
+
     failed = [r for r in results if not r.get("completed")]
     if failed:
         raise RuntimeError(
@@ -800,8 +806,38 @@ def cde_harvest_all_run(
                 + (f" ({r['error']})" if r.get("error") else "")
                 for r in failed
             )
+            + (f"; the snapshot also failed: {snapshot_error}" if snapshot_error else "")
         )
+    if snapshot_error:
+        raise RuntimeError(
+            f"All {len(sources)} source(s) harvested, but the snapshot failed: {snapshot_error}"
+        ) from snapshot_error
     logger.info("All %d per-source harvest job(s) completed", len(sources))
+
+
+def _publish_snapshot():
+    """Snapshot the database to CDE_PUBLISH_URL/snapshots/<ts>; return the error, don't raise."""
+    logger = _run_logger()
+    try:
+        base = publish.publish_url()
+        if not base:
+            return None
+        # An empty snapshot would become the "latest" a fresh volume restores from.
+        if core_db.database_is_empty():
+            logger.warning("The database is empty; not publishing a snapshot of it")
+            return None
+        url = f"{base}/snapshots/{_timestamp()}"
+        engine = core_db.create_db_engine()
+        try:
+            snapshot.take_snapshot(engine, url)
+        finally:
+            engine.dispose()
+        logger.info("Snapshot published to %s", url)
+        return None
+    except Exception as e:
+        logger.error("Could not publish the database snapshot: %s", e, exc_info=True)
+        sentry_sdk.capture_exception(e)
+        return e
 
 
 @flow(name="Populate Vernaculars", log_prints=True)
@@ -842,14 +878,40 @@ def populate_vernaculars_run(
     print("vernaculars_main() returned")
 
 
+def _mirror_snapshot(folder, manifest, snapshot_url):
+    """Copy the local pre-rebuild snapshot to CDE_PUBLISH_URL/snapshots/, best effort.
+
+    The local copy is the one the rebuild depends on; the bucket copy is the
+    off-host backup, so an unreachable bucket only warns.
+    """
+    base = publish.publish_url()
+    if not base:
+        return
+    try:
+        publish.publish_folder(
+            folder, f"{base}/snapshots/{snapshot_url.rsplit('/', 1)[-1]}",
+            **{k: v for k, v in manifest.items() if k not in ("files", "published_at")},
+        )
+    except Exception as e:
+        _run_logger().warning("Could not mirror the snapshot to %s: %s", base, e)
+        sentry_sdk.capture_exception(e)
+
+
+# Local copies of the snapshot Rebuild takes before dropping the schema. Under the
+# harvest folder, on its volume, so one survives a crash after the drop; pruned
+# with the run folders.
+REBUILD_SNAPSHOT_FOLDER = Path("harvest") / "_snapshots"
+
+
 @flow(name="Rebuild Database", log_prints=True)
 def cde_rebuild_database_run(
     confirm: str = "",
     run_harvest: bool = True,
     flush_redis: bool = True,
     triggered_by: str | None = None,
+    restore_from: str = "current",
 ):
-    """DESTRUCTIVE: drop the cde schema, recreate it from database/*.sql, re-harvest.
+    """DESTRUCTIVE: drop the cde schema, recreate it from database/*.sql, reload the data.
 
     For when a deploy changes the table layout. Postgres applies 1_schema.sql only on a
     fresh volume and db_migrate re-applies only the [3-9] function files, so the tables
@@ -857,12 +919,23 @@ def cde_rebuild_database_run(
     `relation "cde.x" does not exist`. This rebuilds them without volume surgery or host
     shell access.
 
-    ALL HARVESTED DATA IS LOST — same as deleting the Postgres volume. To proceed,
-    `confirm` must be the database name (DB_NAME); anything else aborts before touching
-    the schema, so a stray Run in the Prefect UI cannot wipe a database by accident.
+    To proceed, `confirm` must be the database name (DB_NAME); anything else aborts
+    before touching the schema, so a stray Run in the Prefect UI cannot wipe a database
+    by accident.
 
-    run_harvest: trigger "Harvest All Sources" afterwards to repopulate (the rebuilt
-    schema is empty, so the app has no data until a harvest completes).
+    restore_from: where the rebuilt schema gets its data.
+      "current" — reload this database's own data, so the site is back as soon as
+                  the load finishes (the default, also for a blank value);
+      "latest"  — the newest non-empty snapshot under CDE_PUBLISH_URL (disaster
+                  recovery on a fresh volume);
+      a URL     — that snapshot (s3://… or file://…);
+      "none"    — leave the schema empty.
+    Whatever it says, a non-empty database is first snapshotted to harvest/_snapshots/,
+    so the pre-rebuild data can always be restored from there. download_jobs is never
+    snapshotted (it holds user emails) and is lost either way.
+
+    run_harvest: trigger "Harvest All Sources" afterwards to refresh (or, with nothing
+    restored, to repopulate) the data.
     """
     # _run_logger (not get_run_logger) so the flow body also works when called
     # directly via .fn outside a run context — which is how it is tested, and how it
@@ -872,10 +945,19 @@ def cde_rebuild_database_run(
     expected = check_confirmation(
         confirm, db_name=core_db.db_name(), host=core_db.db_host()
     )
+    # A cleared field means the safe default, never the destructive "none".
+    restore_from = (restore_from or "current").strip()
+    if restore_from not in ("current", "latest", "none") and "://" not in restore_from:
+        raise ValueError(
+            f"restore_from={restore_from!r} is not current, latest, none or a snapshot URL "
+            "(a local snapshot is file:///app/harvester/harvest/_snapshots/<timestamp>); "
+            "nothing was touched"
+        )
 
     logger.warning(
-        "Rebuilding schema '%s' on %s — dropping all harvested data%s",
-        expected, core_db.db_host(), f" (triggered by {triggered_by})" if triggered_by else "",
+        "Rebuilding schema '%s' on %s (restore_from=%s)%s",
+        expected, core_db.db_host(), restore_from,
+        f" (triggered by {triggered_by})" if triggered_by else "",
     )
 
     # The database itself may not exist: a volume that initialised before DB_NAME was
@@ -894,14 +976,81 @@ def cde_rebuild_database_run(
 
     engine = core_db.create_db_engine()
     try:
-        report = rebuild_schema(engine)
+        with ExitStack() as stack:
+            # Everything that can fail without harm happens before the drop: a source
+            # that cannot be fetched, or is not a loadable snapshot, aborts with
+            # nothing touched.
+            folder = manifest = snapshot_url = None
+            if restore_from == "latest" or "://" in restore_from:
+                snapshot_url = restore_from
+                if restore_from == "latest":
+                    snapshot_url = snapshot.latest_published(publish.publish_url() or "")
+                    if not snapshot_url:
+                        raise ValueError(
+                            "restore_from=latest found no snapshot under CDE_PUBLISH_URL "
+                            f"({publish.publish_url()}); nothing was touched"
+                        )
+                folder, manifest = stack.enter_context(publish.fetched(snapshot_url))
+                snapshot.check_restorable(manifest, snapshot_url)
+
+            with snapshot.loader_lock(engine):
+                # Whatever the restore source, the current data is kept locally first:
+                # if that source turns out bad after the drop, this copy brings it back.
+                pre_rebuild = None
+                if not core_db.database_is_empty():
+                    pre_rebuild = f"file://{REBUILD_SNAPSHOT_FOLDER.resolve()}/{_timestamp()}"
+                    snapshot.take_snapshot(engine, pre_rebuild)
+                    logger.info("Snapshot of the current data taken: %s", pre_rebuild)
+                    if restore_from == "current":
+                        snapshot_url = pre_rebuild
+                        folder, manifest = stack.enter_context(publish.fetched(pre_rebuild))
+                        _mirror_snapshot(folder, manifest, pre_rebuild)
+
+                report = rebuild_schema(engine)
+                logger.info(
+                    "Schema rebuilt: %s + %s -> %d tables",
+                    report["init_file"], ", ".join(report["function_files"]),
+                    report["tables_created"],
+                )
+                if pre_rebuild:
+                    report["pre_rebuild_snapshot"] = pre_rebuild
+
+                # From here on the drop is committed and irreversible. A failure must
+                # not fail this flow: a red run after a successful drop invites someone
+                # to re-run a destructive operation that already did its job.
+                if folder:
+                    report["snapshot"] = snapshot_url
+                    try:
+                        snapshot.restore_aux_tables(engine, folder)
+                    except Exception as e:
+                        report["restore_error"] = f"aux tables: {e}"
+
+            if folder and "restore_error" not in report:
+                try:
+                    report["snapshot_missing_columns"] = snapshot.drop_stale_hashes(folder, manifest)
+                    # The snapshot is the whole database by construction, so the guard
+                    # against a partial harvest wiping other sources does not apply; a
+                    # load that slipped in after the rebuild is replaced, as intended.
+                    report["load"] = db_loader_main(
+                        folder=folder, incremental=False, allow_full_reload=True
+                    )
+                except Exception as e:
+                    report["restore_error"] = f"load: {e}"
+            if folder:
+                report["restored"] = "restore_error" not in report
+                if report["restored"]:
+                    logger.info("Restored the data from %s", snapshot_url)
+                else:
+                    logger.error(
+                        "Schema was rebuilt, but restoring %s failed (%s). The database is "
+                        "EMPTY until a harvest runs. Do NOT re-run the rebuild with "
+                        "restore_from=current (there is nothing left to snapshot); retry with "
+                        "restore_from=%s.", snapshot_url, report["restore_error"],
+                        pre_rebuild or snapshot_url,
+                    )
+                    sentry_sdk.capture_message(f"Rebuild restore failed: {report['restore_error']}")
     finally:
         engine.dispose()
-
-    logger.info(
-        "Schema rebuilt: %s + %s -> %d tables",
-        report["init_file"], ", ".join(report["function_files"]), report["tables_created"],
-    )
 
     # Tiles and legend ranges are cached per-geometry; after a wipe they describe data
     # that no longer exists, so serve-stale would outlive the rebuild.
@@ -912,18 +1061,17 @@ def cde_rebuild_database_run(
             logger.warning("Could not flush the redis cache (%s); tiles may serve stale data", e)
 
     if not run_harvest:
-        logger.warning(
-            "run_harvest=False — the schema is empty. Trigger a harvest before expecting "
-            "the app to show data."
-        )
+        if not report.get("restored"):
+            logger.warning(
+                "run_harvest=False — the schema is empty. Trigger a harvest before expecting "
+                "the app to show data."
+            )
         return report
 
-    # The schema rebuild above is already committed and irreversible. A failure to
-    # SUBMIT the follow-up harvest (deployment not registered yet on a brand-new
-    # install, API hiccup) must not fail this flow: a red run after a successful drop
-    # invites someone to re-run a destructive operation that already did its job. Report
-    # it in the result and let the harvest be triggered by hand.
-    logger.info("Triggering 'Harvest All Sources' to repopulate the empty schema")
+    # A failure to SUBMIT the follow-up harvest (deployment not registered yet on a
+    # brand-new install, API hiccup) must not fail this flow either. Report it in the
+    # result and let the harvest be triggered by hand.
+    logger.info("Triggering 'Harvest All Sources'")
     try:
         run_deployment(
             name="Harvest All Sources/cde-harvest-all",
@@ -935,9 +1083,8 @@ def cde_rebuild_database_run(
         report["harvest_triggered"] = False
         report["harvest_trigger_error"] = str(e)
         logger.error(
-            "Schema was rebuilt, but triggering 'Harvest All Sources' failed (%s). The "
-            "database is EMPTY until a harvest runs — trigger it manually. Do NOT re-run "
-            "the rebuild; it already completed.",
+            "Schema was rebuilt, but triggering 'Harvest All Sources' failed (%s). Trigger "
+            "it manually. Do NOT re-run the rebuild; it already completed.",
             e,
         )
     return report

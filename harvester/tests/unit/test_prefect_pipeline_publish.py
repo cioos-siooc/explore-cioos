@@ -299,3 +299,72 @@ class TestReplayCheck:
 
     def test_the_newest_run_loads(self, folder):
         assert _replay_check(FakeEngine(None, None), folder) is None
+
+
+@pytest.fixture
+def harvest_all(tmp_path, monkeypatch):
+    """Run the Harvest All Sources body with the children and the snapshot stubbed."""
+    monkeypatch.delenv("HARVEST_CONFIG_YAML", raising=False)
+    monkeypatch.delenv("HARVEST_CONFIG_FILE", raising=False)
+    events = []
+
+    def _run(child_ok=True, snapshot_fails=False, empty=False):
+        class Future:
+            def __init__(self, source):
+                self.source = source
+
+            def result(self):
+                events.append("child")
+                return {"source": self.source, "deployment": "d", "flow_run_id": "x",
+                        "state": "COMPLETED" if child_ok else "FAILED", "completed": child_ok,
+                        "error": None if child_ok else "final state FAILED"}
+
+        def take_snapshot(engine, url):
+            events.append(("snapshot", url))
+            if snapshot_fails:
+                raise ConnectionError("bucket unreachable")
+
+        monkeypatch.setattr(prefect_pipeline._trigger_source_harvest, "submit",
+                            lambda src, by: Future(src), raising=False)
+        monkeypatch.setattr(prefect_pipeline.snapshot, "take_snapshot", take_snapshot)
+        monkeypatch.setattr(prefect_pipeline.core_db, "database_is_empty", lambda: empty)
+        monkeypatch.setattr(prefect_pipeline.core_db, "create_db_engine",
+                            lambda: type("E", (), {"dispose": lambda self: None})())
+        monkeypatch.setattr(prefect_pipeline.sentry_sdk, "capture_exception",
+                            lambda e: events.append("sentry"))
+        config = tmp_path / "harvest_config.yaml"
+        config.write_text(yaml.safe_dump({"erddap_urls": [SOURCE]}))
+        prefect_pipeline.cde_harvest_all_run.fn(str(config))
+
+    _run.events = events
+    return _run
+
+
+class TestHarvestAllSnapshot:
+    def test_snapshots_after_every_child_finished(self, harvest_all, monkeypatch):
+        monkeypatch.setenv("CDE_PUBLISH_URL", BASE)
+        harvest_all()
+        assert harvest_all.events[0] == "child"
+        assert harvest_all.events[1][1].startswith(f"{BASE}/snapshots/")
+
+    def test_an_empty_database_is_not_published(self, harvest_all, monkeypatch):
+        # It would become the "latest" snapshot a fresh volume restores from.
+        monkeypatch.setenv("CDE_PUBLISH_URL", BASE)
+        harvest_all(empty=True)
+        assert harvest_all.events == ["child"]
+
+    def test_no_url_takes_no_snapshot(self, harvest_all):
+        harvest_all()
+        assert harvest_all.events == ["child"]
+
+    def test_a_failed_snapshot_fails_the_run_and_alerts(self, harvest_all, monkeypatch):
+        monkeypatch.setenv("CDE_PUBLISH_URL", BASE)
+        with pytest.raises(RuntimeError, match="the snapshot failed"):
+            harvest_all(snapshot_fails=True)
+        assert harvest_all.events[-1] == "sentry"
+
+    def test_failed_sources_still_get_a_snapshot_and_both_are_reported(self, harvest_all, monkeypatch):
+        monkeypatch.setenv("CDE_PUBLISH_URL", BASE)
+        with pytest.raises(RuntimeError, match="did not complete.*the snapshot also failed"):
+            harvest_all(child_ok=False, snapshot_fails=True)
+        assert [e[0] for e in harvest_all.events if isinstance(e, tuple)] == ["snapshot"]

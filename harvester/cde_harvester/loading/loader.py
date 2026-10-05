@@ -374,7 +374,7 @@ def ensure_organization_pks(datasets):
 # harvest re-covers the data anyway, and auto-retrying a resource-starved DB
 # just piles on load.
 @task(name="cde-db-loader", timeout_seconds=7200)
-def main(folder, incremental=False):
+def main(folder, incremental=False, allow_full_reload=False):
     # setup database connection
     logger = get_run_logger()
 
@@ -763,7 +763,7 @@ def main(folder, incremental=False):
                     text("SELECT DISTINCT erddap_url FROM cde.datasets")
                 ).all()
             }
-            allow_full = os.environ.get("CDE_ALLOW_FULL_RELOAD", "").lower() in (
+            allow_full = allow_full_reload or os.environ.get("CDE_ALLOW_FULL_RELOAD", "").lower() in (
                 "1",
                 "true",
                 "yes",

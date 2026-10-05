@@ -50,8 +50,9 @@ services:
       # Remote workers ONLY poll — they must not re-register or re-trigger.
       REGISTER_DEPLOYMENTS: "false"
       RUN_ON_DEPLOY: "false"
-      # Archive each run to object storage; unset = local only. A per-database
-      # prefix, e.g. s3://cioos-juno-cde-harvest/production.
+      # Archive each run, and a database snapshot after each Harvest All, to object
+      # storage; unset = local only. A per-database prefix, e.g.
+      # s3://cioos-juno-cde-harvest/production.
       # Here, not in job_vars: flows inherit this env, and job_vars are stored in
       # plain text in the Prefect DB.
       CDE_PUBLISH_URL: ${CDE_PUBLISH_URL:-}

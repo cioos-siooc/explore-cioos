@@ -120,7 +120,8 @@ start rather than harvest the wrong thing.
 
   CSV output, logs and caches stay local to each host; the DB is the source of
   truth. With `CDE_PUBLISH_URL` set, each run is also archived to object storage
-  after it loads. The `Load Harvest Run` deployment loads an archived run on
+  after it loads, and each `Harvest All Sources` run publishes a full database
+  snapshot there. The `Load Harvest Run` deployment loads an archived run on
   whichever worker picks it up.
 
 The Prefect server keeps its metadata in a dedicated `prefect` Postgres database
@@ -133,10 +134,18 @@ Postgres applies `database/1_schema.sql` only on a **fresh** volume, and
 or renames a table therefore migrates "cleanly" and then fails at query time with
 `relation "cde.<table>" does not exist`.
 
-The `Rebuild Database` deployment fixes this in place. It drops the `cde` schema,
-re-applies all SQL in one transaction, flushes the redis tile cache and triggers a
-full harvest. **It destroys all harvested data**, so `confirm` must equal
-`DB_NAME`; pass `-p run_harvest=false` to leave the database empty.
+The `Rebuild Database` deployment fixes this in place. It snapshots the harvested
+data to `harvest/_snapshots/<timestamp>/`, drops the `cde` schema, re-applies all
+SQL in one transaction, reloads the data, flushes the redis tile cache and triggers
+a harvest to refresh it. `confirm` must equal `DB_NAME`. `-p restore_from` picks
+what gets reloaded: `current` (the default: the data it just snapshotted),
+`latest` (the newest snapshot under `CDE_PUBLISH_URL`, e.g. onto a fresh volume), a
+snapshot URL (`s3://…`, or `file:///app/harvester/harvest/_snapshots/<timestamp>`
+for a local one), or `none` (an empty schema). Whatever it reloads, a non-empty
+database is snapshotted first, so the pre-rebuild data can always be restored. A
+source that is not a complete, non-empty snapshot is refused before anything is
+dropped. Download history (`download_jobs`) is never snapshotted and is lost
+either way.
 
 ```sh
 docker exec <prefect_worker> sh -c "cd /app/harvester && uv run prefect deployment run \

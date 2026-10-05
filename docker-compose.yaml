@@ -319,8 +319,9 @@ services:
       # worker-entrypoint.sh default so the two no longer disagree; raise it
       # deliberately, together with HARVESTER_MEM_LIMIT.
       HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-2}
-      # Archive each run to object storage; unset = local only. A per-database
-      # prefix, e.g. s3://cioos-juno-cde-harvest/production.
+      # Archive each run, and a database snapshot after each Harvest All, to object
+      # storage; unset = local only. A per-database prefix, e.g.
+      # s3://cioos-juno-cde-harvest/production.
       # Here, not in job_vars: flows inherit this env, and job_vars are stored in
       # plain text in the Prefect DB.
       CDE_PUBLISH_URL: ${CDE_PUBLISH_URL:-}
