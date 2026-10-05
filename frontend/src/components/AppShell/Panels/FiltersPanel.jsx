@@ -142,6 +142,8 @@ export default function FiltersPanel({ searchInputRef }) {
     updating: countsUpdating,
     filteredCount,
     total,
+    allDatasetsShown,
+    title: countsTitle,
   } = useDatasetCounts();
   const { dataLayerChoices, resetDataLayers, requestDraw } = useMapState();
 
@@ -670,23 +672,21 @@ export default function FiltersPanel({ searchInputRef }) {
           be scrolled past to reach it. */}
       <div className="filtersPanelFooter">
         <span
+          data-testid="filters-panel-count"
           className={classNames("filtersPanelCount", {
             updating: countsUpdating,
           })}
-          title={
-            countsReady
-              ? t("dockDatasetsCountTitle", {
-                  filtered: filteredCount,
-                  total: totalCount,
-                })
-              : t("datasetsCountLoadingTitle")
-          }
+          title={countsTitle}
         >
           {countsReady ? (
-            t("topBarCountsSummary", {
-              filtered: filteredCount,
-              total: totalCount,
-            })
+            allDatasetsShown ? (
+              t("topBarCountsTotal", { count: totalCount })
+            ) : (
+              t("topBarCountsSummary", {
+                filtered: filteredCount,
+                total: totalCount,
+              })
+            )
           ) : (
             <Spinner size="xs" className="countSpinner" />
           )}

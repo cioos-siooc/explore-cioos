@@ -22,6 +22,7 @@ export default function DatasetCounts() {
     filteredCount,
     total,
     allDatasetsShown,
+    title,
   } = useDatasetCounts();
 
   // A failed /datasets leaves no catalogue total; what came back filtered is
@@ -38,13 +39,7 @@ export default function DatasetCounts() {
         <Spinner size="xs" className="countSpinner" />
       ) : (
         // Announced when a filter changes the tally.
-        <span
-          role="status"
-          title={t("dockDatasetsCountTitle", {
-            filtered: filteredCount,
-            total: totalCount,
-          })}
-        >
+        <span role="status" title={title}>
           {allDatasetsShown ? (
             format(totalCount)
           ) : (
