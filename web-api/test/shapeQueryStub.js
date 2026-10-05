@@ -15,21 +15,29 @@ function install() {
   const calls = [];
   let queue = [];
 
+  function next(name) {
+    if (!queue.length) {
+      throw new Error(
+        `shapeQueryStub: ${name}() called with nothing queued — ` +
+          "call shapeQuery.queueResult() once per call the route will make.",
+      );
+    }
+    const result = queue.shift();
+    if (result instanceof Error) throw result;
+    return result;
+  }
+
   const stub = new Module(shapeQueryPath, null);
   stub.filename = shapeQueryPath;
   stub.loaded = true;
   stub.exports = {
     async getShapeQuery(query, doEstimate, getRecordsList) {
       calls.push({ query, doEstimate, getRecordsList });
-      if (!queue.length) {
-        throw new Error(
-          "shapeQueryStub: getShapeQuery() called with nothing queued — " +
-            "call shapeQuery.queueResult() once per call the route will make.",
-        );
-      }
-      const next = queue.shift();
-      if (next instanceof Error) throw next;
-      return next;
+      return next("getShapeQuery");
+    },
+    async getDatasetPksInShape(query) {
+      calls.push({ query, pksOnly: true });
+      return next("getDatasetPksInShape");
     },
     async buildShapeSql() {
       throw new Error("shapeQueryStub: buildShapeSql() is not stubbed");
@@ -39,7 +47,7 @@ function install() {
 
   return {
     calls,
-    // Queue the array getShapeQuery should resolve to on its next call.
+    // Queue the array the next stubbed call should resolve to.
     queueResult(rows) {
       queue.push(rows);
     },
