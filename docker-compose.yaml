@@ -319,6 +319,15 @@ services:
       # worker-entrypoint.sh default so the two no longer disagree; raise it
       # deliberately, together with HARVESTER_MEM_LIMIT.
       HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-2}
+      # Archive each run to object storage; unset = local only. A per-database
+      # prefix, e.g. s3://cioos-juno-cde-harvest/production.
+      # Here, not in job_vars: flows inherit this env, and job_vars are stored in
+      # plain text in the Prefect DB.
+      CDE_PUBLISH_URL: ${CDE_PUBLISH_URL:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-https://objets.juno.calculquebec.ca}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
     # Resource containment. Setting memswap_limit == mem_limit gives this
     # container ZERO swap (cgroup v2: memory.swap.max = memswap_limit -
     # mem_limit = 0), so a runaway harvest is OOM-killed inside its own cgroup

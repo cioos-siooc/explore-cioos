@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import csv
 import logging
 import os
 import shutil
@@ -10,15 +11,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+import sentry_sdk
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, task
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
+from sqlalchemy import text
 
 from cde_harvester.__main__ import main as harvester_main
 from cde_harvester.core import db as core_db
+from cde_harvester.core import publish
 from cde_harvester.core.config import (
     load_config,
     resolve_harvest_config_file,
@@ -170,6 +174,29 @@ def _prune_server_run_folders(base_folder, keep=KEEP_RUNS_PER_SERVER, protect=()
                 logger.warning("Could not prune run folder %s: %s", path, e)
 
 
+def _publish_run(run_folder, slug, incremental):
+    """Archive a finished run folder under CDE_PUBLISH_URL/runs/; return the error, don't raise.
+
+    Returning lets the caller finish the run's own cleanup before turning it
+    red. The Sentry capture is explicit because log records are breadcrumbs
+    only (core/observability.py) and Prefect swallows the flow's exception.
+    """
+    logger = _run_logger()
+    url = None
+    try:
+        base = publish.publish_url()
+        if not base:
+            return None
+        url = f"{base}/runs/{slug}/{Path(run_folder).name}"
+        publish.publish_folder(run_folder, url, kind="run", slug=slug, incremental=incremental)
+        logger.info("Archived run to %s", url)
+        return None
+    except Exception as e:
+        logger.error("Could not archive run %s to %s: %s", run_folder, url, e, exc_info=True)
+        sentry_sdk.capture_exception(e)
+        return e
+
+
 def deployment_slug(source):
     """Stable per-source slug; must match harvest-dashboard/app/config.deployment_slug."""
     if not source or str(source).strip().lower() in OBIS_ALIASES:
@@ -267,6 +294,8 @@ class PrefectCDEPipeline:
         slug = deployment_slug(self.source) if self.source else "full"
         run_folder = _server_run_folder(base_folder, slug, _timestamp())
 
+        harvested = False
+        publish_error = None
         with _harvest_file_log(self.log_dir, self.log_level, slug) as log_path:
             if log_path:
                 logger.info("Writing harvest log file: %s (served at /harvester_logs/)", log_path)
@@ -315,6 +344,7 @@ class PrefectCDEPipeline:
                         skip_unchanged=effective_incremental,
                     )
                     logger.info("cde_harvester completed successfully")
+                    harvested = True
                 except Exception as e:
                     logger.error(f"cde_harvester failed: {e}", exc_info=True)
                     raise
@@ -354,7 +384,14 @@ class PrefectCDEPipeline:
 
                 logger.info("CDE Pipeline completed successfully")
             finally:
+                # After the load, so an unreachable bucket never delays the data;
+                # a failed load is still archived and can be replayed later.
+                if harvested:
+                    publish_error = _publish_run(run_folder, slug, effective_incremental)
                 _publish_log_artifact(log_path)
+
+        if publish_error:
+            raise RuntimeError(f"Run loaded but not archived: {publish_error}") from publish_error
 
     def create_process_work_pool(self, pool_name="cde-process-pool"):
         """Create the `process` work pool (idempotent; safe under concurrent replicas)."""
@@ -480,6 +517,17 @@ class PrefectCDEPipeline:
             source_deployment_names.append(dep_name)
             logger.info("Per-source deployment registered: %s (source=%s)", dep_name, src)
 
+        # Loads a run published to CDE_PUBLISH_URL, on whichever worker picks it up.
+        load_run_id = flow.from_source(
+            source=source_dir,
+            entrypoint="cde_harvester/prefect_pipeline.py:cde_load_run",
+        ).deploy(
+            name="cde-load-run",
+            work_pool_name=POOL_NAME,
+            cron=None,
+            job_variables=job_vars,
+        )
+
         # Destructive schema rebuild, on-demand only — never scheduled, and gated on a
         # confirm parameter matching DB_NAME (see cde_rebuild_database_run).
         rebuild_id = flow.from_source(
@@ -509,8 +557,9 @@ class PrefectCDEPipeline:
         print(f"  uv run prefect worker start --pool {POOL_NAME} --type process")
         logger.info(
             "Deployments created: cde-harvester=%s cde-harvest-all=%s "
-            "populate-vernaculars=%s rebuild-database=%s per-source=%s",
-            harvest_id, orchestrator_id, vernaculars_id, rebuild_id, source_deployment_names,
+            "populate-vernaculars=%s load-run=%s rebuild-database=%s per-source=%s",
+            harvest_id, orchestrator_id, vernaculars_id, load_run_id, rebuild_id,
+            source_deployment_names,
         )
         return harvest_id
 
@@ -545,6 +594,97 @@ def cde_pipeline_run(
     pipeline.source = source
     pipeline.triggered_by = triggered_by
     pipeline.cde_pipeline()
+
+
+def _replay_check(engine, folder):
+    """("skip" | "refuse", reason) when loading this run folder now would be wrong, else None.
+
+    Skip: the run is already loaded (its run_id is harvest_runs' primary key, so
+    a second load would roll back anyway). Refuse: a newer run for the same
+    source is loaded. A run is a delta, so replaying an older one rolls its
+    datasets back, and prune_stale_datasets drops every dataset added since.
+    """
+    runs_file = Path(folder) / "harvest_runs.csv"
+    if not runs_file.is_file():
+        return None
+    with open(runs_file, newline="") as f:
+        run = next(csv.DictReader(f))
+    with engine.connect() as conn:
+        if conn.execute(
+            text("SELECT 1 FROM cde.harvest_runs WHERE run_id = CAST(:run_id AS uuid)"),
+            {"run_id": run["run_id"]},
+        ).first():
+            return "skip", f"run {run['run_id']} is already loaded"
+        newer = conn.execute(
+            text("""
+                SELECT run_id, started_at FROM cde.harvest_runs
+                WHERE status = 'ok' AND started_at > CAST(:started_at AS timestamptz)
+                  AND (scope = 'full' OR :scope = 'full' OR triggered_source = :source)
+                ORDER BY started_at DESC LIMIT 1
+            """),
+            {"started_at": run["started_at"], "scope": run["scope"], "source": run["triggered_source"]},
+        ).first()
+    if newer:
+        return "refuse", (
+            f"a newer run for this source ({newer.run_id}, started {newer.started_at}) is "
+            "already loaded; this older delta would roll its datasets back and prune "
+            "any added since"
+        )
+    return None
+
+
+@flow(name="Load Harvest Run", log_prints=True)
+def cde_load_run(
+    run_url: str,
+    incremental: bool | None = None,
+    force: bool = False,
+    flush_redis: bool = True,
+):
+    """Load one published harvest run (CDE_PUBLISH_URL/runs/<slug>/<ts>) into the database.
+
+    For loading on another machine than the one that harvested, or replaying a
+    run that was archived but never loaded. `incremental` defaults to the mode
+    the run was harvested in. `force` loads a run from outside this database's
+    prefix, or one older than what is already loaded for its source.
+
+    The older-run check reads committed runs before the load queues for the
+    loader lock, so it cannot see a harvest of the same source that is loading
+    right now: don't replay a source while it is being harvested.
+    """
+    logger = _run_logger()
+    base = publish.publish_url()
+    if "://" in run_url and not force and not (base and run_url.startswith(base + "/")):
+        raise ValueError(
+            f"{run_url} is not under this database's CDE_PUBLISH_URL ({base}). Runs are "
+            "deltas against the database they were harvested for; pass force=True to "
+            "load it anyway."
+        )
+
+    with publish.fetched(run_url) as (folder, manifest):
+        manifest = manifest or {}
+        if manifest.get("kind") == "snapshot":
+            raise ValueError(f"{run_url} is a snapshot, not a harvest run")
+        if incremental is None:
+            incremental = manifest.get("incremental", True)
+
+        engine = core_db.create_db_engine()
+        try:
+            check = _replay_check(engine, folder)
+        finally:
+            engine.dispose()
+        if check and check[0] == "skip":
+            logger.info("Nothing to load: %s", check[1])
+            return {"changed": False, "skipped": check[1]}
+        if check and not force:
+            raise RuntimeError(f"Refusing to load {run_url}: {check[1]}. Pass force=True to load it anyway.")
+
+        logger.info("Loading %s (incremental=%s)", run_url, incremental)
+        summary = db_loader_main(folder=folder, incremental=incremental)
+
+    if flush_redis and summary["changed"]:
+        clearRedisCache()
+        reloadTopRequests()
+    return summary
 
 
 # Poll cadence and tolerance for _trigger_source_harvest's wait loop. We poll the

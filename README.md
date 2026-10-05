@@ -119,7 +119,9 @@ start rather than harvest the wrong thing.
   ```
 
   CSV output, logs and caches stay local to each host; the DB is the source of
-  truth.
+  truth. With `CDE_PUBLISH_URL` set, each run is also archived to object storage
+  after it loads. The `Load Harvest Run` deployment loads an archived run on
+  whichever worker picks it up.
 
 The Prefect server keeps its metadata in a dedicated `prefect` Postgres database
 in the shared `db` service — SQLite locks under concurrent workers.

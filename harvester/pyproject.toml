@@ -19,6 +19,7 @@ dependencies = [
     "pyyaml>=6.0.1",
     "redis>=6.4.0",
     "requests>=2.31.0",
+    "s3fs>=2026.6.0",
     "sentry-sdk>=2.38.0",
     "shapely>=2.0.3",
     "sqlalchemy>=2.0.0,<3.0.0",

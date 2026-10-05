@@ -58,6 +58,14 @@ def isolate_db_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def isolate_publish_env(monkeypatch):
+    """Keep a developer's CDE_PUBLISH_URL (loaded from .env the same way) out of
+    every test: with credentials also present, a stubbed pipeline test would
+    archive its fake run to the real bucket."""
+    monkeypatch.delenv("CDE_PUBLISH_URL", raising=False)
+
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------

@@ -50,6 +50,15 @@ services:
       # Remote workers ONLY poll — they must not re-register or re-trigger.
       REGISTER_DEPLOYMENTS: "false"
       RUN_ON_DEPLOY: "false"
+      # Archive each run to object storage; unset = local only. A per-database
+      # prefix, e.g. s3://cioos-juno-cde-harvest/production.
+      # Here, not in job_vars: flows inherit this env, and job_vars are stored in
+      # plain text in the Prefect DB.
+      CDE_PUBLISH_URL: ${CDE_PUBLISH_URL:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-https://objets.juno.calculquebec.ca}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
     volumes:
       # Alternative to HARVEST_CONFIG_B64: copy the primary stack's config to
       # this host and uncomment (must stay in sync with the primary).
