@@ -138,7 +138,7 @@
   pointer-events: none;
 }
 
-/* With a term, the term itself says what the search is for. */
+/* Open, the field's own placeholder says what it is for. */
 .quickFilterSearch.expanded .quickFilterCaption {
   display: none;
 }
@@ -201,9 +201,9 @@
 }
 
 /* ------------------------------------------------------------------
- * The search control: one circle that grows into a pill naming the published
- * title term, with its clear button. The magnifier opens the search palette
- * either way, so the circle never moves as the term appears beside it.
+ * The search control: one circle that grows into a pill. The button is the
+ * magnifier throughout — it opens the field while closed and submits it once
+ * open — so the circle never moves as the field appears beside it.
  * ------------------------------------------------------------------ */
 .quickFilterSearch {
   display: flex;
@@ -213,9 +213,9 @@
   transition: background-color var(--cioos-transition-fast);
 }
 
-/* With a term, the wrapper becomes the pill and the button inside it loses
-   its own chrome — one shape holding magnifier, term and clear, rather than
-   a circle with a box stuck to it. */
+/* Open, the form itself becomes the pill and the button inside it loses its
+   own chrome — one shape holding magnifier, field and clear, rather than a
+   circle with a box stuck to it. */
 .quickFilterSearch.expanded {
   gap: 4px;
   max-width: 100%;
@@ -241,33 +241,20 @@
   box-shadow: var(--cioos-focus);
 }
 
-.quickFilterSearchTerm {
-  flex: 0 1 auto;
-  max-width: 180px;
+.quickFilterSearchInput {
+  flex: 1 1 auto;
+  width: 180px;
 
   /* Shrinks ahead of the buttons on a narrow screen: the row wraps rather than
-     overflowing, and a term that can give way keeps it to fewer lines. */
+     overflowing, and a field that can give way keeps it to fewer lines. */
   min-width: 0;
-  overflow: hidden;
   padding: 6px 0;
   border: none;
+  outline: none;
   background: transparent;
   font: inherit;
   font-size: var(--cioos-font-size-md);
   color: var(--cioos-ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.quickFilterSearchTerm:hover {
-  color: var(--cioos-primary-800);
-}
-
-.quickFilterSearchTerm:focus-visible {
-  outline: none;
-  border-radius: var(--cioos-radius-sm);
-  box-shadow: var(--cioos-focus);
 }
 
 .quickFilterSearchClear {

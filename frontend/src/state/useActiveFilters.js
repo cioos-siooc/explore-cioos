@@ -28,7 +28,7 @@ import { useUI } from "./ui/UIProvider.jsx";
 // FiltersPanel.jsx — most groups key off a stable i18n key, but time/depth key
 // off their own translated label, so those two are computed with t() rather
 // than hardcoded).
-export function filterNameForKey(key, t) {
+function filterNameForKey(key, t) {
   switch (key) {
     case "eovs":
       return "oceanVariablesFiltername";
@@ -71,7 +71,7 @@ const ICON_FOR_KEY = {
 // createElement, not JSX: this is a plain .js module (no esbuild JSX loader
 // configured for that extension — see vite.config.mjs), and renaming it to
 // .jsx isn't worth doing for the one element this hook returns.
-export function iconForKey(key) {
+function iconForKey(key) {
   const Icon = ICON_FOR_KEY[key];
   return Icon
     ? React.createElement(Icon, { size: 14, "aria-hidden": true })

@@ -18,7 +18,7 @@ import "./styles.css";
 // what looked like a valid pick. Family and below is the conservative
 // "always works" band. The API cap is still the safety net for direct
 // callers — this list just keeps the UI clean.
-export const TOO_BROAD_RANKS = new Set([
+const TOO_BROAD_RANKS = new Set([
   "Kingdom",
   "Subkingdom",
   "Superkingdom",
