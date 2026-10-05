@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useEffect } from "react";
-import { Globe, InfoCircle, Map } from "react-bootstrap-icons";
+import { Globe, InfoCircle, Map, Search } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -21,7 +21,12 @@ const GLOBE_TIP_MAX_ZOOM = 2;
 
 export default function BrandSearch({ children }) {
   const { t, i18n } = useTranslation();
-  const { showIntroModal, setShowIntroModal } = useUI();
+  const {
+    showIntroModal,
+    setShowIntroModal,
+    showFilterSearch,
+    openFilterSearch,
+  } = useUI();
   const { projection, setProjection, zoom } = useMapState();
   const { offerTip, tipHighlight } = useTips();
 
@@ -76,6 +81,19 @@ export default function BrandSearch({ children }) {
               className="brandMinorItem brandFeedback"
               size={20}
             />
+            <button
+              type="button"
+              className={classNames("brandMinorItem", {
+                active: showFilterSearch,
+              })}
+              data-testid="filter-search-open"
+              onClick={() => openFilterSearch()}
+              aria-haspopup="dialog"
+              title={t("filterSearchOpenTitle")}
+              aria-label={t("filterSearchOpenTitle")}
+            >
+              <Search size={20} aria-hidden="true" />
+            </button>
             <button
               type="button"
               className={classNames("brandMinorItem", {
