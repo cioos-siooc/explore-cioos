@@ -33,6 +33,7 @@ describe("FilterSearch", () => {
       seen.realtimeOnly = realtimeOnly;
       seen.dataLayerChoices = useMapState().dataLayerChoices;
       seen.search = useSelection().datasetTitleSearchText;
+      seen.draw = useMapState().drawRequest?.mode;
       const ui = useUI();
       seen.ui = {
         showFilterSearch: ui.showFilterSearch,
@@ -136,6 +137,17 @@ describe("FilterSearch", () => {
     expect(option("Subsurface temperature")).toBeInTheDocument();
   });
 
+  it("finds a data portal by its display name", async () => {
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "CIOOS Pacific");
+
+    expect(
+      within(screen.getByRole("listbox")).getByText("Data Portal"),
+    ).toBeInTheDocument();
+    expect(option("CIOOS Pacific")).toBeInTheDocument();
+  });
+
   it("offers the typed text as a title search first", async () => {
     const { user, seen, box } = await renderPalette();
 
@@ -177,9 +189,103 @@ describe("FilterSearch", () => {
     expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
   });
 
-  it("explains itself when nothing is applied", async () => {
+  // The draw happens on the map, so the palette steps out of its way.
+  it("starts an area draw by name, and closes for it", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "polygon");
+    await user.click(option("Polygon"));
+
+    expect(seen.draw).toBe("polygon");
+    expect(seen.ui.showFilterSearch).toBe(false);
+  });
+
+  it("lists a drawn area when empty, and clears it", async () => {
+    const { user, seen } = await renderPalette(
+      "/?latMin=40&lonMin=-70&latMax=50&lonMax=-60",
+    );
+
+    expect(option("Bounding box")).toHaveTextContent("Remove");
+    await user.click(option("Bounding box"));
+
+    expect(seen.draw).toBe("clear");
+    expect(seen.ui.showFilterSearch).toBe(true);
+  });
+
+  it("clears every filter at once from its footer button", async () => {
+    const { user, seen, box } = await renderPalette(
+      "/?eovs=oxygen&realtimeOnly=true&search=argo",
+    );
+    await waitFor(() => expect(seen.oxygen?.isSelected).toBe(true));
+
+    await user.click(screen.getByTestId("filter-search-clear-all"));
+
+    expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
+    expect(seen.realtimeOnly).toBe(false);
+    expect(seen.search).toBe("");
+    expect(seen.draw).toBe("clear");
+    expect(seen.ui.showFilterSearch).toBe(true);
+    expect(box).toHaveFocus();
+    expect(screen.queryByTestId("filter-search-clear-all")).toBeNull();
+  });
+
+  it("clears every filter when asked for by name", async () => {
+    const { user, seen, box } = await renderPalette("/?eovs=oxygen");
+    await waitFor(() => expect(seen.oxygen?.isSelected).toBe(true));
+
+    await user.type(box, "reset");
+    await user.click(option("Clear all filters"));
+
+    expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
+  });
+
+  it("offers no clear-all button while nothing is set", async () => {
     await renderPalette();
-    expect(screen.getByText(/Find any filter by name/)).toBeInTheDocument();
+    expect(screen.queryByTestId("filter-search-clear-all")).toBeNull();
+  });
+
+  it("opens empty again after being opened by typing", async () => {
+    const { user, box } = await renderPalette();
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByTestId("filter-search-input")).toBeNull(),
+    );
+    await user.keyboard("o");
+    expect(await screen.findByTestId("filter-search-input")).toHaveValue("o");
+    await user.keyboard("{Escape}{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByTestId("filter-search-input")).toBeNull(),
+    );
+
+    await user.keyboard("{Control>}k{/Control}");
+
+    expect(await screen.findByTestId("filter-search-input")).toHaveValue("");
+    expect(box).not.toBeInTheDocument();
+  });
+
+  it("explains what can be searched when nothing is applied", async () => {
+    const { user, box } = await renderPalette();
+    const help = screen.getByTestId("filter-search-help");
+    for (const name of ["Dates", "Depths", "Quick filters", "Exclude"])
+      expect(within(help).getByText(name)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "last 3 months" }));
+
+    expect(box).toHaveValue("last 3 months");
+    expect(box).toHaveFocus();
+    expect(screen.queryByTestId("filter-search-help")).toBeNull();
+  });
+
+  it("links to the classic Filters panel", async () => {
+    const { user, seen } = await renderPalette();
+
+    await user.click(screen.getByTestId("filter-search-open-filters"));
+
+    expect(seen.ui).toEqual({
+      showFilterSearch: false,
+      showFiltersModal: true,
+      openFilter: undefined,
+    });
   });
 
   it("applies a typed time range, and a typed depth range", async () => {
@@ -235,5 +341,18 @@ describe("FilterSearch", () => {
     expect(seen.ui.showFilterSearch).toBe(true);
     await user.keyboard("{Escape}");
     expect(seen.ui.showFilterSearch).toBe(false);
+  });
+
+  it("empties the box from its clear button, keeping the palette open", async () => {
+    const { user, seen, box } = await renderPalette();
+    expect(screen.queryByTestId("filter-search-clear")).toBeNull();
+
+    await user.type(box, "oxygen");
+    await user.click(screen.getByTestId("filter-search-clear"));
+
+    expect(box).toHaveValue("");
+    expect(box).toHaveFocus();
+    expect(seen.ui.showFilterSearch).toBe(true);
+    expect(screen.queryByTestId("filter-search-clear")).toBeNull();
   });
 });

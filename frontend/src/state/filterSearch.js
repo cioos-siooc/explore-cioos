@@ -15,7 +15,6 @@ const FUSE_OPTIONS = {
   keys: [{ name: "text", getFn: (option) => option.matchText ?? option.label }],
   ignoreDiacritics: true,
   ignoreLocation: true,
-  threshold: 0.35,
 };
 
 // A leading "-", "not" or "sauf" asks for the value to be excluded rather than
@@ -40,11 +39,15 @@ export function matchFilterOptions(
   keep = () => false,
 ) {
   const needle = term.trim();
+  // A typo in a short word leaves too little of it to go on: "DFO" one letter
+  // off matches half the catalogue. Short terms match near exactly, and the
+  // tolerance grows with the term.
+  const looseness = needle.length <= 3 ? 0.1 : needle.length <= 5 ? 0.25 : 0.35;
   return groups
     .map((group) => ({
       ...group,
       options: needle
-        ? new Fuse(group.options, FUSE_OPTIONS)
+        ? new Fuse(group.options, { ...FUSE_OPTIONS, threshold: looseness })
             .search(needle, { limit })
             .map(({ item }) => item)
         : group.options.filter((o) => o.state || keep(group.key, o)),

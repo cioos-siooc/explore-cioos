@@ -25,7 +25,7 @@ export default function BrandSearch({ children }) {
     showIntroModal,
     setShowIntroModal,
     showFilterSearch,
-    setShowFilterSearch,
+    openFilterSearch,
   } = useUI();
   const { projection, setProjection, zoom } = useMapState();
   const { offerTip, tipHighlight } = useTips();
@@ -87,7 +87,7 @@ export default function BrandSearch({ children }) {
                 active: showFilterSearch,
               })}
               data-testid="filter-search-open"
-              onClick={() => setShowFilterSearch(true)}
+              onClick={() => openFilterSearch()}
               aria-haspopup="dialog"
               title={t("filterSearchOpenTitle")}
               aria-label={t("filterSearchOpenTitle")}

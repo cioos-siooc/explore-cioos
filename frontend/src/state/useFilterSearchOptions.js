@@ -7,6 +7,7 @@ import {
   defaultEndDepth,
 } from "../components/config.js";
 import eovsJSONfile from "../eovs.json";
+import { polygonIsRectangle } from "../utilities.jsx";
 import {
   DATA_LAYER_HINT_KEYS,
   DATA_LAYER_KEYS,
@@ -15,13 +16,17 @@ import {
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
+import useResetAllFilters from "./useResetAllFilters.js";
 
 const stateOf = (option) =>
   option.isSelected ? "include" : option.isExcluded ? "exclude" : undefined;
 
 // Every value any filter can take, as groups of
 // `{ id, label, description?, state, toggle }`
-// options for the search bar to match against. `toggle(target)` follows the
+// options for the search bar to match against. An option may also carry
+// `closes` (the palette closes once it is picked, as a draw happens on the map
+// behind it), `action` (the verb to show instead of Add / Remove) and
+// `command` (an action rather than a value, so it has no state to show). `toggle(target)` follows the
 // geometry switches' rule (see toggledDataLayerChoice): asking for the state
 // an option is already in clears it. Each writes the same provider state the
 // classic filter UI does, so both stay in step and the URL carries either.
@@ -37,13 +42,15 @@ export default function useFilterSearchOptions(
   const { t, i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const filters = useFilters();
-  const { dataLayerChoices, toggleDataLayer } = useMapState();
+  const { dataLayerChoices, toggleDataLayer, requestDraw } = useMapState();
   const {
+    polygon,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     onlyInView,
     setOnlyInView,
   } = useSelection();
+  const [canReset, resetAll] = useResetAllFilters();
 
   const listOptions = (list, setList, translatable, idPrefix = "") =>
     list.map((option) => {
@@ -111,6 +118,19 @@ export default function useFilterSearchOptions(
     };
   };
   const scientificNames = [...picked, ...dropped];
+
+  const boxDrawn = Boolean(polygon) && polygonIsRectangle(polygon);
+  const areaOption = (mode, label, drawn) => ({
+    id: mode,
+    label,
+    description: t("quickFilterAreaTitle"),
+    matchText: `${label} ${t("spatialFilterFilterName")}`,
+    state: drawn ? "include" : undefined,
+    includeOnly: true,
+    closes: !drawn,
+    action: drawn ? undefined : t("filterSearchActionDraw"),
+    toggle: () => requestDraw(drawn ? "clear" : mode),
+  });
 
   const rangeGroup = (key, label, current, defaults, set, unit = "") => {
     const typed = typedRange?.key === key;
@@ -281,6 +301,35 @@ export default function useFilterSearchOptions(
         filters.setDatasetsSelected,
         true,
       ),
+    },
+    // After the catalogue's values, which a few loosely matched letters
+    // ("oxyg" for "Polygon") should not push down.
+    {
+      key: "area",
+      label: t("spatialFilterFilterName"),
+      options: [
+        areaOption("box", t("drawBoundingBoxOption"), boxDrawn),
+        areaOption(
+          "polygon",
+          t("drawPolygonOption"),
+          Boolean(polygon) && !boxDrawn,
+        ),
+      ],
+    },
+    canReset && {
+      key: "reset",
+      label: t("quickFilterCaptionReset"),
+      options: [
+        {
+          id: "reset",
+          label: t("filterSearchClearAll"),
+          matchText: `${t("filterSearchClearAll")} ${t("quickFilterCaptionReset")}`,
+          includeOnly: true,
+          command: true,
+          action: t("quickFilterCaptionReset"),
+          toggle: resetAll,
+        },
+      ],
     },
   ].filter(Boolean);
 }

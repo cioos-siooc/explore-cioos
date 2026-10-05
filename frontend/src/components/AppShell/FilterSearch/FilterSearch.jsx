@@ -1,6 +1,14 @@
 import * as React from "react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { BoxArrowUpRight, BroadcastPin, Search } from "react-bootstrap-icons";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  ArrowCounterclockwise,
+  BoundingBox,
+  BoxArrowUpRight,
+  BroadcastPin,
+  Search,
+  SlashCircle,
+  X,
+} from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
@@ -18,6 +26,7 @@ import {
   iconForKey,
 } from "../../../state/useActiveFilters.js";
 import useFilterSearchOptions from "../../../state/useFilterSearchOptions.js";
+import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -67,7 +76,13 @@ function useScientificNameMatches(term, enabled) {
   return wanted && result.query === term ? result.items : [];
 }
 
-const GROUP_ICONS = { text: Search, quick: BroadcastPin };
+const GROUP_ICONS = {
+  text: Search,
+  quick: BroadcastPin,
+  area: BoundingBox,
+  reset: ArrowCounterclockwise,
+  exclude: SlashCircle,
+};
 
 function GroupIcon({ groupKey, size = 14 }) {
   const Icon = GROUP_ICONS[groupKey];
@@ -77,6 +92,7 @@ function GroupIcon({ groupKey, size = 14 }) {
 // The Filters modal row an option is set from, for the detail pane's link.
 function panelFilterName(groupKey, option, t) {
   if (groupKey === "text") return "textSearchFilterName";
+  if (groupKey === "area") return "spatialFilterFilterName";
   if (option.id === "realtime") return t("realtimeFilterName");
   if (option.id === "inView") return t("datasetsCardOnlyInViewText");
   return filterNameForKey(groupKey, t);
@@ -124,18 +140,15 @@ function useFilterSearchShortcut(open) {
 // writes the same state the Filters modal and quick filters do, so it sits
 // beside them rather than replacing them.
 export default function FilterSearch() {
-  const { showFilterSearch, setShowFilterSearch } = useUI();
+  const {
+    showFilterSearch,
+    setShowFilterSearch,
+    filterSearchText,
+    openFilterSearch,
+  } = useUI();
   const titleId = useId();
-  const [initialText, setInitialText] = useState("");
   const inputRef = useRef(null);
-  const open = useCallback(
-    (text) => {
-      setInitialText(text);
-      setShowFilterSearch(true);
-    },
-    [setShowFilterSearch],
-  );
-  useFilterSearchShortcut(open);
+  useFilterSearchShortcut(openFilterSearch);
 
   return (
     <Modal
@@ -149,10 +162,78 @@ export default function FilterSearch() {
     >
       <FilterSearchPalette
         titleId={titleId}
-        initialText={initialText}
+        initialText={filterSearchText}
         inputRef={inputRef}
       />
     </Modal>
+  );
+}
+
+// One line per kind of search, drawn with its results group's icon; the
+// examples fill the box in.
+const HELP_ROWS = [
+  { group: "text", help: "Filters", note: true },
+  { group: "time", help: "Time" },
+  { group: "depth", help: "Depth" },
+  { group: "quick", help: "Toggles" },
+  { group: "area", help: "Area" },
+  { group: "exclude", help: "Exclude" },
+];
+
+function FilterSearchHelp({ showSpecies, onExample, onOpenFilters }) {
+  const { t } = useTranslation();
+  const examples = (help) => {
+    const list = t(`filterSearchHelp${help}Examples`, { returnObjects: true });
+    return help === "Filters" && showSpecies
+      ? [...list, t("filterSearchHelpSpeciesExample")]
+      : list;
+  };
+  return (
+    <div className="filterSearchHelp" data-testid="filter-search-help">
+      <p className="filterSearchHelpTitle">{t("filterSearchHelpTitle")}</p>
+      <dl className="filterSearchHelpRows">
+        {HELP_ROWS.map((row) => (
+          <div key={row.help} className="filterSearchHelpRow">
+            <dt>
+              <span className="filterSearchHelpName">
+                <GroupIcon groupKey={row.group} />
+                {t(`filterSearchHelp${row.help}`)}
+              </span>
+              {row.note && (
+                <span className="filterSearchHelpNote">
+                  {t(`filterSearchHelp${row.help}Note`)}
+                </span>
+              )}
+            </dt>
+            <dd>
+              {examples(row.help).map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  className="filterSearchHelpExample"
+                  onClick={() => onExample(example)}
+                  title={t("filterSearchHelpExampleTitle", { example })}
+                >
+                  {example}
+                </button>
+              ))}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="filterSearchHelpClassic">
+        {t("filterSearchHelpClassic")}{" "}
+        <button
+          type="button"
+          className="filterSearchPanelLink"
+          data-testid="filter-search-open-filters"
+          onClick={onOpenFilters}
+        >
+          {t("filterSearchOpenAllFilters")}
+          <BoxArrowUpRight size={12} aria-hidden="true" />
+        </button>
+      </p>
+    </div>
   );
 }
 
@@ -162,6 +243,7 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
   const { obisDataAvailable } = useFilters();
   const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection();
   const { setShowFilterSearch, setOpenFilter, setShowFiltersModal } = useUI();
+  const [canReset, resetAll] = useResetAllFilters();
   const listId = useId();
   const [text, setText] = useState(initialText);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -229,11 +311,12 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
       ? Boolean(option.state)
       : targetFor(option) === option.state;
   const actionLabel = (option) =>
-    removes(option)
+    option.action ??
+    (removes(option)
       ? t("filterSearchActionRemove")
       : exclude
         ? t("filterOptionExcludeAction")
-        : t("filterSearchActionAdd");
+        : t("filterSearchActionAdd"));
 
   function choose({ group, option }) {
     if (!term) {
@@ -241,12 +324,19 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
       setTouched((prev) => new Set(prev).add(`${group.key}:${option.id}`));
       option.toggle(option.state ?? "include");
     } else option.toggle(targetFor(option));
+    if (option.closes) setShowFilterSearch(false);
   }
 
   function openInPanel(name) {
     setShowFilterSearch(false);
     setOpenFilter(name);
     setShowFiltersModal(true);
+  }
+
+  function clearText() {
+    setText("");
+    setTouched(new Set());
+    setActiveIndex(0);
   }
 
   function onKeyDown(e) {
@@ -261,9 +351,7 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
     } else if (e.key === "Escape" && text) {
       // A first Escape empties the box; the next one is Modal's, and closes.
       e.stopPropagation();
-      setText("");
-      setTouched(new Set());
-      setActiveIndex(0);
+      clearText();
     }
   }
 
@@ -296,6 +384,21 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
           aria-controls={flat.length > 0 ? listId : undefined}
           aria-activedescendant={current ? `${listId}-${active}` : undefined}
         />
+        {text && (
+          <button
+            type="button"
+            className="filterSearchClear"
+            data-testid="filter-search-clear"
+            onClick={() => {
+              clearText();
+              inputRef.current?.focus();
+            }}
+            title={t("filterClearSearchTitle")}
+            aria-label={t("filterClearSearchTitle")}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        )}
         <kbd className="filterSearchKey">Esc</kbd>
       </div>
       <div className="filterSearchResults">
@@ -343,10 +446,12 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
                         className="filterSearchOptionState"
                         aria-hidden="true"
                       >
-                        <OptionStateIcon
-                          isSelected={option.state === "include"}
-                          isExcluded={option.state === "exclude"}
-                        />
+                        {!option.command && (
+                          <OptionStateIcon
+                            isSelected={option.state === "include"}
+                            isExcluded={option.state === "exclude"}
+                          />
+                        )}
                       </span>
                       <span className="filterSearchOptionText">
                         <span className="filterSearchOptionLabel">
@@ -383,28 +488,61 @@ function FilterSearchPalette({ titleId, initialText, inputRef }) {
               </div>
             ))}
           </div>
-        ) : (
+        ) : term ? (
           <p className="filterSearchEmpty" role="status">
-            {term
-              ? t("filterSearchNoResults", { term })
-              : t("filterSearchIntro")}
+            {t("filterSearchNoResults", { term })}
           </p>
+        ) : (
+          <FilterSearchHelp
+            showSpecies={obisDataAvailable}
+            onExample={(example) => {
+              setText(example);
+              setTouched(new Set());
+              setActiveIndex(0);
+              inputRef.current?.focus();
+            }}
+            onOpenFilters={() => openInPanel(undefined)}
+          />
         )}
       </div>
       <footer className="filterSearchFooter">
-        {panelName ? (
-          <button
-            type="button"
-            className="filterSearchPanelLink"
-            data-testid="filter-search-open-panel"
-            onClick={() => openInPanel(panelName)}
-          >
-            {t("filterSearchOpenInPanel")}: {current.group.label}
-            <BoxArrowUpRight size={12} aria-hidden="true" />
-          </button>
-        ) : (
-          <span>{t("filterSearchHint")}</span>
-        )}
+        <span className="filterSearchFooterActions">
+          {panelName ? (
+            <button
+              type="button"
+              className="filterSearchPanelLink"
+              data-testid="filter-search-open-panel"
+              onClick={() => openInPanel(panelName)}
+            >
+              {t("filterSearchOpenInPanel")}: {current.group.label}
+              <BoxArrowUpRight size={12} aria-hidden="true" />
+            </button>
+          ) : term ? (
+            <button
+              type="button"
+              className="filterSearchPanelLink"
+              onClick={() => openInPanel(undefined)}
+            >
+              {t("filterSearchOpenAllFilters")}
+              <BoxArrowUpRight size={12} aria-hidden="true" />
+            </button>
+          ) : null}
+          {canReset && (
+            <button
+              type="button"
+              className="filterSearchClearAll"
+              data-testid="filter-search-clear-all"
+              onClick={() => {
+                resetAll();
+                setTouched(new Set());
+                inputRef.current?.focus();
+              }}
+            >
+              <ArrowCounterclockwise size={12} aria-hidden="true" />
+              {t("filterSearchClearAll")}
+            </button>
+          )}
+        </span>
         <span className="filterSearchKeys" aria-hidden="true">
           <kbd className="filterSearchKey">↑↓</kbd>
           {t("filterSearchKeysNavigate")}

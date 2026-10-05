@@ -13,17 +13,21 @@ import {
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
-import { polygonIsRectangle, useSearchInput } from "../../../utilities.jsx";
+import { polygonIsRectangle } from "../../../utilities.jsx";
 import { isMarkerTier } from "../../config.js";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
-import useActiveFilters from "../../../state/useActiveFilters.js";
+import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 // The quick filters: the one-click ones that act on the map or are a single
 // toggle rather than a list of options, as round buttons floating under the top bar.
+//
+// Search opens the search palette (see FilterSearch), which reaches every
+// filter, this row's included.
 //
 // They used to be scattered — search and the two draw tools behind an unlabeled
 // caret on the Filters segment, "only in view" hidden inside the parentheses of
@@ -50,7 +54,7 @@ import "./styles.css";
 // than a second button next to it clearing only half of what is set.
 export default function QuickFilters() {
   const { t } = useTranslation();
-  const { requestDraw, resetDataLayers, zoom } = useMapState();
+  const { requestDraw, zoom } = useMapState();
   const {
     polygon,
     datasetTitleSearchText,
@@ -58,8 +62,9 @@ export default function QuickFilters() {
     onlyInView,
     setOnlyInView,
   } = useSelection();
-  const activeFilterCount = useActiveFilters().length;
-  const { resetFilters, realtimeOnly, setRealtimeOnly } = useFilters();
+  const { realtimeOnly, setRealtimeOnly } = useFilters();
+  const { openFilterSearch } = useUI();
+  const [canReset, resetAll] = useResetAllFilters();
   const { offerTip, tipHighlight } = useTips();
   // Zoomed in to a local area, the whole-catalogue list stops matching the map.
   const zoomedIn = isMarkerTier(zoom) && !onlyInView;
@@ -68,10 +73,6 @@ export default function QuickFilters() {
   }, [zoomedIn, offerTip]);
 
   const labelId = useId();
-  const searchInputId = useId();
-  const inputRef = useRef(null);
-  const searchButtonRef = useRef(null);
-  const [searchOpen, setSearchOpen] = useState(false);
   const areaMenuId = useId();
   const areaRef = useRef(null);
   const areaButtonRef = useRef(null);
@@ -88,44 +89,14 @@ export default function QuickFilters() {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [areaMenuOpen]);
 
-  // The hook lives here, in the row that is always mounted — not in the field,
-  // which comes and goes with the expansion. Its cleanup publishes text that
-  // hadn't been submitted yet (see useSearchInput), so mounted with the field
-  // it would requery the whole map every time the field closed on an unsent
-  // word. Up here, collapsing keeps the draft and asks the map for nothing.
-  const [searchText, setSearchText, submitSearch] = useSearchInput(
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
-    { trigger: "submit" },
-  );
-
-  // A published term holds the field open on its own: it is the only thing on
-  // screen naming what the search is narrowing to, so it cannot be collapsed
-  // out of sight. Clearing is what closes it.
-  const searchExpanded = searchOpen || Boolean(datasetTitleSearchText);
-
-  // On searchOpen, not on searchExpanded: a term arriving from a share link
-  // opens the field too, and focusing it there would take the caret off
-  // whatever the page loaded with. Only the button press asks for the caret.
-  useEffect(() => {
-    if (searchOpen) inputRef.current?.focus();
-  }, [searchOpen]);
-
   const hasShape = Boolean(polygon);
   const boxActive = hasShape && polygonIsRectangle(polygon);
   const polygonActive = hasShape && !boxActive;
-  const anySet =
-    hasShape || onlyInView || realtimeOnly || Boolean(datasetTitleSearchText);
 
   function chooseArea(mode) {
     requestDraw(mode);
     setAreaMenuOpen(false);
     areaButtonRef.current?.focus();
-  }
-
-  function closeSearch() {
-    setSearchOpen(false);
-    searchButtonRef.current?.focus();
   }
 
   return (
@@ -140,97 +111,58 @@ export default function QuickFilters() {
           {t("topBarQuickFiltersLabel")}
         </span>
       </span>
-      {/* A form, so Enter searches natively and the magnifier is that same
-          submit rather than a second code path. Collapsed, that magnifier is
-          instead the button that opens the field. */}
-      <form
+      {/* The search palette (see FilterSearch) covers titles as well as every
+          other filter, so this opens it rather than keeping a title-only field
+          of its own. A published title term stays named here, as nothing else
+          on screen does: the chips leave the quick filters out. */}
+      <div
         className={classNames("quickFilterSearch", {
-          expanded: searchExpanded,
+          expanded: Boolean(datasetTitleSearchText),
         })}
-        onSubmit={(e) => {
-          e.preventDefault();
-          submitSearch();
-        }}
-        onBlur={(e) => {
-          // Empty and abandoned: close it up rather than leave an empty field
-          // sitting open. A term already published keeps it open (see
-          // searchExpanded), and focus moving to the clear/submit button
-          // within this same form is not a departure.
-          if (searchText || datasetTitleSearchText) return;
-          if (e.currentTarget.contains(e.relatedTarget)) return;
-          setSearchOpen(false);
-        }}
       >
         <button
-          ref={searchButtonRef}
-          type={searchExpanded ? "submit" : "button"}
+          type="button"
           className={classNames("quickFilterButton", {
             applied: Boolean(datasetTitleSearchText),
           })}
           data-testid="quick-filter-search"
-          onClick={searchExpanded ? undefined : () => setSearchOpen(true)}
-          aria-expanded={searchExpanded}
-          // Only while the field is really there: aria-controls pointing at an
-          // element that isn't in the DOM is an axe violation, and the a11y
-          // baseline is a ratchet (see e2e/support/axeBaseline.js).
-          aria-controls={searchExpanded ? searchInputId : undefined}
-          title={
-            searchExpanded
-              ? t("filterSearchSubmitTitle")
-              : t("quickFilterSearchTitle")
-          }
-          aria-label={
-            searchExpanded
-              ? t("filterSearchSubmitTitle")
-              : t("textSearchFilterName")
-          }
+          onClick={() => openFilterSearch(datasetTitleSearchText)}
+          aria-haspopup="dialog"
+          title={t("filterSearchOpenTitle")}
+          aria-label={t("filterSearchOpenTitle")}
         >
           <Search size={18} aria-hidden="true" />
           <span className="quickFilterCaption" aria-hidden="true">
             {t("quickFilterCaptionSearch")}
           </span>
         </button>
-        {searchExpanded && (
+        {datasetTitleSearchText && (
           <>
-            <input
-              ref={inputRef}
-              id={searchInputId}
-              type="text"
-              className="quickFilterSearchInput"
-              data-testid="quick-filter-search-input"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Escape") return;
-                // On the published term, not the box's contents: a draft can be
-                // tucked away (the hook holds it, and it comes back on the way
-                // in), but a term that is actually narrowing the map is the
-                // only thing on screen naming it, so it cannot be hidden.
-                if (!datasetTitleSearchText) closeSearch();
-              }}
-              placeholder={t("textSearchFilterPlaceholder")}
-              aria-label={t("textSearchFilterName")}
-            />
-            {searchText && (
-              <button
-                type="button"
-                className="quickFilterSearchClear"
-                data-testid="quick-filter-search-clear"
-                // Emptying publishes immediately (see useSearchInput), so this
-                // drops the filter as well as the text.
-                onClick={() => {
-                  setSearchText("");
-                  closeSearch();
-                }}
-                title={t("filterClearSearchTitle")}
-                aria-label={t("filterClearSearchTitle")}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            )}
+            <button
+              type="button"
+              className="quickFilterSearchTerm"
+              data-testid="quick-filter-search-term"
+              onClick={() => openFilterSearch(datasetTitleSearchText)}
+              aria-haspopup="dialog"
+              title={t("quickFilterSearchEditTitle", {
+                term: datasetTitleSearchText,
+              })}
+            >
+              “{datasetTitleSearchText}”
+            </button>
+            <button
+              type="button"
+              className="quickFilterSearchClear"
+              data-testid="quick-filter-search-clear"
+              onClick={() => setDatasetTitleSearchText("")}
+              title={t("filterClearSearchTitle")}
+              aria-label={t("filterClearSearchTitle")}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
           </>
         )}
-      </form>
+      </div>
       <div
         ref={areaRef}
         className={classNames("quickFilterArea", { open: areaMenuOpen })}
@@ -346,15 +278,8 @@ export default function QuickFilters() {
         type="button"
         className="quickFilterButton quickFilterReset"
         data-testid="quick-filter-reset"
-        disabled={!anySet && activeFilterCount === 0}
-        onClick={() => {
-          resetFilters();
-          resetDataLayers();
-          requestDraw("clear");
-          setDatasetTitleSearchText("");
-          setOnlyInView(false);
-          setSearchOpen(false);
-        }}
+        disabled={!canReset}
+        onClick={resetAll}
         title={t("resetFiltersButtonTooltipText")}
         aria-label={t("resetFiltersButtonTooltipText")}
       >
