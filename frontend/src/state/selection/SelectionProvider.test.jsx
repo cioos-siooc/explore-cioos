@@ -234,8 +234,12 @@ describe("SelectionProvider", () => {
     // world-sized viewport has them all in view.
     const mockedFetch = globalThis.fetch;
     vi.stubGlobal("fetch", async (input) => {
-      const response = await mockedFetch(input);
       const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/pointQuery/inView")) {
+        const pks = pointQueryFixture.map((row) => row.pk);
+        return new Response(JSON.stringify(pks), { status: 200 });
+      }
+      const response = await mockedFetch(input);
       if (!url.includes("/pointQuery")) return response;
       const rows = (await response.json()).map((row) => ({
         ...row,
@@ -271,6 +275,51 @@ describe("SelectionProvider", () => {
     act(() => latest.setListSearchText("zzzzqqq"));
     await waitFor(() => expect(latest.listedDatasets).toHaveLength(0));
     expect(latest.inViewCount).toBe(latest.pointsData.length);
+  });
+
+  it("the server's in-view answer overrides a bbox that merely overlaps the view", async () => {
+    // Every row's bbox covers the view, as an OBIS dataset spread across an
+    // ocean does; the server says only the first has a feature inside it.
+    const mockedFetch = globalThis.fetch;
+    const inViewPk = pointQueryFixture[0].pk;
+    vi.stubGlobal("fetch", async (input) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/pointQuery/inView")) {
+        return new Response(JSON.stringify([inViewPk]), { status: 200 });
+      }
+      const response = await mockedFetch(input);
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row) => ({
+        ...row,
+        filtered_bbox_geojson: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [-140, 40],
+              [-50, 40],
+              [-50, 80],
+              [-140, 80],
+              [-140, 40],
+            ],
+          ],
+        },
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    await renderLoaded();
+    act(() => latest.setOnlyInView(true));
+    act(() =>
+      latestMapState.setMapView((view) => ({
+        ...view,
+        bounds: [
+          [-64, 44],
+          [-63, 45],
+        ],
+      })),
+    );
+
+    await waitFor(() => expect(latest.inViewCount).toBe(1));
+    expect(latest.filteredDatasets.map((row) => row.pk)).toEqual([inViewPk]);
   });
 
   it("\"only in view\" narrows the coverage figure's dataset list, not the map's", async () => {

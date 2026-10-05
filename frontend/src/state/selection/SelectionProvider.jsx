@@ -31,6 +31,7 @@ import { useMapState } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, hiddenDatasetPksFor } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import { RECORD_PARAM, withoutPreviewParams } from "./previewParams.js";
+import { useViewportDatasetPks } from "./viewportDatasetPks.js";
 
 const SelectionContext = createContext();
 
@@ -257,12 +258,12 @@ export default function SelectionProvider({ children }) {
   );
 
   // The live viewport changes on every pan; debounce it so a continuous drag
-  // recomputes the in-view set once it settles rather than every frame.
-  const viewportBounds = useDebounce(mapView?.bounds, 150);
+  // asks for the in-view set once it settles rather than every frame.
+  const viewportBounds = useDebounce(mapView?.bounds, 300);
 
-  // pks whose extent overlaps the current viewport. Recomputed only when the
-  // result set or the settled viewport changes.
-  const datasetsInViewPks = useMemo(() => {
+  // pks whose extent overlaps the current viewport: the instant answer, used
+  // until the server's exact one for this view lands (or where it can't ask).
+  const bboxInViewPks = useMemo(() => {
     const inView = new Set();
     if (!viewportBounds) return inView;
     for (const { pk, bounds } of datasetBounds) {
@@ -270,6 +271,13 @@ export default function SelectionProvider({ children }) {
     }
     return inView;
   }, [datasetBounds, viewportBounds]);
+  const exactInViewPks = useViewportDatasetPks({
+    viewportBounds,
+    query,
+    polygon,
+    enabled: catalogLoaded,
+  });
+  const datasetsInViewPks = exactInViewPks ?? bboxInViewPks;
 
   // pointsData narrowed by the title search, matched the same way
   // DatasetsTable's search box used to match locally: title, dataset type,

@@ -254,3 +254,21 @@ test("features are aggregated per dataset_pk before the dataset metadata joins i
     assert.doesNotMatch(sql, /GROUP BY d\.pk/);
   }
 });
+
+test("pksOnly selects pk_url over the same union and filters as the full query", async () => {
+  const query = { latMin: "48", latMax: "49", lonMin: "-124", lonMax: "-123" };
+  const full = await build(query, { doEstimate: false });
+  const pks = await build(query, { doEstimate: false, pksOnly: true });
+
+  assert.match(pks.sql, /SELECT DISTINCT d\.pk_url AS pk/);
+  for (const branch of [PROFILES, TRAJECTORY, OBIS, GRIDDAP]) {
+    assert.match(pks.sql, branch);
+  }
+  assert.doesNotMatch(pks.sql, /ST_Extent|per_dataset/);
+  assert.deepEqual(Object.keys(pks.params).sort(), [
+    "filters",
+    "obisFilters",
+    "profileFilters",
+  ]);
+  assert.equal(pks.params.filters.toString(), full.params.filters.toString());
+});
