@@ -340,7 +340,10 @@ class OBISHarvester(BaseHarvester):
     def _enrich_with_ckan(self, df_datasets):
         """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
         self.logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
-        df_ckan = get_ckan_obis_records(df_datasets["dataset_id"].tolist(), cache_folder=self.folder)
+        df_ckan = get_ckan_obis_records(
+            df_datasets["dataset_id"].tolist(), cache_folder=self.folder,
+            erddap_url=OBIS_SOURCE_URL,
+        )
 
         if df_ckan.empty:
             df_datasets["title_fr"] = None

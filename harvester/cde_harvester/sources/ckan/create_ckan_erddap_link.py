@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 
 
+import logging
 import re
 from urllib.parse import urlencode
 
 import diskcache as dc
 import pandas as pd
 import requests
-from prefect import get_run_logger, task
+from prefect import task
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+from cde_harvester.core.observability import run_logger
 
 # National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
@@ -92,8 +95,16 @@ def unescape_ascii(x):
 
 @task(task_run_name="fetch-ckan-metadata")
 def get_ckan_records(dataset_ids, limit=None, cache=False):
-    """Fetch the full CKAN record for each harvested dataset ID (@task)."""
-    records = list_ckan_records_with_erddap_urls(cache)
+    """Fetch the full CKAN record for each harvested dataset ID (@task).
+
+    Returns None when CKAN is unreachable: it is enrichment only, so an outage
+    must not fail the harvest (the merge falls back to the stored metadata).
+    """
+    try:
+        records = list_ckan_records_with_erddap_urls(cache)
+    except (requests.RequestException, RuntimeError, KeyError) as e:
+        run_logger(logging.getLogger(__name__)).warning(f"CKAN unavailable, falling back to stored CKAN metadata: {e}")
+        return None
 
     # just used for testing
     if limit:
@@ -117,7 +128,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
         # retreive the data for each record
 
-        title_translated = record_full.get("title_translated")
+        title_translated = record_full.get("title_translated") or {}
         # Kept for the commented-out ckan_summary fields below.
         notes_translated = record_full.get("notes_translated")  # noqa: F841
 
@@ -137,7 +148,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         }
 
         for k, v in ckan_record_text.items():
-            ckan_record_text[k] = remove_newlines(unescape_ascii(v))
+            if v:
+                ckan_record_text[k] = remove_newlines(unescape_ascii(v))
 
         organizations = []
 
@@ -186,11 +198,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
 def list_ckan_records_with_erddap_urls(cache_requests):
     """Fetch all CKAN records with ERDDAP urls (paged)."""
-    try:
-        logger = get_run_logger()
-    except Exception:
-        import logging as _logging
-        logger = _logging.getLogger(__name__)
+    logger = run_logger(logging.getLogger(__name__))
     logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
     row_start = 0
