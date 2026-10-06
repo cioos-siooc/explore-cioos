@@ -11,6 +11,7 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { defaultStartDate, defaultEndDate } from "../../config.js";
 import FiltersModal from "../Modals/FiltersModal.jsx";
+import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
 
 describe("FilterSearch", () => {
   beforeEach(() => {
@@ -135,6 +136,84 @@ describe("FilterSearch", () => {
 
     // Named as the Filters list names it, found by its French name.
     expect(option("Dissolved Organic Carbon")).toBeInTheDocument();
+  });
+
+  it("finds an ocean variable by its category", async () => {
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "biogeochemical");
+
+    expect(option("Oxygen")).toBeInTheDocument();
+  });
+
+  const categoryOption = () =>
+    options().find((o) => o.classList.contains("shortcut"));
+
+  it("offers the category itself, tagged, ahead of its variables", async () => {
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "biogeochemical");
+
+    const category = categoryOption();
+    expect(category).toHaveTextContent("CategoryBiogeochemical");
+    expect(category).toHaveTextContent(
+      "All 5 ocean variables in this category",
+    );
+    const group = category.closest("[role=group]");
+    expect(within(group).getAllByRole("option")[0]).toBe(category);
+  });
+
+  it("includes every variable of a category picked from the search", async () => {
+    const { user, seen, box } = await renderPalette();
+    await user.type(box, "biogeochemical");
+
+    await user.click(categoryOption());
+
+    await waitFor(() =>
+      expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false }),
+    );
+    expect(categoryOption()).toHaveAttribute("data-state", "include");
+  });
+
+  it("excludes a whole category with a leading minus", async () => {
+    const { user, seen, box } = await renderPalette();
+    await user.type(box, "-biogeochemical");
+
+    await user.click(categoryOption());
+
+    await waitFor(() =>
+      expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: true }),
+    );
+  });
+
+  it("lists the variables a category set, not the category, as applied", async () => {
+    const { box } = await renderPalette(
+      "/?eovs=dissolvedOrganicCarbon,nutrients,inorganicCarbon,oxygen,particulateMatter",
+    );
+    expect(box).toHaveValue("");
+
+    await waitFor(() => expect(options()).toHaveLength(5));
+    expect(categoryOption()).toBeUndefined();
+  });
+
+  it("chips each variable a category set, not the category", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <FiltersModal />
+        <ActiveFilterChips />
+      </>,
+      { providers: "app" },
+    );
+    await user.keyboard("{Control>}k{/Control}");
+    const box = await screen.findByTestId("filter-search-input");
+    await user.type(box, "cross-disciplinary");
+
+    await user.click(categoryOption());
+
+    await waitFor(() =>
+      expect(screen.queryAllByTestId("filter-chip-item")).toHaveLength(2),
+    );
   });
 
   it("finds a data portal by its display name", async () => {

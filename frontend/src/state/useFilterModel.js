@@ -7,6 +7,7 @@ import {
   defaultEndDepth,
 } from "../components/config.js";
 import eovsJSONfile from "../eovs.json";
+import eovCategoriesJSONfile from "../eovCategories.json";
 import {
   generateRangeSelectBadgeTitle,
   polygonIsRectangle,
@@ -20,6 +21,7 @@ import {
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
+import useEovCategories from "./useEovCategories.js";
 
 const stateOf = (option) =>
   option.isSelected ? "include" : option.isExcluded ? "exclude" : undefined;
@@ -35,8 +37,9 @@ const stateOf = (option) =>
 // A group carries `panelName`, the Filters modal row it is set from, and
 // `clear`, which drops all of it. An option may also carry `closes` (the
 // palette closes once it is picked, as a draw happens on the map behind it),
-// `action` (the verb to show instead of Add / Remove) and `includeOnly` (it
-// cannot be excluded).
+// `action` (the verb to show instead of Add / Remove), `includeOnly` (it
+// cannot be excluded) and `shortcut` (it sets other options of its group at
+// once, as an EOV category does, so it is never listed as applied itself).
 //
 // scientificNameMatches are WoRMS hits for the palette's term, which only the
 // API can produce; the picked names are always offered so they can be removed.
@@ -47,6 +50,7 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const filters = useFilters();
+  const eovCategories = useEovCategories();
   const { dataLayerChoices, toggleDataLayer, resetDataLayers, requestDraw } =
     useMapState();
   const {
@@ -266,7 +270,8 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
     ),
     (() => {
       // Shown by the same name the Filters list gives it, but matched on its
-      // eovs.json names too, so it is found by its name in either language.
+      // eovs.json names and category too, so it is found by either in either
+      // language. Each category is offered as well, to set all of it at once.
       const group = listGroup(
         "eovs",
         t("oceanVariablesFiltername"),
@@ -278,17 +283,30 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
       );
       return {
         ...group,
-        options: group.options.map((option, i) => {
-          const eov = eovsJSONfile.find(
-            (e) => e.value === filters.eovsSelected[i].title,
-          );
-          return eov
-            ? {
-                ...option,
-                matchText: `${eov["label EN"]} ${eov["label FR"]}`,
-              }
-            : option;
-        }),
+        options: [
+          ...eovCategories.map((c) => ({
+            id: `category-${c.category}`,
+            label: c.label,
+            description: t("filterSearchCategoryDescription", {
+              count: c.count,
+            }),
+            matchText: `${c.names.en} ${c.names.fr}`,
+            state: c.state,
+            shortcut: true,
+            toggle: c.toggle,
+          })),
+          ...group.options.map((option, i) => {
+            const eov = eovsJSONfile.find(
+              (e) => e.value === filters.eovsSelected[i].title,
+            );
+            return eov
+              ? {
+                  ...option,
+                  matchText: `${eov["label EN"]} ${eov["label FR"]} ${eovCategoriesJSONfile[eov.category].en} ${eovCategoriesJSONfile[eov.category].fr}`,
+                }
+              : option;
+          }),
+        ],
       };
     })(),
     listGroup(

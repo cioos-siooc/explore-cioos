@@ -31,7 +31,8 @@ export function parseFilterQuery(text) {
 // groups: [{ key, options: [{ label, matchText?, state, ... }] }]. With no term, the
 // options already applied, so the bar doubles as the list to remove them from
 // (plus any `keep(groupKey, option)` names, so one just removed stays listed);
-// otherwise the options that match the term, closest first.
+// otherwise the options that match the term, closest first. A shortcut is
+// never listed as applied: the options it set are.
 export function matchFilterOptions(
   groups,
   term,
@@ -50,7 +51,9 @@ export function matchFilterOptions(
         ? new Fuse(group.options, { ...FUSE_OPTIONS, threshold: looseness })
             .search(needle, { limit })
             .map(({ item }) => item)
-        : group.options.filter((o) => o.state || keep(group.key, o)),
+        : group.options.filter(
+            (o) => (o.state && !o.shortcut) || keep(group.key, o),
+          ),
     }))
     .filter((group) => group.options.length > 0);
 }

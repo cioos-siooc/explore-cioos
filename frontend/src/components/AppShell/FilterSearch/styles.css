@@ -221,6 +221,24 @@
   color: var(--cioos-error);
 }
 
+/* A category sets a whole set of variables at once: tinted and tagged so it
+   reads as a group rather than one more variable. */
+.filterSearchOption.shortcut:not([data-state="exclude"]) {
+  background-color: var(--cioos-teal-light);
+}
+
+.filterSearchOptionTag {
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  color: var(--cioos-white);
+}
+
 .filterSearchOptionHint {
   margin-left: 6px;
   font-weight: 400;
