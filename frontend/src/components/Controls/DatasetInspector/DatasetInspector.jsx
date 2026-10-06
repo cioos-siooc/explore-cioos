@@ -201,15 +201,6 @@ export default function DatasetInspector({
     ([, type]) => type === dataset.cdm_data_type,
   );
   const isRealtime = Boolean(dataset.is_realtime);
-  useEffect(
-    () =>
-      offerTip([
-        ...(isTrajectory ? ["trackDate"] : []),
-        ...(isRealtime ? ["realtime"] : []),
-        "datasetNav",
-      ]),
-    [offerTip, isTrajectory, isRealtime],
-  );
   const [datasetRecords, setDatasetRecords] = useState();
   const [recordsError, setRecordsError] = useState(false);
   const [recordsAttempt, setRecordsAttempt] = useState(0);
@@ -224,6 +215,15 @@ export default function DatasetInspector({
     : dataset.cdm_data_type;
   // no per-record list for OBIS (external) or griddap (metadata-only)
   const hasRecordList = dataset.source_type !== "obis" && !isGrid;
+  useEffect(
+    () =>
+      offerTip([
+        ...(isTrajectory ? ["trajectory"] : []),
+        ...(isRealtime ? ["realtime"] : []),
+        ...(hasRecordList ? ["showData"] : []),
+      ]),
+    [offerTip, isTrajectory, isRealtime, hasRecordList],
+  );
   // OBIS datasets always link out to OBIS; the rest have whichever of their
   // ERDDAP / CKAN URLs the harvest found.
   const hasSources =
@@ -528,10 +528,7 @@ export default function DatasetInspector({
           control, in the one place that marks the panel as being on a dataset
           rather than the list. */}
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
-        <div
-          className="datasetTitleHeading"
-          data-tip-highlight={tipHighlight("datasetNav")}
-        >
+        <div className="datasetTitleHeading">
           <FileEarmarkText
             className="datasetTitleIcon"
             size={20}
@@ -703,7 +700,6 @@ export default function DatasetInspector({
                 {dataset.is_realtime && (
                   <span
                     className="datasetTitleLive"
-                    data-tip-highlight={tipHighlight("realtime")}
                     title={t("datasetRealtimeBadgeTitle")}
                   >
                     {t("datasetRealtimeBadgeText")}
@@ -771,13 +767,7 @@ export default function DatasetInspector({
           <div className="recordSection">
             <div
               className="recordSectionHeader"
-              // The drawn trajectory's track button takes the pointer when
-              // there is one.
-              data-tip-highlight={
-                isTrajectoryDataset && onMapId === undefined
-                  ? tipHighlight("trackDate")
-                  : undefined
-              }
+              data-tip-highlight={tipHighlight("showData")}
             >
               <strong>{t("datasetInspectorRecordTable")}</strong>
               <span className="recordHint">
@@ -871,11 +861,6 @@ export default function DatasetInspector({
                               type="button"
                               className="listCardButton"
                               aria-pressed={onMap}
-                              data-tip-highlight={
-                                onMap && isTrajectoryDataset
-                                  ? tipHighlight("trackDate")
-                                  : undefined
-                              }
                               title={t(
                                 onMap
                                   ? "datasetInspectorHideFromMapTitle"

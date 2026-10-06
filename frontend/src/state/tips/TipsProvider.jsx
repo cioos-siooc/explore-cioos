@@ -16,28 +16,36 @@ import useTourStages from "./useTourStages.js";
 // `tip_<key>` in the locale files. Most are also offered on the map the first
 // time the user does the thing they are about (see offerTip's callers); the
 // rest are only reachable from the dialog.
+//
+// Ordered the way a search goes — find, narrow, look, take away — and limited
+// to what changes what the user finds or gets. How a control works belongs on
+// the control (its hint or tooltip), not here.
 export const TIPS = [
-  "shareLink",
   "whatsHere",
-  "reshapeArea",
   "inView",
-  "sliderKeys",
   "timeCoverage",
-  "datasetNav",
+  "speciesName",
+  "exclude",
+  "matchAll",
   "realtime",
-  "trackDate",
+  "showData",
+  "trajectory",
   "griddapWms",
-  "griddedCoverage",
-  "nonna",
-  "globe",
-  "sizeLimit",
+  "filtersCutDownload",
+  "directLinks",
+  "shareLink",
 ];
 
-// Offered the moment a shape is finished, when the user is looking at the map
-// rather than the card, and the reshaping it describes is right there to try:
-// it gets a few seconds instead of waiting to be closed.
-const FLEETING_TIPS = ["reshapeArea"];
-const FLEETING_TIP_MS = 8000;
+// The tips whose control lives in a dialog, by the dialog that holds it. While
+// that dialog is open the tip is shown inside it (see TipCard's `inModal`), and
+// the tour opens it for them (see useTourStages).
+export const TIP_MODALS = {
+  speciesName: "filters",
+  exclude: "filters",
+  matchAll: "filters",
+  filtersCutDownload: "download",
+  directLinks: "download",
+};
 
 // Outside the provider (leaf-component tests render without it) offering a
 // tip is a no-op rather than a crash.
@@ -57,6 +65,8 @@ export default function TipsProvider({ children }) {
     showDownloadModal,
     showCoverageModal,
     showSelectionHelpModal,
+    setShowFiltersModal,
+    setShowDownloadModal,
   } = useUI();
   const [tipsEnabled, setTipsEnabled] = usePersistentState("tipsEnabled", true);
   const [seenTips, setSeenTips] = usePersistentState("seenTips", []);
@@ -134,10 +144,26 @@ export default function TipsProvider({ children }) {
     stagesRef.current = stages;
   });
 
-  const showTourStep = useCallback((key) => {
-    setActiveTip(key);
-    stagesRef.current[key]?.();
-  }, []);
+  // The dialog a step opened, closed again once the tour moves off it, so the
+  // next step's control isn't left behind it. One the user opened stays open.
+  const tourModal = useRef();
+  const closeTourModal = useCallback(() => {
+    if (tourModal.current === "filters") setShowFiltersModal(false);
+    if (tourModal.current === "download") setShowDownloadModal(false);
+    tourModal.current = undefined;
+  }, [setShowFiltersModal, setShowDownloadModal]);
+
+  const showTourStep = useCallback(
+    (key) => {
+      if (tourModal.current && tourModal.current !== TIP_MODALS[key]) {
+        closeTourModal();
+      }
+      setActiveTip(key);
+      const opened = stagesRef.current[key]?.();
+      if (opened) tourModal.current = opened;
+    },
+    [closeTourModal],
+  );
   const startTour = useCallback(
     (key) => {
       // The tour is this visit's tip; nothing is offered on top of it after.
@@ -159,15 +185,11 @@ export default function TipsProvider({ children }) {
   );
 
   const dismissTip = useCallback(() => {
+    closeTourModal();
     setActiveTip();
     setTouring(false);
-  }, []);
+  }, [closeTourModal]);
 
-  useEffect(() => {
-    if (touring || !FLEETING_TIPS.includes(activeTip)) return;
-    const timer = setTimeout(dismissTip, FLEETING_TIP_MS);
-    return () => clearTimeout(timer);
-  }, [activeTip, touring, dismissTip]);
   const disableTips = useCallback(() => {
     setTipsEnabled(false);
     setActiveTip();

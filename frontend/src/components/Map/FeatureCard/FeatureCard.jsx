@@ -97,9 +97,18 @@ export default function FeatureCard() {
   // query itself is left alone so the card picks back up where it left off
   // once neither is in the way.
   const open = Boolean(featureQuery) && !sidebarOpen && !inspectDataset;
+  // Species records under the click make it the moment to say they can be
+  // searched for by name.
+  const hasObis =
+    open &&
+    (query?.items || []).some(
+      (item) =>
+        pointsData.find((row) => Number(row.pk) === item.pk)?.source_type ===
+        "obis",
+    );
   useEffect(() => {
-    if (open) offerTip("whatsHere");
-  }, [open, offerTip]);
+    if (open) offerTip([...(hasObis ? ["speciesName"] : []), "whatsHere"]);
+  }, [open, hasObis, offerTip]);
   // Nothing has been clicked yet in this session: there is no card to park.
   if (!query) return null;
 

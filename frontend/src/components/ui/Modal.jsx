@@ -26,6 +26,7 @@ export default function Modal({
   children,
   "aria-labelledby": ariaLabelledby,
   "data-testid": testId,
+  initialFocusRef,
 }) {
   const contentRef = useRef(null);
 
@@ -39,12 +40,12 @@ export default function Modal({
     if (!show) return undefined;
     const previousFocus = document.activeElement;
     document.body.classList.add("cioos-modal-open");
-    contentRef.current?.focus();
+    (initialFocusRef?.current ?? contentRef.current)?.focus();
     return () => {
       document.body.classList.remove("cioos-modal-open");
       previousFocus?.focus?.();
     };
-  }, [show]);
+  }, [show, initialFocusRef]);
 
   useEffect(() => {
     if (!show) return undefined;

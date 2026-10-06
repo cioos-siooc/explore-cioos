@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import { X } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
-import useActiveFilters from "../../../state/useActiveFilters.js";
+import useActiveFilters, {
+  QUICK_FILTER_KEYS,
+} from "../../../state/useActiveFilters.js";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 // How many values a group shows before folding the rest behind a "+N" chip —
@@ -20,19 +23,33 @@ const MAX_VISIBLE_VALUES = 2;
 // enclosing card. Each group's name is its own small pill — paired with the
 // button that clears the whole group — immediately followed by its chosen
 // values as lighter pills. Clicking the name jumps to that filter's page (the
-// Filters modal, or the datasets sidebar for the text search), and each value
-// can still be dropped on its own. Show/Hide lives on the main Filters button
-// instead of here (see TopControls) — one toggle for this row and the quick
-// filters above it, rather than each keeping its own; Clear-all lives with
-// the quick filters (see QuickFilters).
+// Filters modal, or the search palette for the title search), and each value
+// can still be dropped on its own. Clear all is the quick filters' Reset (see
+// QuickFilters).
 export default function ActiveFilterChips() {
   const { t } = useTranslation();
-  const activeFilters = useActiveFilters();
+  const allFilters = useActiveFilters();
+  const activeFilters = allFilters.filter((f) => !QUICK_FILTER_KEYS.has(f.key));
+  const { eovsMatchAll } = useFilters();
   const { offerTip } = useTips();
-  const filtering = activeFilters.length > 0;
+  const filtering = allFilters.length > 0;
+  // Each of these refines a filter the user has just set, so it is offered
+  // ahead of the general one, and only while it would change something.
+  const listFiltering = activeFilters.length > 0;
+  const items = activeFilters.flatMap((f) => f.items ?? []);
+  const excluding = items.some((item) => item.excluded);
+  const eovsIncluded = (
+    activeFilters.find((f) => f.key === "eovs")?.items ?? []
+  ).filter((item) => !item.excluded).length;
+  const offerMatchAll = eovsIncluded > 1 && !eovsMatchAll;
   useEffect(() => {
-    if (filtering) offerTip("shareLink");
-  }, [filtering, offerTip]);
+    if (!filtering) return;
+    offerTip([
+      ...(offerMatchAll ? ["matchAll"] : []),
+      ...(listFiltering && !excluding ? ["exclude"] : []),
+      "shareLink",
+    ]);
+  }, [filtering, offerMatchAll, listFiltering, excluding, offerTip]);
 
   // Which groups currently show every value rather than the folded MAX_VISIBLE_VALUES —
   // toggled by the button at the end of the group's own row, so opening one

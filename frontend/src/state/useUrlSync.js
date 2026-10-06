@@ -18,6 +18,7 @@ import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
+import { useUI } from "./ui/UIProvider.jsx";
 
 // Sole owner of the URL format: serializes everything that shapes what the
 // user is looking at — the debounced filter query, the drawn selection, the
@@ -74,6 +75,7 @@ export default function UrlSync() {
     selectedTrajectory,
     mappedRecord,
   } = useSelection();
+  const { coverageAxis } = useUI();
   const [isPageLoad, setIsPageLoad] = useState(true);
 
   // Set of hidden group keys — a stable string so a Set rebuilt with the same
@@ -167,6 +169,7 @@ export default function UrlSync() {
     if (!bathymetryVisible) obj.bathy = "false";
     if (griddapCoverageVisible) obj.griddap = "true";
     if (projection === "globe") obj.globe = "true";
+    if (coverageAxis !== "timeline") obj.coverageAxis = coverageAxis;
     const combined = new URLSearchParams(obj);
     // Replace, never push: this mirrors state the app never reads back out of
     // the URL, so an entry per map pan would only bury the history entries
@@ -196,6 +199,7 @@ export default function UrlSync() {
     highlightedRecord,
     selectedTrajectory,
     mappedRecord,
+    coverageAxis,
   ]);
 
   // `i18n` deliberately excluded from the deps, despite reading it in the

@@ -385,4 +385,35 @@ describe("DatasetInspector", () => {
     await user.click(show);
     expect(screen.getByTestId("mapped-record")).toHaveTextContent("none");
   });
+
+  describe("tips", () => {
+    const seenTips = () =>
+      JSON.parse(window.localStorage.getItem("cde.seenTips") || "[]");
+
+    beforeEach(() => {
+      window.localStorage.setItem("cde.introSeen", "true");
+    });
+
+    it("offers Show data on a page with a feature list", async () => {
+      await renderReady();
+      await waitFor(() => expect(seenTips()).toEqual(["showData"]));
+    });
+
+    it("offers the real-time filter on a real-time dataset", async () => {
+      await renderReady({ dataset: { ...DATASET, is_realtime: true } });
+      await waitFor(() => expect(seenTips()).toEqual(["realtime"]));
+    });
+
+    it("offers the trajectory date first on a trajectory", async () => {
+      await renderReady({
+        dataset: { ...DATASET, cdm_data_type: "Trajectory", is_realtime: true },
+      });
+      await waitFor(() => expect(seenTips()).toEqual(["trajectory"]));
+    });
+
+    it("offers nothing of its own on an OBIS page, which has no feature list", async () => {
+      await renderReady({ dataset: { ...DATASET, source_type: "obis" } });
+      expect(seenTips()).toEqual([]);
+    });
+  });
 });

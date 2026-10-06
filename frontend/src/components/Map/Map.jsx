@@ -491,8 +491,6 @@ export default function CreateMap({
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
   onFeatureQuery = () => {},
-  // A box or polygon has just been finished with the draw tools.
-  onShapeDrawn = () => {},
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
@@ -2058,7 +2056,6 @@ export default function CreateMap({
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
   const onMarkerClickRef = useRef(onMarkerClick);
   const onTrackClickRef = useRef(onTrackClick);
-  const onShapeDrawnRef = useRef(onShapeDrawn);
 
   // The latest-value refs above, for the handlers registered once on mount.
   // Written after commit rather than during render, so a render React throws
@@ -2073,7 +2070,6 @@ export default function CreateMap({
     onFeatureQueryRef.current = onFeatureQuery;
     onMarkerClickRef.current = onMarkerClick;
     onTrackClickRef.current = onTrackClick;
-    onShapeDrawnRef.current = onShapeDrawn;
   });
 
   // The filter query and the data-layer selection combine into one suffix
@@ -3843,9 +3839,23 @@ export default function CreateMap({
       if (!bathymetryVisibleRef.current) {
         setLayersVisibility(bathymetryLayerIds, false);
       }
+
+      // mapbox-gl-draw only starts listening for clicks once map.loaded(),
+      // which waits for every basemap tile just like 'load' does, so the
+      // first clicks of a drawing were dropped while the rasters streamed in.
+      // Its layers need only the style, so it is re-added now with the map
+      // reported loaded for that one synchronous call. Re-adding resets the
+      // mode, so a tool picked before the style arrived is entered again.
+      const draw = drawPolygon.current;
+      const mode = draw.getMode();
+      draw.changeMode("simple_select");
+      map.current.removeControl(draw);
+      map.current.loaded = () => true;
+      map.current.addControl(draw, "bottom-right");
+      delete map.current.loaded;
+      if (mode !== "simple_select") draw.changeMode(mode);
     });
 
-    // The draw control only connects on 'load', so the shape has to wait for it.
     map.current.once("load", () => {
       loadTurfUnion();
       // A share link can carry the spatial selection (rectangle bounds or a
@@ -3877,7 +3887,6 @@ export default function CreateMap({
       const polygon = feature.geometry.coordinates[0];
       highlightPoints(polygon);
       setPolygon(polygon);
-      onShapeDrawnRef.current();
       map.current.getCanvas().style.cursor = "unset";
       // Straight into direct_select so the shape is immediately draggable
       // (yellow, with handles) rather than sitting in simple_select first.

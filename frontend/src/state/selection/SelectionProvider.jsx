@@ -332,6 +332,11 @@ export default function SelectionProvider({ children }) {
     [filteredDatasets, datasetsInViewPks],
   );
 
+  const realtimeCount = useMemo(
+    () => filteredDatasets.filter((row) => row.is_realtime).length,
+    [filteredDatasets],
+  );
+
   // filteredDatasets as a pk list, for the queries that ask a question about
   // the filtered data rather than draw it (the coverage figure). Everything
   // the list narrows by — the search box, "only in view", the data-layer
@@ -959,6 +964,7 @@ export default function SelectionProvider({ children }) {
     platformsAvailable,
     datasetsInViewPks,
     inViewCount,
+    realtimeCount,
     onlyInView,
     setOnlyInView,
     groupBy,

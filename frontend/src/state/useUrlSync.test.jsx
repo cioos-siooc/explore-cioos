@@ -7,6 +7,7 @@ import { installMockFetch } from "../test/mockFetch.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
+import { useUI } from "./ui/UIProvider.jsx";
 
 // UrlSync (src/state/useUrlSync.js) is already mounted inside AppProviders —
 // it is the sole writer of window.location. There is nothing to render it
@@ -19,6 +20,7 @@ function Probe() {
     filters: useFilters(),
     selection: useSelection(),
     mapState: useMapState(),
+    ui: useUI(),
   };
   return (
     <span data-testid="ready">
@@ -116,6 +118,32 @@ describe("UrlSync", () => {
 
     act(() => hooks.selection.setGroupBy("platform"));
     await waitFor(() => expect(params().get("groupBy")).toBe("platform"));
+  });
+
+  it("records the coverage figure's time axis only when folded by season", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    expect(params().has("coverageAxis")).toBe(false);
+
+    act(() => hooks.ui.setCoverageAxis("seasonal"));
+    await waitFor(() => expect(params().get("coverageAxis")).toBe("seasonal"));
+
+    act(() => hooks.ui.setCoverageAxis("timeline"));
+    await waitFor(() => expect(params().has("coverageAxis")).toBe(false));
+  });
+
+  it("opens the coverage figure on the time axis the link carries", async () => {
+    renderWithProviders(<Probe />, {
+      providers: "app",
+      url: "/?coverageAxis=seasonal",
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    expect(hooks.ui.coverageAxis).toBe("seasonal");
+    await waitFor(() => expect(params().get("coverageAxis")).toBe("seasonal"));
   });
 
   it("records the observations-layer switch only when turned off", async () => {

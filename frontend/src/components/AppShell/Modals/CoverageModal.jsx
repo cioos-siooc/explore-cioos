@@ -32,6 +32,10 @@ const GROUP_OPTIONS = ["source", "platform", "dataType", "organization"];
 // What the bars count. Keys match the API's `count` values.
 const COUNT_OPTIONS = ["datasets", "features", "days"];
 
+// The x-axis: the timeline, or every year folded onto weeks of the year. Keys
+// match the API's `view` values and the ?coverageAxis= link param.
+const VIEW_OPTIONS = ["timeline", "seasonal"];
+
 // How many past responses to keep. The two dropdowns alone are 12 combinations
 // of one selection, and each is a query the API answers in seconds when its
 // own cache is cold, so holding them is worth far more than the few kB they
@@ -111,7 +115,12 @@ function CoverageOption({ label, help }) {
 // chosen dimension. Depth is handled by the filter, not drawn as an axis.
 export default function CoverageModal() {
   const { t } = useTranslation();
-  const { showCoverageModal, setShowCoverageModal } = useUI();
+  const {
+    showCoverageModal,
+    setShowCoverageModal,
+    coverageAxis: view,
+    setCoverageAxis: setView,
+  } = useUI();
   // The same selection the datasets list shows: the filter query plus the
   // drawn polygon (combinedQueries, what /pointQuery was asked), narrowed to
   // the datasets the list's own client-side filters left standing. Reading
@@ -146,7 +155,7 @@ export default function CoverageModal() {
       filteredDatasetPks,
       allDatasetPks,
     );
-    const url = `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&${filterString}`;
+    const url = `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&view=${view}&${filterString}`;
 
     const cached = cache.current.get(url);
     if (cached) {
@@ -187,6 +196,7 @@ export default function CoverageModal() {
     allDatasetPks,
     groupBy,
     count,
+    view,
   ]);
 
   const isEmpty = histogram && histogram.cells.length === 0;
@@ -241,8 +251,37 @@ export default function CoverageModal() {
                 {t("coverageDaysNote")}
               </div>
             )}
+            {view === "seasonal" && (
+              <div className="coverageToolbarNote">
+                <InfoCircle aria-hidden="true" />
+                {t("coverageSeasonalNote")}
+              </div>
+            )}
           </div>
           <div className="coverageToolbarControls">
+            <span className="coverageToolbarLabel">
+              {t("coverageViewLabel")}
+            </span>
+            <DropdownButton
+              data-testid="coverage-view-dropdown"
+              title={t(`coverageView_${view}`)}
+              menuClassName="coverageOptionMenu"
+              align="end"
+            >
+              {VIEW_OPTIONS.map((option) => (
+                <Dropdown.Item
+                  key={option}
+                  data-testid="coverage-view-option"
+                  active={option === view}
+                  onClick={() => setView(option)}
+                >
+                  <CoverageOption
+                    label={t(`coverageView_${option}`)}
+                    help={t(`coverageViewHelp_${option}`)}
+                  />
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
             <span className="coverageToolbarLabel">
               {t("coverageCountByLabel")}
             </span>

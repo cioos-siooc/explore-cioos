@@ -61,15 +61,21 @@ export default function UIProvider({ children }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showCoverageModal, setShowCoverageModal] = useState(false);
+  // The coverage figure's time axis: the timeline, or every year folded onto
+  // one Jan-to-Dec axis. Seeded from ?coverageAxis= so a link keeps it.
+  const [coverageAxis, setCoverageAxis] = useState(() =>
+    new URL(window.location.href).searchParams.get("coverageAxis") ===
+    "seasonal"
+      ? "seasonal"
+      : "timeline",
+  );
   // How picking datasets for a download works, opened from the sidebar
   // footer's one-line version of the same thing.
   const [showSelectionHelpModal, setShowSelectionHelpModal] = useState(false);
   // Which filter flyout is open inside the filters modal (one at a time).
   const [openFilter, setOpenFilter] = useState();
-  // The quick-filter row and the active-filter chips under it (see
-  // QuickFilters, ActiveFilterChips): shown by default, put away together by
-  // one toggle living on the main Filters button, rather than each row
-  // keeping its own.
+  // The quick filters and active-filter chips under the top bar: shown by
+  // default, put away by the toggle living on the main Filters button.
   const [quickFiltersCollapsed, setQuickFiltersCollapsed] = useState(false);
   // The intro opens by itself until it has been closed once, so a reload
   // before dismissing it still shows it.
@@ -79,6 +85,15 @@ export default function UIProvider({ children }) {
     if (!showIntroModal) setIntroSeen(true);
   }, [showIntroModal, setIntroSeen]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  // The Filters modal opened on its search page (see FilterSearch) rather than
+  // on a filter, holding this text; null when it was opened any other way.
+  const [filterSearchText, setFilterSearchText] = useState(null);
+  const openFilterSearch = useCallback((text = "") => {
+    setFilterSearchText(text);
+    setOpenFilter(undefined);
+    setShowFiltersModal(true);
+  }, []);
+  if (!showFiltersModal && filterSearchText !== null) setFilterSearchText(null);
 
   // A drawn box or polygon surfaces the matching datasets — on wide screens
   // only: narrower, the list would cover the shape just drawn, and the top-bar
@@ -124,6 +139,8 @@ export default function UIProvider({ children }) {
     setShowDownloadModal,
     showCoverageModal,
     setShowCoverageModal,
+    coverageAxis,
+    setCoverageAxis,
     showSelectionHelpModal,
     setShowSelectionHelpModal,
     openFilter,
@@ -134,6 +151,8 @@ export default function UIProvider({ children }) {
     setShowIntroModal,
     showPrivacyModal,
     setShowPrivacyModal,
+    filterSearchText,
+    openFilterSearch,
   };
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
