@@ -6,9 +6,17 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import TipText from "./TipText.jsx";
 
 describe("TipText", () => {
-  it("draws the download glyph where the tip names it", () => {
+  it("draws the add glyph where the tip names it", () => {
     renderWithProviders(<TipText tip="whatsHere" />);
-    expect(screen.getByRole("img", { name: "Download" })).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("<download");
+    expect(
+      screen.getByRole("img", { name: "Add to selection" }),
+    ).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("<add");
+  });
+
+  it("draws the exclude glyph where the tip names it", () => {
+    renderWithProviders(<TipText tip="exclude" />);
+    expect(screen.getByRole("img", { name: "Exclude" })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("<exclude");
   });
 });

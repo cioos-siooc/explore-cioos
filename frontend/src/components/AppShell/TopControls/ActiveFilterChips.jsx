@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import useActiveFilters, {
   QUICK_FILTER_KEYS,
 } from "../../../state/useActiveFilters.js";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 // How many values a group shows before folding the rest behind a "+N" chip —
@@ -29,11 +30,26 @@ export default function ActiveFilterChips() {
   const { t } = useTranslation();
   const allFilters = useActiveFilters();
   const activeFilters = allFilters.filter((f) => !QUICK_FILTER_KEYS.has(f.key));
+  const { eovsMatchAll } = useFilters();
   const { offerTip } = useTips();
   const filtering = allFilters.length > 0;
+  // Each of these refines a filter the user has just set, so it is offered
+  // ahead of the general one, and only while it would change something.
+  const listFiltering = activeFilters.length > 0;
+  const items = activeFilters.flatMap((f) => f.items ?? []);
+  const excluding = items.some((item) => item.excluded);
+  const eovsIncluded = (
+    activeFilters.find((f) => f.key === "eovs")?.items ?? []
+  ).filter((item) => !item.excluded).length;
+  const offerMatchAll = eovsIncluded > 1 && !eovsMatchAll;
   useEffect(() => {
-    if (filtering) offerTip("shareLink");
-  }, [filtering, offerTip]);
+    if (!filtering) return;
+    offerTip([
+      ...(offerMatchAll ? ["matchAll"] : []),
+      ...(listFiltering && !excluding ? ["exclude"] : []),
+      "shareLink",
+    ]);
+  }, [filtering, offerMatchAll, listFiltering, excluding, offerTip]);
 
   // Which groups currently show every value rather than the folded MAX_VISIBLE_VALUES —
   // toggled by the button at the end of the group's own row, so opening one

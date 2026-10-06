@@ -59,14 +59,20 @@ import "./styles.css";
 // Included or excluded — either way the option constrains the filter.
 const isSet = (option) => option.isSelected || option.isExcluded;
 
-function createOptionSubset(searchTerms, allOptions) {
-  if (searchTerms) {
-    return allOptions.filter((option) =>
-      option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()),
-    );
-  } else {
-    return allOptions;
-  }
+// Matches the raw title and what the user actually reads — the translated
+// label and, for EOVs, the category in either language ("physique" finds them
+// all).
+function createOptionSubset(searchTerms, allOptions, t) {
+  if (!searchTerms) return allOptions;
+  const search = searchTerms.toString().toLowerCase();
+  return allOptions.filter((option) =>
+    [
+      option.title,
+      t(option.title),
+      option.categoryTranslated?.en,
+      option.categoryTranslated?.fr,
+    ].some((text) => text?.toLowerCase().includes(search)),
+  );
 }
 
 // The Filters panel: filter rows grouped into sections on the left, with the
@@ -244,10 +250,11 @@ export default function FiltersPanel({ searchInputRef }) {
         : scientificNamesPicked.length + t("scientificNamesMulti");
 
   // The Any/All control, on the lists where a dataset can carry several values.
-  const matchAllSwitch = (id, checked, setChecked) => (
+  const matchAllSwitch = (id, checked, setChecked, tipTarget) => (
     <Switch
       id={id}
       data-testid={id}
+      tipTarget={tipTarget}
       label={t("filterMatchAllLabel")}
       checked={checked}
       onChange={(e) => setChecked(e.target.checked)}
@@ -350,15 +357,22 @@ export default function FiltersPanel({ searchInputRef }) {
                 setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
               }
             >
-              {matchAllSwitch("eovs-match-all", eovsMatchAll, setEovsMatchAll)}
+              {matchAllSwitch(
+                "eovs-match-all",
+                eovsMatchAll,
+                setEovsMatchAll,
+                "matchAll",
+              )}
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   eovsSearchTerms,
                   eovsSelected,
+                  t,
                 )}
                 setOptionsSelected={setEovsSelected}
                 searchable
                 translatable
+                grouped
                 allOptions={eovsSelected}
               />
             </Filter>
@@ -389,6 +403,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 optionsSelected={createOptionSubset(
                   platformsSearchTerms,
                   platformsSelected,
+                  t,
                 )}
                 setOptionsSelected={setPlatformsSelected}
                 searchable
@@ -423,6 +438,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 optionsSelected={createOptionSubset(
                   orgsSearchTerms,
                   orgsSelected,
+                  t,
                 )}
                 setOptionsSelected={setOrgsSelected}
                 searchable
@@ -456,6 +472,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 optionsSelected={createOptionSubset(
                   datasetSearchTerms,
                   datasetsSelected,
+                  t,
                 )}
                 setOptionsSelected={setDatasetsSelected}
                 searchable
@@ -637,6 +654,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 searchPlaceholder={t("scientificNameFilterSearchPlaceholder")}
                 filterName={scientificNamesFilterTranslationKey}
                 openFilter={openFilter === scientificNamesFilterTranslationKey}
+                tipTarget="speciesName"
                 setOpenFilter={setOpenFilter}
                 resetButton={
                   scientificNamesPicked.length > 0

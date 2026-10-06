@@ -16,6 +16,13 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
   );
 }
 
+// A whole EOV category at once, like SourceFilter's OBIS group: a mixed
+// category goes to all-included (or all-excluded) first.
+export const withCategoryState = (options, category, state) =>
+  options.map((opt) =>
+    opt.category === category ? { ...opt, ...state } : opt,
+  );
+
 // The click cycle of a list filter option: neutral -> include ->
 // exclude -> neutral. The two flags are mutually exclusive, and `isSelected`
 // keeps meaning "included" everywhere it was already read.

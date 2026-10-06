@@ -491,8 +491,6 @@ export default function CreateMap({
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
   onFeatureQuery = () => {},
-  // A box or polygon has just been finished with the draw tools.
-  onShapeDrawn = () => {},
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
@@ -2058,7 +2056,6 @@ export default function CreateMap({
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
   const onMarkerClickRef = useRef(onMarkerClick);
   const onTrackClickRef = useRef(onTrackClick);
-  const onShapeDrawnRef = useRef(onShapeDrawn);
 
   // The latest-value refs above, for the handlers registered once on mount.
   // Written after commit rather than during render, so a render React throws
@@ -2073,7 +2070,6 @@ export default function CreateMap({
     onFeatureQueryRef.current = onFeatureQuery;
     onMarkerClickRef.current = onMarkerClick;
     onTrackClickRef.current = onTrackClick;
-    onShapeDrawnRef.current = onShapeDrawn;
   });
 
   // The filter query and the data-layer selection combine into one suffix
@@ -3886,7 +3882,6 @@ export default function CreateMap({
       const polygon = feature.geometry.coordinates[0];
       highlightPoints(polygon);
       setPolygon(polygon);
-      onShapeDrawnRef.current();
       map.current.getCanvas().style.cursor = "unset";
       // Straight into direct_select so the shape is immediately draggable
       // (yellow, with handles) rather than sitting in simple_select first.
