@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useState } from "react";
 import {
-  ArrowCounterclockwise,
   ArrowsExpand,
   BoundingBox,
   Building,
@@ -9,13 +8,8 @@ import {
   Cursor,
   Eye,
   FileEarmarkSpreadsheet,
-  Funnel,
-  HandIndex,
-  Intersect,
-  Map as MapIcon,
   Pentagon,
   Search,
-  SlashCircle,
   Stack,
   Tag,
   Water,
@@ -26,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import Spinner from "../../ui/Spinner.jsx";
+import FilterSearch from "../FilterSearch/FilterSearch.jsx";
 import Filter from "../../Controls/Filter/Filter.jsx";
 import FilterSection from "../../Controls/Filter/FilterMenu/FilterSection.jsx";
 import DataLayersFilter from "../../Controls/Filter/DataLayersFilter/DataLayersFilter.jsx";
@@ -54,21 +49,12 @@ import {
   chosenDataLayerKeys,
 } from "../../../state/dataLayers.js";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
+import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
-
-// The how-to shown in the detail pane before any filter is open (below) —
-// one step per glyph, in the order a first-time visitor would do them.
-const PLACEHOLDER_STEPS = [
-  { key: "select", Icon: HandIndex },
-  { key: "combine", Icon: Intersect },
-  { key: "exclude", Icon: SlashCircle },
-  { key: "live", Icon: MapIcon },
-  { key: "reset", Icon: ArrowCounterclockwise },
-];
 
 // Included or excluded — either way the option constrains the filter.
 const isSet = (option) => option.isSelected || option.isExcluded;
@@ -89,7 +75,7 @@ function createOptionSubset(searchTerms, allOptions, t) {
 // open filter's options in the detail pane on the right (see styles.css —
 // the .filterOptions flyout is re-anchored inside the sheet), over a footer
 // that reports what the filters currently add up to.
-export default function FiltersPanel() {
+export default function FiltersPanel({ searchInputRef }) {
   const { t } = useTranslation();
   const {
     eovsSelected,
@@ -140,22 +126,26 @@ export default function FiltersPanel() {
     allObisNodesExcluded,
     showObis,
     obisDataAvailable,
-    resetFilters,
   } = useFilters();
   const {
     datasetTitleSearchText,
-    setDatasetTitleSearchText,
     onlyInView,
     setOnlyInView,
     inViewCount,
     polygon,
   } = useSelection();
-  const { openFilter, setOpenFilter } = useUI();
+  const { openFilter, setOpenFilter, filterSearchText } = useUI();
+  // The search page's text, kept here so a visit to a filter's own page and
+  // back finds it as it was left.
+  const [searchText, setSearchText] = useState(filterSearchText ?? "");
+  const [, resetAll] = useResetAllFilters();
   const {
     ready: countsReady,
     updating: countsUpdating,
     filteredCount,
     total,
+    allDatasetsShown,
+    title: countsTitle,
   } = useDatasetCounts();
   const { dataLayerChoices, resetDataLayers, requestDraw } = useMapState();
 
@@ -184,14 +174,6 @@ export default function FiltersPanel() {
       : dataLayersChosen.length === 1
         ? dataLayerLabel(dataLayersChosen[0])
         : dataLayersChosen.length + t("dataLayersMulti");
-
-  // No options list of its own (it matches free text against dataset titles),
-  // so it skips generateMultipleSelectBadgeTitle: idle it reads as a bare
-  // filter name, active it shows the typed text itself — same rule as the
-  // scientific name search below.
-  const textSearchFilterTranslationKey = "textSearchFilterName";
-  const textSearchBadgeTitle =
-    datasetTitleSearchText || t(textSearchFilterTranslationKey);
 
   const eovsFilterTranslationKey = "oceanVariablesFiltername";
   const eovsBadgeTitle = generateMultipleSelectBadgeTitle(
@@ -301,46 +283,40 @@ export default function FiltersPanel() {
   // then all we know it to be (same fallback as the top bar's counter).
   const totalCount = total ?? filteredCount;
 
-  function resetEverything() {
-    resetFilters();
-    resetDataLayers();
-    requestDraw("clear");
-    setDatasetTitleSearchText("");
-    setOnlyInView(false);
-  }
-
   return (
-    <div className="filtersPanel" data-testid="filters-panel">
+    <div
+      className={classNames("filtersPanel", {
+        searching: !openFilter && searchText.trim(),
+      })}
+      data-testid="filters-panel"
+    >
       <div className="filtersPanelBody">
+        {!openFilter && (
+          <FilterSearch
+            text={searchText}
+            setText={setSearchText}
+            inputRef={searchInputRef}
+          />
+        )}
         <div className="filtersPanelList" data-testid="filters-panel-list">
+          {/* The way back to the search page from a filter's own page; on a
+              phone the search sits above the list instead (see styles.css). */}
+          <div className="filter filtersPanelSearchRow">
+            <button
+              type="button"
+              data-testid="filters-panel-search"
+              className={classNames("filterHeader", {
+                open: !openFilter,
+                active: Boolean(datasetTitleSearchText),
+              })}
+              aria-current={!openFilter ? "true" : undefined}
+              onClick={() => setOpenFilter(undefined)}
+            >
+              <Search />
+              <div className="badgeTitle">{t("filterSearchLabel")}</div>
+            </button>
+          </div>
           <FilterSection title={t("filterGroupWhat")}>
-            {/* Ahead of Data Layers: it matches free text against dataset
-                titles directly, rather than narrowing by facet, so it is the
-                one row here that isn't picking from an options list — the
-                same state the map's own search button and the datasets list
-                search box read and write (SelectionProvider). */}
-            <Filter
-              active={Boolean(datasetTitleSearchText)}
-              badgeTitle={textSearchBadgeTitle}
-              tooltip={t("textSearchFilterTooltip")}
-              icon={<Search />}
-              controlled
-              searchable
-              // Unlike the facet rows, this one's value re-queries the map, so
-              // it goes on Enter or the magnifier rather than on a pause.
-              searchOnSubmit
-              searchTerms={datasetTitleSearchText}
-              setSearchTerms={setDatasetTitleSearchText}
-              searchPlaceholder={t("textSearchFilterPlaceholder")}
-              filterName={textSearchFilterTranslationKey}
-              openFilter={openFilter === textSearchFilterTranslationKey}
-              setOpenFilter={setOpenFilter}
-              resetButton={
-                datasetTitleSearchText
-                  ? () => setDatasetTitleSearchText("")
-                  : undefined
-              }
-            />
             {/* First of the facet rows: this is the coarsest "what" there is —
                 it decides which families of data exist for the filters below
                 to narrow. */}
@@ -694,27 +670,6 @@ export default function FiltersPanel() {
             </FilterSection>
           )}
         </div>
-        {!openFilter && (
-          <div className="filtersPanelPlaceholder">
-            <span className="filtersPanelPlaceholderIcon" aria-hidden="true">
-              <Funnel size={22} />
-            </span>
-            <p className="filtersPanelPlaceholderTitle">
-              {t("filtersPanelHintTitle")}
-            </p>
-            <p className="filtersPanelPlaceholderText">
-              {t("filtersPanelHint")}
-            </p>
-            <ul className="filtersPanelPlaceholderSteps">
-              {PLACEHOLDER_STEPS.map(({ key, Icon }) => (
-                <li key={key}>
-                  <Icon size={16} aria-hidden="true" />
-                  <span>{t(`filtersPanelHintStep_${key}`)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
       {/* Filters apply live, so there is nothing to confirm here — but the
           dialog covers the map at every width and takes the whole screen on a
@@ -724,23 +679,21 @@ export default function FiltersPanel() {
           be scrolled past to reach it. */}
       <div className="filtersPanelFooter">
         <span
+          data-testid="filters-panel-count"
           className={classNames("filtersPanelCount", {
             updating: countsUpdating,
           })}
-          title={
-            countsReady
-              ? t("dockDatasetsCountTitle", {
-                  filtered: filteredCount,
-                  total: totalCount,
-                })
-              : t("datasetsCountLoadingTitle")
-          }
+          title={countsTitle}
         >
           {countsReady ? (
-            t("topBarCountsSummary", {
-              filtered: filteredCount,
-              total: totalCount,
-            })
+            allDatasetsShown ? (
+              t("topBarCountsTotal", { count: totalCount })
+            ) : (
+              t("topBarCountsSummary", {
+                filtered: filteredCount,
+                total: totalCount,
+              })
+            )
           ) : (
             <Spinner size="xs" className="countSpinner" />
           )}
@@ -748,7 +701,7 @@ export default function FiltersPanel() {
         <button
           type="button"
           className="filtersPanelReset"
-          onClick={resetEverything}
+          onClick={resetAll}
           title={t("resetFiltersButtonTooltipText")}
         >
           {t("filtersPanelResetAll")}

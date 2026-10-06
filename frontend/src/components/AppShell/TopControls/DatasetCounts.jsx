@@ -4,33 +4,31 @@ import classNames from "classnames";
 
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
-import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
-// The dataset tally: one compact line of type between the brand lockup and the
-// Datasets/Filters tabs, banded off from both so it reads as its own strip —
-// "123/150 datasets (23 in view)".
+// The dataset tally — "123/150 datasets" — centred between the brand lockup
+// and the Datasets/Filters tabs.
 //
-// The parenthetical is a button, not just a caption: it reports how many of
-// the filtered datasets the current viewport holds and applies the "only in
-// view" narrowing on click — a second, in-line entry point onto the same
-// toggle the Eye button among the quick filters below the card also sets
-// (see QuickFilters).
+// With nothing filtered out, the total alone: "150/150" said it twice. Once
+// filtered, the filtered number holds the total's width (a hidden copy of the
+// total sits under it), so further filtering never shifts the line.
 //
 // Until `ready` there is no count to show — not even a zero — so the strip is a
 // spinner. See useDatasetCounts.
 export default function DatasetCounts() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     ready: countsReady,
     updating: countsUpdating,
     filteredCount,
     total,
+    allDatasetsShown,
+    title,
   } = useDatasetCounts();
-  const { onlyInView, setOnlyInView, inViewCount } = useSelection();
 
   // A failed /datasets leaves no catalogue total; what came back filtered is
   // then all we know it to be.
   const totalCount = total ?? filteredCount;
+  const format = new Intl.NumberFormat(i18n.language).format;
 
   return (
     <div
@@ -40,45 +38,21 @@ export default function DatasetCounts() {
       {!countsReady ? (
         <Spinner size="xs" className="countSpinner" />
       ) : (
-        <>
-          {/* Announced when a filter changes the tally; the in-view count
-              beside it is left out, since every pan would repeat it. */}
-          <span
-            role="status"
-            title={t("dockDatasetsCountTitle", {
-              filtered: filteredCount,
-              total: totalCount,
-            })}
-          >
-            {t("topBarCountsSummary", {
-              filtered: filteredCount,
-              total: totalCount,
-            })}
-          </span>
-          {/* The gap between the two spans supplies the space before the
-                bracket: a literal one would be trimmed as leading whitespace
-                at the start of the flex item. */}
-          <span className="topBarCountsInViewWrap">
-            (
-            <button
-              type="button"
-              data-testid="counts-only-in-view"
-              className={classNames("topBarCountsInView", {
-                active: onlyInView,
-              })}
-              onClick={() => setOnlyInView(!onlyInView)}
-              aria-pressed={onlyInView}
-              title={
-                onlyInView
-                  ? t("topBarCountsInViewOffTitle")
-                  : t("quickFilterInViewTitle")
-              }
-            >
-              {t("topBarCountsInViewLink", { count: inViewCount })}
-            </button>
-            )
-          </span>
-        </>
+        // Announced when a filter changes the tally.
+        <span role="status" title={title}>
+          {allDatasetsShown ? (
+            format(totalCount)
+          ) : (
+            <>
+              <span className="topBarCountsFiltered">
+                <span aria-hidden="true">{format(totalCount)}</span>
+                <span>{format(filteredCount)}</span>
+              </span>
+              /{format(totalCount)}
+            </>
+          )}{" "}
+          {t("topBarCountsUnit")}
+        </span>
       )}
     </div>
   );

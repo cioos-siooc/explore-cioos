@@ -155,6 +155,20 @@ describe("AppShell (composition)", () => {
       expect(screen.queryByTestId("dataset-map-card")).toBeNull();
     });
 
+    it("sits in the corner, clear of the top bar, in place of the quick filters", async () => {
+      const { card } = await minimize();
+      expect(card).toHaveClass("corner");
+      expect(screen.getByTestId("top-bar")).not.toContainElement(card);
+      expect(screen.queryByTestId("quick-filters")).toBeNull();
+    });
+
+    it("hangs under the header on a phone", async () => {
+      setViewportWidth(MOBILE_WIDTH);
+      const { card } = await minimize();
+      expect(card).not.toHaveClass("corner");
+      expect(screen.getByTestId("top-bar")).toContainElement(card);
+    });
+
     it("is left for good from the card's close button", async () => {
       const { user } = await minimize();
       await user.click(screen.getByTestId("dataset-map-card-close"));

@@ -17,6 +17,9 @@ import DatasetMapCard from "../DatasetMapCard/DatasetMapCard.jsx";
 import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import TopBarRow from "./TopBarRow.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -55,11 +58,10 @@ function measureTopBarSpace(rect) {
 //
 // Under the card, on the map rather than in it, the quick filters (see
 // QuickFilters) — the ones that act on the map instead of on a list of
-// options. The active-filter chips flow beneath those, staying centered.
-// Both of those rows fold away together, toggled by the small chevron riding
-// on the far side of the Filters segment: it reads as part of the button that
-// already names the filter state, rather than a fourth control among the
-// tools it hides.
+// options. The active-filter chips flow beneath those, staying centered. Both
+// fold away with the small chevron riding on the far side of the Filters
+// segment: it reads as part of the button that already names the filter
+// state, rather than another control among the ones it hides.
 export default function TopControls() {
   const { t } = useTranslation();
   // The same list the chips below render, so the badge can never report a
@@ -77,9 +79,11 @@ export default function TopControls() {
   } = useUI();
   const { inspectDataset } = useSelection();
   const { tipHighlight } = useTips();
-  // A dataset page minimized to the map: the card naming it takes the quick
-  // filters' place under the brand card, since those act on the whole catalogue
-  // rather than on the one dataset the map is keyed to.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  // A dataset page minimized to the map: the quick filters give way, since
+  // they act on the whole catalogue rather than on the one dataset the map is
+  // keyed to. On a phone the card naming it takes their place under the
+  // header; wider, it sits in the bottom-left corner (see DatasetMapCorner).
   const datasetMinimized = Boolean(inspectDataset) && !sidebarOpen;
 
   const barRef = useRef(null);
@@ -88,7 +92,9 @@ export default function TopControls() {
   return (
     <div className="topBar" ref={barRef} data-testid="top-bar">
       <BrandSearch>
-        <DatasetCounts />
+        <div className="topBarStatusRow">
+          <DatasetCounts />
+        </div>
         <div className="topBarActions" data-testid="top-bar-actions">
           <button
             type="button"
@@ -158,10 +164,6 @@ export default function TopControls() {
                 </span>
               )}
             </button>
-            {/* Show/Hide for the quick-filter row and the active-filter
-                chips beneath it (see QuickFilters, ActiveFilterChips) — one
-                toggle for both, riding on the button that already names
-                whether any filter is set. */}
             <button
               type="button"
               className="topBarFiltersToggle"
@@ -193,14 +195,16 @@ export default function TopControls() {
       <TopBarRow
         contentKey={
           datasetMinimized
-            ? "dataset"
+            ? isMobile
+              ? "dataset"
+              : null
             : quickFiltersCollapsed
               ? null
               : "filters"
         }
       >
         {datasetMinimized ? (
-          <DatasetMapCard dataset={inspectDataset} />
+          isMobile && <DatasetMapCard dataset={inspectDataset} />
         ) : (
           <QuickFilters />
         )}

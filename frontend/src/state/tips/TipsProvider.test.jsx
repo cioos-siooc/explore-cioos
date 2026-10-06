@@ -268,7 +268,7 @@ describe("contextual tips", () => {
       await user.click(screen.getByText("offer reshape"));
       expect(card()).toHaveTextContent(`Tip 3 of ${TIPS.length}`);
       await user.click(screen.getByRole("button", { name: "Next tip" }));
-      expect(card()).toHaveTextContent(/eye button/);
+      expect(card()).toHaveTextContent(/In view button/);
       await user.click(screen.getByRole("button", { name: "Previous tip" }));
       act(() => vi.advanceTimersByTime(60_000));
       expect(card()).toHaveTextContent(/Drag the corners/);
@@ -310,7 +310,7 @@ describe("contextual tips", () => {
         i -= 1
       )
         await user.click(screen.getByRole("button", { name: "Previous tip" }));
-      expect(card()).toHaveTextContent(/eye button/);
+      expect(card()).toHaveTextContent(/In view button/);
       expect(screen.getByTestId("quick-filters")).toHaveTextContent("shown");
     });
   });

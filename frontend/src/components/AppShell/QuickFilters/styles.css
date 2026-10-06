@@ -7,40 +7,16 @@
 .quickFilters {
   display: flex;
 
-  /* Wrapping is what holds the row inside the screen at every width: on a
-     phone the label takes a line of its own (see the breakpoint below), and
-     an expanded field takes another, rather than pushing the page sideways. */
+  /* Wrapping is what holds the row inside the screen at every width, rather
+     than pushing the page sideways. */
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
 
   /* Wide enough apart for the captions under each button, and the row's own
      bottom padding holds them clear of the chips below. */
-  gap: 24px 30px;
+  gap: 24px 36px;
   padding-bottom: 16px;
-}
-
-/* Names the row on screen as well as for assistive tech (it labels the
-   group). Takes the line above the buttons; on a phone it is hidden (see
-   below). The row gap is sized for captions, which hang under the buttons,
-   not above them, so the label pulls itself back down to the row. */
-.quickFiltersLabel {
-  flex-basis: 100%;
-  margin-bottom: -16px;
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  line-height: 1.15;
-  text-align: center;
-  color: var(--cioos-ink);
-}
-
-/* The pill is on the text rather than the label, so it stays sized to the
-   words when the label is stretched across a line of its own. */
-.quickFiltersLabelText {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: var(--cioos-radius-sm);
-  background-color: var(--cioos-white);
 }
 
 .quickFilterButton {
@@ -113,17 +89,40 @@
   box-shadow: none;
 }
 
-.quickFilterReset:not(:disabled):hover {
+.quickFilterReset:not(:disabled):hover,
+.quickFilterReset:not(:disabled):active {
   background-color: var(--cioos-error);
   border-color: transparent;
   color: var(--cioos-white);
 }
 
+.quickFilterReset:not(:disabled):active {
+  background-color: var(--cioos-error-700);
+}
+
+/* Under the icon, inside the circle: the button stacks the two and stays
+   centred on the icon alone when there is no count. */
+.quickFilterButton:has(.quickFilterCount) {
+  flex-direction: column;
+  gap: 1px;
+}
+
+.quickFilterCount {
+  font-size: var(--cioos-font-size-3xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 /* Hung below the circle rather than inside it, so the circles keep their size
    and the row just spaces out to make room. The white pill keeps it legible
-   over whatever the map draws beneath. */
+   over whatever the map draws beneath. Every pill is as wide as the longest
+   caption ("Temps réel"), so the row reads as one set rather than pills sized
+   to their words. */
 .quickFilterCaption {
   position: absolute;
+  min-width: 5.75em;
+  text-align: center;
   top: calc(100% + 4px);
   left: 50%;
   transform: translateX(-50%);
@@ -136,11 +135,6 @@
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
   pointer-events: none;
-}
-
-/* Open, the field's own placeholder says what it is for. */
-.quickFilterSearch.expanded .quickFilterCaption {
-  display: none;
 }
 
 /* ------------------------------------------------------------------
@@ -201,96 +195,15 @@
 }
 
 /* ------------------------------------------------------------------
- * The search control: one circle that grows into a pill. The button is the
- * magnifier throughout — it opens the field while closed and submits it once
- * open — so the circle never moves as the field appears beside it.
- * ------------------------------------------------------------------ */
-.quickFilterSearch {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  min-width: 0;
-  transition: background-color var(--cioos-transition-fast);
-}
-
-/* Open, the form itself becomes the pill and the button inside it loses its
-   own chrome — one shape holding magnifier, field and clear, rather than a
-   circle with a box stuck to it. */
-.quickFilterSearch.expanded {
-  gap: 4px;
-  max-width: 100%;
-  padding-right: 8px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-float);
-}
-
-.quickFilterSearch.expanded .quickFilterButton {
-  border-color: transparent;
-  background: transparent;
-  color: var(--cioos-primary-700);
-  box-shadow: none;
-}
-
-.quickFilterSearch.expanded .quickFilterButton:hover {
-  color: var(--cioos-primary-800);
-}
-
-.quickFilterSearch.expanded .quickFilterButton:focus-visible {
-  box-shadow: var(--cioos-focus);
-}
-
-.quickFilterSearchInput {
-  flex: 1 1 auto;
-  width: 180px;
-
-  /* Shrinks ahead of the buttons on a narrow screen: the row wraps rather than
-     overflowing, and a field that can give way keeps it to fewer lines. */
-  min-width: 0;
-  padding: 6px 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  font: inherit;
-  font-size: var(--cioos-font-size-md);
-  color: var(--cioos-ink);
-}
-
-.quickFilterSearchClear {
-  display: inline-flex;
-  flex: 0 0 auto;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-}
-
-.quickFilterSearchClear:hover {
-  color: var(--cioos-ink);
-}
-
-.quickFilterSearchClear:focus-visible {
-  outline: none;
-  border-radius: var(--cioos-radius-sm);
-  box-shadow: var(--cioos-focus);
-}
-
-/* ------------------------------------------------------------------
  * Large screen with a mouse: the buttons' titles and hover say what each one
  * does, so a caption shows only for the button being pointed at (or focused
- * from the keyboard), and the row packs back together without the room five
+ * from the keyboard), and the row packs back together without the room four
  * standing captions needed.
  * ------------------------------------------------------------------ */
 @media (min-width: 701px) and (min-height: 501px) and (hover: hover) and (pointer: fine) {
   .quickFilters {
     gap: 8px 18px;
     padding-bottom: 8px;
-  }
-
-  .quickFiltersLabel {
-    margin-bottom: 0;
   }
 
   .quickFilterCaption {
@@ -314,17 +227,10 @@
     align-self: center;
     max-width: calc(100vw - 16px);
 
-    /* Five 40px buttons across a 360px screen, spaced so neighbouring
-       captions at the phone size ("Visibles", "Temps réel") clear each other. */
-    gap: 20px 30px;
+    /* Four 40px buttons across a 360px screen, spaced so the equal-width
+       captions at the phone size clear each other. */
+    gap: 20px 44px;
     padding-bottom: 16px;
-  }
-
-  /* No room beside the buttons, and a line of its own is too high a price
-     for a heading the captions already spell out. Still names the group:
-     aria-labelledby reads a hidden label. */
-  .quickFiltersLabel {
-    display: none;
   }
 
   .quickFilterCaption {

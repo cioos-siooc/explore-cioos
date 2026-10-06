@@ -1,62 +1,32 @@
 import * as React from "react";
-import { useTranslation } from "react-i18next";
 import {
   ArrowsExpand,
+  BoundingBox,
+  BroadcastPin,
   Building,
   Cursor,
   CalendarWeek,
+  Eye,
   FileEarmarkSpreadsheet,
+  Search,
   Server,
   Stack,
   Tag,
   Water,
 } from "react-bootstrap-icons";
 
-import { generateRangeSelectBadgeTitle } from "../utilities.jsx";
-import {
-  defaultStartDate,
-  defaultEndDate,
-  defaultStartDepth,
-  defaultEndDepth,
-} from "../components/config.js";
-import { DATA_LAYER_LABEL_KEYS, chosenDataLayerKeys } from "./dataLayers.js";
-import { useFilters } from "./filters/FilterProvider.jsx";
-import { useMapState } from "./map/MapStateProvider.jsx";
+import useFilterModel from "./useFilterModel.js";
+import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
-
-// Maps each group key to the filterName FiltersPanel opens it under (see
-// FiltersPanel.jsx — most groups key off a stable i18n key, but time/depth key
-// off their own translated label, so those two are computed with t() rather
-// than hardcoded).
-function filterNameForKey(key, t) {
-  switch (key) {
-    case "eovs":
-      return "oceanVariablesFiltername";
-    case "platforms":
-      return "platformsFilterName";
-    case "orgs":
-      return "organizationFilterName";
-    case "datasets":
-      return "datasetsFilterName";
-    case "sources":
-      return "sourceFilterName";
-    case "time":
-      return t("timeframeFilterName");
-    case "depth":
-      return t("depthRangeFilterName");
-    case "scientificName":
-      return "scientificNameFilterName";
-    case "dataLayers":
-      return "layerSelectorLabel";
-    default:
-      return undefined;
-  }
-}
 
 // The same icon FiltersPanel shows on that filter's own row (see
 // FiltersPanel.jsx's `icon` prop per <Filter>), so a chip and the row it came
 // from read as the same filter at a glance.
 const ICON_FOR_KEY = {
+  text: Search,
+  realtime: BroadcastPin,
+  inView: Eye,
+  area: BoundingBox,
   eovs: Water,
   platforms: Cursor,
   orgs: Building,
@@ -71,77 +41,49 @@ const ICON_FOR_KEY = {
 // createElement, not JSX: this is a plain .js module (no esbuild JSX loader
 // configured for that extension — see vite.config.mjs), and renaming it to
 // .jsx isn't worth doing for the one element this hook returns.
-function iconForKey(key) {
+export function iconForKey(key) {
   const Icon = ICON_FOR_KEY[key];
   return Icon
     ? React.createElement(Icon, { size: 14, "aria-hidden": true })
     : null;
 }
 
-// Every filter the Filters modal counts, as one list of groups:
-// `{ key, label, goToFilter, removeAll, items }`, one item per chosen value.
-//
-// One of them is not a catalogue facet FilterProvider owns — the geometry
-// layers live in MapState — so the list can only be assembled above both
-// providers. That is the whole reason this is a hook and not another field on
-// FilterProvider: counting only the facets it could see was what made the
-// Filters badge report fewer filters than the chips directly under it
-// listed.
-//
-// The chips render this list and the Filters button and modal count it, so the
-// number and the list it labels cannot disagree.
-//
-// The quick filters — the title search, the drawn area, the "only in view"
-// narrowing and the real-time toggle — are deliberately not here, even though
-// FiltersPanel also has a row for each of them: they have their own buttons on
-// the map (see QuickFilters), so a chip and a badge tick for something that
-// already has a lit button next to it would be the same state announced twice.
-// Both write the same underlying state, so the modal row and the map button
-// always agree with each other.
+// The quick filters' own buttons light up while they are set (see
+// QuickFilters), so the chips leave them out.
+export const QUICK_FILTER_KEYS = new Set(["area", "inView", "realtime"]);
+
+// Every filter currently narrowing the map, quick filters included, as one
+// list of groups: `{ key, label, icon, goToFilter, removeAll, items }`, one
+// item per applied value. Read off useFilterModel, the same description the
+// search palette lists, so the chips, the Filters badge that counts them and
+// the palette's own applied list cannot disagree.
 export default function useActiveFilters() {
-  const { t } = useTranslation();
-  const { buildActiveFilters, startDate, endDate, startDepth, endDepth } =
-    useFilters();
-  const { dataLayerChoices, clearDataLayer, resetDataLayers } = useMapState();
-  const { setShowFiltersModal, setOpenFilter } = useUI();
+  const model = useFilterModel();
+  const { datasetTitleSearchText } = useSelection();
+  const { setShowFiltersModal, setOpenFilter, openFilterSearch } = useUI();
 
-  const timeframesBadgeTitle = generateRangeSelectBadgeTitle(
-    t("timeframeFilterName"),
-    [startDate, endDate],
-    [defaultStartDate, defaultEndDate],
-  );
-  const depthRangeBadgeTitle = generateRangeSelectBadgeTitle(
-    t("depthRangeFilterName"),
-    [startDepth, endDepth],
-    [defaultStartDepth, defaultEndDepth],
-    "(m)",
-  );
-
-  // The geometry picks, announced the same way every other filter's are: one
-  // item per included or excluded geometry, which dropping clears.
-  const chosenDataLayers = chosenDataLayerKeys(dataLayerChoices);
-
-  return [
-    chosenDataLayers.length > 0 && {
-      key: "dataLayers",
-      label: t("layerSelectorLabel"),
-      removeAll: resetDataLayers,
-      items: chosenDataLayers.map((key) => ({
-        id: key,
-        label: t(DATA_LAYER_LABEL_KEYS[key]),
-        excluded: dataLayerChoices[key] === "exclude",
-        remove: () => clearDataLayer(key),
+  return model.flatMap((group) => {
+    const applied = group.options.filter((o) => o.state);
+    if (applied.length === 0) return [];
+    return {
+      key: group.key,
+      label: group.label,
+      icon: iconForKey(group.key),
+      removeAll: group.clear,
+      // The title search has no row of its own in the Filters modal: it is
+      // the palette's (see FilterSearch).
+      goToFilter: group.panelName
+        ? () => {
+            setOpenFilter(group.panelName);
+            setShowFiltersModal(true);
+          }
+        : () => openFilterSearch(datasetTitleSearchText),
+      items: applied.map((option) => ({
+        id: option.id,
+        label: option.label,
+        excluded: option.state === "exclude",
+        remove: () => option.toggle(option.state),
       })),
-    },
-    ...buildActiveFilters({ timeframesBadgeTitle, depthRangeBadgeTitle }),
-  ]
-    .filter(Boolean)
-    .map((f) => ({
-      ...f,
-      icon: iconForKey(f.key),
-      goToFilter: () => {
-        setOpenFilter(filterNameForKey(f.key, t));
-        setShowFiltersModal(true);
-      },
-    }));
+    };
+  });
 }

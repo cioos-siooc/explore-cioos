@@ -1,15 +1,19 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../test/renderWithProviders.jsx";
 import { installMockFetch } from "../test/mockFetch.js";
 import useActiveFilters from "./useActiveFilters.js";
 
+let latest;
+
 function Probe() {
-  const keys = useActiveFilters().map((f) => f.key);
-  return <span data-testid="keys">{keys.join(",")}</span>;
+  latest = useActiveFilters();
+  return <span data-testid="keys">{latest.map((f) => f.key).join(",")}</span>;
 }
+
+const group = (key) => latest.find((f) => f.key === key);
 
 // Seeded through the address, the way a share link arrives: one URL sets up
 // the catalogue facets, the map camera and the list's own narrowing at once.
@@ -52,23 +56,48 @@ describe("useActiveFilters", () => {
     await waitFor(() => expect(keys()).toContain("dataLayers"));
   });
 
-  // The quick filters have their own buttons on the map (and a row in the
-  // Filters modal that writes the same state), so the badge that sits on that
-  // modal must not double-count them — a chip and a lit map button for the
-  // same thing would be the same state announced twice.
-  it("ignores the quick filters, which already have their own indicator", async () => {
+  // The quick filters light their own buttons too, but a chip is what names
+  // the value (the title term, the shape) and drops it, the same way it does
+  // for every other filter.
+  it("lists the quick filters like any other", async () => {
     open(
       "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
     );
-    await waitFor(() => expect(screen.getByTestId("keys")).toBeInTheDocument());
-    expect(keys()).toEqual([]);
+    await waitFor(() =>
+      expect(keys().sort()).toEqual(["area", "inView", "text"].sort()),
+    );
+    expect(group("text").items).toMatchObject([{ label: "“temperature”" }]);
   });
 
-  it("counts every one it does own together", async () => {
+  it("counts every one together", async () => {
     open(
       "eovs=oxygen&layers=profile&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
     );
-    await waitFor(() => expect(keys()).toHaveLength(2));
-    expect(keys().sort()).toEqual(["dataLayers", "eovs"].sort());
+    await waitFor(() =>
+      expect(keys().sort()).toEqual(
+        ["area", "dataLayers", "eovs", "inView"].sort(),
+      ),
+    );
+  });
+
+  it("marks an excluded value, in the lists and the species alike", async () => {
+    open("excludePlatforms=mooring&excludeScientificNames=Orcinus%20orca");
+    await waitFor(() => expect(group("platforms")).toBeDefined());
+    expect(group("platforms").items).toMatchObject([
+      { label: "Mooring", excluded: true },
+    ]);
+    await waitFor(() => expect(group("scientificName")).toBeDefined());
+    expect(group("scientificName").items).toMatchObject([
+      { label: "Orcinus orca", excluded: true },
+    ]);
+  });
+
+  it("removes one value on its own", async () => {
+    open("eovs=oxygen");
+    await waitFor(() => expect(group("eovs")?.items).toHaveLength(1));
+
+    act(() => group("eovs").items[0].remove());
+
+    await waitFor(() => expect(group("eovs")).toBeUndefined());
   });
 });
