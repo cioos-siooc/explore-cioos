@@ -1,0 +1,44 @@
+{
+  "fishAbundanceAndDistribution": [
+    1829,
+    1517375,
+    152352
+  ],
+  "marineTurtlesBirdsMammalsAbundanceAndDistribution": [
+    1836,
+    2688,
+    137085,
+    148736,
+    159017,
+    159502,
+    242598,
+    477316,
+    987094
+  ],
+  "seaTurtlesAbundanceAndDistribution": [
+    987094
+  ],
+  "seabirdsAbundanceAndDistribution": [
+    1836
+  ],
+  "marineMammalsAbundanceAndDistribution": [
+    2688,
+    137085,
+    148736,
+    159017,
+    159502,
+    242598,
+    477316
+  ],
+  "hardCoralCoverAndComposition": [
+    1363
+  ],
+  "seagrassCoverAndComposition": [
+    143768,
+    143769,
+    143770,
+    144192,
+    205672,
+    206854
+  ]
+}

@@ -14,6 +14,7 @@ import pytest
 from cde_harvester.loading.loader import (
     ensure_organization_pks,
     load_cells_copy,
+    load_eov_taxa,
     main,
     prepare_profiles_dataframe,
 )
@@ -153,6 +154,24 @@ class TestLoadCellsCopy:
         assert lines[1] == r"\N"
 
 
+class TestLoadEovTaxa:
+    def test_replaces_table_with_synced_mapping(self, mocker):
+        mocker.patch("cde_harvester.loading.loader.text", side_effect=lambda s: s)
+        mocker.patch(
+            "cde_harvester.loading.loader.get_eov_taxa",
+            return_value={"fishAbundanceAndDistribution": [1829, 152352]},
+        )
+        transaction = MagicMock()
+        load_eov_taxa(transaction)
+        (delete,), (insert, rows) = [c.args for c in transaction.execute.call_args_list]
+        assert delete == "DELETE FROM cde.eov_taxa"
+        assert insert.startswith("INSERT INTO cde.eov_taxa")
+        assert rows == [
+            {"eov": "fishAbundanceAndDistribution", "aphia_id": 1829},
+            {"eov": "fishAbundanceAndDistribution", "aphia_id": 152352},
+        ]
+
+
 class TestEnsureOrganizationPks:
     def test_missing_column_gets_empty_arrays(self, sample_datasets_df):
         df = sample_datasets_df.drop(
@@ -205,6 +224,17 @@ class TestDbLoaderMainFullReload:
 # ---------------------------------------------------------------------------
 # main() — incremental mode
 # ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("incremental", [False, True])
+def test_eov_taxa_replaced_under_the_advisory_lock(
+    harvest_folder, mock_engine, mocker, incremental
+):
+    # Concurrent loaders would otherwise collide on cde.eov_taxa's rows.
+    sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=incremental)
+    lock = next(i for i, s in enumerate(sql_calls) if "pg_advisory_xact_lock" in s)
+    replace = sql_calls.index("DELETE FROM cde.eov_taxa")
+    assert lock < replace
+
 
 class TestDbLoaderMainIncremental:
     def test_create_temp_tables_called(self, harvest_folder, mock_engine, mocker):

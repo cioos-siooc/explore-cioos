@@ -21,6 +21,12 @@ def get_eov_to_standard_name():
 eov_to_standard_name = get_eov_to_standard_name()
 
 
+def get_eov_taxa():
+    # Biology EOV → WoRMS AphiaIDs (synced from cioos-commons/eovs/taxa.json)
+    with open(Path(__file__).parent / "eov_taxa.json") as f:
+        return json.load(f)
+
+
 def get_df_eov_to_standard_name(eov_to_standard_name):
     res = []
     for eov, standard_names in eov_to_standard_name.items():

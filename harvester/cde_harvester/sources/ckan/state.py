@@ -14,6 +14,10 @@ PREVIOUS_CKAN_COLUMNS = [
     "erddap_url", "dataset_id", "ckan_id", "title", "title_fr", "organizations", "eovs",
 ]
 
+# An OBIS dataset's eovs also holds the EOVs derived from its taxa; only its
+# declared_eovs came from CKAN.
+_SELECT_EXPRESSIONS = {"eovs": "coalesce(declared_eovs, eovs) AS eovs"}
+
 
 def load_previous_ckan(erddap_urls):
     """CKAN-linked rows of cde.datasets for these sources; empty on any error."""
@@ -24,7 +28,8 @@ def load_previous_ckan(erddap_urls):
         with engine.connect() as conn:
             rows = conn.execute(
                 text(
-                    f"SELECT {', '.join(PREVIOUS_CKAN_COLUMNS)} FROM cde.datasets "
+                    f"SELECT {', '.join(_SELECT_EXPRESSIONS.get(c, c) for c in PREVIOUS_CKAN_COLUMNS)} "
+                    "FROM cde.datasets "
                     "WHERE erddap_url IN :urls AND ckan_id IS NOT NULL"
                 ).bindparams(bindparam("urls", expanding=True)),
                 {"urls": urls},

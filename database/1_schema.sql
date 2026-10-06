@@ -73,6 +73,10 @@ CREATE TABLE datasets (
     first_eov_column TEXT,
     source_type TEXT DEFAULT 'erddap',
     obis_nodes text[] DEFAULT '{}',
+    -- OBIS only: the EOVs CKAN declares for the dataset, kept apart from
+    -- `eovs` because obis_derive_eovs() rebuilds `eovs` as these plus the EOVs
+    -- derived from the dataset's taxa.
+    declared_eovs text[],
     -- Croissant file-list hash (set only for file-backed datasets); skip-if-unchanged.
     content_hash TEXT,
     -- Why content_hash is NULL (HASH_* code: database-backed, Croissant fetch error, …);
@@ -309,6 +313,9 @@ CREATE TABLE obis_cells (
     -- small integer set of descendant AphiaIDs and we test overlap on this
     -- column instead of building a 100k+ name array per tile request.
     aphia_ids integer[] NOT NULL DEFAULT '{}',
+    -- The dataset's declared EOVs plus those whose cde.eov_taxa contain one
+    -- of aphia_ids. Set by obis_derive_eovs() in 5_profile_process.sql.
+    eovs text[] NOT NULL DEFAULT '{}',
     n_records bigint,
     -- Distinct UTC days with at least one dated occurrence in this cell.
     -- A COUNT, not a span: matches cde.trajectory_hexes.days so the map's
@@ -352,6 +359,7 @@ CREATE INDEX ON obis_cells (hex_1_pk);
 CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scientific_names)
   WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
 CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia_ids);
+CREATE INDEX obis_cells_eovs_gin              ON cde.obis_cells USING GIN (eovs);
 -- Same three as cde.profiles above, and same reasoning for why depth_min is
 -- left out. Untested against real data: production carries no OBIS rows yet,
 -- so these are sized from the identical predicate shape rather than measured.
@@ -601,6 +609,17 @@ CREATE MATERIALIZED VIEW cde.obis_scientific_name_popularity AS
 CREATE UNIQUE INDEX ON cde.obis_scientific_name_popularity (scientific_name);
 CREATE INDEX obis_scientific_name_popularity_total_records
   ON cde.obis_scientific_name_popularity (total_records DESC);
+
+
+-- Biology EOV -> WoRMS AphiaIDs (cioos-commons eovs/taxa.json, synced to
+-- harvester/cde_harvester/eov_taxa.json). A taxon belongs to an EOV when it or
+-- one of its ancestors is listed. Replaced by the loader on every load.
+DROP TABLE IF EXISTS cde.eov_taxa;
+CREATE TABLE cde.eov_taxa (
+    eov      text    NOT NULL,
+    aphia_id integer NOT NULL,
+    PRIMARY KEY (eov, aphia_id)
+);
 
 
 -- Vernacular (common) names per scientific name, sourced from WoRMS.

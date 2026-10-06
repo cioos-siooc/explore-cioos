@@ -615,7 +615,9 @@ def main():
     logger.info("Backfilling obis_cells.aphia_ids from vernaculars")
     with engine.begin() as conn:
         backfilled = conn.execute(text("SELECT obis_backfill_aphia_ids()")).scalar()
+        derived = conn.execute(text("SELECT obis_derive_eovs()")).scalar()
     logger.info("Backfilled aphia_ids into %s obis_cells", backfilled)
+    logger.info("Re-derived EOVs on %s obis_cells", derived)
 
 
 if __name__ == "__main__":
