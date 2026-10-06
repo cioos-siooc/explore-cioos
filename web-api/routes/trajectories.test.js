@@ -193,12 +193,10 @@ test("GET /trajectories/passes resolves `at` to the hex of the zoom's tier, wrap
 
 test("GET /trajectories/passes without `at` is the shared selection alone", async () => {
   db.queueRaw([]);
-  const res = await agent
-    .get("/trajectories/passes")
-    .query({
-      datasetPKs: "42",
-      polygon: "[[-64,44],[-63,44],[-63,45],[-64,44]]",
-    });
+  const res = await agent.get("/trajectories/passes").query({
+    datasetPKs: "42",
+    polygon: "[[-64,44],[-63,44],[-63,45],[-64,44]]",
+  });
   assert.equal(res.status, 200);
   const [sql] = db.queries;
   assert.doesNotMatch(sql, /ST_MakePoint/);
