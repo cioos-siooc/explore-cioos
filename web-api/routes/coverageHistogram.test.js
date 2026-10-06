@@ -115,3 +115,53 @@ test("rejects an unknown count", async () => {
   const res = await agent.get("/coverageHistogram").query({ count: "bogus" });
   assert.equal(res.status, 400);
 });
+
+test("the seasonal view folds real calendar bins into 52 weeks of the year", async () => {
+  db.queueRaw([{ min: "2010-01-01T00:00:00Z", max: "2014-12-31T00:00:00Z" }]);
+  db.queueRaw([]);
+
+  const res = await agent
+    .get("/coverageHistogram")
+    .query({ count: "days", view: "seasonal", timeMin: "2011-03-10" });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.view, "seasonal");
+  // Reported in a reference year, so the figure draws 52 week bars.
+  const edges = res.body.timeBinEdges;
+  assert.equal(edges.length, 53);
+  assert.equal(edges[0].slice(0, 10), "2001-01-01");
+  assert.equal(edges[51].slice(0, 10), "2001-12-24");
+  assert.equal(edges[52].slice(0, 10), "2002-01-01");
+
+  // The real bins start at the time filter, not the Jan 1 or week boundary
+  // before it, or days the filter excludes would be counted. Mar 10 is in the
+  // week opening Mar 5 (the 10th), and Dec 24 always folds into the last week.
+  const sql = db.queries[1];
+  assert.match(sql, /\{"2011-03-10","2011-03-12",/);
+  assert.match(sql, /'\{10,11,/);
+  assert.match(sql, /"2011-12-24","2012-01-01"/);
+  assert.match(sql, /,52,1,2,/);
+});
+
+test("the entity counts fold before they count distinct", async () => {
+  db.queueRaw([{ min: "2010-01-01T00:00:00Z", max: "2014-12-31T00:00:00Z" }]);
+  db.queueRaw([]);
+  db.queueRaw([]);
+
+  await agent
+    .get("/coverageHistogram")
+    .query({ count: "datasets", view: "seasonal" });
+
+  // A span longer than a year is expanded across one year of bins at most
+  // before it is folded into weeks.
+  assert.match(
+    db.queries[1],
+    /SELECT DISTINCT entity, series_key,\s+\(\(SELECT grp/,
+  );
+  assert.match(db.queries[1], /tb0 \+ \(51\)::integer/);
+});
+
+test("rejects an unknown view", async () => {
+  const res = await agent.get("/coverageHistogram").query({ view: "bogus" });
+  assert.equal(res.status, 400);
+});

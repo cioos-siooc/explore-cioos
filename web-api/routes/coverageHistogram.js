@@ -97,7 +97,16 @@ const GROUP_BY = {
   },
 };
 
-function buildTimeBins(timeMin, timeMax, extent = {}) {
+// The x-axis: a plain timeline, or every year folded onto one Jan-to-Dec axis.
+const VIEWS = ["timeline", "seasonal"];
+// Seasonal bins are 7-day blocks from Jan 1, so the last one runs Dec 24 to
+// Dec 31 (one or two days longer) and every year folds onto the same 52.
+const WEEKS_PER_YEAR = 52;
+// The non-leap year the seasonal edges are reported in, so the figure can keep
+// drawing from timeBinEdges; only the month and day are meaningful.
+const SEASONAL_REFERENCE_YEAR = 2001;
+
+function selectionWindow(timeMin, timeMax, extent = {}) {
   // Same defaults as the frontend's time slider (config.js): the filter query
   // string omits them when untouched.
   const windowStart = new Date(timeMin || "1900-01-01T00:00:00Z").getTime();
@@ -105,13 +114,67 @@ function buildTimeBins(timeMin, timeMax, extent = {}) {
   // The bins span the data the selection holds, not the whole window: an
   // untouched filter is 1900 to now, which buried a 2012-onward selection in a
   // century of empty bars.
-  let start = extent.min
+  const start = extent.min
     ? Math.max(windowStart, new Date(extent.min).getTime())
     : windowStart;
   let end = extent.max
     ? Math.min(windowEnd, new Date(extent.max).getTime() + DAY_MS)
     : windowEnd;
   if (end <= start) end = start + DAY_MS;
+  return { windowStart, start, end };
+}
+
+function weekOfYear(ms) {
+  const date = new Date(ms);
+  const dayOfYear = Math.floor(
+    (ms - Date.UTC(date.getUTCFullYear(), 0, 1)) / DAY_MS,
+  );
+  return Math.min(WEEKS_PER_YEAR, Math.floor(dayOfYear / 7) + 1);
+}
+
+/*
+ * Real calendar bins over the window, each tagged with the week of year it
+ * folds into. The first and last bins are cut at the window rather than
+ * rounded out to a week boundary: the days query clips its islands by the bin
+ * edges alone, so an edge before timeMin would count days the filter excludes.
+ */
+function buildSeasonalBins({ start, end }) {
+  const edgesMs = [start];
+  const firstYear = new Date(start).getUTCFullYear();
+  const lastYear = new Date(end).getUTCFullYear();
+  for (let year = firstYear; year <= lastYear; year += 1) {
+    for (let week = 0; week < WEEKS_PER_YEAR; week += 1) {
+      const edge = Date.UTC(year, 0, 1 + 7 * week);
+      if (edge > start && edge < end) edgesMs.push(edge);
+    }
+  }
+  edgesMs.push(end);
+  const edges = edgesMs.map((ms) => new Date(ms).toISOString());
+  const outputEdges = Array.from({ length: WEEKS_PER_YEAR + 1 }, (_, week) =>
+    new Date(
+      week === WEEKS_PER_YEAR
+        ? Date.UTC(SEASONAL_REFERENCE_YEAR + 1, 0, 1)
+        : Date.UTC(SEASONAL_REFERENCE_YEAR, 0, 1 + 7 * week),
+    ).toISOString(),
+  );
+  return {
+    edges,
+    dateEdges: edges.map((e) => e.slice(0, 10)),
+    binGroups: edgesMs.slice(0, -1).map(weekOfYear),
+    // 52 consecutive bins already hold every week, so a long span need not be
+    // expanded past that before it is folded.
+    foldSpan: WEEKS_PER_YEAR - 1,
+    outputEdges,
+    start,
+    end,
+    numBins: edgesMs.length - 1,
+  };
+}
+
+function buildTimeBins(timeMin, timeMax, extent = {}) {
+  const span = selectionWindow(timeMin, timeMax, extent);
+  const { windowStart, end } = span;
+  let { start } = span;
 
   const rawWidth = (end - start) / TARGET_TIME_BINS;
   const width =
@@ -129,11 +192,19 @@ function buildTimeBins(timeMin, timeMax, extent = {}) {
   const edges = Array.from({ length: numBins + 1 }, (_, i) =>
     new Date(start + i * width).toISOString(),
   );
-  // The same edges as whole UTC days. The days count measures a day set, so it
-  // bins on dates rather than bucketing an epoch; slicing the ISO string is
-  // exactly what the old to_timestamp(...) AT TIME ZONE 'UTC' cast produced.
+  // The same edges as whole UTC days, for the days count, which measures a day
+  // set and so bins on dates rather than timestamps.
   const dateEdges = edges.map((e) => e.slice(0, 10));
-  return { edges, dateEdges, start, end: start + numBins * width, numBins };
+  return {
+    edges,
+    dateEdges,
+    binGroups: Array.from({ length: numBins }, (_, i) => i + 1),
+    foldSpan: numBins,
+    outputEdges: edges,
+    start,
+    end: start + numBins * width,
+    numBins,
+  };
 }
 
 /*
@@ -188,6 +259,14 @@ function rankSeriesFromCells(rows) {
  *           exceed the number of calendar days in the bin. That is deliberately
  *           unlike the map's `days` ramp, which unions them.
  *       - in: query
+ *         name: view
+ *         schema: { type: string, enum: [timeline, seasonal] }
+ *         description: >
+ *           `timeline` (default) bins along the time window. `seasonal` folds
+ *           every year in it onto 52 weeks of the year (7-day blocks from
+ *           Jan 1; the last runs to Dec 31), and timeBinEdges are then given in
+ *           a non-leap reference year whose year carries no meaning.
+ *       - in: query
  *         name: timeMin
  *         schema: { type: string, format: date-time }
  *       - in: query
@@ -235,7 +314,12 @@ function rankSeriesFromCells(rows) {
  */
 router.get(
   "/",
-  ...pipeline({ checks: [check("count").isIn(COUNTS).optional()] }),
+  ...pipeline({
+    checks: [
+      check("count").isIn(COUNTS).optional(),
+      check("view").isIn(VIEWS).optional(),
+    ],
+  }),
   async (req, res) => {
     const groupByKey = Object.prototype.hasOwnProperty.call(
       GROUP_BY,
@@ -249,6 +333,7 @@ router.get(
     const count = COUNTS.includes(req.query.count)
       ? req.query.count
       : "datasets";
+    const view = req.query.view === "seasonal" ? "seasonal" : "timeline";
 
     // Client errors (a bad polygon, too broad a taxon selection) carry a
     // statusCode that app.js's error handler turns into the response.
@@ -358,7 +443,10 @@ router.get(
     WHERE  ${filters.hasShared ? ":filters" : "TRUE"}`,
       filterBindings,
     );
-    const timeBins = buildTimeBins(timeMin, timeMax, extent);
+    const timeBins =
+      view === "seasonal"
+        ? buildSeasonalBins(selectionWindow(timeMin, timeMax, extent))
+        : buildTimeBins(timeMin, timeMax, extent);
 
     const windowClause = `WHERE  ${filters.hasShared ? ":filters" : "TRUE"}
         AND    p.time_max >= :timeStart::timestamptz
@@ -453,17 +541,18 @@ router.get(
     /* The bin edges, bound once. Every reference below is an uncorrelated
        scalar subquery, which PostgreSQL evaluates a single time as an InitPlan
        — spelling the array inline instead put a copy of all 128 dates at six
-       places in the statement. */
+       places in the statement. grp is the bar each bin is drawn in: itself on
+       the timeline, its week of the year in the seasonal view. */
     bin_edges AS (
-        SELECT (:binEdges)::date[] AS ed
+        SELECT (:binEdges)::date[] AS ed, (:binGroups)::integer[] AS grp
     ),
     bins AS (
-        SELECT idx::integer AS idx, edge AS win_lo,
+        SELECT idx::integer AS idx, grp[idx] AS grp, edge AS win_lo,
                lead(edge) OVER (ORDER BY idx) AS win_hi
         FROM bin_edges
         CROSS JOIN LATERAL unnest(ed) WITH ORDINALITY AS b(edge, idx)
     )
-    SELECT b.idx AS t, a.series_key, min(a.series_kind) AS series_kind,
+    SELECT b.grp AS t, a.series_key, min(a.series_kind) AS series_kind,
            sum(LEAST(a.hi, b.win_hi) - GREATEST(a.lo, b.win_lo))::integer AS count
     FROM attributed a
     CROSS JOIN LATERAL generate_series(
@@ -474,7 +563,7 @@ router.get(
     JOIN bins b ON b.idx = g.t
     WHERE a.hi > (SELECT ed[1] FROM bin_edges)
     AND   a.lo < (SELECT ed[array_length(ed, 1)] FROM bin_edges)
-    GROUP BY b.idx, a.series_key
+    GROUP BY b.grp, a.series_key
     HAVING sum(LEAST(a.hi, b.win_hi) - GREATEST(a.lo, b.win_lo)) > 0`;
 
     // The datasets / features counts. `spans` turns each row into the
@@ -509,26 +598,33 @@ router.get(
     // Cells: bucket each span into a 1-based bin-index range, collapse to
     // DISTINCT (entity, series, tb0, tb1) tuples first (buckets are coarse, so
     // a dataset's spans mostly share a tuple), then expand into the bins each
-    // tuple covers and count distinct entities per (bin, series).
+    // tuple covers, fold each bin into the bar it is drawn in, and count
+    // distinct entities per (bar, series). The fold comes before the distinct
+    // count, so a dataset with data in week 10 of five years counts once there.
     const entityCellsSql = `WITH ${entityCtes},
+    bin_edges AS (
+        SELECT (:timeEdges)::timestamptz[] AS ed, (:binGroups)::integer[] AS grp
+    ),
     bucketed AS (
         SELECT DISTINCT entity, series_key,
             least(greatest(width_bucket(
-                extract(epoch from greatest(span_min, :timeStart::timestamptz))::double precision,
-                (:epochStart)::double precision, (:epochEnd)::double precision, (:numTimeBins)::integer
+                greatest(span_min, :timeStart::timestamptz),
+                (SELECT ed FROM bin_edges)
             ), 1), (:numTimeBins)::integer) AS tb0,
             least(greatest(width_bucket(
-                extract(epoch from least(span_max, :timeEnd::timestamptz))::double precision,
-                (:epochStart)::double precision, (:epochEnd)::double precision, (:numTimeBins)::integer
+                least(span_max, :timeEnd::timestamptz),
+                (SELECT ed FROM bin_edges)
             ), 1), (:numTimeBins)::integer) AS tb1
         FROM spans
         WHERE span_max >= :timeStart::timestamptz
         AND   span_min <= :timeEnd::timestamptz
     ),
     expanded AS (
-        SELECT DISTINCT entity, series_key, t.t
+        SELECT DISTINCT entity, series_key,
+               ((SELECT grp FROM bin_edges))[t.t] AS t
         FROM bucketed
-        CROSS JOIN LATERAL generate_series(tb0, tb1) AS t(t)
+        CROSS JOIN LATERAL generate_series(
+            tb0, LEAST(tb1, tb0 + (:foldSpan)::integer)) AS t(t)
     )
     SELECT t, series_key, count(*)::integer AS count
     FROM expanded
@@ -557,11 +653,11 @@ router.get(
       ...filterBindings,
       timeStart: new Date(timeBins.start).toISOString(),
       timeEnd: new Date(timeBins.end).toISOString(),
-      epochStart: timeBins.start / 1000,
-      epochEnd: timeBins.end / 1000,
       numTimeBins: timeBins.numBins,
-      // The days query bins on whole UTC days rather than by bucketing an
-      // epoch, so it takes the edges as dates and binary-searches them.
+      timeEdges: timeBins.edges,
+      binGroups: timeBins.binGroups,
+      foldSpan: timeBins.foldSpan,
+      // The days query bins on whole UTC days, so it takes the edges as dates.
       binEdges: timeBins.dateEdges,
     };
 
@@ -593,7 +689,8 @@ router.get(
     res.send({
       groupBy: groupByKey,
       count,
-      timeBinEdges: timeBins.edges,
+      view,
+      timeBinEdges: timeBins.outputEdges,
       series,
       cells: cellRows.rows.map((r) => [r.t, r.series_key, r.count]),
     });

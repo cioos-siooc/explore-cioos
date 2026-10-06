@@ -83,6 +83,17 @@ describe("CoverageModal", () => {
     expect(histogramCalls()).toHaveLength(2);
   });
 
+  it("asks for the seasonal view when it is picked", async () => {
+    const user = open();
+    await waitFor(() => expect(histogramCalls()).toHaveLength(1));
+    expect(histogramCalls()[0]).toContain("view=timeline");
+
+    await user.click(screen.getByTestId("coverage-view-dropdown-toggle"));
+    await user.click(screen.getAllByTestId("coverage-view-option")[1]);
+    await waitFor(() => expect(histogramCalls()).toHaveLength(2));
+    expect(histogramCalls()[1]).toContain("view=seasonal");
+  });
+
   it("keeps the previous figure on screen while the next one loads", async () => {
     const user = open();
     await waitFor(() => expect(histogramCalls()).toHaveLength(1));
