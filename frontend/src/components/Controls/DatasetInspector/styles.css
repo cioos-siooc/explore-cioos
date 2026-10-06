@@ -717,3 +717,9 @@
     white-space: normal;
   }
 }
+
+.passButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}

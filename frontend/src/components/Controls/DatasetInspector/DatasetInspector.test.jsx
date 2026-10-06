@@ -38,10 +38,13 @@ function Harness({
   returnToList = () => {},
   dataset = DATASET,
   setInspectRecordID = () => {},
+  initialTrajectory,
+  query = {},
 }) {
   const { catalogLoaded } = useFilters();
   const { showDownloadModal } = useUI();
-  const [selectedTrajectory, setSelectedTrajectory] = React.useState();
+  const [selectedTrajectory, setSelectedTrajectory] =
+    React.useState(initialTrajectory);
   const { mappedRecord } = useSelection();
   if (!catalogLoaded) return <span data-testid="state">loading</span>;
 
@@ -62,7 +65,7 @@ function Harness({
         setInspectRecordID={setInspectRecordID}
         selectedTrajectory={selectedTrajectory}
         setSelectedTrajectory={setSelectedTrajectory}
-        query={{}}
+        query={query}
         activeWmsOverlay={undefined}
         setActiveWmsOverlay={() => {}}
       />
@@ -215,11 +218,28 @@ describe("DatasetInspector", () => {
       trajectory_id_variable: "cruise",
     };
 
+    let passesUrls;
     beforeEach(() => {
+      passesUrls = [];
       const fixtureFetch = globalThis.fetch;
       vi.stubGlobal(
         "fetch",
         vi.fn(async (input) => {
+          if (String(input).includes("/trajectories/passes")) {
+            passesUrls.push(new URL(String(input)));
+            return new Response(
+              JSON.stringify([
+                {
+                  trajectory_id: "cruise-a",
+                  passes: [
+                    { start: "2020-01-03", end: "2020-01-05" },
+                    { start: "2020-02-01", end: "2020-02-01" },
+                  ],
+                },
+              ]),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          }
           if (!String(input).includes("/datasetRecordsList")) {
             return fixtureFetch(input);
           }
@@ -275,6 +295,68 @@ describe("DatasetInspector", () => {
       await user.click(within(card).getByRole("button", { name: /Show data/ }));
       expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a");
       expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
+    });
+
+    it("asks for no passes without a selected area", async () => {
+      await renderReady({ dataset: TRAJECTORY_DATASET });
+      await screen.findByText("cruise-a");
+      expect(passesUrls).toHaveLength(0);
+      expect(screen.queryByText("In selected area")).not.toBeInTheDocument();
+    });
+
+    it("lists when each trajectory was in the clicked area, pinned first", async () => {
+      await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        initialTrajectory: {
+          datasetPk: TRAJECTORY_DATASET.pk,
+          trajectoryId: "cruise-b",
+          area: { lngLat: [-63.5, 44.6], z: 7 },
+        },
+      });
+      const pass = await screen.findByText("2020-01-03 → 2020-01-05");
+      expect(screen.getByText("2020-02-01")).toBeInTheDocument();
+      expect(pass.closest(".listCard")).toHaveClass("pinned");
+      // Default sort is id descending, which would put cruise-b first.
+      const ids = [...document.querySelectorAll(".listCardId")].map(
+        (el) => el.textContent,
+      );
+      expect(ids).toEqual(["cruise-a", "cruise-b"]);
+      expect(
+        screen.getByText(
+          "1 trajectory passed through the selected area. Click a period on its card to plot that period's data.",
+        ),
+      ).toBeInTheDocument();
+
+      const [url] = passesUrls;
+      expect(url.searchParams.get("datasetPKs")).toBe("2337");
+      expect(url.searchParams.get("at")).toBe("-63.5,44.6");
+      expect(url.searchParams.get("z")).toBe("7");
+    });
+
+    it("plots a pass's period when it is clicked", async () => {
+      const setInspectRecordID = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        setInspectRecordID,
+        query: { polygon: "[[-64,44],[-63,44],[-63,45],[-64,44]]" },
+      });
+      await user.click(
+        await screen.findByRole("button", {
+          name: "Plot cruise-a data from 2020-01-03 to 2020-01-05",
+        }),
+      );
+      expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a", {
+        period: { start: "2020-01-03", end: "2020-01-05" },
+      });
+    });
+
+    it("asks about a drawn polygon without a clicked point", async () => {
+      const polygon = "[[-64,44],[-63,44],[-63,45],[-64,44]]";
+      await renderReady({ dataset: TRAJECTORY_DATASET, query: { polygon } });
+      await screen.findByText("2020-01-03 → 2020-01-05");
+      const [url] = passesUrls;
+      expect(url.searchParams.get("polygon")).toBe(polygon);
+      expect(url.searchParams.has("at")).toBe(false);
     });
   });
 

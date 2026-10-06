@@ -30,7 +30,12 @@ import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, hiddenDatasetPksFor } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
-import { RECORD_PARAM, withoutPreviewParams } from "./previewParams.js";
+import {
+  PERIOD_PARAM,
+  RECORD_PARAM,
+  parsePeriod,
+  withoutPreviewParams,
+} from "./previewParams.js";
 import { useViewportDatasetPks } from "./viewportDatasetPks.js";
 
 const SelectionContext = createContext();
@@ -124,7 +129,8 @@ export default function SelectionProvider({ children }) {
 
   // One platform (trajectory id) picked in the dataset inspector to draw its
   // track on the map, clipped to the time filter: {datasetPk, datasetTitle,
-  // trajectoryId, frameView} | undefined.
+  // trajectoryId, frameView, area} | undefined. `area` ({lngLat, z}) is set
+  // only by a click on the track itself.
   const [selectedTrajectory, setSelectedTrajectory] = useState();
 
   // The one record (timeseries_id/profile_id) an unambiguous map marker click
@@ -497,6 +503,11 @@ export default function SelectionProvider({ children }) {
   // as the dataset above: Back closes the preview natively, and the link
   // reproduces it.
   const inspectRecordID = searchParams.get(RECORD_PARAM) || undefined;
+  const periodParam = searchParams.get(PERIOD_PARAM) || undefined;
+  const inspectRecordPeriod = useMemo(
+    () => parsePeriod(periodParam),
+    [periodParam],
+  );
 
   // Opening a record is a navigation the user made, so it pushes an entry Back
   // reverses. Closing it drops the plot params in the SAME write, because
@@ -504,7 +515,7 @@ export default function SelectionProvider({ children }) {
   // not the ones a previous call in this same tick just wrote — so two calls
   // would silently lose one of them.
   const setInspectRecordID = useCallback(
-    (recordId, { replace = false } = {}) => {
+    (recordId, { replace = false, period } = {}) => {
       // Set before the navigation, so the modal never renders "no data" in the
       // frame between the record opening and the fetch starting.
       if (recordId) setRecordLoading(true);
@@ -513,6 +524,10 @@ export default function SelectionProvider({ children }) {
           if (!recordId) return withoutPreviewParams(previous);
           const next = new URLSearchParams(previous);
           next.set(RECORD_PARAM, recordId);
+          // Opening a record without a period shows its latest data, so a
+          // period left from the last pass plotted must not carry over.
+          if (period) next.set(PERIOD_PARAM, `${period.start}~${period.end}`);
+          else next.delete(PERIOD_PARAM);
           return next;
         },
         { replace },
@@ -544,15 +559,17 @@ export default function SelectionProvider({ children }) {
   // [inspectDataset] effect below from clearing the selection it just made (it
   // sees the new inspectDataset and the matching selectedTrajectory together).
   const selectTrajectoryFromMap = useCallback(
-    (datasetPk, trajectoryId, datasetTitle) => {
-      // Re-clicking the selected track is a no-op, not a toggle: track-lines
-      // stays hit-testable (just dimmed) under the selected track drawn over it,
-      // so a toggle would clear the selection on any click along it — including
-      // a click meant to read a fix tooltip. Clearing stays the platform row.
+    (datasetPk, trajectoryId, datasetTitle, area) => {
+      // Re-clicking the selected track is not a toggle: track-lines stays
+      // hit-testable (just dimmed) under the selected track drawn over it, so a
+      // toggle would clear the selection on any click along it — including a
+      // click meant to read a fix tooltip. Clearing stays the platform row.
+      // It only moves the clicked area along the track.
       if (
         selectedTrajectory?.datasetPk === datasetPk &&
         selectedTrajectory?.trajectoryId === trajectoryId
       ) {
+        if (area) setSelectedTrajectory((prev) => ({ ...prev, area }));
         return;
       }
 
@@ -583,6 +600,9 @@ export default function SelectionProvider({ children }) {
         datasetPk,
         datasetTitle: dataset?.title || datasetTitle,
         trajectoryId,
+        // The clicked point and zoom, which the dataset page resolves to the
+        // hex the click fell in (see useTrajectoryPasses).
+        area,
       });
     },
     [pointsData, inspectDataset, selectedTrajectory, setInspectDataset],
@@ -862,7 +882,11 @@ export default function SelectionProvider({ children }) {
     setRecordLoading(true);
     const previewUrl = `${server}/preview?dataset=${encodeURIComponent(
       inspectDatasetId,
-    )}&profile=${encodeURIComponent(inspectRecordID)}`;
+    )}&profile=${encodeURIComponent(inspectRecordID)}${
+      inspectRecordPeriod
+        ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
+        : ""
+    }`;
     fetch(previewUrl)
       .then((response) => {
         if (response.ok) return response.json();
@@ -886,7 +910,7 @@ export default function SelectionProvider({ children }) {
         reportError("preview fetch failed", error);
         setRecordLoading(false);
       });
-  }, [inspectRecordID, inspectDatasetId]);
+  }, [inspectRecordID, inspectDatasetId, inspectRecordPeriod]);
 
   const value = {
     polygon,
@@ -914,6 +938,7 @@ export default function SelectionProvider({ children }) {
     pointsError,
     retryPointQuery,
     inspectRecordID,
+    inspectRecordPeriod,
     setInspectRecordID,
     // Derived, not stored: the record param IS the open state, the same way
     // ?dataset= is the dataset page's.

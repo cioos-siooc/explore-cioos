@@ -15,6 +15,7 @@ import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
@@ -36,6 +37,7 @@ import ListCard, {
   ListCardSkeleton,
   useExpandableList,
 } from "./ListCard.jsx";
+import useTrajectoryPasses from "./useTrajectoryPasses.js";
 import { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 import ZoomToDataset, {
@@ -125,6 +127,51 @@ const EOV_VISIBLE_LIMIT = 3;
 // this page.
 const recordKeyOf = (row) => row.profile_id;
 
+const formatPass = ({ start, end }) =>
+  start === end ? start : `${start} → ${end}`;
+
+// A trajectory's passes through the selected area, each a button that plots
+// that period of its data. Condensed past a few like the variable tags, since a
+// ship on a regular route can cross the same hex hundreds of times.
+function PassButtons({ recordId, passes, onPlot }) {
+  const { t } = useTranslation();
+  const { shown, hidden, expanded, toggle } = useExpandableList(passes, 3);
+  return (
+    <span className="passButtons">
+      {shown.map((pass) => {
+        const label = t("datasetInspectorPlotPassTitle", {
+          id: recordId,
+          start: pass.start,
+          end: pass.end,
+        });
+        return (
+          <button
+            key={pass.start}
+            type="button"
+            className="listCardButton"
+            title={label}
+            aria-label={label}
+            onClick={() => onPlot(pass)}
+          >
+            <GraphUp size={13} aria-hidden="true" />
+            {formatPass(pass)}
+          </button>
+        );
+      })}
+      {(hidden > 0 || expanded) && (
+        <button
+          type="button"
+          className="listCardTagsMore"
+          onClick={toggle}
+          aria-expanded={expanded}
+        >
+          {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
+        </button>
+      )}
+    </span>
+  );
+}
+
 export default function DatasetInspector({
   dataset,
   // Shared with the sidebar header's back control (SelectionProvider), so both
@@ -191,6 +238,21 @@ export default function DatasetInspector({
   const isTrajectoryDataset =
     dataset.source_type !== "obis" &&
     (dataset.cdm_data_type || "").includes("Trajectory");
+
+  // The clicked area: this dataset's track clicked directly, else the last
+  // click on the map (a hex, or tracks too close together to pick one).
+  const { featureQuery } = useMapState();
+  const clickedArea =
+    selectedTrajectory?.datasetPk === dataset.pk && selectedTrajectory.area
+      ? selectedTrajectory.area
+      : featureQuery?.lngLat && featureQuery.buckets
+        ? { lngLat: featureQuery.lngLat, z: featureQuery.buckets.z }
+        : undefined;
+  const passes = useTrajectoryPasses(
+    isTrajectoryDataset ? dataset.pk : undefined,
+    query,
+    clickedArea,
+  );
 
   useEffect(() => {
     if (!hasRecordList) {
@@ -365,6 +427,14 @@ export default function DatasetInspector({
   // sorted to the top" treatment the datasets list itself gives a map click
   // (see DatasetsTable's pinnedPks).
   const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk;
+  const pinnedKeys = useMemo(
+    () =>
+      new Set([
+        ...passes.keys(),
+        ...(markerRecordPinned ? [highlightedRecord.profileId] : []),
+      ]),
+    [passes, markerRecordPinned, highlightedRecord],
+  );
 
   // "Show on map": a trajectory dataset's records are its trajectories
   // (shapeQuery aliases trajectory_id into profile_id), so its cards draw the
@@ -724,6 +794,12 @@ export default function DatasetInspector({
                 </button>
               </div>
             )}
+            {passes.size > 0 && (
+              <div className="recordMapClickHint">
+                <span className="recordMapClickSwatch" aria-hidden="true" />
+                {t("datasetInspectorPassesHint", { count: passes.size })}
+              </div>
+            )}
             {loading ? (
               <SkeletonGroup className="cardList">
                 {Array.from({ length: 5 }, (_, i) => (
@@ -749,9 +825,7 @@ export default function DatasetInspector({
                 defaultSort={{ field: "id", dir: "desc" }}
                 filterPlaceholder={t("datasetInspectorFilterText")}
                 emptyText={t("datasetInspectorNoRecordsText")}
-                pinnedKey={
-                  markerRecordPinned ? highlightedRecord.profileId : undefined
-                }
+                pinnedKeys={pinnedKeys}
                 focusKey={onMapId}
                 pagerLabel={t("datasetInspectorRecordsPagerLabel")}
                 perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
@@ -766,10 +840,7 @@ export default function DatasetInspector({
                   return (
                     <ListCard
                       id={row.profile_id || "—"}
-                      pinned={
-                        markerRecordPinned &&
-                        row.profile_id === highlightedRecord.profileId
-                      }
+                      pinned={pinnedKeys.has(row.profile_id)}
                       selected={onMap}
                       actions={
                         <>
@@ -815,6 +886,17 @@ export default function DatasetInspector({
                         nowrap
                       >
                         {formatInstantRange(row.time_min, row.time_max)}
+                      </CardField>
+                      <CardField label={t("datasetInspectorPassesText")}>
+                        {passes.get(row.profile_id) && (
+                          <PassButtons
+                            recordId={row.profile_id}
+                            passes={passes.get(row.profile_id)}
+                            onPlot={(period) =>
+                              setInspectRecordID(row.profile_id, { period })
+                            }
+                          />
+                        )}
                       </CardField>
                       <CardField label={t("datasetInspectorDepthRangeText")}>
                         {formatRange(row.depth_min, row.depth_max, "m")}

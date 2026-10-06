@@ -9,7 +9,11 @@ import {
 import { wmsSliceParams } from "../wmsUtilities.js";
 import { anyTrajectoryLayerOn, chosenDataLayerKeys } from "./dataLayers.js";
 import { GROUP_NONE } from "./datasetGroups.js";
-import { PLOT_PARAMS, RECORD_PARAM } from "./selection/previewParams.js";
+import {
+  PERIOD_PARAM,
+  PLOT_PARAMS,
+  RECORD_PARAM,
+} from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
@@ -32,7 +36,7 @@ import { useUI } from "./ui/UIProvider.jsx";
 // state from them, so this sync must carry them through rather than drop them
 // (it rebuilds the whole search string from scratch on every map pan). Anything
 // not named in PRESERVED_PARAMS below is gone the moment the map moves.
-const PRESERVED_PARAMS = ["server", RECORD_PARAM, ...PLOT_PARAMS];
+const PRESERVED_PARAMS = ["server", RECORD_PARAM, PERIOD_PARAM, ...PLOT_PARAMS];
 
 export default function UrlSync() {
   const [searchParams] = useSearchParams();
