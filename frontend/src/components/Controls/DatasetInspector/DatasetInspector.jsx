@@ -130,6 +130,48 @@ const recordKeyOf = (row) => row.profile_id;
 const formatPass = ({ start, end }) =>
   start === end ? start : `${start} → ${end}`;
 
+// A trajectory's passes through the selected area, each a button that plots
+// that period of its data. Condensed past a few like the variable tags, since a
+// ship on a regular route can cross the same hex hundreds of times.
+function PassButtons({ recordId, passes, onPlot }) {
+  const { t } = useTranslation();
+  const { shown, hidden, expanded, toggle } = useExpandableList(passes, 3);
+  return (
+    <span className="passButtons">
+      {shown.map((pass) => {
+        const label = t("datasetInspectorPlotPassTitle", {
+          id: recordId,
+          start: pass.start,
+          end: pass.end,
+        });
+        return (
+          <button
+            key={pass.start}
+            type="button"
+            className="listCardButton"
+            title={label}
+            aria-label={label}
+            onClick={() => onPlot(pass)}
+          >
+            <GraphUp size={13} aria-hidden="true" />
+            {formatPass(pass)}
+          </button>
+        );
+      })}
+      {(hidden > 0 || expanded) && (
+        <button
+          type="button"
+          className="listCardTagsMore"
+          onClick={toggle}
+          aria-expanded={expanded}
+        >
+          {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
+        </button>
+      )}
+    </span>
+  );
+}
+
 export default function DatasetInspector({
   dataset,
   // Shared with the sidebar header's back control (SelectionProvider), so both
@@ -862,8 +904,12 @@ export default function DatasetInspector({
                       </CardField>
                       <CardField label={t("datasetInspectorPassesText")}>
                         {passes.get(row.profile_id) && (
-                          <CardTags
-                            values={passes.get(row.profile_id).map(formatPass)}
+                          <PassButtons
+                            recordId={row.profile_id}
+                            passes={passes.get(row.profile_id)}
+                            onPlot={(period) =>
+                              setInspectRecordID(row.profile_id, { period })
+                            }
                           />
                         )}
                       </CardField>

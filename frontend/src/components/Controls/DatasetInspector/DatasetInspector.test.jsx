@@ -322,13 +322,32 @@ describe("DatasetInspector", () => {
       );
       expect(ids).toEqual(["cruise-a", "cruise-b"]);
       expect(
-        screen.getByText("1 trajectory passed through the selected area"),
+        screen.getByText(
+          "1 trajectory passed through the selected area. Click a period on its card to plot that period's data.",
+        ),
       ).toBeInTheDocument();
 
       const [url] = passesUrls;
       expect(url.searchParams.get("datasetPKs")).toBe("2337");
       expect(url.searchParams.get("at")).toBe("-63.5,44.6");
       expect(url.searchParams.get("z")).toBe("7");
+    });
+
+    it("plots a pass's period when it is clicked", async () => {
+      const setInspectRecordID = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        setInspectRecordID,
+        query: { polygon: "[[-64,44],[-63,44],[-63,45],[-64,44]]" },
+      });
+      await user.click(
+        await screen.findByRole("button", {
+          name: "Plot cruise-a data from 2020-01-03 to 2020-01-05",
+        }),
+      );
+      expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a", {
+        period: { start: "2020-01-03", end: "2020-01-05" },
+      });
     });
 
     it("asks about a drawn polygon without a clicked point", async () => {

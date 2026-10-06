@@ -352,6 +352,24 @@ describe("SelectionProvider", () => {
     expect(latest.datasetPreview).toBeDefined();
   });
 
+  it("previews one period of a record, and drops it when the record reopens without one", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    const period = { start: "2020-01-03", end: "2020-01-05" };
+    act(() => latest.setInspectRecordID("STATION_001", { period }));
+    await waitFor(() => expect(latest.inspectRecordPeriod).toEqual(period));
+    expect(window.location.search).toContain("pperiod=2020-01-03%7E2020-01-05");
+    const previewUrl = globalThis.fetch.mock.calls
+      .map(([input]) => String(input))
+      .find((url) => url.includes("/preview?"));
+    expect(previewUrl).toContain(
+      "&timeMin=2020-01-03T00:00:00Z&timeMax=2020-01-05T23:59:59Z",
+    );
+
+    act(() => latest.setInspectRecordID("STATION_001"));
+    await waitFor(() => expect(latest.inspectRecordPeriod).toBeUndefined());
+  });
+
   it("groups by a dimension and hides datasets belonging only to hidden groups", async () => {
     await renderLoaded();
     act(() => latest.setGroupBy("platform"));

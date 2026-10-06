@@ -16,6 +16,16 @@
 // modal the user had not asked to see.
 export const RECORD_PARAM = "preview";
 
+// The period of that record being previewed, as `YYYY-MM-DD~YYYY-MM-DD`
+// (inclusive UTC days) — set when a trajectory's pass through the selected
+// area is plotted. Absent means the record's most recent data.
+export const PERIOD_PARAM = "pperiod";
+
+export function parsePeriod(value) {
+  const [start, end] = (value || "").split("~");
+  return start && end ? { start, end } : undefined;
+}
+
 // How that record is being drawn. Each of these is written ONLY when it differs
 // from the default the dataset type implies, so an untouched plot adds nothing
 // to the link — the same rule the map's layer switches follow.
@@ -47,6 +57,7 @@ const RETIRED_PLOT_PARAMS = ["px", "py", "p2", "pscale2", "pcolor", "pscale"];
 
 export const PREVIEW_PARAMS = [
   RECORD_PARAM,
+  PERIOD_PARAM,
   ...PLOT_PARAMS,
   ...RETIRED_PLOT_PARAMS,
 ];
