@@ -12,6 +12,7 @@ import {
   capitalizeFirstLetter,
   toggleOptionExcluded,
   toggleOptionIncluded,
+  withCategoryState,
 } from "../../../../utilities";
 import platformColors from "../../../platformColors";
 import { FilterOption } from "./OptionState.jsx";
@@ -51,14 +52,8 @@ export default function MultiCheckboxFilter({
     );
   }
 
-  // A whole category at once, like SourceFilter's OBIS group: a mixed
-  // category goes to all-included (or all-excluded) first.
   function setCategory(category, state) {
-    setOptionsSelected(
-      universe.map((opt) =>
-        opt.category === category ? { ...opt, ...state } : opt,
-      ),
-    );
+    setOptionsSelected(withCategoryState(universe, category, state));
   }
 
   function selectAllSearchResultsToggle() {

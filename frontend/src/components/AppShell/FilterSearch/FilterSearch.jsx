@@ -415,6 +415,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
                       aria-selected={i === active}
                       className={classNames("filterSearchOption", {
                         active: i === active,
+                        shortcut: option.shortcut,
                       })}
                       data-testid="filter-search-option"
                       data-state={option.state ?? "none"}
@@ -443,6 +444,11 @@ export default function FilterSearch({ text, setText, inputRef }) {
                               aria-hidden="true"
                             >
                               {t("filterNotTag")}
+                            </span>
+                          )}
+                          {option.shortcut && (
+                            <span className="filterSearchOptionTag">
+                              {t("filterSearchCategoryTag")}
                             </span>
                           )}
                           {option.label}

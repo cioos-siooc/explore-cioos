@@ -63,7 +63,7 @@ export default function useActiveFilters() {
   const { setShowFiltersModal, setOpenFilter, openFilterSearch } = useUI();
 
   return model.flatMap((group) => {
-    const applied = group.options.filter((o) => o.state);
+    const applied = group.options.filter((o) => o.state && !o.shortcut);
     if (applied.length === 0) return [];
     return {
       key: group.key,
