@@ -58,11 +58,10 @@ function measureTopBarSpace(rect) {
 //
 // Under the card, on the map rather than in it, the quick filters (see
 // QuickFilters) — the ones that act on the map instead of on a list of
-// options. The active-filter chips flow beneath those, staying centered.
-// Both of those rows fold away together, toggled by the small chevron riding
-// on the far side of the Filters segment: it reads as part of the button that
-// already names the filter state, rather than a fourth control among the
-// tools it hides.
+// options. The active-filter chips flow beneath those, staying centered. Both
+// fold away with the small chevron riding on the far side of the Filters
+// segment: it reads as part of the button that already names the filter
+// state, rather than another control among the ones it hides.
 export default function TopControls() {
   const { t } = useTranslation();
   // The same list the chips below render, so the badge can never report a
@@ -93,7 +92,9 @@ export default function TopControls() {
   return (
     <div className="topBar" ref={barRef} data-testid="top-bar">
       <BrandSearch>
-        <DatasetCounts />
+        <div className="topBarStatusRow">
+          <DatasetCounts />
+        </div>
         <div className="topBarActions" data-testid="top-bar-actions">
           <button
             type="button"
@@ -163,10 +164,6 @@ export default function TopControls() {
                 </span>
               )}
             </button>
-            {/* Show/Hide for the quick-filter row and the active-filter
-                chips beneath it (see QuickFilters, ActiveFilterChips) — one
-                toggle for both, riding on the button that already names
-                whether any filter is set. */}
             <button
               type="button"
               className="topBarFiltersToggle"

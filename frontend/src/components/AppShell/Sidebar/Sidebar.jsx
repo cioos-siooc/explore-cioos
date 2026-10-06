@@ -49,8 +49,7 @@ export default function Sidebar() {
   const {
     ready: countsReady,
     updating: countsUpdating,
-    filteredCount,
-    total,
+    title: countsTitle,
     label: countLabel,
   } = useDatasetCounts();
 
@@ -61,14 +60,6 @@ export default function Sidebar() {
   // the dataset's own title block.
   const inspecting = Boolean(inspectDataset);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
-  const countsTitle = countsReady
-    ? t("dockDatasetsCountTitle", {
-        filtered: filteredCount,
-        // A failed /datasets leaves no catalog total; the filtered count is
-        // then all we know, and all the label shows.
-        total: total ?? filteredCount,
-      })
-    : t("datasetsCountLoadingTitle");
 
   const collapseButton = (
     <CloseButton

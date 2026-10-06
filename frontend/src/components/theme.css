@@ -508,7 +508,7 @@ h6 {
   .sidebarFooterHintMore,
   .railStep,
   .sortSelectDirection,
-  .topBarCountsInView
+  .quickFilterButton
 ) {
   position: relative;
 }
@@ -526,7 +526,7 @@ h6 {
   .sidebarFooterHintMore,
   .railStep,
   .sortSelectDirection,
-  .topBarCountsInView,
+  .quickFilterButton,
   .railHandle
 )::before,
 .form-switch .form-check-input::after {

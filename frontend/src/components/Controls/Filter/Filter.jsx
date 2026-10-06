@@ -3,7 +3,6 @@ import { useRef, useState } from "react";
 import {
   ChevronCompactDown,
   ChevronCompactUp,
-  Search,
   X,
   BoxArrowUpRight,
 } from "react-bootstrap-icons";
@@ -36,11 +35,6 @@ export default function Filter({
   searchTerms,
   setSearchTerms,
   searchPlaceholder,
-  // Whether this row's box waits to be submitted. Set only by Text Search,
-  // whose value re-queries the map — the facet rows below it publish on a
-  // pause, because all their search does is filter options already in memory
-  // (see useSearchInput).
-  searchOnSubmit,
   resetButton,
   infoButton,
   children,
@@ -58,13 +52,11 @@ export default function Filter({
   // for a frame.
   if (useChanged(openFilter) && controlled) setFilterOpen(openFilter);
 
-  // What the search box narrows is never just itself: an options list here,
-  // the map and the datasets list in the Text Search row. So the box shows
-  // what is typed and publishes it on its own trigger — see useSearchInput.
+  // Its search re-filters a list thousands of options long, so the box shows
+  // what is typed and publishes it once typing pauses — see useSearchInput.
   const [searchText, setSearchText, submitSearch] = useSearchInput(
     searchTerms ?? "",
     setSearchTerms,
-    { trigger: searchOnSubmit ? "submit" : "pause" },
   );
 
   // This is the filter being edited. Controlled, that also takes the panel
@@ -127,12 +119,9 @@ export default function Filter({
               what used to leave the button sitting on the caption instead of
               in the field. */}
           {searchable && (
-            // A form, so Enter reaches the search the same way the magnifier
-            // does without a key handler of its own. Rows that publish on a
-            // pause are forms too — there Enter just means "don't wait out the
-            // delay" — but only a submitted row shows the button.
+            // A form, so Enter means "don't wait out the delay".
             <form
-              className={`filterSearchRow ${searchOnSubmit ? "withSubmit" : ""}`}
+              className="filterSearchRow"
               onSubmit={(e) => {
                 e.preventDefault();
                 submitSearch();
@@ -146,16 +135,6 @@ export default function Filter({
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder={searchPlaceholder}
               />
-              {searchOnSubmit && (
-                <button
-                  type="submit"
-                  className="filterSearchSubmit"
-                  title={t("filterSearchSubmitTitle")} // 'Search'
-                  aria-label={t("filterSearchSubmitTitle")}
-                >
-                  <Search size={16} aria-hidden="true" />
-                </button>
-              )}
               {searchText && (
                 <button
                   type="button"

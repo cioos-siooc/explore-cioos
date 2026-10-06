@@ -101,7 +101,7 @@ export function generateRangeSelectBadgeTitle(
   return optionsSelected[0] === defaults[0] &&
     optionsSelected[1] === defaults[1]
     ? badgeTitle
-    : `${optionsSelected[0]} - ${optionsSelected[1]}` +
+    : `${optionsSelected[0]} – ${optionsSelected[1]}` +
         (!isEmpty(units) ? " " + units : "");
 }
 

@@ -60,7 +60,7 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 8px 14px;
 }
 
 /* The logo: links out to the org's own site, but carries none of the usual
@@ -73,8 +73,8 @@
 }
 
 /* Two-line wordmark lockup, lines centered on each other: the secondary
-   word(s) (span — DATA / DE DONNÉES) small and widely tracked, the main word
-   (em — EXPLORER / EXPLORATEUR) large and light. */
+   word(s) (span — DATA / DE DONNÉES) small and tracked, the main word
+   (em — EXPLORER / EXPLORATEUR) large. */
 .brandTitle {
   display: flex;
   flex-direction: column;
@@ -95,12 +95,14 @@
 }
 
 .brandTitle span {
-  font-size: var(--cioos-font-size-2xs);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 500;
   line-height: 1.2;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.16em;
+  color: var(--cioos-ink-80);
 
   /* optically recenter: tracking adds a trailing space after the last glyph */
-  margin-right: -0.28em;
+  margin-right: -0.16em;
 }
 
 .brandTitle em {
@@ -109,8 +111,8 @@
   /* sized so EXPLORATEUR fits the slot the sidebar leaves for the title */
   font-size: 17px;
   line-height: 1.1;
-  letter-spacing: 0.06em;
-  margin-right: -0.06em;
+  letter-spacing: 0.04em;
+  margin-right: -0.04em;
   font-weight: 500;
 }
 
@@ -133,7 +135,9 @@
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--cioos-ink-60);
+
+  /* Same ink as the logo name and wordmark beside them. */
+  color: var(--cioos-ink);
   cursor: pointer;
   transition:
     background-color var(--cioos-transition-fast),
@@ -161,11 +165,10 @@
   color: var(--cioos-on-primary);
 }
 
-/* Text, not an icon: ink-60 is 4.2:1 at this size. */
+/* Medium weight so it sits close to the outline icons beside it. */
 .brandLanguage {
   font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
-  color: var(--cioos-ink-80);
+  font-weight: 500;
 }
 
 /* ------------------------------------------------------------------
@@ -237,8 +240,8 @@
   .brandTitle[lang="fr"] span {
     font-size: clamp(
       var(--cioos-font-size-3xs),
-      2.6vw,
-      var(--cioos-font-size-2xs)
+      3vw,
+      var(--cioos-font-size-xs)
     );
   }
 
