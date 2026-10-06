@@ -100,3 +100,119 @@ test("GET /trajectories/track requires an integer datasetPKs", async () => {
     .query({ datasetPKs: "abc", trajectoryId: "glider-1" });
   assert.equal(res.status, 400);
 });
+
+test("GET /trajectories/passes merges each trajectory's runs across hexes", async () => {
+  db.queueRaw([
+    // glider-1 crosses two selected hexes on one voyage (overlapping and
+    // adjacent runs), then comes back a month later.
+    {
+      trajectory_id: "glider-1",
+      first_day: "2024-01-01",
+      last_day: "2024-01-02",
+    },
+    {
+      trajectory_id: "glider-1",
+      first_day: "2024-01-02",
+      last_day: "2024-01-03",
+    },
+    {
+      trajectory_id: "glider-1",
+      first_day: "2024-01-04",
+      last_day: "2024-01-04",
+    },
+    {
+      trajectory_id: "glider-1",
+      first_day: "2024-02-10",
+      last_day: "2024-02-11",
+    },
+    {
+      trajectory_id: "glider-2",
+      first_day: "2023-12-30",
+      last_day: "2023-12-30",
+    },
+  ]);
+
+  const res = await agent
+    .get("/trajectories/passes")
+    .query({ datasetPKs: "42", at: "-63.5,44.6", z: "7" });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, [
+    {
+      trajectory_id: "glider-2",
+      passes: [{ start: "2023-12-30", end: "2023-12-30" }],
+    },
+    {
+      trajectory_id: "glider-1",
+      passes: [
+        { start: "2024-01-01", end: "2024-01-04" },
+        { start: "2024-02-10", end: "2024-02-11" },
+      ],
+    },
+  ]);
+});
+
+test("GET /trajectories/passes clips passes to the time filter", async () => {
+  db.queueRaw([
+    {
+      trajectory_id: "glider-1",
+      first_day: "2024-01-01",
+      last_day: "2024-01-10",
+    },
+    {
+      trajectory_id: "glider-1",
+      first_day: "2024-03-01",
+      last_day: "2024-03-02",
+    },
+  ]);
+
+  const res = await agent.get("/trajectories/passes").query({
+    datasetPKs: "42",
+    timeMin: "2024-01-05T00:00:00Z",
+    timeMax: "2024-02-01T00:00:00Z",
+  });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, [
+    {
+      trajectory_id: "glider-1",
+      passes: [{ start: "2024-01-05", end: "2024-01-10" }],
+    },
+  ]);
+});
+
+test("GET /trajectories/passes resolves `at` to the hex of the zoom's tier, wrapped into ±180", async () => {
+  db.queueRaw([]);
+  await agent
+    .get("/trajectories/passes")
+    .query({ datasetPKs: "42", at: "296.5,44.6", z: "3" });
+  const [sql] = db.queries;
+  assert.match(sql, /cde\.hexes_zoom_0/);
+  assert.match(sql, /ST_MakePoint\(-63\.5, 44\.6\)/);
+});
+
+test("GET /trajectories/passes without `at` is the shared selection alone", async () => {
+  db.queueRaw([]);
+  const res = await agent
+    .get("/trajectories/passes")
+    .query({
+      datasetPKs: "42",
+      polygon: "[[-64,44],[-63,44],[-63,45],[-64,44]]",
+    });
+  assert.equal(res.status, 200);
+  const [sql] = db.queries;
+  assert.doesNotMatch(sql, /ST_MakePoint/);
+  assert.match(sql, /POLYGON\(\(-64 44/);
+});
+
+test("GET /trajectories/passes rejects a malformed `at` or a missing `z`", async () => {
+  for (const query of [
+    { datasetPKs: "42", at: "nope", z: "7" },
+    { datasetPKs: "42", at: "-63,95", z: "7" },
+    { datasetPKs: "42", at: "-63,44" },
+  ]) {
+    const res = await agent.get("/trajectories/passes").query(query);
+    assert.equal(res.status, 400, JSON.stringify(query));
+  }
+  assert.equal(db.queries.length, 0);
+});

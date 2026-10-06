@@ -124,7 +124,8 @@ export default function SelectionProvider({ children }) {
 
   // One platform (trajectory id) picked in the dataset inspector to draw its
   // track on the map, clipped to the time filter: {datasetPk, datasetTitle,
-  // trajectoryId, frameView} | undefined.
+  // trajectoryId, frameView, area} | undefined. `area` ({lngLat, z}) is set
+  // only by a click on the track itself.
   const [selectedTrajectory, setSelectedTrajectory] = useState();
 
   // The one record (timeseries_id/profile_id) an unambiguous map marker click
@@ -539,15 +540,17 @@ export default function SelectionProvider({ children }) {
   // [inspectDataset] effect below from clearing the selection it just made (it
   // sees the new inspectDataset and the matching selectedTrajectory together).
   const selectTrajectoryFromMap = useCallback(
-    (datasetPk, trajectoryId, datasetTitle) => {
-      // Re-clicking the selected track is a no-op, not a toggle: track-lines
-      // stays hit-testable (just dimmed) under the selected track drawn over it,
-      // so a toggle would clear the selection on any click along it — including
-      // a click meant to read a fix tooltip. Clearing stays the platform row.
+    (datasetPk, trajectoryId, datasetTitle, area) => {
+      // Re-clicking the selected track is not a toggle: track-lines stays
+      // hit-testable (just dimmed) under the selected track drawn over it, so a
+      // toggle would clear the selection on any click along it — including a
+      // click meant to read a fix tooltip. Clearing stays the platform row.
+      // It only moves the clicked area along the track.
       if (
         selectedTrajectory?.datasetPk === datasetPk &&
         selectedTrajectory?.trajectoryId === trajectoryId
       ) {
+        if (area) setSelectedTrajectory((prev) => ({ ...prev, area }));
         return;
       }
 
@@ -578,6 +581,9 @@ export default function SelectionProvider({ children }) {
         datasetPk,
         datasetTitle: dataset?.title || datasetTitle,
         trajectoryId,
+        // The clicked point and zoom, which the dataset page resolves to the
+        // hex the click fell in (see useTrajectoryPasses).
+        area,
       });
     },
     [pointsData, inspectDataset, selectedTrajectory, setInspectDataset],

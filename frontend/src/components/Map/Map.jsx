@@ -3681,7 +3681,12 @@ export default function CreateMap({
           .getSource("click-highlight")
           ?.setData(emptyFeatureCollection);
         const track = tracks[0];
-        onTrackClickRef.current(track.pk, track.trajectoryId, track.title);
+        // Where on the track: the dataset page lists when the platform was in
+        // the hex under this point (the area a hex click would have named).
+        onTrackClickRef.current(track.pk, track.trajectoryId, track.title, {
+          lngLat: [e.lngLat.lng, e.lngLat.lat],
+          z: Math.floor(map.current.getZoom()),
+        });
         return;
       }
 

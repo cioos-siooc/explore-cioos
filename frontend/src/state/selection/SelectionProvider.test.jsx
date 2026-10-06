@@ -428,6 +428,34 @@ describe("SelectionProvider", () => {
     expect(latest.selectedTrajectory).toBe(selectionBefore);
   });
 
+  it("re-clicking the selected track elsewhere moves only the clicked area", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const first = { lngLat: [-63, 44], z: 7 };
+    const second = { lngLat: [-62, 45], z: 8 };
+    act(() =>
+      latest.selectTrajectoryFromMap(target.pk, "track-1", target.title, first),
+    );
+    await waitFor(() => expect(latest.selectedTrajectory?.area).toBe(first));
+
+    act(() =>
+      latest.selectTrajectoryFromMap(
+        target.pk,
+        "track-1",
+        target.title,
+        second,
+      ),
+    );
+    await waitFor(() =>
+      expect(latest.selectedTrajectory).toEqual({
+        datasetPk: target.pk,
+        datasetTitle: target.title,
+        trajectoryId: "track-1",
+        area: second,
+      }),
+    );
+  });
+
   it("restores a ?onMap= record once its dataset page resolves, and writes it back", async () => {
     const fixtureRow = pointQueryFixture[0];
     const slug = erddapServerSlug(fixtureRow.erddap_url);
