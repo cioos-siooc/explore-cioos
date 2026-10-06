@@ -46,6 +46,15 @@ def is_valid_duration(duration):
 #
 # tests/conftest.py imports this list rather than restating it: the fixtures
 # built by build_variables_df() must pivot exactly what production pivots.
+# ACDD organization attributes mapped onto the CKAN (ISO 19115 CI_RoleCode)
+# roles the organizations filter is scoped by.
+ACDD_ORGANIZATION_ROLES = {
+    "institution": "owner",
+    "creator": "originator",
+    "publisher": "publisher",
+    "contributor": "contributor",
+}
+
 CONSIDERED_VARIABLE_ATTRIBUTES = [
     "cf_role",
     "standard_name",
@@ -134,6 +143,7 @@ class Dataset:
                 "platform": [self.platform],
                 "eovs": [self.eovs],
                 "organizations": [self.organizations],
+                "organization_roles": [self.organization_roles],
                 "n_profiles": [len(self.profile_ids)],
                 "profile_variables": [self.profile_variable_list],
                 "timeseries_id_variable": self.timeseries_id_variable,
@@ -471,6 +481,11 @@ class Dataset:
 
         self.organizations = list(
             filter(None, {globals_dict.get(x) for x in organization_fields})
+        )
+        self.organization_roles = sorted(
+            f"{ACDD_ORGANIZATION_ROLES[x]}:{globals_dict[x]}"
+            for x in organization_fields
+            if globals_dict.get(x)
         )
 
         self.platform = self.get_platform_code()

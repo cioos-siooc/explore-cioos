@@ -51,7 +51,7 @@ function filterValidators() {
     ])
       .matches(/^[0-9,]*$/)
       .optional(),
-    check(["eovs", "excludeEovs"])
+    check(["eovs", "excludeEovs", "organizationRoles"])
       .matches(/^[a-zA-Z,]*$/)
       .optional(),
     check(["eovsMatch", "organizationsMatch", "scientificNamesMatch"])

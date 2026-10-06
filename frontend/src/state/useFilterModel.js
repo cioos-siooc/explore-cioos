@@ -299,15 +299,25 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
       filters.setPlatformsSelected,
       true,
     ),
-    listGroup(
-      "orgs",
-      t("organizationFilterName"),
-      "organizationFilterName",
-      filters.orgsSelected,
-      filters.setOrgsSelected,
-      false,
-      filters.orgsMatchAll,
-    ),
+    (() => {
+      const group = listGroup(
+        "orgs",
+        t("organizationFilterName"),
+        "organizationFilterName",
+        filters.orgsSelected,
+        filters.setOrgsSelected,
+        false,
+        filters.orgsMatchAll,
+      );
+      const roles = (filters.orgRolesSelected || [])
+        .filter((role) => role.isSelected)
+        .map((role) =>
+          t(`organizationRole_${role.pk}`, { defaultValue: role.pk }),
+        );
+      return roles.length
+        ? { ...group, label: `${group.label} (${roles.join(", ")})` }
+        : group;
+    })(),
     {
       key: "sources",
       label: t("sourceFilterName"),

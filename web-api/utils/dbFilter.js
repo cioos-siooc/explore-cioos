@@ -170,6 +170,7 @@ async function createDBFilter(
     erddapServers,
     excludePlatforms,
     excludeOrganizations,
+    organizationRoles,
     excludeObisNodes,
     excludeErddapServers,
     excludeEovs,
@@ -307,17 +308,45 @@ async function createDBFilter(
     filters.push("point_pk = ANY (:pointPKs)");
   }
 
+  // organizationRoles scopes both the include and the exclude list to those
+  // roles: organization_role_keys holds "<pk_url>:<role>" per dataset, so the
+  // selection becomes the orgs x roles cross product of the same keys.
+  const roles = organizationRoles ? unique(organizationRoles.split(",")) : [];
+  const roleKeys = (pks) => pks.flatMap((pk) => roles.map((r) => `${pk}:${r}`));
+
   if (organizations) {
-    parameters.organizationsString = organizations.split(",");
-    const organizationsOp = organizationsMatch === "all" ? "@>" : "&&";
-    filters.push(`organization_pks ${organizationsOp} :organizationsString`);
+    const pks = unique(organizations.split(","));
+    if (roles.length) {
+      parameters.organizationRoleKeys = roleKeys(pks);
+      if (organizationsMatch === "all") {
+        // every selected org holds at least one selected role
+        parameters.organizationsCount = pks.length;
+        filters.push(
+          "(SELECT count(DISTINCT split_part(k, ':', 1)) FROM unnest(organization_role_keys) k WHERE k = ANY(:organizationRoleKeys)) = :organizationsCount",
+        );
+      } else {
+        filters.push("organization_role_keys && :organizationRoleKeys");
+      }
+    } else {
+      parameters.organizationsString = pks;
+      const organizationsOp = organizationsMatch === "all" ? "@>" : "&&";
+      filters.push(`organization_pks ${organizationsOp} :organizationsString`);
+    }
   }
 
   if (excludeOrganizations) {
-    parameters.excludeOrganizationsArr = excludeOrganizations.split(",");
-    filters.push(
-      "NOT coalesce(organization_pks && :excludeOrganizationsArr, false)",
-    );
+    const pks = unique(excludeOrganizations.split(","));
+    if (roles.length) {
+      parameters.excludeOrganizationRoleKeys = roleKeys(pks);
+      filters.push(
+        "NOT coalesce(organization_role_keys && :excludeOrganizationRoleKeys, false)",
+      );
+    } else {
+      parameters.excludeOrganizationsArr = pks;
+      filters.push(
+        "NOT coalesce(organization_pks && :excludeOrganizationsArr, false)",
+      );
+    }
   }
 
   // Dataset-level, so it belongs in `filters` (the shared fragment) rather than

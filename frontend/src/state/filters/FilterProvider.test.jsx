@@ -100,6 +100,18 @@ describe("FilterProvider", () => {
     });
   });
 
+  it("seeds the organization roles from the URL, and reset clears them", async () => {
+    await renderLoaded({ url: "/?organizations=1&organizationRoles=owner" });
+    expect(
+      latest.orgRolesSelected.filter((r) => r.isSelected).map((r) => r.pk),
+    ).toEqual(["owner"]);
+
+    act(() => latest.resetFilters());
+    await waitFor(() =>
+      expect(latest.orgRolesSelected.some((r) => r.isSelected)).toBe(false),
+    );
+  });
+
   it("excluding every OBIS node hides OBIS like the source filter does", async () => {
     await renderLoaded();
     act(() => {

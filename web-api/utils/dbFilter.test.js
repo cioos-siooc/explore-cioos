@@ -222,6 +222,42 @@ test("organizationsMatch=all asks for every organisation", async () => {
   assert.match(any.shared.toString(), /organization_pks && '\{"1","2"\}'/);
 });
 
+test("organizationRoles scopes the organisations to those roles", async () => {
+  const any = await createDBFilter({
+    organizations: "1,2",
+    organizationRoles: "owner,custodian",
+  });
+  assert.match(
+    any.shared.toString(),
+    /organization_role_keys && '\{"1:owner","1:custodian","2:owner","2:custodian"\}'/,
+  );
+  assert.doesNotMatch(any.shared.toString(), /organization_pks/);
+
+  const all = await createDBFilter({
+    organizations: "1,2",
+    organizationRoles: "owner",
+    organizationsMatch: "all",
+  });
+  assert.match(
+    all.shared.toString(),
+    /count\(DISTINCT split_part\(k, ':', 1\)\) FROM unnest\(organization_role_keys\) k WHERE k = ANY\('\{"1:owner","2:owner"\}'\)\) = 2/,
+  );
+
+  const exclude = await createDBFilter({
+    excludeOrganizations: "3",
+    organizationRoles: "owner",
+  });
+  assert.match(
+    exclude.shared.toString(),
+    /NOT coalesce\(organization_role_keys && '\{"3:owner"\}', false\)/,
+  );
+});
+
+test("organizationRoles alone filters nothing", async () => {
+  const f = await createDBFilter({ organizationRoles: "owner" });
+  assert.equal(f.hasShared, false);
+});
+
 test("scientificNamesMatch=all rolls each name down on its own and ANDs them", async () => {
   const askedFor = [];
   const f = await createDBFilter(

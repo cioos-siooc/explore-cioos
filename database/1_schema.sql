@@ -67,6 +67,10 @@ CREATE TABLE datasets (
     profile_id_variable text,
     trajectory_id_variable text,
     organization_pks INTEGER[],
+    -- "role:Organization name" from CKAN cited-responsible-party / ACDD
+    organization_roles text[],
+    -- "<organizations.pk_url>:role", resolved by ckan_process()
+    organization_role_keys text[],
     n_profiles integer,
     profile_variables text[],
     num_columns integer,

@@ -22,3 +22,13 @@ test("GET /organizations overwrites pk with pk_url on every row", async () => {
   ]);
   assert.match(db.queries[0], /select .* from "cde"\."organizations"/i);
 });
+
+test("GET /organizations/roles returns the role codes", async () => {
+  db.queueRaw([{ role: "custodian" }, { role: "owner" }]);
+
+  const res = await agent.get("/organizations/roles");
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, ["custodian", "owner"]);
+  assert.match(db.queries[0], /unnest\(organization_role_keys\)/);
+});

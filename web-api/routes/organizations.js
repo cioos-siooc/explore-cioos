@@ -36,4 +36,28 @@ router.get("/", ...pipeline({ filters: false }), async (req, res) => {
   );
 });
 
+/**
+ * @swagger
+ * /organizations/roles:
+ *   get:
+ *     summary: List organization roles
+ *     tags: [Organizations]
+ *     description: Returns the contact roles (ISO 19115 CI_RoleCode) organizations hold on datasets, for the organizationRoles filter.
+ *     responses:
+ *       200:
+ *         description: Array of role codes.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ */
+router.get("/roles", ...pipeline({ filters: false }), async (req, res) => {
+  const { rows } = await db.raw(
+    "SELECT DISTINCT split_part(k, ':', 2) AS role FROM cde.datasets, unnest(organization_role_keys) k ORDER BY 1",
+  );
+  res.send(rows.map((r) => r.role));
+});
+
 module.exports = router;

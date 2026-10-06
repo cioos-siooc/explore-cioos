@@ -212,12 +212,14 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
         if ckan_unavailable:
             ckan_links = (
                 load_previous_ckan(erddap_datasets["erddap_url"].unique())
-                .rename(columns={"title": "ckan_title", "organizations": "ckan_organizations"})
+                .rename(columns={"title": "ckan_title", "organizations": "ckan_organizations",
+                                 "organization_roles": "ckan_organization_roles"})
                 .drop(columns="eovs")
             )
         if ckan_links.empty:
             ckan_links = pd.DataFrame(columns=["erddap_url", "dataset_id", "ckan_id",
-                                               "ckan_organizations", "ckan_title", "title_fr"])
+                                               "ckan_organizations", "ckan_organization_roles",
+                                               "ckan_title", "title_fr"])
         ckan_by_key = ckan_links.assign(
             _erddap_key=ckan_links["erddap_url"].map(erddap_join_key)
         ).drop(columns="erddap_url")
@@ -254,13 +256,18 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 
         erddap_datasets["ckan_title"].fillna(erddap_datasets["title"], inplace=True)
 
-        # prioritize with organizations from CKAN and then pull ERDDAP if needed
-        erddap_datasets["organizations"] = erddap_datasets.apply(
-            lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),
-            axis=1,
+        # prioritize with organizations from CKAN and then pull ERDDAP if needed;
+        # roles come from the same source so they describe the same organizations
+        use_ckan = erddap_datasets["ckan_organizations"].map(bool)
+        erddap_datasets["organizations"] = erddap_datasets["ckan_organizations"].where(
+            use_ckan, erddap_datasets["organizations"].map(unescape_ascii_list)
+        )
+        erddap_datasets["organization_roles"] = erddap_datasets["ckan_organization_roles"].where(
+            use_ckan, erddap_datasets["organization_roles"].map(unescape_ascii_list)
         )
         del erddap_datasets["title"]
         del erddap_datasets["ckan_organizations"]
+        del erddap_datasets["ckan_organization_roles"]
 
         erddap_datasets.rename(
             columns={
