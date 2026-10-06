@@ -1,13 +1,15 @@
 /* A fixed width rather than the title's: shrink-wrapped, a short title left
    the two buttons too narrow to sit side by side. Scrolls rather than running
-   off the screen once a gridded dataset's legend is open in it. */
+   off the screen once a gridded dataset's legend is open in it, but vertically
+   only and without a scrollbar: a bar eats into a card this narrow. */
 .datasetMapCard {
   display: flex;
   flex-direction: column;
   gap: 6px;
   box-sizing: border-box;
   width: min(320px, calc(100vw - 24px));
-  overflow-y: auto;
+  overflow: hidden auto;
+  scrollbar-width: none;
   padding: 6px 6px 8px 10px;
   border: 1px solid var(--cioos-primary);
   border-radius: var(--cioos-radius-lg);
