@@ -370,6 +370,7 @@ export default function FilterProvider({ children }) {
             isSelected: eovsFromURL.includes(eov),
             isExcluded: eovsExcludedFromURL.includes(eov),
             pk: index,
+            category: eovMetadata?.category || "Other",
             hover_en: eovMetadata?.["definition EN"],
             hover_fr: eovMetadata?.["definition FR"],
           };

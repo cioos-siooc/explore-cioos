@@ -150,7 +150,7 @@
   "activeFilterShowMoreTitle": "Show {{count}} more",
   "activeFilterShowLessTitle": "Show {{count}} fewer",
   "oceanVariableFilterTooltip": "Filter data by ocean variable name. Selection works as logical OR operation; switch on \"Match all selected variables\" to keep only data measuring every one of them.",
-  "oceanVariableFilterSeachPlaceholder": "Search for ocean variable name...",
+  "oceanVariableFilterSeachPlaceholder": "Search ocean variables or categories...",
   "platformFilterTooltip": "Filter data by platform type. Click an option to include it, or the exclude button at the end of its row to exclude it; click again to undo. Included options work as logical OR; excluded ones are removed from the result.",
   "platformsFilterSeachPlaceholder": "Search for platform type...",
   "organizationFilterTooltip": "Filter data by responsible organisation name. Click an option to include it, or the exclude button at the end of its row to exclude it; click again to undo. Included options work as logical OR; excluded ones are removed from the result.",
@@ -791,5 +791,10 @@
   "filterOptionExcludeTitle": "Exclude: leave out datasets that match this",
   "filterOptionUnexcludeTitle": "Stop excluding this",
   "filterMatchAll": "all",
-  "filterMatchAllLabel": "Match all included options"
+  "filterMatchAllLabel": "Match all included options",
+  "Physical": "Physical",
+  "Biogeochemical": "Biogeochemical",
+  "Biology and Ecosystems": "Biology and Ecosystems",
+  "Cross-disciplinary": "Cross-disciplinary",
+  "Other": "Other"
 }

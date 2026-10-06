@@ -209,4 +209,71 @@ describe("MultiCheckboxFilter", () => {
       { pk: 2, title: "salinity", isSelected: false, isExcluded: false },
     ]);
   });
+
+  describe("grouped", () => {
+    const EOVS = [
+      { pk: 1, title: "oxygen", category: "Biogeochemical", isSelected: true },
+      { pk: 2, title: "nutrients", category: "Biogeochemical" },
+      { pk: 3, title: "seaIce", category: "Physical" },
+    ];
+    const group = (name) =>
+      screen
+        .getAllByTestId("filter-option-group")
+        .find((el) => el.textContent.startsWith(name));
+
+    it("renders one category row above its options", () => {
+      render(
+        <MultiCheckboxFilter
+          optionsSelected={EOVS}
+          setOptionsSelected={() => {}}
+          allOptions={EOVS}
+          grouped
+        />,
+      );
+      expect(
+        screen.getByRole("group", { name: "Biogeochemical" }),
+      ).toContainElement(screen.getAllByTestId("filter-option")[0]);
+      expect(screen.getAllByTestId("filter-option-group")).toHaveLength(2);
+      expect(group("Biogeochemical")).toHaveAttribute("aria-checked", "mixed");
+      expect(group("Physical")).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("the category row includes every option in it, the rest untouched", async () => {
+      const user = userEvent.setup();
+      const setOptionsSelected = vi.fn();
+      render(
+        <MultiCheckboxFilter
+          optionsSelected={EOVS}
+          setOptionsSelected={setOptionsSelected}
+          allOptions={EOVS}
+          grouped
+        />,
+      );
+      await user.click(group("Biogeochemical"));
+      expect(setOptionsSelected).toHaveBeenCalledWith([
+        { ...EOVS[0], isSelected: true, isExcluded: false },
+        { ...EOVS[1], isSelected: true, isExcluded: false },
+        EOVS[2],
+      ]);
+    });
+
+    it("the category's exclude button excludes every option in it", async () => {
+      const user = userEvent.setup();
+      const setOptionsSelected = vi.fn();
+      render(
+        <MultiCheckboxFilter
+          optionsSelected={EOVS}
+          setOptionsSelected={setOptionsSelected}
+          allOptions={EOVS}
+          grouped
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: /: Physical$/ }));
+      expect(setOptionsSelected).toHaveBeenCalledWith([
+        EOVS[0],
+        EOVS[1],
+        { ...EOVS[2], isSelected: false, isExcluded: true },
+      ]);
+    });
+  });
 });

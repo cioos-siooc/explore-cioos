@@ -73,14 +73,16 @@ const PLACEHOLDER_STEPS = [
 // Included or excluded — either way the option constrains the filter.
 const isSet = (option) => option.isSelected || option.isExcluded;
 
-function createOptionSubset(searchTerms, allOptions) {
-  if (searchTerms) {
-    return allOptions.filter((option) =>
-      option.title.toLowerCase().includes(searchTerms.toString().toLowerCase()),
-    );
-  } else {
-    return allOptions;
-  }
+// Matches the raw title and what the user actually reads — the translated
+// label and, for EOVs, the translated category ("Physical" finds them all).
+function createOptionSubset(searchTerms, allOptions, t) {
+  if (!searchTerms) return allOptions;
+  const search = searchTerms.toString().toLowerCase();
+  return allOptions.filter((option) =>
+    [option.title, t(option.title), option.category && t(option.category)].some(
+      (text) => text?.toLowerCase().includes(search),
+    ),
+  );
 }
 
 // The Filters panel: filter rows grouped into sections on the left, with the
@@ -379,10 +381,12 @@ export default function FiltersPanel() {
                 optionsSelected={createOptionSubset(
                   eovsSearchTerms,
                   eovsSelected,
+                  t,
                 )}
                 setOptionsSelected={setEovsSelected}
                 searchable
                 translatable
+                grouped
                 allOptions={eovsSelected}
               />
             </Filter>
@@ -413,6 +417,7 @@ export default function FiltersPanel() {
                 optionsSelected={createOptionSubset(
                   platformsSearchTerms,
                   platformsSelected,
+                  t,
                 )}
                 setOptionsSelected={setPlatformsSelected}
                 searchable
@@ -447,6 +452,7 @@ export default function FiltersPanel() {
                 optionsSelected={createOptionSubset(
                   orgsSearchTerms,
                   orgsSelected,
+                  t,
                 )}
                 setOptionsSelected={setOrgsSelected}
                 searchable
@@ -480,6 +486,7 @@ export default function FiltersPanel() {
                 optionsSelected={createOptionSubset(
                   datasetSearchTerms,
                   datasetsSelected,
+                  t,
                 )}
                 setOptionsSelected={setDatasetsSelected}
                 searchable
