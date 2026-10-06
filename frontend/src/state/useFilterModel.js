@@ -266,7 +266,8 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
     ),
     (() => {
       // Shown by the same name the Filters list gives it, but matched on its
-      // eovs.json names too, so it is found by its name in either language.
+      // eovs.json names and category too, so it is found by either in either
+      // language.
       const group = listGroup(
         "eovs",
         t("oceanVariablesFiltername"),
@@ -285,7 +286,7 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
           return eov
             ? {
                 ...option,
-                matchText: `${eov["label EN"]} ${eov["label FR"]}`,
+                matchText: `${eov["label EN"]} ${eov["label FR"]} ${eov.category} ${t(eov.category)}`,
               }
             : option;
         }),

@@ -137,6 +137,14 @@ describe("FilterSearch", () => {
     expect(option("Dissolved Organic Carbon")).toBeInTheDocument();
   });
 
+  it("finds an ocean variable by its category", async () => {
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "biogeochemical");
+
+    expect(option("Oxygen")).toBeInTheDocument();
+  });
+
   it("finds a data portal by its display name", async () => {
     const { user, box } = await renderPalette();
 
