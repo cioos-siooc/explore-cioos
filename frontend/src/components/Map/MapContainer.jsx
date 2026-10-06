@@ -8,7 +8,6 @@ import fetchJson from "../../state/fetchJson.js";
 import reportError from "../../state/reportError.js";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
-import { useTips } from "../../state/tips/TipsProvider.jsx";
 
 // Map.jsx's WATCHED_MAP_LAYERS ids that draw data rather than basemap.
 const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
@@ -16,7 +15,6 @@ const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
 // Single adapter between the state providers and the imperative Map
 // component — Map.js keeps its prop-based interface untouched.
 export default function MapContainer() {
-  const { offerTip } = useTips();
   const {
     mapQueryString,
     setLoading,
@@ -155,7 +153,6 @@ export default function MapContainer() {
         coverageRangeLevels={coverageRangeLevels}
         onViewportHexRange={setViewportHexRange}
         onFeatureQuery={handleFeatureQuery}
-        onShapeDrawn={() => offerTip("reshapeArea")}
         featureQuery={featureQuery}
         sharedFeatureQueryAt={sharedFeatureQueryAt}
         onMarkerClick={onMarkerClick}

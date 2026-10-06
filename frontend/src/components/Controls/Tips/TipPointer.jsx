@@ -20,7 +20,7 @@ const sameRects = (a, b) =>
 // several of the controls are fixed surfaces a positioned child would upset.
 // Followed every frame while it is up, since the controls it points at slide
 // in with the panels that hold them.
-export default function TipPointer() {
+export default function TipPointer({ inModal = false }) {
   const [targets, setTargets] = useState([]);
 
   useEffect(() => {
@@ -29,7 +29,13 @@ export default function TipPointer() {
     // pointing at the foot of a scrolled-away list points at nothing.
     const revealed = new WeakSet();
     const follow = () => {
-      const shown = [...document.querySelectorAll("[data-tip-highlight]")]
+      // From inside a dialog, only what the dialog holds: the rest of the page
+      // is behind it.
+      const shown = [
+        ...document.querySelectorAll(
+          inModal ? ".modal [data-tip-highlight]" : "[data-tip-highlight]",
+        ),
+      ]
         .map((element) => [element, element.getBoundingClientRect()])
         // Sized and on screen: the cards that slide away (the sidebar, the
         // what's here card) are parked past the edge rather than unmounted.
@@ -53,7 +59,7 @@ export default function TipPointer() {
     };
     follow();
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [inModal]);
 
   return createPortal(
     targets.map((rect, i) => {
@@ -63,7 +69,10 @@ export default function TipPointer() {
       return (
         <span
           key={i}
-          className={classNames("tipPointer", { tipPointerAbove: !fromBelow })}
+          className={classNames("tipPointer", {
+            tipPointerAbove: !fromBelow,
+            tipPointerOverModal: inModal,
+          })}
           style={{
             left: rect.left + rect.width / 2,
             top: fromBelow ? rect.bottom : rect.top,
