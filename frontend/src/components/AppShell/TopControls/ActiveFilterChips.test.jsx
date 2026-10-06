@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import * as React from "react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import TipCard from "../../Controls/Tips/TipCard.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 
@@ -170,22 +172,52 @@ describe("ActiveFilterChips", () => {
     expect(names.some((name) => name.includes("Oxygen"))).toBe(true);
   });
 
-  // Show/Hide now lives on the main Filters button (see
-  // TopControls.test.jsx) and Clear-all lives with the quick filters (see
-  // QuickFilters.test.jsx) — this component renders neither itself, so it
-  // has nothing of its own left to test here.
-
-  // The quick filters are named by their own buttons on the map (and a row in
-  // the Filters modal), which carry both their state and the way to drop them
-  // (see QuickFilters), so repeating them here would be the same filter
-  // announced twice.
-  it("leaves the quick filters to their own row", async () => {
+  // A quick filter's own button lights up instead (see QuickFilters).
+  it("leaves the quick filters to their buttons", async () => {
     open(
-      "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
+      "search=temperature&onlyInView=true&realtimeOnly=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
     );
+    await waitFor(() => expect(groups()).toHaveLength(1));
+    expect(
+      within(group("text")).getByTestId("filter-chip-item"),
+    ).toHaveTextContent("temperature");
+    expect(group("inView")).toBeNull();
+    expect(group("area")).toBeNull();
+    expect(group("realtime")).toBeNull();
+  });
+
+  it("shows no row for quick filters alone", async () => {
+    open("onlyInView=true&realtimeOnly=true");
     await waitFor(() =>
       expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
     );
+  });
+
+  // The title search has no row of its own in the Filters modal: its chip
+  // opens the search palette on the term instead.
+  it("opens the search palette from the title search's chip", async () => {
+    const seen = {};
+    function UIProbe() {
+      const { showFiltersModal, filterSearchText } = useUI();
+      Object.assign(seen, { showFiltersModal, filterSearchText });
+      return null;
+    }
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <ActiveFilterChips />
+        <UIProbe />
+      </>,
+      { url: "/?search=temperature", providers: "app" },
+    );
+    await waitFor(() => expect(group("text")).toBeInTheDocument());
+
+    await user.click(within(group("text")).getByTestId("filter-chip-label"));
+
+    expect(seen).toEqual({
+      showFiltersModal: true,
+      filterSearchText: "temperature",
+    });
   });
 
   describe("tips", () => {

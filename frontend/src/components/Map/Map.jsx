@@ -3834,9 +3834,23 @@ export default function CreateMap({
       if (!bathymetryVisibleRef.current) {
         setLayersVisibility(bathymetryLayerIds, false);
       }
+
+      // mapbox-gl-draw only starts listening for clicks once map.loaded(),
+      // which waits for every basemap tile just like 'load' does, so the
+      // first clicks of a drawing were dropped while the rasters streamed in.
+      // Its layers need only the style, so it is re-added now with the map
+      // reported loaded for that one synchronous call. Re-adding resets the
+      // mode, so a tool picked before the style arrived is entered again.
+      const draw = drawPolygon.current;
+      const mode = draw.getMode();
+      draw.changeMode("simple_select");
+      map.current.removeControl(draw);
+      map.current.loaded = () => true;
+      map.current.addControl(draw, "bottom-right");
+      delete map.current.loaded;
+      if (mode !== "simple_select") draw.changeMode(mode);
     });
 
-    // The draw control only connects on 'load', so the shape has to wait for it.
     map.current.once("load", () => {
       loadTurfUnion();
       // A share link can carry the spatial selection (rectangle bounds or a

@@ -18,6 +18,7 @@ import PrivacyModal from "./Modals/PrivacyModal.jsx";
 import PreviewHost from "./Panels/PreviewHost.jsx";
 import Loading from "../Controls/Loading/Loading.jsx";
 import Legend from "../Controls/Legend/Legend.jsx";
+import { DatasetMapCorner } from "./DatasetMapCard/DatasetMapCard.jsx";
 import DepthBar from "../Controls/DepthBar/DepthBar.jsx";
 import TimeBar from "../Controls/TimeBar/TimeBar.jsx";
 import IntroModal from "../Controls/IntroModal/IntroModal.jsx";
@@ -141,6 +142,7 @@ export default function AppShell() {
           dismissed by the next click — and before the rest of the chrome, which
           all outranks it. */}
       <FeatureCard />
+      <DatasetMapCorner />
       <ApiErrorBanner />
       {/* Every wait in the app, named in one panel: the map redrawing, the
           basemap catching up, the legend, the datasets list, a record, the

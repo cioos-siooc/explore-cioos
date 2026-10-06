@@ -33,7 +33,7 @@ describe("TopControls", () => {
   // opening it (see styles.css' .topBarFiltersToggle) — a real button beside
   // the one that opens the modal, not a second job for that same button.
   describe("the quick-filters toggle on the Filters button", () => {
-    it("folds the quick-filter row and the active-filter chips away together", async () => {
+    it("folds the quick filters and active-filter chips away and back", async () => {
       const user = userEvent.setup({ delay: null });
       renderWithProviders(<TopControls />, {
         url: "/?eovs=oxygen",
@@ -55,10 +55,10 @@ describe("TopControls", () => {
 
       await user.click(toggle);
 
-      expect(screen.getByTestId("quick-filters")).toBeInTheDocument();
       await waitFor(() =>
         expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(1),
       );
+      expect(screen.getByTestId("quick-filters")).toBeInTheDocument();
     });
 
     it("hides without clearing what it hides", async () => {
