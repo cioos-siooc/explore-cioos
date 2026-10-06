@@ -278,9 +278,8 @@ $$ LANGUAGE plpgsql;
 
 
 -- Rebuild obis_cells.eovs and the OBIS datasets' eovs. A cell holds its
--- dataset's declared (CKAN) EOVs plus every EOV in cde.eov_taxa listing one of
--- its taxa or their WoRMS ancestors; a dataset holds its declared EOVs plus its
--- cells'. Both are recomputed from declared_eovs and the mapping, never from
+-- dataset's declared (CKAN) EOVs plus every EOV whose cde.eov_taxa rule one of
+-- its taxa satisfies; a dataset holds its declared EOVs plus its cells'. Both are recomputed from declared_eovs and the mapping, never from
 -- their previous value, so a taxon dropped from the mapping drops out too.
 -- Only rows whose value changes are written, which keeps an incremental load
 -- from rewriting every cell. Still a full scan (~3s at 240k cells), so it runs
@@ -293,7 +292,16 @@ BEGIN
     SELECT DISTINCT v.aphia_id, t.eov
       FROM cde.scientific_name_vernaculars v
       JOIN cde.eov_taxa t
-        ON t.aphia_id = v.aphia_id OR t.aphia_id = ANY (v.ancestor_aphia_ids)
+        ON (t.aphia_ids = '{}'
+            OR v.aphia_id = ANY (t.aphia_ids)
+            OR v.ancestor_aphia_ids && t.aphia_ids)
+       AND NOT (v.aphia_id = ANY (t.exclude_aphia_ids)
+                OR v.ancestor_aphia_ids && t.exclude_aphia_ids)
+       AND (t.functional_groups = '{}'
+            OR EXISTS (SELECT 1
+                         FROM unnest(v.functional_groups) AS fg,
+                              unnest(t.functional_groups) AS want
+                        WHERE fg = want OR fg LIKE want || ' > %'))
      WHERE v.aphia_id IS NOT NULL
   ),
   cell_taxon_eovs AS (

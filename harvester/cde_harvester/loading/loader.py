@@ -121,13 +121,21 @@ def prepare_profiles_dataframe(profiles):
 def load_eov_taxa(transaction):
     """Replace cde.eov_taxa with the synced mapping that obis_derive_eovs() reads."""
     rows = [
-        {"eov": eov, "aphia_id": aphia_id}
-        for eov, aphia_ids in get_eov_taxa().items()
-        for aphia_id in aphia_ids
+        {
+            "eov": eov,
+            "aphia_ids": rule.get("aphia_ids", []),
+            "exclude_aphia_ids": rule.get("exclude_aphia_ids", []),
+            "functional_groups": rule.get("functional_groups", []),
+        }
+        for eov, rule in get_eov_taxa().items()
     ]
     transaction.execute(text("DELETE FROM cde.eov_taxa"))
     transaction.execute(
-        text("INSERT INTO cde.eov_taxa (eov, aphia_id) VALUES (:eov, :aphia_id)"),
+        text(
+            "INSERT INTO cde.eov_taxa"
+            " (eov, aphia_ids, exclude_aphia_ids, functional_groups)"
+            " VALUES (:eov, :aphia_ids, :exclude_aphia_ids, :functional_groups)"
+        ),
         rows,
     )
 

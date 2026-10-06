@@ -1,44 +1,40 @@
 {
-  "fishAbundanceAndDistribution": [
-    1829,
-    1517375,
-    152352
-  ],
-  "marineTurtlesBirdsMammalsAbundanceAndDistribution": [
-    1836,
-    2688,
-    137085,
-    148736,
-    159017,
-    159502,
-    242598,
-    477316,
-    987094
-  ],
-  "seaTurtlesAbundanceAndDistribution": [
-    987094
-  ],
-  "seabirdsAbundanceAndDistribution": [
-    1836
-  ],
-  "marineMammalsAbundanceAndDistribution": [
-    2688,
-    137085,
-    148736,
-    159017,
-    159502,
-    242598,
-    477316
-  ],
-  "hardCoralCoverAndComposition": [
-    1363
-  ],
-  "seagrassCoverAndComposition": [
-    143768,
-    143769,
-    143770,
-    144192,
-    205672,
-    206854
-  ]
+  "phytoplanktonBiomassAndDiversity": {
+    "functional_groups": ["plankton > phytoplankton"]
+  },
+  "zooplanktonBiomassAndDiversity": {
+    "functional_groups": ["plankton > zooplankton"]
+  },
+  "fishAbundanceAndDistribution": {
+    "aphia_ids": [1829, 1517375, 152352]
+  },
+  "marineTurtlesBirdsMammalsAbundanceAndDistribution": {
+    "aphia_ids": [1836, 2688, 137085, 148736, 159017, 159502, 242598, 477316, 987094]
+  },
+  "seaTurtlesAbundanceAndDistribution": {
+    "aphia_ids": [987094]
+  },
+  "seabirdsAbundanceAndDistribution": {
+    "aphia_ids": [1836]
+  },
+  "marineMammalsAbundanceAndDistribution": {
+    "aphia_ids": [2688, 137085, 148736, 159017, 159502, 242598, 477316]
+  },
+  "hardCoralCoverAndComposition": {
+    "aphia_ids": [1363]
+  },
+  "seagrassCoverAndComposition": {
+    "aphia_ids": [143768, 143769, 143770, 144192, 205672, 206854]
+  },
+  "macroalgalCanopyCoverAndComposition": {
+    "aphia_ids": [844, 845]
+  },
+  "invertebrateAbundanceAndDistribution": {
+    "aphia_ids": [2],
+    "exclude_aphia_ids": [146419],
+    "functional_groups": ["benthos"]
+  },
+  "microbeBiomassAndDiversity": {
+    "aphia_ids": [6, 8]
+  }
 }

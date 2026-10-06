@@ -5,11 +5,13 @@
 ALTER TABLE cde.datasets   ADD COLUMN IF NOT EXISTS declared_eovs text[];
 ALTER TABLE cde.obis_cells ADD COLUMN IF NOT EXISTS eovs text[] NOT NULL DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS obis_cells_eovs_gin ON cde.obis_cells USING GIN (eovs);
+ALTER TABLE cde.scientific_name_vernaculars ADD COLUMN IF NOT EXISTS functional_groups text[];
 
 CREATE TABLE IF NOT EXISTS cde.eov_taxa (
-    eov      text    NOT NULL,
-    aphia_id integer NOT NULL,
-    PRIMARY KEY (eov, aphia_id)
+    eov               text PRIMARY KEY,
+    aphia_ids         integer[] NOT NULL DEFAULT '{}',
+    exclude_aphia_ids integer[] NOT NULL DEFAULT '{}',
+    functional_groups text[]    NOT NULL DEFAULT '{}'
 );
 
 -- Until an OBIS dataset is re-harvested its `eovs` is still exactly what CKAN

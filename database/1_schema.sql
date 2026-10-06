@@ -611,14 +611,16 @@ CREATE INDEX obis_scientific_name_popularity_total_records
   ON cde.obis_scientific_name_popularity (total_records DESC);
 
 
--- Biology EOV -> WoRMS AphiaIDs (cioos-commons eovs/taxa.json, synced to
--- harvester/cde_harvester/eov_taxa.json). A taxon belongs to an EOV when it or
--- one of its ancestors is listed. Replaced by the loader on every load.
+-- Biology EOV -> WoRMS rule (cioos-commons eovs/taxa.json, synced to
+-- harvester/cde_harvester/eov_taxa.json; its README defines the fields). An
+-- empty array leaves that field unconstrained. Replaced by the loader on every
+-- load.
 DROP TABLE IF EXISTS cde.eov_taxa;
 CREATE TABLE cde.eov_taxa (
-    eov      text    NOT NULL,
-    aphia_id integer NOT NULL,
-    PRIMARY KEY (eov, aphia_id)
+    eov               text PRIMARY KEY,
+    aphia_ids         integer[] NOT NULL DEFAULT '{}',
+    exclude_aphia_ids integer[] NOT NULL DEFAULT '{}',
+    functional_groups text[]    NOT NULL DEFAULT '{}'
 );
 
 
@@ -633,6 +635,10 @@ CREATE TABLE cde.scientific_name_vernaculars (
     aphia_id            integer,
     rank                text,
     ancestor_aphia_ids  integer[] NOT NULL DEFAULT '{}',
+    -- WoRMS "Functional group" values (e.g. 'plankton > zooplankton') for the
+    -- adult or unstaged life stage, inherited from parent taxa. NULL = not
+    -- fetched yet, which populate_vernaculars treats as work to do.
+    functional_groups   text[],
     vernaculars_en      text[]    NOT NULL DEFAULT '{}',
     vernaculars_fr      text[]    NOT NULL DEFAULT '{}',
     fetched_at          timestamptz NOT NULL DEFAULT now(),

@@ -159,16 +159,33 @@ class TestLoadEovTaxa:
         mocker.patch("cde_harvester.loading.loader.text", side_effect=lambda s: s)
         mocker.patch(
             "cde_harvester.loading.loader.get_eov_taxa",
-            return_value={"fishAbundanceAndDistribution": [1829, 152352]},
+            return_value={
+                "fishAbundanceAndDistribution": {"aphia_ids": [1829, 152352]},
+                "zooplanktonBiomassAndDiversity": {
+                    "functional_groups": ["plankton > zooplankton"]
+                },
+            },
         )
         transaction = MagicMock()
         load_eov_taxa(transaction)
         (delete,), (insert, rows) = [c.args for c in transaction.execute.call_args_list]
         assert delete == "DELETE FROM cde.eov_taxa"
         assert insert.startswith("INSERT INTO cde.eov_taxa")
+        # Absent fields become empty arrays, which obis_derive_eovs() reads
+        # as unconstrained.
         assert rows == [
-            {"eov": "fishAbundanceAndDistribution", "aphia_id": 1829},
-            {"eov": "fishAbundanceAndDistribution", "aphia_id": 152352},
+            {
+                "eov": "fishAbundanceAndDistribution",
+                "aphia_ids": [1829, 152352],
+                "exclude_aphia_ids": [],
+                "functional_groups": [],
+            },
+            {
+                "eov": "zooplanktonBiomassAndDiversity",
+                "aphia_ids": [],
+                "exclude_aphia_ids": [],
+                "functional_groups": ["plankton > zooplankton"],
+            },
         ]
 
 
