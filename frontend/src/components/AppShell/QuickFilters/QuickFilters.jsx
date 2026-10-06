@@ -249,7 +249,6 @@ export default function QuickFilters() {
           type="button"
           className={classNames("quickFilterButton", { applied: hasShape })}
           data-testid="quick-filter-area"
-          data-tip-highlight={tipHighlight("reshapeArea")}
           onClick={() => setAreaMenuOpen(!areaMenuOpen)}
           aria-expanded={areaMenuOpen}
           aria-controls={areaMenuOpen ? areaMenuId : undefined}
@@ -328,6 +327,7 @@ export default function QuickFilters() {
         type="button"
         className={classNames("quickFilterButton", { applied: realtimeOnly })}
         data-testid="quick-filter-realtime"
+        data-tip-highlight={tipHighlight("realtime")}
         onClick={() => setRealtimeOnly(!realtimeOnly)}
         aria-pressed={realtimeOnly}
         title={t("quickFilterRealtimeTitle")}

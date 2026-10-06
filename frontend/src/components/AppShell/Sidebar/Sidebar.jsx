@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useEffect, useRef } from "react";
 import {
   ChevronLeft,
   Download,
@@ -43,7 +44,7 @@ export default function Sidebar() {
     setShowDownloadModal,
     setShowSelectionHelpModal,
   } = useUI();
-  const { tipHighlight } = useTips();
+  const { offerTip, tipHighlight } = useTips();
   // Until `ready`, there is no dataset count to show — not even a zero. See
   // useDatasetCounts.
   const {
@@ -61,6 +62,15 @@ export default function Sidebar() {
   // the dataset's own title block.
   const inspecting = Boolean(inspectDataset);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
+  // Adding to the selection is when what goes into a download starts to
+  // matter: how the filters shape it first, then how to skip the queue.
+  const lastSelectedCount = useRef(selectedCount);
+  useEffect(() => {
+    if (selectedCount > lastSelectedCount.current) {
+      offerTip(["filtersCutDownload", "directLinks"]);
+    }
+    lastSelectedCount.current = selectedCount;
+  }, [selectedCount, offerTip]);
   const countsTitle = countsReady
     ? t("dockDatasetsCountTitle", {
         filtered: filteredCount,
@@ -191,7 +201,9 @@ export default function Sidebar() {
           <button
             type="button"
             className="sidebarDownloadButton"
-            data-tip-highlight={tipHighlight("sizeLimit")}
+            data-tip-highlight={
+              tipHighlight("filtersCutDownload") || tipHighlight("directLinks")
+            }
             disabled={selectedCount === 0}
             onClick={() => setShowDownloadModal(true)}
             title={t("dockDownloadCountTitle", { count: selectedCount })}

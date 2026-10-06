@@ -16,8 +16,7 @@ import "./styles.css";
 // It holds a corner of the map (see .tipCard); on phones, where the card would
 // cover too much of it, it waits as a lightbulb button until tapped. A status
 // rather than a dialog: announced, but it never takes focus from what the user
-// is doing, and — bar the few fleeting ones — it stays until dismissed rather
-// than timing out mid-read.
+// is doing, and it stays until dismissed rather than timing out mid-read.
 export default function TipCard() {
   const { t } = useTranslation();
   const { activeTip, touring, stepTour, dismissTip, disableTips } = useTips();

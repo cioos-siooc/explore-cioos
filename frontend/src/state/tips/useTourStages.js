@@ -4,7 +4,6 @@ import { useUI } from "../ui/UIProvider.jsx";
 import {
   findTrajectory,
   showGridded,
-  showNonna,
   showTrajectory,
   showWhatsHere,
 } from "./scenes.js";
@@ -21,8 +20,7 @@ export default function useTourStages() {
     setInspectDataset,
     selectTrajectoryFromMap,
   } = useSelection();
-  const { zoomToGeometry, setBathymetryVisible, requestFeatureQueryAt } =
-    useMapState();
+  const { zoomToGeometry, requestFeatureQueryAt } = useMapState();
   const { setSidebarOpen, setQuickFiltersCollapsed } = useUI();
 
   // Keeps an already-open page that fits rather than swapping it for another.
@@ -40,11 +38,15 @@ export default function useTourStages() {
       setSidebarOpen(false);
       showWhatsHere({ zoomToGeometry, requestFeatureQueryAt });
     },
-    reshapeArea: showQuickFilters,
     inView: showQuickFilters,
-    datasetNav: () => openDataset(() => true),
-    realtime: () => openDataset((dataset) => dataset.is_realtime),
-    trackDate: () => {
+    realtime: showQuickFilters,
+    // A page with a feature list: OBIS and gridded pages have none.
+    showData: () =>
+      openDataset(
+        (dataset) =>
+          dataset.source_type !== "obis" && dataset.cdm_data_type !== "Grid",
+      ),
+    trajectory: () => {
       const dataset = findTrajectory(pointsData);
       if (!dataset) return;
       setSidebarOpen(true);
@@ -60,7 +62,7 @@ export default function useTourStages() {
       setSidebarOpen(true);
       showGridded(dataset, { setInspectDataset, zoomToGeometry });
     },
-    nonna: () => showNonna({ setBathymetryVisible, zoomToGeometry }),
-    sizeLimit: () => setSidebarOpen(true),
+    filtersCutDownload: () => setSidebarOpen(true),
+    directLinks: () => setSidebarOpen(true),
   };
 }

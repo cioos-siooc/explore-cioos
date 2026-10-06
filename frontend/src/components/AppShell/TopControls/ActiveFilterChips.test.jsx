@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import TipCard from "../../Controls/Tips/TipCard.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 
 // Seeded entirely through the address, the way a share link arrives: every
@@ -185,5 +186,40 @@ describe("ActiveFilterChips", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("active-filter-chips")).toBeNull(),
     );
+  });
+
+  describe("tips", () => {
+    // A returning visitor: tips stay quiet on a first visit.
+    function openWithTips(search) {
+      window.localStorage.setItem("cde.introSeen", "true");
+      return renderWithProviders(
+        <>
+          <ActiveFilterChips />
+          <TipCard />
+        </>,
+        { url: `/?${search}`, providers: "app" },
+      );
+    }
+
+    it("offers Match all once several variables are included", async () => {
+      openWithTips("eovs=oxygen,subSurfaceTemperature");
+      expect(await screen.findByTestId("tip-card")).toHaveTextContent(
+        /Match all/,
+      );
+    });
+
+    it("offers excluding when a filter only includes", async () => {
+      openWithTips("eovs=oxygen");
+      expect(await screen.findByTestId("tip-card")).toHaveTextContent(
+        /leave things out/,
+      );
+    });
+
+    it("falls back to the share link once the user already excludes", async () => {
+      openWithTips("eovs=oxygen&excludeEovs=subSurfaceTemperature");
+      expect(await screen.findByTestId("tip-card")).toHaveTextContent(
+        /page address/,
+      );
+    });
   });
 });

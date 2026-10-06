@@ -16,28 +16,25 @@ import useTourStages from "./useTourStages.js";
 // `tip_<key>` in the locale files. Most are also offered on the map the first
 // time the user does the thing they are about (see offerTip's callers); the
 // rest are only reachable from the dialog.
+//
+// Ordered the way a search goes — find, narrow, look, take away — and limited
+// to what changes what the user finds or gets. How a control works belongs on
+// the control (its hint or tooltip), not here.
 export const TIPS = [
-  "shareLink",
   "whatsHere",
-  "reshapeArea",
   "inView",
-  "sliderKeys",
   "timeCoverage",
-  "datasetNav",
+  "speciesName",
+  "exclude",
+  "matchAll",
   "realtime",
-  "trackDate",
+  "showData",
+  "trajectory",
   "griddapWms",
-  "griddedCoverage",
-  "nonna",
-  "globe",
-  "sizeLimit",
+  "filtersCutDownload",
+  "directLinks",
+  "shareLink",
 ];
-
-// Offered the moment a shape is finished, when the user is looking at the map
-// rather than the card, and the reshaping it describes is right there to try:
-// it gets a few seconds instead of waiting to be closed.
-const FLEETING_TIPS = ["reshapeArea"];
-const FLEETING_TIP_MS = 8000;
 
 // Outside the provider (leaf-component tests render without it) offering a
 // tip is a no-op rather than a crash.
@@ -163,11 +160,6 @@ export default function TipsProvider({ children }) {
     setTouring(false);
   }, []);
 
-  useEffect(() => {
-    if (touring || !FLEETING_TIPS.includes(activeTip)) return;
-    const timer = setTimeout(dismissTip, FLEETING_TIP_MS);
-    return () => clearTimeout(timer);
-  }, [activeTip, touring, dismissTip]);
   const disableTips = useCallback(() => {
     setTipsEnabled(false);
     setActiveTip();

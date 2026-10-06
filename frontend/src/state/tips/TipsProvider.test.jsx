@@ -10,8 +10,8 @@ import { useUI } from "../ui/UIProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
 import { TIPS, useTips } from "./TipsProvider.jsx";
 
-// Stands in for the components that offer tips (the map's draw handler, the
-// time bar, …), plus a modal flag to hold them back with.
+// Stands in for the components that offer tips (the filter chips, the time
+// bar, …), plus a modal flag to hold them back with.
 function Probe() {
   const { offerTip, tipHighlight, startTour } = useTips();
   const {
@@ -21,16 +21,13 @@ function Probe() {
   } = useUI();
   return (
     <>
-      <button type="button" onClick={() => offerTip("reshapeArea")}>
-        offer reshape
+      <button type="button" onClick={() => offerTip("exclude")}>
+        offer exclude
       </button>
-      <button type="button" onClick={() => offerTip("sliderKeys")}>
-        offer slider
+      <button type="button" onClick={() => offerTip("matchAll")}>
+        offer match all
       </button>
-      <button
-        type="button"
-        onClick={() => offerTip(["reshapeArea", "sliderKeys"])}
-      >
+      <button type="button" onClick={() => offerTip(["exclude", "matchAll"])}>
         offer either
       </button>
       <button type="button" onClick={() => startTour("timeCoverage")}>
@@ -52,12 +49,12 @@ function Probe() {
         close filters
       </button>
       <span
-        data-testid="reshape-target"
-        data-tip-highlight={tipHighlight("reshapeArea")}
+        data-testid="exclude-target"
+        data-tip-highlight={tipHighlight("exclude")}
       />
       <span
-        data-testid="slider-target"
-        data-tip-highlight={tipHighlight("sliderKeys")}
+        data-testid="match-all-target"
+        data-tip-highlight={tipHighlight("matchAll")}
       />
       <TipCard />
     </>
@@ -80,24 +77,24 @@ describe("contextual tips", () => {
   it("shows the offered tip once, and remembers it as seen", async () => {
     returningVisitor();
     const { user } = renderProbe();
-    await user.click(screen.getByText("offer reshape"));
-    expect(card()).toHaveTextContent(/Drag the corners/);
+    await user.click(screen.getByText("offer exclude"));
+    expect(card()).toHaveTextContent(/leave things out/);
     expect(JSON.parse(window.localStorage.getItem("cde.seenTips"))).toEqual([
-      "reshapeArea",
+      "exclude",
     ]);
   });
 
   it("highlights only the active tip's control, until dismissed", async () => {
     returningVisitor();
     const { user } = renderProbe();
-    const reshape = screen.getByTestId("reshape-target");
-    const slider = screen.getByTestId("slider-target");
-    expect(reshape).not.toHaveAttribute("data-tip-highlight");
-    await user.click(screen.getByText("offer reshape"));
-    expect(reshape).toHaveAttribute("data-tip-highlight");
-    expect(slider).not.toHaveAttribute("data-tip-highlight");
+    const exclude = screen.getByTestId("exclude-target");
+    const matchAll = screen.getByTestId("match-all-target");
+    expect(exclude).not.toHaveAttribute("data-tip-highlight");
+    await user.click(screen.getByText("offer exclude"));
+    expect(exclude).toHaveAttribute("data-tip-highlight");
+    expect(matchAll).not.toHaveAttribute("data-tip-highlight");
     await user.click(screen.getByRole("button", { name: "Close tip" }));
-    expect(reshape).not.toHaveAttribute("data-tip-highlight");
+    expect(exclude).not.toHaveAttribute("data-tip-highlight");
   });
 
   it("points at the highlighted control once it has a size on screen", async () => {
@@ -118,7 +115,7 @@ describe("contextual tips", () => {
       });
     const { user } = renderProbe();
     expect(screen.queryByTestId("tip-pointer")).toBeNull();
-    await user.click(screen.getByText("offer reshape"));
+    await user.click(screen.getByText("offer exclude"));
     expect(await screen.findByTestId("tip-pointer")).toHaveStyle({
       left: "115px",
       top: "70px",
@@ -129,39 +126,33 @@ describe("contextual tips", () => {
   it("shows at most one tip per visit", async () => {
     returningVisitor();
     const { user } = renderProbe();
-    await user.click(screen.getByText("offer reshape"));
+    await user.click(screen.getByText("offer exclude"));
     await user.click(screen.getByRole("button", { name: "Close tip" }));
-    await user.click(screen.getByText("offer slider"));
+    await user.click(screen.getByText("offer match all"));
     expect(card()).toBeNull();
   });
 
   it("never repeats a tip already seen", async () => {
     returningVisitor();
-    window.localStorage.setItem(
-      "cde.seenTips",
-      JSON.stringify(["reshapeArea"]),
-    );
+    window.localStorage.setItem("cde.seenTips", JSON.stringify(["exclude"]));
     const { user } = renderProbe();
-    await user.click(screen.getByText("offer reshape"));
+    await user.click(screen.getByText("offer exclude"));
     expect(card()).toBeNull();
-    await user.click(screen.getByText("offer slider"));
-    expect(card()).toHaveTextContent(/time bar/);
+    await user.click(screen.getByText("offer match all"));
+    expect(card()).toHaveTextContent(/Match all/);
   });
 
   it("offers the first unseen tip of a priority list", async () => {
     returningVisitor();
-    window.localStorage.setItem(
-      "cde.seenTips",
-      JSON.stringify(["reshapeArea"]),
-    );
+    window.localStorage.setItem("cde.seenTips", JSON.stringify(["exclude"]));
     const { user } = renderProbe();
     await user.click(screen.getByText("offer either"));
-    expect(card()).toHaveTextContent(/time bar/);
+    expect(card()).toHaveTextContent(/Match all/);
   });
 
   it("stays quiet on a first visit, where the intro covers the basics", async () => {
     const { user } = renderProbe();
-    await user.click(screen.getByText("offer reshape"));
+    await user.click(screen.getByText("offer exclude"));
     expect(card()).toBeNull();
   });
 
@@ -169,28 +160,17 @@ describe("contextual tips", () => {
     returningVisitor();
     window.localStorage.setItem("cde.tipsEnabled", "false");
     const { user } = renderProbe();
-    await user.click(screen.getByText("offer reshape"));
+    await user.click(screen.getByText("offer exclude"));
     expect(card()).toBeNull();
   });
 
-  it("lets the reshape tip go by itself after a few seconds", async () => {
+  it("keeps a tip up until closed", async () => {
     returningVisitor();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderProbe();
-    fireEvent.click(screen.getByText("offer reshape"));
-    expect(card()).toHaveTextContent(/Drag the corners/);
-    act(() => vi.advanceTimersByTime(8000));
-    expect(card()).toBeNull();
-    vi.useRealTimers();
-  });
-
-  it("keeps other tips up until closed", async () => {
-    returningVisitor();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    renderProbe();
-    fireEvent.click(screen.getByText("offer slider"));
+    fireEvent.click(screen.getByText("offer match all"));
     act(() => vi.advanceTimersByTime(60000));
-    expect(card()).toHaveTextContent(/time bar/);
+    expect(card()).toHaveTextContent(/Match all/);
     vi.useRealTimers();
   });
 
@@ -198,16 +178,16 @@ describe("contextual tips", () => {
     returningVisitor();
     const { user } = renderProbe();
     await user.click(screen.getByText("open filters"));
-    await user.click(screen.getByText("offer slider"));
+    await user.click(screen.getByText("offer match all"));
     expect(card()).toBeNull();
     await user.click(screen.getByText("close filters"));
-    expect(card()).toHaveTextContent(/time bar/);
+    expect(card()).toHaveTextContent(/Match all/);
   });
 
   it("“Don't show tips” turns them off for good", async () => {
     returningVisitor();
     const { user } = renderProbe();
-    await user.click(screen.getByText("offer reshape"));
+    await user.click(screen.getByText("offer exclude"));
     await user.click(screen.getByRole("button", { name: "Don't show tips" }));
     expect(card()).toBeNull();
     expect(window.localStorage.getItem("cde.tipsEnabled")).toBe("false");
@@ -219,12 +199,12 @@ describe("contextual tips", () => {
     it("waits as a lightbulb until tapped, then shows the card", async () => {
       returningVisitor();
       const { user } = renderProbe();
-      await user.click(screen.getByText("offer slider"));
+      await user.click(screen.getByText("offer match all"));
       expect(card()).toBeNull();
       await user.click(
         screen.getByRole("button", { name: "A tip is available" }),
       );
-      expect(card()).toHaveTextContent(/arrow keys/);
+      expect(card()).toHaveTextContent(/Match all/);
     });
 
     it("opens a tour straight away", async () => {
@@ -245,7 +225,9 @@ describe("contextual tips", () => {
       const { user } = renderProbe();
       await user.click(screen.getByText("start tour"));
       expect(card()).toHaveTextContent(/Time coverage/);
-      expect(card()).toHaveTextContent(`Tip 6 of ${TIPS.length}`);
+      expect(card()).toHaveTextContent(
+        `Tip ${TIPS.indexOf("timeCoverage") + 1} of ${TIPS.length}`,
+      );
     });
 
     it("steps both ways, wrapping round, and ends on close", async () => {
@@ -253,33 +235,35 @@ describe("contextual tips", () => {
       const { user } = renderProbe();
       await user.click(screen.getByText("start tour"));
       await user.click(screen.getByRole("button", { name: "Next tip" }));
-      expect(card()).toHaveTextContent(`Tip 7 of ${TIPS.length}`);
+      expect(card()).toHaveTextContent(
+        `Tip ${TIPS.indexOf("timeCoverage") + 2} of ${TIPS.length}`,
+      );
       await user.click(screen.getByRole("button", { name: "Previous tip" }));
       await user.click(screen.getByRole("button", { name: "Previous tip" }));
-      expect(card()).toHaveTextContent(`Tip 5 of ${TIPS.length}`);
+      expect(card()).toHaveTextContent(
+        `Tip ${TIPS.indexOf("timeCoverage")} of ${TIPS.length}`,
+      );
       await user.click(screen.getByRole("button", { name: "Close tip" }));
       expect(card()).toBeNull();
     });
 
-    it("starts from an offered tip, which then no longer times out", async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+    it("starts from an offered tip", async () => {
       returningVisitor();
       const { user } = renderProbe();
-      await user.click(screen.getByText("offer reshape"));
-      expect(card()).toHaveTextContent(`Tip 3 of ${TIPS.length}`);
+      await user.click(screen.getByText("offer exclude"));
+      expect(card()).toHaveTextContent(
+        `Tip ${TIPS.indexOf("exclude") + 1} of ${TIPS.length}`,
+      );
       await user.click(screen.getByRole("button", { name: "Next tip" }));
-      expect(card()).toHaveTextContent(/eye button/);
-      await user.click(screen.getByRole("button", { name: "Previous tip" }));
-      act(() => vi.advanceTimersByTime(60_000));
-      expect(card()).toHaveTextContent(/Drag the corners/);
-      vi.useRealTimers();
+      expect(card()).toHaveTextContent(/Match all/);
+      expect(card()).not.toHaveTextContent("Don't show tips");
     });
 
     it("holds back offered tips while it runs", async () => {
       returningVisitor();
       const { user } = renderProbe();
       await user.click(screen.getByText("start tour"));
-      await user.click(screen.getByText("offer reshape"));
+      await user.click(screen.getByText("offer exclude"));
       expect(card()).toHaveTextContent(/Time coverage/);
     });
 
@@ -293,7 +277,7 @@ describe("contextual tips", () => {
         i -= 1
       )
         await user.click(screen.getByRole("button", { name: "Previous tip" }));
-      expect(card()).toHaveTextContent(/What's here card/);
+      expect(card()).toHaveTextContent(/adds a dataset to your selection/);
       expect(screen.getByTestId("feature-query-request")).not.toHaveTextContent(
         "none",
       );
@@ -310,7 +294,7 @@ describe("contextual tips", () => {
         i -= 1
       )
         await user.click(screen.getByRole("button", { name: "Previous tip" }));
-      expect(card()).toHaveTextContent(/eye button/);
+      expect(card()).toHaveTextContent(/In view button/);
       expect(screen.getByTestId("quick-filters")).toHaveTextContent("shown");
     });
   });

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useChanged } from "../../utilities.jsx";
@@ -26,8 +26,6 @@ import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
-import { useTips } from "../../state/tips/TipsProvider.jsx";
-import { bathymetryLegendMinZoom } from "../config.js";
 import "./styles.css";
 
 // The map-first shell: full-bleed map with a centered top bar (brand on the
@@ -56,13 +54,6 @@ export default function AppShell() {
   const { startDate, endDate, timeFilterActive } = useFilters();
   const { showIntroModal, setShowIntroModal } = useUI();
   const { platformsAvailable } = useSelection();
-  const { offerTip } = useTips();
-
-  // Zoomed in far enough that the CHS NONNA soundings take over the seafloor.
-  const nonnaShown = bathymetryVisible && zoom >= bathymetryLegendMinZoom;
-  useEffect(() => {
-    if (nonnaShown) offerTip("nonna");
-  }, [nonnaShown, offerTip]);
 
   const [splashMounted, setSplashMounted] = useState(firstPaintPending);
 
@@ -93,7 +84,6 @@ export default function AppShell() {
       label: t("layersBathymetry"),
       checked: bathymetryVisible,
       onChange: () => setBathymetryVisible(!bathymetryVisible),
-      tipTarget: "nonna",
     },
     tracks: {
       key: "tracks",
@@ -112,7 +102,6 @@ export default function AppShell() {
       label: t("layersGriddedCoverage"),
       checked: griddapCoverageVisible,
       onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible),
-      tipTarget: "griddedCoverage",
     },
   ];
 
