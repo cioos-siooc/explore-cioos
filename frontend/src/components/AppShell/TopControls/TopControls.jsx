@@ -17,6 +17,9 @@ import DatasetMapCard from "../DatasetMapCard/DatasetMapCard.jsx";
 import QuickFilters from "../QuickFilters/QuickFilters.jsx";
 import TopBarRow from "./TopBarRow.jsx";
 import usePublishedFootprint from "../../../state/ui/usePublishedFootprint.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -77,9 +80,11 @@ export default function TopControls() {
   } = useUI();
   const { inspectDataset } = useSelection();
   const { tipHighlight } = useTips();
-  // A dataset page minimized to the map: the card naming it takes the quick
-  // filters' place under the brand card, since those act on the whole catalogue
-  // rather than on the one dataset the map is keyed to.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  // A dataset page minimized to the map: the quick filters give way, since
+  // they act on the whole catalogue rather than on the one dataset the map is
+  // keyed to. On a phone the card naming it takes their place under the
+  // header; wider, it sits in the bottom-left corner (see DatasetMapCorner).
   const datasetMinimized = Boolean(inspectDataset) && !sidebarOpen;
 
   const barRef = useRef(null);
@@ -193,14 +198,16 @@ export default function TopControls() {
       <TopBarRow
         contentKey={
           datasetMinimized
-            ? "dataset"
+            ? isMobile
+              ? "dataset"
+              : null
             : quickFiltersCollapsed
               ? null
               : "filters"
         }
       >
         {datasetMinimized ? (
-          <DatasetMapCard dataset={inspectDataset} />
+          isMobile && <DatasetMapCard dataset={inspectDataset} />
         ) : (
           <QuickFilters />
         )}
