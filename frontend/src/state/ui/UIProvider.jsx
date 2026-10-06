@@ -61,6 +61,14 @@ export default function UIProvider({ children }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showCoverageModal, setShowCoverageModal] = useState(false);
+  // The coverage figure's time axis: the timeline, or every year folded onto
+  // one Jan-to-Dec axis. Seeded from ?coverageAxis= so a link keeps it.
+  const [coverageAxis, setCoverageAxis] = useState(() =>
+    new URL(window.location.href).searchParams.get("coverageAxis") ===
+    "seasonal"
+      ? "seasonal"
+      : "timeline",
+  );
   // How picking datasets for a download works, opened from the sidebar
   // footer's one-line version of the same thing.
   const [showSelectionHelpModal, setShowSelectionHelpModal] = useState(false);
@@ -131,6 +139,8 @@ export default function UIProvider({ children }) {
     setShowDownloadModal,
     showCoverageModal,
     setShowCoverageModal,
+    coverageAxis,
+    setCoverageAxis,
     showSelectionHelpModal,
     setShowSelectionHelpModal,
     openFilter,
