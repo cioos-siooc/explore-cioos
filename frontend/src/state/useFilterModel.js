@@ -7,6 +7,7 @@ import {
   defaultEndDepth,
 } from "../components/config.js";
 import eovsJSONfile from "../eovs.json";
+import eovCategoriesJSONfile from "../eovCategories.json";
 import {
   generateRangeSelectBadgeTitle,
   polygonIsRectangle,
@@ -286,7 +287,7 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
           return eov
             ? {
                 ...option,
-                matchText: `${eov["label EN"]} ${eov["label FR"]} ${eov.category} ${t(eov.category)}`,
+                matchText: `${eov["label EN"]} ${eov["label FR"]} ${eovCategoriesJSONfile[eov.category].en} ${eovCategoriesJSONfile[eov.category].fr}`,
               }
             : option;
         }),

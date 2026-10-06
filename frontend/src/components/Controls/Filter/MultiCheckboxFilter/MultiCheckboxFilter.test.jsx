@@ -211,10 +211,18 @@ describe("MultiCheckboxFilter", () => {
   });
 
   describe("grouped", () => {
+    const BIOGEOCHEMICAL = {
+      category: "Biogeochemical",
+      categoryTranslated: { en: "Biogeochemical", fr: "Biogéochimie" },
+    };
+    const PHYSICAL = {
+      category: "Physical",
+      categoryTranslated: { en: "Physical", fr: "Physique" },
+    };
     const EOVS = [
-      { pk: 1, title: "oxygen", category: "Biogeochemical", isSelected: true },
-      { pk: 2, title: "nutrients", category: "Biogeochemical" },
-      { pk: 3, title: "seaIce", category: "Physical" },
+      { pk: 1, title: "oxygen", ...BIOGEOCHEMICAL, isSelected: true },
+      { pk: 2, title: "nutrients", ...BIOGEOCHEMICAL },
+      { pk: 3, title: "seaIce", ...PHYSICAL },
     ];
     const group = (name) =>
       screen

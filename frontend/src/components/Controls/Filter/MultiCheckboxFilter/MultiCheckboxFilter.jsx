@@ -73,23 +73,24 @@ export default function MultiCheckboxFilter({
     );
   }
 
+  const categoryLabel = (option) => option.categoryTranslated[i18n.language];
+
   function groupByCategory(options) {
     const groups = new Map();
     for (const option of options) {
       if (!groups.has(option.category)) groups.set(option.category, []);
       groups.get(option.category).push(option);
     }
-    return [...groups].sort(([a], [b]) =>
-      t(a).localeCompare(t(b), i18n.language),
+    return [...groups].sort(([, [a]], [, [b]]) =>
+      categoryLabel(a).localeCompare(categoryLabel(b), i18n.language),
     );
   }
 
-  function renderCategoryRow(category) {
+  function renderCategoryRow(category, label) {
     const members = universe.filter((opt) => opt.category === category);
     const allSelected = members.every(isChecked);
     const allExcluded = members.every((opt) => opt.isExcluded);
     const someSet = members.some((opt) => opt.isSelected || opt.isExcluded);
-    const label = t(category);
     return (
       <FilterOption
         className="optionGroupButton"
@@ -229,9 +230,9 @@ export default function MultiCheckboxFilter({
             key={category}
             className="optionGroup"
             role="group"
-            aria-label={t(category)}
+            aria-label={categoryLabel(options[0])}
           >
-            {renderCategoryRow(category)}
+            {renderCategoryRow(category, categoryLabel(options[0]))}
             <div className="optionGroupChildren">
               {options.map(renderOption)}
             </div>

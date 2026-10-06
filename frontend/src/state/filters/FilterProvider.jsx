@@ -14,7 +14,9 @@ import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
 
 import platformsJSONfile from "../../platforms.json";
+// Both copied verbatim from cioos-commons/eovs/ (eov.json, categories.json).
 import eovsJSONfile from "../../eovs.json";
+import eovCategoriesJSONfile from "../../eovCategories.json";
 import erddapServersJSONfile from "../../erddapServers.json";
 import { server } from "../../config.js";
 import {
@@ -363,13 +365,15 @@ export default function FilterProvider({ children }) {
       setEovsSelected(
         eovs.map((eov, index) => {
           const eovMetadata = eovsJSONfile.find((e) => e.value === eov);
+          const category = eovMetadata?.category || "Other";
 
           return {
             title: eov,
             isSelected: eovsFromURL.includes(eov),
             isExcluded: eovsExcludedFromURL.includes(eov),
             pk: index,
-            category: eovMetadata?.category || "Other",
+            category,
+            categoryTranslated: eovCategoriesJSONfile[category],
             hover_en: eovMetadata?.["definition EN"],
             hover_fr: eovMetadata?.["definition FR"],
           };

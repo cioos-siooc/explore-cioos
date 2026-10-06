@@ -831,10 +831,5 @@
   "filterSearchHelpSectionWhat": "Data layers, ocean variables and platforms",
   "filterSearchHelpSectionFrom": "Organizations, datasets and data portals",
   "filterSearchHelpSectionWhenWhere": "Area, time, depth, real-time and in view",
-  "filterSearchHelpSectionBiodiversity": "Species, from OBIS",
-  "Physical": "Physical",
-  "Biogeochemical": "Biogeochemical",
-  "Biology and Ecosystems": "Biology and Ecosystems",
-  "Cross-disciplinary": "Cross-disciplinary",
-  "Other": "Other"
+  "filterSearchHelpSectionBiodiversity": "Species, from OBIS"
 }

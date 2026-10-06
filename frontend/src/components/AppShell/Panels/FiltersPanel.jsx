@@ -60,14 +60,18 @@ import "./styles.css";
 const isSet = (option) => option.isSelected || option.isExcluded;
 
 // Matches the raw title and what the user actually reads — the translated
-// label and, for EOVs, the translated category ("Physical" finds them all).
+// label and, for EOVs, the category in either language ("physique" finds them
+// all).
 function createOptionSubset(searchTerms, allOptions, t) {
   if (!searchTerms) return allOptions;
   const search = searchTerms.toString().toLowerCase();
   return allOptions.filter((option) =>
-    [option.title, t(option.title), option.category && t(option.category)].some(
-      (text) => text?.toLowerCase().includes(search),
-    ),
+    [
+      option.title,
+      t(option.title),
+      option.categoryTranslated?.en,
+      option.categoryTranslated?.fr,
+    ].some((text) => text?.toLowerCase().includes(search)),
   );
 }
 

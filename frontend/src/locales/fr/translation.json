@@ -832,10 +832,5 @@
   "filterSearchHelpSectionWhat": "Couches de données, variables océaniques et plateformes",
   "filterSearchHelpSectionFrom": "Organisations, jeux de données et portails de données",
   "filterSearchHelpSectionWhenWhere": "Zone, période, profondeur, temps réel et dans la vue",
-  "filterSearchHelpSectionBiodiversity": "Espèces, provenant d'OBIS",
-  "Physical": "Physique",
-  "Biogeochemical": "Biogéochimie",
-  "Biology and Ecosystems": "Biologie et écosystèmes",
-  "Cross-disciplinary": "Transdisciplinaire",
-  "Other": "Autre"
+  "filterSearchHelpSectionBiodiversity": "Espèces, provenant d'OBIS"
 }
