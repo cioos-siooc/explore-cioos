@@ -10,6 +10,7 @@ import {
   trailingWindowOptions,
 } from "../../config.js";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, { DateField } from "../TimeRail/TimeRail.jsx";
 import {
   MS_PER_DAY,
@@ -43,6 +44,7 @@ export default function TrajectoryDate() {
   const { t } = useTranslation();
   const { zoom, scrubTime, setScrubTime, trailingDays, setTrailingDays } =
     useMapState();
+  const { tipHighlight } = useTips();
 
   const maxIso = todayIso();
   const axis = useMemo(() => createTimeAxis(tracksMinDate, maxIso), [maxIso]);
@@ -123,6 +125,7 @@ export default function TrajectoryDate() {
       <div
         className="legendItem trajectoryDateRow"
         title={t("legendTrackHead")}
+        data-tip-highlight={tipHighlight("trajectory")}
       >
         {/* the same arrowhead the map draws, pointing along the course */}
         <svg

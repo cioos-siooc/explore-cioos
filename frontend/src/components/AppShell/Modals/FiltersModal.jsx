@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import Modal from "../../ui/Modal.jsx";
 import FiltersPanel from "../Panels/FiltersPanel.jsx";
+import TipCard from "../../Controls/Tips/TipCard.jsx";
 import { useFilterSearchShortcut } from "../FilterSearch/FilterSearch.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
@@ -93,6 +94,7 @@ export default function FiltersModal() {
           </span>
         </Modal.Title>
       </Modal.Header>
+      <TipCard inModal="filters" />
       <Modal.Body>
         <FiltersPanel searchInputRef={searchInputRef} />
       </Modal.Body>

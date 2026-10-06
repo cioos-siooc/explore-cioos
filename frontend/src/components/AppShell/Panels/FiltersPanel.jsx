@@ -250,10 +250,11 @@ export default function FiltersPanel({ searchInputRef }) {
         : scientificNamesPicked.length + t("scientificNamesMulti");
 
   // The Any/All control, on the lists where a dataset can carry several values.
-  const matchAllSwitch = (id, checked, setChecked) => (
+  const matchAllSwitch = (id, checked, setChecked, tipTarget) => (
     <Switch
       id={id}
       data-testid={id}
+      tipTarget={tipTarget}
       label={t("filterMatchAllLabel")}
       checked={checked}
       onChange={(e) => setChecked(e.target.checked)}
@@ -356,7 +357,12 @@ export default function FiltersPanel({ searchInputRef }) {
                 setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
               }
             >
-              {matchAllSwitch("eovs-match-all", eovsMatchAll, setEovsMatchAll)}
+              {matchAllSwitch(
+                "eovs-match-all",
+                eovsMatchAll,
+                setEovsMatchAll,
+                "matchAll",
+              )}
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   eovsSearchTerms,
@@ -648,6 +654,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 searchPlaceholder={t("scientificNameFilterSearchPlaceholder")}
                 filterName={scientificNamesFilterTranslationKey}
                 openFilter={openFilter === scientificNamesFilterTranslationKey}
+                tipTarget="speciesName"
                 setOpenFilter={setOpenFilter}
                 resetButton={
                   scientificNamesPicked.length > 0

@@ -16,6 +16,7 @@ import {
 } from "../../../../utilities";
 import platformColors from "../../../platformColors";
 import { FilterOption } from "./OptionState.jsx";
+import { useTips } from "../../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
 export default function MultiCheckboxFilter({
@@ -27,6 +28,7 @@ export default function MultiCheckboxFilter({
   allOptions,
 }) {
   const { t, i18n } = useTranslation();
+  const { tipHighlight } = useTips();
 
   // Array.prototype.sort mutates in place — copy first. optionsSelected is a
   // slice of caller state (FilterProvider's eovsSelected etc.); sorting it
@@ -125,7 +127,7 @@ export default function MultiCheckboxFilter({
     );
   }
 
-  function renderOption(option) {
+  function renderOption(option, isFirst) {
     let title;
     if (translatable) {
       // Translation in title_translation
@@ -172,6 +174,7 @@ export default function MultiCheckboxFilter({
           isExcluded={option.isExcluded}
           onInclude={() => updateOption(option, toggleOptionIncluded)}
           onExclude={() => updateOption(option, toggleOptionExcluded)}
+          excludeTipHighlight={tipHighlight(isFirst && "exclude")}
           title={hoverText ? "" : t(title)}
           data-testid="filter-option"
           data-option-pk={option.pk}
@@ -220,7 +223,7 @@ export default function MultiCheckboxFilter({
       {optionsSelected.length === 0 ? (
         <div>{t("multiCheckboxFilterNoFilterWarning")}</div>
       ) : grouped ? (
-        groupByCategory(optionsSelectedSorted).map(([category, options]) => (
+        groupByCategory(optionsSelectedSorted).map(([category, options], g) => (
           <div
             key={category}
             className="optionGroup"
@@ -229,12 +232,14 @@ export default function MultiCheckboxFilter({
           >
             {renderCategoryRow(category, categoryLabel(options[0]))}
             <div className="optionGroupChildren">
-              {options.map(renderOption)}
+              {options.map((option, i) =>
+                renderOption(option, g === 0 && i === 0),
+              )}
             </div>
           </div>
         ))
       ) : (
-        optionsSelectedSorted.map(renderOption)
+        optionsSelectedSorted.map((option, i) => renderOption(option, i === 0))
       )}
     </div>
   );
