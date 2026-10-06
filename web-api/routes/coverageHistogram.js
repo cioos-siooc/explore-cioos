@@ -97,17 +97,34 @@ const GROUP_BY = {
   },
 };
 
-function buildTimeBins(timeMin, timeMax) {
+function buildTimeBins(timeMin, timeMax, extent = {}) {
   // Same defaults as the frontend's time slider (config.js): the filter query
   // string omits them when untouched.
-  const start = new Date(timeMin || "1900-01-01T00:00:00Z").getTime();
-  let end = timeMax ? new Date(timeMax).getTime() : Date.now();
+  const windowStart = new Date(timeMin || "1900-01-01T00:00:00Z").getTime();
+  const windowEnd = timeMax ? new Date(timeMax).getTime() : Date.now();
+  // The bins span the data the selection holds, not the whole window: an
+  // untouched filter is 1900 to now, which buried a 2012-onward selection in a
+  // century of empty bars.
+  let start = extent.min
+    ? Math.max(windowStart, new Date(extent.min).getTime())
+    : windowStart;
+  let end = extent.max
+    ? Math.min(windowEnd, new Date(extent.max).getTime() + DAY_MS)
+    : windowEnd;
   if (end <= start) end = start + DAY_MS;
 
   const rawWidth = (end - start) / TARGET_TIME_BINS;
   const width =
     TIME_BIN_WIDTHS_MS.find((w) => w >= rawWidth) ||
     TIME_BIN_WIDTHS_MS[TIME_BIN_WIDTHS_MS.length - 1];
+  // Year-wide bins open on Jan 1 so each one reads as the calendar year(s) the
+  // figure labels it with.
+  if (width >= YEAR_MS) {
+    start = Math.max(
+      windowStart,
+      Date.UTC(new Date(start).getUTCFullYear(), 0, 1),
+    );
+  }
   const numBins = Math.max(1, Math.ceil((end - start) / width));
   const edges = Array.from({ length: numBins + 1 }, (_, i) =>
     new Date(start + i * width).toISOString(),
@@ -247,8 +264,6 @@ router.get(
     const erddap = erddapVisible(req.query);
     const obis = obisVisible(req.query);
 
-    const timeBins = buildTimeBins(timeMin, timeMax);
-
     // The counted entity: distinct datasets, or distinct cf_role features.
     // What one counted thing is. For "days" the unit is the FEATURE, falling
     // back to the dataset where there is no cf_role: a trajectory is stored as
@@ -326,6 +341,24 @@ router.get(
     const combinedSql = `combined AS (
         ${unionBranches(branches, profilesBranch)}
     )`;
+
+    const filterBindings = {
+      filters: filters.shared,
+      obisFilters: filters.obisOnly,
+      profileFilters: filters.profileOnly,
+    };
+    const {
+      rows: [extent],
+    } = await db.raw(
+      `WITH ${combinedSql}
+    SELECT min(p.time_min) AS min, max(p.time_max) AS max
+    FROM   combined p
+    JOIN   cde.datasets d
+    ON     p.dataset_pk = d.pk
+    WHERE  ${filters.hasShared ? ":filters" : "TRUE"}`,
+      filterBindings,
+    );
+    const timeBins = buildTimeBins(timeMin, timeMax, extent);
 
     const windowClause = `WHERE  ${filters.hasShared ? ":filters" : "TRUE"}
         AND    p.time_max >= :timeStart::timestamptz
@@ -521,9 +554,7 @@ router.get(
     ORDER BY total DESC`;
 
     const bindings = {
-      filters: filters.shared,
-      obisFilters: filters.obisOnly,
-      profileFilters: filters.profileOnly,
+      ...filterBindings,
       timeStart: new Date(timeBins.start).toISOString(),
       timeEnd: new Date(timeBins.end).toISOString(),
       epochStart: timeBins.start / 1000,
