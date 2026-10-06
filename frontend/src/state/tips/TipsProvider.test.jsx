@@ -1,11 +1,12 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
 import { MOBILE_WIDTH, setViewportWidth } from "../../test/viewport.js";
 import TipCard from "../../components/Controls/Tips/TipCard.jsx";
+import FiltersModal from "../../components/AppShell/Modals/FiltersModal.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
 import { TIPS, useTips } from "./TipsProvider.jsx";
@@ -57,6 +58,8 @@ function Probe() {
         data-tip-highlight={tipHighlight("matchAll")}
       />
       <TipCard />
+      {/* Where the filter tips' tour steps show (see TIP_MODALS). */}
+      <FiltersModal />
     </>
   );
 }
@@ -296,6 +299,89 @@ describe("contextual tips", () => {
         await user.click(screen.getByRole("button", { name: "Previous tip" }));
       expect(card()).toHaveTextContent(/In view button/);
       expect(screen.getByTestId("quick-filters")).toHaveTextContent("shown");
+    });
+  });
+
+  describe("tour steps inside the Filters window", () => {
+    function FiltersHarness() {
+      const { startTour, offerTip } = useTips();
+      const { setShowFiltersModal } = useUI();
+      return (
+        <>
+          <button type="button" onClick={() => startTour("exclude")}>
+            tour from exclude
+          </button>
+          <button type="button" onClick={() => offerTip("exclude")}>
+            offer exclude
+          </button>
+          <button type="button" onClick={() => setShowFiltersModal(true)}>
+            open filters
+          </button>
+          <TipCard />
+          <FiltersModal />
+        </>
+      );
+    }
+    const modal = () => screen.queryByTestId("filters-modal");
+
+    it("opens the window on the filter and shows the tip inside it, at the control", async () => {
+      returningVisitor();
+      const { user } = renderWithProviders(<FiltersHarness />, {
+        providers: "app",
+      });
+      await user.click(screen.getByText("tour from exclude"));
+      expect(modal()).toBeInTheDocument();
+      expect(within(modal()).getByTestId("tip-card")).toHaveTextContent(
+        /leave things out/,
+      );
+      expect(screen.getAllByTestId("tip-card")).toHaveLength(1);
+      const [first, second] = await within(modal()).findAllByRole("button", {
+        name: /^Exclude: /,
+      });
+      expect(first).toHaveAttribute("data-tip-highlight");
+      expect(second).not.toHaveAttribute("data-tip-highlight");
+
+      await user.click(screen.getByRole("button", { name: "Next tip" }));
+      expect(within(modal()).getByTestId("tip-card")).toHaveTextContent(
+        /Match all/,
+      );
+      expect(
+        within(modal())
+          .getByTestId("eovs-match-all")
+          .closest("[data-tip-highlight]"),
+      ).not.toBeNull();
+    });
+
+    it("closes the window it opened once the tour moves off it, or ends", async () => {
+      returningVisitor();
+      const { user } = renderWithProviders(<FiltersHarness />, {
+        providers: "app",
+      });
+      await user.click(screen.getByText("tour from exclude"));
+      await user.click(screen.getByRole("button", { name: "Next tip" }));
+      await user.click(screen.getByRole("button", { name: "Next tip" }));
+      expect(card()).toHaveTextContent(/Real-time button/);
+      expect(modal()).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Previous tip" }));
+      expect(modal()).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Close tip" }));
+      expect(modal()).toBeNull();
+    });
+
+    it("moves an offered tip into a window the user opens, and leaves it open on close", async () => {
+      returningVisitor();
+      const { user } = renderWithProviders(<FiltersHarness />, {
+        providers: "app",
+      });
+      await user.click(screen.getByText("offer exclude"));
+      expect(modal()).toBeNull();
+      expect(card()).toBeInTheDocument();
+      await user.click(screen.getByText("open filters"));
+      expect(within(modal()).getByTestId("tip-card")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Close tip" }));
+      expect(modal()).toBeInTheDocument();
+      expect(card()).toBeNull();
     });
   });
 });

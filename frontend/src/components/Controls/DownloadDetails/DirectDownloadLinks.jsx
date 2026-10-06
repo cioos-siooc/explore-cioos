@@ -13,6 +13,7 @@ import {
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   downloadTextFile,
   filterSummaryText,
@@ -44,6 +45,7 @@ export default function DirectDownloadLinks({
   formatControls,
 }) {
   const { t } = useTranslation();
+  const { tipHighlight } = useTips();
   const [copyState, copy] = useCopyToClipboard("direct download links");
 
   // What the links could not carry — counted rather than listed, because the
@@ -65,6 +67,7 @@ export default function DirectDownloadLinks({
     <div
       className="downloadFooterSection directLinks"
       data-testid="direct-links"
+      data-tip-highlight={tipHighlight("directLinks")}
     >
       <span className="downloadFooterTitle">
         {t("directLinksTitle")}

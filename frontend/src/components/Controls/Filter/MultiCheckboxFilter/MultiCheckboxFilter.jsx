@@ -9,6 +9,7 @@ import {
 } from "../../../../utilities";
 import platformColors from "../../../platformColors";
 import { FilterOption } from "./OptionState.jsx";
+import { useTips } from "../../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
 export default function MultiCheckboxFilter({
@@ -19,6 +20,7 @@ export default function MultiCheckboxFilter({
   allOptions,
 }) {
   const { t, i18n } = useTranslation();
+  const { tipHighlight } = useTips();
 
   // Array.prototype.sort mutates in place — copy first. optionsSelected is a
   // slice of caller state (FilterProvider's eovsSelected etc.); sorting it
@@ -130,6 +132,7 @@ export default function MultiCheckboxFilter({
                 isExcluded={option.isExcluded}
                 onInclude={() => updateOption(option, toggleOptionIncluded)}
                 onExclude={() => updateOption(option, toggleOptionExcluded)}
+                excludeTipHighlight={tipHighlight(index === 0 && "exclude")}
                 title={hoverText ? "" : t(title)}
                 data-testid="filter-option"
                 data-option-pk={option.pk}

@@ -5,6 +5,7 @@ import isEmpty from "lodash-es/isEmpty";
 
 import Modal from "../../ui/Modal.jsx";
 import DownloadPanel from "../Panels/DownloadPanel.jsx";
+import TipCard from "../../Controls/Tips/TipCard.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
@@ -51,6 +52,7 @@ export default function DownloadModal() {
           </span>
         </Modal.Title>
       </Modal.Header>
+      <TipCard inModal="download" />
       <Modal.Body>
         <DownloadPanel />
       </Modal.Body>

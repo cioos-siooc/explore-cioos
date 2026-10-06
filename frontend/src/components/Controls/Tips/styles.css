@@ -192,3 +192,19 @@
     animation: none;
   }
 }
+
+/* Inside the dialog that holds the control it names (see TipCard's inModal):
+   a row under the dialog's header rather than a floating card, and the hand
+   drawn above the dialog it points into. */
+.tipCard.tipCardInModal {
+  position: static;
+  inset: auto;
+  flex-shrink: 0;
+  width: auto;
+  margin: 0 var(--cioos-space-md) var(--cioos-space-sm);
+  box-shadow: none;
+}
+
+.tipPointer.tipPointerOverModal {
+  z-index: calc(var(--cioos-z-modal, 1055) + 1);
+}

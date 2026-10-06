@@ -36,6 +36,17 @@ export const TIPS = [
   "shareLink",
 ];
 
+// The tips whose control lives in a dialog, by the dialog that holds it. While
+// that dialog is open the tip is shown inside it (see TipCard's `inModal`), and
+// the tour opens it for them (see useTourStages).
+export const TIP_MODALS = {
+  speciesName: "filters",
+  exclude: "filters",
+  matchAll: "filters",
+  filtersCutDownload: "download",
+  directLinks: "download",
+};
+
 // Outside the provider (leaf-component tests render without it) offering a
 // tip is a no-op rather than a crash.
 const TipsContext = createContext({
@@ -54,6 +65,8 @@ export default function TipsProvider({ children }) {
     showDownloadModal,
     showCoverageModal,
     showSelectionHelpModal,
+    setShowFiltersModal,
+    setShowDownloadModal,
   } = useUI();
   const [tipsEnabled, setTipsEnabled] = usePersistentState("tipsEnabled", true);
   const [seenTips, setSeenTips] = usePersistentState("seenTips", []);
@@ -131,10 +144,26 @@ export default function TipsProvider({ children }) {
     stagesRef.current = stages;
   });
 
-  const showTourStep = useCallback((key) => {
-    setActiveTip(key);
-    stagesRef.current[key]?.();
-  }, []);
+  // The dialog a step opened, closed again once the tour moves off it, so the
+  // next step's control isn't left behind it. One the user opened stays open.
+  const tourModal = useRef();
+  const closeTourModal = useCallback(() => {
+    if (tourModal.current === "filters") setShowFiltersModal(false);
+    if (tourModal.current === "download") setShowDownloadModal(false);
+    tourModal.current = undefined;
+  }, [setShowFiltersModal, setShowDownloadModal]);
+
+  const showTourStep = useCallback(
+    (key) => {
+      if (tourModal.current && tourModal.current !== TIP_MODALS[key]) {
+        closeTourModal();
+      }
+      setActiveTip(key);
+      const opened = stagesRef.current[key]?.();
+      if (opened) tourModal.current = opened;
+    },
+    [closeTourModal],
+  );
   const startTour = useCallback(
     (key) => {
       // The tour is this visit's tip; nothing is offered on top of it after.
@@ -156,9 +185,10 @@ export default function TipsProvider({ children }) {
   );
 
   const dismissTip = useCallback(() => {
+    closeTourModal();
     setActiveTip();
     setTouring(false);
-  }, []);
+  }, [closeTourModal]);
 
   const disableTips = useCallback(() => {
     setTipsEnabled(false);
