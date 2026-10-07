@@ -295,7 +295,9 @@ def extract_features(dataset, handler):
         x for x in llat_variables if x in dataset.variables_list
     ]
 
-    profiles_with_lat_lon = dataset.get_profile_ids()
+    profiles_with_lat_lon = dataset.get_profile_ids(
+        collapse_time_profile_ids=handler.collapse_time_profile_ids
+    )
 
     if profiles_with_lat_lon.empty:
         return profiles_with_lat_lon

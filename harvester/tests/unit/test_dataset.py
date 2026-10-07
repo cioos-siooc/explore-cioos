@@ -286,3 +286,45 @@ class TestDatasetGetDf:
         required = ["title", "erddap_url", "dataset_id", "cdm_data_type", "platform", "eovs"]
         for col in required:
             assert col in df.columns
+
+
+class TestGetProfileIds:
+    def test_all_missing_cf_role_falls_back_to_one_row_per_feature(self, mock_erddap_server):
+        """ERDDAP drops all-missing rows, so distinct() of a never-filled
+        cf_role column is empty; the orderByMax fallback keeps the feature."""
+        from io import StringIO
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(ERDDAP_INFO_CSV)).fillna("")
+            if "orderByMax" in url:
+                return pd.DataFrame({"station_id": [float("nan")], "time": ["2020-01-01T00:00:00Z"]})
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
+
+        assert list(profile_ids.columns) == ["station_id"]
+        assert len(profile_ids) == 1
+
+    def test_time_profile_id_is_dropped_before_enumerating(self, mock_erddap_server):
+        """profile_id on time means one profile per record: only the
+        timeseries are enumerated, never the timestamps."""
+        from io import StringIO
+        info_csv = ERDDAP_INFO_CSV + "attribute,time,cf_role,,profile_id\n"
+        queries = []
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(info_csv)).fillna("")
+            queries.append(url)
+            return pd.DataFrame({"station_id": ["S1"]})
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        dataset = Dataset(mock_erddap_server, DATASET_ID)
+        dataset.get_profile_ids(collapse_time_profile_ids=True)
+
+        assert dataset.profile_variables == {"timeseries_id": "station_id"}
+        assert queries == [f"/tabledap/{DATASET_ID}.csv?station_id&distinct()"]

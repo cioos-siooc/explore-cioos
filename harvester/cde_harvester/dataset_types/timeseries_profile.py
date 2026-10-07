@@ -7,6 +7,9 @@ from cde_harvester.dataset_types.base import DatasetTypeHandler
 class TimeSeriesProfileHandler(DatasetTypeHandler):
     features_span_multiple_days = True
     cdm_data_type = "TimeSeriesProfile"
+    # A profile per timestamp always exceeds the 2000-per-timeseries collapse
+    # threshold below.
+    collapse_time_profile_ids = True
 
     def extract_features(self, dataset):
         return tabledap_features.extract_features(dataset, self)
@@ -15,6 +18,9 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
         self, dataset, profiles_with_lat_lon, profiles, profile_variables,
         profile_variable_list,
     ):
+        if "profile_id" not in profile_variables:
+            return profiles_with_lat_lon, profile_variables, profile_variable_list
+
         # Review if there's a enough samples to group by timeseries only
         profiles_per_timeseries = profiles_with_lat_lon.groupby(
             profile_variables["timeseries_id"]

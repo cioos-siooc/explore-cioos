@@ -121,6 +121,21 @@ class TestErddapCsvToDf:
         with pytest.raises(requests.exceptions.HTTPError):
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
 
+    def test_504_is_not_retried_immediately(self):
+        from cde_harvester.sources.erddap.client import _RETRY_STATUSES
+        assert 504 not in _RETRY_STATUSES
+
+    def test_504_records_the_dataset_for_a_deferred_retry(self):
+        erddap = _make_erddap()
+        erddap.session.get.return_value = MockResponse(
+            text="Gateway Time-out", status_code=504,
+            url=ERDDAP_URL + "/tabledap/ds.csv"
+        )
+        dataset = MagicMock(id="ds", erddap_url=ERDDAP_URL, queried_urls=[])
+        with pytest.raises(requests.exceptions.HTTPError):
+            erddap.erddap_csv_to_df("/tabledap/ds.csv", dataset=dataset)
+        assert list(erddap.gateway_timeouts) == ["ds"]
+
     def test_response_too_large_raises(self):
         erddap = _make_erddap()
         from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
