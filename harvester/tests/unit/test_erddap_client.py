@@ -203,3 +203,38 @@ class TestParseErddapDate:
         from cde_harvester.sources.erddap.client import ERDDAP
         result = ERDDAP.parse_erddap_date("not-a-date")
         assert pd.isna(result)
+
+
+class TestCroissantVersionGate:
+    CROISSANT = '{"distribution": [{"@type": "cr:FileObject", "name": "a.nc"}]}'
+
+    def _erddap_with(self, version_text):
+        erddap = _make_erddap()
+        erddap.session.get.reset_mock()
+        erddap.session.get.side_effect = lambda url, **kw: MockResponse(
+            text=version_text if url.endswith("/version") else self.CROISSANT
+        )
+        return erddap
+
+    def _requested(self, erddap):
+        return [c.args[0] for c in erddap.session.get.call_args_list]
+
+    def test_old_erddap_skips_croissant_request(self):
+        from cde_harvester.core.errors import HASH_CROISSANT_UNSUPPORTED
+        erddap = self._erddap_with("ERDDAP_version=2.25\n")
+        assert erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1") == (
+            None, False, HASH_CROISSANT_UNSUPPORTED
+        )
+        assert not any(u.endswith(".croissant") for u in self._requested(erddap))
+
+    def test_version_is_fetched_once_per_server(self):
+        erddap = self._erddap_with("ERDDAP_version=2.25\n")
+        erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        erddap.get_croissant_fingerprint(ERDDAP_URL, "ds2")
+        assert self._requested(erddap) == [ERDDAP_URL + "/version"]
+
+    @pytest.mark.parametrize("version_text", ["ERDDAP_version=2.28\n", "garbage"])
+    def test_supported_or_unknown_version_fetches_croissant(self, version_text):
+        erddap = self._erddap_with(version_text)
+        digest, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert digest and has_files and reason is None

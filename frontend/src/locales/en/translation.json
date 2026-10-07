@@ -502,6 +502,7 @@
   "harvest.hashReason.HASH_NO_FILE_LIST": "not hashed (database-backed, no file list)",
   "harvest.hashReason.HASH_CROISSANT_HTTP_ERROR": "unavailable (Croissant endpoint error)",
   "harvest.hashReason.HASH_CROISSANT_UNREADABLE": "unavailable (Croissant metadata unreadable)",
+  "harvest.hashReason.HASH_CROISSANT_UNSUPPORTED": "unavailable (ERDDAP older than 2.28, no Croissant)",
   "harvest.hashReason.HASH_FEDERATED_UNRESOLVED": "unavailable (federated source unresolved)",
   "harvest.reason.UNCHANGED": "Unchanged",
   "harvest.reason.CDM_DATA_TYPE_UNSUPPORTED": "Unsupported CDM type",
