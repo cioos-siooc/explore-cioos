@@ -236,35 +236,30 @@ class Dataset:
         if not profile_variables:
             return []
 
-        profile_ids = pd.DataFrame()
+        # distinct() of the ids alone measured ~0.2s on every ONC and
+        # cioospacific dataset tried; an orderByMinMax over time scans every
+        # record and 504s on dap.oceannetworks.ca's long sensor streams.
+        # Moving-feature lat/lon is left to tabledap_features: a distinct()
+        # with it returns one row per GPS fix.
+        identity = list(profile_variable_list)
         subset_variables = self.subset_variables()
         if set(profile_variable_list) <= subset_variables:
-            # A distinct() over subsetVariables alone is answered from ERDDAP's
-            # pre-built subset table, not a data scan. A subset lat/lon is
+            # Served from the pre-built subset table, where a lat/lon is
             # per-feature by declaration, so it comes along for the bbox.
-            position = [
+            identity += [
                 v for v in ("latitude", "longitude")
                 if v in subset_variables and v not in profile_variable_list
             ]
-            profile_ids = self.dataset_tabledap_query(
-                f"{','.join(profile_variable_list + position)}&distinct()"
-            )
+        profile_ids = self.dataset_tabledap_query(f"{','.join(identity)}&distinct()")
 
         if profile_ids.empty and "time" not in profile_variable_list:
-            # The per-feature time bounds are needed anyway, so the same scan
-            # enumerates the features. Pairing the ids with time also keeps a
-            # cf_role column that is never filled (seagull-erddap's `platform`):
-            # ERDDAP drops rows whose requested columns are ALL missing, which
-            # empties a distinct() of the ids alone.
+            # ERDDAP drops rows whose requested columns are ALL missing, so a
+            # cf_role column that is never filled (seagull-erddap's `platform`)
+            # empties the distinct(). Pairing it with time keeps one row per
+            # feature, and the time bounds come along.
             profile_ids = self.get_max_min(
                 profile_variable_list + ["time"]
             ).reset_index()
-        elif profile_ids.empty:
-            # Identities only: a distinct() with lat/lon returns one row per
-            # GPS fix on a moving feature. tabledap_features fetches the bbox.
-            profile_ids = self.dataset_tabledap_query(
-                f"{','.join(profile_variable_list)}&distinct()"
-            )
 
         if profile_ids.empty:
             return profile_ids
