@@ -261,6 +261,11 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
         ),
       ).toEqual(["2", "1"]),
     );
+    expect(
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].map((h) =>
+        h.style.getPropertyValue("--group-share"),
+      ),
+    ).toEqual(["1", "0.5"]);
 
     await user.selectOptions(screen.getByLabelText("Group by"), "none");
     expect(screen.getByLabelText("Sort")).toHaveValue("title");
@@ -449,6 +454,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
     rerender(table([vessel]));
     expect(header("mooring")).toHaveClass("empty", "excluded");
+    expect(header("mooring").style.getPropertyValue("--group-share")).toBe("0");
     await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
     await waitFor(() => expect(platform("mooring").isExcluded).toBe(false));
     expect(header("mooring")).toHaveClass("empty");

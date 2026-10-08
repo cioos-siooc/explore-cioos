@@ -354,7 +354,17 @@ button.datasetCardTitle:focus-visible {
   padding: 0 2px 0 0;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
+
+  /* Data bar: the group's share of the largest one at its level, drawn over
+     whichever wash the header's state sets. */
+  --group-bar: color-mix(in srgb, var(--cioos-primary) 22%, transparent);
+
   background-color: var(--cioos-surface-2);
+  background-image: linear-gradient(
+    to right,
+    var(--group-bar) calc(var(--group-share, 0) * 100%),
+    transparent 0
+  );
   transition:
     background-color var(--cioos-transition-fast),
     border-color var(--cioos-transition-fast);
@@ -446,6 +456,8 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetsCardGroupHeader.excluded {
+  --group-bar: color-mix(in srgb, var(--cioos-error) 15%, transparent);
+
   border-color: var(--cioos-error);
   background-color: var(--cioos-error-bg);
 }

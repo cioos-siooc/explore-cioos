@@ -315,27 +315,40 @@ export default function DatasetsTable({
     const keys = [...byGroup.keys(), ...emptyKeys];
     if (parentGroupKeys(groupBy).length === 0) {
       pushGroups(keys, 0);
-      return items;
-    }
-    const childrenByParent = new Map();
-    for (const key of keys) {
-      const parent = groupParent(key, groupBy);
-      if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
-      childrenByParent.get(parent).push(key);
-    }
-    const parentSize = (parent) =>
-      new Set(childrenByParent.get(parent).flatMap(rowsOf)).size;
-    for (const parent of sortKeys(childrenByParent.keys(), parentSize)) {
-      items.push({
-        header: true,
-        group: parent,
-        count: parentSize(parent),
-        depth: 0,
-        expandable: true,
-      });
-      if (expandedGroups.has(parent)) {
-        pushGroups(childrenByParent.get(parent), 1);
+    } else {
+      const childrenByParent = new Map();
+      for (const key of keys) {
+        const parent = groupParent(key, groupBy);
+        if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
+        childrenByParent.get(parent).push(key);
       }
+      const parentSize = (parent) =>
+        new Set(childrenByParent.get(parent).flatMap(rowsOf)).size;
+      for (const parent of sortKeys(childrenByParent.keys(), parentSize)) {
+        items.push({
+          header: true,
+          group: parent,
+          count: parentSize(parent),
+          depth: 0,
+          expandable: true,
+        });
+        if (expandedGroups.has(parent)) {
+          pushGroups(childrenByParent.get(parent), 1);
+        }
+      }
+    }
+    // Each header's share of the largest group at its depth sizes its data bar.
+    const maxByDepth = [];
+    for (const item of items) {
+      if (item.header) {
+        maxByDepth[item.depth] = Math.max(
+          maxByDepth[item.depth] ?? 0,
+          item.count,
+        );
+      }
+    }
+    for (const item of items) {
+      if (item.header) item.share = item.count / (maxByDepth[item.depth] || 1);
     }
     return items;
   }, [
@@ -611,6 +624,7 @@ export default function DatasetsTable({
                   excluded: filter?.state === "exclude",
                   nested: item.depth > 0,
                 })}
+                style={{ "--group-share": item.share }}
               >
                 <button
                   type="button"
