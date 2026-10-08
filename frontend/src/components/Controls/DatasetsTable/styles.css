@@ -23,11 +23,12 @@
   background-color: var(--cioos-white);
 }
 
-/* Wraps only when the search box would drop below a usable width — the
-   narrowest phone, or long French captions. */
+/* Never wraps: when the row is too narrow the Filters button and the pills
+   give up width (label and values ellipsize) rather than a second row of
+   buttons taking room from the cards. */
 .datasetsCardToolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
 }
@@ -464,6 +465,9 @@ button.datasetCardTitle:focus-visible {
    and active (modal open) washes as that button. */
 .datasetsCardFilters {
   flex: 1 1 auto;
+  min-width: 44px;
+  overflow: hidden;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -529,6 +533,7 @@ button.datasetCardTitle:focus-visible {
    so an occasional control doesn't take a row of the arrange line from the two
    permanent ones. */
 .datasetsCardShowAllGroups {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
