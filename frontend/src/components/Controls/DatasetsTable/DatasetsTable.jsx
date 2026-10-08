@@ -6,9 +6,8 @@ import React, {
   useState,
 } from "react";
 import {
-  CaretDownFill,
-  CaretRightFill,
   Check2Circle,
+  ChevronRight,
   Eye,
   EyeSlash,
   Filter,
@@ -32,11 +31,18 @@ import {
   isGroupDimension,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
+import { useChanged } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import "./styles.css";
+
+// Orders the groups by how many datasets each holds, not the rows — offered
+// only while the list is grouped, and its default then.
+const GROUP_SIZE = "groupSize";
+const DEFAULT_SORT = { field: "title", dir: "asc" };
+const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
 
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
 // doesn't create a new Set every render and thrash memo deps.
@@ -104,8 +110,18 @@ export default function DatasetsTable({
 
   // Sort fields differ by context: the download modal exposes the size and
   // downloadable status; the sidebar exposes the locations and days counts.
+  const grouped = isGroupDimension(groupBy);
   const sortFields = useMemo(() => {
     const base = [
+      ...(grouped
+        ? [
+            {
+              id: GROUP_SIZE,
+              label: t("datasetsCardSortGroupSizeText"),
+              type: "number",
+            },
+          ]
+        : []),
       { id: "title", label: t("datasetsTableHeaderTitleText"), type: "string" },
       { id: "type", label: t("datasetsTableHeaderTypeText"), type: "string" },
       {
@@ -138,10 +154,17 @@ export default function DatasetsTable({
       });
     }
     return base;
-  }, [isDownloadModal, t]);
+  }, [isDownloadModal, grouped, t]);
 
-  const [sort, setSort] = useState({ field: "title", dir: "asc" });
-  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const [sort, setSort] = useState(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
+  // Groups start closed, so a grouping reads first as its list of groups; a new
+  // grouping starts closed again.
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+  if (useChanged(groupBy)) setExpandedGroups(new Set());
+  if (useChanged(grouped)) setSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
+  // Group size orders the groups (renderItems); the rows within them go by
+  // title.
+  const rowSort = sort.field === GROUP_SIZE ? DEFAULT_SORT : sort;
 
   const groupByOptions = useMemo(() => groupOptions(t), [t]);
   // Hiding a group takes its datasets off the map. Not offered for the
@@ -182,8 +205,8 @@ export default function DatasetsTable({
   // Search filtering happens upstream (SelectionProvider's filteredDatasets) —
   // this just sorts whatever it's handed.
   const visibleRows = useMemo(() => {
-    const field = sortFields.find((f) => f.id === sort.field);
-    const factor = sort.dir === "asc" ? 1 : -1;
+    const field = sortFields.find((f) => f.id === rowSort.field);
+    const factor = rowSort.dir === "asc" ? 1 : -1;
     const sorted = [...(datasets || [])].sort((a, b) => {
       // Datasets under the last map click come first, in the chosen sort order
       // among themselves. This rides on top of the sort rather than replacing
@@ -192,13 +215,13 @@ export default function DatasetsTable({
       const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1;
       const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1;
       if (pa !== pb) return pa - pb;
-      const va = sortValue(a, sort.field);
-      const vb = sortValue(b, sort.field);
+      const va = sortValue(a, rowSort.field);
+      const vb = sortValue(b, rowSort.field);
       if (field?.type === "number") return (va - vb) * factor;
       return String(va).localeCompare(String(vb), i18n.language) * factor;
     });
     return sorted;
-  }, [datasets, sort, i18n.language, pinnedPks, sortFields, sortValue]);
+  }, [datasets, rowSort, i18n.language, pinnedPks, sortFields, sortValue]);
 
   // Flat render list: without grouping it's just the sorted rows; with grouping
   // it's the rows bucketed under headers. Each entry is either
@@ -222,16 +245,18 @@ export default function DatasetsTable({
         byGroup.get(key).push(row);
       }
     }
+    const keys = sortGroupKeys(byGroup.keys(), groupBy, t, i18n.language);
+    if (sort.field === GROUP_SIZE) {
+      const factor = sort.dir === "asc" ? 1 : -1;
+      keys.sort(
+        (a, b) => (byGroup.get(a).length - byGroup.get(b).length) * factor,
+      );
+    }
     const items = [];
-    for (const key of sortGroupKeys(
-      byGroup.keys(),
-      groupBy,
-      t,
-      i18n.language,
-    )) {
+    for (const key of keys) {
       const rows = byGroup.get(key);
       items.push({ header: true, group: key, count: rows.length });
-      if (!collapsedGroups.has(key)) {
+      if (expandedGroups.has(key)) {
         for (const row of rows) items.push({ row, group: key });
       }
     }
@@ -239,7 +264,8 @@ export default function DatasetsTable({
   }, [
     visibleRows,
     groupBy,
-    collapsedGroups,
+    expandedGroups,
+    sort,
     datasetsInViewPks,
     selectedPks,
     i18n.language,
@@ -278,7 +304,7 @@ export default function DatasetsTable({
     let pendingHeader = null;
     for (const item of renderItems) {
       if (item.header) {
-        if (collapsedGroups.has(item.group)) {
+        if (!expandedGroups.has(item.group)) {
           pendingHeader = null;
           if (rowIndex >= firstRow && rowIndex < lastRow) out.push(item);
         } else {
@@ -297,14 +323,7 @@ export default function DatasetsTable({
       rowIndex++;
     }
     return out;
-  }, [
-    renderItems,
-    firstRow,
-    pageSize,
-    currentPage,
-    pageCount,
-    collapsedGroups,
-  ]);
+  }, [renderItems, firstRow, pageSize, currentPage, pageCount, expandedGroups]);
 
   // The what's here tip points at one of the click's datasets that can be
   // ticked in, while this list rather than the card holds them (see Sidebar).
@@ -315,8 +334,8 @@ export default function DatasetsTable({
       pinnedPks.has(Number(item.row.pk)),
   );
 
-  const toggleGroupCollapsed = (group) => {
-    setCollapsedGroups((prev) => {
+  const toggleGroupExpanded = (group) => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
       else next.add(group);
@@ -515,25 +534,28 @@ export default function DatasetsTable({
                 />
               );
             }
-            const collapsed = collapsedGroups.has(item.group);
+            const collapsed = !expandedGroups.has(item.group);
             const hidden = hiddenGroups.has(item.group);
             const label = groupLabel(item.group, groupBy, t);
             return (
               <div
                 key={`group:${item.group}`}
-                className={classNames("datasetsCardGroupHeader", { hidden })}
+                className={classNames("datasetsCardGroupHeader", {
+                  open: !collapsed,
+                  hidden,
+                })}
               >
                 <button
                   type="button"
                   className="datasetsCardGroupToggle"
-                  onClick={() => toggleGroupCollapsed(item.group)}
+                  onClick={() => toggleGroupExpanded(item.group)}
                   aria-expanded={!collapsed}
                 >
-                  {collapsed ? (
-                    <CaretRightFill size={10} aria-hidden="true" />
-                  ) : (
-                    <CaretDownFill size={10} aria-hidden="true" />
-                  )}
+                  <ChevronRight
+                    className="datasetsCardGroupCaret"
+                    size={11}
+                    aria-hidden="true"
+                  />
                   <span className="datasetsCardGroupTitle" title={label}>
                     {label}
                   </span>

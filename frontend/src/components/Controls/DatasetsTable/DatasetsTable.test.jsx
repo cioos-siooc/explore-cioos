@@ -227,6 +227,62 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("grouping sorts by group size, largest first, and ungrouping sorts by title again", async () => {
+    const rows = [
+      makeRow({ pk: 1, title: "A", platform: "buoy" }),
+      makeRow({ pk: 2, title: "B", platform: "mooring" }),
+      makeRow({ pk: 3, title: "C", platform: "mooring" }),
+    ];
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={rows}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+
+    expect(screen.getByLabelText("Sort")).toHaveValue("groupSize");
+    await waitFor(() =>
+      expect(
+        [...document.querySelectorAll(".datasetsCardGroupCount")].map(
+          (el) => el.textContent,
+        ),
+      ).toEqual(["2", "1"]),
+    );
+
+    await user.selectOptions(screen.getByLabelText("Group by"), "none");
+    expect(screen.getByLabelText("Sort")).toHaveValue("title");
+    expect(
+      screen.queryByRole("option", { name: "Group size" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("starts every group closed, and a header opens its group", async () => {
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+
+    const toggles = await screen.findAllByRole("button", { expanded: false });
+    expect(screen.queryAllByTestId("dataset-card")).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { expanded: true })).toHaveLength(0);
+
+    await user.click(toggles[0]);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByTestId("dataset-card").length).toBeGreaterThan(0);
+  });
 });
 
 describe("DatasetsTable (download modal)", () => {

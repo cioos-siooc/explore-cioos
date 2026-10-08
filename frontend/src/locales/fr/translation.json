@@ -197,6 +197,7 @@
   "datasetsCardSortByLabel": "Tri",
   "datasetsCardSortPlatformText": "Plateforme",
   "datasetsCardSortDaysText": "Jours de données",
+  "datasetsCardSortGroupSizeText": "Taille du groupe",
   "datasetsCardSortDownloadableText": "Téléchargeable",
   "datasetsCardNotDownloadableText": "Non téléchargeable",
   "datasetsCardSortAscendingTitle": "Tri croissant (appuyer pour inverser)",

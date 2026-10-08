@@ -197,6 +197,7 @@
   "datasetsCardSortByLabel": "Sort",
   "datasetsCardSortPlatformText": "Platform",
   "datasetsCardSortDaysText": "Days of data",
+  "datasetsCardSortGroupSizeText": "Group size",
   "datasetsCardSortDownloadableText": "Downloadable",
   "datasetsCardNotDownloadableText": "Not downloadable",
   "datasetsCardSortAscendingTitle": "Sorted ascending (tap to reverse)",
