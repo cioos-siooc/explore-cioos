@@ -2,7 +2,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import classNames from "classnames";
 import { ChevronLeft, ChevronRight, Lightbulb } from "react-bootstrap-icons";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import CloseButton from "../../ui/CloseButton.jsx";
 import TipPointer, {
@@ -151,11 +151,21 @@ export default function TipCard({ inModal }) {
       <p className="tipCardText">
         <TipText tip={activeTip} />
       </p>
-      {!touring && (
-        <button type="button" className="tipCardLink" onClick={disableTips}>
-          {t("tipsDisable")}
-        </button>
-      )}
+      <div className="tipCardFooter">
+        {!touring && (
+          <button type="button" className="tipCardLink" onClick={disableTips}>
+            {t("tipsDisable")}
+          </button>
+        )}
+        {/* Screen readers have the keys from the step buttons'
+            aria-keyshortcuts. */}
+        <span className="tipCardKeys" aria-hidden="true">
+          <Trans
+            i18nKey="tipKeysHint"
+            components={{ prev: <kbd />, next: <kbd /> }}
+          />
+        </span>
+      </div>
       <TipPointer targets={targets} inModal={Boolean(inModal)} />
     </div>
   );

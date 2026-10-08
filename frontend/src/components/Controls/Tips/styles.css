@@ -153,6 +153,40 @@
   color: var(--cioos-primary);
 }
 
+.tipCardFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+  margin-right: var(--cioos-space-sm);
+}
+
+/* Only where there is a keyboard to press them on. */
+.tipCardKeys {
+  margin-left: auto;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
+@media (hover: none) {
+  .tipCardKeys {
+    display: none;
+  }
+}
+
+.tipCardKeys kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  font-family: inherit;
+  font-size: var(--cioos-font-size-2xs);
+  line-height: 1.5;
+  text-align: center;
+  color: var(--cioos-ink);
+}
+
 .tipCardLink {
   padding: 0;
   border: 0;
