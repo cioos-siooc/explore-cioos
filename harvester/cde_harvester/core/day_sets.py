@@ -192,3 +192,13 @@ def ranges_to_psycopg(ranges):
     DatatypeMismatch. Its own range type adapts correctly.
     """
     return [DateRange(lo, hi, "[)") for lo, hi in ranges or []]
+
+
+def ranges_from_psycopg(value):
+    """Inverse of ranges_to_psycopg: a daterange[] read back from the database, as a run list.
+
+    Anything that is not a list (a NULL column) passes through unchanged.
+    """
+    if not isinstance(value, list):
+        return value
+    return [(r.lower, r.upper) for r in value if not r.isempty]

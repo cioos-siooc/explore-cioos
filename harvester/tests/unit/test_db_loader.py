@@ -174,6 +174,29 @@ class TestEnsureOrganizationPks:
 # main() — full reload mode
 # ---------------------------------------------------------------------------
 
+class TestFullReloadGuard:
+    """A full reload TRUNCATEs every source, so one that covers fewer sources than
+    the database holds is refused unless the caller knows the input is complete."""
+
+    def _existing(self, mock_engine, sources):
+        # The load runs on engine.connect() (commit-as-you-go), not engine.begin().
+        engine, _conn = mock_engine
+        conn = engine.connect.return_value.__enter__.return_value
+        conn.execute.return_value.all.return_value = [(s,) for s in sources]
+
+    def test_refuses_to_drop_a_source_the_harvest_does_not_cover(self, harvest_folder, mock_engine, mocker):
+        self._existing(mock_engine, ["https://other.erddap/erddap"])
+        _patch_loader(mock_engine, mocker)
+        with pytest.raises(RuntimeError, match="Refusing full reload"):
+            main.fn(harvest_folder, incremental=False)
+
+    def test_a_caller_restoring_the_whole_database_may_proceed(self, harvest_folder, mock_engine, mocker):
+        self._existing(mock_engine, ["https://other.erddap/erddap"])
+        mock_text = _patch_loader(mock_engine, mocker)
+        main.fn(harvest_folder, incremental=False, allow_full_reload=True)
+        assert any("remove_all_data" in c.args[0] for c in mock_text.call_args_list)
+
+
 class TestDbLoaderMainFullReload:
     def test_no_constraint_ddl_toggling(self, harvest_folder, mock_engine, mocker):
         # Full reload no longer drops/re-adds constraints via ALTER TABLE:

@@ -5,6 +5,9 @@ can go wrong without a database: which files get picked up, in what order, and t
 missing init file aborts rather than dropping a schema it cannot recreate.
 """
 
+import contextlib
+from pathlib import Path
+
 import pytest
 from cde_harvester.core import schema
 
@@ -327,6 +330,7 @@ class TestRebuildFlowBody:
         monkeypatch.setattr(pp, "ensure_database", lambda engine, name: False)
         monkeypatch.setattr(pp.core_db, "db_name", lambda: "cde")
         monkeypatch.setattr(pp.core_db, "db_host", lambda: "db")
+        _stub_empty_database(monkeypatch)
 
     def test_happy_path_reports_trigger(self, monkeypatch):
         self._patch(monkeypatch)
@@ -378,6 +382,15 @@ class TestRebuildFlowBody:
 class _FakeEngine:
     def dispose(self):
         pass
+
+
+def _stub_empty_database(monkeypatch):
+    """The rebuild flow's snapshot path against a database with nothing to snapshot,
+    which is what these tests describe: the flow as it ran before snapshots existed."""
+    from cde_harvester import prefect_pipeline as pp
+
+    monkeypatch.setattr(pp.snapshot, "loader_lock", lambda engine: contextlib.nullcontext())
+    monkeypatch.setattr(pp.core_db, "database_is_empty", lambda: True)
 
 
 class TestConfirmationMessagesAreDistinct:
@@ -508,6 +521,7 @@ class TestFlowCreatesMissingDatabase:
         monkeypatch.setattr(pp.core_db, "maintenance_engine", lambda **kw: _FakeEngine())
         monkeypatch.setattr(pp.core_db, "db_name", lambda: "cde")
         monkeypatch.setattr(pp.core_db, "db_host", lambda: "db")
+        _stub_empty_database(monkeypatch)
         from cde_harvester.prefect_pipeline import cde_rebuild_database_run
 
         return cde_rebuild_database_run.fn
@@ -519,6 +533,22 @@ class TestFlowCreatesMissingDatabase:
         assert seen == ["cde"]
         assert rebuilds == [1]
         assert report["tables_created"] == 18
+
+    def test_nothing_connects_to_the_database_before_it_exists(self, monkeypatch):
+        from cde_harvester import prefect_pipeline as pp
+
+        calls = []
+        flow = self._patch(monkeypatch, lambda engine, name: calls.append("ensure") or True, [])
+
+        @contextlib.contextmanager
+        def loader_lock(engine):
+            calls.append("lock")
+            yield
+
+        monkeypatch.setattr(pp.snapshot, "loader_lock", loader_lock)
+        monkeypatch.setattr(pp.core_db, "database_is_empty", lambda: calls.append("is_empty") or True)
+        flow(confirm="cde")
+        assert calls == ["ensure", "lock", "is_empty"]
 
     def test_creation_failure_aborts_before_rebuild(self, monkeypatch):
         rebuilds = []
@@ -571,3 +601,225 @@ class _RecordingConn:
 
     def cursor(self):
         return _RecordingCursor(self)
+
+
+class TestRebuildRestore:
+    """restore_from: what the rebuilt schema is reloaded from.
+
+    Everything that can fail harmlessly (checking the source, fetching or taking
+    the snapshot) must happen before the drop, a non-empty database is always
+    snapshotted before it, and nothing after the drop may fail the run."""
+
+    @staticmethod
+    def _tables(**overrides):
+        from cde_harvester.loading import snapshot
+
+        tables = {t: {"rows": 1, "columns": list(c)} for t, (_, c) in snapshot.LOADER_TABLES.items()}
+        tables.update(overrides)
+        return tables
+
+    @classmethod
+    def _publish_snapshot(cls, tmp_path, url, **manifest_fields):
+        from cde_harvester.core import publish
+
+        folder = tmp_path / "exported"
+        folder.mkdir(exist_ok=True)
+        (folder / "datasets.csv").write_text("dataset_id,content_hash\nds1,abc\n")
+        fields = {"kind": "snapshot", "incremental": False, "tables": cls._tables(), **manifest_fields}
+        return publish.publish_folder(folder, url, **fields)
+
+    @classmethod
+    def _run(cls, monkeypatch, tmp_path, events, *, empty=False, take=None, load=None,
+             aux=None, drift=None, **kwargs):
+        from cde_harvester import prefect_pipeline as pp
+
+        report = {"schema": "cde", "init_file": "1_schema.sql", "function_files": [],
+                  "tables_created": 18}
+
+        @contextlib.contextmanager
+        def loader_lock(engine):
+            events.append("lock")
+            yield
+            events.append("unlock")
+
+        def take_snapshot(engine, url):
+            events.append("export")
+            if take:
+                take()
+            return cls._publish_snapshot(tmp_path, url)
+
+        def restore_aux_tables(engine, folder):
+            events.append("aux")
+            if aux:
+                aux()
+
+        def db_loader_main(folder, incremental, allow_full_reload):
+            hashes = (Path(folder) / "datasets.csv").read_text().splitlines()[1]
+            events.append(("load", incremental, allow_full_reload, hashes))
+            if load:
+                load()
+            return {"changed": True}
+
+        TestRebuildFlowBody._patch(
+            monkeypatch,
+            rebuild=lambda engine: events.append("rebuild") or dict(report),
+            trigger=lambda **kw: events.append("harvest"),
+        )
+        monkeypatch.setattr(pp.core_db, "database_is_empty", lambda: empty)
+        monkeypatch.setattr(pp.snapshot, "loader_lock", loader_lock)
+        monkeypatch.setattr(pp.snapshot, "take_snapshot", take_snapshot)
+        monkeypatch.setattr(pp.snapshot, "restore_aux_tables", restore_aux_tables)
+        if drift:
+            monkeypatch.setattr(pp.snapshot, "drop_stale_hashes", drift)
+        monkeypatch.setattr(pp, "db_loader_main", db_loader_main)
+        monkeypatch.setattr(pp, "REBUILD_SNAPSHOT_FOLDER", tmp_path / "harvest" / "_snapshots")
+        monkeypatch.setattr(pp.sentry_sdk, "capture_message", lambda msg: events.append("sentry"))
+        return TestRebuildFlowBody._flow()(confirm="cde", **kwargs)
+
+    def test_current_snapshots_then_drops_then_reloads(self, monkeypatch, tmp_path):
+        events = []
+        report = self._run(monkeypatch, tmp_path, events)
+        assert events == [
+            "lock", "export", "rebuild", "aux", "unlock",
+            # A full reload that may replace a load that slipped in after the drop.
+            ("load", False, True, "ds1,abc"), "harvest",
+        ]
+        assert report["restored"] is True
+        assert report["snapshot"] == report["pre_rebuild_snapshot"]
+        assert report["snapshot"].startswith(f"file://{tmp_path}/harvest/_snapshots/")
+
+    def test_a_blank_value_means_current_not_none(self, monkeypatch, tmp_path):
+        events = []
+        self._run(monkeypatch, tmp_path, events, restore_from="")
+        assert "export" in events and events[-2][0] == "load"
+
+    @pytest.mark.parametrize("value", ["Latest", "curent", "harvest/_snapshots/20260901_000000"])
+    def test_an_unknown_value_aborts_before_anything(self, monkeypatch, tmp_path, value):
+        events = []
+        with pytest.raises(ValueError, match="nothing was touched"):
+            self._run(monkeypatch, tmp_path, events, restore_from=value)
+        assert events == []
+
+    def test_a_failed_export_never_reaches_the_drop(self, monkeypatch, tmp_path):
+        def boom():
+            raise RuntimeError("disk full")
+
+        events = []
+        with pytest.raises(RuntimeError, match="disk full"):
+            self._run(monkeypatch, tmp_path, events, take=boom)
+        assert "rebuild" not in events
+
+    def test_a_failed_load_after_the_drop_does_not_fail_the_run(self, monkeypatch, tmp_path):
+        def boom():
+            raise RuntimeError("validate_loaded_data failed")
+
+        events = []
+        report = self._run(monkeypatch, tmp_path, events, load=boom)
+        assert report["restored"] is False
+        assert "validate_loaded_data failed" in report["restore_error"]
+        assert events[-2:] == ["sentry", "harvest"]
+
+    def test_a_failed_aux_restore_after_the_drop_skips_the_load(self, monkeypatch, tmp_path):
+        # Loading without the lookups would renumber every pk_url in shared links.
+        def boom():
+            raise RuntimeError("aux copy failed")
+
+        events = []
+        report = self._run(monkeypatch, tmp_path, events, aux=boom)
+        assert report["restored"] is False and "aux tables" in report["restore_error"]
+        assert not [e for e in events if isinstance(e, tuple)]
+        assert events[-2:] == ["sentry", "harvest"]
+
+    def test_a_failed_drift_rule_after_the_drop_does_not_fail_the_run(self, monkeypatch, tmp_path):
+        def boom(folder, manifest):
+            raise OSError("No space left on device")
+
+        events = []
+        report = self._run(monkeypatch, tmp_path, events, drift=boom)
+        assert report["restored"] is False and "No space left" in report["restore_error"]
+        assert events[-2:] == ["sentry", "harvest"]
+
+    def test_an_empty_database_has_nothing_to_snapshot(self, monkeypatch, tmp_path):
+        events = []
+        report = self._run(monkeypatch, tmp_path, events, empty=True)
+        assert events == ["lock", "rebuild", "unlock", "harvest"]
+        assert "restored" not in report and "pre_rebuild_snapshot" not in report
+
+    def test_none_still_keeps_a_snapshot_of_the_current_data(self, monkeypatch, tmp_path):
+        events = []
+        report = self._run(monkeypatch, tmp_path, events, restore_from="none")
+        assert events == ["lock", "export", "rebuild", "unlock", "harvest"]
+        assert report["pre_rebuild_snapshot"].startswith(f"file://{tmp_path}/harvest/_snapshots/")
+        assert "restored" not in report
+
+    def test_latest_without_a_snapshot_aborts_before_anything(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("CDE_PUBLISH_URL", f"file://{tmp_path}/archive/dev")
+        events = []
+        with pytest.raises(ValueError, match="found no snapshot"):
+            self._run(monkeypatch, tmp_path, events, restore_from="latest")
+        assert events == []
+
+    def test_an_unfetchable_snapshot_aborts_before_anything(self, monkeypatch, tmp_path):
+        events = []
+        with pytest.raises(FileNotFoundError, match="upload never finished"):
+            self._run(monkeypatch, tmp_path, events, restore_from=f"file://{tmp_path}/nowhere")
+        assert events == []
+
+    @pytest.mark.parametrize("fields,message", [
+        ({"kind": "run", "incremental": True}, "not a published snapshot"),
+        ({"tables": {"datasets": {"rows": 0, "columns": ["dataset_id"]}}}, "holds no datasets"),
+        ({"tables": {"datasets": {"rows": 1, "columns": ["dataset_id", "added_later"]}}}, "cannot load"),
+    ])
+    def test_a_source_that_is_not_a_loadable_snapshot_aborts_before_anything(
+        self, monkeypatch, tmp_path, fields, message
+    ):
+        url = f"file://{tmp_path}/archive/dev/runs/x/1"
+        self._publish_snapshot(tmp_path, url, **fields)
+        events = []
+        with pytest.raises(ValueError, match=message):
+            self._run(monkeypatch, tmp_path, events, restore_from=url)
+        assert events == []
+
+    def test_a_published_snapshot_is_loaded_after_snapshotting_the_current_data(self, monkeypatch, tmp_path):
+        self._publish_snapshot(tmp_path, f"file://{tmp_path}/archive/dev/snapshots/1")
+        monkeypatch.setenv("CDE_PUBLISH_URL", f"file://{tmp_path}/archive/dev")
+
+        events = []
+        report = self._run(monkeypatch, tmp_path, events, restore_from="latest")
+        assert events == ["lock", "export", "rebuild", "aux", "unlock", ("load", False, True, "ds1,abc"), "harvest"]
+        assert report["snapshot"] == f"file://{tmp_path}/archive/dev/snapshots/1"
+        assert report["pre_rebuild_snapshot"] != report["snapshot"]
+
+    def test_a_snapshot_missing_columns_loads_with_its_hashes_cleared(self, monkeypatch, tmp_path):
+        from cde_harvester.loading import snapshot
+
+        profiles = [c for c in snapshot.LOADER_TABLES["profiles"][1] if c != "eovs"]
+        url = f"file://{tmp_path}/archive/dev/snapshots/1"
+        self._publish_snapshot(tmp_path, url, tables=self._tables(profiles={"rows": 1, "columns": profiles}))
+
+        events = []
+        report = self._run(monkeypatch, tmp_path, events, restore_from=url)
+        assert report["snapshot_missing_columns"] == {"profiles": ["eovs"]}
+        assert ("load", False, True, "ds1,") in events
+
+    def test_the_pre_rebuild_snapshot_is_mirrored_to_the_bucket(self, monkeypatch, tmp_path):
+        from cde_harvester.core import publish
+
+        monkeypatch.setenv("CDE_PUBLISH_URL", f"file://{tmp_path}/archive/dev")
+        events = []
+        report = self._run(monkeypatch, tmp_path, events)
+        name = report["snapshot"].rsplit("/", 1)[-1]
+        with publish.fetched(f"file://{tmp_path}/archive/dev/snapshots/{name}") as (_, mirrored), \
+                publish.fetched(report["snapshot"]) as (_, local):
+            assert {k: mirrored[k] for k in ("kind", "incremental", "tables")} == \
+                {k: local[k] for k in ("kind", "incremental", "tables")}
+
+    def test_an_unreachable_bucket_does_not_stop_the_rebuild(self, monkeypatch, tmp_path):
+        from cde_harvester import prefect_pipeline as pp
+
+        monkeypatch.setenv("CDE_PUBLISH_URL", "s3://cioos-juno-cde-harvest/dev")
+        monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+        monkeypatch.setattr(pp.sentry_sdk, "capture_exception", lambda e: None)
+        events = []
+        report = self._run(monkeypatch, tmp_path, events)
+        assert report["restored"] is True
