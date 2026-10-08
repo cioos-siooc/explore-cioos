@@ -7,7 +7,8 @@ const { pipeline } = require("../utils/routePipeline");
 
 const SPARKLINE_DEPTH = 10;
 
-const STRATEGY_DOC = path.join(__dirname, "../docs/erddap-harvest-strategy.md");
+const HARVEST_DOCS_DIR = path.join(__dirname, "../docs/harvesting");
+const HARVEST_DOCS = new Set(["workflow", "erddap", "obis"]);
 
 // Cap on the per-dataset attempt history. cde.harvest_attempts is append-only
 // and gains a row per dataset per run, so this was the one dashboard query
@@ -415,8 +416,13 @@ router.get(
   },
 );
 
-router.get("/strategy", (req, res) => {
-  res.type("text/markdown").sendFile(STRATEGY_DOC);
+router.get("/docs/:doc", (req, res) => {
+  if (!HARVEST_DOCS.has(req.params.doc)) {
+    return res.status(404).json({ error: "Doc not found" });
+  }
+  res
+    .type("text/markdown")
+    .sendFile(path.join(HARVEST_DOCS_DIR, `${req.params.doc}.md`));
 });
 
 router.get(

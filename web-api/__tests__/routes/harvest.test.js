@@ -124,13 +124,23 @@ describe("GET /harvest/dataset/:slug/:datasetId", () => {
   });
 });
 
-describe("GET /harvest/strategy", () => {
-  it("serves the ERDDAP harvest strategy as markdown", async () => {
-    const res = await request(app).get("/harvest/strategy");
+describe("GET /harvest/docs/:doc", () => {
+  it.each([
+    ["workflow", "# Harvest workflow"],
+    ["erddap", "# ERDDAP harvest strategy"],
+    ["obis", "# OBIS harvest strategy"],
+  ])("serves the %s doc as markdown", async (doc, title) => {
+    const res = await request(app).get(`/harvest/docs/${doc}`);
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/^text\/markdown/);
-    expect(res.text).toMatch(/^# ERDDAP harvest strategy/);
+    expect(res.text.startsWith(title)).toBe(true);
     expect(db.raw).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for an unknown doc", async () => {
+    const res = await request(app).get("/harvest/docs/ckan");
+
+    expect(res.status).toBe(404);
   });
 });

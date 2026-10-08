@@ -1,10 +1,29 @@
 # ERDDAP harvest strategy
 
+> **Harvest docs:** [Workflow](workflow.md) (`GET /harvest/docs/workflow`)
+> · **ERDDAP** (`GET /harvest/docs/erddap`)
+> · [OBIS](obis.md) (`GET /harvest/docs/obis`)
+
 How the CIOOS Data Explorer harvester reads each ERDDAP `cdm_data_type`. The
-goal for every dataset is to answer **what** (variables and EOVs), **when**
-(time coverage and the days with data) and **where** (positions and depth)
-from cheap metadata and server-side aggregations, without downloading full
-record data and without overloading the source server.
+[workflow](workflow.md) page shows where this fits: each ERDDAP server
+is its own *Harvest Source* run. The datasets it produces are then given their
+catalogue titles and organizations by [CKAN](workflow.md#ckan) and
+[loaded](workflow.md#loading) into the database.
+
+The goal for every dataset is to answer **what** (variables and EOVs),
+**when** (time coverage and the days with data) and **where** (positions and
+depth) from cheap metadata and server-side aggregations, without downloading
+full record data and without overloading the source server.
+
+**ERDDAP terms used below.** A *tabledap* dataset is a table of records; a
+*griddap* dataset is a gridded array. The `cdm_data_type` attribute says how
+the records are organized, and the `cf_role` attribute marks the variable that
+identifies each **feature** (a station, a cast, a glider deployment). The
+`distinct()`, `orderByCount()`, `orderByMinMax()` and `orderByMin()` filters
+make ERDDAP do the work on the server. They return one row per group (a
+feature, or a feature and a day) with the distinct values, counts,
+minimum/maximum, or first row, instead of the records themselves. Adding
+`time/86400` to the grouping groups by UTC day.
 
 Supported types: `TimeSeries`, `Profile`, `TimeSeriesProfile`, `Trajectory`,
 `TrajectoryProfile` (tabledap) and `Grid` (griddap). Any other
@@ -60,12 +79,17 @@ flowchart TD
 4. **Metadata.** The dataset `info` page: global attributes and per-variable
    attributes (`standard_name`, `cf_role`, `actual_range`, units).
 5. **Compliance checks** (a failure is a skip, not an error):
-   - `cde_ingest=false` global opts the dataset out;
-   - `time`, `latitude`, `longitude` are required (`Grid`: lat/lon only);
-   - at least one `standard_name` must map to a GOOS EOV;
-   - not both `depth` and `altitude`.
+   - `cde_ingest=false` global opts the dataset out (`INGEST_FLAG_FALSE`);
+   - `time`, `latitude`, `longitude` are required (`Grid`: lat/lon only)
+     (`MISSING_REQUIRED_VARS`);
+   - at least one `standard_name` must map to a GOOS EOV
+     (`NO_SUPPORTED_VARIABLES`);
+   - not both `depth` and `altitude` (`DEPTH_AND_ALTITUDE`).
 6. **Feature extraction** by the type's handler (below). No rows means
    `NO_PROFILES_FOUND`.
+
+Unchanged datasets are not re-harvested. The loader only bumps their
+`verified_at` and keeps their stored rows.
 
 Datasets are harvested **one at a time per server**; servers run in parallel.
 Responses are streamed and abandoned past 200 MB (`RESPONSE_TOO_LARGE`).
@@ -174,3 +198,37 @@ page:
   overlay.
 
 A grid with no usable lat/lon extent is skipped as `NO_PROFILES_FOUND`.
+
+## In the database
+
+| Harvest output | Table | What the loader adds |
+| --- | --- | --- |
+| Dataset row (all types) | `cde.datasets` | CKAN title, organizations and link ([CKAN](workflow.md#ckan)); merged day ranges |
+| Point-like features | `cde.profiles` | Map point in `cde.points`, hex membership for the map layer |
+| Trajectory day stats and track | `cde.trajectory_days`, `cde.trajectory_points` | Track summary, then the hex sweep into `cde.trajectory_hexes` |
+| Grid | `cde.datasets` only | — |
+
+Each server run replaces the rows of the datasets it harvested. It also
+prunes datasets of that server that are no longer listed upstream (see
+[Loading](workflow.md#loading)).
+
+## Reason codes
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| `UNCHANGED` | skipped | Croissant hash unchanged; stored rows kept |
+| `CDM_DATA_TYPE_UNSUPPORTED` | skipped | `cdm_data_type` is not one of the supported types |
+| `ON_SKIP_LIST` | skipped | Listed in `skipped_datasets.json` |
+| `INGEST_FLAG_FALSE` | skipped | `cde_ingest=false` global attribute |
+| `MISSING_REQUIRED_VARS` | skipped | No `time` / `latitude` / `longitude` |
+| `NO_SUPPORTED_VARIABLES` | skipped | No `standard_name` maps to an EOV |
+| `DEPTH_AND_ALTITUDE` | skipped | Both `depth` and `altitude` present |
+| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (or a grid without lat/lon extent) |
+| `HTTP_ERROR` | error | ERDDAP answered non-200 after retries; the message holds ERDDAP's own error text |
+| `RESPONSE_TOO_LARGE` | error | A response passed the 200 MB cap |
+| `UNKNOWN_ERROR` | error | Any other exception |
+
+A dataset that errors or is skipped keeps the rows loaded by an earlier
+run. That includes compliance skips such as `INGEST_FLAG_FALSE`. The one
+exception is `NO_PROFILES_FOUND`: the dataset is removed, because the server
+was reached and it has nothing to show.
