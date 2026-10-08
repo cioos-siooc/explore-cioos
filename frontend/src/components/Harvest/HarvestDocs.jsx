@@ -1,5 +1,11 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import { Link, NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
 import { HARVEST_DOCS, renderHarvestDoc } from "./harvestDocs.js";
@@ -16,7 +22,11 @@ async function renderDiagrams(container) {
     return node;
   });
   const { default: mermaid } = await import("mermaid");
-  mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "neutral" });
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: "neutral",
+  });
   await mermaid.run({ nodes });
 }
 
@@ -28,16 +38,22 @@ export default function HarvestDocs() {
   const contentRef = useRef(null);
 
   const markdown = HARVEST_DOCS[doc];
-  const html = useMemo(() => markdown && renderHarvestDoc(markdown), [markdown]);
+  const html = useMemo(
+    () => markdown && renderHarvestDoc(markdown),
+    [markdown],
+  );
 
   useEffect(() => {
     const container = contentRef.current;
     if (!container) return;
-    renderDiagrams(container).catch((e) => console.warn("Diagram render failed", e));
+    renderDiagrams(container).catch((e) =>
+      console.warn("Diagram render failed", e),
+    );
   }, [html]);
 
   useEffect(() => {
-    const target = hash && document.getElementById(decodeURIComponent(hash.slice(1)));
+    const target =
+      hash && document.getElementById(decodeURIComponent(hash.slice(1)));
     if (target) target.scrollIntoView();
     else window.scrollTo(0, 0);
   }, [html, hash]);
@@ -46,7 +62,14 @@ export default function HarvestDocs() {
   // the language param and SPA state survive.
   function onContentClick(event) {
     const link = event.target.closest("a[data-route]");
-    if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    if (
+      !link ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.button !== 0
+    )
+      return;
     event.preventDefault();
     const [path, anchor = ""] = link.dataset.route.split("#");
     navigate(`${path}${search}${anchor && `#${anchor}`}`);

@@ -24,7 +24,9 @@ describe("renderHarvestDoc", () => {
   });
 
   it("gives headings GitHub-style ids", () => {
-    expect(renderHarvestDoc("## Reason codes")).toContain('<h2 id="reason-codes">');
+    expect(renderHarvestDoc("## Reason codes")).toContain(
+      '<h2 id="reason-codes">',
+    );
     expect(slugify("Moving platforms: <code>Trajectory</code>")).toBe(
       "moving-platforms-trajectory",
     );

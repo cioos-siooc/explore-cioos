@@ -48,7 +48,10 @@ describe("HarvestDocs", () => {
       .find((a) => a.dataset.route);
     await user.click(link);
     expect(
-      screen.getByRole("heading", { level: 1, name: "ERDDAP harvest strategy" }),
+      screen.getByRole("heading", {
+        level: 1,
+        name: "ERDDAP harvest strategy",
+      }),
     ).toBeInTheDocument();
     expect(window.location.pathname).toBe("/harvest/docs/erddap");
     expect(window.location.search).toBe("?lang=en");
