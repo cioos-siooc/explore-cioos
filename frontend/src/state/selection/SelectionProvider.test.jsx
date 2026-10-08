@@ -209,30 +209,6 @@ describe("SelectionProvider", () => {
     );
   });
 
-  it("datasetTitleSearchText matches aliases of the search term", async () => {
-    const otnTitle = "Ocean Tracking Network acoustic receivers";
-    const mockedFetch = globalThis.fetch;
-    vi.stubGlobal("fetch", async (input) => {
-      const url = typeof input === "string" ? input : input.url;
-      const response = await mockedFetch(input);
-      if (!url.includes("/pointQuery") || url.includes("/pointQuery/inView"))
-        return response;
-      const rows = (await response.json()).map((row, i) =>
-        i === 0
-          ? { ...row, title_translated: { en: otnTitle, fr: otnTitle } }
-          : row,
-      );
-      return new Response(JSON.stringify(rows), { status: 200 });
-    });
-    await renderLoaded();
-    act(() => latest.setDatasetTitleSearchText("OTN"));
-    await waitFor(() =>
-      expect(latest.filteredDatasets.map((row) => row.title)).toEqual([
-        otnTitle,
-      ]),
-    );
-  });
-
   it("listSearchText narrows listedDatasets only — not the counters or the map", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];

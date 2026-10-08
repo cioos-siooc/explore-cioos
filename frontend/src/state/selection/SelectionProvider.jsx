@@ -10,7 +10,6 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import deburr from "lodash-es/deburr";
 import isEmpty from "lodash-es/isEmpty";
 
 import { server } from "../../config.js";
@@ -27,7 +26,6 @@ import {
   useDebounce,
 } from "../../utilities.jsx";
 import erddapServersJSONfile from "../../erddapServers.json";
-import { aliasVariants } from "../searchAliases.js";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, hiddenDatasetPksFor } from "../datasetGroups.js";
@@ -59,25 +57,22 @@ const isPlatformlessDataset = (row) =>
   row.source_type === "obis";
 
 // What the free-text search matches a dataset on: its title, its dataset type,
-// and the name of the data portal it came from. `queries` are the search's
-// aliasVariants, so "otn" also keeps "Ocean Tracking Network" titles.
+// and the name of the data portal it came from. `query` is already lowercased.
 // Shared by the datasets list and the map narrowing below, so the two always
 // agree on what a search term keeps.
-function datasetMatchesSearch(row, queries, language) {
-  const text = deburr(
-    [
-      row.title,
-      row.cdm_data_type,
-      formatErddapServerName(
-        row.erddap_server_url || row.erddap_url,
-        language,
-        erddapServersJSONfile,
-      ),
-    ]
-      .join(" ")
-      .toLowerCase(),
-  );
-  return queries.some((query) => text.includes(query));
+function datasetMatchesSearch(row, query, language) {
+  return [
+    row.title,
+    row.cdm_data_type,
+    formatErddapServerName(
+      row.erddap_server_url || row.erddap_url,
+      language,
+      erddapServersJSONfile,
+    ),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
 }
 
 function datasetInLanguage(point, language) {
@@ -300,7 +295,7 @@ export default function SelectionProvider({ children }) {
   // that have no presence on the map (see state/dataLayers.js for which
   // switch owns which dataset — Grid datasets belong to none and always stay).
   const filteredDatasets = useMemo(() => {
-    const queries = aliasVariants(datasetTitleSearchText);
+    const query = datasetTitleSearchText.toLowerCase();
     const hasSearch = !isEmpty(datasetTitleSearchText);
     const layersNarrowed = !allDataLayersOn(dataLayers);
     if (!hasSearch && !onlyInView && !layersNarrowed) return pointsData;
@@ -308,7 +303,7 @@ export default function SelectionProvider({ children }) {
       if (layersNarrowed && !datasetInDataLayers(row, dataLayers)) return false;
       if (onlyInView && !datasetsInViewPks.has(row.pk)) return false;
       if (!hasSearch) return true;
-      return datasetMatchesSearch(row, queries, i18n.language);
+      return datasetMatchesSearch(row, query, i18n.language);
     });
   }, [
     pointsData,
@@ -321,9 +316,9 @@ export default function SelectionProvider({ children }) {
 
   const listedDatasets = useMemo(() => {
     if (isEmpty(listSearchText)) return filteredDatasets;
-    const queries = aliasVariants(listSearchText);
+    const query = listSearchText.toLowerCase();
     return filteredDatasets.filter((row) =>
-      datasetMatchesSearch(row, queries, i18n.language),
+      datasetMatchesSearch(row, query, i18n.language),
     );
   }, [filteredDatasets, listSearchText, i18n.language]);
 
@@ -432,14 +427,14 @@ export default function SelectionProvider({ children }) {
   // typed (useSearchInput's "submit" trigger). Debouncing it here on top of
   // that would only delay the map behind the list it has to agree with.
   const mapDatasetPks = useMemo(() => {
-    const queries = aliasVariants(datasetTitleSearchText);
+    const query = datasetTitleSearchText.toLowerCase();
     const hasSearch = !isEmpty(datasetTitleSearchText);
     if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
     return pointsData
       .filter(
         (row) =>
           !hiddenDatasetPks.has(row.pk) &&
-          (!hasSearch || datasetMatchesSearch(row, queries, i18n.language)),
+          (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
       )
       .map((row) => row.pk);
   }, [hiddenDatasetPks, pointsData, datasetTitleSearchText, i18n.language]);
