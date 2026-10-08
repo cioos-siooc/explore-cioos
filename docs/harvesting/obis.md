@@ -1,8 +1,8 @@
 # OBIS harvest strategy
 
-> **Harvest docs:** [Workflow](workflow.md) (`GET /harvest/docs/workflow`)
-> · [ERDDAP](erddap.md) (`GET /harvest/docs/erddap`)
-> · **OBIS** (`GET /harvest/docs/obis`)
+> **Harvest docs:** [Workflow](workflow.md)
+> · [ERDDAP](erddap.md)
+> · **OBIS**
 
 This page describes how the CIOOS Data Explorer harvester reads datasets from
 the [Ocean Biodiversity Information System](https://obis.org). The

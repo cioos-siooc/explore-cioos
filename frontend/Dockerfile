@@ -40,6 +40,11 @@ RUN npm ci --quiet
 # from the lockfile.
 COPY . .
 
+# The harvest docs are bundled from the repo-root docs/ folder, outside this
+# build context; compose passes it as the `docs` context. Placed where
+# vite.config.mjs resolves it (../docs/harvesting from the app dir).
+COPY --from=docs harvesting /usr/src/docs/harvesting
+
 RUN --mount=type=secret,id=sentry_auth_token \
     SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
     npm run build

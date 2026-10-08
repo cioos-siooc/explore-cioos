@@ -27,6 +27,9 @@ export default function HarvestLayout({ breadcrumbs, children }) {
           {t("harvest.layout.backLink")}
         </Link>
         <span className="harvest-header-title">{t("harvest.title")}</span>
+        <Link to="/harvest/docs/workflow" className="harvest-home-link">
+          {t("harvest.docs.link")}
+        </Link>
         <button className="harvest-lang-toggle" onClick={toggleLanguage}>
           {otherLang.toUpperCase()}
         </button>

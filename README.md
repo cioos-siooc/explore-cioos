@@ -82,6 +82,13 @@ When harvests run is set in `.env` (all optional):
 To run one by hand, open the Prefect UI, find **cde-harvester-deployment** (or a
 per-source deployment) and click **Run → Quick Run**.
 
+How a harvest works end to end (orchestration, the ERDDAP / OBIS / CKAN
+strategies, loading) is described in the
+[harvest workflow](docs/harvesting/workflow.md), with per-source detail for
+[ERDDAP](docs/harvesting/erddap.md) and [OBIS](docs/harvesting/obis.md). The
+frontend bundles them at build time and shows them on the harvest dashboard
+at `/harvest/docs/{workflow,erddap,obis}`.
+
 More in the [harvester README](harvester/README.md) and the
 [DB loader README](harvester/cde_harvester/loading/README.md).
 

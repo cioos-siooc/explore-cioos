@@ -1,8 +1,8 @@
 # Harvest workflow
 
-> **Harvest docs:** **Workflow** (`GET /harvest/docs/workflow`)
-> · [ERDDAP](erddap.md) (`GET /harvest/docs/erddap`)
-> · [OBIS](obis.md) (`GET /harvest/docs/obis`)
+> **Harvest docs:** **Workflow**
+> · [ERDDAP](erddap.md)
+> · [OBIS](obis.md)
 
 This page describes how the CIOOS Data Explorer harvester turns three upstream
 systems into the `cde` database: how runs are scheduled, what each source

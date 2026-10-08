@@ -1,8 +1,8 @@
 # ERDDAP harvest strategy
 
-> **Harvest docs:** [Workflow](workflow.md) (`GET /harvest/docs/workflow`)
-> · **ERDDAP** (`GET /harvest/docs/erddap`)
-> · [OBIS](obis.md) (`GET /harvest/docs/obis`)
+> **Harvest docs:** [Workflow](workflow.md)
+> · **ERDDAP**
+> · [OBIS](obis.md)
 
 How the CIOOS Data Explorer harvester reads each ERDDAP `cdm_data_type`. The
 [workflow](workflow.md) page shows where this fits: each ERDDAP server

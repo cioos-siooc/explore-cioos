@@ -212,6 +212,9 @@ services:
   frontend:
     build:
       context: ./frontend
+      # The harvest docs page bundles docs/harvesting (see frontend/Dockerfile).
+      additional_contexts:
+        docs: ./docs
       args:
         # Default to a same-origin relative path so the SPA works on whatever
         # public hostname serves it without a rebuild.
