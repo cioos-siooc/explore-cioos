@@ -139,6 +139,7 @@ class TestCdePipelineWiring:
         monkeypatch.setattr(prefect_pipeline, "harvester_main", fake_harvester_main)
         monkeypatch.setattr(prefect_pipeline, "db_loader_main", lambda **kw: None)
         monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "_trigger_vernaculars", lambda: None)
 
         config = dict(DISCOVERY_CONFIG, folder=str(tmp_path / "harvest"))
         p = PrefectCDEPipeline()
@@ -151,6 +152,58 @@ class TestCdePipelineWiring:
         }
         assert captured["obis_discovery"]["enabled"] is True
         assert captured["obis_dataset_ids"] == []
+
+
+class TestVernacularsTrigger:
+    @pytest.fixture
+    def triggered(self, config_file, tmp_path, monkeypatch):
+        """Run cde_pipeline() for `source`; return the deployments it submitted."""
+        monkeypatch.setattr(prefect_pipeline, "harvester_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "db_loader_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
+
+        def _run(source, config=DISCOVERY_CONFIG):
+            calls = []
+
+            def fake_run_deployment(name, **kw):
+                calls.append(name)
+                return type("FlowRun", (), {"id": "x"})()
+
+            monkeypatch.setattr(prefect_pipeline, "run_deployment", fake_run_deployment)
+            p = PrefectCDEPipeline()
+            p.init_config(config_file(dict(config, folder=str(tmp_path / "harvest"))))
+            p.source = source
+            p.cde_pipeline()
+            return calls
+
+        return _run
+
+    def test_obis_run_triggers_vernaculars(self, triggered):
+        assert triggered("obis") == [prefect_pipeline.VERNACULARS_DEPLOYMENT]
+
+    def test_full_run_with_obis_triggers_vernaculars(self, triggered):
+        assert triggered(None) == [prefect_pipeline.VERNACULARS_DEPLOYMENT]
+
+    def test_erddap_run_does_not_trigger(self, triggered):
+        assert triggered("https://data.cioospacific.ca/erddap") == []
+
+    def test_full_run_without_obis_does_not_trigger(self, triggered):
+        config = {"erddap_urls": ["https://data.cioospacific.ca/erddap"], "folder": "harvest"}
+        assert triggered(None, config) == []
+
+    def test_trigger_failure_does_not_fail_the_harvest(self, config_file, tmp_path, monkeypatch):
+        monkeypatch.setattr(prefect_pipeline, "harvester_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "db_loader_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
+
+        def boom(name, **kw):
+            raise RuntimeError("deployment not found")
+
+        monkeypatch.setattr(prefect_pipeline, "run_deployment", boom)
+        p = PrefectCDEPipeline()
+        p.init_config(config_file(dict(DISCOVERY_CONFIG, folder=str(tmp_path / "harvest"))))
+        p.source = "obis"
+        p.cde_pipeline()
 
 
 # ---------------------------------------------------------------------------
