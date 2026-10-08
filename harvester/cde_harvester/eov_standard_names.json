@@ -49,7 +49,14 @@
   ],
   "seaIce": [
     "sea_ice_draft",
-    "sea_ice_thickness"
+    "sea_ice_thickness",
+    "eastward_sea_ice_velocity",
+    "northward_sea_ice_velocity",
+    "eastward_derivative_of_northward_sea_ice_velocity",
+    "northward_derivative_of_eastward_sea_ice_velocity",
+    "sea_ice_x_velocity",
+    "sea_ice_y_velocity",
+    "sea_ice_speed"
   ],
   "seaState": [
     "sea_surface_swell_wave_period",
@@ -102,7 +109,15 @@
   ],
   "surfaceCurrents": [
     "surface_eastward_sea_water_velocity",
-    "surface_northward_sea_water_velocity"
+    "surface_northward_sea_water_velocity",
+    "surface_geostrophic_eastward_sea_water_velocity",
+    "surface_geostrophic_northward_sea_water_velocity",
+    "surface_geostrophic_eastward_sea_water_velocity_assuming_mean_sea_level_for_geoid",
+    "surface_geostrophic_northward_sea_water_velocity_assuming_mean_sea_level_for_geoid",
+    "eastward_sea_water_velocity_due_to_ekman_drift",
+    "northward_sea_water_velocity_due_to_ekman_drift",
+    "sea_surface_wave_stokes_drift_eastward_velocity",
+    "sea_surface_wave_stokes_drift_northward_velocity"
   ],
   "subSurfaceCurrents": [
     "sea_water_speed",
@@ -123,7 +138,15 @@
     "upward_sea_water_velocity",
     "sea_water_x_velocity",
     "sea_water_y_velocity",
-    "direction_of_sea_water_velocity"
+    "direction_of_sea_water_velocity",
+    "baroclinic_eastward_sea_water_velocity",
+    "baroclinic_northward_sea_water_velocity",
+    "barotropic_eastward_sea_water_velocity",
+    "barotropic_northward_sea_water_velocity",
+    "geostrophic_eastward_sea_water_velocity",
+    "geostrophic_northward_sea_water_velocity",
+    "eastward_sea_water_velocity_due_to_parameterized_mesoscale_eddies",
+    "northward_sea_water_velocity_due_to_parameterized_mesoscale_eddies"
   ],
   "transientTracers": [],
   "particulateMatter": [
@@ -288,7 +311,9 @@
     "upward_y_stress_at_sea_ice_base",
     "sea_surface_wave_directional_spread",
     "sea_surface_wave_from_direction",
-    "sea_surface_wave_maximum_period"
+    "sea_surface_wave_maximum_period",
+    "eastward_friction_velocity_at_sea_water_surface",
+    "northward_friction_velocity_at_sea_water_surface"
   ],
   "oceanBottomPressure": []
 }
