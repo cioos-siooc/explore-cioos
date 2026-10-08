@@ -234,27 +234,48 @@ npm --prefix frontend run test:a11y                    # axe, ratcheting baselin
 
 ### CI/CD
 
-The [Deploy workflow](.github/workflows/deploy.yml) deploys immutable release
-tags after the release-triggered Integration Tests (including visual regression)
-succeed. A prerelease (for example `v1.2.0-rc.1`) must point to a commit on
-`development*` or `master` and deploys staging; a full release must point to a
-commit on `master` and deploys production. Both run on Juno over WireGuard
-through the shared `cioos-deploy-docker-compose` action, pinned to the tag's
-commit. To roll back, dispatch Deploy with an existing published release
-tag and its matching environment; historic CI runs need not still be retained.
+The [Deploy workflow](.github/workflows/deploy.yml) runs when a GitHub release
+is published (or is dispatched by hand with an existing tag). Its `release` job
+verifies the tag and deploys nothing; then exactly one deploy job runs. The tag
+name picks the target and any other name is rejected:
+
+| Tag | Release type | Target | Commit must be on |
+|---|---|---|---|
+| `beta*` | prerelease | beta | `development*` or `master` |
+| `vX.Y.Z-rc.N` | prerelease | staging | `master` |
+| `vX.Y.Z` | full release | production | `master`, with a successful staging deployment of the same commit |
+
+Before any deploy, `release` also requires a non-draft release and the
+release-triggered Integration Tests (including visual regression) to pass.
+Production's extra gate reads GitHub's deployment records: tag `vX.Y.Z` on the
+same commit as the `vX.Y.Z-rc.N` that deployed successfully. A beta deploy never
+satisfies it.
+
+```bash
+gh release create beta3 --target <branch-or-sha> --prerelease          # beta
+gh release create v1.2.0-rc.1 --target master --prerelease             # staging
+gh release create v1.2.0 --target master                               # production
+```
+
+Beta and staging are one stack on one Juno host (`dev.explore.cioos.ca`) and
+deploy one at a time; production is another host. All run over WireGuard through
+the shared `cioos-deploy-docker-compose` action, pinned to the tag's commit. To
+roll back or redeploy, dispatch Deploy with an existing published release tag;
+the target follows from the tag.
 
 `.env.production` in this repo **is** the production configuration: `op://`
 references name 1Password items, everything else ships as written. Change
 production settings there, not on the box.
 
-`.env.staging` is the matching Juno staging template. Before publishing
-a prerelease, create its referenced `explore-cioos-staging` 1Password item with
-the listed fields. In particular, give staging its own public URL, nginx and
-Prefect ports, Postgres port/database/password, and external database address.
-Create the staging external Docker network once on Juno with
-`docker network create explore-cioos-staging_default`. The staging template
-uses that network and the tracked sample harvest config so its first deployment
-does not depend on production's network or host-editable config file.
+`.env.staging` is the beta/staging template. Create its referenced
+`explore-cioos-staging` 1Password item with the listed fields, and the external
+network once on Juno with `docker network create explore-cioos-staging_default`.
+`docker-compose.staging.yaml` suffixes the Postgres and harvester volumes
+(`harvest_data`, `harvester_cache`, `obis_cache`) with the tag: a new tag starts
+empty (schema + `RUN_ON_DEPLOY` harvest), redeploying the same tag keeps its
+data. Superseded volumes are not removed; list them with
+`docker volume ls -f name=explore-cioos-staging_` and `docker volume rm` the old
+tags'. The host has 2 CPU / 8 GB, so `HARVESTER_MEM_LIMIT` is 3g.
 
 ### Coolify (latest)
 
