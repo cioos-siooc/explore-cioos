@@ -274,10 +274,13 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("starts every group closed, and a header opens its group", async () => {
+  it("starts every group closed past one page, and a header opens its group", async () => {
+    const rows = Array.from({ length: 30 }, (_, i) =>
+      makeRow({ pk: i + 1, platform: i % 2 ? "buoy" : "mooring" }),
+    );
     const { user } = renderWithProviders(
       <DatasetsTable
-        datasets={ROWS}
+        datasets={rows}
         selectAll={false}
         handleSelectAllDatasets={() => {}}
         handleSelectDataset={() => {}}
@@ -296,7 +299,33 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     expect(screen.getAllByTestId("dataset-card").length).toBeGreaterThan(0);
   });
 
-  it("groups by data portal under ERDDAP and OBIS, open to their portals", async () => {
+  it("starts every group open when its rows fit on one page, and a header closes its group", async () => {
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+
+    const toggles = await screen.findAllByRole("button", { expanded: true });
+    expect(screen.queryAllByRole("button", { expanded: false })).toHaveLength(
+      0,
+    );
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(ROWS.length);
+
+    await user.click(toggles[0]);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getAllByTestId("dataset-card").length).toBeLessThan(
+      ROWS.length,
+    );
+  });
+
+  it("groups by data portal under ERDDAP and OBIS", async () => {
     const erddap = "https://erddap.ogsl.ca/erddap";
     const rows = [
       makeRow({ pk: 1, title: "A", erddap_server_url: erddap }),
@@ -339,10 +368,11 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
         ["OTN-OBIS", "1", true],
       ]),
     );
-    expect(screen.queryAllByTestId("dataset-card")).toHaveLength(0);
+    // The OBIS dataset is listed under each of its nodes.
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(4);
 
     await user.click(screen.getByRole("button", { name: /OTN-OBIS/ }));
-    expect(screen.getAllByTestId("dataset-card")).toHaveLength(1);
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(3);
 
     // A parent sets its whole source list, as the Filters modal's OBIS row
     // does; a node the catalogue doesn't know offers no filter.

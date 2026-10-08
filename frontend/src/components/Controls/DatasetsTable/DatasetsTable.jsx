@@ -155,13 +155,9 @@ export default function DatasetsTable({
   }, [isDownloadModal, grouped, t]);
 
   const [sort, setSort] = useState(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
-  // Groups start closed, so a grouping reads first as its list of groups; a new
-  // grouping starts closed again. A nested dimension opens its parents, so it
-  // reads as the list of groups inside them.
-  const [expandedGroups, setExpandedGroups] = useState(
-    () => new Set(parentGroupKeys(groupBy)),
-  );
-  if (useChanged(groupBy)) setExpandedGroups(new Set(parentGroupKeys(groupBy)));
+  // The groups the reader opened or closed against their default (see
+  // isExpanded below).
+  const [toggledGroups, setToggledGroups] = useState(() => new Set());
   if (useChanged(grouped)) setSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
   // Group size orders the groups (renderItems); the rows within them go by
   // title.
@@ -240,6 +236,21 @@ export default function DatasetsTable({
     return groups;
   }, [visibleRows, groupBy]);
 
+  // Groups start closed, so a grouping reads first as its list of groups —
+  // unless every row fits on one page, when the list itself is shown. A nested
+  // dimension opens its parents, so it reads as the list of groups inside
+  // them. A new grouping, or results that cross the one-page line, drop the
+  // reader's own toggles.
+  const fitsOnePage =
+    [...byGroup.values()].reduce((n, rows) => n + rows.length, 0) <= pageSize;
+  if (useChanged(groupBy, fitsOnePage)) setToggledGroups(new Set());
+  const isExpanded = useCallback(
+    (key) =>
+      (fitsOnePage || parentGroupKeys(groupBy).includes(key)) !==
+      toggledGroups.has(key),
+    [fitsOnePage, groupBy, toggledGroups],
+  );
+
   // The groups seen while the dimension's own filter was not narrowing it.
   // Once it is, the groups it took out of the results — every other one when
   // one is included, the excluded one itself — stay listed from here, empty,
@@ -307,7 +318,7 @@ export default function DatasetsTable({
           depth,
           expandable: rows.length > 0,
         });
-        if (rows.length > 0 && expandedGroups.has(key)) {
+        if (rows.length > 0 && isExpanded(key)) {
           for (const row of rows) items.push({ row, group: key });
         }
       }
@@ -345,7 +356,7 @@ export default function DatasetsTable({
           depth: 0,
           expandable: true,
         });
-        if (expandedGroups.has(parent)) {
+        if (isExpanded(parent)) {
           pushGroups(childrenByParent.get(parent), 1);
         }
       }
@@ -369,7 +380,7 @@ export default function DatasetsTable({
     groupBy,
     byGroup,
     emptyKeys,
-    expandedGroups,
+    isExpanded,
     sort,
     i18n.language,
     t,
@@ -420,7 +431,7 @@ export default function DatasetsTable({
     for (const item of renderItems) {
       if (item.header) {
         openHeaders = openHeaders.slice(0, item.depth);
-        if (expandedGroups.has(item.group)) {
+        if (item.expandable && isExpanded(item.group)) {
           openHeaders.push(item);
         } else if (rowIndex >= firstRow && rowIndex < lastRow) {
           emit(item);
@@ -432,7 +443,7 @@ export default function DatasetsTable({
       rowIndex++;
     }
     return out;
-  }, [renderItems, firstRow, pageSize, currentPage, pageCount, expandedGroups]);
+  }, [renderItems, firstRow, pageSize, currentPage, pageCount, isExpanded]);
 
   // The what's here tip points at one of the click's datasets that can be
   // ticked in, while this list rather than the card holds them (see Sidebar).
@@ -444,7 +455,7 @@ export default function DatasetsTable({
   );
 
   const toggleGroupExpanded = (group) => {
-    setExpandedGroups((prev) => {
+    setToggledGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
       else next.add(group);
@@ -624,7 +635,7 @@ export default function DatasetsTable({
                 />
               );
             }
-            const collapsed = !expandedGroups.has(item.group);
+            const collapsed = !isExpanded(item.group);
             const filter = filterFor(item.group);
             const label = groupLabel(item.group, groupBy, t, i18n.language);
             return (
