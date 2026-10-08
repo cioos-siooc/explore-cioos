@@ -283,6 +283,90 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
     expect(screen.getAllByTestId("dataset-card").length).toBeGreaterThan(0);
   });
+
+  it("groups by data portal under ERDDAP and OBIS, open to their portals", async () => {
+    const erddap = "https://erddap.ogsl.ca/erddap";
+    const rows = [
+      makeRow({ pk: 1, title: "A", erddap_server_url: erddap }),
+      makeRow({ pk: 2, title: "B", erddap_server_url: erddap }),
+      makeRow({
+        pk: 3,
+        title: "C",
+        source_type: "obis",
+        obis_nodes: ["OBIS Canada", "OTN-OBIS"],
+      }),
+    ];
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={rows}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "source");
+
+    const headers = () =>
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].map((h) => [
+        h.querySelector(".datasetsCardGroupTitle").textContent,
+        h.querySelector(".datasetsCardGroupCount").textContent,
+        h.classList.contains("nested"),
+      ]);
+    // The OBIS dataset sits in both nodes but counts once for OBIS.
+    await waitFor(() =>
+      expect(headers()).toEqual([
+        ["ERDDAP", "2", false],
+        ["SLGO", "2", true],
+        ["OBIS", "1", false],
+        ["OBIS Canada", "1", true],
+        ["OTN-OBIS", "1", true],
+      ]),
+    );
+    expect(screen.queryAllByTestId("dataset-card")).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: /OTN-OBIS/ }));
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(1);
+
+    // Hiding OBIS hides its nodes too; their own eyes wait on the parent's.
+    const eyes = () => document.querySelectorAll(".datasetsCardGroupHide");
+    await user.click(eyes()[2]);
+    expect(eyes()[2]).toHaveAttribute("aria-pressed", "true");
+    expect(eyes()[3]).toBeDisabled();
+    expect(eyes()[4]).toBeDisabled();
+    expect(eyes()[0]).toBeEnabled();
+  });
+
+  it("a page opened mid-group re-shows both its parent and its group header", async () => {
+    const rows = Array.from({ length: 30 }, (_, i) =>
+      makeRow({
+        pk: i + 1,
+        title: `Station ${String(i).padStart(2, "0")}`,
+        erddap_server_url: "https://erddap.ogsl.ca/erddap",
+      }),
+    );
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={rows}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "source");
+    await user.click(await screen.findByRole("button", { name: /SLGO/ }));
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(
+      [...document.querySelectorAll(".datasetsCardGroupTitle")].map(
+        (el) => el.textContent,
+      ),
+    ).toEqual(["ERDDAP", "SLGO"]);
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(5);
+  });
 });
 
 describe("DatasetsTable (download modal)", () => {

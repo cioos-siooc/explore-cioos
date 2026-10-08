@@ -449,6 +449,21 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-primary-700);
 }
 
+/* A group inside a parent group (the data portal dimension): indented under
+   it, and sticking just below the parent's header rather than over it. */
+.datasetsCardGroupHeader.nested {
+  top: 34px;
+  margin-left: 12px;
+  width: calc(100% - 12px);
+}
+
+/* Hidden with its parent: only the parent's eye brings it back. */
+.datasetsCardGroupHeader .datasetsCardGroupHide:disabled {
+  cursor: default;
+  color: var(--cioos-ink-40);
+  background: none;
+}
+
 .datasetCard.hiddenFromMap {
   opacity: 0.55;
 }

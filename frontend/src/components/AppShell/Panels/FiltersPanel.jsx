@@ -207,11 +207,21 @@ export default function FiltersPanel({ searchInputRef }) {
 
   const sourcesBadgeTitle = (() => {
     const notTitle = (title) => t("filterExcludedOption", { title });
+    const allServersSelected =
+      erddapServersSelected.length > 0 &&
+      erddapServersSelected.every((s) => s.isSelected);
+    const allServersExcluded =
+      erddapServersSelected.length > 0 &&
+      erddapServersSelected.every((s) => s.isExcluded);
     const selectedTitles = [
-      ...erddapServersSelected
-        .filter(isSet)
-        .map((s) => (s.isExcluded ? notTitle(s.title) : s.title)),
-      // a fully selected (or fully excluded) OBIS group reads as one source
+      // a fully selected (or fully excluded) group reads as one source
+      ...(allServersSelected
+        ? ["ERDDAP"]
+        : allServersExcluded
+          ? [notTitle("ERDDAP")]
+          : erddapServersSelected
+              .filter(isSet)
+              .map((s) => (s.isExcluded ? notTitle(s.title) : s.title))),
       ...(allObisNodesSelected
         ? ["OBIS"]
         : allObisNodesExcluded

@@ -28,7 +28,10 @@ import {
   groupKeysFor,
   groupLabel,
   groupOptions,
+  groupParent,
   isGroupDimension,
+  isGroupHidden,
+  parentGroupKeys,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
 import { useChanged } from "../../../utilities.jsx";
@@ -158,9 +161,12 @@ export default function DatasetsTable({
 
   const [sort, setSort] = useState(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
   // Groups start closed, so a grouping reads first as its list of groups; a new
-  // grouping starts closed again.
-  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
-  if (useChanged(groupBy)) setExpandedGroups(new Set());
+  // grouping starts closed again. A nested dimension opens its parents, so it
+  // reads as the list of groups inside them.
+  const [expandedGroups, setExpandedGroups] = useState(
+    () => new Set(parentGroupKeys(groupBy)),
+  );
+  if (useChanged(groupBy)) setExpandedGroups(new Set(parentGroupKeys(groupBy)));
   if (useChanged(grouped)) setSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
   // Group size orders the groups (renderItems); the rows within them go by
   // title.
@@ -230,7 +236,10 @@ export default function DatasetsTable({
   // stay in their sorted order within a group; groups are alphabetical by label
   // with Other/Uncategorized last. Array-valued dims place a dataset under each
   // of its values, so the total row entries can exceed the unique dataset count
-  // (the toolbar count stays unique — see below).
+  // (the toolbar count stays unique — see below). A nested dimension adds a
+  // header per parent (depth 0) above its groups' headers (depth 1); a
+  // parent's count is its unique datasets, since a dataset can sit in several
+  // of its groups.
   const renderItems = useMemo(() => {
     if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
     const byGroup = new Map();
@@ -245,19 +254,45 @@ export default function DatasetsTable({
         byGroup.get(key).push(row);
       }
     }
-    const keys = sortGroupKeys(byGroup.keys(), groupBy, t, i18n.language);
-    if (sort.field === GROUP_SIZE) {
-      const factor = sort.dir === "asc" ? 1 : -1;
-      keys.sort(
-        (a, b) => (byGroup.get(a).length - byGroup.get(b).length) * factor,
-      );
-    }
+    const sortKeys = (keys, sizeOf) => {
+      const sorted = sortGroupKeys(keys, groupBy, t, i18n.language);
+      if (sort.field === GROUP_SIZE) {
+        const factor = sort.dir === "asc" ? 1 : -1;
+        sorted.sort((a, b) => (sizeOf(a) - sizeOf(b)) * factor);
+      }
+      return sorted;
+    };
     const items = [];
-    for (const key of keys) {
-      const rows = byGroup.get(key);
-      items.push({ header: true, group: key, count: rows.length });
-      if (expandedGroups.has(key)) {
-        for (const row of rows) items.push({ row, group: key });
+    const pushGroups = (keys, depth) => {
+      for (const key of sortKeys(keys, (k) => byGroup.get(k).length)) {
+        const rows = byGroup.get(key);
+        items.push({ header: true, group: key, count: rows.length, depth });
+        if (expandedGroups.has(key)) {
+          for (const row of rows) items.push({ row, group: key });
+        }
+      }
+    };
+    if (parentGroupKeys(groupBy).length === 0) {
+      pushGroups(byGroup.keys(), 0);
+      return items;
+    }
+    const childrenByParent = new Map();
+    for (const key of byGroup.keys()) {
+      const parent = groupParent(key, groupBy);
+      if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
+      childrenByParent.get(parent).push(key);
+    }
+    const parentSize = (parent) =>
+      new Set(childrenByParent.get(parent).flatMap((k) => byGroup.get(k))).size;
+    for (const parent of sortKeys(childrenByParent.keys(), parentSize)) {
+      items.push({
+        header: true,
+        group: parent,
+        count: parentSize(parent),
+        depth: 0,
+      });
+      if (expandedGroups.has(parent)) {
+        pushGroups(childrenByParent.get(parent), 1);
       }
     }
     return items;
@@ -287,10 +322,10 @@ export default function DatasetsTable({
   const firstRow = (currentPage - 1) * pageSize;
 
   // This page's slice of the render list. Headers don't consume the page's
-  // budget: a group header is re-shown at the top of every page its rows run
-  // onto, so a page opened mid-group still says which group it is in. A
-  // collapsed group has no rows of its own, so its header shows on the page
-  // its position falls into — once, never twice.
+  // budget: an open group's header (and its parent's) is re-shown at the top
+  // of every page its rows run onto, so a page opened mid-group still says
+  // which group it is in. A collapsed group has no rows of its own, so its
+  // header shows on the page its position falls into — once, never twice.
   const pageItems = useMemo(() => {
     // The last page runs to the end so that collapsed groups trailing the final
     // row still land somewhere — with an exact multiple of pageSize there is no
@@ -301,25 +336,31 @@ export default function DatasetsTable({
         : firstRow + pageSize;
     const out = [];
     let rowIndex = 0;
-    let pendingHeader = null;
+    // The open headers enclosing the current position, one per depth, and
+    // whether this page has shown each yet.
+    let openHeaders = [];
+    const emitted = new Set();
+    const emit = (item) => {
+      for (const header of openHeaders) {
+        if (!emitted.has(header)) {
+          out.push(header);
+          emitted.add(header);
+        }
+      }
+      out.push(item);
+    };
     for (const item of renderItems) {
       if (item.header) {
-        if (!expandedGroups.has(item.group)) {
-          pendingHeader = null;
-          if (rowIndex >= firstRow && rowIndex < lastRow) out.push(item);
-        } else {
-          pendingHeader = item;
+        openHeaders = openHeaders.slice(0, item.depth);
+        if (expandedGroups.has(item.group)) {
+          openHeaders.push(item);
+        } else if (rowIndex >= firstRow && rowIndex < lastRow) {
+          emit(item);
         }
         continue;
       }
       if (rowIndex >= lastRow) break;
-      if (rowIndex >= firstRow) {
-        if (pendingHeader) {
-          out.push(pendingHeader);
-          pendingHeader = null;
-        }
-        out.push(item);
-      }
+      if (rowIndex >= firstRow) emit(item);
       rowIndex++;
     }
     return out;
@@ -523,7 +564,8 @@ export default function DatasetsTable({
                   onHover={setHoveredDataset}
                   onHoverEnd={() => setHoveredDataset()}
                   hiddenFromMap={
-                    item.group !== undefined && hiddenGroups.has(item.group)
+                    item.group !== undefined &&
+                    isGroupHidden(item.group, groupBy, hiddenGroups)
                   }
                   fromMapClick={pinnedPks.has(Number(item.row.pk))}
                   tipHighlight={tipHighlight(
@@ -535,14 +577,17 @@ export default function DatasetsTable({
               );
             }
             const collapsed = !expandedGroups.has(item.group);
-            const hidden = hiddenGroups.has(item.group);
-            const label = groupLabel(item.group, groupBy, t);
+            const hidden = isGroupHidden(item.group, groupBy, hiddenGroups);
+            // A group whose parent is hidden can't be shown on its own.
+            const hiddenByParent = hidden && !hiddenGroups.has(item.group);
+            const label = groupLabel(item.group, groupBy, t, i18n.language);
             return (
               <div
                 key={`group:${item.group}`}
                 className={classNames("datasetsCardGroupHeader", {
                   open: !collapsed,
                   hidden,
+                  nested: item.depth > 0,
                 })}
               >
                 <button
@@ -566,6 +611,7 @@ export default function DatasetsTable({
                     type="button"
                     className="datasetsCardGroupHide"
                     onClick={() => toggleGroupHidden(item.group)}
+                    disabled={hiddenByParent}
                     aria-pressed={hidden}
                     title={
                       hidden

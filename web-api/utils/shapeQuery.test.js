@@ -63,6 +63,11 @@ test("an obisNodes selection hides profiles unless erddapServers is set alongsid
   assert.match(combined.sql, OBIS);
 });
 
+test("rows carry their OBIS nodes so the list can group by data portal", async () => {
+  const { sql } = await build({});
+  assert.match(sql, /d\.obis_nodes,/);
+});
+
 test("an empty branch set still yields runnable SQL that matches nothing", async () => {
   // Every arm suppressed at once: the guard must emit a WHERE FALSE shell, not
   // an empty UNION that fails to parse.

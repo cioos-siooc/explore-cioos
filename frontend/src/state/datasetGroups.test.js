@@ -14,6 +14,9 @@ import {
   groupLabel,
   sortGroupKeys,
   hiddenDatasetPksFor,
+  groupParent,
+  isGroupHidden,
+  parentGroupKeys,
 } from "./datasetGroups.js";
 
 const t = (key) => key;
@@ -41,11 +44,20 @@ describe("groupKeysFor", () => {
     expect(groupKeysFor({}, "platform", null)).toEqual([OTHER_KEY]);
   });
 
-  it("groups by source_type for the source dimension, defaulting to erddap", () => {
+  it("groups by ERDDAP server or by each OBIS node for the source dimension", () => {
+    expect(
+      groupKeysFor({ erddap_server_url: "https://e/erddap" }, "source", null),
+    ).toEqual(["erddap:https://e/erddap"]);
+    expect(
+      groupKeysFor(
+        { source_type: "obis", obis_nodes: ["OBIS Canada", "OTN-OBIS"] },
+        "source",
+        null,
+      ),
+    ).toEqual(["obis:OBIS Canada", "obis:OTN-OBIS"]);
     expect(groupKeysFor({ source_type: "obis" }, "source", null)).toEqual([
-      "obis",
+      `obis:${UNCATEGORIZED_KEY}`,
     ]);
-    expect(groupKeysFor({}, "source", null)).toEqual(["erddap"]);
   });
 
   it("returns every organization or eov a dataset belongs to (array-valued dimensions)", () => {
@@ -101,9 +113,16 @@ describe("groupLabel", () => {
     expect(groupLabel("Point", "type", t)).toBe("Point");
   });
 
-  it("uppercases OBIS but title-cases ERDDAP for the source dimension", () => {
+  it("labels the source parents, servers by name and nodes as themselves", () => {
     expect(groupLabel("obis", "source", t)).toBe("OBIS");
     expect(groupLabel("erddap", "source", t)).toBe("ERDDAP");
+    expect(
+      groupLabel("erddap:https://erddap.ogsl.ca/erddap", "source", t, "fr"),
+    ).toBe("OGSL");
+    expect(groupLabel("obis:OTN-OBIS", "source", t)).toBe("OTN-OBIS");
+    expect(groupLabel(`obis:${UNCATEGORIZED_KEY}`, "source", t)).toBe(
+      "datasetsCardGroupUncategorizedText",
+    );
   });
 
   it("translates the in/out-of-view and selected/unselected labels", () => {
@@ -189,5 +208,30 @@ describe("hiddenDatasetPksFor", () => {
       null,
     );
     expect(hidden).toEqual(new Set([1, 2, 3]));
+  });
+});
+
+describe("nested groups", () => {
+  it("only the source dimension has parents", () => {
+    expect(parentGroupKeys("source")).toEqual(["erddap", "obis"]);
+    expect(parentGroupKeys("organization")).toEqual([]);
+    expect(groupParent("erddap:https://e/erddap", "source")).toBe("erddap");
+    expect(groupParent("obis", "source")).toBe(null);
+    expect(groupParent("a:b", "eov")).toBe(null);
+  });
+
+  it("hiding a parent hides every group in it, and its datasets from the map", () => {
+    const hiddenGroups = new Set(["obis"]);
+    expect(isGroupHidden("obis:OTN-OBIS", "source", hiddenGroups)).toBe(true);
+    expect(isGroupHidden("erddap:https://e", "source", hiddenGroups)).toBe(
+      false,
+    );
+    const datasets = [
+      { pk: 1, source_type: "obis", obis_nodes: ["OTN-OBIS"] },
+      { pk: 2, erddap_server_url: "https://e" },
+    ];
+    expect(hiddenDatasetPksFor(datasets, "source", hiddenGroups, null)).toEqual(
+      new Set([1]),
+    );
   });
 });
