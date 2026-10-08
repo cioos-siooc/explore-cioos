@@ -1,6 +1,7 @@
 import Fuse from "fuse.js";
 import deburr from "lodash-es/deburr";
 
+import { aliasVariants } from "./searchAliases.js";
 import {
   defaultStartDate,
   defaultEndDate,
@@ -11,8 +12,15 @@ import {
 // Typo-tolerant, and blind to case and accents, so "temprature" finds
 // "Température" and the French facet labels are as reachable as the English
 // ones. ignoreLocation, as a dataset title names its subject anywhere in it.
+// Aliases too, so "otn" finds "Ocean Tracking Network".
 const FUSE_OPTIONS = {
-  keys: [{ name: "text", getFn: (option) => option.matchText ?? option.label }],
+  keys: [
+    {
+      name: "text",
+      getFn: (option) =>
+        aliasVariants(option.matchText ?? option.label).join(" "),
+    },
+  ],
   ignoreDiacritics: true,
   ignoreLocation: true,
 };
