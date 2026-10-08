@@ -1,3 +1,4 @@
+const path = require("path");
 const express = require("express");
 
 const router = express.Router();
@@ -5,6 +6,8 @@ const db = require("../db");
 const { pipeline } = require("../utils/routePipeline");
 
 const SPARKLINE_DEPTH = 10;
+
+const STRATEGY_DOC = path.join(__dirname, "../docs/erddap-harvest-strategy.md");
 
 // Cap on the per-dataset attempt history. cde.harvest_attempts is append-only
 // and gains a row per dataset per run, so this was the one dashboard query
@@ -411,6 +414,10 @@ router.get(
     res.json({ run, attempts });
   },
 );
+
+router.get("/strategy", (req, res) => {
+  res.type("text/markdown").sendFile(STRATEGY_DOC);
+});
 
 router.get(
   "/reasons",

@@ -123,3 +123,14 @@ describe("GET /harvest/dataset/:slug/:datasetId", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("GET /harvest/strategy", () => {
+  it("serves the ERDDAP harvest strategy as markdown", async () => {
+    const res = await request(app).get("/harvest/strategy");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/^text\/markdown/);
+    expect(res.text).toMatch(/^# ERDDAP harvest strategy/);
+    expect(db.raw).not.toHaveBeenCalled();
+  });
+});
