@@ -243,6 +243,8 @@
   "datasetsTableSizeTitle": "Approximate dataset size in megabytes",
   "datasetsTableDetailsTitle": "Open dataset details",
   "datasetInspectorDownloadText": "Download",
+  "datasetNotInResultsText": "This dataset doesn't match your current filters.",
+  "datasetNotInResultsBackText": "Back to results",
   "datasetInspectorDownloadTitle": "Add this dataset to the selection and open the download",
   "datasetInspectorDownloadInSelectionTitle": "Remove this dataset from the download selection",
   "datasetInspectorTitleText": "Title",

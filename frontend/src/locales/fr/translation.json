@@ -243,6 +243,8 @@
   "datasetsTableSizeTitle": "Taille approximative du jeu de données en mégaoctets",
   "datasetsTableDetailsTitle": "Ouvrir les détails du jeu de données",
   "datasetInspectorDownloadText": "Télécharger",
+  "datasetNotInResultsText": "Ce jeu de données ne correspond pas à vos filtres actuels.",
+  "datasetNotInResultsBackText": "Retour aux résultats",
   "datasetInspectorDownloadTitle": "Ajouter ce jeu de données à la sélection et ouvrir le téléchargement",
   "datasetInspectorDownloadInSelectionTitle": "Retirer ce jeu de données de la sélection de téléchargement",
   "datasetInspectorTitleText": "Titre",

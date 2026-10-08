@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -68,6 +69,9 @@ export default function DatasetsTable({
   // card can show the query its own dataset would be fetched with. Built by
   // DownloadDetails, which owns the format choice the strip below shares.
   downloadLinksByPk,
+  // Kept mounted under an open dataset page, so coming back finds the same
+  // page and scroll position (see DatasetsPanel).
+  hidden = false,
 }) {
   const { t, i18n } = useTranslation();
   // The grouping lives in SelectionProvider: it outlives this list while a
@@ -105,6 +109,18 @@ export default function DatasetsTable({
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
   const listRef = useRef(null);
+  // A display:none list loses its scroll offset, so it is remembered here and
+  // put back when the list shows again.
+  const scrollTopRef = useRef(0);
+  const scrollListToTop = () => {
+    scrollTopRef.current = 0;
+    if (listRef.current) listRef.current.scrollTop = 0;
+  };
+  useLayoutEffect(() => {
+    if (!hidden && listRef.current) {
+      listRef.current.scrollTop = scrollTopRef.current;
+    }
+  }, [hidden]);
 
   // Sort fields differ by context: the download modal exposes the size and
   // downloadable status; the sidebar exposes the locations and days counts.
@@ -478,14 +494,14 @@ export default function DatasetsTable({
     // happen in an effect either way.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
-    if (listRef.current) listRef.current.scrollTop = 0;
+    scrollListToTop();
   }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks]);
 
   // Every page starts at its top — the reader is at a new place in the list,
   // not where they left the scroll bar on the page before.
   const goToPage = (next) => {
     setPage(Math.min(Math.max(next, 1), pageCount));
-    if (listRef.current) listRef.current.scrollTop = 0;
+    scrollListToTop();
   };
 
   const sortControl = (
@@ -596,7 +612,13 @@ export default function DatasetsTable({
           {t("datasetsCardMapClickHint")}
         </div>
       )}
-      <div className="datasetsCardList" ref={listRef}>
+      <div
+        className="datasetsCardList"
+        ref={listRef}
+        onScroll={(event) => {
+          if (!hidden) scrollTopRef.current = event.currentTarget.scrollTop;
+        }}
+      >
         {visibleRows.length === 0 ? (
           <div className="datasetsCardEmpty">
             {t(

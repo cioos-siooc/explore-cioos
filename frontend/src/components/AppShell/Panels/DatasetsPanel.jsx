@@ -57,8 +57,10 @@ export default function DatasetsPanel() {
       {/* The two views are deliberately not interchangeable: the list is the
           browsing surface, a dataset page is a drill-in. Each announces itself
           on entry (the detail slides in from the right, the list back in from
-          the left — see styles.css), and the sidebar header changes with it. */}
-      {inspectDataset ? (
+          the left — see styles.css), and the sidebar header changes with it.
+          The list stays mounted, hidden, under a dataset page, so going back
+          lands on the same page of it, scrolled to the same place. */}
+      {inspectDataset && (
         <div className="datasetsPanelView datasetsPanelDetail" key="detail">
           <DatasetInspector
             dataset={inspectDataset}
@@ -74,16 +76,20 @@ export default function DatasetsPanel() {
             setActiveWmsOverlay={setActiveWmsOverlay}
           />
         </div>
-      ) : (
-        <div className="datasetsPanelView datasetsPanelList" key="list">
-          <DatasetsTable
-            handleSelectDataset={handleSelectDataset}
-            setInspectDataset={setInspectDataset}
-            datasets={filteredDatasets}
-            setHoveredDataset={setHoveredDataset}
-          />
-        </div>
       )}
+      <div
+        className="datasetsPanelView datasetsPanelList"
+        key="list"
+        hidden={Boolean(inspectDataset)}
+      >
+        <DatasetsTable
+          handleSelectDataset={handleSelectDataset}
+          setInspectDataset={setInspectDataset}
+          datasets={filteredDatasets}
+          setHoveredDataset={setHoveredDataset}
+          hidden={Boolean(inspectDataset)}
+        />
+      </div>
     </div>
   );
 }

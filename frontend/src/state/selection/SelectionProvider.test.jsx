@@ -135,6 +135,75 @@ describe("SelectionProvider", () => {
     expect(latest.inspectDataset).toBeUndefined();
   });
 
+  it("keeps an open dataset page when a filter excludes it, flagged out of the results", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    expect(latest.inspectDatasetExcluded).toBe(false);
+
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/pointQuery?")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(pointQueryFixture.slice(1))),
+          );
+        }
+        return realFetch(input, init);
+      }),
+    );
+    act(() => latestFilters.setStartDate("2020-01-01"));
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length - 1),
+    );
+
+    expect(latest.inspectDataset?.dataset_id).toBe(fixtureRow.dataset_id);
+    expect(latest.inspectDatasetExcluded).toBe(true);
+    expect(new URL(window.location.href).searchParams.get("dataset")).toBe(
+      fixtureRow.dataset_id,
+    );
+  });
+
+  it("flags the open dataset out of the results when the title search excludes it", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(false));
+
+    act(() => latest.setDatasetTitleSearchText("no-title-matches-this"));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(true));
+    expect(latest.inspectDataset?.pk).toBe(target.pk);
+  });
+
+  it("goes back to the list entry a dataset page was opened from", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const entriesBefore = window.history.length;
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDataset?.pk).toBe(target.pk));
+    expect(window.history.length).toBe(entriesBefore + 1);
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(
+      new URL(window.location.href).searchParams.get("dataset"),
+    ).toBeNull();
+    // Popped back to the list entry, not a new one stacked on the page's.
+    expect(window.history.length).toBe(entriesBefore + 1);
+    expect(window.history.state?.usr?.fromList).toBeFalsy();
+  });
+
+  it("closes a linked dataset page in place, with no list entry to go back to", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    const entries = window.history.length;
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(window.history.length).toBe(entries);
+  });
+
   it("handleSelectDataset toggles a dataset into pointsToReview and counts it", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];

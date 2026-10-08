@@ -8,7 +8,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
@@ -101,6 +101,8 @@ export default function SelectionProvider({ children }) {
     dataLayers,
   } = useMapState();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     languageRef.current = i18n.language;
@@ -381,10 +383,43 @@ export default function SelectionProvider({ children }) {
   // component state, so Back/Forward move through it natively and the page can
   // be linked to. useSearchParams re-renders on popstate, which is what makes
   // the browser's Back button close the page for free.
-  const inspectDataset = useMemo(
+  //
+  // A filter that excludes the open dataset doesn't close its page — the user
+  // chose to open it, and the search state around it isn't theirs to lose it
+  // to. The last row it resolved to is kept and shown instead; the page says
+  // the dataset is no longer among the results (inspectDatasetExcluded).
+  const resolvedInspectDataset = useMemo(
     () => pointsData.find((point) => datasetMatchesUrlKey(point, searchParams)),
     [pointsData, searchParams],
   );
+  const [retainedInspectDataset, setRetainedInspectDataset] = useState();
+  if (
+    resolvedInspectDataset &&
+    resolvedInspectDataset !== retainedInspectDataset
+  ) {
+    setRetainedInspectDataset(resolvedInspectDataset);
+  }
+  const inspectDataset = useMemo(() => {
+    if (resolvedInspectDataset) return resolvedInspectDataset;
+    if (!datasetMatchesUrlKey(retainedInspectDataset, searchParams)) return;
+    return datasetInLanguage(retainedInspectDataset, i18n.language);
+  }, [
+    resolvedInspectDataset,
+    retainedInspectDataset,
+    searchParams,
+    i18n.language,
+  ]);
+  const inspectDatasetExcluded = Boolean(
+    inspectDataset &&
+    !filteredDatasets.some((row) => row.pk === inspectDataset.pk),
+  );
+
+  // Whether the address shows the list (no dataset page). Read by
+  // setInspectDataset at call time, so it can stay stable across map pans.
+  const onListRef = useRef(!searchParams.get("dataset"));
+  useEffect(() => {
+    onListRef.current = !searchParams.get("dataset");
+  }, [searchParams]);
 
   // A share link that named a dataset but no camera: frame its footprint as
   // soon as it resolves out of pointsData, same as the "Zoom to dataset"
@@ -403,10 +438,11 @@ export default function SelectionProvider({ children }) {
     zoomToGeometry,
   ]);
 
-  // Opening or closing a dataset page is a navigation the user made, so it
-  // pushes an entry that Back reverses. Automatic opens/closes (auto-inspecting
-  // a lone result, dropping a dataset the filters just excluded) pass
-  // replace: true — Back should skip a step the user never took.
+  // Opening a dataset page is a navigation the user made, so it pushes an
+  // entry that Back reverses. Automatic opens/closes pass replace: true — Back
+  // should skip a step the user never took. An entry pushed straight from the
+  // list is tagged fromList, which lets returnToDatasetList go back to that
+  // list entry instead of stacking a new one on top.
   const setInspectDataset = useCallback(
     (dataset, { replace = false } = {}) => {
       setSearchParams(
@@ -427,7 +463,7 @@ export default function SelectionProvider({ children }) {
           }
           return next;
         },
-        { replace },
+        { replace, state: { fromList: !replace && onListRef.current } },
       );
     },
     [setSearchParams],
@@ -481,10 +517,17 @@ export default function SelectionProvider({ children }) {
   // and the filter only changes when the user presses a button — so leaving the
   // page is now just leaving the page. Clearing here would instead discard a
   // selection they deliberately built up.
+  //
+  // Straight back to the list entry the page was opened from, when there is
+  // one, so browser Back afterwards doesn't reopen the page just left (UrlSync
+  // rewrites the popped address from the current filters and camera). A page
+  // reached any other way (a link, a marker hop, a record preview opened on
+  // top) closes in place instead.
   const returnToDatasetList = useCallback(() => {
-    setInspectDataset();
+    if (location.state?.fromList) navigate(-1);
+    else setInspectDataset(undefined, { replace: true });
     setSelectedTrajectory();
-  }, [setInspectDataset]);
+  }, [location.state, navigate, setInspectDataset]);
 
   // A track clicked on the map does what clicking a platform row in the dataset
   // inspector does (DatasetInspector's onRowClicked): open that dataset's page
@@ -608,12 +651,11 @@ export default function SelectionProvider({ children }) {
     if (
       !isEmpty(pointsData) &&
       searchParams.get("dataset") &&
-      !pointsData.some((point) => datasetMatchesUrlKey(point, searchParams))
+      !inspectDataset
     ) {
-      // The results just changed under an open dataset page and the dataset is
-      // no longer among them (a filter excluded it, say): the page has already
-      // closed itself — inspectDataset stopped resolving — so clear the params
-      // it left behind rather than carry a dead key in the URL.
+      // The URL names a dataset that has never been among the results (an
+      // unknown id, or a link whose own filters exclude it): there is no row
+      // to show, so clear the params rather than carry a dead key in the URL.
       setSearchParams(
         (previous) => {
           const next = withoutPreviewParams(previous);
@@ -624,7 +666,7 @@ export default function SelectionProvider({ children }) {
         { replace: true },
       );
     }
-  }, [pointsData, searchParams, setSearchParams]);
+  }, [pointsData, searchParams, inspectDataset, setSearchParams]);
 
   useEffect(() => {
     const resultByPk = new Map(pointsData.map((row) => [row.pk, row]));
@@ -863,6 +905,7 @@ export default function SelectionProvider({ children }) {
     setMappedRecord,
     pointsData,
     inspectDataset,
+    inspectDatasetExcluded,
     setInspectDataset,
     returnToDatasetList,
     addDatasetsToSelection,

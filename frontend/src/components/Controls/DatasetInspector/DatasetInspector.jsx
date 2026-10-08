@@ -6,6 +6,7 @@ import {
   Download,
   FileEarmarkText,
   GraphUp,
+  InfoCircle,
   PinMap,
   PinMapFill,
 } from "react-bootstrap-icons";
@@ -193,8 +194,13 @@ export default function DatasetInspector({
   const { t, i18n } = useTranslation();
   const { zoomToDataset } = useZoomToDataset();
   const { eovsSelected } = useFilters();
-  const { handleSelectDataset, selectedPks, mappedRecord, setMappedRecord } =
-    useSelection();
+  const {
+    handleSelectDataset,
+    selectedPks,
+    mappedRecord,
+    setMappedRecord,
+    inspectDatasetExcluded,
+  } = useSelection();
   const { setShowDownloadModal } = useUI();
   const { offerTip, tipHighlight } = useTips();
   const isTrajectory = TRAJECTORY_TYPE_KEYS.some(
@@ -566,6 +572,22 @@ export default function DatasetInspector({
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
         </div>
+        {/* A filter or the list's own narrowing can exclude a dataset whose
+            page is already open. The page stays (the user chose it), and says
+            so, since its records below now follow filters it no longer meets. */}
+        {inspectDatasetExcluded && (
+          <div className="datasetNotInResults" role="status">
+            <InfoCircle size={14} aria-hidden="true" />
+            <span>{t("datasetNotInResultsText")}</span>
+            <button
+              type="button"
+              className="datasetNotInResultsBack"
+              onClick={returnToList}
+            >
+              {t("datasetNotInResultsBackText")}
+            </button>
+          </div>
+        )}
       </div>
       <div className="datasetInspectorBody">
         {/* The front matter, as compact as it can be read: one field per

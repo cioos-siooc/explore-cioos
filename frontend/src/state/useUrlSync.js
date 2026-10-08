@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -47,6 +47,7 @@ export default function UrlSync() {
   const lang = searchParams.get("lang") || i18n.resolvedLanguage;
   const dataset = searchParams.get("dataset");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { query } = useFilters();
   const {
@@ -162,8 +163,12 @@ export default function UrlSync() {
     const combined = new URLSearchParams(obj);
     // Replace, never push: this mirrors state the app never reads back out of
     // the URL, so an entry per map pan would only bury the history entries
-    // that do mean something (opening a dataset page).
-    navigate("?" + combined.toString(), { replace: true });
+    // that do mean something (opening a dataset page) — and the entry's state
+    // rides along, since SelectionProvider's back-to-list reads it.
+    navigate("?" + combined.toString(), {
+      replace: true,
+      state: location.state,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     query,
@@ -187,6 +192,9 @@ export default function UrlSync() {
     selectedTrajectory,
     mappedRecord,
     coverageAxis,
+    // Back/Forward across a dataset page lands on an address written when that
+    // entry was left; rewrite it from the current state.
+    dataset,
   ]);
 
   // `i18n` deliberately excluded from the deps, despite reading it in the
