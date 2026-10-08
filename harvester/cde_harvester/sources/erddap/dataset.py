@@ -208,7 +208,7 @@ class Dataset:
 
         return df_min_max
 
-    def get_profile_ids(self):
+    def get_profile_ids(self, collapse_time_profile_ids=False):
         df_variables = self.df_variables
 
         # Organize dataset variables by their cf_roles
@@ -218,6 +218,11 @@ class Dataset:
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
+        if collapse_time_profile_ids and profile_variables.get("profile_id") == "time":
+            # One "profile" per record timestamp: enumerating them scans the
+            # whole dataset (dap.oceannetworks.ca's sensor streams 504 or exceed
+            # the size cap), only for the handler to collapse to timeseries.
+            profile_variables.pop("profile_id")
 
         # sorting so the url is consistent every time for query caching
         profile_variable_list = sorted(profile_variables.values())
@@ -240,6 +245,16 @@ class Dataset:
         profile_ids = self.dataset_tabledap_query(
             f"{','.join(profile_variable_list)}&distinct()"
         )
+
+        if profile_ids.empty and "time" not in profile_variable_list:
+            # ERDDAP drops rows whose requested columns are ALL missing, so a
+            # cf_role column that is never filled (seagull-erddap's `platform`)
+            # empties the distinct() above. Pairing it with time keeps the
+            # rows: one per feature, with a missing id.
+            group = ",".join(profile_variable_list + ["time"])
+            profile_ids = self.dataset_tabledap_query(
+                group + requests.utils.quote(f'&orderByMax("{group}")')
+            ).drop(columns="time", errors="ignore")
 
         if profile_ids.empty:
             return profile_ids

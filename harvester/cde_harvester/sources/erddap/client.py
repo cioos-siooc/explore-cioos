@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import tempfile
+import time
 from urllib.parse import unquote, urlparse
 
 import diskcache as dc
@@ -68,7 +69,12 @@ class _SpooledBody(tempfile.SpooledTemporaryFile):
 # 408 (Request Timeout) and 520 (Cloudflare "unknown error") are transient
 # timeouts seen on the cioosatlantic/cioospacific CTD-profile endpoints under
 # load; the same queries succeed on a later attempt, so retry rather than skip.
-_RETRY_STATUSES = (408, 413, 500, 502, 503, 504, 520, 522, 524)
+# 504 is deliberately absent: it means the gateway gave up while ERDDAP was
+# still compiling the query (300 s on dap.oceannetworks.ca), and an immediate
+# retry just times out again. ERDDAP keeps compiling and caches the result, so
+# the harvester retries those datasets at the end of the pass instead (see
+# gateway_timeouts).
+_RETRY_STATUSES = (408, 413, 500, 502, 503, 520, 522, 524)
 
 
 _ERDDAP_SOURCE_RE = re.compile(
@@ -129,6 +135,9 @@ class ERDDAP:
         self.domain = urlparse(erddap_url).netloc
         self.host_slug = self.domain.lower().replace(".", "-")  # for the task run label
         self.session = _build_retry_session()
+        # {dataset_id: monotonic time of its first 504}; the harvester defers
+        # these datasets to a second pass.
+        self.gateway_timeouts = {}
 
         try:
             self.logger = get_run_logger()
@@ -228,6 +237,8 @@ class ERDDAP:
             dataset.queried_urls.append(decoded_url)
 
         response, body = self._fetch(url_combined, decoded_url, logger)
+        if response.status_code == 504 and dataset is not None:
+            self.gateway_timeouts.setdefault(dataset.id, time.monotonic())
 
         try:
             original_hostname = urlparse(url_combined).hostname

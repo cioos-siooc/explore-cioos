@@ -27,6 +27,9 @@ class DatasetTypeHandler(ABC):
     # the [time_min, time_max] span already IS the day set and the database
     # fills `days` from it.
     features_span_multiple_days: bool = False
+    # Whether a cf_role=profile_id on `time` is dropped before enumerating
+    # features, identifying them by their other cf_role variables only.
+    collapse_time_profile_ids: bool = False
 
     @abstractmethod
     def extract_features(self, dataset) -> pd.DataFrame:
