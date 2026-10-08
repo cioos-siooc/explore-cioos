@@ -119,7 +119,9 @@ export default function UIProvider({ children }) {
   // directly, with no filter change to notice, so the panel is raised for the
   // page itself rather than for whatever happened to precede it. Covers a share
   // link carrying ?dataset= too, which lands with the page already open.
-  useRevealSidebar(inspectDataset, Boolean, setSidebarOpenState);
+  // Keyed on the pk: a results refresh hands the same open dataset back as a
+  // new object, which must not reopen a sidebar the user collapsed over it.
+  useRevealSidebar(inspectDataset?.pk, Boolean, setSidebarOpenState);
 
   // Clicking a track on the map draws its platform history — surface the panel
   // holding the page that shows it.

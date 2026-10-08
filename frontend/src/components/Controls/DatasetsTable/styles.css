@@ -336,6 +336,7 @@ button.datasetCardTitle:focus-visible {
    stays labelled while scrolling. The label toggles collapse; the trailing
    pair includes or excludes the group in the main filters, as a row of the
    Filters modal does. --- */
+
 /* A group is a row of its own, not a divider: with every group closed by
    default the headers are the list, so each is a full-width target. Kept
    compact so a closed list shows as many groups as it can. Flat inside the
