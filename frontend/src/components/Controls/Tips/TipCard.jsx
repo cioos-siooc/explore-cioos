@@ -1,52 +1,88 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import classNames from "classnames";
 import { ChevronLeft, ChevronRight, Lightbulb } from "react-bootstrap-icons";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import CloseButton from "../../ui/CloseButton.jsx";
-import TipPointer from "./TipPointer.jsx";
+import TipPointer, {
+  anchorCardStyle,
+  pointsFromBelow,
+  useTipTargets,
+} from "./TipPointer.jsx";
 import TipText from "./TipText.jsx";
-import {
-  TIP_MODALS,
-  TIPS,
-  useTips,
-} from "../../../state/tips/TipsProvider.jsx";
+import { TIP_MODALS, useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
 
+// Where the arrow keys already mean something: moving a text cursor, a
+// slider's handle, the map.
+const OWNS_ARROWS =
+  'input, textarea, select, [contenteditable="true"], [role="slider"], .maplibregl-canvas-container';
+
 // The tip the user just earned by doing what it is about (see TipsProvider).
-// It holds a corner of the map (see .tipCard); on phones, where the card would
-// cover too much of it, it waits as a lightbulb button until tapped. A status
+// It sits just past the hand pointing at the control it talks about, or holds
+// a corner of the map (see .tipCard) while that control is off screen; on
+// phones, where the card would cover too much of it, it waits as a lightbulb
+// button until tapped. A status
 // rather than a dialog: announced, but it never takes focus from what the user
 // is doing, and it stays until dismissed rather than timing out mid-read.
 //
 // A tip about a control inside a dialog (TIP_MODALS) moves into that dialog
 // while it is open — rendered there with `inModal` naming it — since the
-// dialog covers the map corner the card otherwise holds.
+// dialog covers the map corner the card otherwise holds. It stays in the
+// dialog's DOM even when hung by its control, so the dialog's focus trap and
+// Escape still cover it.
 export default function TipCard({ inModal }) {
   const { t } = useTranslation();
-  const { activeTip, touring, stepTour, dismissTip, disableTips } = useTips();
+  const { activeTip, tourTips, touring, stepTour, dismissTip, disableTips } =
+    useTips();
   const { showFiltersModal, showDownloadModal } = useUI();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [openedTip, setOpenedTip] = useState(null);
 
-  if (!activeTip) return null;
   const tipModal = TIP_MODALS[activeTip];
-  if (inModal) {
-    if (tipModal !== inModal) return null;
-  } else if (
-    { filters: showFiltersModal, download: showDownloadModal }[tipModal]
-  ) {
-    return null;
-  }
-
+  const shown =
+    Boolean(activeTip) &&
+    (inModal
+      ? tipModal === inModal
+      : !{ filters: showFiltersModal, download: showDownloadModal }[tipModal]);
   // A tour was asked for, so it opens straight away. Inside a dialog the card
   // takes no map space, so it never waits as a badge there.
-  if (isMobile && !touring && !inModal && openedTip !== activeTip) {
+  const waiting = isMobile && !touring && !inModal && openedTip !== activeTip;
+  const open = shown && !waiting;
+  const targets = useTipTargets(open, Boolean(inModal));
+
+  // ← and → page through the tips while the card is up, from anywhere the
+  // arrows aren't already doing something.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+      if (
+        !step ||
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.target.closest?.(OWNS_ARROWS)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      stepTour(step);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, stepTour]);
+
+  if (!shown) return null;
+
+  if (waiting) {
     return (
       <div className="tipBadge" role="status">
         <button
@@ -62,9 +98,15 @@ export default function TipCard({ inModal }) {
     );
   }
 
+  const anchor = targets[0];
   return (
     <div
-      className={classNames("tipCard", { tipCardInModal: inModal })}
+      className={classNames("tipCard", {
+        tipCardInModal: inModal,
+        tipCardAnchored: anchor,
+        tipCardAbove: anchor && !pointsFromBelow(anchor),
+      })}
+      style={anchor ? anchorCardStyle(anchor) : undefined}
       role="status"
       data-testid="tip-card"
       onKeyDown={(e) => {
@@ -80,15 +122,16 @@ export default function TipCard({ inModal }) {
         <Lightbulb className="tipCardIcon" size={16} aria-hidden="true" />
         <span className="tipCardHeading">
           {t("tipCounter", {
-            n: TIPS.indexOf(activeTip) + 1,
-            total: TIPS.length,
+            n: tourTips.indexOf(activeTip) + 1,
+            total: tourTips.length,
           })}
         </span>
         <button
           type="button"
           className="tipCardStep"
-          title={t("tipPrevious")}
+          title={`${t("tipPrevious")} (←)`}
           aria-label={t("tipPrevious")}
+          aria-keyshortcuts="ArrowLeft"
           onClick={() => stepTour(-1)}
         >
           <ChevronLeft size={14} aria-hidden="true" />
@@ -96,8 +139,9 @@ export default function TipCard({ inModal }) {
         <button
           type="button"
           className="tipCardStep"
-          title={t("tipNext")}
+          title={`${t("tipNext")} (→)`}
           aria-label={t("tipNext")}
+          aria-keyshortcuts="ArrowRight"
           onClick={() => stepTour(1)}
         >
           <ChevronRight size={14} aria-hidden="true" />
@@ -107,12 +151,22 @@ export default function TipCard({ inModal }) {
       <p className="tipCardText">
         <TipText tip={activeTip} />
       </p>
-      {!touring && (
-        <button type="button" className="tipCardLink" onClick={disableTips}>
-          {t("tipsDisable")}
-        </button>
-      )}
-      <TipPointer inModal={Boolean(inModal)} />
+      <div className="tipCardFooter">
+        {!touring && (
+          <button type="button" className="tipCardLink" onClick={disableTips}>
+            {t("tipsDisable")}
+          </button>
+        )}
+        {/* Screen readers have the keys from the step buttons'
+            aria-keyshortcuts. */}
+        <span className="tipCardKeys" aria-hidden="true">
+          <Trans
+            i18nKey="tipKeysHint"
+            components={{ prev: <kbd />, next: <kbd /> }}
+          />
+        </span>
+      </div>
+      <TipPointer targets={targets} inModal={Boolean(inModal)} />
     </div>
   );
 }

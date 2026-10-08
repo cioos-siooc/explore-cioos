@@ -38,6 +38,7 @@
   "tipCardOpen": "Une astuce est disponible",
   "tipCardClose": "Fermer l'astuce",
   "tipsDisable": "Ne plus afficher d'astuces",
+  "tipKeysHint": "<prev>←</prev> <next>→</next> pour parcourir les astuces",
   "tip_whatsHere": "<add/> ajoute un jeu de données à votre sélection. Elle est conservée quand vous déplacez la carte ou filtrez : rassemblez des jeux de données en plusieurs clics avant de télécharger.",
   "tip_inView": "Seulement ce qui est à l'écran? Le bouton Visibles, à côté du nombre de jeux de données, ne garde que les jeux de données visibles sur la carte.",
   "tip_timeCoverage": "Vous hésitez sur les dates? Couverture temporelle, dans la barre du haut, montre les données dans le temps.",

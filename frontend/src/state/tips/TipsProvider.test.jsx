@@ -1,6 +1,12 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
@@ -14,7 +20,7 @@ import { TIPS, useTips } from "./TipsProvider.jsx";
 // Stands in for the components that offer tips (the filter chips, the time
 // bar, …), plus a modal flag to hold them back with.
 function Probe() {
-  const { offerTip, tipHighlight, startTour } = useTips();
+  const { offerTip, tipHighlight, startTour, tourTips } = useTips();
   const {
     setShowFiltersModal,
     quickFiltersCollapsed,
@@ -40,6 +46,8 @@ function Probe() {
       <span data-testid="feature-query-request">
         {useMapState().featureQueryRequest?.lngLat.join(",") ?? "none"}
       </span>
+      <span data-testid="tour-tips">{tourTips.join(",")}</span>
+      <input aria-label="probe field" />
       <span data-testid="quick-filters">
         {quickFiltersCollapsed ? "folded" : "shown"}
       </span>
@@ -71,6 +79,10 @@ function returningVisitor() {
 
 const renderProbe = () => renderWithProviders(<Probe />, { providers: "app" });
 const card = () => screen.queryByTestId("tip-card");
+// The tips this catalogue's tour pages through, once it has loaded.
+const tour = () => screen.getByTestId("tour-tips").textContent.split(",");
+const counter = (key, offset = 0) =>
+  `Tip ${tour().indexOf(key) + 1 + offset} of ${tour().length}`;
 
 describe("contextual tips", () => {
   beforeEach(() => {
@@ -123,6 +135,8 @@ describe("contextual tips", () => {
       left: "115px",
       top: "70px",
     });
+    expect(card()).toHaveClass("tipCardAnchored");
+    expect(card()).toHaveStyle({ left: "12px", top: "128px" });
     rect.mockRestore();
   });
 
@@ -228,9 +242,7 @@ describe("contextual tips", () => {
       const { user } = renderProbe();
       await user.click(screen.getByText("start tour"));
       expect(card()).toHaveTextContent(/Time coverage/);
-      expect(card()).toHaveTextContent(
-        `Tip ${TIPS.indexOf("timeCoverage") + 1} of ${TIPS.length}`,
-      );
+      expect(card()).toHaveTextContent(counter("timeCoverage"));
     });
 
     it("steps both ways, wrapping round, and ends on close", async () => {
@@ -238,28 +250,64 @@ describe("contextual tips", () => {
       const { user } = renderProbe();
       await user.click(screen.getByText("start tour"));
       await user.click(screen.getByRole("button", { name: "Next tip" }));
-      expect(card()).toHaveTextContent(
-        `Tip ${TIPS.indexOf("timeCoverage") + 2} of ${TIPS.length}`,
-      );
+      expect(card()).toHaveTextContent(counter("timeCoverage", 1));
       await user.click(screen.getByRole("button", { name: "Previous tip" }));
       await user.click(screen.getByRole("button", { name: "Previous tip" }));
-      expect(card()).toHaveTextContent(
-        `Tip ${TIPS.indexOf("timeCoverage")} of ${TIPS.length}`,
-      );
+      expect(card()).toHaveTextContent(counter("timeCoverage", -1));
       await user.click(screen.getByRole("button", { name: "Close tip" }));
       expect(card()).toBeNull();
+    });
+
+    it("steps with the arrow keys, except where they move a cursor", async () => {
+      returningVisitor();
+      const { user } = renderProbe();
+      await user.click(screen.getByText("start tour"));
+      await user.keyboard("{ArrowRight}");
+      expect(card()).toHaveTextContent(counter("timeCoverage", 1));
+      await user.keyboard("{ArrowLeft}{ArrowLeft}");
+      expect(card()).toHaveTextContent(counter("timeCoverage", -1));
+
+      await user.click(screen.getByLabelText("probe field"));
+      await user.keyboard("{ArrowRight}");
+      expect(card()).toHaveTextContent(counter("timeCoverage", -1));
     });
 
     it("starts from an offered tip", async () => {
       returningVisitor();
       const { user } = renderProbe();
       await user.click(screen.getByText("offer exclude"));
-      expect(card()).toHaveTextContent(
-        `Tip ${TIPS.indexOf("exclude") + 1} of ${TIPS.length}`,
-      );
+      expect(card()).toHaveTextContent(counter("exclude"));
       await user.click(screen.getByRole("button", { name: "Next tip" }));
       expect(card()).toHaveTextContent(/Match all/);
       expect(card()).not.toHaveTextContent("Don't show tips");
+    });
+
+    it("passes over a step whose control the catalogue can't show", async () => {
+      returningVisitor();
+      const { user } = renderProbe();
+      // The fixtures hold OBIS data and feature datasets, but nothing gridded.
+      await waitFor(() => expect(tour()).toContain("speciesName"));
+      expect(tour()).toContain("showData");
+      expect(tour()).not.toContain("griddapWms");
+      await user.click(screen.getByText("start tour"));
+      for (let i = 0; i < tour().length; i += 1) {
+        expect(card()).not.toHaveTextContent(/Show on map/);
+        await user.click(screen.getByRole("button", { name: "Next tip" }));
+      }
+      expect(card()).toHaveTextContent(/Time coverage/);
+    });
+
+    it("passes over the species tip without OBIS data", async () => {
+      returningVisitor();
+      const fixtures = window.fetch;
+      vi.stubGlobal("fetch", (input, ...rest) =>
+        String(input.url ?? input).endsWith("/obisNodes")
+          ? Promise.resolve(Response.json([]))
+          : fixtures(input, ...rest),
+      );
+      renderProbe();
+      await waitFor(() => expect(tour()).toContain("showData"));
+      expect(tour()).not.toContain("speciesName");
     });
 
     it("holds back offered tips while it runs", async () => {
@@ -350,6 +398,32 @@ describe("contextual tips", () => {
           .getByTestId("eovs-match-all")
           .closest("[data-tip-highlight]"),
       ).not.toBeNull();
+    });
+
+    it("hangs the tip by its control inside the window", async () => {
+      returningVisitor();
+      const rect = vi
+        .spyOn(Element.prototype, "getBoundingClientRect")
+        .mockImplementation(function () {
+          return this.hasAttribute("data-tip-highlight")
+            ? {
+                left: 300,
+                top: 600,
+                width: 30,
+                height: 30,
+                right: 330,
+                bottom: 630,
+              }
+            : { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 };
+        });
+      const { user } = renderWithProviders(<FiltersHarness />, {
+        providers: "app",
+      });
+      await user.click(screen.getByText("tour from exclude"));
+      const tip = within(modal()).getByTestId("tip-card");
+      await vi.waitFor(() => expect(tip).toHaveClass("tipCardAnchored"));
+      expect(tip).toHaveClass("tipCardAbove");
+      rect.mockRestore();
     });
 
     it("closes the window it opened once the tour moves off it, or ends", async () => {

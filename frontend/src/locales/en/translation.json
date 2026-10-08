@@ -38,6 +38,7 @@
   "tipCardOpen": "A tip is available",
   "tipCardClose": "Close tip",
   "tipsDisable": "Don't show tips",
+  "tipKeysHint": "<prev>←</prev> <next>→</next> to browse tips",
   "tip_whatsHere": "<add/> adds a dataset to your selection. It stays as you pan and filter, so you can gather datasets from several clicks before downloading.",
   "tip_inView": "Only want what's on screen? The In view button beside the dataset count keeps just the datasets in the map view.",
   "tip_timeCoverage": "Not sure which dates to pick? Time coverage in the top bar charts the data over time.",

@@ -6,7 +6,6 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
-import { TIPS } from "../../../state/tips/TipsProvider.jsx";
 import TipCard from "../Tips/TipCard.jsx";
 import IntroModal from "./IntroModal.jsx";
 
@@ -131,9 +130,7 @@ describe("IntroModal", () => {
     const { user } = renderIntro({ setShowModal });
     await user.click(screen.getByRole("button", { name: "Take a quick tour" }));
     expect(setShowModal).toHaveBeenCalledWith(false);
-    expect(screen.getByTestId("tip-card")).toHaveTextContent(
-      `Tip 1 of ${TIPS.length}`,
-    );
+    expect(screen.getByTestId("tip-card")).toHaveTextContent(/Tip 1 of \d+/);
   });
 
   it("points at the real buttons: the tips lightbulb and the About ⓘ", () => {

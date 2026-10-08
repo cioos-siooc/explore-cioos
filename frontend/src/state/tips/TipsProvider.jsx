@@ -138,7 +138,7 @@ export default function TipsProvider({ children }) {
 
   // Read at call time: the stages close over the selection and the catalogue,
   // which change far more often than a step is taken.
-  const stages = useTourStages();
+  const { stages, skipped } = useTourStages();
   const stagesRef = useRef(stages);
   useEffect(() => {
     stagesRef.current = stages;
@@ -173,16 +173,19 @@ export default function TipsProvider({ children }) {
     },
     [showTourStep],
   );
+  // The tips the tour pages through. The one up stays in the count even if
+  // its control has since gone, so stepping on from it still works.
+  const tourTips = TIPS.filter((key) => key === activeTip || !skipped.has(key));
+
   // Stepping on from an offered tip turns it into a tour.
-  const stepTour = useCallback(
-    (step) => {
-      setTouring(true);
-      showTourStep(
-        TIPS[(TIPS.indexOf(activeTip) + step + TIPS.length) % TIPS.length],
-      );
-    },
-    [activeTip, showTourStep],
-  );
+  const stepTour = (step) => {
+    setTouring(true);
+    showTourStep(
+      tourTips[
+        (tourTips.indexOf(activeTip) + step + tourTips.length) % tourTips.length
+      ],
+    );
+  };
 
   const dismissTip = useCallback(() => {
     closeTourModal();
@@ -197,6 +200,7 @@ export default function TipsProvider({ children }) {
 
   const value = {
     activeTip,
+    tourTips,
     offerTip,
     tipHighlight,
     touring,
