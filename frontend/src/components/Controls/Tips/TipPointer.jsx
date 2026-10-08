@@ -4,6 +4,13 @@ import { createPortal } from "react-dom";
 import { HandIndexThumbFill } from "react-bootstrap-icons";
 import classNames from "classnames";
 
+// The hand's size and its gap from the control (.tipPointer, .tipPointerBadge),
+// so the card can be hung just past the hand.
+const POINTER_GAP = 12;
+const POINTER_SIZE = 42;
+const CARD_MARGIN = 12;
+const CARD_MAX_WIDTH = 360;
+
 const sameRects = (a, b) =>
   a.length === b.length &&
   a.every(
@@ -14,16 +21,38 @@ const sameRects = (a, b) =>
       Math.round(rect.height) === Math.round(b[i].height),
   );
 
-// A hand pointing at each control the active tip talks about (the elements
-// carrying `data-tip-highlight`). Drawn over the page rather than on the
-// control itself: the top bar's strip clips anything drawn past its edges, and
-// several of the controls are fixed surfaces a positioned child would upset.
-// Followed every frame while it is up, since the controls it points at slide
-// in with the panels that hold them.
-export default function TipPointer({ inModal = false }) {
+// From below for a control in the top half of the screen, from above
+// otherwise, so the hand (and the card past it) lands on the side with room.
+export const pointsFromBelow = (rect, viewportHeight = window.innerHeight) =>
+  rect.top + rect.height / 2 < viewportHeight / 2;
+
+// Where the tip card goes to sit just past the hand pointing at `rect`:
+// centered on the control and kept on screen. Hung from its far edge (`bottom`
+// when above) so its own height never needs measuring.
+export function anchorCardStyle(
+  rect,
+  viewportWidth = window.innerWidth,
+  viewportHeight = window.innerHeight,
+) {
+  const width = Math.min(CARD_MAX_WIDTH, viewportWidth - 2 * CARD_MARGIN);
+  const left = Math.min(
+    Math.max(rect.left + rect.width / 2 - width / 2, CARD_MARGIN),
+    viewportWidth - width - CARD_MARGIN,
+  );
+  const offset = POINTER_GAP + POINTER_SIZE + 4;
+  return pointsFromBelow(rect, viewportHeight)
+    ? { left, width, top: rect.bottom + offset }
+    : { left, width, bottom: viewportHeight - rect.top + offset };
+}
+
+// The on-screen rects of the controls the active tip talks about (the
+// elements carrying `data-tip-highlight`), followed every frame while
+// `enabled`, since the controls slide in with the panels that hold them.
+export function useTipTargets(enabled, inModal) {
   const [targets, setTargets] = useState([]);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     let frame;
     // Each control is brought into view once, as it first turns up: a hand
     // pointing at the foot of a scrolled-away list points at nothing.
@@ -59,13 +88,19 @@ export default function TipPointer({ inModal = false }) {
     };
     follow();
     return () => cancelAnimationFrame(frame);
-  }, [inModal]);
+  }, [enabled, inModal]);
 
+  return enabled ? targets : [];
+}
+
+// A hand pointing at each of `targets` (see useTipTargets). Drawn over the
+// page rather than on the control itself: the top bar's strip clips anything
+// drawn past its edges, and several of the controls are fixed surfaces a
+// positioned child would upset.
+export default function TipPointer({ targets, inModal = false }) {
   return createPortal(
     targets.map((rect, i) => {
-      // From below for a control in the top half of the screen, from above
-      // otherwise, so the hand lands on the side with room for it.
-      const fromBelow = rect.top + rect.height / 2 < window.innerHeight / 2;
+      const fromBelow = pointsFromBelow(rect);
       return (
         <span
           key={i}

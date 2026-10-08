@@ -15,10 +15,19 @@
   width: min(360px, calc(100vw - 24px));
   padding: var(--cioos-space-xs) var(--cioos-space-xs) var(--cioos-space-sm)
     var(--cioos-space-md);
-  background-color: var(--cioos-white);
-  border: 1px solid var(--cioos-hairline);
+
+  /* Teal like the hand and the highlight ring, not white: most of what it
+     sits on (the sidebar, the dialogs, the light basemap) is white. */
+  background-color: color-mix(
+    in srgb,
+    var(--cioos-primary) 12%,
+    var(--cioos-white)
+  );
+  border: 2px solid var(--cioos-primary);
   border-radius: var(--cioos-radius);
-  box-shadow: var(--cioos-shadow-float);
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
   font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink);
@@ -47,17 +56,44 @@
   }
 }
 
+/* Hung just past the hand pointing at the control (see anchorCardStyle), so
+   control, hand and text read as one. Placed inline, over whichever corner the
+   rules above chose. */
+.tipCard.tipCardAnchored {
+  inset: auto;
+  animation: tipCardEnter 200ms ease-out;
+}
+
+.tipCard.tipCardAnchored.tipCardAbove {
+  --tip-card-enter: 8px;
+}
+
+@keyframes tipCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--tip-card-enter, -8px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tipCard.tipCardAnchored {
+    animation: none;
+  }
+}
+
 .tipBadgeButton {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--cioos-hairline);
+  border: 2px solid var(--cioos-white);
   border-radius: 50%;
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-float);
-  color: var(--cioos-primary);
+  background-color: var(--cioos-primary);
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
+  color: var(--cioos-on-primary);
   cursor: pointer;
 }
 
@@ -97,7 +133,7 @@
 
 @media (hover: hover) {
   .tipCardStep:hover {
-    background-color: var(--cioos-surface-2);
+    background-color: var(--cioos-white);
     color: var(--cioos-ink);
   }
 }
@@ -122,7 +158,7 @@
   border: 0;
   background: none;
   font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -203,6 +239,19 @@
   width: auto;
   margin: 0 var(--cioos-space-md) var(--cioos-space-sm);
   box-shadow: none;
+}
+
+/* Hung by its control inside the dialog, like on the map: fixed to the
+   viewport (nothing between it and the page is transformed), and on the
+   same rung as on the map, which within the dialog puts it over the open
+   filter's pane and the sticky headers. */
+.tipCard.tipCardInModal.tipCardAnchored {
+  position: fixed;
+  z-index: var(--cioos-z-dock, 35);
+  margin: 0;
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
 }
 
 .tipPointer.tipPointerOverModal {

@@ -5,7 +5,11 @@ import { ChevronLeft, ChevronRight, Lightbulb } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import CloseButton from "../../ui/CloseButton.jsx";
-import TipPointer from "./TipPointer.jsx";
+import TipPointer, {
+  anchorCardStyle,
+  pointsFromBelow,
+  useTipTargets,
+} from "./TipPointer.jsx";
 import TipText from "./TipText.jsx";
 import {
   TIP_MODALS,
@@ -19,14 +23,18 @@ import useMediaQuery, {
 import "./styles.css";
 
 // The tip the user just earned by doing what it is about (see TipsProvider).
-// It holds a corner of the map (see .tipCard); on phones, where the card would
-// cover too much of it, it waits as a lightbulb button until tapped. A status
+// It sits just past the hand pointing at the control it talks about, or holds
+// a corner of the map (see .tipCard) while that control is off screen; on
+// phones, where the card would cover too much of it, it waits as a lightbulb
+// button until tapped. A status
 // rather than a dialog: announced, but it never takes focus from what the user
 // is doing, and it stays until dismissed rather than timing out mid-read.
 //
 // A tip about a control inside a dialog (TIP_MODALS) moves into that dialog
 // while it is open — rendered there with `inModal` naming it — since the
-// dialog covers the map corner the card otherwise holds.
+// dialog covers the map corner the card otherwise holds. It stays in the
+// dialog's DOM even when hung by its control, so the dialog's focus trap and
+// Escape still cover it.
 export default function TipCard({ inModal }) {
   const { t } = useTranslation();
   const { activeTip, touring, stepTour, dismissTip, disableTips } = useTips();
@@ -34,19 +42,20 @@ export default function TipCard({ inModal }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [openedTip, setOpenedTip] = useState(null);
 
-  if (!activeTip) return null;
   const tipModal = TIP_MODALS[activeTip];
-  if (inModal) {
-    if (tipModal !== inModal) return null;
-  } else if (
-    { filters: showFiltersModal, download: showDownloadModal }[tipModal]
-  ) {
-    return null;
-  }
-
+  const shown =
+    Boolean(activeTip) &&
+    (inModal
+      ? tipModal === inModal
+      : !{ filters: showFiltersModal, download: showDownloadModal }[tipModal]);
   // A tour was asked for, so it opens straight away. Inside a dialog the card
   // takes no map space, so it never waits as a badge there.
-  if (isMobile && !touring && !inModal && openedTip !== activeTip) {
+  const waiting = isMobile && !touring && !inModal && openedTip !== activeTip;
+  const targets = useTipTargets(shown && !waiting, Boolean(inModal));
+
+  if (!shown) return null;
+
+  if (waiting) {
     return (
       <div className="tipBadge" role="status">
         <button
@@ -62,9 +71,15 @@ export default function TipCard({ inModal }) {
     );
   }
 
+  const anchor = targets[0];
   return (
     <div
-      className={classNames("tipCard", { tipCardInModal: inModal })}
+      className={classNames("tipCard", {
+        tipCardInModal: inModal,
+        tipCardAnchored: anchor,
+        tipCardAbove: anchor && !pointsFromBelow(anchor),
+      })}
+      style={anchor ? anchorCardStyle(anchor) : undefined}
       role="status"
       data-testid="tip-card"
       onKeyDown={(e) => {
@@ -112,7 +127,7 @@ export default function TipCard({ inModal }) {
           {t("tipsDisable")}
         </button>
       )}
-      <TipPointer inModal={Boolean(inModal)} />
+      <TipPointer targets={targets} inModal={Boolean(inModal)} />
     </div>
   );
 }

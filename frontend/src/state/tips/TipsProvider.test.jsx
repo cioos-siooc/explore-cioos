@@ -123,6 +123,8 @@ describe("contextual tips", () => {
       left: "115px",
       top: "70px",
     });
+    expect(card()).toHaveClass("tipCardAnchored");
+    expect(card()).toHaveStyle({ left: "12px", top: "128px" });
     rect.mockRestore();
   });
 
@@ -350,6 +352,32 @@ describe("contextual tips", () => {
           .getByTestId("eovs-match-all")
           .closest("[data-tip-highlight]"),
       ).not.toBeNull();
+    });
+
+    it("hangs the tip by its control inside the window", async () => {
+      returningVisitor();
+      const rect = vi
+        .spyOn(Element.prototype, "getBoundingClientRect")
+        .mockImplementation(function () {
+          return this.hasAttribute("data-tip-highlight")
+            ? {
+                left: 300,
+                top: 600,
+                width: 30,
+                height: 30,
+                right: 330,
+                bottom: 630,
+              }
+            : { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 };
+        });
+      const { user } = renderWithProviders(<FiltersHarness />, {
+        providers: "app",
+      });
+      await user.click(screen.getByText("tour from exclude"));
+      const tip = within(modal()).getByTestId("tip-card");
+      await vi.waitFor(() => expect(tip).toHaveClass("tipCardAnchored"));
+      expect(tip).toHaveClass("tipCardAbove");
+      rect.mockRestore();
     });
 
     it("closes the window it opened once the tour moves off it, or ends", async () => {
