@@ -37,9 +37,9 @@ describe("choices, like every other list filter", () => {
   });
 
   it("draws only the included geometries once any is included", () => {
-    const drawn = dataLayersFromChoices({ obis: "include", grid: "include" });
+    const drawn = dataLayersFromChoices({ point: "include", grid: "include" });
     expect(DATA_LAYER_KEYS.filter((key) => drawn[key])).toEqual([
-      "obis",
+      "point",
       "grid",
     ]);
   });
@@ -53,8 +53,8 @@ describe("choices, like every other list filter", () => {
   });
 
   it("includes and excludes combine", () => {
-    const drawn = dataLayersFromChoices({ obis: "include", grid: "exclude" });
-    expect(drawn.obis).toBe(true);
+    const drawn = dataLayersFromChoices({ point: "include", grid: "exclude" });
+    expect(drawn.point).toBe(true);
     expect(drawn.grid).toBe(false);
     expect(drawn.profile).toBe(false);
   });
@@ -80,11 +80,13 @@ describe("anyTrajectoryLayerOn", () => {
 });
 
 describe("mapping a dataset row onto a switch", () => {
-  it("matches OBIS on source before cdm_data_type", () => {
-    // OBIS rows carry cdm_data_type 'Point', which an ERDDAP dataset can be too.
+  it("maps Point by type, whatever the source", () => {
     expect(
       dataLayerKeyForDataset({ source_type: "obis", cdm_data_type: "Point" }),
-    ).toBe("obis");
+    ).toBe("point");
+    expect(
+      dataLayerKeyForDataset({ source_type: "erddap", cdm_data_type: "Point" }),
+    ).toBe("point");
   });
 
   it("maps the profile and trajectory cdm_data_types", () => {
@@ -107,13 +109,13 @@ describe("mapping a dataset row onto a switch", () => {
   });
 
   it("governs nothing for an unrecognised geometry", () => {
-    expect(dataLayerKeyForDataset({ cdm_data_type: "Point" })).toBeUndefined();
+    expect(dataLayerKeyForDataset({ cdm_data_type: "Other" })).toBeUndefined();
   });
 
   it("admits a dataset no switch governs, whatever the selection", () => {
     // Otherwise narrowing to one geometry would silently drop rows the filter
     // has no opinion about.
-    const row = { cdm_data_type: "Point" };
+    const row = { cdm_data_type: "Other" };
     expect(datasetInDataLayers(row, onlyDataLayer("grid"))).toBe(true);
   });
 
@@ -139,11 +141,12 @@ describe("naming a cdm_data_type", () => {
     expect(cdmDataTypeLabel("TrajectoryProfile", t)).toBe(
       "layerTrajectoryProfile",
     );
+    expect(cdmDataTypeLabel("Point", t)).toBe("layerPoint");
     expect(cdmDataTypeLabel("Grid", t)).toBe("layerGrid");
   });
 
   it("shows a type no switch names as it is", () => {
-    expect(cdmDataTypeLabel("Point", t)).toBe("Point");
+    expect(cdmDataTypeLabel("Other", t)).toBe("Other");
     expect(cdmDataTypeLabel(undefined, t)).toBeUndefined();
   });
 });

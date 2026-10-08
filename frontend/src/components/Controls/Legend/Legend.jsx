@@ -197,7 +197,7 @@ export default function Legend({
   // hexagons (see buildTileSuffix).
   const profileFamilyOn =
     layers.profile || layers.timeseries || layers.timeseriesProfile;
-  const cellsAsHexes = layers.obis || trajectoryOn;
+  const cellsAsHexes = layers.point || trajectoryOn;
   const hexesOnMap = markerTier
     ? cellsAsHexes
     : profileFamilyOn || cellsAsHexes;

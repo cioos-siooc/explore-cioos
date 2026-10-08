@@ -42,6 +42,7 @@ function legendUrl(legendQuery) {
 import { useFilters } from "../filters/FilterProvider.jsx";
 import {
   DATA_LAYER_KEYS,
+  currentDataLayerKey,
   DEFAULT_TRACKS_MODE,
   dataLayersFromChoices,
   toggledDataLayerChoice,
@@ -300,7 +301,10 @@ export default function MapStateProvider({ children }) {
   // said "all off", which is excluding every geometry.
   const [dataLayerChoices, setDataLayerChoices] = useState(() => {
     const listParam = (name) =>
-      (urlParams.get(name) ?? "").split(",").filter(Boolean);
+      (urlParams.get(name) ?? "")
+        .split(",")
+        .filter(Boolean)
+        .map(currentDataLayerKey);
     const included = listParam("layers");
     const excluded =
       urlParams.get("layers") === ""

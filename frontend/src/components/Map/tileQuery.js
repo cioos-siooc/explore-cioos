@@ -29,7 +29,8 @@ export function buildTileSuffix(baseQuery, dataLayers) {
   // — see HEX_METRIC.
   params.set("metric", HEX_METRIC);
   if (dataLayers) {
-    if (!dataLayers.obis || params.get("includeObis") === "false") {
+    // OBIS cells are the only Point rows the API holds, so the switch maps here.
+    if (!dataLayers.point || params.get("includeObis") === "false") {
       params.set("includeObis", "false");
     }
     const enabledTypes = PROFILE_TYPE_KEYS.filter(

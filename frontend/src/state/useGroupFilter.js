@@ -16,11 +16,11 @@ import { useMapState } from "./map/MapStateProvider.jsx";
 import useEovCategories from "./useEovCategories.js";
 import useSourceKinds from "./useSourceKinds.js";
 
-// The type group a geometry switch stands for. OBIS has none: its datasets
-// group under their cdm_data_type, 'Point', beside ERDDAP's.
+// The type group a geometry switch stands for.
 const TYPE_KEY_BY_LAYER = new Map([
   ...PROFILE_TYPE_KEYS,
   ...TRAJECTORY_TYPE_KEYS,
+  ["point", "Point"],
   ["grid", GRID_KEY],
 ]);
 

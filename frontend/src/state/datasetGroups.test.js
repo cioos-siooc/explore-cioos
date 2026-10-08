@@ -95,7 +95,7 @@ describe("groupLabel", () => {
       "layerTimeseriesProfile",
     );
     expect(groupLabel("TimeSeries", "type", t)).toBe("layerTimeseries");
-    expect(groupLabel("Point", "type", t)).toBe("Point");
+    expect(groupLabel("Point", "type", t)).toBe("layerPoint");
   });
 
   it("labels the source parents, servers by name and nodes as themselves", () => {

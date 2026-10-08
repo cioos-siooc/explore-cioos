@@ -114,6 +114,14 @@ describe("MapStateProvider", () => {
     expect(latest.dataLayers.profile).toBe(true);
   });
 
+  it("reads an older link's 'obis' geometry as Point", async () => {
+    await renderReady({ url: "/?layers=obis&excludeLayers=grid" });
+    expect(latest.dataLayerChoices).toEqual({
+      point: "include",
+      grid: "exclude",
+    });
+  });
+
   it("reads an older link's empty ?layers= as every geometry excluded", async () => {
     await renderReady({ url: "/?layers=" });
     expect(Object.values(latest.dataLayers).some(Boolean)).toBe(false);
