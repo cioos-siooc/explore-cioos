@@ -54,6 +54,23 @@ describe("parseFilterQuery", () => {
 });
 
 describe("matchFilterOptions", () => {
+  it("finds an option by an alias of its label", () => {
+    const orgs = [
+      {
+        key: "orgs",
+        options: [
+          { id: 1, label: "Ocean Tracking Network" },
+          { id: 2, label: "OGSL" },
+          { id: 3, label: "Hakai Institute" },
+        ],
+      },
+    ];
+    const ids = (term) =>
+      matchFilterOptions(orgs, term).flatMap((g) => g.options.map((o) => o.id));
+    expect(ids("otn")).toEqual([1]);
+    expect(ids("SLGO")).toEqual([2]);
+  });
+
   it("lists only the applied options when there is no term", () => {
     expect(matchFilterOptions(groups, "")).toEqual([
       { key: "eovs", options: [groups[0].options[1]] },
