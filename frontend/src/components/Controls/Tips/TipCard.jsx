@@ -11,11 +11,7 @@ import TipPointer, {
   useTipTargets,
 } from "./TipPointer.jsx";
 import TipText from "./TipText.jsx";
-import {
-  TIP_MODALS,
-  TIPS,
-  useTips,
-} from "../../../state/tips/TipsProvider.jsx";
+import { TIP_MODALS, useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
@@ -37,7 +33,8 @@ import "./styles.css";
 // Escape still cover it.
 export default function TipCard({ inModal }) {
   const { t } = useTranslation();
-  const { activeTip, touring, stepTour, dismissTip, disableTips } = useTips();
+  const { activeTip, tourTips, touring, stepTour, dismissTip, disableTips } =
+    useTips();
   const { showFiltersModal, showDownloadModal } = useUI();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [openedTip, setOpenedTip] = useState(null);
@@ -95,8 +92,8 @@ export default function TipCard({ inModal }) {
         <Lightbulb className="tipCardIcon" size={16} aria-hidden="true" />
         <span className="tipCardHeading">
           {t("tipCounter", {
-            n: TIPS.indexOf(activeTip) + 1,
-            total: TIPS.length,
+            n: tourTips.indexOf(activeTip) + 1,
+            total: tourTips.length,
           })}
         </span>
         <button
