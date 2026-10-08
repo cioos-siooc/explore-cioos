@@ -1,7 +1,14 @@
 name: Deploy
 
-# Prereleases deploy staging; full releases deploy production. Wait for the
-# release's Integration Tests (including visual regression) before deploying.
+# The tag name picks the target (anything else is rejected):
+#   beta*          -> beta        any development*/master commit
+#   vX.Y.Z-rc.N    -> staging     master only
+#   vX.Y.Z         -> production  master only, and only a SHA whose staging
+#                                 deployment succeeded
+# beta and staging share one stack on the Juno host cioos-co-dev-explore
+# (dev.explore.cioos.ca, behind Caddy basic_auth), one deploy at a time. Each new
+# tag gets a fresh database volume (docker-compose.staging.yaml). Wait for the release's Integration Tests (including
+# visual regression) before deploying.
 on:
   release:
     types: [published]
@@ -11,17 +18,11 @@ on:
         description: Existing release tag to redeploy
         required: true
         type: string
-      environment:
-        description: Deployment target
-        required: true
-        type: choice
-        options:
-          - staging
-          - production
 
 permissions:
   actions: read
   contents: read
+  deployments: read
 
 jobs:
   release:
@@ -44,24 +45,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
-          TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'staging' || 'production') }}
-          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
           PUBLISHED_AT: ${{ github.event.release.published_at }}
         run: |
-          [[ "$TAG" == v* ]]
+          case "$TAG" in
+            beta*) target=beta ;;
+            *) if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then target=staging
+               elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then target=production
+               else echo "Tag $TAG is not beta*, vX.Y.Z-rc.N or vX.Y.Z" >&2; exit 1; fi ;;
+          esac
           git show-ref --verify --quiet "refs/tags/$TAG"
           sha=$(git rev-parse "$TAG^{commit}")
           release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")
           test "$(jq -r '.draft' <<< "$release")" = false
-          if [ "$TARGET" = staging ]; then
-            test "$(jq -r '.prerelease' <<< "$release")" = true
-          else
+          if [ "$target" = production ]; then
             test "$(jq -r '.prerelease' <<< "$release")" = false
+          else
+            test "$(jq -r '.prerelease' <<< "$release")" = true
           fi
           git fetch origin '+refs/heads/*:refs/remotes/origin/*'
-          if [ "$TARGET" = production ]; then
-            git merge-base --is-ancestor "$sha" refs/remotes/origin/master
-          else
+          if [ "$target" = beta ]; then
             found=false
             for branch in $(git for-each-ref --format='%(refname)' refs/remotes/origin); do
               case "$branch" in
@@ -70,8 +72,18 @@ jobs:
               esac
             done
             test "$found" = true
+          else
+            git merge-base --is-ancestor "$sha" refs/remotes/origin/master
           fi
-          if [ "$MANUAL" != true ]; then
+          if [ "$target" = production ]; then
+            staged=false
+            for id in $(gh api "repos/$GITHUB_REPOSITORY/deployments?sha=$sha&environment=staging&per_page=100" --jq '.[].id'); do
+              state=$(gh api "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --jq '.[0].state')
+              if [ "$state" = success ]; then staged=true; break; fi
+            done
+            test "$staged" = true || { echo "$sha has no successful staging deployment" >&2; exit 1; }
+          fi
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then
             for _ in $(seq 1 70); do
               conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build_and_test.yml/runs?event=release&head_sha=$sha&per_page=100" \
                 | jq -r --arg published "$PUBLISHED_AT" '.workflow_runs | map(select(.created_at >= $published)) | sort_by(.created_at) | last | .conclusion // "pending"')
@@ -86,16 +98,18 @@ jobs:
           {
             printf 'sha=%s\n' "$sha"
             printf 'tag=%s\n' "$TAG"
-            printf 'target=%s\n' "$TARGET"
+            printf 'target=%s\n' "$target"
           } >> "$GITHUB_OUTPUT"
 
   staging:
-    name: Deploy staging
+    name: Deploy ${{ needs.release.outputs.target }}
     needs: release
-    if: needs.release.outputs.target == 'staging'
+    if: needs.release.outputs.target != 'production'
     timeout-minutes: 15
     runs-on: ubuntu-latest
-    environment: staging
+    # beta and staging deploy the same stack, but stay separate GitHub
+    # environments so only a staging deployment satisfies the production gate.
+    environment: ${{ needs.release.outputs.target }}
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
@@ -103,13 +117,16 @@ jobs:
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
           wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
-          ssh_host: ${{ secrets.SERVER_IP }}
+          # cioos-co-dev-explore (not a secret: an internal address, reachable
+          # only over the VPN above).
+          ssh_host: 172.16.61.26
           ssh_username: runner
           ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
           deploy_path: /srv/services/explore-cioos-staging
           stack_name: explore-cioos-staging
-          compose_files: docker-compose.yaml docker-compose.production.yaml
+          compose_files: docker-compose.yaml docker-compose.production.yaml docker-compose.staging.yaml
           op_secret_files: .env.staging:.env
+          env_overrides: DEPLOY_TAG=${{ needs.release.outputs.tag }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"
