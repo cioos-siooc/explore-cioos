@@ -73,7 +73,8 @@ separate deploy step and no system cron.
 
 When harvests run is set in `.env` (all optional):
 
-- `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules; unset means none.
+- `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules; unset means none
+  (vernaculars also run after every OBIS harvest).
 - `RUN_ON_DEPLOY=true` — one full harvest on every (re)deploy.
 - `INCREMENTAL_MODE=true` — full runs only update changed datasets. Single-source
   runs are always incremental so they can't truncate other sources.

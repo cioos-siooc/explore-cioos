@@ -101,6 +101,7 @@ def _publish_log_artifact(log_path):
 POOL_NAME = "cde-process-pool"
 # @flow name of cde_pipeline_run; must match harvest-dashboard/app/config.HARVEST_FLOW_NAME.
 HARVEST_FLOW_NAME = "Harvest Source"
+VERNACULARS_DEPLOYMENT = "Populate Vernaculars/populate-vernaculars-deployment"
 
 TIMESTAMP_FMT = "%Y%m%d_%H%M%S"
 KEEP_RUNS_PER_SERVER = 5
@@ -176,6 +177,19 @@ def deployment_slug(source):
         return "obis"
     host = urlparse(source if "://" in source else "https://" + source).hostname or str(source)
     return host.lower().replace(".", "-")
+
+
+def _trigger_vernaculars():
+    """Queue a WoRMS backfill for the scientific names this OBIS load added.
+
+    Fire-and-forget: the harvest has already loaded, so a submit failure is
+    logged rather than failing the run."""
+    logger = _run_logger()
+    try:
+        flow_run = run_deployment(name=VERNACULARS_DEPLOYMENT, timeout=0)
+        logger.info("Triggered %s (flow_run=%s)", VERNACULARS_DEPLOYMENT, flow_run.id)
+    except Exception as e:
+        logger.warning("Could not trigger %s: %s", VERNACULARS_DEPLOYMENT, e)
 
 
 def _cron_env(var_name):
@@ -352,9 +366,19 @@ class PrefectCDEPipeline:
                         load_summary["pruned"],
                     )
 
+                if self._covers_obis():
+                    _trigger_vernaculars()
+
                 logger.info("CDE Pipeline completed successfully")
             finally:
                 _publish_log_artifact(log_path)
+
+    def _covers_obis(self):
+        if self.source:
+            return deployment_slug(self.source) == "obis"
+        return "obis" in _configured_sources(
+            self.erddap_urls, self.obis_dataset_ids, self.obis_discovery
+        )
 
     def create_process_work_pool(self, pool_name="cde-process-pool"):
         """Create the `process` work pool (idempotent; safe under concurrent replicas)."""
@@ -444,7 +468,8 @@ class PrefectCDEPipeline:
             job_variables=job_vars,
         )
 
-        # Post-harvest WoRMS vernaculars backfill on its own schedule.
+        # WoRMS vernaculars backfill: always registered, triggered after every OBIS
+        # load (see _trigger_vernaculars), plus VERNACULARS_CRON if set.
         vernaculars_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:populate_vernaculars_run",
