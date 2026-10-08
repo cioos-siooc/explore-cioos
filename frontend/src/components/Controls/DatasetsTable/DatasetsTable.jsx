@@ -11,6 +11,7 @@ import {
   Check2Circle,
   Eye,
   EyeSlash,
+  Filter,
   XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -19,6 +20,8 @@ import classNames from "classnames";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
+import useActiveFilters from "../../../state/useActiveFilters.js";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
   GROUP_NONE,
@@ -29,12 +32,10 @@ import {
   isGroupDimension,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
-import { useSearchInput } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
-import TableFilter from "../../ui/TableFilter.jsx";
 import "./styles.css";
 
 // Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
@@ -61,12 +62,10 @@ export default function DatasetsTable({
   datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
-  // The search, grouping and hidden groups live in SelectionProvider: they
-  // outlive this list while a dataset page replaces it, the hidden groups
-  // decide what the map draws, and all of them are carried in the URL.
+  // The grouping and hidden groups live in SelectionProvider: they outlive
+  // this list while a dataset page replaces it, the hidden groups decide what
+  // the map draws, and both are carried in the URL.
   const {
-    listSearchText,
-    setListSearchText,
     groupBy: selectedGroupBy,
     setGroupBy,
     hiddenGroups,
@@ -80,11 +79,10 @@ export default function DatasetsTable({
     handleSelectDataset: removeFromSelection,
     pointsError,
   } = useSelection();
-  // Narrows only this list (see listedDatasets), so it can follow the typing.
-  const [searchText, setSearchText] = useSearchInput(
-    listSearchText,
-    setListSearchText,
-  );
+  // The list has no search of its own: narrowing it is the Filters modal's
+  // job, so there is one way to narrow the datasets, not two.
+  const { openFilters, showFiltersModal } = useUI();
+  const activeFilterCount = useActiveFilters().length;
   // The datasets the open "what's here" card is about. They sort to the top of
   // the list, which is what ties the card to this list at all — without it the
   // card named datasets that could be on page 6 of 8, and there was no way to
@@ -181,7 +179,7 @@ export default function DatasetsTable({
     [t],
   );
 
-  // Search filtering happens upstream (SelectionProvider's listedDatasets) —
+  // Search filtering happens upstream (SelectionProvider's filteredDatasets) —
   // this just sorts whatever it's handed.
   const visibleRows = useMemo(() => {
     const field = sortFields.find((f) => f.id === sort.field);
@@ -379,11 +377,25 @@ export default function DatasetsTable({
         // Search, sort and grouping on one row: every row spent here is a
         // dataset card the sidebar does not show.
         <div className="datasetsCardToolbar">
-          <TableFilter
-            value={searchText}
-            onChange={setSearchText}
-            placeholder={t("datasetsListSearchPlaceholder")}
-          />
+          <button
+            type="button"
+            className={classNames("datasetsCardFilters", {
+              active: showFiltersModal,
+              applied: !showFiltersModal && activeFilterCount > 0,
+            })}
+            data-testid="datasets-filters-button"
+            onClick={openFilters}
+            aria-pressed={showFiltersModal}
+            title={t("dockFiltersCountTitle", { count: activeFilterCount })}
+          >
+            <Filter size={13} aria-hidden="true" />
+            {t("filtersMenuButton")}
+            {activeFilterCount > 0 && (
+              <span className="datasetsCardFiltersCount">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
           {sortControl}
           <SelectPill
             label={t("datasetsCardGroupByLabel")}

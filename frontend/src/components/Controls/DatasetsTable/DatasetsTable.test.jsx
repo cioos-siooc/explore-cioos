@@ -7,6 +7,7 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import translationFR from "../../../locales/fr/translation.json";
 
 function makeRow(overrides) {
@@ -121,13 +122,11 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).toEqual(["A", "C", "B"]);
   });
 
-  // The box narrows only the list (SelectionProvider's listedDatasets, which
-  // feeds `datasets` in the real app) — never the title search filter, which
-  // narrows the map too.
-  it("the search box writes listSearchText, not the title search filter", async () => {
-    let latest;
+  // The list has no search of its own; its Filters button opens the modal's.
+  it("the Filters button opens the Filters modal's search", async () => {
+    let ui;
     function Probe() {
-      latest = useSelection();
+      ui = useUI();
       return null;
     }
     const user = userEvent.setup({ delay: null });
@@ -144,10 +143,10 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       { providers: "app" },
     );
     await screen.findAllByTestId("dataset-card");
-    await user.type(screen.getByPlaceholderText("Filter this list"), "beta");
+    await user.click(screen.getByTestId("datasets-filters-button"));
 
-    await waitFor(() => expect(latest.listSearchText).toBe("beta"));
-    expect(latest.datasetTitleSearchText).toBe("");
+    expect(ui.showFiltersModal).toBe(true);
+    expect(ui.openFilter).toBeUndefined();
   });
 
   it("shows the no-results message when the datasets prop is empty", async () => {

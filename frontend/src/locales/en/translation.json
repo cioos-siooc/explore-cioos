@@ -263,7 +263,6 @@
   "datasetInspectorDepthTooLargeWarningText": "too big",
   "datasetInspectorRecordsShownText": "features shown...",
   "datasetInspectorFilterText": "Search table",
-  "datasetsListSearchPlaceholder": "Filter this list",
   "datasetInspectorClickPreviewText": "\"Show data\" previews a feature's data; \"Show on map\" points it out on the map.",
   "datasetInspectorRecordTable": "Feature list",
   "datasetInspectorNoRecordsText": "No features match your search.",

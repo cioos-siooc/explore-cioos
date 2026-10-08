@@ -188,7 +188,7 @@ describe("AppShell (composition)", () => {
       expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
     );
 
-    const filtersButton = await screen.findByText("Filters");
+    const filtersButton = await screen.findByTestId("topbar-filters-button");
     await user.click(filtersButton);
     await waitFor(() => {
       expect(

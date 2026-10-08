@@ -264,7 +264,6 @@
   "datasetInspectorDepthTooLargeWarningText": "trop volumineux",
   "datasetInspectorRecordsShownText": " entités affichées...",
   "datasetInspectorFilterText": "Rechercher le tableau",
-  "datasetsListSearchPlaceholder": "Filtrer cette liste",
   "datasetInspectorClickPreviewText": "« Afficher les données » prévisualise les données d'une entité; « Afficher sur la carte » la repère sur la carte.",
   "datasetInspectorRecordTable": "Liste des entités",
   "datasetInspectorNoRecordsText": "Aucune entité ne correspond à votre recherche.",

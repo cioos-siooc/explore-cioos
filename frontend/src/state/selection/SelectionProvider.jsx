@@ -186,17 +186,11 @@ export default function SelectionProvider({ children }) {
     Boolean(initialParams.get(RECORD_PARAM)),
   );
   const [datasetPreview, setDatasetPreview] = useState();
-  // Free-text title search for the datasets list (DatasetsTable's search
-  // box). Lifted out of that component so it can also surface as a
+  // Free-text title search: a filter like any other, set from the Filters
+  // modal's search (which the sidebar's search box opens) and shown as a
   // removable chip in ActiveFilterChips.
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
     () => initialParams.get("search") || "",
-  );
-  // The datasets sidebar's own search box. Unlike the title search above it is
-  // not a filter: it only narrows the list being read (listedDatasets below),
-  // never the map, the counters or the downloads.
-  const [listSearchText, setListSearchText] = useState(
-    () => initialParams.get("listSearch") || "",
   );
   const [combinedQueries, setCombinedQueries] = useState([]);
   // "Only in view": restrict the list to datasets whose extent overlaps the
@@ -314,18 +308,9 @@ export default function SelectionProvider({ children }) {
     i18n.language,
   ]);
 
-  const listedDatasets = useMemo(() => {
-    if (isEmpty(listSearchText)) return filteredDatasets;
-    const query = listSearchText.toLowerCase();
-    return filteredDatasets.filter((row) =>
-      datasetMatchesSearch(row, query, i18n.language),
-    );
-  }, [filteredDatasets, listSearchText, i18n.language]);
-
   // Over filteredDatasets rather than pointsData: the title search and the
   // data-layer switches narrow only client-side, so the raw in-view set still
-  // counted every dataset they took out ("0/N datasets (917 in view)"). Not
-  // over listedDatasets: the sidebar's own search never moves the counters.
+  // counted every dataset they took out ("0/N datasets (917 in view)").
   const inViewCount = useMemo(
     () =>
       filteredDatasets.filter((row) => datasetsInViewPks.has(row.pk)).length,
@@ -956,10 +941,7 @@ export default function SelectionProvider({ children }) {
     setDatasetPreview,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
-    listSearchText,
-    setListSearchText,
     filteredDatasets,
-    listedDatasets,
     filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,
