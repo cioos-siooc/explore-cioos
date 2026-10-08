@@ -69,20 +69,12 @@ export default function UrlSync() {
     datasetTitleSearchText,
     onlyInView,
     groupBy,
-    hiddenGroups,
     highlightedRecord,
     selectedTrajectory,
     mappedRecord,
   } = useSelection();
   const { coverageAxis } = useUI();
   const [isPageLoad, setIsPageLoad] = useState(true);
-
-  // Set of hidden group keys — a stable string so a Set rebuilt with the same
-  // members doesn't re-navigate.
-  const hiddenGroupsParam = [...hiddenGroups]
-    .map((key) => encodeURIComponent(key))
-    .sort()
-    .join(",");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -105,7 +97,6 @@ export default function UrlSync() {
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
-      ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
       ...(dataset ? { dataset } : {}),
       // Everything that hangs off the dataset page. The server that
       // disambiguates it and the open preview (which record, and how it is
@@ -181,7 +172,6 @@ export default function UrlSync() {
     datasetTitleSearchText,
     onlyInView,
     groupBy,
-    hiddenGroupsParam,
     tracksMode,
     debouncedScrubTime,
     trailingDays,

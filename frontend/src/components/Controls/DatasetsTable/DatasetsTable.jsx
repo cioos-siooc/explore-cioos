@@ -7,10 +7,11 @@ import React, {
 } from "react";
 import {
   Check2Circle,
+  CheckSquare,
   ChevronRight,
-  Eye,
-  EyeSlash,
   Filter,
+  SlashCircle,
+  Square,
   XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -21,16 +22,15 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useActiveFilters from "../../../state/useActiveFilters.js";
+import useGroupFilter from "../../../state/useGroupFilter.js";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
   GROUP_NONE,
-  HIDEABLE_DIMENSIONS,
   groupKeysFor,
   groupLabel,
   groupOptions,
   groupParent,
   isGroupDimension,
-  isGroupHidden,
   parentGroupKeys,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
@@ -47,8 +47,8 @@ const GROUP_SIZE = "groupSize";
 const DEFAULT_SORT = { field: "title", dir: "asc" };
 const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
 
-// Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
-// doesn't create a new Set every render and thrash memo deps.
+// Stable empty set, so an unpinned list doesn't create a new Set every render
+// and thrash memo deps.
 const EMPTY_SET = new Set();
 
 // The datasets list, rendered as cards (replaces the old data table). Used in
@@ -68,18 +68,13 @@ export default function DatasetsTable({
   // card can show the query its own dataset would be fetched with. Built by
   // DownloadDetails, which owns the format choice the strip below shares.
   downloadLinksByPk,
-  datasetsInViewPks = EMPTY_SET,
 }) {
   const { t, i18n } = useTranslation();
-  // The grouping and hidden groups live in SelectionProvider: they outlive
-  // this list while a dataset page replaces it, the hidden groups decide what
-  // the map draws, and both are carried in the URL.
+  // The grouping lives in SelectionProvider: it outlives this list while a
+  // dataset page replaces it, and is carried in the URL.
   const {
     groupBy: selectedGroupBy,
     setGroupBy,
-    hiddenGroups,
-    toggleGroupHidden,
-    showAllGroups,
     selectedPks,
     // Drops a dataset from the selection outright — aliased because the
     // download modal's own `handleSelectDataset` prop means something
@@ -173,9 +168,13 @@ export default function DatasetsTable({
   const rowSort = sort.field === GROUP_SIZE ? DEFAULT_SORT : sort;
 
   const groupByOptions = useMemo(() => groupOptions(t), [t]);
-  // Hiding a group takes its datasets off the map. Not offered for the
-  // viewport-based dimension ('inView'), whose membership changes on every pan.
-  const canHideGroups = HIDEABLE_DIMENSIONS.has(groupBy);
+  // Each group header includes or excludes its group in the main filters.
+  const {
+    filterFor,
+    filteredKeys: ownFilterKeys,
+    narrowed: ownFilterSet,
+  } = useGroupFilter(groupBy);
+  const ownFilterId = ownFilterKeys.join("\n");
 
   const sortValue = useCallback(
     (row, field) => {
@@ -229,9 +228,50 @@ export default function DatasetsTable({
     return sorted;
   }, [datasets, rowSort, i18n.language, pinnedPks, sortFields, sortValue]);
 
+  const byGroup = useMemo(() => {
+    const groups = new Map();
+    if (!isGroupDimension(groupBy)) return groups;
+    for (const row of visibleRows) {
+      for (const key of groupKeysFor(row, groupBy)) {
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      }
+    }
+    return groups;
+  }, [visibleRows, groupBy]);
+
+  // The groups seen while the dimension's own filter was not narrowing it.
+  // Once it is, the groups it took out of the results — every other one when
+  // one is included, the excluded one itself — stay listed from here, empty,
+  // so that filter can still be added to or undone from the list. Refreshed
+  // only when new results land, not the moment the filter clears: until the
+  // refetch, the results still lack the group being brought back.
+  const [knownGroups, setKnownGroups] = useState({ groupBy, keys: [] });
+  if (knownGroups.groupBy !== groupBy || knownGroups.datasets !== datasets) {
+    setKnownGroups({
+      groupBy,
+      datasets,
+      keys:
+        ownFilterSet && knownGroups.groupBy === groupBy
+          ? knownGroups.keys
+          : [...byGroup.keys()],
+    });
+  }
+  const emptyKeys = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...knownGroups.keys,
+          ...ownFilterId.split("\n").filter(Boolean),
+        ]),
+      ].filter((key) => !byGroup.has(key)),
+    [knownGroups, ownFilterId, byGroup],
+  );
+
   // Flat render list: without grouping it's just the sorted rows; with grouping
   // it's the rows bucketed under headers. Each entry is either
-  // { header, group, count } or { row, group }, where group is the stable group
+  // { header, group, count, depth, expandable } or { row, group }, where group
+  // is the stable group
   // key (see state/datasetGroups.js — labels are derived at render time). Rows
   // stay in their sorted order within a group; groups are alphabetical by label
   // with Other/Uncategorized last. Array-valued dims place a dataset under each
@@ -239,57 +279,59 @@ export default function DatasetsTable({
   // (the toolbar count stays unique — see below). A nested dimension adds a
   // header per parent (depth 0) above its groups' headers (depth 1); a
   // parent's count is its unique datasets, since a dataset can sit in several
-  // of its groups.
+  // of its groups. The empty groups (emptyKeys) list after the rest, and only
+  // a parent of them opens.
   const renderItems = useMemo(() => {
     if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
-    const byGroup = new Map();
-    for (const row of visibleRows) {
-      for (const key of groupKeysFor(
-        row,
-        groupBy,
-        datasetsInViewPks,
-        selectedPks,
-      )) {
-        if (!byGroup.has(key)) byGroup.set(key, []);
-        byGroup.get(key).push(row);
-      }
-    }
+    const rowsOf = (key) => byGroup.get(key) ?? [];
     const sortKeys = (keys, sizeOf) => {
       const sorted = sortGroupKeys(keys, groupBy, t, i18n.language);
       if (sort.field === GROUP_SIZE) {
         const factor = sort.dir === "asc" ? 1 : -1;
         sorted.sort((a, b) => (sizeOf(a) - sizeOf(b)) * factor);
       }
-      return sorted;
+      // The groups the results no longer hold go under the ones they do.
+      return [
+        ...sorted.filter((key) => sizeOf(key) > 0),
+        ...sorted.filter((key) => sizeOf(key) === 0),
+      ];
     };
     const items = [];
     const pushGroups = (keys, depth) => {
-      for (const key of sortKeys(keys, (k) => byGroup.get(k).length)) {
-        const rows = byGroup.get(key);
-        items.push({ header: true, group: key, count: rows.length, depth });
-        if (expandedGroups.has(key)) {
+      for (const key of sortKeys(keys, (k) => rowsOf(k).length)) {
+        const rows = rowsOf(key);
+        items.push({
+          header: true,
+          group: key,
+          count: rows.length,
+          depth,
+          expandable: rows.length > 0,
+        });
+        if (rows.length > 0 && expandedGroups.has(key)) {
           for (const row of rows) items.push({ row, group: key });
         }
       }
     };
+    const keys = [...byGroup.keys(), ...emptyKeys];
     if (parentGroupKeys(groupBy).length === 0) {
-      pushGroups(byGroup.keys(), 0);
+      pushGroups(keys, 0);
       return items;
     }
     const childrenByParent = new Map();
-    for (const key of byGroup.keys()) {
+    for (const key of keys) {
       const parent = groupParent(key, groupBy);
       if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
       childrenByParent.get(parent).push(key);
     }
     const parentSize = (parent) =>
-      new Set(childrenByParent.get(parent).flatMap((k) => byGroup.get(k))).size;
+      new Set(childrenByParent.get(parent).flatMap(rowsOf)).size;
     for (const parent of sortKeys(childrenByParent.keys(), parentSize)) {
       items.push({
         header: true,
         group: parent,
         count: parentSize(parent),
         depth: 0,
+        expandable: true,
       });
       if (expandedGroups.has(parent)) {
         pushGroups(childrenByParent.get(parent), 1);
@@ -299,10 +341,10 @@ export default function DatasetsTable({
   }, [
     visibleRows,
     groupBy,
+    byGroup,
+    emptyKeys,
     expandedGroups,
     sort,
-    datasetsInViewPks,
-    selectedPks,
     i18n.language,
     t,
   ]);
@@ -463,22 +505,6 @@ export default function DatasetsTable({
             options={groupByOptions}
             onChange={setGroupBy}
           />
-          {hiddenGroups.size > 0 && (
-            <button
-              type="button"
-              className="datasetsCardShowAllGroups"
-              onClick={showAllGroups}
-              title={t("datasetsCardGroupShowAllText", {
-                count: hiddenGroups.size,
-              })}
-              aria-label={t("datasetsCardGroupShowAllText", {
-                count: hiddenGroups.size,
-              })}
-            >
-              <Eye size={13} aria-hidden="true" />
-              {hiddenGroups.size}
-            </button>
-          )}
         </div>
       )}
 
@@ -563,10 +589,6 @@ export default function DatasetsTable({
                   onInspect={isDownloadModal ? undefined : setInspectDataset}
                   onHover={setHoveredDataset}
                   onHoverEnd={() => setHoveredDataset()}
-                  hiddenFromMap={
-                    item.group !== undefined &&
-                    isGroupHidden(item.group, groupBy, hiddenGroups)
-                  }
                   fromMapClick={pinnedPks.has(Number(item.row.pk))}
                   tipHighlight={tipHighlight(
                     item === whatsHereTarget && "whatsHere",
@@ -577,16 +599,16 @@ export default function DatasetsTable({
               );
             }
             const collapsed = !expandedGroups.has(item.group);
-            const hidden = isGroupHidden(item.group, groupBy, hiddenGroups);
-            // A group whose parent is hidden can't be shown on its own.
-            const hiddenByParent = hidden && !hiddenGroups.has(item.group);
+            const filter = filterFor(item.group);
             const label = groupLabel(item.group, groupBy, t, i18n.language);
             return (
               <div
                 key={`group:${item.group}`}
                 className={classNames("datasetsCardGroupHeader", {
-                  open: !collapsed,
-                  hidden,
+                  open: !collapsed && item.expandable,
+                  empty: item.count === 0,
+                  included: filter?.state === "include",
+                  excluded: filter?.state === "exclude",
                   nested: item.depth > 0,
                 })}
               >
@@ -594,7 +616,8 @@ export default function DatasetsTable({
                   type="button"
                   className="datasetsCardGroupToggle"
                   onClick={() => toggleGroupExpanded(item.group)}
-                  aria-expanded={!collapsed}
+                  aria-expanded={item.expandable ? !collapsed : undefined}
+                  disabled={!item.expandable}
                 >
                   <ChevronRight
                     className="datasetsCardGroupCaret"
@@ -606,25 +629,41 @@ export default function DatasetsTable({
                   </span>
                   <span className="datasetsCardGroupCount">{item.count}</span>
                 </button>
-                {canHideGroups && (
-                  <button
-                    type="button"
-                    className="datasetsCardGroupHide"
-                    onClick={() => toggleGroupHidden(item.group)}
-                    disabled={hiddenByParent}
-                    aria-pressed={hidden}
-                    title={
-                      hidden
-                        ? t("datasetsCardGroupShowOnMapTitle")
-                        : t("datasetsCardGroupHideFromMapTitle")
-                    }
-                  >
-                    {hidden ? (
-                      <EyeSlash size={13} aria-hidden="true" />
-                    ) : (
-                      <Eye size={13} aria-hidden="true" />
-                    )}
-                  </button>
+                {filter && (
+                  <>
+                    <button
+                      type="button"
+                      className="datasetsCardGroupFilter"
+                      onClick={() => filter.toggle("include")}
+                      aria-pressed={filter.state === "include"}
+                      aria-label={`${t("datasetsCardGroupIncludeAction")}: ${label}`}
+                      title={t(
+                        filter.state === "include"
+                          ? "datasetsCardGroupUnincludeTitle"
+                          : "datasetsCardGroupIncludeTitle",
+                      )}
+                    >
+                      {filter.state === "include" ? (
+                        <CheckSquare size={13} aria-hidden="true" />
+                      ) : (
+                        <Square size={13} aria-hidden="true" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="datasetsCardGroupFilter exclude"
+                      onClick={() => filter.toggle("exclude")}
+                      aria-pressed={filter.state === "exclude"}
+                      aria-label={`${t("filterOptionExcludeAction")}: ${label}`}
+                      title={t(
+                        filter.state === "exclude"
+                          ? "filterOptionUnexcludeTitle"
+                          : "filterOptionExcludeTitle",
+                      )}
+                    >
+                      <SlashCircle size={13} aria-hidden="true" />
+                    </button>
+                  </>
                 )}
               </div>
             );

@@ -24,7 +24,6 @@ export default function DatasetsPanel() {
     handleSelectDataset,
     setHoveredDataset,
     combinedQueries,
-    datasetsInViewPks,
     selectedTrajectory,
     setSelectedTrajectory,
     highlightedRecord,
@@ -82,7 +81,6 @@ export default function DatasetsPanel() {
             setInspectDataset={setInspectDataset}
             datasets={filteredDatasets}
             setHoveredDataset={setHoveredDataset}
-            datasetsInViewPks={datasetsInViewPks}
           />
         </div>
       )}

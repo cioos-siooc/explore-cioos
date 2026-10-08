@@ -8,6 +8,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import translationFR from "../../../locales/fr/translation.json";
 
 function makeRow(overrides) {
@@ -21,6 +22,12 @@ function makeRow(overrides) {
     organizations: [],
     ...overrides,
   };
+}
+
+let filters;
+function FiltersProbe() {
+  filters = useFilters();
+  return null;
 }
 
 const ROWS = [
@@ -297,12 +304,15 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       }),
     ];
     const { user } = renderWithProviders(
-      <DatasetsTable
-        datasets={rows}
-        selectAll={false}
-        handleSelectAllDatasets={() => {}}
-        handleSelectDataset={() => {}}
-      />,
+      <>
+        <DatasetsTable
+          datasets={rows}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>,
       { providers: "app" },
     );
     await screen.findAllByTestId("dataset-card");
@@ -329,13 +339,128 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     await user.click(screen.getByRole("button", { name: /OTN-OBIS/ }));
     expect(screen.getAllByTestId("dataset-card")).toHaveLength(1);
 
-    // Hiding OBIS hides its nodes too; their own eyes wait on the parent's.
-    const eyes = () => document.querySelectorAll(".datasetsCardGroupHide");
-    await user.click(eyes()[2]);
-    expect(eyes()[2]).toHaveAttribute("aria-pressed", "true");
-    expect(eyes()[3]).toBeDisabled();
-    expect(eyes()[4]).toBeDisabled();
-    expect(eyes()[0]).toBeEnabled();
+    // A parent sets its whole source list, as the Filters modal's OBIS row
+    // does; a node the catalogue doesn't know offers no filter.
+    await user.click(screen.getByRole("button", { name: "Exclude: OBIS" }));
+    await waitFor(() =>
+      expect(filters.obisNodesSelected.every((n) => n.isExcluded)).toBe(true),
+    );
+    expect(
+      [...document.querySelectorAll(".datasetsCardGroupHeader.excluded")].map(
+        (h) => h.querySelector(".datasetsCardGroupTitle").textContent,
+      ),
+    ).toEqual(["OBIS"]);
+    expect(
+      screen.queryByRole("button", { name: "Exclude: OTN-OBIS" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("a group header includes or excludes its group in the main filters", async () => {
+    const { user } = renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+    const mooring = () =>
+      filters.platformsSelected.find((p) => p.title === "mooring");
+
+    const include = await screen.findByRole("button", {
+      name: "Add filter: mooring",
+    });
+    await user.click(include);
+    await waitFor(() => expect(mooring().isSelected).toBe(true));
+    expect(include).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await waitFor(() => expect(mooring().isExcluded).toBe(true));
+    expect(mooring().isSelected).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await waitFor(() => expect(mooring().isExcluded).toBe(false));
+  });
+
+  it("keeps the groups a header's own filter took out, empty, until the grouping changes", async () => {
+    const vessel = makeRow({
+      pk: 4,
+      title: "Delta",
+      platform: "surface vessel",
+    });
+    const table = (datasets) => (
+      <>
+        <DatasetsTable
+          datasets={datasets}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>
+    );
+    const { user, rerender } = renderWithProviders(table([...ROWS, vessel]), {
+      providers: "app",
+    });
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+    const header = (name) =>
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].find(
+        (h) => h.querySelector(".datasetsCardGroupTitle").textContent === name,
+      );
+    const platform = (name) =>
+      filters.platformsSelected.find((p) => p.title === name);
+
+    // Including mooring narrows the results to it; surface vessel stays
+    // listed, empty and last, so it can be added too.
+    await user.click(
+      await screen.findByRole("button", { name: "Add filter: mooring" }),
+    );
+    rerender(table(ROWS));
+    expect(header("surface vessel")).toHaveClass("empty");
+    expect(
+      header("surface vessel").querySelector(".datasetsCardGroupCount"),
+    ).toHaveTextContent("0");
+    expect(
+      header("surface vessel").querySelector(".datasetsCardGroupToggle"),
+    ).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: "Add filter: surface vessel" }),
+    );
+    await waitFor(() =>
+      expect(platform("surface vessel").isSelected).toBe(true),
+    );
+    expect(platform("mooring").isSelected).toBe(true);
+
+    // An excluded group stays listed with its undo, and clearing the filter
+    // keeps it until the results bring it back.
+    await user.click(
+      screen.getByRole("button", { name: "Add filter: mooring" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Add filter: surface vessel" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    rerender(table([vessel]));
+    expect(header("mooring")).toHaveClass("empty", "excluded");
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await waitFor(() => expect(platform("mooring").isExcluded).toBe(false));
+    expect(header("mooring")).toHaveClass("empty");
+
+    rerender(table([...ROWS, vessel]));
+    expect(header("mooring")).not.toHaveClass("empty");
+
+    await user.selectOptions(screen.getByLabelText("Group by"), "type");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+    expect(
+      document.querySelectorAll(".datasetsCardGroupHeader.empty"),
+    ).toHaveLength(0);
   });
 
   it("a page opened mid-group re-shows both its parent and its group header", async () => {

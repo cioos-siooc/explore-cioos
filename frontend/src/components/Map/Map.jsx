@@ -471,9 +471,8 @@ const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
 // then each site is marked individually rather than the file being exempted,
 // so effects added later are still checked.
 export default function CreateMap({
-  // The query string the map draws from: the filters, narrowed to the dataset
-  // groups still shown (MapStateProvider assembles it — the sidebar list keeps
-  // the hidden groups, the tiles don't).
+  // The query string the map draws from: the filters, narrowed by the text
+  // search (MapStateProvider assembles it).
   mapQueryString,
   // No setPointsToReview: that list is the download selection, derived in
   // SelectionProvider from the `selected` flags on the results. The map used to

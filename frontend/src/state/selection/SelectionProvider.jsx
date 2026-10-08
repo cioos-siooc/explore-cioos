@@ -28,7 +28,7 @@ import {
 import erddapServersJSONfile from "../../erddapServers.json";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
-import { GROUP_NONE, hiddenDatasetPksFor } from "../datasetGroups.js";
+import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
   PERIOD_PARAM,
@@ -200,25 +200,12 @@ export default function SelectionProvider({ children }) {
     () => initialParams.get("onlyInView") === "true",
   );
 
-  // Grouping of the datasets list, and the groups the user has hidden from the
-  // map. Both live here rather than in DatasetsTable: the hidden groups decide
-  // what the map draws (see mapDatasetPKs below), and both are shareable — the
-  // list can unmount (the inspector takes over the panel) without losing them.
-  const [groupBy, setGroupByState] = useState(() => {
+  // Grouping of the datasets list. Lives here rather than in DatasetsTable so
+  // it survives the list unmounting while a dataset page replaces it.
+  const [groupBy, setGroupBy] = useState(() => {
     const initialGroupBy = initialParams.get("groupBy");
-    return !initialGroupBy || initialGroupBy === "selected"
-      ? GROUP_NONE
-      : initialGroupBy;
+    return isGroupDimension(initialGroupBy) ? initialGroupBy : GROUP_NONE;
   });
-  const [hiddenGroups, setHiddenGroups] = useState(
-    () =>
-      new Set(
-        (initialParams.get("hiddenGroups") || "")
-          .split(",")
-          .map((key) => decodeURIComponent(key))
-          .filter(Boolean),
-      ),
-  );
 
   // Per-dataset bbox, computed once per result set from the filtered extent
   // (falls back to the coverage bbox, the only one grids carry).
@@ -333,9 +320,8 @@ export default function SelectionProvider({ children }) {
   // returns pointsData itself when none of the three is active, and undefined
   // here leaves the query as the filters wrote it (see applyDatasetPKs).
   //
-  // Deliberately NOT mapDatasetPks: that one carries the hidden groups (a map
-  // visibility toggle the list ignores) and deliberately drops "only in view",
-  // which would rewrite every tile URL on every pan. This one is the list.
+  // Deliberately NOT mapDatasetPks: that one drops "only in view", which would
+  // rewrite every tile URL on every pan. This one is the list.
   const filteredDatasetPks = useMemo(
     () =>
       filteredDatasets === pointsData
@@ -359,45 +345,12 @@ export default function SelectionProvider({ children }) {
     [shortlist],
   );
 
-  // Group keys are only meaningful within one dimension, so switching
-  // dimensions drops whatever was hidden under the old one.
-  const setGroupBy = useCallback((dimension) => {
-    setGroupByState(dimension);
-    setHiddenGroups(new Set());
-  }, []);
-
-  const toggleGroupHidden = useCallback((group) => {
-    setHiddenGroups((previous) => {
-      const next = new Set(previous);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      return next;
-    });
-  }, []);
-
-  const showAllGroups = useCallback(() => setHiddenGroups(new Set()), []);
-
-  // Datasets hidden from the map by their group. The list still shows them —
-  // this is a visibility toggle, not a filter.
-  const hiddenDatasetPks = useMemo(
-    () =>
-      hiddenDatasetPksFor(
-        pointsData,
-        groupBy,
-        hiddenGroups,
-        datasetsInViewPks,
-        selectedPks,
-      ),
-    [pointsData, groupBy, hiddenGroups, datasetsInViewPks, selectedPks],
-  );
-
   // Hand the map the datasets it may draw. The tile/legend/coverage queries
   // take an include list (datasetPKs), so the narrowing is expressed as a pk
   // list over the current results; undefined while nothing narrows them leaves
   // those queries as the filters wrote them.
   //
-  // Two things narrow it: the groups hidden in the list, and the free-text
-  // search. The search is a filter rather than a display choice, so the map
+  // The free-text search narrows it. The search is a filter rather than a display choice, so the map
   // has to honour it — drawing markers and hexes for datasets the search has
   // taken out of the list is the map disagreeing with its own sidebar. The
   // other two narrowings filteredDatasets applies stay out of it: the
@@ -414,15 +367,11 @@ export default function SelectionProvider({ children }) {
   const mapDatasetPks = useMemo(() => {
     const query = datasetTitleSearchText.toLowerCase();
     const hasSearch = !isEmpty(datasetTitleSearchText);
-    if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
+    if (!hasSearch) return undefined;
     return pointsData
-      .filter(
-        (row) =>
-          !hiddenDatasetPks.has(row.pk) &&
-          (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
-      )
+      .filter((row) => datasetMatchesSearch(row, query, i18n.language))
       .map((row) => row.pk);
-  }, [hiddenDatasetPks, pointsData, datasetTitleSearchText, i18n.language]);
+  }, [pointsData, datasetTitleSearchText, i18n.language]);
 
   useEffect(() => {
     setMapDatasetPKs(mapDatasetPks);
@@ -951,10 +900,6 @@ export default function SelectionProvider({ children }) {
     setOnlyInView,
     groupBy,
     setGroupBy,
-    hiddenGroups,
-    toggleGroupHidden,
-    showAllGroups,
-    hiddenDatasetPks,
     combinedQueries,
     handleSelectDataset,
   };

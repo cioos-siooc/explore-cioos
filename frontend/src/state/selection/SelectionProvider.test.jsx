@@ -345,35 +345,6 @@ describe("SelectionProvider", () => {
     await waitFor(() => expect(latest.inspectRecordPeriod).toBeUndefined());
   });
 
-  it("groups by a dimension and hides datasets belonging only to hidden groups", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
-
-    const target = latest.pointsData[0];
-    act(() => latest.toggleGroupHidden(target.platform));
-    await waitFor(() => {
-      const stillHidingTarget = latest.pointsData
-        .filter((p) => p.platform === target.platform)
-        .every((p) => latest.hiddenDatasetPks.has(p.pk));
-      expect(stillHidingTarget).toBe(true);
-    });
-
-    act(() => latest.showAllGroups());
-    await waitFor(() => expect(latest.hiddenDatasetPks.size).toBe(0));
-  });
-
-  it("switching groupBy drops whatever was hidden under the old dimension", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
-    act(() => latest.toggleGroupHidden(latest.pointsData[0].platform));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(1));
-
-    act(() => latest.setGroupBy("type"));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(0));
-  });
-
   it("addDatasetsToSelection puts the named pks aside, ignoring one absent from the results", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];

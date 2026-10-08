@@ -14,7 +14,7 @@ let latest;
 function Probe() {
   latest = useMapState();
   // SelectionProvider's own initial /pointQuery load, once it settles,
-  // recomputes hiddenDatasetPks and — seeing nothing hidden — calls
+  // recomputes mapDatasetPks and — seeing no search — calls
   // setMapDatasetPKs(undefined) via its own effect. Under enough load that
   // load can still be in flight after legendLoading clears, and would land
   // AFTER (and silently clobber) a value this suite sets on mapDatasetPKs —

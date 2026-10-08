@@ -1,9 +1,9 @@
 // Grouping of the datasets list (DatasetsTable) by one dimension at a time.
 //
-// A group is identified by a stable key, never by its label: the keys are
-// persisted (URL: ?groupBy=&hiddenGroups=) and matched against the hidden set,
-// both of which have to survive a language switch. Labels are derived from the
-// key at render time.
+// Every dimension is one of the filters, so each group header can include or
+// exclude its group in the main filters (see useGroupFilter). A group is
+// identified by a stable key, never by its label — the key has to survive a
+// language switch; labels are derived from it at render time.
 
 import erddapServers from "../erddapServers.json";
 import { formatErddapServerName } from "../utilities.jsx";
@@ -16,14 +16,9 @@ export const GROUP_NONE = "none";
 export const GRID_KEY = "__grid__";
 export const OTHER_KEY = "__other__";
 export const UNCATEGORIZED_KEY = "__uncategorized__";
-export const IN_VIEW_KEY = "in";
-export const OUT_OF_VIEW_KEY = "out";
-export const SELECTED_KEY = "selected";
-export const UNSELECTED_KEY = "unselected";
 
 // The data portal dimension is two levels deep: each ERDDAP server and OBIS
-// node is a group of its own, nested under its kind. The parents keep the keys
-// the flat ERDDAP/OBIS grouping used, so hidden groups in old links still hold.
+// node is a group of its own, nested under its kind.
 export const ERDDAP_KEY = "erddap";
 export const OBIS_KEY = "obis";
 const PARENT_KEYS_BY_DIMENSION = { source: [ERDDAP_KEY, OBIS_KEY] };
@@ -31,13 +26,7 @@ const PARENT_KEYS_BY_DIMENSION = { source: [ERDDAP_KEY, OBIS_KEY] };
 // Groups that sort last regardless of their label.
 const LAST_KEYS = new Set([OTHER_KEY, UNCATEGORIZED_KEY]);
 
-// 'inView' groups by the current map viewport rather than by a property of the
-// dataset, so its membership changes on every pan — hiding it from the map is
-// not offered (see DatasetsTable), which would otherwise reload the tiles on
-// each pan for no visible gain. 'selected' is the same shape of thing: it
-// groups by what the user has put aside, which they change constantly, so it
-// isn't hideable either.
-export const HIDEABLE_DIMENSIONS = new Set([
+const DIMENSIONS = new Set([
   "type",
   "platform",
   "organization",
@@ -53,20 +42,19 @@ export function groupOptions(t) {
     { id: "organization", label: t("datasetsCardGroupOrganizationText") },
     { id: "eov", label: t("datasetsCardGroupEovText") },
     { id: "source", label: t("datasetsCardGroupSourceText") },
-    { id: "inView", label: t("datasetsCardOnlyInViewText") },
-    { id: "selected", label: t("datasetsCardGroupSelectedText") },
   ];
 }
 
+// Also what a ?groupBy= from an old link is checked against: the in-view and
+// selection groupings it may name are gone.
 export function isGroupDimension(groupBy) {
-  return Boolean(groupBy) && groupBy !== GROUP_NONE;
+  return DIMENSIONS.has(groupBy);
 }
 
 // The group key(s) a dataset belongs to under the active dimension. The
 // array-valued dimensions (organization, eov) return several, so a dataset
-// shows under each of its values. `selectedPks` is only read for the
-// 'selected' dimension — membership there is the shortlist, not a row field.
-export function groupKeysFor(row, groupBy, datasetsInViewPks, selectedPks) {
+// shows under each of its values.
+export function groupKeysFor(row, groupBy) {
   const isGrid = row.cdm_data_type === "Grid";
   switch (groupBy) {
     case "type":
@@ -86,10 +74,6 @@ export function groupKeysFor(row, groupBy, datasetsInViewPks, selectedPks) {
         : [UNCATEGORIZED_KEY];
     case "eov":
       return row.eovs?.length ? row.eovs : [UNCATEGORIZED_KEY];
-    case "inView":
-      return [datasetsInViewPks?.has(row.pk) ? IN_VIEW_KEY : OUT_OF_VIEW_KEY];
-    case "selected":
-      return [selectedPks?.has(row.pk) ? SELECTED_KEY : UNSELECTED_KEY];
     default:
       return [];
   }
@@ -105,11 +89,6 @@ export function groupParent(key, groupBy) {
   if (!PARENT_KEYS_BY_DIMENSION[groupBy]) return null;
   const separator = String(key).indexOf(":");
   return separator === -1 ? null : key.slice(0, separator);
-}
-
-// Hiding a parent hides every group nested in it.
-export function isGroupHidden(key, groupBy, hiddenGroups) {
-  return hiddenGroups.has(key) || hiddenGroups.has(groupParent(key, groupBy));
 }
 
 export function groupLabel(key, groupBy, t, language = "en") {
@@ -131,35 +110,14 @@ export function groupLabel(key, groupBy, t, language = "en") {
       return cdmDataTypeLabel(key, t);
     case "source":
       return key === OBIS_KEY ? "OBIS" : "ERDDAP";
-    case "inView":
-      return key === IN_VIEW_KEY
-        ? t("datasetsCardOnlyInViewText")
-        : t("datasetsCardGroupOutOfViewText");
-    case "selected":
-      return key === SELECTED_KEY
-        ? t("datasetsCardGroupInSelectionText")
-        : t("datasetsCardGroupNotInSelectionText");
     default:
       return key;
   }
 }
 
-// The two-group dimensions have a natural order that alphabetising would
-// scramble — and would scramble differently per language. The group the user
-// asked about goes first.
-const FIRST_KEY_BY_DIMENSION = {
-  inView: IN_VIEW_KEY,
-  selected: SELECTED_KEY,
-};
-
 // Alphabetical by label, with Other/Uncategorized pinned to the bottom.
 export function sortGroupKeys(keys, groupBy, t, language) {
-  const firstKey = FIRST_KEY_BY_DIMENSION[groupBy];
   return [...keys].sort((a, b) => {
-    if (firstKey) {
-      if (a === firstKey) return -1;
-      if (b === firstKey) return 1;
-    }
     const aLast = LAST_KEYS.has(a);
     const bLast = LAST_KEYS.has(b);
     if (aLast !== bLast) return aLast ? 1 : -1;
@@ -168,28 +126,4 @@ export function sortGroupKeys(keys, groupBy, t, language) {
       language,
     );
   });
-}
-
-// The datasets the map must not draw: those whose every group is hidden. A
-// dataset in several groups (an organization pair, say) stays on the map as
-// long as one of them is still shown.
-export function hiddenDatasetPksFor(
-  datasets,
-  groupBy,
-  hiddenGroups,
-  datasetsInViewPks,
-  selectedPks,
-) {
-  const hidden = new Set();
-  if (!isGroupDimension(groupBy) || hiddenGroups.size === 0) return hidden;
-  for (const row of datasets) {
-    const keys = groupKeysFor(row, groupBy, datasetsInViewPks, selectedPks);
-    if (
-      keys.length > 0 &&
-      keys.every((key) => isGroupHidden(key, groupBy, hiddenGroups))
-    ) {
-      hidden.add(row.pk);
-    }
-  }
-  return hidden;
 }

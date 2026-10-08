@@ -333,8 +333,9 @@ button.datasetCardTitle:focus-visible {
 }
 
 /* --- Group headers: sticky within the scroll region so the current group
-   stays labelled while scrolling. The label toggles collapse; the trailing eye
-   takes the group's datasets off the map (they stay in the list). --- */
+   stays labelled while scrolling. The label toggles collapse; the trailing
+   pair includes or excludes the group in the main filters, as a row of the
+   Filters modal does. --- */
 /* A group is a row of its own, not a divider: with every group closed by
    default the headers are the list, so each is a full-width target. Kept
    compact so a closed list shows as many groups as it can. Flat inside the
@@ -392,7 +393,7 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetsCardGroupToggle:focus-visible,
-.datasetsCardGroupHide:focus-visible {
+.datasetsCardGroupFilter:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
@@ -412,7 +413,7 @@ button.datasetCardTitle:focus-visible {
   transform: rotate(90deg);
 }
 
-.datasetsCardGroupHide {
+.datasetsCardGroupFilter {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -429,24 +430,54 @@ button.datasetCardTitle:focus-visible {
     background-color var(--cioos-transition-fast);
 }
 
-.datasetsCardGroupHide:hover {
+.datasetsCardGroupFilter:hover {
   color: var(--cioos-primary-700);
   background-color: var(--cioos-white);
 }
 
-/* Hidden from the map: the header and its cards stay legible but recede, and
-   the eye — now the way back — keeps its teal. */
-.datasetsCardGroupHeader.hidden .datasetsCardGroupToggle {
-  color: var(--cioos-ink-60);
+.datasetsCardGroupFilter.exclude:hover {
+  color: var(--cioos-error);
 }
 
-.datasetsCardGroupHeader.hidden .datasetsCardGroupTitle {
-  text-decoration: line-through;
-  text-decoration-color: var(--cioos-ink-40);
-}
-
-.datasetsCardGroupHeader.hidden .datasetsCardGroupHide {
+/* Included / excluded in the main filters: the same teal and red washes the
+   Filters modal's rows take. */
+.datasetsCardGroupHeader.included .datasetsCardGroupFilter:not(.exclude) {
   color: var(--cioos-primary-700);
+}
+
+.datasetsCardGroupHeader.excluded {
+  border-color: var(--cioos-error);
+  background-color: var(--cioos-error-bg);
+}
+
+.datasetsCardGroupHeader.excluded .datasetsCardGroupTitle {
+  text-decoration: line-through;
+}
+
+.datasetsCardGroupHeader.excluded .datasetsCardGroupFilter.exclude {
+  color: var(--cioos-error);
+}
+
+/* Empty: its own filter took the group out of the results. Kept as a row so
+   that filter can still be added to or undone here, but read as a choice, not
+   a group with contents. */
+.datasetsCardGroupHeader.empty {
+  border-style: dashed;
+  background-color: var(--cioos-white);
+}
+
+.datasetsCardGroupHeader.empty .datasetsCardGroupToggle {
+  color: var(--cioos-ink-60);
+  font-weight: 400;
+  cursor: default;
+}
+
+.datasetsCardGroupHeader.empty .datasetsCardGroupCaret {
+  visibility: hidden;
+}
+
+.datasetsCardGroupHeader.empty.excluded {
+  background-color: var(--cioos-error-bg);
 }
 
 /* A group inside a parent group (the data portal dimension): indented under
@@ -455,17 +486,6 @@ button.datasetCardTitle:focus-visible {
   top: 34px;
   margin-left: 12px;
   width: calc(100% - 12px);
-}
-
-/* Hidden with its parent: only the parent's eye brings it back. */
-.datasetsCardGroupHeader .datasetsCardGroupHide:disabled {
-  cursor: default;
-  color: var(--cioos-ink-40);
-  background: none;
-}
-
-.datasetCard.hiddenFromMap {
-  opacity: 0.55;
 }
 
 .datasetsCardGroupTitle {
@@ -541,36 +561,6 @@ button.datasetCardTitle:focus-visible {
 .datasetsCardFilters.active .datasetsCardFiltersCount {
   background-color: var(--cioos-on-primary);
   color: var(--cioos-primary);
-}
-
-/* "Show all on map": only present while something is hidden, and then only as
-   the eye and the count — the sentence is the tooltip and the accessible name,
-   so an occasional control doesn't take a row of the arrange line from the two
-   permanent ones. */
-.datasetsCardShowAllGroups {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 9px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  color: var(--cioos-primary-700);
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.datasetsCardShowAllGroups:focus-visible {
-  outline: none;
-  border-color: var(--cioos-primary);
-  box-shadow: var(--cioos-focus);
-}
-
-.datasetsCardShowAllGroups:hover {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
 }
 
 .datasetsCardGroupCount {
