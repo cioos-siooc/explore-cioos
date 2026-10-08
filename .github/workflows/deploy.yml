@@ -1,7 +1,9 @@
 name: Deploy
 
-# Prereleases deploy staging; full releases deploy production. Wait for the
-# release's Integration Tests (including visual regression) before deploying.
+# beta* tags (and any prerelease) deploy staging — its own Juno host,
+# cioos-co-dev-explore, served at dev.explore.cioos.ca behind Caddy basic_auth.
+# Full v* releases deploy production. Wait for the release's Integration Tests
+# (including visual regression) before deploying.
 on:
   release:
     types: [published]
@@ -44,17 +46,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
-          TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.release.prerelease && 'staging' || 'production') }}
+          TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || ((startsWith(github.event.release.tag_name, 'beta') || github.event.release.prerelease) && 'staging' || 'production') }}
           MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
           PUBLISHED_AT: ${{ github.event.release.published_at }}
         run: |
-          [[ "$TAG" == v* ]]
+          if [ "$TARGET" = staging ]; then
+            [[ "$TAG" == v* || "$TAG" == beta* ]]
+          else
+            [[ "$TAG" == v* ]]
+          fi
           git show-ref --verify --quiet "refs/tags/$TAG"
           sha=$(git rev-parse "$TAG^{commit}")
           release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")
           test "$(jq -r '.draft' <<< "$release")" = false
+          # A beta* tag is staging by name; a v* tag must be marked prerelease.
           if [ "$TARGET" = staging ]; then
-            test "$(jq -r '.prerelease' <<< "$release")" = true
+            [[ "$TAG" == beta* ]] || test "$(jq -r '.prerelease' <<< "$release")" = true
           else
             test "$(jq -r '.prerelease' <<< "$release")" = false
           fi
@@ -103,7 +110,9 @@ jobs:
       - uses: cioos-siooc/cioos-deploy-docker-compose@main
         with:
           wg_config: ${{ secrets.JUNO_WIREGUARD_VPN_CONFIG }}
-          ssh_host: ${{ secrets.SERVER_IP }}
+          # cioos-co-dev-explore — staging's own host (not a secret: an
+          # internal address, reachable only over the VPN above).
+          ssh_host: 172.16.61.26
           ssh_username: runner
           ssh_key: ${{ secrets.JUNO_RUNNER_PRIVATE_KEY }}
           deploy_path: /srv/services/explore-cioos-staging
