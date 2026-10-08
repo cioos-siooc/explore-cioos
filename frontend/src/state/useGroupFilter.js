@@ -13,6 +13,8 @@ import {
 } from "./datasetGroups.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
+import useEovCategories from "./useEovCategories.js";
+import useSourceKinds from "./useSourceKinds.js";
 
 // The type group a geometry switch stands for. OBIS has none: its datasets
 // group under their cdm_data_type, 'Point', beside ERDDAP's.
@@ -43,29 +45,6 @@ const listOption = (list, setList, matches) => {
   };
 };
 
-// A whole source list at once, as the Filters modal's ERDDAP / OBIS rows set it.
-const wholeList = (list, setList) => {
-  if (list.length === 0) return undefined;
-  const state = list.every((o) => o.isSelected)
-    ? "include"
-    : list.every((o) => o.isExcluded)
-      ? "exclude"
-      : undefined;
-  return {
-    state,
-    toggle: (target) => {
-      const next = state === target ? undefined : target;
-      setList((prev) =>
-        prev.map((o) => ({
-          ...o,
-          isSelected: next === "include",
-          isExcluded: next === "exclude",
-        })),
-      );
-    },
-  };
-};
-
 // The datasets-list groups as the main-filter options they stand for.
 // `filterFor(key)` is `{ state: "include" | "exclude" | undefined,
 // toggle(target) }`, where asking for the state it is already in clears it, as
@@ -76,6 +55,8 @@ const wholeList = (list, setList) => {
 export default function useGroupFilter(groupBy) {
   const filters = useFilters();
   const { dataLayerChoices, toggleDataLayer } = useMapState();
+  const eovCategories = useEovCategories();
+  const sourceKinds = useSourceKinds();
 
   const filterFor = (key) => {
     switch (groupBy) {
@@ -103,27 +84,31 @@ export default function useGroupFilter(groupBy) {
           filters.setOrgsSelected,
           (o) => o.title === key,
         );
-      case "eov":
+      case "eov": {
+        const parent = groupParent(key, groupBy);
+        if (!parent) return eovCategories.find((c) => c.category === key);
+        const value = key.slice(parent.length + 1);
         return listOption(
           filters.eovsSelected,
           filters.setEovsSelected,
-          (o) => o.title === key,
+          (o) => o.title === value,
         );
+      }
       case "source": {
         const parent = groupParent(key, groupBy);
-        const erddap = [
-          filters.erddapServersSelected,
-          filters.setErddapServersSelected,
-        ];
-        const obis = [filters.obisNodesSelected, filters.setObisNodesSelected];
-        if (!parent) {
-          if (key === ERDDAP_KEY) return wholeList(...erddap);
-          return key === OBIS_KEY ? wholeList(...obis) : undefined;
-        }
+        if (!parent) return sourceKinds.find((kind) => kind.key === key);
         const value = key.slice(parent.length + 1);
         return parent === ERDDAP_KEY
-          ? listOption(...erddap, (o) => o.url === value)
-          : listOption(...obis, (o) => o.title === value);
+          ? listOption(
+              filters.erddapServersSelected,
+              filters.setErddapServersSelected,
+              (o) => o.url === value,
+            )
+          : listOption(
+              filters.obisNodesSelected,
+              filters.setObisNodesSelected,
+              (o) => o.title === value,
+            );
       }
       default:
         return undefined;
@@ -151,7 +136,10 @@ export default function useGroupFilter(groupBy) {
       filteredKeys = stated(filters.orgsSelected, title);
       break;
     case "eov":
-      filteredKeys = stated(filters.eovsSelected, title);
+      filteredKeys = stated(
+        filters.eovsSelected,
+        (o) => `${o.category}:${o.title}`,
+      );
       break;
     case "source": {
       // A list set as a whole is the ERDDAP or OBIS row's doing: naming every

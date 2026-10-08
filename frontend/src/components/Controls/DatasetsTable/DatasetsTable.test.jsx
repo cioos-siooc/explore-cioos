@@ -360,6 +360,62 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("groups by ocean variable under open categories; a category header sets it whole", async () => {
+    const rows = [
+      makeRow({ pk: 1, title: "A", eovs: ["oxygen", "nutrients"] }),
+      makeRow({ pk: 2, title: "B", eovs: ["seaState"] }),
+      makeRow({ pk: 3, title: "C", eovs: [] }),
+    ];
+    const { user } = renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={rows}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "eov");
+
+    const headers = () =>
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].map((h) => [
+        h.querySelector(".datasetsCardGroupTitle").textContent,
+        h.querySelector(".datasetsCardGroupCount").textContent,
+        h.classList.contains("nested"),
+      ]);
+    // A dataset without an EOV sits beside the categories, not inside one.
+    await waitFor(() =>
+      expect(headers()).toEqual([
+        ["Biogeochemical", "1", false],
+        ["Nutrients", "1", true],
+        ["Oxygen", "1", true],
+        ["Physical", "1", false],
+        ["Sea State", "1", true],
+        ["Uncategorized", "1", false],
+      ]),
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add filter: Biogeochemical" }),
+    );
+    await waitFor(() =>
+      expect(
+        filters.eovsSelected
+          .filter((o) => o.category === "Biogeochemical")
+          .every((o) => o.isSelected),
+      ).toBe(true),
+    );
+    expect(
+      filters.eovsSelected.some(
+        (o) => o.category !== "Biogeochemical" && o.isSelected,
+      ),
+    ).toBe(false);
+  });
+
   it("a group header includes or excludes its group in the main filters", async () => {
     const { user } = renderWithProviders(
       <>

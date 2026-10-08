@@ -186,17 +186,25 @@ describe("FilterSearch", () => {
     );
   });
 
-  it("lists the variables a category set, not the category, as applied", async () => {
+  it("lists a category set as a whole as one applied filter", async () => {
     const { box } = await renderPalette(
       "/?eovs=dissolvedOrganicCarbon,nutrients,inorganicCarbon,oxygen,particulateMatter",
     );
     expect(box).toHaveValue("");
 
-    await waitFor(() => expect(options()).toHaveLength(5));
+    await waitFor(() => expect(options()).toHaveLength(1));
+    expect(categoryOption()).toHaveAttribute("data-state", "include");
+  });
+
+  it("lists the variables of a partly set category, not the category", async () => {
+    const { box } = await renderPalette("/?eovs=nutrients,oxygen");
+    expect(box).toHaveValue("");
+
+    await waitFor(() => expect(options()).toHaveLength(2));
     expect(categoryOption()).toBeUndefined();
   });
 
-  it("chips each variable a category set, not the category", async () => {
+  it("chips a category set as a whole once, and clears it whole", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
@@ -212,7 +220,10 @@ describe("FilterSearch", () => {
     await user.click(categoryOption());
 
     await waitFor(() =>
-      expect(screen.queryAllByTestId("filter-chip-item")).toHaveLength(2),
+      expect(screen.queryAllByTestId("filter-chip-item")).toHaveLength(1),
+    );
+    expect(screen.getByTestId("filter-chip-item")).toHaveTextContent(
+      "Cross-disciplinary",
     );
   });
 

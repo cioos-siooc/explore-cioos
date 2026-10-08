@@ -802,6 +802,8 @@
   "filterSearchCategoryTag": "Catégorie",
   "filterSearchCategoryDescription_one": "La {{count}} variable océanique de cette catégorie",
   "filterSearchCategoryDescription_other": "Les {{count}} variables océaniques de cette catégorie",
+  "filterSearchSourceKindDescription_one": "La {{count}} source de ce portail",
+  "filterSearchSourceKindDescription_other": "Les {{count}} sources de ce portail",
   "filterSearchActionAdd": "Ajouter",
   "filterSearchActionRemove": "Retirer",
   "filterSearchOpenTitle": "Rechercher des filtres (Ctrl+K)",

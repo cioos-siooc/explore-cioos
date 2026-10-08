@@ -801,6 +801,8 @@
   "filterSearchCategoryTag": "Category",
   "filterSearchCategoryDescription_one": "All {{count}} ocean variable in this category",
   "filterSearchCategoryDescription_other": "All {{count}} ocean variables in this category",
+  "filterSearchSourceKindDescription_one": "All {{count}} source of this portal",
+  "filterSearchSourceKindDescription_other": "All {{count}} sources of this portal",
   "filterSearchActionAdd": "Add",
   "filterSearchActionRemove": "Remove",
   "filterSearchOpenTitle": "Search filters (Ctrl+K)",

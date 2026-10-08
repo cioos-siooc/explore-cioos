@@ -65,7 +65,14 @@ describe("groupKeysFor", () => {
     expect(groupKeysFor({ organizations: [] }, "organization")).toEqual([
       UNCATEGORIZED_KEY,
     ]);
-    expect(groupKeysFor({ eovs: ["salinity"] }, "eov")).toEqual(["salinity"]);
+    expect(groupKeysFor({ eovs: ["oxygen", "seaIce"] }, "eov")).toEqual([
+      "Biogeochemical:oxygen",
+      "Physical:seaIce",
+    ]);
+    expect(groupKeysFor({ eovs: ["notAnEov"] }, "eov")).toEqual([
+      "Other:notAnEov",
+    ]);
+    expect(groupKeysFor({ eovs: [] }, "eov")).toEqual([UNCATEGORIZED_KEY]);
   });
 
   it("returns no keys for GROUP_NONE or an unrecognized dimension", () => {
@@ -103,7 +110,14 @@ describe("groupLabel", () => {
     );
   });
 
-  it("returns the raw key for organization/eov, which have no translation", () => {
+  it("labels an EOV category in the language asked for, and an EOV by its translation", () => {
+    expect(groupLabel("Biology and Ecosystems", "eov", t, "fr-CA")).toBe(
+      "Biologie et écosystèmes",
+    );
+    expect(groupLabel("Biogeochemical:oxygen", "eov", t)).toBe("oxygen");
+  });
+
+  it("returns the raw key for organization, which has no translation", () => {
     expect(groupLabel("Fisheries and Oceans Canada", "organization", t)).toBe(
       "Fisheries and Oceans Canada",
     );
@@ -128,11 +142,14 @@ describe("sortGroupKeys", () => {
 });
 
 describe("nested groups", () => {
-  it("only the source dimension has parents", () => {
+  it("nests data portals under their kind and EOVs under their category", () => {
     expect(parentGroupKeys("source")).toEqual(["erddap", "obis"]);
+    expect(parentGroupKeys("eov")).toContain("Physical");
     expect(parentGroupKeys("organization")).toEqual([]);
     expect(groupParent("erddap:https://e/erddap", "source")).toBe("erddap");
     expect(groupParent("obis", "source")).toBe(null);
-    expect(groupParent("a:b", "eov")).toBe(null);
+    expect(groupParent("Physical:seaIce", "eov")).toBe("Physical");
+    expect(groupParent(UNCATEGORIZED_KEY, "eov")).toBe(null);
+    expect(groupParent("a:b", "organization")).toBe(null);
   });
 });

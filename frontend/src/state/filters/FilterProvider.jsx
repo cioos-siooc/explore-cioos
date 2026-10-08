@@ -10,6 +10,7 @@ import {
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
+import { eovCategory } from "../datasetGroups.js";
 import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
 
@@ -365,7 +366,7 @@ export default function FilterProvider({ children }) {
       setEovsSelected(
         eovs.map((eov, index) => {
           const eovMetadata = eovsJSONfile.find((e) => e.value === eov);
-          const category = eovMetadata?.category || "Other";
+          const category = eovCategory(eov);
 
           return {
             title: eov,

@@ -5,6 +5,8 @@
 // identified by a stable key, never by its label — the key has to survive a
 // language switch; labels are derived from it at render time.
 
+import eovCategories from "../eovCategories.json";
+import eovs from "../eovs.json";
 import erddapServers from "../erddapServers.json";
 import { formatErddapServerName } from "../utilities.jsx";
 import { cdmDataTypeLabel } from "./dataLayers.js";
@@ -17,11 +19,20 @@ export const GRID_KEY = "__grid__";
 export const OTHER_KEY = "__other__";
 export const UNCATEGORIZED_KEY = "__uncategorized__";
 
-// The data portal dimension is two levels deep: each ERDDAP server and OBIS
-// node is a group of its own, nested under its kind.
+// The data portal and ocean variable dimensions are two levels deep: each
+// ERDDAP server and OBIS node is a group of its own, nested under its kind, and
+// each EOV under its category. A nested group's key is `parent:value`.
 export const ERDDAP_KEY = "erddap";
 export const OBIS_KEY = "obis";
-const PARENT_KEYS_BY_DIMENSION = { source: [ERDDAP_KEY, OBIS_KEY] };
+const PARENT_KEYS_BY_DIMENSION = {
+  source: [ERDDAP_KEY, OBIS_KEY],
+  eov: Object.keys(eovCategories),
+};
+
+// An EOV the vocabulary doesn't list still has to sit in some category.
+export function eovCategory(eov) {
+  return eovs.find((e) => e.value === eov)?.category || "Other";
+}
 
 // Groups that sort last regardless of their label.
 const LAST_KEYS = new Set([OTHER_KEY, UNCATEGORIZED_KEY]);
@@ -73,7 +84,9 @@ export function groupKeysFor(row, groupBy) {
         ? row.organizations
         : [UNCATEGORIZED_KEY];
     case "eov":
-      return row.eovs?.length ? row.eovs : [UNCATEGORIZED_KEY];
+      return row.eovs?.length
+        ? row.eovs.map((eov) => `${eovCategory(eov)}:${eov}`)
+        : [UNCATEGORIZED_KEY];
     default:
       return [];
   }
@@ -98,6 +111,7 @@ export function groupLabel(key, groupBy, t, language = "en") {
     if (parent === ERDDAP_KEY && child !== OTHER_KEY) {
       return formatErddapServerName(child, language, erddapServers);
     }
+    if (groupBy === "eov") return t(child);
     return parent === OBIS_KEY && child !== UNCATEGORIZED_KEY
       ? child
       : groupLabel(child, groupBy, t, language);
@@ -110,6 +124,10 @@ export function groupLabel(key, groupBy, t, language = "en") {
       return cdmDataTypeLabel(key, t);
     case "source":
       return key === OBIS_KEY ? "OBIS" : "ERDDAP";
+    case "eov":
+      return (
+        eovCategories[key]?.[language.startsWith("fr") ? "fr" : "en"] ?? key
+      );
     default:
       return key;
   }

@@ -322,9 +322,22 @@ export default function DatasetsTable({
         if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
         childrenByParent.get(parent).push(key);
       }
+      // A group with no parent (datasets without an EOV) is a plain group
+      // among the parents.
+      const topLevel = childrenByParent.get(null) ?? [];
+      childrenByParent.delete(null);
       const parentSize = (parent) =>
-        new Set(childrenByParent.get(parent).flatMap(rowsOf)).size;
-      for (const parent of sortKeys(childrenByParent.keys(), parentSize)) {
+        childrenByParent.has(parent)
+          ? new Set(childrenByParent.get(parent).flatMap(rowsOf)).size
+          : rowsOf(parent).length;
+      for (const parent of sortKeys(
+        [...childrenByParent.keys(), ...topLevel],
+        parentSize,
+      )) {
+        if (!childrenByParent.has(parent)) {
+          pushGroups([parent], 0);
+          continue;
+        }
         items.push({
           header: true,
           group: parent,
