@@ -324,3 +324,254 @@ class TestPerFeatureEovs:
         result = get_profiles(single_station_dataset)
         assert list(result["eovs"].iloc[0]) == list(single_station_dataset.eovs)
         single_station_dataset.get_eov_variables.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Metadata first: fewer full-data scans
+# ---------------------------------------------------------------------------
+
+STATIONS = ["STATION_001", "STATION_002"]
+
+
+def _stations_max_min(stations):
+    """get_max_min answering for every station, as orderByMinMax does."""
+    bounds = {
+        "time": ("2020-01-01T00:00:00Z", "2023-12-31T00:00:00Z"),
+        "latitude": (48.5, 48.5),
+        "longitude": (-125.0, -125.0),
+    }
+
+    def _get_max_min(vars_list):
+        last_var = vars_list[-1]
+        low, high = bounds.get(last_var, (0.5, 200.5))
+        return pd.DataFrame({
+            "station_id": stations,
+            f"{last_var}_min": [low] * len(stations),
+            f"{last_var}_max": [high] * len(stations),
+        }).set_index(vars_list[:-1])
+
+    return _get_max_min
+
+
+def _day_count(rows):
+    """A per-day orderByCount response, the grouped time column carrying the
+    bucket INDEX the way ERDDAP returns it."""
+    frame = pd.DataFrame(
+        rows, columns=["station_id", "day", "latitude", "depth", "temperature", "oxygen"]
+    )
+    index = (pd.to_datetime(frame.pop("day")) - pd.Timestamp("1970-01-01")).dt.days
+    frame.insert(1, "time", pd.to_datetime(index, unit="s").dt.strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    ))
+    return frame
+
+
+def _counting_queries(dataset):
+    return [
+        call.args[0] for call in dataset.dataset_tabledap_query.call_args_list
+        if "orderByCount" in call.args[0]
+    ]
+
+
+class TestMergedDayCount:
+    """Without a resolution, one per-day orderByCount answers the day set, the
+    record count and the per-feature EOVs; no separate get_count scan."""
+
+    @pytest.fixture
+    def dataset(self, two_station_dataset):
+        two_station_dataset.dataset_tabledap_query.side_effect = lambda url: _day_count([
+            ("STATION_001", "2020-03-01", 10, 12, 12, 12),
+            ("STATION_001", "2020-03-02", 5, 5, 5, 0),
+            ("STATION_002", "2020-03-01", 7, 7, 7, 0),
+        ])
+        return two_station_dataset
+
+    def test_get_count_is_not_called(self, dataset):
+        get_profiles(dataset)
+        dataset.get_count.assert_not_called()
+        assert len(_counting_queries(dataset)) == 1
+
+    def test_n_records_sums_the_daily_record_counts(self, dataset):
+        result = get_profiles(dataset).set_index("timeseries_id")
+        assert result.loc["STATION_001", "n_records"] == 17
+        assert result.loc["STATION_002", "n_records"] == 7
+
+    def test_days_and_eovs_come_from_the_same_response(self, dataset):
+        result = get_profiles(dataset).set_index("timeseries_id")
+        assert result.loc["STATION_001", "days"] == 2
+        assert result.loc["STATION_001", "eovs"] == ["oxygen", "subSurfaceTemperature"]
+        assert result.loc["STATION_002", "eovs"] == ["subSurfaceTemperature"]
+
+    def test_eov_variables_are_counted_in_the_day_query(self, dataset):
+        get_profiles(dataset)
+        request_vars = _counting_queries(dataset)[0].split("%26")[0].split(",")
+        assert {"temperature", "oxygen", "depth"} <= set(request_vars)
+
+    def test_failed_day_count_falls_back_to_get_count(self, two_station_dataset):
+        two_station_dataset.dataset_tabledap_query.side_effect = (
+            lambda url: pd.DataFrame()
+        )
+        result = get_profiles(two_station_dataset)
+        two_station_dataset.get_count.assert_called()
+        assert len(result) == 2
+
+    def test_gateway_timeout_defers_instead_of_rescanning(self, two_station_dataset):
+        """After a 504 the plain count would time out too; the harvester's
+        deferred retry redoes the dataset once ERDDAP has cached the result."""
+        two_station_dataset.dataset_tabledap_query.side_effect = (
+            lambda url: pd.DataFrame()
+        )
+        two_station_dataset.erddap_server.gateway_timeouts = {DATASET_ID: 0.0}
+        result = get_profiles(two_station_dataset)
+        assert result.empty
+        two_station_dataset.get_count.assert_not_called()
+
+
+class TestTimeCoverageResolution:
+    """time_coverage_resolution holds for every feature: records come from each
+    feature's span, and no counting request is made."""
+
+    @pytest.fixture
+    def dataset(self, two_station_dataset):
+        two_station_dataset.globals["time_coverage_resolution"] = "PT1H"
+        return two_station_dataset
+
+    def test_no_counting_request(self, dataset):
+        get_profiles(dataset)
+        dataset.get_count.assert_not_called()
+        assert _counting_queries(dataset) == []
+
+    def test_n_records_is_the_span_over_the_resolution(self, dataset):
+        result = get_profiles(dataset).set_index("timeseries_id")
+        hours = (pd.Timestamp("2023-12-31") - pd.Timestamp("2020-01-01")).days * 24
+        assert result.loc["STATION_001", "n_records"] == hours + 1
+
+    def test_every_feature_gets_the_dataset_eovs_and_its_span(self, dataset):
+        result = get_profiles(dataset)
+        for eovs in result["eovs"]:
+            assert eovs == dataset.eovs
+        span = (pd.Timestamp("2023-12-31") - pd.Timestamp("2020-01-01")).days
+        assert result["days"].tolist() == [span, span]
+        assert result["day_ranges"].tolist() == [[], []]
+
+    @pytest.mark.parametrize("resolution", ["monthly", "PT0S", ""])
+    def test_unusable_resolution_is_ignored(self, two_station_dataset, resolution):
+        two_station_dataset.globals["time_coverage_resolution"] = resolution
+        get_profiles(two_station_dataset)
+        two_station_dataset.get_count.assert_called()
+
+    def test_profile_type_ignores_the_resolution(self):
+        """A Profile feature is one cast; span / resolution says nothing about
+        its record count."""
+        dataset = build_mock_dataset(cdm_data_type="Profile")
+        dataset.globals["time_coverage_resolution"] = "PT1H"
+        get_profiles(dataset)
+        dataset.get_count.assert_called()
+
+
+class TestSingleTimeseriesFromMetadata:
+    """A single time series whose metadata has time coverage, position and
+    resolution needs no data scan beyond enumerating it."""
+
+    @pytest.fixture
+    def dataset(self, single_station_dataset):
+        single_station_dataset.globals.update({
+            "time_coverage_resolution": "PT1H",
+            "geospatial_lat_min": "48.5",
+            "geospatial_lat_max": "48.5",
+            "geospatial_lon_min": "-125.0",
+            "geospatial_lon_max": "-125.0",
+        })
+        return single_station_dataset
+
+    def test_no_data_query(self, dataset):
+        result = get_profiles(dataset)
+        assert len(result) == 1
+        dataset.get_max_min.assert_not_called()
+        dataset.get_count.assert_not_called()
+        dataset.dataset_tabledap_query.assert_not_called()
+
+    def test_time_coverage_globals_stand_in_for_actual_range(self, dataset):
+        dataset.df_variables.loc["time", "actual_range"] = ""
+        dataset.globals["time_coverage_start"] = "2021-02-01T00:00:00Z"
+        dataset.globals["time_coverage_end"] = "2021-02-02T00:00:00Z"
+        result = get_profiles(dataset)
+        assert result.loc[0, "time_min"] == pd.Timestamp("2021-02-01", tz="UTC")
+        assert result.loc[0, "n_records"] == 25
+        dataset.get_max_min.assert_not_called()
+
+
+class TestIdentityCarriesBounds:
+    def test_time_bounds_from_the_identity_are_not_requeried(self, two_station_dataset):
+        two_station_dataset.get_profile_ids.return_value = pd.DataFrame({
+            "station_id": STATIONS,
+            "time_min": ["2020-01-01T00:00:00Z", "2021-01-01T00:00:00Z"],
+            "time_max": ["2020-12-31T00:00:00Z", "2021-12-31T00:00:00Z"],
+        })
+        result = get_profiles(two_station_dataset).set_index("timeseries_id")
+        queried = [c.args[0][-1] for c in two_station_dataset.get_max_min.call_args_list]
+        assert "time" not in queried
+        assert result.loc["STATION_002", "time_min"] == pd.Timestamp("2021-01-01", tz="UTC")
+
+    def test_subset_positions_give_the_box_without_a_query(self, two_station_dataset):
+        """STATION_002 was relocated once: its box spans both positions."""
+        two_station_dataset.get_profile_ids.return_value = pd.DataFrame({
+            "station_id": ["STATION_001", "STATION_002", "STATION_002"],
+            "latitude": [48.5, 49.5, 49.7],
+            "longitude": [-125.0, -126.0, -126.2],
+        })
+        result = get_profiles(two_station_dataset).set_index("timeseries_id")
+        queried = [c.args[0][-1] for c in two_station_dataset.get_max_min.call_args_list]
+        assert "latitude" not in queried and "longitude" not in queried
+        assert len(result) == 2
+        assert result.loc["STATION_002", "latitude_min"] == 49.5
+        assert result.loc["STATION_002", "latitude_max"] == 49.7
+
+
+class TestTimeSeriesProfile:
+    @pytest.fixture
+    def dataset(self):
+        dataset = build_mock_dataset(cdm_data_type="TimeSeriesProfile")
+        dataset.profile_variables = {"timeseries_id": "station_id", "profile_id": "cast"}
+        dataset.profile_variable_list = ["cast", "station_id"]
+        identity = pd.DataFrame({
+            "cast": ["c1", "c2", "c3"],
+            "station_id": ["STATION_001", "STATION_001", "STATION_002"],
+            "time_min": ["2020-01-01T00:00:00Z", "2020-06-01T00:00:00Z",
+                         "2021-01-01T00:00:00Z"],
+            "time_max": ["2020-01-01T00:00:00Z", "2020-06-01T00:00:00Z",
+                         "2021-01-01T00:00:00Z"],
+        })
+        dataset.get_profile_ids.return_value = identity
+        dataset.profile_ids = identity
+        dataset.get_max_min.side_effect = _stations_max_min(STATIONS)
+        return dataset
+
+    def test_collapse_keeps_each_timeseries_envelope(self, dataset):
+        result = get_profiles(dataset).set_index("timeseries_id")
+        assert result.loc["STATION_001", "time_min"] == pd.Timestamp("2020-01-01", tz="UTC")
+        assert result.loc["STATION_001", "time_max"] == pd.Timestamp("2020-06-01", tz="UTC")
+        assert result.loc["STATION_001", "n_profiles"] == 2
+
+    def test_resolution_counts_rows_per_profile_from_one_sample(self, dataset):
+        dataset.globals["time_coverage_resolution"] = "P1D"
+        dataset.dataset_tabledap_query.side_effect = lambda url: pd.DataFrame({
+            "station_id": ["STATION_001"] * 3,
+            "time": ["2020-01-01T00:00:00Z"] * 3,
+        })
+        result = get_profiles(dataset).set_index("timeseries_id")
+
+        (url,) = [c.args[0] for c in dataset.dataset_tabledap_query.call_args_list]
+        assert url == "station_id,time&time=2020-01-01T00:00:00Z"
+        days = (pd.Timestamp("2020-06-01") - pd.Timestamp("2020-01-01")).days
+        assert result.loc["STATION_001", "n_records"] == (days + 1) * 3
+        # absent from the sample: the mean of the stations that were there
+        assert result.loc["STATION_002", "n_records"] == 3
+        dataset.get_count.assert_not_called()
+
+    def test_failed_sample_counts_one_row_per_timestep(self, dataset):
+        dataset.globals["time_coverage_resolution"] = "P1D"
+        dataset.dataset_tabledap_query.side_effect = lambda url: pd.DataFrame()
+        result = get_profiles(dataset).set_index("timeseries_id")
+        days = (pd.Timestamp("2020-06-01") - pd.Timestamp("2020-01-01")).days
+        assert result.loc["STATION_001", "n_records"] == days + 1

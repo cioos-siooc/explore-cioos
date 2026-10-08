@@ -49,6 +49,12 @@ class DatasetTypeHandler(ABC):
         its collapse-to-timeseries logic."""
         return profiles_with_lat_lon, profile_variables, profile_variable_list
 
+    def rows_per_timestep(self, dataset, profiles, profile_variable_list):
+        """Hook: records one ``time_coverage_resolution`` timestep holds, per
+        feature (a scalar or a Series aligned to ``profiles``). Default 1: a
+        timeseries record is one row per timestep."""
+        return 1
+
     def extract_track_points(self, dataset):
         """Hook: secondary output — ordered, downsampled track fixes
         (TrajectoryPointSchema-shaped) for track-line rendering AND for the

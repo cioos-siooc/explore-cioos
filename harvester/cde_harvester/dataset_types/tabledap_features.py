@@ -20,6 +20,7 @@ from cde_harvester.core.day_sets import (
 )
 from cde_harvester.dataset_types.geo import classify_profile_location
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
+from cde_harvester.sources.erddap.dataset import is_valid_duration
 
 
 def _axis_bounds_from_metadata(dataset, axis):
@@ -51,6 +52,30 @@ def _axis_bounds_from_metadata(dataset, axis):
     return None
 
 
+def _range_from_metadata(dataset, variable):
+    """[min, max] strings for ``variable`` from a single-feature dataset's
+    metadata: its ``actual_range``, else for time the ``time_coverage_start``/
+    ``time_coverage_end`` globals (a missing end reads as ongoing). None when
+    neither is set."""
+    actual_range = dataset.df_variables.loc[variable].get("actual_range")
+    if actual_range and len(parts := actual_range.split(",")) == 2:
+        return [part.strip() for part in parts]
+    start = dataset.globals.get("time_coverage_start")
+    if variable == "time" and start:
+        return [start, dataset.globals.get("time_coverage_end") or "NaN"]
+    return None
+
+
+def _time_resolution(dataset):
+    """The dataset's ``time_coverage_resolution`` as a positive Timedelta, or
+    None. It is taken to hold for every feature in the dataset."""
+    resolution = dataset.globals.get("time_coverage_resolution")
+    if not resolution or not is_valid_duration(resolution):
+        return None
+    resolution = pd.Timedelta(resolution)
+    return resolution if resolution > pd.Timedelta(0) else None
+
+
 def _eovs_per_feature(profile_count, eov_variables, dataset_eovs):
     """Per-feature EOV lists as a Series aligned to ``profile_count``'s index.
 
@@ -79,12 +104,14 @@ def _eovs_per_feature(profile_count, eov_variables, dataset_eovs):
     return pd.Series(per_feature, index=profile_count.index)
 
 
-def _lat_lon_box(dataset, profiles, profile_variable_list, logger):
+def _lat_lon_box(dataset, profiles, profile_variable_list, logger, identity):
     """Per-feature lat/lon bounding box, indexed by ``profile_variable_list``
     with columns latitude_min/max, longitude_min/max.
 
-    Single-feature datasets use metadata (no query); otherwise two bounded
-    orderByMinMax queries (one per axis). Returns an empty frame on failure.
+    Single-feature datasets use metadata, and features whose identity came
+    with subset-table positions use those (neither queries); otherwise two
+    bounded orderByMinMax queries (one per axis). Returns an empty frame on
+    failure.
     """
     if len(profiles) == 1:
         lat_bounds = _axis_bounds_from_metadata(dataset, "latitude")
@@ -101,6 +128,15 @@ def _lat_lon_box(dataset, profiles, profile_variable_list, logger):
                 },
                 index=idx,
             )
+
+    if {"latitude", "longitude"} <= set(identity.columns):
+        logger.debug("Using subset-table positions for lat/lon bounding box")
+        return identity.groupby(profile_variable_list, dropna=False).agg(
+            latitude_min=("latitude", "min"),
+            latitude_max=("latitude", "max"),
+            longitude_min=("longitude", "min"),
+            longitude_max=("longitude", "max"),
+        )
 
     lat_mm = dataset.get_max_min(profile_variable_list + ["latitude"])
     lon_mm = dataset.get_max_min(profile_variable_list + ["longitude"])
@@ -147,15 +183,24 @@ def _string_key(index):
     return pd.Index(frame.iloc[:, 0], name=index.name)
 
 
-def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
-    """Per-feature day sets, from one grouped request.
+def _extract_day_sets(
+    dataset, profiles, profile_variable_list, logger,
+    record_variables=(), eov_variables=(),
+):
+    """Per-feature day sets, record counts and EOV counts, from one grouped
+    request.
 
-    Returns a (days, day_ranges) frame indexed like ``profiles``, or None when
-    the day set could not be determined — in which case the caller leaves both
-    columns unset and the database fills ``days`` from the time span
+    Returns a (day_ranges, days, n_records, <eov variable>...) frame indexed
+    like ``profiles``, or None when the day set could not be determined — in
+    which case the caller counts records the old way and leaves the day set
+    unset, so the database fills ``days`` from the time span
     (5_profile_process.sql). That fallback is a strict over-count, which is the
     whole reason this function exists, but it is never wrong enough to justify
     dropping a dataset.
+
+    ``n_records`` sums, over a feature's days, the largest daily count among
+    the counted variable and ``record_variables``. The ``eov_variables``
+    columns are each variable's non-null count summed the same way.
 
     One `orderByCount("<cf_role vars>,time/86400")` answers it for every feature
     at once. Three things about that query are easy to get wrong:
@@ -196,7 +241,14 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
         logger.warning("No countable variable outside the group; using the time span")
         return None
 
-    request_vars = group_vars + ["time", counted]
+    record_columns = [counted] + [
+        v for v in record_variables if v not in group_vars + ["time", counted]
+    ]
+    eov_columns = [
+        v for v in eov_variables
+        if v not in group_vars + ["time"] + record_columns
+    ]
+    request_vars = group_vars + ["time"] + record_columns + eov_columns
     url = ",".join(request_vars) + requests.utils.quote(
         f'&orderByCount("{day_bucket_group(group_vars)}")'
     )
@@ -222,6 +274,14 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
         logger.warning("Per-feature day count had no usable dates; using the time span")
         return None
 
+    count_columns = [c for c in record_columns + eov_columns if c in df_days]
+    df_days[count_columns] = df_days[count_columns].apply(
+        pd.to_numeric, errors="coerce"
+    )
+    df_days["_records"] = df_days[
+        [c for c in record_columns if c in df_days]
+    ].max(axis="columns")
+
     if group_vars:
         for column in group_vars:
             df_days[column] = df_days[column].astype(str)
@@ -233,6 +293,10 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
 
     day_sets = grouped["day"].apply(days_to_ranges).rename("day_ranges").to_frame()
     day_sets["days"] = day_sets["day_ranges"].apply(total_days)
+    day_sets["n_records"] = grouped["_records"].sum()
+    for column in eov_columns:
+        if column in df_days:
+            day_sets[column] = grouped[column].sum()
 
     # Align to the caller's index rather than leaving it to join on dtype. The
     # identity frame's keys come from the distinct() CSV — an integer station id
@@ -261,7 +325,52 @@ def _extract_day_sets(dataset, profiles, profile_variable_list, logger):
     day_sets["day_ranges"] = day_sets["day_ranges"].apply(
         lambda runs: runs if isinstance(runs, list) else []
     )
+    day_sets["n_records"] = day_sets["n_records"].fillna(0)
     return day_sets
+
+
+def _timesteps(profiles, resolution):
+    """Timesteps per feature over its [time_min, time_max] at ``resolution``."""
+    start = ERDDAP.parse_erddap_dates(profiles["time_min"].astype(str).str.strip())
+    end = ERDDAP.parse_erddap_dates(profiles["time_max"].astype(str).str.strip())
+    return (end - start) // resolution + 1
+
+
+def _count_records(
+    dataset, profiles, profile_variable_list, count_variables, eov_variables,
+    logger,
+):
+    """``profiles`` with n_records and eovs from a per-feature orderByCount."""
+    time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
+    time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
+    profile_count = dataset.get_count(
+        sorted(set(count_variables) | set(eov_variables)),
+        profile_variable_list,
+        time_min,
+        time_max,
+    )
+    if profile_count.empty and eov_variables:
+        # The widened request can fail where the narrow one succeeds (longer
+        # URL, larger response). Never lose a dataset over EOV detection: redo
+        # the original request and fall back to the dataset's EOVs.
+        logger.warning("Count including EOV variables failed, retrying without them")
+        eov_variables = {}
+        profile_count = dataset.get_count(
+            count_variables, profile_variable_list, time_min, time_max
+        )
+
+    if not profile_count.empty:
+        profile_count = profile_count.set_index(profile_variable_list)
+        # n_records counts records, not variables: it has to keep ranging over
+        # the same columns it did before the EOV columns joined the request.
+        n_records_columns = [
+            column for column in count_variables if column in profile_count.columns
+        ]
+        profiles["n_records"] = profile_count[n_records_columns].max(axis="columns")
+        profiles["eovs"] = _eovs_per_feature(
+            profile_count, eov_variables, dataset.eovs
+        )
+    return profiles
 
 
 def extract_features(dataset, handler):
@@ -280,8 +389,6 @@ def extract_features(dataset, handler):
 
     """
 
-    df_variables = dataset.df_variables
-
     vertical_variables = ["depth", "altitude"]
 
     # lat,lon not in this list. They have to be treated differently as getting
@@ -295,16 +402,19 @@ def extract_features(dataset, handler):
         x for x in llat_variables if x in dataset.variables_list
     ]
 
-    profiles_with_lat_lon = dataset.get_profile_ids(
+    identity = dataset.get_profile_ids(
         collapse_time_profile_ids=handler.collapse_time_profile_ids
     )
 
-    if profiles_with_lat_lon.empty:
-        return profiles_with_lat_lon
+    if identity.empty:
+        return identity
 
-    profiles = profiles_with_lat_lon[
-        profiles_with_lat_lon.columns.difference(["latitude", "longitude"])
-    ].drop_duplicates()
+    # The identity frame may carry subset-table positions; those only feed the
+    # bounding box below, never the one-row-per-feature frame.
+    profiles_with_lat_lon = identity.drop(
+        columns=["latitude", "longitude"], errors="ignore"
+    ).drop_duplicates()
+    profiles = profiles_with_lat_lon.copy()
     # Organize dataset variables by their cf_roles
     # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
     profile_variables = dataset.profile_variables
@@ -341,12 +451,15 @@ def extract_features(dataset, handler):
             profiles_with_lat_lon[llat_variable + "_min"] = val
             profiles_with_lat_lon[llat_variable + "_max"] = val
             continue
-        # if this dataset is a single profile and actual_range is set, use that
-        elif len(profiles) == 1 and df_variables.loc[llat_variable].get("actual_range"):
-            # if this dataset is a single profile and actual_range is set, use that
-            logger.debug(f"Using dataset actual_range for {llat_variable}")
+        elif llat_variable + "_min" in profiles_with_lat_lon:
+            # Came with the feature identity (get_profile_ids).
+            continue
+        elif len(profiles) == 1 and (
+            metadata_range := _range_from_metadata(dataset, llat_variable)
+        ):
+            logger.debug(f"Using dataset metadata for {llat_variable}")
 
-            [min, max] = df_variables.loc[llat_variable]["actual_range"].split(",")
+            [min, max] = metadata_range
 
             # For ongoing datasets
             if "NaN" in max:
@@ -376,7 +489,7 @@ def extract_features(dataset, handler):
     # used by spatial search. The min of lat and min of lon separately can be a
     # point not in the dataset, so we never treat them as a location on their
     # own — only as box extents + a derived midpoint.
-    box = _lat_lon_box(dataset, profiles, profile_variable_list, logger)
+    box = _lat_lon_box(dataset, profiles, profile_variable_list, logger, identity)
     if box.empty:
         logger.error(f"No lat/lon data found for {dataset.id}")
         return box
@@ -420,9 +533,6 @@ def extract_features(dataset, handler):
         "(not time_min.isnull()) and not (time_max.isnull())"
     ).copy()
 
-    time_min = ERDDAP.parse_erddap_date(profiles["time_min"].min())
-    time_max = ERDDAP.parse_erddap_date(profiles["time_max"].max())
-
     count_variables = sorted(set(count_variables))
 
     # Variables carrying an EOV are counted per feature as well: ERDDAP's
@@ -431,40 +541,50 @@ def extract_features(dataset, handler):
     # dataset's EOVs each feature actually holds.
     #
     # A single-feature dataset is skipped: its one feature is the dataset, so
-    # its EOVs are the dataset's. That also sidesteps get_count's two shortcuts
-    # (time_coverage_resolution, 30-day extrapolation), which only fire for
-    # single-feature datasets and return a time-only or window-limited frame
-    # that cannot answer EOV presence.
+    # its EOVs are the dataset's. That also sidesteps get_count's 30-day
+    # extrapolation, which only fires for single-feature datasets and returns a
+    # window-limited frame that cannot answer EOV presence.
     is_single_feature = len(dataset.profile_ids) <= 1 or len(profiles) <= 1
     eov_variables = {} if is_single_feature else dataset.get_eov_variables()
 
-    profile_count = dataset.get_count(
-        sorted(set(count_variables) | set(eov_variables)),
-        profile_variable_list,
-        time_min,
-        time_max,
-    )
-    if profile_count.empty and eov_variables:
-        # The widened request can fail where the narrow one succeeds (longer
-        # URL, larger response). Never lose a dataset over EOV detection: redo
-        # the original request and fall back to the dataset's EOVs.
-        logger.warning("Count including EOV variables failed, retrying without them")
-        eov_variables = {}
-        profile_count = dataset.get_count(
-            count_variables, profile_variable_list, time_min, time_max
+    # Counting is the costliest scan, so the cheapest answer wins:
+    #   1. time_coverage_resolution — records from each feature's span, no
+    #      request. The day set falls back to the span and every feature gets
+    #      the dataset's EOVs: the accepted price of skipping the scan.
+    #   2. one per-day orderByCount answering the day set, record count and
+    #      per-feature EOVs together (multi-day feature types only; a Profile
+    #      feature is a single cast, so its span already IS its day set);
+    #   3. a plain per-feature orderByCount.
+    resolution = _time_resolution(dataset)
+    day_sets = None
+    if handler.features_span_multiple_days and resolution is not None:
+        logger.debug("Using time_coverage_resolution for the record count")
+        timesteps = _timesteps(profiles, resolution)
+        profiles["n_records"] = timesteps * handler.rows_per_timestep(
+            dataset, profiles, profile_variable_list
+        )
+        profiles["eovs"] = [list(dataset.eovs)] * len(profiles)
+    elif handler.features_span_multiple_days:
+        day_sets = _extract_day_sets(
+            dataset, profiles, profile_variable_list, logger,
+            record_variables=[v for v in ("depth",) if v in dataset.variables_list],
+            eov_variables=list(eov_variables),
         )
 
-    if not profile_count.empty:
-        profile_count = profile_count.set_index(profile_variable_list)
-        # n_records counts records, not variables: it has to keep ranging over
-        # the same columns it did before the EOV columns joined the request.
-        n_records_columns = [
-            column for column in count_variables if column in profile_count.columns
-        ]
-        profiles["n_records"] = profile_count[n_records_columns].max(axis="columns")
-        profiles["eovs"] = _eovs_per_feature(
-            profile_count, eov_variables, dataset.eovs
+    if day_sets is not None:
+        profiles = profiles.join(day_sets[["day_ranges", "days", "n_records"]])
+        profiles["eovs"] = _eovs_per_feature(day_sets, eov_variables, dataset.eovs)
+    elif "n_records" not in profiles:
+        if dataset.id in dataset.erddap_server.gateway_timeouts:
+            # The same scan would time out again; the harvester retries the
+            # whole dataset once ERDDAP has had time to cache the result.
+            logger.warning("Gateway timeout while counting; deferring the dataset")
+            return pd.DataFrame()
+        profiles = _count_records(
+            dataset, profiles, profile_variable_list, count_variables,
+            eov_variables, logger,
         )
+
     if "n_records" not in profiles:
         profiles["n_records"] = None
     if "eovs" not in profiles:
@@ -476,15 +596,6 @@ def extract_features(dataset, handler):
     if profiles.empty:
         logger.error("Error counting records")
         return profiles
-
-    # Per-feature day sets, while the frame is still indexed by the cf_role
-    # variables the grouped request answers on. Only for types whose features
-    # can span more than one day: a Profile feature is a single cast, so its
-    # span already IS its day set and a second request would buy nothing.
-    if handler.features_span_multiple_days:
-        day_sets = _extract_day_sets(dataset, profiles, profile_variable_list, logger)
-        if day_sets is not None:
-            profiles = profiles.join(day_sets)
 
     profiles = profiles.reset_index(drop=False).copy()
 

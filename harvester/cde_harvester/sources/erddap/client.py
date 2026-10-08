@@ -22,6 +22,7 @@ from urllib3.util.retry import Retry
 from cde_harvester.core.errors import (
     HASH_CROISSANT_HTTP_ERROR,
     HASH_CROISSANT_UNREADABLE,
+    HASH_CROISSANT_UNSUPPORTED,
     HASH_FEDERATED_UNRESOLVED,
     HASH_NO_FILE_LIST,
     ResponseTooLargeError,
@@ -82,6 +83,12 @@ _ERDDAP_SOURCE_RE = re.compile(
 )
 
 
+# ERDDAP added the .croissant endpoint in 2.28.
+CROISSANT_MIN_VERSION = (2, 28)
+
+_ERDDAP_VERSION_RE = re.compile(r"ERDDAP_version=(\d+)\.(\d+)")
+
+
 def _croissant_source_url(doc):
     match = re.search(r"sourceUrl=(\S+)", doc.get("description") or "")
     return match.group(1) if match else None
@@ -138,6 +145,8 @@ class ERDDAP:
         # {dataset_id: monotonic time of its first 504}; the harvester defers
         # these datasets to a second pass.
         self.gateway_timeouts = {}
+        # {erddap_base: bool}; federated hops can land on other servers.
+        self._croissant_supported = {}
 
         try:
             self.logger = get_run_logger()
@@ -374,6 +383,8 @@ class ERDDAP:
         when a hash was produced. Fail-open: (None, False, <reason>) on any error.
         """
         erddap_base = erddap_base.rstrip("/")
+        if not self._supports_croissant(erddap_base):
+            return None, False, HASH_CROISSANT_UNSUPPORTED
         try:
             # Small metadata doc — don't inherit the 1h data-query timeout; a
             # hung .croissant endpoint would otherwise stall every dataset.
@@ -409,6 +420,21 @@ class ERDDAP:
             return None, False, HASH_NO_FILE_LIST
 
         return None, False, HASH_FEDERATED_UNRESOLVED
+
+    def _supports_croissant(self, erddap_base):
+        """False only when the server reports a version older than 2.28; an
+        unreadable version stays fail-open and lets .croissant be tried."""
+        if erddap_base not in self._croissant_supported:
+            try:
+                response = self.session.get(f"{erddap_base}/version", timeout=60)
+                match = _ERDDAP_VERSION_RE.search(response.text)
+            except requests.RequestException:
+                match = None
+            self._croissant_supported[erddap_base] = (
+                not match
+                or tuple(map(int, match.groups())) >= CROISSANT_MIN_VERSION
+            )
+        return self._croissant_supported[erddap_base]
 
     def get_dataset(self, dataset_id, data_structure="table"):
         return Dataset(self, dataset_id, data_structure=data_structure)

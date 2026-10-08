@@ -2,6 +2,13 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { fileURLToPath } from "node:url";
+
+// The harvest docs live in the repo-root docs/ folder, beside the harvester
+// they describe; the frontend image gets them as the `docs` build context.
+const harvestDocs = fileURLToPath(
+  new URL("../docs/harvesting", import.meta.url),
+);
 
 export default defineConfig(({ mode }) => {
   // Keep the pre-Vite deploy contract: plain API_URL / BASE_URL /
@@ -32,6 +39,7 @@ export default defineConfig(({ mode }) => {
           sourcemaps: { filesToDeleteAfterUpload: ["dist/**/*.map"] },
         }),
     ].filter(Boolean),
+    resolve: { alias: { "@harvest-docs": harvestDocs } },
     define: {
       "process.env.API_URL": JSON.stringify(env.API_URL),
       "process.env.BASE_URL": JSON.stringify(env.BASE_URL || "/"),
@@ -44,6 +52,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 8000,
+      fs: { allow: [".", harvestDocs] },
       // Dev-only: forward /api to the docker-compose nginx (published on
       // NGINX_PORT, default 8098, by docker-compose.override.yaml), which
       // proxies on to web-api:5000. Keeps dev same-origin and on the exact

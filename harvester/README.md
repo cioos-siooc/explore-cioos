@@ -21,6 +21,11 @@ The harvester performs the following tasks:
 
 The harvester is typically run periodically (via the Docker harvester profile) to keep the database up-to-date with the latest datasets.
 
+For how each source is harvested, see the
+[harvest workflow](../docs/harvesting/workflow.md) and the
+[ERDDAP](../docs/harvesting/erddap.md) and
+[OBIS](../docs/harvesting/obis.md) strategy docs.
+
 ## Installation
 
 ### Using Docker (Recommended)

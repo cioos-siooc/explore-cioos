@@ -5,3 +5,7 @@
 ## Objective
 
 Answer **what/when/where** per dataset and subset, without overloading the source server or the local one — favor cheap metadata queries and efficient runs over pulling full record data.
+
+## Harvest docs
+
+Three linked docs in `docs/harvesting/`, bundled by the frontend and shown at `/harvest/docs/<name>`: `workflow.md` (orchestration, run outcomes, freshness, CKAN, loading), `erddap.md` (per `cdm_data_type`) and `obis.md` (discovery, cells, cache). Any change to harvester or loader behavior (queries, fallbacks, thresholds, skip/compliance rules, reason codes, supported types, pruning) must update the affected doc in the same change.

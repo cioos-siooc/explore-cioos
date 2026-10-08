@@ -289,24 +289,30 @@ class TestDatasetGetDf:
 
 
 class TestGetProfileIds:
-    def test_all_missing_cf_role_falls_back_to_one_row_per_feature(self, mock_erddap_server):
+    def test_all_missing_cf_role_still_yields_one_row_per_feature(self, mock_erddap_server):
         """ERDDAP drops all-missing rows, so distinct() of a never-filled
-        cf_role column is empty; the orderByMax fallback keeps the feature."""
+        cf_role column is empty; pairing the ids with time in orderByMinMax
+        keeps the feature, with its time bounds."""
         from io import StringIO
 
         def _erddap_csv_to_df(url, skiprows=None, dataset=None):
             if "/info/" in url:
                 return pd.read_csv(StringIO(ERDDAP_INFO_CSV)).fillna("")
-            if "orderByMax" in url:
-                return pd.DataFrame({"station_id": [float("nan")], "time": ["2020-01-01T00:00:00Z"]})
+            if "orderByMinMax" in url:
+                return pd.DataFrame({
+                    "station_id": [float("nan")] * 2,
+                    "time": ["2020-01-01T00:00:00Z", "2021-01-01T00:00:00Z"],
+                })
             return pd.DataFrame()
 
         mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
         from cde_harvester.sources.erddap.dataset import Dataset
         profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
 
-        assert list(profile_ids.columns) == ["station_id"]
+        assert list(profile_ids.columns) == ["station_id", "time_min", "time_max"]
         assert len(profile_ids) == 1
+        assert profile_ids.loc[0, "time_min"] == "2020-01-01T00:00:00Z"
+        assert profile_ids.loc[0, "time_max"] == "2021-01-01T00:00:00Z"
 
     def test_time_profile_id_is_dropped_before_enumerating(self, mock_erddap_server):
         """profile_id on time means one profile per record: only the
@@ -319,7 +325,7 @@ class TestGetProfileIds:
             if "/info/" in url:
                 return pd.read_csv(StringIO(info_csv)).fillna("")
             queries.append(url)
-            return pd.DataFrame({"station_id": ["S1"]})
+            return pd.DataFrame({"station_id": ["S1", "S1"], "time": ["a", "b"]})
 
         mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
         from cde_harvester.sources.erddap.dataset import Dataset
@@ -328,3 +334,74 @@ class TestGetProfileIds:
 
         assert dataset.profile_variables == {"timeseries_id": "station_id"}
         assert queries == [f"/tabledap/{DATASET_ID}.csv?station_id&distinct()"]
+
+    def test_identity_never_scans_time_when_distinct_answers(self, mock_erddap_server):
+        """The cheap distinct() answers; no orderByMinMax over time, which
+        504s on long single-feature sensor streams."""
+        from io import StringIO
+        queries = []
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(ERDDAP_INFO_CSV)).fillna("")
+            queries.append(url)
+            return pd.DataFrame({"station_id": ["S1"]})
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
+
+        assert queries == [f"/tabledap/{DATASET_ID}.csv?station_id&distinct()"]
+        assert list(profile_ids.columns) == ["station_id"]
+
+    def test_subset_variables_are_served_from_the_subset_table(self, mock_erddap_server):
+        """cf_role ids listed in subsetVariables: one distinct(), which ERDDAP
+        answers from its subset table, carrying the subset lat/lon."""
+        from io import StringIO
+        info_csv = (
+            ERDDAP_INFO_CSV
+            + 'attribute,NC_GLOBAL,subsetVariables,String,"station_id, latitude, longitude"\n'
+        )
+        queries = []
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(info_csv)).fillna("")
+            queries.append(url)
+            return pd.DataFrame(
+                {"station_id": ["S1"], "latitude": [48.5], "longitude": [-125.0]}
+            )
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
+
+        assert queries == [
+            f"/tabledap/{DATASET_ID}.csv?station_id,latitude,longitude&distinct()"
+        ]
+        assert list(profile_ids.columns) == ["station_id", "latitude", "longitude"]
+
+    def test_empty_subset_distinct_falls_back_to_the_time_scan(self, mock_erddap_server):
+        """An all-missing id empties the subset distinct() too; the time scan
+        still recovers the feature."""
+        from io import StringIO
+        info_csv = (
+            ERDDAP_INFO_CSV
+            + "attribute,NC_GLOBAL,subsetVariables,String,station_id\n"
+        )
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(info_csv)).fillna("")
+            if "orderByMinMax" in url:
+                return pd.DataFrame({
+                    "station_id": [float("nan")] * 2,
+                    "time": ["2020-01-01T00:00:00Z", "2021-01-01T00:00:00Z"],
+                })
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
+
+        assert len(profile_ids) == 1
