@@ -52,9 +52,6 @@ export default function DatasetCard({
   onRemove,
   onHover = () => {},
   onHoverEnd = () => {},
-  // The card's group is hidden from the map: the dataset stays in the list
-  // (and downloadable), so it's dimmed rather than dropped.
-  hiddenFromMap,
   // This dataset is one the last map click found. It has already been sorted to
   // the top of the list; the accent is what says why it is up there, so the
   // reordering reads as an answer rather than as the list having shuffled
@@ -98,7 +95,6 @@ export default function DatasetCard({
         selected,
         clickable,
         downloadModal: isDownloadModal,
-        hiddenFromMap,
         fromMapClick,
       })}
       title={fromMapClick ? t("datasetCardFromMapTitle") : undefined}

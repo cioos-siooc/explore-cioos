@@ -74,7 +74,7 @@ describe("OBIS is off unless its layer is on", () => {
 
   it("does not add the param when only the layer is on and the filter is silent", () => {
     expect(
-      params(buildTileSuffix("", onlyDataLayer("obis"))).has("includeObis"),
+      params(buildTileSuffix("", onlyDataLayer("point"))).has("includeObis"),
     ).toBe(false);
   });
 });

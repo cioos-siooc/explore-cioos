@@ -28,11 +28,22 @@ export function parseFilterQuery(text) {
   return { term: trimmed.replace(EXCLUDE_PREFIX, "").trim(), exclude };
 }
 
+// The options of a group that are set. A shortcut set as a whole (an EOV
+// category, ERDDAP, OBIS) stands in for the options it covers, so it reads as
+// one filter; a partly set one is not listed, the options it covers are.
+export function appliedOptions(group) {
+  const applied = group.options.filter((o) => o.state);
+  const covered = new Set(
+    applied.filter((o) => o.shortcut).flatMap((o) => o.covers),
+  );
+  return applied.filter((o) => !covered.has(o.id));
+}
+
 // groups: [{ key, options: [{ label, matchText?, state, ... }] }]. With no term, the
-// options already applied, so the bar doubles as the list to remove them from
-// (plus any `keep(groupKey, option)` names, so one just removed stays listed);
-// otherwise the options that match the term, closest first. A shortcut is
-// never listed as applied: the options it set are.
+// options already applied (see appliedOptions), so the bar doubles as the list
+// to remove them from (plus any `keep(groupKey, option)` names, so one just
+// removed stays listed); otherwise the options that match the term, closest
+// first.
 export function matchFilterOptions(
   groups,
   term,
@@ -45,16 +56,25 @@ export function matchFilterOptions(
   // tolerance grows with the term.
   const looseness = needle.length <= 3 ? 0.1 : needle.length <= 5 ? 0.25 : 0.35;
   return groups
-    .map((group) => ({
-      ...group,
-      options: needle
-        ? new Fuse(group.options, { ...FUSE_OPTIONS, threshold: looseness })
-            .search(needle, { limit })
-            .map(({ item }) => item)
-        : group.options.filter(
-            (o) => (o.state && !o.shortcut) || keep(group.key, o),
-          ),
-    }))
+    .map((group) => {
+      if (needle) {
+        const fuse = new Fuse(group.options, {
+          ...FUSE_OPTIONS,
+          threshold: looseness,
+        });
+        return {
+          ...group,
+          options: fuse.search(needle, { limit }).map(({ item }) => item),
+        };
+      }
+      const applied = new Set(appliedOptions(group));
+      return {
+        ...group,
+        options: group.options.filter(
+          (o) => applied.has(o) || keep(group.key, o),
+        ),
+      };
+    })
     .filter((group) => group.options.length > 0);
 }
 

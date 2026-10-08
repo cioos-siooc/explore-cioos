@@ -135,6 +135,75 @@ describe("SelectionProvider", () => {
     expect(latest.inspectDataset).toBeUndefined();
   });
 
+  it("keeps an open dataset page when a filter excludes it, flagged out of the results", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    expect(latest.inspectDatasetExcluded).toBe(false);
+
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/pointQuery?")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(pointQueryFixture.slice(1))),
+          );
+        }
+        return realFetch(input, init);
+      }),
+    );
+    act(() => latestFilters.setStartDate("2020-01-01"));
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length - 1),
+    );
+
+    expect(latest.inspectDataset?.dataset_id).toBe(fixtureRow.dataset_id);
+    expect(latest.inspectDatasetExcluded).toBe(true);
+    expect(new URL(window.location.href).searchParams.get("dataset")).toBe(
+      fixtureRow.dataset_id,
+    );
+  });
+
+  it("flags the open dataset out of the results when the title search excludes it", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(false));
+
+    act(() => latest.setDatasetTitleSearchText("no-title-matches-this"));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(true));
+    expect(latest.inspectDataset?.pk).toBe(target.pk);
+  });
+
+  it("goes back to the list entry a dataset page was opened from", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const entriesBefore = window.history.length;
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDataset?.pk).toBe(target.pk));
+    expect(window.history.length).toBe(entriesBefore + 1);
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(
+      new URL(window.location.href).searchParams.get("dataset"),
+    ).toBeNull();
+    // Popped back to the list entry, not a new one stacked on the page's.
+    expect(window.history.length).toBe(entriesBefore + 1);
+    expect(window.history.state?.usr?.fromList).toBeFalsy();
+  });
+
+  it("closes a linked dataset page in place, with no list entry to go back to", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    const entries = window.history.length;
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(window.history.length).toBe(entries);
+  });
+
   it("handleSelectDataset toggles a dataset into pointsToReview and counts it", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];
@@ -209,27 +278,7 @@ describe("SelectionProvider", () => {
     );
   });
 
-  it("listSearchText narrows listedDatasets only — not the counters or the map", async () => {
-    await renderLoaded();
-    const target = latest.pointsData[0];
-    const needle = target.title.slice(0, 6);
-    act(() => latest.setListSearchText(needle));
-    await waitFor(() => {
-      expect(latest.listedDatasets).toContain(target);
-      expect(
-        latest.listedDatasets.every((row) =>
-          row.title.toLowerCase().includes(needle.toLowerCase()),
-        ),
-      ).toBe(true);
-    });
-    expect(latest.filteredDatasets).toBe(latest.pointsData);
-    expect(latest.filteredDatasetPks).toBeUndefined();
-    expect(
-      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
-    ).toBeNull();
-  });
-
-  it("inViewCount counts the filtered datasets in view — the title search moves it, the list search does not", async () => {
+  it("inViewCount counts the filtered datasets in view — the title search moves it", async () => {
     // The fixture rows carry no bbox; give every one the same point so a
     // world-sized viewport has them all in view.
     const mockedFetch = globalThis.fetch;
@@ -270,11 +319,6 @@ describe("SelectionProvider", () => {
 
     act(() => latest.setDatasetTitleSearchText("zzzzqqq"));
     await waitFor(() => expect(latest.inViewCount).toBe(0));
-
-    act(() => latest.setDatasetTitleSearchText(""));
-    act(() => latest.setListSearchText("zzzzqqq"));
-    await waitFor(() => expect(latest.listedDatasets).toHaveLength(0));
-    expect(latest.inViewCount).toBe(latest.pointsData.length);
   });
 
   it("the server's in-view answer overrides a bbox that merely overlaps the view", async () => {
@@ -368,35 +412,6 @@ describe("SelectionProvider", () => {
 
     act(() => latest.setInspectRecordID("STATION_001"));
     await waitFor(() => expect(latest.inspectRecordPeriod).toBeUndefined());
-  });
-
-  it("groups by a dimension and hides datasets belonging only to hidden groups", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
-
-    const target = latest.pointsData[0];
-    act(() => latest.toggleGroupHidden(target.platform));
-    await waitFor(() => {
-      const stillHidingTarget = latest.pointsData
-        .filter((p) => p.platform === target.platform)
-        .every((p) => latest.hiddenDatasetPks.has(p.pk));
-      expect(stillHidingTarget).toBe(true);
-    });
-
-    act(() => latest.showAllGroups());
-    await waitFor(() => expect(latest.hiddenDatasetPks.size).toBe(0));
-  });
-
-  it("switching groupBy drops whatever was hidden under the old dimension", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
-    act(() => latest.toggleGroupHidden(latest.pointsData[0].platform));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(1));
-
-    act(() => latest.setGroupBy("type"));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(0));
   });
 
   it("addDatasetsToSelection puts the named pks aside, ignoring one absent from the results", async () => {

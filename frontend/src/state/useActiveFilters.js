@@ -15,6 +15,7 @@ import {
   Water,
 } from "react-bootstrap-icons";
 
+import { appliedOptions } from "./filterSearch.js";
 import useFilterModel from "./useFilterModel.js";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
@@ -63,7 +64,7 @@ export default function useActiveFilters() {
   const { setShowFiltersModal, setOpenFilter, openFilterSearch } = useUI();
 
   return model.flatMap((group) => {
-    const applied = group.options.filter((o) => o.state && !o.shortcut);
+    const applied = appliedOptions(group);
     if (applied.length === 0) return [];
     return {
       key: group.key,

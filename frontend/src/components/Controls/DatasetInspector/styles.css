@@ -108,7 +108,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700, var(--cioos-primary));
+  color: var(--cioos-primary-700);
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -133,6 +133,43 @@
 .datasetTitleAction:active,
 .datasetTitleActions .zoomToDatasetButton:active {
   transform: translateY(1px);
+}
+
+/* The open dataset no longer matches the results (see DatasetInspector). Same
+   ink-on-tint division as .directLinksWarning: the glyph carries the amber. */
+.datasetNotInResults {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  padding: 6px 9px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-warn-bg);
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.datasetNotInResults svg {
+  flex: 0 0 auto;
+  color: var(--cioos-warn);
+}
+
+.datasetNotInResultsBack {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.datasetNotInResultsBack:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* Griddap: no download to add to a selection. The button stays in place and

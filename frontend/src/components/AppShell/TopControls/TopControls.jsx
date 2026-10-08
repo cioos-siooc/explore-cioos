@@ -69,7 +69,7 @@ export default function TopControls() {
   const activeFilterCount = useActiveFilters().length;
   const {
     showFiltersModal,
-    setShowFiltersModal,
+    openFilters,
     showCoverageModal,
     setShowCoverageModal,
     sidebarOpen,
@@ -150,7 +150,7 @@ export default function TopControls() {
               type="button"
               className="topBarFiltersOpen"
               data-testid="topbar-filters-button"
-              onClick={() => setShowFiltersModal(true)}
+              onClick={openFilters}
               aria-pressed={showFiltersModal}
               title={t("dockFiltersCountTitle", { count: activeFilterCount })}
             >

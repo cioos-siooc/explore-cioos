@@ -255,6 +255,7 @@ async function buildShapeSql(
                   organizations,
                   p.profiles_count,
                   d.source_type,
+                  d.obis_nodes,
                   -- Whether the dataset exposes a variable literally named
                   -- 'depth'. tabledap 400s on a depth>= constraint for a
                   -- dataset that doesn't ("Unrecognized constraint

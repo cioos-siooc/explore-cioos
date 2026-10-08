@@ -10,6 +10,10 @@ export const defaultEndDepth = 12000;
 
 export const defaultScientificNamesSelected = [];
 export const defaultObisNodesSelected = [];
+// The OBIS nodes the Data Portal filter lists before "show more": the two
+// Canadian nodes the harvest is built around (see the harvester's OBIS
+// discovery); the others only contribute datasets inside Canadian waters.
+export const featuredObisNodes = ["OBIS Canada", "OTN-OBIS"];
 
 // The camera a visit without ?lat/?lon/?zoom opens at. Map.jsx builds the
 // MapLibre instance from these, and MapStateProvider seeds its own view state

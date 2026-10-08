@@ -85,14 +85,22 @@ export default function UIProvider({ children }) {
     if (!showIntroModal) setIntroSeen(true);
   }, [showIntroModal, setIntroSeen]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  // The Filters modal opened on its search page (see FilterSearch) rather than
-  // on a filter, holding this text; null when it was opened any other way.
-  const [filterSearchText, setFilterSearchText] = useState(null);
-  const openFilterSearch = useCallback((text = "") => {
-    setFilterSearchText(text);
+  // The Filters modal on its search page rather than on whichever filter was
+  // open last — what both Filters buttons open.
+  const openFilters = useCallback(() => {
     setOpenFilter(undefined);
     setShowFiltersModal(true);
   }, []);
+  // The same, opened by typing (see useFilterSearchShortcut) and holding this
+  // text; null when it was opened any other way.
+  const [filterSearchText, setFilterSearchText] = useState(null);
+  const openFilterSearch = useCallback(
+    (text = "") => {
+      setFilterSearchText(text);
+      openFilters();
+    },
+    [openFilters],
+  );
   if (!showFiltersModal && filterSearchText !== null) setFilterSearchText(null);
 
   // A drawn box or polygon surfaces the matching datasets — on wide screens
@@ -111,7 +119,9 @@ export default function UIProvider({ children }) {
   // directly, with no filter change to notice, so the panel is raised for the
   // page itself rather than for whatever happened to precede it. Covers a share
   // link carrying ?dataset= too, which lands with the page already open.
-  useRevealSidebar(inspectDataset, Boolean, setSidebarOpenState);
+  // Keyed on the pk: a results refresh hands the same open dataset back as a
+  // new object, which must not reopen a sidebar the user collapsed over it.
+  useRevealSidebar(inspectDataset?.pk, Boolean, setSidebarOpenState);
 
   // Clicking a track on the map draws its platform history — surface the panel
   // holding the page that shows it.
@@ -152,6 +162,7 @@ export default function UIProvider({ children }) {
     showPrivacyModal,
     setShowPrivacyModal,
     filterSearchText,
+    openFilters,
     openFilterSearch,
   };
 
