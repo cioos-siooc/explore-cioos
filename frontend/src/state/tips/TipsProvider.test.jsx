@@ -47,6 +47,7 @@ function Probe() {
         {useMapState().featureQueryRequest?.lngLat.join(",") ?? "none"}
       </span>
       <span data-testid="tour-tips">{tourTips.join(",")}</span>
+      <input aria-label="probe field" />
       <span data-testid="quick-filters">
         {quickFiltersCollapsed ? "folded" : "shown"}
       </span>
@@ -255,6 +256,20 @@ describe("contextual tips", () => {
       expect(card()).toHaveTextContent(counter("timeCoverage", -1));
       await user.click(screen.getByRole("button", { name: "Close tip" }));
       expect(card()).toBeNull();
+    });
+
+    it("steps with the arrow keys, except where they move a cursor", async () => {
+      returningVisitor();
+      const { user } = renderProbe();
+      await user.click(screen.getByText("start tour"));
+      await user.keyboard("{ArrowRight}");
+      expect(card()).toHaveTextContent(counter("timeCoverage", 1));
+      await user.keyboard("{ArrowLeft}{ArrowLeft}");
+      expect(card()).toHaveTextContent(counter("timeCoverage", -1));
+
+      await user.click(screen.getByLabelText("probe field"));
+      await user.keyboard("{ArrowRight}");
+      expect(card()).toHaveTextContent(counter("timeCoverage", -1));
     });
 
     it("starts from an offered tip", async () => {

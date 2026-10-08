@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import classNames from "classnames";
 import { ChevronLeft, ChevronRight, Lightbulb } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -17,6 +17,11 @@ import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
+
+// Where the arrow keys already mean something: moving a text cursor, a
+// slider's handle, the map.
+const OWNS_ARROWS =
+  'input, textarea, select, [contenteditable="true"], [role="slider"], .maplibregl-canvas-container';
 
 // The tip the user just earned by doing what it is about (see TipsProvider).
 // It sits just past the hand pointing at the control it talks about, or holds
@@ -48,7 +53,32 @@ export default function TipCard({ inModal }) {
   // A tour was asked for, so it opens straight away. Inside a dialog the card
   // takes no map space, so it never waits as a badge there.
   const waiting = isMobile && !touring && !inModal && openedTip !== activeTip;
-  const targets = useTipTargets(shown && !waiting, Boolean(inModal));
+  const open = shown && !waiting;
+  const targets = useTipTargets(open, Boolean(inModal));
+
+  // ← and → page through the tips while the card is up, from anywhere the
+  // arrows aren't already doing something.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+      if (
+        !step ||
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.target.closest?.(OWNS_ARROWS)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      stepTour(step);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, stepTour]);
 
   if (!shown) return null;
 
@@ -99,8 +129,9 @@ export default function TipCard({ inModal }) {
         <button
           type="button"
           className="tipCardStep"
-          title={t("tipPrevious")}
+          title={`${t("tipPrevious")} (←)`}
           aria-label={t("tipPrevious")}
+          aria-keyshortcuts="ArrowLeft"
           onClick={() => stepTour(-1)}
         >
           <ChevronLeft size={14} aria-hidden="true" />
@@ -108,8 +139,9 @@ export default function TipCard({ inModal }) {
         <button
           type="button"
           className="tipCardStep"
-          title={t("tipNext")}
+          title={`${t("tipNext")} (→)`}
           aria-label={t("tipNext")}
+          aria-keyshortcuts="ArrowRight"
           onClick={() => stepTour(1)}
         >
           <ChevronRight size={14} aria-hidden="true" />
