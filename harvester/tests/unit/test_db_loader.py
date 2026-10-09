@@ -16,6 +16,7 @@ from cde_harvester.loading.loader import (
     load_cells_copy,
     main,
     prepare_profiles_dataframe,
+    record_failed_run,
 )
 
 # ---------------------------------------------------------------------------
@@ -283,3 +284,77 @@ class TestLoadSummary:
         summary = _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False)
         assert summary["changed"] is True
         assert summary["full_reload"] is True
+
+
+# ---------------------------------------------------------------------------
+# record_failed_run: a failed run still reaches the harvest dashboard
+# ---------------------------------------------------------------------------
+
+RUN_ID = "11111111-1111-1111-1111-111111111111"
+
+
+def _write_audit(folder, run_status, run_error=None):
+    pd.DataFrame([{
+        "run_id": RUN_ID,
+        "started_at": "2026-10-09T00:00:00Z",
+        "finished_at": "2026-10-09T00:10:00Z",
+        "status": run_status,
+        "error_message": run_error,
+    }]).to_csv(folder / "harvest_runs.csv", index=False)
+    pd.DataFrame([
+        {"run_id": RUN_ID, "erddap_url": "https://e/erddap", "dataset_id": "ok",
+         "status": "success", "reason_code": None, "error_message": None,
+         "attempted_at": "2026-10-09T00:05:00Z"},
+        {"run_id": RUN_ID, "erddap_url": "https://e/erddap", "dataset_id": "bad",
+         "status": "error", "reason_code": "HTTP_ERROR", "error_message": "500",
+         "attempted_at": "2026-10-09T00:06:00Z"},
+    ]).to_csv(folder / "harvest_attempts.csv", index=False)
+
+
+@pytest.fixture
+def record(mock_engine, mocker):
+    """Run record_failed_run against a run folder; returns the (runs, attempts)
+    frames it appended, or None when it only updated an existing run."""
+    engine, conn = mock_engine
+    mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
+    appended = mocker.patch("cde_harvester.loading.loader._append_run_audit")
+
+    def _record(folder, error, already_committed=False):
+        conn.execute.return_value.rowcount = 1 if already_committed else 0
+        assert record_failed_run(str(folder), error)
+        if not appended.called:
+            return None
+        _con, runs, attempts = appended.call_args.args
+        return runs, attempts
+
+    return _record
+
+
+class TestRecordFailedRun:
+    def test_harvest_failure_keeps_its_own_message_and_attempts(self, tmp_path, record):
+        _write_audit(tmp_path, "failed", "RuntimeError: No datasets harvested")
+        runs, attempts = record(tmp_path, "RuntimeError: No datasets harvested")
+        assert runs.loc[0, "status"] == "failed"
+        assert runs.loc[0, "error_message"] == "RuntimeError: No datasets harvested"
+        assert list(attempts["status"]) == ["success", "error"]
+
+    def test_load_failure_marks_harvested_datasets_as_not_loaded(self, tmp_path, record):
+        _write_audit(tmp_path, "ok")
+        runs, attempts = record(tmp_path, "OperationalError: deadlock")
+        assert runs.loc[0, "status"] == "failed"
+        assert runs.loc[0, "error_message"] == "OperationalError: deadlock"
+        ok = attempts.set_index("dataset_id").loc["ok"]
+        assert (ok["status"], ok["reason_code"]) == ("error", "LOAD_FAILED")
+        assert ok["error_message"] == "OperationalError: deadlock"
+        bad = attempts.set_index("dataset_id").loc["bad"]
+        assert (bad["status"], bad["reason_code"]) == ("error", "HTTP_ERROR")
+
+    def test_failure_after_commit_only_flags_the_run(self, tmp_path, record):
+        _write_audit(tmp_path, "ok")
+        assert record(tmp_path, "boom", already_committed=True) is None
+
+    def test_missing_audit_csvs_record_nothing(self, tmp_path, mock_engine, mocker):
+        engine, _conn = mock_engine
+        mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
+        assert record_failed_run(str(tmp_path), "boom") is False
+        engine.begin.assert_not_called()

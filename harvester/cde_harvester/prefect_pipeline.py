@@ -31,6 +31,7 @@ from cde_harvester.core.schema import (
     rebuild_schema,
 )
 from cde_harvester.loading.loader import main as db_loader_main
+from cde_harvester.loading.loader import record_failed_run
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.sources import OBIS_ALIASES
@@ -213,6 +214,15 @@ def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
     return sources
 
 
+def _record_failed_run(run_folder, error):
+    """Put a failed run on the harvest dashboard. Never masks the run's own error."""
+    logger = _run_logger()
+    try:
+        record_failed_run(str(run_folder), f"{type(error).__name__}: {error}")
+    except Exception as e:
+        logger.error(f"Could not record the failed run: {e}", exc_info=True)
+
+
 class PrefectCDEPipeline:
     erddap_urls: str
     cache_requests: bool
@@ -312,38 +322,14 @@ class PrefectCDEPipeline:
 
                 logger.info("Running cde_harvester subflow")
                 try:
-                    harvester_main(
-                        erddap_urls=self.erddap_urls,
-                        cache_requests=self.cache_requests,
-                        folder=str(run_folder),
-                        dataset_ids=self.dataset_ids,
-                        obis_dataset_ids=self.obis_dataset_ids,
-                        obis_folder=str(obis_folder),
-                        # Both of these were previously never passed, so the
-                        # documented obis_geo_filter config block was silently
-                        # ignored on the Prefect (production) path.
-                        obis_geo_filter=self.obis_geo_filter,
-                        obis_discovery=self.obis_discovery,
-                        source=self.source,
-                        triggered_by=self.triggered_by,
-                        skip_unchanged=effective_incremental,
+                    load_summary = self._harvest_and_load(
+                        run_folder, obis_folder, effective_incremental
                     )
-                    logger.info("cde_harvester completed successfully")
                 except Exception as e:
-                    logger.error(f"cde_harvester failed: {e}", exc_info=True)
+                    _record_failed_run(run_folder, e)
                     raise
-
-                logger.info("Running cde_db_loader subflow")
-                try:
-                    load_summary = db_loader_main(
-                        folder=str(run_folder), incremental=effective_incremental
-                    )
-                    logger.info("cde_db_loader completed successfully")
-                    # Prune only after a successful load so failed runs' CSVs survive.
-                    _prune_server_run_folders(base_folder, protect=[run_folder])
-                except Exception as e:
-                    logger.error(f"cde_db_loader failed: {e}", exc_info=True)
-                    raise
+                # Prune only after a successful load so failed runs' CSVs survive.
+                _prune_server_run_folders(base_folder, protect=[run_folder])
 
                 # A run where every dataset hashed unchanged moved nothing the API
                 # serves, so dropping the cache would only make the next visitor
@@ -372,6 +358,41 @@ class PrefectCDEPipeline:
                 logger.info("CDE Pipeline completed successfully")
             finally:
                 _publish_log_artifact(log_path)
+
+    def _harvest_and_load(self, run_folder, obis_folder, effective_incremental):
+        logger = _run_logger()
+        try:
+            harvester_main(
+                erddap_urls=self.erddap_urls,
+                cache_requests=self.cache_requests,
+                folder=str(run_folder),
+                dataset_ids=self.dataset_ids,
+                obis_dataset_ids=self.obis_dataset_ids,
+                obis_folder=str(obis_folder),
+                # Both of these were previously never passed, so the
+                # documented obis_geo_filter config block was silently
+                # ignored on the Prefect (production) path.
+                obis_geo_filter=self.obis_geo_filter,
+                obis_discovery=self.obis_discovery,
+                source=self.source,
+                triggered_by=self.triggered_by,
+                skip_unchanged=effective_incremental,
+            )
+            logger.info("cde_harvester completed successfully")
+        except Exception as e:
+            logger.error(f"cde_harvester failed: {e}", exc_info=True)
+            raise
+
+        logger.info("Running cde_db_loader subflow")
+        try:
+            load_summary = db_loader_main(
+                folder=str(run_folder), incremental=effective_incremental
+            )
+            logger.info("cde_db_loader completed successfully")
+        except Exception as e:
+            logger.error(f"cde_db_loader failed: {e}", exc_info=True)
+            raise
+        return load_summary
 
     def _covers_obis(self):
         if self.source:

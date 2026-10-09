@@ -89,6 +89,12 @@ async function listServers() {
   // rows use the obis.org sentinel), so the two agree on real data, and the
   // old and new CTEs were diffed on a live database to confirm it.
   //
+  // last_success is the server's latest run that ended 'ok': failed runs are
+  // recorded too, so the latest attempt alone can't say when it last worked.
+  // harvest_runs gains one row per run (small) and is walked newest-first; the
+  // EXISTS is a lookup on harvest_attempts' (run_id, erddap_url, ...) primary
+  // key, so the search stops at the first matching run.
+  //
   // Kept out of the SQL string on purpose: knex substitutes its :name and ?
   // bindings inside `--` comments too, so prose belongs here.
   const sql = `
@@ -108,12 +114,26 @@ async function listServers() {
            COUNT(*) FILTER (WHERE ${NORM_STATUS("a")} = 'success') AS n_success,
            COUNT(*) FILTER (WHERE ${NORM_STATUS("a")} = 'skipped') AS n_skipped,
            COUNT(*) FILTER (WHERE a.status = 'error')   AS n_error,
-           COUNT(*) AS n_total
+           COUNT(*) AS n_total,
+           last_success.finished_at AS last_success_at,
+           last_success.run_id      AS last_success_run_id
     FROM latest_run_per_server s
     LEFT JOIN cde.harvest_attempts a
         ON a.erddap_url = s.erddap_url
        AND a.run_id     = s.last_run_id
-    GROUP BY s.erddap_url, s.source, s.last_attempted_at, s.last_run_id
+    LEFT JOIN LATERAL (
+        SELECT r.run_id, r.finished_at::timestamptz AS finished_at
+        FROM cde.harvest_runs r
+        WHERE r.status = 'ok'
+          AND EXISTS (
+                SELECT 1 FROM cde.harvest_attempts x
+                WHERE x.run_id = r.run_id AND x.erddap_url = s.erddap_url
+              )
+        ORDER BY r.started_at DESC
+        LIMIT 1
+    ) last_success ON true
+    GROUP BY s.erddap_url, s.source, s.last_attempted_at, s.last_run_id,
+             last_success.finished_at, last_success.run_id
     ORDER BY s.erddap_url
   `;
   const result = await db.raw(sql);
