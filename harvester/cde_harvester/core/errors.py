@@ -9,6 +9,8 @@ NO_PROFILES_FOUND = "NO_PROFILES_FOUND"
 ON_SKIP_LIST = "ON_SKIP_LIST"
 RESPONSE_TOO_LARGE = "RESPONSE_TOO_LARGE"
 UNCHANGED = "UNCHANGED"
+# Harvested, but the run's database load failed: nothing was stored.
+LOAD_FAILED = "LOAD_FAILED"
 
 # Why a dataset has no content_hash (stored on cde.datasets.content_hash_reason).
 # Distinct from the harvest-status reason codes above: these explain hash *absence*,

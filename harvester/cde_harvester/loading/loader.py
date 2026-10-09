@@ -11,6 +11,7 @@ import pandas as pd
 from prefect import get_run_logger, task
 from sqlalchemy import text
 
+from cde_harvester.core import errors
 from cde_harvester.core.day_sets import (
     ranges_from_iso,
     ranges_to_pg_literal,
@@ -366,6 +367,103 @@ def ensure_organization_pks(datasets):
         )
     return datasets
 
+def _read_run_audit(folder):
+    """The run's harvest_runs/harvest_attempts CSVs, as written by the
+    harvester on every outcome. Either is None when absent (pre-dashboard
+    harvest folders still load)."""
+    runs_file = f"{folder}/harvest_runs.csv"
+    attempts_file = f"{folder}/harvest_attempts.csv"
+    # Text columns read as text: an all-numeric column ("500" error messages)
+    # would otherwise parse as float and be stored as "500.0".
+    runs = (
+        pd.read_csv(
+            runs_file,
+            parse_dates=["started_at", "finished_at"],
+            dtype={"run_id": str, "git_sha": str, "error_message": str},
+        )
+        if os.path.isfile(runs_file)
+        else None
+    )
+    attempts = (
+        pd.read_csv(
+            attempts_file,
+            parse_dates=["attempted_at"],
+            dtype={
+                "run_id": str, "dataset_id": str, "reason_code": str,
+                "error_message": str, "query_urls": str, "warnings": str,
+            },
+        )
+        if os.path.isfile(attempts_file)
+        else None
+    )
+    return runs, attempts
+
+
+def _append_run_audit(con, runs, attempts, schema="cde"):
+    for table, df in (("harvest_runs", runs), ("harvest_attempts", attempts)):
+        if df is None or df.empty:
+            continue
+        logger.info("Writing %s (%d rows)", table, len(df))
+        df.to_sql(
+            table,
+            con=con,
+            if_exists="append",
+            schema=schema,
+            index=False,
+            method="multi",
+            chunksize=SQL_INSERT_CHUNKSIZE,
+        )
+
+
+def record_failed_run(folder, error_message):
+    """Write a failed run's audit rows so the harvest dashboard shows it.
+
+    A successful load writes them inside its own transaction; a run that fails
+    in harvest or load never got there. This is its own short transaction,
+    without the loader lock: the audit tables are append-only and never touched
+    by the data phases. When the harvest succeeded but the load rolled back,
+    the datasets it harvested were not stored, so they are reported as
+    LOAD_FAILED instead of success. A load that failed after its commit already
+    wrote the rows; only the run's status changes.
+    """
+    runs, attempts = _read_run_audit(folder)
+    if runs is None or runs.empty:
+        logger.warning("No harvest_runs.csv in %s; failed run not recorded", folder)
+        return False
+
+    run_ids = list(runs["run_id"].astype(str))
+    finished_at = pd.Timestamp.now(tz="UTC")
+    with create_db_engine().begin() as con:
+        committed = con.execute(
+            text(
+                "UPDATE cde.harvest_runs SET status = 'failed',"
+                " finished_at = :finished_at, error_message = :error_message"
+                " WHERE run_id = ANY(CAST(:ids AS uuid[]))"
+            ),
+            {"ids": run_ids, "finished_at": finished_at, "error_message": error_message},
+        ).rowcount
+        if committed:
+            return True
+
+        harvest_failed = (runs["status"] == "failed").all()
+        runs = runs.assign(
+            status="failed",
+            finished_at=finished_at,
+            error_message=(
+                runs["error_message"].fillna(error_message)
+                if harvest_failed
+                else error_message
+            ),
+        )
+        if not harvest_failed and attempts is not None:
+            harvested = attempts["status"] == "success"
+            attempts.loc[harvested, "status"] = "error"
+            attempts.loc[harvested, "reason_code"] = errors.LOAD_FAILED
+            attempts.loc[harvested, "error_message"] = error_message
+        _append_run_audit(con, runs, attempts)
+    return True
+
+
 # timeout_seconds: hard ceiling well above any observed load (full reload incl.
 # hex build runs tens of minutes). A run that exceeds it is genuinely wedged —
 # Prefect marks it Failed instead of leaving it Running forever, complementing
@@ -390,8 +488,6 @@ def main(folder, incremental=False):
     trajectory_days_file = f"{folder}/trajectory_days.csv"
     trajectory_points_file = f"{folder}/trajectory_points.csv"
     verified_file = f"{folder}/verified.csv"
-    harvest_runs_file = f"{folder}/harvest_runs.csv"
-    harvest_attempts_file = f"{folder}/harvest_attempts.csv"
 
     logger.info("Reading %s, %s", datasets_file, skipped_datasets_file)
 
@@ -423,21 +519,7 @@ def main(folder, incremental=False):
         logger.info("Reading %s", verified_file)
         verified = pd.read_csv(verified_file, parse_dates=["verified_at"])
 
-    # Harvest audit CSVs are produced by the harvester's run lifecycle and
-    # feed the harvest-dashboard service. Optional so old harvest folders
-    # (pre-dashboard) still load cleanly.
-    harvest_runs_df = None
-    harvest_attempts_df = None
-    if os.path.isfile(harvest_runs_file):
-        logger.info("Reading %s", harvest_runs_file)
-        harvest_runs_df = pd.read_csv(
-            harvest_runs_file, parse_dates=["started_at", "finished_at"]
-        )
-    if os.path.isfile(harvest_attempts_file):
-        logger.info("Reading %s", harvest_attempts_file)
-        harvest_attempts_df = pd.read_csv(
-            harvest_attempts_file, parse_dates=["attempted_at"]
-        )
+    harvest_runs_df, harvest_attempts_df = _read_run_audit(folder)
 
     if "eovs" in profiles.columns:
         profiles["eovs"] = profiles["eovs"].apply(
@@ -981,32 +1063,8 @@ def main(folder, incremental=False):
 
         # Harvest audit: append-only. Same writes in both incremental and
         # full-reload paths since these tables are never truncated.
-        if harvest_runs_df is not None and not harvest_runs_df.empty:
-            with _timed("harvest_runs to_sql", logger):
-                logger.info("Writing harvest_runs (%d rows)", len(harvest_runs_df))
-                harvest_runs_df.to_sql(
-                    "harvest_runs",
-                    con=transaction,
-                    if_exists="append",
-                    schema=schema,
-                    index=False,
-                    method="multi",
-                    chunksize=SQL_INSERT_CHUNKSIZE,
-                )
-        if harvest_attempts_df is not None and not harvest_attempts_df.empty:
-            with _timed("harvest_attempts to_sql", logger):
-                logger.info(
-                    "Writing harvest_attempts (%d rows)", len(harvest_attempts_df)
-                )
-                harvest_attempts_df.to_sql(
-                    "harvest_attempts",
-                    con=transaction,
-                    if_exists="append",
-                    schema=schema,
-                    index=False,
-                    method="multi",
-                    chunksize=SQL_INSERT_CHUNKSIZE,
-                )
+        with _timed("harvest audit to_sql", logger):
+            _append_run_audit(transaction, harvest_runs_df, harvest_attempts_df)
 
         # Commit the locked phase (engine.connect() does not auto-commit the
         # way engine.begin() did); this also releases the advisory lock.

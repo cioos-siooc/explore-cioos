@@ -516,6 +516,7 @@
   "harvest.reason.ON_SKIP_LIST": "On skip list",
   "harvest.reason.HTTP_ERROR": "HTTP error",
   "harvest.reason.RESPONSE_TOO_LARGE": "Response too large",
+  "harvest.reason.LOAD_FAILED": "Database load failed",
   "harvest.reason.MISSING_REQUIRED_VARS": "Missing required variables",
   "harvest.reason.NO_SUPPORTED_VARIABLES": "No supported variables",
   "harvest.reason.INGEST_FLAG_FALSE": "Ingest disabled",
