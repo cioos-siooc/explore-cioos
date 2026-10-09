@@ -26,6 +26,8 @@ from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
+from cioos_metadata_conversion.load_from import obis as obis_conversion
+from cioos_metadata_conversion.load_from.obis import map_obis_to_cioos
 from prefect import task
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,15 @@ FETCH_VECTORS_PER_CHUNK = 100
 # Left to itself duckdb takes 80% of host RAM, which inside a 6GB container is
 # not a limit at all; this keeps its share well clear of the harvester's.
 OBIS_DUCKDB_MEMORY_LIMIT = os.environ.get("OBIS_DUCKDB_MEMORY_LIMIT", "512MB")
+
+# Threads for the duckdb connection the metadata conversion scans each dataset's
+# parquet with. Its peak grows with the thread count and memory_limit does not
+# bound it (CPR's eMoF scan: 1.56 GB at 24 threads, 0.9 GB at 8); a limit low
+# enough to matter makes the scan fail and the converter fall back to sampling
+# the API, which silently drops EOVs.
+OBIS_CONVERSION_DUCKDB_THREADS = int(
+    os.environ.get("OBIS_CONVERSION_DUCKDB_THREADS", min(os.cpu_count() or 1, 8))
+)
 
 
 # The epoch-millisecond range datetime64[ns] can represent (1677-09-21 to
@@ -324,9 +335,11 @@ class OBISHarvester(BaseHarvester):
                 else pd.DataFrame(columns=attempt_columns)
             )
 
-            # Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs)
+            # Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs),
+            # or with their converted OBIS metadata when CKAN has no record
             if not df_datasets.empty:
                 df_datasets = self._enrich_with_ckan(df_datasets)
+                df_datasets = self._enrich_with_conversion(df_datasets)
 
             return HarvestResult(
                 profiles=df_profiles,
@@ -340,10 +353,11 @@ class OBISHarvester(BaseHarvester):
     def _enrich_with_ckan(self, df_datasets):
         """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
         self.logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
-        df_ckan = get_ckan_obis_records(
-            df_datasets["dataset_id"].tolist(), cache_folder=self.folder,
-            erddap_url=OBIS_SOURCE_URL,
-        )
+        ipt_urls = {
+            dataset_id: self.fetch_dataset_metadata(dataset_id).get("url")
+            for dataset_id in df_datasets["dataset_id"]
+        }
+        df_ckan = get_ckan_obis_records(ipt_urls, erddap_url=OBIS_SOURCE_URL)
 
         if df_ckan.empty:
             df_datasets["title_fr"] = None
@@ -363,6 +377,56 @@ class OBISHarvester(BaseHarvester):
         df_datasets.drop(columns=["ckan_eovs", "ckan_title"], inplace=True)
 
         return df_datasets
+
+    def _enrich_with_conversion(self, df_datasets):
+        """Fill EOVs and summary of datasets without a CKAN record from their converted OBIS metadata."""
+        df_datasets["summary"] = None
+        unmatched = df_datasets.index[df_datasets["ckan_id"].isna()]
+        total = len(unmatched)
+        converted = 0
+        for i, idx in enumerate(unmatched, 1):
+            if i % 50 == 0 or i == total:
+                self.logger.info("Metadata conversion progress: %d/%d", i, total)
+            record = self.convert_metadata(df_datasets.at[idx, "dataset_id"])
+            if record:
+                df_datasets.at[idx, "eovs"] = record["eov"]
+                df_datasets.at[idx, "summary"] = record["abstract"]["en"] or None
+                converted += 1
+        self.logger.info(
+            "Converted OBIS metadata for %d / %d datasets without a CKAN record", converted, total,
+        )
+        return df_datasets
+
+    def convert_metadata(self, dataset_id):
+        """Convert a dataset's OBIS metadata to a CIOOS record with cioos-metadata-conversion."""
+        cache_file = os.path.join(self.folder, f"{dataset_id}_cioos.json")
+        cached = self._read_cache(cache_file)
+        if cached is not None:
+            return cached
+
+        metadata = self.fetch_dataset_metadata(dataset_id)
+        if not metadata:
+            return None
+
+        import duckdb
+
+        # The converter otherwise reads through one module-global connection it
+        # never closes, whose memory ratchets from dataset to dataset (1.4 GB to
+        # 6 GB over a full run, #241); give it a fresh one per dataset instead.
+        con = duckdb.connect(config={"threads": OBIS_CONVERSION_DUCKDB_THREADS})
+        obis_conversion._DUCKDB_CON = con
+        try:
+            con.execute("INSTALL httpfs; LOAD httpfs;")
+            record = map_obis_to_cioos(metadata)
+        except Exception as e:
+            self.logger.warning("Metadata conversion failed for %s: %s", dataset_id, e)
+            return None
+        finally:
+            obis_conversion._DUCKDB_CON = None
+            con.close()
+
+        self._write_cache(cache_file, record)
+        return record
 
     def aggregate_cells(self, dataset_id, results, apply_filter=False):
         """Aggregate occurrences by unique lat/lon grid cell into obis_cells rows.
@@ -578,7 +642,7 @@ class OBISHarvester(BaseHarvester):
 
     def _clear_cache(self, dataset_id):
         """Delete cached occurrence and metadata files for a dataset."""
-        for name in [f"{dataset_id}.json", f"{dataset_id}_metadata.json"]:
+        for name in [f"{dataset_id}.json", f"{dataset_id}_metadata.json", f"{dataset_id}_cioos.json"]:
             for path in [
                 os.path.join(self.folder, name),
                 os.path.join(self.folder, name + ".gz"),

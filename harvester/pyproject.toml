@@ -5,6 +5,7 @@ description = "CIOOS Explorer Harvester"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "cioos-metadata-conversion",
     "duckdb>=1.0.0",
     "diskcache>=5.6.3",
     "erddapy>=2.2.0",
@@ -30,6 +31,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["cde_harvester"]
+
+[tool.uv.sources]
+cioos-metadata-conversion = { git = "https://github.com/cioos-siooc/cioos-metadata-conversion", rev = "a5f890ffa094f3ae5e745e4b5d4927ce12b31a91" }
 
 [dependency-groups]
 dev = [

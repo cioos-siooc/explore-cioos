@@ -13,12 +13,20 @@ import os
 import duckdb
 import pandas as pd
 import pytest
+from cde_harvester.sources.obis import harvester as obis_harvester
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 RESULT_COLUMNS = [
     "decimalLatitude", "decimalLongitude", "date_start", "date_end",
     "minimumDepthInMeters", "maximumDepthInMeters", "scientificName",
 ]
+
+
+@pytest.fixture(autouse=True)
+def offline_metadata_enrichment(monkeypatch):
+    """harvest() ends with a CKAN query and a metadata conversion, both over the network."""
+    monkeypatch.setattr(obis_harvester, "get_ckan_obis_records", lambda *args, **kwargs: pd.DataFrame())
+    monkeypatch.setattr(OBISHarvester, "convert_metadata", lambda self, dataset_id: None)
 
 
 @pytest.fixture
