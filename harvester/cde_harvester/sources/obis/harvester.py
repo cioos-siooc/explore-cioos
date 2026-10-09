@@ -26,6 +26,7 @@ from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
+from cioos_metadata_conversion.load_from import obis as obis_conversion
 from cioos_metadata_conversion.load_from.obis import map_obis_to_cioos
 from prefect import task
 
@@ -51,6 +52,15 @@ FETCH_VECTORS_PER_CHUNK = 100
 # Left to itself duckdb takes 80% of host RAM, which inside a 6GB container is
 # not a limit at all; this keeps its share well clear of the harvester's.
 OBIS_DUCKDB_MEMORY_LIMIT = os.environ.get("OBIS_DUCKDB_MEMORY_LIMIT", "512MB")
+
+# Threads for the duckdb connection the metadata conversion scans each dataset's
+# parquet with. Its peak grows with the thread count and memory_limit does not
+# bound it (CPR's eMoF scan: 1.56 GB at 24 threads, 0.9 GB at 8); a limit low
+# enough to matter makes the scan fail and the converter fall back to sampling
+# the API, which silently drops EOVs.
+OBIS_CONVERSION_DUCKDB_THREADS = int(
+    os.environ.get("OBIS_CONVERSION_DUCKDB_THREADS", min(os.cpu_count() or 1, 8))
+)
 
 
 # The epoch-millisecond range datetime64[ns] can represent (1677-09-21 to
@@ -397,11 +407,23 @@ class OBISHarvester(BaseHarvester):
         metadata = self.fetch_dataset_metadata(dataset_id)
         if not metadata:
             return None
+
+        import duckdb
+
+        # The converter otherwise reads through one module-global connection it
+        # never closes, whose memory ratchets from dataset to dataset (1.4 GB to
+        # 6 GB over a full run, #241); give it a fresh one per dataset instead.
+        con = duckdb.connect(config={"threads": OBIS_CONVERSION_DUCKDB_THREADS})
+        obis_conversion._DUCKDB_CON = con
         try:
+            con.execute("INSTALL httpfs; LOAD httpfs;")
             record = map_obis_to_cioos(metadata)
         except Exception as e:
             self.logger.warning("Metadata conversion failed for %s: %s", dataset_id, e)
             return None
+        finally:
+            obis_conversion._DUCKDB_CON = None
+            con.close()
 
         self._write_cache(cache_file, record)
         return record

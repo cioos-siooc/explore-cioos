@@ -7,7 +7,12 @@ import pandas as pd
 import pytest
 from cde_harvester.sources.ckan.create_ckan_obis_link import CKAN_OBIS_COLUMNS
 from cde_harvester.sources.obis import harvester as obis_harvester
-from cde_harvester.sources.obis.harvester import OBIS_SOURCE_URL, OBISHarvester
+from cde_harvester.sources.obis.harvester import (
+    OBIS_CONVERSION_DUCKDB_THREADS,
+    OBIS_SOURCE_URL,
+    OBISHarvester,
+)
+from cioos_metadata_conversion.load_from import obis as obis_conversion
 
 MATCHED = "11111111-1111-4111-8111-111111111111"
 UNMATCHED = "22222222-2222-4222-8222-222222222222"
@@ -31,6 +36,11 @@ def _ckan(*dataset_ids):
         ],
         columns=CKAN_OBIS_COLUMNS,
     )
+
+
+@pytest.fixture(autouse=True)
+def duckdb_connect(mocker):
+    return mocker.patch("duckdb.connect", side_effect=lambda **kwargs: mocker.MagicMock())
 
 
 @pytest.fixture
@@ -103,3 +113,31 @@ def test_conversion_is_cached(harvester, mocker, tmp_path):
     assert harvester.convert_metadata(UNMATCHED) == CONVERTED
     convert.assert_called_once()
     assert os.path.isfile(tmp_path / f"{UNMATCHED}_cioos.json.gz")
+
+
+def test_each_conversion_reads_through_its_own_connection_closed_after(harvester, mocker, duckdb_connect):
+    seen = []
+    mocker.patch.object(
+        obis_harvester, "map_obis_to_cioos",
+        side_effect=lambda metadata: seen.append(obis_conversion._DUCKDB_CON) or CONVERTED,
+    )
+    harvester.convert_metadata(MATCHED)
+    harvester.convert_metadata(UNMATCHED)
+    assert len({id(con) for con in seen}) == 2
+    for con in seen:
+        con.close.assert_called_once()
+    duckdb_connect.assert_called_with(config={"threads": OBIS_CONVERSION_DUCKDB_THREADS})
+    assert obis_conversion._DUCKDB_CON is None
+
+
+def test_conversion_connection_closed_when_conversion_fails(harvester, mocker, duckdb_connect):
+    seen = []
+
+    def fail(metadata):
+        seen.append(obis_conversion._DUCKDB_CON)
+        raise RuntimeError("parquet down")
+
+    mocker.patch.object(obis_harvester, "map_obis_to_cioos", side_effect=fail)
+    assert harvester.convert_metadata(UNMATCHED) is None
+    seen[0].close.assert_called_once()
+    assert obis_conversion._DUCKDB_CON is None
