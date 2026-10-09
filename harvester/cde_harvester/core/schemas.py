@@ -23,6 +23,7 @@ DATASET_ARRAY_DTYPES = {
     "profile_variables": ARRAY(TEXT),
     "organization_pks": ARRAY(INTEGER),
     "obis_nodes": ARRAY(TEXT),
+    "declared_eovs": ARRAY(TEXT),
     # Per-variable metadata: lists of dicts, stored as jsonb.
     "table_variables": JSONB,
     # Griddap metadata: lists of dicts, stored as jsonb.

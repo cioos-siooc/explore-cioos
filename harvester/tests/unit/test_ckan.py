@@ -292,6 +292,16 @@ class TestCkanUnavailable:
         assert df.empty
         assert list(df.columns) == PREVIOUS_CKAN_COLUMNS
 
+    def test_stored_metadata_reads_declared_eovs(self, mocker):
+        # An OBIS row's eovs includes taxon-derived EOVs; restoring those as
+        # CKAN's would make them permanent.
+        engine = mocker.patch("cde_harvester.sources.ckan.state.create_db_engine").return_value
+        conn = engine.connect.return_value.__enter__.return_value
+        conn.execute.return_value.all.return_value = []
+        load_previous_ckan(["https://obis.org"])
+        sql = str(conn.execute.call_args.args[0])
+        assert "coalesce(declared_eovs, eovs) AS eovs" in sql
+
     def test_failed_obis_lookup_not_cached(self, mocker, tmp_path):
         get = mocker.patch(
             "cde_harvester.sources.ckan.create_ckan_obis_link.requests.get",

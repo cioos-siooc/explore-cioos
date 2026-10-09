@@ -252,6 +252,43 @@ test("every branch reading cde.profiles binds the feature-level EOV filter", asy
   }
 });
 
+test("every branch reading cde.obis_cells binds the cell-level EOV filter", async () => {
+  // Same failure mode as the profiles rule above: a branch that omits
+  // dbFilter's obisOnly fragment keeps every cell of a matching dataset.
+  for (const [query, operator] of [
+    [{ eovs: "fishAbundanceAndDistribution" }, /eovs && /],
+    [
+      {
+        eovs: "fishAbundanceAndDistribution,seabirdsAbundanceAndDistribution",
+        eovsMatch: "all",
+      },
+      /eovs @> /,
+    ],
+  ]) {
+    const statements = [
+      ...(await sqlFrom("tiles", query)),
+      ...(await sqlFrom("legend", query)),
+      ...(await sqlFrom("timeExtent", query)),
+      ...(await sqlFrom("download", query)),
+      ...(await sqlFrom("coverageHistogram", query)),
+      await shapeSql(query),
+    ].filter((sql) => sql.includes("FROM cde.obis_cells"));
+
+    assert.ok(statements.length >= 5, "expected an OBIS branch per route");
+    for (const sql of statements) {
+      // Up to the next FROM only: the dataset-level copy of the clause sits in
+      // the outer query a few hundred characters on and would mask its absence.
+      const after = sql.slice(sql.indexOf("FROM cde.obis_cells") + 4);
+      const obisBranch = after.slice(0, after.search(/\bFROM\b/));
+      assert.match(
+        obisBranch,
+        operator,
+        `an OBIS branch omits the cell-level EOV filter: ${obisBranch.slice(0, 160)}`,
+      );
+    }
+  }
+});
+
 test("outside the map, trajectory coverage is read at one tier only", async () => {
   // Coverage rows exist at both tiers describing the same data, so anything
   // counting a trajectory once has to pin a tier. The tile routes pick theirs

@@ -73,6 +73,10 @@ CREATE TABLE datasets (
     first_eov_column TEXT,
     source_type TEXT DEFAULT 'erddap',
     obis_nodes text[] DEFAULT '{}',
+    -- OBIS only: the EOVs CKAN declares for the dataset, kept apart from
+    -- `eovs` because obis_derive_eovs() rebuilds `eovs` as these plus the EOVs
+    -- derived from the dataset's taxa.
+    declared_eovs text[],
     -- Croissant file-list hash (set only for file-backed datasets); skip-if-unchanged.
     content_hash TEXT,
     -- Why content_hash is NULL (HASH_* code: database-backed, Croissant fetch error, …);
@@ -309,6 +313,9 @@ CREATE TABLE obis_cells (
     -- small integer set of descendant AphiaIDs and we test overlap on this
     -- column instead of building a 100k+ name array per tile request.
     aphia_ids integer[] NOT NULL DEFAULT '{}',
+    -- The dataset's declared EOVs plus those whose cde.eov_taxa contain one
+    -- of aphia_ids. Set by obis_derive_eovs() in 5_profile_process.sql.
+    eovs text[] NOT NULL DEFAULT '{}',
     n_records bigint,
     -- Distinct UTC days with at least one dated occurrence in this cell.
     -- A COUNT, not a span: matches cde.trajectory_hexes.days so the map's
@@ -352,6 +359,7 @@ CREATE INDEX ON obis_cells (hex_1_pk);
 CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scientific_names)
   WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
 CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia_ids);
+CREATE INDEX obis_cells_eovs_gin              ON cde.obis_cells USING GIN (eovs);
 -- Same three as cde.profiles above, and same reasoning for why depth_min is
 -- left out. Untested against real data: production carries no OBIS rows yet,
 -- so these are sized from the identical predicate shape rather than measured.
@@ -603,6 +611,19 @@ CREATE INDEX obis_scientific_name_popularity_total_records
   ON cde.obis_scientific_name_popularity (total_records DESC);
 
 
+-- Biology EOV -> WoRMS rule (cioos-commons eovs/taxa.json, synced to
+-- harvester/cde_harvester/eov_taxa.json; its README defines the fields). An
+-- empty array leaves that field unconstrained. Replaced by the loader on every
+-- load.
+DROP TABLE IF EXISTS cde.eov_taxa;
+CREATE TABLE cde.eov_taxa (
+    eov               text PRIMARY KEY,
+    aphia_ids         integer[] NOT NULL DEFAULT '{}',
+    exclude_aphia_ids integer[] NOT NULL DEFAULT '{}',
+    functional_groups text[]    NOT NULL DEFAULT '{}'
+);
+
+
 -- Vernacular (common) names per scientific name, sourced from WoRMS.
 -- Populated by cde_harvester/loading/populate_vernaculars.py, not by the harvest itself.
 -- Searches use unnest + ILIKE; with a small row count (one per scientific name)
@@ -614,6 +635,10 @@ CREATE TABLE cde.scientific_name_vernaculars (
     aphia_id            integer,
     rank                text,
     ancestor_aphia_ids  integer[] NOT NULL DEFAULT '{}',
+    -- WoRMS "Functional group" values (e.g. 'plankton > zooplankton') for the
+    -- adult or unstaged life stage, inherited from parent taxa. NULL = not
+    -- fetched yet, which populate_vernaculars treats as work to do.
+    functional_groups   text[],
     vernaculars_en      text[]    NOT NULL DEFAULT '{}',
     vernaculars_fr      text[]    NOT NULL DEFAULT '{}',
     fetched_at          timestamptz NOT NULL DEFAULT now(),

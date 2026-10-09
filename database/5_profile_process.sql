@@ -277,6 +277,82 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Rebuild obis_cells.eovs and the OBIS datasets' eovs. A cell holds its
+-- dataset's declared (CKAN) EOVs plus every EOV whose cde.eov_taxa rule one of
+-- its taxa satisfies; a dataset holds its declared EOVs plus its cells'. Both are recomputed from declared_eovs and the mapping, never from
+-- their previous value, so a taxon dropped from the mapping drops out too.
+-- Only rows whose value changes are written, which keeps an incremental load
+-- from rewriting every cell. Still a full scan (~3s at 240k cells), so it runs
+-- only where aphia_ids or the lineage can change: obis_process(), the full
+-- reload's OBIS steps, and populate_vernaculars -- not on non-OBIS loads.
+CREATE OR REPLACE FUNCTION obis_derive_eovs() RETURNS bigint AS $$
+DECLARE n bigint;
+BEGIN
+  WITH aphia_eovs AS (
+    SELECT DISTINCT v.aphia_id, t.eov
+      FROM cde.scientific_name_vernaculars v
+      JOIN cde.eov_taxa t
+        ON (t.aphia_ids = '{}'
+            OR v.aphia_id = ANY (t.aphia_ids)
+            OR v.ancestor_aphia_ids && t.aphia_ids)
+       AND NOT (v.aphia_id = ANY (t.exclude_aphia_ids)
+                OR v.ancestor_aphia_ids && t.exclude_aphia_ids)
+       AND (t.functional_groups = '{}'
+            OR EXISTS (SELECT 1
+                         FROM unnest(v.functional_groups) AS fg,
+                              unnest(t.functional_groups) AS want
+                        WHERE fg = want OR fg LIKE want || ' > %'))
+     WHERE v.aphia_id IS NOT NULL
+  ),
+  cell_taxon_eovs AS (
+    SELECT c.pk, array_agg(DISTINCT ae.eov) AS eovs
+      FROM cde.obis_cells c
+      CROSS JOIN LATERAL unnest(c.aphia_ids) AS a(aphia_id)
+      JOIN aphia_eovs ae USING (aphia_id)
+     GROUP BY c.pk
+  ),
+  computed AS (
+    SELECT c.pk,
+           ARRAY(SELECT DISTINCT e
+                   FROM unnest(coalesce(d.declared_eovs, '{}') || coalesce(ct.eovs, '{}')) AS e
+                  ORDER BY e) AS eovs
+      FROM cde.obis_cells c
+      LEFT JOIN cde.datasets d ON d.pk = c.dataset_pk
+      LEFT JOIN cell_taxon_eovs ct ON ct.pk = c.pk
+  )
+  UPDATE cde.obis_cells c
+     SET eovs = computed.eovs
+    FROM computed
+   WHERE c.pk = computed.pk
+     AND c.eovs IS DISTINCT FROM computed.eovs;
+  GET DIAGNOSTICS n = ROW_COUNT;
+
+  WITH dataset_cell_eovs AS (
+    SELECT c.dataset_pk, array_agg(DISTINCT e) AS eovs
+      FROM cde.obis_cells c
+      CROSS JOIN LATERAL unnest(c.eovs) AS e
+     GROUP BY c.dataset_pk
+  ),
+  computed AS (
+    SELECT d.pk,
+           ARRAY(SELECT DISTINCT e
+                   FROM unnest(coalesce(d.declared_eovs, '{}') || coalesce(dc.eovs, '{}')) AS e
+                  ORDER BY e) AS eovs
+      FROM cde.datasets d
+      LEFT JOIN dataset_cell_eovs dc ON dc.dataset_pk = d.pk
+     WHERE d.source_type = 'obis'
+  )
+  UPDATE cde.datasets d
+     SET eovs = computed.eovs
+    FROM computed
+   WHERE d.pk = computed.pk
+     AND d.eovs IS DISTINCT FROM computed.eovs;
+
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Backfill obis_cells.aphia_ids from scientific_name_vernaculars so the
 -- rank-aware filter rolldown can use integer-set overlap. Names not yet in
 -- vernaculars (species new to this harvest, before populate_vernaculars.py
@@ -359,6 +435,7 @@ BEGIN
   PERFORM obis_update_n_profiles();
   PERFORM obis_refresh_matviews(concurrent_refresh);
   PERFORM obis_backfill_aphia_ids(rebuild_indexes);
+  PERFORM obis_derive_eovs();
 END;
 $$ LANGUAGE plpgsql;
 

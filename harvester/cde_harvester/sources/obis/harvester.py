@@ -357,6 +357,7 @@ class OBISHarvester(BaseHarvester):
             lambda r: r["ckan_eovs"] if isinstance(r.get("ckan_eovs"), list) and r["ckan_eovs"] else r["eovs"],
             axis=1,
         )
+        df_datasets["declared_eovs"] = df_datasets["eovs"]
         # Use CKAN title if available, keep OBIS title as fallback
         df_datasets["title"] = df_datasets["ckan_title"].fillna(df_datasets["title"])
 
@@ -563,6 +564,7 @@ class OBISHarvester(BaseHarvester):
             "cdm_data_type": "Point",
             "platform": "unknown",
             "eovs": [],
+            "declared_eovs": [],
             "organizations": organizations,
             "n_profiles": len(cells),
             "profile_variables": [],

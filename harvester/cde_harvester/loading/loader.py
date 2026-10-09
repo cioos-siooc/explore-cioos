@@ -23,6 +23,7 @@ from cde_harvester.core.schemas import (
     DATASET_ARRAY_DTYPES,
     PROFILE_ARRAY_DTYPES,
 )
+from cde_harvester.utils import get_eov_taxa
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -115,6 +116,28 @@ def prepare_profiles_dataframe(profiles):
         columns=["altitude_min", "altitude_max", "scientific_names"], errors="ignore"
     ).dropna(subset=["time_min", "time_max"])
     return profiles
+
+
+def load_eov_taxa(transaction):
+    """Replace cde.eov_taxa with the synced mapping that obis_derive_eovs() reads."""
+    rows = [
+        {
+            "eov": eov,
+            "aphia_ids": rule.get("aphia_ids", []),
+            "exclude_aphia_ids": rule.get("exclude_aphia_ids", []),
+            "functional_groups": rule.get("functional_groups", []),
+        }
+        for eov, rule in get_eov_taxa().items()
+    ]
+    transaction.execute(text("DELETE FROM cde.eov_taxa"))
+    transaction.execute(
+        text(
+            "INSERT INTO cde.eov_taxa"
+            " (eov, aphia_ids, exclude_aphia_ids, functional_groups)"
+            " VALUES (:eov, :aphia_ids, :exclude_aphia_ids, :functional_groups)"
+        ),
+        rows,
+    )
 
 
 def prepare_obis_cells_dataframe(obis_cells, name_to_aphia=None):
@@ -459,6 +482,12 @@ def main(folder, incremental=False):
         )
     else:
         datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
+    if "declared_eovs" in datasets.columns:
+        datasets["declared_eovs"] = datasets["declared_eovs"].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else None
+        )
+    else:
+        datasets["declared_eovs"] = None
 
     # jsonb metadata columns (table_variables for every dataset type, the two
     # grid_* ones for griddap). All nullable; absent entirely from older harvest
@@ -539,6 +568,8 @@ def main(folder, incremental=False):
             {"k": DB_LOADER_ADVISORY_LOCK_KEY},
         )
         transaction.execute(text("SET lock_timeout = '2min'"))
+        # Under the lock: concurrent loaders would otherwise race on its rows.
+        load_eov_taxa(transaction)
 
     # "Commit as you go" connection, NOT engine.begin(): the load is two
     # transactions — a session-private staging phase (temp tables + uploads,
@@ -914,6 +945,7 @@ def main(folder, incremental=False):
                     ("obis_update_n_profiles", "()"),
                     ("obis_refresh_matviews", "(FALSE)"),
                     ("obis_backfill_aphia_ids", "()"),
+                    ("obis_derive_eovs", "()"),
                 ]
                 logger.info("Processing obis_cells")
                 for fn, args in obis_steps:

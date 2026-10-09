@@ -202,10 +202,13 @@ async function createDBFilter(
     // shape query's profilesBranch, tiles.js (the hex/point route), legend.js,
     // timeExtent.js and download.js. Branches that cannot
     // answer it stay dataset-level via `filters`, which is why that clause is
-    // kept there: obis_cells, trajectory cells and track stats, the griddap
-    // pseudo-branch, and the two coverage-cell queries (/tiles/cells and the
-    // legend's coverage ramp) which read only trajectory + OBIS cells.
+    // kept there: trajectory cells and track stats, the griddap pseudo-branch,
+    // and the trajectory half of the two coverage-cell queries (/tiles/cells
+    // and the legend's coverage ramp).
     profileFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
+    // OBIS cells carry the EOVs their taxa map to (obis_derive_eovs()), so a
+    // fish selection keeps only the cells that recorded fish.
+    obisFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
   }
 
   // Both levels, like the include: a dataset that measured an excluded EOV is
