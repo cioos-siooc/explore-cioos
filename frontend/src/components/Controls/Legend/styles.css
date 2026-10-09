@@ -23,7 +23,6 @@
   /* Viewport held clear above the card, so a long list of keys stops short of
      the centered top bar instead of running the height of the screen. */
   --legend-top-reserve: 108px;
-
   --cioos-font-size-3xs: calc(10px + var(--legend-grow) / 400);
   --cioos-font-size-2xs: calc(10px + var(--legend-grow) / 400);
   --cioos-font-size-xs: calc(11px + var(--legend-grow) / 400);
