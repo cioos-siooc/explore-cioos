@@ -36,7 +36,7 @@ flowchart TD
     ckan --> csv["Run folder of CSVs"]
 
     o --> ohv["OBIS strategy:<br/>discovery, occurrences to cells"]
-    ohv --> ockan["CKAN: lookup per OBIS UUID"]
+    ohv --> ockan["CKAN: match records by OBIS<br/>or IPT link, else convert<br/>the OBIS metadata"]
     ockan --> csv
 
     csv --> load["db-loader: incremental,<br/>serialized by advisory lock"]
@@ -112,12 +112,17 @@ previous harvest. Datasets that have nothing stored are loaded without
 enrichment, and their change hash is cleared so the next run re-harvests them
 instead of skipping them as unchanged.
 
-**OBIS datasets.** Each OBIS UUID is looked up individually in CKAN through the
-OBIS XML harvest source (`xml_location_url`). A match supplies the **EOVs**
-(OBIS has none of its own), the French title, the CKAN title and the
-catalogue link. Lookups are cached on disk, including "not found" results. A
-failed lookup falls back to the stored metadata and is never cached as
-"not found".
+**OBIS datasets.** After the OBIS datasets are harvested, one paged
+`package_search` (`res_url:*obis.org* OR res_url:*ipt*`) fetches every
+national-catalogue record linking an OBIS dataset page
+(`obis.org/dataset/<uuid>`) or an IPT resource page. A dataset matches by its
+UUID, else by the IPT resource page its OBIS metadata gives as `url` (scheme-,
+case- and version-insensitive). A match supplies the **EOVs** (OBIS has none of
+its own), the French title, the CKAN title and the catalogue link. A dataset
+with no match gets its EOVs and summary from its OBIS metadata, converted by
+[cioos-metadata-conversion](https://github.com/cioos-siooc/cioos-metadata-conversion);
+conversions are cached on disk. If CKAN is unreachable, the datasets keep the
+CKAN metadata stored by the previous harvest and the rest are converted.
 
 The database then normalizes organization names into `cde.organizations`.
 

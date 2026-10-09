@@ -93,6 +93,15 @@ def unescape_ascii(x):
         return x
 
 
+def remove_newlines(s):
+    # not sure why all these are needed but they seem to be
+    s = s.replace("\r", "")
+    s = s.replace("\n", "")
+    s = s.replace("\\n", "")
+    s = s.replace("\\r", "")
+    return s
+
+
 @task(task_run_name="fetch-ckan-metadata")
 def get_ckan_records(dataset_ids, limit=None, cache=False):
     """Fetch the full CKAN record for each harvested dataset ID (@task).
@@ -101,7 +110,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
     must not fail the harvest (the merge falls back to the stored metadata).
     """
     try:
-        records = list_ckan_records_with_erddap_urls(cache)
+        records = list_ckan_records(cache)
     except (requests.RequestException, RuntimeError, KeyError) as e:
         run_logger(logging.getLogger(__name__)).warning(f"CKAN unavailable, falling back to stored CKAN metadata: {e}")
         return None
@@ -131,14 +140,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         title_translated = record_full.get("title_translated") or {}
         # Kept for the commented-out ckan_summary fields below.
         notes_translated = record_full.get("notes_translated")  # noqa: F841
-
-        def remove_newlines(s):
-            # not sure why all these are needed but they seem to be
-            s = s.replace("\r", "")
-            s = s.replace("\n", "")
-            s = s.replace("\\n", "")
-            s = s.replace("\\r", "")
-            return s
 
         ckan_record_text = {
             "title": title_translated.get("en"),
@@ -196,8 +197,8 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
     return df.drop(columns="is_subset")
 
 
-def list_ckan_records_with_erddap_urls(cache_requests):
-    """Fetch all CKAN records with ERDDAP urls (paged)."""
+def list_ckan_records(cache_requests, query="res_url:*erddap*"):
+    """Fetch all CKAN records matching a package_search query (paged)."""
     logger = run_logger(logging.getLogger(__name__))
     logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
@@ -213,7 +214,7 @@ def list_ckan_records_with_erddap_urls(cache_requests):
         erddap_datasets_query = (
             CKAN_API_URL
             + "/action/package_search?"
-            + urlencode({"rows": row_page_limit, "start": row_start, "q": "res_url:*erddap*"})
+            + urlencode({"rows": row_page_limit, "start": row_start, "q": query})
         )
         logger.info(erddap_datasets_query)
         # print(erddap_datasets_query)
