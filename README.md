@@ -276,8 +276,7 @@ references name 1Password items, everything else ships as written. Change
 production settings there, not on the box.
 
 `.env.staging` is the beta/staging template. Create its referenced
-`explore-cioos-staging` 1Password item with the listed fields, and the external
-network once on Juno with `docker network create explore-cioos-staging_default`.
+`explore-cioos-staging` 1Password item with the listed fields.
 `docker-compose.staging.yaml` suffixes the Postgres and harvester volumes
 (`harvest_data`, `harvester_cache`, `obis_cache`) with the tag: a new tag starts
 empty (schema + `RUN_ON_DEPLOY` harvest), redeploying the same tag keeps its
@@ -343,13 +342,11 @@ build full copies of the stack.
 ### Self-hosted production
 
 `docker-compose.production.yaml` is an **overlay** on `docker-compose.yaml`,
-holding only what production adds: host ports (nginx, Prefect, Postgres), the
-external `explore-cioos_default` network, the host-editable `harvest_config.yaml`
+holding only what production adds: host ports (nginx, Prefect, Postgres), the host-editable `harvest_config.yaml`
 bind mount, a capped redis config, and an overridable `DB_HOST_EXTERNAL`.
 Everything else is inherited.
 
-1. Create the shared network once: `docker network create explore-cioos_default`.
-2. Create `.env` — CI does this for you. By hand, start from `.env.production`
+1. Create `.env` — CI does this for you. By hand, start from `.env.production`
    (not `.env.sample`) and replace the `op://` references. Minimum:
 
    ```sh
@@ -364,9 +361,9 @@ Everything else is inherited.
    `DB_HOST_EXTERNAL` and `DB_BIND_ADDRESS` to the VPN address; otherwise the DB
    port stays bound to `127.0.0.1`.
 
-3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
+2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
    [Harvest configuration](#harvest-configuration)).
-4. Start: `sudo docker compose up -d --build`.
+3. Start: `sudo docker compose up -d --build`.
 
 ### Monitoring
 
