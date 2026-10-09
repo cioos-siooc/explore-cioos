@@ -9,6 +9,7 @@ any HTTP calls.
 import pandas as pd
 import pytest
 from cde_harvester.dataset_types import extract_features as get_profiles
+from cde_harvester.dataset_types import timeseries_profile
 from conftest import (
     DATASET_ID,
     ERDDAP_URL,
@@ -530,7 +531,8 @@ class TestIdentityCarriesBounds:
 
 class TestTimeSeriesProfile:
     @pytest.fixture
-    def dataset(self):
+    def dataset(self, monkeypatch):
+        monkeypatch.setattr(timeseries_profile, "MAX_PROFILES_PER_TIMESERIES", 1)
         dataset = build_mock_dataset(cdm_data_type="TimeSeriesProfile")
         dataset.profile_variables = {"timeseries_id": "station_id", "profile_id": "cast"}
         dataset.profile_variable_list = ["cast", "station_id"]
@@ -552,6 +554,28 @@ class TestTimeSeriesProfile:
         assert result.loc["STATION_001", "time_min"] == pd.Timestamp("2020-01-01", tz="UTC")
         assert result.loc["STATION_001", "time_max"] == pd.Timestamp("2020-06-01", tz="UTC")
         assert result.loc["STATION_001", "n_profiles"] == 2
+
+    def test_few_profiles_per_timeseries_keep_one_feature_per_profile(
+        self, dataset, monkeypatch
+    ):
+        monkeypatch.setattr(timeseries_profile, "MAX_PROFILES_PER_TIMESERIES", 2)
+        per_station = dataset.get_max_min.side_effect
+
+        def per_cast(vars_list):
+            bounds = per_station(["station_id", vars_list[-1]]).reset_index()
+            return (
+                dataset.profile_ids[["cast", "station_id"]]
+                .merge(bounds, on="station_id")
+                .set_index(vars_list[:-1])
+            )
+
+        dataset.get_max_min.side_effect = per_cast
+        dataset.get_count.return_value = dataset.profile_ids[
+            ["cast", "station_id"]
+        ].assign(time=10)
+        result = get_profiles(dataset)
+        assert sorted(result["profile_id"]) == ["c1", "c2", "c3"]
+        assert (result["n_profiles"] == 1).all()
 
     def test_resolution_counts_rows_per_profile_from_one_sample(self, dataset):
         dataset.globals["time_coverage_resolution"] = "P1D"
