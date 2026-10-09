@@ -6,7 +6,7 @@ name: Deploy
 #   vX.Y.Z         -> production  master only, and only a SHA whose staging
 #                                 deployment succeeded
 # beta and staging share one stack on the Juno host cioos-co-dev-explore
-# (dev.explore.cioos.ca, behind Caddy basic_auth), one deploy at a time. Each new
+# (explore.dev.cioos.ca, behind Caddy basic_auth), one deploy at a time. Each new
 # tag gets a fresh database volume (docker-compose.staging.yaml). Wait for the release's Integration Tests (including
 # visual regression) before deploying.
 on:

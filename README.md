@@ -265,7 +265,7 @@ gh release create v1.2.0-rc.1 --target master --prerelease             # staging
 gh release create v1.2.0 --target master                               # production
 ```
 
-Beta and staging are one stack on one Juno host (`dev.explore.cioos.ca`) and
+Beta and staging are one stack on one Juno host (`explore.dev.cioos.ca`) and
 deploy one at a time; production is another host. All run over WireGuard through
 the shared `cioos-deploy-docker-compose` action, pinned to the tag's commit. To
 roll back or redeploy, dispatch Deploy with an existing published release tag;
