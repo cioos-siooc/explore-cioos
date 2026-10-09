@@ -44,10 +44,3 @@ services:
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - ./redis-config/redis.conf:/usr/local/etc/redis/redis.conf:ro
-
-# Project default => every service joins it, including inherited ones.
-# Must exist: docker network create <COMPOSE_NETWORK_NAME>
-networks:
-  default:
-    name: ${COMPOSE_NETWORK_NAME:-explore-cioos_default}
-    external: true
