@@ -126,7 +126,11 @@ jobs:
           stack_name: explore-cioos-staging
           compose_files: docker-compose.yaml docker-compose.production.yaml docker-compose.staging.yaml
           op_secret_files: .env.staging:.env
-          env_overrides: DEPLOY_TAG=${{ needs.release.outputs.tag }}
+          # The tag doubles as the Sentry release, shared by web-api and the
+          # frontend's sourcemap upload.
+          env_overrides: |
+            DEPLOY_TAG=${{ needs.release.outputs.tag }}
+            SENTRY_RELEASE=${{ needs.release.outputs.tag }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"
@@ -152,6 +156,7 @@ jobs:
           stack_name: explore-cioos-production
           compose_files: docker-compose.yaml docker-compose.production.yaml
           op_secret_files: .env.production:.env
+          env_overrides: SENTRY_RELEASE=${{ needs.release.outputs.tag }}
           op_service_account_token: ${{ secrets.CIOOS_CO_1PASSWORD_TOKEN }}
           git_sha: ${{ needs.release.outputs.sha }}
           docker_compose_down: "true"

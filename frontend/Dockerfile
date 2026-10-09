@@ -45,8 +45,11 @@ COPY . .
 # vite.config.mjs resolves it (../docs/harvesting from the app dir).
 COPY --from=docs harvesting /usr/src/docs/harvesting
 
+# Node's default heap cap (~2 GB) is below the build's peak (~3.3 GB with
+# sourcemaps, since mermaid joined the bundle).
 RUN --mount=type=secret,id=sentry_auth_token \
     SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
+    NODE_OPTIONS=--max-old-space-size=4096 \
     npm run build
 
 # Stage 2 - the production environment

@@ -96,7 +96,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "dist",
-      sourcemap: true,
+      // Only the Sentry plugin consumes (and then deletes) the maps; without
+      // it they would ship publicly and cost ~0.8 GB of build memory.
+      sourcemap: !!env.SENTRY_AUTH_TOKEN,
       rollupOptions: {
         output: {
           manualChunks: {
