@@ -620,6 +620,9 @@ export default function CreateMap({
   // it can reach the DOM as an attribute. The ref stays the guard — it is read
   // synchronously inside reportFirstPaint, where a state value would be stale.
   const [firstPainted, setFirstPainted] = useState(false);
+  // The mount effect's pushMapView, so reportFirstPaint can seed the in-view
+  // bounds the moment the map is handed over.
+  const pushMapViewRef = useRef(null);
   // Latest rangeLevels, for the once-registered measurement handler: it runs on
   // the first render's closure (like setColorStops, which it reaches through a
   // ref of its own), so the prop it captured is forever the mount-time one.
@@ -890,6 +893,7 @@ export default function CreateMap({
     // which is exactly what screenshot capture disables.
     setFirstPainted(true);
     onFirstPaint();
+    pushMapViewRef.current?.();
   }
 
   // Reveal once a measurement pass has settled what the ramp is going to be.
@@ -1437,7 +1441,14 @@ export default function CreateMap({
   // test is what stops the loop, since repainting a data-driven paint property
   // makes the map re-render, which is one of the things that calls this.
   function refreshViewportHexRange() {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    // The tiles this key needs are still on their way in: hold whatever is
+    // painted and take another pass at the next idle. Treating "can't tell" as
+    // "nothing here" is what handed the ramp back to the catalogue-wide tier
+    // and then took it away again a moment later: two full re-colourings where
+    // the user asked for none. Only the hex sources, not isStyleLoaded(), which
+    // also waits on the tracks and the CHS soundings and so held the first
+    // reveal back behind them.
+    if (!map.current || !hexSourcesLoaded()) return;
     const key = rampKey();
     if (rampMeasuredFor.current === key) return;
     const range = measureVisibleHexRange(rampFocusPk.current);
@@ -1446,13 +1457,6 @@ export default function CreateMap({
       // returns at the top, which is what holds the colours and the legend's
       // numbers still through a drag.
       rampMeasuredFor.current = key;
-    } else if (!hexSourcesLoaded()) {
-      // No answer yet, and the tiles this key needs are still on their way in.
-      // Hold whatever is painted and take another pass at the next idle.
-      // Treating "can't tell" as "nothing here" is what handed the ramp back to
-      // the catalogue-wide tier and then took it away again a moment later: two
-      // full re-colourings where the user asked for none.
-      return;
     }
     // Sources loaded and still nothing on screen IS an answer — no hexes here,
     // so the catalogue-wide tier takes the ramp back and the legend can say the
@@ -3980,9 +3984,13 @@ export default function CreateMap({
       });
     };
     map.current.on("moveend", pushMapView);
-    // moveend doesn't fire until the first interaction, so seed bounds once the
-    // initial camera settles — otherwise the in-view set is empty until a pan.
-    map.current.once("idle", pushMapView);
+    // moveend doesn't fire until the first interaction, so seed bounds when the
+    // map is handed over (reportFirstPaint) — otherwise the in-view set is
+    // empty until a pan. Not 'idle': that waits on every tile, so the count
+    // read "0 in view" for as long as the slowest source took. Not
+    // 'style.load' either: the list re-render it sets off competed with the
+    // first paint and held the reveal back by about a quarter of a second.
+    pushMapViewRef.current = pushMapView;
     map.current.on("mousedown", (e) => {
       if (e.originalEvent.shiftKey) {
         shiftBoxCreate.current = true;
