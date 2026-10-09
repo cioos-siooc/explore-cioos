@@ -1,3 +1,17 @@
+/* Grows with the monitor from 1600px to 2400px wide, so the keys don't shrink
+   to a postage stamp on a large screen; laptops and the 1600px e2e viewport
+   keep the base sizes. The dialog is portalled out of the card, so it needs the
+   sizes too; the compact (mobile) card zeroes the growth below. */
+.mapLegend,
+.legendModal {
+  --legend-grow: clamp(0px, 100vw - 1600px, 800px);
+  --legend-gutter: calc(9px + var(--legend-grow) / 200);
+  --legend-swatch: calc(12px + var(--legend-grow) / 200);
+  --legend-row: calc(15px + var(--legend-grow) / 200);
+  --legend-bar: calc(10px + var(--legend-grow) / 200);
+  --legend-switch: calc(16px + var(--legend-grow) / 200);
+}
+
 /* Compact floating legend card, bottom-right corner of the map — the keys on
    the right, the "what's here" card on the left, both down on the bottom edge
    where they are read against the map rather than over the top bar. */
@@ -10,6 +24,10 @@
      the centered top bar instead of running the height of the screen. */
   --legend-top-reserve: 108px;
 
+  --cioos-font-size-3xs: calc(10px + var(--legend-grow) / 400);
+  --cioos-font-size-2xs: calc(10px + var(--legend-grow) / 400);
+  --cioos-font-size-xs: calc(11px + var(--legend-grow) / 400);
+
   position: fixed;
   right: 12px;
   bottom: var(--legend-corner-offset);
@@ -19,8 +37,8 @@
   border-radius: var(--cioos-radius);
   display: flex;
   flex-direction: column;
-  min-width: 124px;
-  max-width: 190px;
+  min-width: calc(124px + var(--legend-grow) / 32);
+  max-width: calc(190px + var(--legend-grow) / 20);
 
   /* Two ceilings, whichever is lower: the reserve above, and the foot of the
      depth strip down the right edge when one is up — this card sits under that
@@ -52,7 +70,7 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 5px 9px;
+  padding: calc(5px + var(--legend-grow) / 400) var(--legend-gutter);
   border: none;
   background: transparent;
   font-family: var(--cioos-font-body);
@@ -79,7 +97,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 9px 6px;
+  padding: 0 var(--legend-gutter) calc(6px + var(--legend-grow) / 400);
 }
 
 /* One group of related entries — the observations, the tracks, the seafloor, the
@@ -237,7 +255,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 15px;
+  min-height: var(--legend-row);
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink);
   line-height: 1.15;
@@ -251,7 +269,7 @@
   flex-direction: row;
   align-items: center;
   gap: 4px;
-  min-height: 15px;
+  min-height: var(--legend-row);
 
   /* Indented off the card's left edge. The row leads with a 6px circle inside a
      12px swatch box, so its ink starts further right than the colour bar's does
@@ -265,7 +283,7 @@
 .legendItem .legendSwatch,
 .legendSizeKey .legendSwatch {
   flex: 0 0 auto;
-  width: 12px;
+  width: var(--legend-swatch);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -279,13 +297,13 @@
 }
 
 .legendPointCircle.small {
-  width: 6px;
-  height: 6px;
+  width: calc(var(--legend-swatch) / 2);
+  height: calc(var(--legend-swatch) / 2);
 }
 
 .legendPointCircle.large {
-  width: 12px;
-  height: 12px;
+  width: var(--legend-swatch);
+  height: var(--legend-swatch);
 }
 
 .legendItemLabel {
@@ -297,14 +315,14 @@
 /* Continuous color bar for hex ramps, drawn in the scale's (log-like) space
    with count ticks at each stop. */
 .legendColorBar {
-  height: 10px;
+  height: var(--legend-bar);
   border-radius: 3px;
   border: 1px solid var(--cioos-hairline);
 }
 
 .legendColorBarTicks {
   position: relative;
-  height: 12px;
+  height: calc(12px + var(--legend-grow) / 400);
   margin-top: 3px;
 }
 
@@ -350,13 +368,13 @@
 }
 
 .mapLegend .form-switch .form-check-input {
-  width: 28px;
-  height: 16px;
+  width: calc(var(--legend-switch) + 12px);
+  height: var(--legend-switch);
 }
 
 .mapLegend .form-switch .form-check-input::before {
-  width: 12px;
-  height: 12px;
+  width: calc(var(--legend-switch) - 4px);
+  height: calc(var(--legend-switch) - 4px);
 }
 
 .mapLegend .form-switch .form-check-input:checked::before {
@@ -378,7 +396,8 @@
 .legendFooter {
   flex: 0 0 auto;
   border-top: 1px solid var(--cioos-hairline);
-  padding: 4px 9px 5px;
+  padding: calc(4px + var(--legend-grow) / 400) var(--legend-gutter)
+    calc(5px + var(--legend-grow) / 400);
 }
 
 /* The scale to the left, the ⓘ to the right — one row, the height of the
@@ -508,9 +527,7 @@
 /* The card holds the desktop type sizes instead of the phone step-up: it is a
    glance over the map, and the full keys are a tap away in the dialog. */
 .legendCompact {
-  --cioos-font-size-3xs: 10px;
-  --cioos-font-size-2xs: 10px;
-  --cioos-font-size-xs: 11px;
+  --legend-grow: 0px;
 
   min-width: 96px;
   max-width: 136px;
