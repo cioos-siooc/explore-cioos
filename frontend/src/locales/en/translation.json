@@ -536,6 +536,8 @@
   "harvest.filter.search": "Search",
   "harvest.filter.clear": "Clear",
   "harvest.card.lastAttempt": "Last attempt: {{date}}",
+  "harvest.card.lastSuccess": "Last success: {{date}}",
+  "harvest.card.noSuccess": "No successful run on record",
   "tracksToggleLabel": "Show trajectory tracks",
   "layerSelectorLabel": "Observation type",
   "layerProfile": "Profile",

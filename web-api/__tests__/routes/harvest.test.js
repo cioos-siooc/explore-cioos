@@ -71,6 +71,16 @@ describe("GET /harvest/servers", () => {
     // The pattern this replaced, and the one recentRuns was already moved off.
     expect(sql).not.toContain("FROM cde.harvest_attempts ha2");
   });
+
+  it("reports each server's last successful run, not just its latest attempt", async () => {
+    respond = () => [];
+
+    await request(app).get("/harvest/servers");
+
+    const sql = sqlFor("latest_run_per_server");
+    expect(sql).toContain("last_success_at");
+    expect(sql).toContain("WHERE r.status = 'ok'");
+  });
 });
 
 describe("GET /harvest/dataset/:slug/:datasetId", () => {
