@@ -1,0 +1,24 @@
+# Build context for the `frontend` service: the repo ROOT, with
+# frontend/Dockerfile. BuildKit uses this file instead of the root .dockerignore
+# because it sits beside that Dockerfile. Allow-list only what the image needs.
+*
+!frontend
+!docs/harvesting
+
+# node_modules is the load-bearing entry: the Dockerfile runs `npm ci` and then
+# copies frontend/, so without this the host's node_modules is copied straight
+# over the tree npm ci just installed — the image then ships whatever was on a
+# developer's laptop rather than what package-lock.json pins.
+frontend/node_modules
+frontend/dist
+frontend/.env
+frontend/.env.*
+!frontend/.env.development
+
+**/.DS_Store
+frontend/.vscode
+frontend/coverage
+frontend/playwright-report
+frontend/test-results
+frontend/stats.html
+frontend/*.log
