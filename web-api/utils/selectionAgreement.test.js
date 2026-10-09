@@ -369,6 +369,31 @@ test("every selection route inherits the exclude filters and match modes", async
   }
 });
 
+test("every selection route inherits the organization role scope", async () => {
+  const query = { organizations: "1", organizationRoles: "owner" };
+  const statements = [
+    ...(await sqlFrom("tiles", query)),
+    ...(await sqlFrom("tiles/cells", query)),
+    ...(await sqlFrom("legend", query)),
+    ...(await sqlFrom("timeExtent", query)),
+    ...(await sqlFrom("download", query)),
+    ...(await sqlFrom("griddapCoverage", query)),
+    await shapeSql(query),
+  ].filter((sql) => /FROM cde\./.test(sql));
+
+  assert.ok(
+    statements.length >= 6,
+    "expected at least one statement per route",
+  );
+  for (const sql of statements) {
+    assert.match(
+      sql,
+      /organization_role_keys && '\{"1:owner"\}'/,
+      `omits organizationRoles: ${sql.slice(0, 160)}`,
+    );
+  }
+});
+
 test("every coverageHistogram count reads the same branch set", async () => {
   // The three counts used to share one CTE string, so testing any of them
   // tested all three. They now build their own — the days count merges each

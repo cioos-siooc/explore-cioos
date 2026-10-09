@@ -266,6 +266,32 @@ describe("createDataFilterQueryString", () => {
     expect(paramsFor(false).has("organizations")).toBe(false);
     expect(paramsFor(true).get("organizations")).toBe("1,2");
   });
+
+  it("organization roles scope an organization selection only", () => {
+    const orgRolesSelected = [
+      selected("owner", { pk: "owner" }),
+      unselected("distributor", { pk: "distributor" }),
+    ];
+    const paramsFor = (orgsSelected) =>
+      new URLSearchParams(
+        createDataFilterQueryString(
+          makeQuery({ orgsSelected, orgRolesSelected }),
+        ),
+      );
+    expect(paramsFor([selected("A", { pk: 1 })]).get("organizationRoles")).toBe(
+      "owner",
+    );
+    expect(paramsFor([excluded("A", { pk: 1 })]).get("organizationRoles")).toBe(
+      "owner",
+    );
+    expect(
+      paramsFor([unselected("A", { pk: 1 })]).has("organizationRoles"),
+    ).toBe(false);
+    // every org ticked is still a filter once it is scoped to a role
+    expect(paramsFor([selected("A", { pk: 1 })]).get("organizations")).toBe(
+      "1",
+    );
+  });
 });
 
 describe("toggleOptionIncluded / toggleOptionExcluded", () => {

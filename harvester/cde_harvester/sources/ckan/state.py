@@ -11,7 +11,8 @@ from cde_harvester.core.observability import run_logger
 _module_logger = logging.getLogger(__name__)
 
 PREVIOUS_CKAN_COLUMNS = [
-    "erddap_url", "dataset_id", "ckan_id", "title", "title_fr", "organizations", "eovs",
+    "erddap_url", "dataset_id", "ckan_id", "title", "title_fr", "organizations",
+    "organization_roles", "eovs",
 ]
 
 

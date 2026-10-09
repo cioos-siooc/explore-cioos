@@ -62,6 +62,7 @@ export const defaultQuery = {
   realtimeOnly: defaultRealtimeOnly,
   eovsMatchAll: false,
   orgsMatchAll: false,
+  orgRolesSelected: [],
   scientificNamesExcluded: defaultScientificNamesSelected,
   scientificNamesMatchAll: false,
 };
@@ -80,6 +81,9 @@ export default function FilterProvider({ children }) {
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500);
   const [orgsSearchTerms, setOrgsSearchTerms] = useState("");
   const [orgsMatchAll, setOrgsMatchAll] = useState(false);
+  // Contact roles (owner, custodian...) the organization selection is scoped
+  // to; none ticked means any role. Not debounced, like orgsMatchAll.
+  const [orgRolesSelected, setOrgRolesSelected] = useState([]);
 
   const [datasetsSelected, setDatasetsSelected] = useState(
     defaultDatatsetsSelected,
@@ -199,6 +203,7 @@ export default function FilterProvider({ children }) {
       realtimeOnly,
       eovsMatchAll,
       orgsMatchAll,
+      orgRolesSelected,
       scientificNamesMatchAll,
     }),
     [
@@ -217,6 +222,7 @@ export default function FilterProvider({ children }) {
       realtimeOnly,
       eovsMatchAll,
       orgsMatchAll,
+      orgRolesSelected,
       scientificNamesMatchAll,
       showObis,
     ],
@@ -300,6 +306,7 @@ export default function FilterProvider({ children }) {
       realtimeOnly: realtimeOnlyFromURL,
       eovsMatch,
       organizationsMatch,
+      organizationRoles,
       scientificNamesMatch,
       excludeEovs,
       excludePlatforms,
@@ -402,6 +409,19 @@ export default function FilterProvider({ children }) {
       );
     });
 
+    const orgRolesFromURL = organizationRoles?.split(",") || [];
+    const orgRolesRequest = fetchJson(`${server}/organizations/roles`).then(
+      (roles) => {
+        setOrgRolesSelected(
+          roles.map((role) => ({
+            title: role,
+            pk: role,
+            isSelected: orgRolesFromURL.includes(role),
+          })),
+        );
+      },
+    );
+
     // OBIS nodes — distinct list from /obisNodes. Names double as the pk
     // since the schema stores text[] (no per-node lookup table).
     const obisNodesFromURL = (obisNodes?.split(",") || []).map((s) =>
@@ -481,6 +501,7 @@ export default function FilterProvider({ children }) {
       platformsRequest,
       eovsRequest,
       orgsRequest,
+      orgRolesRequest,
       obisNodesRequest,
       datasetsRequest,
       erddapServersRequest,
@@ -510,6 +531,9 @@ export default function FilterProvider({ children }) {
     setRealtimeOnly(defaultRealtimeOnly);
     setEovsMatchAll(false);
     setOrgsMatchAll(false);
+    setOrgRolesSelected(
+      orgRolesSelected.map((role) => ({ ...role, isSelected: false })),
+    );
     setScientificNamesMatchAll(false);
     setStartDate(defaultStartDate);
     setEndDate(defaultEndDate);
@@ -597,6 +621,8 @@ export default function FilterProvider({ children }) {
     setEovsMatchAll,
     orgsMatchAll,
     setOrgsMatchAll,
+    orgRolesSelected,
+    setOrgRolesSelected,
     scientificNamesMatchAll,
     setScientificNamesMatchAll,
     startDate,

@@ -40,6 +40,26 @@ FROM (
 WHERE d.pk = sub.pk
   AND d.organization_pks IS DISTINCT FROM sub.pks;
 
+-- "role:Organization name" -> "<pk_url>:role". Every dataset gets a row (LEFT
+-- JOINs), so one that lost all its roles is reset to '{}' rather than kept.
+UPDATE cde.datasets d
+SET organization_role_keys = sub.keys
+FROM (
+    SELECT d.pk,
+           coalesce(
+             array_agg(DISTINCT o.pk_url || ':' || split_part(r, ':', 1)
+                       ORDER BY o.pk_url || ':' || split_part(r, ':', 1))
+               FILTER (WHERE o.pk_url IS NOT NULL),
+             '{}'
+           ) AS keys
+    FROM cde.datasets d
+    LEFT JOIN LATERAL unnest(d.organization_roles) r ON TRUE
+    LEFT JOIN cde.organizations o ON o.name = substr(r, strpos(r, ':') + 1)
+    GROUP BY d.pk
+) sub
+WHERE d.pk = sub.pk
+  AND d.organization_role_keys IS DISTINCT FROM sub.keys;
+
 
   END;
 $$ LANGUAGE plpgsql;

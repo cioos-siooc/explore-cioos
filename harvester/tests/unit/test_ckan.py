@@ -11,6 +11,7 @@ import pytest
 import requests
 from cde_harvester.core.errors import HASH_CKAN_UNAVAILABLE
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
+    ckan_organization_roles,
     erddap_join_key,
     get_ckan_records,
     split_erddap_url,
@@ -126,6 +127,22 @@ class TestUnescapeAscii:
     def test_list_unescaping_with_escapes(self):
         result = unescape_ascii_list([r"Café", r"Institut für Meeresforschung"])
         assert result == ["Café", "Institut für Meeresforschung"]
+
+
+# ---------------------------------------------------------------------------
+# Tests: ckan_organization_roles
+# ---------------------------------------------------------------------------
+
+class TestCkanOrganizationRoles:
+    def test_pairs_every_role_with_its_organization(self):
+        organizations, roles = ckan_organization_roles([
+            {"organisation-name": "ONC", "role": ["owner", "custodian"]},
+            {"organisation-name": "DFO", "role": "distributor"},
+            {"organisation-name": "", "role": ["owner"]},
+            {"organisation-name": "No role"},
+        ])
+        assert organizations == ["DFO", "No role", "ONC"]
+        assert roles == ["custodian:ONC", "distributor:DFO", "owner:ONC"]
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +338,7 @@ class TestMergeCkanJoin:
             "dataset_id": ["matched", "orphan"],
             "title": ["t1", "t2"],
             "organizations": [["org"], ["org"]],
+            "organization_roles": [["owner:org"], ["owner:org"]],
             "content_hash": ["h1", "h2"],
             "content_hash_reason": [None, None],
         })
@@ -329,6 +347,7 @@ class TestMergeCkanJoin:
             "dataset_id": ["matched"],
             "ckan_id": ["ckan-1"],
             "ckan_organizations": [["CKAN org"]],
+            "ckan_organization_roles": [["custodian:CKAN org"]],
             "ckan_title": ["CKAN title"],
             "title_fr": ["Titre"],
         })
@@ -357,7 +376,8 @@ class TestMergeCkanJoin:
             return_value=pd.DataFrame([{
                 "erddap_url": "https://erddap.amundsenscience.com/erddap",
                 "dataset_id": "matched", "ckan_id": "ckan-1", "title": "Stored title",
-                "title_fr": "Titre stocké", "organizations": ["Stored org"], "eovs": ["seaSurfaceTemperature"],
+                "title_fr": "Titre stocké", "organizations": ["Stored org"],
+                "organization_roles": ["owner:Stored org"], "eovs": ["seaSurfaceTemperature"],
             }]),
         )
         datasets, logger = self._merge(
@@ -369,6 +389,7 @@ class TestMergeCkanJoin:
             "ckan-1", "Stored title", "Titre stocké",
         )
         assert matched["organizations"] == "['Stored org']"
+        assert matched["organization_roles"] == "['owner:Stored org']"
         assert matched["content_hash"] == "h1"
         assert logger.warning.call_args_list[0].args[0].startswith("CKAN unavailable")
 
@@ -384,6 +405,11 @@ class TestMergeCkanJoin:
         assert datasets["title"].tolist() == ["t1", "t2"]
         assert datasets["content_hash"].isna().all()
         assert (datasets["content_hash_reason"] == HASH_CKAN_UNAVAILABLE).all()
+
+    def test_roles_follow_the_organizations_source(self, mocker, tmp_path):
+        datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")
+        assert datasets.loc["matched", "organization_roles"] == "['custodian:CKAN org']"
+        assert datasets.loc["orphan", "organization_roles"] == "['owner:org']"
 
     def test_hash_kept_when_ckan_available(self, mocker, tmp_path):
         datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")

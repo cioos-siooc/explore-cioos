@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -29,5 +29,17 @@ describe("FiltersPanel", () => {
       "title",
       expect.stringMatching(/^\d+ of 40 datasets shown$/),
     );
+  });
+
+  it("organization role buttons toggle the role scope", async () => {
+    renderWithProviders(<FiltersPanel />, { providers: "app" });
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Organization/ }),
+    );
+    const owner = await screen.findByTestId("org-role-owner");
+    expect(owner).toHaveTextContent("Owner");
+    expect(owner).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(owner);
+    expect(owner).toHaveAttribute("aria-pressed", "true");
   });
 });

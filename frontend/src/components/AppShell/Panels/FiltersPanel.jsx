@@ -94,6 +94,8 @@ export default function FiltersPanel({ searchInputRef }) {
     setOrgsSearchTerms,
     orgsMatchAll,
     setOrgsMatchAll,
+    orgRolesSelected,
+    setOrgRolesSelected,
     datasetsSelected,
     setDatasetsSelected,
     datasetSearchTerms,
@@ -444,6 +446,33 @@ export default function FiltersPanel({ searchInputRef }) {
               }
             >
               {matchAllSwitch("orgs-match-all", orgsMatchAll, setOrgsMatchAll)}
+              {orgRolesSelected.length > 0 && (
+                <fieldset className="organizationRoles">
+                  <legend>{t("organizationRolesLabel")}</legend>
+                  {orgRolesSelected.map((role) => (
+                    <button
+                      key={role.pk}
+                      type="button"
+                      className="organizationRole"
+                      aria-pressed={role.isSelected}
+                      data-testid={`org-role-${role.pk}`}
+                      onClick={() =>
+                        setOrgRolesSelected(
+                          orgRolesSelected.map((r) =>
+                            r.pk === role.pk
+                              ? { ...r, isSelected: !r.isSelected }
+                              : r,
+                          ),
+                        )
+                      }
+                    >
+                      {t(`organizationRole_${role.pk}`, {
+                        defaultValue: role.pk,
+                      })}
+                    </button>
+                  ))}
+                </fieldset>
+              )}
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   orgsSearchTerms,

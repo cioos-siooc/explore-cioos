@@ -161,6 +161,7 @@ export function createDataFilterQueryString(query) {
     realtimeOnly,
     eovsMatchAll,
     orgsMatchAll,
+    orgRolesSelected,
     scientificNamesMatchAll,
   } = query;
 
@@ -223,8 +224,18 @@ export function createDataFilterQueryString(query) {
       .join(); // create the comma delimited list of dataset pks
   }
 
-  // Every org ticked only means "no filter" when any one of them will do.
-  if (!organizationsMatch && orgsSelected.every((e) => e.isSelected)) {
+  const orgRoles = (orgRolesSelected || [])
+    .filter((role) => role.isSelected)
+    .map((role) => role.title)
+    .join(",");
+
+  // Every org ticked only means "no filter" when any one of them, in any
+  // role, will do.
+  if (
+    !organizationsMatch &&
+    !orgRoles &&
+    orgsSelected.every((e) => e.isSelected)
+  ) {
     orgPKs = "";
   } else {
     orgPKs = orgsSelected
@@ -288,6 +299,9 @@ export function createDataFilterQueryString(query) {
     organizations: orgPKs,
     organizationsMatch,
     excludeOrganizations: excludedList(orgsSelected, (o) => o.pk),
+    // Roles only scope an organization selection; alone they filter nothing.
+    organizationRoles:
+      orgPKs || orgsSelected.some((o) => o.isExcluded) ? orgRoles : "",
     erddapServers,
     excludeErddapServers: excludedList(erddapServersSelected, (s) => s.url),
     excludeObisNodes: excludedList(obisNodesSelected, (n) =>

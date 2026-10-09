@@ -564,6 +564,8 @@ class OBISHarvester(BaseHarvester):
             "platform": "unknown",
             "eovs": [],
             "organizations": organizations,
+            # OBIS institutes carry no role; they match only an unscoped filter.
+            "organization_roles": [],
             "n_profiles": len(cells),
             "profile_variables": [],
             "timeseries_id_variable": None,

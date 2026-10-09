@@ -93,6 +93,22 @@ def unescape_ascii(x):
         return x
 
 
+def ckan_organization_roles(contacts):
+    """(organizations, ["role:Organization"]) from CKAN cited-responsible-party."""
+    organizations = set()
+    roles = set()
+    for contact in contacts:
+        organization = unescape_ascii(contact.get("organisation-name"))
+        if not organization:
+            continue
+        organizations.add(organization)
+        contact_roles = contact.get("role") or []
+        if isinstance(contact_roles, str):
+            contact_roles = [contact_roles]
+        roles.update(f"{role}:{organization}" for role in contact_roles if role)
+    return sorted(organizations), sorted(roles)
+
+
 @task(task_run_name="fetch-ckan-metadata")
 def get_ckan_records(dataset_ids, limit=None, cache=False):
     """Fetch the full CKAN record for each harvested dataset ID (@task).
@@ -151,13 +167,9 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
             if v:
                 ckan_record_text[k] = remove_newlines(unescape_ascii(v))
 
-        organizations = []
-
-        for contact in record_full.get("cited-responsible-party", []):
-            organizations += [unescape_ascii(contact.get("organisation-name"))]
-
-        # remove duplicates, empty strings
-        organizations = list(filter(None, set(organizations)))
+        organizations, organization_roles = ckan_organization_roles(
+            record_full.get("cited-responsible-party", [])
+        )
 
         for erddap_host, dataset_id, is_subset in links:
             out.append(
@@ -168,6 +180,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
                     organizations,
                     ckan_record_text,
                     is_subset,
+                    organization_roles,
                 ],
             )
 
@@ -176,6 +189,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "dataset_id": [x[1] for x in out],
         "ckan_id": [x[2] for x in out],
         "ckan_organizations": [x[3] for x in out],
+        "ckan_organization_roles": [x[6] for x in out],
         "ckan_title": [x[4]["title"] for x in out],
         "title_fr": [x[4]["title_fr"] for x in out],
         # "ckan_summary": [x[4]["ckan_summary"] for x in out],

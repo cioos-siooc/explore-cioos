@@ -68,6 +68,10 @@ class TestDatasetMetadataParsing:
         ds = _make_dataset(mock_erddap_server)
         assert "Test Institution" in ds.organizations
 
+    def test_institution_maps_to_owner_role(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        assert "owner:Test Institution" in ds.organization_roles
+
     def test_platform_defaults_to_unknown_when_no_platform_global(self, mock_erddap_server):
         # Our test info CSV has no 'platform' or 'platform_vocabulary' globals
         ds = _make_dataset(mock_erddap_server)

@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, DATERANGE, INTEGER, JSONB, TEX
 DATASET_ARRAY_DTYPES = {
     "eovs": ARRAY(TEXT),
     "organizations": ARRAY(TEXT),
+    "organization_roles": ARRAY(TEXT),
     "profile_variables": ARRAY(TEXT),
     "organization_pks": ARRAY(INTEGER),
     "obis_nodes": ARRAY(TEXT),

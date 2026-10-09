@@ -449,16 +449,17 @@ def main(folder, incremental=False):
     datasets["profile_variables"] = datasets["profile_variables"].apply(
         ast.literal_eval
     )
-    if "obis_nodes" in datasets.columns:
-        datasets["obis_nodes"] = datasets["obis_nodes"].apply(
-            lambda x: (
-                ast.literal_eval(x)
-                if isinstance(x, str)
-                else (x if isinstance(x, list) else [])
+    for col in ("obis_nodes", "organization_roles"):
+        if col in datasets.columns:
+            datasets[col] = datasets[col].apply(
+                lambda x: (
+                    ast.literal_eval(x)
+                    if isinstance(x, str)
+                    else (x if isinstance(x, list) else [])
+                )
             )
-        )
-    else:
-        datasets["obis_nodes"] = [[] for _ in range(len(datasets))]
+        else:
+            datasets[col] = [[] for _ in range(len(datasets))]
 
     # jsonb metadata columns (table_variables for every dataset type, the two
     # grid_* ones for griddap). All nullable; absent entirely from older harvest
