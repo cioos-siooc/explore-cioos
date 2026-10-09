@@ -32,18 +32,18 @@ ENV SENTRY_PROJECT=$SENTRY_PROJECT
 # or, from compose, `build.secrets` (see docker-compose.production.yaml).
 
 # Install dependencies first so source changes don't bust the npm ci layer
-COPY package.json package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --quiet
 
-# .dockerignore keeps the host node_modules out of this copy. Without it, the
-# laptop's dependency tree landed on top of the one npm ci had just installed
-# from the lockfile.
-COPY . .
+# Dockerfile.dockerignore keeps the host node_modules out of this copy. Without
+# it, the laptop's dependency tree landed on top of the one npm ci had just
+# installed from the lockfile.
+COPY frontend/ .
 
-# The harvest docs are bundled from the repo-root docs/ folder, outside this
-# build context; compose passes it as the `docs` context. Placed where
-# vite.config.mjs resolves it (../docs/harvesting from the app dir).
-COPY --from=docs harvesting /usr/src/docs/harvesting
+# The build context is the repo root (not frontend/) because the harvest docs
+# page bundles the repo-root docs/harvesting. Placed where vite.config.mjs
+# resolves it (../docs/harvesting from the app dir).
+COPY docs/harvesting /usr/src/docs/harvesting
 
 # Node's default heap cap (~2 GB) is below the build's peak (~3.3 GB with
 # sourcemaps, since mermaid joined the bundle).
@@ -56,8 +56,8 @@ RUN --mount=type=secret,id=sentry_auth_token \
 # Pinned to match nginx/Dockerfile; this was untagged `nginx`, i.e. latest.
 FROM nginx:1.30.5-alpine
 COPY --from=build-deps /usr/src/app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --chmod=755 api-proxy.sh /docker-entrypoint.d/40-api-proxy.sh
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chmod=755 frontend/api-proxy.sh /docker-entrypoint.d/40-api-proxy.sh
 EXPOSE 80
 
 # Serves the built SPA; index.html is the only guaranteed path.

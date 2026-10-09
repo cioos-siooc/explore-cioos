@@ -317,8 +317,10 @@ PR, and deletes the preview when the PR closes. The settings live on the
 `explore-cioos-frontend-previews` application in the explore-cioos project:
 
 - Source is the `cioos-co-juno-coolify` GitHub App, branch `development-v2`.
-- Build pack **Dockerfile**, base directory `/frontend`, port 80.
-- Watch paths `frontend/**`.
+- Build pack **Dockerfile**, base directory `/`, Dockerfile location
+  `/frontend/Dockerfile`, port 80. The context is the repo root because the
+  harvest docs page bundles `docs/harvesting`.
+- Watch paths `frontend/**` and `docs/harvesting/**`.
 - Auto-deploy off, so the application's own deployment never runs.
 - Preview Deployments on, with URL template
   `explore-pr-{{pr_id}}.cool.juno.cioos.ca`. It has to be one level under

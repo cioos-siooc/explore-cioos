@@ -5,7 +5,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { fileURLToPath } from "node:url";
 
 // The harvest docs live in the repo-root docs/ folder, beside the harvester
-// they describe; the frontend image gets them as the `docs` build context.
+// they describe; the frontend image builds from the repo root to reach them.
 const harvestDocs = fileURLToPath(
   new URL("../docs/harvesting", import.meta.url),
 );
