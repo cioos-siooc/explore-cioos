@@ -73,13 +73,21 @@ separate deploy step and no system cron.
 
 When harvests run is set in `.env` (all optional):
 
-- `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules; unset means none.
+- `HARVESTER_CRON` / `VERNACULARS_CRON` — recurring schedules; unset means none
+  (vernaculars also run after every OBIS harvest).
 - `RUN_ON_DEPLOY=true` — one full harvest on every (re)deploy.
 - `INCREMENTAL_MODE=true` — full runs only update changed datasets. Single-source
   runs are always incremental so they can't truncate other sources.
 
 To run one by hand, open the Prefect UI, find **cde-harvester-deployment** (or a
 per-source deployment) and click **Run → Quick Run**.
+
+How a harvest works end to end (orchestration, the ERDDAP / OBIS / CKAN
+strategies, loading) is described in the
+[harvest workflow](docs/harvesting/workflow.md), with per-source detail for
+[ERDDAP](docs/harvesting/erddap.md) and [OBIS](docs/harvesting/obis.md). The
+frontend bundles them at build time and shows them on the harvest dashboard
+at `/harvest/docs/{workflow,erddap,obis}`.
 
 More in the [harvester README](harvester/README.md) and the
 [DB loader README](harvester/cde_harvester/loading/README.md).
@@ -142,7 +150,7 @@ docker exec <prefect_worker> sh -c "cd /app/harvester && uv run prefect deployme
 ```
 
 Prefer this to deleting the Postgres volume. If you must delete it, it is named
-for the compose project (e.g. `explore-cioos-production_postgres-data`) — check
+for the compose project (e.g. `explore-cioos-production_postgres18-data`) — check
 `docker volume ls` first. Redis has no volume; restarting it clears the cache.
 
 ## Downloads
@@ -234,23 +242,56 @@ npm --prefix frontend run test:a11y                    # axe, ratcheting baselin
 
 ### CI/CD
 
-The [Deploy workflow](.github/workflows/deploy.yml) deploys `master` and
-`development` once the Integration Tests workflow **succeeds** on that branch, so
-a red build never deploys (`workflow_dispatch` allows a manual deploy that skips
-the gate). It connects over WireGuard, checks out the tested commit, renders
-`.env.production` through 1Password into `.env` on the server, and runs the
-production compose pair.
+The [Deploy workflow](.github/workflows/deploy.yml) runs when a GitHub release
+is published (or is dispatched by hand with an existing tag). Its `release` job
+verifies the tag and deploys nothing; then exactly one deploy job runs. The tag
+name picks the target and any other name is rejected:
+
+| Tag | Release type | Target | Commit must be on |
+|---|---|---|---|
+| `beta*` | prerelease | beta | `development*` or `master` |
+| `vX.Y.Z-rc.N` | prerelease | staging | `master` |
+| `vX.Y.Z` | full release | production | `master`, with a successful staging deployment of the same commit |
+
+Before any deploy, `release` also requires a non-draft release and the
+release-triggered Integration Tests (including visual regression) to pass.
+Production's extra gate reads GitHub's deployment records: tag `vX.Y.Z` on the
+same commit as the `vX.Y.Z-rc.N` that deployed successfully. A beta deploy never
+satisfies it.
+
+```bash
+gh release create beta3 --target <branch-or-sha> --prerelease          # beta
+gh release create v1.2.0-rc.1 --target master --prerelease             # staging
+gh release create v1.2.0 --target master                               # production
+```
+
+Beta and staging are one stack on one Juno host (`explore.dev.cioos.ca`) and
+deploy one at a time; production is another host. All run over WireGuard through
+the shared `cioos-deploy-docker-compose` action, pinned to the tag's commit. To
+roll back or redeploy, dispatch Deploy with an existing published release tag;
+the target follows from the tag.
 
 `.env.production` in this repo **is** the production configuration: `op://`
 references name 1Password items, everything else ships as written. Change
 production settings there, not on the box.
 
-### Coolify (dev/staging)
+`.env.staging` is the beta/staging template. Create its referenced
+`explore-cioos-staging` 1Password item with the listed fields.
+`docker-compose.staging.yaml` suffixes the Postgres and harvester volumes
+(`harvest_data`, `harvester_cache`, `obis_cache`) with the tag: a new tag starts
+empty (schema + `RUN_ON_DEPLOY` harvest), redeploying the same tag keeps its
+data. Superseded volumes are not removed; list them with
+`docker volume ls -f name=explore-cioos-staging_` and `docker volume rm` the old
+tags'. The host has 2 CPU / 8 GB, so `HARVESTER_MEM_LIMIT` is 3g.
 
-Create a **Docker Compose** resource pointing at `docker-compose.yaml` alone. It
-publishes no host ports and already carries Coolify's magic variables
-(`SERVICE_FQDN_NGINX_4000`, `SERVICE_URL_NGINX`, and the same pair for Prefect).
-Coolify ignores `docker-compose.override.yaml`.
+### Coolify (latest)
+
+Create a **Docker Compose** resource tracking `development-v2` and pointing at
+`docker-compose.yaml` alone. Enable Coolify's GitHub automatic deployment so it
+remains the branch-updated `latest` instance. It publishes no host ports and
+already carries Coolify's magic variables (`SERVICE_FQDN_NGINX_4000`,
+`SERVICE_URL_NGINX`, and the same pair for Prefect). Coolify ignores
+`docker-compose.override.yaml`.
 
 Paste `.env.coolify.sample` into the resource's environment ("Developer view"):
 `DB_PASSWORD` is required; `HARVEST_CONFIG_B64`, `ENVIRONMENT`, `SENTRY_DSN`,
@@ -276,8 +317,10 @@ PR, and deletes the preview when the PR closes. The settings live on the
 `explore-cioos-frontend-previews` application in the explore-cioos project:
 
 - Source is the `cioos-co-juno-coolify` GitHub App, branch `development-v2`.
-- Build pack **Dockerfile**, base directory `/frontend`, port 80.
-- Watch paths `frontend/**`.
+- Build pack **Dockerfile**, base directory `/`, Dockerfile location
+  `/frontend/Dockerfile`, port 80. The context is the repo root because the
+  harvest docs page bundles `docs/harvesting`.
+- Watch paths `frontend/**` and `docs/harvesting/**`.
 - Auto-deploy off, so the application's own deployment never runs.
 - Preview Deployments on, with URL template
   `explore-pr-{{pr_id}}.cool.juno.cioos.ca`. It has to be one level under
@@ -301,13 +344,11 @@ build full copies of the stack.
 ### Self-hosted production
 
 `docker-compose.production.yaml` is an **overlay** on `docker-compose.yaml`,
-holding only what production adds: host ports (nginx, Prefect, Postgres), the
-external `explore-cioos_default` network, the host-editable `harvest_config.yaml`
+holding only what production adds: host ports (nginx, Prefect, Postgres), the host-editable `harvest_config.yaml`
 bind mount, a capped redis config, and an overridable `DB_HOST_EXTERNAL`.
 Everything else is inherited.
 
-1. Create the shared network once: `docker network create explore-cioos_default`.
-2. Create `.env` — CI does this for you. By hand, start from `.env.production`
+1. Create `.env` — CI does this for you. By hand, start from `.env.production`
    (not `.env.sample`) and replace the `op://` references. Minimum:
 
    ```sh
@@ -322,9 +363,9 @@ Everything else is inherited.
    `DB_HOST_EXTERNAL` and `DB_BIND_ADDRESS` to the VPN address; otherwise the DB
    port stays bound to `127.0.0.1`.
 
-3. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
+2. Copy `harvest_config.sample.yaml` to `harvest_config.yaml` and edit it (see
    [Harvest configuration](#harvest-configuration)).
-4. Start: `sudo docker compose up -d --build`.
+3. Start: `sudo docker compose up -d --build`.
 
 ### Monitoring
 

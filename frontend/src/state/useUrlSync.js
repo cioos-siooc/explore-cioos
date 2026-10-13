@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -9,11 +9,16 @@ import {
 import { wmsSliceParams } from "../wmsUtilities.js";
 import { anyTrajectoryLayerOn, chosenDataLayerKeys } from "./dataLayers.js";
 import { GROUP_NONE } from "./datasetGroups.js";
-import { PLOT_PARAMS, RECORD_PARAM } from "./selection/previewParams.js";
+import {
+  PERIOD_PARAM,
+  PLOT_PARAMS,
+  RECORD_PARAM,
+} from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
+import { useUI } from "./ui/UIProvider.jsx";
 
 // Sole owner of the URL format: serializes everything that shapes what the
 // user is looking at — the debounced filter query, the drawn selection, the
@@ -31,7 +36,7 @@ import { useSelection } from "./selection/SelectionProvider.jsx";
 // state from them, so this sync must carry them through rather than drop them
 // (it rebuilds the whole search string from scratch on every map pan). Anything
 // not named in PRESERVED_PARAMS below is gone the moment the map moves.
-const PRESERVED_PARAMS = ["server", RECORD_PARAM, ...PLOT_PARAMS];
+const PRESERVED_PARAMS = ["server", RECORD_PARAM, PERIOD_PARAM, ...PLOT_PARAMS];
 
 export default function UrlSync() {
   const [searchParams] = useSearchParams();
@@ -42,6 +47,7 @@ export default function UrlSync() {
   const lang = searchParams.get("lang") || i18n.resolvedLanguage;
   const dataset = searchParams.get("dataset");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { query } = useFilters();
   const {
@@ -62,22 +68,14 @@ export default function UrlSync() {
   const {
     polygon,
     datasetTitleSearchText,
-    listSearchText,
     onlyInView,
     groupBy,
-    hiddenGroups,
     highlightedRecord,
     selectedTrajectory,
     mappedRecord,
   } = useSelection();
+  const { coverageAxis } = useUI();
   const [isPageLoad, setIsPageLoad] = useState(true);
-
-  // Set of hidden group keys — a stable string so a Set rebuilt with the same
-  // members doesn't re-navigate.
-  const hiddenGroupsParam = [...hiddenGroups]
-    .map((key) => encodeURIComponent(key))
-    .sort()
-    .join(",");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -98,10 +96,8 @@ export default function UrlSync() {
       ...Object.fromEntries(selectionParams),
       lang,
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
-      ...(listSearchText ? { listSearch: listSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
-      ...(hiddenGroupsParam ? { hiddenGroups: hiddenGroupsParam } : {}),
       ...(dataset ? { dataset } : {}),
       // Everything that hangs off the dataset page. The server that
       // disambiguates it and the open preview (which record, and how it is
@@ -163,21 +159,24 @@ export default function UrlSync() {
     if (!bathymetryVisible) obj.bathy = "false";
     if (griddapCoverageVisible) obj.griddap = "true";
     if (projection === "globe") obj.globe = "true";
+    if (coverageAxis !== "timeline") obj.coverageAxis = coverageAxis;
     const combined = new URLSearchParams(obj);
     // Replace, never push: this mirrors state the app never reads back out of
     // the URL, so an entry per map pan would only bury the history entries
-    // that do mean something (opening a dataset page).
-    navigate("?" + combined.toString(), { replace: true });
+    // that do mean something (opening a dataset page) — and the entry's state
+    // rides along, since SelectionProvider's back-to-list reads it.
+    navigate("?" + combined.toString(), {
+      replace: true,
+      state: location.state,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     query,
     mapView,
     polygon,
     datasetTitleSearchText,
-    listSearchText,
     onlyInView,
     groupBy,
-    hiddenGroupsParam,
     tracksMode,
     debouncedScrubTime,
     trailingDays,
@@ -192,6 +191,10 @@ export default function UrlSync() {
     highlightedRecord,
     selectedTrajectory,
     mappedRecord,
+    coverageAxis,
+    // Back/Forward across a dataset page lands on an address written when that
+    // entry was left; rewrite it from the current state.
+    dataset,
   ]);
 
   // `i18n` deliberately excluded from the deps, despite reading it in the

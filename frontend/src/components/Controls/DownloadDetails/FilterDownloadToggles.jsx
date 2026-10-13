@@ -7,6 +7,7 @@ import polygonImage from "../../Images/polygonIcon.png";
 import rectangleImage from "../../Images/rectangleIcon.png";
 import { polygonIsRectangle } from "../../../utilities.jsx";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
 /*
  * "Apply this filter to my download" — one chip per filter that is actually
@@ -32,12 +33,16 @@ export default function FilterDownloadToggles({
   setFilterDownloadByPolygon,
 }) {
   const { t } = useTranslation();
+  const { tipHighlight } = useTips();
 
   const toggleClassName = (active, enabled) =>
     classNames("filterDownloadToggle", { active }, { disabled: !enabled });
 
   return (
-    <div className="downloadBandGroup filterDownloadToggles">
+    <div
+      className="downloadBandGroup filterDownloadToggles"
+      data-tip-highlight={tipHighlight("filtersCutDownload")}
+    >
       <span className="downloadBandLabel">
         {t("downloadDetailsFilterSectionTitle")}
         <QuestionIconTooltip

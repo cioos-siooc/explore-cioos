@@ -428,3 +428,58 @@ test("a real upstream failure is reported as one", async () => {
   assert.equal(res.body.error, "ERDDAP_UNAVAILABLE");
   assert.equal(res.body.upstreamStatus, 500);
 });
+
+test("a requested period replaces the cadence window in the ERDDAP query", async () => {
+  db.queueRaw([
+    {
+      ...FEATURE_ROW,
+      use_whole_profile: false,
+      new_start_time: "2024-02-01T00:00:00Z",
+    },
+  ]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2020-01-03"]] } },
+  });
+
+  const res = await agent.get("/preview").query({
+    dataset: "obs_270",
+    profile: "1",
+    timeMin: "2020-01-03T00:00:00Z",
+    timeMax: "2020-01-05T23:59:59Z",
+  });
+
+  assert.equal(res.status, 200);
+  const { url } = axios.calls[0];
+  assert.match(
+    url,
+    /&time>=2020-01-03T00:00:00\.000Z&time<=2020-01-05T23:59:59\.000Z$/,
+  );
+  assert.doesNotMatch(url, /time>2024/);
+});
+
+test("rejects a period that is not an ISO 8601 instant", async () => {
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1", timeMin: "yesterday" });
+  assert.equal(res.status, 400);
+  assert.equal(axios.calls.length, 0);
+});
+
+test("`at` wins over a period: a single cast needs no time window", async () => {
+  db.queueRaw([STEPPED_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1]] } },
+  });
+
+  await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "AZMP-ESG",
+    at: "AZMP-ESG-21/05/20-23:01:41",
+    timeMin: "2020-01-03T00:00:00Z",
+    timeMax: "2020-01-05T23:59:59Z",
+  });
+
+  const { url } = axios.calls[0];
+  assert.ok(url.includes("&profile=~"));
+  assert.ok(!url.includes("time>") && !url.includes("time<"));
+});

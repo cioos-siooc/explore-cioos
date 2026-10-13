@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import tempfile
+import time
 from urllib.parse import unquote, urlparse
 
 import diskcache as dc
@@ -21,6 +22,7 @@ from urllib3.util.retry import Retry
 from cde_harvester.core.errors import (
     HASH_CROISSANT_HTTP_ERROR,
     HASH_CROISSANT_UNREADABLE,
+    HASH_CROISSANT_UNSUPPORTED,
     HASH_FEDERATED_UNRESOLVED,
     HASH_NO_FILE_LIST,
     ResponseTooLargeError,
@@ -68,12 +70,23 @@ class _SpooledBody(tempfile.SpooledTemporaryFile):
 # 408 (Request Timeout) and 520 (Cloudflare "unknown error") are transient
 # timeouts seen on the cioosatlantic/cioospacific CTD-profile endpoints under
 # load; the same queries succeed on a later attempt, so retry rather than skip.
-_RETRY_STATUSES = (408, 413, 500, 502, 503, 504, 520, 522, 524)
+# 504 is deliberately absent: it means the gateway gave up while ERDDAP was
+# still compiling the query (300 s on dap.oceannetworks.ca), and an immediate
+# retry just times out again. ERDDAP keeps compiling and caches the result, so
+# the harvester retries those datasets at the end of the pass instead (see
+# gateway_timeouts).
+_RETRY_STATUSES = (408, 413, 500, 502, 503, 520, 522, 524)
 
 
 _ERDDAP_SOURCE_RE = re.compile(
     r"(https?://.+?/erddap)/(tabledap|griddap)/([^/?.\s]+)"
 )
+
+
+# ERDDAP added the .croissant endpoint in 2.28.
+CROISSANT_MIN_VERSION = (2, 28)
+
+_ERDDAP_VERSION_RE = re.compile(r"ERDDAP_version=(\d+)\.(\d+)")
 
 
 def _croissant_source_url(doc):
@@ -129,6 +142,11 @@ class ERDDAP:
         self.domain = urlparse(erddap_url).netloc
         self.host_slug = self.domain.lower().replace(".", "-")  # for the task run label
         self.session = _build_retry_session()
+        # {dataset_id: monotonic time of its first 504}; the harvester defers
+        # these datasets to a second pass.
+        self.gateway_timeouts = {}
+        # {erddap_base: bool}; federated hops can land on other servers.
+        self._croissant_supported = {}
 
         try:
             self.logger = get_run_logger()
@@ -199,7 +217,7 @@ class ERDDAP:
         if is_timestamp:
             return pd.to_datetime(series, unit="s", utc=True)
 
-        return pd.to_datetime(series, errors="coerce", utc=True)
+        return pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
 
     def erddap_csv_to_df(self, url, skiprows=(1,), dataset=None):
         """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
@@ -228,6 +246,8 @@ class ERDDAP:
             dataset.queried_urls.append(decoded_url)
 
         response, body = self._fetch(url_combined, decoded_url, logger)
+        if response.status_code == 504 and dataset is not None:
+            self.gateway_timeouts.setdefault(dataset.id, time.monotonic())
 
         try:
             original_hostname = urlparse(url_combined).hostname
@@ -363,6 +383,8 @@ class ERDDAP:
         when a hash was produced. Fail-open: (None, False, <reason>) on any error.
         """
         erddap_base = erddap_base.rstrip("/")
+        if not self._supports_croissant(erddap_base):
+            return None, False, HASH_CROISSANT_UNSUPPORTED
         try:
             # Small metadata doc — don't inherit the 1h data-query timeout; a
             # hung .croissant endpoint would otherwise stall every dataset.
@@ -398,6 +420,21 @@ class ERDDAP:
             return None, False, HASH_NO_FILE_LIST
 
         return None, False, HASH_FEDERATED_UNRESOLVED
+
+    def _supports_croissant(self, erddap_base):
+        """False only when the server reports a version older than 2.28; an
+        unreadable version stays fail-open and lets .croissant be tried."""
+        if erddap_base not in self._croissant_supported:
+            try:
+                response = self.session.get(f"{erddap_base}/version", timeout=60)
+                match = _ERDDAP_VERSION_RE.search(response.text)
+            except requests.RequestException:
+                match = None
+            self._croissant_supported[erddap_base] = (
+                not match
+                or tuple(map(int, match.groups())) >= CROISSANT_MIN_VERSION
+            )
+        return self._croissant_supported[erddap_base]
 
     def get_dataset(self, dataset_id, data_structure="table"):
         return Dataset(self, dataset_id, data_structure=data_structure)

@@ -93,7 +93,7 @@ export default function WmsLegend({
         onClick={() => setCompactOpen(true)}
         title={t("wmsLegendShowTitle")}
       >
-        <Grid3x3Gap size={15} color="#52a79b" aria-hidden="true" />
+        <Grid3x3Gap size={15} color="var(--cioos-primary)" aria-hidden="true" />
         <span className="wmsLegendPeekLabel">
           {overlay.variable
             ? variableLabel(overlay.variable)

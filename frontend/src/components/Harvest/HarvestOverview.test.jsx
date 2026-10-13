@@ -13,6 +13,7 @@ const SERVERS = [
     n_skipped: 2,
     n_error: 1,
     last_attempted_at: "2024-03-01T00:00:00Z",
+    last_success_at: "2024-02-28T00:00:00Z",
   },
 ];
 const RUNS = [
@@ -65,6 +66,19 @@ describe("HarvestOverview", () => {
     expect(screen.getByText("✗ 1")).toBeInTheDocument();
   });
 
+  it("shows when each server last harvested successfully", async () => {
+    renderWithProviders(<HarvestOverview />);
+    expect(await screen.findByText(/Last success:/)).toBeInTheDocument();
+  });
+
+  it("says so when a server has never harvested successfully", async () => {
+    stubRoutes({ "/servers": [{ ...SERVERS[0], last_success_at: null }] });
+    renderWithProviders(<HarvestOverview />);
+    expect(
+      await screen.findByText("No successful run on record"),
+    ).toBeInTheDocument();
+  });
+
   it("shows the recent-runs table with status and totals", async () => {
     renderWithProviders(<HarvestOverview />);
     await waitFor(() => {
@@ -95,14 +109,8 @@ describe("HarvestOverview", () => {
       "/downloads/summary": { ...DOWNLOADS_SUMMARY, n_stuck: 3 },
     });
     renderWithProviders(<HarvestOverview />);
-    // Note: translation.json's "_plural" suffix is i18next v3 pluralization;
-    // this app's i18next (v25, default compatibilityJSON 'v4') expects
-    // "_other" for English instead, so the _plural key is never selected and
-    // the base (singular-worded) string renders whatever the count — a real
-    // product bug, not a test quirk. Asserting the singular text here
-    // documents current behaviour rather than the intended one.
     expect(
-      await screen.findByText(/3 download request is queued/),
+      await screen.findByText(/3 download requests are queued/),
     ).toBeInTheDocument();
   });
 

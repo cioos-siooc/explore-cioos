@@ -16,6 +16,7 @@ const {
   erddapVisible,
   obisVisible,
   DRAWN_AS_POINT,
+  coarseRollupBranch,
   unionBranches,
 } = require("../utils/selection");
 
@@ -184,6 +185,26 @@ router.get("/", ...pipeline(), async (req, res) => {
     profilesBranch,
   );
 
+  // A dataset-level selection takes the zoom0 ramp from the rollup, gated as
+  // the hex branches above are (trajectory rides with profiles, no type
+  // filter); hex_records then only feeds zoom1.
+  const zoom0FromRollup = filters.datasetLevelOnly;
+  const rollupConds = [];
+  if (includeProfiles) {
+    rollupConds.push("source = 'profiles'", "source = 'trajectory'");
+  }
+  if (includeObis) rollupConds.push("source = 'obis'");
+  const zoom0Records = zoom0FromRollup
+    ? `rollup_records AS (
+        SELECT hex_0_pk, p.dataset_pk, metric_value
+        FROM (${coarseRollupBranch(metric, rollupConds, "hex_0_pk")}) p
+        JOIN cde.datasets d
+        ON p.dataset_pk = d.pk
+        ${filters.hasShared ? "WHERE :filters" : ""}
+        ),`
+    : "";
+  const zoom0Source = zoom0FromRollup ? "rollup_records" : "hex_records";
+
   const sql = `
         WITH combined_hex AS (
         ${combinedHexInner}
@@ -205,12 +226,13 @@ router.get("/", ...pipeline(), async (req, res) => {
         ON p.dataset_pk = d.pk
         ${filters.hasShared ? "WHERE :filters" : ""}
         ),
+        ${zoom0Records}
 
         -- Not count(distinct point_pk): the ramp ranks hexes by how much data
         -- they hold, so its domain has to be over the same quantity the tiles
         -- emit as \`count\`, aggregated the same way (countAggregate) — a sum
         -- for \`records\`, a day-set union for \`days\`.
-        sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, "hex_records")} count FROM hex_records WHERE hex_0_pk IS NOT NULL GROUP BY hex_0_pk) s),
+        sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, zoom0Source)} count FROM ${zoom0Source} WHERE hex_0_pk IS NOT NULL GROUP BY hex_0_pk) s),
         sub2 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, "hex_records")} count FROM hex_records WHERE hex_1_pk IS NOT NULL GROUP BY hex_1_pk) s),
         sub3 AS (SELECT ${rampRange()} zoom2 FROM (SELECT ${countAggregate(metric, "point_records")} count FROM point_records GROUP BY point_pk) s)
 

@@ -70,17 +70,9 @@ describe("FilterProvider", () => {
     await waitFor(() => expect(latest.query.eovsMatchAll).toBe(true));
   });
 
-  it("an excluded option is a 'not' chip, and reset clears exclusions and the match mode", async () => {
+  it("reset clears exclusions and the match mode", async () => {
     await renderLoaded({ url: "/?excludePlatforms=mooring&eovsMatch=all" });
-    const platformsChip = latest
-      .buildActiveFilters({
-        timeframesBadgeTitle: "",
-        depthRangeBadgeTitle: "",
-      })
-      .find((c) => c.key === "platforms");
-    expect(platformsChip.items).toMatchObject([
-      { label: "Mooring", excluded: true },
-    ]);
+    expect(latest.platformsSelected.some((p) => p.isExcluded)).toBe(true);
 
     act(() => latest.resetFilters());
     await waitFor(() => {
@@ -98,15 +90,6 @@ describe("FilterProvider", () => {
     expect(latest.orgsMatchAll).toBe(true);
     expect(latest.scientificNamesMatchAll).toBe(true);
     expect(latest.scientificNamesExcluded).toEqual(["Orcinus orca"]);
-    const speciesChip = latest
-      .buildActiveFilters({
-        timeframesBadgeTitle: "",
-        depthRangeBadgeTitle: "",
-      })
-      .find((c) => c.key === "scientificName");
-    expect(speciesChip.items).toMatchObject([
-      { label: "Orcinus orca", excluded: true },
-    ]);
 
     act(() => latest.resetFilters());
     await waitFor(() => {
@@ -153,26 +136,6 @@ describe("FilterProvider", () => {
     await waitFor(() => {
       expect(latest.eovsSelected.every((e) => !e.isSelected)).toBe(true);
       expect(latest.startDate).toBe("1900-01-01");
-    });
-  });
-
-  it("buildActiveFilters reflects a selected eov as a removable chip, and removing it clears just that one", async () => {
-    await renderLoaded({ url: "/?eovs=oxygen" });
-    let chips = latest.buildActiveFilters({
-      timeframesBadgeTitle: "",
-      depthRangeBadgeTitle: "",
-    });
-    let eovChip = chips.find((c) => c.key === "eovs");
-    expect(eovChip.items).toHaveLength(1);
-
-    act(() => eovChip.items[0].remove());
-    await waitFor(() => {
-      chips = latest.buildActiveFilters({
-        timeframesBadgeTitle: "",
-        depthRangeBadgeTitle: "",
-      });
-      eovChip = chips.find((c) => c.key === "eovs");
-      expect(eovChip).toBeUndefined();
     });
   });
 

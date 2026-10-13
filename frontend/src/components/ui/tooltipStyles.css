@@ -15,7 +15,7 @@
   background-color: var(--cioos-navy, #152f37);
   color: var(--cioos-white, #fff);
   font-family: var(--cioos-font-body, sans-serif);
-  font-size: var(--cioos-font-size-xs, 11px);
+  font-size: var(--cioos-font-size-xs);
   line-height: 1.4;
   border-radius: var(--cioos-radius-sm, 6px);
   box-shadow: var(--cioos-shadow-md, 0 2px 8px rgb(21 47 55 / 20%));

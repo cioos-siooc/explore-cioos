@@ -7,7 +7,9 @@ import createPlotlyComponent from "react-plotly.js/factory";
 import frLocale from "plotly.js-locales/fr";
 
 import erddapServers from "../../../erddapServers.json";
+import platformColors from "../../platformColors";
 import { escapeHtml, formatErddapServerName } from "../../../utilities";
+import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 
 Plotly.register(frLocale);
@@ -16,19 +18,22 @@ const Plot = createPlotlyComponent(Plotly);
 // At most this many series get their own color; the rest fold into "Other".
 const MAX_SERIES = 7;
 
-// Validated CVD-safe categorical palette (dataviz skill, light-surface slots
-// 1–7, in the order that maximises adjacent separation). "Other" uses a
-// neutral gray so it never impersonates a real series.
+// Coastal categorical palette, in slot order: deep teal, sky, sea-urchin rose,
+// kelp, deep-sea blue, driftwood, anemone. Stacking follows slot order, and the
+// order is what keeps neighbouring segments apart under colour blindness
+// (validated adjacent-pair, not all-pair — don't reshuffle it). It stays off the
+// hues the map reserves: track violet, grid amber, click goldenrod and error
+// coral. "Other" is a navy-tinted neutral so it never impersonates a series.
 const SERIES_COLORS = [
-  "#2a78d6", // blue
-  "#008300", // green
-  "#e87ba4", // magenta
-  "#eda100", // yellow
-  "#1baf7a", // aqua
-  "#eb6834", // orange
-  "#4a3aa7", // violet
+  "#008b7d",
+  "#53b6eb",
+  "#b83b76",
+  "#85b749",
+  "#2b519c",
+  "#be753f",
+  "#e398ca",
 ];
-const OTHER_COLOR = "#9a9a92";
+const OTHER_COLOR = "#a7b8bc";
 
 // Below the width at which the coverage dialog stops growing (1040px + its
 // 24px gutter), bars get too thin for their white outlines: Plotly strokes
@@ -44,19 +49,25 @@ const MONTH_MS = YEAR_MS / 12;
 // and which can arrive null for a dataset with no erddap_url, so the shared
 // helper's own null handling matters here. Source series carry their platform
 // so an ERDDAP server and an OBIS node with similar names stay distinguishable.
-function seriesLabel(key, kind, language) {
+function seriesLabel(key, kind, language, t) {
   if (kind === "erddap")
     return `${formatErddapServerName(key, language, erddapServers)} (ERDDAP)`;
   if (kind === "obis") return `${key} (OBIS)`;
-  // Platforms, data types and organization names are already display-ready.
+  if (kind === "dataType") return cdmDataTypeLabel(key, t);
+  // Platforms and organization names are already display-ready.
   return key;
 }
 
-// One label per time bin, sized to the bin width.
-function formatPeriod(startMs, endMs, locale) {
+// One label per time bin, sized to the bin width. Seasonal bins are weeks of
+// a reference year whose year means nothing, so it is left out.
+function formatPeriod(startMs, endMs, locale, seasonal) {
   const start = new Date(startMs);
   const endInclusive = new Date(endMs - 1);
   const width = endMs - startMs;
+  if (seasonal) {
+    const weekFormat = { day: "numeric", month: "short", timeZone: "UTC" };
+    return `${start.toLocaleDateString(locale, weekFormat)} – ${endInclusive.toLocaleDateString(locale, weekFormat)}`;
+  }
   if (width >= YEAR_MS - DAY_MS) {
     // Bins are whole 365.25-day years, so an edge drifts hours either side of
     // Jan 1. Nudge past that before reading the opening year, then count the
@@ -96,6 +107,7 @@ export default function CoverageHistogramPlot({ histogram }) {
     datasets: "coverageCountDatasets",
   };
   const countLabel = t(COUNT_LABELS[histogram.count] || COUNT_LABELS.datasets);
+  const seasonal = histogram.view === "seasonal";
 
   const { traces, binCenters, binWidths, legendSide } = useMemo(() => {
     const { timeBinEdges, series, cells } = histogram;
@@ -112,7 +124,7 @@ export default function CoverageHistogramPlot({ histogram }) {
       (_, i) => edgesMs[i + 1] - edgesMs[i],
     );
     const labels = Array.from({ length: numBins }, (_, i) =>
-      formatPeriod(edgesMs[i], edgesMs[i + 1], locale),
+      formatPeriod(edgesMs[i], edgesMs[i + 1], locale, seasonal),
     );
 
     // Top series keep their identity; everything past MAX_SERIES sums into a
@@ -133,9 +145,15 @@ export default function CoverageHistogramPlot({ histogram }) {
 
     // Stacking order = trace order; the largest series (first) sits at the
     // bottom of every bar.
-    const built = top.map((s, index) => ({
-      name: seriesLabel(s.key, s.kind, i18n.language),
-      color: SERIES_COLORS[index % SERIES_COLORS.length],
+    // A platform wears its map colour, so the figure and the markers agree;
+    // anything the platform key lacks takes the next palette slot.
+    const platformColor = (s) =>
+      s.kind === "platform" &&
+      platformColors.find(({ platform }) => platform === s.key)?.color;
+    let nextSlot = 0;
+    const built = top.map((s) => ({
+      name: seriesLabel(s.key, s.kind, i18n.language, t),
+      color: platformColor(s) || SERIES_COLORS[nextSlot++],
       y: counts.get(s.key),
     }));
     if (hasOther) {
@@ -194,7 +212,7 @@ export default function CoverageHistogramPlot({ histogram }) {
       binWidths: widths,
       legendSide: side,
     };
-  }, [histogram, locale, i18n.language, t, countLabel]);
+  }, [histogram, locale, i18n.language, t, countLabel, seasonal]);
 
   return (
     <div className="coverageHistogramPlot">
@@ -231,6 +249,7 @@ export default function CoverageHistogramPlot({ histogram }) {
             showline: true,
             linecolor: "rgba(21, 47, 55, 0.4)",
             linewidth: 1,
+            ...(seasonal && { tickformat: "%b", dtick: "M1" }),
           },
           yaxis: {
             automargin: true,

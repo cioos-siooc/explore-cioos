@@ -51,6 +51,7 @@ export function DropdownButton({
   // the toggle differently while its menu is up (see topBarQuickFiltersToggle)
   // use this to mirror it into their own state.
   onOpenChange,
+  disabled,
   children,
   "data-testid": testId,
 }) {
@@ -135,6 +136,7 @@ export function DropdownButton({
         data-testid={testId && `${testId}-toggle`}
         className={buttonClasses}
         title={tooltip}
+        disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen(!open)}

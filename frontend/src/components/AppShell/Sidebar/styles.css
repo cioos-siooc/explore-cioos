@@ -147,7 +147,7 @@
 .datasetsHeaderLabel {
   flex-shrink: 0;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-lg);
   line-height: 1.2;
   color: var(--cioos-navy);
@@ -161,6 +161,7 @@
 }
 
 .datasetsHeaderCount {
+  font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
@@ -284,7 +285,7 @@
   overflow: hidden;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-2xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -377,7 +378,7 @@
   background-color: var(--cioos-primary);
   font: inherit;
   font-weight: 700;
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
   cursor: pointer;
   transition: background-color var(--cioos-transition-fast);
 }
@@ -386,8 +387,12 @@
   background-color: var(--cioos-primary-700);
 }
 
+/* A washed-out fill instead of a faded one: the teal at 45% left its white
+   "0 selected" unreadable. */
 .sidebarDownloadButton:disabled {
-  opacity: 0.45;
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
   cursor: default;
 }
 
@@ -401,9 +406,34 @@
 }
 
 .sidebarDownloadCount {
+  font-variant-numeric: tabular-nums;
   font-size: var(--cioos-font-size-xs);
   font-weight: 400;
   white-space: nowrap;
+}
+
+.sidebarDownloadButton:not(:disabled) .sidebarDownloadCount {
+  animation: sidebarCountPulse 450ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sidebarCountPulse {
+  from {
+    transform: scale(1.35);
+  }
+}
+
+/* Reduced motion: the count still signals the change, as a flash instead of
+   a swell. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebarDownloadButton:not(:disabled) .sidebarDownloadCount {
+    animation: sidebarCountFlash 450ms ease-out;
+  }
+}
+
+@keyframes sidebarCountFlash {
+  from {
+    opacity: 0.2;
+  }
 }
 
 /* ------------------------------------------------------------------
@@ -417,7 +447,7 @@
  * Closed, the card is parked below the bottom edge and inert (see the
  * base rule above), so the map has the whole screen back.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   /* One step over the top bar — the one piece of chrome that outranks this
      column everywhere else, and the last thing between it and the whole
      screen. Deliberately not higher: the map's "what's here" card sits two
@@ -434,7 +464,7 @@
 
     /* Undo theme.css's phone step-up so more of the list fits on screen; the
        small tiers stop at their desktop sizes rather than drop further. */
-    --cioos-font-size-3xs: 9px;
+    --cioos-font-size-3xs: 10px;
     --cioos-font-size-2xs: 10px;
     --cioos-font-size-xs: 11px;
     --cioos-font-size-sm: 11px;

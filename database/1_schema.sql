@@ -471,6 +471,28 @@ CREATE INDEX trajectory_hexes_time_min_idx ON trajectory_hexes (time_min);
 CREATE INDEX trajectory_hexes_depth_max_idx ON trajectory_hexes (depth_max);
 
 
+-- One row per (coarse hex, dataset, source): the three feature tables rolled
+-- up to the grain the z<5 tiles and the legend's zoom0 ramp aggregate at. A
+-- request whose filters are all dataset-level (dbFilter's datasetLevelOnly)
+-- reads this instead of re-unnesting every feature's day set: 685 k feature
+-- rows become ~35 k, a z2 tile 2.5 s -> 0.2 s. Rebuilt per load by
+-- refresh_hexes_zoom_0_rollup() (5_profile_process.sql); derived, so no FKs.
+DROP TABLE IF EXISTS hexes_zoom_0_rollup;
+CREATE TABLE hexes_zoom_0_rollup (
+    hex_pk integer NOT NULL,
+    dataset_pk integer NOT NULL,
+    -- 'profiles' (show_as_point rows only), 'trajectory' or 'obis': the
+    -- routes' source toggles gate on it.
+    source text NOT NULL,
+    n_records bigint NOT NULL,
+    -- The source rows' day sets unioned into disjoint ranges, each row's
+    -- [time_min, time_max] span standing in where its own set is unknown —
+    -- the rule utils/hexMetric.js applies per row. NULL when no row has days.
+    day_ranges daterange[],
+    PRIMARY KEY (hex_pk, dataset_pk, source)
+);
+
+
 -- Ordered, downsampled track fixes for Trajectory / TrajectoryProfile
 -- datasets: one row per (trajectory, retained fix), produced by the
 -- harvester's extract_track_points (per-profile fixes for TrajectoryProfile,

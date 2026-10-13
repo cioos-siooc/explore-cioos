@@ -7,15 +7,11 @@ import {
   DATA_LAYER_LABEL_KEYS,
 } from "../../../../state/dataLayers.js";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
-import {
-  ExcludedLabel,
-  OptionStateIcon,
-  optionStateClass,
-} from "../MultiCheckboxFilter/OptionState.jsx";
+import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
 // Which observation geometries the map draws. It behaves as every other list
-// filter does: a click cycles include -> exclude -> clear, nothing picked means
+// filter does: the row includes, its end button excludes, nothing picked means
 // unfiltered (all seven drawn), and the map draws the included geometries (or
 // all of them, when none is included) minus the excluded ones. The selection gates the datasets list and its counts for
 // every row (see datasetInDataLayers), and additionally gates the map's point/
@@ -34,7 +30,7 @@ import "./styles.css";
 // selected. They live on the legend entries they key (see Legend.jsx).
 export default function DataLayersFilter() {
   const { t } = useTranslation();
-  const { dataLayerChoices, cycleDataLayer } = useMapState();
+  const { dataLayerChoices, toggleDataLayer } = useMapState();
 
   return (
     <div className="multiCheckboxFilter dataLayersFilter">
@@ -44,27 +40,18 @@ export default function DataLayersFilter() {
           isExcluded: dataLayerChoices[key] === "exclude",
         };
         return (
-          <div
+          <FilterOption
             key={key}
-            className={optionStateClass(state)}
-            role="checkbox"
-            aria-checked={state.isSelected}
-            tabIndex={0}
-            onClick={() => cycleDataLayer(key)}
-            onKeyDown={(event) => {
-              if (event.key === " " || event.key === "Enter") {
-                event.preventDefault();
-                cycleDataLayer(key);
-              }
-            }}
+            label={t(DATA_LAYER_LABEL_KEYS[key])}
+            {...state}
+            onInclude={() => toggleDataLayer(key, "include")}
+            onExclude={() => toggleDataLayer(key, "exclude")}
           >
-            <OptionStateIcon {...state} />
             <span className="optionName">
               {t(DATA_LAYER_LABEL_KEYS[key])}
               <span className="optionHint">{t(DATA_LAYER_HINT_KEYS[key])}</span>
             </span>
-            <ExcludedLabel {...state} />
-          </div>
+          </FilterOption>
         );
       })}
     </div>

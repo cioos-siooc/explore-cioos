@@ -7,6 +7,7 @@ import { installMockFetch } from "../test/mockFetch.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
+import { useUI } from "./ui/UIProvider.jsx";
 
 // UrlSync (src/state/useUrlSync.js) is already mounted inside AppProviders —
 // it is the sole writer of window.location. There is nothing to render it
@@ -19,6 +20,7 @@ function Probe() {
     filters: useFilters(),
     selection: useSelection(),
     mapState: useMapState(),
+    ui: useUI(),
   };
   return (
     <span data-testid="ready">
@@ -53,20 +55,6 @@ describe("UrlSync", () => {
 
     act(() => hooks.selection.setDatasetTitleSearchText(""));
     await waitFor(() => expect(params().has("search")).toBe(false));
-  });
-
-  it("writes the list search into ?listSearch=, and drops it when cleared", async () => {
-    renderWithProviders(<Probe />, { providers: "app" });
-    await waitFor(() =>
-      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
-    );
-
-    act(() => hooks.selection.setListSearchText("orca"));
-    await waitFor(() => expect(params().get("listSearch")).toBe("orca"));
-    expect(params().has("search")).toBe(false);
-
-    act(() => hooks.selection.setListSearchText(""));
-    await waitFor(() => expect(params().has("listSearch")).toBe(false));
   });
 
   it("keeps the search's dataset list out of the link — only the expression", async () => {
@@ -118,6 +106,32 @@ describe("UrlSync", () => {
     await waitFor(() => expect(params().get("groupBy")).toBe("platform"));
   });
 
+  it("records the coverage figure's time axis only when folded by season", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    expect(params().has("coverageAxis")).toBe(false);
+
+    act(() => hooks.ui.setCoverageAxis("seasonal"));
+    await waitFor(() => expect(params().get("coverageAxis")).toBe("seasonal"));
+
+    act(() => hooks.ui.setCoverageAxis("timeline"));
+    await waitFor(() => expect(params().has("coverageAxis")).toBe(false));
+  });
+
+  it("opens the coverage figure on the time axis the link carries", async () => {
+    renderWithProviders(<Probe />, {
+      providers: "app",
+      url: "/?coverageAxis=seasonal",
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    expect(hooks.ui.coverageAxis).toBe("seasonal");
+    await waitFor(() => expect(params().get("coverageAxis")).toBe("seasonal"));
+  });
+
   it("records the observations-layer switch only when turned off", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
     await waitFor(() =>
@@ -134,9 +148,8 @@ describe("UrlSync", () => {
     await waitFor(() =>
       expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
     );
-    act(() => hooks.mapState.cycleDataLayer("profile"));
-    act(() => hooks.mapState.cycleDataLayer("grid"));
-    act(() => hooks.mapState.cycleDataLayer("grid"));
+    act(() => hooks.mapState.toggleDataLayer("profile", "include"));
+    act(() => hooks.mapState.toggleDataLayer("grid", "exclude"));
     await waitFor(() => {
       expect(params().get("layers")).toBe("profile");
       expect(params().get("excludeLayers")).toBe("grid");

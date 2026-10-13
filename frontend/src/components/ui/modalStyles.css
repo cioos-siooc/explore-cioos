@@ -68,7 +68,7 @@ body.cioos-modal-open {
 
 .modal-title {
   font-family: var(--cioos-font-display, sans-serif);
-  font-size: var(--cioos-font-size-lg, 18px);
+  font-size: var(--cioos-font-size-lg);
   line-height: 1.4;
 }
 
@@ -94,7 +94,7 @@ body.cioos-modal-open {
 
 /* Mobile: the close button — shared with every other dismissable surface, and
    grown to a touch target by its own stylesheet — takes more of the row. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .modal-header {
     /* The title and the button both grew; the row gives back the padding it
        no longer needs to look like a header. */

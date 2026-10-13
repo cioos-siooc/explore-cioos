@@ -114,6 +114,45 @@ describe("AppShell (composition)", () => {
     expect(screen.queryByTestId("dataset-map-card")).toBeNull();
   });
 
+  it("keeps a dataset page the search excludes, saying so, with a way back", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("cde.introSeen", "true");
+    renderWithProviders(<AppShell />, {
+      providers: "app",
+      url: `/?dataset=${pointQueryFixture[0].dataset_id}&search=no-title-matches-this`,
+    });
+    await screen.findByText(
+      "This dataset doesn't match your current filters.",
+      {},
+      { timeout: 3000 },
+    );
+    await user.click(screen.getByRole("button", { name: "Back to results" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("sidebar-back")).toBeNull(),
+    );
+  });
+
+  it("comes back from a dataset page to the same page of the list", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("cde.introSeen", "true");
+    renderWithProviders(<AppShell />, { providers: "app" });
+    await user.click(await screen.findByTestId("topbar-datasets-button"));
+    await screen.findAllByTestId("dataset-card", {}, { timeout: 3000 });
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    const firstTitle = () =>
+      screen
+        .getAllByTestId("dataset-card")[0]
+        .querySelector(".datasetCardTitle").textContent;
+    const pageTwoTitle = firstTitle();
+
+    await user.click(screen.getAllByTestId("dataset-card")[0]);
+    await user.click(await screen.findByTestId("sidebar-back"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("sidebar-back")).toBeNull(),
+    );
+    expect(firstTitle()).toBe(pageTwoTitle);
+  });
+
   describe("a minimized dataset page", () => {
     // Collapsing the sidebar on a dataset page used to leave the map keyed to
     // that dataset with no way back to its page: the top bar's Datasets button
@@ -155,6 +194,20 @@ describe("AppShell (composition)", () => {
       expect(screen.queryByTestId("dataset-map-card")).toBeNull();
     });
 
+    it("sits in the corner, clear of the top bar, in place of the quick filters", async () => {
+      const { card } = await minimize();
+      expect(card).toHaveClass("corner");
+      expect(screen.getByTestId("top-bar")).not.toContainElement(card);
+      expect(screen.queryByTestId("quick-filters")).toBeNull();
+    });
+
+    it("hangs under the header on a phone", async () => {
+      setViewportWidth(MOBILE_WIDTH);
+      const { card } = await minimize();
+      expect(card).not.toHaveClass("corner");
+      expect(screen.getByTestId("top-bar")).toContainElement(card);
+    });
+
     it("is left for good from the card's close button", async () => {
       const { user } = await minimize();
       await user.click(screen.getByTestId("dataset-map-card-close"));
@@ -174,7 +227,7 @@ describe("AppShell (composition)", () => {
       expect(screen.getByTestId("mock-map")).toBeInTheDocument(),
     );
 
-    const filtersButton = await screen.findByText("Filters");
+    const filtersButton = await screen.findByTestId("topbar-filters-button");
     await user.click(filtersButton);
     await waitFor(() => {
       expect(
@@ -213,5 +266,26 @@ describe("AppShell (composition)", () => {
         document.querySelector(".apiErrorBanner, [class*=ErrorBanner]"),
       ).toBeTruthy();
     });
+  });
+
+  it("shows the API error banner and a load-failed list when /pointQuery fails", async () => {
+    installMockFetch();
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/pointQuery")) {
+        return Promise.resolve(new Response(null, { status: 500 }));
+      }
+      return realFetch(input, init);
+    };
+    renderWithProviders(<AppShell />, { providers: "app" });
+    expect(
+      await screen.findByText(
+        "The data service is not responding, so the dataset list could not be loaded.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No datasets match your search."),
+    ).not.toBeInTheDocument();
   });
 });

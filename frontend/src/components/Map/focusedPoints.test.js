@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { featureHasDataset, focusedPointFeatures } from "./focusedPoints.js";
+import { focusedPointFeatures } from "./focusedPoints.js";
 
 // Shaped the way queryRenderedFeatures returns markers: the pk promoted to id,
 // the datasets as the JSON string MapLibre hands back.
@@ -8,17 +8,6 @@ const marker = (id, datasets, count = 1) => ({
   id,
   geometry: { type: "Point", coordinates: [id, id] },
   properties: { pk: id, count, datasets },
-});
-
-describe("featureHasDataset", () => {
-  it("matches a pk in the datasets array, not a substring of one", () => {
-    expect(featureHasDataset(marker(1, "[12,5]"), 5)).toBe(true);
-    expect(featureHasDataset(marker(1, "[12,5]"), 1)).toBe(false);
-  });
-
-  it("treats malformed datasets as not matching", () => {
-    expect(featureHasDataset(marker(1, "not json"), 5)).toBe(false);
-  });
 });
 
 describe("focusedPointFeatures", () => {

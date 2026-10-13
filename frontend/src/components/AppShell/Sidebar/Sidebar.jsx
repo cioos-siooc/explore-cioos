@@ -1,10 +1,12 @@
 import * as React from "react";
+import { useEffect, useRef } from "react";
 import {
   ChevronLeft,
   Download,
   FileEarmarkText,
   ListUl,
   Map as MapIcon,
+  PlusCircle,
   QuestionCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -42,14 +44,13 @@ export default function Sidebar() {
     setShowDownloadModal,
     setShowSelectionHelpModal,
   } = useUI();
-  const { tipHighlight } = useTips();
+  const { offerTip, tipHighlight } = useTips();
   // Until `ready`, there is no dataset count to show — not even a zero. See
   // useDatasetCounts.
   const {
     ready: countsReady,
     updating: countsUpdating,
-    filteredCount,
-    total,
+    title: countsTitle,
     label: countLabel,
   } = useDatasetCounts();
 
@@ -60,14 +61,15 @@ export default function Sidebar() {
   // the dataset's own title block.
   const inspecting = Boolean(inspectDataset);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
-  const countsTitle = countsReady
-    ? t("dockDatasetsCountTitle", {
-        filtered: filteredCount,
-        // A failed /datasets leaves no catalog total; the filtered count is
-        // then all we know, and all the label shows.
-        total: total ?? filteredCount,
-      })
-    : t("datasetsCountLoadingTitle");
+  // Adding to the selection is when what goes into a download starts to
+  // matter: how the filters shape it first, then how to skip the queue.
+  const lastSelectedCount = useRef(selectedCount);
+  useEffect(() => {
+    if (selectedCount > lastSelectedCount.current) {
+      offerTip(["filtersCutDownload", "directLinks"]);
+    }
+    lastSelectedCount.current = selectedCount;
+  }, [selectedCount, offerTip]);
 
   const collapseButton = (
     <CloseButton
@@ -170,7 +172,7 @@ export default function Sidebar() {
             className="sidebarFooterHint"
             title={t("sidebarSelectionHintTitle")}
           >
-            <Download
+            <PlusCircle
               className="sidebarFooterHintIcon"
               size={13}
               aria-hidden="true"
@@ -190,7 +192,9 @@ export default function Sidebar() {
           <button
             type="button"
             className="sidebarDownloadButton"
-            data-tip-highlight={tipHighlight("sizeLimit")}
+            data-tip-highlight={
+              tipHighlight("filtersCutDownload") || tipHighlight("directLinks")
+            }
             disabled={selectedCount === 0}
             onClick={() => setShowDownloadModal(true)}
             title={t("dockDownloadCountTitle", { count: selectedCount })}
@@ -198,7 +202,9 @@ export default function Sidebar() {
             <Download size={16} aria-hidden="true" />
             <span className="sidebarDownloadText">
               {t("downloadModalButtonText")}
-              <span className="sidebarDownloadCount">
+              {/* Keyed on the count so each add or removal replays the pulse,
+                  tying the card's + to the button it fed. */}
+              <span className="sidebarDownloadCount" key={selectedCount}>
                 {t("sidebarCountsSelected", { count: selectedCount })}
               </span>
             </span>

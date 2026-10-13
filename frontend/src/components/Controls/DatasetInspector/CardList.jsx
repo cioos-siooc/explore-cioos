@@ -18,8 +18,9 @@ import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 //
 // `sortFields` is [{ id, label, type, value }] — `value(item)` reads the field
 // off an item and `type` ('string' | 'number') says how to compare it.
-// `pinnedKey` names one item to hold at the top of the first page whatever the
-// sort (the record a map click resolved to), and `focusKey` one to page to
+// `pinnedKeys` (a Set) names items to hold at the top of the first page
+// whatever the sort (the record a map click resolved to, the trajectories that
+// crossed the selected area), and `focusKey` one to page to
 // wherever it falls (the trajectory whose track is drawn).
 export default function CardList({
   items,
@@ -29,7 +30,7 @@ export default function CardList({
   renderItem,
   filterPlaceholder,
   emptyText,
-  pinnedKey,
+  pinnedKeys,
   focusKey,
   pagerLabel,
   perPageLabel,
@@ -43,18 +44,18 @@ export default function CardList({
     const field = sortFields.find((f) => f.id === sort.field);
     const factor = sort.dir === "asc" ? 1 : -1;
     return [...(filterRows(items, filterText) || [])].sort((a, b) => {
-      // The pinned item rides on top of the sort rather than replacing it, so
-      // the sort control still does what it says — the pin just puts one item in
-      // front of the order they produce.
-      const pa = pinnedKey !== undefined && keyOf(a) === pinnedKey ? 0 : 1;
-      const pb = pinnedKey !== undefined && keyOf(b) === pinnedKey ? 0 : 1;
+      // Pinned items ride on top of the sort rather than replacing it, so the
+      // sort control still does what it says — the pin just puts them in front
+      // of the order it produces.
+      const pa = pinnedKeys?.has(keyOf(a)) ? 0 : 1;
+      const pb = pinnedKeys?.has(keyOf(b)) ? 0 : 1;
       if (pa !== pb) return pa - pb;
       const va = field?.value(a);
       const vb = field?.value(b);
       if (field?.type === "number") return ((va ?? 0) - (vb ?? 0)) * factor;
       return String(va ?? "").localeCompare(String(vb ?? "")) * factor;
     });
-  }, [items, filterText, sort, pinnedKey, keyOf, sortFields]);
+  }, [items, filterText, sort, pinnedKeys, keyOf, sortFields]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   // Clamped rather than stored: a page can vanish under the list when the

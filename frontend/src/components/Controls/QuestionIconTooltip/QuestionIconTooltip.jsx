@@ -17,7 +17,7 @@ export default function QuestionIconTooltip({
     >
       <QuestionCircle
         className={classNames("helpIcon", className)}
-        color="#52A79B"
+        color="var(--cioos-primary-700)"
         size={size}
       />
     </Tooltip>

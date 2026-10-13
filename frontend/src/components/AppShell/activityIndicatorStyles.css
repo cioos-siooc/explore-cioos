@@ -48,14 +48,14 @@
      card there blocks more of it than a status report needs to. */
   background-color: rgb(255 255 255 / 78%);
   box-shadow: var(--cioos-shadow-float);
-  font-size: var(--cioos-font-size-sm, 12px);
+  font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
 }
 
 .activityStatusHeading {
   /* The column owns the spacing between the three blocks. */
   margin: 0;
-  font-size: var(--cioos-font-size-2xs, 10px);
+  font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;

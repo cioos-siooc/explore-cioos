@@ -150,9 +150,9 @@ describe("MultiCheckboxFilter", () => {
     ]);
   });
 
-  it("an option cycles include -> exclude -> clear", async () => {
+  it("the row includes and its exclude button excludes, each undoing itself", async () => {
     const user = userEvent.setup();
-    // Stateful, so the three clicks walk the cycle rather than each starting
+    // Stateful, so the clicks build on each other rather than each starting
     // from the initial props.
     function Harness() {
       const [options, setOptions] = React.useState([
@@ -168,23 +168,29 @@ describe("MultiCheckboxFilter", () => {
     }
     render(<Harness />);
     const option = () => screen.getByTestId("filter-option");
+    const exclude = () => screen.getByRole("button", { name: /: Glider$/ });
 
     await user.click(option());
     expect(option()).toHaveAttribute("aria-checked", "true");
     expect(option()).toHaveAttribute("data-excluded", "false");
 
-    await user.click(option());
+    await user.click(exclude());
     expect(option()).toHaveAttribute("aria-checked", "false");
     expect(option()).toHaveAttribute("data-excluded", "true");
+    expect(exclude()).toHaveAttribute("aria-pressed", "true");
     // aria-checked cannot say "excluded", so it is announced as text.
     expect(option()).toHaveTextContent("(excluded)");
 
+    await user.click(exclude());
+    expect(option()).toHaveAttribute("data-excluded", "false");
+
+    await user.click(option());
     await user.click(option());
     expect(option()).toHaveAttribute("aria-checked", "false");
     expect(option()).toHaveAttribute("data-excluded", "false");
   });
 
-  it("clicking an included option excludes it rather than unticking it", async () => {
+  it("clicking an included option unticks it", async () => {
     const user = userEvent.setup();
     const setOptionsSelected = vi.fn();
     render(
@@ -200,7 +206,82 @@ describe("MultiCheckboxFilter", () => {
     await user.click(ticked);
     expect(setOptionsSelected).toHaveBeenCalledWith([
       { pk: 1, title: "seaSurfaceTemperature", isSelected: false },
-      { pk: 2, title: "salinity", isSelected: false, isExcluded: true },
+      { pk: 2, title: "salinity", isSelected: false, isExcluded: false },
     ]);
+  });
+
+  describe("grouped", () => {
+    const BIOGEOCHEMICAL = {
+      category: "Biogeochemical",
+      categoryTranslated: { en: "Biogeochemical", fr: "Biogéochimie" },
+    };
+    const PHYSICAL = {
+      category: "Physical",
+      categoryTranslated: { en: "Physical", fr: "Physique" },
+    };
+    const EOVS = [
+      { pk: 1, title: "oxygen", ...BIOGEOCHEMICAL, isSelected: true },
+      { pk: 2, title: "nutrients", ...BIOGEOCHEMICAL },
+      { pk: 3, title: "seaIce", ...PHYSICAL },
+    ];
+    const group = (name) =>
+      screen
+        .getAllByTestId("filter-option-group")
+        .find((el) => el.textContent.startsWith(name));
+
+    it("renders one category row above its options", () => {
+      render(
+        <MultiCheckboxFilter
+          optionsSelected={EOVS}
+          setOptionsSelected={() => {}}
+          allOptions={EOVS}
+          grouped
+        />,
+      );
+      expect(
+        screen.getByRole("group", { name: "Biogeochemical" }),
+      ).toContainElement(screen.getAllByTestId("filter-option")[0]);
+      expect(screen.getAllByTestId("filter-option-group")).toHaveLength(2);
+      expect(group("Biogeochemical")).toHaveAttribute("aria-checked", "mixed");
+      expect(group("Physical")).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("the category row includes every option in it, the rest untouched", async () => {
+      const user = userEvent.setup();
+      const setOptionsSelected = vi.fn();
+      render(
+        <MultiCheckboxFilter
+          optionsSelected={EOVS}
+          setOptionsSelected={setOptionsSelected}
+          allOptions={EOVS}
+          grouped
+        />,
+      );
+      await user.click(group("Biogeochemical"));
+      expect(setOptionsSelected).toHaveBeenCalledWith([
+        { ...EOVS[0], isSelected: true, isExcluded: false },
+        { ...EOVS[1], isSelected: true, isExcluded: false },
+        EOVS[2],
+      ]);
+    });
+
+    it("the category's exclude button excludes every option in it", async () => {
+      const user = userEvent.setup();
+      const setOptionsSelected = vi.fn();
+      render(
+        <MultiCheckboxFilter
+          optionsSelected={EOVS}
+          setOptionsSelected={setOptionsSelected}
+          allOptions={EOVS}
+          grouped
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: /: Physical$/ }));
+      expect(setOptionsSelected).toHaveBeenCalledWith([
+        EOVS[0],
+        EOVS[1],
+        { ...EOVS[2], isSelected: false, isExcluded: true },
+      ]);
+    });
   });
 });

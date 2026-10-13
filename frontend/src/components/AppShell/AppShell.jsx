@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useChanged } from "../../utilities.jsx";
@@ -18,6 +18,7 @@ import PrivacyModal from "./Modals/PrivacyModal.jsx";
 import PreviewHost from "./Panels/PreviewHost.jsx";
 import Loading from "../Controls/Loading/Loading.jsx";
 import Legend from "../Controls/Legend/Legend.jsx";
+import { DatasetMapCorner } from "./DatasetMapCard/DatasetMapCard.jsx";
 import DepthBar from "../Controls/DepthBar/DepthBar.jsx";
 import TimeBar from "../Controls/TimeBar/TimeBar.jsx";
 import IntroModal from "../Controls/IntroModal/IntroModal.jsx";
@@ -26,8 +27,6 @@ import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
-import { useTips } from "../../state/tips/TipsProvider.jsx";
-import { bathymetryLegendMinZoom } from "../config.js";
 import "./styles.css";
 
 // The map-first shell: full-bleed map with a centered top bar (brand on the
@@ -56,13 +55,6 @@ export default function AppShell() {
   const { startDate, endDate, timeFilterActive } = useFilters();
   const { showIntroModal, setShowIntroModal } = useUI();
   const { platformsAvailable } = useSelection();
-  const { offerTip } = useTips();
-
-  // Zoomed in far enough that the CHS NONNA soundings take over the seafloor.
-  const nonnaShown = bathymetryVisible && zoom >= bathymetryLegendMinZoom;
-  useEffect(() => {
-    if (nonnaShown) offerTip("nonna");
-  }, [nonnaShown, offerTip]);
 
   const [splashMounted, setSplashMounted] = useState(firstPaintPending);
 
@@ -93,7 +85,6 @@ export default function AppShell() {
       label: t("layersBathymetry"),
       checked: bathymetryVisible,
       onChange: () => setBathymetryVisible(!bathymetryVisible),
-      tipTarget: "nonna",
     },
     tracks: {
       key: "tracks",
@@ -112,7 +103,6 @@ export default function AppShell() {
       label: t("layersGriddedCoverage"),
       checked: griddapCoverageVisible,
       onChange: () => setGriddapCoverageVisible(!griddapCoverageVisible),
-      tipTarget: "griddedCoverage",
     },
   ];
 
@@ -152,6 +142,7 @@ export default function AppShell() {
           dismissed by the next click — and before the rest of the chrome, which
           all outranks it. */}
       <FeatureCard />
+      <DatasetMapCorner />
       <ApiErrorBanner />
       {/* Every wait in the app, named in one panel: the map redrawing, the
           basemap catching up, the legend, the datasets list, a record, the

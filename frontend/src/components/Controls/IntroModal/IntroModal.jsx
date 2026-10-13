@@ -169,7 +169,6 @@ export default function IntroModal({ showModal, setShowModal }) {
           <CioosLogo />
         </a>
         <Modal.Title className="introTitle" id="introModalTitle">
-          <span className="introEyebrow">{t("dockIntroButtonTitle")}</span>
           <span className="introTitleName">{t("CIOOSDataExplorer")}</span>
           <span className="tagLine">{t("CIOOSQuote")}</span>
         </Modal.Title>

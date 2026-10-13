@@ -42,22 +42,21 @@ from cde_harvester.sources.erddap.client import ERDDAP
 logger = logging.getLogger(__name__)
 
 # Track-point downsampling for plain Trajectory datasets (ships/drifters can
-# report every few seconds, others every few days): start from a cheap
-# one-fix-per-UTC-day probe (TRACK_DAY_SECONDS), then refine to a finer bucket
-# sized so the CANDIDATE response stays under TRACK_CANDIDATE_BUDGET rows
-# (~90 bytes/row -> ~27MB, comfortably under MAX_RESPONSE_SIZE), never coarser
-# than a day and never finer than 10 minutes. The candidate set is
-# deliberately oversampled relative to what's stored: time buckets are
-# speed-blind (a coarse bucket on a fast ferry draws 50km chords across
-# land), so shape fidelity comes from the Douglas-Peucker pass afterwards,
-# which needs fine-grained input to have anything to work with. At 10-minute
-# buckets a 20-knot vessel moves ~6km per retained fix — segments follow a
-# coastal channel instead of cutting across it.
-# Sizing off the probe's OWN row count (active trajectory-days) rather than a
-# duration/count pulled from dataset metadata means a single corrupt timestamp
-# far outside the real deployment window (seen in practice on a live C-PROOF
-# glider dataset) adds one harmless extra "active day" instead of blowing up
-# the chosen interval.
+# report every few seconds, others every few days): one bucketed query, the
+# bucket sized from the active trajectory-day count so the CANDIDATE response
+# stays under TRACK_CANDIDATE_BUDGET rows (~90 bytes/row -> ~27MB, comfortably
+# under MAX_RESPONSE_SIZE), never coarser than a day and never finer than 10
+# minutes. The candidate set is deliberately oversampled relative to what's
+# stored: time buckets are speed-blind (a coarse bucket on a fast ferry draws
+# 50km chords across land), so shape fidelity comes from the Douglas-Peucker
+# pass afterwards, which needs fine-grained input to have anything to work
+# with. At 10-minute buckets a 20-knot vessel moves ~6km per retained fix —
+# segments follow a coastal channel instead of cutting across it.
+# Sizing off the active trajectory-days the day counts already returned,
+# rather than a duration pulled from dataset metadata, means a single corrupt
+# timestamp far outside the real deployment window (seen in practice on a
+# live C-PROOF glider dataset) adds one harmless extra "active day" instead of
+# blowing up the chosen interval.
 TRACK_DAY_SECONDS = 86400
 TRACK_CANDIDATE_BUDGET = 300_000
 TRACK_MIN_INTERVAL_SECONDS = 600
@@ -136,6 +135,18 @@ def _day_counts(dataset, traj_var):
     if traj_var:
         df[traj_var] = df[traj_var].astype(str)
     return df.dropna(subset=["day"])
+
+
+def _constant_depth(dataset):
+    """The depth value when depth's actual_range says it never varies (a
+    ship's fixed intake depth), else None — the per-day depth query would
+    only repeat it."""
+    try:
+        actual_range = dataset.df_variables.loc["depth", "actual_range"]
+        lo, hi = (float(v) for v in actual_range.split(","))
+    except (KeyError, AttributeError, ValueError):
+        return None
+    return lo if lo == hi else None
 
 
 def _day_depths(dataset, traj_var):
@@ -289,15 +300,9 @@ def _first_fix_per_interval(df, traj_var, interval_seconds):
     )
 
 
-def _first_fix_per_day(df, traj_var):
-    """Reduce a raw [traj?, latitude, longitude, time] frame to the first fix
-    of each (trajectory, UTC day). Expects `time` already parsed to datetime."""
-    return _first_fix_per_interval(df, traj_var, TRACK_DAY_SECONDS)
-
-
 def _choose_track_interval_seconds(n_active_groups):
     """Pick a finer bucket size (seconds) from how many (trajectory, day)
-    groups a cheap day-level probe already found — not from a dataset-level
+    groups the day counts already found — not from a dataset-level
     duration, which a single corrupt out-of-range timestamp can blow up to
     years (seen in practice). Worst-case candidate rows are
     n_active_groups * (day / interval), so interval =
@@ -465,7 +470,8 @@ def extract_track_points(dataset, per_profile=False):
     the track survives _decimate_tracks is how much of the map lights up.
 
     Assumes extract_day_stats() already ran on this dataset (it populates
-    dataset.trajectory_id_variable / profile_id_variable).
+    dataset.trajectory_id_variable / profile_id_variable and the active
+    trajectory-day count that sizes the bucket).
     """
     log = dataset.logger
     traj_var = dataset.trajectory_id_variable
@@ -480,14 +486,12 @@ def extract_track_points(dataset, per_profile=False):
             # the same frame) — _profile_fixes serves both from one request.
             points = _profile_fixes(dataset, traj_var, profile_var)
         else:
-            # Two-step adaptive downsample, both fully server-side (never a
-            # local full-resolution download): first probe at one-fix-per-
-            # UTC-day (cheap, response size bounded regardless of reporting
-            # cadence); its OWN row count -- active trajectory-days -- sizes a
-            # second, finer bucket query so the candidate set stays near
-            # TRACK_TARGET_POINTS whether the platform reports every second
-            # or every few days. Sizing off the probe's row count rather than
-            # a dataset-metadata duration means one corrupt out-of-range
+            # Adaptive server-side downsample (never a local full-resolution
+            # download): the active trajectory-day count extract_day_stats
+            # already fetched sizes the bucket, so the candidate set stays
+            # near TRACK_CANDIDATE_BUDGET whether the platform reports every
+            # second or every few days. Sizing off that count rather than a
+            # dataset-metadata duration means one corrupt out-of-range
             # timestamp (seen in practice) can't blow up the chosen interval.
             # ERDDAP requires the min target as an explicit trailing variable
             # -- omitting it (e.g. orderByMin("traj,time/86400") alone) 404s
@@ -503,20 +507,21 @@ def extract_track_points(dataset, per_profile=False):
                 )
                 return dataset.dataset_tabledap_query(url)
 
-            points = _query_at_interval(TRACK_DAY_SECONDS)
+            interval = _choose_track_interval_seconds(
+                getattr(dataset, "_trajectory_day_count", 0)
+            )
+            try:
+                points = _query_at_interval(interval)
+            except HTTPError:
+                if interval == TRACK_DAY_SECONDS:
+                    raise
+                # A fine bucket is the expensive query; daily fixes still
+                # draw a usable track.
+                interval = TRACK_DAY_SECONDS
+                points = _query_at_interval(interval)
             if not points.empty:
                 points["time"] = ERDDAP.parse_erddap_dates(points["time"])
-                points = _first_fix_per_day(points, traj_var)
-
-                finer_interval = _choose_track_interval_seconds(len(points))
-                if finer_interval < TRACK_DAY_SECONDS:
-                    try:
-                        finer_points = _query_at_interval(finer_interval)
-                    except HTTPError:
-                        finer_points = pd.DataFrame()
-                    if not finer_points.empty:
-                        finer_points["time"] = ERDDAP.parse_erddap_dates(finer_points["time"])
-                        points = _first_fix_per_interval(finer_points, traj_var, finer_interval)
+                points = _first_fix_per_interval(points, traj_var, interval)
     except HTTPError:
         log.warning(
             "Server-side track-point grouping failed for %s; falling back to "
@@ -624,15 +629,8 @@ def extract_day_stats(dataset, count_profiles=False):
     profile_var = dataset.profile_id_variable
     has_depth = "depth" in dataset.variables_list
 
-    # Distinct trajectory list: cheap, and get_df() derives the dataset-level
-    # n_profiles (number of deployments/missions) from it.
-    if traj_var:
-        trajectories = dataset.dataset_tabledap_query(f"{traj_var}&distinct()")
-        dataset.profile_ids = trajectories
-    else:
+    if not traj_var:
         log.warning("No cf_role=trajectory_id variable; treating dataset as one trajectory")
-        trajectories = pd.DataFrame({"trajectory_id": [""]})
-        dataset.profile_ids = trajectories
 
     group_cols = ([traj_var] if traj_var else []) + ["day"]
 
@@ -652,8 +650,12 @@ def extract_day_stats(dataset, count_profiles=False):
         )
         days = pd.DataFrame()
 
+    constant_depth = _constant_depth(dataset) if has_depth else None
     if days.empty:
         days = _day_stats_via_chunked_download(dataset, traj_var, has_depth)
+    elif constant_depth is not None:
+        days["depth_min"] = constant_depth
+        days["depth_max"] = constant_depth
     elif has_depth:
         # Best-effort, like the profile count below: a dataset whose counts
         # succeeded must not fail because its depth query was too large.
@@ -674,6 +676,15 @@ def extract_day_stats(dataset, count_profiles=False):
     if days.empty:
         log.warning("No trajectory days found for %s", dataset.id)
         return days
+
+    # get_df() derives the dataset-level n_profiles (missions) from the
+    # trajectory list, and extract_track_points sizes its bucket from the
+    # active trajectory-day count — both already answered by the day rows.
+    dataset.profile_ids = (
+        days[[traj_var]].drop_duplicates() if traj_var
+        else pd.DataFrame({"trajectory_id": [""]})
+    )
+    dataset._trajectory_day_count = len(days)
 
     # Distinct profiles per day (TrajectoryProfile only), counted from the
     # per-profile fixes extract_track_points draws the track from — no request

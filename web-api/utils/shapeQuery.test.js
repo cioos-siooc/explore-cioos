@@ -63,6 +63,11 @@ test("an obisNodes selection hides profiles unless erddapServers is set alongsid
   assert.match(combined.sql, OBIS);
 });
 
+test("rows carry their OBIS nodes so the list can group by data portal", async () => {
+  const { sql } = await build({});
+  assert.match(sql, /d\.obis_nodes,/);
+});
+
 test("an empty branch set still yields runnable SQL that matches nothing", async () => {
   // Every arm suppressed at once: the guard must emit a WHERE FALSE shell, not
   // an empty UNION that fails to parse.
@@ -93,7 +98,10 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
     depthMax: "100",
   });
   assert.match(est.sql, /AS records_count/);
-  assert.match(est.sql, /records_count \* num_columns \* :multiplier/);
+  assert.match(
+    est.sql,
+    /records_count \* CASE WHEN source_type = 'obis' THEN :obisColumns ELSE num_columns END \* :multiplier/,
+  );
   assert.deepEqual(Object.keys(est.params).sort(), [
     "adder",
     "depthMax",
@@ -101,6 +109,7 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
     "depthVariableProbe",
     "filters",
     "multiplier",
+    "obisColumns",
     "obisFilters",
     "profileFilters",
     "timeMax",
@@ -128,6 +137,29 @@ test("the estimate is a day-set overlap, not an elapsed span", async () => {
   assert.match(sql, /day_range_overlap_days\(p\.day_ranges/);
   // The span remains the fallback for features harvested before day sets.
   assert.match(sql, /range_intersection_length\(tstzrange/);
+});
+
+test("the obis arm derives records_per_day from its occurrence count, not a zero", async () => {
+  // A zero rate made every OBIS estimate 0. The denominator switches on
+  // day_ranges exactly as the estimate's day factor does, so an unfiltered
+  // estimate sums to the cell's n_records.
+  const { sql } = await build({});
+  const from = sql.indexOf("FROM cde.obis_cells");
+  const obisArm = sql.slice(sql.lastIndexOf("SELECT", from), from);
+  assert.match(
+    obisArm,
+    /n_records::float \/ GREATEST\(CASE WHEN coalesce\(array_length\(day_ranges, 1\), 0\) > 0 THEN days ELSE date_part\('days', time_max - time_min\) END, 1\) AS records_per_day/,
+  );
+  assert.doesNotMatch(obisArm, /\b0 as records_per_day/i);
+});
+
+test("OBIS sizes take the downloader CSV width, since OBIS datasets carry no num_columns", async () => {
+  const est = await build({});
+  assert.match(
+    est.sql,
+    /records_count \* CASE WHEN source_type = 'obis' THEN :obisColumns ELSE num_columns END \* :multiplier/,
+  );
+  assert.equal(est.params.obisColumns, 8);
 });
 
 test("the three filter fragments are passed as bindings, not inlined", async () => {
@@ -213,4 +245,35 @@ test("the datasets list reads days from the stored day set, clipped to the time 
 
   const estimate = await build({}, { doEstimate: true, getRecordsList: false });
   assert.doesNotMatch(estimate.sql, /AS days/);
+});
+
+test("features are aggregated per dataset_pk before the dataset metadata joins in", async () => {
+  // Grouping on d.pk alongside the wide metadata row made the planner sort
+  // every matched feature to disk: 8-9.8 s -> 2.2 s unfiltered on prod data.
+  for (const opts of [
+    { doEstimate: false, getRecordsList: false },
+    { doEstimate: true, getRecordsList: false },
+  ]) {
+    const { sql } = await build({}, opts);
+    assert.match(sql, /FROM {5}filtered p\s+GROUP BY p\.dataset_pk\)/);
+    assert.doesNotMatch(sql, /GROUP BY d\.pk/);
+  }
+});
+
+test("pksOnly selects pk_url over the same union and filters as the full query", async () => {
+  const query = { latMin: "48", latMax: "49", lonMin: "-124", lonMax: "-123" };
+  const full = await build(query, { doEstimate: false });
+  const pks = await build(query, { doEstimate: false, pksOnly: true });
+
+  assert.match(pks.sql, /SELECT DISTINCT d\.pk_url AS pk/);
+  for (const branch of [PROFILES, TRAJECTORY, OBIS, GRIDDAP]) {
+    assert.match(pks.sql, branch);
+  }
+  assert.doesNotMatch(pks.sql, /ST_Extent|per_dataset/);
+  assert.deepEqual(Object.keys(pks.params).sort(), [
+    "filters",
+    "obisFilters",
+    "profileFilters",
+  ]);
+  assert.equal(pks.params.filters.toString(), full.params.filters.toString());
 });

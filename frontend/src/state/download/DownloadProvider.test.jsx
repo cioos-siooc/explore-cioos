@@ -35,8 +35,8 @@ function Probe() {
   return <span data-testid="state">{ready ? "ready" : "loading"}</span>;
 }
 
-async function renderReady() {
-  const result = renderWithProviders(<Probe />, { providers: "app" });
+async function renderReady(url = "/") {
+  const result = renderWithProviders(<Probe />, { providers: "app", url });
   await waitFor(() =>
     expect(screen.getByTestId("state")).toHaveTextContent("ready"),
   );
@@ -133,6 +133,37 @@ describe("DownloadProvider", () => {
       await submit(true);
       expect(document.cookie).toBe("");
     });
+
+    it('opens the query string with a parameter, not an empty "&"', async () => {
+      await submit(false);
+      const [{ url }] = requests;
+      expect(url).not.toMatch(/\?&|&&|&$/);
+      const params = new URL(url).searchParams;
+      expect(params.get("datasetPKs")).toBe("1");
+      expect(params.get("lang")).toBe("en");
+    });
+
+    it("names the basket once when the Datasets filter is also narrowing", async () => {
+      await renderReady("/?datasetPKs=2337");
+      // query is debounced: submitting before it lands sends no Datasets
+      // filter at all, and there is then nothing for the basket to collide with.
+      await waitFor(
+        () =>
+          expect(filters.query.datasetsSelected.some((d) => d.isSelected)).toBe(
+            true,
+          ),
+        { timeout: 2000 },
+      );
+      act(() => {
+        selection.setPointsToDownload([{ pk: 2337 }]);
+        download.setEmail("diver@example.com");
+      });
+      act(() => download.handleSubmission());
+      await waitFor(() => expect(requests).toHaveLength(1));
+      expect(
+        new URL(requests[0].url).searchParams.getAll("datasetPKs"),
+      ).toEqual(["2337"]);
+    });
   });
 
   it("validates the email as it's edited", async () => {
@@ -164,7 +195,7 @@ describe("DownloadProvider", () => {
     );
     await waitFor(() =>
       expect(download.submissionFeedback?.text).toBe(
-        i18n.t("submissionStateTextSuccess"),
+        i18n.t("submissionStateTextSuccess", { email: "diver@example.com" }),
       ),
     );
   });
@@ -187,8 +218,38 @@ describe("DownloadProvider", () => {
     act(() => download.handleSubmission());
     await waitFor(() =>
       expect(download.submissionFeedback?.text).toBe(
-        i18n.t("submissionStateTextFailed"),
+        i18n.t("submissionStateTextFailedServer"),
       ),
+    );
+  });
+
+  it.each([
+    [
+      "the API rejects the request",
+      () => new Response(null, { status: 400 }),
+      "submissionStateTextFailedRejected",
+    ],
+    [
+      "the API can't be reached",
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      "submissionStateTextFailedNetwork",
+    ],
+  ])("names the cause when %s", async (_, respond, key) => {
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/download?")) return Promise.resolve().then(respond);
+      return realFetch(input, init);
+    };
+
+    const { i18n } = await renderReady();
+    act(() => {
+      selection.setPointsToDownload([{ pk: 1 }]);
+      download.setEmail("diver@example.com");
+    });
+    act(() => download.handleSubmission());
+    await waitFor(() =>
+      expect(download.submissionFeedback?.text).toBe(i18n.t(key)),
     );
   });
 

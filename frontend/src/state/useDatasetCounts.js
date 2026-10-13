@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { formatDatasetCount } from "../utilities.jsx";
@@ -18,6 +20,7 @@ import { formatDatasetCount } from "../utilities.jsx";
 // previous counts stay on screen (dimmed) instead of collapsing back to a
 // spinner, so a filter tweak doesn't make the numbers flicker.
 export default function useDatasetCounts() {
+  const { t, i18n } = useTranslation();
   const { totalNumberOfDatasets, catalogLoaded } = useFilters();
   const { filteredDatasets, selectionLoading, initialPointsQueryComplete } =
     useSelection();
@@ -29,16 +32,32 @@ export default function useDatasetCounts() {
   // Reflects the title-search / "only in view" narrowing too, not just the
   // server-side filters, so the counters agree with the list they sit next to.
   const filteredCount = filteredDatasets?.length ?? 0;
+  // Nothing filtered out (or no total to compare against): the
+  // "filtered / total" split is noise, so state the single number alone.
+  const allDatasetsShown =
+    !totalNumberOfDatasets || filteredCount === totalNumberOfDatasets;
 
   return {
     ready,
     updating: ready && selectionLoading,
     filteredCount,
     total: totalNumberOfDatasets,
-    // Nothing filtered out (or no total to compare against): the
-    // "filtered / total" split is noise, so state the single number alone.
-    allDatasetsShown:
-      !totalNumberOfDatasets || filteredCount === totalNumberOfDatasets,
-    label: formatDatasetCount(filteredCount, totalNumberOfDatasets),
+    allDatasetsShown,
+    // The hover text every counter shares, matching what the label says.
+    title: !ready
+      ? t("datasetsCountLoadingTitle")
+      : allDatasetsShown
+        ? t("dockDatasetsAllShownTitle", {
+            count: totalNumberOfDatasets ?? filteredCount,
+          })
+        : t("dockDatasetsCountTitle", {
+            filtered: filteredCount,
+            total: totalNumberOfDatasets,
+          }),
+    label: formatDatasetCount(
+      filteredCount,
+      totalNumberOfDatasets,
+      i18n.language,
+    ),
   };
 }

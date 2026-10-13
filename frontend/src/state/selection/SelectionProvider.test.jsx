@@ -48,6 +48,33 @@ describe("SelectionProvider", () => {
     expect(row.title).toBe(pointQueryFixture[0].title_translated.en);
   });
 
+  it("flags a failed /pointQuery instead of reporting no matches, and retries it", async () => {
+    const realFetch = globalThis.fetch;
+    let failing = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (failing && url.includes("/pointQuery")) {
+          return Promise.resolve(
+            new Response("<html>504</html>", { status: 504 }),
+          );
+        }
+        return realFetch(input, init);
+      }),
+    );
+    await renderLoaded();
+    expect(latest.pointsError).toBe(true);
+    expect(latest.pointsData).toHaveLength(0);
+
+    failing = false;
+    act(() => latest.retryPointQuery());
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length),
+    );
+    expect(latest.pointsError).toBe(false);
+  });
+
   it("keeps the latest time-filtered results when an older request finishes last", async () => {
     await renderLoaded();
     vi.useFakeTimers();
@@ -106,6 +133,75 @@ describe("SelectionProvider", () => {
   it("leaves inspectDataset unresolved for an unknown dataset id", async () => {
     await renderLoaded({ url: "/?dataset=does-not-exist" });
     expect(latest.inspectDataset).toBeUndefined();
+  });
+
+  it("keeps an open dataset page when a filter excludes it, flagged out of the results", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    expect(latest.inspectDatasetExcluded).toBe(false);
+
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/pointQuery?")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(pointQueryFixture.slice(1))),
+          );
+        }
+        return realFetch(input, init);
+      }),
+    );
+    act(() => latestFilters.setStartDate("2020-01-01"));
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length - 1),
+    );
+
+    expect(latest.inspectDataset?.dataset_id).toBe(fixtureRow.dataset_id);
+    expect(latest.inspectDatasetExcluded).toBe(true);
+    expect(new URL(window.location.href).searchParams.get("dataset")).toBe(
+      fixtureRow.dataset_id,
+    );
+  });
+
+  it("flags the open dataset out of the results when the title search excludes it", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(false));
+
+    act(() => latest.setDatasetTitleSearchText("no-title-matches-this"));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(true));
+    expect(latest.inspectDataset?.pk).toBe(target.pk);
+  });
+
+  it("goes back to the list entry a dataset page was opened from", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const entriesBefore = window.history.length;
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDataset?.pk).toBe(target.pk));
+    expect(window.history.length).toBe(entriesBefore + 1);
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(
+      new URL(window.location.href).searchParams.get("dataset"),
+    ).toBeNull();
+    // Popped back to the list entry, not a new one stacked on the page's.
+    expect(window.history.length).toBe(entriesBefore + 1);
+    expect(window.history.state?.usr?.fromList).toBeFalsy();
+  });
+
+  it("closes a linked dataset page in place, with no list entry to go back to", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    const entries = window.history.length;
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(window.history.length).toBe(entries);
   });
 
   it("handleSelectDataset toggles a dataset into pointsToReview and counts it", async () => {
@@ -182,24 +278,92 @@ describe("SelectionProvider", () => {
     );
   });
 
-  it("listSearchText narrows listedDatasets only — not the counters or the map", async () => {
-    await renderLoaded();
-    const target = latest.pointsData[0];
-    const needle = target.title.slice(0, 6);
-    act(() => latest.setListSearchText(needle));
-    await waitFor(() => {
-      expect(latest.listedDatasets).toContain(target);
-      expect(
-        latest.listedDatasets.every((row) =>
-          row.title.toLowerCase().includes(needle.toLowerCase()),
-        ),
-      ).toBe(true);
+  it("inViewCount counts the filtered datasets in view — the title search moves it", async () => {
+    // The fixture rows carry no bbox; give every one the same point so a
+    // world-sized viewport has them all in view.
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/pointQuery/inView")) {
+        const pks = pointQueryFixture.map((row) => row.pk);
+        return new Response(JSON.stringify(pks), { status: 200 });
+      }
+      const response = await mockedFetch(input);
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row) => ({
+        ...row,
+        filtered_bbox_geojson: { type: "Point", coordinates: [-63, 44] },
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
     });
-    expect(latest.filteredDatasets).toBe(latest.pointsData);
-    expect(latest.filteredDatasetPks).toBeUndefined();
-    expect(
-      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
-    ).toBeNull();
+    await renderLoaded();
+    act(() =>
+      latestMapState.setMapView((view) => ({
+        ...view,
+        bounds: [
+          [-180, -90],
+          [180, 90],
+        ],
+      })),
+    );
+    await waitFor(() =>
+      expect(latest.inViewCount).toBe(latest.pointsData.length),
+    );
+
+    const needle = latest.pointsData[0].title.slice(0, 6);
+    act(() => latest.setDatasetTitleSearchText(needle));
+    await waitFor(() =>
+      expect(latest.inViewCount).toBe(latest.filteredDatasets.length),
+    );
+    expect(latest.inViewCount).toBeLessThan(latest.pointsData.length);
+
+    act(() => latest.setDatasetTitleSearchText("zzzzqqq"));
+    await waitFor(() => expect(latest.inViewCount).toBe(0));
+  });
+
+  it("the server's in-view answer overrides a bbox that merely overlaps the view", async () => {
+    // Every row's bbox covers the view, as an OBIS dataset spread across an
+    // ocean does; the server says only the first has a feature inside it.
+    const mockedFetch = globalThis.fetch;
+    const inViewPk = pointQueryFixture[0].pk;
+    vi.stubGlobal("fetch", async (input) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/pointQuery/inView")) {
+        return new Response(JSON.stringify([inViewPk]), { status: 200 });
+      }
+      const response = await mockedFetch(input);
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row) => ({
+        ...row,
+        filtered_bbox_geojson: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [-140, 40],
+              [-50, 40],
+              [-50, 80],
+              [-140, 80],
+              [-140, 40],
+            ],
+          ],
+        },
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    await renderLoaded();
+    act(() => latest.setOnlyInView(true));
+    act(() =>
+      latestMapState.setMapView((view) => ({
+        ...view,
+        bounds: [
+          [-64, 44],
+          [-63, 45],
+        ],
+      })),
+    );
+
+    await waitFor(() => expect(latest.inViewCount).toBe(1));
+    expect(latest.filteredDatasets.map((row) => row.pk)).toEqual([inViewPk]);
   });
 
   it("\"only in view\" narrows the coverage figure's dataset list, not the map's", async () => {
@@ -279,33 +443,29 @@ describe("SelectionProvider", () => {
     expect(previewUrls().at(-1)).not.toContain("at=");
   });
 
-  it("groups by a dimension and hides datasets belonging only to hidden groups", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
-
-    const target = latest.pointsData[0];
-    act(() => latest.toggleGroupHidden(target.platform));
-    await waitFor(() => {
-      const stillHidingTarget = latest.pointsData
-        .filter((p) => p.platform === target.platform)
-        .every((p) => latest.hiddenDatasetPks.has(p.pk));
-      expect(stillHidingTarget).toBe(true);
-    });
-
-    act(() => latest.showAllGroups());
-    await waitFor(() => expect(latest.hiddenDatasetPks.size).toBe(0));
+  it("a ?preview= naming no dataset keeps the modal closed", async () => {
+    // The modal opens on inspectDataset AND inspectRecordID; a link carrying
+    // only half of that must not open an empty dialog.
+    await renderLoaded({ url: "/?preview=record-1" });
+    expect(latest.showPreviewModal).toBe(false);
   });
 
-  it("switching groupBy drops whatever was hidden under the old dimension", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
-    act(() => latest.toggleGroupHidden(latest.pointsData[0].platform));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(1));
+  it("previews one period of a record, and drops it when the record reopens without one", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    const period = { start: "2020-01-03", end: "2020-01-05" };
+    act(() => latest.setInspectRecordID("STATION_001", { period }));
+    await waitFor(() => expect(latest.inspectRecordPeriod).toEqual(period));
+    expect(window.location.search).toContain("pperiod=2020-01-03%7E2020-01-05");
+    const previewUrl = globalThis.fetch.mock.calls
+      .map(([input]) => String(input))
+      .find((url) => url.includes("/preview?"));
+    expect(previewUrl).toContain(
+      "&timeMin=2020-01-03T00:00:00Z&timeMax=2020-01-05T23:59:59Z",
+    );
 
-    act(() => latest.setGroupBy("type"));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(0));
+    act(() => latest.setInspectRecordID("STATION_001"));
+    await waitFor(() => expect(latest.inspectRecordPeriod).toBeUndefined());
   });
 
   it("addDatasetsToSelection puts the named pks aside, ignoring one absent from the results", async () => {
@@ -353,6 +513,34 @@ describe("SelectionProvider", () => {
     );
     // A toggle would have cleared it; the guard leaves it exactly as it was.
     expect(latest.selectedTrajectory).toBe(selectionBefore);
+  });
+
+  it("re-clicking the selected track elsewhere moves only the clicked area", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const first = { lngLat: [-63, 44], z: 7 };
+    const second = { lngLat: [-62, 45], z: 8 };
+    act(() =>
+      latest.selectTrajectoryFromMap(target.pk, "track-1", target.title, first),
+    );
+    await waitFor(() => expect(latest.selectedTrajectory?.area).toBe(first));
+
+    act(() =>
+      latest.selectTrajectoryFromMap(
+        target.pk,
+        "track-1",
+        target.title,
+        second,
+      ),
+    );
+    await waitFor(() =>
+      expect(latest.selectedTrajectory).toEqual({
+        datasetPk: target.pk,
+        datasetTitle: target.title,
+        trajectoryId: "track-1",
+        area: second,
+      }),
+    );
   });
 
   it("restores a ?onMap= record once its dataset page resolves, and writes it back", async () => {

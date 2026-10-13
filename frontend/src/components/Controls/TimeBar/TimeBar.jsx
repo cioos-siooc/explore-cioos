@@ -47,14 +47,9 @@ function measureBarSpace({ top, height }) {
 // the range is set there.
 export default function TimeBar() {
   const { timeFilterActive } = useFilters();
-  const { activeTip } = useTips();
   const isMobile = useMediaQuery(MOBILE_QUERY);
 
-  // Its own tip brings it up over the whole range, so there is a bar to point
-  // at before any range is set.
-  if ((!timeFilterActive && activeTip !== "sliderKeys") || isMobile) {
-    return null;
-  }
+  if (!timeFilterActive || isMobile) return null;
   return <TimeBarSurface />;
 }
 
@@ -73,7 +68,7 @@ function TimeBarSurface() {
     timeExtent,
   } = useFilters();
 
-  const { offerTip, tipHighlight } = useTips();
+  const { offerTip } = useTips();
   useEffect(() => offerTip("timeCoverage"), [offerTip]);
   const barRef = useRef(null);
   usePublishedFootprint(barRef, "--cioos-time-bar-space", measureBarSpace);
@@ -110,7 +105,6 @@ function TimeBarSurface() {
   // axis in the first place, and that a chosen window moves whole.
   const setHandleValue = useCallback(
     (handle, iso) => {
-      offerTip("sliderKeys");
       if (!windowLocked) return setFieldValue(handle, iso);
       const { start, end } = slideRange(handle, iso, {
         startDate,
@@ -122,7 +116,6 @@ function TimeBarSurface() {
       setEndDate(end);
     },
     [
-      offerTip,
       setFieldValue,
       setStartDate,
       setEndDate,
@@ -134,12 +127,7 @@ function TimeBarSurface() {
   );
 
   return (
-    <div
-      className="timeBar"
-      ref={barRef}
-      aria-label={t("timeBarAriaLabel")}
-      data-tip-highlight={tipHighlight("sliderKeys")}
-    >
+    <div className="timeBar" ref={barRef} aria-label={t("timeBarAriaLabel")}>
       {/* The fields sit inside the card, along the top of the rail they drive,
           rather than in a pill of their own floating above it: one surface for
           one control. */}

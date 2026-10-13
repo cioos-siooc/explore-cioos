@@ -5,16 +5,18 @@ import {
   CheckCircleFill,
   Download,
   FileEarmarkText,
+  GraphUp,
+  InfoCircle,
   PinMap,
   PinMapFill,
 } from "react-bootstrap-icons";
-// import platformColors from '../../platformColors'
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
@@ -29,12 +31,14 @@ import {
   formatRange,
 } from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
+import { DatasetPlatformIcon } from "../DatasetsTable/DatasetCard.jsx";
 import ListCard, {
   CardField,
   CardTags,
   ListCardSkeleton,
   useExpandableList,
 } from "./ListCard.jsx";
+import useTrajectoryPasses from "./useTrajectoryPasses.js";
 import { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 import ZoomToDataset, {
@@ -124,6 +128,51 @@ const EOV_VISIBLE_LIMIT = 3;
 // this page.
 const recordKeyOf = (row) => row.profile_id;
 
+const formatPass = ({ start, end }) =>
+  start === end ? start : `${start} → ${end}`;
+
+// A trajectory's passes through the selected area, each a button that plots
+// that period of its data. Condensed past a few like the variable tags, since a
+// ship on a regular route can cross the same hex hundreds of times.
+function PassButtons({ recordId, passes, onPlot }) {
+  const { t } = useTranslation();
+  const { shown, hidden, expanded, toggle } = useExpandableList(passes, 3);
+  return (
+    <span className="passButtons">
+      {shown.map((pass) => {
+        const label = t("datasetInspectorPlotPassTitle", {
+          id: recordId,
+          start: pass.start,
+          end: pass.end,
+        });
+        return (
+          <button
+            key={pass.start}
+            type="button"
+            className="listCardButton"
+            title={label}
+            aria-label={label}
+            onClick={() => onPlot(pass)}
+          >
+            <GraphUp size={13} aria-hidden="true" />
+            {formatPass(pass)}
+          </button>
+        );
+      })}
+      {(hidden > 0 || expanded) && (
+        <button
+          type="button"
+          className="listCardTagsMore"
+          onClick={toggle}
+          aria-expanded={expanded}
+        >
+          {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
+        </button>
+      )}
+    </span>
+  );
+}
+
 export default function DatasetInspector({
   dataset,
   // Shared with the sidebar header's back control (SelectionProvider), so both
@@ -145,25 +194,23 @@ export default function DatasetInspector({
   const { t, i18n } = useTranslation();
   const { zoomToDataset } = useZoomToDataset();
   const { eovsSelected } = useFilters();
-  const { handleSelectDataset, selectedPks, mappedRecord, setMappedRecord } =
-    useSelection();
+  const {
+    handleSelectDataset,
+    selectedPks,
+    mappedRecord,
+    setMappedRecord,
+    inspectDatasetExcluded,
+  } = useSelection();
   const { setShowDownloadModal } = useUI();
   const { offerTip, tipHighlight } = useTips();
   const isTrajectory = TRAJECTORY_TYPE_KEYS.some(
     ([, type]) => type === dataset.cdm_data_type,
   );
   const isRealtime = Boolean(dataset.is_realtime);
-  useEffect(
-    () =>
-      offerTip([
-        ...(isTrajectory ? ["trackDate"] : []),
-        ...(isRealtime ? ["realtime"] : []),
-        "datasetNav",
-      ]),
-    [offerTip, isTrajectory, isRealtime],
-  );
   const [datasetRecords, setDatasetRecords] = useState();
   const [trajectoryPlatforms, setTrajectoryPlatforms] = useState();
+  const [recordsError, setRecordsError] = useState(false);
+  const [recordsAttempt, setRecordsAttempt] = useState(0);
   const inspectorRef = useRef(null);
   const isGrid = dataset.cdm_data_type === "Grid";
   // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
@@ -175,6 +222,15 @@ export default function DatasetInspector({
     : dataset.cdm_data_type;
   // no per-record list for OBIS (external) or griddap (metadata-only)
   const hasRecordList = dataset.source_type !== "obis" && !isGrid;
+  useEffect(
+    () =>
+      offerTip([
+        ...(isTrajectory ? ["trajectory"] : []),
+        ...(isRealtime ? ["realtime"] : []),
+        ...(hasRecordList ? ["showData"] : []),
+      ]),
+    [offerTip, isTrajectory, isRealtime, hasRecordList],
+  );
   // OBIS datasets always link out to OBIS; the rest have whichever of their
   // ERDDAP / CKAN URLs the harvest found.
   const hasSources =
@@ -186,12 +242,24 @@ export default function DatasetInspector({
   const [loading, setLoading] = useState(hasRecordList);
   useActivityTask("activityRecordListText", loading);
 
-  // const platformColor = platformColors.filter(
-  //   (pc) => pc.platform === dataset.platform
-  // )
   const isTrajectoryDataset =
     dataset.source_type !== "obis" &&
     (dataset.cdm_data_type || "").includes("Trajectory");
+
+  // The clicked area: this dataset's track clicked directly, else the last
+  // click on the map (a hex, or tracks too close together to pick one).
+  const { featureQuery } = useMapState();
+  const clickedArea =
+    selectedTrajectory?.datasetPk === dataset.pk && selectedTrajectory.area
+      ? selectedTrajectory.area
+      : featureQuery?.lngLat && featureQuery.buckets
+        ? { lngLat: featureQuery.lngLat, z: featureQuery.buckets.z }
+        : undefined;
+  const passes = useTrajectoryPasses(
+    isTrajectoryDataset ? dataset.pk : undefined,
+    query,
+    clickedArea,
+  );
 
   useEffect(() => {
     if (!hasRecordList) {
@@ -212,13 +280,16 @@ export default function DatasetInspector({
         return response.json();
       })
       .then((data) => {
-        if (!cancelled) setDatasetRecords(data);
+        if (cancelled) return;
+        setDatasetRecords(data);
+        setRecordsError(false);
       })
       .catch((error) => {
-        // An error response used to leave the spinner running forever. Land on
-        // an empty record table instead — the rest of the page still reads.
+        // Said as a failure with a retry, not as an empty table, which would
+        // read as "this dataset has no records"; the rest of the page still
+        // reads.
         reportError("datasetRecordsList fetch failed", error);
-        if (!cancelled) setDatasetRecords([]);
+        if (!cancelled) setRecordsError(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -231,7 +302,7 @@ export default function DatasetInspector({
     // filter change while the page is open; the list is refreshed when the page
     // is reopened instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset, hasRecordList]);
+  }, [dataset, hasRecordList, recordsAttempt]);
 
   // Trajectory datasets: /trajectories/platforms is the only source for how many
   // fixes a track holds. It used to back a second card list of its own, whose
@@ -407,6 +478,14 @@ export default function DatasetInspector({
   // sorted to the top" treatment the datasets list itself gives a map click
   // (see DatasetsTable's pinnedPks).
   const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk;
+  const pinnedKeys = useMemo(
+    () =>
+      new Set([
+        ...passes.keys(),
+        ...(markerRecordPinned ? [highlightedRecord.profileId] : []),
+      ]),
+    [passes, markerRecordPinned, highlightedRecord],
+  );
 
   // "Show on map": a trajectory dataset's records are its trajectories
   // (shapeQuery aliases trajectory_id into profile_id), so its cards draw the
@@ -500,10 +579,7 @@ export default function DatasetInspector({
           control, in the one place that marks the panel as being on a dataset
           rather than the list. */}
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
-        <div
-          className="datasetTitleHeading"
-          data-tip-highlight={tipHighlight("datasetNav")}
-        >
+        <div className="datasetTitleHeading">
           <FileEarmarkText
             className="datasetTitleIcon"
             size={20}
@@ -541,6 +617,22 @@ export default function DatasetInspector({
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
         </div>
+        {/* A filter or the list's own narrowing can exclude a dataset whose
+            page is already open. The page stays (the user chose it), and says
+            so, since its records below now follow filters it no longer meets. */}
+        {inspectDatasetExcluded && (
+          <div className="datasetNotInResults" role="status">
+            <InfoCircle size={14} aria-hidden="true" />
+            <span>{t("datasetNotInResultsText")}</span>
+            <button
+              type="button"
+              className="datasetNotInResultsBack"
+              onClick={returnToList}
+            >
+              {t("datasetNotInResultsBackText")}
+            </button>
+          </div>
+        )}
       </div>
       <div className="datasetInspectorBody">
         {/* The front matter, as compact as it can be read: one field per
@@ -621,7 +713,18 @@ export default function DatasetInspector({
               {/* Nullable in the schema; an empty chip under a label reads as
                   a broken field. */}
               {dataset.platform ? (
-                <span className="metadataChip">{t(dataset.platform)}</span>
+                <span className="metadataChip">
+                  <span className="metadataPlatformGlyph" aria-hidden="true">
+                    <DatasetPlatformIcon
+                      platform={dataset.platform}
+                      cdmDataType={dataset.cdm_data_type}
+                      sourceType={dataset.source_type}
+                      t={t}
+                      decorative
+                    />
+                  </span>
+                  {t(dataset.platform)}
+                </span>
               ) : (
                 <span className="metadataEmpty">—</span>
               )}
@@ -664,7 +767,6 @@ export default function DatasetInspector({
                 {dataset.is_realtime && (
                   <span
                     className="datasetTitleLive"
-                    data-tip-highlight={tipHighlight("realtime")}
                     title={t("datasetRealtimeBadgeTitle")}
                   >
                     {t("datasetRealtimeBadgeText")}
@@ -732,13 +834,7 @@ export default function DatasetInspector({
           <div className="recordSection">
             <div
               className="recordSectionHeader"
-              // The drawn trajectory's track button takes the pointer when
-              // there is one.
-              data-tip-highlight={
-                isTrajectoryDataset && onMapId === undefined
-                  ? tipHighlight("trackDate")
-                  : undefined
-              }
+              data-tip-highlight={tipHighlight("showData")}
             >
               <strong>{t("datasetInspectorRecordTable")}</strong>
               <span className="recordHint">
@@ -765,12 +861,29 @@ export default function DatasetInspector({
                 </button>
               </div>
             )}
+            {passes.size > 0 && (
+              <div className="recordMapClickHint">
+                <span className="recordMapClickSwatch" aria-hidden="true" />
+                {t("datasetInspectorPassesHint", { count: passes.size })}
+              </div>
+            )}
             {loading ? (
               <SkeletonGroup className="cardList">
                 {Array.from({ length: 5 }, (_, i) => (
                   <ListCardSkeleton key={i} />
                 ))}
               </SkeletonGroup>
+            ) : recordsError ? (
+              <div className="cardListEmpty" role="alert">
+                {t("datasetInspectorRecordsLoadFailedText")}{" "}
+                <button
+                  type="button"
+                  className="recordShowAll"
+                  onClick={() => setRecordsAttempt((attempt) => attempt + 1)}
+                >
+                  {t("apiErrorRetryButton")}
+                </button>
+              </div>
             ) : (
               <CardList
                 items={datasetRecords?.profiles}
@@ -779,9 +892,7 @@ export default function DatasetInspector({
                 defaultSort={{ field: "id", dir: "desc" }}
                 filterPlaceholder={t("datasetInspectorFilterText")}
                 emptyText={t("datasetInspectorNoRecordsText")}
-                pinnedKey={
-                  markerRecordPinned ? highlightedRecord.profileId : undefined
-                }
+                pinnedKeys={pinnedKeys}
                 focusKey={onMapId}
                 pagerLabel={t("datasetInspectorRecordsPagerLabel")}
                 perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
@@ -796,48 +907,63 @@ export default function DatasetInspector({
                   return (
                     <ListCard
                       id={row.profile_id || "—"}
-                      pinned={
-                        markerRecordPinned &&
-                        row.profile_id === highlightedRecord.profileId
-                      }
+                      pinned={pinnedKeys.has(row.profile_id)}
                       selected={onMap}
-                      action={
-                        // A record with no id cannot be looked up again.
-                        (isTrajectoryDataset || row.profile_id) && (
-                          <button
-                            type="button"
-                            className="listCardMapButton"
-                            aria-pressed={onMap}
-                            data-tip-highlight={
-                              onMap && isTrajectoryDataset
-                                ? tipHighlight("trackDate")
-                                : undefined
-                            }
-                            title={t(
-                              onMap
-                                ? "datasetInspectorHideFromMapTitle"
-                                : isTrajectoryDataset
-                                  ? "trajectoryTrackShowTitle"
-                                  : "datasetInspectorShowOnMapTitle",
-                            )}
-                            onClick={() => toggleOnMap(row.profile_id)}
-                          >
-                            {onMap ? (
-                              <PinMapFill size={13} aria-hidden="true" />
-                            ) : (
-                              <PinMap size={13} aria-hidden="true" />
-                            )}
-                            {t("datasetInspectorShowOnMapText")}
-                          </button>
-                        )
+                      actions={
+                        <>
+                          {/* A record with no id cannot be looked up again. */}
+                          {row.profile_id && (
+                            <button
+                              type="button"
+                              className="listCardButton"
+                              title={t("datasetInspectorShowDataTitle")}
+                              onClick={() => setInspectRecordID(row.profile_id)}
+                            >
+                              <GraphUp size={13} aria-hidden="true" />
+                              {t("datasetInspectorShowDataText")}
+                            </button>
+                          )}
+                          {(isTrajectoryDataset || row.profile_id) && (
+                            <button
+                              type="button"
+                              className="listCardButton"
+                              aria-pressed={onMap}
+                              title={t(
+                                onMap
+                                  ? "datasetInspectorHideFromMapTitle"
+                                  : isTrajectoryDataset
+                                    ? "trajectoryTrackShowTitle"
+                                    : "datasetInspectorShowOnMapTitle",
+                              )}
+                              onClick={() => toggleOnMap(row.profile_id)}
+                            >
+                              {onMap ? (
+                                <PinMapFill size={13} aria-hidden="true" />
+                              ) : (
+                                <PinMap size={13} aria-hidden="true" />
+                              )}
+                              {t("datasetInspectorShowOnMapText")}
+                            </button>
+                          )}
+                        </>
                       }
-                      onClick={() => setInspectRecordID(row.profile_id)}
                     >
                       <CardField
                         label={t("datasetInspectorTimeframeText")}
                         nowrap
                       >
                         {formatInstantRange(row.time_min, row.time_max)}
+                      </CardField>
+                      <CardField label={t("datasetInspectorPassesText")}>
+                        {passes.get(row.profile_id) && (
+                          <PassButtons
+                            recordId={row.profile_id}
+                            passes={passes.get(row.profile_id)}
+                            onPlot={(period) =>
+                              setInspectRecordID(row.profile_id, { period })
+                            }
+                          />
+                        )}
                       </CardField>
                       <CardField label={t("datasetInspectorDepthRangeText")}>
                         {formatRange(row.depth_min, row.depth_max, "m")}

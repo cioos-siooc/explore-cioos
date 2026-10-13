@@ -10,20 +10,15 @@ import {
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
+import { eovCategory } from "../datasetGroups.js";
 import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
 
 import platformsJSONfile from "../../platforms.json";
+// Both copied verbatim from cioos-commons/eovs/ (eov.json, categories.json).
 import eovsJSONfile from "../../eovs.json";
+import eovCategoriesJSONfile from "../../eovCategories.json";
 import erddapServersJSONfile from "../../erddapServers.json";
-
-// An ERDDAP server's display name in the current language. erddapServers.json
-// is the label source; a server we carry no metadata for shows its URL.
-function erddapServerTitle(url, language) {
-  const metadata = erddapServersJSONfile.find((s) => s.url === url);
-  if (!metadata) return url;
-  return language === "fr" ? metadata.label_fr : metadata.label_en;
-}
 import { server } from "../../config.js";
 import {
   defaultEovsSelected,
@@ -42,8 +37,8 @@ import {
 import {
   capitalizeFirstLetter,
   useDebounce,
-  setAllOptionsIsSelectedTo,
   createDataFilterQueryString,
+  formatErddapServerName,
 } from "../../utilities.jsx";
 
 const FilterContext = createContext();
@@ -111,7 +106,11 @@ export default function FilterProvider({ children }) {
     () =>
       erddapServerSelections.map((server) => ({
         ...server,
-        title: erddapServerTitle(server.url, i18n.language),
+        title: formatErddapServerName(
+          server.url,
+          i18n.language,
+          erddapServersJSONfile,
+        ),
       })),
     [erddapServerSelections, i18n.language],
   );
@@ -367,12 +366,15 @@ export default function FilterProvider({ children }) {
       setEovsSelected(
         eovs.map((eov, index) => {
           const eovMetadata = eovsJSONfile.find((e) => e.value === eov);
+          const category = eovCategory(eov);
 
           return {
             title: eov,
             isSelected: eovsFromURL.includes(eov),
             isExcluded: eovsExcludedFromURL.includes(eov),
             pk: index,
+            category,
+            categoryTranslated: eovCategoriesJSONfile[category],
             hover_en: eovMetadata?.["definition EN"],
             hover_fr: eovMetadata?.["definition FR"],
           };
@@ -565,204 +567,6 @@ export default function FilterProvider({ children }) {
     return capitalizeFirstLetter(title);
   };
 
-  // Build the active-filter descriptor for one multi-select filter: the list
-  // of chosen options (each removable on its own) plus a clear-all handler.
-  const matchAllLabel = (label, matchAll, includedCount) =>
-    matchAll && includedCount > 1 ? `${label} (${t("filterMatchAll")})` : label;
-
-  const buildMultiActiveFilter = (
-    key,
-    label,
-    selected,
-    setSelected,
-    translatable,
-    matchAll = false,
-  ) => {
-    const chosen = selected.filter((o) => o.isSelected || o.isExcluded);
-    if (chosen.length === 0) return false;
-    return {
-      key,
-      label: matchAllLabel(
-        label,
-        matchAll,
-        chosen.filter((o) => o.isSelected).length,
-      ),
-      removeAll: () => setAllOptionsIsSelectedTo(false, selected, setSelected),
-      items: chosen.map((o) => ({
-        id: o.pk,
-        label: optionLabel(o, translatable),
-        excluded: Boolean(o.isExcluded),
-        remove: () =>
-          setSelected(
-            selected.map((opt) =>
-              opt.pk === o.pk
-                ? { ...opt, isSelected: false, isExcluded: false }
-                : opt,
-            ),
-          ),
-      })),
-    };
-  };
-
-  // Filters currently constraining the map — surfaced as chips/bullets that
-  // show what's applied. Each can be dropped whole, or value-by-value,
-  // without opening the filters UI. Range labels (time/depth) are appended by
-  // the consumer since they depend on presentation helpers.
-  const buildActiveFilters = ({ timeframesBadgeTitle, depthRangeBadgeTitle }) =>
-    [
-      buildMultiActiveFilter(
-        "eovs",
-        t("oceanVariablesFiltername"),
-        eovsSelected,
-        setEovsSelected,
-        true,
-        eovsMatchAll,
-      ),
-      buildMultiActiveFilter(
-        "platforms",
-        t("platformsFilterName"),
-        platformsSelected,
-        setPlatformsSelected,
-        true,
-      ),
-      buildMultiActiveFilter(
-        "orgs",
-        t("organizationFilterName"),
-        orgsSelected,
-        setOrgsSelected,
-        false,
-        orgsMatchAll,
-      ),
-      buildMultiActiveFilter(
-        "datasets",
-        t("datasetsFilterName"),
-        datasetsSelected,
-        setDatasetsSelected,
-        true,
-      ),
-      (() => {
-        // ERDDAP servers and OBIS nodes share a single "Data Portal" filter, so
-        // they surface as one combined chip. Each chosen option is tagged with
-        // its source array to avoid cross-deselecting on colliding pk values.
-        const chosen = [
-          ...erddapServersSelected
-            .filter((o) => o.isSelected || o.isExcluded)
-            .map((o) => ({
-              o,
-              src: "erddap",
-              all: erddapServersSelected,
-              setSelected: setErddapServersSelected,
-            })),
-          ...obisNodesSelected
-            .filter((o) => o.isSelected || o.isExcluded)
-            .map((o) => ({
-              o,
-              src: "obis",
-              all: obisNodesSelected,
-              setSelected: setObisNodesSelected,
-            })),
-        ];
-        if (chosen.length === 0) return false;
-        return {
-          key: "sources",
-          label: t("sourceFilterName"),
-          removeAll: () => {
-            setAllOptionsIsSelectedTo(
-              false,
-              erddapServersSelected,
-              setErddapServersSelected,
-            );
-            setAllOptionsIsSelectedTo(
-              false,
-              obisNodesSelected,
-              setObisNodesSelected,
-            );
-          },
-          items: chosen.map(({ o, src, all, setSelected }) => ({
-            id: `${src}-${o.pk}`,
-            label: optionLabel(o, false),
-            excluded: Boolean(o.isExcluded),
-            remove: () =>
-              setSelected(
-                all.map((opt) =>
-                  opt.pk === o.pk
-                    ? { ...opt, isSelected: false, isExcluded: false }
-                    : opt,
-                ),
-              ),
-          })),
-        };
-      })(),
-      timeFilterActive && {
-        key: "time",
-        label: t("timeframeFilterName"),
-        removeAll: () => {
-          setStartDate(defaultStartDate);
-          setEndDate(defaultEndDate);
-        },
-        items: [
-          {
-            id: "time",
-            label: timeframesBadgeTitle,
-            remove: () => {
-              setStartDate(defaultStartDate);
-              setEndDate(defaultEndDate);
-            },
-          },
-        ],
-      },
-      depthFilterActive && {
-        key: "depth",
-        label: t("depthRangeFilterName"),
-        removeAll: () => {
-          setStartDepth(defaultStartDepth);
-          setEndDepth(defaultEndDepth);
-        },
-        items: [
-          {
-            id: "depth",
-            label: depthRangeBadgeTitle,
-            remove: () => {
-              setStartDepth(defaultStartDepth);
-              setEndDepth(defaultEndDepth);
-            },
-          },
-        ],
-      },
-      (scientificNamesSelected.length > 0 ||
-        scientificNamesExcluded.length > 0) && {
-        key: "scientificName",
-        label: matchAllLabel(
-          t("scientificNameFilterName"),
-          scientificNamesMatchAll,
-          scientificNamesSelected.length,
-        ),
-        removeAll: () => {
-          setScientificNamesSelected([]);
-          setScientificNamesExcluded([]);
-        },
-        items: [
-          ...scientificNamesSelected.map((name) => ({
-            id: name,
-            label: name,
-            remove: () =>
-              setScientificNamesSelected(
-                scientificNamesSelected.filter((n) => n !== name),
-              ),
-          })),
-          ...scientificNamesExcluded.map((name) => ({
-            id: `not-${name}`,
-            label: name,
-            excluded: true,
-            remove: () =>
-              setScientificNamesExcluded(
-                scientificNamesExcluded.filter((n) => n !== name),
-              ),
-          })),
-        ],
-      },
-    ].filter(Boolean);
-
   const value = {
     query,
     eovsSelected,
@@ -818,7 +622,7 @@ export default function FilterProvider({ children }) {
     obisDataAvailable,
     totalNumberOfDatasets,
     resetFilters,
-    buildActiveFilters,
+    optionLabel,
     catalogError,
     catalogLoaded,
     loadCatalog,

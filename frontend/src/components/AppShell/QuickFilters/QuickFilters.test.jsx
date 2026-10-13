@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -29,10 +29,9 @@ describe("QuickFilters", () => {
     installMockFetch();
   });
 
-  // The row writes nothing of its own: the search publishes the same
-  // datasetTitleSearchText the datasets list does, and the Area menu sends
-  // the same one-shot requestDraw the map already answers. Both are asserted
-  // through that shared state rather than through the markup.
+  // The row writes nothing of its own: the Area menu sends the same one-shot
+  // requestDraw the map already answers, asserted through that shared state
+  // rather than through the markup.
   function renderRow(url = "/") {
     const seen = { search: [], draw: [], onlyInView: [], realtimeOnly: [] };
     function Probe() {
@@ -55,112 +54,6 @@ describe("QuickFilters", () => {
     );
     return { user, seen };
   }
-
-  const openSearch = async (user) =>
-    user.click(screen.getByTestId("quick-filter-search"));
-
-  it("keeps the search field away until it is asked for", async () => {
-    renderRow();
-    expect(screen.queryByTestId("quick-filter-search-input")).toBeNull();
-    expect(screen.getByTestId("quick-filter-search")).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-  });
-
-  // The search reaches the map, the counts and the datasets list, so it
-  // publishes when asked for — Enter — never on a pause mid-word.
-  it("publishes the typed text on Enter, and nothing before it", async () => {
-    const { user, seen } = renderRow();
-    await openSearch(user);
-
-    const box = screen.getByTestId("quick-filter-search-input");
-    await user.type(box, "temp");
-    expect(seen.search.at(-1)).toBe("");
-
-    await user.type(box, "{Enter}");
-
-    await waitFor(() => expect(seen.search.at(-1)).toBe("temp"));
-    expect([...new Set(seen.search)]).toEqual(["", "temp"]);
-  });
-
-  it("publishes on the magnifier too — open, it is the same submit", async () => {
-    const { user, seen } = renderRow();
-    await openSearch(user);
-
-    await user.type(screen.getByTestId("quick-filter-search-input"), "temp");
-    await user.click(screen.getByTestId("quick-filter-search"));
-
-    await waitFor(() => expect(seen.search.at(-1)).toBe("temp"));
-  });
-
-  // The hook lives in the row rather than in the field, so a word typed and
-  // then abandoned is neither published nor lost.
-  it("does not search for a draft abandoned by closing the field", async () => {
-    const { user, seen } = renderRow();
-    await openSearch(user);
-
-    await user.type(screen.getByTestId("quick-filter-search-input"), "temp");
-    await user.keyboard("{Escape}");
-
-    await waitFor(() =>
-      expect(screen.queryByTestId("quick-filter-search-input")).toBeNull(),
-    );
-    expect([...new Set(seen.search)]).toEqual([""]);
-
-    // ...and it is still there on the way back in.
-    await openSearch(user);
-    expect(screen.getByTestId("quick-filter-search-input")).toHaveValue("temp");
-  });
-
-  it("closes the empty field when focus leaves it", async () => {
-    const { user } = renderRow();
-    await openSearch(user);
-
-    await user.click(document.body);
-
-    await waitFor(() =>
-      expect(screen.queryByTestId("quick-filter-search-input")).toBeNull(),
-    );
-  });
-
-  it("keeps the field open on blur while a draft is still in it", async () => {
-    const { user } = renderRow();
-    await openSearch(user);
-
-    await user.type(screen.getByTestId("quick-filter-search-input"), "temp");
-    await user.click(document.body);
-
-    expect(screen.getByTestId("quick-filter-search-input")).toBeInTheDocument();
-  });
-
-  it("does not close moving focus to its own clear button", async () => {
-    const { user } = renderRow("/?search=temperature");
-
-    screen.getByTestId("quick-filter-search-input").focus();
-    await user.tab();
-
-    expect(screen.getByTestId("quick-filter-search-clear")).toHaveFocus();
-    expect(screen.getByTestId("quick-filter-search-input")).toBeInTheDocument();
-  });
-
-  it("holds the field open for a term carried in the link", async () => {
-    renderRow("/?search=temperature");
-    const box = screen.getByTestId("quick-filter-search-input");
-    expect(box).toHaveValue("temperature");
-    // Opened by the term rather than by a press, so the caret is left wherever
-    // the page put it.
-    expect(box).not.toHaveFocus();
-  });
-
-  it("clears the search immediately, without waiting to be submitted", async () => {
-    const { user, seen } = renderRow("/?search=temperature");
-
-    await user.click(screen.getByTestId("quick-filter-search-clear"));
-
-    await waitFor(() => expect(seen.search.at(-1)).toBe(""));
-    expect(screen.queryByTestId("quick-filter-search-input")).toBeNull();
-  });
 
   const openArea = async (user) =>
     user.click(screen.getByTestId("quick-filter-area"));
@@ -281,11 +174,72 @@ describe("QuickFilters", () => {
     expect(screen.getByTestId("quick-filter-reset")).toBeEnabled();
   });
 
-  it("is named by its visible label", () => {
+  it("is named for assistive tech", () => {
     renderRow();
     expect(
       screen.getByRole("group", { name: "Quick filters" }),
     ).toBeInTheDocument();
+  });
+
+  it("previews on the real-time button how many listed datasets it keeps, until it is on", async () => {
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const rows = (await response.json()).map((row, i) => ({
+        ...row,
+        is_realtime: i < 3,
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    const { user } = renderRow();
+    expect(screen.queryByTestId("quick-filter-realtime-count")).toBeNull();
+
+    const count = await screen.findByTestId("quick-filter-realtime-count");
+    await waitFor(() => expect(count).toHaveTextContent("3"));
+    const button = screen.getByTestId("quick-filter-realtime");
+    expect(button).toHaveAccessibleDescription("3 datasets");
+    expect(
+      screen.getByTestId("quick-filter-in-view-count"),
+    ).toBeInTheDocument();
+
+    await user.click(button);
+    expect(screen.queryByTestId("quick-filter-realtime-count")).toBeNull();
+    expect(button).not.toHaveAccessibleDescription(/3 datasets/);
+  });
+
+  it("shows the in-view count inside its button, under the icon", async () => {
+    renderRow();
+    const count = await screen.findByTestId("quick-filter-in-view-count");
+    const button = screen.getByTestId("quick-filter-in-view");
+    expect(button).toContainElement(count);
+    expect(button.querySelector(".quickFilterCaption")).not.toContainElement(
+      count,
+    );
+  });
+
+  it("shortens a big count on the button but describes the button with it in full", async () => {
+    const mockedFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input) => {
+      const response = await mockedFetch(input);
+      const url = typeof input === "string" ? input : input.url;
+      if (!url.includes("/pointQuery")) return response;
+      const [row] = await response.json();
+      const rows = Array.from({ length: 2150 }, (_, i) => ({
+        ...row,
+        pk: i + 1,
+        is_realtime: true,
+      }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    });
+    renderRow();
+
+    const count = await screen.findByTestId("quick-filter-realtime-count");
+    await waitFor(() => expect(count).toHaveTextContent("2.2K"));
+    expect(
+      screen.getByTestId("quick-filter-realtime"),
+    ).toHaveAccessibleDescription("2,150 datasets");
   });
 
   it("drops every quick filter at once", async () => {
@@ -303,12 +257,9 @@ describe("QuickFilters", () => {
     });
   });
 
-  // The reset button is the same one tested above (quick-filter-reset):
-  // there is only the one, for the modal filters the chips show and the
-  // quick ones together — mounted alongside ActiveFilterChips here rather
-  // than in that component's own tests, since it renders no reset of its
-  // own. The Show/Hide toggle for both rows now rides on the main Filters
-  // button instead (see TopControls.test.jsx).
+  // There is only the one reset, for the modal filters the chips show and the
+  // quick ones together — mounted alongside ActiveFilterChips here rather than
+  // in that component's own tests, since it renders no reset of its own.
   it("the single reset clears the modal filter along with the quick ones", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(

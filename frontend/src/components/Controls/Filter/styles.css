@@ -119,7 +119,7 @@
 
 .filterOptionsActions button:hover {
   background-color: var(--cioos-primary);
-  color: var(--cioos-white);
+  color: var(--cioos-on-primary);
 }
 
 /* The field and its clear button as one positioned unit — see Filter.jsx. */
@@ -173,44 +173,6 @@
 .clearFilter:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
-}
-
-/* Text Search only (see Filter's searchOnSubmit): the trailing edge is the
-   submit button, and Clear moves inboard of it so the two sit side by side
-   rather than on top of each other. */
-.filterSearchSubmit {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--cioos-radius-sm);
-  background: transparent;
-  color: var(--cioos-ink-60);
-  cursor: pointer;
-}
-
-.filterSearchSubmit:hover {
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-ink);
-}
-
-.filterSearchSubmit:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-.filterSearchRow.withSubmit .clearFilter {
-  right: 38px;
-}
-
-.filterSearchRow.withSubmit .filterSearch {
-  padding-right: 80px;
 }
 
 .filterInfoButton {
@@ -354,7 +316,7 @@
  * typed fields at least 16px, below which Safari zooms the whole page in
  * when one takes focus.
  * ------------------------------------------------------------------ */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .filterSearch {
     min-height: 44px;
 

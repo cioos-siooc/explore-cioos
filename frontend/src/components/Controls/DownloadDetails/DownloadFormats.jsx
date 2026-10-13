@@ -8,13 +8,10 @@ import "./styles.css";
 /*
  * What file every link in this modal asks for — one setting per source.
  *
- * It sits on the datasets toolbar rather than in the direct-links column
- * because it governs more than that column: DownloadDetails builds one set of
- * links from it and hands them both to the export buttons below and to the
- * "Download CSV" button on every card in the list. Set to Parquet inside a
- * panel labelled "Direct links", it silently relabelled forty buttons
- * elsewhere on the screen; above the list, it reads as what it is — a setting
- * for everything under it.
+ * It sits in the footer's direct-links column and stays there while the links
+ * are collapsed, so the format choice is visible before they are asked for.
+ * DownloadDetails builds one set of links from it and hands them both to the
+ * export buttons and to the per-card query links.
  *
  * Which pickers appear at all follows the selection: a basket of only OBIS
  * occurrences has no use for a tabledap format, and vice versa.

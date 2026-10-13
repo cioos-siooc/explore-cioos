@@ -8,6 +8,8 @@ offline and deterministically.
 
 import pandas as pd
 import pytest
+import requests
+from cde_harvester.core.errors import HASH_CKAN_UNAVAILABLE
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     erddap_join_key,
     get_ckan_records,
@@ -15,6 +17,8 @@ from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     unescape_ascii,
     unescape_ascii_list,
 )
+from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.sources.ckan.state import PREVIOUS_CKAN_COLUMNS, load_previous_ckan
 from conftest import (
     CKAN_EMPTY_RESPONSE,
     CKAN_PACKAGE_SEARCH_RESPONSE,
@@ -228,9 +232,86 @@ class TestGetCkanRecordsMatching:
         df = get_ckan_records(None)
         assert df["dataset_id"].tolist() == ["good"]
 
+    def test_record_without_french_title_kept(self, mocker):
+        record = _record("en-only", "https://erddap.ogsl.ca/erddap/tabledap/x.html")
+        record["title_translated"] = {"en": "English only"}
+        _make_ckan_get(mocker, _search_pages(record))
+        df = get_ckan_records(None)
+        assert df["ckan_title"].tolist() == ["English only"]
+        assert df["title_fr"].isna().all()
+
+
+class TestCkanUnavailable:
+    def test_outage_returns_none(self, mocker):
+        session = mocker.MagicMock()
+        session.get.side_effect = requests.ConnectionError("down")
+        mocker.patch(
+            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+            return_value=session,
+        )
+        assert get_ckan_records([DATASET_ID]) is None
+
+    def test_non_json_body_returns_none(self, mocker):
+        resp = mocker.MagicMock()
+        resp.json.side_effect = requests.exceptions.JSONDecodeError("x", "<html>", 0)
+        resp.text = "<html>"
+        session = mocker.MagicMock()
+        session.get.return_value = resp
+        mocker.patch(
+            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+            return_value=session,
+        )
+        assert get_ckan_records([DATASET_ID]) is None
+
+    def test_failed_obis_lookup_restored_from_stored_metadata(self, mocker):
+        mocker.patch(
+            "cde_harvester.sources.ckan.create_ckan_obis_link.requests.get",
+            side_effect=requests.ConnectionError("down"),
+        )
+        load = mocker.patch(
+            "cde_harvester.sources.ckan.create_ckan_obis_link.load_previous_ckan",
+            return_value=pd.DataFrame([
+                {"erddap_url": "https://obis.org", "dataset_id": d, "ckan_id": f"ckan-{d}",
+                 "title": "Stored", "title_fr": "Stocké", "organizations": [], "eovs": ["fish"]}
+                for d in ("uuid-1", "uuid-other")
+            ]),
+        )
+        df = get_ckan_obis_records(["uuid-1", "uuid-2"], erddap_url="https://obis.org")
+        load.assert_called_once_with(["https://obis.org"])
+        assert df.to_dict("records") == [{
+            "dataset_id": "uuid-1", "ckan_id": "ckan-uuid-1", "ckan_eovs": ["fish"],
+            "ckan_title": "Stored", "title_fr": "Stocké",
+        }]
+
+    def test_stored_metadata_lookup_fails_open(self, mocker):
+        mocker.patch(
+            "cde_harvester.sources.ckan.state.create_db_engine",
+            side_effect=RuntimeError("no db"),
+        )
+        df = load_previous_ckan(["https://obis.org"])
+        assert df.empty
+        assert list(df.columns) == PREVIOUS_CKAN_COLUMNS
+
+    def test_failed_obis_lookup_not_cached(self, mocker, tmp_path):
+        get = mocker.patch(
+            "cde_harvester.sources.ckan.create_ckan_obis_link.requests.get",
+            side_effect=requests.ConnectionError("down"),
+        )
+        assert get_ckan_obis_records(["uuid-1"], cache_folder=str(tmp_path)).empty
+        assert list(tmp_path.iterdir()) == []
+
+        found = mocker.MagicMock()
+        found.json.return_value = {"result": {"results": [
+            {"id": "ckan-1", "title_translated": {"en": "t", "fr": "f"}},
+        ]}}
+        get.side_effect = None
+        get.return_value = found
+        df = get_ckan_obis_records(["uuid-1"], cache_folder=str(tmp_path))
+        assert df["ckan_id"].tolist() == ["ckan-1"]
+
 
 class TestMergeCkanJoin:
-    def _merge(self, mocker, tmp_path, ckan_erddap_url):
+    def _merge(self, mocker, tmp_path, ckan_erddap_url, ckan_available=True):
         from cde_harvester.__main__ import merge_and_write_csvs
 
         logger = mocker.MagicMock()
@@ -240,6 +321,8 @@ class TestMergeCkanJoin:
             "dataset_id": ["matched", "orphan"],
             "title": ["t1", "t2"],
             "organizations": [["org"], ["org"]],
+            "content_hash": ["h1", "h2"],
+            "content_hash_reason": [None, None],
         })
         df_ckan = pd.DataFrame({
             "erddap_url": [ckan_erddap_url],
@@ -252,7 +335,8 @@ class TestMergeCkanJoin:
         merge_and_write_csvs.fn(
             str(tmp_path), erddap_datasets,
             pd.DataFrame({"depth_min": [], "depth_max": []}), pd.DataFrame(),
-            pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), df_ckan,
+            pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),
+            df_ckan if ckan_available else None,
         )
         return pd.read_csv(tmp_path / "datasets.csv").set_index("dataset_id"), logger
 
@@ -266,3 +350,41 @@ class TestMergeCkanJoin:
         message = logger.warning.call_args_list[0].args[0]
         assert message.startswith("1 ERDDAP datasets have no CKAN record")
         assert "https://erddap.amundsenscience.com/erddap/orphan" in message
+
+    def test_ckan_outage_keeps_stored_metadata(self, mocker, tmp_path):
+        load = mocker.patch(
+            "cde_harvester.__main__.load_previous_ckan",
+            return_value=pd.DataFrame([{
+                "erddap_url": "https://erddap.amundsenscience.com/erddap",
+                "dataset_id": "matched", "ckan_id": "ckan-1", "title": "Stored title",
+                "title_fr": "Titre stocké", "organizations": ["Stored org"], "eovs": ["seaSurfaceTemperature"],
+            }]),
+        )
+        datasets, logger = self._merge(
+            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap", ckan_available=False,
+        )
+        load.assert_called_once()
+        matched = datasets.loc["matched"]
+        assert (matched["ckan_id"], matched["title"], matched["title_fr"]) == (
+            "ckan-1", "Stored title", "Titre stocké",
+        )
+        assert matched["organizations"] == "['Stored org']"
+        assert matched["content_hash"] == "h1"
+        assert logger.warning.call_args_list[0].args[0].startswith("CKAN unavailable")
+
+    def test_ckan_outage_clears_hash_of_datasets_without_stored_link(self, mocker, tmp_path):
+        mocker.patch(
+            "cde_harvester.__main__.load_previous_ckan",
+            return_value=pd.DataFrame(columns=PREVIOUS_CKAN_COLUMNS),
+        )
+        datasets, _ = self._merge(
+            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap", ckan_available=False,
+        )
+        assert datasets["ckan_id"].isna().all()
+        assert datasets["title"].tolist() == ["t1", "t2"]
+        assert datasets["content_hash"].isna().all()
+        assert (datasets["content_hash_reason"] == HASH_CKAN_UNAVAILABLE).all()
+
+    def test_hash_kept_when_ckan_available(self, mocker, tmp_path):
+        datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")
+        assert datasets.loc["matched", "content_hash"] == "h1"

@@ -6,10 +6,8 @@ import Spinner from "../ui/Spinner.jsx";
 import { server } from "../../config";
 import fetchJson from "../../state/fetchJson.js";
 import reportError from "../../state/reportError.js";
-import { useFilters } from "../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
-import { useTips } from "../../state/tips/TipsProvider.jsx";
 
 // Map.jsx's WATCHED_MAP_LAYERS ids that draw data rather than basemap.
 const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
@@ -17,13 +15,12 @@ const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
 // Single adapter between the state providers and the imperative Map
 // component — Map.js keeps its prop-based interface untouched.
 export default function MapContainer() {
-  const { setDatasetsSelected } = useFilters();
-  const { offerTip } = useTips();
   const {
     mapQueryString,
     setLoading,
     reportFirstPaint,
     setLoadingLayers,
+    mapView,
     loadingLayers,
     firstPaintPending,
     setMapView,
@@ -59,6 +56,7 @@ export default function MapContainer() {
     setHighlightedRecord,
     setInspectRecordID,
     selectedTrajectory,
+    setSelectedTrajectory,
     selectTrajectoryFromMap,
     mappedRecord,
     pointsData,
@@ -76,11 +74,14 @@ export default function MapContainer() {
   // cluster of markers too ambiguous for onMarkerClick below) reports what it
   // found through featureQuery, which the datasets list reads to sort and
   // outline the matching rows (DatasetsTable's pinnedPks) — an answer only
-  // the list can give. While a dataset is open the map is keyed to that one
-  // dataset, so the click asks nothing of the others: no card, no ring, and
-  // the page stays put. The marker and track shortcuts below still apply.
+  // the list can give. While a dataset is open the page stays put (the card
+  // hides itself), but the click still names the selected area its record
+  // list pins trajectories by, so it is recorded rather than dropped.
   const handleFeatureQuery = (query) => {
-    if (query && inspectDataset) return;
+    // The newest click names the area, so it replaces a track click's.
+    if (selectedTrajectory?.area) {
+      setSelectedTrajectory((prev) => prev && { ...prev, area: undefined });
+    }
     setFeatureQuery(query);
   };
 
@@ -150,12 +151,12 @@ export default function MapContainer() {
         setLoading={setLoading}
         setLoadingLayers={setLoadingLayers}
         mapQueryString={mapQueryString}
+        initialView={mapView}
         setMapView={setMapView}
         rangeLevels={rangeLevels}
         coverageRangeLevels={coverageRangeLevels}
         onViewportHexRange={setViewportHexRange}
         onFeatureQuery={handleFeatureQuery}
-        onShapeDrawn={() => offerTip("reshapeArea")}
         featureQuery={featureQuery}
         sharedFeatureQueryAt={sharedFeatureQueryAt}
         onMarkerClick={onMarkerClick}
@@ -163,7 +164,6 @@ export default function MapContainer() {
         setHoveredDataset={setHoveredDataset}
         hoveredDataset={hoveredDataset}
         inspectDataset={inspectDataset}
-        setDatasetsSelected={setDatasetsSelected}
         tracksMode={tracksMode}
         scrubTime={debouncedScrubTime}
         trailingDays={trailingDays}

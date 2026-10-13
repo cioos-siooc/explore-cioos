@@ -1,24 +1,52 @@
-.sourceFilter .obisGroupButton {
+.sourceFilter .sourceGroupRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
-.sourceFilter .obisGroupButton svg {
+.sourceFilter .sourceGroupRow .sourceGroupButton {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sourceFilter .sourceGroupButton svg {
   flex-shrink: 0;
 }
 
-.sourceFilter .obisGroupButton .optionName {
+.sourceFilter .sourceGroupButton .optionName {
   flex-grow: 1;
 }
 
-.sourceFilter .obisGroupChevron {
-  padding: 0 8px;
+.sourceFilter .sourceGroupChevron {
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
 
-.sourceFilter .obisGroupChevron:hover {
+.sourceFilter .sourceGroupChevron:hover {
   color: var(--cioos-primary);
 }
 
-.sourceFilter .obisGroupChildren {
+.sourceFilter .sourceGroupChildren {
   margin-left: 25px;
+}
+
+.sourceFilter .sourceGroupMore {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sourceFilter .sourceGroupMore:hover {
+  color: var(--cioos-primary);
+}
+
+.sourceFilter .sourceGroupMore:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }

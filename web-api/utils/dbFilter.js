@@ -11,6 +11,25 @@ const db = require("../db");
 // programmatic clients.
 const MAX_EXPANDED_APHIA_IDS = 5000;
 
+// The request parameters whose predicates read feature columns rather than
+// cde.datasets — see `datasetLevelOnly` at the end of createDBFilter.
+const FEATURE_LEVEL_PARAMS = [
+  "timeMin",
+  "timeMax",
+  "depthMin",
+  "depthMax",
+  "latMin",
+  "latMax",
+  "lonMin",
+  "lonMax",
+  "polygon",
+  "eovs",
+  "excludeEovs",
+  "pointPKs",
+  "scientificNames",
+  "excludeScientificNames",
+];
+
 // Pre-computes the rolldown expansion in one fast query (~30ms even for
 // Phylum). Returns the set of AphiaIDs a selection rolls down to: the selected
 // names' accepted AphiaIDs (covers synonyms via shared valid_AphiaID) UNION
@@ -446,11 +465,16 @@ async function createDBFilter(
   // can omit: it lands in an outer WHERE that is dropped entirely when nothing
   // narrows it. The other two are bound inside a branch's own WHERE, where
   // "TRUE" is the right answer and no caller ever needs to ask.
+  //
+  // `datasetLevelOnly` says every predicate reads cde.datasets alone, so a
+  // pre-aggregated row set (cde.hexes_zoom_0_rollup) answers the selection
+  // exactly; the others test a feature's own time, depth, place, EOVs or taxa.
   return {
     shared: db.raw(sharedSql, parameters),
     obisOnly: db.raw(obisSql, parameters),
     profileOnly: db.raw(profileSql, parameters),
     hasShared: filters.length > 0,
+    datasetLevelOnly: !FEATURE_LEVEL_PARAMS.some((name) => request[name]),
   };
 }
 

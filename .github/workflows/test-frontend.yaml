@@ -39,9 +39,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          # frontend/package.json declares engines.node >= 22, and the frontend
-          # image builds on node:22-alpine.
-          node-version: 22
+          # frontend/package.json declares engines.node >= 24, and the frontend
+          # image builds on node:24-alpine.
+          node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -70,7 +70,7 @@ jobs:
       # Running in the container is what makes the a11y node counts
       # reproducible: it is the same image e2e/in-container.sh uses locally,
       # so fonts and Chromium match rather than differing per machine.
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
       # Chromium dies on the default 64MB /dev/shm.
       options: --ipc=host
     steps:
@@ -78,7 +78,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

@@ -1,11 +1,12 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import TopControls from "./TopControls.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 
 describe("TopControls", () => {
   beforeEach(() => {
@@ -33,7 +34,7 @@ describe("TopControls", () => {
   // opening it (see styles.css' .topBarFiltersToggle) — a real button beside
   // the one that opens the modal, not a second job for that same button.
   describe("the quick-filters toggle on the Filters button", () => {
-    it("folds the quick-filter row and the active-filter chips away together", async () => {
+    it("folds the quick filters and active-filter chips away and back", async () => {
       const user = userEvent.setup({ delay: null });
       renderWithProviders(<TopControls />, {
         url: "/?eovs=oxygen",
@@ -55,10 +56,10 @@ describe("TopControls", () => {
 
       await user.click(toggle);
 
-      expect(screen.getByTestId("quick-filters")).toBeInTheDocument();
       await waitFor(() =>
         expect(screen.queryAllByTestId("filter-chip-group")).toHaveLength(1),
       );
+      expect(screen.getByTestId("quick-filters")).toBeInTheDocument();
     });
 
     it("hides without clearing what it hides", async () => {
@@ -98,5 +99,29 @@ describe("TopControls", () => {
 
       expect(filtersButton).toHaveAttribute("aria-pressed", "true");
     });
+  });
+
+  // The same as the datasets list's Filters button: the search page, not
+  // whichever filter was open when the modal last closed.
+  it("opens the filters modal on its search page", async () => {
+    let ui;
+    function Probe() {
+      ui = useUI();
+      return null;
+    }
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <TopControls />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    act(() => ui.setOpenFilter("oceanVariablesFiltername"));
+
+    await user.click(screen.getByTestId("topbar-filters-button"));
+
+    expect(ui.showFiltersModal).toBe(true);
+    expect(ui.openFilter).toBeUndefined();
   });
 });

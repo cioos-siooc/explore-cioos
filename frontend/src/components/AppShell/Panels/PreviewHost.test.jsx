@@ -1,34 +1,40 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 
-import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
-import { installMockFetch } from "../../../test/mockFetch.js";
+let showPreviewModal;
+
+vi.mock("../../../state/selection/SelectionProvider.jsx", () => ({
+  useSelection: () => ({ showPreviewModal }),
+}));
+vi.mock("../../Controls/DatasetPreview/DatasetPreview.jsx", () => ({
+  default: ({ showModal }) => (
+    <div data-testid="preview" data-open={String(showModal)} />
+  ),
+}));
+
 import PreviewHost from "./PreviewHost.jsx";
 
-// The host exists so the modal stays mounted at shell level and survives panel
-// swaps, which means it is mounted on every page — including every page with no
-// record open. That it draws nothing there is the thing worth holding.
 describe("PreviewHost", () => {
-  beforeEach(() => {
-    installMockFetch();
+  it("loads nothing until the preview first opens", () => {
+    showPreviewModal = false;
+    render(<PreviewHost />);
+    expect(screen.queryByTestId("preview")).not.toBeInTheDocument();
   });
 
-  it("draws nothing while no record is open", () => {
-    const { container } = renderWithProviders(<PreviewHost />, {
-      providers: "app",
-    });
-    expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
+  it("mounts the preview on open and keeps it mounted after it closes", async () => {
+    showPreviewModal = false;
+    const { rerender } = render(<PreviewHost />);
 
-  it("stays silent for a ?preview= that names no dataset", () => {
-    // The modal opens on inspectDataset AND inspectRecordID; a link carrying
-    // only half of that must not open an empty dialog.
-    renderWithProviders(<PreviewHost />, {
-      url: "/?preview=record-1",
-      providers: "app",
-    });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    showPreviewModal = true;
+    rerender(<PreviewHost />);
+    expect(await screen.findByTestId("preview")).toHaveAttribute(
+      "data-open",
+      "true",
+    );
+
+    showPreviewModal = false;
+    rerender(<PreviewHost />);
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-open", "false");
   });
 });

@@ -1,7 +1,7 @@
 # Pinned. This read `node:alpine` — no version at all — so the runtime was
 # whatever `latest` happened to be on the day of the build, silently drifting
-# across majors. 22 matches frontend/Dockerfile and the CI node-version.
-FROM node:22-alpine
+# across majors. 24 matches frontend/Dockerfile and the CI node-version.
+FROM node:24-alpine
 
 WORKDIR /usr/src/app
 

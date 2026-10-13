@@ -62,6 +62,7 @@ const RECORDS = {
   profiles: "coalesce(n_records, 0)",
   trajectory_hexes: "coalesce(n_records, 0)",
   obis_cells: "coalesce(n_records, 0)",
+  hexes_zoom_0_rollup: "n_records",
 };
 
 // `days` is a set union, so each row contributes day RANGES rather than a
@@ -104,7 +105,11 @@ function metricValueExpr(table, metric) {
 // Goes immediately after `FROM <table>` in a branch: the join supplying
 // metric_value, or nothing when the metric is a plain per-row number.
 function metricJoin(table, metric) {
-  return metric === "days" ? DAY_SET_JOIN : "";
+  if (metric !== "days") return "";
+  // The rollup's day sets already carry the span fallback, merged.
+  return table === "hexes_zoom_0_rollup"
+    ? "LEFT JOIN LATERAL unnest(day_ranges) metric_days(day) ON true"
+    : DAY_SET_JOIN;
 }
 
 // The aggregate that produces a bucket's `count`, over rows qualified by

@@ -1,2 +1,2 @@
-FROM postgis/postgis:13-3.1-alpine
+FROM postgis/postgis:18-3.6-alpine
 COPY *.sql /docker-entrypoint-initdb.d/

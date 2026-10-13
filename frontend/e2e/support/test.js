@@ -29,9 +29,15 @@ export const test = base.extend({
   // trajectory scrub time defaults to today, so without this the query strings
   // the app sends — and therefore which fixture answers, and therefore any
   // screenshot showing a date — change at midnight.
+  //
+  // Started at FROZEN_TIME and left running rather than pinned there
+  // (setFixedTime): lodash's debounce measures its wait with Date.now(), so a
+  // clock that never moves re-arms every debounce forever, and the grid hover
+  // chip, the draw commit and the viewport ramp measurement never happened.
+  // A spec lasts seconds from midday, so the date cannot roll over under it.
   frozenClock: [
     async ({ context }, use) => {
-      await context.clock.setFixedTime(FROZEN_TIME);
+      await context.clock.setSystemTime(FROZEN_TIME);
       await use(FROZEN_TIME);
     },
     { auto: true },

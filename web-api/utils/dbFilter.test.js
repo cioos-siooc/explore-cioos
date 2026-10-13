@@ -368,3 +368,45 @@ test("realtimeOnly off or absent constrains nothing", async () => {
     assert.equal(f.hasShared, false);
   }
 });
+
+test("datasetLevelOnly holds only while every predicate reads cde.datasets", async () => {
+  const datasetLevel = {
+    platforms: "p",
+    excludePlatforms: "q",
+    datasetPKs: "a",
+    excludeDatasetPKs: "b",
+    organizations: "1",
+    excludeOrganizations: "2",
+    realtimeOnly: "true",
+    obisNodes: "n1",
+    erddapServers: "https://e",
+    excludeErddapServers: "https://f",
+    excludeObisNodes: "n2",
+  };
+  assert.equal((await createDBFilter({})).datasetLevelOnly, true);
+  assert.equal((await createDBFilter(datasetLevel)).datasetLevelOnly, true);
+
+  const featureLevel = {
+    timeMin: "2020-01-01",
+    timeMax: "2021-01-01",
+    depthMin: "1",
+    depthMax: "2",
+    latMin: "40",
+    latMax: "50",
+    lonMin: "-60",
+    lonMax: "-50",
+    polygon: "[[-60,40],[-50,40],[-50,50],[-60,40]]",
+    eovs: "seaSurfaceTemperature",
+    excludeEovs: "oxygen",
+    pointPKs: "1",
+    scientificNames: "Gadus morhua",
+    excludeScientificNames: "Gadus morhua",
+  };
+  for (const [name, value] of Object.entries(featureLevel)) {
+    const f = await createDBFilter(
+      { ...datasetLevel, [name]: value },
+      { fetchAphiaIds: async () => [126436] },
+    );
+    assert.equal(f.datasetLevelOnly, false, name);
+  }
+});

@@ -1,12 +1,4 @@
-// Hex and marker features carry the datasets they aggregate as a JSON array
-// of pks (MapLibre hands nested properties back as strings).
-export const featureHasDataset = (feature, pk) => {
-  try {
-    return JSON.parse(feature.properties.datasets).includes(pk);
-  } catch {
-    return false;
-  }
-};
+import { featureHasDataset } from "./hitTest.js";
 
 // The focused dataset's markers, copied out of queryRenderedFeatures hits into
 // a GeoJSON collection so they can be redrawn above the greyed rest. A marker

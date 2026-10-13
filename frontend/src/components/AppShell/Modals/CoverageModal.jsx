@@ -1,7 +1,11 @@
 import * as React from "react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BarChartLine } from "react-bootstrap-icons";
+import {
+  BarChartLine,
+  ExclamationCircle,
+  InfoCircle,
+} from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
@@ -27,6 +31,10 @@ const GROUP_OPTIONS = ["source", "platform", "dataType", "organization"];
 
 // What the bars count. Keys match the API's `count` values.
 const COUNT_OPTIONS = ["datasets", "features", "days"];
+
+// The x-axis: the timeline, or every year folded onto weeks of the year. Keys
+// match the API's `view` values and the ?coverageAxis= link param.
+const VIEW_OPTIONS = ["timeline", "seasonal"];
 
 // How many past responses to keep. The two dropdowns alone are 12 combinations
 // of one selection, and each is a query the API answers in seconds when its
@@ -107,7 +115,12 @@ function CoverageOption({ label, help }) {
 // chosen dimension. Depth is handled by the filter, not drawn as an axis.
 export default function CoverageModal() {
   const { t } = useTranslation();
-  const { showCoverageModal, setShowCoverageModal } = useUI();
+  const {
+    showCoverageModal,
+    setShowCoverageModal,
+    coverageAxis: view,
+    setCoverageAxis: setView,
+  } = useUI();
   // The same selection the datasets list shows: the filter query plus the
   // drawn polygon (combinedQueries, what /pointQuery was asked), narrowed to
   // the datasets the list's own client-side filters left standing. Reading
@@ -142,7 +155,7 @@ export default function CoverageModal() {
       filteredDatasetPks,
       allDatasetPks,
     );
-    const url = `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&${filterString}`;
+    const url = `${server}/coverageHistogram?groupBy=${groupBy}&count=${count}&view=${view}&${filterString}`;
 
     const cached = cache.current.get(url);
     if (cached) {
@@ -183,6 +196,7 @@ export default function CoverageModal() {
     allDatasetPks,
     groupBy,
     count,
+    view,
   ]);
 
   const isEmpty = histogram && histogram.cells.length === 0;
@@ -223,6 +237,7 @@ export default function CoverageModal() {
                 otherwise. */}
             {groupBy === "organization" && (
               <div className="coverageToolbarNote">
+                <InfoCircle aria-hidden="true" />
                 {t("coverageOrganizationNote")}
               </div>
             )}
@@ -231,10 +246,42 @@ export default function CoverageModal() {
                 calendar days in its period. Deliberately unlike the map's
                 days ramp, which unions. */}
             {count === "days" && (
-              <div className="coverageToolbarNote">{t("coverageDaysNote")}</div>
+              <div className="coverageToolbarNote">
+                <InfoCircle aria-hidden="true" />
+                {t("coverageDaysNote")}
+              </div>
+            )}
+            {view === "seasonal" && (
+              <div className="coverageToolbarNote">
+                <InfoCircle aria-hidden="true" />
+                {t("coverageSeasonalNote")}
+              </div>
             )}
           </div>
           <div className="coverageToolbarControls">
+            <span className="coverageToolbarLabel">
+              {t("coverageViewLabel")}
+            </span>
+            <DropdownButton
+              data-testid="coverage-view-dropdown"
+              title={t(`coverageView_${view}`)}
+              menuClassName="coverageOptionMenu"
+              align="end"
+            >
+              {VIEW_OPTIONS.map((option) => (
+                <Dropdown.Item
+                  key={option}
+                  data-testid="coverage-view-option"
+                  active={option === view}
+                  onClick={() => setView(option)}
+                >
+                  <CoverageOption
+                    label={t(`coverageView_${option}`)}
+                    help={t(`coverageViewHelp_${option}`)}
+                  />
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
             <span className="coverageToolbarLabel">
               {t("coverageCountByLabel")}
             </span>
@@ -290,7 +337,8 @@ export default function CoverageModal() {
               the API's cache is cold. */}
           {loading && !showStalePlot && histogramSkeleton}
           {!loading && error && (
-            <div className="coverageModalStatus">
+            <div className="coverageModalStatus coverageModalError">
+              <ExclamationCircle aria-hidden="true" />
               {t("coverageErrorMessage")}
             </div>
           )}

@@ -7,13 +7,14 @@ import { installMockFetch } from "../../test/mockFetch.js";
 import { useMapState } from "./MapStateProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 import legendFixture from "../../../e2e/fixtures/api/legend.json";
+import griddapCoverageFixture from "../../../e2e/fixtures/api/griddapCoverage.json";
 
 let latest;
 
 function Probe() {
   latest = useMapState();
   // SelectionProvider's own initial /pointQuery load, once it settles,
-  // recomputes hiddenDatasetPks and — seeing nothing hidden — calls
+  // recomputes mapDatasetPks and — seeing no search — calls
   // setMapDatasetPKs(undefined) via its own effect. Under enough load that
   // load can still be in flight after legendLoading clears, and would land
   // AFTER (and silently clobber) a value this suite sets on mapDatasetPKs —
@@ -113,26 +114,34 @@ describe("MapStateProvider", () => {
     expect(latest.dataLayers.profile).toBe(true);
   });
 
+  it("reads an older link's 'obis' geometry as Point", async () => {
+    await renderReady({ url: "/?layers=obis&excludeLayers=grid" });
+    expect(latest.dataLayerChoices).toEqual({
+      point: "include",
+      grid: "exclude",
+    });
+  });
+
   it("reads an older link's empty ?layers= as every geometry excluded", async () => {
     await renderReady({ url: "/?layers=" });
     expect(Object.values(latest.dataLayers).some(Boolean)).toBe(false);
   });
 
-  it("cycleDataLayer walks include -> exclude -> clear", async () => {
+  it("toggleDataLayer includes, switches to exclude, and clears", async () => {
     await renderReady();
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "include"));
     expect(latest.dataLayers.grid).toBe(true);
     expect(latest.dataLayers.profile).toBe(false);
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "exclude"));
     expect(latest.dataLayers.grid).toBe(false);
     expect(latest.dataLayers.profile).toBe(true);
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "exclude"));
     expect(latest.dataLayerChoices).toEqual({});
   });
 
   it("resetDataLayers restores the everything-on default", async () => {
     await renderReady();
-    act(() => latest.cycleDataLayer("grid"));
+    act(() => latest.toggleDataLayer("grid", "include"));
     act(() => latest.resetDataLayers());
     expect(Object.values(latest.dataLayers).every(Boolean)).toBe(true);
   });
@@ -143,10 +152,7 @@ describe("MapStateProvider", () => {
 
     act(() => latest.setGriddapCoverageVisible(true));
     await waitFor(() =>
-      expect(latest.griddapCoverage).toEqual({
-        type: "FeatureCollection",
-        features: [],
-      }),
+      expect(latest.griddapCoverage).toEqual(griddapCoverageFixture),
     );
   });
 

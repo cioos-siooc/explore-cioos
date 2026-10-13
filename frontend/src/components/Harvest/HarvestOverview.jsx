@@ -45,6 +45,13 @@ function ServerCard({ server, t }) {
           date: fmtDt(server.last_attempted_at),
         })}
       </div>
+      <div className="harvest-card-meta">
+        {server.last_success_at
+          ? t("harvest.card.lastSuccess", {
+              date: fmtDt(server.last_success_at),
+            })
+          : t("harvest.card.noSuccess")}
+      </div>
     </Link>
   );
 }

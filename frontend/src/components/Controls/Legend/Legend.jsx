@@ -88,7 +88,7 @@ function depthPosition(metres) {
 // an average hexagon looks like on the map. Picking an end of the ramp would have
 // made the icon claim a count.
 // The tips whose control is on this card (see tipHighlight's callers here).
-const LEGEND_TIPS = ["griddedCoverage", "nonna"];
+const LEGEND_TIPS = ["trajectory"];
 
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)];
 
@@ -197,7 +197,7 @@ export default function Legend({
   // hexagons (see buildTileSuffix).
   const profileFamilyOn =
     layers.profile || layers.timeseries || layers.timeseriesProfile;
-  const cellsAsHexes = layers.obis || trajectoryOn;
+  const cellsAsHexes = layers.point || trajectoryOn;
   const hexesOnMap = markerTier
     ? cellsAsHexes
     : profileFamilyOn || cellsAsHexes;
@@ -560,7 +560,7 @@ export default function Legend({
               {platformSwatches.map((pc) => (
                 <div className="legendItem" key={pc.platform}>
                   <CircleFill
-                    className="legendSwatch"
+                    className="legendSwatch platformGlyph"
                     size={10}
                     fill={pc.color}
                     aria-hidden="true"

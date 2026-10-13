@@ -601,3 +601,103 @@ BEGIN
   END IF;
 END;
 $$;
+
+
+-- Rebuilds cde.hexes_zoom_0_rollup (see 1_schema.sql) from the three feature
+-- tables, with the same row rules the tile branches apply: profiles only where
+-- show_as_point, trajectory coverage at tier 0, rows without a hex or dataset
+-- dropped (the tile joins would drop them). Day sets are merged per key with
+-- the gaps-and-islands pass refresh_dataset_day_ranges() uses. Only changed
+-- keys are written: one statement, so the DELETE (keys no longer produced) and
+-- the upsert (keys still produced) never touch the same row.
+CREATE OR REPLACE FUNCTION refresh_hexes_zoom_0_rollup() RETURNS bigint AS $$
+DECLARE
+  n bigint;
+BEGIN
+  WITH keyed AS (
+    SELECT hex_0_pk AS hex_pk, dataset_pk, 'profiles' AS source,
+           n_records, day_ranges, time_min, time_max
+      FROM cde.profiles WHERE show_as_point
+    UNION ALL
+    SELECT hex_pk, dataset_pk, 'trajectory', n_records, day_ranges, time_min, time_max
+      FROM cde.trajectory_hexes WHERE hex_tier = 0
+    UNION ALL
+    SELECT hex_0_pk, dataset_pk, 'obis', n_records, day_ranges, time_min, time_max
+      FROM cde.obis_cells
+  ),
+  totals AS (
+    SELECT hex_pk, dataset_pk, source, sum(coalesce(n_records, 0))::bigint AS n_records
+      FROM keyed
+     WHERE hex_pk IS NOT NULL AND dataset_pk IS NOT NULL
+     GROUP BY hex_pk, dataset_pk, source
+  ),
+  ranges AS (
+    SELECT hex_pk, dataset_pk, source, r
+      FROM keyed
+      CROSS JOIN LATERAL unnest(
+        CASE WHEN coalesce(array_length(day_ranges, 1), 0) > 0 THEN day_ranges
+             WHEN time_min IS NOT NULL THEN
+               ARRAY[daterange(time_min::date, GREATEST(time_max::date, time_min::date) + 1)]
+        END) r
+     WHERE hex_pk IS NOT NULL AND dataset_pk IS NOT NULL
+       AND r IS NOT NULL AND NOT isempty(r)
+  ),
+  marked AS (
+    SELECT hex_pk, dataset_pk, source, r,
+           CASE WHEN lower(r) > max(upper(r)) OVER (
+                    PARTITION BY hex_pk, dataset_pk, source ORDER BY r
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)
+                THEN 1 ELSE 0 END AS starts_island
+      FROM ranges
+  ),
+  islands AS (
+    SELECT hex_pk, dataset_pk, source, daterange(min(lower(r)), max(upper(r))) AS r
+      FROM (
+        SELECT hex_pk, dataset_pk, source, r,
+               sum(starts_island) OVER (PARTITION BY hex_pk, dataset_pk, source
+                                        ORDER BY r ROWS UNBOUNDED PRECEDING) AS island
+          FROM marked
+      ) grouped
+     GROUP BY hex_pk, dataset_pk, source, island
+  ),
+  next AS (
+    SELECT t.hex_pk, t.dataset_pk, t.source, t.n_records, s.day_ranges
+      FROM totals t
+      LEFT JOIN (
+        SELECT hex_pk, dataset_pk, source, array_agg(r ORDER BY r) AS day_ranges
+          FROM islands
+         GROUP BY hex_pk, dataset_pk, source
+      ) s USING (hex_pk, dataset_pk, source)
+  ),
+  removed AS (
+    DELETE FROM cde.hexes_zoom_0_rollup o
+     WHERE NOT EXISTS (SELECT 1 FROM next
+                        WHERE next.hex_pk = o.hex_pk
+                          AND next.dataset_pk = o.dataset_pk
+                          AND next.source = o.source)
+    RETURNING 1
+  ),
+  written AS (
+    INSERT INTO cde.hexes_zoom_0_rollup AS o
+    SELECT * FROM next
+    ON CONFLICT (hex_pk, dataset_pk, source) DO UPDATE
+       SET n_records = EXCLUDED.n_records, day_ranges = EXCLUDED.day_ranges
+     WHERE (o.n_records, o.day_ranges)
+           IS DISTINCT FROM (EXCLUDED.n_records, EXCLUDED.day_ranges)
+    RETURNING 1
+  )
+  SELECT (SELECT count(*) FROM removed) + (SELECT count(*) FROM written) INTO n;
+  RETURN n;
+END;
+$$ LANGUAGE plpgsql;
+
+-- One-off backfill for databases that predate the table
+-- (3_hexes_zoom_0_rollup_migration.sql); a no-op once it holds rows.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM cde.hexes_zoom_0_rollup)
+     AND EXISTS (SELECT 1 FROM cde.datasets) THEN
+    PERFORM refresh_hexes_zoom_0_rollup();
+  END IF;
+END;
+$$;

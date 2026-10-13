@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      - development
+      - "development*"
   # The visual (screenshot) suite's own trigger — see "Run the visual
   # regression suite" in the docker job below. GitHub doesn't support
   # `paths:` filtering on `release` events, so a published release runs this
@@ -51,7 +51,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -128,9 +128,9 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
-          # Match the app runtime: frontend/package.json requires >=22 and
-          # frontend/Dockerfile builds on node:22-alpine.
-          node-version: 22
+          # Match the app runtime: frontend/package.json requires >=24 and
+          # frontend/Dockerfile builds on node:24-alpine.
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             test/package-lock.json

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   Clipboard,
   ClipboardCheck,
+  Download,
   ExclamationTriangleFill,
   FiletypeCsv,
   FiletypeSh,
@@ -10,7 +11,9 @@ import {
 } from "react-bootstrap-icons";
 
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
+import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   downloadTextFile,
   filterSummaryText,
@@ -32,13 +35,17 @@ import "./styles.css";
  *
  * The links themselves are built by DownloadDetails, which also hands them to
  * the card list above so a dataset's card can show the one query it would be
- * fetched with — and the format they are built in is set on that list's
- * toolbar (DownloadFormats), because it governs both. This column owns nothing
- * but the copy button's flash: what it exports and what the cards show are the
- * same links.
+ * fetched with. The format picker (DownloadFormats) is built there too and
+ * only rendered here. This column owns nothing but the copy button's flash:
+ * what it exports and what the cards show are the same links.
  */
-export default function DirectDownloadLinks({ links, constraints }) {
+export default function DirectDownloadLinks({
+  links,
+  constraints,
+  formatControls,
+}) {
   const { t } = useTranslation();
+  const { tipHighlight } = useTips();
   const [copyState, copy] = useCopyToClipboard("direct download links");
 
   // What the links could not carry — counted rather than listed, because the
@@ -60,6 +67,7 @@ export default function DirectDownloadLinks({ links, constraints }) {
     <div
       className="downloadFooterSection directLinks"
       data-testid="direct-links"
+      data-tip-highlight={tipHighlight("directLinks")}
     >
       <span className="downloadFooterTitle">
         {t("directLinksTitle")}
@@ -74,6 +82,8 @@ export default function DirectDownloadLinks({ links, constraints }) {
             : t("directLinksCount", { count: links.length })}
         </span>
       </span>
+
+      {formatControls}
 
       <div className="directLinksActions">
         <button
@@ -93,43 +103,50 @@ export default function DirectDownloadLinks({ links, constraints }) {
               ? t("directLinksCopyFailed")
               : t("directLinksCopy")}
         </button>
-        <button
-          type="button"
-          className="directLinksButton"
-          disabled={disabled}
-          onClick={() =>
-            downloadTextFile(
-              `${stem}.sh`,
-              linksToCurlScript(links, exportMeta),
-              "text/x-shellscript",
-            )
+        {/* Copy stays a button of its own: its label flashes the result,
+            which a menu item that closes on click could not show. */}
+        <DropdownButton
+          title={
+            <>
+              <Download size={16} aria-hidden="true" />
+              {t("directLinksSave")}
+            </>
           }
-        >
-          <FiletypeSh size={16} aria-hidden="true" />
-          {t("directLinksScript")}
-        </button>
-        <button
-          type="button"
-          className="directLinksButton"
+          className="directLinksSave"
+          toggleClassName="directLinksButton"
+          align="end"
           disabled={disabled}
-          onClick={() =>
-            downloadTextFile(`${stem}.txt`, linksToText(links, exportMeta))
-          }
+          data-testid="direct-links-save"
         >
-          <FiletypeTxt size={16} aria-hidden="true" />
-          {t("directLinksText")}
-        </button>
-        <button
-          type="button"
-          className="directLinksButton"
-          disabled={disabled}
-          onClick={() =>
-            downloadTextFile(`${stem}.csv`, linksToCsv(links), "text/csv")
-          }
-        >
-          <FiletypeCsv size={16} aria-hidden="true" />
-          {t("directLinksCsv")}
-        </button>
+          <Dropdown.Item
+            onClick={() =>
+              downloadTextFile(
+                `${stem}.sh`,
+                linksToCurlScript(links, exportMeta),
+                "text/x-shellscript",
+              )
+            }
+          >
+            <FiletypeSh size={16} aria-hidden="true" />
+            {t("directLinksScript")}
+          </Dropdown.Item>
+          <Dropdown.Item
+            onClick={() =>
+              downloadTextFile(`${stem}.txt`, linksToText(links, exportMeta))
+            }
+          >
+            <FiletypeTxt size={16} aria-hidden="true" />
+            {t("directLinksText")}
+          </Dropdown.Item>
+          <Dropdown.Item
+            onClick={() =>
+              downloadTextFile(`${stem}.csv`, linksToCsv(links), "text/csv")
+            }
+          >
+            <FiletypeCsv size={16} aria-hidden="true" />
+            {t("directLinksCsv")}
+          </Dropdown.Item>
+        </DropdownButton>
       </div>
 
       {/* Each caveat is about the links as built, so it sits at the foot of

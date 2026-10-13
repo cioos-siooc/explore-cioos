@@ -131,6 +131,41 @@ describe("revealing the sidebar for a drawn shape", () => {
   });
 });
 
+describe("revealing the sidebar for a dataset page", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
+  function PageProbe() {
+    const { pointsData, setInspectDataset } = useSelection();
+    return (
+      <>
+        <SidebarProbe />
+        <button type="button" onClick={() => setInspectDataset(pointsData[0])}>
+          open
+        </button>
+      </>
+    );
+  }
+
+  it("opens for a page, and stays closed over it when the results refresh", async () => {
+    setViewportWidth(DESKTOP_WIDTH);
+    const { user, i18n } = renderWithProviders(<PageProbe />, {
+      providers: "app",
+    });
+    await waitFor(() => expect(state()).toBe("open"));
+    await user.click(screen.getByRole("button", { name: "toggle" }));
+
+    await user.click(screen.getByRole("button", { name: "open" }));
+    await waitFor(() => expect(state()).toBe("open"));
+
+    // Re-translating the results hands the same dataset back as a new object.
+    await user.click(screen.getByRole("button", { name: "toggle" }));
+    await act(async () => i18n.changeLanguage("fr"));
+    expect(state()).toBe("closed");
+  });
+});
+
 describe("the intro modal", () => {
   beforeEach(() => {
     installMockFetch();

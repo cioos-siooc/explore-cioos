@@ -6,7 +6,7 @@ import shutil
 import sys
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -31,6 +31,7 @@ from cde_harvester.core.schema import (
     rebuild_schema,
 )
 from cde_harvester.loading.loader import main as db_loader_main
+from cde_harvester.loading.loader import record_failed_run
 from cde_harvester.loading.populate_vernaculars import main as vernaculars_main
 from cde_harvester.redisFunctions import clearRedisCache, reloadTopRequests
 from cde_harvester.sources import OBIS_ALIASES
@@ -101,6 +102,7 @@ def _publish_log_artifact(log_path):
 POOL_NAME = "cde-process-pool"
 # @flow name of cde_pipeline_run; must match harvest-dashboard/app/config.HARVEST_FLOW_NAME.
 HARVEST_FLOW_NAME = "Harvest Source"
+VERNACULARS_DEPLOYMENT = "Populate Vernaculars/populate-vernaculars-deployment"
 
 TIMESTAMP_FMT = "%Y%m%d_%H%M%S"
 KEEP_RUNS_PER_SERVER = 5
@@ -111,7 +113,7 @@ PRUNE_GRACE_SECONDS = 6 * 3600
 def _timestamp():
     # UTC: these name the per-run output folders, which are compared and
     # pruned by timestamp order (see PRUNE_GRACE_SECONDS).
-    return datetime.now(timezone.utc).strftime(TIMESTAMP_FMT)
+    return datetime.now(UTC).strftime(TIMESTAMP_FMT)
 
 
 def _server_run_folder(base_folder, slug, timestamp):
@@ -178,6 +180,19 @@ def deployment_slug(source):
     return host.lower().replace(".", "-")
 
 
+def _trigger_vernaculars():
+    """Queue a WoRMS backfill for the scientific names this OBIS load added.
+
+    Fire-and-forget: the harvest has already loaded, so a submit failure is
+    logged rather than failing the run."""
+    logger = _run_logger()
+    try:
+        flow_run = run_deployment(name=VERNACULARS_DEPLOYMENT, timeout=0)
+        logger.info("Triggered %s (flow_run=%s)", VERNACULARS_DEPLOYMENT, flow_run.id)
+    except Exception as e:
+        logger.warning("Could not trigger %s: %s", VERNACULARS_DEPLOYMENT, e)
+
+
 def _cron_env(var_name):
     """Cron from env var; unset/empty/whitespace -> None (cron='' breaks Prefect's .deploy)."""
     return (os.getenv(var_name) or "").strip() or None
@@ -197,6 +212,15 @@ def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
     if obis_dataset_ids or (obis_discovery or {}).get("enabled", bool(obis_discovery)):
         sources.append("obis")
     return sources
+
+
+def _record_failed_run(run_folder, error):
+    """Put a failed run on the harvest dashboard. Never masks the run's own error."""
+    logger = _run_logger()
+    try:
+        record_failed_run(str(run_folder), f"{type(error).__name__}: {error}")
+    except Exception as e:
+        logger.error(f"Could not record the failed run: {e}", exc_info=True)
 
 
 class PrefectCDEPipeline:
@@ -298,38 +322,14 @@ class PrefectCDEPipeline:
 
                 logger.info("Running cde_harvester subflow")
                 try:
-                    harvester_main(
-                        erddap_urls=self.erddap_urls,
-                        cache_requests=self.cache_requests,
-                        folder=str(run_folder),
-                        dataset_ids=self.dataset_ids,
-                        obis_dataset_ids=self.obis_dataset_ids,
-                        obis_folder=str(obis_folder),
-                        # Both of these were previously never passed, so the
-                        # documented obis_geo_filter config block was silently
-                        # ignored on the Prefect (production) path.
-                        obis_geo_filter=self.obis_geo_filter,
-                        obis_discovery=self.obis_discovery,
-                        source=self.source,
-                        triggered_by=self.triggered_by,
-                        skip_unchanged=effective_incremental,
+                    load_summary = self._harvest_and_load(
+                        run_folder, obis_folder, effective_incremental
                     )
-                    logger.info("cde_harvester completed successfully")
                 except Exception as e:
-                    logger.error(f"cde_harvester failed: {e}", exc_info=True)
+                    _record_failed_run(run_folder, e)
                     raise
-
-                logger.info("Running cde_db_loader subflow")
-                try:
-                    load_summary = db_loader_main(
-                        folder=str(run_folder), incremental=effective_incremental
-                    )
-                    logger.info("cde_db_loader completed successfully")
-                    # Prune only after a successful load so failed runs' CSVs survive.
-                    _prune_server_run_folders(base_folder, protect=[run_folder])
-                except Exception as e:
-                    logger.error(f"cde_db_loader failed: {e}", exc_info=True)
-                    raise
+                # Prune only after a successful load so failed runs' CSVs survive.
+                _prune_server_run_folders(base_folder, protect=[run_folder])
 
                 # A run where every dataset hashed unchanged moved nothing the API
                 # serves, so dropping the cache would only make the next visitor
@@ -352,9 +352,54 @@ class PrefectCDEPipeline:
                         load_summary["pruned"],
                     )
 
+                if self._covers_obis():
+                    _trigger_vernaculars()
+
                 logger.info("CDE Pipeline completed successfully")
             finally:
                 _publish_log_artifact(log_path)
+
+    def _harvest_and_load(self, run_folder, obis_folder, effective_incremental):
+        logger = _run_logger()
+        try:
+            harvester_main(
+                erddap_urls=self.erddap_urls,
+                cache_requests=self.cache_requests,
+                folder=str(run_folder),
+                dataset_ids=self.dataset_ids,
+                obis_dataset_ids=self.obis_dataset_ids,
+                obis_folder=str(obis_folder),
+                # Both of these were previously never passed, so the
+                # documented obis_geo_filter config block was silently
+                # ignored on the Prefect (production) path.
+                obis_geo_filter=self.obis_geo_filter,
+                obis_discovery=self.obis_discovery,
+                source=self.source,
+                triggered_by=self.triggered_by,
+                skip_unchanged=effective_incremental,
+            )
+            logger.info("cde_harvester completed successfully")
+        except Exception as e:
+            logger.error(f"cde_harvester failed: {e}", exc_info=True)
+            raise
+
+        logger.info("Running cde_db_loader subflow")
+        try:
+            load_summary = db_loader_main(
+                folder=str(run_folder), incremental=effective_incremental
+            )
+            logger.info("cde_db_loader completed successfully")
+        except Exception as e:
+            logger.error(f"cde_db_loader failed: {e}", exc_info=True)
+            raise
+        return load_summary
+
+    def _covers_obis(self):
+        if self.source:
+            return deployment_slug(self.source) == "obis"
+        return "obis" in _configured_sources(
+            self.erddap_urls, self.obis_dataset_ids, self.obis_discovery
+        )
 
     def create_process_work_pool(self, pool_name="cde-process-pool"):
         """Create the `process` work pool (idempotent; safe under concurrent replicas)."""
@@ -444,7 +489,8 @@ class PrefectCDEPipeline:
             job_variables=job_vars,
         )
 
-        # Post-harvest WoRMS vernaculars backfill on its own schedule.
+        # WoRMS vernaculars backfill: always registered, triggered after every OBIS
+        # load (see _trigger_vernaculars), plus VERNACULARS_CRON if set.
         vernaculars_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:populate_vernaculars_run",

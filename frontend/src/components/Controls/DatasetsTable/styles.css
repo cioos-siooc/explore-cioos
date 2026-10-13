@@ -23,11 +23,12 @@
   background-color: var(--cioos-white);
 }
 
-/* Wraps only when the search box would drop below a usable width — the
-   narrowest phone, or long French captions. */
+/* Never wraps: when the row is too narrow the Filters button and the pills
+   give up width (label and values ellipsize) rather than a second row of
+   buttons taking room from the cards. */
 .datasetsCardToolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
 }
@@ -158,7 +159,7 @@
 
 .legendBadge.success {
   background-color: var(--cioos-success-bg);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .legendBadge.error {
@@ -238,7 +239,7 @@
 /* In the order: the selection's own teal, the same state the card's border and
    the sidebar's Download button are in. */
 .datasetCardSelect.checked {
-  color: var(--cioos-primary);
+  color: var(--cioos-primary-700);
 }
 
 @media (hover: hover) {
@@ -309,10 +310,22 @@
   background-color: var(--cioos-surface-2);
 }
 
-.datasetCard.clickable:focus-visible {
-  outline: none;
+/* The title button is what takes focus; the ring goes on the whole card. */
+.datasetCard.clickable:has(.datasetCardTitle:focus-visible) {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
+}
+
+button.datasetCardTitle {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.datasetCardTitle:focus-visible {
+  outline: none;
 }
 
 .datasetCard.selected {
@@ -320,8 +333,16 @@
 }
 
 /* --- Group headers: sticky within the scroll region so the current group
-   stays labelled while scrolling. The label toggles collapse; the trailing eye
-   takes the group's datasets off the map (they stay in the list). --- */
+   stays labelled while scrolling. The label toggles collapse; the trailing
+   pair includes or excludes the group in the main filters, as a row of the
+   Filters modal does. --- */
+
+/* A group is a row of its own, not a divider: with every group closed by
+   default the headers are the list, so each is a full-width target. Kept
+   compact so a closed list shows as many groups as it can. Flat inside the
+   sidebar (hairline, no lift) and on the wash rather than white, so it never
+   reads as one more dataset card. Opaque, since it sticks over the cards
+   scrolling beneath it. */
 .datasetsCardGroupHeader {
   position: sticky;
   top: 0;
@@ -330,61 +351,154 @@
   align-items: center;
   gap: 2px;
   width: 100%;
-  margin: 4px 0 2px;
-  padding: 0 4px 0 8px;
-  border-bottom: 1px solid var(--cioos-hairline);
+  min-height: 32px;
+  padding: 0 2px 0 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+
+  /* Data bar: the group's share of the largest one at its level, drawn over
+     whichever wash the header's state sets. */
+  --group-bar: color-mix(in srgb, var(--cioos-primary) 22%, transparent);
+
   background-color: var(--cioos-surface-2);
+  background-image: linear-gradient(
+    to right,
+    var(--group-bar) calc(var(--group-share, 0) * 100%),
+    transparent 0
+  );
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast);
+}
+
+.datasetsCardGroupHeader:hover {
+  border-color: var(--cioos-primary);
+}
+
+/* Open: the header takes the "has a value" wash and the teal edge, so the
+   cards under it read as its contents, and it says which group they are in
+   while it sticks above them. */
+.datasetsCardGroupHeader.open {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-teal-light);
 }
 
 .datasetsCardGroupToggle {
   flex: 1 1 auto;
   min-width: 0;
+  align-self: stretch;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 0;
+  padding: 4px 4px 4px 8px;
   border: none;
+  border-radius: var(--cioos-radius);
   background: none;
   color: var(--cioos-ink);
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
+  line-height: 1.2;
   text-align: left;
   cursor: pointer;
 }
 
-.datasetsCardGroupToggle:hover {
-  color: var(--cioos-primary-700);
+.datasetsCardGroupToggle:focus-visible,
+.datasetsCardGroupFilter:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
-.datasetsCardGroupHide {
+.datasetsCardGroupHeader.open .datasetsCardGroupToggle {
+  color: var(--cioos-primary-800);
+}
+
+.datasetsCardGroupCaret {
+  flex: 0 0 auto;
+  color: var(--cioos-primary);
+  transition: transform var(--cioos-transition-fast);
+}
+
+.datasetsCardGroupHeader.open .datasetsCardGroupCaret {
+  color: var(--cioos-primary-700);
+  transform: rotate(90deg);
+}
+
+.datasetsCardGroupFilter {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  padding: 5px;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   border: none;
-  border-radius: var(--cioos-radius-sm, 4px);
+  border-radius: var(--cioos-radius-sm);
   background: none;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-60);
   cursor: pointer;
+  transition:
+    color var(--cioos-transition-fast),
+    background-color var(--cioos-transition-fast);
 }
 
-.datasetsCardGroupHide:hover {
+.datasetsCardGroupFilter:hover {
   color: var(--cioos-primary-700);
   background-color: var(--cioos-white);
 }
 
-/* Hidden from the map: the header and its cards stay legible but recede. */
-.datasetsCardGroupHeader.hidden .datasetsCardGroupToggle {
-  color: var(--cioos-ink-40);
+.datasetsCardGroupFilter.exclude:hover {
+  color: var(--cioos-error);
 }
 
-.datasetsCardGroupHeader.hidden .datasetsCardGroupHide {
+/* Included / excluded in the main filters: the same teal and red washes the
+   Filters modal's rows take. */
+.datasetsCardGroupHeader.included .datasetsCardGroupFilter:not(.exclude) {
   color: var(--cioos-primary-700);
 }
 
-.datasetCard.hiddenFromMap {
-  opacity: 0.55;
+.datasetsCardGroupHeader.excluded {
+  --group-bar: color-mix(in srgb, var(--cioos-error) 15%, transparent);
+
+  border-color: var(--cioos-error);
+  background-color: var(--cioos-error-bg);
+}
+
+.datasetsCardGroupHeader.excluded .datasetsCardGroupTitle {
+  text-decoration: line-through;
+}
+
+.datasetsCardGroupHeader.excluded .datasetsCardGroupFilter.exclude {
+  color: var(--cioos-error);
+}
+
+/* Empty: its own filter took the group out of the results. Kept as a row so
+   that filter can still be added to or undone here, but read as a choice, not
+   a group with contents. */
+.datasetsCardGroupHeader.empty {
+  border-style: dashed;
+  background-color: var(--cioos-white);
+}
+
+.datasetsCardGroupHeader.empty .datasetsCardGroupToggle {
+  color: var(--cioos-ink-60);
+  font-weight: 400;
+  cursor: default;
+}
+
+.datasetsCardGroupHeader.empty .datasetsCardGroupCaret {
+  visibility: hidden;
+}
+
+.datasetsCardGroupHeader.empty.excluded {
+  background-color: var(--cioos-error-bg);
+}
+
+/* A group inside a parent group (the data portal dimension): indented under
+   it, and sticking just below the parent's header rather than over it. */
+.datasetsCardGroupHeader.nested {
+  top: 34px;
+  margin-left: 12px;
+  width: calc(100% - 12px);
 }
 
 .datasetsCardGroupTitle {
@@ -394,15 +508,19 @@
   white-space: nowrap;
 }
 
-/* "Show all on map": only present while something is hidden, and then only as
-   the eye and the count — the sentence is the tooltip and the accessible name,
-   so an occasional control doesn't take a row of the arrange line from the two
-   permanent ones. */
-.datasetsCardShowAllGroups {
+/* The Filters button in the brand card, at the size of the pills beside it: it
+   takes the stretch the search box used to, and the same applied (filters set)
+   and active (modal open) washes as that button. */
+.datasetsCardFilters {
+  flex: 1 1 auto;
+  min-width: 44px;
+  overflow: hidden;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 9px;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
@@ -412,28 +530,70 @@
   cursor: pointer;
 }
 
-.datasetsCardShowAllGroups:focus-visible {
+.datasetsCardFilters svg {
+  color: var(--cioos-primary);
+}
+
+.datasetsCardFilters:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsCardFilters:focus-visible {
   outline: none;
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
 }
 
-.datasetsCardShowAllGroups:hover {
+.datasetsCardFilters.applied {
   border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary-800);
+}
+
+.datasetsCardFilters.active {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.datasetsCardFilters.active svg {
+  color: var(--cioos-on-primary);
+}
+
+.datasetsCardFiltersCount {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.datasetsCardFilters.active .datasetsCardFiltersCount {
+  background-color: var(--cioos-on-primary);
+  color: var(--cioos-primary);
 }
 
 .datasetsCardGroupCount {
   flex: 0 0 auto;
-  min-width: 20px;
-  padding: 1px 7px;
+  min-width: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   font-family: var(--cioos-font-body, inherit);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+.datasetsCardGroupHeader.open .datasetsCardGroupCount {
+  border-color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
 }
 
 /* --- Card body --- */
@@ -474,7 +634,7 @@
    is no width to share: the `auto` track holds the links at full size and the
    meta line is squeezed to its longest word. So the pair stops sharing a row
    and the card is the stack it is in the sidebar. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .datasetCard.downloadModal .datasetCardBody {
     display: flex;
     flex-direction: column;
@@ -508,7 +668,7 @@
   flex: 1 1 auto;
   min-width: 0;
   font-family: var(--cioos-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--cioos-font-size-base);
   line-height: 1.25;
   color: var(--cioos-ink);
@@ -526,7 +686,7 @@
   border-radius: var(--cioos-radius-pill);
   background: var(--cioos-live);
   color: var(--cioos-white);
-  font-size: 0.68rem;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
@@ -541,6 +701,7 @@
 }
 
 .datasetCardMetaItem {
+  font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -609,7 +770,7 @@
 
 .datasetCardSizePill.downloadable {
   background-color: var(--cioos-success-bg);
-  color: var(--cioos-primary-700);
+  color: var(--cioos-primary-800);
 }
 
 .datasetCardStatus {
@@ -643,18 +804,6 @@
   white-space: nowrap;
 }
 
-/* The one link that fetches data rather than opening a page. Its download
-   glyph is what says so — a filled pill here read as the card's primary
-   action, which it is not: the card's action is the checkbox at the other end
-   of the title, and three links in a row should look like three links. */
-.datasetCardSourceLink.download {
-  text-decoration: none;
-}
-
-.datasetCardSourceLink.download:hover {
-  text-decoration: underline;
-}
-
 /* The three parts of one offer. A tighter gap than .datasetCardSources' own,
    so the warning and the copy read as belonging to the link between them
    rather than as two more entries in the row of links. */
@@ -673,7 +822,7 @@
   color: var(--cioos-warn);
 }
 
-.datasetCardCopyLink {
+.datasetCardIconLink {
   display: inline-flex;
   align-items: center;
   padding: 3px;
@@ -686,13 +835,13 @@
 }
 
 @media (hover: hover) {
-  .datasetCardCopyLink:hover {
+  .datasetCardIconLink:hover {
     color: var(--cioos-primary-700);
     background-color: var(--cioos-surface-2);
   }
 }
 
-.datasetCardCopyLink:focus-visible {
+.datasetCardIconLink:focus-visible {
   outline: 2px solid var(--cioos-primary-700);
   outline-offset: 1px;
 }
@@ -742,7 +891,7 @@
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-surface-2);
   color: var(--cioos-ink-60);
-  font-size: 0.72rem;
+  font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -759,7 +908,7 @@
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-surface-2);
   color: var(--cioos-ink-60);
-  font-size: 0.76rem;
+  font-size: var(--cioos-font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -802,7 +951,7 @@
   gap: 6px;
   align-items: flex-start;
   color: var(--cioos-warn);
-  font-size: 0.74rem;
+  font-size: var(--cioos-font-size-sm);
   line-height: 1.35;
 }
 
@@ -814,7 +963,7 @@
 /* Phone, download modal only: the panel around this list has become one
    scrolling column (DownloadDetails/styles.css), so the list gives up its own
    scroll rather than holding a second one inside the page's. */
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) {
   .datasetsTable.downloadModal,
   .datasetsTable.downloadModal .datasetsCardList {
     height: auto;

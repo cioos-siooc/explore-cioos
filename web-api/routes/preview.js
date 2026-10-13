@@ -22,6 +22,16 @@ const Sentry = require("@sentry/node");
  *         name: profile
  *         required: true
  *         schema: { type: string }
+ *       - in: query
+ *         name: timeMin
+ *         schema: { type: string, format: date-time }
+ *         description: >
+ *           With timeMax, limits the preview to that period (e.g. one pass of
+ *           a trajectory through a selected area) instead of the record's
+ *           most recent rows.
+ *       - in: query
+ *         name: timeMax
+ *         schema: { type: string, format: date-time }
  *     responses:
  *       200:
  *         description: >
@@ -220,10 +230,13 @@ router.get(
     // that had just failed.
     cacheFor: "5 minutes",
     cacheToggle: cache.onlyOk,
-    checks: [check(["dataset", "profile", "at"]).isLength({ max: 256 })],
+    checks: [
+      check(["dataset", "profile", "at"]).isLength({ max: 256 }),
+      check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
+    ],
   }),
   async (req, res, next) => {
-    const { dataset, profile, at } = req.query;
+    const { dataset, profile, at, timeMin, timeMax } = req.query;
 
     // NOTE: filtered by dataset_id alone, so a dataset_id published on two
     // ERDDAP servers resolves to whichever row sorts first. That ambiguity
@@ -275,6 +288,10 @@ router.get(
       at && steppedRecord(profile_variable, step_variable) ? at : null;
     if (step) {
       erddapQuery += `&${constraintFor(step_variable, step)}`;
+    } else if (timeMin || timeMax) {
+      // A period the caller asked for replaces the cadence window below.
+      if (timeMin) erddapQuery += `&time>=${new Date(timeMin).toISOString()}`;
+      if (timeMax) erddapQuery += `&time<=${new Date(timeMax).toISOString()}`;
     } else if (!use_whole_profile) {
       // Lower bound only. This used to also send `&time<${time_max}` -- the
       // harvested maximum -- to guard "against records added since the last
