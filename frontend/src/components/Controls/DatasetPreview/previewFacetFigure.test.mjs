@@ -690,19 +690,58 @@ test("the line keeps the variable's own colour while the markers carry the ramp"
   assert.equal(data[1].line.color, paletteColorFor("KT_haline"));
 });
 
-test("lines become markers+lines when colouring, and markers are left alone", () => {
-  assert.equal(
-    colored(["TE90_01"], { mode: "lines" }).data[0].mode,
-    "markers+lines",
+test("a colour column draws the line in the ramp, in traces of its own", () => {
+  const { data } = colored(["TE90_01"], { mode: "markers+lines" });
+  const panel = data.at(-1);
+  const lines = data.slice(0, -1);
+  assert.ok(lines.length > 1, `${lines.length} line traces`);
+  lines.forEach((trace) => {
+    assert.equal(trace.mode, "lines");
+    assert.equal(trace.hoverinfo, "skip");
+    assert.equal(trace.xaxis, panel.xaxis);
+    assert.equal(trace.yaxis, panel.yaxis);
+    assert.match(trace.line.color, /^rgb\(/);
+  });
+  // The panel's own trace keeps the markers and the hover.
+  assert.equal(panel.mode, "markers");
+  assert.equal(panel.marker.coloraxis, "coloraxis");
+  assert.ok(panel.hovertemplate);
+});
+
+test("every panel's line is drawn under its markers, on its own axes", () => {
+  const { data } = colored(["TE90_01", "PSAL_01"], { mode: "markers+lines" });
+  const panels = data.slice(-2);
+  const lines = data.slice(0, -2);
+  assert.deepEqual(
+    panels.map((trace) => trace.mode),
+    ["markers", "markers"],
   );
-  assert.equal(
-    colored(["TE90_01"], { mode: "markers" }).data[0].mode,
-    "markers",
+  assert.deepEqual(
+    new Set(lines.map((trace) => trace.xaxis)),
+    new Set(["x", "x2"]),
   );
+});
+
+test("Line with a colour column stays a line, its hover kept by hidden markers", () => {
+  const { data } = colored(["TE90_01"], { mode: "lines" });
+  const panel = data.at(-1);
+  assert.ok(data.length > 1);
+  assert.equal(panel.mode, "markers");
+  assert.equal(panel.marker.opacity, 0);
+  assert.ok(panel.hovertemplate);
+  assert.ok(!("opacity" in colored(["TE90_01"]).data[0].marker));
+});
+
+test("markers alone, or no colour column, add no line traces", () => {
   assert.equal(
-    colored(["TE90_01"], { mode: "markers+lines" }).data[0].mode,
-    "markers+lines",
+    colored(["TE90_01", "PSAL_01"], { mode: "markers" }).data.length,
+    2,
   );
+  const plain = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"], {
+    mode: "markers+lines",
+  });
+  assert.equal(plain.data.length, 2);
+  assert.equal(plain.data[0].mode, "markers+lines");
 });
 
 test("a colour column costs the panels no width at all", () => {

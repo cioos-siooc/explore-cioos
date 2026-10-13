@@ -476,3 +476,10 @@
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-primary);
 }
+
+/* A coloured line is many traces meeting at shared points; Plotly's butt caps
+   leave a notch at each angled joint, round ones close it. */
+.datasetPreviewPlotArea .scatterlayer .js-line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

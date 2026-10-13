@@ -18,6 +18,7 @@ import {
   colorScaleForVariable,
   legendTicksFor,
 } from "./previewColorScales.js";
+import { coloredLineBinsFor, lineBinLimitFor } from "./previewColoredLine.js";
 import {
   ellipsize,
   maxCharsFor,
@@ -257,8 +258,9 @@ export function buildFigure({
   const colorStops = hasColorBar
     ? colorScaleForVariable(colorVariable, colorScale)
     : null;
-  // A ramp has nothing to draw on without markers.
-  const drawMode = hasColorBar && mode === "lines" ? "markers+lines" : mode;
+  // The ramp's line is drawn by traces of its own — see previewColoredLine.js —
+  // leaving the panel's trace the markers and the hover.
+  const coloredLine = hasColorBar && mode.includes("lines");
 
   const margin = marginFor(plan.orientation, titleLines);
   // 0 until the plot area has been measured, and maxCharsFor turns that into
@@ -278,6 +280,12 @@ export function buildFigure({
           (domain[1] - domain[0]),
       ),
     );
+  const binLimit = coloredLine
+    ? lineBinLimitFor({
+        panelCount: panels.length,
+        axisPixels: sharedLetter === "y" ? plottingHeight : plottingWidth,
+      })
+    : 0;
 
   const layout = {
     uirevision,
@@ -363,6 +371,7 @@ export function buildFigure({
     title: axisTitle(wrapAlong(sharedTitle, sharedLetter, [0, 1])),
   };
 
+  const lineTraces = [];
   const traces = panels.map((columnName, index) => {
     const domain = domains[index];
     const panelTitle = titleFor(columnName);
@@ -385,8 +394,7 @@ export function buildFigure({
     const sharedValues = (data || []).map((row) => row[sharedAxis]);
     const panelValues = (data || []).map((row) => row[columnName]);
     // This colour says WHICH variable the panel draws — the colour DIMENSION,
-    // when one is set, takes the markers and says what a third column was doing,
-    // leaving this on the line.
+    // when one is set, takes the markers and the line instead.
     const color =
       colors[columnName] ||
       defaultColorFor(variablesByName.get(columnName), index);
@@ -406,9 +414,32 @@ export function buildFigure({
     const positionInHover =
       !arrangement.unifiedHover && sharedText && sharedText.length;
 
+    if (coloredLine) {
+      coloredLineBinsFor({
+        sharedValues,
+        panelValues,
+        colorValues: colorDimension.values,
+        range: colorDimension.range,
+        stops: colorStops,
+        binLimit,
+        fallbackColor: color,
+      }).forEach((bin) =>
+        lineTraces.push({
+          type: "scatter",
+          mode: "lines",
+          hoverinfo: "skip", // the panel's own trace answers the hover
+          [panelLetter]: bin.panelValues,
+          [sharedLetter]: bin.sharedValues,
+          [`${panelLetter}axis`]: axisRef(panelLetter, index),
+          [`${sharedLetter}axis`]: sharedLetter,
+          line: { color: bin.color },
+        }),
+      );
+    }
+
     return {
       type: "scatter",
-      mode: drawMode,
+      mode: coloredLine ? "markers" : mode,
       // Never drawn — <extra></extra> drops the box Plotly keeps it in — but
       // plain rather than wrapped: a <br> belongs to the panel that needed it.
       name: panelTitle,
@@ -429,7 +460,11 @@ export function buildFigure({
         (colorInHover ? `<br>${hoverLine(colorAxis, "%{customdata}")}` : "") +
         "<extra></extra>",
       marker: hasColorBar
-        ? { color: colorDimension.values, coloraxis: "coloraxis" }
+        ? {
+            color: colorDimension.values,
+            coloraxis: "coloraxis",
+            ...(mode.includes("markers") ? {} : { opacity: 0 }), // kept for the hover
+          }
         : { color },
       line: { color },
       ...(positionInHover ? { text: sharedText } : {}),
@@ -448,5 +483,6 @@ export function buildFigure({
         ticks: legendTicksFor(colorDimension),
       }
     : null;
-  return { data: traces, layout, colorLegend };
+  // First, so every panel's markers draw over its line.
+  return { data: [...lineTraces, ...traces], layout, colorLegend };
 }

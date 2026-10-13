@@ -110,6 +110,18 @@ describe("the shipped plotly bundle and the colour dimension", () => {
   });
 });
 
+describe("the shipped plotly bundle and the coloured line", () => {
+  it("still takes one colour per line, which is why the line is binned", async () => {
+    const schema = await plotlySchema();
+    const { line, hoverinfo } = schema.traces.scatter.attributes;
+    // If this fails Plotly has learned per-point line colours, and
+    // previewColoredLine.js can go.
+    expect(line.color.arrayOk).toBeFalsy();
+    // The bins leave the hover to the panel's own trace.
+    expect(hoverinfo.extras).toContain("skip");
+  });
+});
+
 describe("the shipped plotly bundle and the axis-wide hover", () => {
   it("can hover every subplot sharing an axis, unified or not", async () => {
     const schema = await plotlySchema();
