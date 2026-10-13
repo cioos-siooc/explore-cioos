@@ -9,11 +9,11 @@ import { COLUMNS } from "./previewFacetPlan.js";
 import { MAX_TITLE_LINES } from "./previewLabelText.js";
 
 // Left of every vertical axis: room for its tick labels, then room for the
-// axis's own label, which is written horizontally and so needs width where a
-// rotated one needed almost none. Reserved on the left in both orientations,
-// because both put a labelled vertical axis there.
-export const TICK_ROOM_PX = 52;
-export const LABEL_GUTTER_PX = 104;
+// axis's own label, which runs along the axis and so needs only its line
+// height — two 18px lines here, automargin covers a third. Reserved on the left
+// in both orientations, because both put a labelled vertical axis there.
+export const TICK_ROOM_PX = 40;
+export const LABEL_GUTTER_PX = 48;
 
 // Orientation-dependent because the two layouts spend their other edges
 // differently: a profile puts its panel titles on TOP and nothing at the
@@ -21,10 +21,10 @@ export const LABEL_GUTTER_PX = 104;
 const COLUMNS_MARGIN = {
   l: TICK_ROOM_PX + LABEL_GUTTER_PX,
   r: 26,
-  t: 54,
+  t: 64,
   b: 22,
 };
-const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 62 };
+const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 72 };
 
 // 14px at Plotly's LINE_SPACING of 1.3 is 18.2; 19 buys a pixel of clearance
 // rather than spending one.

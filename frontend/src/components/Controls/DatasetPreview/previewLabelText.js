@@ -5,10 +5,11 @@
 // defaults, because these estimates assume the size that is actually rendered.
 
 // Every label is drawn at this size explicitly, rather than at Plotly's default
-// for an axis title — bigFont(layout.font.size) = round(1.2 * 12) = 14. Being
-// explicit is what lets maxCharsFor predict how wide a label will render, and 12
-// matches the tick labels.
-export const LABEL_FONT_PX = 12;
+// for an axis title, which is what lets maxCharsFor predict how wide a label
+// will render. Twice the ticks, so a label reads as the heading of its numbers.
+export const LABEL_FONT_PX = 18;
+export const TICK_FONT_PX = 9;
+export const HOVER_FONT_PX = 12; // the hover box is read, not scanned: not tick-sized
 export const TITLE_FONT_PX = 14;
 export const MAX_TITLE_LINES = 2;
 

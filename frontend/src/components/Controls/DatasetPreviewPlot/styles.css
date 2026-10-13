@@ -38,6 +38,55 @@
   max-width: 60%;
   min-height: 0;
   overflow: hidden auto;
+  transition:
+    width 200ms ease,
+    visibility 0s linear 0s;
+}
+
+/* Visibility flips only once the slide ends, so collapsed controls leave the tab
+   order without vanishing mid-animation. */
+.datasetPreviewParamsPane.isCollapsed {
+  visibility: hidden;
+  transition:
+    width 200ms ease,
+    visibility 0s linear 200ms;
+}
+
+.datasetPreviewPlotPanes.isResizing .datasetPreviewParamsPane {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .datasetPreviewParamsPane,
+  .datasetPreviewParamsPane.isCollapsed {
+    transition: none;
+  }
+}
+
+.paneCollapseToggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: 4px;
+  background-color: var(--cioos-white);
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.paneCollapseToggle:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-primary-800);
+}
+
+.paneCollapseToggle:focus-visible {
+  outline: 2px solid var(--cioos-primary);
+  outline-offset: 1px;
 }
 
 /* Checkbox rows in the variable picker. The menu is portaled to document.body
@@ -107,7 +156,7 @@
   min-width: 0;
 }
 
-/* The plot side of the row: the fixed colour legend, then the scroller. A column
+/* The plot side of the row: the scroller, then the fixed colour legend. A column
  * so the legend can sit outside .datasetPreviewPlotArea — inside it, a wide
  * profile would scroll the legend off with the panels, which is the whole
  * reason the colourbar left the figure. Its width is the scroller's, so
@@ -125,7 +174,7 @@
  * Legend's, which are private to that component's stylesheet. */
 .colorScaleLegend {
   flex: 0 0 auto;
-  padding: 0 0 6px;
+  padding: 6px 0 0;
 }
 
 .colorScaleLegendLabel {
@@ -193,6 +242,12 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
+}
+
+/* Plotly's hovermode "x" repeats the time in a box on the axis; every panel's
+   hover box already leads with it, and no layout attribute turns it off. */
+.datasetPreviewPlotArea .hoverlayer .axistext {
+  display: none;
 }
 
 .datasetPreviewPlotEmpty {

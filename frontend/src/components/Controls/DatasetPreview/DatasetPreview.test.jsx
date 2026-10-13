@@ -92,7 +92,7 @@ describe("DatasetPreview", () => {
       );
       // The provider is what hands these over — the plot takes no props.
       expect(screen.getByTestId("preview-plot")).toHaveTextContent(
-        "depth|temperature|markers|number",
+        "depth|temperature|markers+lines|number",
       );
     });
 
@@ -149,6 +149,27 @@ describe("DatasetPreview", () => {
       // Called with nothing: one write clears ?preview= and the plot params
       // together, because react-router drops one of two writes in a tick.
       expect(setInspectRecordID).toHaveBeenCalledWith();
+    });
+
+    it("puts the Plot button before the Table button", () => {
+      open();
+      const plot = screen.getByRole("button", { name: "Plot" });
+      const table = screen.getByRole("button", { name: "Table" });
+      expect(
+        plot.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("copies the link from an icon-only button that still has a name", async () => {
+      const { user } = open();
+      const copy = screen.getByRole("button", { name: "Copy link" });
+      expect(copy).toHaveTextContent("");
+      expect(copy).toHaveAttribute("title", "Copy link");
+
+      await user.click(copy);
+      expect(
+        screen.getByRole("button", { name: "Link copied!" }),
+      ).toBeInTheDocument();
     });
 
     it("titles itself with the dataset and the record", () => {

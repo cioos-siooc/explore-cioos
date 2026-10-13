@@ -139,11 +139,11 @@ describe("DatasetPreviewPlot", () => {
   it("switches the mode every panel is drawn in", async () => {
     const user = open();
     await plotted();
-    await user.click(screen.getByRole("button", { name: "Markers" }));
-    await user.click(screen.getByText("Markers + Line"));
+    await user.click(screen.getByRole("button", { name: "Markers + Line" }));
+    await user.click(screen.getByText("Markers"));
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Markers + Line" }),
+        screen.getByRole("button", { name: "Markers" }),
       ).toBeInTheDocument(),
     );
   });
@@ -156,6 +156,25 @@ describe("DatasetPreviewPlot", () => {
     await waitFor(() =>
       expect(screen.getByText("Color scale")).toBeInTheDocument(),
     );
+  });
+
+  it("draws the colour scale below the plot, outside its scroller", async () => {
+    const user = open();
+    await plotted();
+    await user.click(screen.getByRole("button", { name: "None" }));
+    await user.click(screen.getByText("salinity ( PSU )"));
+
+    const legend = await waitFor(() => {
+      const found = document.querySelector(".colorScaleLegend");
+      expect(found).not.toBeNull();
+      return found;
+    });
+    const plotArea = document.querySelector(".datasetPreviewPlotArea");
+    expect(plotArea.contains(legend)).toBe(false);
+    expect(
+      plotArea.compareDocumentPosition(legend) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("keeps a rename across the Table/Plot flip that unmounts the plot", async () => {
@@ -173,5 +192,42 @@ describe("DatasetPreviewPlot", () => {
     expect(screen.getByLabelText("temperature ( degree_C )")).toHaveValue(
       "Temp",
     );
+  });
+
+  it("collapses the settings pane and expands it again", async () => {
+    const user = open();
+    await plotted();
+    const hide = screen.getByRole("button", {
+      name: "Hide the plot settings panel",
+    });
+    expect(hide).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("separator")).toBeInTheDocument();
+
+    await user.click(hide);
+    const show = screen.getByRole("button", {
+      name: "Show the plot settings panel",
+    });
+    expect(show).toHaveAttribute("aria-expanded", "false");
+    // Nothing left to resize while the pane is hidden.
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+
+    await user.click(show);
+    expect(screen.getByRole("separator")).toBeInTheDocument();
+  });
+
+  it("keeps the pane collapsed across the Table/Plot flip", async () => {
+    const user = open();
+    await plotted();
+    await user.click(
+      screen.getByRole("button", { name: "Hide the plot settings panel" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Table" }));
+    await user.click(screen.getByRole("button", { name: "Plot" }));
+    await plotted();
+
+    expect(
+      screen.getByRole("button", { name: "Show the plot settings panel" }),
+    ).toHaveAttribute("aria-expanded", "false");
   });
 });

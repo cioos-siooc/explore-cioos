@@ -12,8 +12,10 @@ import { buildFigure, recordTitleFor } from "./previewFacetFigure.js";
 import {
   maxCharsFor,
   titleLinesFor,
+  HOVER_FONT_PX,
   LABEL_FONT_PX,
   MAX_TITLE_LINES,
+  TICK_FONT_PX,
   TITLE_FONT_PX,
 } from "./previewLabelText.js";
 import {
@@ -23,7 +25,6 @@ import {
   plotHeightFor,
   plotWidthFor,
   titleRoomFor,
-  LABEL_GUTTER_PX,
   MIN_PANEL_PX,
 } from "./previewFacetSizing.js";
 import { colorScaleFor } from "./previewColorScales.js";
@@ -103,22 +104,12 @@ test("a profile gets one shared y axis and one x axis per panel", () => {
   assert.equal(Object.keys(layout).filter((k) => /^xaxis/.test(k)).length, 6);
 });
 
-test("the shared depth axis is reversed, and labelled horizontally beside itself", () => {
+test("the shared depth axis is reversed, and titled along itself", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
   assert.equal(layout.yaxis.autorange, "reversed");
-  // NOT an axis title: this Plotly has no angle on one, so it would be drawn
-  // sideways. An annotation in the same place instead — beside the axis, centred
-  // on the span it labels.
-  assert.ok(!layout.yaxis.title);
-  assert.equal(layout.annotations.length, 1);
-  const label = layout.annotations[0];
-  assert.equal(label.text.replace(/<br>/g, " "), "depth of observation ( m )");
-  assert.equal(label.y, 0.5);
-  assert.equal(label.yanchor, "middle");
-  // Left of the axis line and clear of its tick labels.
-  assert.equal(label.xanchor, "right");
-  assert.ok(label.xshift < 0);
-  assert.equal(label.showarrow, false);
+  assert.equal(layout.yaxis.title.text, "depth of observation ( m )");
+  assert.equal(layout.yaxis.automargin, true);
+  assert.equal(layout.annotations, undefined);
 });
 
 test("profile panel titles sit on top, one per variable", () => {
@@ -183,11 +174,9 @@ test("the first selected variable is drawn at the bottom", () => {
   const { layout } = figure("TimeSeries", ["TE90_01", "PSAL_01", "DOXY_01"]);
   assert.ok(layout.yaxis.domain[0] < layout.yaxis3.domain[0]);
   assert.equal(
-    layout.annotations[0].text.replace(/<br>/g, " "),
+    layout.yaxis.title.text,
     "Temperature (1990 scale) ( degree_C )",
   );
-  const [low, high] = layout.yaxis.domain;
-  assert.equal(layout.annotations[0].y, (low + high) / 2);
 });
 
 test("a timeseries puts time across and the variable up", () => {
@@ -256,75 +245,68 @@ test("no rows yet still produces the full axis skeleton", () => {
   assert.equal(layout.xaxis2.title.text, "Practical Salinity ( PSU )");
 });
 
-// --- labels read horizontally, whatever the orientation ----------------------
+// --- every label runs along its own axis -----------------------------------
 
-test("every stacked panel is labelled along its own axis, never rotated", () => {
+test("every stacked panel is titled on its own y axis", () => {
   const { layout } = figure("TimeSeries", ALL_SIX);
-  assert.equal(layout.annotations.length, ALL_SIX.length);
+  assert.equal(layout.annotations, undefined);
   for (let index = 0; index < ALL_SIX.length; index += 1) {
     const key = index === 0 ? "yaxis" : `yaxis${index + 1}`;
-    // A y axis title is the one label Plotly insists on rotating, so no panel
-    // axis carries one.
-    assert.ok(!layout[key].title, `${key} has no title`);
-    const [low, high] = layout[key].domain;
-    const annotation = layout.annotations[index];
-    // Where the axis title would have been: centred on the axis it labels, and
-    // to the left of it.
-    assert.equal(
-      annotation.y,
-      (low + high) / 2,
-      `${key} label is centred on it`,
-    );
-    assert.equal(annotation.yanchor, "middle");
-    assert.equal(annotation.xanchor, "right");
-    assert.equal(annotation.x, 0);
-    assert.ok(annotation.xshift < 0);
-    assert.equal(annotation.font.size, LABEL_FONT_PX);
+    assert.ok(layout[key].title.text, `${key} has a title`);
+    assert.equal(layout[key].title.font.size, LABEL_FONT_PX);
+    assert.equal(layout[key].automargin, true);
   }
 });
 
-test("a vertical axis label wraps into the gutter the margin reserves", () => {
-  // The gutter is a constant, so unlike a panel title this wraps even on the
-  // first render, before anything has been measured.
-  const { layout } = figure("TimeSeries", ALL_SIX);
-  const fits = maxCharsFor(LABEL_GUTTER_PX);
-  layout.annotations.forEach((annotation) => {
-    annotation.text.split("<br>").forEach((line) => {
+test("a vertical axis title wraps to its own panel's height once it is known", () => {
+  const size = { width: 900, height: 1300 };
+  const { layout } = figure("TimeSeries", ALL_SIX, { size });
+  const margin = marginFor(ROWS, 1);
+  const [low, high] = layout.yaxis.domain;
+  const fits = maxCharsFor((size.height - margin.t - margin.b) * (high - low));
+  const titles = ALL_SIX.map(
+    (_, index) =>
+      layout[index === 0 ? "yaxis" : `yaxis${index + 1}`].title.text,
+  );
+  titles.forEach((text) => {
+    text.split("<br>").forEach((line) => {
       assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
     });
   });
-  // Long enough to need it: this one does not fit on one line.
   assert.ok(
-    layout.annotations[1].text.includes("<br>"),
-    layout.annotations[1].text,
+    titles.some((text) => text.includes("<br>")),
+    titles.join(" | "),
   );
-  const margin = marginFor(ROWS);
-  assert.ok(
-    margin.l >= LABEL_GUTTER_PX,
-    `left margin ${margin.l} holds a ${LABEL_GUTTER_PX}px gutter`,
-  );
+  // Unmeasured, nothing wraps.
+  const unsized = figure("TimeSeries", ALL_SIX);
+  assert.ok(!unsized.layout.yaxis2.title.text.includes("<br>"));
 });
 
-test("a stack keeps its shared axis title — that one is already horizontal", () => {
+test("a stack keeps its shared axis title", () => {
   const { layout } = figure("TimeSeries", ["TE90_01"]);
   assert.equal(layout.xaxis.title.text, "Time ( UTC )");
   assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX);
 });
 
-test("a profile labels only the shared axis by annotation", () => {
-  // Panel titles there are x titles on top, which Plotly already draws
-  // horizontally — so they stay axis titles and keep automargin.
+test("a profile titles its panels on top and its shared axis beside them", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
-  assert.equal(layout.annotations.length, 1);
   assert.equal(layout.xaxis.side, "top");
   assert.ok(layout.xaxis.title.text);
+  assert.ok(layout.yaxis.title.text);
 });
 
-test("every label is drawn at the size the wrap estimate assumes", () => {
+test("labels are twice the ticks, at the size the wrap estimate assumes", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
-  assert.equal(layout.font.size, LABEL_FONT_PX);
+  assert.equal(layout.font.size, TICK_FONT_PX);
+  assert.equal(LABEL_FONT_PX, 2 * TICK_FONT_PX);
   assert.equal(layout.xaxis.title.font.size, LABEL_FONT_PX);
-  assert.equal(layout.annotations[0].font.size, LABEL_FONT_PX);
+  assert.equal(layout.yaxis.title.font.size, LABEL_FONT_PX);
+});
+
+test("the hover box keeps a readable size rather than the ticks' size", () => {
+  const { layout } = figure("TimeSeries", ["TE90_01"]);
+  assert.equal(layout.hoverlabel.font.size, HOVER_FONT_PX);
+  assert.ok(HOVER_FONT_PX > TICK_FONT_PX);
 });
 
 // --- wrapping ----------------------------------------------------------------
@@ -342,9 +324,12 @@ test("panel titles wrap to their own panel once the width is known", () => {
   const [start, end] = wide.layout.xaxis.domain;
   const fits = maxCharsFor((1140 - columns.l - columns.r) * (end - start));
   titles.forEach((text) => {
-    text.split("<br>").forEach((line) => {
-      assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
-    });
+    text
+      .split("<br>")
+      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut, so it alone may run over
+      .forEach((line) => {
+        assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
+      });
   });
   // And the labels that do not fit were the reason: they wrapped.
   assert.ok(
@@ -750,12 +735,6 @@ test("the legend carries the label, the stops and the ticks", () => {
 
 test("no colour column, no legend", () => {
   assert.equal(figure("TimeSeriesProfile", ALL_SIX).colorLegend, null);
-});
-
-test("a colour column moves no annotation, because it adds none", () => {
-  const plain = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"]);
-  const withColor = colored(["TE90_01", "PSAL_01"]);
-  assert.deepEqual(withColor.layout.annotations, plain.layout.annotations);
 });
 
 test("hover gains the colour value, off customdata", () => {

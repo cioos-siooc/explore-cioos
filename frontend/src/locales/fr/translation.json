@@ -413,6 +413,8 @@
   "datasetPreviewPlotYAxis": "Axe Y",
   "datasetPreviewPlotAddRemovePlots": "(+/-)",
   "datasetPreviewPlotResizeParams": "Redimensionner le panneau de réglages du graphique",
+  "datasetPreviewPlotHideParams": "Masquer le panneau de réglages du graphique",
+  "datasetPreviewPlotShowParams": "Afficher le panneau de réglages du graphique",
   "datasetPreviewPlotSelectAll": "Tout sélectionner",
   "datasetPreviewPlotSelectNone": "Tout désélectionner",
   "datasetPreviewPlotNoVariables": "Aucune variable traçable",

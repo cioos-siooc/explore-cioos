@@ -59,20 +59,20 @@ test.describe("record preview", () => {
     const mode = (name) =>
       page.getByTestId("preview-mode-option").getByText(name, { exact: true });
 
-    await expect(modeToggle).toHaveText("Markers");
-    await modeToggle.click();
-    await mode("Markers + Line").click();
-
     await expect(modeToggle).toHaveText("Markers + Line");
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get("pmode"))
-      .toBe("markers+lines");
-
-    // Back to the default and the param goes, rather than being pinned at it.
     await modeToggle.click();
     await mode("Markers").click();
 
     await expect(modeToggle).toHaveText("Markers");
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("pmode"))
+      .toBe("markers");
+
+    // Back to the default and the param goes, rather than being pinned at it.
+    await modeToggle.click();
+    await mode("Markers + Line").click();
+
+    await expect(modeToggle).toHaveText("Markers + Line");
     await expect
       .poll(() => new URL(page.url()).searchParams.get("pmode"))
       .toBeNull();

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Check2, Clipboard } from "react-bootstrap-icons";
+import { Check2, Link45deg } from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
 import useElementSize from "../../ui/useElementSize.js";
@@ -76,10 +76,14 @@ export default function DatasetPreview({
   // this stale by definition, with no effect to run.
   const [copiedLinkKey, setCopiedLinkKey] = useState(NO_LINK_COPIED);
   const linkCopied = copiedLinkKey === linkKey;
+  const copyLinkText = t(
+    linkCopied ? "copiedPreviewLinkTitle" : "copyPreviewLinkTitle",
+  );
 
   // A viewing preference like the disclosure triangle in the plot, not a view of
   // the data — so not in the URL, and not reset per record.
   const [paneWidth, setPaneWidth] = useState(PANE_DEFAULT_PX);
+  const [paneCollapsed, setPaneCollapsed] = useState(false);
 
   // The Table view's scroll container, and the CEILING on the plot's height.
   // Measured here because its height is set by the modal (flex, capped at the
@@ -106,6 +110,8 @@ export default function DatasetPreview({
     setCustomLabels,
     paneWidth,
     setPaneWidth,
+    paneCollapsed,
+    setPaneCollapsed,
     availableHeight: scrollSize.height,
   };
 
@@ -134,19 +140,19 @@ export default function DatasetPreview({
               <>
                 <button
                   className={`toggleButton ${
-                    selectedVis === "table" && "selected"
-                  }`}
-                  onClick={() => setSelectedVis("table")}
-                >
-                  {t("datasetPreviewTableText")}
-                </button>
-                <button
-                  className={`toggleButton ${
                     selectedVis === "plot" && "selected"
                   }`}
                   onClick={() => setSelectedVis("plot")}
                 >
                   {t("datasetPreviewPlotText")}
+                </button>
+                <button
+                  className={`toggleButton ${
+                    selectedVis === "table" && "selected"
+                  }`}
+                  onClick={() => setSelectedVis("table")}
+                >
+                  {t("datasetPreviewTableText")}
                 </button>
               </>
             )}
@@ -167,20 +173,17 @@ export default function DatasetPreview({
               <button
                 type="button"
                 className="copyLinkButton"
+                aria-label={copyLinkText}
+                title={copyLinkText}
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
                   setCopiedLinkKey(linkKey);
                 }}
               >
                 {linkCopied ? (
-                  <Check2 size={16} aria-hidden="true" />
+                  <Check2 size={18} aria-hidden="true" />
                 ) : (
-                  <Clipboard size={16} aria-hidden="true" />
-                )}
-                {t(
-                  linkCopied
-                    ? "copiedPreviewLinkTitle"
-                    : "copyPreviewLinkTitle",
+                  <Link45deg size={18} aria-hidden="true" />
                 )}
               </button>
             )}

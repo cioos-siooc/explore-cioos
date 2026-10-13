@@ -412,6 +412,8 @@
   "datasetPreviewPlotYAxis": "Y axis",
   "datasetPreviewPlotAddRemovePlots": "(+/-)",
   "datasetPreviewPlotResizeParams": "Resize the plot settings panel",
+  "datasetPreviewPlotHideParams": "Hide the plot settings panel",
+  "datasetPreviewPlotShowParams": "Show the plot settings panel",
   "datasetPreviewPlotSelectAll": "Select all",
   "datasetPreviewPlotSelectNone": "Clear all",
   "datasetPreviewPlotNoVariables": "No plottable variables",

@@ -107,22 +107,23 @@
   margin: 10px auto;
 }
 
-.tableAndPlotGridItem .dropdown button {
+.tableAndPlotGridItem .dropdown .btn:hover {
   background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
 }
 
 .tableAndPlotGridItem hr {
   margin-top: 0;
 }
 
-/* Copy-link button. Shares the toggle buttons' shape but not their fixed width:
-   it holds an icon plus a couple of words, and it is not a toggle. */
+/* Copy-link button: an icon-only square at the toggle buttons' height. */
 .tableAndPlotGridContainer .copyLinkButton {
+  width: 42px;
   height: 42px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
+  justify-content: center;
+  padding: 0;
   background-color: white;
   border-radius: 5px;
   border: 2px solid var(--cioos-hairline);

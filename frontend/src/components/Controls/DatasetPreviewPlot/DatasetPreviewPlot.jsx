@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ChevronBarLeft, ChevronBarRight } from "react-bootstrap-icons";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import PaneDivider from "../../ui/PaneDivider.jsx";
 import useElementSize from "../../ui/useElementSize.js";
@@ -83,6 +84,8 @@ export default function DatasetPreviewPlot() {
     availableHeight,
     paneWidth,
     setPaneWidth,
+    paneCollapsed,
+    setPaneCollapsed,
   } = usePreviewPlot();
 
   // Purely local: a disclosure triangle is not worth a param, and nobody wants
@@ -230,9 +233,13 @@ export default function DatasetPreviewPlot() {
       }
     >
       <div
-        className="datasetPreviewParamsPane"
+        className={
+          paneCollapsed
+            ? "datasetPreviewParamsPane isCollapsed"
+            : "datasetPreviewParamsPane"
+        }
         id={PARAMS_PANE_ID}
-        style={{ width: paneWidth }}
+        style={{ width: paneCollapsed ? 0 : paneWidth }}
       >
         {/* First in the pane deliberately: it is the one control that changes
             every panel at once. */}
@@ -346,26 +353,47 @@ export default function DatasetPreviewPlot() {
         )}
       </div>
 
-      <PaneDivider
-        label={t("datasetPreviewPlotResizeParams")}
-        controls={PARAMS_PANE_ID}
-        value={paneWidth}
-        min={PANE_MIN_PX}
-        max={clampPaneWidth(PANE_MAX_PX, bounds)}
-        reset={PANE_DEFAULT_PX}
-        onChange={(next) => setPaneWidth(clampPaneWidth(next, bounds))}
-        onDragChange={setResizing}
-      />
+      <button
+        type="button"
+        className="paneCollapseToggle"
+        aria-expanded={!paneCollapsed}
+        aria-controls={PARAMS_PANE_ID}
+        aria-label={t(
+          paneCollapsed
+            ? "datasetPreviewPlotShowParams"
+            : "datasetPreviewPlotHideParams",
+        )}
+        title={t(
+          paneCollapsed
+            ? "datasetPreviewPlotShowParams"
+            : "datasetPreviewPlotHideParams",
+        )}
+        onClick={() => setPaneCollapsed(!paneCollapsed)}
+      >
+        {paneCollapsed ? (
+          <ChevronBarRight size={16} aria-hidden="true" />
+        ) : (
+          <ChevronBarLeft size={16} aria-hidden="true" />
+        )}
+      </button>
+      {!paneCollapsed && (
+        <PaneDivider
+          label={t("datasetPreviewPlotResizeParams")}
+          controls={PARAMS_PANE_ID}
+          value={paneWidth}
+          min={PANE_MIN_PX}
+          max={clampPaneWidth(PANE_MAX_PX, bounds)}
+          reset={PANE_DEFAULT_PX}
+          onChange={(next) => setPaneWidth(clampPaneWidth(next, bounds))}
+          onDragChange={setResizing}
+        />
+      )}
 
       <div className="datasetPreviewPlotColumn">
         {/* Above the figure rather than in the parameters pane: this says WHICH
             rows are drawn where every control in the pane says how, and the
             pane is too narrow to read a cast's date in. */}
         <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
-
-        {/* Above the scroller, not inside it: a profile wide enough to scroll
-            is exactly the plot whose scale would otherwise be off-screen. */}
-        <ColorScaleLegend legend={figure && figure.colorLegend} />
 
         <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
           {figure ? (
@@ -400,6 +428,10 @@ export default function DatasetPreviewPlot() {
             </p>
           )}
         </div>
+
+        {/* Below the scroller, not inside it: a profile wide enough to scroll
+            is exactly the plot whose scale would otherwise be off-screen. */}
+        <ColorScaleLegend legend={figure && figure.colorLegend} />
       </div>
     </div>
   );

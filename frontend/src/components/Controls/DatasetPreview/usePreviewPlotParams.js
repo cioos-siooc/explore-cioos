@@ -38,7 +38,7 @@ export const PLOT_MODES = [
   { value: "markers+lines", labelKey: "markersAndLine" },
 ];
 
-const DEFAULT_MODE = PLOT_MODES[0].value;
+const DEFAULT_MODE = "markers+lines";
 
 // A panel list rides in one param rather than one param per panel: the count is
 // unbounded (as many variables as the dataset has), and pvars=A,B,C stays

@@ -7,14 +7,8 @@
 // the arithmetic here (see previewFacetSizing) makes this function's return
 // value the thing under test, assertable under `node --test` with no browser.
 //
-// WHY SOME LABELS ARE ANNOTATIONS AND NOT AXIS TITLES
-// A cartesian axis title in this Plotly is exactly {text, font, standoff} —
-// there is no angle on it, so Plotly always writes a y axis title sideways.
-// Every label here has to read horizontally, so the two that would sit beside a
-// vertical axis are drawn as layout.annotations instead: the shared depth label
-// in a profile, and each panel's label in a stack. The labels Plotly already
-// draws horizontally stay axis titles, because axis titles get `automargin` and
-// annotations do not.
+// Every label is an axis title, so it runs along its axis and is centred on it —
+// Plotly writes a y axis title sideways — and gets `automargin`.
 
 import { COLUMNS, ROWS } from "./previewFacetPlan.js";
 import { labelFor, shortLabelFor } from "./previewVariables.js";
@@ -30,7 +24,9 @@ import {
   titleLinesFor,
   wrapLabel,
   wrapTitleFor,
+  HOVER_FONT_PX,
   LABEL_FONT_PX,
+  TICK_FONT_PX,
   TITLE_FONT_PX,
 } from "./previewLabelText.js";
 import {
@@ -41,9 +37,7 @@ import {
   plotHeightFor,
   plotWidthFor,
   COLUMN_GAP,
-  LABEL_GUTTER_PX,
   ROW_GAP,
-  TICK_ROOM_PX,
   TITLE_PAD_PX,
 } from "./previewFacetSizing.js";
 
@@ -55,29 +49,6 @@ const axisKey = (letter, index) =>
   index === 0 ? `${letter}axis` : `${letter}axis${index + 1}`;
 const axisRef = (letter, index) =>
   index === 0 ? letter : `${letter}${index + 1}`;
-
-// A vertical axis's own label, in the place Plotly would have put its title —
-// beside the axis, centred on the span it labels — but horizontal instead of
-// rotated. `y` is the centre of that span in paper coordinates.
-const axisLabel = (text, y) => ({
-  text,
-  xref: "paper",
-  x: 0,
-  xanchor: "right",
-  xshift: -TICK_ROOM_PX,
-  yref: "paper",
-  y,
-  yanchor: "middle",
-  showarrow: false,
-  align: "right",
-  font: { size: LABEL_FONT_PX },
-});
-
-// Vertical-axis labels wrap into the fixed gutter the margin reserves, not into
-// a measured panel — the gutter is a constant, so these wrap on the very first
-// render too. Four lines because the panel is at least MIN_PANEL_PX tall.
-const wrapAxisLabel = (text) =>
-  wrapLabel(text, maxCharsFor(LABEL_GUTTER_PX), 4);
 
 // The hover's line, on the SHARED axis alone — a second one per panel would be
 // noise. `across` is what makes it span every panel: Plotly draws it between the
@@ -104,13 +75,7 @@ const axisTitle = (text) => ({
 
 // The two arrangements, as closed alternatives rather than one boolean asked a
 // dozen times. Each owns the letters its axes take — which is what wires the
-// traces — the gap between panels, how the hover is gathered, and which of its
-// two labels can be an axis title at all.
-//
-// `annotated` is the one that needs saying: a label beside a VERTICAL axis
-// cannot be an axis title, because this Plotly writes those sideways and offers
-// no angle anywhere. A profile's shared depth label is therefore an annotation
-// while each panel is titled on top; a stack is exactly the reverse.
+// traces — the gap between panels, and how the hover is gathered.
 const COLUMNS_LAYOUT = {
   gap: COLUMN_GAP,
   shared: "y",
@@ -120,7 +85,6 @@ const COLUMNS_LAYOUT = {
   // more than one is drawn — YANGLE, and no attribute turns it off. Unified
   // gathers them into one horizontal box instead.
   unifiedHover: true,
-  annotated: "shared",
   panelTitleSide: "top",
 };
 
@@ -131,7 +95,6 @@ const ROWS_LAYOUT = {
   // Not rotated, so a stack keeps one box per panel.
   hovermode: "x",
   unifiedHover: false,
-  annotated: "panel",
   panelTitleSide: null,
 };
 
@@ -303,14 +266,25 @@ export function buildFigure({
   const plottingWidth = size.width
     ? Math.max(size.width - margin.l - margin.r, 0)
     : 0;
-  const wrapAt = (text, widthPx) => wrapLabel(text, maxCharsFor(widthPx));
+  const plottingHeight = size.height
+    ? Math.max(size.height - margin.t - margin.b, 0)
+    : 0;
+  // A title wraps against the length of its own axis: across for x, along for y.
+  const wrapAlong = (text, letter, domain) =>
+    wrapLabel(
+      text,
+      maxCharsFor(
+        (letter === "y" ? plottingHeight : plottingWidth) *
+          (domain[1] - domain[0]),
+      ),
+    );
 
-  const annotations = [];
   const layout = {
     uirevision,
     margin,
-    // Stated rather than inherited, because maxCharsFor's estimate assumes it.
-    font: { size: LABEL_FONT_PX },
+    // Ticks; every label states its own LABEL_FONT_PX.
+    font: { size: TICK_FONT_PX },
+    hoverlabel: { font: { size: HOVER_FONT_PX } },
     showlegend: false, // each panel is titled; a legend would repeat it
     // One hover for every panel at once, along the axis they share.
     // `hoversubplots` is what widens it past the panel under the pointer.
@@ -370,7 +344,6 @@ export function buildFigure({
       }
     : {};
 
-  const sharedIsAnnotated = arrangement.annotated === "shared";
   layout[`${sharedLetter}axis`] = {
     automargin: true,
     domain: [0, 1],
@@ -387,14 +360,8 @@ export function buildFigure({
         }
       : {}),
     ...(plan.sharedReversed ? { autorange: "reversed" } : {}),
-    // Horizontal here, so it keeps an axis title and automargin sizes for it.
-    ...(sharedIsAnnotated
-      ? {}
-      : { title: axisTitle(wrapAt(sharedTitle, plottingWidth)) }),
+    title: axisTitle(wrapAlong(sharedTitle, sharedLetter, [0, 1])),
   };
-  if (sharedIsAnnotated) {
-    annotations.push(axisLabel(wrapAxisLabel(sharedTitle), 0.5));
-  }
 
   const traces = panels.map((columnName, index) => {
     const domain = domains[index];
@@ -402,7 +369,6 @@ export function buildFigure({
 
     // domainsFor counts up from 0, and 0 is the BOTTOM of a Plotly y axis, so a
     // stack's panel order already puts the first selected variable lowest.
-    const panelIsAnnotated = arrangement.annotated === "panel";
     layout[axisKey(panelLetter, index)] = {
       domain,
       anchor: sharedLetter,
@@ -410,22 +376,11 @@ export function buildFigure({
       ...(arrangement.panelTitleSide
         ? { side: arrangement.panelTitleSide }
         : {}),
-      ...(panelIsAnnotated
-        ? {}
-        : {
-            // Wrapped to its OWN panel's width: six panels in a 1140px modal
-            // are ~170px each, and one unwrapped long_name covers three.
-            title: axisTitle(
-              wrapAt(panelTitle, plottingWidth * (domain[1] - domain[0])),
-            ),
-          }),
+      // Wrapped to its OWN panel: six panels in a 1140px modal are ~170px
+      // each, and one unwrapped long_name covers three.
+      title: axisTitle(wrapAlong(panelTitle, panelLetter, domain)),
       zeroline: false,
     };
-    if (panelIsAnnotated) {
-      annotations.push(
-        axisLabel(wrapAxisLabel(panelTitle), (domain[0] + domain[1]) / 2),
-      );
-    }
 
     const sharedValues = (data || []).map((row) => row[sharedAxis]);
     const panelValues = (data || []).map((row) => row[columnName]);
@@ -482,7 +437,6 @@ export function buildFigure({
     };
   });
 
-  layout.annotations = annotations;
   // The same stops the markers were given and the same range they were mapped
   // over, so the strip above the plot and the markers cannot disagree about what
   // a colour means. Null when there is no colour column, which is what decides

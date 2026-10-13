@@ -56,7 +56,7 @@ describe("usePreviewPlotParams", () => {
       open();
       expect(api.sharedAxis).toBe("depth");
       expect(api.panels).toEqual(["temperature"]);
-      expect(api.plotType).toBe("markers");
+      expect(api.plotType).toBe("markers+lines");
       expect(api.selectedVis).toBe("plot");
     });
 
@@ -82,7 +82,7 @@ describe("usePreviewPlotParams", () => {
       await run(() => api.setPlotType("lines"));
       expect(param("pmode")).toBe("lines");
 
-      await run(() => api.setPlotType("markers"));
+      await run(() => api.setPlotType("markers+lines"));
       expect(param("pmode")).toBeNull();
     });
 
@@ -153,7 +153,7 @@ describe("usePreviewPlotParams", () => {
 
     it("ignores an unknown plot mode", () => {
       open("pmode=sausage");
-      expect(api.plotType).toBe("markers");
+      expect(api.plotType).toBe("markers+lines");
     });
   });
 
