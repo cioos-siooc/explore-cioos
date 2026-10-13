@@ -11,6 +11,7 @@ import {
   formatDatasetCount,
   formatErddapServerName,
   formatSizeEstimate,
+  generateColorStops,
   getCurrentRangeLevel,
   toggleOptionExcluded,
   toggleOptionIncluded,
@@ -18,6 +19,7 @@ import {
   sumSizeEstimates,
   polygonToWkt,
   quantizeCountRange,
+  quantileBreaks,
   rangesEqual,
   rangeLevelHasData,
   revealOffset,
@@ -523,6 +525,40 @@ describe("legend range helpers", () => {
   it("rejects a range that describes no data", () => {
     expect(quantizeCountRange([null, null])).toBeUndefined();
     expect(quantizeCountRange(undefined)).toBeUndefined();
+  });
+});
+
+describe("quantile colour stops", () => {
+  const palette = ["a", "b", "c", "d", "e"];
+
+  it("picks breaks at evenly spaced percentiles, minimum to maximum", () => {
+    expect(quantileBreaks([9, 1, 5, 3, 7], 3)).toEqual([1, 5, 9]);
+    expect(quantileBreaks([])).toBeUndefined();
+  });
+
+  it("gives each colour an equal share of the hexes, not of the log axis", () => {
+    // Most hexes bunched between 1k and 2k on a 1..1e6 range: a log ramp would
+    // spend most of its colours on decades nothing occupies.
+    const breaks = [1, 1000, 1200, 1500, 1e6];
+    const stops = generateColorStops(palette, [1, 1e6, 1e6, breaks]);
+    expect(stops.map((s) => s.stop)).toEqual(breaks);
+    expect(stops.map((s) => s.color)).toEqual(palette);
+  });
+
+  it("resamples breaks whose number differs from the palette's", () => {
+    const stops = generateColorStops(palette, [1, 900, 900, [1, 100, 900]]);
+    expect(stops.map((s) => s.stop)).toEqual([1, 50, 100, 500, 900]);
+  });
+
+  it("keeps the linear ramp for narrow ranges", () => {
+    const stops = generateColorStops(palette, [1, 5, 5, [1, 1, 1, 2, 5]]);
+    expect(stops.map((s) => s.stop)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("compares ranges by their breaks too", () => {
+    expect(rangesEqual([1, 10, 10, [1, 5, 10]], [1, 10, 10, [1, 2, 10]])).toBe(
+      false,
+    );
   });
 });
 

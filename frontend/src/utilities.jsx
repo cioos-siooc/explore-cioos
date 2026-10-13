@@ -333,7 +333,23 @@ export function generateColorStops(colorScale, range) {
   // holds at least one thing.
   const lo = Math.max(Number.isFinite(range[0]) ? range[0] : 1, 1);
   const hi = range[1];
-  if (hi / lo >= LOG_SCALE_MIN_RATIO) {
+  const breaks = range[3];
+  if (hi / lo >= LOG_SCALE_MIN_RATIO && breaks?.length > 1) {
+    // Quantile breaks (see rampRange in web-api/routes/legend.js and
+    // measureVisibleHexRange): colour i sits at the count i/(n-1) of the way
+    // through the hexes, so every shade covers about as many hexes whatever
+    // shape the distribution has. The breaks are resampled rather than used
+    // as-is so their number doesn't have to match the palette's.
+    colors = colorScale;
+    scale = (index) => {
+      const position = (index / (colors.length - 1)) * (breaks.length - 1);
+      const below = Math.floor(position);
+      const above = Math.min(below + 1, breaks.length - 1);
+      const value =
+        breaks[below] + (breaks[above] - breaks[below]) * (position - below);
+      return Math.min(Math.max(value, lo), hi);
+    };
+  } else if (hi / lo >= LOG_SCALE_MIN_RATIO) {
     // Measurement and day counts span five to eight orders of magnitude. Any
     // linear spacing over that puts all but a handful of hexes in the lightest
     // color, which reads as "there's nothing here" across most of the map. Log
@@ -631,12 +647,28 @@ export function quantizeCountRange(range) {
   return [Math.min(lo, hi), hi];
 }
 
+// The counts at n evenly spaced percentiles of `counts`, minimum to maximum —
+// the viewport's version of the breaks /legend computes with percentile_disc
+// (same discrete pick, so the two tiers agree on what a break is).
+export function quantileBreaks(counts, n = 12) {
+  if (!counts.length) return undefined;
+  const sorted = Float64Array.from(counts).sort();
+  return Array.from(
+    { length: n },
+    (_, i) => sorted[Math.round((i / (n - 1)) * (sorted.length - 1))],
+  );
+}
+
 // Are two [min, max] ranges the same domain? Used to drop no-op ramp repaints
 // and the state updates that would re-render the legend behind them.
 export function rangesEqual(a, b) {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
-  return a[0] === b[0] && a[1] === b[1];
+  return (
+    a[0] === b[0] &&
+    a[1] === b[1] &&
+    String(a[3] ?? "") === String(b[3] ?? "")
+  );
 }
 
 // Does a [min, max] range describe any data? The API answers a query that

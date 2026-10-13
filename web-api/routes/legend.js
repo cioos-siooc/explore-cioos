@@ -34,12 +34,22 @@ const {
 //
 // trueMax is carried so the legend can mark a clamped top tick with "+"
 // instead of claiming a maximum that isn't the maximum.
+//
+// breaks are the counts at evenly spaced percentiles from the minimum to
+// rampMax, so the frontend can give each colour an equal share of the hexes
+// instead of an equal slice of a log axis the counts may not fill evenly.
 const RAMP_MAX_PERCENTILE = 0.99;
+const RAMP_BREAKS = 12;
+const BREAK_FRACTIONS = Array.from(
+  { length: RAMP_BREAKS },
+  (_, i) => (i / (RAMP_BREAKS - 1)) * RAMP_MAX_PERCENTILE,
+);
 function rampRange() {
   return `json_build_array(
     min(count),
     percentile_disc(${RAMP_MAX_PERCENTILE}) WITHIN GROUP (ORDER BY count),
-    max(count)
+    max(count),
+    percentile_disc(ARRAY[${BREAK_FRACTIONS.join(",")}]::float8[]) WITHIN GROUP (ORDER BY count)
   )`;
 }
 
@@ -102,7 +112,9 @@ function rampRange() {
  *                 recordsCount:
  *                   type: object
  *                   description: >
- *                     Each tier is [min, rampMax, trueMax]. rampMax is the
+ *                     Each tier is [min, rampMax, trueMax, breaks], breaks
+ *                     being the counts at 12 evenly spaced percentiles from
+ *                     the minimum to rampMax. rampMax is the
  *                     99th percentile, not the maximum — record counts have a
  *                     long tail that would otherwise flatten the ramp; hexes
  *                     above it saturate at the darkest colour. trueMax lets

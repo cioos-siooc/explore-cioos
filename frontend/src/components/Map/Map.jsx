@@ -28,6 +28,7 @@ import {
   mapCoverPadding,
   polygonIsRectangle,
   quantizeCountRange,
+  quantileBreaks,
   rangesEqual,
   revealOffset,
   zoomToDatasetCamera,
@@ -1382,10 +1383,12 @@ export default function CreateMap({
     if (features.length < MIN_VIEWPORT_HEXES) return undefined;
     let lo = Infinity;
     let hi = -Infinity;
+    // Keyed by feature id: a hex straddling a tile boundary comes back once per
+    // tile, and counting it twice would skew the quantile breaks.
+    const counts = new Map();
     // A plain loop, not a map/filter chain: this runs over every rendered hex,
     // and the intermediate arrays are the only part of it that would be
-    // expensive. Features straddling a tile boundary appear more than once —
-    // harmless for a min/max.
+    // expensive.
     for (const feature of features) {
       // With a dataset page open, every other dataset's cells are greyed (see
       // hoverHighlightPoints) — they carry none of the ramp's colours, so they
@@ -1397,9 +1400,11 @@ export default function CreateMap({
       if (!Number.isFinite(count) || count <= 0) continue;
       if (count < lo) lo = count;
       if (count > hi) hi = count;
+      counts.set(feature.id ?? counts.size, count);
     }
     if (!Number.isFinite(hi)) return undefined;
-    return quantizeCountRange([lo, hi]);
+    const range = quantizeCountRange([lo, hi]);
+    return range && [...range, undefined, quantileBreaks([...counts.values()])];
   }
 
   // What the held measurement describes, and the whole test for whether it
