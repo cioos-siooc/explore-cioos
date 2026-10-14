@@ -807,7 +807,7 @@ router.get(
     -- candidate row carries them: the track's summary bbox stands in for
     -- search_geom (the spatial predicates are ST_Intersects against an extent
     -- either way), and the dataset columns the filter may reference ride along
-    -- under the alias d that it qualifies pk_url/obis_nodes/erddap_url with.
+    -- under the alias d that it qualifies its dataset columns with.
     -- Selected here rather than in the outer WHERE because a SELECT alias is
     -- not visible to its own WHERE; the subquery has no LIMIT or grouping, so
     -- the planner flattens it and the bbox GiST index is still used.
@@ -828,7 +828,8 @@ router.get(
                s.median_gap_secs, s.time_min, s.time_max, s.n_points
              ) AS gap_secs,
              d.pk_url, d.eovs, d.platform, d.organization_pks,
-             d.obis_nodes, d.erddap_url
+             d.obis_nodes, d.erddap_url,
+             d.coverage_time_max, d.verified_at, d.cdm_data_type
       FROM cde.trajectory_track_stats s
       JOIN cde.datasets d ON d.pk = s.dataset_pk, te
       WHERE s.bbox && ST_Expand(
