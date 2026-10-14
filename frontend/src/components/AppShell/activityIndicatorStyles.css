@@ -65,3 +65,29 @@
 .activityStatus .cioosSpinner {
   color: var(--cioos-primary);
 }
+
+/* Phones: the centre of a narrow map is all of it, so the report steps into
+   the bottom-right corner, across from the legend card in the bottom-left. */
+@media (max-width: 700px), (max-height: 500px) {
+  .activityIndicator {
+    left: auto;
+    right: 8px;
+    transform: none;
+    align-items: flex-end;
+  }
+
+  .activityStatus {
+    max-width: min(180px, calc(100vw - 16px));
+    padding: 5px 8px;
+    gap: 3px;
+    font-size: var(--cioos-font-size-2xs);
+  }
+
+  .activityStatusHeading {
+    font-size: var(--cioos-font-size-3xs);
+  }
+
+  .activityStatus .activityList {
+    gap: 2px;
+  }
+}

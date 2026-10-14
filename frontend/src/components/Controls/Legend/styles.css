@@ -541,8 +541,11 @@
   color: var(--cioos-ink);
 }
 
+/* One ramp, nothing to scroll to: a pixel of overflow would otherwise draw a
+   scrollbar down the card's side on phones. */
 .legendCompact .legendBody {
   padding: 0 6px 4px;
+  overflow: visible;
 }
 
 .legendCompact .legendFooter {

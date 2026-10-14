@@ -120,4 +120,15 @@ describe("Modal", () => {
     );
     expect(screen.getByTestId("filters-modal")).toBeInTheDocument();
   });
+
+  it("names the dialog from an aria-label when its visible title is not the whole name", () => {
+    render(
+      <Modal show aria-label="CIOOS Data Explorer">
+        <Modal.Body>content</Modal.Body>
+      </Modal>,
+    );
+    expect(
+      screen.getByRole("dialog", { name: "CIOOS Data Explorer" }),
+    ).toBeInTheDocument();
+  });
 });
