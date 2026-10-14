@@ -587,8 +587,6 @@
   .topBarCountsRow {
     min-height: 0;
     font-size: var(--cioos-font-size-2xs);
-    white-space: normal;
-    text-align: center;
   }
 }
 
