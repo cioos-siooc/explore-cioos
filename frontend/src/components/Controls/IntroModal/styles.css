@@ -426,8 +426,7 @@
 }
 
 /* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
-   brand and tagline are on the app's own header, and here they would only
-   crowd the title and the close button; the hero stacks. */
+   tagline would only crowd the title and the close button; the hero stacks. */
 @media (max-width: 700px), (max-height: 500px) {
   /* The phone type scale the other full-screen modals use
      (AppShell/Modals/styles.css); body text re-applies the base for the same
@@ -442,13 +441,23 @@
     --cioos-font-size-xl: 18px;
   }
 
-  .introBrand,
   .introModal .tagLine {
     display: none;
   }
 
   .introModal .modal-header {
+    gap: var(--cioos-space-md);
     padding: var(--cioos-space-sm) var(--cioos-space-md);
+  }
+
+  /* Sized as the app header's lockup is on a phone (TopLeft/styles.css). */
+  .introBrand {
+    padding-right: var(--cioos-space-md);
+    font-size: min(var(--cioos-font-size-xl), 6.5vw);
+  }
+
+  .introBrand .cioosLogoName {
+    font-size: 0.7em;
   }
 
   .introModal .modal-body {
