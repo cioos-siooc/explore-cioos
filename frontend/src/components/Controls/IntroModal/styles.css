@@ -450,14 +450,8 @@
     padding: var(--cioos-space-sm) var(--cioos-space-md);
   }
 
-  /* Sized as the app header's lockup is on a phone (TopLeft/styles.css). */
   .introBrand {
     padding-right: var(--cioos-space-md);
-    font-size: min(var(--cioos-font-size-xl), 6.5vw);
-  }
-
-  .introBrand .cioosLogoName {
-    font-size: 0.7em;
   }
 
   .introModal .modal-body {

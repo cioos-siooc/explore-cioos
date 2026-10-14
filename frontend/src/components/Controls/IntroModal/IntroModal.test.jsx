@@ -47,7 +47,15 @@ describe("IntroModal", () => {
       <IntroModal showModal={false} setShowModal={() => {}} />,
       { providers: "app" },
     );
-    expect(screen.queryByText("CIOOS Data Explorer")).not.toBeInTheDocument();
+    expect(screen.queryByText("Data Explorer")).not.toBeInTheDocument();
+  });
+
+  it("leaves the brand to the logo beside the title, not the title itself", () => {
+    renderIntro();
+    expect(
+      screen.getByRole("dialog", { name: "CIOOS Data Explorer" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Data Explorer")).toHaveClass("introTitleName");
   });
 
   it("leads with the hero and the three steps of using the tool", () => {

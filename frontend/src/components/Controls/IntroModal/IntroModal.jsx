@@ -150,7 +150,7 @@ export default function IntroModal({ showModal, setShowModal }) {
       show={showModal}
       size="xl"
       centered
-      aria-labelledby="introModalTitle"
+      aria-label={t("CIOOSDataExplorer")}
       onHide={close}
       scrollable
       className="introModal"
@@ -168,8 +168,8 @@ export default function IntroModal({ showModal, setShowModal }) {
         >
           <CioosLogo />
         </a>
-        <Modal.Title className="introTitle" id="introModalTitle">
-          <span className="introTitleName">{t("CIOOSDataExplorer")}</span>
+        <Modal.Title className="introTitle">
+          <span className="introTitleName">{t("dataExplorer")}</span>
           <span className="tagLine">{t("CIOOSQuote")}</span>
         </Modal.Title>
       </Modal.Header>
