@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from cde_harvester.core.harvest_warnings import HarvestWarnings
 from cde_harvester.sources.erddap.dataset import CONSIDERED_VARIABLE_ATTRIBUTES
 
 # ---------------------------------------------------------------------------
@@ -490,6 +491,7 @@ def build_mock_dataset(
     mock.df_variables = df_variables
     mock.variables_list = variables_list
     mock.logger = logging.getLogger("test.mock_dataset")
+    mock.warnings = HarvestWarnings(mock.logger)
 
     # Globals parsed from NC_GLOBAL attributes
     info_df = build_info_df(info_csv)

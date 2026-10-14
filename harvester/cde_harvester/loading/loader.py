@@ -1,6 +1,7 @@
 import ast
 import csv
 import io
+import json
 import logging
 import os
 import time
@@ -10,6 +11,7 @@ import numpy as np
 import pandas as pd
 from prefect import get_run_logger, task
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from cde_harvester.core import errors
 from cde_harvester.core.day_sets import (
@@ -404,6 +406,14 @@ def _append_run_audit(con, runs, attempts, schema="cde"):
         if df is None or df.empty:
             continue
         logger.info("Writing %s (%d rows)", table, len(df))
+        dtype = None
+        if "warnings" in df:
+            # The CSV carries the JSON text; JSONB re-serializes what it is
+            # given, so it must receive the parsed list, not the string.
+            df = df.assign(warnings=df["warnings"].map(
+                lambda v: json.loads(v) if isinstance(v, str) and v else None
+            ))
+            dtype = {"warnings": JSONB(none_as_null=True)}
         df.to_sql(
             table,
             con=con,
@@ -412,6 +422,7 @@ def _append_run_audit(con, runs, attempts, schema="cde"):
             index=False,
             method="multi",
             chunksize=SQL_INSERT_CHUNKSIZE,
+            dtype=dtype,
         )
 
 

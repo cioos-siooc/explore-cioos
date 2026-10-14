@@ -23,6 +23,7 @@ from cde_harvester.core.errors import (
     ResponseTooLargeError,
 )
 from cde_harvester.core.frame_spill import SpillSet
+from cde_harvester.core.harvest_warnings import FEATURES_HIDDEN, TRACKS_UNAVAILABLE
 from cde_harvester.core.issues import erddap_error_text
 from cde_harvester.core.schemas import (
     DatasetSchema,
@@ -68,9 +69,8 @@ def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
     """Build one harvest_attempts.csv row (kept identical to the legacy
     record_attempt closure so the harvest-dashboard contract is unchanged).
 
-    ``warnings`` is a non-fatal note surfaced on the harvest dashboard for an
-    otherwise-successful dataset (e.g. features hidden from the map because
-    they span a region)."""
+    ``warnings`` is the dataset's HarvestWarnings JSON: non-fatal notes
+    surfaced on the harvest dashboard."""
     urls = list(query_urls or [])
     return {
         "run_id": run_id,
@@ -481,6 +481,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                         error_message="Dataset passed compliance but feature extraction returned no rows",
                         duration_ms=duration_ms,
                         query_urls=dataset.queried_urls,
+                        warnings=dataset.warnings.to_json(),
                     ),
                 )
             # Secondary output for trajectory types: ordered track fixes.
@@ -489,30 +490,26 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
             df_track_points = None
             try:
                 df_track_points = extract_track_points(dataset)
-            except Exception:
-                log.warning(
-                    "Track-point extraction failed for %s; coverage cells "
-                    "kept, tracks skipped", dataset_id, exc_info=True,
+            except Exception as e:
+                log.debug("Track-point extraction failed", exc_info=True)
+                dataset.warnings.add(
+                    TRACKS_UNAVAILABLE,
+                    f"Track-point extraction failed ({type(e).__name__}: {e}); "
+                    "coverage kept, tracks skipped",
                 )
             duration_ms = int((time.monotonic() - t0) * 1000)
             log.info("complete")
-            # Non-fatal warning: features spanning a region (>POINT_THRESHOLD_M)
-            # are hidden from the map (kept searchable). Surface it per dataset
-            # on the harvest dashboard. Only the profiles pipeline sets
-            # show_as_point; trajectory cells don't carry it.
-            warnings = None
+            # Only the profiles pipeline sets show_as_point; trajectory cells
+            # don't carry it.
             if "show_as_point" in df_features.columns:
                 n_hidden = int((~df_features["show_as_point"].astype(bool)).sum())
                 if n_hidden:
-                    log.warning(
-                        "%d of %d features span more than %d m and are hidden "
-                        "from the map (still searchable)",
-                        n_hidden, len(df_features), POINT_THRESHOLD_M,
-                    )
-                    warnings = (
+                    dataset.warnings.add(
+                        FEATURES_HIDDEN,
                         f"{n_hidden} of {len(df_features)} features span more than "
                         f"{POINT_THRESHOLD_M} m and are hidden from the map "
-                        "(still searchable via geospatial filters)."
+                        "(still searchable via geospatial filters).",
+                        count=n_hidden,
                     )
             return DatasetHarvestResult(
                 status="success",
@@ -526,7 +523,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                     status="success",
                     duration_ms=duration_ms,
                     query_urls=dataset.queried_urls,
-                    warnings=warnings,
+                    warnings=dataset.warnings.to_json(),
                 ),
             )
 
@@ -542,6 +539,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                 error_message=getattr(compliance_checker, "failure_details", None),
                 duration_ms=duration_ms,
                 query_urls=dataset.queried_urls,
+                warnings=dataset.warnings.to_json(),
             ),
         )
     except HTTPError as e:

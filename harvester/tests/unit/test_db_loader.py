@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 from cde_harvester.loading.loader import (
+    _append_run_audit,
     ensure_organization_pks,
     load_cells_copy,
     main,
@@ -358,3 +359,19 @@ class TestRecordFailedRun:
         mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
         assert record_failed_run(str(tmp_path), "boom") is False
         engine.begin.assert_not_called()
+
+
+class TestAppendRunAudit:
+    def test_warnings_are_written_as_parsed_jsonb(self, mocker):
+        to_sql = mocker.patch.object(pd.DataFrame, "to_sql", autospec=True)
+        attempts = pd.DataFrame({
+            "dataset_id": ["a", "b"],
+            "warnings": ['[{"code": "FEATURES_HIDDEN", "message": "m"}]', None],
+        })
+        _append_run_audit(MagicMock(), None, attempts)
+        written, table = to_sql.call_args.args[:2]
+        assert table == "harvest_attempts"
+        assert written["warnings"].tolist() == [
+            [{"code": "FEATURES_HIDDEN", "message": "m"}], None,
+        ]
+        assert type(to_sql.call_args.kwargs["dtype"]["warnings"]).__name__ == "JSONB"

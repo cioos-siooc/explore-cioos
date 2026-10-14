@@ -4,6 +4,7 @@ from cde_harvester.core.errors import (
     MISSING_REQUIRED_VARS,
     NO_SUPPORTED_VARIABLES,
 )
+from cde_harvester.core.harvest_warnings import NON_CF_STANDARD_NAMES
 from cde_harvester.utils import (
     eov_standard_name,
     intersection,
@@ -54,13 +55,18 @@ class CDEComplianceChecker:
             .tolist()
         )
 
-        #  List non-CF standard names
+        # ioos_qc flag variables carry "<variable>_<test>_test" names by design.
         non_standard_names = [
-            x for x in standard_names_in_dataset if not is_cf_standard_name(x)
+            x for x in standard_names_in_dataset
+            if not is_cf_standard_name(x) and not x.endswith("_test")
         ]
         if non_standard_names:
-            self.logger.warn(
-                "Found unstandard standard_name:" + str(non_standard_names)
+            self.dataset.warnings.add(
+                NON_CF_STANDARD_NAMES,
+                f"{len(non_standard_names)} standard_name(s) not in the CF "
+                "standard name table",
+                items=non_standard_names,
+                count=len(non_standard_names),
             )
 
         #  This dataset has at least one standard name mapped to GOOS

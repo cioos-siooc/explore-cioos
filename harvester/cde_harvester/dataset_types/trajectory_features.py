@@ -37,6 +37,11 @@ from shapely.geometry import LineString
 
 from cde_harvester.core.day_sets import bucket_index_to_day, day_bucket_group
 from cde_harvester.core.errors import ResponseTooLargeError
+from cde_harvester.core.harvest_warnings import (
+    DEPTH_RANGE_UNAVAILABLE,
+    PROFILE_COUNT_UNAVAILABLE,
+    TRAJECTORY_DATA_INCOMPLETE,
+)
 from cde_harvester.sources.erddap.client import ERDDAP
 
 logger = logging.getLogger(__name__)
@@ -185,7 +190,6 @@ def _iter_raw_chunks(dataset, traj_var, has_depth):
     glider's full download is ~330MB against a 200MB cap); monthly chunks
     bound that far more reliably. Each chunk is bounded by MAX_RESPONSE_SIZE;
     failed chunks are logged and skipped."""
-    log = dataset.logger
     request_vars = ([traj_var] if traj_var else []) + ["latitude", "longitude", "time"]
     if has_depth:
         request_vars.append("depth")
@@ -215,8 +219,14 @@ def _iter_raw_chunks(dataset, traj_var, has_depth):
     for time_query in chunks:
         try:
             df = dataset.dataset_tabledap_query(columns + time_query)
-        except HTTPError:
-            log.warning("Trajectory fallback chunk failed, skipping: %s", time_query)
+        except HTTPError as e:
+            dataset.warnings.add(
+                TRAJECTORY_DATA_INCOMPLETE,
+                "Chunked trajectory download skipped time window(s) after an "
+                "HTTP error",
+                items=[f"{time_query} ({e})"],
+                count=1,
+            )
             continue
         if df.empty:
             continue
@@ -662,10 +672,20 @@ def extract_day_stats(dataset, count_profiles=False):
         # succeeded must not fail because its depth query was too large.
         try:
             depths = _to_days(_day_depths(dataset, traj_var), traj_var)
-        except (HTTPError, ResponseTooLargeError):
-            log.warning("Per-day depth range failed for %s", dataset.id, exc_info=True)
-            depths = pd.DataFrame()
-        if not depths.empty:
+        except (HTTPError, ResponseTooLargeError) as e:
+            dataset.warnings.add(
+                DEPTH_RANGE_UNAVAILABLE,
+                f"Per-day depth range query failed ({type(e).__name__}: {e}); "
+                "days kept at depth 0",
+            )
+            depths = None
+        if depths is not None and depths.empty:
+            dataset.warnings.add(
+                DEPTH_RANGE_UNAVAILABLE,
+                "Per-day depth range query returned no values (all-NaN depth?); "
+                "days kept at depth 0",
+            )
+        if depths is not None and not depths.empty:
             depths["depth"] = pd.to_numeric(depths["depth"], errors="coerce")
             depths = (
                 depths.groupby(group_cols, dropna=False)
@@ -695,10 +715,11 @@ def extract_day_stats(dataset, count_profiles=False):
     if count_profiles and profile_var:
         try:
             fixes = _to_days(_profile_fixes(dataset, traj_var, profile_var), traj_var)
-        except (HTTPError, ResponseTooLargeError):
-            log.warning(
-                "Per-day profile count failed for %s; keeping days without "
-                "n_profiles", dataset.id, exc_info=True,
+        except (HTTPError, ResponseTooLargeError) as e:
+            dataset.warnings.add(
+                PROFILE_COUNT_UNAVAILABLE,
+                f"Per-day profile count failed ({type(e).__name__}: {e}); "
+                "days kept without n_profiles",
             )
             fixes = pd.DataFrame()
         if not fixes.empty:

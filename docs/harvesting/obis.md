@@ -116,7 +116,8 @@ corrupt cached file cannot fail every retry.
 Within each chunk:
 
 1. Drop occurrences without coordinates, or outside the Web Mercator range
-   (|lat| > 85.06°, |lon| > 180°).
+   (|lat| > 85.06°, |lon| > 180°). Out-of-range drops are recorded as an
+   `OCCURRENCES_DROPPED` [warning](workflow.md#warnings).
 2. Unless the dataset is exempt, keep only points inside the boundary
    polygon.
 3. Snap each position to the 1/12° grid.
