@@ -191,6 +191,26 @@ test("GET /tiles/tracks/:z/:x/:y.mvt caps the candidate set at TRACKS_MAX_PER_TI
   assert.match(db.queries[0], /LIMIT 2500/);
 });
 
+test("GET /tiles/tracks/:z/:x/:y.mvt carries the realtime filter's dataset columns into cand_rows", async () => {
+  // The shared filter runs against cand_rows under the alias d, so every
+  // dataset column it reads must be selected there or Postgres 500s.
+  db.queueRaw([{ st_asmvt: FAKE_TILE }]);
+  await agent.get("/tiles/tracks/6/20/20.mvt").query({
+    timeMin: "2020-01-01T00:00:00Z",
+    timeMax: "2020-02-01T00:00:00Z",
+    realtimeOnly: "true",
+  });
+  const sql = db.queries[0];
+  const candRows = sql.slice(
+    sql.indexOf("cand_rows AS"),
+    sql.indexOf("cand AS"),
+  );
+  for (const col of ["coverage_time_max", "verified_at", "cdm_data_type"]) {
+    assert.match(candRows, new RegExp(`d\\.${col}\\b`));
+  }
+  assert.match(sql, /dataset_is_realtime\(d\.coverage_time_max/);
+});
+
 /*
  * /tiles/datasets — the per-dataset split of a clicked bucket's count.
  *
