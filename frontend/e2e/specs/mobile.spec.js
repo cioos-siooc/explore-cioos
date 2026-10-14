@@ -65,7 +65,7 @@ test.describe("the phone layout", () => {
   });
 });
 
-test("names every quick filter under its button, and still fits the width", async ({
+test("names every quick filter on its button, and still fits the width", async ({
   page,
 }) => {
   await openApp(page);
@@ -74,7 +74,6 @@ test("names every quick filter under its button, and still fits the width", asyn
     ["quick-filter-area", "Area"],
     ["quick-filter-in-view", "In view"],
     ["quick-filter-realtime", "Real-time"],
-    ["quick-filter-reset", "Reset"],
   ]) {
     await expect(
       row.getByTestId(testId).locator(".quickFilterCaption"),
@@ -83,6 +82,16 @@ test("names every quick filter under its button, and still fits the width", asyn
       row.getByTestId(testId).locator(".quickFilterCaption"),
     ).toBeVisible();
   }
+  // Icon only on a phone, so the row fits on one line.
+  await expect(row.getByTestId("quick-filter-reset")).toHaveAccessibleName(
+    /clear all filters/i,
+  );
+  const tops = await row
+    .locator(".quickFilterButton")
+    .evaluateAll((buttons) =>
+      buttons.map((b) => b.getBoundingClientRect().top),
+    );
+  expect(new Set(tops).size, "the quick filters wrap").toBe(1);
 
   const overflow = await page.evaluate(
     () =>
