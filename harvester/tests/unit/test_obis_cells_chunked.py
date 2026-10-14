@@ -13,7 +13,7 @@ deliberately:
 import pandas as pd
 import pytest
 from cde_harvester.core.obis_cells import merge_cell_partials
-from cde_harvester.sources.obis.harvester import OBISHarvester
+from cde_harvester.sources.obis.harvester import OBISHarvester, _epoch_ms_to_utc
 
 DAY_MS = 86_400_000
 BASE_MS = 1_600_000_000_000
@@ -177,3 +177,13 @@ class TestOutOfRangeDates:
         cells = harvester.aggregate_cells("ds-1", rows, apply_filter=False)
         assert cells["n_records"].iloc[0] == 3
         assert cells["days"].iloc[0] == 1
+
+    def test_a_null_among_repeated_sorted_dates_does_not_raise(self):
+        # pandas 2.3's to_datetime cache maps the Int64 <NA> to a bogus negative
+        # index for this shape (sorted, repeated values), raising "'indices'
+        # contains values less than allowed" -- it took out whole OBIS datasets.
+        days_ms = [BASE_MS + i * 86_400_000 for i in range(200)]
+        series = pd.Series(pd.array(sorted(days_ms * 2) + [None], dtype="Int64"))
+        parsed = _epoch_ms_to_utc(series)
+        assert parsed.isna().tolist() == [False] * 400 + [True]
+        assert parsed.iloc[0] == pd.Timestamp(BASE_MS, unit="ms", tz="UTC")

@@ -74,7 +74,10 @@ def _epoch_ms_to_utc(series):
     """
     values = pd.to_numeric(series, errors="coerce")
     low, high = _REPRESENTABLE_MS
-    values = values.where((values >= low) & (values <= high))
+    # float64: pandas 2.3's to_datetime cache maps an Int64 <NA> to a bogus
+    # negative index ("'indices' contains values less than allowed"); epoch ms
+    # of real dates are exact in float64 and NaN parses cleanly.
+    values = values.where((values >= low) & (values <= high)).astype("float64")
     return pd.to_datetime(values, unit="ms", errors="coerce", utc=True)
 
 
