@@ -232,6 +232,12 @@
     padding-bottom: 6px;
   }
 
+  /* Sized by its button rather than by a line box around it, which centred
+     the Area pill half a pixel off its neighbours. */
+  .quickFilterArea {
+    display: flex;
+  }
+
   .quickFilterButton,
   .quickFilterButton:has(.quickFilterCount) {
     flex-direction: row;
