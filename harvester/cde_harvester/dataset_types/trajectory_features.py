@@ -163,9 +163,10 @@ def _day_depths(dataset, traj_var):
 
 def _to_days(df, traj_var):
     """Add a UTC `day` column from a parsed/parseable `time` column."""
-    df = df.dropna(subset=["time"]).copy()
+    # erddap_csv_to_df answers ERDDAP's no-data 404 with a column-less frame.
     if df.empty:
         return df
+    df = df.dropna(subset=["time"]).copy()
     if not pd.api.types.is_datetime64_any_dtype(df["time"]):
         df["time"] = ERDDAP.parse_erddap_dates(df["time"])
     df = df.dropna(subset=["time"])

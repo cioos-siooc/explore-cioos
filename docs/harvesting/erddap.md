@@ -186,9 +186,11 @@ response scales with trajectory-days, not with the full-resolution track:
 - **Per-day stats** (`cde.trajectory_days`): one row per (trajectory, UTC
   day) with the record count (`orderByCount("<trajectory_id>,time/86400")`)
   and depth range (`orderByMinMax(...,depth)`; skipped when `depth`'s
-  `actual_range` is constant). `TrajectoryProfile` also counts distinct
-  profiles per day with `orderByMin("<trajectory_id>,<profile_id>,time")`,
-  whose result is reused for the track.
+  `actual_range` is constant; best-effort, so a failed or empty depth
+  query, e.g. an all-NaN `depth`, keeps the days at depth 0).
+  `TrajectoryProfile` also counts distinct profiles per day with
+  `orderByMin("<trajectory_id>,<profile_id>,time")`, whose result is reused
+  for the track.
 - **Track points** (`cde.trajectory_points`): ordered, downsampled fixes.
   - `Trajectory`: one `orderByMin("<trajectory_id>,time/<interval>,time")`,
     the interval sized from the active trajectory-day count so the response
