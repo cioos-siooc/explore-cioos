@@ -444,6 +444,7 @@
   "datasetPreviewNoData": "This dataset can not be previewed. Try again later",
   "previewPositionAxis": "Position along track",
   "previewProfileSlice": "Profile",
+  "previewProfileTitle": "Profile: {{record}}",
   "previewProfileSliceAll": "All in this window",
   "previewProfileSliceOf": "Profile {{index}} of {{total}} in this record",
   "previewProfileSlicePrevious": "Previous profile",

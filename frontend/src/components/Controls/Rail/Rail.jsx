@@ -44,12 +44,16 @@ export default function Rail({
   // it — sets its own keyboard pace.
   stepFor,
   onCommit,
+  // (handleKey, value). When given, a handle drag reports here and commits
+  // once on release — for a rail whose every commit costs a fetch.
+  onDrag,
   orientation = "horizontal",
   className,
 }) {
   const vertical = orientation === "vertical";
   const [trackRef, trackSize] = useElementSize();
   const draggingRef = useRef(null);
+  const draggedValueRef = useRef(null);
   const railLength = vertical ? trackSize.height : trackSize.width;
 
   // Where a pointer sits along the track, 0..1 from the axis minimum.
@@ -65,11 +69,9 @@ export default function Rail({
     [trackRef, vertical],
   );
 
-  const setHandleFromPointer = useCallback(
-    (key, event) => {
-      onCommit(key, snap(axis.toValue(positionFromPointer(event)), key));
-    },
-    [axis, positionFromPointer, onCommit, snap],
+  const valueFromPointer = useCallback(
+    (key, event) => snap(axis.toValue(positionFromPointer(event)), key),
+    [axis, positionFromPointer, snap],
   );
 
   function beginDrag(key) {
@@ -78,23 +80,35 @@ export default function Rail({
       // text-selection / scroll gestures while a handle is being dragged.
       event.preventDefault();
       event.stopPropagation();
-      event.currentTarget.setPointerCapture(event.pointerId);
+      event.currentTarget.setPointerCapture?.(event.pointerId); // optional: jsdom lacks it
       event.currentTarget.focus();
       draggingRef.current = key;
     };
   }
 
   function onHandlePointerMove(event) {
-    if (!draggingRef.current) return;
-    setHandleFromPointer(draggingRef.current, event);
+    const key = draggingRef.current;
+    if (!key) return;
+    const value = valueFromPointer(key, event);
+    if (onDrag) {
+      draggedValueRef.current = value;
+      onDrag(key, value);
+    } else {
+      onCommit(key, value);
+    }
   }
 
   function endDrag(event) {
-    if (!draggingRef.current) return;
+    const key = draggingRef.current;
+    if (!key) return;
     draggingRef.current = null;
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    if (onDrag && draggedValueRef.current !== null) {
+      onCommit(key, draggedValueRef.current);
+    }
+    draggedValueRef.current = null;
   }
 
   // A press anywhere on the track moves whichever handle is closest to it, so
@@ -109,7 +123,7 @@ export default function Rail({
         ? handle
         : best,
     );
-    setHandleFromPointer(nearest.key, event);
+    onCommit(nearest.key, valueFromPointer(nearest.key, event));
   }
 
   // Arrows follow the rail: left/right along a horizontal one, up/down along a

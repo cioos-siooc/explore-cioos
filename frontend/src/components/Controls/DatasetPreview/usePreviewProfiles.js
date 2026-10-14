@@ -15,6 +15,9 @@ import { server } from "../../../config.js";
 // Fetched here rather than inside the lazy Plotly chunk so it is in flight while
 // the ~1.1 MB of plotly is still downloading.
 //
+// A TimeSeriesProfile harvested per cast is a record that is one cast: the list
+// is then its station's, and `current` names the cast /preview draws by default.
+//
 // A failure is not an error state: no steps means no slider, and the plot is
 // exactly what it was before this existed. /preview reports anything that is
 // genuinely wrong with the record.

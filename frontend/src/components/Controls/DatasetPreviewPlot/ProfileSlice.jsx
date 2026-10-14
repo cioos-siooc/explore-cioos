@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight } from "react-bootstrap-icons";
 
@@ -38,34 +38,48 @@ export default function ProfileSlice({ profiles, step, setStep }) {
   // Memoised because the `|| []` fallback is a fresh array every render, which
   // would re-run every hook below it on every keystroke elsewhere in the pane.
   const steps = useMemo(() => (profiles && profiles.steps) || [], [profiles]);
+  // A record that is itself one cast of a station: /preview draws that cast
+  // when no step is set, so there is no All stop to offer.
+  const current = (profiles && profiles.current) || null;
+  const first = current ? 1 : ALL;
 
   const index = useMemo(() => {
-    if (!step) return ALL;
-    const at = steps.findIndex((entry) => entry.value === step);
+    const drawn = step || current;
+    if (!drawn) return ALL;
+    const at = steps.findIndex((entry) => entry.value === drawn);
     // A link naming a profile this record does not have falls back to the
     // window rather than to an empty plot.
-    return at < 0 ? ALL : at + 1;
-  }, [step, steps]);
+    return at < 0 ? first : at + 1;
+  }, [step, current, first, steps]);
+
+  // Where the handle sits mid-drag; the plot only refetches on release.
+  const [draftIndex, setDraftIndex] = useState(null);
+  const shownIndex = draftIndex ?? index;
+
+  const clampIndex = useCallback(
+    (next) => Math.max(first, Math.min(steps.length, Math.round(next))),
+    [steps, first],
+  );
 
   const commit = useCallback(
     (next) => {
-      const clamped = Math.max(ALL, Math.min(steps.length, Math.round(next)));
+      const clamped = clampIndex(next);
       setStep(clamped === ALL ? null : steps[clamped - 1].value);
     },
-    [steps, setStep],
+    [steps, setStep, clampIndex],
   );
 
-  const axis = useMemo(
-    () => ({
-      min: ALL,
+  const axis = useMemo(() => {
+    const span = steps.length - first;
+    return {
+      min: first,
       max: steps.length,
-      minText: t("previewProfileSliceAll"),
+      minText: first === ALL ? t("previewProfileSliceAll") : timeText(steps[0]),
       maxText: timeText(steps[steps.length - 1]),
-      toPos: (value) => (steps.length ? value / steps.length : 0),
-      toValue: (position) => position * steps.length,
-    }),
-    [steps, t],
-  );
+      toPos: (value) => (span > 0 ? (value - first) / span : 0),
+      toValue: (position) => first + position * span,
+    };
+  }, [steps, first, t]);
 
   // One profile and the "All" stop draw the same rows, so there is nothing to
   // step through — which is what hides this for Profile, TimeSeries, Trajectory
@@ -73,87 +87,97 @@ export default function ProfileSlice({ profiles, step, setStep }) {
   if (steps.length < 2) return null;
 
   const label =
-    index === ALL ? t("previewProfileSliceAll") : timeText(steps[index - 1]);
+    shownIndex === ALL
+      ? t("previewProfileSliceAll")
+      : timeText(steps[shownIndex - 1]);
 
   // What the "n / N" means. On the All stop that is the window, not the record:
   // the rows drawn are the tail /preview returns, which is a different claim
   // from "all 335 casts". Past MAX_STEPS the list is a sample of the record, and
   // saying so is the difference between a slider that skips and one that lies.
   let countTitle;
-  if (index === ALL) {
+  if (shownIndex === ALL) {
     countTitle = t("previewProfileSliceWindow");
   } else if (profiles.truncated) {
     countTitle = t("previewProfileSliceSampled", {
-      index,
+      index: shownIndex,
       shown: steps.length,
       total: profiles.count,
     });
   } else {
-    countTitle = t("previewProfileSliceOf", { index, total: steps.length });
+    countTitle = t("previewProfileSliceOf", {
+      index: shownIndex,
+      total: steps.length,
+    });
   }
 
   return (
     <div className="previewProfileSlice">
-      <span className="previewProfileSliceCaption">
-        {t("previewProfileSlice")}
-      </span>
-      <button
-        type="button"
-        className="railStep"
-        title={t("previewProfileSlicePrevious")}
-        aria-label={t("previewProfileSlicePrevious")}
-        disabled={index <= ALL}
-        onClick={() => commit(index - 1)}
-      >
-        <ChevronLeft size={10} />
-      </button>
-      <Rail
-        className="previewProfileSliceRail"
-        axis={axis}
-        handles={[
-          {
-            key: "profile",
-            value: index,
-            valueText: label,
-            label: t("previewProfileSlice"),
-            className: "railHandleMarker railHandleGrid",
-          },
-        ]}
-        // How far into the record the drawn profile sits. Nothing is filtered
-        // by it — the marker alone is too small to read at a glance.
-        bands={[
-          {
-            key: "elapsed",
-            from: ALL,
-            to: index,
-            className: "previewProfileSliceFill",
-          },
-        ]}
-        // No tick labels: a cast id is far too long to sit under a rail, and
-        // the readout beside it already names the one that is drawn.
-        ticksFor={() => []}
-        snap={(value) => Math.round(value)}
-        stepFor={(event) =>
-          event.shiftKey || event.key?.startsWith("Page") ? 10 : 1
-        }
-        onCommit={(handleKey, value) => commit(value)}
-      />
-      <button
-        type="button"
-        className="railStep"
-        title={t("previewProfileSliceNext")}
-        aria-label={t("previewProfileSliceNext")}
-        disabled={index >= steps.length}
-        onClick={() => commit(index + 1)}
-      >
-        <ChevronRight size={10} />
-      </button>
-      <span className="previewProfileSliceLabel" title={countTitle}>
-        {label}
-      </span>
-      <span className="previewProfileSliceCount" title={countTitle}>
-        {index} / {steps.length}
-      </span>
+      <div className="previewProfileSliceReadout">
+        <span className="previewProfileSliceLabel" title={countTitle}>
+          {label}
+        </span>
+        <span className="previewProfileSliceCount" title={countTitle}>
+          {shownIndex} / {steps.length}
+        </span>
+      </div>
+      <div className="previewProfileSliceControls">
+        <button
+          type="button"
+          className="railStep"
+          title={t("previewProfileSlicePrevious")}
+          aria-label={t("previewProfileSlicePrevious")}
+          disabled={shownIndex <= first}
+          onClick={() => commit(shownIndex - 1)}
+        >
+          <ChevronLeft size={10} />
+        </button>
+        <Rail
+          className="previewProfileSliceRail"
+          axis={axis}
+          handles={[
+            {
+              key: "profile",
+              value: shownIndex,
+              valueText: label,
+              label: t("previewProfileSlice"),
+              className: "railHandleMarker railHandleGrid",
+            },
+          ]}
+          // How far into the record the drawn profile sits. Nothing is filtered
+          // by it — the marker alone is too small to read at a glance.
+          bands={[
+            {
+              key: "elapsed",
+              from: first,
+              to: shownIndex,
+              className: "previewProfileSliceFill",
+            },
+          ]}
+          // No tick labels: a cast id is far too long to sit under a rail, and
+          // the readout above it already names the one that is drawn.
+          ticksFor={() => []}
+          snap={(value) => Math.round(value)}
+          stepFor={(event) =>
+            event.shiftKey || event.key?.startsWith("Page") ? 10 : 1
+          }
+          onDrag={(handleKey, value) => setDraftIndex(clampIndex(value))}
+          onCommit={(handleKey, value) => {
+            setDraftIndex(null);
+            commit(value);
+          }}
+        />
+        <button
+          type="button"
+          className="railStep"
+          title={t("previewProfileSliceNext")}
+          aria-label={t("previewProfileSliceNext")}
+          disabled={shownIndex >= steps.length}
+          onClick={() => commit(shownIndex + 1)}
+        >
+          <ChevronRight size={10} />
+        </button>
+      </div>
     </div>
   );
 }

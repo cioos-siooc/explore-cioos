@@ -419,27 +419,53 @@
   min-width: 180px;
 }
 
-/* Which profile of the record is drawn. Above the figure, not in the parameters
-   pane: at the pane's ~200px the cast's date was ellipsised, which is the one
-   thing this control exists to show. 75% of the plot column leaves the rail a
-   usable length and the readout its full text. */
-.previewProfileSlice {
+/* Which record and which of its profiles is drawn. Above the figure, outside
+   Plotly's div, so the modebar is never covered. Wraps on a narrow column: the
+   slider drops under the title at full width. */
+.previewProfileHeader {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  width: 75%;
+  justify-content: space-between;
+  gap: 4px 16px;
   padding: 0 0 6px;
+}
+
+.previewProfileTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--cioos-font-size-base);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.previewProfileSlice {
+  display: flex;
+  flex: 0 1 33.333%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 240px;
   font-size: var(--cioos-font-size-xs);
 }
 
-.previewProfileSliceCaption {
-  flex-shrink: 0;
-  color: var(--cioos-ink-60);
+.previewProfileSliceReadout {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-/* The only part that gives: the steppers and the readout are sized by their
-   own text. */
+.previewProfileSliceControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The only part that gives: the steppers are sized by their own icons. */
 .previewProfileSliceRail {
   flex: 1 1 auto;
   min-width: 0;

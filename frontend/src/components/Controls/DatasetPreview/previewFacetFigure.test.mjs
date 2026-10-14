@@ -8,7 +8,11 @@ import {
   positionRowsFor,
   trackIndexFor,
 } from "./previewTrackIndex.js";
-import { buildFigure, recordTitleFor } from "./previewFacetFigure.js";
+import {
+  buildFigure,
+  plotBoxFor,
+  recordTitleFor,
+} from "./previewFacetFigure.js";
 import {
   maxCharsFor,
   titleLinesFor,
@@ -549,6 +553,24 @@ test("a cf_role column with nothing in it is skipped, not printed empty", () => 
     recordTitleFor({ plan: null, variablesByName: new Map(), data }),
     "",
   );
+});
+
+test("a box without the title gives its lines back to the panels", () => {
+  const variables = variablesFrom(VIKING, VIKING_DATASET);
+  const box = (withTitle) =>
+    plotBoxFor({
+      plan: facetPlanFor(VIKING_DATASET, variables, DATA),
+      variablesByName: byColumnName(variables),
+      data: DATA,
+      panelCount: 6,
+      availableHeight: 620,
+      measured: { width: 1140, height: 620 },
+      withTitle,
+    });
+  assert.equal(box(true).title, TITLE);
+  assert.equal(box(false).title, "");
+  assert.equal(box(false).titleLines, 0);
+  assert.ok(box(false).height >= box(true).height);
 });
 
 test("a window spanning several profiles names three and counts the rest", () => {

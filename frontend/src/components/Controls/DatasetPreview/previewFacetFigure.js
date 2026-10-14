@@ -162,8 +162,11 @@ export function plotBoxFor({
   panelCount,
   availableHeight,
   measured = {},
+  withTitle = true,
 }) {
-  const title = recordTitleFor({ plan, variablesByName, data });
+  const title = withTitle
+    ? recordTitleFor({ plan, variablesByName, data })
+    : "";
   const width = plotWidthFor(
     plan.orientation,
     panelCount,

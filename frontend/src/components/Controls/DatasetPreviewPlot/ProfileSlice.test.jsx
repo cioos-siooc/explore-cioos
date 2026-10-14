@@ -116,6 +116,32 @@ describe("ProfileSlice", () => {
     expect(end).toHaveBeenCalledWith("AZMP-ESG-cast-334");
   });
 
+  it("follows a drag in its readout but only picks the profile on release", () => {
+    const rect = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockReturnValue({
+        left: 0,
+        top: 0,
+        right: 100,
+        bottom: 10,
+        width: 100,
+        height: 10,
+        x: 0,
+        y: 0,
+      });
+    const setStep = show(profilesOf(10));
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 30, pointerId: 1 });
+    expect(screen.getByText("3 / 10")).toBeInTheDocument();
+    expect(screen.getByText("2021-05-22 23:01Z")).toBeInTheDocument();
+    expect(setStep).not.toHaveBeenCalled();
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+    expect(setStep).toHaveBeenCalledTimes(1);
+    expect(setStep).toHaveBeenCalledWith("AZMP-ESG-cast-2");
+    rect.mockRestore();
+  });
+
   it("falls back to the window when a link names a profile this record lacks", () => {
     show(profilesOf(335), "a-cast-from-another-station");
     expect(screen.getByText("All in this window")).toBeInTheDocument();
@@ -133,6 +159,24 @@ describe("ProfileSlice", () => {
       "title",
       "Profile 3 of 4818 reachable, sampled evenly from the 48166 in this record",
     );
+  });
+
+  it("opens on a cast record's own cast, with no All stop to step back to", () => {
+    // A TimeSeriesProfile harvested per cast: /preview draws that cast.
+    show(profilesOf(10, { current: "AZMP-ESG-cast-0" }));
+    expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    expect(screen.queryByText("All in this window")).toBeNull();
+    expect(screen.getByTitle("Previous profile")).toBeDisabled();
+  });
+
+  it("steps from a cast record's own cast by value, never onto the window", () => {
+    const setStep = show(profilesOf(10, { current: "AZMP-ESG-cast-1" }));
+    fireEvent.click(screen.getByTitle("Previous profile"));
+    expect(setStep).toHaveBeenCalledWith("AZMP-ESG-cast-0");
+
+    const home = show(profilesOf(10, { current: "AZMP-ESG-cast-1" }));
+    fireEvent.keyDown(screen.getByRole("slider"), { key: "Home" });
+    expect(home).toHaveBeenCalledWith("AZMP-ESG-cast-0");
   });
 
   it("calls the All stop a window, not the whole record", () => {

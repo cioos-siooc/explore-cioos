@@ -145,7 +145,9 @@ profile_feature AS (
          p.time_min,
          p.time_max,
          p.n_records,
-         p.records_per_day
+         p.records_per_day,
+         p.profile_id AS cast_id,
+         p.timeseries_id AS station_id
   FROM   cde.profiles p
   JOIN   ds ON ds.pk = p.dataset_pk
   WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
@@ -160,7 +162,9 @@ trajectory_feature AS (
          s.time_max,
          SUM(td.n_records) AS n_records,
          SUM(td.n_records)::double precision
-           / GREATEST(COUNT(DISTINCT td.day), 1) AS records_per_day
+           / GREATEST(COUNT(DISTINCT td.day), 1) AS records_per_day,
+         NULL::text AS cast_id,
+         NULL::text AS station_id
   FROM   cde.trajectory_track_stats s
   JOIN   ds ON ds.pk = s.dataset_pk
   JOIN   cde.trajectory_days td
@@ -193,7 +197,13 @@ SELECT ds.dataset_id,
        -- which is what decides whether a record has profiles to step through;
        -- a Profile record's own id is both, and a TimeSeries has none.
        ds.profile_id_variable AS step_variable,
-       f.feature_id AS profile_id,
+       -- A TimeSeriesProfile is stored per cast unless a station holds more
+       -- than the harvester's cap (timeseries_profile.py), so its record id can
+       -- be a cast. The constraint above is on the station, so constrain on the
+       -- cast's station and step to the cast itself.
+       CASE WHEN cast_record.is_cast THEN f.station_id ELSE f.feature_id END
+         AS profile_id,
+       CASE WHEN cast_record.is_cast THEN f.cast_id END AS record_step,
        f.n_records,
        -- ::text renders '2024-01-02 03:04:05+00' -- a literal space and a
        -- non-Z offset, both of which go straight into an ERDDAP URL. Same
@@ -205,6 +215,11 @@ SELECT ds.dataset_id,
          OR f.n_records <= :NUM_RECORDS) AS use_whole_profile
 FROM   feature f
 JOIN   ds ON ds.pk = f.dataset_pk
+CROSS JOIN LATERAL (
+  SELECT ds.cdm_data_type = 'TimeSeriesProfile'
+         AND f.cast_id IS NOT NULL
+         AND f.station_id IS NOT NULL AS is_cast
+) cast_record
 CROSS JOIN LATERAL (
   -- Widen back from time_max by however many hours it takes to gather about
   -- NUM_RECORDS rows at this record's own cadence. A cadence of zero (or NULL)
@@ -266,6 +281,7 @@ router.get(
       new_start_time,
       use_whole_profile,
       table_variables,
+      record_step,
     } = rows.rows[0];
 
     if (!profile_variable) {
@@ -284,8 +300,10 @@ router.get(
     // reach a profile OUTSIDE the tail window below, so the two are exclusive:
     // asking for a 2023 cast and then constraining to the last few hours of the
     // record answers nothing.
-    const step =
-      at && steppedRecord(profile_variable, step_variable) ? at : null;
+    // A cast record with no `at` draws its own cast.
+    const step = steppedRecord(profile_variable, step_variable)
+      ? at || record_step
+      : null;
     if (step) {
       erddapQuery += `&${constraintFor(step_variable, step)}`;
     } else if (timeMin || timeMax) {
@@ -414,7 +432,9 @@ router.get(
  *         description: >
  *           { column, steps: [{ value, time }], count, truncated }. `count` is
  *           always the true number of profiles; `steps` is every k-th of them
- *           once that passes 5000, with `truncated` saying so.
+ *           once that passes 5000, with `truncated` saying so. `current` is
+ *           the cast the record itself names (a TimeSeriesProfile harvested
+ *           per cast), which /preview draws when no `at` is given; else null.
  *       404:
  *         description: Unknown dataset or unknown record.
  *       422:
@@ -453,6 +473,7 @@ router.get(
       cdm_data_type,
       erddap_url,
       profile_id,
+      record_step,
     } = rows.rows[0];
 
     if (!profile_variable) {
@@ -511,6 +532,7 @@ router.get(
         steps,
         count: ordered.length,
         truncated,
+        current: record_step ?? null,
       });
     } catch (error) {
       const status = error.response?.status;

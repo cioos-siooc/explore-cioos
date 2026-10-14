@@ -257,7 +257,78 @@ test("without `at` the query is exactly what it always was", async () => {
   assert.ok(url.includes("time>2024-10-01T00:00:00Z"));
 });
 
+// A TimeSeriesProfile harvested per cast: the record id is a cast, resolved to
+// its station plus the cast as the default step.
+const CAST_ROW = {
+  ...STEPPED_ROW,
+  profile_id: "PMZA-VAS",
+  record_step: "PMZA-VAS-24/10/14-08:31:41",
+};
+
+test("a cast record without `at` draws its own cast at its station", async () => {
+  db.queueRaw([CAST_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1]] } },
+  });
+
+  const res = await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "PMZA-VAS-24/10/14-08:31:41",
+  });
+
+  assert.equal(res.status, 200);
+  const { url } = axios.calls[0];
+  assert.ok(url.includes(`station_id=~${encodeURIComponent('"PMZA-VAS"')}`));
+  assert.ok(
+    url.includes(
+      `&profile=~${encodeURIComponent('"PMZA-VAS-24/10/14-08:31:41"')}`,
+    ),
+  );
+  assert.ok(!url.includes("time>"));
+});
+
+test("`at` wins over a cast record's own cast", async () => {
+  db.queueRaw([CAST_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1]] } },
+  });
+
+  await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "PMZA-VAS-24/10/14-08:31:41",
+    at: "PMZA-VAS-24/10/10-14:01:41",
+  });
+
+  const { url } = axios.calls[0];
+  assert.ok(url.includes(encodeURIComponent('"PMZA-VAS-24/10/10-14:01:41"')));
+  assert.ok(!url.includes(encodeURIComponent("24/10/14-08:31:41")));
+});
+
 // --- /preview/profiles -------------------------------------------------------
+
+test("a cast record lists its station's casts and names its own as current", async () => {
+  db.queueRaw([CAST_ROW]);
+  axios.queueResponse({
+    data: {
+      table: {
+        columnNames: ["profile", "time"],
+        rows: [["PMZA-VAS-24/10/14-08:31:41", "2024-10-14T08:31:41Z"]],
+      },
+    },
+  });
+
+  const res = await agent.get("/preview/profiles").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "PMZA-VAS-24/10/14-08:31:41",
+  });
+
+  assert.equal(res.body.current, "PMZA-VAS-24/10/14-08:31:41");
+  assert.ok(
+    axios.calls[0].url.includes(
+      `station_id=~${encodeURIComponent('"PMZA-VAS"')}`,
+    ),
+  );
+});
 
 test("lists a record's casts, earliest first, with their times", async () => {
   db.queueRaw([STEPPED_ROW]);
@@ -281,6 +352,7 @@ test("lists a record's casts, earliest first, with their times", async () => {
   assert.equal(res.body.column, "profile");
   assert.equal(res.body.count, 2);
   assert.equal(res.body.truncated, false);
+  assert.equal(res.body.current, null);
   assert.deepEqual(res.body.steps, [
     { value: "cast-a", time: "2021-05-20T23:01:41Z" },
     { value: "cast-b", time: "2021-05-21T10:00:00Z" },

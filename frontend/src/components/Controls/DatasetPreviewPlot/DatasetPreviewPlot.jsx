@@ -40,6 +40,9 @@ import { PLOT_MODES } from "../DatasetPreview/usePreviewPlotParams.js";
 import { usePreviewPlot } from "../DatasetPreview/PreviewPlotProvider.jsx";
 
 const PARAMS_PANE_ID = "datasetPreviewParamsPane";
+// Records holding many casts: named in a header row beside the cast slider
+// instead of in the figure's own title.
+const PROFILE_RECORD_TYPES = ["TimeSeriesProfile", "TrajectoryProfile"];
 
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
@@ -55,6 +58,7 @@ const Plot = createPlotlyComponent(Plotly);
 export default function DatasetPreviewPlot() {
   const { t, i18n } = useTranslation();
   const {
+    inspectDataset,
     inspectRecordID,
     plotData,
     trackIndex,
@@ -101,6 +105,9 @@ export default function DatasetPreviewPlot() {
   const panelChoices = panelCandidatesFor(variables, sharedAxis);
   const sharedCandidates = sharedCandidatesFor(variables);
   const directions = axisDirectionsFor(plan.orientation);
+  const hasProfileHeader = PROFILE_RECORD_TYPES.includes(
+    inspectDataset?.cdm_data_type,
+  );
   const axisCaptionFor = (direction) =>
     direction === "horizontal"
       ? t("datasetPreviewPlotXAxis")
@@ -117,6 +124,7 @@ export default function DatasetPreviewPlot() {
         panelCount: panels.length,
         availableHeight,
         measured: plotAreaSize,
+        withTitle: !hasProfileHeader,
       }),
     [
       plan,
@@ -125,6 +133,7 @@ export default function DatasetPreviewPlot() {
       panels.length,
       availableHeight,
       plotAreaSize,
+      hasProfileHeader,
     ],
   );
 
@@ -393,7 +402,14 @@ export default function DatasetPreviewPlot() {
         {/* Above the figure rather than in the parameters pane: this says WHICH
             rows are drawn where every control in the pane says how, and the
             pane is too narrow to read a cast's date in. */}
-        <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
+        {hasProfileHeader && (
+          <div className="previewProfileHeader">
+            <h5 className="previewProfileTitle" title={inspectRecordID}>
+              {t("previewProfileTitle", { record: inspectRecordID })}
+            </h5>
+            <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
+          </div>
+        )}
 
         <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
           {figure ? (

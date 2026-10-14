@@ -111,6 +111,20 @@ describe("DatasetPreviewPlot", () => {
     expect(rowCaptioned("Y axis")).toHaveTextContent("temperature");
   });
 
+  it("names a record of many casts in a header row above the figure", async () => {
+    open("/", { ...DATASET, cdm_data_type: "TimeSeriesProfile" });
+    await plotted();
+    expect(
+      screen.getByRole("heading", { name: "Profile: record-1" }),
+    ).toBeInTheDocument();
+  });
+
+  it("draws no header row for a record holding a single cast", async () => {
+    open();
+    await plotted();
+    expect(screen.queryByText("Profile: record-1")).not.toBeInTheDocument();
+  });
+
   it("hints that the panels axis takes more than one variable", async () => {
     open();
     await plotted();
