@@ -111,6 +111,28 @@ and [OBIS](obis.md#reason-codes) pages. Each attempt also
 records the query URLs used. Errors are grouped per server and distinct error
 before being sent to Sentry, so only a new problem raises an alert.
 
+### Warnings
+
+A dataset can also carry **warnings**: non-fatal problems recorded on its
+attempt, shown on its dashboard page and counted per code on its server's page.
+They are not sent to Sentry. A hash-`UNCHANGED` attempt carries none, so the
+dashboard shows the warnings of the dataset's last `success` attempt, which
+describes the data still stored.
+
+| Code | Meaning |
+| --- | --- |
+| `FEATURES_HIDDEN` | Features spanning more than 1 km are hidden from the map (still searchable) |
+| `FEATURES_DROPPED` | Features removed: latitude/longitude out of range, depth outside -100..15 000 m, no record count, or an unparseable time |
+| `OCCURRENCES_DROPPED` | OBIS occurrences dropped for coordinates outside the Web Mercator range |
+| `NON_CF_STANDARD_NAMES` | `standard_name` values not in the CF table (ioos_qc `*_test` names excluded) |
+| `UNKNOWN_PLATFORM_VOCABULARY` | `platform` set without a recognized `platform_vocabulary`; stored as `unknown` |
+| `DAY_COUNT_FALLBACK` | Per-feature day sets unavailable; `days` comes from the time span (an over-count) |
+| `RECORD_COUNT_ESTIMATED` | Rows per profile could not be sampled; one record counted per timestep |
+| `DEPTH_RANGE_UNAVAILABLE` | Trajectory per-day depth range failed or returned no values; days kept at depth 0 |
+| `PROFILE_COUNT_UNAVAILABLE` | Trajectory per-day profile count failed; days kept without it |
+| `TRACKS_UNAVAILABLE` | Track-point extraction failed; coverage kept, no track drawn |
+| `TRAJECTORY_DATA_INCOMPLETE` | Chunked trajectory download skipped a time window after an HTTP error |
+
 ## Change detection and freshness
 
 | | ERDDAP | OBIS |

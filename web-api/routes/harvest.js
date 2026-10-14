@@ -15,6 +15,8 @@ const SPARKLINE_DEPTH = 10;
 // present a partial history as the whole one.
 const HISTORY_MAX_ROWS = 200;
 
+const WARNING_DATASET_SAMPLE = 20;
+
 // A hash-unchanged skip (status='skipped', reason_code='UNCHANGED') means the
 // dataset was verified as up to date — one HTTP request, nothing re-uploaded.
 // In the dataset-centric dashboard views that counts as a healthy "success"
@@ -180,7 +182,15 @@ async function recentRuns(limit = 20) {
   return result.rows;
 }
 
-async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
+// warnings come from the latest raw 'success' attempt, not the latest attempt:
+// an UNCHANGED skip carries none, yet the loaded data is still that harvest's.
+// The LATERAL walks harvest_attempts_dataset_idx newest-first per dataset.
+async function serverDatasets(
+  erddapUrl,
+  statusFilter = null,
+  q = null,
+  warningCode = null,
+) {
   const sql = `
     WITH latest_attempt AS (
         SELECT DISTINCT ON (erddap_url, dataset_id)
@@ -193,8 +203,7 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
                duration_ms,
                attempted_at,
                run_id,
-               query_urls,
-               warnings
+               query_urls
         FROM cde.harvest_attempts ha
         WHERE erddap_url = ?
         ORDER BY erddap_url, dataset_id, attempted_at DESC
@@ -226,7 +235,7 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
            la.attempted_at,
            la.run_id,
            la.query_urls,
-           la.warnings,
+           lw.warnings,
            sp.history_statuses,
            sp.history_times,
            ds.content_hash,
@@ -236,6 +245,15 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
                                ds.cdm_data_type) AS is_realtime
     FROM latest_attempt la
     LEFT JOIN sparkline   sp USING (erddap_url, dataset_id)
+    LEFT JOIN LATERAL (
+        SELECT ok.warnings
+        FROM cde.harvest_attempts ok
+        WHERE ok.erddap_url = la.erddap_url
+          AND ok.dataset_id = la.dataset_id
+          AND ok.status = 'success'
+        ORDER BY ok.attempted_at DESC
+        LIMIT 1
+    ) lw ON true
     LEFT JOIN cde.datasets ds
         ON ds.dataset_id = la.dataset_id
        AND rtrim(ds.erddap_url, '/') = rtrim(la.erddap_url, '/')
@@ -245,6 +263,10 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
             OR la.dataset_id     ILIKE '%' || ? || '%'
             OR la.reason_code    ILIKE '%' || ? || '%'
             OR la.error_message  ILIKE '%' || ? || '%'
+          )
+      AND (
+            CAST(? AS text) IS NULL
+            OR lw.warnings @> jsonb_build_array(jsonb_build_object('code', CAST(? AS text)))
           )
     ORDER BY
       CASE la.status WHEN 'error' THEN 0 WHEN 'skipped' THEN 1 ELSE 2 END,
@@ -260,6 +282,8 @@ async function serverDatasets(erddapUrl, statusFilter = null, q = null) {
     q,
     q,
     q,
+    warningCode,
+    warningCode,
   ]);
   return result.rows;
 }
@@ -303,6 +327,20 @@ async function datasetMeta(erddapUrl, datasetId) {
   `;
   const result = await db.raw(sql, [datasetId, erddapUrl]);
   return result.rows[0] || null;
+}
+
+async function latestSuccessWarnings(erddapUrl, datasetId) {
+  const sql = `
+    SELECT ok.warnings
+    FROM cde.harvest_attempts ok
+    WHERE ok.erddap_url = ?
+      AND ok.dataset_id = ?
+      AND ok.status = 'success'
+    ORDER BY ok.attempted_at DESC
+    LIMIT 1
+  `;
+  const result = await db.raw(sql, [erddapUrl, datasetId]);
+  return result.rows[0]?.warnings ?? null;
 }
 
 async function runDetail(runId) {
@@ -366,6 +404,29 @@ async function reasonBreakdown(erddapUrl = null) {
   return result.rows;
 }
 
+async function warningBreakdown(erddapUrl) {
+  const sql = `
+    WITH latest_success AS (
+        SELECT DISTINCT ON (dataset_id)
+               dataset_id, warnings
+        FROM cde.harvest_attempts
+        WHERE erddap_url = ?
+          AND status = 'success'
+        ORDER BY dataset_id, attempted_at DESC
+    )
+    SELECT w ->> 'code' AS code,
+           COUNT(DISTINCT ls.dataset_id)::int AS n_datasets,
+           SUM(COALESCE((w ->> 'count')::bigint, 1))::int AS total_count,
+           (array_agg(DISTINCT ls.dataset_id ORDER BY ls.dataset_id))[1:?] AS dataset_ids
+    FROM latest_success ls
+    CROSS JOIN LATERAL jsonb_array_elements(ls.warnings) w
+    GROUP BY w ->> 'code'
+    ORDER BY n_datasets DESC, code
+  `;
+  const result = await db.raw(sql, [erddapUrl, WARNING_DATASET_SAMPLE]);
+  return result.rows;
+}
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 router.get(
@@ -383,7 +444,8 @@ router.get(
     const erddapUrl = await resolveErddapUrl(req.params.slug);
     const status = req.query.status || null;
     const q = req.query.q || null;
-    res.json(await serverDatasets(erddapUrl, status, q));
+    const warning = req.query.warning || null;
+    res.json(await serverDatasets(erddapUrl, status, q, warning));
   },
 );
 
@@ -399,6 +461,10 @@ router.get(
     if (!history.length)
       return res.status(404).json({ error: "No harvest history found" });
     const meta = await datasetMeta(erddapUrl, req.params.datasetId);
+    const currentWarnings = await latestSuccessWarnings(
+      erddapUrl,
+      req.params.datasetId,
+    );
     res.json({
       history,
       // Present so the page can say it is showing the most recent N rather
@@ -406,6 +472,9 @@ router.get(
       historyTruncated: truncated,
       historyLimit: HISTORY_MAX_ROWS,
       meta,
+      // Latest real harvest's warnings: the latest attempt may be an
+      // UNCHANGED skip, which carries none.
+      currentWarnings,
       erddap_url: erddapUrl,
     });
   },
@@ -446,6 +515,15 @@ router.get(
   async (req, res) => {
     const erddapUrl = await resolveErddapUrl(req.params.slug);
     res.json(await reasonBreakdown(erddapUrl));
+  },
+);
+
+router.get(
+  "/warnings/:slug",
+  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
+  async (req, res) => {
+    const erddapUrl = await resolveErddapUrl(req.params.slug);
+    res.json(await warningBreakdown(erddapUrl));
   },
 );
 

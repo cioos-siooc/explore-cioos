@@ -73,6 +73,14 @@ class TestDatasetMetadataParsing:
         ds = _make_dataset(mock_erddap_server)
         assert ds.platform == "unknown"
 
+    def test_platform_with_unknown_vocabulary_is_a_warning(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        ds.globals.update(platform="45217", platform_vocabulary="None specified")
+        assert ds.get_platform_code() == "unknown"
+        [warning] = ds.warnings
+        assert warning["code"] == "UNKNOWN_PLATFORM_VOCABULARY"
+        assert warning["items"] == ["45217"]
+
 
 class TestPlottingAttributes:
     """The attributes the faceted dataset preview needs.

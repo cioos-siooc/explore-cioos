@@ -59,6 +59,52 @@ describe("GET /harvest/servers/:slug", () => {
   });
 });
 
+describe("GET /harvest/servers/:slug?warning=", () => {
+  it("binds the warning code rather than splicing it into the SQL", async () => {
+    respond = (sql) =>
+      sql.includes("translate(") ? [{ erddap_url: "https://e.ca/erddap" }] : [];
+
+    const res = await request(app)
+      .get("/harvest/servers/e-ca-erddap")
+      .query({ warning: "FEATURES_DROPPED' OR 1=1 --" });
+
+    expect(res.status).toBe(200);
+    const call = db.raw.mock.calls.find(([sql]) =>
+      sql.includes("jsonb_build_object('code'"),
+    );
+    expect(call[0]).not.toContain("FEATURES_DROPPED");
+    expect(call[1].slice(-2)).toEqual([
+      "FEATURES_DROPPED' OR 1=1 --",
+      "FEATURES_DROPPED' OR 1=1 --",
+    ]);
+  });
+});
+
+describe("GET /harvest/warnings/:slug", () => {
+  it("aggregates each dataset's latest success attempt by warning code", async () => {
+    respond = (sql) => {
+      if (sql.includes("translate(")) return [{ erddap_url: "https://e.ca" }];
+      return [
+        {
+          code: "FEATURES_HIDDEN",
+          n_datasets: 2,
+          total_count: 5,
+          dataset_ids: ["a", "b"],
+        },
+      ];
+    };
+
+    const res = await request(app).get("/harvest/warnings/e-ca");
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].code).toBe("FEATURES_HIDDEN");
+    const sql = sqlFor("jsonb_array_elements");
+    expect(sql).toContain("DISTINCT ON (dataset_id)");
+    expect(sql).toContain("status = 'success'");
+    expect(sql).toContain("GROUP BY w ->> 'code'");
+  });
+});
+
 describe("GET /harvest/servers", () => {
   it("takes each server's latest attempt with DISTINCT ON, not a correlated subquery", async () => {
     respond = () => [];

@@ -32,6 +32,7 @@ from cde_harvester.core.day_sets import (
     ranges_to_psycopg,
     total_days,
 )
+from cde_harvester.core.harvest_warnings import DAY_COUNT_FALLBACK, HarvestWarnings
 from cde_harvester.dataset_types.profile import ProfileHandler
 from cde_harvester.dataset_types.tabledap_features import (
     MAX_DAY_COUNT_ROWS,
@@ -71,6 +72,7 @@ class FakeDataset:
         self.response = response if response is not None else pd.DataFrame()
         self.raises = raises
         self.queries = []
+        self.warnings = HarvestWarnings(LOG)
 
     def dataset_tabledap_query(self, url):
         self.queries.append(url)
@@ -209,6 +211,7 @@ class TestFallsBackInsteadOfFailing:
     def test_query_error_falls_back(self, one_station, error):
         ds = FakeDataset(raises=error)
         assert _extract_day_sets(ds, one_station, ["station_id"], LOG) is None
+        assert ds.warnings.codes() == [DAY_COUNT_FALLBACK]
 
     def test_empty_response_falls_back(self, one_station):
         # An ERDDAP too old for orderBy interval grouping answers 500 with a
@@ -247,6 +250,7 @@ class TestFallsBackInsteadOfFailing:
         ds = FakeDataset(day_count_response([("S1", "2020-03-01")]))
         assert _extract_day_sets(ds, frame, ["station_id"], LOG) is None
         assert ds.queries == []
+        assert ds.warnings.codes() == [DAY_COUNT_FALLBACK]
 
     def test_a_large_but_plausible_dataset_is_still_asked(self, one_station):
         """The cap must not skip the intermittent datasets it exists to help.

@@ -12,6 +12,7 @@ import pandas as pd
 import requests
 from cde_harvester.core.day_sets import days_to_ranges
 from cde_harvester.core.frame_spill import SpillSet
+from cde_harvester.core.harvest_warnings import OCCURRENCES_DROPPED, HarvestWarnings
 from cde_harvester.core.obis_cells import merge_cell_partials
 from cde_harvester.core.observability import run_logger
 from cde_harvester.core.schemas import (
@@ -74,7 +75,10 @@ def _epoch_ms_to_utc(series):
     """
     values = pd.to_numeric(series, errors="coerce")
     low, high = _REPRESENTABLE_MS
-    values = values.where((values >= low) & (values <= high))
+    # float64: pandas 2.3's to_datetime cache maps an Int64 <NA> to a bogus
+    # negative index ("'indices' contains values less than allowed"); epoch ms
+    # of real dates are exact in float64 and NaN parses cleanly.
+    values = values.where((values >= low) & (values <= high)).astype("float64")
     return pd.to_datetime(values, unit="ms", errors="coerce", utc=True)
 
 
@@ -170,7 +174,7 @@ class OBISHarvester(BaseHarvester):
         spills = SpillSet(flush_every=self.CELLS_FLUSH_EVERY, prefix="obis_cells_")
 
         def record_attempt(dataset_id, status, reason_code=None,
-                           error_message=None, duration_ms=None):
+                           error_message=None, duration_ms=None, warnings=None):
             # Surface the two OBIS endpoints we hit so the dashboard can show
             # exactly what was fetched per dataset.
             query_urls = [
@@ -188,6 +192,7 @@ class OBISHarvester(BaseHarvester):
                 "duration_ms": duration_ms,
                 "attempted_at": datetime.now(UTC),
                 "query_urls": "\n".join(query_urls),
+                "warnings": warnings.to_json() if warnings else None,
             })
 
         with spills:
@@ -227,6 +232,7 @@ class OBISHarvester(BaseHarvester):
                         # gives exactly what one pass over the whole dataset
                         # would -- see core.obis_cells.
                         stats = {"n_occurrences": 0, "n_dropped": 0, "n_kept": 0}
+                        warnings = HarvestWarnings(self.logger)
                         partials = []
                         for chunk in self.iter_occurrences(dataset_id, bbox=bbox):
                             partial = self._aggregate_chunk(
@@ -235,7 +241,7 @@ class OBISHarvester(BaseHarvester):
                             del chunk
                             if not partial.empty:
                                 partials.append(partial)
-                        self._log_aggregate_stats(dataset_id, stats)
+                        self._log_aggregate_stats(dataset_id, stats, warnings)
 
                         if not stats["n_occurrences"]:
                             self.logger.warning("No occurrences for dataset %s", dataset_id)
@@ -259,6 +265,7 @@ class OBISHarvester(BaseHarvester):
                                 reason_code="NO_VALID_COORDINATES",
                                 error_message="No occurrences had valid lat/lon after filtering",
                                 duration_ms=int((time.monotonic() - t0) * 1000),
+                                warnings=warnings,
                             )
                             break
 
@@ -269,6 +276,7 @@ class OBISHarvester(BaseHarvester):
                         record_attempt(
                             dataset_id, status="success",
                             duration_ms=int((time.monotonic() - t0) * 1000),
+                            warnings=warnings,
                         )
                         break
 
@@ -392,7 +400,7 @@ class OBISHarvester(BaseHarvester):
         cells["depth_max"] = cells["depth_max"].fillna(0)
         return cells
 
-    def _log_aggregate_stats(self, dataset_id, stats):
+    def _log_aggregate_stats(self, dataset_id, stats, warnings):
         """Report one chunked dataset's filtering totals in a single line each.
 
         `_aggregate_chunk` accumulates instead of logging because it runs per
@@ -402,9 +410,12 @@ class OBISHarvester(BaseHarvester):
         memory this is trying to bound.
         """
         if stats.get("n_dropped"):
-            self.logger.warning(
-                "Dropped %d occurrences with out-of-range coordinates for %s",
-                stats["n_dropped"], dataset_id,
+            warnings.add(
+                OCCURRENCES_DROPPED,
+                f"{stats['n_dropped']} of {stats['n_occurrences']} occurrences "
+                "dropped: coordinates outside the Web Mercator range "
+                "(|latitude| > 85.06 or |longitude| > 180)",
+                count=stats["n_dropped"],
             )
         if stats.get("n_filtered") is not None:
             self.logger.info(

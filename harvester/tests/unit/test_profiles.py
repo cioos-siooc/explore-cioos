@@ -142,6 +142,9 @@ class TestGetProfilesEmptyAndEdgeCases:
         """Profiles with latitude > 90 must be removed by the bad-geometry filter."""
         result = get_profiles(bad_geometry_dataset)
         assert result.empty
+        dropped = {w["code"]: w for w in bad_geometry_dataset.warnings}["FEATURES_DROPPED"]
+        assert dropped["count"] == 1
+        assert dropped["items"] == ["STATION_001"]
 
     def test_unparseable_time_feature_filtered_out(self, single_station_dataset):
         """A time pandas can't represent (year 0019, a typo for 2019) coerces

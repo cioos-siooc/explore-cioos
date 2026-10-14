@@ -3,6 +3,7 @@
 import pandas as pd
 from requests.exceptions import HTTPError
 
+from cde_harvester.core.harvest_warnings import RECORD_COUNT_ESTIMATED
 from cde_harvester.dataset_types import tabledap_features
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
@@ -94,8 +95,9 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
                 .reindex(tabledap_features._string_key(profiles.index))
             )
         if rows.isna().all():
-            dataset.logger.warning(
-                "Could not sample rows per profile; counting one per timestep"
+            dataset.warnings.add(
+                RECORD_COUNT_ESTIMATED,
+                "Could not sample rows per profile; counting one record per timestep",
             )
             return 1
         return pd.Series(rows.fillna(rows.mean()).to_numpy(), index=profiles.index)

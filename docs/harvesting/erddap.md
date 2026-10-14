@@ -156,14 +156,17 @@ Antimeridian-crossing boxes are measured the short way.
    days counts its first 30 days and extrapolates.
 
 A failed step 2 never drops the dataset: when the day set is unknown the
-database derives `days` from the time span (an over-count). Step 3 is
+database derives `days` from the time span (an over-count), and the attempt
+carries a `DAY_COUNT_FALLBACK` [warning](workflow.md#warnings). Step 3 is
 required: if it fails, no feature has a record count and the dataset ends as
 `NO_PROFILES_FOUND` (or `RESPONSE_TOO_LARGE` when the response passed the
 cap).
 
 Features are also dropped when their position, time bounds or depth are
 unusable: no lat/lon box or time bounds, latitude outside ±90°, longitude
-outside ±180°, depth below 15 000 m or above 100 m altitude.
+outside ±180°, depth below 15 000 m or above 100 m altitude. The attempt
+records them as a `FEATURES_DROPPED` [warning](workflow.md#warnings) with a
+sample of the feature ids.
 
 **Type differences**
 
@@ -186,9 +189,11 @@ response scales with trajectory-days, not with the full-resolution track:
 - **Per-day stats** (`cde.trajectory_days`): one row per (trajectory, UTC
   day) with the record count (`orderByCount("<trajectory_id>,time/86400")`)
   and depth range (`orderByMinMax(...,depth)`; skipped when `depth`'s
-  `actual_range` is constant). `TrajectoryProfile` also counts distinct
-  profiles per day with `orderByMin("<trajectory_id>,<profile_id>,time")`,
-  whose result is reused for the track.
+  `actual_range` is constant; best-effort, so a failed or empty depth
+  query, e.g. an all-NaN `depth`, keeps the days at depth 0).
+  `TrajectoryProfile` also counts distinct profiles per day with
+  `orderByMin("<trajectory_id>,<profile_id>,time")`, whose result is reused
+  for the track.
 - **Track points** (`cde.trajectory_points`): ordered, downsampled fixes.
   - `Trajectory`: one `orderByMin("<trajectory_id>,time/<interval>,time")`,
     the interval sized from the active trajectory-day count so the response

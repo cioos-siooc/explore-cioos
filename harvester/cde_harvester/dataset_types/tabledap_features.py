@@ -18,6 +18,7 @@ from cde_harvester.core.day_sets import (
     days_to_ranges,
     total_days,
 )
+from cde_harvester.core.harvest_warnings import DAY_COUNT_FALLBACK, FEATURES_DROPPED
 from cde_harvester.dataset_types.geo import classify_profile_location
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
 from cde_harvester.sources.erddap.dataset import is_valid_duration
@@ -223,22 +224,29 @@ def _extract_day_sets(
     span_start = ERDDAP.parse_erddap_date(profiles["time_min"].min())
     span_end = ERDDAP.parse_erddap_date(profiles["time_max"].max())
     if pd.isna(span_start) or pd.isna(span_end):
-        logger.warning("Cannot size the per-feature day count; using the time span")
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            "Cannot size the per-feature day count; using the time span",
+        )
         return None
     span_days = max((span_end - span_start).days, 1)
     estimated_rows = len(profiles) * span_days
     if estimated_rows > MAX_DAY_COUNT_ROWS:
-        logger.warning(
-            "Skipping per-feature day count: ~%d rows (%d features x %d days) "
-            "exceeds the %d cap; falling back to the time span",
-            estimated_rows, len(profiles), span_days, MAX_DAY_COUNT_ROWS,
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            f"Skipping per-feature day count: ~{estimated_rows} rows "
+            f"({len(profiles)} features x {span_days} days) exceeds the "
+            f"{MAX_DAY_COUNT_ROWS} cap; falling back to the time span",
         )
         return None
 
     group_vars = [v for v in profile_variable_list if v != "time"]
     counted = next((v for v in _COUNT_CANDIDATES if v not in group_vars), None)
     if counted is None:
-        logger.warning("No countable variable outside the group; using the time span")
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            "No countable variable outside the group; using the time span",
+        )
         return None
 
     record_columns = [counted] + [
@@ -257,21 +265,30 @@ def _extract_day_sets(
     except (HTTPError, ResponseTooLargeError):
         # Both are recoverable here: an old ERDDAP without orderBy interval
         # grouping, a server refusing the request, or a response over the cap.
-        logger.warning("Per-feature day count failed; falling back to the time span")
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            "Per-feature day count failed; falling back to the time span",
+        )
         return None
 
     if df_days.empty:
         # erddap_csv_to_df turns "no operator found in constraint" and "too
         # much data" 500s into an empty frame rather than raising, so this is
         # the same class of miss as the exception above.
-        logger.warning("Per-feature day count returned nothing; using the time span")
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            "Per-feature day count returned nothing; using the time span",
+        )
         return None
 
     df_days = df_days.copy()
     df_days["day"] = bucket_index_to_day(df_days["time"], ERDDAP.parse_erddap_dates)
     df_days = df_days.dropna(subset=["day"])
     if df_days.empty:
-        logger.warning("Per-feature day count had no usable dates; using the time span")
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            "Per-feature day count had no usable dates; using the time span",
+        )
         return None
 
     count_columns = [c for c in record_columns + eov_columns if c in df_days]
@@ -306,15 +323,19 @@ def _extract_day_sets(
     # error to notice. Comparing as strings is also what makes a grouping that
     # lost a level (time dropped above) fail loudly here instead.
     if day_sets.index.nlevels != profiles.index.nlevels:
-        logger.warning(
-            "Day-set grouping does not match the feature identity; using the time span"
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            "Day-set grouping does not match the feature identity; using the time span",
         )
         return None
 
     day_sets = day_sets.reindex(_string_key(profiles.index))
     matched = day_sets["days"].notna()
     if not matched.any():
-        logger.warning("No day set matched a feature; using the time span")
+        dataset.warnings.add(
+            DAY_COUNT_FALLBACK,
+            "No day set matched a feature; using the time span",
+        )
         return None
     if not matched.all():
         logger.info(
@@ -371,6 +392,17 @@ def _count_records(
             profile_count, eov_variables, dataset.eovs
         )
     return profiles
+
+
+def _feature_ids(profiles):
+    """One label per feature for a warning: "<timeseries_id>/<profile_id>"."""
+    columns = [c for c in ("timeseries_id", "profile_id") if c in profiles]
+    if not columns:
+        return []
+    labels = profiles[columns].astype(str).agg(
+        lambda row: "/".join(v for v in row if v), axis="columns"
+    )
+    return labels[labels != ""].drop_duplicates().tolist()
 
 
 def extract_features(dataset, handler):
@@ -614,9 +646,12 @@ def extract_features(dataset, handler):
     # NO_PROFILES_FOUND, not loaded with a feature the loader then discards.
     unparseable_time = profiles["time_min"].isna() | profiles["time_max"].isna()
     if unparseable_time.any():
-        logger.warning(
-            "%d of %d features have an unparseable time and will be removed",
-            int(unparseable_time.sum()), len(profiles),
+        dataset.warnings.add(
+            FEATURES_DROPPED,
+            f"{int(unparseable_time.sum())} of {len(profiles)} features removed: "
+            "unparseable time",
+            items=_feature_ids(profiles[unparseable_time]),
+            count=int(unparseable_time.sum()),
         )
         profiles = profiles[~unparseable_time].copy()
         if profiles.empty:
@@ -696,13 +731,14 @@ def extract_features(dataset, handler):
     profiles_bad_geom = profiles.query(profiles_bad_geom_query)
 
     if not profiles_bad_geom.empty:
-        logger.warn(
-            "These profiles with bad lat/long/depth/time values will be removed:"
+        dataset.warnings.add(
+            FEATURES_DROPPED,
+            f"{len(profiles_bad_geom)} of {len(profiles)} features removed: "
+            "latitude/longitude out of range, depth outside -100..15000 m, "
+            "or no record count",
+            items=_feature_ids(profiles_bad_geom),
+            count=len(profiles_bad_geom),
         )
-        # TODO this could use record_id if it existed
-        logger.warn(set(profiles_bad_geom["profile_id"].to_list()))
-        logger.warn(set(profiles_bad_geom["timeseries_id"].to_list()))
-
         profiles = profiles.query("not " + profiles_bad_geom_query)
 
     return profiles
