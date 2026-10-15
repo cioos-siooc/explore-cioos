@@ -21,6 +21,7 @@
   "introFeature_search_body": "Cherchez par mot-clé, ou filtrez selon ce qui a été mesuré, quand et où.",
   "introFeature_download_title": "Obtenez les données",
   "introFeature_download_body": "Téléchargez-les, ou ouvrez-les là où elles sont publiées.",
+  "introFeature_download_help": "Comment télécharger",
   "CIOOSDataExplorer": "Explorateur de données du SIOOC",
   "dataExplorer": "Explorateur de données",
   "CIOOSQuote": "\"Des données océaniques pour l'avenir de nos océans\"",

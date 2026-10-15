@@ -127,9 +127,7 @@ describe("IntroModal", () => {
 
   it("the download card opens the selection help", async () => {
     const { user } = renderIntro();
-    await user.click(
-      screen.getByRole("button", { name: "What can I download?" }),
-    );
+    await user.click(screen.getByRole("button", { name: "How to download" }));
     expect(screen.getByTestId("selection-help")).toHaveTextContent("open");
   });
 
