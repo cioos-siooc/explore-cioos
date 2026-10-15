@@ -17,7 +17,10 @@ from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     unescape_ascii,
     unescape_ascii_list,
 )
-from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
+from cde_harvester.sources.ckan.create_ckan_obis_link import (
+    get_ckan_obis_records,
+    ipt_resource_key,
+)
 from cde_harvester.sources.ckan.state import PREVIOUS_CKAN_COLUMNS, load_previous_ckan
 from conftest import (
     CKAN_EMPTY_RESPONSE,
@@ -34,7 +37,7 @@ def _make_ckan_get(mocker, pages):
     Patch the CKAN session builder so session.get() yields the given page
     responses. CKAN fetching now goes through a requests.Session built by
     _build_ckan_session() rather than the module-level requests.get.
-    Each call to list_ckan_records_with_erddap_urls paginates until results empty.
+    Each call to list_ckan_records paginates until results empty.
     """
     responses = []
     for page in pages:
@@ -264,9 +267,11 @@ class TestCkanUnavailable:
         assert get_ckan_records([DATASET_ID]) is None
 
     def test_failed_obis_lookup_restored_from_stored_metadata(self, mocker):
+        session = mocker.MagicMock()
+        session.get.side_effect = requests.ConnectionError("down")
         mocker.patch(
-            "cde_harvester.sources.ckan.create_ckan_obis_link.requests.get",
-            side_effect=requests.ConnectionError("down"),
+            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+            return_value=session,
         )
         load = mocker.patch(
             "cde_harvester.sources.ckan.create_ckan_obis_link.load_previous_ckan",
@@ -276,7 +281,7 @@ class TestCkanUnavailable:
                 for d in ("uuid-1", "uuid-other")
             ]),
         )
-        df = get_ckan_obis_records(["uuid-1", "uuid-2"], erddap_url="https://obis.org")
+        df = get_ckan_obis_records({"uuid-1": None, "uuid-2": None}, erddap_url="https://obis.org")
         load.assert_called_once_with(["https://obis.org"])
         assert df.to_dict("records") == [{
             "dataset_id": "uuid-1", "ckan_id": "ckan-uuid-1", "ckan_eovs": ["fish"],
@@ -292,22 +297,69 @@ class TestCkanUnavailable:
         assert df.empty
         assert list(df.columns) == PREVIOUS_CKAN_COLUMNS
 
-    def test_failed_obis_lookup_not_cached(self, mocker, tmp_path):
-        get = mocker.patch(
-            "cde_harvester.sources.ckan.create_ckan_obis_link.requests.get",
-            side_effect=requests.ConnectionError("down"),
+    def test_failed_obis_lookup_not_remembered(self, mocker):
+        session = mocker.MagicMock()
+        session.get.side_effect = requests.ConnectionError("down")
+        mocker.patch(
+            "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
+            return_value=session,
         )
-        assert get_ckan_obis_records(["uuid-1"], cache_folder=str(tmp_path)).empty
-        assert list(tmp_path.iterdir()) == []
+        assert get_ckan_obis_records({OBIS_UUID: None}).empty
 
-        found = mocker.MagicMock()
-        found.json.return_value = {"result": {"results": [
-            {"id": "ckan-1", "title_translated": {"en": "t", "fr": "f"}},
-        ]}}
-        get.side_effect = None
-        get.return_value = found
-        df = get_ckan_obis_records(["uuid-1"], cache_folder=str(tmp_path))
+        _make_ckan_get(mocker, _search_pages(_record("ckan-1", f"https://obis.org/dataset/{OBIS_UUID}")))
+        df = get_ckan_obis_records({OBIS_UUID: None})
         assert df["ckan_id"].tolist() == ["ckan-1"]
+
+
+OBIS_UUID = "0a1b2c3d-0000-4000-8000-00000000abcd"
+QU39_IPT = "https://ipt.iobis.org/obiscanada/resource?r=hakai_qu39"
+
+
+class TestGetCkanObisRecords:
+    def test_queries_national_catalogue_for_obis_and_ipt_links(self, mocker):
+        _make_ckan_get(mocker, _search_pages())
+        get_ckan_obis_records({OBIS_UUID: None})
+        from cde_harvester.sources.ckan import create_ckan_erddap_link as mod
+        url = mod._build_ckan_session.return_value.get.call_args_list[0].args[0]
+        assert url.startswith("https://catalogue.cioos.ca/api/3/action/package_search?")
+        assert "q=res_url%3A%2Aobis.org%2A+OR+res_url%3A%2Aipt%2A" in url
+
+    def test_matched_by_obis_dataset_page(self, mocker):
+        record = _record("by-uuid", "https://catalogue.example/notes.pdf", f"https://obis.org/dataset/{OBIS_UUID}")
+        record["eov"] = ["fishAbundanceAndDistribution"]
+        _make_ckan_get(mocker, _search_pages(record))
+        df = get_ckan_obis_records({OBIS_UUID: None, "11111111-1111-4111-8111-111111111111": None})
+        assert df.to_dict("records") == [{
+            "dataset_id": OBIS_UUID, "ckan_id": "by-uuid", "ckan_eovs": ["fishAbundanceAndDistribution"],
+            "ckan_title": "by-uuid en", "title_fr": "by-uuid fr",
+        }]
+
+    def test_matched_by_ipt_resource_ignoring_scheme_case_and_version(self, mocker):
+        _make_ckan_get(mocker, _search_pages(
+            _record("by-ipt", "http://IPT.iobis.org/obiscanada/resource?r=hakai_qu39&v=1.4"),
+        ))
+        df = get_ckan_obis_records({OBIS_UUID: QU39_IPT})
+        assert df["ckan_id"].tolist() == ["by-ipt"]
+
+    def test_same_shortname_on_another_ipt_not_matched(self, mocker):
+        _make_ckan_get(mocker, _search_pages(
+            _record("other-ipt", "https://ipt.iobis.org/caribbean/resource?r=hakai_qu39"),
+        ))
+        assert get_ckan_obis_records({OBIS_UUID: QU39_IPT}).empty
+
+    def test_titles_cleaned_like_erddap(self, mocker):
+        record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
+        record["title_translated"] = {"en": "Line\\none"}
+        _make_ckan_get(mocker, _search_pages(record))
+        df = get_ckan_obis_records({OBIS_UUID: None})
+        assert df["ckan_title"].tolist() == ["Lineone"]
+        assert df["title_fr"].isna().all()
+
+    def test_ipt_key_ignores_endpoint(self):
+        assert ipt_resource_key("https://ipt.iobis.org/obiscanada/archive.do?r=x") == ipt_resource_key(
+            "http://ipt.iobis.org/obiscanada/resource?r=x&v=2.0"
+        )
+        assert ipt_resource_key(f"https://obis.org/dataset/{OBIS_UUID}") is None
 
 
 class TestMergeCkanJoin:

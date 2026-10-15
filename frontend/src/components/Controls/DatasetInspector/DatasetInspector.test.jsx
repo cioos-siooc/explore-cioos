@@ -107,6 +107,37 @@ describe("DatasetInspector", () => {
     expect(erddapLink).toHaveAttribute("href", DATASET.erddap_url);
   });
 
+  it("links an OBIS dataset to OBIS and to the CKAN record the harvest matched", async () => {
+    const ckanUrl = "https://catalogue.cioos.ca/dataset/ckan-obis-1";
+    await renderReady({
+      dataset: {
+        ...DATASET,
+        source_type: "obis",
+        dataset_id: "obis-uuid",
+        ckan_url: ckanUrl,
+      },
+    });
+    expect(screen.getByRole("link", { name: "View on OBIS" })).toHaveAttribute(
+      "href",
+      "https://obis.org/dataset/obis-uuid",
+    );
+    expect(
+      screen.getByRole("link", { name: "Metadata (CKAN)" }),
+    ).toHaveAttribute("href", ckanUrl);
+  });
+
+  it("shows no CKAN link for an OBIS dataset the harvest matched to none", async () => {
+    await renderReady({
+      dataset: { ...DATASET, source_type: "obis", dataset_id: "obis-uuid" },
+    });
+    expect(
+      screen.getByRole("link", { name: "View on OBIS" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /CKAN/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders organization, variable and platform values as plain chips, not filter toggles", async () => {
     await renderReady();
     for (const value of ["Chicago Park District", "Oxygen", "Mooring"]) {

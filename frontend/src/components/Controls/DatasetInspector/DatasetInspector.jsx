@@ -230,8 +230,8 @@ export default function DatasetInspector({
       ]),
     [offerTip, isTrajectory, isRealtime, hasRecordList],
   );
-  // OBIS datasets always link out to OBIS; the rest have whichever of their
-  // ERDDAP / CKAN URLs the harvest found.
+  // OBIS datasets always link out to OBIS, the rest to ERDDAP when the harvest
+  // found one; any of them can also have the CKAN URL the harvest matched.
   const hasSources =
     dataset.source_type === "obis" ||
     Boolean(dataset.erddap_url || dataset.ckan_url);
@@ -749,30 +749,28 @@ export default function DatasetInspector({
                     {t("datasetInspectorOBISURL")}
                   </a>
                 ) : (
-                  <>
-                    {dataset.erddap_url && (
-                      <a
-                        className="metadataChip metadataLink"
-                        href={dataset.erddap_url}
-                        target="_blank"
-                        title={t("datasetInspectorERDDAPText")}
-                        rel="noreferrer"
-                      >
-                        {t("datasetInspectorERDDAPURL")} (ERDDAP™)
-                      </a>
-                    )}
-                    {dataset.ckan_url && (
-                      <a
-                        className="metadataChip metadataLink"
-                        href={dataset.ckan_url}
-                        target="_blank"
-                        title={t("datasetInspectorCKANText")}
-                        rel="noreferrer"
-                      >
-                        {t("datasetInspectorCKANURL")} (CKAN)
-                      </a>
-                    )}
-                  </>
+                  dataset.erddap_url && (
+                    <a
+                      className="metadataChip metadataLink"
+                      href={dataset.erddap_url}
+                      target="_blank"
+                      title={t("datasetInspectorERDDAPText")}
+                      rel="noreferrer"
+                    >
+                      {t("datasetInspectorERDDAPURL")} (ERDDAP™)
+                    </a>
+                  )
+                )}
+                {dataset.ckan_url && (
+                  <a
+                    className="metadataChip metadataLink"
+                    href={dataset.ckan_url}
+                    target="_blank"
+                    title={t("datasetInspectorCKANText")}
+                    rel="noreferrer"
+                  >
+                    {t("datasetInspectorCKANURL")} (CKAN)
+                  </a>
                 )}
               </dd>
             </div>

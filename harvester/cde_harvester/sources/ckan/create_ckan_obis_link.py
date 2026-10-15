@@ -1,155 +1,121 @@
-"""Fetch CKAN metadata for OBIS datasets.
+"""Match OBIS datasets to the national CKAN records that cite them.
 
-Queries the CIOOS CKAN instance for each OBIS dataset UUID by searching
-for it in the ``xml_location_url`` field. Returns a DataFrame that can
-be joined onto harvested OBIS datasets to enrich them with EOVs,
-French titles, and CKAN IDs.
+Uses the same catalogue and paged package_search as the ERDDAP link, so a
+stored ckan_id resolves to the same catalogue record URL. A record cites an
+OBIS dataset by its obis.org/dataset/<uuid> page or by the IPT resource page
+that the OBIS dataset metadata gives as ``url``.
 """
 
-import gzip
-import json
 import logging
-import os
+import re
+from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
 import requests
 
+from cde_harvester.core.observability import run_logger
+from cde_harvester.sources.ckan.create_ckan_erddap_link import (
+    list_ckan_records,
+    remove_newlines,
+    unescape_ascii,
+)
 from cde_harvester.sources.ckan.state import load_previous_ckan
 
 logger = logging.getLogger(__name__)
 
-CKAN_API_URL = "https://cioos-national-ckan.preprod.ogsl.ca/api/3"
-HARVEST_SOURCE = "obis-xml-harvest-demo"
+OBIS_RECORDS_QUERY = "res_url:*obis.org* OR res_url:*ipt*"
+CKAN_OBIS_COLUMNS = ["dataset_id", "ckan_id", "ckan_eovs", "ckan_title", "title_fr"]
+
+_OBIS_DATASET_URL = re.compile(r"obis\.org/dataset/([0-9a-f-]{36})")
 
 
-def _lookup_ckan_package(dataset_id, ckan_api_url=CKAN_API_URL):
-    """Look up a single OBIS dataset in CKAN by its UUID.
+def ipt_resource_key(url):
+    """Scheme/case/endpoint/version-insensitive key for an IPT resource link.
 
-    Searches for the UUID in the xml_location_url field
-    (e.g. ``.../<dataset_id>.xml``).
+    Keeps the IPT's context path: one host (ipt.iobis.org) runs several IPTs
+    whose resource short names can collide.
     """
-    url = (
-        f"{ckan_api_url}/action/package_search"
-        f"?fq=harvest_source_title:{HARVEST_SOURCE}"
-        f"&q=xml_location_url:*{dataset_id}.xml"
-        f"&rows=1"
+    parsed = urlparse(url.strip().lower())
+    shortname = parse_qs(parsed.query).get("r")
+    if not shortname:
+        return None
+    context = parsed.path.rsplit("/", 1)[0]
+    return f"{parsed.netloc}{context}?r={shortname[0]}"
+
+
+def _ckan_row(dataset_id, record):
+    title_translated = record.get("title_translated") or {}
+    title, title_fr = (
+        remove_newlines(unescape_ascii(v)) if v else v
+        for v in (title_translated.get("en"), title_translated.get("fr"))
     )
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    results = response.json()["result"]["results"]
-    return results[0] if results else None
+    return {
+        "dataset_id": dataset_id,
+        "ckan_id": record["id"],
+        "ckan_eovs": record.get("eov") or [],
+        "ckan_title": title,
+        "title_fr": title_fr,
+    }
 
 
-def _read_cache(path):
-    gz = path + ".gz"
-    try:
-        if os.path.isfile(gz):
-            with gzip.open(gz, "rt") as f:
-                return json.load(f)
-        if os.path.isfile(path):
-            with open(path) as f:
-                return json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning("Corrupt cache file %s, will re-fetch: %s", path, e)
-    return None  # not cached or corrupt
+def _stored_ckan_rows(dataset_ids, erddap_url):
+    previous = load_previous_ckan([erddap_url])
+    previous = previous[previous["dataset_id"].isin(dataset_ids)]
+    return [
+        {
+            "dataset_id": row.dataset_id,
+            "ckan_id": row.ckan_id,
+            "ckan_eovs": list(row.eovs or []),
+            "ckan_title": row.title,
+            "title_fr": row.title_fr,
+        }
+        for row in previous.itertuples()
+    ]
 
 
-def _write_cache(path, data):
-    with gzip.open(path + ".gz", "wt") as f:
-        json.dump(data, f)
-
-
-def get_ckan_obis_records(dataset_ids, ckan_api_url=CKAN_API_URL, cache_folder=None,
-                          erddap_url=None):
-    """Fetch CKAN metadata for a list of OBIS dataset UUIDs.
+def get_ckan_obis_records(ipt_urls, erddap_url=None):
+    """Match OBIS datasets to CKAN records, one row per matched dataset.
 
     Parameters
     ----------
-    dataset_ids : list[str]
-        OBIS dataset UUIDs to look up.
-    ckan_api_url : str
-        Base URL of the CKAN API.
-    cache_folder : str, optional
-        Directory to cache per-dataset CKAN lookups as gzip JSON.
-        Uses the same folder as occurrence cache when provided.
+    ipt_urls : dict[str, str | None]
+        OBIS dataset UUID -> the ``url`` (IPT resource page) from its OBIS
+        dataset metadata.
     erddap_url : str, optional
-        The datasets' source key in cde.datasets; failed lookups fall back to
-        the CKAN metadata stored there by a previous harvest.
+        The datasets' source key in cde.datasets; when CKAN is unreachable the
+        datasets fall back to the CKAN metadata stored there by a previous
+        harvest.
 
     Returns
     -------
     pd.DataFrame
         Columns: dataset_id, ckan_id, ckan_eovs, ckan_title, title_fr
     """
-    if cache_folder:
-        os.makedirs(cache_folder, exist_ok=True)
+    log = run_logger(logger)
+    try:
+        records = list_ckan_records(False, OBIS_RECORDS_QUERY)
+    except (requests.RequestException, RuntimeError, KeyError) as e:
+        log.warning("CKAN unavailable, falling back to stored CKAN metadata: %s", e)
+        rows = _stored_ckan_rows(list(ipt_urls), erddap_url) if erddap_url else []
+        log.warning("%d OBIS datasets restored from stored CKAN metadata", len(rows))
+        return pd.DataFrame(rows, columns=CKAN_OBIS_COLUMNS)
 
-    records = []
-    failed = []
-    total = len(dataset_ids)
-    fetched = 0
-    for i, dataset_id in enumerate(dataset_ids, 1):
-        if i % 50 == 0 or i == total:
-            logger.info("CKAN lookup progress: %d/%d", i, total)
+    by_uuid, by_ipt = {}, {}
+    for record in records:
+        for resource in record.get("resources", []):
+            url = resource.get("url") or ""
+            match = _OBIS_DATASET_URL.search(url.lower())
+            if match:
+                by_uuid.setdefault(match.group(1), record)
+            key = ipt_resource_key(url)
+            if key:
+                by_ipt.setdefault(key, record)
 
-        pkg = None
-        cache_file = os.path.join(cache_folder, f"ckan_{dataset_id}.json") if cache_folder else None
+    rows = []
+    for dataset_id, ipt_url in ipt_urls.items():
+        record = by_uuid.get(dataset_id) or by_ipt.get(ipt_resource_key(ipt_url or ""))
+        if record:
+            rows.append(_ckan_row(dataset_id, record))
 
-        cached = _read_cache(cache_file) if cache_file else None
-        if cached is not None:  # None means not cached; False/dict are valid hits
-            pkg = cached or None
-        else:
-            fetched += 1
-            try:
-                pkg = _lookup_ckan_package(dataset_id, ckan_api_url)
-            except (requests.RequestException, ValueError, KeyError) as e:
-                # Not cached: a CKAN outage must not read as "not found" forever.
-                logger.warning("CKAN lookup failed for %s: %s", dataset_id, e)
-                failed.append(dataset_id)
-                continue
-            if cache_file:
-                # Store False for "looked up but not found" to avoid re-fetching
-                _write_cache(cache_file, pkg or False)
-
-        if not pkg:
-            logger.debug("No CKAN record found for %s", dataset_id)
-            continue
-
-        title_translated = pkg.get("title_translated") or {}
-        eovs = pkg.get("eov") or []
-
-        records.append({
-            "dataset_id": dataset_id,
-            "ckan_id": pkg["id"],
-            "ckan_eovs": eovs,
-            "ckan_title": title_translated.get("en"),
-            "title_fr": title_translated.get("fr"),
-        })
-
-    if failed and erddap_url:
-        previous = load_previous_ckan([erddap_url])
-        previous = previous[previous["dataset_id"].isin(failed)]
-        logger.warning(
-            "%d failed CKAN lookups, %d restored from stored metadata",
-            len(failed), len(previous),
-        )
-        records += [
-            {
-                "dataset_id": row.dataset_id,
-                "ckan_id": row.ckan_id,
-                "ckan_eovs": list(row.eovs or []),
-                "ckan_title": row.title,
-                "title_fr": row.title_fr,
-            }
-            for row in previous.itertuples()
-        ]
-
-    df = pd.DataFrame(records)
-    if not df.empty:
-        df = df.drop_duplicates(subset="dataset_id")
-
-    logger.info(
-        "Matched %d / %d OBIS datasets to CKAN records (%d fetched, %d from cache)",
-        len(df), len(dataset_ids), fetched, len(dataset_ids) - fetched,
-    )
-    return df
+    log.info("Matched %d / %d OBIS datasets to CKAN records", len(rows), len(ipt_urls))
+    return pd.DataFrame(rows, columns=CKAN_OBIS_COLUMNS)
