@@ -23,6 +23,7 @@ export default function DownloadModal() {
       show={showDownloadModal}
       onHide={() => setShowDownloadModal(false)}
       className="downloadModal"
+      sheet
       data-testid="download-modal"
       dialogClassName="downloadModalDialog"
       aria-labelledby="downloadModalTitle"

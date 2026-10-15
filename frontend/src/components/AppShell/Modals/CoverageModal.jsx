@@ -256,6 +256,7 @@ export default function CoverageModal() {
         show={showCoverageModal}
         onHide={() => setShowCoverageModal(false)}
         className="coverageModal"
+        sheet
         data-testid="coverage-modal"
         dialogClassName="coverageModalDialog"
         aria-labelledby="coverageModalTitle"

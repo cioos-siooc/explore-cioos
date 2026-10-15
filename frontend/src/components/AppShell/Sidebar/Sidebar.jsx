@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   Download,
@@ -13,14 +13,21 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
+import { useChanged } from "../../../utilities.jsx";
 import CloseButton from "../../ui/CloseButton.jsx";
+import useSheetDrag from "../../ui/useSheetDrag.js";
 import DatasetsPanel from "../Panels/DatasetsPanel.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
+import useBackDismiss from "../../../state/ui/useBackDismiss.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
+import "../../ui/sheetHandleStyles.css";
 
 // The left column: the datasets card — a header naming the list, the list
 // itself, and the Download footer. (The brand and the
@@ -55,6 +62,18 @@ export default function Sidebar() {
   } = useDatasetCounts();
 
   const expanded = sidebarOpen;
+  // On a phone the card is a bottom sheet like the Filters, Download and
+  // Coverage ones: dragged down by its handle or header, and closed by Back.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const cardRef = useRef(null);
+  const startDrag = useSheetDrag(cardRef, () => setSidebarOpen(false));
+  // Raised over a dataset page (a map click, a share link, the minimized
+  // card), the sheet takes no history entry: it would sit above the page's own,
+  // and leaving the page from in here and then closing the sheet would pop back
+  // onto the page just left. Back closes the page first instead.
+  const [backable, setBackable] = useState(false);
+  if (useChanged(expanded) && expanded) setBackable(!inspectDataset);
+  useBackDismiss(isMobile && expanded && backable, () => setSidebarOpen(false));
   // The panel is on a single dataset rather than the list. The banner swaps
   // with it, so the card never leaves the user guessing which of the two
   // surfaces they are on — and the way back is in the banner, not buried in
@@ -86,11 +105,25 @@ export default function Sidebar() {
       data-testid="sidebar"
     >
       <section
+        ref={cardRef}
         className={classNames("sidebarDatasets", { expanded })}
         data-testid="sidebar-datasets"
         data-expanded={expanded}
         data-map-cover={expanded || undefined}
+        onPointerDown={
+          isMobile
+            ? (event) => {
+                if (
+                  event.target.closest(
+                    ".sheetHandle, .datasetsHeader, .datasetsBanner",
+                  )
+                )
+                  startDrag(event);
+              }
+            : undefined
+        }
       >
+        {isMobile && <div className="sheetHandle" aria-hidden="true" />}
         {inspecting ? (
           <div className="datasetsBanner">
             {/* The label names the destination rather than the surface it

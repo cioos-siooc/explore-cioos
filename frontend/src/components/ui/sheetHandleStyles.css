@@ -1,0 +1,16 @@
+/* The grab handle along a bottom sheet's top edge (Modal's `sheet`, and the
+   datasets sheet on phones), dragged down to dismiss it — see useSheetDrag.
+   It does not scroll, so the browser leaves a vertical swipe on it to the
+   drag. The sheet positions it, and leaves room above its header for it. */
+.sheetHandle {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  z-index: 1;
+  width: 36px;
+  height: 4px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-ink-40);
+  transform: translateX(-50%);
+  touch-action: none;
+}

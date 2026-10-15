@@ -171,6 +171,21 @@ test.describe("pointing at markers and tracks", () => {
     await expect(openCard(page)).toHaveCount(0);
   });
 
+  test("closing the dataset a marker opened leaves it closed", async ({
+    page,
+  }) => {
+    // On a phone the list rises over the page the click opened. Closing the
+    // page from there must not hand Back an entry that reopens it.
+    await openScene(page);
+    await clickUntil(page, LONE_MARKER.at, () =>
+      expect(page).toHaveURL(/[?&]dataset=/, { timeout: 1_000 }),
+    );
+    await page.getByTestId("sidebar-close-dataset").click();
+    await expect(page).not.toHaveURL(/[?&]dataset=/);
+    await page.waitForTimeout(1_000);
+    await expect(page).not.toHaveURL(/[?&]dataset=/);
+  });
+
   test("clicking a shared marker lists both datasets as a station", async ({
     page,
   }) => {

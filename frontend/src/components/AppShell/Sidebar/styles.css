@@ -487,22 +487,35 @@
     box-shadow: none;
 
     /* Down here the sheet is the screen, so it parks below the bottom edge
-       and rises from it rather than in from the side. */
+       and rises from it rather than in from the side — over the screen's
+       whole height, so at the same unhurried pace as the other sheets
+       (modalStyles.css). */
     transform: translateY(100%);
+    transition-duration: 0.5s;
   }
 
   .sidebarDatasets.expanded {
     transform: translateY(0);
   }
 
-  /* The header is now the top of the screen rather than the top of a card, so
-     it is sized like one — a taller row. */
-  .datasetsHeader {
-    padding: var(--cioos-space-md) var(--cioos-space-lg);
+  /* The grab area under the handle: the header or the dataset banner, with
+     room above it for the handle. Neither scrolls, so a vertical swipe on them
+     is left to the drag (useSheetDrag). The list under them scrolls to its end
+     and stops there rather than pulling the page to refresh. */
+  .datasetsHeader,
+  .datasetsBanner {
+    touch-action: none;
   }
 
+  .sidebarBody {
+    overscroll-behavior: contain;
+  }
+
+  /* The header is now the top of the screen rather than the top of a card, so
+     it is sized like one — a taller row. */
+  .datasetsHeader,
   .datasetsBanner {
-    padding: var(--cioos-space-md) var(--cioos-space-lg);
+    padding: var(--cioos-space-lg) var(--cioos-space-lg) var(--cioos-space-md);
   }
 
   /* Type is a step larger down here and the row is no wider, so the label

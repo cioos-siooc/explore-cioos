@@ -23,7 +23,9 @@ import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { MARKER_MIN_ZOOM } from "../../config.js";
-import useMediaQuery from "../../../state/ui/useMediaQuery.js";
+import useMediaQuery, {
+  REDUCED_MOTION_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
@@ -108,7 +110,7 @@ const COUNT_UP_MS = 900;
 // Counts up to `target` once it is known, so the catalogue's size reads as a
 // live figure rather than copy. Lands on it at once when motion is reduced.
 function useCountUp(target) {
-  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reduced = useMediaQuery(REDUCED_MOTION_QUERY);
   const [value, setValue] = useState(0);
   useEffect(() => {
     if (!target || reduced) return undefined;
@@ -154,6 +156,7 @@ export default function IntroModal({ showModal, setShowModal }) {
       onHide={close}
       scrollable
       className="introModal"
+      sheet
       fullscreen="lg-down"
     >
       <Modal.Header closeButton>

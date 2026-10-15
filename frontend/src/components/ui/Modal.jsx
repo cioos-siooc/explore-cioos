@@ -1,10 +1,21 @@
 import * as React from "react";
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useInRouterContext } from "react-router-dom";
 
 import CloseButton from "./CloseButton.jsx";
+import useSheetDrag from "./useSheetDrag.js";
+import useBackDismiss from "../../state/ui/useBackDismiss.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+  REDUCED_MOTION_QUERY,
+} from "../../state/ui/useMediaQuery.js";
 
+import "./sheetHandleStyles.css";
 import "./modalStyles.css";
+
+// Comfortably past the sheet's 0.5s slide (modalStyles.css).
+const EXIT_BACKSTOP_MS = 1000;
 
 const ModalContext = createContext({ onHide: () => {} });
 
@@ -18,6 +29,10 @@ const openModals = [];
 // per-component CSS keeps applying. The header's close button is the app's
 // shared one, not Bootstrap's .btn-close — a modal is dismissed with the same
 // control as every other surface here.
+//
+// On a phone, `sheet` makes it a bottom sheet: it rises from the bottom edge,
+// is dragged back down by its handle or header, slides out when closed, and
+// closes on Back (see useBackDismiss).
 export default function Modal({
   show,
   onHide = () => {},
@@ -32,8 +47,29 @@ export default function Modal({
   "aria-label": ariaLabel,
   "data-testid": testId,
   initialFocusRef,
+  sheet = false,
 }) {
   const contentRef = useRef(null);
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
+  const asSheet = sheet && isMobile;
+  const startDrag = useSheetDrag(contentRef, onHide);
+  // A sheet stays mounted for its exit, until its slide out ends.
+  const animateExit = asSheet && !reducedMotion;
+  const [mounted, setMounted] = useState(show);
+  if (show && !mounted) setMounted(true);
+  if (!show && mounted && !animateExit) setMounted(false);
+  // The slide's end is what unmounts it; this is only the backstop for a slide
+  // that never reports one (a tab hidden mid-exit), so no sheet is left over
+  // the page invisible.
+  useEffect(() => {
+    if (show || !mounted) return undefined;
+    const timer = setTimeout(() => setMounted(false), EXIT_BACKSTOP_MS);
+    return () => clearTimeout(timer);
+  }, [show, mounted]);
+  const backDismiss = useInRouterContext() && asSheet && (
+    <BackDismiss open={show} onClose={onHide} />
+  );
 
   // What opening does, once per opening: take focus into the dialog, and give
   // it back to whatever had it when the dialog goes. Keyed on `show` alone —
@@ -84,7 +120,7 @@ export default function Modal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [show, onHide]);
 
-  if (!show) return null;
+  if (!mounted) return backDismiss || null;
 
   const dialogClasses = [
     "modal-dialog",
@@ -98,28 +134,68 @@ export default function Modal({
     .filter(Boolean)
     .join(" ");
 
-  return createPortal(
-    <ModalContext.Provider value={{ onHide }}>
-      <div
-        className={`modal ${className}`}
-        data-testid={testId}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={ariaLabelledby}
-        aria-label={ariaLabel}
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) onHide();
-        }}
-      >
-        <div className={dialogClasses}>
-          <div className="modal-content" ref={contentRef} tabIndex={-1}>
-            {children}
+  return (
+    <>
+      {backDismiss}
+      {createPortal(
+        <ModalContext.Provider value={{ onHide }}>
+          <div
+            className={[
+              "modal",
+              asSheet && "sheet",
+              !show && "sheetClosing",
+              className,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            data-testid={testId}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={ariaLabelledby}
+            aria-label={ariaLabel}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) onHide();
+            }}
+          >
+            <div className={dialogClasses}>
+              <div
+                className="modal-content"
+                ref={contentRef}
+                tabIndex={-1}
+                onPointerDown={
+                  asSheet
+                    ? (event) => {
+                        if (event.target.closest(".sheetHandle, .modal-header"))
+                          startDrag(event);
+                      }
+                    : undefined
+                }
+                onTransitionEnd={(event) => {
+                  if (
+                    !show &&
+                    event.target === contentRef.current &&
+                    event.propertyName === "transform"
+                  )
+                    setMounted(false);
+                }}
+              >
+                {asSheet && <div className="sheetHandle" aria-hidden="true" />}
+                {children}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </ModalContext.Provider>,
-    document.body,
+        </ModalContext.Provider>,
+        document.body,
+      )}
+    </>
   );
+}
+
+// Rendered only inside a router: Modal itself is also used, and tested, where
+// there is no history to put an entry in.
+function BackDismiss({ open, onClose }) {
+  useBackDismiss(open, onClose);
+  return null;
 }
 
 function ModalHeader({ closeButton, className = "", children }) {

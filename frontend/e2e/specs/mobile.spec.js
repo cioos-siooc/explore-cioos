@@ -55,6 +55,43 @@ test.describe("the phone layout", () => {
     expect(dialog.width).toBeGreaterThan(page.viewportSize().width * 0.9);
   });
 
+  test("closes a sheet on Back, keeping what was chosen in it", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.getByTestId("topbar-filters-button").click();
+    await page.locator('[data-filter-name="oceanVariablesFiltername"]').click();
+    await page.getByTestId("filter-option").first().click();
+    await expect(page).toHaveURL(/eovs=/);
+
+    await page.goBack();
+
+    await expect(page.getByTestId("filters-modal")).toHaveCount(0);
+    await expect(page.getByTestId("map-container")).toBeVisible();
+    await expect(page).toHaveURL(/eovs=/);
+  });
+
+  test("puts a sheet away when dragged down by its header", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.getByTestId("topbar-datasets-button").click();
+    const sheet = page.getByTestId("sidebar-datasets");
+    await expect(sheet).toHaveAttribute("data-expanded", "true");
+    // Risen all the way, so the header is where it was measured.
+    await expect(sheet).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+
+    const header = await sheet.locator(".datasetsHeader").boundingBox();
+    const x = header.x + header.width / 3;
+    const y = header.y + header.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 300, { steps: 10 });
+    await page.mouse.up();
+
+    await expect(sheet).toHaveAttribute("data-expanded", "false");
+  });
+
   test("keeps the top controls reachable", async ({ page }) => {
     await openApp(page);
     const bar = await page.getByTestId("top-bar").boundingBox();
