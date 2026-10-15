@@ -8,6 +8,7 @@ import {
 } from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
+import HelpModal from "../../ui/HelpModal.jsx";
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
@@ -35,6 +36,18 @@ const COUNT_OPTIONS = ["datasets", "features", "days"];
 // The x-axis: the timeline, or every year folded onto weeks of the year. Keys
 // match the API's `view` values and the ?coverageAxis= link param.
 const VIEW_OPTIONS = ["timeline", "seasonal"];
+
+// The one value per dropdown whose bars need a word on how to read them, and
+// that word. Organizations are the one multi-valued dimension: a dataset in two
+// of them lands in both series, so the stack total is not the dataset count.
+// Days are per-feature and added up, so a bar measures observation effort and
+// routinely exceeds the calendar days in its period — deliberately unlike the
+// map's days ramp, which unions.
+const NOTES = {
+  coverageView_: { value: "seasonal", text: "coverageSeasonalNote" },
+  coverageMetric_: { value: "days", text: "coverageDaysNote" },
+  coverageGroup_: { value: "organization", text: "coverageOrganizationNote" },
+};
 
 // How many past responses to keep. The two dropdowns alone are 12 combinations
 // of one selection, and each is a query the API answers in seconds when its
@@ -129,6 +142,8 @@ export default function CoverageModal() {
   const { combinedQueries, filteredDatasetPks, pointsData } = useSelection();
   const [groupBy, setGroupBy] = useState("source");
   const [count, setCount] = useState("days");
+  // The open note's option name prefix (e.g. "coverageMetric_"), or null.
+  const [noteFor, setNoteFor] = useState(null);
   const [histogram, setHistogram] = useState();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -204,168 +219,178 @@ export default function CoverageModal() {
   // the new one lands. An error or an empty result replaces it as before.
   const showStalePlot = Boolean(loading && histogram && !isEmpty);
 
+  // A dropdown's label, and an ⓘ opening the note for its current value when
+  // that value changes how the bars read.
+  function renderLabel(labelKey, value, optionPrefix) {
+    const hasNote = NOTES[optionPrefix].value === value;
+    const label = t(labelKey);
+    return (
+      <span className="coverageToolbarLabel">
+        {label}
+        {hasNote && (
+          <button
+            type="button"
+            className="coverageNoteButton"
+            data-testid="coverage-note-button"
+            onClick={() => setNoteFor(optionPrefix)}
+            title={t("coverageNoteOpen", { section: label })}
+            aria-label={t("coverageNoteOpen", { section: label })}
+          >
+            <InfoCircle size={12} aria-hidden="true" />
+          </button>
+        )}
+      </span>
+    );
+  }
+
+  const noteValue = {
+    coverageView_: view,
+    coverageMetric_: count,
+    coverageGroup_: groupBy,
+  }[noteFor];
+  const noteOpen = Boolean(noteFor) && NOTES[noteFor].value === noteValue;
+
   return (
-    <Modal
-      show={showCoverageModal}
-      onHide={() => setShowCoverageModal(false)}
-      className="coverageModal"
-      data-testid="coverage-modal"
-      dialogClassName="coverageModalDialog"
-      aria-labelledby="coverageModalTitle"
-    >
-      <Modal.Header closeButton>
-        <Modal.Title id="coverageModalTitle">
-          <span className="downloadModalTitleIcon" aria-hidden="true">
-            <BarChartLine size={20} />
-          </span>
-          <span className="downloadModalTitleText">
-            <span className="downloadModalTitleHeading">
-              {t("coverageModalTitleText")}
+    <>
+      <Modal
+        show={showCoverageModal}
+        onHide={() => setShowCoverageModal(false)}
+        className="coverageModal"
+        data-testid="coverage-modal"
+        dialogClassName="coverageModalDialog"
+        aria-labelledby="coverageModalTitle"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title id="coverageModalTitle">
+            <span className="downloadModalTitleIcon" aria-hidden="true">
+              <BarChartLine size={20} />
             </span>
-            <span className="downloadModalTitleSubtitle">
-              {t("coverageModalSubtitleText")}
+            <span className="downloadModalTitleText">
+              <span className="downloadModalTitleHeading">
+                {t("coverageModalTitleText")}
+              </span>
+              <span className="downloadModalTitleSubtitle">
+                {t("coverageModalSubtitleText")}
+              </span>
             </span>
-          </span>
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <div className="coverageToolbar">
-          <div className="coverageToolbarNotes">
-            {/* Organizations are the one multi-valued dimension: a dataset in
-                two of them lands in both series, so the stack total is not
-                the dataset count. Say so rather than let the axis imply
-                otherwise. */}
-            {groupBy === "organization" && (
-              <div className="coverageToolbarNote">
-                <InfoCircle aria-hidden="true" />
-                {t("coverageOrganizationNote")}
-              </div>
-            )}
-            {/* Days are per-feature and added up, so a bar measures
-                observation effort and routinely exceeds the number of
-                calendar days in its period. Deliberately unlike the map's
-                days ramp, which unions. */}
-            {count === "days" && (
-              <div className="coverageToolbarNote">
-                <InfoCircle aria-hidden="true" />
-                {t("coverageDaysNote")}
-              </div>
-            )}
-            {view === "seasonal" && (
-              <div className="coverageToolbarNote">
-                <InfoCircle aria-hidden="true" />
-                {t("coverageSeasonalNote")}
-              </div>
-            )}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="coverageToolbar">
+            <div className="coverageToolbarControls">
+              {renderLabel("coverageViewLabel", view, "coverageView_")}
+              <DropdownButton
+                data-testid="coverage-view-dropdown"
+                title={t(`coverageView_${view}`)}
+                menuClassName="coverageOptionMenu"
+                align="end"
+              >
+                {VIEW_OPTIONS.map((option) => (
+                  <Dropdown.Item
+                    key={option}
+                    data-testid="coverage-view-option"
+                    active={option === view}
+                    onClick={() => setView(option)}
+                  >
+                    <CoverageOption
+                      label={t(`coverageView_${option}`)}
+                      help={t(`coverageViewHelp_${option}`)}
+                    />
+                  </Dropdown.Item>
+                ))}
+              </DropdownButton>
+              {renderLabel("coverageCountByLabel", count, "coverageMetric_")}
+              <DropdownButton
+                data-testid="coverage-count-dropdown"
+                title={t(`coverageMetric_${count}`)}
+                menuClassName="coverageOptionMenu"
+                align="end"
+              >
+                {COUNT_OPTIONS.map((option) => (
+                  <Dropdown.Item
+                    key={option}
+                    data-testid="coverage-count-option"
+                    active={option === count}
+                    onClick={() => setCount(option)}
+                  >
+                    <CoverageOption
+                      label={t(`coverageMetric_${option}`)}
+                      help={t(`coverageMetricHelp_${option}`)}
+                    />
+                  </Dropdown.Item>
+                ))}
+              </DropdownButton>
+              {renderLabel("coverageColorByLabel", groupBy, "coverageGroup_")}
+              <DropdownButton
+                data-testid="coverage-group-dropdown"
+                title={t(`coverageGroup_${groupBy}`)}
+                menuClassName="coverageOptionMenu"
+                align="end"
+              >
+                {GROUP_OPTIONS.map((option) => (
+                  <Dropdown.Item
+                    key={option}
+                    data-testid="coverage-group-option"
+                    active={option === groupBy}
+                    onClick={() => setGroupBy(option)}
+                  >
+                    <CoverageOption
+                      label={t(`coverageGroup_${option}`)}
+                      help={t(`coverageGroupHelp_${option}`)}
+                    />
+                  </Dropdown.Item>
+                ))}
+              </DropdownButton>
+            </div>
           </div>
-          <div className="coverageToolbarControls">
-            <span className="coverageToolbarLabel">
-              {t("coverageViewLabel")}
-            </span>
-            <DropdownButton
-              data-testid="coverage-view-dropdown"
-              title={t(`coverageView_${view}`)}
-              menuClassName="coverageOptionMenu"
-              align="end"
-            >
-              {VIEW_OPTIONS.map((option) => (
-                <Dropdown.Item
-                  key={option}
-                  data-testid="coverage-view-option"
-                  active={option === view}
-                  onClick={() => setView(option)}
-                >
-                  <CoverageOption
-                    label={t(`coverageView_${option}`)}
-                    help={t(`coverageViewHelp_${option}`)}
-                  />
-                </Dropdown.Item>
-              ))}
-            </DropdownButton>
-            <span className="coverageToolbarLabel">
-              {t("coverageCountByLabel")}
-            </span>
-            <DropdownButton
-              data-testid="coverage-count-dropdown"
-              title={t(`coverageMetric_${count}`)}
-              menuClassName="coverageOptionMenu"
-              align="end"
-            >
-              {COUNT_OPTIONS.map((option) => (
-                <Dropdown.Item
-                  key={option}
-                  data-testid="coverage-count-option"
-                  active={option === count}
-                  onClick={() => setCount(option)}
-                >
-                  <CoverageOption
-                    label={t(`coverageMetric_${option}`)}
-                    help={t(`coverageMetricHelp_${option}`)}
-                  />
-                </Dropdown.Item>
-              ))}
-            </DropdownButton>
-            <span className="coverageToolbarLabel">
-              {t("coverageColorByLabel")}
-            </span>
-            <DropdownButton
-              data-testid="coverage-group-dropdown"
-              title={t(`coverageGroup_${groupBy}`)}
-              menuClassName="coverageOptionMenu"
-              align="end"
-            >
-              {GROUP_OPTIONS.map((option) => (
-                <Dropdown.Item
-                  key={option}
-                  data-testid="coverage-group-option"
-                  active={option === groupBy}
-                  onClick={() => setGroupBy(option)}
-                >
-                  <CoverageOption
-                    label={t(`coverageGroup_${option}`)}
-                    help={t(`coverageGroupHelp_${option}`)}
-                  />
-                </Dropdown.Item>
-              ))}
-            </DropdownButton>
-          </div>
-        </div>
-        <div className="coveragePlotArea">
-          {/* A refetch keeps the bars it already has, dimmed, rather than
+          <div className="coveragePlotArea">
+            {/* A refetch keeps the bars it already has, dimmed, rather than
               blanking to an empty area: switching Count or Colour-by changes
               one facet of the same figure, and these queries take seconds when
               the API's cache is cold. */}
-          {loading && !showStalePlot && histogramSkeleton}
-          {!loading && error && (
-            <div className="coverageModalStatus coverageModalError">
-              <ExclamationCircle aria-hidden="true" />
-              {t("coverageErrorMessage")}
-            </div>
-          )}
-          {!loading && !error && isEmpty && (
-            <div className="coverageModalStatus">
-              {t("coverageEmptyMessage")}
-            </div>
-          )}
-          {(showStalePlot || (!loading && !error && histogram && !isEmpty)) && (
-            <Suspense fallback={histogramSkeleton}>
-              <div
-                className={
-                  loading ? "coveragePlotStale" : "coveragePlotCurrent"
-                }
-                aria-busy={loading || undefined}
-              >
-                <CoverageHistogramPlot histogram={histogram} />
+            {loading && !showStalePlot && histogramSkeleton}
+            {!loading && error && (
+              <div className="coverageModalStatus coverageModalError">
+                <ExclamationCircle aria-hidden="true" />
+                {t("coverageErrorMessage")}
               </div>
-            </Suspense>
-          )}
-          {showStalePlot && (
-            <div className="coverageModalStatus coveragePlotBusy">
-              <Spinner size="lg" />
-            </div>
-          )}
-        </div>
-      </Modal.Body>
-    </Modal>
+            )}
+            {!loading && !error && isEmpty && (
+              <div className="coverageModalStatus">
+                {t("coverageEmptyMessage")}
+              </div>
+            )}
+            {(showStalePlot ||
+              (!loading && !error && histogram && !isEmpty)) && (
+              <Suspense fallback={histogramSkeleton}>
+                <div
+                  className={
+                    loading ? "coveragePlotStale" : "coveragePlotCurrent"
+                  }
+                  aria-busy={loading || undefined}
+                >
+                  <CoverageHistogramPlot histogram={histogram} />
+                </div>
+              </Suspense>
+            )}
+            {showStalePlot && (
+              <div className="coverageModalStatus coveragePlotBusy">
+                <Spinner size="lg" />
+              </div>
+            )}
+          </div>
+        </Modal.Body>
+      </Modal>
+      <HelpModal
+        show={showCoverageModal && noteOpen}
+        onHide={() => setNoteFor(null)}
+        id="coverageNoteModal"
+        data-testid="coverage-note-modal"
+        icon={<InfoCircle size={20} />}
+        title={noteOpen ? t(`${noteFor}${noteValue}`) : ""}
+      >
+        {noteOpen && <p className="helpModalText">{t(NOTES[noteFor].text)}</p>}
+      </HelpModal>
+    </>
   );
 }

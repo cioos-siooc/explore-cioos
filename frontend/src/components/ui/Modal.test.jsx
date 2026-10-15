@@ -37,6 +37,49 @@ describe("Modal", () => {
     expect(onHide).toHaveBeenCalledTimes(1);
   });
 
+  it("closes only the top dialog on Escape, keeping the body locked under it", async () => {
+    const user = userEvent.setup();
+    const hideOuter = vi.fn();
+    const hideInner = vi.fn();
+    const { rerender } = render(
+      <>
+        <Modal show onHide={hideOuter}>
+          <Modal.Body>outer</Modal.Body>
+        </Modal>
+        <Modal show={false} onHide={hideInner}>
+          <Modal.Body>inner</Modal.Body>
+        </Modal>
+      </>,
+    );
+    rerender(
+      <>
+        <Modal show onHide={hideOuter}>
+          <Modal.Body>outer</Modal.Body>
+        </Modal>
+        <Modal show onHide={hideInner}>
+          <Modal.Body>inner</Modal.Body>
+        </Modal>
+      </>,
+    );
+    await user.keyboard("{Escape}");
+    expect(hideInner).toHaveBeenCalledTimes(1);
+    expect(hideOuter).not.toHaveBeenCalled();
+
+    rerender(
+      <>
+        <Modal show onHide={hideOuter}>
+          <Modal.Body>outer</Modal.Body>
+        </Modal>
+        <Modal show={false} onHide={hideInner}>
+          <Modal.Body>inner</Modal.Body>
+        </Modal>
+      </>,
+    );
+    expect(document.body).toHaveClass("cioos-modal-open");
+    await user.keyboard("{Escape}");
+    expect(hideOuter).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onHide on a backdrop click, but not on a click inside the dialog", async () => {
     const user = userEvent.setup();
     const onHide = vi.fn();

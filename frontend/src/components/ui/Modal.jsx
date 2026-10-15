@@ -8,6 +8,10 @@ import "./modalStyles.css";
 
 const ModalContext = createContext({ onHide: () => {} });
 
+// The open dialogs, oldest first. A help dialog can open over the one it
+// explains, and only the top one may answer Escape or own the body lock.
+const openModals = [];
+
 // Drop-in replacement for the react-bootstrap Modal subset this app uses.
 // Emits Bootstrap-compatible class names (.modal, .modal-dialog,
 // .modal-content, .modal-header, .modal-title, .modal-body) so the existing
@@ -40,10 +44,13 @@ export default function Modal({
   useEffect(() => {
     if (!show) return undefined;
     const previousFocus = document.activeElement;
+    openModals.push(contentRef);
     document.body.classList.add("cioos-modal-open");
     (initialFocusRef?.current ?? contentRef.current)?.focus();
     return () => {
-      document.body.classList.remove("cioos-modal-open");
+      openModals.splice(openModals.indexOf(contentRef), 1);
+      if (openModals.length === 0)
+        document.body.classList.remove("cioos-modal-open");
       previousFocus?.focus?.();
     };
   }, [show, initialFocusRef]);
@@ -52,6 +59,7 @@ export default function Modal({
     if (!show) return undefined;
 
     function handleKeyDown(event) {
+      if (openModals.at(-1) !== contentRef) return;
       if (event.key === "Escape") {
         event.stopPropagation();
         onHide();

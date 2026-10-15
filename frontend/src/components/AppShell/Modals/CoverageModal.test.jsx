@@ -147,4 +147,22 @@ describe("CoverageModal", () => {
       expect(document.querySelector(".coveragePlotCurrent")).not.toBeNull(),
     );
   });
+
+  it("opens the note for the chosen count from the ⓘ beside its label", async () => {
+    const user = open();
+    // Days is the default count, and the one that adds up past the calendar.
+    await user.click(await screen.findByTestId("coverage-note-button"));
+    expect(screen.getByTestId("coverage-note-modal")).toHaveTextContent(
+      /added together/,
+    );
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("coverage-note-modal")).not.toBeInTheDocument();
+    expect(screen.getByTestId("coverage-modal")).toBeInTheDocument();
+
+    await chooseCount(user, "Datasets");
+    expect(
+      screen.queryByTestId("coverage-note-button"),
+    ).not.toBeInTheDocument();
+  });
 });

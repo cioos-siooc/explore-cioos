@@ -257,29 +257,6 @@
   padding-bottom: var(--cioos-space-sm);
 }
 
-.coverageToolbarNotes {
-  flex: 1 1 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--cioos-font-size-sm);
-  color: var(--cioos-ink-80);
-}
-
-/* How to read the bars, not a footnote: the info glyph marks it as such. */
-.coverageToolbarNote {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  line-height: 1.35;
-}
-
-.coverageToolbarNote svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--cioos-info);
-}
-
 .coverageToolbarControls {
   display: flex;
   align-items: center;
@@ -287,8 +264,34 @@
 }
 
 .coverageToolbarLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
+}
+
+/* How to read the bars for the value chosen beside it; the glyph the legend
+   uses for the same kind of note. */
+.coverageNoteButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cioos-info);
+  cursor: pointer;
+}
+
+.coverageNoteButton:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.coverageNoteButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* Each option carries a line saying what it measures, so the menu wraps
@@ -482,10 +485,7 @@
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
     gap: 2px var(--cioos-space-sm);
-
-    /* Beside the notes when the phone is held sideways, under them, full
-       width, when it is upright. */
-    flex: 1 1 300px;
+    flex: 1 1 auto;
   }
 
   .coverageToolbarLabel {
