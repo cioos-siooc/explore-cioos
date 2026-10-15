@@ -596,7 +596,6 @@ export default function DatasetInspector({
         )}
       </div>
       <div className="datasetInspectorBody">
-        <DatasetAbstract {...metadata} />
         {/* The front matter, as compact as it can be read: one field per
             line, each a small eyebrow label with its value beside it on the
             same line (wrapping under only when the row is too narrow for
@@ -783,6 +782,7 @@ export default function DatasetInspector({
             </div>
           )}
         </dl>
+        <DatasetAbstract {...metadata} />
         <DatasetMetadata {...metadata} />
         {isGrid && (
           <GriddapDetails

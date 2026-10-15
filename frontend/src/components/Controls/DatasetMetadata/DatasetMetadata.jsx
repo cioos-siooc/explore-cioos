@@ -4,12 +4,14 @@ import { useTranslation } from "react-i18next";
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import { CardTags } from "../DatasetInspector/ListCard.jsx";
 import { formatRange } from "../../../utilities.jsx";
+import { renderMarkdown } from "./markdown.js";
 import "./styles.css";
 
 // CKAN keyword lists run to dozens (every CF standard name and EOV).
 const KEYWORD_LIMIT = 12;
 
-// Past this many characters the abstract is clamped behind "Show more".
+// Past this many characters of source the abstract is clamped behind
+// "Show more".
 const ABSTRACT_CLAMP_LENGTH = 320;
 
 // A {en, fr} value in the page's language, else whichever language exists:
@@ -35,6 +37,17 @@ function useCodeLabel() {
 // ISO dates arrive as a day or a full instant; the day is what reads.
 const day = (value) => value?.slice(0, 10);
 
+// Publisher-written prose (CKAN notes are markdown, ERDDAP summaries plain
+// text); renderMarkdown escapes raw HTML and unsafe links.
+function Markdown({ text, className }) {
+  return (
+    <div
+      className={["metadataMarkdown", className].filter(Boolean).join(" ")}
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
+    />
+  );
+}
+
 export function DatasetAbstract({ metadata, loading }) {
   const { t, i18n } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -52,15 +65,14 @@ export function DatasetAbstract({ metadata, loading }) {
   const clamped = abstract.length > ABSTRACT_CLAMP_LENGTH;
   return (
     <div className="datasetAbstract">
-      <p
+      <Markdown
+        text={abstract}
         className={
           clamped && !expanded
             ? "datasetAbstractText clamped"
             : "datasetAbstractText"
         }
-      >
-        {abstract}
-      </p>
+      />
       {clamped && (
         <button
           type="button"
@@ -75,12 +87,14 @@ export function DatasetAbstract({ metadata, loading }) {
   );
 }
 
-function Section({ title, children }) {
+// One compact card per kind of metadata, always open: the page is read top to
+// bottom, so a value worth harvesting is worth showing without a click.
+function MetadataCard({ title, wide, children }) {
   return (
-    <details className="metadataSection">
-      <summary className="metadataSectionTitle">{title}</summary>
-      <div className="metadataSectionBody">{children}</div>
-    </details>
+    <section className={wide ? "metadataCard wide" : "metadataCard"}>
+      <h3 className="metadataCardTitle">{title}</h3>
+      {children}
+    </section>
   );
 }
 
@@ -150,8 +164,8 @@ function Contact({ contact }) {
 }
 
 // The descriptive metadata the harvest merged from CKAN, OBIS and ERDDAP, as
-// collapsed sections under the metadata sheet. A section with nothing in it is
-// left out rather than shown empty.
+// a grid of cards under the abstract. A card with nothing in it is left out
+// rather than shown empty.
 export default function DatasetMetadata({ metadata, loading, error, retry }) {
   const { t, i18n } = useTranslation();
   const codeLabel = useCodeLabel();
@@ -194,7 +208,7 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
 
   const sections = [
     (citation || m.doi) && (
-      <Section key="citation" title={t("metadataCitationTitle")}>
+      <MetadataCard key="citation" wide title={t("metadataCitationTitle")}>
         {citation && (
           <div className="metadataCitation">
             <p>{citation}</p>
@@ -208,19 +222,19 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
             </Field>
           </dl>
         )}
-      </Section>
+      </MetadataCard>
     ),
     m.contacts?.length > 0 && (
-      <Section key="contacts" title={t("metadataContactsTitle")}>
+      <MetadataCard key="contacts" wide title={t("metadataContactsTitle")}>
         <ul className="metadataContacts">
           {m.contacts.map((contact, i) => (
             <Contact key={i} contact={contact} />
           ))}
         </ul>
-      </Section>
+      </MetadataCard>
     ),
     m.license && (
-      <Section key="license" title={t("metadataLicenseTitle")}>
+      <MetadataCard key="license" title={t("metadataLicenseTitle")}>
         {m.license.url ? (
           <ExternalLink href={m.license.url}>
             {m.license.title || m.license.url}
@@ -228,17 +242,17 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
         ) : (
           <p>{m.license.title}</p>
         )}
-      </Section>
+      </MetadataCard>
     ),
     keywords?.length > 0 && (
-      <Section key="keywords" title={t("metadataKeywordsTitle")}>
+      <MetadataCard key="keywords" wide title={t("metadataKeywordsTitle")}>
         <div className="metadataTags">
           <CardTags values={keywords} limit={KEYWORD_LIMIT} />
         </div>
-      </Section>
+      </MetadataCard>
     ),
     hasDates && (
-      <Section key="dates" title={t("metadataDatesTitle")}>
+      <MetadataCard key="dates" title={t("metadataDatesTitle")}>
         <dl>
           <Field label={t("metadataCreatedText")}>{day(dates.created)}</Field>
           <Field label={t("metadataPublishedText")}>
@@ -258,10 +272,10 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
             {m.update_frequency && codeLabel(m.update_frequency)}
           </Field>
         </dl>
-      </Section>
+      </MetadataCard>
     ),
     hasContext && (
-      <Section key="context" title={t("metadataContextTitle")}>
+      <MetadataCard key="context" wide title={t("metadataContextTitle")}>
         <dl>
           <Field label={t("metadataProjectsText")}>
             {m.projects?.length > 0 && (
@@ -271,18 +285,16 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
             )}
           </Field>
           <Field label={t("metadataLineageText")}>
-            {m.lineage && <p className="metadataProse">{m.lineage}</p>}
+            {m.lineage && <Markdown text={m.lineage} />}
           </Field>
           <Field label={t("metadataAcknowledgementText")}>
-            {m.acknowledgement && (
-              <p className="metadataProse">{m.acknowledgement}</p>
-            )}
+            {m.acknowledgement && <Markdown text={m.acknowledgement} />}
           </Field>
         </dl>
-      </Section>
+      </MetadataCard>
     ),
     m.resources?.length > 0 && (
-      <Section key="resources" title={t("metadataResourcesTitle")}>
+      <MetadataCard key="resources" wide title={t("metadataResourcesTitle")}>
         <ul className="metadataResources">
           {m.resources.map((resource, i) => (
             <li key={i}>
@@ -299,7 +311,7 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
             </li>
           ))}
         </ul>
-      </Section>
+      </MetadataCard>
     ),
   ].filter(Boolean);
 

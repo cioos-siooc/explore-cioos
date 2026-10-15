@@ -65,6 +65,37 @@ describe("DatasetAbstract", () => {
     expect(toggle).toHaveTextContent("Show less");
   });
 
+  it("renders the abstract as markdown", () => {
+    renderWithProviders(
+      <DatasetAbstract
+        metadata={{
+          abstract: { en: "**Bold** text\n\n- one\n- [link](https://x.org)" },
+        }}
+      />,
+    );
+    expect(screen.getByText("Bold").tagName).toBe("STRONG");
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "link" })).toHaveAttribute(
+      "href",
+      "https://x.org",
+    );
+  });
+
+  it("shows publisher HTML and unsafe links as text, never as markup", () => {
+    const { container } = renderWithProviders(
+      <DatasetAbstract
+        metadata={{
+          abstract: {
+            en: '<img src=x onerror="alert(1)"> [click](javascript:alert(1))',
+          },
+        }}
+      />,
+    );
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("a")).toBeNull();
+    expect(container).toHaveTextContent('<img src=x onerror="alert(1)"> click');
+  });
+
   it("renders nothing without an abstract", () => {
     const { container } = renderWithProviders(
       <DatasetAbstract metadata={{}} />,
@@ -74,11 +105,11 @@ describe("DatasetAbstract", () => {
 });
 
 describe("DatasetMetadata", () => {
-  it("lists only the sections that have something in them", () => {
+  it("shows every card with something in it, open, and no others", () => {
     renderWithProviders(<DatasetMetadata metadata={METADATA} />);
-    const sections = [...document.querySelectorAll("summary")].map(
-      (summary) => summary.textContent,
-    );
+    const sections = screen
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
     expect(sections).toEqual([
       "How to cite",
       "Contacts",
