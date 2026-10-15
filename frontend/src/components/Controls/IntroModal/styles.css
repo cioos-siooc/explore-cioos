@@ -427,6 +427,14 @@
   cursor: pointer;
 }
 
+@media (max-width: 992px) {
+  .introFeatures,
+  .introShowcases,
+  .introFooterCards {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
    tagline would only crowd the title and the close button; the hero stacks. */
 @media (max-width: 700px), (max-height: 500px) {
@@ -518,35 +526,51 @@
     gap: var(--cioos-space-sm);
   }
 
+  /* The three steps as a row of small tiles, titles only: read at a glance
+     as a sequence rather than scrolled past as three banners. */
   .introFeatures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-top: var(--cioos-space-sm);
   }
 
-  /* The icon beside the heading rather than above it: a row each instead of
-     a block each. */
   .introFeature {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 2px var(--cioos-space-sm);
-    padding: var(--cioos-space-sm) var(--cioos-space-md);
-  }
-
-  .introFeature > :not(.introFeatureIcon, h3) {
-    grid-column: 1 / -1;
+    gap: var(--cioos-space-xs);
+    padding: var(--cioos-space-sm) var(--cioos-space-xs);
+    border: 0;
+    background: color-mix(in srgb, var(--cioos-teal-light) 35%, transparent);
+    box-shadow: none;
+    text-align: center;
   }
 
   .introFeature > h3 {
     margin: 0;
+    font-size: var(--cioos-font-size-md);
+    line-height: 1.25;
   }
 
-  .introFeature p {
-    line-height: 1.45;
+  /* Side by side, the order already reads; the numbers only add width. */
+  .introFeature h3::before {
+    content: none;
+  }
+
+  .introFeature .introLink {
+    margin-top: 0;
+    font-size: var(--cioos-font-size-sm);
+  }
+
+  .introFeature p,
+  .introShowcaseBody,
+  .introShowcaseArrow {
+    display: none;
   }
 
   .introFeatureIcon {
     width: 32px;
     height: 32px;
+    background: var(--cioos-white);
   }
 
   .introFeatureIcon svg {
@@ -558,9 +582,30 @@
     margin: var(--cioos-space-md) 0 var(--cioos-space-xs);
   }
 
+  /* Compact chips, two to a row; an odd one out takes the full row. */
+  .introShowcases {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--cioos-space-xs);
+  }
+
+  .introShowcases > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .introShowcase {
+    gap: var(--cioos-space-xs);
+    padding: var(--cioos-space-xs);
+    border-radius: var(--cioos-radius);
+  }
+
+  .introShowcaseTitle {
+    font-size: var(--cioos-font-size-sm);
+    line-height: 1.25;
+  }
+
   .introShowcaseIcon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
 
   .introFooter {
@@ -568,13 +613,90 @@
     padding-top: var(--cioos-space-sm);
   }
 
+  /* Two to a row, headings and controls only. Tips keeps a full row for its
+     switch; the reopen card keeps its text, which is all it has to say. */
+  .introFooterCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .introFooterCard {
     gap: var(--cioos-space-xs);
-    padding: var(--cioos-space-sm) var(--cioos-space-md);
+    padding: var(--cioos-space-sm);
+  }
+
+  .introTipsCard {
+    flex-flow: row wrap;
+    align-items: center;
+    grid-column: 1 / -1;
+  }
+
+  .introTipsCard > .introFooterHeading {
+    flex-basis: 100%;
+  }
+
+  /* The switch's label wraps in whatever the tour button leaves it, so the
+     two share one row instead of stacking. */
+  .introTipsCard > .form-switch {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .introTipsCard > .introFooterAction {
+    flex: none;
+  }
+
+  .introFooterHeading {
+    font-size: var(--cioos-font-size-base);
+  }
+
+  .introFooterCard:not(:last-child) p {
+    display: none;
+  }
+
+  .introFooterAction {
+    align-self: flex-start;
+    padding: 4px 12px;
+    font-size: var(--cioos-font-size-sm);
   }
 
   .introFooterCard p {
-    line-height: 1.45;
+    font-size: var(--cioos-font-size-sm);
+    line-height: 1.4;
+  }
+}
+
+/* Upright phones: the call to action leaves the copy for the stats' row, so
+   the hero ends on it instead of stacking a row for each. */
+@media (max-width: 700px) {
+  .introHero {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .introHeroCopy {
+    display: contents;
+  }
+
+  .introHeroTitle,
+  .introHeroText {
+    position: relative;
+    grid-column: 1 / -1;
+  }
+
+  .introHeroText {
+    margin: 0;
+  }
+
+  .introStats {
+    display: flex;
+    flex-direction: row;
+    grid-area: 3 / 1;
+    padding: 0;
+    border-top: 0;
+  }
+
+  .introHeroActions {
+    position: relative;
+    grid-area: 3 / 2;
   }
 }
 
@@ -590,14 +712,6 @@
     padding: 0 0 0 var(--cioos-space-md);
     border-top: 0;
     border-left: 1px solid rgb(255 255 255 / 20%);
-  }
-}
-
-@media (max-width: 992px) {
-  .introFeatures,
-  .introShowcases,
-  .introFooterCards {
-    grid-template-columns: 1fr;
   }
 }
 
