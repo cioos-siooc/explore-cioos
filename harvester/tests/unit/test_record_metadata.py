@@ -201,8 +201,11 @@ def test_cioos_semicolon_contributors_and_repeated_contact_merged():
     ]
 
 
-def test_abstract_markup_stripped():
-    record = {"abstract": {"en": "<p>Objective: larvae &amp; scallops</p><p>Version 1</p>"}}
+def test_abstract_html_becomes_markdown():
+    record = {"abstract": {"en": (
+        "<p>Objective: larvae &amp; scallops</p><p>See:<ul><li>one</li><li>two</li></ul>"
+        "<https://example.org> **kept**</p>"
+    )}}
     assert from_cioos_record(record)["abstract"] == {
-        "en": "Objective: larvae & scallops\nVersion 1",
+        "en": "Objective: larvae & scallops\n\nSee:\n- one\n- two\n\n<https://example.org> **kept**",
     }

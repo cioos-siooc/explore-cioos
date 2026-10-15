@@ -27,8 +27,11 @@ _UNTRANSLATED_FR = "Traduction française actuellement indisponible"
 _DOI = re.compile(r"(10\.\d{4,9}/\S+)")
 _URL = re.compile(r"^https?://\S+$")
 _ESCAPED_UNICODE = re.compile(r"\\u([0-9a-fA-F]{4})")
-_BLOCK_TAG = re.compile(r"<\s*(br|/p|/div|/li)\s*/?>", re.IGNORECASE)
-_TAG = re.compile(r"<[^>]+>")
+_PARAGRAPH_END = re.compile(r"<\s*/\s*(p|div|ul|ol)\s*>", re.IGNORECASE)
+_LINE_BREAK = re.compile(r"<\s*br\s*/?\s*>", re.IGNORECASE)
+_LIST_ITEM = re.compile(r"<\s*li\b[^>]*>", re.IGNORECASE)
+# Any tag, but not a markdown autolink like <https://example.org>.
+_TAG = re.compile(r"<(?!https?://|mailto:)[^>]+>")
 
 
 def _text(value):
@@ -80,12 +83,16 @@ def _first(items):
 
 
 def _plain(text):
-    """Abstracts arrive with HTML markup from some publishers (OBIS IPT
-    especially); the page shows them as text."""
+    """Abstracts are rendered as markdown, but some publishers (OBIS IPT
+    especially) send HTML: keep its paragraphs, breaks and list items as
+    markdown and drop the rest of the markup."""
     if not isinstance(text, str):
         return text
-    text = _TAG.sub("", _BLOCK_TAG.sub("\n", text))
-    return html.unescape(text).strip()
+    text = _PARAGRAPH_END.sub("\n\n", text)
+    text = _LINE_BREAK.sub("\n", text)
+    text = _LIST_ITEM.sub("\n- ", text)
+    text = html.unescape(_TAG.sub("", text))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _abstract(value):
