@@ -199,3 +199,10 @@ def test_cioos_semicolon_contributors_and_repeated_contact_merged():
         {"name": "Hare, Alex", "roles": ["processor", "custodian"]},
         {"name": "Tula Foundation", "roles": ["funder"]},
     ]
+
+
+def test_abstract_markup_stripped():
+    record = {"abstract": {"en": "<p>Objective: larvae &amp; scallops</p><p>Version 1</p>"}}
+    assert from_cioos_record(record)["abstract"] == {
+        "en": "Objective: larvae & scallops\nVersion 1",
+    }

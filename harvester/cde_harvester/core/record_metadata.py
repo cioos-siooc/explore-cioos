@@ -15,6 +15,7 @@ Empty values are dropped rather than stored, so a field a better source leaves
 blank falls through to the next one.
 """
 
+import html
 import json
 import math
 import re
@@ -26,6 +27,8 @@ _UNTRANSLATED_FR = "Traduction française actuellement indisponible"
 _DOI = re.compile(r"(10\.\d{4,9}/\S+)")
 _URL = re.compile(r"^https?://\S+$")
 _ESCAPED_UNICODE = re.compile(r"\\u([0-9a-fA-F]{4})")
+_BLOCK_TAG = re.compile(r"<\s*(br|/p|/div|/li)\s*/?>", re.IGNORECASE)
+_TAG = re.compile(r"<[^>]+>")
 
 
 def _text(value):
@@ -74,6 +77,19 @@ def _number(value):
 
 def _first(items):
     return items[0] if items else {}
+
+
+def _plain(text):
+    """Abstracts arrive with HTML markup from some publishers (OBIS IPT
+    especially); the page shows them as text."""
+    if not isinstance(text, str):
+        return text
+    text = _TAG.sub("", _BLOCK_TAG.sub("\n", text))
+    return html.unescape(text).strip()
+
+
+def _abstract(value):
+    return {lang: _plain(text) for lang, text in (value or {}).items()}
 
 
 def _who(contacts):
@@ -171,7 +187,7 @@ def from_ckan(package):
     keywords = package.get("keywords") or {}
     identifiers = package.get("unique-resource-identifier-full") or []
     return _prune({
-        "abstract": package.get("notes_translated") or {"en": package.get("notes")},
+        "abstract": _abstract(package.get("notes_translated") or {"en": package.get("notes")}),
         "citation": {lang: _csl_citation(citation.get(lang)) for lang in ("en", "fr")},
         "doi": next(filter(None, (_doi_url(i.get("code")) for i in identifiers)), None),
         "license": {"title": package.get("license_title"), "url": package.get("license_url")},
@@ -211,7 +227,7 @@ def from_cioos_record(record, citation=None):
     record has no citation field."""
     keywords = record.get("keywords") or {}
     return _prune({
-        "abstract": _english(record.get("abstract")),
+        "abstract": _abstract(_english(record.get("abstract"))),
         "citation": {"en": citation},
         "doi": _doi_url(record.get("datasetIdentifier")),
         "license": {"url": record.get("license")}
@@ -287,7 +303,7 @@ def from_erddap_globals(globals_):
     g = {k: _erddap_text(v) for k, v in (globals_ or {}).items()}
     license_text = _text(g.get("license"))
     return _prune({
-        "abstract": {"en": g.get("summary"), "fr": g.get("summary_fr") or g.get("summary_fra")},
+        "abstract": _abstract({"en": g.get("summary"), "fr": g.get("summary_fr") or g.get("summary_fra")}),
         "citation": {"en": g.get("citation")},
         "doi": _doi_url(g.get("doi")),
         "license": {"url": license_text}
