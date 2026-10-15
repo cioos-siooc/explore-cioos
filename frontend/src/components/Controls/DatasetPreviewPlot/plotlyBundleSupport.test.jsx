@@ -5,7 +5,10 @@ import {
   byColumnName,
 } from "../DatasetPreview/previewVariables.js";
 import { facetPlanFor } from "../DatasetPreview/previewFacetPlan.js";
-import { buildFigure } from "../DatasetPreview/previewFacetFigure.js";
+import {
+  buildColorFigure,
+  buildFigure,
+} from "../DatasetPreview/previewFacetFigure.js";
 
 // Does the bundle we actually ship understand what the figure emits?
 //
@@ -174,6 +177,55 @@ describe("the shipped plotly bundle and the axis-wide hover", () => {
       (key) => {
         expect(axis, key).toHaveProperty(key);
       },
+    );
+  });
+});
+
+describe("the shipped plotly bundle and the colour plot", () => {
+  function colorPlotFigure(colorVariable) {
+    const dataset = { cdm_data_type: "Profile", first_eov_column: "TE90_01" };
+    return buildColorFigure({
+      variablesByName: byColumnName(variablesFrom(TABLE, dataset)),
+      panels: ["TE90_01", colorVariable],
+      xAxis: "PSAL_01",
+      yAxis: "depth",
+      data: DATA,
+      mode: "markers",
+      size: { width: 900, height: 600 },
+      uirevision: "test",
+    });
+  }
+
+  it("understands every key a panel's own colourbar sets", async () => {
+    const schema = await plotlySchema();
+    const known = schema.layout.layoutAttributes.coloraxis;
+    // Time as the second panel, so the bar's tick override is covered too.
+    const { layout } = colorPlotFigure("time");
+
+    ["coloraxis", "coloraxis2"].forEach((name) => {
+      const { colorbar, ...rest } = layout[name];
+      Object.keys(rest).forEach((key) => {
+        expect(known, `layout.${name}.${key}`).toHaveProperty(key);
+      });
+      Object.keys(colorbar).forEach((key) => {
+        expect(known.colorbar, `${name}.colorbar.${key}`).toHaveProperty(key);
+      });
+      Object.keys(colorbar.title).forEach((key) => {
+        expect(
+          known.colorbar.title,
+          `${name}.colorbar.title.${key}`,
+        ).toHaveProperty(key);
+      });
+    });
+    expect(known.colorbar.title.side.values).toContain("right");
+    expect(known.colorbar.lenmode.values).toContain("fraction");
+  });
+
+  it("can tie every panel's Y axis to the first, so one zoom moves them all", async () => {
+    const schema = await plotlySchema();
+    expect(schema.layout.layoutAttributes.yaxis).toHaveProperty("matches");
+    expect(schema.layout.layoutAttributes.hovermode.values).toContain(
+      "closest",
     );
   });
 });

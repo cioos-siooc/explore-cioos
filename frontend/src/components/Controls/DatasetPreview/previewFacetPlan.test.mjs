@@ -5,6 +5,7 @@ import { variablesFrom } from "./previewVariables.js";
 import {
   axisDirectionsFor,
   colorCandidatesFor,
+  colorPlotAxesFor,
   facetPlanFor,
   panelCandidatesFor,
   plotBlockerFor,
@@ -20,6 +21,11 @@ import {
   positionRowsFor,
   trackIndexFor,
 } from "./previewTrackIndex.js";
+import {
+  EUCLIDEAN_DISTANCE_COLUMN,
+  TOTAL_DISTANCE_TRAVELED_COLUMN,
+  trackDistancesFor,
+} from "./previewTrackDistance.js";
 import {
   VIKING,
   VIKING_NO_META,
@@ -143,23 +149,117 @@ test("a plan exists before any harvest has filled columnMeta", () => {
   assert.deepEqual(plan.panelDefaults, ["TE90_01"]);
 });
 
-test("shared candidates lead with coordinates then offer every measurement", () => {
+test("the X axis offers every column: coordinates, measurements, then the rest", () => {
   const candidates = sharedCandidatesFor(
     variablesFrom(VIKING, VIKING_DATASET),
+    VIKING_DATASET,
   ).map((v) => v.columnName);
-  // Coordinates first, so the plausible answer is at the top of the dropdown...
-  assert.deepEqual(candidates.slice(0, 6), [
+  assert.deepEqual(candidates, [
     "time",
     "obs_lat",
     "obs_lon",
     "latitude",
     "longitude",
     "depth",
+    "TE90_01",
+    "CNDC_01",
+    "PRES_01",
+    "PSAL_01",
+    "FLOR_01",
+    "DOXY_01",
+    "station_id",
+    "profile",
   ]);
-  // ...but "salinity against temperature" stays reachable.
-  assert.ok(candidates.includes("PSAL_01"));
-  // Ids and flags are never offered.
-  assert.ok(!candidates.includes("station_id"));
+});
+
+// Time is not the first coordinate here, so only the type can lift it.
+const DEPTH_FIRST = {
+  columnNames: ["depth", "latitude", "longitude", "time", "temperature"],
+  columnTypes: ["float", "float", "float", "String", "float"],
+  columnUnits: ["m", "degrees_north", "degrees_east", "UTC", "degree_C"],
+};
+
+test("a timeseries lists time first on the X axis", () => {
+  for (const type of ["TimeSeries", "TimeSeriesProfile"]) {
+    const dataset = { ...VIKING_DATASET, cdm_data_type: type };
+    const candidates = sharedCandidatesFor(
+      variablesFrom(DEPTH_FIRST, dataset),
+      dataset,
+    ).map((v) => v.columnName);
+    assert.equal(candidates[0], "time", type);
+  }
+  const profile = { ...VIKING_DATASET, cdm_data_type: "Profile" };
+  assert.equal(
+    sharedCandidatesFor(variablesFrom(DEPTH_FIRST, profile), profile)[0]
+      .columnName,
+    "depth",
+  );
+});
+
+// Two profiles of two depths each, a degree of latitude apart.
+const TRACK_PROFILE_ROWS = [
+  { time: "2021-05-24T18:00:00Z", latitude: 1, longitude: 0, depth: 1 },
+  { time: "2021-05-24T18:00:00Z", latitude: 1, longitude: 0, depth: 5 },
+  { time: "2021-05-24T17:00:00Z", latitude: 0, longitude: 0, depth: 1 },
+  { time: "2021-05-24T17:00:00Z", latitude: 0, longitude: 0, depth: 5 },
+];
+
+const trackVariablesFor = (dataset) => {
+  const columns = variablesFrom(VIKING, dataset);
+  return [
+    ...columns,
+    trackIndexFor(dataset, columns, TRACK_PROFILE_ROWS).variable,
+    ...trackDistancesFor(dataset, columns, TRACK_PROFILE_ROWS).variables,
+  ];
+};
+
+test("a track lists its index and both distances first on the X axis", () => {
+  for (const type of ["Trajectory", "TrajectoryProfile"]) {
+    const dataset = { ...VIKING_DATASET, cdm_data_type: type };
+    const candidates = sharedCandidatesFor(
+      trackVariablesFor(dataset),
+      dataset,
+    ).map((v) => v.columnName);
+    assert.deepEqual(
+      candidates.slice(0, 4),
+      [
+        POSITION_INDEX_COLUMN,
+        TOTAL_DISTANCE_TRAVELED_COLUMN,
+        EUCLIDEAN_DISTANCE_COLUMN,
+        "time",
+      ],
+      type,
+    );
+  }
+});
+
+test("a trajectory profile still opens on depth, its index one pick away", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TrajectoryProfile" };
+  const plan = facetPlanFor(
+    dataset,
+    trackVariablesFor(dataset),
+    TRACK_PROFILE_ROWS,
+  );
+  assert.equal(plan.sharedAxis, "depth");
+  assert.equal(plan.sharedCandidates[0], POSITION_INDEX_COLUMN);
+  assert.deepEqual(plan.panelDefaults, ["TE90_01"]);
+});
+
+test("the Y axis offers the same columns as X, less the shared axis", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Trajectory" };
+  const variables = trackVariablesFor(dataset);
+  const offeredOnX = sharedCandidatesFor(variables, dataset).map(
+    (v) => v.columnName,
+  );
+  const offeredOnY = panelCandidatesFor(variables, "time", dataset).map(
+    (v) => v.columnName,
+  );
+  assert.deepEqual(
+    [...offeredOnY].sort(),
+    offeredOnX.filter((columnName) => columnName !== "time").sort(),
+  );
+  assert.ok(offeredOnY.includes("station_id"));
+  assert.ok(offeredOnY.includes(TOTAL_DISTANCE_TRAVELED_COLUMN));
 });
 
 test("resolvePanels drops the shared axis, unknown columns and duplicates", () => {
@@ -330,6 +430,21 @@ test("the colour dimension offers the shared axis's columns, time included", () 
   assert.ok(candidates.includes("TE90_01"));
 });
 
+test("a time column that is also the profile id is still offered as the colour dimension", () => {
+  const dataset = {
+    ...VIKING_DATASET,
+    cdm_data_type: "Profile",
+    profile_id_variable: "time",
+  };
+  const variables = variablesFrom(VIKING, dataset);
+  const candidates = colorCandidatesFor(variables).map(
+    (variable) => variable.columnName,
+  );
+  assert.ok(candidates.includes("time"));
+  // It still names the record.
+  assert.ok(facetPlanFor(dataset, variables).titleColumns.includes("time"));
+});
+
 test("a column no ramp can order is never offered as the colour dimension", () => {
   const candidates = colorCandidatesFor(
     variablesFrom(VIKING, VIKING_DATASET),
@@ -419,25 +534,106 @@ test("a bathymetric transect is drawn rather than refused", () => {
   assert.deepEqual(plan.panelDefaults, ["distance"]);
 });
 
-test("panelCandidatesFor offers the measurements, minus the shared axis", () => {
+test("panelCandidatesFor offers the measurements first, then every other column", () => {
   const variables = variablesFrom(VIKING, VIKING_DATASET);
   assert.deepEqual(
-    panelCandidatesFor(variables, "TE90_01").map((v) => v.columnName),
-    ["CNDC_01", "PRES_01", "PSAL_01", "FLOR_01", "DOXY_01"],
+    panelCandidatesFor(variables, "TE90_01", VIKING_DATASET).map(
+      (v) => v.columnName,
+    ),
+    [
+      "CNDC_01",
+      "PRES_01",
+      "PSAL_01",
+      "FLOR_01",
+      "DOXY_01",
+      "time",
+      "obs_lat",
+      "obs_lon",
+      "latitude",
+      "longitude",
+      "depth",
+      "station_id",
+      "profile",
+    ],
   );
 });
 
-test("panelCandidatesFor falls back to the vertical coordinate, never to position", () => {
-  // With distance as the shared axis the transect has no measurement left, and
-  // an empty panel picker is a dead end the axis dropdown can walk into.
+test("a record with no measurement left still offers every other column", () => {
+  // With distance as the shared axis the transect has no measurement left; the
+  // picker is never the dead end it once was.
   const variables = variablesFrom(BATHYMETRY, BATHYMETRY_DATASET);
   assert.deepEqual(
-    panelCandidatesFor(variables, "distance").map((v) => v.columnName),
-    ["sea_floor_depth"],
+    panelCandidatesFor(variables, "distance", BATHYMETRY_DATASET).map(
+      (v) => v.columnName,
+    ),
+    [
+      "time",
+      "longitude",
+      "latitude",
+      "sea_floor_depth",
+      "profilID",
+      "transectID",
+    ],
   );
-  // Latitude and longitude say where, not what: never a panel.
-  const offered = panelCandidatesFor(variables, "sea_floor_depth").map(
-    (v) => v.columnName,
+});
+
+// --- the colour plot's X and Y ------------------------------------------------
+
+const colorAxesFor = (type, variables, data) => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: type };
+  const columns = variables || variablesFrom(VIKING, dataset);
+  return colorPlotAxesFor(
+    dataset,
+    columns,
+    facetPlanFor(dataset, columns, data),
   );
-  assert.deepEqual(offered, ["distance"]);
+};
+
+test("a profile's colour plot runs time across its depth", () => {
+  for (const type of ["Profile", "TimeSeriesProfile"]) {
+    assert.deepEqual(colorAxesFor(type), { x: "time", y: "depth" }, type);
+  }
+});
+
+test("a trajectory profile's colour plot runs its track across its depth", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TrajectoryProfile" };
+  const variables = variablesFrom(VIKING, dataset);
+  const data = [
+    { time: "2021-05-24T20:38:00Z", latitude: 47.57, longitude: -69.85 },
+    { time: "2021-05-24T17:06:00Z", latitude: 47.61, longitude: -69.92 },
+  ];
+  const trackIndex = trackIndexFor(dataset, variables, data, "Position");
+  assert.deepEqual(
+    colorAxesFor(
+      "TrajectoryProfile",
+      [...variables, trackIndex.variable],
+      data,
+    ),
+    { x: POSITION_INDEX_COLUMN, y: "depth" },
+  );
+});
+
+test("a timeseries' colour plot keeps time across and puts depth down", () => {
+  assert.deepEqual(colorAxesFor("TimeSeries"), { x: "time", y: "depth" });
+});
+
+test("with no depth, the colour plot's Y is a measurement no panel opens on", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeries" };
+  const variables = variablesFrom(VIKING, dataset).filter(
+    (variable) => variable.columnName !== "depth",
+  );
+  const axes = colorAxesFor("TimeSeries", variables);
+  assert.equal(axes.x, "time");
+  assert.ok(axes.y && axes.y !== "TE90_01" && axes.y !== "time");
+});
+
+test("a point's colour plot draws its measurement against depth", () => {
+  assert.deepEqual(colorAxesFor("Point"), { x: "TE90_01", y: "depth" });
+});
+
+test("no plan means no colour plot axes", () => {
+  assert.deepEqual(colorPlotAxesFor({ cdm_data_type: "Grid" }, [], null), {
+    x: null,
+    y: null,
+  });
 });

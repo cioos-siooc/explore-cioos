@@ -15,6 +15,10 @@ import {
   POSITION_INDEX_COLUMN,
   timeCoordinateOf,
 } from "./previewTrackIndex.js";
+import {
+  EUCLIDEAN_DISTANCE_COLUMN,
+  TOTAL_DISTANCE_TRAVELED_COLUMN,
+} from "./previewTrackDistance.js";
 
 export const COLUMNS = "columns"; // profiles: panels across, shared Y
 export const ROWS = "rows"; // timeseries: panels stacked, shared X
@@ -79,10 +83,23 @@ function trackAxisFor(variables, data) {
   );
 }
 
+// The computed axes a track offers, in the order the axis lists show them.
+const TRACK_AXIS_COLUMNS = [
+  POSITION_INDEX_COLUMN,
+  TOTAL_DISTANCE_TRAVELED_COLUMN,
+  EUCLIDEAN_DISTANCE_COLUMN,
+];
+const trackLeadingAxes = (variables) =>
+  TRACK_AXIS_COLUMNS.map((columnName) =>
+    find(variables, (variable) => variable.columnName === columnName),
+  );
+const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
+
 // One row per plottable cdm_data_type: how its panels stack, which axis they
-// share, and what the search was looking for when a record has none. A seventh
-// type is one row here and nowhere else — this table is what `defaultVisFor`
-// means by plottable and what the blocker message names.
+// share, which columns head the axis lists, and what the search was looking for
+// when a record has none. A seventh type is one row here and nowhere else —
+// this table is what `defaultVisFor` means by plottable and what the blocker
+// message names.
 //
 // Point needs nothing beyond its first measurement: the shared axis is always
 // excluded from the panel set, so "variable 1 on x, the rest as panels" falls
@@ -97,21 +114,25 @@ const CDM_LAYOUTS = {
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
+    leadingAxesFor: timeLeadingAxis,
   },
   TrajectoryProfile: {
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
+    leadingAxesFor: trackLeadingAxes,
   },
   TimeSeries: {
     orientation: ROWS,
     wanted: "time",
     sharedAxisFor: timeCoordinateOf,
+    leadingAxesFor: timeLeadingAxis,
   },
   Trajectory: {
     orientation: ROWS,
     wanted: "track",
     sharedAxisFor: trackAxisFor,
+    leadingAxesFor: trackLeadingAxes,
   },
   Point: {
     orientation: ROWS,
@@ -133,25 +154,69 @@ export function axisDirectionsFor(orientation) {
     : { x: "horizontal", y: "vertical" };
 }
 
-// Columns offerable as the shared axis, most plausible first. Coordinates lead
-// because they are what the layouts assume; every measurement follows so
-// "salinity against temperature" stays reachable, which is the whole point of
-// keeping the axis overridable.
-export function sharedCandidatesFor(variables) {
-  const coordinates = (variables || []).filter(
-    (variable) => variable.kind === "coordinate",
-  );
-  return [...coordinates, ...measurementsOf(variables)];
+const coordinatesOf = (variables) =>
+  (variables || []).filter((variable) => variable.kind === "coordinate");
+
+// Every column, each once, in the order given.
+const uniqueColumns = (variables) => [
+  ...new Map(
+    variables
+      .filter(Boolean)
+      .map((variable) => [variable.columnName, variable]),
+  ).values(),
+];
+
+// Every column offerable as the shared axis, most plausible first: the type's
+// own leading axes, then the coordinates the layouts assume, then the
+// measurements so "salinity against temperature" stays reachable, then the rest
+// (ids, flags, text), which Plotly draws as categories.
+export function sharedCandidatesFor(variables, dataset) {
+  const layout = layoutFor(dataset);
+  const leading =
+    layout && layout.leadingAxesFor ? layout.leadingAxesFor(variables) : [];
+  return uniqueColumns([
+    ...leading,
+    ...coordinatesOf(variables),
+    ...measurementsOf(variables),
+    ...(variables || []),
+  ]);
 }
 
-// What can carry the colour dimension: the same columns the shared axis offers,
-// less the ones a ramp cannot order — a station id says nothing by sorting after
-// another one. Time stays: it is TEXT in ERDDAP's JSON rather than a number, and
-// it is the most useful third dimension a profile or a track has.
+// What can carry the colour dimension: the coordinates and measurements a ramp
+// can order — a station id says nothing by sorting after another one. Time
+// stays: it is TEXT in ERDDAP's JSON rather than a number, and it is the most
+// useful third dimension a profile or a track has.
 export function colorCandidatesFor(variables) {
-  return sharedCandidatesFor(variables).filter(
+  return [...coordinatesOf(variables), ...measurementsOf(variables)].filter(
     (variable) => variable.isNumeric || isTimeLike(variable),
   );
+}
+
+// The colour plot's X and Y when the link names neither: every panel draws Y
+// against X and is shaded by its own variable, so the two are the record's
+// "where" — time (or the track) across, depth down. A profile's shared axis is
+// already that depth, a stack's is already that time.
+export function colorPlotAxesFor(dataset, variables, plan) {
+  if (!plan) return { x: null, y: null };
+  const layout = layoutFor(dataset);
+  const panelDefaults = plan.panelDefaults || [];
+  if (plan.orientation === COLUMNS) {
+    const leading =
+      layout && layout.leadingAxesFor
+        ? layout.leadingAxesFor(variables).filter(Boolean)
+        : [];
+    const across = leading[0] || timeCoordinateOf(variables);
+    return { x: (across && across.columnName) || null, y: plan.sharedAxis };
+  }
+  const notTaken = (variable) =>
+    variable.columnName !== plan.sharedAxis &&
+    !panelDefaults.includes(variable.columnName);
+  const down =
+    verticalCoordinate(variables) || measurementsOf(variables).find(notTaken);
+  return {
+    x: plan.sharedAxis,
+    y: down && down.columnName !== plan.sharedAxis ? down.columnName : null,
+  };
 }
 
 // Where a measurement was taken, never what it measured. Excluded from the
@@ -163,7 +228,16 @@ const isHorizontalPosition = (variable) =>
   variable.standardName === "latitude" ||
   variable.standardName === "longitude";
 
-// What this record can put in a panel, given the axis the panels share.
+// Every column this record can put in a panel, given the axis the panels share:
+// the measurements first, as the usual pick, then everything else.
+export function panelCandidatesFor(variables, sharedAxis, dataset) {
+  return uniqueColumns([
+    ...measurementsOf(variables),
+    ...sharedCandidatesFor(variables, dataset),
+  ]).filter((variable) => variable.columnName !== sharedAxis);
+}
+
+// What a record opens on, given the axis the panels share.
 //
 // Normally the measurements, which is what `measurement` means. The fallback is
 // for a record that MEASURES ITS OWN VERTICAL COORDINATE — ismerOsl002 sounds a
@@ -172,7 +246,7 @@ const isHorizontalPosition = (variable) =>
 // depth becomes the shared axis, and refusing to draw it was wrong: the
 // coordinate is the data. Only reached when the primary list is empty, so a
 // record with measurements is untouched.
-export function panelCandidatesFor(variables, sharedAxis) {
+function defaultPanelCandidatesFor(variables, sharedAxis) {
   const notShared = (variable) =>
     !sharedAxis || variable.columnName !== sharedAxis;
   const measurements = measurementsOf(variables).filter(notShared);
@@ -190,7 +264,10 @@ export function panelCandidatesFor(variables, sharedAxis) {
 // plottable, else the first candidate. One panel, matching what the preview
 // showed before faceting.
 function defaultPanelsFor(dataset, variables, shared) {
-  const candidates = panelCandidatesFor(variables, shared && shared.columnName);
+  const candidates = defaultPanelCandidatesFor(
+    variables,
+    shared && shared.columnName,
+  );
   if (!candidates.length) return [];
   const preferred =
     dataset &&
@@ -238,7 +315,13 @@ function planOrBlockerFor(dataset, variables, data) {
   if (!panelDefaults.length) return blocked(PLOT_BLOCKED.NO_MEASUREMENTS);
 
   return {
-    plan: planFrom(layout.orientation, shared, variables, panelDefaults),
+    plan: planFrom(
+      dataset,
+      layout.orientation,
+      shared,
+      variables,
+      panelDefaults,
+    ),
   };
 }
 
@@ -254,13 +337,13 @@ export function facetPlanFor(dataset, variables, data) {
   return planOrBlockerFor(dataset, variables, data).plan || null;
 }
 
-function planFrom(orientation, shared, variables, panelDefaults) {
+function planFrom(dataset, orientation, shared, variables, panelDefaults) {
   return {
     orientation,
     sharedAxis: shared.columnName,
     // A depth axis runs downwards; nothing else is reversed.
     sharedReversed: orientation === COLUMNS && isDownwardVertical(shared),
-    sharedCandidates: sharedCandidatesFor(variables).map(
+    sharedCandidates: sharedCandidatesFor(variables, dataset).map(
       (variable) => variable.columnName,
     ),
     // What names the record: the cf_role columns, which the figure turns into

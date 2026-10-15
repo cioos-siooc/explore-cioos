@@ -118,6 +118,7 @@ function flaggedColumns(columnMeta) {
 }
 
 function classify(variable, { flagColumns }) {
+  if (isTimeLike(variable)) return "coordinate"; // rqmMoh*Ctd publish cf_role=profile_id ON time
   if (
     // Set from the harvest when it knows, from the dataset's own three id fields
     // when it does not.

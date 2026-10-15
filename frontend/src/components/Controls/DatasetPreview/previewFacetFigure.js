@@ -11,7 +11,11 @@
 // Plotly writes a y axis title sideways — and gets `automargin`.
 
 import { COLUMNS, ROWS } from "./previewFacetPlan.js";
-import { labelFor, shortLabelFor } from "./previewVariables.js";
+import {
+  isDownwardVertical,
+  labelFor,
+  shortLabelFor,
+} from "./previewVariables.js";
 import { defaultColorFor } from "./previewColors.js";
 import {
   colorDimensionFor,
@@ -37,6 +41,7 @@ import {
   marginFor,
   plotHeightFor,
   plotWidthFor,
+  COLORBAR_ROOM_PX,
   COLUMN_GAP,
   ROW_GAP,
   TITLE_PAD_PX,
@@ -163,24 +168,77 @@ export function plotBoxFor({
   availableHeight,
   measured = {},
   withTitle = true,
+  orientation = plan.orientation, // the colour plot always stacks
 }) {
   const title = withTitle
     ? recordTitleFor({ plan, variablesByName, data })
     : "";
   const width = plotWidthFor(
-    plan.orientation,
+    orientation,
     panelCount,
     boxBudgetFor(measured.width),
   );
   const titleLines = titleLinesFor(title, width);
   const height = plotHeightFor(
-    plan.orientation,
+    orientation,
     panelCount,
     heightBudgetFor(availableHeight, measured.height),
     titleLines,
   );
   return { title, width, height, titleLines };
 }
+
+// What the figure calls a column, on an axis and in a hover. Shared by both
+// layouts so a rename reads the same in each.
+function labellerFor(variablesByName, labels) {
+  const titleFor = (columnName) => {
+    const custom = labels[columnName] && labels[columnName].trim();
+    const variable = variablesByName.get(columnName);
+    if (!custom) return labelFor(variable);
+    return variable && variable.unit
+      ? `${custom} ( ${variable.unit} )`
+      : custom;
+  };
+
+  // What the hover calls a column: the user's rename, else its long_name. Capped
+  // because a box is open on every panel at once and one 125-character long_name
+  // would stretch it across the figure.
+  const hoverNameFor = (columnName) => {
+    const custom = labels[columnName] && labels[columnName].trim();
+    const name =
+      custom || shortLabelFor(variablesByName.get(columnName)) || columnName;
+    return ellipsize(name, HOVER_NAME_CHARS);
+  };
+  // After the value rather than after the name: "3.21 degree_C" reads as a
+  // measurement, where "TE90_01 ( degree_C ): 3.21" reads as a column heading.
+  const hoverUnitFor = (columnName) => {
+    const variable = variablesByName.get(columnName);
+    return variable && variable.unit ? ` ${variable.unit}` : "";
+  };
+  const hoverLine = (columnName, token) =>
+    `${hoverNameFor(columnName)}: ${token}${hoverUnitFor(columnName)}`;
+
+  return { titleFor, hoverLine };
+}
+
+// Pinned inside the top margin: yref 'container' with y 1 and yanchor 'top'
+// puts the first line's cap top exactly pad.t below the top of the image.
+//
+// title.automargin is deliberately NOT set. It exists in this bundle and it
+// only ever grows a margin — but it grows it inside a height that is fixed
+// here, so a push nobody predicted would silently shrink every panel below
+// the MIN_PANEL_PX the floor promised. Reserved by hand instead.
+const layoutTitleFor = (wrappedTitle) => ({
+  text: wrappedTitle,
+  font: { size: TITLE_FONT_PX },
+  xref: "container",
+  x: 0.5,
+  xanchor: "center",
+  yref: "container",
+  y: 1,
+  yanchor: "top",
+  pad: { t: TITLE_PAD_PX },
+});
 
 /**
  * @param plan          from facetPlanFor()
@@ -217,32 +275,7 @@ export function buildFigure({
   size = {},
   uirevision,
 }) {
-  const titleFor = (columnName) => {
-    const custom = labels[columnName] && labels[columnName].trim();
-    const variable = variablesByName.get(columnName);
-    if (!custom) return labelFor(variable);
-    return variable && variable.unit
-      ? `${custom} ( ${variable.unit} )`
-      : custom;
-  };
-
-  // What the hover calls a column: the user's rename, else its long_name. Capped
-  // because a box is open on every panel at once and one 125-character long_name
-  // would stretch it across the figure.
-  const hoverNameFor = (columnName) => {
-    const custom = labels[columnName] && labels[columnName].trim();
-    const name =
-      custom || shortLabelFor(variablesByName.get(columnName)) || columnName;
-    return ellipsize(name, HOVER_NAME_CHARS);
-  };
-  // After the value rather than after the name: "3.21 degree_C" reads as a
-  // measurement, where "TE90_01 ( degree_C ): 3.21" reads as a column heading.
-  const hoverUnitFor = (columnName) => {
-    const variable = variablesByName.get(columnName);
-    return variable && variable.unit ? ` ${variable.unit}` : "";
-  };
-  const hoverLine = (columnName, token) =>
-    `${hoverNameFor(columnName)}: ${token}${hoverUnitFor(columnName)}`;
+  const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
 
   const arrangement = ARRANGEMENTS[plan.orientation] || ROWS_LAYOUT;
   const { shared: sharedLetter, panel: panelLetter } = arrangement;
@@ -307,26 +340,7 @@ export function buildFigure({
     ...(size.height ? { height: size.height } : {}),
   };
 
-  if (titleLines) {
-    // Pinned inside the top margin: yref 'container' with y 1 and yanchor 'top'
-    // puts the first line's cap top exactly pad.t below the top of the image.
-    //
-    // title.automargin is deliberately NOT set. It exists in this bundle and it
-    // only ever grows a margin — but it grows it inside a height that is fixed
-    // here, so a push nobody predicted would silently shrink every panel below
-    // the MIN_PANEL_PX the floor promised. Reserved by hand instead.
-    layout.title = {
-      text: wrappedTitle,
-      font: { size: TITLE_FONT_PX },
-      xref: "container",
-      x: 0.5,
-      xanchor: "center",
-      yref: "container",
-      y: 1,
-      yanchor: "top",
-      pad: { t: TITLE_PAD_PX },
-    };
-  }
+  if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
 
   if (hasColorBar) {
     // ONE colour axis in the layout, not one mapping per trace: Plotly ranges it
@@ -402,14 +416,17 @@ export function buildFigure({
       colors[columnName] ||
       defaultColorFor(variablesByName.get(columnName), index);
 
-    // The colour column is worth a hover line unless this panel already prints
-    // it. Never in a unified box: every row of it comes from the SAME data row,
-    // so one line per panel would be one copy of the same value per panel.
+    // The colour column is worth a hover line unless the box already prints it.
+    // A unified box gathers every panel from the SAME data row, so it gets the
+    // line once, on the first panel, and none when any panel draws that column.
+    const colorAlreadyPrinted = arrangement.unifiedHover
+      ? panels.includes(colorAxis)
+      : colorAxis === columnName;
     const colorInHover =
-      !arrangement.unifiedHover &&
       hasColorBar &&
       colorAxis !== sharedAxis &&
-      colorAxis !== columnName;
+      !colorAlreadyPrinted &&
+      (!arrangement.unifiedHover || index === 0);
 
     // Where the row IS, when the shared axis only says which row it is. Carried
     // as `text` because customdata is spoken for by the colour dimension, and
@@ -488,4 +505,195 @@ export function buildFigure({
     : null;
   // First, so every panel's markers draw over its line.
   return { data: [...lineTraces, ...traces], layout, colorLegend };
+}
+
+const COLORBAR_THICKNESS_PX = 12;
+const COLORBAR_PAD_PX = 10;
+
+/**
+ * The colour plot: every panel draws the same Y against the same X, one panel
+ * per colour variable, each shaded by its own variable through its own
+ * colourbar. The bar spans exactly its panel's domain, which is what ties a
+ * scale to its graph.
+ *
+ * Takes buildFigure's inputs, except that `panels` are the colour variables and
+ * `xAxis`/`yAxis` replace `sharedAxis`. Always stacked: the bars sit inside the
+ * figure, and only a stack is guaranteed never to scroll them out of view.
+ *
+ * @param scales { [columnName]: scaleName } — the user's overrides only
+ */
+export function buildColorFigure({
+  variablesByName,
+  panels,
+  xAxis,
+  yAxis,
+  data,
+  labels = {},
+  scales = {},
+  title = "",
+  mode = "markers",
+  sharedTicks = null,
+  sharedText = null,
+  size = {},
+  uirevision,
+}) {
+  const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
+  const domains = domainsFor(panels.length, ROW_GAP);
+
+  const wrappedTitle = wrapTitleFor(title, size.width);
+  const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
+  const baseMargin = marginFor(ROWS, titleLines);
+  const margin = { ...baseMargin, r: baseMargin.r + COLORBAR_ROOM_PX };
+  const plottingWidth = size.width
+    ? Math.max(size.width - margin.l - margin.r, 0)
+    : 0;
+  const plottingHeight = size.height
+    ? Math.max(size.height - margin.t - margin.b, 0)
+    : 0;
+  const wrapAlong = (text, pixels) => wrapLabel(text, maxCharsFor(pixels));
+  const binLimit = mode.includes("lines")
+    ? lineBinLimitFor({ panelCount: panels.length, axisPixels: plottingWidth })
+    : 0;
+
+  const layout = {
+    uirevision,
+    margin,
+    font: { size: TICK_FONT_PX },
+    hoverlabel: { font: { size: HOVER_FONT_PX } },
+    showlegend: false,
+    // Panels share X and Y but not their rows' colours: the point under the
+    // pointer is the only one worth a box.
+    hovermode: "closest",
+    dragmode: "zoom",
+    modebar: { orientation: "v" },
+    ...(size.width ? { width: size.width } : {}),
+    ...(size.height ? { height: size.height } : {}),
+  };
+  if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
+
+  layout.xaxis = {
+    automargin: true,
+    domain: [0, 1],
+    anchor: "y",
+    ...(sharedTicks
+      ? {
+          tickmode: "array",
+          tickvals: sharedTicks.tickvals,
+          ticktext: sharedTicks.ticktext,
+        }
+      : {}),
+    title: axisTitle(wrapAlong(titleFor(xAxis), plottingWidth)),
+  };
+
+  const yTitle = titleFor(yAxis);
+  const yReversed = isDownwardVertical(variablesByName.get(yAxis));
+  const xValues = (data || []).map((row) => row[xAxis]);
+  const yValues = (data || []).map((row) => row[yAxis]);
+
+  const lineTraces = [];
+  const traces = panels.map((columnName, index) => {
+    const domain = domains[index];
+    const variable = variablesByName.get(columnName);
+    const dimension = colorDimensionFor(variable, data);
+    const stops = colorScaleForVariable(variable, scales[columnName]);
+    const colorAxisName = index === 0 ? "coloraxis" : `coloraxis${index + 1}`;
+    const fallbackColor = defaultColorFor(variable, index);
+
+    layout[axisKey("y", index)] = {
+      domain,
+      anchor: "x",
+      automargin: true,
+      zeroline: false,
+      ...(index > 0 ? { matches: "y" } : {}), // one zoom for every panel
+      ...(yReversed ? { autorange: "reversed" } : {}),
+      title: axisTitle(
+        wrapAlong(yTitle, plottingHeight * (domain[1] - domain[0])),
+      ),
+    };
+
+    if (dimension) {
+      layout[colorAxisName] = {
+        colorscale: stops,
+        ...(dimension.range
+          ? { cmin: dimension.range[0], cmax: dimension.range[1] }
+          : {}),
+        colorbar: {
+          x: 1,
+          xanchor: "left",
+          xpad: COLORBAR_PAD_PX,
+          y: (domain[0] + domain[1]) / 2,
+          yanchor: "middle",
+          len: domain[1] - domain[0],
+          lenmode: "fraction",
+          thickness: COLORBAR_THICKNESS_PX,
+          tickfont: { size: TICK_FONT_PX },
+          ...(dimension.ticks || {}),
+          title: {
+            text: titleFor(columnName),
+            side: "right",
+            font: { size: LABEL_FONT_PX },
+          },
+        },
+      };
+    }
+
+    // A row with no colour has nothing to say on this panel: a gap, not a grey
+    // point.
+    const panelY = dimension
+      ? yValues.map((value, row) =>
+          dimension.values[row] === null ? null : value,
+        )
+      : yValues;
+
+    if (dimension && mode.includes("lines")) {
+      coloredLineBinsFor({
+        sharedValues: xValues,
+        panelValues: panelY,
+        colorValues: dimension.values,
+        range: dimension.range,
+        stops,
+        binLimit,
+        fallbackColor,
+      }).forEach((bin) =>
+        lineTraces.push({
+          type: "scatter",
+          mode: "lines",
+          hoverinfo: "skip",
+          x: bin.sharedValues,
+          y: bin.panelValues,
+          xaxis: "x",
+          yaxis: axisRef("y", index),
+          line: { color: bin.color },
+        }),
+      );
+    }
+
+    const positionLine = sharedText
+      ? `${hoverLine(xAxis, "%{x:d}")}<br>%{text}` // ":d" prints the rank
+      : hoverLine(xAxis, "%{x}");
+    return {
+      type: "scatter",
+      mode: dimension && mode.includes("lines") ? "markers" : mode,
+      name: titleFor(columnName),
+      x: xValues,
+      y: panelY,
+      xaxis: "x",
+      yaxis: axisRef("y", index),
+      hovertemplate: `${positionLine}<br>${hoverLine(yAxis, "%{y}")}<br>${hoverLine(columnName, "%{customdata}")}<extra></extra>`,
+      marker: dimension
+        ? {
+            color: dimension.values,
+            coloraxis: colorAxisName,
+            ...(mode.includes("markers") ? {} : { opacity: 0 }), // kept for the hover
+          }
+        : { color: fallbackColor },
+      line: { color: fallbackColor },
+      customdata: dimension
+        ? dimension.hoverValues
+        : (data || []).map((row) => row[columnName]),
+      ...(sharedText ? { text: sharedText } : {}),
+    };
+  });
+
+  return { data: [...lineTraces, ...traces], layout, colorLegend: null };
 }

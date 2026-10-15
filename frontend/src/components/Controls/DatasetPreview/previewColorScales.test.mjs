@@ -9,6 +9,8 @@ import {
   colorScaleFor,
   colorScaleForVariable,
   normalizeColorScale,
+  formatScalesParam,
+  parseScalesParam,
   swatchStopsFor,
   timeTicksFor,
 } from "./previewColorScales.js";
@@ -213,4 +215,28 @@ test("the automatic choice is a name the picker can show, and agrees with the sc
       name,
     );
   });
+});
+
+// --- the colour plot's per-variable scales, in a link ------------------------
+
+test("per-variable scales round-trip through the link", () => {
+  const scales = { TE90_01: "KT_thermal", PSAL_01: "Cividis" };
+  const param = formatScalesParam(scales);
+  assert.equal(param, "PSAL_01~Cividis,TE90_01~KT_thermal");
+  assert.deepEqual(parseScalesParam(param), scales);
+});
+
+test("an unknown scale, a rainbow or an unknown column is dropped", () => {
+  assert.deepEqual(
+    parseScalesParam(
+      "TE90_01~Jet,PSAL_01~Nope,GONE~Viridis,DOXY~KT_deep",
+      (columnName) => columnName !== "GONE",
+    ),
+    { DOXY: "KT_deep" },
+  );
+});
+
+test("no override at all deletes the param", () => {
+  assert.equal(formatScalesParam({}), null);
+  assert.equal(formatScalesParam({ TE90_01: "Rainbow" }), null);
 });

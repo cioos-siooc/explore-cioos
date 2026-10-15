@@ -26,6 +26,10 @@ const COLUMNS_MARGIN = {
 };
 const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 72 };
 
+// Right of a colour plot's panels: each one's own colourbar, its tick labels and
+// its sideways title.
+export const COLORBAR_ROOM_PX = 96;
+
 // 14px at Plotly's LINE_SPACING of 1.3 is 18.2; 19 buys a pixel of clearance
 // rather than spending one.
 const TITLE_LINE_PX = 19;

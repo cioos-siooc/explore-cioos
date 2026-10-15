@@ -101,6 +101,39 @@ export function autoScaleNameFor(variable) {
     : DEFAULT_COLOR_SCALE;
 }
 
+const PAIR = "~";
+const SEPARATOR = ",";
+
+/**
+ * The colour plot's per-variable scales: 'TE90_01~KT_thermal,PSAL_01~Cividis'
+ * -> { TE90_01: 'KT_thermal', PSAL_01: 'Cividis' }. The same codec as
+ * previewColors' `pcolors`, and the same rule: an unknown column or scale is
+ * dropped, never defaulted.
+ */
+export function parseScalesParam(value, isKnown) {
+  const scales = {};
+  (value || "").split(SEPARATOR).forEach((entry) => {
+    const [columnName, scaleName] = entry.split(PAIR);
+    const scale = normalizeColorScale(scaleName);
+    const name = (columnName || "").trim();
+    if (!name || !scale) return;
+    if (isKnown && !isKnown(name)) return;
+    scales[name] = scale;
+  });
+  return scales;
+}
+
+// The inverse, sorted so one set of picks always spells one URL; null when
+// nothing is overridden, which deletes the param.
+export function formatScalesParam(scales) {
+  const entries = Object.keys(scales || {})
+    .sort()
+    .map((columnName) => [columnName, normalizeColorScale(scales[columnName])])
+    .filter(([, scale]) => scale)
+    .map(([columnName, scale]) => `${columnName}${PAIR}${scale}`);
+  return entries.length ? entries.join(SEPARATOR) : null;
+}
+
 /**
  * The scale a colour column is drawn in: the user's pick, else the publisher's
  * own colorBarPalette, else Viridis — and never a rainbow, whichever of the

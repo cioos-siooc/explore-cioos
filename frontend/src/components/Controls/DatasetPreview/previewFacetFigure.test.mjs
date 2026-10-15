@@ -9,6 +9,7 @@ import {
   trackIndexFor,
 } from "./previewTrackIndex.js";
 import {
+  buildColorFigure,
   buildFigure,
   plotBoxFor,
   recordTitleFor,
@@ -29,6 +30,7 @@ import {
   plotHeightFor,
   plotWidthFor,
   titleRoomFor,
+  COLORBAR_ROOM_PX,
   MIN_PANEL_PX,
 } from "./previewFacetSizing.js";
 import { colorScaleFor } from "./previewColorScales.js";
@@ -817,15 +819,38 @@ test("hover gains the colour value, off customdata", () => {
   );
 });
 
-test("a unified box never repeats the colour value, once per panel", () => {
+test("a unified box prints the colour value once, on the first panel", () => {
   // Every row of it comes from the same data row, so one line per panel would
   // be the same number N times.
-  const { data } = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
-    colorAxis: "PSAL_01",
+  const { data } = figureFrom(
+    VIKING,
+    "TimeSeriesProfile",
+    ["TE90_01", "DOXY_01"],
+    { colorAxis: "PSAL_01" },
+  );
+  assert.ok(
+    data[0].hovertemplate.endsWith(
+      "<br>Practical Salinity: %{customdata} PSU<extra></extra>",
+    ),
+  );
+  assert.ok(!data[1].hovertemplate.includes("%{customdata}"));
+});
+
+test("a unified box adds no colour line when a panel or the shared axis prints it", () => {
+  const byPanel = figureFrom(
+    VIKING,
+    "TimeSeriesProfile",
+    ["TE90_01", "PSAL_01"],
+    { colorAxis: "PSAL_01" },
+  );
+  byPanel.data.forEach((trace) =>
+    assert.ok(!trace.hovertemplate.includes("%{customdata}")),
+  );
+
+  const bySharedAxis = figureFrom(VIKING, "TimeSeriesProfile", ["TE90_01"], {
+    colorAxis: "depth",
   });
-  assert.ok(!data[0].hovertemplate.includes("%{customdata}"));
-  // The values are still there: the markers are what carry them.
-  assert.ok(data[0].marker.coloraxis);
+  assert.ok(!bySharedAxis.data[0].hovertemplate.includes("%{customdata}"));
 });
 
 test("colouring by a column the panel already prints adds no second copy", () => {
@@ -999,4 +1024,148 @@ test("a profile never takes position text — its box is unified", () => {
     assert.equal(trace.text, undefined);
     assert.ok(!trace.hovertemplate.includes("%{text}"));
   });
+});
+
+// --- colour plot -------------------------------------------------------------
+
+function colorFigure(panels, extra = {}) {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const variables = variablesFrom(VIKING_PALETTES, dataset);
+  return buildColorFigure({
+    variablesByName: byColumnName(variables),
+    panels,
+    xAxis: "time",
+    yAxis: "depth",
+    data: DATA,
+    mode: "markers",
+    uirevision: "test",
+    ...extra,
+  });
+}
+
+const panelTraces = (data) => data.filter((trace) => trace.hovertemplate);
+
+test("a colour plot stacks one panel per colour variable, all drawing Y on X", () => {
+  const { data, layout } = colorFigure(["TE90_01", "PSAL_01"]);
+  assert.equal(Object.keys(layout).filter((k) => /^xaxis/.test(k)).length, 1);
+  assert.equal(Object.keys(layout).filter((k) => /^yaxis/.test(k)).length, 2);
+  assert.deepEqual(
+    data.map((trace) => trace.yaxis),
+    ["y", "y2"],
+  );
+  data.forEach((trace) => {
+    assert.equal(trace.xaxis, "x");
+    assert.deepEqual(
+      trace.x,
+      DATA.map((row) => row.time),
+    );
+    assert.deepEqual(
+      trace.y,
+      DATA.map((row) => row.depth),
+    );
+  });
+});
+
+test("every colour panel titles its Y, reverses depth and zooms with the first", () => {
+  const { layout } = colorFigure(["TE90_01", "PSAL_01"]);
+  assert.equal(layout.yaxis.autorange, "reversed");
+  assert.equal(layout.yaxis2.autorange, "reversed");
+  assert.equal(layout.yaxis.title.text, "depth of observation ( m )");
+  assert.equal(layout.yaxis2.title.text, "depth of observation ( m )");
+  assert.equal(layout.yaxis.matches, undefined);
+  assert.equal(layout.yaxis2.matches, "y");
+});
+
+test("each panel's colourbar spans exactly its panel and names its variable", () => {
+  const { data, layout } = colorFigure(["TE90_01", "PSAL_01"]);
+  [
+    ["coloraxis", layout.yaxis, "Temperature (1990 scale) ( degree_C )"],
+    ["coloraxis2", layout.yaxis2, "Practical Salinity ( PSU )"],
+  ].forEach(([name, axis, label], index) => {
+    const { colorbar } = layout[name];
+    const [start, end] = axis.domain;
+    assert.equal(colorbar.y, (start + end) / 2, name);
+    assert.equal(colorbar.len, end - start, name);
+    assert.equal(colorbar.lenmode, "fraction", name);
+    assert.equal(colorbar.yanchor, "middle", name);
+    assert.equal(colorbar.title.text, label, name);
+    assert.equal(data[index].marker.coloraxis, name);
+  });
+});
+
+test("each colour panel draws in its own variable's scale, or the user's", () => {
+  const { layout } = colorFigure(["TE90_01", "PSAL_01"], {
+    scales: { PSAL_01: "Cividis" },
+  });
+  assert.deepEqual(layout.coloraxis.colorscale, paletteFor("KT_thermal"));
+  assert.deepEqual(layout.coloraxis2.colorscale, colorScaleFor("Cividis"));
+  assert.equal(layout.coloraxis.cmin, 0);
+  assert.equal(layout.coloraxis.cmax, 19);
+});
+
+test("the colour plot's right margin holds the colourbars", () => {
+  const { layout } = colorFigure(["TE90_01"]);
+  assert.equal(layout.margin.r, marginFor(ROWS, 0).r + COLORBAR_ROOM_PX);
+  assert.equal(layout.hovermode, "closest");
+});
+
+test("a colour plot keeps the plot type: lines are binned in each panel's ramp", () => {
+  const { data } = colorFigure(["TE90_01", "PSAL_01"], { mode: "lines" });
+  const lines = data.filter((trace) => !trace.hovertemplate);
+  assert.ok(lines.length > 0);
+  assert.ok(lines.some((trace) => trace.yaxis === "y"));
+  assert.ok(lines.some((trace) => trace.yaxis === "y2"));
+  const panels = panelTraces(data);
+  assert.equal(panels.length, 2);
+  panels.forEach((trace) => {
+    assert.equal(trace.mode, "markers");
+    assert.equal(trace.marker.opacity, 0);
+  });
+});
+
+test("a time colour variable labels its bar with dates, not epoch milliseconds", () => {
+  const { layout } = colorFigure(["time"], { xAxis: "TE90_01" });
+  assert.equal(layout.coloraxis.colorbar.tickmode, "array");
+  assert.ok(
+    layout.coloraxis.colorbar.ticktext.every((text) => !/^\d{10,}$/.test(text)),
+  );
+});
+
+test("a row without a colour is a gap in its panel, not a grey point", () => {
+  const data = DATA.map((row, index) =>
+    index === 3 ? { ...row, TE90_01: null } : row,
+  );
+  const [trace] = panelTraces(colorFigure(["TE90_01"], { data }).data);
+  assert.equal(trace.y[3], null);
+  assert.equal(trace.y[4], DATA[4].depth);
+});
+
+test("a colour variable with no value at all draws solid and gets no bar", () => {
+  const data = DATA.map((row) => ({ ...row, TE90_01: null }));
+  const { data: traces, layout } = colorFigure(["TE90_01"], { data });
+  assert.equal(layout.coloraxis, undefined);
+  assert.equal(typeof traces[0].marker.color, "string");
+});
+
+test("the colour plot's hover names X, Y and the colour value", () => {
+  const [trace] = colorFigure(["TE90_01"]).data;
+  assert.match(trace.hovertemplate, /depth/i);
+  assert.match(trace.hovertemplate, /%\{customdata\} degree_C/);
+  assert.match(trace.hovertemplate, /%\{x\}/);
+});
+
+test("plotBoxFor sizes a colour plot as a stack, whatever the record's type", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const variables = variablesFrom(VIKING, dataset);
+  const box = plotBoxFor({
+    plan: facetPlanFor(dataset, variables, DATA),
+    variablesByName: byColumnName(variables),
+    data: DATA,
+    panelCount: 6,
+    availableHeight: 400,
+    measured: { width: 800, height: 400 },
+    orientation: ROWS,
+  });
+  assert.equal(box.width, 799);
+  assert.ok(box.height > 400);
 });

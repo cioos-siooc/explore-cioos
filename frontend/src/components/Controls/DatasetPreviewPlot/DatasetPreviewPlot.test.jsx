@@ -111,6 +111,38 @@ describe("DatasetPreviewPlot", () => {
     expect(rowCaptioned("Y axis")).toHaveTextContent("temperature");
   });
 
+  it("swaps to the colour plot's controls when its layout is picked", async () => {
+    const user = open();
+    await plotted();
+    await user.click(screen.getByRole("button", { name: "Panels" }));
+    await user.click(screen.getByText("Color plot"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("plotly")).toHaveAttribute(
+        "data-hovermode",
+        "closest",
+      ),
+    );
+    expect(rowCaptioned("X axis")).toHaveTextContent("time");
+    expect(rowCaptioned("Y axis")).toHaveTextContent("depth");
+    // Color by is the multi-pick now, and the single colour dimension's scale
+    // row is not offered.
+    expect(rowCaptioned("Color by")).toHaveTextContent("temperature");
+    expect(rowCaptioned("Color by")).toHaveTextContent("(+/-)");
+    expect(screen.queryByText("Color scale")).not.toBeInTheDocument();
+  });
+
+  it("offers a scale per colour variable in Customize plot, not a colour", async () => {
+    const user = open("/?playout=color");
+    await plotted();
+    await user.click(screen.getByText(/Customize plot/));
+    const row = document
+      .querySelector('label[for="rename-temperature"]')
+      .closest(".labelEditorRow");
+    expect(row.querySelector(".colorScaleChip")).not.toBeNull();
+    expect(row.querySelector(".dropdownButtonSwatch")).toBeNull();
+  });
+
   it("names a record of many casts in a header row above the figure", async () => {
     open("/", { ...DATASET, cdm_data_type: "TimeSeriesProfile" });
     await plotted();

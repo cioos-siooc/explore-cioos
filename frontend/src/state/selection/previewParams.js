@@ -51,6 +51,14 @@ export function parsePeriod(value) {
 //   pzscale  the colourscale that column is drawn in
 //                                  (default: its own colorBarPalette, else
 //                                  Viridis — and never a rainbow)
+//   playout  color                 (default: one panel per variable against a
+//                                  shared axis; `color` draws the same X and Y
+//                                  in every panel, one panel per `pvars`
+//                                  variable, each shaded by that variable)
+//   pcx      the colour plot's X   (default: time / track, per type)
+//   pcy      the colour plot's Y   (default: depth, else a measurement)
+//   pzscales the colour plot's scale per variable, `column~Scale` comma-
+//            separated             (default: as for pzscale)
 //   pstep    which profile INSIDE the record is drawn, by the value of the
 //            dataset's cf_role=profile_id column
 //                                  (default: none, meaning the window
@@ -64,6 +72,10 @@ export const PLOT_PARAMS = [
   "pcolors",
   "pz",
   "pzscale",
+  "playout",
+  "pcx",
+  "pcy",
+  "pzscales",
   STEP_PARAM,
 ];
 

@@ -325,6 +325,22 @@ test("an ERDDAP time-format unit marks a coordinate", () => {
   assert.equal(index.get("temperature").kind, "measurement");
 });
 
+test("a time column that is also the record id stays a coordinate", () => {
+  // rqmMoh2019Ctd publishes cf_role=profile_id on its time column.
+  const table = {
+    columnNames: ["time", "temperature"],
+    columnTypes: ["String", "float"],
+    columnUnits: ["UTC", "degree_C"],
+    columnMeta: [
+      { name: "time", cf_role: "profile_id", standard_name: "time" },
+      { name: "temperature" },
+    ],
+  };
+  const time = byColumnName(variablesFrom(table, {})).get("time");
+  assert.equal(time.kind, "coordinate");
+  assert.equal(time.cfRole, "profile_id");
+});
+
 test("an ID-suffixed column is an id even when nothing declares it", () => {
   // minilogID is an instrument serial number whose ioos_category is only
   // "Other" — the name is the only signal there is.

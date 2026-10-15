@@ -18,7 +18,9 @@ export const POSITION_INDEX_COLUMN = "position_index";
 
 // Only tracks. A profile shares depth and a timeseries shares time; neither has
 // positions to rank.
-const INDEXED_TYPES = new Set(["Trajectory"]);
+const INDEXED_TYPES = new Set(["Trajectory", "TrajectoryProfile"]);
+// A profile's rows all sit at its one position, so they share one index.
+const INDEXED_BY_POSITION = new Set(["TrajectoryProfile"]);
 
 // Enough to label the axis without the labels touching each other: two lines of
 // ~8 characters each, against a stacked panel's full width.
@@ -51,6 +53,12 @@ function coordinateNamed(variables, standardName, fallbackNames) {
   );
 }
 
+export const latitudeOf = (variables) =>
+  coordinateNamed(variables, "latitude", new Set(["latitude", "lat"]));
+
+export const longitudeOf = (variables) =>
+  coordinateNamed(variables, "longitude", new Set(["longitude", "lon"]));
+
 // ERDDAP sends time as an ISO string, but a dataset whose units are epoch
 // seconds sends a number; both are orderable, nothing else is.
 function instantOf(value) {
@@ -61,6 +69,7 @@ function instantOf(value) {
 }
 
 const formatCoordinate = (value) => {
+  if (value === null || value === undefined || value === "") return ""; // Number() reads these as 0
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(COORDINATE_DIGITS) : "";
 };
@@ -77,6 +86,31 @@ function tickPositionsFor(count) {
 }
 
 /**
+ * The input row indices sorted by time, or null when fewer than two rows carry
+ * a readable time to order them by.
+ */
+export function timeOrderFor(variables, data) {
+  const time = timeCoordinateOf(variables);
+  if (!time || !data) return null;
+
+  const instants = data.map((row) => instantOf(row[time.columnName]));
+  if (instants.filter((instant) => instant !== null).length < 2) return null;
+
+  // Stable, and a row with no readable time sorts last rather than anywhere:
+  // it has no place on the track, and dropping it would hide data.
+  return data
+    .map((_, index) => index)
+    .sort((left, right) => {
+      const a = instants[left];
+      const b = instants[right];
+      if (a === b) return left - right;
+      if (a === null) return 1;
+      if (b === null) return -1;
+      return a - b;
+    });
+}
+
+/**
  * The position index for this record, or null when it needs none.
  *
  * @param dataset   the record's dataset row (read for cdm_data_type)
@@ -84,9 +118,10 @@ function tickPositionsFor(count) {
  * @param data      array of row objects, in the order /preview sent them
  * @param label     what to call the axis, translated by the caller
  *
- * Returns `{ variable, order, ticks, labels }`, where `order` holds the input
- * row indices sorted by time and everything else is in THAT order — so
- * positionRowsFor's rows, `ticks` and `labels` line up by construction.
+ * Returns `{ variable, order, indexes, ticks, labels }`, where `order` holds
+ * the input row indices sorted by time and everything else is in THAT order — so
+ * positionRowsFor's rows, `indexes`, `ticks` and `labels` line up by
+ * construction.
  */
 export function trackIndexFor(dataset, variables, data, label = "Position") {
   const type = (dataset && dataset.cdm_data_type) || "";
@@ -100,35 +135,11 @@ export function trackIndexFor(dataset, variables, data, label = "Position") {
     return null;
   }
 
-  const time = timeCoordinateOf(variables);
-  if (!time) return null;
+  const order = timeOrderFor(variables, data);
+  if (!order) return null;
 
-  const instants = data.map((row) => instantOf(row[time.columnName]));
-  if (instants.filter((instant) => instant !== null).length < 2) return null;
-
-  // Stable, and a row with no readable time sorts last rather than anywhere:
-  // it has no place on the track, and dropping it would hide data.
-  const order = data
-    .map((_, index) => index)
-    .sort((left, right) => {
-      const a = instants[left];
-      const b = instants[right];
-      if (a === b) return left - right;
-      if (a === null) return 1;
-      if (b === null) return -1;
-      return a - b;
-    });
-
-  const latitude = coordinateNamed(
-    variables,
-    "latitude",
-    new Set(["latitude", "lat"]),
-  );
-  const longitude = coordinateNamed(
-    variables,
-    "longitude",
-    new Set(["longitude", "lon"]),
-  );
+  const latitude = latitudeOf(variables);
+  const longitude = longitudeOf(variables);
 
   const labels = order.map((rowIndex) => {
     if (!latitude || !longitude) return "";
@@ -137,14 +148,29 @@ export function trackIndexFor(dataset, variables, data, label = "Position") {
     return north && east ? `${north}, ${east}` : "";
   });
 
-  const positions = tickPositionsFor(order.length);
+  // One index per row, except where the type groups a position's rows together.
+  // An unpositioned row always starts its own.
+  const sharesPreviousIndex = (position) =>
+    INDEXED_BY_POSITION.has(type) &&
+    position > 0 &&
+    labels[position] !== "" &&
+    labels[position] === labels[position - 1];
+  const indexes = [];
+  const firstPositionOfIndex = [];
+  labels.forEach((_, position) => {
+    if (!sharesPreviousIndex(position)) firstPositionOfIndex.push(position);
+    indexes.push(firstPositionOfIndex.length);
+  });
+
+  const tickIndexes = tickPositionsFor(firstPositionOfIndex.length);
   const ticks = {
-    tickvals: positions.map((position) => position + 1),
+    tickvals: tickIndexes.map((index) => index + 1),
     // Latitude over longitude, because a tick is narrow and a track is read
     // north-then-east. An unpositioned row labels its index alone.
-    ticktext: positions.map((position) =>
-      labels[position] ? labels[position].replace(", ", "<br>") : "",
-    ),
+    ticktext: tickIndexes.map((index) => {
+      const label = labels[firstPositionOfIndex[index]];
+      return label ? label.replace(", ", "<br>") : "";
+    }),
   };
 
   return {
@@ -164,10 +190,11 @@ export function trackIndexFor(dataset, variables, data, label = "Position") {
       cmin: undefined,
       cmax: undefined,
       // Not "measurement": this keeps it out of measurementsOf, so it is never
-      // offered as a panel while staying offerable as the shared axis.
+      // a default panel, though either axis can pick it.
       kind: "coordinate",
     },
     order,
+    indexes,
     ticks,
     labels,
   };
@@ -183,6 +210,6 @@ export function positionRowsFor(data, trackIndex) {
   if (!trackIndex) return data;
   return trackIndex.order.map((rowIndex, position) => ({
     ...data[rowIndex],
-    [POSITION_INDEX_COLUMN]: position + 1,
+    [POSITION_INDEX_COLUMN]: trackIndex.indexes[position],
   }));
 }

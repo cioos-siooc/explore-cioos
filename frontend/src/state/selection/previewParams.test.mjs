@@ -19,6 +19,10 @@ test("the preview owns the record param and the plot params", () => {
     "pcolors",
     "pz",
     "pzscale",
+    "playout",
+    "pcx",
+    "pcy",
+    "pzscales",
     "pstep",
   ]);
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {

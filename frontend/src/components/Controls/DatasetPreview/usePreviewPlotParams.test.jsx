@@ -190,4 +190,117 @@ describe("usePreviewPlotParams", () => {
       "salinity",
     ]);
   });
+
+  describe("a track's distance axes", () => {
+    const TRACK_TABLE = {
+      columnNames: ["time", "latitude", "longitude", "temperature"],
+      columnTypes: ["String", "float", "float", "float"],
+      columnUnits: ["UTC", "degrees_north", "degrees_east", "degree_C"],
+    };
+    const TRACK_DATA = [
+      {
+        time: "2024-01-01T01:00:00Z",
+        latitude: 1,
+        longitude: 0,
+        temperature: 9,
+      },
+      {
+        time: "2024-01-01T00:00:00Z",
+        latitude: 0,
+        longitude: 0,
+        temperature: 10,
+      },
+    ];
+    const openTrack = (cdmDataType) =>
+      renderWithProviders(
+        <Probe
+          dataset={{ cdm_data_type: cdmDataType }}
+          table={TRACK_TABLE}
+          data={TRACK_DATA}
+        />,
+        { url: "/" },
+      );
+
+    it("lists the index and both distances first for a trajectory, carried on the drawn rows", () => {
+      openTrack("Trajectory");
+      expect(api.plan.sharedCandidates.slice(0, 3)).toEqual([
+        "position_index",
+        "total_distance_traveled",
+        "euclidean_distance",
+      ]);
+      expect(api.sharedAxis).toBe("position_index");
+      expect(api.plotData.map((row) => row.total_distance_traveled)).toEqual([
+        0,
+        expect.closeTo(111.195, 3),
+      ]);
+    });
+
+    it("offers them on a trajectory profile too, but not on a profile", () => {
+      openTrack("TrajectoryProfile");
+      expect(api.variablesByName.has("total_distance_traveled")).toBe(true);
+      openTrack("Profile");
+      expect(api.variablesByName.has("total_distance_traveled")).toBe(false);
+    });
+  });
+
+  describe("the colour plot", () => {
+    it("opens on panels, adding nothing to the link", () => {
+      open();
+      expect(api.plotLayout).toBe("panels");
+      ["playout", "pcx", "pcy", "pzscales"].forEach((name) =>
+        expect(param(name)).toBeNull(),
+      );
+    });
+
+    it("runs time across depth, keeping the variables already picked", async () => {
+      open("pvars=temperature,salinity");
+      await run(() => api.setPlotLayout("color"));
+      expect(param("playout")).toBe("color");
+      expect(api.colorX).toBe("time");
+      expect(api.colorY).toBe("depth");
+      expect(api.panels).toEqual(["temperature", "salinity"]);
+
+      await run(() => api.setPlotLayout("panels"));
+      expect(param("playout")).toBeNull();
+    });
+
+    it("never shades a panel by its own X or Y", () => {
+      open("playout=color&pvars=temperature,depth,time,salinity");
+      expect(api.panels).toEqual(["temperature", "salinity"]);
+    });
+
+    it("drops a colour variable moved onto an axis in the same write", async () => {
+      open("playout=color&pvars=temperature,salinity");
+      await run(() => api.setColorX("salinity"));
+      expect(param("pcx")).toBe("salinity");
+      expect(param("pvars")).toBeNull(); // back to the default [temperature]
+      expect(api.panels).toEqual(["temperature"]);
+
+      await run(() => api.setColorX("time"));
+      expect(param("pcx")).toBeNull();
+    });
+
+    it("falls back to the default axes for columns this dataset lacks", () => {
+      open("playout=color&pcx=nope&pcy=gone");
+      expect(api.colorX).toBe("time");
+      expect(api.colorY).toBe("depth");
+    });
+
+    it("stores a per-variable scale and deletes it on the way back", async () => {
+      open("playout=color");
+      await run(() => api.setVariableScale("temperature", "Cividis"));
+      expect(param("pzscales")).toBe("temperature~Cividis");
+      expect(api.variableScales).toEqual({ temperature: "Cividis" });
+
+      await run(() => api.setVariableScale("temperature", null));
+      expect(param("pzscales")).toBeNull();
+    });
+
+    it("changes uirevision when the colour plot's axes change", async () => {
+      open("playout=color");
+      const before = api.uirevision;
+      await run(() => api.setColorY("salinity"));
+      expect(api.uirevision).not.toBe(before);
+    });
+  });
 });

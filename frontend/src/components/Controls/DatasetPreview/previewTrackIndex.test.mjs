@@ -106,7 +106,7 @@ test("a track with no coordinates is still indexed, with bare ticks", () => {
   assert.deepEqual(index.ticks.tickvals, [1, 2]);
 });
 
-test("the synthetic variable is a coordinate, so it is never a panel", () => {
+test("the synthetic variable is a coordinate, so it is never a default panel", () => {
   const { variable } = indexFor(OUT_OF_ORDER);
   assert.equal(variable.columnName, POSITION_INDEX_COLUMN);
   assert.equal(variable.kind, "coordinate");
@@ -114,6 +114,48 @@ test("the synthetic variable is a coordinate, so it is never a panel", () => {
   assert.equal(variable.unit, null);
   // The caller translates it; the module must not hard-code English.
   assert.equal(variable.longName, "Position along track");
+});
+
+test("a trajectory profile's rows share one index per position", () => {
+  const profiles = [
+    { time: "2021-05-24T18:00:00Z", latitude: 1, longitude: 0, depth: 1 },
+    { time: "2021-05-24T18:00:00Z", latitude: 1, longitude: 0, depth: 5 },
+    { time: "2021-05-24T17:00:00Z", latitude: 0, longitude: 0, depth: 1 },
+    { time: "2021-05-24T17:00:00Z", latitude: 0, longitude: 0, depth: 5 },
+    { time: "2021-05-24T19:00:00Z", latitude: null, longitude: 0, depth: 1 },
+    { time: "2021-05-24T19:00:00Z", latitude: null, longitude: 0, depth: 5 },
+  ];
+  const index = indexFor(profiles, {
+    ...VIKING_DATASET,
+    cdm_data_type: "TrajectoryProfile",
+  });
+  // Unpositioned rows cannot be told apart, so each gets its own index.
+  assert.deepEqual(
+    positionRowsFor(profiles, index).map((row) => row[POSITION_INDEX_COLUMN]),
+    [1, 1, 2, 2, 3, 4],
+  );
+  assert.deepEqual(index.ticks.tickvals, [1, 2, 3, 4]);
+  assert.deepEqual(index.ticks.ticktext, [
+    "0.0000<br>0.0000",
+    "1.0000<br>0.0000",
+    "",
+    "",
+  ]);
+  // The hover still names every row.
+  assert.equal(index.labels.length, profiles.length);
+});
+
+test("a trajectory that stays put still advances one index per row", () => {
+  const stationary = [
+    { time: "2021-05-24T17:00:00Z", latitude: 1, longitude: 0 },
+    { time: "2021-05-24T18:00:00Z", latitude: 1, longitude: 0 },
+  ];
+  assert.deepEqual(
+    positionRowsFor(stationary, indexFor(stationary)).map(
+      (row) => row[POSITION_INDEX_COLUMN],
+    ),
+    [1, 2],
+  );
 });
 
 test("only a trajectory gets one", () => {
