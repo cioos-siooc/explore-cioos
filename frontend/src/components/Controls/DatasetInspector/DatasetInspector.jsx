@@ -549,6 +549,7 @@ export default function DatasetInspector({
             aria-hidden="true"
           />
           <h2 className="datasetTitle">{dataset.title}</h2>
+          <LicensePill {...metadata} />
         </div>
         {/* Every action on this page, named. These are the only things here
             that change anything: the values in the sheet below are read, not
@@ -579,8 +580,8 @@ export default function DatasetInspector({
           </button>
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
-          <LicensePill {...metadata} />
         </div>
+        <DatasetAbstract {...metadata} />
         {/* A filter or the list's own narrowing can exclude a dataset whose
             page is already open. The page stays (the user chose it), and says
             so, since its records below now follow filters it no longer meets. */}
@@ -776,7 +777,6 @@ export default function DatasetInspector({
             </div>
           )}
         </dl>
-        <DatasetAbstract {...metadata} />
         <DatasetMetadata dataset={dataset} {...metadata} />
         {isGrid && (
           <GriddapDetails

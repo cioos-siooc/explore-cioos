@@ -166,7 +166,7 @@ export function MetadataSheetRows({ metadata }) {
         </div>
       )}
       {pills.length > 0 && (
-        <div className="metaCell">
+        <div className="metaCell metaCellStacked">
           <dt className="metadataLabel">{t("metadataDatesTitle")}</dt>
           <dd className="metadataValue">
             {pills.map(([label, value]) => (
@@ -256,20 +256,55 @@ function CopyButton({ text }) {
   );
 }
 
+// Collapsed: the citation is long and mostly wanted for the copy button.
+function Citation({ citation, doi }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const doiInCitation =
+    doi && citation?.includes(doi.replace(/^https?:\/\/doi\.org\//, ""));
+  return (
+    <MetadataCard
+      title={t("metadataCitationTitle")}
+      action={
+        <>
+          <button
+            type="button"
+            className="recordShowAll"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {t(open ? "metadataHideCitationText" : "metadataShowCitationText")}
+          </button>
+          {citation && <CopyButton text={citation} />}
+        </>
+      }
+    >
+      {open && (
+        <p className="metadataCitation">
+          {citation}
+          {/* Most citations end with their DOI already. */}
+          {doi && !doiInCitation && (
+            <>
+              {citation && " "}
+              <ExternalLink href={doi}>{doi}</ExternalLink>
+            </>
+          )}
+        </p>
+      )}
+    </MetadataCard>
+  );
+}
+
 function Contact({ contact }) {
   const codeLabel = useCodeLabel();
-  const name = contact.name || contact.organization;
+  const { name, organization } = contact;
+  const link = (text) =>
+    contact.url ? <ExternalLink href={contact.url}>{text}</ExternalLink> : text;
   return (
     <li className="metadataContact">
-      <span className="metadataContactName">
-        {contact.url ? (
-          <ExternalLink href={contact.url}>{name}</ExternalLink>
-        ) : (
-          name
-        )}
-      </span>
-      {contact.name && contact.organization && (
-        <span className="metadataContactOrg">{contact.organization}</span>
+      <span className="metadataContactOrg">{link(organization || name)}</span>
+      {organization && name && (
+        <span className="metadataContactName">{name}</span>
       )}
       {contact.roles?.length > 0 && (
         <span className="metadataContactRoles">
@@ -447,24 +482,12 @@ export default function DatasetMetadata({
   const m = metadata ?? {};
   const citation = localized(m.citation, i18n.language);
   const contacts = m.contacts ?? [];
-  const organizations = dataset.organizations ?? [];
-  const doiInCitation =
-    m.doi && citation?.includes(m.doi.replace(/^https?:\/\/doi\.org\//, ""));
 
   return (
     <div className="datasetMetadata">
-      <Resources dataset={dataset} metadata={m} />
-      {(organizations.length > 0 || contacts.length > 0) && (
+      {(citation || m.doi) && <Citation citation={citation} doi={m.doi} />}
+      {contacts.length > 0 && (
         <MetadataCard title={t("metadataContactsTitle")}>
-          {organizations.length > 0 && (
-            <div className="metadataTags">
-              {organizations.map((org) => (
-                <span className="metadataChip" key={org}>
-                  {org}
-                </span>
-              ))}
-            </div>
-          )}
           <ContactGroup
             title={t("metadataCitedContactsTitle")}
             contacts={contacts.filter((c) => c.cited)}
@@ -475,23 +498,7 @@ export default function DatasetMetadata({
           />
         </MetadataCard>
       )}
-      {(citation || m.doi) && (
-        <MetadataCard
-          title={t("metadataCitationTitle")}
-          action={citation && <CopyButton text={citation} />}
-        >
-          <p className="metadataCitation">
-            {citation}
-            {/* Most citations end with their DOI already. */}
-            {m.doi && !doiInCitation && (
-              <>
-                {citation && " "}
-                <ExternalLink href={m.doi}>{m.doi}</ExternalLink>
-              </>
-            )}
-          </p>
-        </MetadataCard>
-      )}
+      <Resources dataset={dataset} metadata={m} />
       {(m.projects?.length > 0 || m.lineage || m.acknowledgement) && (
         <MetadataCard title={t("metadataContextTitle")}>
           {m.projects?.length > 0 && (

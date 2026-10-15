@@ -95,13 +95,9 @@ describe("DatasetInspector", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows organizations, ocean variables, geometry, platform and sources", async () => {
+  it("shows ocean variables, geometry, platform and sources", async () => {
     await renderReady();
-    // Organizations sit with the contacts, once the metadata has loaded.
-    expect(
-      await screen.findByText("Chicago Park District"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Oxygen")).toBeInTheDocument();
+    expect(await screen.findByText("Oxygen")).toBeInTheDocument();
     expect(screen.getByText("subSurfaceTemperature")).toBeInTheDocument();
     // TimeSeries maps to the "Time series" data-layer label.
     expect(screen.getByText("Time series")).toBeInTheDocument();
@@ -141,10 +137,10 @@ describe("DatasetInspector", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders organization, variable and platform values as plain chips, not filter toggles", async () => {
+  it("renders variable and platform values as plain chips, not filter toggles", async () => {
     await renderReady();
-    await screen.findByText("Chicago Park District");
-    for (const value of ["Chicago Park District", "Oxygen", "Mooring"]) {
+    await screen.findByText("Oxygen");
+    for (const value of ["Oxygen", "Mooring"]) {
       const chip = screen.getByText(value);
       expect(chip).toHaveClass("metadataChip");
       expect(chip.closest("button")).toBeNull();

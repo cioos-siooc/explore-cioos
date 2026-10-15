@@ -130,7 +130,7 @@ describe("DatasetMetadata", () => {
       screen
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent),
-    ).toEqual(["Resources", "Organizations and contacts", "How to cite"]);
+    ).toEqual(["How to cite", "Organizations and contacts", "Resources"]);
   });
 
   it("lists the dataset's own access links before its catalogue's, each once", () => {
@@ -166,7 +166,7 @@ describe("DatasetMetadata", () => {
     expect(screen.getByText("Only French")).toBeInTheDocument();
   });
 
-  it("groups contacts by whether the citation names them, under the organizations", () => {
+  it("groups contacts by whether the citation names them", () => {
     renderCards({
       metadata: {
         contacts: [
@@ -175,7 +175,6 @@ describe("DatasetMetadata", () => {
         ],
       },
     });
-    expect(screen.getByText("An institute")).toHaveClass("metadataChip");
     const cited = screen.getByRole("heading", { level: 4, name: "Cited" });
     expect(cited.parentElement).toHaveTextContent("Doe, Jane");
     const other = screen.getByRole("heading", {
@@ -185,12 +184,22 @@ describe("DatasetMetadata", () => {
     expect(other.parentElement).toHaveTextContent("Data Office");
   });
 
-  it("copies the citation from an icon button, and adds a DOI it lacks", async () => {
+  it("hides the citation until asked, and adds a DOI it lacks", async () => {
     const user = userEvent.setup();
     renderCards();
+    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.getByText(/A dataset\./)).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "https://doi.org/10.0000/x" }),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hide" }));
+    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+  });
+
+  it("copies the citation from an icon button while it is hidden", async () => {
+    const user = userEvent.setup();
+    renderCards();
     await user.click(screen.getByRole("button", { name: "Copy citation" }));
     // user-event stands in its own clipboard for the browser's.
     expect(await navigator.clipboard.readText()).toBe(
@@ -214,9 +223,23 @@ describe("DatasetMetadata", () => {
     ).toBeInTheDocument();
   });
 
-  it("still lists the organizations and access links before a re-harvest", () => {
+  it("names a contact's organization first, once when it is the only name", () => {
+    renderCards({
+      metadata: {
+        contacts: [
+          { name: "Doe, Jane", organization: "An institute" },
+          { organization: "Data Office" },
+        ],
+      },
+    });
+    const org = screen.getByText("An institute");
+    expect(org).toHaveClass("metadataContactOrg");
+    expect(org.nextElementSibling).toHaveTextContent("Doe, Jane");
+    expect(screen.getAllByText("Data Office")).toHaveLength(1);
+  });
+
+  it("still lists the access links before a re-harvest", () => {
     renderCards({ metadata: {} });
-    expect(screen.getByText("An institute")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /Data access form/ }),
     ).toBeInTheDocument();
