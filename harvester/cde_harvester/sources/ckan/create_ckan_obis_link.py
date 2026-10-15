@@ -14,6 +14,7 @@ import pandas as pd
 import requests
 
 from cde_harvester.core.observability import run_logger
+from cde_harvester.core.record_metadata import from_ckan
 from cde_harvester.sources.ckan.create_ckan_erddap_link import (
     list_ckan_records,
     remove_newlines,
@@ -24,7 +25,7 @@ from cde_harvester.sources.ckan.state import load_previous_ckan
 logger = logging.getLogger(__name__)
 
 OBIS_RECORDS_QUERY = "res_url:*obis.org* OR res_url:*ipt*"
-CKAN_OBIS_COLUMNS = ["dataset_id", "ckan_id", "ckan_eovs", "ckan_title", "title_fr"]
+CKAN_OBIS_COLUMNS = ["dataset_id", "ckan_id", "ckan_eovs", "ckan_title", "title_fr", "ckan_metadata"]
 
 _OBIS_DATASET_URL = re.compile(r"obis\.org/dataset/([0-9a-f-]{36})")
 
@@ -55,6 +56,7 @@ def _ckan_row(dataset_id, record):
         "ckan_eovs": record.get("eov") or [],
         "ckan_title": title,
         "title_fr": title_fr,
+        "ckan_metadata": from_ckan(record),
     }
 
 
@@ -68,6 +70,7 @@ def _stored_ckan_rows(dataset_ids, erddap_url):
             "ckan_eovs": list(row.eovs or []),
             "ckan_title": row.title,
             "title_fr": row.title_fr,
+            "ckan_metadata": row.metadata,
         }
         for row in previous.itertuples()
     ]
@@ -89,7 +92,7 @@ def get_ckan_obis_records(ipt_urls, erddap_url=None):
     Returns
     -------
     pd.DataFrame
-        Columns: dataset_id, ckan_id, ckan_eovs, ckan_title, title_fr
+        Columns: dataset_id, ckan_id, ckan_eovs, ckan_title, title_fr, ckan_metadata
     """
     log = run_logger(logger)
     try:

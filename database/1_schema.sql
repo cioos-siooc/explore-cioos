@@ -134,6 +134,10 @@ CREATE TABLE datasets (
     -- hundreds of thousands of feature ranges per request. Rebuilt after each
     -- load by refresh_dataset_day_ranges() (5_profile_process.sql).
     day_ranges daterange[],
+    -- The dataset page's descriptive metadata (abstract, citation, contacts,
+    -- license, ...), normalized and merged CKAN > OBIS > ERDDAP by
+    -- harvester/cde_harvester/core/record_metadata.py. NULL until re-harvested.
+    metadata jsonb,
     UNIQUE(dataset_id, erddap_url)
 );
 

@@ -28,6 +28,8 @@ DATASET_ARRAY_DTYPES = {
     # Griddap metadata: lists of dicts, stored as jsonb.
     "grid_variables": JSONB,
     "grid_dimensions": JSONB,
+    # Descriptive record metadata (core/record_metadata.py): a dict -> jsonb.
+    "metadata": JSONB,
 }
 
 PROFILE_ARRAY_DTYPES = {
@@ -206,6 +208,7 @@ class DatasetSchema(pa.DataFrameModel):
     grid_variables: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
     grid_dimensions: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
     wms_url: Series[str] = pa.Field(nullable=True)
+    metadata: Series[object] = pa.Field(nullable=True)  # dict -> jsonb
 
     class Config:
         coerce = True
