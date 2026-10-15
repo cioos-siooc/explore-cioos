@@ -42,6 +42,7 @@ describe("GET /scientificNames", () => {
         prefix: "Orcinus%",
         sub: "%Orcinus%",
         limit: 10,
+        cap: 5000,
       });
     });
 

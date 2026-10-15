@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { createTestApp } = require("../test/testApp");
+const { MAX_EXPANDED_APHIA_IDS } = require("../utils/dbFilter");
 
 const { agent, db, resetCache } = createTestApp();
 
@@ -37,6 +38,17 @@ test("q searches by scientific-name prefix or vernacular substring", async () =>
 
   assert.equal(res.status, 200);
   assert.equal(res.body[0].scientificName, "Orcinus orca");
+});
+
+test("q flags each result tooBroad against the rolldown cap", async () => {
+  db.queueRaw([]);
+
+  await agent.get("/scientificNames").query({ q: "crab" });
+
+  assert.match(
+    db.queries[0],
+    new RegExp(`>= ${MAX_EXPANDED_APHIA_IDS} AS "tooBroad"`),
+  );
 });
 
 test("names= hydrates an exact list and skips the search branch entirely", async () => {
