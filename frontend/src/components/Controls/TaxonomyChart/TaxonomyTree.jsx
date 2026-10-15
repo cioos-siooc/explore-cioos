@@ -80,7 +80,7 @@ export default function TaxonomyTree({ tree }) {
 
   return (
     <div className="taxonomyTree">
-      <div className="taxonomyTreeActions">
+      <div className="taxonomyActions">
         <button
           type="button"
           className="recordShowAll"

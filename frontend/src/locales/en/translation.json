@@ -897,5 +897,6 @@
   "taxonRank_order": "Order",
   "taxonRank_family": "Family",
   "taxonRank_genus": "Genus",
-  "taxonRank_species": "Species"
+  "taxonRank_species": "Species",
+  "taxonomyShowAllText": "Show all"
 }

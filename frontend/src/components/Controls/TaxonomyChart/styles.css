@@ -46,14 +46,19 @@
   max-height: 520px;
 }
 
-.taxonomyTreeActions {
+.taxonomyActions {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
 }
 
-.taxonomyTreeActions .recordShowAll {
+.taxonomyActions .recordShowAll {
   margin-left: 0;
+}
+
+.taxonomyActions .recordShowAll:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Connector lines after GBIF's occurrenceTaxonomyTree: a vertical pipe down

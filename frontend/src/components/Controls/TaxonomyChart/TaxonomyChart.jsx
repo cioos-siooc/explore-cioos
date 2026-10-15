@@ -66,11 +66,9 @@ export default function TaxonomyChart({ datasetId }) {
     body = <TaxonomyTree key={datasetId} tree={tree} />;
   } else {
     body = (
-      <div className="taxonomySunburstFrame">
-        <Suspense fallback={spinner}>
-          <TaxonomySunburst tree={tree} />
-        </Suspense>
-      </div>
+      <Suspense fallback={spinner}>
+        <TaxonomySunburst key={datasetId} tree={tree} />
+      </Suspense>
     );
   }
 

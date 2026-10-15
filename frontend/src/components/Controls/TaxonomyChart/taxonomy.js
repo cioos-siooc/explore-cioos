@@ -91,15 +91,16 @@ function finalize(node) {
 // Phyla make the first ring, as in OBIS's own sunburst: Plotly colours by
 // that ring, and a dataset is nearly always one kingdom, which would paint
 // the whole chart a single colour.
+export const SUNBURST_ROOT_ID = "\u0000root";
+
 export function sunburstTrace(tree, rootLabel) {
   const trace = { ids: [], labels: [], parents: [], values: [], ranks: [] };
-  const ROOT_ID = "\u0000root";
   function walk(node, parentId) {
     if (node.rank === "kingdom") {
       node.children.forEach((child) => walk(child, parentId));
       return;
     }
-    const id = node.rank === "root" ? ROOT_ID : node.id;
+    const id = node.rank === "root" ? SUNBURST_ROOT_ID : node.id;
     trace.ids.push(id);
     trace.labels.push(node.rank === "root" ? rootLabel : node.name);
     trace.parents.push(parentId);
