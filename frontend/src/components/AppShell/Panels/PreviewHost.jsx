@@ -14,6 +14,7 @@ export default function PreviewHost() {
   const {
     datasetPreview,
     setDatasetPreview,
+    previewError,
     inspectDataset,
     setInspectDataset,
     showPreviewModal,
@@ -32,6 +33,7 @@ export default function PreviewHost() {
       <DatasetPreview
         datasetPreview={datasetPreview}
         setDatasetPreview={setDatasetPreview}
+        previewError={previewError}
         inspectDataset={inspectDataset}
         setInspectDataset={setInspectDataset}
         showModal={showPreviewModal}

@@ -27,6 +27,21 @@ function Harness({ onSize }) {
   );
 }
 
+// The measured element behind a flag, because that is the real shape of the
+// caller this hook exists for: DatasetPreview is mounted for the whole session
+// and its box only appears once a record is opened.
+function LateHarness({ mounted }) {
+  const [ref, size] = useElementSize();
+  return (
+    <>
+      <span data-testid="size">
+        {size.width}x{size.height}
+      </span>
+      {mounted && <div ref={ref} data-testid="box" />}
+    </>
+  );
+}
+
 describe("useElementSize", () => {
   it("starts at zero before anything is measured", () => {
     render(<Harness />);
@@ -53,5 +68,42 @@ describe("useElementSize", () => {
     const rendersAfterFirstResize = renders;
     act(() => window.dispatchEvent(new Event("resize")));
     expect(renders).toBe(rendersAfterFirstResize);
+  });
+
+  it("measures an element that mounted after the hook did", () => {
+    const { rerender } = render(<LateHarness mounted={false} />);
+    rerender(<LateHarness mounted />);
+    stubClientBox(screen.getByTestId("box"), 640, 480);
+    act(() => window.dispatchEvent(new Event("resize")));
+    // Sized from an element that did not exist when the hook first ran. This is
+    // the whole point: the preview plot's box appears only once a record is
+    // opened, and an effect reading ref.current on mount never saw it.
+    expect(screen.getByTestId("size")).toHaveTextContent("640x480");
+  });
+
+  it("stops measuring once the element goes away", () => {
+    const { rerender } = render(<LateHarness mounted />);
+    stubClientBox(screen.getByTestId("box"), 100, 50);
+    act(() => window.dispatchEvent(new Event("resize")));
+    expect(screen.getByTestId("size")).toHaveTextContent("100x50");
+
+    rerender(<LateHarness mounted={false} />);
+    act(() => window.dispatchEvent(new Event("resize")));
+    expect(screen.getByTestId("size")).toHaveTextContent("100x50");
+  });
+
+  it("hands the node back on .current, for callers measuring a rect", () => {
+    let captured;
+    function RefHarness({ mounted }) {
+      const [ref] = useElementSize();
+      captured = ref;
+      return mounted ? <div ref={ref} data-testid="box" /> : null;
+    }
+    // Rail.jsx reads trackRef.current.getBoundingClientRect() for its pointer
+    // maths, so the callback ref has to keep answering like an object one.
+    const { rerender } = render(<RefHarness mounted />);
+    expect(captured.current).toBe(screen.getByTestId("box"));
+    rerender(<RefHarness mounted={false} />);
+    expect(captured.current).toBeNull();
   });
 });

@@ -23,6 +23,10 @@ and lands in a ``jsonb`` column.
 # for an axis range: publishers leave fill sentinels inside it. On
 # mpoPmzaVikingCtdInsitu, TE90_01 (degree_C) declares
 # actual_range = -1.4899, 191277.0.
+#
+# ERDDAP's own "name" attribute is deliberately NOT among them:
+# the key "name" below already holds the variable's destination name, which
+# /preview matches columns by, and the loop would overwrite it.
 PERSISTED_VARIABLE_ATTRIBUTES = [
     "long_name",
     "standard_name",

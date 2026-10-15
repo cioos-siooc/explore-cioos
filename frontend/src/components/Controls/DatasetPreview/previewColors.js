@@ -1,10 +1,9 @@
 // One colour per plotted variable: where its default comes from, and how a
 // user's override survives a link.
 //
-// This replaces the colour DIMENSION the preview used to have — one variable's
-// values shading every panel through a shared colourscale and colourbar. With a
-// panel per variable there is nothing to disambiguate inside a panel, so colour
-// is free to say WHICH variable a panel draws instead of what its values are.
+// This one names the PANEL: with a panel per variable, a solid colour is free to
+// say which variable is drawn rather than what its values are. It keeps the
+// line; previewColorScales.js takes the markers.
 //
 // Pure on purpose: the param codec has to be assertable under `node --test`, and
 // usePreviewPlotParams (which owns the param) imports react-router.
@@ -34,10 +33,11 @@ export const SWATCHES = [
  * ERDDAP's own colorBarPalette implies, else the next colour along the list
  * above.
  *
- * The publisher's intent is worth honouring here in a way it was not worth
- * honouring for the colourbar: `KT_thermal` on a temperature and `KT_haline` on
- * a salinity mean the plot opens reading roughly the way an ERDDAP graph of the
- * same dataset does, with no choice made by anyone.
+ * The publisher's intent is worth honouring: `KT_thermal` on a temperature and
+ * `KT_haline` on a salinity mean the plot opens reading roughly the way an
+ * ERDDAP graph of the same dataset does, with no choice made by anyone. The same
+ * attribute picks the colour dimension's ramp, one ramp at full resolution where
+ * this takes one stop of it.
  */
 export function defaultColorFor(variable, index) {
   const position =
