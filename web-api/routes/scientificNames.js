@@ -6,6 +6,47 @@ const db = require("../db");
 const { pipeline } = require("../utils/routePipeline");
 const { MAX_EXPANDED_APHIA_IDS } = require("../utils/dbFilter");
 
+// WoRMS ranks, broadest first. Ancestor counts can't stand in: lineages differ
+// in depth, so a sponge species sits fewer steps from the root than a crab
+// infraorder.
+const RANK_ORDER = [
+  "Superdomain",
+  "Kingdom",
+  "Subkingdom",
+  "Infrakingdom",
+  "Phylum",
+  "Phylum (Division)",
+  "Subphylum",
+  "Subphylum (Subdivision)",
+  "Infraphylum",
+  "Parvphylum",
+  "Gigaclass",
+  "Megaclass",
+  "Superclass",
+  "Class",
+  "Subclass",
+  "Infraclass",
+  "Subterclass",
+  "Superorder",
+  "Order",
+  "Suborder",
+  "Infraorder",
+  "Parvorder",
+  "Superfamily",
+  "Epifamily",
+  "Family",
+  "Subfamily",
+  "Tribe",
+  "Subtribe",
+  "Genus",
+  "Subgenus",
+  "Species",
+  "Subspecies",
+  "Variety",
+  "Forma",
+];
+const RANK_ORDER_SQL = `ARRAY[${RANK_ORDER.map((r) => `'${r}'`).join(", ")}]`;
+
 /**
  * @swagger
  * /scientificNames:
@@ -103,8 +144,9 @@ router.get(
     //
     // Common-name hits come first, as a tree: each sits under its highest
     // common-name-matched ancestor ("crab" lists Brachyura "crabs", then
-    // Cancridae, Cancer, Cancer borealis…), groups ordered by that ancestor's
-    // common name. Scientific-name-only hits follow.
+    // Cancridae, Cancer, Cancer borealis…). Higher ranks lead, both between
+    // groups and among siblings — each path step is keyed by its rank, then
+    // its name. Scientific-name-only hits follow.
     //
     // tooBroad is counted on the returned page only, and stops at the cap.
     const sql = `
@@ -129,25 +171,28 @@ router.get(
       ),
       placed AS (
         SELECT h.*,
-               CASE WHEN h.matched IS NULL THEN ARRAY[]::text[] ELSE ARRAY(
-                 SELECT a.scientific_name FROM hits a
+               CASE WHEN h.matched IS NOT NULL THEN ARRAY(
+                 SELECT lpad(
+                          COALESCE(array_position(${RANK_ORDER_SQL}, a.rank), 99)::text,
+                          2, '0'
+                        ) || a.scientific_name
+                   FROM hits a
                   WHERE a.matched IS NOT NULL
-                    AND a.aphia_id = ANY(h.ancestor_aphia_ids)
+                    AND (a.aphia_id = ANY(h.ancestor_aphia_ids)
+                         OR a.scientific_name = h.scientific_name)
                   ORDER BY cardinality(a.ancestor_aphia_ids)
-               ) END || h.scientific_name AS path
+               ) END AS path
           FROM hits h
       ),
       page AS (
         SELECT p.*,
                row_number() OVER (
                  ORDER BY (p.matched IS NULL),
-                          lower(anchor.matched),
                           p.path,
                           (p.scientific_name ILIKE :prefix) DESC,
                           p.scientific_name
                ) AS ord
           FROM placed p
-     LEFT JOIN placed anchor ON anchor.scientific_name = p.path[1]
       ORDER BY ord
          LIMIT :limit
       )
