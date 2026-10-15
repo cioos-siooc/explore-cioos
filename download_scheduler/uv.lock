@@ -247,7 +247,7 @@ wheels = [
 [[package]]
 name = "cioos-metadata-conversion"
 version = "0.1.0"
-source = { git = "https://github.com/cioos-siooc/cioos-metadata-conversion?rev=a5f890ffa094f3ae5e745e4b5d4927ce12b31a91#a5f890ffa094f3ae5e745e4b5d4927ce12b31a91" }
+source = { git = "https://github.com/cioos-siooc/cioos-metadata-conversion?rev=1231913b103f5a6557f3c27b8ad967645f17d9c4#1231913b103f5a6557f3c27b8ad967645f17d9c4" }
 dependencies = [
     { name = "click" },
     { name = "datacite" },
@@ -721,7 +721,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cioos-metadata-conversion", git = "https://github.com/cioos-siooc/cioos-metadata-conversion?rev=a5f890ffa094f3ae5e745e4b5d4927ce12b31a91" },
+    { name = "cioos-metadata-conversion", git = "https://github.com/cioos-siooc/cioos-metadata-conversion?rev=1231913b103f5a6557f3c27b8ad967645f17d9c4" },
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "duckdb", specifier = ">=1.0.0" },
     { name = "erddapy", specifier = ">=2.2.0" },
