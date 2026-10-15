@@ -11,43 +11,6 @@ import "../styles.css";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
 
-// Show only Family and below in the typeahead — every higher rank is
-// either guaranteed to blow the API's 5000-AphiaID cap (Class+ on this
-// dataset) or sometimes does (most Orders, e.g. Decapoda ≈ 10k,
-// Stylommatophora ≈ 11k), which would surface as a confusing 400 from
-// what looked like a valid pick. Family and below is the conservative
-// "always works" band. The API cap is still the safety net for direct
-// callers — this list just keeps the UI clean.
-export const TOO_BROAD_RANKS = new Set([
-  "Kingdom",
-  "Subkingdom",
-  "Superkingdom",
-  "Domain",
-  "Superdomain",
-  "Phylum",
-  "Subphylum",
-  "Superphylum",
-  "Phylum (Division)",
-  "Subphylum (Subdivision)",
-  "Class",
-  "Subclass",
-  "Superclass",
-  "Infraclass",
-  "Parvclass",
-  "Cohort",
-  "Subcohort",
-  "Superorder",
-  "Magnorder",
-  "Grandorder",
-  "Mirorder",
-  "Order",
-  "Suborder",
-  "Infraorder",
-  "Parvorder",
-  "Superfamily",
-  "Epifamily",
-]);
-
 // The body of the Scientific Name filter: the same ticked list of options every
 // other filter in the panel shows.
 //
@@ -186,10 +149,7 @@ export default function ScientificNameFilter({
       isExcluded: scientificNamesExcluded.includes(scientificName),
     })),
     ...suggestions
-      .filter(
-        (s) =>
-          !picked.includes(s.scientificName) && !TOO_BROAD_RANKS.has(s.rank),
-      )
+      .filter((s) => !picked.includes(s.scientificName) && !s.tooBroad)
       .map((s) => ({ ...s, isSelected: false, isExcluded: false })),
   ];
 

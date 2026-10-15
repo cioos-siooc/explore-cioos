@@ -6,9 +6,9 @@ const db = require("../db");
 // Hard cap on the AphiaID rolldown expansion. Selections expanding to more
 // than this many distinct AphiaIDs are rejected with HTTP 400 — a Phylum or
 // Kingdom selection blows past this and would force a multi-minute GIN OR
-// against tens of thousands of posting lists. The frontend already hides
-// those ranks from the dropdown; this is the API-level safety net for
-// programmatic clients.
+// against tens of thousands of posting lists. /scientificNames flags such
+// names tooBroad so the frontend never offers them; this is the API-level
+// safety net for programmatic clients.
 const MAX_EXPANDED_APHIA_IDS = 5000;
 
 // The request parameters whose predicates read feature columns rather than

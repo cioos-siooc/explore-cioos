@@ -4,6 +4,7 @@ const { check } = require("express-validator");
 const router = express.Router();
 const db = require("../db");
 const { pipeline } = require("../utils/routePipeline");
+const { MAX_EXPANDED_APHIA_IDS } = require("../utils/dbFilter");
 
 /**
  * @swagger
@@ -36,7 +37,7 @@ const { pipeline } = require("../utils/routePipeline");
  *         description: Comma-separated scientific names to look up exactly (overrides q).
  *     responses:
  *       200:
- *         description: Array of {scientificName, vernacular, rank} objects. `vernacular` and `rank` may be null.
+ *         description: Array of {scientificName, vernacular, rank, tooBroad} objects. `vernacular` and `rank` may be null; `tooBroad` is only set on searches.
  *         content:
  *           application/json:
  *             schema:
@@ -47,6 +48,7 @@ const { pipeline } = require("../utils/routePipeline");
  *                   scientificName: { type: string }
  *                   vernacular: { type: string, nullable: true }
  *                   rank: { type: string, nullable: true, description: "WoRMS taxonomic rank (e.g. Species, Genus). Selecting a higher-rank entry rolls down to descendants." }
+ *                   tooBroad: { type: boolean, description: "Selecting this name would roll down to more taxa than the filter accepts (400)." }
  */
 router.get(
   "/",
@@ -103,6 +105,8 @@ router.get(
     // common-name-matched ancestor ("crab" lists Brachyura "crabs", then
     // Cancridae, Cancer, Cancer borealis…), groups ordered by that ancestor's
     // common name. Scientific-name-only hits follow.
+    //
+    // tooBroad is counted on the returned page only, and stops at the cap.
     const sql = `
       WITH hits AS (
         SELECT n.scientific_name,
@@ -132,24 +136,40 @@ router.get(
                   ORDER BY cardinality(a.ancestor_aphia_ids)
                ) END || h.scientific_name AS path
           FROM hits h
+      ),
+      page AS (
+        SELECT p.*,
+               row_number() OVER (
+                 ORDER BY (p.matched IS NULL),
+                          lower(anchor.matched),
+                          p.path,
+                          (p.scientific_name ILIKE :prefix) DESC,
+                          p.scientific_name
+               ) AS ord
+          FROM placed p
+     LEFT JOIN placed anchor ON anchor.scientific_name = p.path[1]
+      ORDER BY ord
+         LIMIT :limit
       )
-      SELECT p.scientific_name AS "scientificName",
-             COALESCE(p.matched, p.first_vernacular) AS vernacular,
-             p.rank AS rank
-        FROM placed p
-   LEFT JOIN placed anchor ON anchor.scientific_name = p.path[1]
-    ORDER BY (p.matched IS NULL),
-             lower(anchor.matched),
-             p.path,
-             (p.scientific_name ILIKE :prefix) DESC,
-             p.scientific_name
-       LIMIT :limit`;
+      SELECT scientific_name AS "scientificName",
+             COALESCE(matched, first_vernacular) AS vernacular,
+             rank,
+             (SELECT count(*) FROM (
+                SELECT DISTINCT d.aphia_id
+                  FROM cde.scientific_name_vernaculars d
+                 WHERE d.ancestor_aphia_ids @> ARRAY[page.aphia_id]
+                   AND d.aphia_id <> page.aphia_id
+                 LIMIT :cap
+              ) descendants) >= :cap AS "tooBroad"
+        FROM page
+    ORDER BY ord`;
 
     const { rows } = await db.raw(sql, {
       q,
       prefix: `${q}%`,
       sub: `%${q}%`,
       limit,
+      cap: MAX_EXPANDED_APHIA_IDS,
     });
     return res.json(rows);
   },
