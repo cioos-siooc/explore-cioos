@@ -225,7 +225,7 @@ export default function IntroModal({ showModal, setShowModal }) {
                   className="introLink"
                   onClick={() => setShowSelectionHelpModal(true)}
                 >
-                  {t("sidebarSelectionHintMoreText")}
+                  {t("introFeature_download_help")}
                 </button>
               )}
             </li>
