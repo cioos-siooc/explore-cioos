@@ -104,34 +104,33 @@ export default function GriddapDetails({
   return (
     <div className="griddapDetails">
       {dataset.wms_url ? (
-        <div className="metadataGridItem griddapWmsControls">
-          <strong>{t("griddapMapPreviewTitle")}</strong>
-          <Switch
-            id="griddapShowOnMapSwitch"
-            tipTarget="griddapWms"
-            label={t("griddapShowOnMapToggle")}
-            checked={overlayActive}
-            disabled={!variables.length}
-            onChange={(event) =>
-              event.target.checked ? showOverlay() : setActiveWmsOverlay()
-            }
-          />
+        <div className="metadataCard griddapWmsCard">
+          <div className="metadataCardHeader griddapWmsHeader">
+            <h3 className="griddapCardTitle">{t("griddapMapPreviewTitle")}</h3>
+            <Switch
+              id="griddapShowOnMapSwitch"
+              tipTarget="griddapWms"
+              label={t("griddapShowOnMapToggle")}
+              checked={overlayActive}
+              disabled={!variables.length}
+              onChange={(event) =>
+                event.target.checked ? showOverlay() : setActiveWmsOverlay()
+              }
+            />
+          </div>
           {overlayActive && sidebarOpen && (
             <WmsLegend
               overlay={activeWmsOverlay}
               variant="inline"
-              onClose={() => setActiveWmsOverlay()}
               setActiveWmsOverlay={setActiveWmsOverlay}
             />
           )}
         </div>
       ) : (
-        <div className="metadataGridItem griddapNoWms">
-          {t("griddapNoWmsText")}
-        </div>
+        <div className="metadataCard griddapNoWms">{t("griddapNoWmsText")}</div>
       )}
-      <div className="metadataGridItem">
-        <strong>{t("griddapDimensionsTitle")}</strong>
+      <div className="metadataCard">
+        <h3 className="griddapCardTitle">{t("griddapDimensionsTitle")}</h3>
         {/* One card per axis rather than a 5-column table: at the sidebar's
             width the table's columns collapsed into unreadable slivers. */}
         <ul className="griddapDimensionsList">
@@ -165,8 +164,8 @@ export default function GriddapDetails({
           ))}
         </ul>
       </div>
-      <div className="metadataGridItem">
-        <strong>{t("griddapVariablesTitle")}</strong>
+      <div className="metadataCard">
+        <h3 className="griddapCardTitle">{t("griddapVariablesTitle")}</h3>
         <ul className="griddapVariablesList">
           {variables.map((variable) => (
             <li key={variable.name} className="griddapVariable">

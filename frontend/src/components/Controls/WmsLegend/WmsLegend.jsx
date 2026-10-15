@@ -113,27 +113,34 @@ export default function WmsLegend({
           whatever is left of the other two, or nothing. */}
       <div className="wmsLegendHeader">
         {variables.length > 1 && (
-          <DropdownButton
-            className="wmsLegendVariableSelector"
-            size="sm"
-            variant="outline-secondary"
-            tooltip={t("griddapVariableSelect")}
-            title={
-              <span className="wmsLegendVariableName">
-                {overlay.variable ? variableLabel(overlay.variable) : ""}
+          <div className="wmsLegendField">
+            {variant === "inline" && (
+              <span className="wmsLegendFieldLabel">
+                {t("griddapVariableSelect")}
               </span>
-            }
-          >
-            {variables.map((variable) => (
-              <Dropdown.Item
-                key={variable.name}
-                active={variable.name === overlay.variable?.name}
-                onClick={() => setActiveWmsOverlay({ ...overlay, variable })}
-              >
-                {variableLabel(variable)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
+            )}
+            <DropdownButton
+              className="wmsLegendVariableSelector"
+              size="sm"
+              variant="outline-secondary"
+              tooltip={t("griddapVariableSelect")}
+              title={
+                <span className="wmsLegendVariableName">
+                  {overlay.variable ? variableLabel(overlay.variable) : ""}
+                </span>
+              }
+            >
+              {variables.map((variable) => (
+                <Dropdown.Item
+                  key={variable.name}
+                  active={variable.name === overlay.variable?.name}
+                  onClick={() => setActiveWmsOverlay({ ...overlay, variable })}
+                >
+                  {variableLabel(variable)}
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+          </div>
         )}
         {/* Folds the card back to its button. Distinct from the X beside it,
             which turns the overlay off — this one only stops showing its key,
