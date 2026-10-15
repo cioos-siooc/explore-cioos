@@ -471,8 +471,8 @@
     --top-bar-gap: 6px;
   }
 
-  /* Rows take the header's full width, as the column itself does here. */
-  /* minmax(0, …): an auto column grows to its content, which let the
+  /* Rows take the header's full width, as the column itself does here.
+     minmax(0, …): an auto column grows to its content, which let the
      one-line chip row widen past the screen instead of scrolling. */
   .topBarRow {
     grid-template-columns: minmax(0, 1fr);
