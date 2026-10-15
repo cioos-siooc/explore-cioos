@@ -74,7 +74,7 @@ export default function UrlSync() {
     selectedTrajectory,
     mappedRecord,
   } = useSelection();
-  const { coverageAxis } = useUI();
+  const { coverageAxis, taxonomyView } = useUI();
   const [isPageLoad, setIsPageLoad] = useState(true);
 
   useEffect(() => {
@@ -160,6 +160,7 @@ export default function UrlSync() {
     if (griddapCoverageVisible) obj.griddap = "true";
     if (projection === "globe") obj.globe = "true";
     if (coverageAxis !== "timeline") obj.coverageAxis = coverageAxis;
+    if (taxonomyView !== "sunburst") obj.taxonomy = taxonomyView;
     const combined = new URLSearchParams(obj);
     // Replace, never push: this mirrors state the app never reads back out of
     // the URL, so an entry per map pan would only bury the history entries
@@ -192,6 +193,7 @@ export default function UrlSync() {
     selectedTrajectory,
     mappedRecord,
     coverageAxis,
+    taxonomyView,
     // Back/Forward across a dataset page lands on an address written when that
     // entry was left; rewrite it from the current state.
     dataset,
