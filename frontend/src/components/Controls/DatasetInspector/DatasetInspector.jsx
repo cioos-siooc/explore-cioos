@@ -11,6 +11,10 @@ import {
   PinMapFill,
 } from "react-bootstrap-icons";
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
+import DatasetMetadata, {
+  DatasetAbstract,
+} from "../DatasetMetadata/DatasetMetadata.jsx";
+import useDatasetMetadata from "../DatasetMetadata/useDatasetMetadata.js";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
@@ -207,6 +211,7 @@ export default function DatasetInspector({
     ([, type]) => type === dataset.cdm_data_type,
   );
   const isRealtime = Boolean(dataset.is_realtime);
+  const metadata = useDatasetMetadata(dataset.pk);
   const [datasetRecords, setDatasetRecords] = useState();
   const [recordsError, setRecordsError] = useState(false);
   const [recordsAttempt, setRecordsAttempt] = useState(0);
@@ -590,6 +595,7 @@ export default function DatasetInspector({
         )}
       </div>
       <div className="datasetInspectorBody">
+        <DatasetAbstract {...metadata} />
         {/* The front matter, as compact as it can be read: one field per
             line, each a small eyebrow label with its value beside it on the
             same line (wrapping under only when the row is too narrow for
@@ -776,6 +782,7 @@ export default function DatasetInspector({
             </div>
           )}
         </dl>
+        <DatasetMetadata {...metadata} />
         {isGrid && (
           <GriddapDetails
             dataset={dataset}

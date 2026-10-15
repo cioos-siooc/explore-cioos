@@ -1,0 +1,47 @@
+{
+  "abstract": {
+    "en": "Conductivity, temperature and depth profiles collected from a research vessel along a coastal transect. Casts were made at fixed stations every season to describe the water column's structure, its stratification and how it changes through the year.\n\nData were quality controlled following the program's standard procedures before publication.",
+    "fr": "Profils de conductivité, de température et de profondeur recueillis à bord d'un navire de recherche le long d'un transect côtier. Les profils ont été réalisés à des stations fixes à chaque saison afin de décrire la structure de la colonne d'eau, sa stratification et son évolution au cours de l'année.\n\nLes données ont fait l'objet d'un contrôle de la qualité selon les procédures normalisées du programme avant leur publication."
+  },
+  "citation": {
+    "en": "Example Ocean Institute (2024). Coastal transect CTD profiles. https://doi.org/10.0000/example-ctd",
+    "fr": "Example Ocean Institute (2024). Profils CTD du transect côtier. https://doi.org/10.0000/example-ctd"
+  },
+  "doi": "https://doi.org/10.0000/example-ctd",
+  "license": {
+    "title": "Creative Commons Attribution 4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "contacts": [
+    {
+      "name": "Example Ocean Institute",
+      "email": "data@example.org",
+      "url": "https://example.org",
+      "roles": ["custodian", "distributor", "owner"]
+    },
+    {
+      "name": "Doe, Jane",
+      "organization": "Example Ocean Institute",
+      "url": "https://orcid.org/0000-0000-0000-0000",
+      "roles": ["principalInvestigator"]
+    }
+  ],
+  "keywords": {
+    "en": ["oceans", "ctd", "temperature", "salinity", "vertical profiles"],
+    "fr": ["océans", "ctd", "température", "salinité", "profils verticaux"]
+  },
+  "dates": { "created": "2019-04-01", "published": "2024-06-15" },
+  "temporal_extent": { "begin": "2019-04-01", "end": "2023-10-30" },
+  "vertical_extent": { "min": 0, "max": 250 },
+  "progress": "onGoing",
+  "update_frequency": "asNeeded",
+  "projects": ["Coastal Monitoring Program"],
+  "resources": [
+    {
+      "name": "ERDDAP",
+      "url": "https://erddap.example.org/erddap/tabledap/example_ctd.html",
+      "format": "ERDDAP"
+    },
+    { "name": "infoUrl", "url": "https://example.org/coastal-ctd" }
+  ]
+}

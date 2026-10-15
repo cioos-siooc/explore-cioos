@@ -1,0 +1,155 @@
+/* The abstract and the metadata sections sit on the inspector's wash as white
+   cards, like the metadata sheet and the record list around them. */
+.datasetAbstract,
+.datasetMetadata {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+.datasetAbstract {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.datasetAbstractText {
+  margin: 0;
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.5;
+  color: var(--cioos-ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.datasetAbstractText.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+/* The "Show more" / "Copy" pills reuse .recordShowAll, which pushes itself
+   right with an auto margin meant for a flex header row. */
+.datasetAbstract .recordShowAll,
+.metadataCitation .recordShowAll {
+  margin-left: 0;
+}
+
+.datasetMetadata {
+  padding: 2px 10px;
+}
+
+.metadataSection + .metadataSection {
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.metadataSectionTitle {
+  padding: 7px 0;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.metadataSectionTitle:focus-visible {
+  border-radius: var(--cioos-radius-sm);
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.metadataSectionBody {
+  padding: 0 0 10px;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.45;
+  color: var(--cioos-ink);
+  overflow-wrap: anywhere;
+}
+
+.metadataSectionBody p {
+  margin: 0;
+}
+
+.metadataSectionBody a {
+  color: var(--cioos-primary-700);
+  font-weight: 600;
+}
+
+.metadataSectionBody dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+/* Label above value, the eyebrow label the metadata sheet uses. */
+.metadataField .metadataLabel {
+  margin-bottom: 2px;
+  font-size: var(--cioos-font-size-2xs);
+}
+
+.metadataFieldValue {
+  margin: 0;
+}
+
+.metadataCitation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.metadataProse {
+  white-space: pre-line;
+}
+
+.metadataTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.metadataContacts,
+.metadataResources {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.metadataContact {
+  display: flex;
+  flex-direction: column;
+}
+
+.metadataContactName {
+  font-weight: 600;
+}
+
+.metadataContactOrg,
+.metadataContactRoles {
+  color: var(--cioos-ink-80);
+}
+
+.metadataContactRoles {
+  font-size: var(--cioos-font-size-xs);
+}
+
+.metadataContactEmail {
+  font-size: var(--cioos-font-size-xs);
+}
+
+.metadataResourceFormat {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-surface-2);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  color: var(--cioos-ink-80);
+}
