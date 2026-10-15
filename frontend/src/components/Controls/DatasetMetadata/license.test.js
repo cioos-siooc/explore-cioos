@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { licenseLabel } from "./license.js";
+import { licenseLabel, licenseText } from "./license.js";
 
 describe("licenseLabel", () => {
   it.each([
@@ -33,7 +33,28 @@ describe("licenseLabel", () => {
     [{ title: "government-open-license-canada" }, "OGL Canada"],
     [{ title: "Open Government Licence - Canada" }, "OGL Canada"],
     [{ title: "Use freely, cite the source" }, "Use freely, cite the source"],
+    [
+      {
+        title:
+          "rights: 'http://data.gc.ca/eng/open-government-licence-canada &amp; http://www.canadensys.net/norms'",
+      },
+      "OGL Canada",
+    ],
+    [{ url: "https://example.org/licence" }, undefined],
+    [
+      {
+        title:
+          "The data may be used and redistributed for free but is not intended\nfor legal use.",
+      },
+      undefined,
+    ],
   ])("%j -> %s", (license, label) => {
     expect(licenseLabel(license)).toBe(label);
+  });
+});
+
+describe("licenseText", () => {
+  it("decodes the entities a double-escaped source leaves behind", () => {
+    expect(licenseText("A &amp; B &lt;c&gt;")).toBe("A & B <c>");
   });
 });

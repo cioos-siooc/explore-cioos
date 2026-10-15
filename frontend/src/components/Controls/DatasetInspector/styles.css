@@ -7,6 +7,51 @@
   min-height: 0;
 }
 
+/* Two segments, in the brand tab strip's own look: a teal wash at rest, solid
+   teal for the open one, each with an icon, so they read as buttons that
+   switch the page rather than as a heading. */
+.datasetTabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+}
+
+.datasetTab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius);
+  background-color: rgb(82 167 155 / 14%);
+  font-family: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.datasetTab:hover {
+  background-color: rgb(82 167 155 / 24%);
+}
+
+.datasetTab[aria-selected="true"] {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.datasetTab:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 /* The panel hosting this page washes its background (see .datasetsPanelDetail),
    which is what separates a dataset page from the list it drilled in from. The
    sections below sit on that wash as white cards. */
@@ -82,8 +127,9 @@
    icon and nothing else; across the full width each one can say what it does,
    which is the whole point of them being here. */
 .datasetTitleActions {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
 }
@@ -212,41 +258,46 @@
   color: var(--cioos-ink-80);
 }
 
-/* --- Metadata record sheet ---
-   The front matter of a journal article, compressed: one field per line, each
-   a tiny eyebrow label with its value beside it on the same line — the same
-   label/value baseline pairing the record cards use (.listCardField). Rows
-   stack in a single column so every field reads label-left/value-right down
-   one edge; whitespace does the dividing, so there are no rules and no label
-   gutter eating the width. */
-
-/* No top rule of its own: the pinned title block above already draws one. */
+/* --- Facts sheet ---
+   A spec table: one row per fact, the label in a fixed column on the left and
+   its value beside it, a hairline between rows. The eye runs down the label
+   edge to find a field and reads across for its value. On a narrow screen the
+   value drops under its label. */
 .datasetMetaSheet {
-  display: grid;
-  gap: 3px;
   margin: 0 0 10px;
-  padding: 7px 10px;
+  padding: 0 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
 }
 
-/* Label and value share a line while there is room for both, and the value
-   drops under its label when there isn't — the same wrapping rule
-   .listCardField uses on the record cards. */
 .datasetMetaSheet .metaCell {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 2px 10px;
   align-items: baseline;
-  gap: 2px 8px;
-  min-width: 0;
+  padding: 7px 0;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.datasetMetaSheet .metaCell:first-child {
+  border-top: 0;
 }
 
 .datasetMetaSheet .metadataLabel {
-  flex: 0 0 auto;
-  margin-bottom: 0;
-  font-size: var(--cioos-font-size-2xs);
-  line-height: 1.2;
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cioos-ink-80);
+}
+
+@media (max-width: 400px) {
+  .datasetMetaSheet .metaCell {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .metadataValue {
@@ -254,29 +305,33 @@
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
-}
-
-.datasetMetaSheet .metadataValue {
-  flex: 1 1 140px;
   margin: 0;
-
-  /* Chips wrap onto new lines when there are many; top-align them so each
-     wrapped row lines up cleanly under the label. */
-  align-items: flex-start;
-  align-content: flex-start;
-  gap: 4px;
 }
 
-/* Last update: a single chip plus its Real-time badge, never several chips
-   wrapping onto their own lines — so unlike the top-aligned default above,
-   the badge can center on the chip's own height instead of its top edge. */
-.datasetMetaSheet .metadataValueCentered {
-  align-items: center;
+/* A fact is plain text; only the lists (ocean variables, keywords) are chips,
+   so the eye can tell a value from a tag. */
+.metadataFact {
+  font-size: var(--cioos-font-size-base);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--cioos-ink);
 }
 
-/* Chips sit flush inside their field; the field's gap handles spacing. */
+/* Ocean variables and keywords: the exact box .filterButton uses (same pill
+   radius, hairline border, white fill, padding and font-size). */
 .datasetMetaSheet .metadataChip {
+  display: inline-flex;
+  align-items: center;
   margin: 0;
+  padding: 2px 12px;
+  text-align: left;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--cioos-ink);
 }
 
 /* Grid node count: the axis factors read as small stacked value/name pairs,
@@ -321,36 +376,6 @@
   color: var(--cioos-ink-60);
 }
 
-.gridNodeTotal {
-  font-size: var(--cioos-font-size-md);
-  font-weight: 700;
-  color: var(--cioos-ink);
-  white-space: nowrap;
-}
-
-/* A badge for a value that isn't itself a filter (geometry, the record
-   count) or that is a link rather than a button (the source links) — the
-   exact box .filterButton uses (same pill radius, hairline border, white
-   fill, padding and font-size), so every field's value reads as one
-   consistent badge family regardless of what renders it. */
-.datasetMetaSheet .metadataChip,
-.datasetMetaSheet .metadataLink {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 12px;
-  text-align: left;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.3;
-}
-
-.datasetMetaSheet .metadataChip {
-  font-weight: 500;
-  color: var(--cioos-ink);
-}
-
 /* Platform: the dot or hexagon the map draws this platform's markers in, so
    the row names the colour to look for. A line box of its own rather than a
    flex box, so the chip keeps its text baseline and stays level with its
@@ -372,36 +397,20 @@
   color: var(--cioos-ink-60);
 }
 
-/* Source links (ERDDAP / CKAN / OBIS): the same badge, coloured and weighted
-   like a link so it still reads as clickable. */
-.datasetMetaSheet .metadataLink {
-  font-weight: 600;
-  color: var(--cioos-primary-700);
-  text-decoration: none;
-}
-
-.datasetMetaSheet .metadataLink:hover,
-.datasetMetaSheet .metadataLink:focus-visible {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
-  outline: none;
-}
-
-.datasetMetaSheet .metadataLink:focus-visible {
-  box-shadow: var(--cioos-focus);
-}
-
-/* --- Record table section --- */
+/* --- Record table section ---
+   No container of its own: the header is a white card, and every record card
+   below it sits separately on the panel's sand wash. */
 .recordSection {
-  margin-bottom: 12px;
-  padding: 12px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  background-color: var(--cioos-white);
+  display: flex;
+  flex-direction: column;
 }
 
 .recordSectionHeader {
-  margin-bottom: 10px;
+  margin-bottom: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
 }
 
 .recordSectionHeader strong {
@@ -510,11 +519,31 @@
   font-style: italic;
 }
 
-/* The pager sits inside the section's white card, so it needs no background or
-   top rule of its own beyond the hairline. */
+/* Search and sort stay on screen while the cards scroll under them, on the
+   panel's own sand so nothing shows through. */
+.recordSection .cardList {
+  margin-top: 4px;
+}
+
+.recordSection .cardListToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0 0 4px;
+  background-color: var(--cioos-sand);
+}
+
+/* The bottom of the list stays on screen while the cards scroll under it. */
 .recordSection .pager {
-  padding: 8px 0 0;
-  background: none;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-card);
 }
 
 .listCard {

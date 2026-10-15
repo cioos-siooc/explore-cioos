@@ -7,8 +7,11 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetMetadata, {
   DatasetAbstract,
+  KeywordsCell,
   LicensePill,
-  MetadataSheetRows,
+  MetadataExtentCells,
+  Citation,
+  Organizations,
   localized,
 } from "./DatasetMetadata.jsx";
 import useDatasetMetadata from "./useDatasetMetadata.js";
@@ -58,7 +61,7 @@ describe("DatasetAbstract", () => {
   it("clamps a long abstract behind Show more", async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <DatasetAbstract metadata={{ abstract: { en: "word ".repeat(100) } }} />,
+      <DatasetAbstract metadata={{ abstract: { en: "word ".repeat(200) } }} />,
     );
     const toggle = screen.getByRole("button", { name: "Show more" });
     expect(document.querySelector(".datasetAbstractText")).toHaveClass(
@@ -130,7 +133,21 @@ describe("DatasetMetadata", () => {
       screen
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent),
-    ).toEqual(["How to cite", "Organizations and contacts", "Resources"]);
+    ).toEqual(["Resources"]);
+    expect(
+      screen
+        .getByText("Dates, contacts, projects and history")
+        .closest("details"),
+    ).not.toHaveAttribute("open");
+  });
+
+  it("leaves the fine print out when the record has none", () => {
+    renderCards({
+      metadata: { ...METADATA, progress: undefined, contacts: [] },
+    });
+    expect(
+      screen.queryByText("Dates, contacts, projects and history"),
+    ).toBeNull();
   });
 
   it("lists the dataset's own access links before its catalogue's, each once", () => {
@@ -166,40 +183,39 @@ describe("DatasetMetadata", () => {
     expect(screen.getByText("Only French")).toBeInTheDocument();
   });
 
-  it("groups contacts by whether the citation names them", () => {
+  it("lists contacts by name and role, those the citation names first", () => {
     renderCards({
       metadata: {
         contacts: [
-          { name: "Doe, Jane", roles: ["author"], cited: true },
           { name: "Data Office", roles: ["distributor"], cited: false },
+          { name: "Doe, Jane", roles: ["author"], cited: true },
         ],
       },
     });
-    const cited = screen.getByRole("heading", { level: 4, name: "Cited" });
-    expect(cited.parentElement).toHaveTextContent("Doe, Jane");
-    const other = screen.getByRole("heading", {
-      level: 4,
-      name: "Other contacts",
+    const items = screen
+      .getByRole("heading", { level: 4, name: "Contacts" })
+      .parentElement.querySelectorAll("li");
+    expect(items[0]).toHaveTextContent("Doe, Jane");
+    expect(items[0]).toHaveTextContent("Author");
+    expect(items[1]).toHaveTextContent("Data Office");
+  });
+
+  it("puts the record's dates and status in the fine print", () => {
+    renderCards({
+      metadata: { ...METADATA, dates: { created: "2019-04-01T00:00:00Z" } },
     });
-    expect(other.parentElement).toHaveTextContent("Data Office");
+    expect(screen.getByText("Created").parentElement).toHaveTextContent(
+      "Created2019-04-01",
+    );
+    expect(screen.getByText("Status").parentElement).toHaveTextContent(
+      "Ongoing",
+    );
   });
 
-  it("hides the citation until asked, and adds a DOI it lacks", async () => {
+  it("copies the citation from an icon button", async () => {
     const user = userEvent.setup();
-    renderCards();
-    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show" }));
-    expect(screen.getByText(/A dataset\./)).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "https://doi.org/10.0000/x" }),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Hide" }));
-    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
-  });
-
-  it("copies the citation from an icon button while it is hidden", async () => {
-    const user = userEvent.setup();
-    renderCards();
+    renderWithProviders(<Citation metadata={METADATA} />);
+    await user.click(screen.getByRole("button", { name: "Citation" }));
     await user.click(screen.getByRole("button", { name: "Copy citation" }));
     // user-event stands in its own clipboard for the browser's.
     expect(await navigator.clipboard.readText()).toBe(
@@ -223,21 +239,6 @@ describe("DatasetMetadata", () => {
     ).toBeInTheDocument();
   });
 
-  it("names a contact's organization first, once when it is the only name", () => {
-    renderCards({
-      metadata: {
-        contacts: [
-          { name: "Doe, Jane", organization: "An institute" },
-          { organization: "Data Office" },
-        ],
-      },
-    });
-    const org = screen.getByText("An institute");
-    expect(org).toHaveClass("metadataContactOrg");
-    expect(org.nextElementSibling).toHaveTextContent("Doe, Jane");
-    expect(screen.getAllByText("Data Office")).toHaveLength(1);
-  });
-
   it("still lists the access links before a re-harvest", () => {
     renderCards({ metadata: {} });
     expect(
@@ -257,6 +258,102 @@ describe("DatasetMetadata", () => {
   });
 });
 
+describe("Organizations", () => {
+  it("lists each organization once", () => {
+    const { container } = renderWithProviders(
+      <Organizations
+        metadata={{
+          ...METADATA,
+          contacts: [
+            { name: "Doe, Jane", organization: "An institute" },
+            { name: "Roe, Rick", organization: "An Institute" },
+            { organization: "Data Office" },
+            { name: "No Org" },
+          ],
+        }}
+      />,
+    );
+    expect(
+      [...container.querySelectorAll(".metadataChip")].map(
+        (c) => c.textContent,
+      ),
+    ).toEqual(["An institute", "Data Office"]);
+  });
+
+  it("folds organizations past the third behind a count, and unfolds them", async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(
+      <Organizations
+        metadata={{
+          contacts: ["A", "B", "C", "D", "E"].map((organization) => ({
+            organization,
+          })),
+        }}
+      />,
+    );
+    const chips = () =>
+      [...container.querySelectorAll(".metadataChip")].map(
+        (c) => c.textContent,
+      );
+    expect(chips()).toEqual(["A", "B", "C", "+2"]);
+    await user.click(screen.getByRole("button", { name: "Show more" }));
+    expect(chips()).toEqual(["A", "B", "C", "D", "E", "Show less"]);
+  });
+
+  it("carries the full name of an organization as its title", () => {
+    const name = "A very long institute name that the chip crops";
+    renderWithProviders(
+      <Organizations metadata={{ contacts: [{ organization: name }] }} />,
+    );
+    expect(screen.getByText(name)).toHaveAttribute("title", name);
+  });
+
+  it("renders nothing without organizations", () => {
+    const { container } = renderWithProviders(<Organizations metadata={{}} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Citation", () => {
+  it("shows the citation in a popup on click, adding a DOI it lacks", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Citation metadata={METADATA} />);
+    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Citation" }));
+    expect(screen.getByText(/A dataset\./)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "https://doi.org/10.0000/x" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+  });
+
+  it("shows the citation on hover", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Citation metadata={METADATA} />);
+    await user.hover(screen.getByRole("button", { name: "Citation" }));
+    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+    expect(await screen.findByText(/A dataset\./)).toBeInTheDocument();
+    await user.unhover(screen.getByRole("button", { name: "Citation" }));
+    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+  });
+
+  it("does not open when the pointer only passes over", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Citation metadata={METADATA} />);
+    const button = screen.getByRole("button", { name: "Citation" });
+    await user.hover(button);
+    await user.unhover(button);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
+  });
+
+  it("renders nothing without a citation or DOI", () => {
+    const { container } = renderWithProviders(<Citation metadata={{}} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
 describe("LicensePill", () => {
   it("names the license briefly, its full wording on hover", () => {
     renderWithProviders(<LicensePill metadata={METADATA} />);
@@ -268,29 +365,30 @@ describe("LicensePill", () => {
   });
 });
 
-describe("MetadataSheetRows", () => {
-  it("adds keywords and single-line date pills to the metadata sheet", () => {
+describe("facts sheet cells", () => {
+  it("shows the declared period and depth, and only those it has", () => {
     renderWithProviders(
       <dl>
-        <MetadataSheetRows
+        <MetadataExtentCells
           metadata={{
-            ...METADATA,
-            dates: { created: "2019-04-01T00:00:00Z" },
             temporal_extent: { begin: "2019-04-01", end: "2023-10-30" },
           }}
         />
       </dl>,
     );
-    expect(screen.getByText("temperature")).toHaveClass("metadataChip");
-    expect(screen.getByText("Created").parentElement).toHaveTextContent(
-      "Created2019-04-01",
-    );
     expect(screen.getByText("Time period").parentElement).toHaveTextContent(
       "2019-04-01 – 2023-10-30",
     );
-    expect(screen.getByText("Status").parentElement).toHaveTextContent(
-      "Ongoing",
+    expect(screen.queryByText("Depth")).toBeNull();
+  });
+
+  it("lists keywords as chips", () => {
+    renderWithProviders(
+      <dl>
+        <KeywordsCell metadata={METADATA} />
+      </dl>,
     );
+    expect(screen.getByText("temperature")).toHaveClass("metadataChip");
   });
 });
 

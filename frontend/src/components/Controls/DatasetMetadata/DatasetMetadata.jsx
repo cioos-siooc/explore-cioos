@@ -1,26 +1,27 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BoxArrowUpRight,
   Clipboard,
   ClipboardCheck,
+  Quote,
 } from "react-bootstrap-icons";
 
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import { useExpandableList } from "../DatasetInspector/ListCard.jsx";
 import { erddapServerBase } from "../../../downloadLinks.js";
 import { formatRange } from "../../../utilities.jsx";
-import { licenseLabel } from "./license.js";
+import { licenseLabel, licenseText } from "./license.js";
 import { renderMarkdown } from "./markdown.js";
 import "./styles.css";
 
 // CKAN keyword lists run to dozens (every CF standard name and EOV); the
 // sheet shows the first few, like the ocean variables beside them.
-const KEYWORD_LIMIT = 6;
+const KEYWORD_LIMIT = 3;
 
 // Past this many characters of source the abstract is clamped behind
 // "Show more".
-const ABSTRACT_CLAMP_LENGTH = 320;
+const ABSTRACT_CLAMP_LENGTH = 700;
 
 // A {en, fr} value in the page's language, else whichever language exists:
 // most records are bilingual, but an OBIS or ERDDAP-only one is English only.
@@ -84,8 +85,10 @@ export function LicensePill({ metadata }) {
   const { t } = useTranslation();
   const license = metadata?.license;
   if (!license) return null;
-  const text = t("metadataLicensePillText", { license: licenseLabel(license) });
-  const title = license.title || license.url;
+  const text = t("metadataLicensePillText", {
+    license: licenseLabel(license) ?? t("metadataLicenseCustomText"),
+  });
+  const title = licenseText(license.title) || license.url;
   return license.url ? (
     <ExternalLink
       href={license.url}
@@ -101,20 +104,13 @@ export function LicensePill({ metadata }) {
   );
 }
 
-// Keywords and dates, as rows of the metadata sheet beside the ocean
-// variables: chips the sheet already uses, each date a single-line pill.
-export function MetadataSheetRows({ metadata }) {
-  const { t, i18n } = useTranslation();
-  const codeLabel = useCodeLabel();
-  const keywords = localized(metadata?.keywords, i18n.language) ?? [];
-  const { shown, hidden, expanded, toggle } = useExpandableList(
-    keywords,
-    KEYWORD_LIMIT,
-  );
-  const dates = metadata?.dates ?? {};
+// Where and when the data is, as cells of the facts sheet: the period and
+// depth the catalogue record declares.
+export function MetadataExtentCells({ metadata }) {
+  const { t } = useTranslation();
   const temporal = metadata?.temporal_extent ?? {};
   const vertical = metadata?.vertical_extent ?? {};
-  const pills = [
+  return [
     [
       t("metadataTemporalExtentText"),
       formatRange(day(temporal.begin), day(temporal.end)),
@@ -123,62 +119,52 @@ export function MetadataSheetRows({ metadata }) {
       t("metadataVerticalExtentText"),
       formatRange(vertical.min, vertical.max, "m"),
     ],
-    [t("metadataCreatedText"), day(dates.created)],
-    [t("metadataPublishedText"), day(dates.published)],
-    [t("metadataRevisedText"), day(dates.revised)],
-    [
-      t("metadataProgressText"),
-      metadata?.progress && codeLabel(metadata.progress),
-    ],
-    [
-      t("metadataUpdateFrequencyText"),
-      metadata?.update_frequency && codeLabel(metadata.update_frequency),
-    ],
-  ].filter(([, value]) => value);
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => (
+      <div className="metaCell" key={label}>
+        <dt className="metadataLabel">{label}</dt>
+        <dd className="metadataValue">
+          <span className="metadataFact">{value}</span>
+        </dd>
+      </div>
+    ));
+}
 
+export function KeywordsCell({ metadata }) {
+  const { t, i18n } = useTranslation();
+  const keywords = localized(metadata?.keywords, i18n.language) ?? [];
+  const { shown, hidden, expanded, toggle } = useExpandableList(
+    keywords,
+    KEYWORD_LIMIT,
+  );
+  if (!keywords.length) return null;
   return (
-    <>
-      {keywords.length > 0 && (
-        <div className="metaCell">
-          <dt className="metadataLabel">{t("metadataKeywordsTitle")}</dt>
-          <dd className="metadataValue">
-            {shown.map((keyword) => (
-              <span className="metadataChip" key={keyword}>
-                {keyword}
-              </span>
-            ))}
-            {(hidden > 0 || expanded) && (
-              <button
-                type="button"
-                className="listCardTagsMore"
-                onClick={toggle}
-                aria-expanded={expanded}
-                title={
-                  expanded
-                    ? t("listCardTagsFewerText")
-                    : t("listCardTagsMoreTitle", { total: keywords.length })
-                }
-              >
-                {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
-              </button>
-            )}
-          </dd>
-        </div>
-      )}
-      {pills.length > 0 && (
-        <div className="metaCell metaCellStacked">
-          <dt className="metadataLabel">{t("metadataDatesTitle")}</dt>
-          <dd className="metadataValue">
-            {pills.map(([label, value]) => (
-              <span className="metadataChip metadataDatePill" key={label}>
-                <span className="metadataDatePillLabel">{label}</span>
-                {value}
-              </span>
-            ))}
-          </dd>
-        </div>
-      )}
-    </>
+    <div className="metaCell">
+      <dt className="metadataLabel">{t("metadataKeywordsTitle")}</dt>
+      <dd className="metadataValue">
+        {shown.map((keyword) => (
+          <span className="metadataChip" key={keyword}>
+            {keyword}
+          </span>
+        ))}
+        {(hidden > 0 || expanded) && (
+          <button
+            type="button"
+            className="listCardTagsMore"
+            onClick={toggle}
+            aria-expanded={expanded}
+            title={
+              expanded
+                ? t("listCardTagsFewerText")
+                : t("listCardTagsMoreTitle", { total: keywords.length })
+            }
+          >
+            {expanded ? t("listCardTagsFewerText") : `+${hidden}`}
+          </button>
+        )}
+      </dd>
+    </div>
   );
 }
 
@@ -256,55 +242,105 @@ function CopyButton({ text }) {
   );
 }
 
-// Collapsed: the citation is long and mostly wanted for the copy button.
-function Citation({ citation, doi }) {
+// The citation opens on hover and stays open once clicked (Escape or a click
+// outside closes it), so its DOI link and copy button can be reached. The
+// body is positioned against the nearest positioned ancestor (the action
+// row), which lets it span the title block's width.
+const HOVER_OPEN_DELAY_MS = 300;
+const MAX_VISIBLE_ORGANIZATIONS = 3;
+
+function CitationPopover({ citation, doi }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const ref = useRef();
+  const hoverTimer = useRef();
+  const open = pinned || hovered;
+
+  // A pointer passing over the button shouldn't throw the popover open.
+  function hoverStart() {
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(
+      () => setHovered(true),
+      HOVER_OPEN_DELAY_MS,
+    );
+  }
+
+  function hoverEnd() {
+    clearTimeout(hoverTimer.current);
+    setHovered(false);
+  }
+
+  useEffect(() => () => clearTimeout(hoverTimer.current), []);
   const doiInCitation =
     doi && citation?.includes(doi.replace(/^https?:\/\/doi\.org\//, ""));
-  return (
-    <MetadataCard
-      title={t("metadataCitationTitle")}
-      action={
-        <>
-          <button
-            type="button"
-            className="recordShowAll"
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {t(open ? "metadataHideCitationText" : "metadataShowCitationText")}
-          </button>
-          {citation && <CopyButton text={citation} />}
-        </>
+
+  useEffect(() => {
+    if (!pinned) return undefined;
+    const close = (event) => {
+      const outside =
+        event.type === "keydown"
+          ? event.key === "Escape"
+          : !ref.current?.contains(event.target);
+      if (outside) {
+        setPinned(false);
+        setHovered(false);
       }
-    >
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [pinned]);
+
+  return (
+    <span ref={ref} onMouseEnter={hoverStart} onMouseLeave={hoverEnd}>
+      <button
+        type="button"
+        className="citationButton"
+        aria-expanded={open}
+        onClick={() => setPinned((value) => !value)}
+      >
+        <Quote size={13} aria-hidden="true" />
+        {t("metadataCitationTitle")}
+      </button>
       {open && (
-        <p className="metadataCitation">
-          {citation}
-          {/* Most citations end with their DOI already. */}
-          {doi && !doiInCitation && (
-            <>
-              {citation && " "}
-              <ExternalLink href={doi}>{doi}</ExternalLink>
-            </>
-          )}
-        </p>
+        <div className="citationPopover">
+          <div className="citationPopoverCard" role="region">
+            <p className="metadataCitation">
+              {citation}
+              {/* Most citations end with their DOI already. */}
+              {doi && !doiInCitation && (
+                <>
+                  {citation && " "}
+                  <ExternalLink href={doi}>{doi}</ExternalLink>
+                </>
+              )}
+            </p>
+            {citation && <CopyButton text={citation} />}
+          </div>
+        </div>
       )}
-    </MetadataCard>
+    </span>
   );
 }
 
 function Contact({ contact }) {
   const codeLabel = useCodeLabel();
-  const { name, organization } = contact;
-  const link = (text) =>
-    contact.url ? <ExternalLink href={contact.url}>{text}</ExternalLink> : text;
+  const label = contact.name || contact.organization;
   return (
     <li className="metadataContact">
-      <span className="metadataContactOrg">{link(organization || name)}</span>
-      {organization && name && (
-        <span className="metadataContactName">{name}</span>
+      <span className="metadataContactName">
+        {contact.url ? (
+          <ExternalLink href={contact.url}>{label}</ExternalLink>
+        ) : (
+          label
+        )}
+      </span>
+      {contact.name && contact.organization && (
+        <span className="metadataContactOrg">{contact.organization}</span>
       )}
       {contact.roles?.length > 0 && (
         <span className="metadataContactRoles">
@@ -315,18 +351,105 @@ function Contact({ contact }) {
   );
 }
 
-function ContactGroup({ title, contacts }) {
-  if (!contacts.length) return null;
+// Everyone behind the dataset, those the citation names first.
+function Contacts({ contacts }) {
+  const { t } = useTranslation();
+  const ordered = [...contacts].sort((a, b) => !!b.cited - !!a.cited);
   return (
-    <div className="metadataContactGroup">
-      <h4 className="metadataGroupTitle">{title}</h4>
+    <div className="metadataContextBlock">
+      <h4 className="metadataGroupTitle">{t("metadataPeopleTitle")}</h4>
       <ul className="metadataContacts">
-        {contacts.map((contact, i) => (
+        {ordered.map((contact, i) => (
           <Contact key={i} contact={contact} />
         ))}
       </ul>
     </div>
   );
+}
+
+// Each organization once, however many of its people are listed.
+function uniqueOrganizations(contacts) {
+  const seen = new Set();
+  return contacts
+    .map((contact) => contact.organization?.trim())
+    .filter(
+      (name) =>
+        name && !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()),
+    );
+}
+
+// Who published it, as chips under the title block's actions.
+export function Organizations({ metadata }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const organizations = uniqueOrganizations(metadata?.contacts ?? []);
+  if (!organizations.length) return null;
+  const hidden = organizations.length - MAX_VISIBLE_ORGANIZATIONS;
+  const shown =
+    expanded || hidden <= 0
+      ? organizations
+      : organizations.slice(0, MAX_VISIBLE_ORGANIZATIONS);
+  return (
+    <div className="metadataTags datasetCredit">
+      {shown.map((name) => (
+        <span className="metadataChip" key={name} title={name}>
+          {name}
+        </span>
+      ))}
+      {hidden > 0 && (
+        <button
+          type="button"
+          className="metadataChip metadataChipToggle"
+          aria-expanded={expanded}
+          aria-label={t(
+            expanded ? "metadataShowLessText" : "metadataShowMoreText",
+          )}
+          title={t(expanded ? "metadataShowLessText" : "metadataShowMoreText")}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? t("metadataShowLessText") : `+${hidden}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// The record this dataset was harvested from, and its catalogue entry: one
+// link each to ERDDAP, OBIS and CKAN, whichever the dataset has.
+export function SourceLinks({ dataset }) {
+  const { t } = useTranslation();
+  const links = [
+    dataset.source_type === "obis"
+      ? ["OBIS", `https://obis.org/dataset/${dataset.dataset_id}`]
+      : ["ERDDAP™", dataset.erddap_url],
+    ["CKAN", dataset.ckan_url],
+  ].filter(([, url]) => url);
+  if (!links.length) return null;
+  return (
+    <div className="datasetSources">
+      <span className="datasetSourcesLabel">{t("metadataSourceText")}</span>
+      {links.map(([name, url]) => (
+        <ExternalLink
+          key={name}
+          href={url}
+          className="datasetSourceLink"
+          title={t("metadataSourceLinkTitle", { source: name })}
+        >
+          {name}
+          <BoxArrowUpRight size={10} aria-hidden="true" />
+        </ExternalLink>
+      ))}
+    </div>
+  );
+}
+
+// The "Citation" button for the title block's action row.
+export function Citation({ metadata }) {
+  const { i18n } = useTranslation();
+  const citation = localized(metadata?.citation, i18n.language);
+  const doi = metadata?.doi;
+  if (!citation && !doi) return null;
+  return <CitationPopover citation={citation} doi={doi} />;
 }
 
 // Links that exist for every dataset of its kind, whatever its catalogue
@@ -447,7 +570,9 @@ function Resources({ dataset, metadata }) {
 }
 
 // The descriptive metadata the harvest merged from CKAN, OBIS and ERDDAP, as
-// cards under the abstract. A card with nothing in it is left out.
+// cards under the facts sheet, in the order a visitor acts on them: where the
+// data is, who is behind it, then the fine print folded into one disclosure.
+// A card with nothing in it is left out.
 export default function DatasetMetadata({
   dataset,
   metadata,
@@ -455,7 +580,8 @@ export default function DatasetMetadata({
   error,
   retry,
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const codeLabel = useCodeLabel();
 
   if (loading) {
     return (
@@ -480,34 +606,59 @@ export default function DatasetMetadata({
   }
 
   const m = metadata ?? {};
-  const citation = localized(m.citation, i18n.language);
   const contacts = m.contacts ?? [];
+  const dates = m.dates ?? {};
+  const datePills = [
+    [t("metadataCreatedText"), day(dates.created)],
+    [t("metadataPublishedText"), day(dates.published)],
+    [t("metadataRevisedText"), day(dates.revised)],
+    [t("metadataProgressText"), m.progress && codeLabel(m.progress)],
+    [
+      t("metadataUpdateFrequencyText"),
+      m.update_frequency && codeLabel(m.update_frequency),
+    ],
+  ].filter(([, value]) => value);
+  const hasFinePrint =
+    contacts.length > 0 ||
+    datePills.length > 0 ||
+    m.projects?.length > 0 ||
+    m.lineage ||
+    m.acknowledgement;
 
   return (
     <div className="datasetMetadata">
-      {(citation || m.doi) && <Citation citation={citation} doi={m.doi} />}
-      {contacts.length > 0 && (
-        <MetadataCard title={t("metadataContactsTitle")}>
-          <ContactGroup
-            title={t("metadataCitedContactsTitle")}
-            contacts={contacts.filter((c) => c.cited)}
-          />
-          <ContactGroup
-            title={t("metadataOtherContactsTitle")}
-            contacts={contacts.filter((c) => !c.cited)}
-          />
-        </MetadataCard>
-      )}
       <Resources dataset={dataset} metadata={m} />
-      {(m.projects?.length > 0 || m.lineage || m.acknowledgement) && (
-        <MetadataCard title={t("metadataContextTitle")}>
+      {hasFinePrint && (
+        <details className="metadataCard metadataMore">
+          <summary className="metadataCardTitle">
+            {t("metadataMoreTitle")}
+          </summary>
+          {datePills.length > 0 && (
+            <div className="metadataContextBlock">
+              <h4 className="metadataGroupTitle">{t("metadataDatesTitle")}</h4>
+              <div className="metadataTags">
+                {datePills.map(([label, value]) => (
+                  <span className="metadataChip" key={label}>
+                    <span className="metadataDatePillLabel">{label}</span>
+                    {value}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {contacts.length > 0 && <Contacts contacts={contacts} />}
           {m.projects?.length > 0 && (
-            <div className="metadataTags">
-              {m.projects.map((project) => (
-                <span className="metadataChip" key={project}>
-                  {project}
-                </span>
-              ))}
+            <div className="metadataContextBlock">
+              <h4 className="metadataGroupTitle">
+                {t("metadataProjectsTitle")}
+              </h4>
+              <div className="metadataTags">
+                {m.projects.map((project) => (
+                  <span className="metadataChip" key={project}>
+                    {project}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
           {m.lineage && (
@@ -524,7 +675,7 @@ export default function DatasetMetadata({
               <Markdown text={m.acknowledgement} />
             </div>
           )}
-        </MetadataCard>
+        </details>
       )}
     </div>
   );

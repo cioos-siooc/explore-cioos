@@ -10,10 +10,10 @@
   padding: 3px 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
+  background-color: var(--cioos-sand);
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
-  color: var(--cioos-ink-80);
+  color: var(--cioos-ink);
   white-space: nowrap;
   text-overflow: ellipsis;
   text-decoration: none;
@@ -31,29 +31,23 @@ a.datasetLicensePill:focus-visible {
   box-shadow: var(--cioos-focus);
 }
 
-/* --- Dates in the metadata sheet: one line each, label then value --- */
-.datasetMetaSheet .metadataDatePill {
-  gap: 5px;
-}
-
-/* Dates always sit under their label, wrapping across lines. */
-.datasetMetaSheet .metaCellStacked .metadataValue {
-  flex-basis: 100%;
-}
-
 .metadataDatePillLabel {
+  margin-right: 5px;
   font-weight: 400;
   color: var(--cioos-ink-80);
 }
 
-/* --- Abstract: the last line of the pinned title block --- */
+/* --- Abstract: a white card, the first thing in the scrolling body --- */
 .datasetAbstract {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  max-height: 40vh;
-  overflow-y: auto;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
 }
 
 .datasetAbstractText {
@@ -64,7 +58,7 @@ a.datasetLicensePill:focus-visible {
 /* Clamped by height rather than line count: rendered markdown is several
    blocks (paragraphs, lists), which line-clamp cannot cut across. */
 .datasetAbstractText.clamped {
-  max-height: 6.2em;
+  max-height: 12em;
   overflow: hidden;
   mask-image: linear-gradient(to bottom, #000 60%, transparent);
 }
@@ -162,7 +156,8 @@ a.datasetLicensePill:focus-visible {
   margin: 0;
 }
 
-.metadataCard a {
+.metadataCard a,
+.datasetCredit a {
   color: var(--cioos-primary-700);
   font-weight: 600;
 }
@@ -174,7 +169,8 @@ a.datasetLicensePill:focus-visible {
   gap: 4px;
 }
 
-.metadataCard .metadataChip {
+.metadataCard .metadataChip,
+.datasetCredit .metadataChip {
   display: inline-flex;
   align-items: center;
   padding: 2px 10px;
@@ -195,7 +191,6 @@ a.datasetLicensePill:focus-visible {
   color: var(--cioos-ink-80);
 }
 
-/* Header actions: the toggle takes the free space, the icon follows it. */
 .metadataCardHeader .metadataIconButton {
   margin-left: 0;
 }
@@ -244,14 +239,18 @@ a.datasetLicensePill:focus-visible {
   background-color: var(--cioos-surface-2);
 }
 
-.metadataContactOrg {
+.metadataContactName {
   font-weight: 600;
   color: var(--cioos-ink);
 }
 
-.metadataContactName,
-.metadataContactRoles {
+.metadataContactOrg {
   color: var(--cioos-ink-80);
+}
+
+.metadataContactRoles {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
 }
 
 .metadataContactRoles {
@@ -325,4 +324,151 @@ a.datasetLicensePill:focus-visible {
 .metadataResourceHost {
   font-size: var(--cioos-font-size-2xs);
   color: var(--cioos-ink-60);
+}
+
+/* The fine print: one closed row until asked for. */
+.metadataMore > summary {
+  cursor: pointer;
+}
+
+.metadataMore > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.metadataMore[open] > summary {
+  margin-bottom: 2px;
+}
+
+/* Organizations in the pinned title block. */
+.datasetCredit {
+  align-items: center;
+  font-size: var(--cioos-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Organizations take the shallows wash, the data's own colour for "has a
+   value", without the teal border that marks an applied filter. */
+.datasetCredit .metadataChip {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  border-color: var(--cioos-teal-light);
+  background-color: var(--cioos-teal-light);
+  font-weight: 600;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.datasetCredit .metadataChipToggle {
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-white);
+  font-family: inherit;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+/* The citation's button sits in the action row; its popover spans the row's
+   width and floats over the page. */
+.citationButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border: 1px dashed var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-family: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.citationButton:hover,
+.citationButton[aria-expanded="true"] {
+  background-color: var(--cioos-surface-2);
+}
+
+.citationButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The padding bridges the gap to the button, so the pointer can travel from
+   one to the other without the hover ending. */
+.citationPopover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding-top: 4px;
+}
+
+.citationPopoverCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+}
+
+.citationPopoverCard .metadataCitation {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+.citationPopoverCard a {
+  color: var(--cioos-primary-700);
+  font-weight: 600;
+}
+
+.citationPopoverCard .metadataIconButton {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
+
+/* Links to the source record, under the organizations. */
+.datasetSources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: var(--cioos-font-size-xs);
+}
+
+.datasetSourcesLabel {
+  font-weight: 600;
+  color: var(--cioos-ink-80);
+}
+
+.datasetSourceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  text-decoration: none;
+}
+
+.datasetSourceLink:hover,
+.datasetSourceLink:focus-visible {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+  outline: none;
+}
+
+.datasetSourceLink:focus-visible {
+  box-shadow: var(--cioos-focus);
 }
