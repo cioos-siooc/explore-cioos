@@ -10,6 +10,20 @@ const harvestDocs = fileURLToPath(
   new URL("../docs/harvesting", import.meta.url),
 );
 
+// Plotly's source registry requires its own (older) maplibre-gl CSS for map
+// traces we never register. Bundled from source, that require becomes a global
+// stylesheet on chunk load, and its `.maplibregl-map { position: relative }`
+// collapses the app's map to zero height.
+const dropPlotlyMaplibreCss = {
+  name: "drop-plotly-maplibre-css",
+  enforce: "pre",
+  load(id) {
+    return /\/plotly\.js\/node_modules\/maplibre-gl\/.*\.css$/.test(id)
+      ? ""
+      : null;
+  },
+};
+
 export default defineConfig(({ mode }) => {
   // Keep the pre-Vite deploy contract: plain API_URL / BASE_URL /
   // SENTRY_TRACES_SAMPLE_RATE env vars (Docker build args) referenced in
@@ -24,6 +38,7 @@ export default defineConfig(({ mode }) => {
     base: env.BASE_URL || "/",
     plugins: [
       react(),
+      dropPlotlyMaplibreCss,
       // npm run build:analyze -> treemap of bundle composition
       process.env.ANALYZE &&
         visualizer({ filename: "dist/stats.html", open: true, gzipSize: true }),

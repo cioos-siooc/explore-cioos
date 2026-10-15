@@ -15,6 +15,7 @@ import DatasetMetadata, {
   DatasetAbstract,
 } from "../DatasetMetadata/DatasetMetadata.jsx";
 import useDatasetMetadata from "../DatasetMetadata/useDatasetMetadata.js";
+import TaxonomyChart from "../TaxonomyChart/TaxonomyChart.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
@@ -789,6 +790,9 @@ export default function DatasetInspector({
             activeWmsOverlay={activeWmsOverlay}
             setActiveWmsOverlay={setActiveWmsOverlay}
           />
+        )}
+        {dataset.source_type === "obis" && (
+          <TaxonomyChart datasetId={dataset.dataset_id} />
         )}
         {hasRecordList && (
           <div className="recordSection">

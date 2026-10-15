@@ -69,6 +69,12 @@ export default function UIProvider({ children }) {
       ? "seasonal"
       : "timeline",
   );
+  // The OBIS page's taxonomy chart: sunburst or GBIF-style tree, from ?taxonomy=.
+  const [taxonomyView, setTaxonomyView] = useState(() =>
+    new URL(window.location.href).searchParams.get("taxonomy") === "tree"
+      ? "tree"
+      : "sunburst",
+  );
   // How picking datasets for a download works, opened from the sidebar
   // footer's one-line version of the same thing.
   const [showSelectionHelpModal, setShowSelectionHelpModal] = useState(false);
@@ -151,6 +157,8 @@ export default function UIProvider({ children }) {
     setShowCoverageModal,
     coverageAxis,
     setCoverageAxis,
+    taxonomyView,
+    setTaxonomyView,
     showSelectionHelpModal,
     setShowSelectionHelpModal,
     openFilter,
