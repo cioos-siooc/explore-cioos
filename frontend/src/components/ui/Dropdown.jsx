@@ -13,6 +13,8 @@ import "./dropdownStyles.css";
 
 const DropdownContext = createContext({ close: () => {} });
 
+const VIEWPORT_MARGIN = 8;
+
 // Replacement for react-bootstrap's DropdownButton + Dropdown.Item pair,
 // emitting Bootstrap-compatible class names (.dropdown, .dropdown-toggle,
 // .dropdown-menu, .dropdown-item) so existing overrides keep applying. The
@@ -38,7 +40,7 @@ export function DropdownButton({
   // 'start' (default) lines the menu's left edge up with the toggle's, which
   // reads fine once the menu is about as wide as its toggle (the two
   // existing callers, both text buttons). 'center' anchors the menu under
-  // the toggle's midpoint instead via transform: translateX(-50%) — needed
+  // the toggle's midpoint instead — needed
   // once the toggle is much narrower than its menu (an icon-only button, say),
   // where left-alignment leaves the menu looking like it belongs to whatever
   // sits to the toggle's right instead. 'end' lines the menu's right edge up
@@ -75,29 +77,29 @@ export function DropdownButton({
     if (!open || !buttonRef.current) return;
     function updateMenuStyle() {
       const rect = buttonRef.current.getBoundingClientRect();
-      const base = {
+      // Floor the menu at its toggle's width so a text button's menu never
+      // looks narrower than the thing it hangs off. Skipped when the caller
+      // passed menuClassName, because this is an inline style and would beat
+      // the width that class was added to set — an icon-only toggle wants
+      // its menu far wider than the toggle, not as narrow.
+      const minWidth = menuClassName ? 0 : rect.width;
+      const width = Math.max(menuRef.current?.offsetWidth ?? 0, minWidth);
+      const left =
+        align === "center"
+          ? rect.left + rect.width / 2 - width / 2
+          : align === "end"
+            ? rect.right - width
+            : rect.left;
+      // Kept on screen: a menu wider than the room on its aligned side (a
+      // 300px menu ending at a phone's first column) would otherwise hang
+      // off the edge.
+      const maxLeft = window.innerWidth - VIEWPORT_MARGIN - width;
+      setMenuStyle({
         position: "fixed",
         top: rect.bottom + 2,
-        // Floor the menu at its toggle's width so a text button's menu never
-        // looks narrower than the thing it hangs off. Skipped when the caller
-        // passed menuClassName, because this is an inline style and would beat
-        // the width that class was added to set — an icon-only toggle wants
-        // its menu far wider than the toggle, not as narrow.
-        ...(menuClassName ? {} : { minWidth: rect.width }),
-      };
-      if (align === "center")
-        setMenuStyle({
-          ...base,
-          left: rect.left + rect.width / 2,
-          transform: "translateX(-50%)",
-        });
-      else if (align === "end")
-        setMenuStyle({
-          ...base,
-          left: rect.right,
-          transform: "translateX(-100%)",
-        });
-      else setMenuStyle({ ...base, left: rect.left });
+        left: Math.max(VIEWPORT_MARGIN, Math.min(left, maxLeft)),
+        ...(menuClassName ? {} : { minWidth }),
+      });
     }
     updateMenuStyle();
     window.addEventListener("resize", updateMenuStyle);
@@ -149,7 +151,15 @@ export function DropdownButton({
             <div
               className={`dropdown-menu show ${menuClassName}`}
               ref={menuRef}
-              style={menuStyle}
+              // Fixed and hidden for the first layout pass, so it is measured
+              // at its own width rather than the body's.
+              style={
+                menuStyle ?? {
+                  position: "fixed",
+                  left: 0,
+                  visibility: "hidden",
+                }
+              }
             >
               {children}
             </div>
