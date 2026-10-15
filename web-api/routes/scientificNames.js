@@ -13,7 +13,8 @@ const { pipeline } = require("../utils/routePipeline");
  *     tags: [ScientificNames]
  *     description: |
  *       Returns OBIS scientific names matched by either a scientific-name prefix or a
- *       vernacular (common) name substring. Each result includes the locale-appropriate
+ *       vernacular (common) name substring. Vernacular matches come first, nested
+ *       under their highest vernacular-matched ancestor. Each result includes the locale-appropriate
  *       vernacular when WoRMS has one cached locally. Pass `names=A,B,C` (without `q`) to
  *       hydrate vernaculars for an exact list of scientific names — used by the frontend
  *       on page load to restore filter chips.
@@ -97,26 +98,51 @@ router.get(
     // returns "Orcinus orca" with subtitle "killer whale" instead of the
     // alphabetically-first WoRMS entry "grampus"). When no query is given, or
     // only the scientific name matched, fall back to the first vernacular.
+    //
+    // Common-name hits come first, as a tree: each sits under its highest
+    // common-name-matched ancestor ("crab" lists Brachyura "crabs", then
+    // Cancridae, Cancer, Cancer borealis…), groups ordered by that ancestor's
+    // common name. Scientific-name-only hits follow.
     const sql = `
-      SELECT n.scientific_name AS "scientificName",
-             COALESCE(
+      WITH hits AS (
+        SELECT n.scientific_name,
+               v.rank,
+               v.aphia_id,
+               v.ancestor_aphia_ids,
+               v.${vernCol}[1] AS first_vernacular,
                (SELECT vn FROM unnest(v.${vernCol}) AS vn
                  WHERE :q <> '' AND vn ILIKE :sub
-                 LIMIT 1),
-               v.${vernCol}[1]
-             ) AS vernacular,
-             v.rank AS rank
-        FROM cde.obis_scientific_names n
-   LEFT JOIN cde.scientific_name_vernaculars v
-          ON v.scientific_name = n.scientific_name
-       WHERE :q = ''
-          OR n.scientific_name ILIKE :prefix
-          OR EXISTS (
-               SELECT 1 FROM unnest(v.${vernCol}) AS vn
-                WHERE vn ILIKE :sub
-             )
-    ORDER BY (n.scientific_name ILIKE :prefix) DESC,
-             n.scientific_name
+                 LIMIT 1) AS matched
+          FROM cde.obis_scientific_names n
+     LEFT JOIN cde.scientific_name_vernaculars v
+            ON v.scientific_name = n.scientific_name
+         WHERE :q = ''
+            OR n.scientific_name ILIKE :prefix
+            OR EXISTS (
+                 SELECT 1 FROM unnest(v.${vernCol}) AS vn
+                  WHERE vn ILIKE :sub
+               )
+      ),
+      placed AS (
+        SELECT h.*,
+               CASE WHEN h.matched IS NULL THEN ARRAY[]::text[] ELSE ARRAY(
+                 SELECT a.scientific_name FROM hits a
+                  WHERE a.matched IS NOT NULL
+                    AND a.aphia_id = ANY(h.ancestor_aphia_ids)
+                  ORDER BY cardinality(a.ancestor_aphia_ids)
+               ) END || h.scientific_name AS path
+          FROM hits h
+      )
+      SELECT p.scientific_name AS "scientificName",
+             COALESCE(p.matched, p.first_vernacular) AS vernacular,
+             p.rank AS rank
+        FROM placed p
+   LEFT JOIN placed anchor ON anchor.scientific_name = p.path[1]
+    ORDER BY (p.matched IS NULL),
+             lower(anchor.matched),
+             p.path,
+             (p.scientific_name ILIKE :prefix) DESC,
+             p.scientific_name
        LIMIT :limit`;
 
     const { rows } = await db.raw(sql, {
