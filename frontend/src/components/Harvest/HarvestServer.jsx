@@ -9,6 +9,7 @@ import HarvestRealtimeBadge from "./HarvestRealtimeBadge.jsx";
 import Sparkline from "./Sparkline.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
+import warningLabel from "./warningLabel.js";
 import { harvestMode } from "./harvestMode.js";
 import { slugify } from "./slug.js";
 import { hostname, fmtDt, fmtDurationMs, datasetLink } from "./format.js";
@@ -21,10 +22,12 @@ export default function HarvestServer() {
     searchParams.get("status") || "",
   );
   const [q, setQ] = useState(searchParams.get("q") || "");
+  const warning = searchParams.get("warning") || "";
 
   const qs = new URLSearchParams();
   if (statusFilter) qs.set("status", statusFilter);
   if (q) qs.set("q", q);
+  if (warning) qs.set("warning", warning);
   const queryStr = qs.toString();
 
   const { data: datasets, loading } = useHarvestFetch(
@@ -35,11 +38,13 @@ export default function HarvestServer() {
   const erddapUrl = (datasets && datasets[0] && datasets[0].erddap_url) || "";
   const host = hostname(erddapUrl) || slug;
   const { data: reasons } = useHarvestFetch(`/reasons/${slug}`);
+  const { data: warningSummary } = useHarvestFetch(`/warnings/${slug}`);
 
-  function applyFilters(newStatus, newQ) {
+  function applyFilters(newStatus, newQ, newWarning = warning) {
     const p = {};
     if (newStatus) p.status = newStatus;
     if (newQ) p.q = newQ;
+    if (newWarning) p.warning = newWarning;
     setSearchParams(p);
   }
 
@@ -124,6 +129,52 @@ export default function HarvestServer() {
         </details>
       )}
 
+      {warningSummary && warningSummary.length > 0 && (
+        <details style={{ marginBottom: "1rem" }}>
+          <summary className="harvest-clickable harvest-text-md harvest-muted-strong">
+            {t("harvest.warnings.title")} ({warningSummary.length})
+          </summary>
+          <table
+            className="harvest-table"
+            style={{ maxWidth: 520, marginTop: "0.5rem" }}
+          >
+            <thead>
+              <tr>
+                <th>{t("harvest.col.warning")}</th>
+                <th>{t("harvest.col.datasets")}</th>
+                <th>{t("harvest.col.count")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {warningSummary.map((w) => (
+                <tr key={w.code}>
+                  <td>
+                    <button
+                      type="button"
+                      className="harvest-clickable harvest-text-sm"
+                      style={{
+                        background: "none",
+                        border: 0,
+                        padding: 0,
+                        textAlign: "left",
+                        color: "var(--cioos-primary-700)",
+                      }}
+                      title={t("harvest.warnings.filterBy")}
+                      aria-pressed={warning === w.code}
+                      onClick={() => applyFilters(statusFilter, q, w.code)}
+                    >
+                      ⚠ {warningLabel(t, w.code)}
+                    </button>
+                  </td>
+                  <td className="harvest-num-total">{w.n_datasets}</td>
+                  <td className="harvest-num-total">{w.total_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+
       <div className="harvest-filter-bar">
         <select
           value={statusFilter}
@@ -152,7 +203,27 @@ export default function HarvestServer() {
         >
           {t("harvest.filter.search")}
         </button>
-        {(statusFilter || q) && (
+        {warning && (
+          <span
+            className="harvest-count-pill harvest-warning-text"
+            style={{
+              background: "var(--harvest-warn-bg)",
+              border: "1px solid var(--harvest-warn-border)",
+            }}
+          >
+            ⚠ {t("harvest.warning.label")}: {warningLabel(t, warning)}{" "}
+            <button
+              type="button"
+              className="harvest-clickable harvest-btn-sm"
+              aria-label={t("harvest.warnings.clearFilter")}
+              title={t("harvest.warnings.clearFilter")}
+              onClick={() => applyFilters(statusFilter, q, "")}
+            >
+              ✕
+            </button>
+          </span>
+        )}
+        {(statusFilter || q || warning) && (
           <button
             className="harvest-text-md harvest-clickable harvest-btn-sm harvest-muted-soft"
             onClick={() => {
@@ -223,9 +294,14 @@ export default function HarvestServer() {
                       <span className="harvest-text-sm" title={d.reason_code}>
                         {reasonLabel(t, d.reason_code)}
                       </span>
-                    ) : d.warnings ? (
-                      <span className="harvest-warning-text" title={d.warnings}>
-                        ⚠ {t("harvest.warning.label")}
+                    ) : d.warnings?.length > 0 ? (
+                      <span
+                        className="harvest-warning-text"
+                        title={d.warnings.map((w) => w.message).join("\n")}
+                      >
+                        ⚠ {warningLabel(t, d.warnings[0].code)}
+                        {d.warnings.length > 1 &&
+                          ` ${t("harvest.warnings.more", { count: d.warnings.length - 1 })}`}
                       </span>
                     ) : (
                       <span className="harvest-muted">—</span>

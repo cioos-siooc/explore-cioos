@@ -218,22 +218,73 @@
 }
 
 /* ------------------------------------------------------------------
- * Mobile: the top bar is a full-bleed header stretching its children, which
- * would pull this row's buttons apart across the screen. It keeps its own
- * width instead and stays centered under the header.
+ * Mobile: one row of pills, the caption beside the icon rather than hung
+ * under a circle, so the row costs one button's height over the map instead
+ * of a circle, a caption and the room between them. The top bar is a
+ * full-bleed header stretching its children; the row keeps its own width and
+ * stays centered under it.
  * ------------------------------------------------------------------ */
 @media (max-width: 700px), (max-height: 500px) {
   .quickFilters {
     align-self: center;
     max-width: calc(100vw - 16px);
-
-    /* Four 40px buttons across a 360px screen, spaced so the equal-width
-       captions at the phone size clear each other. */
-    gap: 20px 44px;
-    padding-bottom: 16px;
+    gap: 4px;
+    padding-bottom: 6px;
   }
 
-  .quickFilterCaption {
-    padding: 3px 4px;
+  /* Sized by its button rather than by a line box around it, which centred
+     the Area pill half a pixel off its neighbours. */
+  .quickFilterArea {
+    display: flex;
+  }
+
+  .quickFilterButton,
+  .quickFilterButton:has(.quickFilterCount) {
+    flex-direction: row;
+    gap: 3px;
+    width: auto;
+    height: 30px;
+    padding: 0 7px;
+    border-radius: var(--cioos-radius-pill);
+  }
+
+  /* Icon only: four captions don't fit a 360px row, and the reset is the one
+     whose arrow says it on its own. Its label stays for assistive tech. */
+  .quickFilterButton.quickFilterReset {
+    width: 30px;
+    margin-left: 0;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .quickFilterReset .quickFilterCaption {
+    display: none;
+  }
+
+  .quickFilterCaption,
+  .quickFilterArea.open .quickFilterCaption {
+    position: static;
+    display: inline;
+    min-width: 0;
+    transform: none;
+    padding: 0;
+    background: none;
+    color: inherit;
+  }
+
+  /* Area is the row's first pill, near the screen edge: centred under it, the
+     menu ran off the left of the screen. */
+  .quickFilterAreaMenu {
+    left: 0;
+    transform: none;
+  }
+
+  /* After the words it qualifies, as a tally on the pill rather than a figure
+     tucked under the icon. */
+  .quickFilterCount {
+    order: 1;
+    padding: 1px 3px;
+    border-radius: var(--cioos-radius-pill);
+    background-color: var(--cioos-surface-2);
   }
 }

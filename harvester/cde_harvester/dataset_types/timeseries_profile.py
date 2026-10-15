@@ -3,16 +3,20 @@
 import pandas as pd
 from requests.exceptions import HTTPError
 
+from cde_harvester.core.harvest_warnings import RECORD_COUNT_ESTIMATED
 from cde_harvester.dataset_types import tabledap_features
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
+
+# Past this many profiles in any one timeseries, features collapse to one per
+# timeseries rather than one per profile.
+MAX_PROFILES_PER_TIMESERIES = 2000
 
 
 class TimeSeriesProfileHandler(DatasetTypeHandler):
     features_span_multiple_days = True
     cdm_data_type = "TimeSeriesProfile"
-    # A profile per timestamp always exceeds the 2000-per-timeseries collapse
-    # threshold below.
+    # A profile per timestamp always exceeds MAX_PROFILES_PER_TIMESERIES.
     collapse_time_profile_ids = True
 
     def extract_features(self, dataset):
@@ -30,7 +34,7 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
             profile_variables["timeseries_id"]
         ).agg("count")[profile_variables["profile_id"]]
 
-        if len(profiles_per_timeseries > 2000):
+        if (profiles_per_timeseries > MAX_PROFILES_PER_TIMESERIES).any():
             # If too many profiles per timeseries just group by timeseries_id
             # In this case we will drop the profile ID column and remove the
             # duplicates this creates.
@@ -91,8 +95,9 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
                 .reindex(tabledap_features._string_key(profiles.index))
             )
         if rows.isna().all():
-            dataset.logger.warning(
-                "Could not sample rows per profile; counting one per timestep"
+            dataset.warnings.add(
+                RECORD_COUNT_ESTIMATED,
+                "Could not sample rows per profile; counting one record per timestep",
             )
             return 1
         return pd.Series(rows.fillna(rows.mean()).to_numpy(), index=profiles.index)

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from urllib.parse import unquote
 
 import pandas as pd
+from cde_harvester.core.harvest_warnings import HarvestWarnings
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
     MAX_TRACK_POINTS_CAP,
@@ -87,6 +88,7 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
     dataset.erddap_url = ERDDAP_URL
     dataset.cdm_data_type = cdm_data_type
     dataset.logger = logging.getLogger("test")
+    dataset.warnings = HarvestWarnings(dataset.logger)
     dataset.globals = {
         "time_coverage_start": "2021-01-01T00:00:00Z",
         "time_coverage_end": "2021-01-20T00:00:00Z",
@@ -243,6 +245,23 @@ class TestDayStatsExtraction:
         days = extract_features(dataset)
         assert len(days) == 2
         assert get_handler("Trajectory").feature_kind == "trajectory_days"
+
+    def test_depth_query_with_no_rows_keeps_the_days(self):
+        # A glider whose depth column is all NaN: ERDDAP answers the per-day
+        # depth query with a no-data 404, which arrives as a column-less frame.
+        dataset = build_trajectory_dataset()
+        inner = dataset.dataset_tabledap_query.side_effect
+
+        def no_depth_rows(url):
+            if "orderByMinMax" in unquote(url):
+                return pd.DataFrame()
+            return inner(url)
+
+        dataset.dataset_tabledap_query = MagicMock(side_effect=no_depth_rows)
+        days = extract_day_stats(dataset)
+        assert len(days) == 2
+        assert days["n_records"].sum() == 800
+        assert dataset.warnings.codes() == ["DEPTH_RANGE_UNAVAILABLE"]
 
     def test_no_depth_variable_fills_zero(self):
         days = extract_day_stats(build_trajectory_dataset(with_depth=False))

@@ -5,6 +5,10 @@ import pandas as pd
 import requests
 from requests.exceptions import HTTPError
 
+from cde_harvester.core.harvest_warnings import (
+    UNKNOWN_PLATFORM_VOCABULARY,
+    HarvestWarnings,
+)
 from cde_harvester.core.observability import run_logger
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
@@ -81,6 +85,7 @@ class Dataset:
         # ERDDAP.erddap_csv_to_df so harvest_attempts can record exactly
         # what was fired. Lets an ERDDAP admin reproduce the failure.
         self.queried_urls = []
+        self.warnings = HarvestWarnings(self.logger)
         self.cdm_data_type = ""
         self.globals = {}
         self.platform = "unknown"
@@ -389,10 +394,11 @@ class Dataset:
             else:
                 self.logger.error("Found unsupported L06 platform: %s", platform)
 
-        self.logger.warning(
-            "Found platform='%s' without known vocabulary='%s', setting to 'unknown'",
-            platform,
-            platform_vocabulary,
+        self.warnings.add(
+            UNKNOWN_PLATFORM_VOCABULARY,
+            f"Platform '{platform}' has no known vocabulary "
+            f"(platform_vocabulary='{platform_vocabulary}'); set to 'unknown'",
+            items=[platform],
         )
         return "unknown"
 

@@ -64,9 +64,35 @@ test("GET /harvest/servers/:slug passes status/q through to the query", async ()
     .query({ status: "error", q: "obs_270" });
 
   assert.equal(res.status, 200);
-  // serverDatasets binds erddapUrl, erddapUrl, SPARKLINE_DEPTH, status, status, q, q, q, q
+  // serverDatasets binds erddapUrl, erddapUrl, SPARKLINE_DEPTH, status, status, q, q, q, q, warning, warning
   assert.match(db.queries[1], /'error'/);
   assert.match(db.queries[1], /'obs_270'/);
+});
+
+test("GET /harvest/servers/:slug filters on a warning code via jsonb containment", async () => {
+  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]);
+  db.queueRaw([]);
+
+  const res = await agent
+    .get("/harvest/servers/erddap-example-com-erddap")
+    .query({ warning: "FEATURES_DROPPED" });
+
+  assert.equal(res.status, 200);
+  assert.match(
+    db.queries[1],
+    /lw\.warnings @> jsonb_build_array\(jsonb_build_object\('code', CAST\('FEATURES_DROPPED' AS text\)\)\)/,
+  );
+});
+
+test("GET /harvest/servers/:slug takes warnings from the latest success attempt", async () => {
+  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]);
+  db.queueRaw([]);
+
+  await agent.get("/harvest/servers/erddap-example-com-erddap");
+
+  assert.match(db.queries[1], /LEFT JOIN LATERAL/);
+  assert.match(db.queries[1], /ok\.status = 'success'/);
+  assert.match(db.queries[1], /lw\.warnings,/);
 });
 
 test("GET /harvest/dataset/:slug/:datasetId 404s when the dataset has no harvest history", async () => {
@@ -84,12 +110,17 @@ test("GET /harvest/dataset/:slug/:datasetId returns history + meta when found", 
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
   db.queueRaw([{ run_id: "r1", status: "success" }]); // datasetHistory
   db.queueRaw([{ content_hash: "abc123", is_realtime: true }]); // datasetMeta
+  db.queueRaw([{ warnings: [{ code: "FEATURES_HIDDEN", message: "m" }] }]); // latestSuccessWarnings
 
   const res = await agent.get(
     "/harvest/dataset/erddap-example-com-erddap/obs_270",
   );
 
   assert.equal(res.status, 200);
+  assert.deepEqual(res.body.currentWarnings, [
+    { code: "FEATURES_HIDDEN", message: "m" },
+  ]);
+  assert.match(db.queries[3], /ok\.status = 'success'/);
   assert.equal(res.body.history.length, 1);
   assert.equal(res.body.meta.content_hash, "abc123");
   assert.equal(res.body.meta.is_realtime, true);
@@ -109,6 +140,7 @@ test("GET /harvest/dataset/:slug/:datasetId flags historyTruncated once the row 
     })),
   );
   db.queueRaw([{ content_hash: "abc123" }]); // datasetMeta
+  db.queueRaw([]); // latestSuccessWarnings
 
   const res = await agent.get(
     "/harvest/dataset/erddap-example-com-erddap/obs_270",
@@ -171,4 +203,26 @@ test("GET /harvest/reasons/:slug scopes the breakdown to one server", async () =
 
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, [{ reason_code: "HTTP_ERROR", n: 2 }]);
+});
+
+test("GET /harvest/warnings/:slug returns the per-code breakdown for one server", async () => {
+  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
+  const row = {
+    code: "NON_CF_STANDARD_NAMES",
+    n_datasets: 3,
+    total_count: 7,
+    dataset_ids: ["a", "b", "c"],
+  };
+  db.queueRaw([row]);
+
+  const res = await agent.get("/harvest/warnings/erddap-example-com-erddap");
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, [row]);
+  assert.match(
+    db.queries[1],
+    /erddap_url = 'https:\/\/erddap\.example\.com\/erddap'/,
+  );
+  assert.match(db.queries[1], /status = 'success'/);
+  assert.match(db.queries[1], /jsonb_array_elements\(ls\.warnings\)/);
 });

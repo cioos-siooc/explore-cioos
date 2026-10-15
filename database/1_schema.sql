@@ -710,10 +710,9 @@ CREATE TABLE cde.harvest_attempts (
     -- splits on \n and renders each as a clickable link so an admin can
     -- replay the exact requests to debug a failure.
     query_urls    text,
-    -- Non-fatal note for an otherwise-successful dataset, surfaced on the
-    -- harvest dashboard (e.g. features hidden from the map because they span
-    -- a region larger than the point threshold).
-    warnings      text,
+    -- Non-fatal notes, surfaced on the harvest dashboard: a JSON array of
+    -- {code, message, count?, items?} (codes in core/harvest_warnings.py).
+    warnings      jsonb,
     PRIMARY KEY (run_id, erddap_url, dataset_id)
 );
 CREATE INDEX harvest_attempts_dataset_idx
