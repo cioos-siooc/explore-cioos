@@ -25,10 +25,9 @@
   mask-image: linear-gradient(to bottom, #000 60%, transparent);
 }
 
-/* The "Show more" / "Copy" pills reuse .recordShowAll, which pushes itself
-   right with an auto margin meant for a flex header row. */
-.datasetAbstract .recordShowAll,
-.metadataCitation .recordShowAll {
+/* The "Show more" pill reuses .recordShowAll, which pushes itself right with
+   an auto margin meant for a flex header row. */
+.datasetAbstract .recordShowAll {
   margin-left: 0;
 }
 
@@ -97,9 +96,20 @@
   grid-column: 1 / -1;
 }
 
+/* Title and its one action (copy, the license chip) share the top line. */
+.metadataCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metadataCardHeader + * {
+  margin-top: 5px;
+}
+
 /* The same eyebrow the metadata sheet labels its fields with. */
 .metadataCardTitle {
-  margin: 0 0 5px;
+  margin: 0;
   font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -144,11 +154,57 @@
 }
 
 .metadataCitation {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  margin-bottom: 6px;
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.4;
+  color: var(--cioos-ink-80);
+}
+
+.metadataIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.metadataIconButton:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+.metadataIconButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The license as a chip on its card's title line; the full wording is the
+   tooltip. Long unrecognised wording is cut rather than wrapped. */
+.metadataLicense {
+  max-width: 70%;
+  overflow: hidden;
+  padding: 1px 9px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+a.metadataLicense {
+  text-decoration: none;
+}
+
+a.metadataLicense:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
 }
 
 .metadataTags {
@@ -185,25 +241,38 @@
   color: var(--cioos-ink-80);
 }
 
-.metadataContactRoles,
-.metadataContactEmail {
+.metadataContactRoles {
   font-size: var(--cioos-font-size-xs);
 }
 
-.metadataResources {
+/* Dates, extents and resource links: a tile each, label over value, the same
+   tile the contacts use. */
+.metadataTiles {
   display: grid;
-  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.metadataResourceFormat {
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: var(--cioos-radius-pill);
+.metadataTile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-surface-2);
+}
+
+.metadataTileLabel {
   font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--cioos-ink-80);
+}
+
+.metadataTileValue {
+  font-weight: 600;
 }

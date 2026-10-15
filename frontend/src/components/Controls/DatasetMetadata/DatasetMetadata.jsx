@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Clipboard, ClipboardCheck } from "react-bootstrap-icons";
 
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import { CardTags } from "../DatasetInspector/ListCard.jsx";
 import { formatRange } from "../../../utilities.jsx";
+import { licenseLabel } from "./license.js";
 import { renderMarkdown } from "./markdown.js";
 import "./styles.css";
 
@@ -89,12 +91,32 @@ export function DatasetAbstract({ metadata, loading }) {
 
 // One compact card per kind of metadata, always open: the page is read top to
 // bottom, so a value worth harvesting is worth showing without a click.
-function MetadataCard({ title, wide, children }) {
+function MetadataCard({ title, wide, action, children }) {
   return (
     <section className={wide ? "metadataCard wide" : "metadataCard"}>
-      <h3 className="metadataCardTitle">{title}</h3>
+      <div className="metadataCardHeader">
+        <h3 className="metadataCardTitle">{title}</h3>
+        {action}
+      </div>
       {children}
     </section>
+  );
+}
+
+// Small label-over-value tiles (a date, an extent, a link), side by side
+// where they fit. A tile with no value is left out.
+function Tiles({ items }) {
+  const shown = items.filter(([, value]) => value);
+  if (!shown.length) return null;
+  return (
+    <ul className="metadataTiles">
+      {shown.map(([label, value], i) => (
+        <li className="metadataTile" key={i}>
+          {label && <span className="metadataTileLabel">{label}</span>}
+          <span className="metadataTileValue">{value}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -121,15 +143,22 @@ function ExternalLink({ href, children }) {
 function CopyButton({ text }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const label = t(copied ? "metadataCopiedText" : "metadataCopyCitationText");
   return (
     <button
       type="button"
-      className="recordShowAll"
+      className="metadataIconButton"
+      aria-label={label}
+      title={label}
       onClick={() =>
         navigator.clipboard.writeText(text).then(() => setCopied(true))
       }
     >
-      {t(copied ? "metadataCopiedText" : "metadataCopyText")}
+      {copied ? (
+        <ClipboardCheck size={13} aria-hidden="true" />
+      ) : (
+        <Clipboard size={13} aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -153,11 +182,6 @@ function Contact({ contact }) {
         <span className="metadataContactRoles">
           {contact.roles.map(codeLabel).join(", ")}
         </span>
-      )}
-      {contact.email && (
-        <a className="metadataContactEmail" href={`mailto:${contact.email}`}>
-          {contact.email}
-        </a>
       )}
     </li>
   );
@@ -207,21 +231,75 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
   const hasContext = m.projects?.length || m.lineage || m.acknowledgement;
 
   const sections = [
+    m.license && (
+      <MetadataCard
+        key="license"
+        wide
+        title={t("metadataLicenseTitle")}
+        action={
+          /* The chip names the license; its full wording is the tooltip. */
+          m.license.url ? (
+            <a
+              className="metadataLicense"
+              href={m.license.url}
+              target="_blank"
+              rel="noreferrer"
+              title={m.license.title || m.license.url}
+            >
+              {licenseLabel(m.license)}
+            </a>
+          ) : (
+            <span className="metadataLicense" title={m.license.title}>
+              {licenseLabel(m.license)}
+            </span>
+          )
+        }
+      />
+    ),
     (citation || m.doi) && (
-      <MetadataCard key="citation" wide title={t("metadataCitationTitle")}>
-        {citation && (
-          <div className="metadataCitation">
-            <p>{citation}</p>
-            <CopyButton text={citation} />
-          </div>
-        )}
-        {m.doi && (
-          <dl>
-            <Field label="DOI">
-              <ExternalLink href={m.doi}>{m.doi}</ExternalLink>
-            </Field>
-          </dl>
-        )}
+      <MetadataCard
+        key="citation"
+        wide
+        title={t("metadataCitationTitle")}
+        action={citation && <CopyButton text={citation} />}
+      >
+        <p className="metadataCitation">
+          {citation}
+          {/* Most citations end with their DOI already. */}
+          {m.doi &&
+            !citation?.includes(
+              m.doi.replace(/^https?:\/\/doi\.org\//, ""),
+            ) && (
+              <>
+                {citation && " "}
+                <ExternalLink href={m.doi}>{m.doi}</ExternalLink>
+              </>
+            )}
+        </p>
+      </MetadataCard>
+    ),
+    hasDates && (
+      <MetadataCard key="dates" wide title={t("metadataDatesTitle")}>
+        <Tiles
+          items={[
+            [
+              t("metadataTemporalExtentText"),
+              formatRange(day(temporal.begin), day(temporal.end)),
+            ],
+            [
+              t("metadataVerticalExtentText"),
+              formatRange(vertical.min, vertical.max, "m"),
+            ],
+            [t("metadataCreatedText"), day(dates.created)],
+            [t("metadataPublishedText"), day(dates.published)],
+            [t("metadataRevisedText"), day(dates.revised)],
+            [t("metadataProgressText"), m.progress && codeLabel(m.progress)],
+            [
+              t("metadataUpdateFrequencyText"),
+              m.update_frequency && codeLabel(m.update_frequency),
+            ],
+          ]}
+        />
       </MetadataCard>
     ),
     m.contacts?.length > 0 && (
@@ -233,17 +311,6 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
         </ul>
       </MetadataCard>
     ),
-    m.license && (
-      <MetadataCard key="license" title={t("metadataLicenseTitle")}>
-        {m.license.url ? (
-          <ExternalLink href={m.license.url}>
-            {m.license.title || m.license.url}
-          </ExternalLink>
-        ) : (
-          <p>{m.license.title}</p>
-        )}
-      </MetadataCard>
-    ),
     keywords?.length > 0 && (
       <MetadataCard key="keywords" wide title={t("metadataKeywordsTitle")}>
         <div className="metadataTags">
@@ -251,27 +318,18 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
         </div>
       </MetadataCard>
     ),
-    hasDates && (
-      <MetadataCard key="dates" title={t("metadataDatesTitle")}>
-        <dl>
-          <Field label={t("metadataCreatedText")}>{day(dates.created)}</Field>
-          <Field label={t("metadataPublishedText")}>
-            {day(dates.published)}
-          </Field>
-          <Field label={t("metadataRevisedText")}>{day(dates.revised)}</Field>
-          <Field label={t("metadataTemporalExtentText")}>
-            {formatRange(day(temporal.begin), day(temporal.end))}
-          </Field>
-          <Field label={t("metadataVerticalExtentText")}>
-            {formatRange(vertical.min, vertical.max, "m")}
-          </Field>
-          <Field label={t("metadataProgressText")}>
-            {m.progress && codeLabel(m.progress)}
-          </Field>
-          <Field label={t("metadataUpdateFrequencyText")}>
-            {m.update_frequency && codeLabel(m.update_frequency)}
-          </Field>
-        </dl>
+    m.resources?.length > 0 && (
+      <MetadataCard key="resources" wide title={t("metadataResourcesTitle")}>
+        <Tiles
+          items={m.resources.map((resource, i) => [
+            resource.format,
+            <ExternalLink key={i} href={resource.url}>
+              {resource.name === "infoUrl"
+                ? t("metadataInfoUrlText")
+                : resource.name || resource.url}
+            </ExternalLink>,
+          ])}
+        />
       </MetadataCard>
     ),
     hasContext && (
@@ -291,26 +349,6 @@ export default function DatasetMetadata({ metadata, loading, error, retry }) {
             {m.acknowledgement && <Markdown text={m.acknowledgement} />}
           </Field>
         </dl>
-      </MetadataCard>
-    ),
-    m.resources?.length > 0 && (
-      <MetadataCard key="resources" wide title={t("metadataResourcesTitle")}>
-        <ul className="metadataResources">
-          {m.resources.map((resource, i) => (
-            <li key={i}>
-              <ExternalLink href={resource.url}>
-                {resource.name === "infoUrl"
-                  ? t("metadataInfoUrlText")
-                  : resource.name || resource.url}
-              </ExternalLink>
-              {resource.format && (
-                <span className="metadataResourceFormat">
-                  {resource.format}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
       </MetadataCard>
     ),
   ].filter(Boolean);

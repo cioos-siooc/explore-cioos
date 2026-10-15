@@ -15,6 +15,10 @@ const METADATA = {
   abstract: { en: "English abstract", fr: "Résumé français" },
   citation: { en: "Someone (2024). A dataset." },
   doi: "https://doi.org/10.0000/x",
+  license: {
+    title: "Creative Commons Attribution 4.0 International",
+    url: "https://creativecommons.org/licenses/by/4.0/",
+  },
   contacts: [
     {
       name: "Doe, Jane",
@@ -111,12 +115,44 @@ describe("DatasetMetadata", () => {
       .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
     expect(sections).toEqual([
+      "License",
       "How to cite",
+      "Dates and extent",
       "Contacts",
       "Keywords",
-      "Dates and extent",
       "Resources",
     ]);
+  });
+
+  it("names the license as a short chip, its full wording on hover", () => {
+    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
+    const chip = screen.getByRole("link", { name: "CC BY 4.0" });
+    expect(chip).toHaveAttribute(
+      "title",
+      "Creative Commons Attribution 4.0 International",
+    );
+  });
+
+  it("copies the citation from an icon button, and adds a DOI it lacks", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
+    expect(
+      screen.getByRole("link", { name: "https://doi.org/10.0000/x" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Copy citation" }));
+    // user-event stands in its own clipboard for the browser's.
+    expect(await navigator.clipboard.readText()).toBe(
+      "Someone (2024). A dataset.",
+    );
+    expect(
+      await screen.findByRole("button", { name: "Citation copied" }),
+    ).toBeInTheDocument();
+  });
+
+  it("never shows a contact's email", () => {
+    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
+    expect(screen.getByText("Doe, Jane")).toBeInTheDocument();
+    expect(screen.queryByText("jane@example.org")).not.toBeInTheDocument();
   });
 
   it("translates known codes and spells out unknown ones", () => {
