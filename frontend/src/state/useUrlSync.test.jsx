@@ -132,6 +132,20 @@ describe("UrlSync", () => {
     await waitFor(() => expect(params().get("coverageAxis")).toBe("seasonal"));
   });
 
+  it("records the taxonomy chart only when it is the tree", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    expect(params().has("taxonomy")).toBe(false);
+
+    act(() => hooks.ui.setTaxonomyView("tree"));
+    await waitFor(() => expect(params().get("taxonomy")).toBe("tree"));
+
+    act(() => hooks.ui.setTaxonomyView("sunburst"));
+    await waitFor(() => expect(params().has("taxonomy")).toBe(false));
+  });
+
   it("records the observations-layer switch only when turned off", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
     await waitFor(() =>

@@ -28,6 +28,7 @@
     "maplibre-gl": "^5.24.0",
     "marked": "^18.1.0",
     "mermaid": "^12.1.0",
+    "plotly.js": "^3.7.0",
     "plotly.js-basic-dist-min": "^3.0.0",
     "plotly.js-locales": "^3.0.0",
     "prop-types": "^15.8.1",
