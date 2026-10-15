@@ -18,6 +18,8 @@ export default function TaxonomyChart({ datasetId }) {
   const { t } = useTranslation();
   const { taxonomyView: view, setTaxonomyView: setView } = useUI();
   const [attempt, setAttempt] = useState(0);
+  // The chart's own controls portal into the header, beside the view toggle.
+  const [actionsEl, setActionsEl] = useState(null);
   // Tagged with the request it answers, so a dataset switch or a retry reads
   // as loading until its own response lands.
   const request = `${datasetId}#${attempt}`;
@@ -38,15 +40,24 @@ export default function TaxonomyChart({ datasetId }) {
     [checklist.taxa],
   );
 
-  const spinner = (
+  const placeholder = (
     <div className="taxonomyStatus">
-      <Spinner />
+      {view === "tree" ? (
+        <div className="taxonomyPlaceholderTree" aria-hidden="true">
+          {[0, 1, 1, 2, 2, 1, 2].map((depth, index) => (
+            <span key={index} style={{ "--depth": depth }} />
+          ))}
+        </div>
+      ) : (
+        <div className="taxonomyPlaceholderSunburst" aria-hidden="true" />
+      )}
+      <Spinner className="taxonomyPlaceholderSpinner" size="lg" />
     </div>
   );
 
   let body;
   if (checklist.request !== request) {
-    body = spinner;
+    body = placeholder;
   } else if (checklist.error) {
     body = (
       <div className="cardListEmpty" role="alert">
@@ -63,11 +74,15 @@ export default function TaxonomyChart({ datasetId }) {
   } else if (!tree.children.length) {
     body = <div className="cardListEmpty">{t("taxonomyEmptyText")}</div>;
   } else if (view === "tree") {
-    body = <TaxonomyTree key={datasetId} tree={tree} />;
+    body = <TaxonomyTree key={datasetId} tree={tree} actionsEl={actionsEl} />;
   } else {
     body = (
-      <Suspense fallback={spinner}>
-        <TaxonomySunburst key={datasetId} tree={tree} />
+      <Suspense fallback={placeholder}>
+        <TaxonomySunburst
+          key={datasetId}
+          tree={tree}
+          actionsEl={actionsEl}
+        />
       </Suspense>
     );
   }
@@ -79,21 +94,24 @@ export default function TaxonomyChart({ datasetId }) {
           <strong>{t("taxonomyTitle")}</strong>
           <span className="recordHint">{t("taxonomyHint")}</span>
         </div>
-        <div
-          className="taxonomyViewToggle"
-          role="group"
-          aria-label={t("taxonomyViewLabel")}
-        >
-          {VIEWS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={view === option}
-              onClick={() => setView(option)}
-            >
-              {t(`taxonomyView_${option}`)}
-            </button>
-          ))}
+        <div className="taxonomyControls">
+          <div className="taxonomyActions" ref={setActionsEl} />
+          <div
+            className="taxonomyViewToggle"
+            role="group"
+            aria-label={t("taxonomyViewLabel")}
+          >
+            {VIEWS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={view === option}
+                onClick={() => setView(option)}
+              >
+                {t(`taxonomyView_${option}`)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {body}

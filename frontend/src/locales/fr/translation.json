@@ -959,7 +959,6 @@
   "taxonomyView_tree": "Arbre",
   "taxonomyAllText": "Tous",
   "taxonomyRecordsText": "Occurrences",
-  "taxonomyExpandAllText": "Tout déplier",
   "taxonomyCollapseAllText": "Replier",
   "taxonomyLoadFailedText": "La taxonomie n'a pas pu être chargée depuis OBIS.",
   "taxonomyEmptyText": "OBIS ne répertorie aucun taxon pour ce jeu de données.",

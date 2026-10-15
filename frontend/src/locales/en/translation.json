@@ -958,7 +958,6 @@
   "taxonomyView_tree": "Tree",
   "taxonomyAllText": "All",
   "taxonomyRecordsText": "Records",
-  "taxonomyExpandAllText": "Expand all",
   "taxonomyCollapseAllText": "Collapse",
   "taxonomyLoadFailedText": "The taxonomy could not be loaded from OBIS.",
   "taxonomyEmptyText": "OBIS lists no taxa for this dataset.",
