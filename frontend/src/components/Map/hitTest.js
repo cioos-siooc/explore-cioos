@@ -418,6 +418,16 @@ export const buildFeatureQuery = (
   };
 };
 
+// Once one dataset's page is open from the card, the other grids stacked under
+// the click are no longer what is being read: griddap-highlight draws the open
+// one, so the click highlight keeps only its cells and markers.
+export const withoutGridHighlight = (highlight) => ({
+  ...highlight,
+  features: highlight.features.filter(
+    (feature) => feature.properties.role === "both",
+  ),
+});
+
 // Hex and marker features carry the datasets they aggregate as a JSON array
 // of pks (MapLibre hands nested properties back as strings). Both the dimming
 // and the ramp's domain ask the same question of them.

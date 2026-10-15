@@ -27,6 +27,9 @@ class DatasetTypeHandler(ABC):
     # the [time_min, time_max] span already IS the day set and the database
     # fills `days` from it.
     features_span_multiple_days: bool = False
+    # Whether a cf_role=profile_id on `time` is dropped before enumerating
+    # features, identifying them by their other cf_role variables only.
+    collapse_time_profile_ids: bool = False
 
     @abstractmethod
     def extract_features(self, dataset) -> pd.DataFrame:
@@ -45,6 +48,12 @@ class DatasetTypeHandler(ABC):
         extraction. Default = no-op. TimeSeriesProfile overrides this with
         its collapse-to-timeseries logic."""
         return profiles_with_lat_lon, profile_variables, profile_variable_list
+
+    def rows_per_timestep(self, dataset, profiles, profile_variable_list):
+        """Hook: records one ``time_coverage_resolution`` timestep holds, per
+        feature (a scalar or a Series aligned to ``profiles``). Default 1: a
+        timeseries record is one row per timestep."""
+        return 1
 
     def extract_track_points(self, dataset):
         """Hook: secondary output — ordered, downsampled track fixes

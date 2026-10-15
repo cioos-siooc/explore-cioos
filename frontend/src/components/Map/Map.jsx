@@ -79,6 +79,7 @@ import {
   selectedTrackLayers,
   trackClickLayers,
   trackItemsIn,
+  withoutGridHighlight,
 } from "./hitTest.js";
 import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
@@ -471,9 +472,8 @@ const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
 // then each site is marked individually rather than the file being exempted,
 // so effects added later are still checked.
 export default function CreateMap({
-  // The query string the map draws from: the filters, narrowed to the dataset
-  // groups still shown (MapStateProvider assembles it — the sidebar list keeps
-  // the hidden groups, the tiles don't).
+  // The query string the map draws from: the filters, narrowed by the text
+  // search (MapStateProvider assembles it).
   mapQueryString,
   // No setPointsToReview: that list is the download selection, derived in
   // SelectionProvider from the `selected` flags on the results. The map used to
@@ -491,8 +491,6 @@ export default function CreateMap({
   // Hands the "what's here" card its payload: everything one click found under
   // it, or null for a click on empty water. See handleMapClick.
   onFeatureQuery = () => {},
-  // A box or polygon has just been finished with the draw tools.
-  onShapeDrawn = () => {},
   // The same payload handed back, so the map can outline the region the open
   // card is describing.
   featureQuery,
@@ -1670,19 +1668,26 @@ export default function CreateMap({
   useEffect(() => {
     const source = map.current?.getSource("click-highlight");
     if (!source) return;
-    source.setData(featureQuery?.highlight || emptyFeatureCollection);
+    const highlight = featureQuery?.highlight || emptyFeatureCollection;
+    source.setData(
+      inspectDataset ? withoutGridHighlight(highlight) : highlight,
+    );
     if (!featureQuery?.highlight?.features?.length) return;
     if (revealedQueryNonce.current === featureQuery.nonce) return;
-    revealedQueryNonce.current = featureQuery.nonce;
     const bounds = boundsFromGeoJson({
       coordinates: featureQuery.highlight.features.map(
         (f) => f.geometry.coordinates,
       ),
     });
     // A frame later, once the card or sidebar this click opened is marked.
-    const frame = requestAnimationFrame(() => revealBounds(bounds));
+    // The nonce is only spent once the reveal runs: opening a page re-runs
+    // this effect, and its cleanup would otherwise cancel the pending reveal.
+    const frame = requestAnimationFrame(() => {
+      revealedQueryNonce.current = featureQuery.nonce;
+      revealBounds(bounds);
+    });
     return () => cancelAnimationFrame(frame);
-  }, [featureQuery]);
+  }, [featureQuery, inspectDataset]);
 
   // Coverage rectangles under the cursor, deduped by dataset: a stack of
   // gridded datasets covering the same water is the norm, not the exception.
@@ -1859,7 +1864,9 @@ export default function CreateMap({
   // list, else the dataset whose page is open. Inspecting a dataset therefore
   // pins the same highlight hovering gives, until it's closed. Every other
   // dataset stays on the map, drawn grey — they are still the context this one
-  // is being read against.
+  // is being read against. The sole writer of griddap-highlight: a shown WMS
+  // overlay's footprint is pinned from here too, since a second writer in the
+  // overlay effect ran later in the same commit and wiped the open grid's box.
   useEffect(() => {
     if (map.current) {
       const focusedDataset = hoveredDataset || inspectDataset;
@@ -1987,7 +1994,6 @@ export default function CreateMap({
     activeWmsOverlayRef.current = activeWmsOverlay;
     removeWmsOverlay();
     if (!activeWmsOverlay) {
-      setGriddapHighlight(null);
       revealedWmsPk.current = undefined;
       return;
     }
@@ -1996,8 +2002,6 @@ export default function CreateMap({
     wmsMoveHandler.current = rerender;
     map.current.on("moveend", rerender);
     setDataLayersVisibility(false);
-    // pin the dataset's footprint outline while its overlay is shown
-    setGriddapHighlight(activeWmsOverlay.bbox);
     // Once per dataset: a new slice or variable is the same layer in the same
     // place, and the user may have moved off it on purpose.
     if (revealedWmsPk.current !== activeWmsOverlay.pk) {
@@ -2058,7 +2062,6 @@ export default function CreateMap({
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
   const onMarkerClickRef = useRef(onMarkerClick);
   const onTrackClickRef = useRef(onTrackClick);
-  const onShapeDrawnRef = useRef(onShapeDrawn);
 
   // The latest-value refs above, for the handlers registered once on mount.
   // Written after commit rather than during render, so a render React throws
@@ -2073,7 +2076,6 @@ export default function CreateMap({
     onFeatureQueryRef.current = onFeatureQuery;
     onMarkerClickRef.current = onMarkerClick;
     onTrackClickRef.current = onTrackClick;
-    onShapeDrawnRef.current = onShapeDrawn;
   });
 
   // The filter query and the data-layer selection combine into one suffix
@@ -3681,7 +3683,12 @@ export default function CreateMap({
           .getSource("click-highlight")
           ?.setData(emptyFeatureCollection);
         const track = tracks[0];
-        onTrackClickRef.current(track.pk, track.trajectoryId, track.title);
+        // Where on the track: the dataset page lists when the platform was in
+        // the hex under this point (the area a hex click would have named).
+        onTrackClickRef.current(track.pk, track.trajectoryId, track.title, {
+          lngLat: [e.lngLat.lng, e.lngLat.lat],
+          z: Math.floor(map.current.getZoom()),
+        });
         return;
       }
 
@@ -3886,7 +3893,6 @@ export default function CreateMap({
       const polygon = feature.geometry.coordinates[0];
       highlightPoints(polygon);
       setPolygon(polygon);
-      onShapeDrawnRef.current();
       map.current.getCanvas().style.cursor = "unset";
       // Straight into direct_select so the shape is immediately draggable
       // (yellow, with handles) rather than sitting in simple_select first.

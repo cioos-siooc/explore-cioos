@@ -68,7 +68,6 @@ test("no preview param collides with one the map or the filters already use", ()
     "search",
     "onlyInView",
     "groupBy",
-    "hiddenGroups",
     "dataset",
     "server",
     // The dataset page's own params, added alongside the preview and the

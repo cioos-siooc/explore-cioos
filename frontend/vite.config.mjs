@@ -2,6 +2,27 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { fileURLToPath } from "node:url";
+
+// The harvest docs live in the repo-root docs/ folder, beside the harvester
+// they describe; the frontend image builds from the repo root to reach them.
+const harvestDocs = fileURLToPath(
+  new URL("../docs/harvesting", import.meta.url),
+);
+
+// Plotly's source registry requires its own (older) maplibre-gl CSS for map
+// traces we never register. Bundled from source, that require becomes a global
+// stylesheet on chunk load, and its `.maplibregl-map { position: relative }`
+// collapses the app's map to zero height.
+const dropPlotlyMaplibreCss = {
+  name: "drop-plotly-maplibre-css",
+  enforce: "pre",
+  load(id) {
+    return /\/plotly\.js\/node_modules\/maplibre-gl\/.*\.css$/.test(id)
+      ? ""
+      : null;
+  },
+};
 
 export default defineConfig(({ mode }) => {
   // Keep the pre-Vite deploy contract: plain API_URL / BASE_URL /
@@ -17,6 +38,7 @@ export default defineConfig(({ mode }) => {
     base: env.BASE_URL || "/",
     plugins: [
       react(),
+      dropPlotlyMaplibreCss,
       // npm run build:analyze -> treemap of bundle composition
       process.env.ANALYZE &&
         visualizer({ filename: "dist/stats.html", open: true, gzipSize: true }),
@@ -32,6 +54,7 @@ export default defineConfig(({ mode }) => {
           sourcemaps: { filesToDeleteAfterUpload: ["dist/**/*.map"] },
         }),
     ].filter(Boolean),
+    resolve: { alias: { "@harvest-docs": harvestDocs } },
     define: {
       "process.env.API_URL": JSON.stringify(env.API_URL),
       "process.env.BASE_URL": JSON.stringify(env.BASE_URL || "/"),
@@ -44,6 +67,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 8000,
+      fs: { allow: [".", harvestDocs] },
       // Dev-only: forward /api to the docker-compose nginx (published on
       // NGINX_PORT, default 8098, by docker-compose.override.yaml), which
       // proxies on to web-api:5000. Keeps dev same-origin and on the exact
@@ -87,7 +111,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "dist",
-      sourcemap: true,
+      // Only the Sentry plugin consumes (and then deletes) the maps; without
+      // it they would ship publicly and cost ~0.8 GB of build memory.
+      sourcemap: !!env.SENTRY_AUTH_TOKEN,
       rollupOptions: {
         output: {
           manualChunks: {

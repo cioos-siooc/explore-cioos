@@ -27,6 +27,9 @@ export default function DatasetPreview({
   datasetPreview,
   inspectDataset,
   inspectRecordID,
+  // {start, end} UTC days when one period of the record is shown (a
+  // trajectory's pass through the selected area) rather than its latest data.
+  inspectRecordPeriod,
   setInspectRecordID,
   showModal,
   recordLoading,
@@ -153,6 +156,11 @@ export default function DatasetPreview({
 
             <h4 className="datasetTitle">
               {inspectDataset.title}: <i>{inspectRecordID}</i>
+              {inspectRecordPeriod && (
+                <span className="datasetPreviewPeriod">
+                  {t("datasetPreviewPeriodText", inspectRecordPeriod)}
+                </span>
+              )}
             </h4>
 
             {dataIsReady && (

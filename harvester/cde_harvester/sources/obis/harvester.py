@@ -12,6 +12,7 @@ import pandas as pd
 import requests
 from cde_harvester.core.day_sets import days_to_ranges
 from cde_harvester.core.frame_spill import SpillSet
+from cde_harvester.core.harvest_warnings import OCCURRENCES_DROPPED, HarvestWarnings
 from cde_harvester.core.obis_cells import merge_cell_partials
 from cde_harvester.core.observability import run_logger
 from cde_harvester.core.schemas import (
@@ -26,6 +27,8 @@ from cde_harvester.sources.base import BaseHarvester, HarvestResult
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
+from cioos_metadata_conversion.load_from import obis as obis_conversion
+from cioos_metadata_conversion.load_from.obis import map_obis_to_cioos
 from prefect import task
 
 logger = logging.getLogger(__name__)
@@ -51,6 +54,15 @@ FETCH_VECTORS_PER_CHUNK = 100
 # not a limit at all; this keeps its share well clear of the harvester's.
 OBIS_DUCKDB_MEMORY_LIMIT = os.environ.get("OBIS_DUCKDB_MEMORY_LIMIT", "512MB")
 
+# Threads for the duckdb connection the metadata conversion scans each dataset's
+# parquet with. Its peak grows with the thread count and memory_limit does not
+# bound it (CPR's eMoF scan: 1.56 GB at 24 threads, 0.9 GB at 8); a limit low
+# enough to matter makes the scan fail and the converter fall back to sampling
+# the API, which silently drops EOVs.
+OBIS_CONVERSION_DUCKDB_THREADS = int(
+    os.environ.get("OBIS_CONVERSION_DUCKDB_THREADS", min(os.cpu_count() or 1, 8))
+)
+
 
 # The epoch-millisecond range datetime64[ns] can represent (1677-09-21 to
 # 2262-04-11). OBIS carries dates well outside it -- fossil and historical
@@ -74,7 +86,10 @@ def _epoch_ms_to_utc(series):
     """
     values = pd.to_numeric(series, errors="coerce")
     low, high = _REPRESENTABLE_MS
-    values = values.where((values >= low) & (values <= high))
+    # float64: pandas 2.3's to_datetime cache maps an Int64 <NA> to a bogus
+    # negative index ("'indices' contains values less than allowed"); epoch ms
+    # of real dates are exact in float64 and NaN parses cleanly.
+    values = values.where((values >= low) & (values <= high)).astype("float64")
     return pd.to_datetime(values, unit="ms", errors="coerce", utc=True)
 
 
@@ -170,7 +185,7 @@ class OBISHarvester(BaseHarvester):
         spills = SpillSet(flush_every=self.CELLS_FLUSH_EVERY, prefix="obis_cells_")
 
         def record_attempt(dataset_id, status, reason_code=None,
-                           error_message=None, duration_ms=None):
+                           error_message=None, duration_ms=None, warnings=None):
             # Surface the two OBIS endpoints we hit so the dashboard can show
             # exactly what was fetched per dataset.
             query_urls = [
@@ -188,6 +203,7 @@ class OBISHarvester(BaseHarvester):
                 "duration_ms": duration_ms,
                 "attempted_at": datetime.now(UTC),
                 "query_urls": "\n".join(query_urls),
+                "warnings": warnings.to_json() if warnings else None,
             })
 
         with spills:
@@ -227,6 +243,7 @@ class OBISHarvester(BaseHarvester):
                         # gives exactly what one pass over the whole dataset
                         # would -- see core.obis_cells.
                         stats = {"n_occurrences": 0, "n_dropped": 0, "n_kept": 0}
+                        warnings = HarvestWarnings(self.logger)
                         partials = []
                         for chunk in self.iter_occurrences(dataset_id, bbox=bbox):
                             partial = self._aggregate_chunk(
@@ -235,7 +252,7 @@ class OBISHarvester(BaseHarvester):
                             del chunk
                             if not partial.empty:
                                 partials.append(partial)
-                        self._log_aggregate_stats(dataset_id, stats)
+                        self._log_aggregate_stats(dataset_id, stats, warnings)
 
                         if not stats["n_occurrences"]:
                             self.logger.warning("No occurrences for dataset %s", dataset_id)
@@ -259,6 +276,7 @@ class OBISHarvester(BaseHarvester):
                                 reason_code="NO_VALID_COORDINATES",
                                 error_message="No occurrences had valid lat/lon after filtering",
                                 duration_ms=int((time.monotonic() - t0) * 1000),
+                                warnings=warnings,
                             )
                             break
 
@@ -269,6 +287,7 @@ class OBISHarvester(BaseHarvester):
                         record_attempt(
                             dataset_id, status="success",
                             duration_ms=int((time.monotonic() - t0) * 1000),
+                            warnings=warnings,
                         )
                         break
 
@@ -324,9 +343,8 @@ class OBISHarvester(BaseHarvester):
                 else pd.DataFrame(columns=attempt_columns)
             )
 
-            # Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs)
             if not df_datasets.empty:
-                df_datasets = self._enrich_with_ckan(df_datasets)
+                df_datasets = self._enrich_metadata(df_datasets)
 
             return HarvestResult(
                 profiles=df_profiles,
@@ -337,13 +355,22 @@ class OBISHarvester(BaseHarvester):
                 attempts=df_attempts,
             )
 
+    def _enrich_metadata(self, df_datasets):
+        """Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs), or
+        with their converted OBIS metadata when CKAN has no record."""
+        df_datasets = self._enrich_with_conversion(self._enrich_with_ckan(df_datasets))
+        # obis_derive_eovs() rebuilds `eovs` as these plus the taxon-derived EOVs.
+        df_datasets["declared_eovs"] = df_datasets["eovs"]
+        return df_datasets
+
     def _enrich_with_ckan(self, df_datasets):
         """Join CKAN metadata onto datasets for EOVs, French titles, and CKAN IDs."""
         self.logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
-        df_ckan = get_ckan_obis_records(
-            df_datasets["dataset_id"].tolist(), cache_folder=self.folder,
-            erddap_url=OBIS_SOURCE_URL,
-        )
+        ipt_urls = {
+            dataset_id: self.fetch_dataset_metadata(dataset_id).get("url")
+            for dataset_id in df_datasets["dataset_id"]
+        }
+        df_ckan = get_ckan_obis_records(ipt_urls, erddap_url=OBIS_SOURCE_URL)
 
         if df_ckan.empty:
             df_datasets["title_fr"] = None
@@ -357,13 +384,62 @@ class OBISHarvester(BaseHarvester):
             lambda r: r["ckan_eovs"] if isinstance(r.get("ckan_eovs"), list) and r["ckan_eovs"] else r["eovs"],
             axis=1,
         )
-        df_datasets["declared_eovs"] = df_datasets["eovs"]
         # Use CKAN title if available, keep OBIS title as fallback
         df_datasets["title"] = df_datasets["ckan_title"].fillna(df_datasets["title"])
 
         df_datasets.drop(columns=["ckan_eovs", "ckan_title"], inplace=True)
 
         return df_datasets
+
+    def _enrich_with_conversion(self, df_datasets):
+        """Fill EOVs and summary of datasets without a CKAN record from their converted OBIS metadata."""
+        df_datasets["summary"] = None
+        unmatched = df_datasets.index[df_datasets["ckan_id"].isna()]
+        total = len(unmatched)
+        converted = 0
+        for i, idx in enumerate(unmatched, 1):
+            if i % 50 == 0 or i == total:
+                self.logger.info("Metadata conversion progress: %d/%d", i, total)
+            record = self.convert_metadata(df_datasets.at[idx, "dataset_id"])
+            if record:
+                df_datasets.at[idx, "eovs"] = record["eov"]
+                df_datasets.at[idx, "summary"] = record["abstract"]["en"] or None
+                converted += 1
+        self.logger.info(
+            "Converted OBIS metadata for %d / %d datasets without a CKAN record", converted, total,
+        )
+        return df_datasets
+
+    def convert_metadata(self, dataset_id):
+        """Convert a dataset's OBIS metadata to a CIOOS record with cioos-metadata-conversion."""
+        cache_file = os.path.join(self.folder, f"{dataset_id}_cioos.json")
+        cached = self._read_cache(cache_file)
+        if cached is not None:
+            return cached
+
+        metadata = self.fetch_dataset_metadata(dataset_id)
+        if not metadata:
+            return None
+
+        import duckdb
+
+        # The converter otherwise reads through one module-global connection it
+        # never closes, whose memory ratchets from dataset to dataset (1.4 GB to
+        # 6 GB over a full run, #241); give it a fresh one per dataset instead.
+        con = duckdb.connect(config={"threads": OBIS_CONVERSION_DUCKDB_THREADS})
+        obis_conversion._DUCKDB_CON = con
+        try:
+            con.execute("INSTALL httpfs; LOAD httpfs;")
+            record = map_obis_to_cioos(metadata)
+        except Exception as e:
+            self.logger.warning("Metadata conversion failed for %s: %s", dataset_id, e)
+            return None
+        finally:
+            obis_conversion._DUCKDB_CON = None
+            con.close()
+
+        self._write_cache(cache_file, record)
+        return record
 
     def aggregate_cells(self, dataset_id, results, apply_filter=False):
         """Aggregate occurrences by unique lat/lon grid cell into obis_cells rows.
@@ -393,7 +469,7 @@ class OBISHarvester(BaseHarvester):
         cells["depth_max"] = cells["depth_max"].fillna(0)
         return cells
 
-    def _log_aggregate_stats(self, dataset_id, stats):
+    def _log_aggregate_stats(self, dataset_id, stats, warnings):
         """Report one chunked dataset's filtering totals in a single line each.
 
         `_aggregate_chunk` accumulates instead of logging because it runs per
@@ -403,9 +479,12 @@ class OBISHarvester(BaseHarvester):
         memory this is trying to bound.
         """
         if stats.get("n_dropped"):
-            self.logger.warning(
-                "Dropped %d occurrences with out-of-range coordinates for %s",
-                stats["n_dropped"], dataset_id,
+            warnings.add(
+                OCCURRENCES_DROPPED,
+                f"{stats['n_dropped']} of {stats['n_occurrences']} occurrences "
+                "dropped: coordinates outside the Web Mercator range "
+                "(|latitude| > 85.06 or |longitude| > 180)",
+                count=stats["n_dropped"],
             )
         if stats.get("n_filtered") is not None:
             self.logger.info(
@@ -580,7 +659,7 @@ class OBISHarvester(BaseHarvester):
 
     def _clear_cache(self, dataset_id):
         """Delete cached occurrence and metadata files for a dataset."""
-        for name in [f"{dataset_id}.json", f"{dataset_id}_metadata.json"]:
+        for name in [f"{dataset_id}.json", f"{dataset_id}_metadata.json", f"{dataset_id}_cioos.json"]:
             for path in [
                 os.path.join(self.folder, name),
                 os.path.join(self.folder, name + ".gz"),

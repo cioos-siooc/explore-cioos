@@ -51,6 +51,29 @@ test.describe("filters", () => {
     await expect(page).toHaveURL(/eovs=/);
   });
 
+  test("ocean variables are grouped, and a category is searchable and selectable as one", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.getByTestId("topbar-filters-button").click();
+    await page.locator('[data-filter-name="oceanVariablesFiltername"]').click();
+
+    await page
+      .getByPlaceholder("Search ocean variables or categories...")
+      .fill("physical");
+    const groups = page.getByTestId("filter-option-group");
+    await expect(groups).toHaveCount(1);
+    await expect(groups).toHaveText("Physical");
+    const physical = page.getByRole("group", { name: "Physical" });
+    await expect(physical.getByTestId("filter-option")).toHaveCount(
+      await page.getByTestId("filter-option").count(),
+    );
+
+    await groups.click();
+    await expect(groups).toHaveAttribute("aria-checked", "true");
+    await expect(page).toHaveURL(/eovs=[^&]*seaSurfaceHeight/);
+  });
+
   test("a filtered link comes back as the same view", async ({ page }) => {
     // The round trip that useUrlSync exists for: the URL is written from state,
     // and every provider seeds itself back out of it on the next load.

@@ -18,6 +18,7 @@ export default function PreviewHost() {
     setInspectDataset,
     showPreviewModal,
     inspectRecordID,
+    inspectRecordPeriod,
     setInspectRecordID,
     recordLoading,
     setRecordLoading,
@@ -35,6 +36,7 @@ export default function PreviewHost() {
         setInspectDataset={setInspectDataset}
         showModal={showPreviewModal}
         inspectRecordID={inspectRecordID}
+        inspectRecordPeriod={inspectRecordPeriod}
         setInspectRecordID={setInspectRecordID}
         recordLoading={recordLoading}
         setRecordLoading={setRecordLoading}

@@ -20,14 +20,16 @@
 // options render once, under the pair.
 //
 // 'trajectories' (plural) is the plain-Trajectory key. It keeps its old name
-// so the ?layers= links already in the wild still resolve.
+// so the ?layers= links already in the wild still resolve. 'point' was 'obis'
+// until Point became a geometry of its own; LEGACY_DATA_LAYER_KEYS maps the
+// old name for those links.
 export const DATA_LAYER_LABEL_KEYS = {
   profile: "layerProfile",
   timeseries: "layerTimeseries",
   timeseriesProfile: "layerTimeseriesProfile",
   trajectories: "layerTrajectories",
   trajectoryProfile: "layerTrajectoryProfile",
-  obis: "layerObis",
+  point: "layerPoint",
   grid: "layerGrid",
 };
 
@@ -39,7 +41,7 @@ export const DATA_LAYER_HINT_KEYS = {
   timeseriesProfile: "layerTimeseriesProfileHint",
   trajectories: "layerTrajectoriesHint",
   trajectoryProfile: "layerTrajectoryProfileHint",
-  obis: "layerObisHint",
+  point: "layerPointHint",
   grid: "layerGridHint",
 };
 
@@ -55,6 +57,10 @@ export const anyTrajectoryLayerOn = (dataLayers) =>
   !dataLayers || TRAJECTORY_LAYER_KEYS.some((key) => dataLayers[key]);
 
 export const DATA_LAYER_KEYS = Object.keys(DATA_LAYER_LABEL_KEYS);
+
+const LEGACY_DATA_LAYER_KEYS = { obis: "point" };
+
+export const currentDataLayerKey = (key) => LEGACY_DATA_LAYER_KEYS[key] ?? key;
 
 export const ALL_DATA_LAYERS = Object.fromEntries(
   DATA_LAYER_KEYS.map((key) => [key, true]),
@@ -115,30 +121,28 @@ export const TRAJECTORY_TYPE_KEYS = [
   ["trajectoryProfile", "TrajectoryProfile"],
 ];
 
-const TYPE_TO_KEY = new Map(
-  [...PROFILE_TYPE_KEYS, ...TRAJECTORY_TYPE_KEYS].map(([key, type]) => [
+// Point is OBIS occurrences today; an ERDDAP Point dataset would join the same
+// switch once the harvester admits the type.
+const TYPE_TO_KEY = new Map([
+  ...[...PROFILE_TYPE_KEYS, ...TRAJECTORY_TYPE_KEYS].map(([key, type]) => [
     type,
     key,
   ]),
-);
+  ["Point", "point"],
+  ["Grid", "grid"],
+]);
 
-// Which switch governs a dataset, or undefined when none does. OBIS datasets
-// carry cdm_data_type 'Point' — which an ERDDAP dataset can legitimately be
-// too — so they're matched on source first, the same way SelectionProvider
-// tells them apart. Griddap datasets carry cdm_data_type 'Grid' and are
-// matched on that, same as every other geometry — the gridded-coverage map
-// switch (griddapCoverageVisible) stays independent of this filter, the same
-// way the trajectory track-lines switch is independent of the trajectory
-// rows: both are map appearance, not dataset admission.
+// Which switch governs a dataset, or undefined when none does. The
+// gridded-coverage map switch (griddapCoverageVisible) stays independent of
+// this filter, the same way the trajectory track-lines switch is independent
+// of the trajectory rows: both are map appearance, not dataset admission.
 export function dataLayerKeyForDataset(row) {
-  if (row.source_type === "obis") return "obis";
-  if (row.cdm_data_type === "Grid") return "grid";
   return TYPE_TO_KEY.get(row.cdm_data_type);
 }
 
 // A cdm_data_type in the geometry filter's own words, so a type reads the same
 // on a card, a group heading and the coverage chart as in the filter. A type
-// no switch names (e.g. OBIS 'Point', the same word in French) is shown as-is.
+// no switch names is shown as-is.
 export function cdmDataTypeLabel(type, t) {
   const key = dataLayerKeyForDataset({ cdm_data_type: type });
   return key ? t(DATA_LAYER_LABEL_KEYS[key]) : type;

@@ -8,7 +8,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
@@ -28,9 +28,14 @@ import {
 import erddapServersJSONfile from "../../erddapServers.json";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
-import { GROUP_NONE, hiddenDatasetPksFor } from "../datasetGroups.js";
+import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
-import { RECORD_PARAM, withoutPreviewParams } from "./previewParams.js";
+import {
+  PERIOD_PARAM,
+  RECORD_PARAM,
+  parsePeriod,
+  withoutPreviewParams,
+} from "./previewParams.js";
 import { useViewportDatasetPks } from "./viewportDatasetPks.js";
 
 const SelectionContext = createContext();
@@ -96,6 +101,8 @@ export default function SelectionProvider({ children }) {
     dataLayers,
   } = useMapState();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     languageRef.current = i18n.language;
@@ -124,7 +131,8 @@ export default function SelectionProvider({ children }) {
 
   // One platform (trajectory id) picked in the dataset inspector to draw its
   // track on the map, clipped to the time filter: {datasetPk, datasetTitle,
-  // trajectoryId, frameView} | undefined.
+  // trajectoryId, frameView, area} | undefined. `area` ({lngLat, z}) is set
+  // only by a click on the track itself.
   const [selectedTrajectory, setSelectedTrajectory] = useState();
 
   // The one record (timeseries_id/profile_id) an unambiguous map marker click
@@ -180,17 +188,11 @@ export default function SelectionProvider({ children }) {
     Boolean(initialParams.get(RECORD_PARAM)),
   );
   const [datasetPreview, setDatasetPreview] = useState();
-  // Free-text title search for the datasets list (DatasetsTable's search
-  // box). Lifted out of that component so it can also surface as a
+  // Free-text title search: a filter like any other, set from the Filters
+  // modal's search (which the sidebar's search box opens) and shown as a
   // removable chip in ActiveFilterChips.
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
     () => initialParams.get("search") || "",
-  );
-  // The datasets sidebar's own search box. Unlike the title search above it is
-  // not a filter: it only narrows the list being read (listedDatasets below),
-  // never the map, the counters or the downloads.
-  const [listSearchText, setListSearchText] = useState(
-    () => initialParams.get("listSearch") || "",
   );
   const [combinedQueries, setCombinedQueries] = useState([]);
   // "Only in view": restrict the list to datasets whose extent overlaps the
@@ -200,25 +202,12 @@ export default function SelectionProvider({ children }) {
     () => initialParams.get("onlyInView") === "true",
   );
 
-  // Grouping of the datasets list, and the groups the user has hidden from the
-  // map. Both live here rather than in DatasetsTable: the hidden groups decide
-  // what the map draws (see mapDatasetPKs below), and both are shareable — the
-  // list can unmount (the inspector takes over the panel) without losing them.
-  const [groupBy, setGroupByState] = useState(() => {
+  // Grouping of the datasets list. Lives here rather than in DatasetsTable so
+  // it survives the list unmounting while a dataset page replaces it.
+  const [groupBy, setGroupBy] = useState(() => {
     const initialGroupBy = initialParams.get("groupBy");
-    return !initialGroupBy || initialGroupBy === "selected"
-      ? GROUP_NONE
-      : initialGroupBy;
+    return isGroupDimension(initialGroupBy) ? initialGroupBy : GROUP_NONE;
   });
-  const [hiddenGroups, setHiddenGroups] = useState(
-    () =>
-      new Set(
-        (initialParams.get("hiddenGroups") || "")
-          .split(",")
-          .map((key) => decodeURIComponent(key))
-          .filter(Boolean),
-      ),
-  );
 
   // Per-dataset bbox, computed once per result set from the filtered extent
   // (falls back to the coverage bbox, the only one grids carry).
@@ -308,18 +297,9 @@ export default function SelectionProvider({ children }) {
     i18n.language,
   ]);
 
-  const listedDatasets = useMemo(() => {
-    if (isEmpty(listSearchText)) return filteredDatasets;
-    const query = listSearchText.toLowerCase();
-    return filteredDatasets.filter((row) =>
-      datasetMatchesSearch(row, query, i18n.language),
-    );
-  }, [filteredDatasets, listSearchText, i18n.language]);
-
   // Over filteredDatasets rather than pointsData: the title search and the
   // data-layer switches narrow only client-side, so the raw in-view set still
-  // counted every dataset they took out ("0/N datasets (917 in view)"). Not
-  // over listedDatasets: the sidebar's own search never moves the counters.
+  // counted every dataset they took out ("0/N datasets (917 in view)").
   const inViewCount = useMemo(
     () =>
       filteredDatasets.filter((row) => datasetsInViewPks.has(row.pk)).length,
@@ -342,9 +322,8 @@ export default function SelectionProvider({ children }) {
   // returns pointsData itself when none of the three is active, and undefined
   // here leaves the query as the filters wrote it (see applyDatasetPKs).
   //
-  // Deliberately NOT mapDatasetPks: that one carries the hidden groups (a map
-  // visibility toggle the list ignores) and deliberately drops "only in view",
-  // which would rewrite every tile URL on every pan. This one is the list.
+  // Deliberately NOT mapDatasetPks: that one drops "only in view", which would
+  // rewrite every tile URL on every pan. This one is the list.
   const filteredDatasetPks = useMemo(
     () =>
       filteredDatasets === pointsData
@@ -368,45 +347,12 @@ export default function SelectionProvider({ children }) {
     [shortlist],
   );
 
-  // Group keys are only meaningful within one dimension, so switching
-  // dimensions drops whatever was hidden under the old one.
-  const setGroupBy = useCallback((dimension) => {
-    setGroupByState(dimension);
-    setHiddenGroups(new Set());
-  }, []);
-
-  const toggleGroupHidden = useCallback((group) => {
-    setHiddenGroups((previous) => {
-      const next = new Set(previous);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      return next;
-    });
-  }, []);
-
-  const showAllGroups = useCallback(() => setHiddenGroups(new Set()), []);
-
-  // Datasets hidden from the map by their group. The list still shows them —
-  // this is a visibility toggle, not a filter.
-  const hiddenDatasetPks = useMemo(
-    () =>
-      hiddenDatasetPksFor(
-        pointsData,
-        groupBy,
-        hiddenGroups,
-        datasetsInViewPks,
-        selectedPks,
-      ),
-    [pointsData, groupBy, hiddenGroups, datasetsInViewPks, selectedPks],
-  );
-
   // Hand the map the datasets it may draw. The tile/legend/coverage queries
   // take an include list (datasetPKs), so the narrowing is expressed as a pk
   // list over the current results; undefined while nothing narrows them leaves
   // those queries as the filters wrote them.
   //
-  // Two things narrow it: the groups hidden in the list, and the free-text
-  // search. The search is a filter rather than a display choice, so the map
+  // The free-text search narrows it. The search is a filter rather than a display choice, so the map
   // has to honour it — drawing markers and hexes for datasets the search has
   // taken out of the list is the map disagreeing with its own sidebar. The
   // other two narrowings filteredDatasets applies stay out of it: the
@@ -423,15 +369,11 @@ export default function SelectionProvider({ children }) {
   const mapDatasetPks = useMemo(() => {
     const query = datasetTitleSearchText.toLowerCase();
     const hasSearch = !isEmpty(datasetTitleSearchText);
-    if (hiddenDatasetPks.size === 0 && !hasSearch) return undefined;
+    if (!hasSearch) return undefined;
     return pointsData
-      .filter(
-        (row) =>
-          !hiddenDatasetPks.has(row.pk) &&
-          (!hasSearch || datasetMatchesSearch(row, query, i18n.language)),
-      )
+      .filter((row) => datasetMatchesSearch(row, query, i18n.language))
       .map((row) => row.pk);
-  }, [hiddenDatasetPks, pointsData, datasetTitleSearchText, i18n.language]);
+  }, [pointsData, datasetTitleSearchText, i18n.language]);
 
   useEffect(() => {
     setMapDatasetPKs(mapDatasetPks);
@@ -441,10 +383,43 @@ export default function SelectionProvider({ children }) {
   // component state, so Back/Forward move through it natively and the page can
   // be linked to. useSearchParams re-renders on popstate, which is what makes
   // the browser's Back button close the page for free.
-  const inspectDataset = useMemo(
+  //
+  // A filter that excludes the open dataset doesn't close its page — the user
+  // chose to open it, and the search state around it isn't theirs to lose it
+  // to. The last row it resolved to is kept and shown instead; the page says
+  // the dataset is no longer among the results (inspectDatasetExcluded).
+  const resolvedInspectDataset = useMemo(
     () => pointsData.find((point) => datasetMatchesUrlKey(point, searchParams)),
     [pointsData, searchParams],
   );
+  const [retainedInspectDataset, setRetainedInspectDataset] = useState();
+  if (
+    resolvedInspectDataset &&
+    resolvedInspectDataset !== retainedInspectDataset
+  ) {
+    setRetainedInspectDataset(resolvedInspectDataset);
+  }
+  const inspectDataset = useMemo(() => {
+    if (resolvedInspectDataset) return resolvedInspectDataset;
+    if (!datasetMatchesUrlKey(retainedInspectDataset, searchParams)) return;
+    return datasetInLanguage(retainedInspectDataset, i18n.language);
+  }, [
+    resolvedInspectDataset,
+    retainedInspectDataset,
+    searchParams,
+    i18n.language,
+  ]);
+  const inspectDatasetExcluded = Boolean(
+    inspectDataset &&
+    !filteredDatasets.some((row) => row.pk === inspectDataset.pk),
+  );
+
+  // Whether the address shows the list (no dataset page). Read by
+  // setInspectDataset at call time, so it can stay stable across map pans.
+  const onListRef = useRef(!searchParams.get("dataset"));
+  useEffect(() => {
+    onListRef.current = !searchParams.get("dataset");
+  }, [searchParams]);
 
   // A share link that named a dataset but no camera: frame its footprint as
   // soon as it resolves out of pointsData, same as the "Zoom to dataset"
@@ -463,10 +438,11 @@ export default function SelectionProvider({ children }) {
     zoomToGeometry,
   ]);
 
-  // Opening or closing a dataset page is a navigation the user made, so it
-  // pushes an entry that Back reverses. Automatic opens/closes (auto-inspecting
-  // a lone result, dropping a dataset the filters just excluded) pass
-  // replace: true — Back should skip a step the user never took.
+  // Opening a dataset page is a navigation the user made, so it pushes an
+  // entry that Back reverses. Automatic opens/closes pass replace: true — Back
+  // should skip a step the user never took. An entry pushed straight from the
+  // list is tagged fromList, which lets returnToDatasetList go back to that
+  // list entry instead of stacking a new one on top.
   const setInspectDataset = useCallback(
     (dataset, { replace = false } = {}) => {
       setSearchParams(
@@ -487,7 +463,7 @@ export default function SelectionProvider({ children }) {
           }
           return next;
         },
-        { replace },
+        { replace, state: { fromList: !replace && onListRef.current } },
       );
     },
     [setSearchParams],
@@ -497,6 +473,11 @@ export default function SelectionProvider({ children }) {
   // as the dataset above: Back closes the preview natively, and the link
   // reproduces it.
   const inspectRecordID = searchParams.get(RECORD_PARAM) || undefined;
+  const periodParam = searchParams.get(PERIOD_PARAM) || undefined;
+  const inspectRecordPeriod = useMemo(
+    () => parsePeriod(periodParam),
+    [periodParam],
+  );
 
   // Opening a record is a navigation the user made, so it pushes an entry Back
   // reverses. Closing it drops the plot params in the SAME write, because
@@ -504,7 +485,7 @@ export default function SelectionProvider({ children }) {
   // not the ones a previous call in this same tick just wrote — so two calls
   // would silently lose one of them.
   const setInspectRecordID = useCallback(
-    (recordId, { replace = false } = {}) => {
+    (recordId, { replace = false, period } = {}) => {
       // Set before the navigation, so the modal never renders "no data" in the
       // frame between the record opening and the fetch starting.
       if (recordId) setRecordLoading(true);
@@ -513,6 +494,10 @@ export default function SelectionProvider({ children }) {
           if (!recordId) return withoutPreviewParams(previous);
           const next = new URLSearchParams(previous);
           next.set(RECORD_PARAM, recordId);
+          // Opening a record without a period shows its latest data, so a
+          // period left from the last pass plotted must not carry over.
+          if (period) next.set(PERIOD_PARAM, `${period.start}~${period.end}`);
+          else next.delete(PERIOD_PARAM);
           return next;
         },
         { replace },
@@ -532,10 +517,17 @@ export default function SelectionProvider({ children }) {
   // and the filter only changes when the user presses a button — so leaving the
   // page is now just leaving the page. Clearing here would instead discard a
   // selection they deliberately built up.
+  //
+  // Straight back to the list entry the page was opened from, when there is
+  // one, so browser Back afterwards doesn't reopen the page just left (UrlSync
+  // rewrites the popped address from the current filters and camera). A page
+  // reached any other way (a link, a marker hop, a record preview opened on
+  // top) closes in place instead.
   const returnToDatasetList = useCallback(() => {
-    setInspectDataset();
+    if (location.state?.fromList) navigate(-1);
+    else setInspectDataset(undefined, { replace: true });
     setSelectedTrajectory();
-  }, [setInspectDataset]);
+  }, [location.state, navigate, setInspectDataset]);
 
   // A track clicked on the map does what clicking a platform row in the dataset
   // inspector does (DatasetInspector's onRowClicked): open that dataset's page
@@ -544,15 +536,17 @@ export default function SelectionProvider({ children }) {
   // [inspectDataset] effect below from clearing the selection it just made (it
   // sees the new inspectDataset and the matching selectedTrajectory together).
   const selectTrajectoryFromMap = useCallback(
-    (datasetPk, trajectoryId, datasetTitle) => {
-      // Re-clicking the selected track is a no-op, not a toggle: track-lines
-      // stays hit-testable (just dimmed) under the selected track drawn over it,
-      // so a toggle would clear the selection on any click along it — including
-      // a click meant to read a fix tooltip. Clearing stays the platform row.
+    (datasetPk, trajectoryId, datasetTitle, area) => {
+      // Re-clicking the selected track is not a toggle: track-lines stays
+      // hit-testable (just dimmed) under the selected track drawn over it, so a
+      // toggle would clear the selection on any click along it — including a
+      // click meant to read a fix tooltip. Clearing stays the platform row.
+      // It only moves the clicked area along the track.
       if (
         selectedTrajectory?.datasetPk === datasetPk &&
         selectedTrajectory?.trajectoryId === trajectoryId
       ) {
+        if (area) setSelectedTrajectory((prev) => ({ ...prev, area }));
         return;
       }
 
@@ -583,6 +577,9 @@ export default function SelectionProvider({ children }) {
         datasetPk,
         datasetTitle: dataset?.title || datasetTitle,
         trajectoryId,
+        // The clicked point and zoom, which the dataset page resolves to the
+        // hex the click fell in (see useTrajectoryPasses).
+        area,
       });
     },
     [pointsData, inspectDataset, selectedTrajectory, setInspectDataset],
@@ -654,12 +651,11 @@ export default function SelectionProvider({ children }) {
     if (
       !isEmpty(pointsData) &&
       searchParams.get("dataset") &&
-      !pointsData.some((point) => datasetMatchesUrlKey(point, searchParams))
+      !inspectDataset
     ) {
-      // The results just changed under an open dataset page and the dataset is
-      // no longer among them (a filter excluded it, say): the page has already
-      // closed itself — inspectDataset stopped resolving — so clear the params
-      // it left behind rather than carry a dead key in the URL.
+      // The URL names a dataset that has never been among the results (an
+      // unknown id, or a link whose own filters exclude it): there is no row
+      // to show, so clear the params rather than carry a dead key in the URL.
       setSearchParams(
         (previous) => {
           const next = withoutPreviewParams(previous);
@@ -670,7 +666,7 @@ export default function SelectionProvider({ children }) {
         { replace: true },
       );
     }
-  }, [pointsData, searchParams, setSearchParams]);
+  }, [pointsData, searchParams, inspectDataset, setSearchParams]);
 
   useEffect(() => {
     const resultByPk = new Map(pointsData.map((row) => [row.pk, row]));
@@ -862,7 +858,11 @@ export default function SelectionProvider({ children }) {
     setRecordLoading(true);
     const previewUrl = `${server}/preview?dataset=${encodeURIComponent(
       inspectDatasetId,
-    )}&profile=${encodeURIComponent(inspectRecordID)}`;
+    )}&profile=${encodeURIComponent(inspectRecordID)}${
+      inspectRecordPeriod
+        ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
+        : ""
+    }`;
     fetch(previewUrl)
       .then((response) => {
         if (response.ok) return response.json();
@@ -886,7 +886,7 @@ export default function SelectionProvider({ children }) {
         reportError("preview fetch failed", error);
         setRecordLoading(false);
       });
-  }, [inspectRecordID, inspectDatasetId]);
+  }, [inspectRecordID, inspectDatasetId, inspectRecordPeriod]);
 
   const value = {
     polygon,
@@ -905,6 +905,7 @@ export default function SelectionProvider({ children }) {
     setMappedRecord,
     pointsData,
     inspectDataset,
+    inspectDatasetExcluded,
     setInspectDataset,
     returnToDatasetList,
     addDatasetsToSelection,
@@ -914,6 +915,7 @@ export default function SelectionProvider({ children }) {
     pointsError,
     retryPointQuery,
     inspectRecordID,
+    inspectRecordPeriod,
     setInspectRecordID,
     // Derived, not stored: the record param IS the open state, the same way
     // ?dataset= is the dataset page's.
@@ -931,10 +933,7 @@ export default function SelectionProvider({ children }) {
     setDatasetPreview,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
-    listSearchText,
-    setListSearchText,
     filteredDatasets,
-    listedDatasets,
     filteredDatasetPks,
     platformsAvailable,
     datasetsInViewPks,
@@ -944,10 +943,6 @@ export default function SelectionProvider({ children }) {
     setOnlyInView,
     groupBy,
     setGroupBy,
-    hiddenGroups,
-    toggleGroupHidden,
-    showAllGroups,
-    hiddenDatasetPks,
     combinedQueries,
     handleSelectDataset,
   };

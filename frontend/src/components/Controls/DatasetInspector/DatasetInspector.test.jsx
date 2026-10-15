@@ -38,10 +38,13 @@ function Harness({
   returnToList = () => {},
   dataset = DATASET,
   setInspectRecordID = () => {},
+  initialTrajectory,
+  query = {},
 }) {
   const { catalogLoaded } = useFilters();
   const { showDownloadModal } = useUI();
-  const [selectedTrajectory, setSelectedTrajectory] = React.useState();
+  const [selectedTrajectory, setSelectedTrajectory] =
+    React.useState(initialTrajectory);
   const { mappedRecord } = useSelection();
   if (!catalogLoaded) return <span data-testid="state">loading</span>;
 
@@ -62,7 +65,7 @@ function Harness({
         setInspectRecordID={setInspectRecordID}
         selectedTrajectory={selectedTrajectory}
         setSelectedTrajectory={setSelectedTrajectory}
-        query={{}}
+        query={query}
         activeWmsOverlay={undefined}
         setActiveWmsOverlay={() => {}}
       />
@@ -102,6 +105,37 @@ describe("DatasetInspector", () => {
     expect(screen.getByText("Mooring")).toBeInTheDocument();
     const erddapLink = screen.getByRole("link", { name: /Dataset/ });
     expect(erddapLink).toHaveAttribute("href", DATASET.erddap_url);
+  });
+
+  it("links an OBIS dataset to OBIS and to the CKAN record the harvest matched", async () => {
+    const ckanUrl = "https://catalogue.cioos.ca/dataset/ckan-obis-1";
+    await renderReady({
+      dataset: {
+        ...DATASET,
+        source_type: "obis",
+        dataset_id: "obis-uuid",
+        ckan_url: ckanUrl,
+      },
+    });
+    expect(screen.getByRole("link", { name: "View on OBIS" })).toHaveAttribute(
+      "href",
+      "https://obis.org/dataset/obis-uuid",
+    );
+    expect(
+      screen.getByRole("link", { name: "Metadata (CKAN)" }),
+    ).toHaveAttribute("href", ckanUrl);
+  });
+
+  it("shows no CKAN link for an OBIS dataset the harvest matched to none", async () => {
+    await renderReady({
+      dataset: { ...DATASET, source_type: "obis", dataset_id: "obis-uuid" },
+    });
+    expect(
+      screen.getByRole("link", { name: "View on OBIS" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /CKAN/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders organization, variable and platform values as plain chips, not filter toggles", async () => {
@@ -215,11 +249,28 @@ describe("DatasetInspector", () => {
       trajectory_id_variable: "cruise",
     };
 
+    let passesUrls;
     beforeEach(() => {
+      passesUrls = [];
       const fixtureFetch = globalThis.fetch;
       vi.stubGlobal(
         "fetch",
         vi.fn(async (input) => {
+          if (String(input).includes("/trajectories/passes")) {
+            passesUrls.push(new URL(String(input)));
+            return new Response(
+              JSON.stringify([
+                {
+                  trajectory_id: "cruise-a",
+                  passes: [
+                    { start: "2020-01-03", end: "2020-01-05" },
+                    { start: "2020-02-01", end: "2020-02-01" },
+                  ],
+                },
+              ]),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          }
           if (!String(input).includes("/datasetRecordsList")) {
             return fixtureFetch(input);
           }
@@ -276,6 +327,68 @@ describe("DatasetInspector", () => {
       expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a");
       expect(screen.getByTestId("drawn-track")).toHaveTextContent("none");
     });
+
+    it("asks for no passes without a selected area", async () => {
+      await renderReady({ dataset: TRAJECTORY_DATASET });
+      await screen.findByText("cruise-a");
+      expect(passesUrls).toHaveLength(0);
+      expect(screen.queryByText("In selected area")).not.toBeInTheDocument();
+    });
+
+    it("lists when each trajectory was in the clicked area, pinned first", async () => {
+      await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        initialTrajectory: {
+          datasetPk: TRAJECTORY_DATASET.pk,
+          trajectoryId: "cruise-b",
+          area: { lngLat: [-63.5, 44.6], z: 7 },
+        },
+      });
+      const pass = await screen.findByText("2020-01-03 → 2020-01-05");
+      expect(screen.getByText("2020-02-01")).toBeInTheDocument();
+      expect(pass.closest(".listCard")).toHaveClass("pinned");
+      // Default sort is id descending, which would put cruise-b first.
+      const ids = [...document.querySelectorAll(".listCardId")].map(
+        (el) => el.textContent,
+      );
+      expect(ids).toEqual(["cruise-a", "cruise-b"]);
+      expect(
+        screen.getByText(
+          "1 trajectory passed through the selected area. Click a period on its card to plot that period's data.",
+        ),
+      ).toBeInTheDocument();
+
+      const [url] = passesUrls;
+      expect(url.searchParams.get("datasetPKs")).toBe("2337");
+      expect(url.searchParams.get("at")).toBe("-63.5,44.6");
+      expect(url.searchParams.get("z")).toBe("7");
+    });
+
+    it("plots a pass's period when it is clicked", async () => {
+      const setInspectRecordID = vi.fn();
+      const { user } = await renderReady({
+        dataset: TRAJECTORY_DATASET,
+        setInspectRecordID,
+        query: { polygon: "[[-64,44],[-63,44],[-63,45],[-64,44]]" },
+      });
+      await user.click(
+        await screen.findByRole("button", {
+          name: "Plot cruise-a data from 2020-01-03 to 2020-01-05",
+        }),
+      );
+      expect(setInspectRecordID).toHaveBeenCalledWith("cruise-a", {
+        period: { start: "2020-01-03", end: "2020-01-05" },
+      });
+    });
+
+    it("asks about a drawn polygon without a clicked point", async () => {
+      const polygon = "[[-64,44],[-63,44],[-63,45],[-64,44]]";
+      await renderReady({ dataset: TRAJECTORY_DATASET, query: { polygon } });
+      await screen.findByText("2020-01-03 → 2020-01-05");
+      const [url] = passesUrls;
+      expect(url.searchParams.get("polygon")).toBe(polygon);
+      expect(url.searchParams.has("at")).toBe(false);
+    });
   });
 
   it("Show on map on a time-series record rings it on the map, and clears it again", async () => {
@@ -302,5 +415,36 @@ describe("DatasetInspector", () => {
 
     await user.click(show);
     expect(screen.getByTestId("mapped-record")).toHaveTextContent("none");
+  });
+
+  describe("tips", () => {
+    const seenTips = () =>
+      JSON.parse(window.localStorage.getItem("cde.seenTips") || "[]");
+
+    beforeEach(() => {
+      window.localStorage.setItem("cde.introSeen", "true");
+    });
+
+    it("offers Show data on a page with a feature list", async () => {
+      await renderReady();
+      await waitFor(() => expect(seenTips()).toEqual(["showData"]));
+    });
+
+    it("offers the real-time filter on a real-time dataset", async () => {
+      await renderReady({ dataset: { ...DATASET, is_realtime: true } });
+      await waitFor(() => expect(seenTips()).toEqual(["realtime"]));
+    });
+
+    it("offers the trajectory date first on a trajectory", async () => {
+      await renderReady({
+        dataset: { ...DATASET, cdm_data_type: "Trajectory", is_realtime: true },
+      });
+      await waitFor(() => expect(seenTips()).toEqual(["trajectory"]));
+    });
+
+    it("offers nothing of its own on an OBIS page, which has no feature list", async () => {
+      await renderReady({ dataset: { ...DATASET, source_type: "obis" } });
+      expect(seenTips()).toEqual([]);
+    });
   });
 });

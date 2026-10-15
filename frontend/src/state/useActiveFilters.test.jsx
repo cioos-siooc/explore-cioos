@@ -48,6 +48,14 @@ describe("useActiveFilters", () => {
     );
   });
 
+  // Every server ticked is the ERDDAP row's doing, so it reads as that one
+  // filter rather than one chip per server.
+  it("lists a whole source kind as one item", async () => {
+    open("includeObis=false");
+    await waitFor(() => expect(keys()).toEqual(["sources"]));
+    expect(group("sources").items).toMatchObject([{ label: "ERDDAP" }]);
+  });
+
   // The geometry layers live in MapState rather than FilterProvider, which is
   // why the count the Filters badge shows used to come up short when one was
   // on.

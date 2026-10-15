@@ -223,8 +223,14 @@
     overflow: hidden;
   }
 
+  /* The lockup beside it is the brand on a phone; the wordmark steps down so
+     the logo can step up within the same row. */
+  .brandTitle span {
+    font-size: var(--cioos-font-size-3xs);
+  }
+
   .brandTitle em {
-    font-size: var(--cioos-font-size-md);
+    font-size: var(--cioos-font-size-sm);
   }
 
   /* French is the language this row stops fitting in: a third longer on both
@@ -234,15 +240,7 @@
      the narrowest phones shrink the wordmark rather than overlapping it, and
      every width with room for the full size still gets it. */
   .brandTitle[lang="fr"] em {
-    font-size: min(var(--cioos-font-size-md), 4vw);
-  }
-
-  .brandTitle[lang="fr"] span {
-    font-size: clamp(
-      var(--cioos-font-size-3xs),
-      3vw,
-      var(--cioos-font-size-xs)
-    );
+    font-size: min(var(--cioos-font-size-sm), 3.6vw);
   }
 
   /* Scaled with the viewport rather than held at the rung's mobile size, the
@@ -251,7 +249,7 @@
      neighbours. On the lockup as a whole, so the mark comes down with the text
      instead of being left oversized beside it. */
   .brandLogo .cioosLogo-inline {
-    font-size: min(var(--cioos-font-size-xl), 5.5vw);
+    font-size: min(var(--cioos-font-size-xl), 6.5vw);
   }
 
   /* The name, not the mark, gives up size: it is what makes the logo's side

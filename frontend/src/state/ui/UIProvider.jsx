@@ -61,6 +61,20 @@ export default function UIProvider({ children }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showCoverageModal, setShowCoverageModal] = useState(false);
+  // The coverage figure's time axis: the timeline, or every year folded onto
+  // one Jan-to-Dec axis. Seeded from ?coverageAxis= so a link keeps it.
+  const [coverageAxis, setCoverageAxis] = useState(() =>
+    new URL(window.location.href).searchParams.get("coverageAxis") ===
+    "seasonal"
+      ? "seasonal"
+      : "timeline",
+  );
+  // The OBIS page's taxonomy chart: sunburst or GBIF-style tree, from ?taxonomy=.
+  const [taxonomyView, setTaxonomyView] = useState(() =>
+    new URL(window.location.href).searchParams.get("taxonomy") === "tree"
+      ? "tree"
+      : "sunburst",
+  );
   // How picking datasets for a download works, opened from the sidebar
   // footer's one-line version of the same thing.
   const [showSelectionHelpModal, setShowSelectionHelpModal] = useState(false);
@@ -77,14 +91,22 @@ export default function UIProvider({ children }) {
     if (!showIntroModal) setIntroSeen(true);
   }, [showIntroModal, setIntroSeen]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  // The Filters modal opened on its search page (see FilterSearch) rather than
-  // on a filter, holding this text; null when it was opened any other way.
-  const [filterSearchText, setFilterSearchText] = useState(null);
-  const openFilterSearch = useCallback((text = "") => {
-    setFilterSearchText(text);
+  // The Filters modal on its search page rather than on whichever filter was
+  // open last — what both Filters buttons open.
+  const openFilters = useCallback(() => {
     setOpenFilter(undefined);
     setShowFiltersModal(true);
   }, []);
+  // The same, opened by typing (see useFilterSearchShortcut) and holding this
+  // text; null when it was opened any other way.
+  const [filterSearchText, setFilterSearchText] = useState(null);
+  const openFilterSearch = useCallback(
+    (text = "") => {
+      setFilterSearchText(text);
+      openFilters();
+    },
+    [openFilters],
+  );
   if (!showFiltersModal && filterSearchText !== null) setFilterSearchText(null);
 
   // A drawn box or polygon surfaces the matching datasets — on wide screens
@@ -103,7 +125,9 @@ export default function UIProvider({ children }) {
   // directly, with no filter change to notice, so the panel is raised for the
   // page itself rather than for whatever happened to precede it. Covers a share
   // link carrying ?dataset= too, which lands with the page already open.
-  useRevealSidebar(inspectDataset, Boolean, setSidebarOpenState);
+  // Keyed on the pk: a results refresh hands the same open dataset back as a
+  // new object, which must not reopen a sidebar the user collapsed over it.
+  useRevealSidebar(inspectDataset?.pk, Boolean, setSidebarOpenState);
 
   // Clicking a track on the map draws its platform history — surface the panel
   // holding the page that shows it.
@@ -131,6 +155,10 @@ export default function UIProvider({ children }) {
     setShowDownloadModal,
     showCoverageModal,
     setShowCoverageModal,
+    coverageAxis,
+    setCoverageAxis,
+    taxonomyView,
+    setTaxonomyView,
     showSelectionHelpModal,
     setShowSelectionHelpModal,
     openFilter,
@@ -142,6 +170,7 @@ export default function UIProvider({ children }) {
     showPrivacyModal,
     setShowPrivacyModal,
     filterSearchText,
+    openFilters,
     openFilterSearch,
   };
 

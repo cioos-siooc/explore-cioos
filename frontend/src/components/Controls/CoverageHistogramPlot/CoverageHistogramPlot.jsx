@@ -58,11 +58,16 @@ function seriesLabel(key, kind, language, t) {
   return key;
 }
 
-// One label per time bin, sized to the bin width.
-function formatPeriod(startMs, endMs, locale) {
+// One label per time bin, sized to the bin width. Seasonal bins are weeks of
+// a reference year whose year means nothing, so it is left out.
+function formatPeriod(startMs, endMs, locale, seasonal) {
   const start = new Date(startMs);
   const endInclusive = new Date(endMs - 1);
   const width = endMs - startMs;
+  if (seasonal) {
+    const weekFormat = { day: "numeric", month: "short", timeZone: "UTC" };
+    return `${start.toLocaleDateString(locale, weekFormat)} – ${endInclusive.toLocaleDateString(locale, weekFormat)}`;
+  }
   if (width >= YEAR_MS - DAY_MS) {
     // Bins are whole 365.25-day years, so an edge drifts hours either side of
     // Jan 1. Nudge past that before reading the opening year, then count the
@@ -102,6 +107,7 @@ export default function CoverageHistogramPlot({ histogram }) {
     datasets: "coverageCountDatasets",
   };
   const countLabel = t(COUNT_LABELS[histogram.count] || COUNT_LABELS.datasets);
+  const seasonal = histogram.view === "seasonal";
 
   const { traces, binCenters, binWidths, legendSide } = useMemo(() => {
     const { timeBinEdges, series, cells } = histogram;
@@ -118,7 +124,7 @@ export default function CoverageHistogramPlot({ histogram }) {
       (_, i) => edgesMs[i + 1] - edgesMs[i],
     );
     const labels = Array.from({ length: numBins }, (_, i) =>
-      formatPeriod(edgesMs[i], edgesMs[i + 1], locale),
+      formatPeriod(edgesMs[i], edgesMs[i + 1], locale, seasonal),
     );
 
     // Top series keep their identity; everything past MAX_SERIES sums into a
@@ -206,7 +212,7 @@ export default function CoverageHistogramPlot({ histogram }) {
       binWidths: widths,
       legendSide: side,
     };
-  }, [histogram, locale, i18n.language, t, countLabel]);
+  }, [histogram, locale, i18n.language, t, countLabel, seasonal]);
 
   return (
     <div className="coverageHistogramPlot">
@@ -243,6 +249,7 @@ export default function CoverageHistogramPlot({ histogram }) {
             showline: true,
             linecolor: "rgba(21, 47, 55, 0.4)",
             linewidth: 1,
+            ...(seasonal && { tickformat: "%b", dtick: "M1" }),
           },
           yaxis: {
             automargin: true,

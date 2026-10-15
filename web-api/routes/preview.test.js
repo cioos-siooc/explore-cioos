@@ -164,3 +164,39 @@ test("escapes ERDDAP regex metacharacters in the profile id constraint", async (
   // encodeURIComponent turns the escaped "\+" into "%5C%2B".
   assert.match(axios.calls[0].url, /a%5C\.b%5C%2Bc/);
 });
+
+test("a requested period replaces the cadence window in the ERDDAP query", async () => {
+  db.queueRaw([
+    {
+      ...FEATURE_ROW,
+      use_whole_profile: false,
+      new_start_time: "2024-02-01T00:00:00Z",
+    },
+  ]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2020-01-03"]] } },
+  });
+
+  const res = await agent.get("/preview").query({
+    dataset: "obs_270",
+    profile: "1",
+    timeMin: "2020-01-03T00:00:00Z",
+    timeMax: "2020-01-05T23:59:59Z",
+  });
+
+  assert.equal(res.status, 200);
+  const { url } = axios.calls[0];
+  assert.match(
+    url,
+    /&time>=2020-01-03T00:00:00\.000Z&time<=2020-01-05T23:59:59\.000Z$/,
+  );
+  assert.doesNotMatch(url, /time>2024/);
+});
+
+test("rejects a period that is not an ISO 8601 instant", async () => {
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1", timeMin: "yesterday" });
+  assert.equal(res.status, 400);
+  assert.equal(axios.calls.length, 0);
+});

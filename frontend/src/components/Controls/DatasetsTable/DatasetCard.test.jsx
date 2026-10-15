@@ -28,7 +28,7 @@ describe("DatasetCard", () => {
     expect(screen.getByText("layerTimeseries")).toBeInTheDocument();
   });
 
-  it("shows a type no geometry switch names as it is", () => {
+  it("names an OBIS occurrence dataset by its Point geometry", () => {
     render(
       <DatasetCard
         row={{ ...ROW, source_type: "obis", cdm_data_type: "Point" }}
@@ -37,7 +37,7 @@ describe("DatasetCard", () => {
       />,
     );
     expect(screen.getByTitle("datasetsTableHeaderTypeText").textContent).toBe(
-      "Point",
+      "layerPoint",
     );
   });
 

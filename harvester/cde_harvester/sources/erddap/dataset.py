@@ -1,11 +1,14 @@
 import logging
 from datetime import UTC, datetime
 
-import numpy as np
 import pandas as pd
 import requests
 from requests.exceptions import HTTPError
 
+from cde_harvester.core.harvest_warnings import (
+    UNKNOWN_PLATFORM_VOCABULARY,
+    HarvestWarnings,
+)
 from cde_harvester.core.observability import run_logger
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
@@ -82,6 +85,7 @@ class Dataset:
         # ERDDAP.erddap_csv_to_df so harvest_attempts can record exactly
         # what was fired. Lets an ERDDAP admin reproduce the failure.
         self.queried_urls = []
+        self.warnings = HarvestWarnings(self.logger)
         self.cdm_data_type = ""
         self.globals = {}
         self.platform = "unknown"
@@ -208,7 +212,7 @@ class Dataset:
 
         return df_min_max
 
-    def get_profile_ids(self):
+    def get_profile_ids(self, collapse_time_profile_ids=False):
         df_variables = self.df_variables
 
         # Organize dataset variables by their cf_roles
@@ -218,6 +222,11 @@ class Dataset:
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
+        if collapse_time_profile_ids and profile_variables.get("profile_id") == "time":
+            # One "profile" per record timestamp: enumerating them scans the
+            # whole dataset (dap.oceannetworks.ca's sensor streams 504 or exceed
+            # the size cap), only for the handler to collapse to timeseries.
+            profile_variables.pop("profile_id")
 
         # sorting so the url is consistent every time for query caching
         profile_variable_list = sorted(profile_variables.values())
@@ -232,20 +241,42 @@ class Dataset:
         if not profile_variables:
             return []
 
-        # Enumerate feature identities only. lat/lon are NOT requested here:
-        # a distinct() including them returns one row per GPS fix on a moving
-        # feature. Per-feature lat/lon min/max (the bounding box) is fetched
-        # separately in tabledap_features via orderByMinMax, which is bounded
-        # by feature count regardless of how much the feature moves.
-        profile_ids = self.dataset_tabledap_query(
-            f"{','.join(profile_variable_list)}&distinct()"
-        )
+        # distinct() of the ids alone measured ~0.2s on every ONC and
+        # cioospacific dataset tried; an orderByMinMax over time scans every
+        # record and 504s on dap.oceannetworks.ca's long sensor streams.
+        # Moving-feature lat/lon is left to tabledap_features: a distinct()
+        # with it returns one row per GPS fix.
+        identity = list(profile_variable_list)
+        subset_variables = self.subset_variables()
+        if set(profile_variable_list) <= subset_variables:
+            # Served from the pre-built subset table, where a lat/lon is
+            # per-feature by declaration, so it comes along for the bbox.
+            identity += [
+                v for v in ("latitude", "longitude")
+                if v in subset_variables and v not in profile_variable_list
+            ]
+        profile_ids = self.dataset_tabledap_query(f"{','.join(identity)}&distinct()")
+
+        if profile_ids.empty and "time" not in profile_variable_list:
+            # ERDDAP drops rows whose requested columns are ALL missing, so a
+            # cf_role column that is never filled (seagull-erddap's `platform`)
+            # empties the distinct(). Pairing it with time keeps one row per
+            # feature, and the time bounds come along.
+            profile_ids = self.get_max_min(
+                profile_variable_list + ["time"]
+            ).reset_index()
 
         if profile_ids.empty:
             return profile_ids
 
-        self.profile_ids = profile_ids
+        self.profile_ids = profile_ids.drop_duplicates(profile_variable_list)
         return profile_ids
+
+    def subset_variables(self):
+        return {
+            v.strip() for v in self.globals.get("subsetVariables", "").split(",")
+            if v.strip()
+        }
 
     def get_count(self, vars, groupby, time_min, time_max):
         """
@@ -264,26 +295,6 @@ class Dataset:
         if str(time_max) == "NaT":
             time_max = datetime.now(UTC).isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
-
-        # Estimate records count per profile using time_coverage_resolution
-        # For now this is only used with single-profile datasets
-        # TODO use each profile's min/max time and then it can be used for any
-        # dataset using time_coverage_resolution
-        time_coverage_resolution = self.globals.get("time_coverage_resolution")
-
-        if (
-            is_single_profile_dataset
-            and time_coverage_resolution
-            and is_valid_duration(time_coverage_resolution)
-        ):
-            self.logger.debug("Using time_coverage_resolution for count")
-            df_profile_ids = self.profile_ids.copy()
-            readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
-                time_coverage_resolution
-            )
-            total_records = readings_per_day * days_in_dataset
-            df_profile_ids["time"] = total_records
-            return df_profile_ids
 
         extraplolation_days = 30
         skip_full_count = (
@@ -383,10 +394,11 @@ class Dataset:
             else:
                 self.logger.error("Found unsupported L06 platform: %s", platform)
 
-        self.logger.warning(
-            "Found platform='%s' without known vocabulary='%s', setting to 'unknown'",
-            platform,
-            platform_vocabulary,
+        self.warnings.add(
+            UNKNOWN_PLATFORM_VOCABULARY,
+            f"Platform '{platform}' has no known vocabulary "
+            f"(platform_vocabulary='{platform_vocabulary}'); set to 'unknown'",
+            items=[platform],
         )
         return "unknown"
 

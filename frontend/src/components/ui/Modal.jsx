@@ -25,6 +25,7 @@ export default function Modal({
   dialogClassName = "",
   children,
   "aria-labelledby": ariaLabelledby,
+  "aria-label": ariaLabel,
   "data-testid": testId,
   initialFocusRef,
 }) {
@@ -97,6 +98,7 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={ariaLabelledby}
+        aria-label={ariaLabel}
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) onHide();
         }}

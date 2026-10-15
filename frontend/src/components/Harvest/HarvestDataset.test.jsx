@@ -162,4 +162,67 @@ describe("HarvestDataset", () => {
       `https://obis.org/dataset/${DATASET_ID}`,
     );
   });
+
+  it("lists the latest successful harvest's warnings even when the latest attempt is an unchanged skip", async () => {
+    installMockHarvestFetch({
+      [PATH]: {
+        history: [
+          { ...OLDER, run_id: "r2", warnings: null },
+          {
+            ...OLDER,
+            warnings: [
+              { code: "FEATURES_DROPPED", message: "2 dropped" },
+              { code: "DAY_COUNT_FALLBACK", message: "time span" },
+            ],
+          },
+        ],
+        meta: null,
+        currentWarnings: [
+          {
+            code: "NON_CF_STANDARD_NAMES",
+            message: "2 names are not CF",
+            count: 2,
+            items: ["foo_bar", "baz_qux"],
+          },
+        ],
+        erddap_url: "https://erddap.example.com/erddap",
+      },
+    });
+    const { user } = renderDataset();
+    await waitFor(() =>
+      expect(
+        document.querySelector(".harvest-latest-card"),
+      ).toBeInTheDocument(),
+    );
+    const box = document.querySelector(
+      ".harvest-latest-card .harvest-warning-box",
+    );
+    expect(box).toHaveTextContent(
+      "Non-CF standard names (2): 2 names are not CF",
+    );
+    await user.click(within(box).getByText("Affected items (2)"));
+    expect(within(box).getByText("foo_bar")).toBeVisible();
+
+    const table = document.querySelector(".harvest-table");
+    const marker = within(table).getByText("⚠ 2");
+    expect(marker.getAttribute("title")).toContain("2 dropped");
+  });
+
+  it("renders no warning box when the latest success had none", async () => {
+    installMockHarvestFetch({
+      [PATH]: {
+        history: [OLDER],
+        meta: null,
+        currentWarnings: null,
+        erddap_url: "https://erddap.example.com/erddap",
+      },
+    });
+    renderDataset();
+    await waitFor(() =>
+      expect(
+        document.querySelector(".harvest-latest-card"),
+      ).toBeInTheDocument(),
+    );
+    expect(document.querySelector(".harvest-warning-box")).toBeNull();
+  });
 });

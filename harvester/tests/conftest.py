@@ -6,12 +6,14 @@ the real ERDDAP servers return, including the units row that gets skipped by
 erddap_csv_to_df (skiprows=[1] for tabledap, skiprows=[] for /info/).
 """
 
+import json
 import logging
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from cde_harvester.core.harvest_warnings import HarvestWarnings
 from cde_harvester.sources.erddap.dataset import CONSIDERED_VARIABLE_ATTRIBUTES
 
 # ---------------------------------------------------------------------------
@@ -352,6 +354,9 @@ class MockResponse:
     def close(self):
         self.closed = True
 
+    def json(self):
+        return json.loads(self.text)
+
     def raise_for_status(self):
         if self.status_code >= 400:
             import requests
@@ -486,6 +491,7 @@ def build_mock_dataset(
     mock.df_variables = df_variables
     mock.variables_list = variables_list
     mock.logger = logging.getLogger("test.mock_dataset")
+    mock.warnings = HarvestWarnings(mock.logger)
 
     # Globals parsed from NC_GLOBAL attributes
     info_df = build_info_df(info_csv)

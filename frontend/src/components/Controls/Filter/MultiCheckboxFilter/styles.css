@@ -124,3 +124,11 @@
 .multiCheckboxFilter .optionColorCircle {
   margin-left: 10px;
 }
+
+.multiCheckboxFilter .optionGroupButton .optionName {
+  font-weight: 600;
+}
+
+.multiCheckboxFilter .optionGroupChildren {
+  margin-left: 25px;
+}

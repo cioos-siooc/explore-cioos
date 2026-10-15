@@ -362,4 +362,45 @@ describe("FeatureCard", () => {
       "day(s) of data",
     );
   });
+
+  describe("tips", () => {
+    const seenTips = () =>
+      JSON.parse(window.localStorage.getItem("cde.seenTips") || "[]");
+    const openOn = (row) =>
+      act(() => {
+        latestMap.setFeatureQuery({
+          nonce: 3,
+          lngLat: [0, 0],
+          items: [{ kind: "observation", pk: row.pk, title: row.title }],
+        });
+      });
+
+    beforeEach(() => {
+      window.localStorage.setItem("cde.introSeen", "true");
+    });
+
+    it("offers the what's here tip for a cell of stations", async () => {
+      await renderReady();
+      openOn(pointQueryFixture[0]);
+      await waitFor(() => expect(seenTips()).toEqual(["whatsHere"]));
+    });
+
+    it("offers species search first when the cell holds OBIS records", async () => {
+      // The recorded catalogue has no OBIS dataset; mark one as such.
+      const fixtureFetch = globalThis.fetch;
+      vi.stubGlobal("fetch", async (input) => {
+        const response = await fixtureFetch(input);
+        const url = typeof input === "string" ? input : input.url;
+        if (!url.includes("pointQuery")) return response;
+        const rows = await response.json();
+        rows[0] = { ...rows[0], source_type: "obis" };
+        return new Response(JSON.stringify(rows), {
+          headers: { "content-type": "application/json" },
+        });
+      });
+      await renderReady();
+      openOn(pointQueryFixture[0]);
+      await waitFor(() => expect(seenTips()).toEqual(["speciesName"]));
+    });
+  });
 });

@@ -64,8 +64,8 @@ describe("CardList", () => {
     expect(rows[0]).toBe("b:2");
   });
 
-  it("holds pinnedKey's item at the top regardless of sort", () => {
-    renderList({ pinnedKey: "c" });
+  it("holds pinnedKeys' items at the top regardless of sort", () => {
+    renderList({ pinnedKeys: new Set(["c"]) });
     const rows = screen.getAllByTestId("row").map((el) => el.textContent);
     expect(rows[0]).toBe("c:10");
   });

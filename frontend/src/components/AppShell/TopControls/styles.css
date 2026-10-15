@@ -534,14 +534,59 @@
     height: 15px;
   }
 
-  /* Inset as the mobile brand row is. */
-  .topBarStatusRow {
-    padding: 0 10px 4px;
+  /* The tally tucks under the wordmark instead of taking a row of its own:
+     the logo and the icon cluster are taller than the two-line wordmark, so
+     the space beside them below it was empty. The brand row dissolves into
+     the card's grid so the three can share rows with the tally. */
+  .brandCard {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, auto) 1fr;
+    column-gap: 8px;
   }
 
+  .brandCardTop {
+    display: contents;
+  }
+
+  .brandLogo,
+  .brandMinorItems {
+    grid-row: 1 / span 2;
+    margin-block: 5px;
+  }
+
+  .brandLogo {
+    grid-column: 1;
+    margin-left: 10px;
+  }
+
+  .brandMinorItems {
+    grid-column: 3;
+    margin-right: 10px;
+  }
+
+  .brandTitle {
+    grid-column: 2;
+    grid-row: 1;
+    padding-top: 5px;
+  }
+
+  .topBarStatusRow {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    padding: 0 0 5px;
+  }
+
+  .topBarActions {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  /* Wraps rather than running under the icons when a filtered French tally
+     is wider than the space between them. */
   .topBarCountsRow {
     min-height: 0;
-    font-size: var(--cioos-font-size-xs);
+    font-size: var(--cioos-font-size-2xs);
   }
 }
 

@@ -150,7 +150,7 @@ export default function IntroModal({ showModal, setShowModal }) {
       show={showModal}
       size="xl"
       centered
-      aria-labelledby="introModalTitle"
+      aria-label={t("CIOOSDataExplorer")}
       onHide={close}
       scrollable
       className="introModal"
@@ -168,8 +168,8 @@ export default function IntroModal({ showModal, setShowModal }) {
         >
           <CioosLogo />
         </a>
-        <Modal.Title className="introTitle" id="introModalTitle">
-          <span className="introTitleName">{t("CIOOSDataExplorer")}</span>
+        <Modal.Title className="introTitle">
+          <span className="introTitleName">{t("dataExplorer")}</span>
           <span className="tagLine">{t("CIOOSQuote")}</span>
         </Modal.Title>
       </Modal.Header>
@@ -225,7 +225,7 @@ export default function IntroModal({ showModal, setShowModal }) {
                   className="introLink"
                   onClick={() => setShowSelectionHelpModal(true)}
                 >
-                  {t("sidebarSelectionHintMoreText")}
+                  {t("introFeature_download_help")}
                 </button>
               )}
             </li>
@@ -260,7 +260,10 @@ export default function IntroModal({ showModal, setShowModal }) {
 
         <footer className="introFooter">
           <div className="introFooterCards">
-            <section className="introFooterCard" data-testid="intro-tips">
+            <section
+              className="introFooterCard introTipsCard"
+              data-testid="intro-tips"
+            >
               <h2 className="introFooterHeading">
                 <Lightbulb size={18} aria-hidden="true" />
                 {t("introTipsHeading")}

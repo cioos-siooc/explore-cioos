@@ -1,11 +1,12 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import TopControls from "./TopControls.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 
 describe("TopControls", () => {
   beforeEach(() => {
@@ -98,5 +99,29 @@ describe("TopControls", () => {
 
       expect(filtersButton).toHaveAttribute("aria-pressed", "true");
     });
+  });
+
+  // The same as the datasets list's Filters button: the search page, not
+  // whichever filter was open when the modal last closed.
+  it("opens the filters modal on its search page", async () => {
+    let ui;
+    function Probe() {
+      ui = useUI();
+      return null;
+    }
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <TopControls />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    act(() => ui.setOpenFilter("oceanVariablesFiltername"));
+
+    await user.click(screen.getByTestId("topbar-filters-button"));
+
+    expect(ui.showFiltersModal).toBe(true);
+    expect(ui.openFilter).toBeUndefined();
   });
 });

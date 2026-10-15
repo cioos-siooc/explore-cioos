@@ -14,6 +14,7 @@ import {
   loadTurfUnion,
   trackFeatureIn,
   trackItemsIn,
+  withoutGridHighlight,
 } from "./hitTest.js";
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
 
@@ -497,5 +498,17 @@ describe("featureHasDataset", () => {
       false,
     );
     expect(featureHasDataset(feature("hexes", {}), 3)).toBe(false);
+  });
+});
+
+describe("withoutGridHighlight", () => {
+  const tagged = (role) => ({ type: "Feature", properties: { role } });
+
+  it("drops the clicked grid boxes and their merged fill, keeping the rest", () => {
+    const highlight = {
+      type: "FeatureCollection",
+      features: [tagged("outline"), tagged("fill"), tagged("both")],
+    };
+    expect(withoutGridHighlight(highlight).features).toEqual([tagged("both")]);
   });
 });

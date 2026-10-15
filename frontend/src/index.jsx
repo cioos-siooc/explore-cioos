@@ -12,7 +12,7 @@ import Loading from "./components/Controls/Loading/Loading.jsx";
 import translationEN from "./locales/en/translation.json";
 import translationFR from "./locales/fr/translation.json";
 import App from "./components/App.jsx";
-import { BrowserRouter, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Route } from "react-router-dom";
 import { clearLegacyCookies } from "./state/usePersistentState.js";
 
 // Served from this origin rather than Google Fonts, which would hand every
@@ -45,6 +45,7 @@ const HarvestRun = lazy(() => import("./components/Harvest/HarvestRun.jsx"));
 const HarvestDownloads = lazy(
   () => import("./components/Harvest/HarvestDownloads.jsx"),
 );
+const HarvestDocs = lazy(() => import("./components/Harvest/HarvestDocs.jsx"));
 const HarvestDownloadJob = lazy(
   () => import("./components/Harvest/HarvestDownloadJob.jsx"),
 );
@@ -104,6 +105,11 @@ createRoot(domContainer).render(
         />
         <Route path="/harvest/run/:runId" element={<HarvestRun />} />
         <Route path="/harvest/downloads" element={<HarvestDownloads />} />
+        <Route
+          path="/harvest/docs"
+          element={<Navigate to="/harvest/docs/workflow" replace />}
+        />
+        <Route path="/harvest/docs/:doc" element={<HarvestDocs />} />
         <Route
           path="/harvest/downloads/:jobId"
           element={<HarvestDownloadJob />}

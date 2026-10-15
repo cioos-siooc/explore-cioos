@@ -167,3 +167,62 @@ def test_chunk_temp_directory_is_cleaned_up_even_on_error():
 
     assert seen_dirs, "expected the harvest to create a chunk temp dir"
     assert not os.path.isdir(seen_dirs[0])
+
+
+def test_gateway_timeouts_are_retried_once_at_the_end_of_the_pass():
+    """A dataset that hit a 504 is held back and harvested again after the
+    rest, and only the retry's outcome is recorded."""
+    harvester = ERDDAPHarvester(ERDDAP_URL)
+    erddap_mock = _erddap_mock(3)
+    erddap_mock.gateway_timeouts = {}
+    calls = []
+
+    def get_dataset(dataset_id, *a, **kw):
+        calls.append(dataset_id)
+        if calls.count("ds_0") == 1 and dataset_id == "ds_0":
+            erddap_mock.gateway_timeouts[dataset_id] = 0.0
+        ds = build_mock_dataset()
+        ds.id = dataset_id
+        return ds
+
+    erddap_mock.get_dataset.side_effect = get_dataset
+    with (
+        patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+        patch("cde_harvester.sources.erddap.harvester.extract_features",
+              side_effect=_features_for),
+        patch("cde_harvester.sources.erddap.harvester.time.sleep") as sleep,
+        patch("cde_harvester.sources.erddap.harvester.time.monotonic", return_value=60.0),
+    ):
+        result = harvester.harvest()
+
+    assert calls == ["ds_0", "ds_1", "ds_2", "ds_0"]
+    sleep.assert_called_once_with(20 * 60 - 60.0)
+    assert result.attempts["dataset_id"].tolist() == ["ds_1", "ds_2", "ds_0"]
+    assert sorted(result.profiles["dataset_id"]) == ["ds_0", "ds_1", "ds_2"]
+
+
+def test_oversize_responses_are_not_retried_after_a_gateway_timeout():
+    """A dataset that 504ed but then failed on the size cap would hit the
+    cap again; it is recorded on the first pass."""
+    from cde_harvester.core.errors import ResponseTooLargeError
+
+    harvester = ERDDAPHarvester(ERDDAP_URL)
+    erddap_mock = _erddap_mock(1)
+    erddap_mock.gateway_timeouts = {}
+    calls = []
+
+    def get_dataset(dataset_id, *a, **kw):
+        calls.append(dataset_id)
+        erddap_mock.gateway_timeouts[dataset_id] = 0.0
+        raise ResponseTooLargeError("too big")
+
+    erddap_mock.get_dataset.side_effect = get_dataset
+    with (
+        patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+        patch("cde_harvester.sources.erddap.harvester.time.sleep") as sleep,
+    ):
+        result = harvester.harvest()
+
+    assert calls == ["ds_0"]
+    sleep.assert_not_called()
+    assert result.attempts["reason_code"].tolist() == ["RESPONSE_TOO_LARGE"]

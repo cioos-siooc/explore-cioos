@@ -7,6 +7,8 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import translationFR from "../../../locales/fr/translation.json";
 
 function makeRow(overrides) {
@@ -20,6 +22,12 @@ function makeRow(overrides) {
     organizations: [],
     ...overrides,
   };
+}
+
+let filters;
+function FiltersProbe() {
+  filters = useFilters();
+  return null;
 }
 
 const ROWS = [
@@ -121,13 +129,11 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).toEqual(["A", "C", "B"]);
   });
 
-  // The box narrows only the list (SelectionProvider's listedDatasets, which
-  // feeds `datasets` in the real app) — never the title search filter, which
-  // narrows the map too.
-  it("the search box writes listSearchText, not the title search filter", async () => {
-    let latest;
+  // The list has no search of its own; its Filters button opens the modal's.
+  it("the Filters button opens the Filters modal's search", async () => {
+    let ui;
     function Probe() {
-      latest = useSelection();
+      ui = useUI();
       return null;
     }
     const user = userEvent.setup({ delay: null });
@@ -144,10 +150,10 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
       { providers: "app" },
     );
     await screen.findAllByTestId("dataset-card");
-    await user.type(screen.getByPlaceholderText("Filter this list"), "beta");
+    await user.click(screen.getByTestId("datasets-filters-button"));
 
-    await waitFor(() => expect(latest.listSearchText).toBe("beta"));
-    expect(latest.datasetTitleSearchText).toBe("");
+    expect(ui.showFiltersModal).toBe(true);
+    expect(ui.openFilter).toBeUndefined();
   });
 
   it("shows the no-results message when the datasets prop is empty", async () => {
@@ -227,6 +233,356 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
         document.querySelector(".datasetsCardGroupHeader"),
       ).toBeInTheDocument();
     });
+  });
+
+  it("grouping sorts by group size, largest first, and ungrouping sorts by title again", async () => {
+    const rows = [
+      makeRow({ pk: 1, title: "A", platform: "buoy" }),
+      makeRow({ pk: 2, title: "B", platform: "mooring" }),
+      makeRow({ pk: 3, title: "C", platform: "mooring" }),
+    ];
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={rows}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+
+    expect(screen.getByLabelText("Sort")).toHaveValue("groupSize");
+    await waitFor(() =>
+      expect(
+        [...document.querySelectorAll(".datasetsCardGroupCount")].map(
+          (el) => el.textContent,
+        ),
+      ).toEqual(["2", "1"]),
+    );
+    expect(
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].map((h) =>
+        h.style.getPropertyValue("--group-share"),
+      ),
+    ).toEqual(["1", "0.5"]);
+
+    await user.selectOptions(screen.getByLabelText("Group by"), "none");
+    expect(screen.getByLabelText("Sort")).toHaveValue("title");
+    expect(
+      screen.queryByRole("option", { name: "Group size" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("starts every group closed past one page, and a header opens its group", async () => {
+    const rows = Array.from({ length: 30 }, (_, i) =>
+      makeRow({ pk: i + 1, platform: i % 2 ? "buoy" : "mooring" }),
+    );
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={rows}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+
+    const toggles = await screen.findAllByRole("button", { expanded: false });
+    expect(screen.queryAllByTestId("dataset-card")).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { expanded: true })).toHaveLength(0);
+
+    await user.click(toggles[0]);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByTestId("dataset-card").length).toBeGreaterThan(0);
+  });
+
+  it("starts every group open when its rows fit on one page, and a header closes its group", async () => {
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+
+    const toggles = await screen.findAllByRole("button", { expanded: true });
+    expect(screen.queryAllByRole("button", { expanded: false })).toHaveLength(
+      0,
+    );
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(ROWS.length);
+
+    await user.click(toggles[0]);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getAllByTestId("dataset-card").length).toBeLessThan(
+      ROWS.length,
+    );
+  });
+
+  it("groups by data portal under ERDDAP and OBIS", async () => {
+    const erddap = "https://erddap.ogsl.ca/erddap";
+    const rows = [
+      makeRow({ pk: 1, title: "A", erddap_server_url: erddap }),
+      makeRow({ pk: 2, title: "B", erddap_server_url: erddap }),
+      makeRow({
+        pk: 3,
+        title: "C",
+        source_type: "obis",
+        obis_nodes: ["OBIS Canada", "OTN-OBIS"],
+      }),
+    ];
+    const { user } = renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={rows}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "source");
+
+    const headers = () =>
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].map((h) => [
+        h.querySelector(".datasetsCardGroupTitle").textContent,
+        h.querySelector(".datasetsCardGroupCount").textContent,
+        h.classList.contains("nested"),
+      ]);
+    // The OBIS dataset sits in both nodes but counts once for OBIS.
+    await waitFor(() =>
+      expect(headers()).toEqual([
+        ["ERDDAP", "2", false],
+        ["SLGO", "2", true],
+        ["OBIS", "1", false],
+        ["OBIS Canada", "1", true],
+        ["OTN-OBIS", "1", true],
+      ]),
+    );
+    // The OBIS dataset is listed under each of its nodes.
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(4);
+
+    await user.click(screen.getByRole("button", { name: /OTN-OBIS/ }));
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(3);
+
+    // A parent sets its whole source list, as the Filters modal's OBIS row
+    // does; a node the catalogue doesn't know offers no filter.
+    await user.click(screen.getByRole("button", { name: "Exclude: OBIS" }));
+    await waitFor(() =>
+      expect(filters.obisNodesSelected.every((n) => n.isExcluded)).toBe(true),
+    );
+    expect(
+      [...document.querySelectorAll(".datasetsCardGroupHeader.excluded")].map(
+        (h) => h.querySelector(".datasetsCardGroupTitle").textContent,
+      ),
+    ).toEqual(["OBIS"]);
+    expect(
+      screen.queryByRole("button", { name: "Exclude: OTN-OBIS" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("groups by ocean variable under open categories; a category header sets it whole", async () => {
+    const rows = [
+      makeRow({ pk: 1, title: "A", eovs: ["oxygen", "nutrients"] }),
+      makeRow({ pk: 2, title: "B", eovs: ["seaState"] }),
+      makeRow({ pk: 3, title: "C", eovs: [] }),
+    ];
+    const { user } = renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={rows}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "eov");
+
+    const headers = () =>
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].map((h) => [
+        h.querySelector(".datasetsCardGroupTitle").textContent,
+        h.querySelector(".datasetsCardGroupCount").textContent,
+        h.classList.contains("nested"),
+      ]);
+    // A dataset without an EOV sits beside the categories, not inside one.
+    await waitFor(() =>
+      expect(headers()).toEqual([
+        ["Biogeochemical", "1", false],
+        ["Nutrients", "1", true],
+        ["Oxygen", "1", true],
+        ["Physical", "1", false],
+        ["Sea State", "1", true],
+        ["Uncategorized", "1", false],
+      ]),
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add filter: Biogeochemical" }),
+    );
+    await waitFor(() =>
+      expect(
+        filters.eovsSelected
+          .filter((o) => o.category === "Biogeochemical")
+          .every((o) => o.isSelected),
+      ).toBe(true),
+    );
+    expect(
+      filters.eovsSelected.some(
+        (o) => o.category !== "Biogeochemical" && o.isSelected,
+      ),
+    ).toBe(false);
+  });
+
+  it("a group header includes or excludes its group in the main filters", async () => {
+    const { user } = renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+    const mooring = () =>
+      filters.platformsSelected.find((p) => p.title === "mooring");
+
+    const include = await screen.findByRole("button", {
+      name: "Add filter: mooring",
+    });
+    await user.click(include);
+    await waitFor(() => expect(mooring().isSelected).toBe(true));
+    expect(include).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await waitFor(() => expect(mooring().isExcluded).toBe(true));
+    expect(mooring().isSelected).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await waitFor(() => expect(mooring().isExcluded).toBe(false));
+  });
+
+  it("keeps the groups a header's own filter took out, empty, until the grouping changes", async () => {
+    const vessel = makeRow({
+      pk: 4,
+      title: "Delta",
+      platform: "surface vessel",
+    });
+    const table = (datasets) => (
+      <>
+        <DatasetsTable
+          datasets={datasets}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <FiltersProbe />
+      </>
+    );
+    const { user, rerender } = renderWithProviders(table([...ROWS, vessel]), {
+      providers: "app",
+    });
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+    const header = (name) =>
+      [...document.querySelectorAll(".datasetsCardGroupHeader")].find(
+        (h) => h.querySelector(".datasetsCardGroupTitle").textContent === name,
+      );
+    const platform = (name) =>
+      filters.platformsSelected.find((p) => p.title === name);
+
+    // Including mooring narrows the results to it; surface vessel stays
+    // listed, empty and last, so it can be added too.
+    await user.click(
+      await screen.findByRole("button", { name: "Add filter: mooring" }),
+    );
+    rerender(table(ROWS));
+    expect(header("surface vessel")).toHaveClass("empty");
+    expect(
+      header("surface vessel").querySelector(".datasetsCardGroupCount"),
+    ).toHaveTextContent("0");
+    expect(
+      header("surface vessel").querySelector(".datasetsCardGroupToggle"),
+    ).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: "Add filter: surface vessel" }),
+    );
+    await waitFor(() =>
+      expect(platform("surface vessel").isSelected).toBe(true),
+    );
+    expect(platform("mooring").isSelected).toBe(true);
+
+    // An excluded group stays listed with its undo, and clearing the filter
+    // keeps it until the results bring it back.
+    await user.click(
+      screen.getByRole("button", { name: "Add filter: mooring" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Add filter: surface vessel" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    rerender(table([vessel]));
+    expect(header("mooring")).toHaveClass("empty", "excluded");
+    expect(header("mooring").style.getPropertyValue("--group-share")).toBe("0");
+    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await waitFor(() => expect(platform("mooring").isExcluded).toBe(false));
+    expect(header("mooring")).toHaveClass("empty");
+
+    rerender(table([...ROWS, vessel]));
+    expect(header("mooring")).not.toHaveClass("empty");
+
+    await user.selectOptions(screen.getByLabelText("Group by"), "type");
+    await user.selectOptions(screen.getByLabelText("Group by"), "platform");
+    expect(
+      document.querySelectorAll(".datasetsCardGroupHeader.empty"),
+    ).toHaveLength(0);
+  });
+
+  it("a page opened mid-group re-shows both its parent and its group header", async () => {
+    const rows = Array.from({ length: 30 }, (_, i) =>
+      makeRow({
+        pk: i + 1,
+        title: `Station ${String(i).padStart(2, "0")}`,
+        erddap_server_url: "https://erddap.ogsl.ca/erddap",
+      }),
+    );
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={rows}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    await user.selectOptions(screen.getByLabelText("Group by"), "source");
+    await user.click(await screen.findByRole("button", { name: /SLGO/ }));
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(
+      [...document.querySelectorAll(".datasetsCardGroupTitle")].map(
+        (el) => el.textContent,
+      ),
+    ).toEqual(["ERDDAP", "SLGO"]);
+    expect(screen.getAllByTestId("dataset-card")).toHaveLength(5);
   });
 });
 

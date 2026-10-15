@@ -15,6 +15,7 @@ import {
   useSearchInput,
 } from "../../../utilities";
 
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
 export default function Filter({
@@ -37,9 +38,12 @@ export default function Filter({
   searchPlaceholder,
   resetButton,
   infoButton,
+  // The tip that points at this filter's search box (see TipsProvider).
+  tipTarget,
   children,
 }) {
   const { t } = useTranslation();
+  const { tipHighlight } = useTips();
 
   // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false);
@@ -122,6 +126,7 @@ export default function Filter({
             // A form, so Enter means "don't wait out the delay".
             <form
               className="filterSearchRow"
+              data-tip-highlight={tipHighlight(tipTarget)}
               onSubmit={(e) => {
                 e.preventDefault();
                 submitSearch();

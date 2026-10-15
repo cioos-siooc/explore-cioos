@@ -40,6 +40,7 @@ export function FilterOption({
   isExcluded,
   onInclude,
   onExclude,
+  excludeTipHighlight,
   className,
   title,
   icon,
@@ -80,6 +81,7 @@ export function FilterOption({
         <button
           type="button"
           className="optionExclude"
+          data-tip-highlight={excludeTipHighlight}
           aria-pressed={Boolean(isExcluded)}
           aria-label={`${t("filterOptionExcludeAction")}: ${label}`}
           title={t(

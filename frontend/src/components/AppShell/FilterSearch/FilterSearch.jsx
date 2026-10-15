@@ -26,7 +26,6 @@ import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
-import { TOO_BROAD_RANKS } from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
 import {
   ExcludedLabel,
   OptionStateIcon,
@@ -57,7 +56,7 @@ function useScientificNameMatches(term, enabled) {
         setResult({
           query,
           items: (Array.isArray(items) ? items : []).filter(
-            (i) => i?.scientificName && !TOO_BROAD_RANKS.has(i.rank),
+            (i) => i?.scientificName && !i.tooBroad,
           ),
         }),
       )
@@ -415,6 +414,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
                       aria-selected={i === active}
                       className={classNames("filterSearchOption", {
                         active: i === active,
+                        shortcut: option.shortcut,
                       })}
                       data-testid="filter-search-option"
                       data-state={option.state ?? "none"}
@@ -443,6 +443,11 @@ export default function FilterSearch({ text, setText, inputRef }) {
                               aria-hidden="true"
                             >
                               {t("filterNotTag")}
+                            </span>
+                          )}
+                          {option.shortcut && (
+                            <span className="filterSearchOptionTag">
+                              {t("filterSearchCategoryTag")}
                             </span>
                           )}
                           {option.label}
