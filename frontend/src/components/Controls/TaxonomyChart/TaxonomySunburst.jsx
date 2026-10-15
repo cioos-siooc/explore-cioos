@@ -63,7 +63,7 @@ export default function TaxonomySunburst({ tree }) {
         font: { family: "Montserrat, system-ui, sans-serif" },
       }}
       config={{
-        displaylogo: false,
+        displayModeBar: false,
         responsive: true,
         locale: i18n.language === "fr" ? "fr" : "en",
       }}
