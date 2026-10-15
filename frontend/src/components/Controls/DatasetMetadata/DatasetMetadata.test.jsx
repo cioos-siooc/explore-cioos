@@ -7,6 +7,8 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetMetadata, {
   DatasetAbstract,
+  LicensePill,
+  MetadataSheetRows,
   localized,
 } from "./DatasetMetadata.jsx";
 import useDatasetMetadata from "./useDatasetMetadata.js";
@@ -108,34 +110,84 @@ describe("DatasetAbstract", () => {
   });
 });
 
+const DATASET = {
+  dataset_id: "example_ctd",
+  organizations: ["An institute"],
+  erddap_url: "https://erddap.example.org/erddap/tabledap/example_ctd.html",
+  erddap_server_url: "https://erddap.example.org/erddap",
+  ckan_url: "https://catalogue.cioos.ca/dataset/abc",
+};
+
+const renderCards = (props) =>
+  renderWithProviders(
+    <DatasetMetadata dataset={DATASET} metadata={METADATA} {...props} />,
+  );
+
 describe("DatasetMetadata", () => {
-  it("shows every card with something in it, open, and no others", () => {
-    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
-    const sections = screen
-      .getAllByRole("heading", { level: 3 })
-      .map((heading) => heading.textContent);
-    expect(sections).toEqual([
-      "License",
-      "How to cite",
-      "Dates and extent",
-      "Contacts",
-      "Keywords",
-      "Resources",
-    ]);
+  it("shows every card with something in it, and no others", () => {
+    renderCards();
+    expect(
+      screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["Resources", "Organizations and contacts", "How to cite"]);
   });
 
-  it("names the license as a short chip, its full wording on hover", () => {
-    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
-    const chip = screen.getByRole("link", { name: "CC BY 4.0" });
-    expect(chip).toHaveAttribute(
-      "title",
-      "Creative Commons Attribution 4.0 International",
-    );
+  it("lists the dataset's own access links before its catalogue's, each once", () => {
+    renderCards();
+    const links = screen
+      .getAllByRole("link")
+      .filter((link) => link.classList.contains("metadataResource"));
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      DATASET.erddap_url,
+      "https://erddap.example.org/erddap/info/example_ctd/index.html",
+      "https://erddap.example.org/erddap/metadata/iso19115/xml/example_ctd_iso19115.xml",
+      DATASET.ckan_url,
+      "https://example.org",
+    ]);
+    expect(links[0]).toHaveTextContent("Data access form");
+    expect(links[0]).toHaveTextContent("erddap.example.org");
+    expect(links[4]).toHaveTextContent("More information");
+  });
+
+  it("shows a catalogue resource in the page's language, or in none", async () => {
+    const { i18n } = renderCards({
+      metadata: {
+        resources: [
+          { name: { en: "English", fr: "Français" }, url: "https://a.org" },
+          { name: "Only French", url: "https://b.org", language: "fr" },
+        ],
+      },
+    });
+    expect(screen.getByText("English")).toBeInTheDocument();
+    expect(screen.queryByText("Only French")).not.toBeInTheDocument();
+    await act(() => i18n.changeLanguage("fr"));
+    expect(screen.getByText("Français")).toBeInTheDocument();
+    expect(screen.getByText("Only French")).toBeInTheDocument();
+  });
+
+  it("groups contacts by whether the citation names them, under the organizations", () => {
+    renderCards({
+      metadata: {
+        contacts: [
+          { name: "Doe, Jane", roles: ["author"], cited: true },
+          { name: "Data Office", roles: ["distributor"], cited: false },
+        ],
+      },
+    });
+    expect(screen.getByText("An institute")).toHaveClass("metadataChip");
+    const cited = screen.getByRole("heading", { level: 4, name: "Cited" });
+    expect(cited.parentElement).toHaveTextContent("Doe, Jane");
+    const other = screen.getByRole("heading", {
+      level: 4,
+      name: "Other contacts",
+    });
+    expect(other.parentElement).toHaveTextContent("Data Office");
   });
 
   it("copies the citation from an icon button, and adds a DOI it lacks", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
+    renderCards();
     expect(
       screen.getByRole("link", { name: "https://doi.org/10.0000/x" }),
     ).toBeInTheDocument();
@@ -150,38 +202,72 @@ describe("DatasetMetadata", () => {
   });
 
   it("never shows a contact's email", () => {
-    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
+    renderCards();
     expect(screen.getByText("Doe, Jane")).toBeInTheDocument();
     expect(screen.queryByText("jane@example.org")).not.toBeInTheDocument();
   });
 
-  it("translates known codes and spells out unknown ones", () => {
-    renderWithProviders(<DatasetMetadata metadata={METADATA} />);
+  it("translates known role codes and spells out unknown ones", () => {
+    renderCards();
     expect(
       screen.getByText("Principal investigator, Some New Role"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Ongoing")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "More information" }),
-    ).toHaveAttribute("href", "https://example.org");
   });
 
-  it("renders nothing for a dataset not yet re-harvested", () => {
-    const { container } = renderWithProviders(
-      <DatasetMetadata metadata={{}} />,
-    );
-    expect(container).toBeEmptyDOMElement();
+  it("still lists the organizations and access links before a re-harvest", () => {
+    renderCards({ metadata: {} });
+    expect(screen.getByText("An institute")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Data access form/ }),
+    ).toBeInTheDocument();
   });
 
   it("says a failed load failed, with a retry", async () => {
     const user = userEvent.setup();
     const retry = vi.fn();
-    renderWithProviders(<DatasetMetadata error retry={retry} />);
+    renderCards({ metadata: undefined, error: true, retry });
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The dataset's metadata could not be loaded.",
     );
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalledOnce();
+  });
+});
+
+describe("LicensePill", () => {
+  it("names the license briefly, its full wording on hover", () => {
+    renderWithProviders(<LicensePill metadata={METADATA} />);
+    const pill = screen.getByRole("link", { name: "License CC BY 4.0" });
+    expect(pill).toHaveAttribute(
+      "title",
+      "Creative Commons Attribution 4.0 International",
+    );
+  });
+});
+
+describe("MetadataSheetRows", () => {
+  it("adds keywords and single-line date pills to the metadata sheet", () => {
+    renderWithProviders(
+      <dl>
+        <MetadataSheetRows
+          metadata={{
+            ...METADATA,
+            dates: { created: "2019-04-01T00:00:00Z" },
+            temporal_extent: { begin: "2019-04-01", end: "2023-10-30" },
+          }}
+        />
+      </dl>,
+    );
+    expect(screen.getByText("temperature")).toHaveClass("metadataChip");
+    expect(screen.getByText("Created").parentElement).toHaveTextContent(
+      "Created2019-04-01",
+    );
+    expect(screen.getByText("Time period").parentElement).toHaveTextContent(
+      "2019-04-01 – 2023-10-30",
+    );
+    expect(screen.getByText("Status").parentElement).toHaveTextContent(
+      "Ongoing",
+    );
   });
 });
 

@@ -6,10 +6,11 @@ their own shape. These turn each into one small dict for ``datasets.metadata``
 (jsonb), and ``merge`` combines them with the first source winning per field:
 
     abstract {en, fr} · citation {en, fr} · doi · license {title, url}
-    contacts [{name, organization, email, url, roles}] · keywords {en, fr}
+    contacts [{name, organization, email, url, roles, cited}] · keywords {en, fr}
     dates {created, published, revised} · temporal_extent {begin, end}
     vertical_extent {min, max} · progress · update_frequency · projects
-    lineage · acknowledgement · resources [{name, url, format}]
+    lineage · acknowledgement
+    resources [{name {en, fr}, description {en, fr}, url, format, language}]
 
 Empty values are dropped rather than stored, so a field a better source leaves
 blank falls through to the next one.
@@ -102,7 +103,8 @@ def _abstract(value):
 def _who(contacts):
     """Contacts with a person or organization to name, one entry per contact:
     a source that lists the same contact under several roles (ACDD's creator
-    and publisher are often one organization) gets one entry with all of them."""
+    and publisher are often one organization) gets one entry with all of them,
+    cited if any of them is."""
     merged = {}
     for contact in contacts:
         if not (_text(contact.get("name")) or _text(contact.get("organization"))):
@@ -111,8 +113,13 @@ def _who(contacts):
         if key in merged:
             roles = merged[key]["roles"]
             roles += [r for r in contact.get("roles") or [] if r not in roles]
+            merged[key]["cited"] = merged[key]["cited"] or contact.get("cited", False)
         else:
-            merged[key] = {**contact, "roles": list(contact.get("roles") or [])}
+            merged[key] = {
+                **contact,
+                "roles": list(contact.get("roles") or []),
+                "cited": bool(contact.get("cited")),
+            }
     return list(merged.values())
 
 
@@ -124,7 +131,19 @@ def _as_list(value):
 
 
 def _links(resources):
-    return [r for r in resources if _text(r.get("url"))]
+    """Resources with a link, each link once."""
+    seen, out = set(), []
+    for resource in resources:
+        url = _text(resource.get("url"))
+        if url and url not in seen:
+            seen.add(url)
+            out.append(resource)
+    return out
+
+
+def _translated(translated, fallback):
+    """CKAN's {en, fr} field, else its single-language one as English."""
+    return translated or {"en": fallback}
 
 
 def merge(*partials):
@@ -174,7 +193,7 @@ def _csl_citation(raw):
     return ". ".join(p.strip().rstrip(".") for p in parts if p and p.strip()) or None
 
 
-def _ckan_contact(party):
+def _ckan_contact(party, cited, default_role=None):
     return {
         "name": party.get("individual-name"),
         "organization": party.get("organisation-name"),
@@ -182,7 +201,8 @@ def _ckan_contact(party):
         "url": party.get("individual-uri_code")
         or party.get("contact-info_online-resource")
         or party.get("organisation-uri_code"),
-        "roles": _as_list(party.get("role")),
+        "roles": _as_list(party.get("role")) or _as_list(default_role),
+        "cited": cited,
     }
 
 
@@ -198,7 +218,14 @@ def from_ckan(package):
         "citation": {lang: _csl_citation(citation.get(lang)) for lang in ("en", "fr")},
         "doi": next(filter(None, (_doi_url(i.get("code")) for i in identifiers)), None),
         "license": {"title": package.get("license_title"), "url": package.get("license_url")},
-        "contacts": _who([_ckan_contact(p) for p in package.get("cited-responsible-party") or []]),
+        "contacts": _who([
+            *(_ckan_contact(p, True) for p in package.get("cited-responsible-party") or []),
+            *(
+                _ckan_contact(p, False, "pointOfContact")
+                for p in package.get("metadata-point-of-contact") or []
+            ),
+            *(_ckan_contact(p, False, "distributor") for p in package.get("distributor") or []),
+        ]),
         "keywords": {lang: _unique(keywords.get(lang) or []) for lang in ("en", "fr")},
         "dates": {
             "created": dates.get("creation"),
@@ -212,7 +239,15 @@ def from_ckan(package):
         "projects": _unique(package.get("projects") or []),
         "lineage": package.get("lineage"),
         "resources": _links([
-            {"name": r.get("name"), "url": r.get("url"), "format": r.get("format")}
+            {
+                "name": _translated(r.get("name_translated"), r.get("name")),
+                "description": _translated(
+                    r.get("description_translated"), r.get("description")
+                ),
+                "url": r.get("url"),
+                "format": r.get("format"),
+                "language": r.get("language"),
+            }
             for r in package.get("resources") or []
         ]),
     }) or {}
@@ -247,6 +282,7 @@ def from_cioos_record(record, citation=None):
                 "email": c.get("indEmail"),
                 "url": c.get("orgURL"),
                 "roles": c.get("role") or [],
+                "cited": bool(c.get("inCitation")),
             }
             for c in record.get("contacts") or []
         ]),
@@ -260,7 +296,11 @@ def from_cioos_record(record, citation=None):
         "progress": record.get("progress"),
         "projects": _unique(record.get("projects") or []),
         "resources": _links([
-            {"name": _english(d.get("name"))["en"], "url": d.get("url")}
+            {
+                "name": _english(d.get("name")),
+                "description": _english(d.get("description")),
+                "url": d.get("url"),
+            }
             for d in record.get("distribution") or []
         ]),
     }) or {}
@@ -283,13 +323,15 @@ def _split(value, separator):
 
 def _acdd_contacts(globals_):
     contacts = []
-    for prefix, role in (("creator", "author"), ("publisher", "publisher")):
+    # ACDD's creator is who a citation names; publisher and contributors are not.
+    for prefix, role, cited in (("creator", "author", True), ("publisher", "publisher", False)):
         contacts.append({
             "name": globals_.get(f"{prefix}_name"),
             "organization": globals_.get(f"{prefix}_institution"),
             "email": globals_.get(f"{prefix}_email"),
             "url": globals_.get(f"{prefix}_url"),
             "roles": [role],
+            "cited": cited,
         })
     # contributor_name/contributor_role are parallel lists: ";"-separated in
     # CIOOS ERDDAPs (each role slot then a comma list), ","-separated elsewhere.
@@ -335,7 +377,7 @@ def from_erddap_globals(globals_):
         "lineage": g.get("history"),
         "acknowledgement": g.get("acknowledgement") or g.get("acknowledgment"),
         "resources": _links([
-            {"name": "infoUrl", "url": g.get("infoUrl")},
+            {"name": {"en": "infoUrl"}, "url": g.get("infoUrl")},
             *[{"url": url} for url in (g.get("references") or "").split() if _URL.match(url)],
         ]),
     }) or {}

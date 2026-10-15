@@ -234,7 +234,7 @@ export function ckanRecordUrl(ckanUrl) {
 // The server a dataset is served from. `erddap_server_url` is the base; older
 // rows (and the download panel's own reshaping) may only carry the landing
 // page, which is the base with /tabledap/<id>.html on the end.
-function erddapServerBase(row) {
+export function erddapServerBase(row) {
   const base = row?.erddap_server_url;
   if (base) return base.replace(/\/$/, "");
   const landing = row?.erddap_url;

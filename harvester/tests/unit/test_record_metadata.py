@@ -42,6 +42,7 @@ CKAN_PACKAGE = {
         {"individual-name": "Chaillou, G", "role": "coAuthor"},
         {"individual-name": "", "organisation-name": "", "role": ["custodian"]},
     ],
+    "distributor": [{"organisation-name": "ISMER Data Office"}],
     "keywords": {"en": ["oceans", "Oceans", "ctd"], "fr": []},
     "dataset-reference-date": [{"type": "creation", "value": "2023-02-21"}],
     "temporal-extent": [{"begin": "2023-02-21", "end": "2023-10-27"}],
@@ -50,7 +51,14 @@ CKAN_PACKAGE = {
     "frequency-of-update": "asNeeded",
     "projects": [],
     "resources": [
-        {"name": "ERDDAP", "url": "https://erddap.example/tabledap/x.html", "format": "ERDDAP"},
+        {
+            "name": "ERDDAP",
+            "name_translated": {"en": "ERDDAP", "fr": "ERDDAP (fr)"},
+            "description": "Data access",
+            "url": "https://erddap.example/tabledap/x.html",
+            "format": "ERDDAP",
+        },
+        {"name": "Same link again", "url": "https://erddap.example/tabledap/x.html"},
         {"name": "No link", "url": ""},
     ],
     "harvest_document_content": "<mdb:MD_Metadata/>",
@@ -71,8 +79,10 @@ def test_ckan_record_normalized():
                 "organization": "ISMER",
                 "url": "https://orcid.org/0000-0001-5782-0876",
                 "roles": ["author", "owner"],
+                "cited": True,
             },
-            {"name": "Chaillou, G", "roles": ["coAuthor"]},
+            {"name": "Chaillou, G", "roles": ["coAuthor"], "cited": True},
+            {"organization": "ISMER Data Office", "roles": ["distributor"], "cited": False},
         ],
         "keywords": {"en": ["oceans", "ctd"]},
         "dates": {"created": "2023-02-21"},
@@ -81,7 +91,12 @@ def test_ckan_record_normalized():
         "progress": "completed",
         "update_frequency": "asNeeded",
         "resources": [
-            {"name": "ERDDAP", "url": "https://erddap.example/tabledap/x.html", "format": "ERDDAP"},
+            {
+                "name": {"en": "ERDDAP", "fr": "ERDDAP (fr)"},
+                "description": {"en": "Data access"},
+                "url": "https://erddap.example/tabledap/x.html",
+                "format": "ERDDAP",
+            },
         ],
     }
 
@@ -96,7 +111,8 @@ def test_converted_obis_record_keeps_english_only():
         "datasetIdentifier": "10.1234/abc",
         "license": "This work is licensed under CC-BY 4.0",
         "contacts": [
-            {"indName": "Ashley Burton", "orgName": "DFO", "indEmail": "a@dfo", "role": ["author"]},
+            {"indName": "Ashley Burton", "orgName": "DFO", "indEmail": "a@dfo", "role": ["author"],
+             "inCitation": True},
             {"indName": "", "orgName": ""},
         ],
         "keywords": {"en": ["Samplingevent"], "fr": ["Samplingevent"]},
@@ -113,11 +129,14 @@ def test_converted_obis_record_keeps_english_only():
         "doi": "https://doi.org/10.1234/abc",
         "license": {"title": "This work is licensed under CC-BY 4.0"},
         "contacts": [
-            {"name": "Ashley Burton", "organization": "DFO", "email": "a@dfo", "roles": ["author"]},
+            {"name": "Ashley Burton", "organization": "DFO", "email": "a@dfo", "roles": ["author"],
+             "cited": True},
         ],
         "keywords": {"en": ["Samplingevent"]},
         "dates": {"published": "2022-03-23T18:27:19Z"},
-        "resources": [{"name": "Darwin Core Archive", "url": "https://ipt.example/archive.do?r=x"}],
+        "resources": [
+            {"name": {"en": "Darwin Core Archive"}, "url": "https://ipt.example/archive.do?r=x"},
+        ],
     }
 
 
@@ -143,9 +162,9 @@ def test_erddap_globals_normalized():
         "abstract": {"en": "Summary", "fr": "Sommaire"},
         "license": {"url": "https://creativecommons.org/licenses/by/4.0/"},
         "contacts": [
-            {"name": "Hakai Institute", "email": "data@hakai.org", "roles": ["author"]},
-            {"name": "Ann", "roles": ["editor"]},
-            {"name": "Bob", "roles": ["pointOfContact"]},
+            {"name": "Hakai Institute", "email": "data@hakai.org", "roles": ["author"], "cited": True},
+            {"name": "Ann", "roles": ["editor"], "cited": False},
+            {"name": "Bob", "roles": ["pointOfContact"], "cited": False},
         ],
         "keywords": {"en": ["temperature", "salinity"]},
         "dates": {"created": "2020-01-01"},
@@ -154,7 +173,7 @@ def test_erddap_globals_normalized():
         "projects": ["Juvenile Salmon", "Oceanography"],
         "lineage": "created by script",
         "resources": [
-            {"name": "infoUrl", "url": "https://hakai.org"},
+            {"name": {"en": "infoUrl"}, "url": "https://hakai.org"},
             {"url": "https://doi.org/10.1/x"},
         ],
     }
@@ -164,7 +183,7 @@ def test_mismatched_contributor_lists_stay_one_contact():
     contacts = from_erddap_globals(
         {"contributor_name": "Smith, Jane", "contributor_role": "editor"}
     )["contacts"]
-    assert contacts == [{"name": "Smith, Jane", "roles": ["editor"]}]
+    assert contacts == [{"name": "Smith, Jane", "roles": ["editor"], "cited": False}]
 
 
 def test_merge_first_source_wins_and_dicts_merge_one_level():
@@ -182,7 +201,7 @@ def test_erddap_escapes_decoded():
         {"summary": "Para one.\\nPara two.", "creator_name": "La\\u00edsa Peixoto Ramos"}
     )
     assert metadata["abstract"] == {"en": "Para one.\nPara two."}
-    assert metadata["contacts"] == [{"name": "Laísa Peixoto Ramos", "roles": ["author"]}]
+    assert metadata["contacts"] == [{"name": "Laísa Peixoto Ramos", "roles": ["author"], "cited": True}]
 
 
 def test_cioos_semicolon_contributors_and_repeated_contact_merged():
@@ -195,9 +214,10 @@ def test_cioos_semicolon_contributors_and_repeated_contact_merged():
         "contributor_role": "processor,custodian;funder",
     })["contacts"]
     assert contacts == [
-        {"name": "Hakai Institute", "email": "data@hakai.org", "roles": ["author", "publisher"]},
-        {"name": "Hare, Alex", "roles": ["processor", "custodian"]},
-        {"name": "Tula Foundation", "roles": ["funder"]},
+        {"name": "Hakai Institute", "email": "data@hakai.org", "roles": ["author", "publisher"],
+         "cited": True},
+        {"name": "Hare, Alex", "roles": ["processor", "custodian"], "cited": False},
+        {"name": "Tula Foundation", "roles": ["funder"], "cited": False},
     ]
 
 

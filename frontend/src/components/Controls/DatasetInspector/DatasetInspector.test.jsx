@@ -97,7 +97,10 @@ describe("DatasetInspector", () => {
 
   it("shows organizations, ocean variables, geometry, platform and sources", async () => {
     await renderReady();
-    expect(screen.getByText("Chicago Park District")).toBeInTheDocument();
+    // Organizations sit with the contacts, once the metadata has loaded.
+    expect(
+      await screen.findByText("Chicago Park District"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Oxygen")).toBeInTheDocument();
     expect(screen.getByText("subSurfaceTemperature")).toBeInTheDocument();
     // TimeSeries maps to the "Time series" data-layer label.
@@ -140,6 +143,7 @@ describe("DatasetInspector", () => {
 
   it("renders organization, variable and platform values as plain chips, not filter toggles", async () => {
     await renderReady();
+    await screen.findByText("Chicago Park District");
     for (const value of ["Chicago Park District", "Oxygen", "Mooring"]) {
       const chip = screen.getByText(value);
       expect(chip).toHaveClass("metadataChip");

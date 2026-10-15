@@ -13,6 +13,8 @@ import {
 import GriddapDetails from "../GriddapDetails/GriddapDetails.jsx";
 import DatasetMetadata, {
   DatasetAbstract,
+  LicensePill,
+  MetadataSheetRows,
 } from "../DatasetMetadata/DatasetMetadata.jsx";
 import useDatasetMetadata from "../DatasetMetadata/useDatasetMetadata.js";
 import TaxonomyChart from "../TaxonomyChart/TaxonomyChart.jsx";
@@ -577,6 +579,7 @@ export default function DatasetInspector({
           </button>
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
+          <LicensePill {...metadata} />
         </div>
         {/* A filter or the list's own narrowing can exclude a dataset whose
             page is already open. The page stays (the user chose it), and says
@@ -601,18 +604,6 @@ export default function DatasetInspector({
             same line (wrapping under only when the row is too narrow for
             both). No row rules — the whitespace separates them. */}
         <dl className="datasetMetaSheet">
-          <div className="metaCell">
-            <dt className="metadataLabel">
-              {t("datasetInspectorOrganizationText")}
-            </dt>
-            <dd className="metadataValue">
-              {dataset.organizations.map((org) => (
-                <span className="metadataChip" key={org}>
-                  {org}
-                </span>
-              ))}
-            </dd>
-          </div>
           <div className="metaCell">
             <dt className="metadataLabel">
               {t("datasetInspectorOceanVariablesText")}
@@ -653,6 +644,9 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
+          {/* Keywords and dates from the harvested metadata; organizations
+              moved to the contacts card below. */}
+          <MetadataSheetRows {...metadata} />
           {/* Geometry, platform, locations and sources: a label with its
               value(s) as badges beside it, the same badge organizations and
               EOVs already use (same pill radius, border and padding as
@@ -783,7 +777,7 @@ export default function DatasetInspector({
           )}
         </dl>
         <DatasetAbstract {...metadata} />
-        <DatasetMetadata {...metadata} />
+        <DatasetMetadata dataset={dataset} {...metadata} />
         {isGrid && (
           <GriddapDetails
             dataset={dataset}

@@ -15,24 +15,34 @@
   "contacts": [
     {
       "name": "Example Ocean Institute",
-      "email": "data@example.org",
       "url": "https://example.org",
-      "roles": ["custodian", "distributor", "owner"]
+      "roles": ["custodian", "distributor", "owner"],
+      "cited": false
     },
     {
       "name": "Doe, Jane",
       "organization": "Example Ocean Institute",
       "url": "https://orcid.org/0000-0000-0000-0000",
-      "roles": ["principalInvestigator"]
+      "roles": ["principalInvestigator"],
+      "cited": true
     }
   ],
   "keywords": {
     "en": ["oceans", "ctd", "temperature", "salinity", "vertical profiles"],
     "fr": ["océans", "ctd", "température", "salinité", "profils verticaux"]
   },
-  "dates": { "created": "2019-04-01", "published": "2024-06-15" },
-  "temporal_extent": { "begin": "2019-04-01", "end": "2023-10-30" },
-  "vertical_extent": { "min": 0, "max": 250 },
+  "dates": {
+    "created": "2019-04-01",
+    "published": "2024-06-15"
+  },
+  "temporal_extent": {
+    "begin": "2019-04-01",
+    "end": "2023-10-30"
+  },
+  "vertical_extent": {
+    "min": 0,
+    "max": 250
+  },
   "progress": "onGoing",
   "update_frequency": "asNeeded",
   "projects": ["Coastal Monitoring Program"],
@@ -40,8 +50,15 @@
     {
       "name": "ERDDAP",
       "url": "https://erddap.example.org/erddap/tabledap/example_ctd.html",
-      "format": "ERDDAP"
+      "format": "ERDDAP",
+      "description": {
+        "en": "Subset and download the CTD profiles.",
+        "fr": "Sélectionner et télécharger les profils CTD."
+      }
     },
-    { "name": "infoUrl", "url": "https://example.org/coastal-ctd" }
+    {
+      "name": "infoUrl",
+      "url": "https://example.org/coastal-ctd"
+    }
   ]
 }
