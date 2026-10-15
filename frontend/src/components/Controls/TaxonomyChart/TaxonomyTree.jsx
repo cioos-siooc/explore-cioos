@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { inkOn, phylumColors } from "./taxonomy.js";
 
 const INITIAL_OPEN_DEPTH = 1;
 
@@ -19,6 +21,7 @@ function interiorIds(node, depth, maxDepth, ids = new Set()) {
 export default function TaxonomyTree({ tree }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "fr" ? "fr-CA" : "en-CA";
+  const colors = useMemo(() => phylumColors(tree), [tree]);
   const [expanded, setExpanded] = useState(() =>
     interiorIds(tree, 0, INITIAL_OPEN_DEPTH + 1),
   );
@@ -32,12 +35,18 @@ export default function TaxonomyTree({ tree }) {
     });
   }
 
-  function renderNode(node) {
+  // A phylum's colour carries down its whole branch, as in the sunburst.
+  function renderNode(node, inheritedColor) {
     const isOpen = expanded.has(node.id);
     const hasChildren = node.children.length > 0;
+    const color = colors.get(node.id) ?? inheritedColor;
     return (
       <li key={node.id} className="taxonomyTreeItem">
-        <span className="taxonomyTreeTile">
+        <span
+          className="taxonomyTreeTile"
+          data-ink={color && inkOn(color)}
+          style={color && { "--taxon-color": color }}
+        >
           {hasChildren ? (
             <button
               type="button"
@@ -61,7 +70,9 @@ export default function TaxonomyTree({ tree }) {
           </span>
         </span>
         {hasChildren && isOpen && (
-          <ul className="taxonomyTreeLines">{node.children.map(renderNode)}</ul>
+          <ul className="taxonomyTreeLines">
+            {node.children.map((child) => renderNode(child, color))}
+          </ul>
         )}
       </li>
     );
@@ -93,7 +104,9 @@ export default function TaxonomyTree({ tree }) {
               {tree.total.toLocaleString(locale)}
             </span>
           </span>
-          <ul className="taxonomyTreeLines">{tree.children.map(renderNode)}</ul>
+          <ul className="taxonomyTreeLines">
+            {tree.children.map((child) => renderNode(child))}
+          </ul>
         </li>
       </ul>
     </div>

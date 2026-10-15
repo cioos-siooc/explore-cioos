@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 import {
+  OBIS_COLORWAY,
   buildTaxonomyTree,
   fetchChecklist,
+  inkOn,
+  phylumColors,
   sunburstTrace,
 } from "./taxonomy.js";
 
@@ -69,6 +72,30 @@ describe("sunburstTrace", () => {
     const mollusca = trace.labels.indexOf("Mollusca");
     expect(trace.parents[mollusca]).toBe(trace.ids[0]);
     expect(new Set(trace.ids).size).toBe(trace.ids.length);
+  });
+});
+
+describe("phylumColors", () => {
+  it("deals the colorway to phyla by descending total across kingdoms", () => {
+    const colors = phylumColors(
+      buildTaxonomyTree([
+        ...TAXA,
+        { kingdom: "Plantae", phylum: "Rhodophyta", records: 15 },
+      ]),
+    );
+    expect([...colors]).toEqual([
+      ["Animalia/Mollusca", OBIS_COLORWAY[0]],
+      ["Plantae/Rhodophyta", OBIS_COLORWAY[1]],
+      ["Animalia/Chordata", OBIS_COLORWAY[2]],
+      ["Animalia/Annelida", OBIS_COLORWAY[3]],
+    ]);
+  });
+});
+
+describe("inkOn", () => {
+  it("puts white text on the dark colours and dark text on the pale ones", () => {
+    expect(inkOn("#1f78b4")).toBe("light");
+    expect(inkOn("#ffff99")).toBe("dark");
   });
 });
 

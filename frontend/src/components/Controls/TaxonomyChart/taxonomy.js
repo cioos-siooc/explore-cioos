@@ -8,6 +8,22 @@ export const TAXON_RANKS = [
   "species",
 ];
 
+// ColorBrewer "Paired", as obis.org's own sunburst uses.
+export const OBIS_COLORWAY = [
+  "#a6cee3",
+  "#1f78b4",
+  "#b2df8a",
+  "#33a02c",
+  "#fb9a99",
+  "#e31a1c",
+  "#fdbf6f",
+  "#ff7f00",
+  "#cab2d6",
+  "#6a3d9a",
+  "#ffff99",
+  "#b15928",
+];
+
 const CHECKLIST_PAGE_SIZE = 5000;
 
 // OBIS caps a checklist page well under the taxa count of its larger datasets,
@@ -93,4 +109,34 @@ export function sunburstTrace(tree, rootLabel) {
   }
   walk(tree, "");
   return trace;
+}
+
+// The colour Plotly gives each phylum's sector, keyed by node id: it sorts the
+// first ring by value, across kingdoms since sunburstTrace skips them, then
+// deals out the colorway in that order (extendsunburstcolors off, so it wraps).
+export function phylumColors(tree) {
+  const phyla = tree.children
+    .flatMap((kingdom) => kingdom.children)
+    .sort((a, b) => b.total - a.total);
+  return new Map(
+    phyla.map((phylum, i) => [
+      phylum.id,
+      OBIS_COLORWAY[i % OBIS_COLORWAY.length],
+    ]),
+  );
+}
+
+function relativeLuminance(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// White text where it out-contrasts the dark ink, i.e. on the darker colours.
+export function inkOn(hex) {
+  const l = relativeLuminance(hex);
+  const ink = relativeLuminance("#152f37");
+  return 1.05 / (l + 0.05) > (l + 0.05) / (ink + 0.05) ? "light" : "dark";
 }

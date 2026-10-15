@@ -6,28 +6,12 @@ import sunburst from "plotly.js/lib/sunburst";
 import createPlotlyComponent from "react-plotly.js/factory";
 import frLocale from "plotly.js-locales/fr";
 
-import { sunburstTrace } from "./taxonomy.js";
+import { OBIS_COLORWAY, sunburstTrace } from "./taxonomy.js";
 
 // The basic Plotly bundle the other plots use has no sunburst; this one is
 // loaded on demand so only an OBIS page showing it pays for it.
 Plotly.register([sunburst, frLocale]);
 const Plot = createPlotlyComponent(Plotly);
-
-// ColorBrewer "Paired", as obis.org's own sunburst uses.
-const OBIS_COLORWAY = [
-  "#a6cee3",
-  "#1f78b4",
-  "#b2df8a",
-  "#33a02c",
-  "#fb9a99",
-  "#e31a1c",
-  "#fdbf6f",
-  "#ff7f00",
-  "#cab2d6",
-  "#6a3d9a",
-  "#ffff99",
-  "#b15928",
-];
 
 export default function TaxonomySunburst({ tree }) {
   const { t, i18n } = useTranslation();
@@ -57,6 +41,7 @@ export default function TaxonomySunburst({ tree }) {
       data={data}
       layout={{
         sunburstcolorway: OBIS_COLORWAY,
+        extendsunburstcolors: false,
         margin: { l: 0, r: 0, t: 0, b: 0 },
         autosize: true,
         paper_bgcolor: "rgba(0,0,0,0)",

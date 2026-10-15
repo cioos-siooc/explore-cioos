@@ -113,6 +113,15 @@
   white-space: nowrap;
 }
 
+.taxonomyTreeTile[data-ink] {
+  border-color: rgb(0 0 0 / 12%);
+  background-color: var(--taxon-color);
+}
+
+.taxonomyTreeTile[data-ink="light"] {
+  color: var(--cioos-white);
+}
+
 .taxonomyTreeName,
 .taxonomyTreeCount {
   padding: 2px 6px;
@@ -130,7 +139,7 @@ button.taxonomyTreeName {
 }
 
 button.taxonomyTreeName:hover {
-  background-color: var(--cioos-white);
+  background-color: rgb(255 255 255 / 35%);
 }
 
 button.taxonomyTreeName[aria-expanded="false"]::after {
@@ -143,4 +152,16 @@ button.taxonomyTreeName[aria-expanded="false"]::after {
   border-left: 1px solid var(--cioos-hairline);
   color: var(--cioos-ink-60);
   font-variant-numeric: tabular-nums;
+}
+
+.taxonomyTreeTile[data-ink] .taxonomyTreeCount {
+  border-left-color: rgb(0 0 0 / 12%);
+  color: inherit;
+  opacity: 0.8;
+}
+
+.taxonomyTreeTile[data-ink]
+  button.taxonomyTreeName[aria-expanded="false"]::after {
+  color: inherit;
+  opacity: 0.7;
 }
