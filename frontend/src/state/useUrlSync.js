@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useNavigationType,
+  useSearchParams,
+} from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -48,6 +53,10 @@ export default function UrlSync() {
   const dataset = searchParams.get("dataset");
   const navigate = useNavigate();
   const location = useLocation();
+  // Back/Forward land on an address written when that entry was left — before
+  // the filters changed inside a sheet that Back has just closed, say — so a
+  // pop is rewritten from the current state like any change to it.
+  const poppedTo = useNavigationType() === "POP" ? location.key : null;
 
   const { query } = useFilters();
   const {
@@ -194,9 +203,8 @@ export default function UrlSync() {
     mappedRecord,
     coverageAxis,
     taxonomyView,
-    // Back/Forward across a dataset page lands on an address written when that
-    // entry was left; rewrite it from the current state.
     dataset,
+    poppedTo,
   ]);
 
   // `i18n` deliberately excluded from the deps, despite reading it in the
