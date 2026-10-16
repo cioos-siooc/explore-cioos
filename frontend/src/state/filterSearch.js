@@ -39,11 +39,12 @@ export function appliedOptions(group) {
   return applied.filter((o) => !covered.has(o.id));
 }
 
-// groups: [{ key, options: [{ label, matchText?, state, ... }] }]. With no term, the
-// options already applied (see appliedOptions), so the bar doubles as the list
-// to remove them from (plus any `keep(groupKey, option)` names, so one just
-// removed stays listed); otherwise the options that match the term, closest
-// first.
+// groups: [{ key, searched?, options: [{ label, matchText?, state, ... }] }]. With
+// no term, the options already applied (see appliedOptions), so the bar doubles
+// as the list to remove them from (plus any `keep(groupKey, option)` names, so
+// one just removed stays listed); otherwise the options that match the term,
+// closest first. A `searched` group was already matched against the term by
+// the service it came from, and is kept as it ranked it.
 export function matchFilterOptions(
   groups,
   term,
@@ -57,6 +58,9 @@ export function matchFilterOptions(
   const looseness = needle.length <= 3 ? 0.1 : needle.length <= 5 ? 0.25 : 0.35;
   return groups
     .map((group) => {
+      if (needle && group.searched) {
+        return { ...group, options: group.options.slice(0, limit) };
+      }
       if (needle) {
         const fuse = new Fuse(group.options, {
           ...FUSE_OPTIONS,

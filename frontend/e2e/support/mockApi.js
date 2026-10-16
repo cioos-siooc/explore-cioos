@@ -27,6 +27,7 @@ const EMPTY_TILEJSON = JSON.stringify({
 });
 
 const TELEMETRY_HOSTS = ["ingest.sentry.io", "plausible.cioos.ca"];
+const GEONAMES_HOST = "geogratis.gc.ca";
 
 // Playwright runs route handlers in REVERSE registration order. Returns the
 // un-mocked request urls, asserted empty on teardown.
@@ -53,22 +54,27 @@ export async function installMockApi(context, { appOrigin, apiOrigin }) {
     return route.abort("blockedbyclient");
   });
 
-  // Registered after => run first => they win.
-  await context.route(`${apiOrigin}/**`, (route) => {
-    const fixture = resolveFixture(route.request().url());
-    if (fixture.empty) return route.fulfill({ status: 204, body: "" });
-    if (fixture.missingPath) {
-      unexpected.push(
-        `${route.request().url()}  (no fixture at ${fixture.missingPath})`,
-      );
-      return route.abort("blockedbyclient");
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: fixture.contentType,
-      body: fixture.body,
-    });
-  });
+  // Registered after => run first => they win. GeoNames (the region search)
+  // is the one third-party API the app queries, so it answers from the same
+  // fixture set.
+  await context.route(
+    (url) => url.origin === apiOrigin || url.host === GEONAMES_HOST,
+    (route) => {
+      const fixture = resolveFixture(route.request().url());
+      if (fixture.empty) return route.fulfill({ status: 204, body: "" });
+      if (fixture.missingPath) {
+        unexpected.push(
+          `${route.request().url()}  (no fixture at ${fixture.missingPath})`,
+        );
+        return route.abort("blockedbyclient");
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: fixture.contentType,
+        body: fixture.body,
+      });
+    },
+  );
 
   for (const host of EXTERNAL_HOSTS) {
     await context.route(`**://${host}/**`, (route) => {

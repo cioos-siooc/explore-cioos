@@ -1,0 +1,98 @@
+import { describe, it, expect } from "vitest";
+import turfPointsWithinPolygon from "@turf/points-within-polygon";
+import { points, polygon } from "@turf/helpers";
+
+import { polygonIsRectangle } from "../utilities.jsx";
+import {
+  MAX_RING_VERTICES,
+  parseRegions,
+  regionBox,
+  regionOutline,
+  regionSearchUrl,
+} from "./regionSearch.js";
+
+// A ragged coastline: a ring of 3000 points whose radius wobbles, which
+// simplifying alone would cut into.
+function coastline(n = 3000) {
+  const ring = Array.from({ length: n }, (_, i) => {
+    const a = (2 * Math.PI * i) / n;
+    const r = 2 + 0.3 * Math.sin(a * 40) + 0.1 * Math.sin(a * 333);
+    return [-64 + r * Math.cos(a), 46 + 0.7 * r * Math.sin(a)];
+  });
+  return [...ring, ring[0]];
+}
+
+const feature = (featureid, type, coordinates, name = "Bay") => ({
+  type: "Feature",
+  properties: { featureid, name, concise: "BAY" },
+  geometry: { type, coordinates },
+});
+
+describe("regionSearchUrl", () => {
+  it("asks GeoNames in the UI language for area-type features only", () => {
+    const url = new URL(regionSearchUrl("baie de fundy", "fr"));
+    expect(url.pathname).toBe("/services/geoname/fr/geonames.geojson");
+    expect(url.searchParams.get("q")).toBe("baie de fundy");
+    expect(url.searchParams.get("concise").split(",")).toContain("BAY");
+  });
+});
+
+describe("parseRegions", () => {
+  it("keeps one hit per feature, and only those with an outline", () => {
+    const square = [
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 0],
+      ],
+    ];
+    const regions = parseRegions({
+      features: [
+        feature("gulf", "MultiPolygon", [square]),
+        feature("gulf", "MultiPolygon", [square]),
+        feature("shelf", "MultiPoint", [[-62, 43]]),
+        feature("fundy", "Polygon", square),
+      ],
+    });
+    expect(regions.map((r) => r.id)).toEqual(["gulf", "fundy"]);
+    expect(regions[0]).toMatchObject({ name: "Bay", type: "BAY" });
+  });
+
+  it("reads an empty or missing reply as no regions", () => {
+    expect(parseRegions({ features: [] })).toEqual([]);
+    expect(parseRegions(undefined)).toEqual([]);
+  });
+});
+
+describe("regionBox", () => {
+  it("is the rectangle the box filter sends as bounds", () => {
+    const ring = regionBox({ type: "Polygon", coordinates: [coastline()] });
+    expect(polygonIsRectangle(ring)).toBe(true);
+  });
+});
+
+describe("regionOutline", () => {
+  it("fits the vertex budget and still holds every point of the region", async () => {
+    const original = coastline();
+    const ring = await regionOutline({
+      type: "MultiPolygon",
+      coordinates: [
+        [original],
+        [
+          [
+            [-50, 40],
+            [-49.9, 40],
+            [-49.9, 40.1],
+            [-50, 40],
+          ],
+        ],
+      ],
+    });
+
+    expect(ring.length).toBeLessThanOrEqual(MAX_RING_VERTICES);
+    expect(ring[0]).toEqual(ring.at(-1));
+    const inside = turfPointsWithinPolygon(points(original), polygon([ring]));
+    expect(inside.features).toHaveLength(original.length);
+  });
+});

@@ -4,6 +4,7 @@ import {
   ArrowCounterclockwise,
   BroadcastPin,
   ChevronRight,
+  GeoAlt,
   Search,
   SlashCircle,
   X,
@@ -21,9 +22,16 @@ import {
   parsePartialRangeQuery,
 } from "../../../state/filterSearch.js";
 import { iconForKey } from "../../../state/useActiveFilters.js";
+import {
+  parseRegions,
+  regionBox,
+  regionOutline,
+  regionSearchUrl,
+} from "../../../state/regionSearch.js";
 import useFilterModel from "../../../state/useFilterModel.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import {
@@ -33,6 +41,7 @@ import {
 import "./styles.css";
 
 const SCIENTIFIC_NAME_MIN_LENGTH = 3;
+const REGION_MIN_LENGTH = 3;
 const MATCHES_PER_GROUP = 8;
 
 // Kept with the term they answer so a stale reply is simply not shown, rather
@@ -69,10 +78,83 @@ function useScientificNameMatches(term, enabled) {
   return wanted && result.query === term ? result.items : [];
 }
 
+// Named areas from NRCan GeoNames, kept with the term they answer as the
+// scientific names are.
+function useRegionMatches(term) {
+  const { i18n } = useTranslation();
+  const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
+  const query = useDebounce(term, 300);
+  const [result, setResult] = useState({ query: "", items: [] });
+  const wanted = query.length >= REGION_MIN_LENGTH;
+
+  useEffect(() => {
+    if (!wanted) return undefined;
+    const controller = new AbortController();
+    fetchJson(regionSearchUrl(query, lang), { signal: controller.signal })
+      .then((geojson) => setResult({ query, items: parseRegions(geojson) }))
+      .catch((error) => {
+        if (error.name !== "AbortError")
+          reportError("region search failed", error);
+      });
+    return () => controller.abort();
+  }, [wanted, query, lang]);
+
+  return wanted && result.query === term ? result.items : [];
+}
+
+// A picked region becomes the area filter, as its outline or as the box
+// around it, and the map frames it.
+function useRegionGroup(term, exclude) {
+  const { t } = useTranslation();
+  const { requestDraw, zoomToGeometry } = useMapState();
+  const [shape, setShape] = useState("polygon");
+  const regions = useRegionMatches(exclude ? "" : term);
+  if (regions.length === 0) return null;
+
+  const apply = async (region) => {
+    zoomToGeometry(region.geometry);
+    try {
+      const ring =
+        shape === "box"
+          ? regionBox(region.geometry)
+          : await regionOutline(region.geometry);
+      requestDraw("shape", ring);
+    } catch (error) {
+      reportError("region outline failed", error);
+    }
+  };
+  const shapeLabel =
+    shape === "box" ? t("drawBoundingBoxOption") : t("drawPolygonOption");
+  return {
+    key: "region",
+    label: t("regionSearchGroup"),
+    searched: true,
+    shapes: [
+      { id: "polygon", label: t("drawPolygonOption") },
+      { id: "box", label: t("drawBoundingBoxOption") },
+    ].map((s) => ({
+      ...s,
+      pressed: shape === s.id,
+      choose: () => setShape(s.id),
+    })),
+    options: regions.map((region) => ({
+      id: region.id,
+      label: region.name,
+      description: t(`regionType${region.type}`, { defaultValue: "" }),
+      command: true,
+      includeOnly: true,
+      closes: true,
+      action: t("regionSearchAction", { shape: shapeLabel }),
+      toggle: () => apply(region),
+    })),
+  };
+}
+
 const GROUP_ICONS = {
   quick: BroadcastPin,
   reset: ArrowCounterclockwise,
   exclude: SlashCircle,
+  region: GeoAlt,
 };
 
 function GroupIcon({ groupKey, size = 14 }) {
@@ -203,6 +285,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
       useScientificNameMatches(term, obisDataAvailable),
       exclude ? undefined : parsePartialRangeQuery(term),
     ),
+    useRegionGroup(term, exclude),
     canReset && {
       key: "reset",
       label: t("quickFilterCaptionReset"),
@@ -372,6 +455,27 @@ export default function FilterSearch({ text, setText, inputRef }) {
                 >
                   <GroupIcon groupKey={group.key} />
                   {group.label}
+                  {group.shapes && (
+                    <span
+                      role="group"
+                      className="filterSearchGroupShapes"
+                      aria-label={t("regionSearchShape")}
+                    >
+                      {group.shapes.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className="filterSearchGroupOpen"
+                          data-testid={`filter-search-region-${s.id}`}
+                          aria-pressed={s.pressed}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={s.choose}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </span>
+                  )}
                   {group.panelName && (
                     <button
                       type="button"
