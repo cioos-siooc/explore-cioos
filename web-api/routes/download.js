@@ -18,6 +18,14 @@ const {
 
 // The email rides in the JSON body so it never reaches access logs or traces.
 
+const FORMATS = ["csv", "parquet", "odv", "nccf"];
+// Past this many matched features, a bounding-box request beats a regex over
+// their IDs (the downloader also caps the number of requests it splits into).
+const MAX_FEATURE_IDS = 5000;
+// The ID variable whose values select a feature in ERDDAP, per cdm_data_type.
+const FEATURE_ID_SQL = `CASE WHEN d.cdm_data_type IN ('TimeSeries', 'TimeSeriesProfile') THEN p.timeseries_id
+               WHEN d.cdm_data_type = 'Profile' THEN p.profile_id END`;
+
 /**
  * @swagger
  * /download:
@@ -39,6 +47,9 @@ const {
  *         name: polygon
  *         schema: { type: string }
  *         description: GeoJSON polygon string.
+ *       - in: query
+ *         name: format
+ *         schema: { type: string, enum: [csv, parquet, odv, nccf], default: csv }
  *       - in: query
  *         name: timeMin
  *         schema: { type: string, format: date-time }
@@ -85,6 +96,7 @@ router.post(
     checks: [
       body("email").isEmail(),
       check("lang").isIn(["en", "fr"]).optional(),
+      check("format").isIn(FORMATS).optional(),
     ],
     cacheFor: null,
   }),
@@ -100,6 +112,7 @@ router.post(
       lonMax,
       polygon,
       lang = "en",
+      format = "csv",
     } = req.query;
     const { email } = req.body;
 
@@ -116,14 +129,17 @@ router.post(
     const showObis = obisVisible(req.query);
 
     const profilesBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max, bbox AS search_geom
+               time_min, time_max, depth_min, depth_max, bbox AS search_geom,
+               timeseries_id, profile_id
         FROM cde.profiles
         WHERE :profileFilters`;
     const trajectoryBranch = `SELECT t.dataset_pk, NULL::integer AS point_pk, t.geom, t.latitude, t.longitude,
-               t.time_min, t.time_max, t.depth_min, t.depth_max, h.geom AS search_geom
+               t.time_min, t.time_max, t.depth_min, t.depth_max, h.geom AS search_geom,
+               NULL::text AS timeseries_id, NULL::text AS profile_id
         ${TRAJECTORY_COVERAGE_FROM}`;
     const obisBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
-               time_min, time_max, depth_min, depth_max, geom AS search_geom
+               time_min, time_max, depth_min, depth_max, geom AS search_geom,
+               NULL::text AS timeseries_id, NULL::text AS profile_id
         FROM cde.obis_cells
         WHERE :obisFilters`;
 
@@ -142,11 +158,20 @@ router.post(
         SELECT d.erddap_url,
                d.dataset_id,
                d.title,
+               d.title_fr,
                d.profile_variables,
                d.cdm_data_type,
                d.source_type,
                d.ckan_id ckan_id,
-               'https://catalogue.cioos.ca/dataset/' || d.ckan_id AS ckan_url
+               'https://catalogue.cioos.ca/dataset/' || d.ckan_id AS ckan_url,
+               d.metadata,
+               d.table_variables,
+               -- The features the search matched, so the downloader fetches
+               -- exactly those rather than everything in the polygon's box.
+               CASE WHEN d.cdm_data_type IN ('TimeSeries', 'TimeSeriesProfile') THEN d.timeseries_id_variable
+                    WHEN d.cdm_data_type = 'Profile' THEN d.profile_id_variable END AS feature_id_variable,
+               CASE WHEN count(DISTINCT ${FEATURE_ID_SQL}) <= ${MAX_FEATURE_IDS}
+                    THEN array_remove(array_agg(DISTINCT ${FEATURE_ID_SQL}), NULL) END AS feature_ids
         FROM combined p
         JOIN cde.datasets d ON p.dataset_pk = d.pk
         ${filters.hasShared ? "WHERE :filters" : ""}
@@ -175,6 +200,13 @@ router.post(
           depth_min: Number.parseFloat(depthMin),
           depth_max: Number.parseFloat(depthMax),
           polygon_region: wktPolygon,
+          format,
+          // Every filter as the Data Explorer sent it, for the package README.
+          filters: Object.fromEntries(
+            Object.entries(req.query).filter(
+              ([key]) => !["polygon", "lang", "format"].includes(key),
+            ),
+          ),
           email,
           job_id: jobID,
         },

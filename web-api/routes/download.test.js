@@ -128,3 +128,40 @@ test("is never cached — two identical requests both queue a job", async () => 
   assert.equal(second.status, 200);
   assert.deepEqual(second.body, { count: 1 });
 });
+
+test("rejects an unknown output format", async () => {
+  const res = await agent
+    .post("/download")
+    .query({ ...VALID_QUERY, format: "xlsx" })
+    .send(EMAIL);
+  assert.equal(res.status, 400);
+});
+
+test("queues the chosen format and the filters as sent, without the email", async () => {
+  shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
+  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
+  db.queueRows({});
+
+  await agent
+    .post("/download")
+    .query({ ...VALID_QUERY, format: "nccf", eovs: "seaSurfaceTemperature" })
+    .send(EMAIL);
+
+  const insert = db.queries[1];
+  assert.match(insert, /"format":"nccf"/);
+  assert.match(insert, /"filters":\{[^}]*"eovs":"seaSurfaceTemperature"/);
+  assert.doesNotMatch(insert, /"filters":\{[^}]*diver@example\.com/);
+});
+
+test("defaults to CSV and passes each dataset's matched feature IDs and metadata", async () => {
+  shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
+  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
+  db.queueRows({});
+
+  await agent.post("/download").query(VALID_QUERY).send(EMAIL);
+
+  assert.match(db.queries[0], /AS feature_ids/);
+  assert.match(db.queries[0], /d\.metadata/);
+  assert.match(db.queries[0], /d\.table_variables/);
+  assert.match(db.queries[1], /"format":"csv"/);
+});
