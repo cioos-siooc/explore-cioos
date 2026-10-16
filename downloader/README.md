@@ -28,7 +28,6 @@ If you need to run the downloader outside of Docker:
 
    This will create a local `.venv` directory and install all dependencies including the harvester package.
 
-2. (Optional) Download and install [wkhtmltopdf](https://wkhtmltopdf.org/downloads.html) if you need PDF generation functionality.
 
 ## Configuration
 
@@ -37,7 +36,6 @@ Configure the downloader through environment variables in `.env` file at the pro
 - `DOWNLOAD_WAF_URL`: Base URL emailed download links are built on. Inside
   compose it is derived from `APP_URL` (see the root `.env.sample`), so set that
   rather than this.
-- `CREATE_PDF`: Enable/disable PDF generation (default: `False`)
 
 Downloads always land in `./downloads` relative to the working directory; there
 is no variable for it.

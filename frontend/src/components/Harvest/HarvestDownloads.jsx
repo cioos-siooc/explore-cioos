@@ -151,7 +151,12 @@ export default function HarvestDownloads() {
   return (
     <HarvestLayout breadcrumbs={breadcrumbs}>
       <h1 className="harvest-page-title">{t("harvest.downloads.title")}</h1>
-      <p className="harvest-page-sub">{t("harvest.downloads.subtitle")}</p>
+      <p className="harvest-page-sub">
+        {t("harvest.downloads.subtitle")}{" "}
+        <Link to="/harvest/docs/downloads" className="harvest-link">
+          {t("harvest.downloads.docsLink")}
+        </Link>
+      </p>
 
       {summary && <QueueWarning summary={summary} t={t} />}
       <SummaryBar summary={summary} t={t} />

@@ -4,10 +4,14 @@ import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
 import DownloadDetails from "../../Controls/DownloadDetails/DownloadDetails.jsx";
+import SelectPill from "../../ui/SelectPill.jsx";
 import Switch from "../../ui/Switch.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import { useDownload } from "../../../state/download/DownloadProvider.jsx";
+import {
+  PACKAGE_FORMATS,
+  useDownload,
+} from "../../../state/download/DownloadProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
@@ -44,6 +48,8 @@ export default function DownloadPanel() {
     filterDownloadByPolygon,
     setFilterDownloadByPolygon,
     polygonFilterActive,
+    packageFormat,
+    setPackageFormat,
     handleEmailChange,
     handleSubmission,
   } = useDownload();
@@ -84,6 +90,22 @@ export default function DownloadPanel() {
           <label className="downloadFooterTitle" htmlFor="downloadEmailInput">
             {t("downloadEmailLabelText")}
           </label>
+          <SelectPill
+            label={t("downloadPackageFormatLabel")}
+            value={packageFormat}
+            options={PACKAGE_FORMATS.map((id) => ({
+              id,
+              label: t(`downloadPackageFormat_${id}`),
+            }))}
+            onChange={setPackageFormat}
+            data-testid="download-package-format"
+          />
+          {["odv", "nccf"].includes(packageFormat) &&
+            pointsToDownload.some((point) => point.source_type === "obis") && (
+              <p className="downloadEmailNotice">
+                {t("downloadPackageFormatObisNote")}
+              </p>
+            )}
           <div className="downloadSubmitRow">
             <input
               id="downloadEmailInput"

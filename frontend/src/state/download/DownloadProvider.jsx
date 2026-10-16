@@ -25,6 +25,10 @@ import { usePersistentState } from "../usePersistentState.js";
 
 const DownloadContext = createContext();
 
+// The format the packaged download is written in; ODV and NetCDF have no
+// OBIS rendition, so OBIS datasets fall back to CSV (see downloader formats.py).
+export const PACKAGE_FORMATS = ["csv", "parquet", "odv", "nccf"];
+
 const FAILURE_TEXT_KEYS = {
   network: "submissionStateTextFailedNetwork",
   rejected: "submissionStateTextFailedRejected",
@@ -51,6 +55,7 @@ export default function DownloadProvider({ children }) {
   const [filterDownloadByTime, setFilterDownloadByTime] = useState(false);
   const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false);
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false);
+  const [packageFormat, setPackageFormat] = useState("csv");
 
   const emailValid = validateEmail(email);
   const polygonFilterActive = !isEmpty(polygon);
@@ -143,7 +148,7 @@ export default function DownloadProvider({ children }) {
     let url = `${server}/download?${applyDatasetPKs(
       createDataFilterQueryString(downloadQuery),
       pointsToDownload.map((point) => point.pk),
-    )}&lang=${i18n.language}`;
+    )}&lang=${i18n.language}&format=${packageFormat}`;
     if (polygon && filterDownloadByPolygon) {
       url += `&polygon=${JSON.stringify(polygon)}`;
     }
@@ -185,6 +190,8 @@ export default function DownloadProvider({ children }) {
     filterDownloadByPolygon,
     setFilterDownloadByPolygon,
     polygonFilterActive,
+    packageFormat,
+    setPackageFormat,
     handleEmailChange,
     handleSubmission,
   };
