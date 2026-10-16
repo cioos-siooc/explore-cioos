@@ -22,18 +22,9 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
-// The left column: the datasets card — a header naming the list, the list
-// itself, and the Download footer. (The brand and the
-// Datasets/Filters entry points live in the centered top bar, which is also
-// what asks for this card.) On phones the same card takes the whole screen;
-// closed, nothing of it is left at any edge.
-// Drilling into a single dataset swaps that header for a banner naming the way
-// back and the surface in view: the card hosts two different surfaces, and the
-// header is what tells them apart.
-// The list's way out is the app's one close button, in the corner. A dataset
-// page has two: Map minimizes it to a card (see DatasetMapCard), keeping the
-// map keyed to it, and the X leaves the dataset and closes the card, as the
-// minimized card's own X does.
+// A dataset page swaps the header for a banner so the two surfaces the card
+// hosts can be told apart. Map minimizes the page to a card (DatasetMapCard),
+// keeping the map keyed to it; the X leaves the dataset.
 export default function Sidebar() {
   const { t } = useTranslation();
   const { pointsToReview, inspectDataset, returnToDatasetList } =
@@ -45,8 +36,7 @@ export default function Sidebar() {
     setShowSelectionHelpModal,
   } = useUI();
   const { offerTip, tipHighlight } = useTips();
-  // Until `ready`, there is no dataset count to show — not even a zero. See
-  // useDatasetCounts.
+  // Until `ready` there is no count to show, not even a zero.
   const {
     ready: countsReady,
     updating: countsUpdating,
@@ -55,14 +45,9 @@ export default function Sidebar() {
   } = useDatasetCounts();
 
   const expanded = sidebarOpen;
-  // The panel is on a single dataset rather than the list. The banner swaps
-  // with it, so the card never leaves the user guessing which of the two
-  // surfaces they are on — and the way back is in the banner, not buried in
-  // the dataset's own title block.
   const inspecting = Boolean(inspectDataset);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
-  // Adding to the selection is when what goes into a download starts to
-  // matter: how the filters shape it first, then how to skip the queue.
+  // Adding to the selection is when download tips start to matter.
   const lastSelectedCount = useRef(selectedCount);
   useEffect(() => {
     if (selectedCount > lastSelectedCount.current) {
@@ -93,8 +78,7 @@ export default function Sidebar() {
       >
         {inspecting ? (
           <div className="datasetsBanner">
-            {/* The label names the destination rather than the surface it
-                leaves, so it needs no tooltip to say where it goes. */}
+            {/* Names the destination, so it needs no tooltip. */}
             <button
               type="button"
               className="datasetsBackButton"
@@ -162,8 +146,7 @@ export default function Sidebar() {
           <DatasetsPanel />
         </div>
         <footer className="sidebarFooter" data-testid="sidebar-footer">
-          {/* The per-card control is a bare icon, so the line naming it sits
-              beside the button it feeds; the full sentence is its tooltip. */}
+          {/* The per-card control is a bare icon, so this line names it. */}
           <p
             className="sidebarFooterHint"
             title={t("sidebarSelectionHintTitle")}
@@ -198,8 +181,7 @@ export default function Sidebar() {
             <Download size={16} aria-hidden="true" />
             <span className="sidebarDownloadText">
               {t("downloadModalButtonText")}
-              {/* Keyed on the count so each add or removal replays the pulse,
-                  tying the card's + to the button it fed. */}
+              {/* Keyed on the count so each change replays the pulse. */}
               <span className="sidebarDownloadCount" key={selectedCount}>
                 {t("sidebarCountsSelected", { count: selectedCount })}
               </span>

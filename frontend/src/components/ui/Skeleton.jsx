@@ -3,13 +3,9 @@ import { useTranslation } from "react-i18next";
 
 import "./skeletonStyles.css";
 
-// A placeholder block in the shape of content that hasn't arrived. For a first
-// load with nothing to show yet; a refresh over content that still means
-// something keeps the Loading scrim instead.
-//
-// `text` stands in for a line of text: it takes the full line height of the
-// element it sits in, so a skeleton built inside a card's real text classes
-// comes out the height the card will have once its text arrives.
+// For a first load; a refresh over meaningful content keeps the Loading scrim.
+// `text` takes the full line height of its element, so built inside the card's
+// real text classes it matches the final height.
 export default function Skeleton({ width, height, radius, text, className }) {
   return (
     <span

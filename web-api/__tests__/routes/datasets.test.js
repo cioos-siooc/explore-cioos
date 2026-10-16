@@ -1,10 +1,3 @@
-/**
- * GET /datasets
- *
- * Returns all datasets with title, pk, organization_pks, platform,
- * and title_translated (en/fr object) via a db.raw() SELECT.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

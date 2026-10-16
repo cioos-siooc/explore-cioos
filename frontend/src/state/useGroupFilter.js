@@ -45,13 +45,9 @@ const listOption = (list, setList, matches) => {
   };
 };
 
-// The datasets-list groups as the main-filter options they stand for.
-// `filterFor(key)` is `{ state: "include" | "exclude" | undefined,
-// toggle(target) }`, where asking for the state it is already in clears it, as
-// in the Filters modal; undefined for a group no filter can express (Other,
-// Uncategorized, a type no geometry switch names). `filteredKeys` are the
-// groups the dimension's filter names, and `narrowed` says whether that filter
-// is set at all — a geometry switch can be with no group to show for it.
+// `filterFor(key)` is `{ state, toggle(target) }` (target = current state
+// clears it), undefined for a group no filter can express. `narrowed` says the
+// filter is set at all: a geometry switch can be with no group to show.
 export default function useGroupFilter(groupBy) {
   const filters = useFilters();
   const { dataLayerChoices, toggleDataLayer } = useMapState();
@@ -142,8 +138,8 @@ export default function useGroupFilter(groupBy) {
       );
       break;
     case "source": {
-      // A list set as a whole is the ERDDAP or OBIS row's doing: naming every
-      // server or node in it would list the whole catalogue.
+      // A list set as a whole is the ERDDAP/OBIS row's doing; naming every
+      // member would list the whole catalogue.
       const sourceKeys = (list, toKey) =>
         list.every((o) => o.isSelected) || list.every((o) => o.isExcluded)
           ? []

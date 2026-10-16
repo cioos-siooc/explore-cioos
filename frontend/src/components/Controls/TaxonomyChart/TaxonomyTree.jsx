@@ -16,9 +16,6 @@ function interiorIds(node, depth, maxDepth, ids = new Set()) {
   return ids;
 }
 
-// GBIF's dataset-metrics tree: nested lists with CSS-drawn connector lines,
-// each taxon a tile of name and record count; a name opens or closes its
-// branch.
 export default function TaxonomyTree({ tree, actionsEl }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "fr" ? "fr-CA" : "en-CA";

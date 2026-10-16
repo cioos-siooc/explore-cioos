@@ -1,15 +1,5 @@
-"""Griddap (gridded dataset) handler.
-
-Griddap datasets are harvested METADATA-ONLY: no per-feature rows are
-produced. ``feature_kind = "dataset_extent"`` is routed to no feature table by
-the harvester — the grid's extent, structure and variable list are set on the
-Dataset object here and flow into datasets.csv via ``Dataset.get_df()``
-(coverage_*, grid_variables, grid_dimensions columns on cde.datasets).
-
-The one-row frame returned by ``extract_features`` only signals "extent
-resolved" to the shared NO_PROFILES_FOUND skip check; an empty frame means the
-dataset has no usable lat/lon extent and is legitimately skipped.
-"""
+"""Griddap handler: metadata-only. Extent, dimensions and variables are set on
+the Dataset and reach cde.datasets via Dataset.get_df(); no feature rows."""
 
 import re
 
@@ -30,8 +20,7 @@ _AVERAGE_SPACING_RE = re.compile(r"averageSpacing=(.+)$")
 
 
 def _parse_dimension_attrs(value):
-    """Parse an info-CSV dimension row's Value field, e.g.
-    'nValues=5827, evenlySpaced=false, averageSpacing=1 day 3h 11m 48s'."""
+    """e.g. 'nValues=5827, evenlySpaced=false, averageSpacing=1 day 3h 11m 48s'."""
     n_values = _N_VALUES_RE.search(value or "")
     even = _EVENLY_SPACED_RE.search(value or "")
     spacing = _AVERAGE_SPACING_RE.search(value or "")
@@ -43,7 +32,6 @@ def _parse_dimension_attrs(value):
 
 
 def _actual_range(dataset, name):
-    """(min, max) raw strings from a variable's actual_range, else None."""
     df_variables = dataset.df_variables
     if name not in df_variables.index:
         return None
@@ -64,8 +52,7 @@ def _to_float(value):
 
 
 def _wrap_lon(x):
-    # already in range: return unchanged (the modulo round-trip loses
-    # floating-point precision)
+    # the modulo round-trip loses floating-point precision
     if -180.0 <= x <= 180.0:
         return x
     wrapped = ((x + 180.0) % 360.0) - 180.0
@@ -76,20 +63,14 @@ def _wrap_lon(x):
 
 
 def normalize_lon_extent(lon_min, lon_max):
-    """Normalize a grid's longitude extent to [-180, 180].
-
-    Grids published on a 0..360 axis are wrapped; a result where min > max
-    marks an antimeridian-crossing extent (the DB generated column splits it
-    into a two-envelope MultiPolygon). A span >= 360 degrees is global.
-    """
+    """A result where min > max marks an antimeridian-crossing extent (the DB
+    generated column splits it into a two-envelope MultiPolygon)."""
     if lon_max - lon_min >= 360:
         return -180.0, 180.0
     return _wrap_lon(lon_min), _wrap_lon(lon_max)
 
 
 def _extract_dimensions(dataset):
-    """[{name, n_values, min, max, spacing, even_spacing, units}] from the raw
-    info frame's ``Row Type == "dimension"`` rows, in dataset order."""
     df_info = dataset.df_info
     dimensions = []
     dim_rows = df_info.query('`Row Type` == "dimension"')
@@ -123,19 +104,12 @@ def _extract_dimensions(dataset):
 
 
 def _extract_variables(dataset):
-    """[{name, standard_name, long_name, units, eovs}] for the data variables
-    (``Row Type == "variable"`` — dimensions excluded). ``eovs`` is the list of
-    EOV keys the variable's standard_name maps to (empty when it maps to none),
-    letting the frontend default the WMS overlay to the first EOV-related
-    variable."""
     df_info = dataset.df_info
     names = (
         df_info.query('`Row Type` == "variable"')["Variable Name"].unique().tolist()
     )
-    # Shares the extraction with datasets.table_variables but NOT its shape:
-    # GriddapDetails.jsx and wmsUtilities.js read these five keys, so the extra
-    # attributes table_variables carries are projected away rather than widening
-    # a column two consumers already depend on.
+    # GriddapDetails.jsx and wmsUtilities.js read exactly these keys; eovs lets
+    # the frontend default the WMS overlay to the first EOV-related variable.
     return [
         {
             "name": variable["name"],
@@ -151,8 +125,6 @@ def _extract_variables(dataset):
 
 
 def _vertical_extent(dataset, dimensions):
-    """(depth_min, depth_max) from geospatial_vertical_* globals, else the
-    depth/altitude dimension range (altitude negated to depth-positive-down)."""
     lo = _to_float(dataset.globals.get("geospatial_vertical_min"))
     hi = _to_float(dataset.globals.get("geospatial_vertical_max"))
     if lo is not None and hi is not None:
@@ -170,8 +142,7 @@ def _vertical_extent(dataset, dimensions):
 def extract_grid_extent(dataset):
     logger = dataset.logger
 
-    # Dataset.get_df() reads len(self.profile_ids); grids have no CF-role
-    # feature identities (same trick as the trajectory handler).
+    # Dataset.get_df() reads len(self.profile_ids).
     dataset.profile_ids = []
 
     lat_bounds = _axis_bounds_from_metadata(dataset, "latitude")
@@ -180,9 +151,8 @@ def extract_grid_extent(dataset):
         logger.warning("No lat/lon extent found in grid metadata")
         return pd.DataFrame()
 
-    # actual_range order isn't guaranteed on descending axes — sort first.
-    # Antimeridian crossings only arise from the 0..360 wrap in
-    # normalize_lon_extent, never from the raw bounds order.
+    # actual_range order isn't guaranteed on descending axes; antimeridian
+    # crossings only arise from the 0..360 wrap, never from the raw order.
     lon_min, lon_max = normalize_lon_extent(*sorted(lon_bounds))
     dataset.coverage_lat_min = min(lat_bounds)
     dataset.coverage_lat_max = max(lat_bounds)
@@ -205,8 +175,7 @@ def extract_grid_extent(dataset):
     dataset.coverage_depth_min = depth_min
     dataset.coverage_depth_max = depth_max
 
-    # Marker row: non-empty = extent resolved (passes the shared
-    # NO_PROFILES_FOUND check); the row itself is never persisted.
+    # Marker row only to pass the shared NO_PROFILES_FOUND check; never persisted.
     return pd.DataFrame(
         [{"erddap_url": dataset.erddap_url, "dataset_id": dataset.id}]
     )

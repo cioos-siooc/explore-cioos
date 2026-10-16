@@ -1,16 +1,9 @@
-// Encode e2e/support/syntheticScene.js into the z7 tiles the marker and track
-// specs replay. Hand-built rather than recorded: the recorded set is z2 hexes
-// only, and re-recording would have to come from a database whose datasets
-// match every other fixture.
+// Encode e2e/support/syntheticScene.js into z7 tiles. Hand-built: re-recording
+// would need a database whose datasets match every other fixture.
 //
 //   node e2e/build-synthetic-tiles.mjs
 //
-// Tiles are written with the same layer names the API serves: the markers into
-// /tiles' 'internal-layer-name', the tracks into /tiles/tracks' 'track-lines'
-// and 'track-heads' (a head at each track's end, heading east). The grids are
-// not tiles: /griddapCoverage is GeoJSON, written as api/griddapCoverage.json.
-// api/trajectories_track.json is what a click on OPEN_TRACK fetches: its fixes
-// at both ends and one in the middle, which no track head sits on.
+// Layer names must match what the API serves.
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";

@@ -8,20 +8,12 @@
    trajectory_build_hexes() - sweep those segments through the hex grid into
                               cde.trajectory_hexes
 
-   The hex grid is PostGIS's origin-anchored hexagon tiling
-   (ST_HexagonGrid / ST_Hexagon): cell (i, j) at a given size sits at a fixed
-   position in the plane regardless of any bounds argument. A point's cell is
-   therefore a pure function of its geometry, and cells never move between
-   runs. hexes_zoom_0 (100 km) / hexes_zoom_1 (10 km) are append-only, keyed
-   on (i, j): create_hexes() and trajectory_build_hexes() insert
-   newly-occupied cells and NEVER delete or renumber, so hex pks are stable
-   across loads. Cells that lose their last row are harmless leftovers
-   (tile/legend queries reach hexes only via the FKs on profiles/obis_cells
-   and via trajectory_hexes.hex_pk) and can be GC'd out of band.
-
-   This replaces the previous delete-and-retile-everything implementation,
-   which re-tiled the whole data extent (from a moving ST_EstimatedExtent) and
-   rewrote every row of points on every load.
+   The hex grid is PostGIS's origin-anchored hexagon tiling, so a point's cell
+   is a pure function of its geometry and cells never move between runs.
+   hexes_zoom_0 (100 km) / hexes_zoom_1 (10 km) are append-only, keyed on
+   (i, j): cells are inserted and NEVER deleted or renumbered, so hex pks are
+   stable across loads. Cells that lose their last row are harmless leftovers
+   (queries reach hexes only via FKs) and can be GC'd out of band.
 
  */
 
@@ -84,11 +76,8 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   FROM assign a
   WHERE p.pk = a.point_pk;
 
-  -- Only the FK is propagated to profiles/obis_cells, and only to rows that
-  -- don't have it yet (rows this load inserted/replaced — point and hex pks
-  -- are stable, so rows linked by a previous run are already correct).
-  -- Tile/legend queries JOIN cde.hexes_zoom_0/1 to fetch the polygon when
-  -- needed.
+  -- Only rows without an FK yet: point and hex pks are stable, so rows linked
+  -- by a previous run are already correct.
   UPDATE cde.profiles
   SET hex_0_pk = points.hex_0_pk,
       hex_1_pk = points.hex_1_pk
@@ -103,10 +92,8 @@ CREATE OR REPLACE FUNCTION create_hexes() RETURNS VOID AS $$
   WHERE points.pk = obis_cells.point_pk
     AND (obis_cells.hex_0_pk IS NULL OR obis_cells.hex_1_pk IS NULL);
 
-  -- NOTE: trajectory coverage does NOT come through cde.points. Its hexes are
-  -- swept from the track itself by trajectory_build_hexes() below, which is
-  -- what keeps a fast platform's coverage continuous instead of lighting only
-  -- the hexes that happen to contain a sampled position.
+  -- Trajectory coverage does NOT come through cde.points: trajectory_build_hexes()
+  -- sweeps it from the track so a fast platform's coverage stays continuous.
 
   END;
 $$ LANGUAGE plpgsql;
@@ -115,26 +102,18 @@ $$ LANGUAGE plpgsql;
 /* ------------------------------------------------------------------------
    Trajectory coverage hexes, swept from the track itself.
 
-   cde.trajectory_points holds the ordered (decimated) fixes of every
-   trajectory. Consecutive fixes define a segment; the segment is intersected
-   with the hex grid, so EVERY hex the platform crossed lights up — not just
-   the ones that happen to contain a sampled position. Entry/exit times come
-   from the fraction of the segment inside each hex (constant speed between
-   fixes), which is what makes a distinct-day count per hex possible.
-
-   Attributes (records, depth, profiles) come from cde.trajectory_days, the
-   per-(trajectory, UTC day) aggregates the harvester fetches from ERDDAP,
-   joined to the hexes by day and apportioned by time spent in each hex.
+   Consecutive fixes in cde.trajectory_points define segments intersected with
+   the hex grid, so EVERY hex the platform crossed lights up. Entry/exit times
+   assume constant speed between fixes, which makes a distinct-day count per
+   hex possible. Attributes come from cde.trajectory_days, joined by day and
+   apportioned by time spent in each hex.
    ------------------------------------------------------------------------ */
 
 
--- Per-trajectory time-gap threshold: 4x the trajectory's MEDIAN inter-fix gap
--- (its typical reporting cadence, robust to idle periods; the mean fallback
--- covers rows written before median_gap_secs existed), floored at 48 hours.
--- Beyond it there is no data, so the path is unknown: no line is drawn and no
--- hex is claimed. Shared with the /tiles/tracks line assembly in
--- web-api/routes/tiles.js, which calls this function — the map lines and the
--- coverage hexes must agree on what counts as a data-backed path.
+-- Per-trajectory time-gap threshold: 4x the MEDIAN inter-fix gap (robust to
+-- idle periods; the mean fallback covers rows written before median_gap_secs
+-- existed), floored at 48 hours. Beyond it the path is unknown: no line, no
+-- hex. Also called by /tiles/tracks so map lines and coverage hexes agree.
 CREATE OR REPLACE FUNCTION trajectory_gap_secs(
   median_gap_secs float8, time_min timestamptz, time_max timestamptz, n_points bigint
 ) RETURNS float8 AS $$
@@ -201,9 +180,7 @@ $$ LANGUAGE sql STABLE PARALLEL SAFE;
 -- incremental load touched); NULL rebuilds everything.
 --
 -- Pure DML on the shared tables — no ALTER/TRUNCATE/DROP INDEX — so it can run
--- against a live web-api without deadlocking readers (see the standing rule in
--- docs/incremental-update-v2-plan.md). The temp tables it creates are private
--- to the session.
+-- against a live web-api without deadlocking readers.
 CREATE OR REPLACE FUNCTION trajectory_build_hexes(p_dataset_pks integer[] DEFAULT NULL)
 RETURNS bigint AS $$
 DECLARE n bigint;
@@ -298,11 +275,9 @@ BEGIN
 
   -- 4. Aggregate to one row per (dataset, trajectory, tier, hex), joining the
   --    per-day ERDDAP aggregates. `share` splits a day's records across the
-  --    hexes visited that day by time spent in each. The +1 second is what
-  --    makes instantaneous occupancy (a single-fix trajectory, or a hex the
-  --    track only touched at one fix) weigh something instead of zero, and it
-  --    keeps the denominator non-zero without a special case; against a real
-  --    day's tens of thousands of seconds it is noise.
+  --    hexes visited that day by time spent in each. The +1 second gives
+  --    instantaneous occupancy a non-zero weight and keeps the denominator
+  --    non-zero.
   DROP TABLE IF EXISTS _traj_hex_agg;
   CREATE TEMP TABLE _traj_hex_agg ON COMMIT DROP AS
   WITH weighted AS (
@@ -326,13 +301,9 @@ BEGIN
             AND d.day = w.day
      GROUP BY 1,2,3,4,5
   ), runs AS (
-    -- The same day set as `days`, kept as the maximal runs of consecutive UTC
-    -- days rather than a single count, so the map can union day sets across
-    -- features instead of adding them up (see day_union_days in
-    -- 8_range_functions.sql). `day - row_number()` is constant within a run of
-    -- consecutive days, which is what collapses the days into runs. Storing
-    -- runs rather than the [time_min, time_max] envelope is what keeps a ship
-    -- that crosses a hex every January from reading as decades of coverage.
+    -- The same day set as `days`, as maximal runs of consecutive UTC days so
+    -- the map can union day sets across features (day_union_days).
+    -- `day - row_number()` is constant within a run of consecutive days.
     SELECT dataset_pk, trajectory_id, tier, i, j,
            array_agg(daterange(lo, hi + 1) ORDER BY lo) AS day_ranges
       FROM (
@@ -360,12 +331,8 @@ BEGIN
   DELETE FROM cde.trajectory_hexes
    WHERE p_dataset_pks IS NULL OR dataset_pk = ANY (p_dataset_pks);
 
-  -- The display point is a property of the HEX, not of the row: many
-  -- trajectories sweep the same cell, and the tier-0/tier-1 arms below used to
-  -- spell the centroid out per output row — ST_Centroid + ST_Transform twice
-  -- over, so four PostGIS calls each. Resolving it once per distinct cell
-  -- first turns that into two calls per cell, and lets the two arms collapse
-  -- into one INSERT ... SELECT.
+  -- The display point is a property of the HEX, not of the row (many
+  -- trajectories sweep the same cell), so resolve it once per distinct cell.
   WITH used_cells AS (
     SELECT DISTINCT tier, i, j FROM _traj_hex_agg
   ),

@@ -211,13 +211,8 @@ test("GET /tiles/tracks/:z/:x/:y.mvt carries the realtime filter's dataset colum
   assert.match(sql, /dataset_is_realtime\(d\.coverage_time_max/);
 });
 
-/*
- * /tiles/datasets — the per-dataset split of a clicked bucket's count.
- *
- * The invariant worth pinning is that it aggregates the SAME rows the tile did,
- * one grouping level finer. If its branches ever drift from the tile's, the
- * card will report numbers the hex it describes cannot account for.
- */
+// /tiles/datasets must aggregate the same rows the tile did, one grouping
+// level finer.
 
 test("GET /tiles/datasets groups the tile's own rows by dataset", async () => {
   db.queueRaw([{ pk: 111, count: 1115 }]);

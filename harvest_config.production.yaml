@@ -28,12 +28,8 @@ log_time:
 #defaults to false
 flush_redis: True
 
-# defaults to false. Incremental now fully replaces routine full reloads:
-# it is delta-proportional, prunes datasets that disappeared upstream
-# (prune_stale_datasets), and never TRUNCATEs — so the site keeps serving
-# during loads. A full reload (False) TRUNCATEs every table and holds an
-# ACCESS EXCLUSIVE lock for the whole rebuild, taking the site down; keep it
-# for disaster recovery only.
+# defaults to false. A full reload (False) TRUNCATEs every table under an
+# ACCESS EXCLUSIVE lock, taking the site down; keep it for disaster recovery.
 incremental: True
 
 # Discover OBIS datasets from the OBIS API: OBIS Canada + OTN-OBIS + anything
@@ -49,12 +45,9 @@ obis_discovery:
   areas: []
   include: []
   exclude:
-    # iNaturalist Research-grade Observations Marine Subset (OBIS UK).
-    # 11.5M global occurrences: get_occurrences bounds the parquet read only by
-    # world lat/lon and materialises every row before the EEZ filter runs, so it
-    # peaks at ~18GB RSS and OOM-kills the 6GB prefect_worker. Newly reachable
-    # via geometry: eez. Drop this entry once the geo filter is pushed into the
-    # DuckDB query.
+    # iNaturalist Research-grade Observations Marine Subset (OBIS UK): 11.5M
+    # occurrences materialised before the EEZ filter OOM-kill the worker. Drop
+    # this once the geo filter is pushed into the DuckDB query.
     - eaea291a-1e1d-4382-b86f-ac3cc15b8d5a
   min_datasets: 700
 
@@ -62,8 +55,6 @@ obis_discovery:
 # the frozen static list.
 # obis_datasets_file: ./Obis_Datasets.json
 
-# Today's effective defaults, spelled out now that this block is actually read
-# on the Prefect path (it used to be silently ignored there).
 obis_geo_filter:
   mode: canada
   exempt_node_ids:

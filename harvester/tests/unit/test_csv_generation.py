@@ -1,14 +1,5 @@
-"""
-Unit tests for CSV file generation and structural validation.
-
-Each test generates its DataFrame by calling real codebase functions with
-mocked ERDDAP responses — not by constructing fixtures by hand.
-
-  datasets.csv  →  Dataset.get_df()      (cde_harvester.sources.erddap.dataset)
-  profiles.csv  →  extract_features()    (cde_harvester.dataset_types)
-  skipped.csv   →  CDEComplianceChecker  (cde_harvester.sources.erddap.compliance)
-                   + harvester skipped-row assembly
-"""
+"""CSV generation tests: each frame comes from the real codebase functions
+with mocked ERDDAP responses, not hand-built fixtures."""
 
 import ast
 from io import StringIO
@@ -28,9 +19,6 @@ from conftest import (
     mock_erddap_server,  # noqa: F401 — imported so pytest discovers the fixture
 )
 
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
 
 def _make_dataset(server, info_csv=ERDDAP_INFO_CSV):
     """Construct a real Dataset backed by a mocked ERDDAP server."""
@@ -57,11 +45,7 @@ def _profiles_df():
 
 
 def _skipped_df():
-    """
-    Build the skipped DataFrame the same way ERDDAPHarvester.harvest() does:
-    run CDEComplianceChecker on a dataset with no supported EOVs, capture the
-    failure reason code, then assemble the row with the schema columns.
-    """
+    """Build the skipped frame the way ERDDAPHarvester.harvest() does."""
     failing_dataset = build_mock_dataset(info_csv=ERDDAP_INFO_NO_EOVS_CSV)
     checker = CDEComplianceChecker(failing_dataset)
     assert not checker.passes_all_checks(), "expected dataset to fail compliance"
@@ -77,10 +61,6 @@ def _roundtrip(df: pd.DataFrame, tmp_path, filename: str) -> pd.DataFrame:
     df.to_csv(path, index=False)
     return pd.read_csv(path)
 
-
-# ---------------------------------------------------------------------------
-# datasets.csv
-# ---------------------------------------------------------------------------
 
 class TestDatasetsCsvGeneration:
     def test_get_df_returns_dataframe(self, mock_erddap_server):
@@ -139,10 +119,6 @@ class TestDatasetsCsvGeneration:
         assert len(df_back) == 1
 
 
-# ---------------------------------------------------------------------------
-# profiles.csv
-# ---------------------------------------------------------------------------
-
 class TestProfilesCsvGeneration:
     def test_get_profiles_returns_dataframe(self):
         df = _profiles_df()
@@ -194,10 +170,6 @@ class TestProfilesCsvGeneration:
         assert len(df_back) == len(df)
 
 
-# ---------------------------------------------------------------------------
-# skipped.csv
-# ---------------------------------------------------------------------------
-
 class TestSkippedCsvGeneration:
     def test_compliance_checker_rejects_no_eov_dataset(self):
         failing_dataset = build_mock_dataset(info_csv=ERDDAP_INFO_NO_EOVS_CSV)
@@ -227,13 +199,8 @@ class TestSkippedCsvGeneration:
 
 
 class TestDatasetLevelTimeCoverage:
-    """coverage_time_min/max on the datasets row.
-
-    Populated from the allDatasets listing, which the harvest already fetches --
-    so every dataset type gets dataset-level time coverage for no extra request,
-    and dataset_is_realtime() (database/8_range_functions.sql) has something to
-    compare against verified_at.
-    """
+    """coverage_time_min/max come from the allDatasets listing, so every type gets
+    them for free and dataset_is_realtime() has something to compare against."""
 
     def test_listing_coverage_reaches_the_datasets_row(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)
@@ -246,10 +213,8 @@ class TestDatasetLevelTimeCoverage:
         assert df["coverage_time_max"][0] == "2025-01-01T00:00:00+00:00"
 
     def test_a_handler_derived_extent_wins_over_the_listing(self, mock_erddap_server):
-        # The Grid handler reads the time dimension's own actual_range, which is
-        # more precise than the listing; get_df() runs after extract_features(),
-        # so by here the handler's value is already set and must not be
-        # overwritten.
+        # The Grid handler's time actual_range is more precise than the listing
+        # and is set before get_df(), so it must not be overwritten.
         ds = _make_dataset(mock_erddap_server)
         ds.profile_ids = pd.DataFrame({"station_id": ["STATION_001"]})
         ds.coverage_time_min = "1999-01-01T00:00:00+00:00"

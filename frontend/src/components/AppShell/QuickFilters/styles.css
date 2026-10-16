@@ -1,20 +1,12 @@
-/* ------------------------------------------------------------------
- * Quick filters — round buttons floating under the top bar, one per filter
- * that acts on the map rather than on a list of options. A layer of its own
- * rather than another band welded into the brand card: these are the map's
- * tools, and they read as sitting on the map with it.
- * ------------------------------------------------------------------ */
+/* Quick filters: round buttons floating under the top bar, one per filter
+   that acts on the map. */
 .quickFilters {
   display: flex;
-
-  /* Wrapping is what holds the row inside the screen at every width, rather
-     than pushing the page sideways. */
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
 
-  /* Wide enough apart for the captions under each button, and the row's own
-     bottom padding holds them clear of the chips below. */
+  /* Room for the captions under each button. */
   gap: 24px 36px;
   padding-bottom: 16px;
 }
@@ -30,8 +22,7 @@
   padding: 0;
   border: 1px solid var(--cioos-hairline);
 
-  /* No --cioos-radius-circle in theme.css; every circle in the app draws its
-     own, as .brandMinorItem does. */
+  /* No --cioos-radius-circle token; circles draw their own, as .brandMinorItem. */
   border-radius: 50%;
   background-color: var(--cioos-white);
   color: var(--cioos-primary-700);
@@ -48,11 +39,8 @@
   color: var(--cioos-primary-800);
 }
 
-/* Set: the same solid-primary fill and raised chip the top bar's own segments
-   wear when what they control is on (see .topBarButton.active) — a lightened
-   full-perimeter ring over the shared 3D shadow, so a lit button reads as
-   pressed and lifted rather than merely a different colour. Icons draw with
-   currentColor, so the fill alone recolors them. */
+/* Same raised treatment as .topBarButton.active. Icons draw with currentColor,
+   so the fill alone recolors them. */
 .quickFilterButton.applied {
   border-color: transparent;
   background-color: var(--cioos-primary);
@@ -73,11 +61,8 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* The reset is not a filter and never lights up; held apart from the filters
-   it clears so it doesn't read as another of them. It drops everything this row
-   and the active-filter chips below can set, so its hover earns the app's
-   destructive-action colour rather than the shared teal wash every other
-   button here gets. */
+/* Never lights up; its hover takes the destructive colour since it drops every
+   filter this row and the chips can set. */
 .quickFilterReset {
   margin-left: 4px;
   color: var(--cioos-ink-80);
@@ -100,8 +85,6 @@
   background-color: var(--cioos-error-700);
 }
 
-/* Under the icon, inside the circle: the button stacks the two and stays
-   centred on the icon alone when there is no count. */
 .quickFilterButton:has(.quickFilterCount) {
   flex-direction: column;
   gap: 1px;
@@ -114,11 +97,8 @@
   line-height: 1;
 }
 
-/* Hung below the circle rather than inside it, so the circles keep their size
-   and the row just spaces out to make room. The white pill keeps it legible
-   over whatever the map draws beneath. Every pill is as wide as the longest
-   caption ("Temps réel"), so the row reads as one set rather than pills sized
-   to their words. */
+/* Hung below the circle so the circles keep their size. Every pill is as wide
+   as the longest caption ("Temps réel") so the row reads as one set. */
 .quickFilterCaption {
   position: absolute;
   min-width: 5.75em;
@@ -137,11 +117,8 @@
   pointer-events: none;
 }
 
-/* ------------------------------------------------------------------
- * The Area control: one button whose menu picks box or polygon. The menu
- * hangs where the caption sits, so the caption steps aside while it is open,
- * and it stacks above the active-filter chips that follow in the top bar.
- * ------------------------------------------------------------------ */
+/* Area control: the caption steps aside while its menu (hung where the
+   caption sits) is open. */
 .quickFilterArea {
   position: relative;
   flex: 0 0 auto;
@@ -194,12 +171,8 @@
   box-shadow: inset var(--cioos-focus);
 }
 
-/* ------------------------------------------------------------------
- * Large screen with a mouse: the buttons' titles and hover say what each one
- * does, so a caption shows only for the button being pointed at (or focused
- * from the keyboard), and the row packs back together without the room four
- * standing captions needed.
- * ------------------------------------------------------------------ */
+/* Large screen with a mouse: titles and hover explain each button, so only
+   the pointed-at or focused one shows its caption. */
 @media (min-width: 701px) and (min-height: 501px) and (hover: hover) and (pointer: fine) {
   .quickFilters {
     gap: 8px 18px;
@@ -217,13 +190,8 @@
   }
 }
 
-/* ------------------------------------------------------------------
- * Mobile: one row of pills, the caption beside the icon rather than hung
- * under a circle, so the row costs one button's height over the map instead
- * of a circle, a caption and the room between them. The top bar is a
- * full-bleed header stretching its children; the row keeps its own width and
- * stays centered under it.
- * ------------------------------------------------------------------ */
+/* Mobile: one row of pills, caption beside the icon, to cost one button's
+   height over the map. */
 @media (max-width: 700px), (max-height: 500px) {
   .quickFilters {
     align-self: center;
@@ -232,8 +200,7 @@
     padding-bottom: 6px;
   }
 
-  /* Sized by its button rather than by a line box around it, which centred
-     the Area pill half a pixel off its neighbours. */
+  /* Sized by its button: a line box around it centred the pill half a pixel off. */
   .quickFilterArea {
     display: flex;
   }
@@ -248,8 +215,8 @@
     border-radius: var(--cioos-radius-pill);
   }
 
-  /* Icon only: four captions don't fit a 360px row, and the reset is the one
-     whose arrow says it on its own. Its label stays for assistive tech. */
+  /* Icon only: four captions don't fit a 360px row. The label stays for
+     assistive tech. */
   .quickFilterButton.quickFilterReset {
     width: 30px;
     margin-left: 0;
@@ -272,15 +239,12 @@
     color: inherit;
   }
 
-  /* Area is the row's first pill, near the screen edge: centred under it, the
-     menu ran off the left of the screen. */
+  /* Near the screen edge: centred, the menu ran off the left. */
   .quickFilterAreaMenu {
     left: 0;
     transform: none;
   }
 
-  /* After the words it qualifies, as a tally on the pill rather than a figure
-     tucked under the icon. */
   .quickFilterCount {
     order: 1;
     padding: 1px 3px;

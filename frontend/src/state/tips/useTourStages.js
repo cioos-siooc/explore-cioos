@@ -9,15 +9,10 @@ import {
   showWhatsHere,
 } from "./scenes.js";
 
-// What each step of the tips tour sets up so the control its tip talks about
-// is on screen to be highlighted. A step that opens a dialog returns which one
-// (see TIP_MODALS), so the tour can close it again on the way out. Only state held above the control lives
-// here; a surface that owns its own visibility (the legend card, the time bar)
-// opens itself for its tip instead. A tip with nothing to set up has no stage.
-//
-// `skipped` names the tips whose control needs something the catalogue
-// doesn't have (no OBIS data, no gridded dataset, …): the tour passes them by
-// rather than pointing at nothing.
+// A step that opens a dialog returns which one (TIP_MODALS) so the tour can
+// close it. Only state held above the control lives here; surfaces owning
+// their own visibility open themselves. `skipped` names tips whose control
+// needs data the catalogue lacks.
 export default function useTourStages() {
   const { obisDataAvailable } = useFilters();
   const {
@@ -43,19 +38,16 @@ export default function useTourStages() {
     const dataset = pointsData.find(fits);
     if (dataset) setInspectDataset(dataset);
   };
-  // A page with a feature list: OBIS and gridded pages have none.
   const hasFeatureList = (dataset) =>
     dataset.source_type !== "obis" && dataset.cdm_data_type !== "Grid";
   const findGridded = () => pointsData.find((row) => row.wms_url);
   const showQuickFilters = () => setQuickFiltersCollapsed(false);
-  // The Filters dialog, on the filter whose control the tip names.
   const openFilter = (filterName) => () => {
     setOpenFilter(filterName);
     setShowFiltersModal(true);
     return "filters";
   };
-  // The Download dialog only lists its sections once something is selected;
-  // until then the sidebar's Download button is what there is to show.
+  // The dialog lists its sections only once something is selected.
   const openDownload = () => {
     if (pointsToReview?.length) {
       setShowDownloadModal(true);

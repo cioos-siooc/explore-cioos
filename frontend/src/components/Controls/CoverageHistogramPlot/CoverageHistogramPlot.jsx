@@ -15,15 +15,10 @@ import useMediaQuery from "../../../state/ui/useMediaQuery.js";
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
 
-// At most this many series get their own color; the rest fold into "Other".
 const MAX_SERIES = 7;
 
-// Coastal categorical palette, in slot order: deep teal, sky, sea-urchin rose,
-// kelp, deep-sea blue, driftwood, anemone. Stacking follows slot order, and the
-// order is what keeps neighbouring segments apart under colour blindness
-// (validated adjacent-pair, not all-pair — don't reshuffle it). It stays off the
-// hues the map reserves: track violet, grid amber, click goldenrod and error
-// coral. "Other" is a navy-tinted neutral so it never impersonates a series.
+// Order is validated for adjacent-pair colour-blind contrast (not all-pair) —
+// don't reshuffle. Avoids the map's reserved hues (track, grid, click, error).
 const SERIES_COLORS = [
   "#008b7d",
   "#53b6eb",
@@ -44,22 +39,17 @@ const DAY_MS = 24 * 3600 * 1000;
 const YEAR_MS = 365.25 * DAY_MS;
 const MONTH_MS = YEAR_MS / 12;
 
-// Human label for a series key, by the kind the API tagged it with. An erddap
-// key is a server URL, which the rest of the app already knows how to name —
-// and which can arrive null for a dataset with no erddap_url, so the shared
-// helper's own null handling matters here. Source series carry their platform
-// so an ERDDAP server and an OBIS node with similar names stay distinguishable.
+// An erddap key can be null (dataset with no erddap_url); the shared helper
+// handles that.
 function seriesLabel(key, kind, language, t) {
   if (kind === "erddap")
     return `${formatErddapServerName(key, language, erddapServers)} (ERDDAP)`;
   if (kind === "obis") return `${key} (OBIS)`;
   if (kind === "dataType") return cdmDataTypeLabel(key, t);
-  // Platforms and organization names are already display-ready.
   return key;
 }
 
-// One label per time bin, sized to the bin width. Seasonal bins are weeks of
-// a reference year whose year means nothing, so it is left out.
+// Seasonal bins are weeks of a reference year whose year means nothing.
 function formatPeriod(startMs, endMs, locale, seasonal) {
   const start = new Date(startMs);
   const endInclusive = new Date(endMs - 1);
@@ -69,10 +59,8 @@ function formatPeriod(startMs, endMs, locale, seasonal) {
     return `${start.toLocaleDateString(locale, weekFormat)} – ${endInclusive.toLocaleDateString(locale, weekFormat)}`;
   }
   if (width >= YEAR_MS - DAY_MS) {
-    // Bins are whole 365.25-day years, so an edge drifts hours either side of
-    // Jan 1. Nudge past that before reading the opening year, then count the
-    // years the bin spans — naming its far edge instead reads the year the
-    // drift spills into, which overstated every span by one.
+    // 365.25-day bins drift hours around Jan 1: nudge before reading the
+    // opening year and count spanned years (the far edge overstates by one).
     const years = Math.max(1, Math.round(width / YEAR_MS));
     const y0 = new Date(startMs + DAY_MS).getUTCFullYear();
     const y1 = y0 + years - 1;
@@ -100,7 +88,6 @@ export default function CoverageHistogramPlot({ histogram }) {
   const locale = i18n.language === "fr" ? "fr-CA" : "en-CA";
   const narrow = useMediaQuery(NARROW_QUERY);
 
-  // Axis + hover wording follows what the bars count.
   const COUNT_LABELS = {
     features: "coverageCountFeatures",
     days: "coverageCountDays",
@@ -118,7 +105,6 @@ export default function CoverageHistogramPlot({ histogram }) {
       { length: numBins },
       (_, i) => new Date((edgesMs[i] + edgesMs[i + 1]) / 2),
     );
-    // Bar width per bin (ms), so contiguous bins tile the time axis.
     const widths = Array.from(
       { length: numBins },
       (_, i) => edgesMs[i + 1] - edgesMs[i],
@@ -127,8 +113,6 @@ export default function CoverageHistogramPlot({ histogram }) {
       formatPeriod(edgesMs[i], edgesMs[i + 1], locale, seasonal),
     );
 
-    // Top series keep their identity; everything past MAX_SERIES sums into a
-    // single "Other" stack segment.
     const top = series.slice(0, MAX_SERIES);
     const counts = new Map(top.map((s) => [s.key, new Array(numBins).fill(0)]));
     const other = new Array(numBins).fill(0);
@@ -143,10 +127,6 @@ export default function CoverageHistogramPlot({ histogram }) {
       }
     });
 
-    // Stacking order = trace order; the largest series (first) sits at the
-    // bottom of every bar.
-    // A platform wears its map colour, so the figure and the markers agree;
-    // anything the platform key lacks takes the next palette slot.
     const platformColor = (s) =>
       s.kind === "platform" &&
       platformColors.find(({ platform }) => platform === s.key)?.color;
@@ -164,10 +144,8 @@ export default function CoverageHistogramPlot({ histogram }) {
       });
     }
 
-    // The legend floats over the plot, so seat it on whichever end the bars
-    // leave emptiest. Only the outer third of each end matters: that is the
-    // width the keys occupy, and a stacked time histogram is nearly always
-    // lopsided (recent bins dwarf old ones).
+    // The floating legend sits over whichever outer third the bars leave
+    // emptiest.
     const totals = new Array(numBins).fill(0);
     built.forEach(({ y }) => y.forEach((value, i) => (totals[i] += value)));
     const peak = (values) => values.reduce((max, v) => Math.max(max, v), 0);
@@ -175,10 +153,8 @@ export default function CoverageHistogramPlot({ histogram }) {
     const side =
       peak(totals.slice(0, end)) <= peak(totals.slice(-end)) ? "left" : "right";
 
-    // Hovering any segment describes the whole bar: its period, total and
-    // every series in it, listed top-down to match the stack, with the
-    // hovered one in bold. Names are harvested strings and Plotly parses the
-    // label as HTML, so they're escaped.
+    // Plotly parses hover labels as HTML and names are harvested strings, so
+    // they're escaped.
     const format = (n) => n.toLocaleString(locale);
     const hoverText = built.map((_, hovered) =>
       labels.map((label, bin) => {
@@ -244,8 +220,6 @@ export default function CoverageHistogramPlot({ histogram }) {
             automargin: true,
             showgrid: false,
             zeroline: false,
-            // Baseline the bars sit on: ink-40, so it reads as structure
-            // rather than dissolving into the gridlines behind it.
             showline: true,
             linecolor: "rgba(21, 47, 55, 0.4)",
             linewidth: 1,
@@ -258,9 +232,6 @@ export default function CoverageHistogramPlot({ histogram }) {
             zeroline: false,
             rangemode: "tozero",
           },
-          // Floated in whichever top corner the bars leave emptiest, inset off
-          // the axes, so the plot keeps the whole container. Draggable from
-          // there (see config.edits) when the guess lands badly.
           legend: {
             x: legendSide === "left" ? 0.02 : 0.98,
             xanchor: legendSide === "left" ? "left" : "right",
@@ -285,8 +256,7 @@ export default function CoverageHistogramPlot({ histogram }) {
         }}
         config={{
           displaylogo: false,
-          // Legend dragging only — not Plotly's full editable mode, which
-          // would also make titles and axis labels click-to-edit.
+          // Not `editable: true`, which would make titles click-to-edit too.
           edits: { legendPosition: true },
           modeBarButtonsToRemove: [
             "select2d",

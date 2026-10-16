@@ -9,9 +9,8 @@ export default {
     "property-no-vendor-prefix": null,
     // `(width >= 700px)` needs Safari 16.4; the min-width form works everywhere.
     "media-feature-range-notation": null,
-    // Both flag deliberate structure here, and acting on either reorders rules
-    // past intervening `margin`/`border` shorthands — a cascade change this
-    // repo has no visual test to catch.
+    // Both flag deliberate structure; fixing either reorders rules past
+    // `margin`/`border` shorthands, changing the cascade.
     "no-descending-specificity": null,
     "no-duplicate-selectors": null,
   },

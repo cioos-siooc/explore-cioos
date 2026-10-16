@@ -26,7 +26,6 @@ import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
-import { TOO_BROAD_RANKS } from "../../Controls/Filter/ScientificNameFilter/ScientificNameFilter.jsx";
 import {
   ExcludedLabel,
   OptionStateIcon,
@@ -36,9 +35,8 @@ import "./styles.css";
 const SCIENTIFIC_NAME_MIN_LENGTH = 3;
 const MATCHES_PER_GROUP = 8;
 
-// WoRMS hits for the term, which unlike every other facet live behind the API
-// rather than in memory. Kept with the term they answer so a stale reply is
-// simply not shown, rather than cleared by an effect.
+// Kept with the term they answer so a stale reply is simply not shown, rather
+// than cleared by an effect.
 function useScientificNameMatches(term, enabled) {
   const { i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
@@ -57,7 +55,7 @@ function useScientificNameMatches(term, enabled) {
         setResult({
           query,
           items: (Array.isArray(items) ? items : []).filter(
-            (i) => i?.scientificName && !TOO_BROAD_RANKS.has(i.rank),
+            (i) => i?.scientificName && !i.tooBroad,
           ),
         }),
       )
@@ -71,7 +69,6 @@ function useScientificNameMatches(term, enabled) {
   return wanted && result.query === term ? result.items : [];
 }
 
-// The help rows and commands that are not a filter of their own.
 const GROUP_ICONS = {
   quick: BroadcastPin,
   reset: ArrowCounterclockwise,
@@ -88,10 +85,8 @@ const isTypingTarget = (el) =>
   (el.isContentEditable ||
     el.closest("input, textarea, select, [contenteditable]") !== null);
 
-// Opened from anywhere with Ctrl/⌘+K, by the Filters button, or by just
-// starting to type on the page: a letter or digit typed while no field has
-// focus and no dialog is up opens it holding that character. Not symbols,
-// which the map takes for zoom (+, -, =).
+// Also opens on typing a letter or digit while no field has focus and no
+// dialog is up. Not symbols, which the map takes for zoom (+, -, =).
 export function useFilterSearchShortcut(open) {
   useEffect(() => {
     function onKeyDown(e) {
@@ -119,8 +114,6 @@ export function useFilterSearchShortcut(open) {
   }, [open]);
 }
 
-// One line per kind of search, drawn with its results group's icon; the
-// examples fill the box in.
 const HELP_ROWS = [
   { group: "text", help: "Filters", note: true },
   { group: "text", help: "Titles", note: true },
@@ -131,7 +124,6 @@ const HELP_ROWS = [
   { group: "exclude", help: "Exclude" },
 ];
 
-// The sections of the filter list beside the search, as FiltersPanel groups them.
 const BROWSE_SECTIONS = ["What", "From", "WhenWhere", "Biodiversity"];
 
 function FilterSearchHelp({ showSpecies, onExample }) {
@@ -192,10 +184,6 @@ function FilterSearchHelp({ showSpecies, onExample }) {
   );
 }
 
-// The Filters modal's home page: a search over every filter. Typing offers
-// matching values from every facet, selecting one applies it (a leading "-"
-// excludes instead) and selecting it again removes it, and the empty box
-// lists what is applied. It writes the same state every filter page does.
 // The text is the panel's, so it survives a visit to a filter's own page.
 export default function FilterSearch({ text, setText, inputRef }) {
   const { t } = useTranslation();
@@ -205,9 +193,8 @@ export default function FilterSearch({ text, setText, inputRef }) {
   const [canReset, resetAll] = useResetAllFilters();
   const listId = useId();
   const [activeIndex, setActiveIndex] = useState(0);
-  // What was selected since the box last changed. Selecting leaves the list as
-  // it is, so several values can be picked in a row: the empty box would
-  // otherwise drop a value the moment it was removed.
+  // Picking leaves the list as it is, so several values can be picked in a
+  // row; the empty box would otherwise drop a value the moment it was removed.
   const [touched, setTouched] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
@@ -276,9 +263,6 @@ export default function FilterSearch({ text, setText, inputRef }) {
       ?.scrollIntoView?.({ block: "nearest" });
   }, [listId, active]);
 
-  // With a term, selecting includes (or excludes, with "-"), and selecting the
-  // state the option is already in clears it; with none, every option listed
-  // is an applied one, and selecting it removes it.
   const targetFor = (option) =>
     exclude ? "exclude" : term ? "include" : option.state;
   const removes = (option) =>
@@ -295,7 +279,6 @@ export default function FilterSearch({ text, setText, inputRef }) {
 
   function choose({ group, option }) {
     if (!term) {
-      // Removed, it is kept listed so it can be put straight back.
       setTouched((prev) => new Set(prev).add(`${group.key}:${option.id}`));
       option.toggle(option.state ?? "include");
     } else option.toggle(targetFor(option));
@@ -419,8 +402,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
                       })}
                       data-testid="filter-search-option"
                       data-state={option.state ?? "none"}
-                      // Keeps focus in the box, so a pick can be followed
-                      // by the next without clicking back into it.
+                      // Keeps focus in the box for consecutive picks.
                       onMouseDown={(e) => e.preventDefault()}
                       onMouseMove={() => setActiveIndex(i)}
                       onClick={() => choose({ group, option })}

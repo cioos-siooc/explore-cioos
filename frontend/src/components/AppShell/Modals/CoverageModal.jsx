@@ -18,34 +18,27 @@ import { server } from "../../../config.js";
 import reportError from "../../../state/reportError.js";
 import "./styles.css";
 
-// The Plotly chunk is ~1.4MB, so the histogram only loads once the modal is
-// actually opened — same pattern as DatasetPreview.
+// The Plotly chunk is ~1.4MB, so it loads only once the modal is opened.
 const CoverageHistogramPlot = lazy(
   () =>
     import("../../Controls/CoverageHistogramPlot/CoverageHistogramPlot.jsx"),
 );
 
-// The dimensions the bars can be split (coloured) by. Keys match the API's
-// groupBy values.
+// Keys match the API's groupBy values.
 const GROUP_OPTIONS = ["source", "platform", "dataType", "organization"];
 
 // What the bars count. Keys match the API's `count` values.
 const COUNT_OPTIONS = ["datasets", "features", "days"];
 
-// The x-axis: the timeline, or every year folded onto weeks of the year. Keys
-// match the API's `view` values and the ?coverageAxis= link param.
+// Keys match the API's `view` values and the ?coverageAxis= link param.
 const VIEW_OPTIONS = ["timeline", "seasonal"];
 
-// How many past responses to keep. The two dropdowns alone are 12 combinations
-// of one selection, and each is a query the API answers in seconds when its
-// own cache is cold, so holding them is worth far more than the few kB they
-// cost. Bounded because the key includes the dataset list, which changes as
-// the map is panned; oldest is evicted first.
+// Each combination costs seconds on a cold API cache, so holding them is worth
+// the few kB. Bounded because the key includes the dataset list, which changes
+// as the map is panned.
 const MAX_CACHED_RESPONSES = 20;
 
-// The figure's outline while it loads: the usual shape of the record — almost
-// nothing early on, a slow climb, a surge in recent decades and a dip in the
-// still-incomplete last years — as (position, height %) control points.
+// The usual shape of the record, as (position, height %) control points.
 const SKELETON_CURVE = [
   [0, 0],
   [0.12, 0],
@@ -92,9 +85,8 @@ const histogramSkeleton = (
         <Skeleton key={i} height={`${height}%`} radius="0" />
       ))}
     </div>
-    {/* The query takes seconds when the API's cache is cold; the bars alone
-        read as a finished figure that failed to draw. The group is the
-        status, so the mark is decoration. */}
+    {/* Bars alone would read as a finished figure that failed to draw. The
+        group is the status, so the mark is decoration. */}
     <div className="coverageModalStatus coveragePlotBusy">
       <Spinner size="lg" role="presentation" />
     </div>
@@ -110,9 +102,7 @@ function CoverageOption({ label, help }) {
   );
 }
 
-// The dataset-coverage figure, launched from the top bar: a histogram of how
-// many datasets match the applied filters over time, with the bars split by a
-// chosen dimension. Depth is handled by the filter, not drawn as an axis.
+// Depth is handled by the filter, not drawn as an axis.
 export default function CoverageModal() {
   const { t } = useTranslation();
   const {
@@ -121,33 +111,25 @@ export default function CoverageModal() {
     coverageAxis: view,
     setCoverageAxis: setView,
   } = useUI();
-  // The same selection the datasets list shows: the filter query plus the
-  // drawn polygon (combinedQueries, what /pointQuery was asked), narrowed to
-  // the datasets the list's own client-side filters left standing. Reading
-  // the filter query alone is how the figure went on counting datasets the
-  // search box, "only in view" and the geometry switches had removed.
+  // Narrowed to what the list's client-side filters left, or the figure would
+  // count datasets the search, "only in view" and geometry switches removed.
   const { combinedQueries, filteredDatasetPks, pointsData } = useSelection();
   const [groupBy, setGroupBy] = useState("source");
   const [count, setCount] = useState("days");
   const [histogram, setHistogram] = useState();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  // The set the narrowing was made from, so a mild one travels as the datasets
-  // it dropped rather than the two thousand it kept (see applyDatasetPKs).
+  // So a mild narrowing travels as the datasets it dropped rather than the
+  // thousands it kept (see applyDatasetPKs).
   const allDatasetPks = useMemo(
     () => pointsData.map((row) => row.pk),
     [pointsData],
   );
 
-  // Responses already fetched, keyed by the request that produced them. The
-  // modal never unmounts (it is always rendered, visibility is a prop), so
-  // this survives closing it — which is the point: reopening the figure, and
-  // toggling either dropdown back to a value already looked at, are the two
-  // things people do most and both used to pay full price for it.
+  // The modal never unmounts, so this survives closing it: reopening and
+  // toggling back to a seen value are the most common actions.
   const cache = useRef(new Map());
 
-  // Fetch only while the modal is open; refetch when the applied filters or
-  // the chosen grouping change so the figure always matches the map + control.
   useEffect(() => {
     if (!showCoverageModal) return undefined;
     const filterString = applyDatasetPKs(
@@ -175,7 +157,6 @@ export default function CoverageModal() {
       })
       .then((data) => {
         cache.current.set(url, data);
-        // Map iterates in insertion order, so the first key is the oldest.
         if (cache.current.size > MAX_CACHED_RESPONSES) {
           cache.current.delete(cache.current.keys().next().value);
         }
@@ -200,8 +181,7 @@ export default function CoverageModal() {
   ]);
 
   const isEmpty = histogram && histogram.cells.length === 0;
-  // A refetch over a figure already on screen: keep drawing the old one until
-  // the new one lands. An error or an empty result replaces it as before.
+  // Keep drawing the old figure until the new one lands.
   const showStalePlot = Boolean(loading && histogram && !isEmpty);
 
   return (
@@ -231,20 +211,16 @@ export default function CoverageModal() {
       <Modal.Body>
         <div className="coverageToolbar">
           <div className="coverageToolbarNotes">
-            {/* Organizations are the one multi-valued dimension: a dataset in
-                two of them lands in both series, so the stack total is not
-                the dataset count. Say so rather than let the axis imply
-                otherwise. */}
+            {/* A dataset in two organizations lands in both series, so the
+                stack total is not the dataset count. */}
             {groupBy === "organization" && (
               <div className="coverageToolbarNote">
                 <InfoCircle aria-hidden="true" />
                 {t("coverageOrganizationNote")}
               </div>
             )}
-            {/* Days are per-feature and added up, so a bar measures
-                observation effort and routinely exceeds the number of
-                calendar days in its period. Deliberately unlike the map's
-                days ramp, which unions. */}
+            {/* Days are summed per feature (observation effort), unlike the
+                map's days ramp, which unions. */}
             {count === "days" && (
               <div className="coverageToolbarNote">
                 <InfoCircle aria-hidden="true" />
@@ -331,10 +307,8 @@ export default function CoverageModal() {
           </div>
         </div>
         <div className="coveragePlotArea">
-          {/* A refetch keeps the bars it already has, dimmed, rather than
-              blanking to an empty area: switching Count or Colour-by changes
-              one facet of the same figure, and these queries take seconds when
-              the API's cache is cold. */}
+          {/* A refetch keeps the old bars, dimmed: these queries take seconds
+              on a cold cache. */}
           {loading && !showStalePlot && histogramSkeleton}
           {!loading && error && (
             <div className="coverageModalStatus coverageModalError">

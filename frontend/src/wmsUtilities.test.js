@@ -21,8 +21,6 @@ import {
   withLiveTimeDimension,
 } from "./wmsUtilities.js";
 
-// A stand-in for MapLibre's LngLatBounds — clampBoundsForWms only ever calls
-// these four getters.
 function bounds(west, south, east, north) {
   return {
     getWest: () => west,
@@ -444,9 +442,7 @@ describe("withLiveTimeDimension", () => {
   });
 
   it("substitutes the live bounds and count together, preserving the step", () => {
-    // The whole point: gridAxisNodes derives step as (max-min)/(count-1), so
-    // advancing `max` without `n_values` would stretch every step and put each
-    // marker between slices rather than on one.
+    // Advancing `max` without `n_values` would put markers between slices.
     const live = {
       name: "time",
       n_values: 13,

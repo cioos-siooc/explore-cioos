@@ -21,22 +21,9 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
 
-// The quick filters: the one-click ones that act on the map or are a single
-// toggle rather than a list of options, as round buttons floating under the
-// brand card. Search has no button here: the Filters button, Ctrl/⌘+K and
-// typing on the map all open the search palette (see FilterSearch).
-//
-// Box and polygon share one Area button whose small menu picks the shape (or
-// clears the one drawn), so the row carries one draw control rather than two.
-//
-// No armed-tool state: drawRequest is a *last* request rather than a current
-// one (see MapStateProvider), so like every other UI here the Area button
-// reads its lit state and icon off the shape on the map instead. Between
-// arming a draw and closing the shape, it is not lit.
-//
-// Each button carries a caption naming it: a touch screen has no hover to show
-// the title, and an icon alone was a guess. The reset is the one for both this
-// row and the active-filter chips beneath it.
+// No armed-tool state: drawRequest is a *last* request, not a current one (see
+// MapStateProvider), so the Area button reads its lit state off the drawn
+// shape. Captions because a touch screen has no hover to show the title.
 export default function QuickFilters() {
   const { t, i18n } = useTranslation();
   const { requestDraw, zoom } = useMapState();
@@ -46,7 +33,6 @@ export default function QuickFilters() {
   const { realtimeOnly, setRealtimeOnly } = useFilters();
   const { offerTip, tipHighlight } = useTips();
   const [canReset, resetAll] = useResetAllFilters();
-  // Zoomed in to a local area, the whole-catalogue list stops matching the map.
   const zoomedIn = isMarkerTier(zoom) && !onlyInView;
   useEffect(() => {
     if (zoomedIn) offerTip("inView");
@@ -59,8 +45,7 @@ export default function QuickFilters() {
   const areaButtonRef = useRef(null);
   const [areaMenuOpen, setAreaMenuOpen] = useState(false);
 
-  // Pointer, not only blur: Safari never focuses a clicked button, so a click
-  // elsewhere would leave the menu up.
+  // Pointer, not only blur: Safari never focuses a clicked button.
   useEffect(() => {
     if (!areaMenuOpen) return;
     function onPointerDown(e) {
@@ -74,10 +59,7 @@ export default function QuickFilters() {
   const boxActive = hasShape && polygonIsRectangle(polygon);
   const polygonActive = hasShape && !boxActive;
 
-  // A toggle that is off previews how many of the listed datasets it would
-  // keep, under its icon. Once on, the tally above already says it. Not before
-  // the counts land, so it never flashes a zero. Compact ("2.2K") to fit the
-  // circle; assistive tech gets the exact number.
+  // Not shown before the counts land, so it never flashes a zero.
   function countPreview(applied, count, id, testId) {
     if (applied || !countsReady) return null;
     return (
@@ -237,8 +219,7 @@ export default function QuickFilters() {
         type="button"
         className="quickFilterButton quickFilterReset"
         data-testid="quick-filter-reset"
-        // Disabled rather than removed while nothing is set, so the row keeps
-        // its shape.
+        // Disabled rather than removed so the row keeps its shape.
         disabled={!canReset}
         onClick={resetAll}
         title={t("resetFiltersButtonTooltipText")}

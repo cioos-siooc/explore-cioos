@@ -7,8 +7,6 @@ output_file = "erddap_ckan_mapping.csv"
 
 def main(cache):
     """Run the CKAN harvester on CIOOS National (cioos.ca)"""
-
-    # query CKAN national for all erddap datsets
     print("Gathering list of records that link to an erddap")
 
     print("Querying each record")

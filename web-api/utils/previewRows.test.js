@@ -27,8 +27,7 @@ test("keeps the newest rows when ERDDAP returns more than the limit", () => {
 });
 
 test("keeps the newest rows even when ERDDAP returns them out of order", () => {
-  // tabledap does not promise row order, so the tail of the response is not
-  // necessarily the newest data. This is the case a bare slice(-n) gets wrong.
+  // tabledap does not promise row order: a bare slice(-n) gets this wrong.
   const t = table([
     "2024-01-03T00:00:00Z",
     "2024-01-01T00:00:00Z",
@@ -53,8 +52,7 @@ test("falls back to the head slice when there is no time column", () => {
 });
 
 test("keeps the shallow end of a record sampled at a single instant", () => {
-  // One cast: every row shares a timestamp and row order is the depth
-  // sequence, so the tail would return only the deepest bins.
+  // One cast: the tail would return only the deepest bins.
   const t = {
     columnNames: ["time", "depth"],
     rows: [0, 10, 20, 30].map((d) => ["2024-01-01T00:00:00Z", d]),
@@ -66,7 +64,7 @@ test("keeps the shallow end of a record sampled at a single instant", () => {
 });
 
 test("preserves ERDDAP's order among rows sharing a timestamp", () => {
-  // Stability matters: the plot draws lines in row order.
+  // The plot draws lines in row order.
   const t = {
     columnNames: ["time", "depth"],
     rows: [

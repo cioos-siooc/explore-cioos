@@ -57,18 +57,8 @@ const N_VALUES = /nValues=(\d+)/;
 const EVENLY_SPACED = /evenlySpaced=(true|false)/;
 const AVERAGE_SPACING = /averageSpacing=(.+)$/;
 
-/*
- * Pull the time dimension out of ERDDAP's info document.
- *
- * Requested as .json rather than the .csv the harvester reads, purely so there
- * is no CSV to parse here: the Value column legitimately contains commas
- * ("nValues=5827, evenlySpaced=false, ...") and an actual_range is itself a
- * comma-separated pair.
- *
- * Two rows carry what we need, the same two the harvester's grid handler reads:
- * the `dimension` row's Value holds nValues/evenlySpaced/averageSpacing, and the
- * variable's `actual_range` attribute holds the bounds.
- */
+// .json rather than the .csv the harvester reads, since the Value column
+// legitimately contains commas.
 function timeDimensionFrom(table) {
   const columns = table?.columnNames || [];
   const at = {
@@ -106,11 +96,8 @@ function timeDimensionFrom(table) {
 router.get(
   "/",
   ...pipeline({
-    // `dataset` is the only param; the shared filter set does not apply.
     filters: false,
-    // Same reasoning as /preview: this calls ERDDAP live, so cache the good
-    // answer and never the failure, or every render re-hits a server that has
-    // just failed. Short enough that a newly published slice shows up promptly.
+    // Never cache a live-ERDDAP failure.
     cacheFor: "5 minutes",
     cacheToggle: cache.onlyOk,
     checks: [check("dataset").isLength({ min: 1, max: 256 })],
@@ -118,9 +105,8 @@ router.get(
   async (req, res, next) => {
     const { dataset } = req.query;
 
-    // Same single-column lookup /preview does, and the same caveat: a
-    // dataset_id published on two servers resolves to whichever row sorts
-    // first, because the frontend only ever sends the id.
+    // NOTE: a dataset_id published on two servers resolves to whichever row
+    // sorts first.
     const { rows } = await db.raw(
       `SELECT dataset_id, erddap_url
          FROM cde.datasets
@@ -138,8 +124,6 @@ router.get(
       const { data } = await axios.get(infoUrl, { timeout: 30000 });
       const time = timeDimensionFrom(data?.table);
       if (!time || (!time.min && !time.max)) {
-        // A static grid with no time axis. Not an error: the caller keeps the
-        // harvested dimensions and its slider simply has nothing to move.
         return res
           .status(404)
           .send({ error: "NO_TIME_DIMENSION", dataset: dataset_id });

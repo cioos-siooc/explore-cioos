@@ -1,21 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-// Live { width, height } of an element, in CSS pixels.
-//
-// Lifted out of Rail.jsx (which measured one axis and kept it private) because
-// the preview plot needs the same thing for a different reason: Plotly sizes
-// itself from window.getComputedStyle(container) and there is no ResizeObserver
-// anywhere in the plotly-basic bundle, so a container that changes size without
-// a window resize — a modal opening, a lazy chunk landing, a flex row settling —
-// is invisible to it. That is what left the plot drawn at Plotly's 450px default
-// until the first control change forced a relayout.
-//
-// The publish() before observe() is the load-bearing part: it is the
-// measure-on-mount that the plot was missing.
-//
-// Measure a container whose size is an INPUT to the plot, never the plot's own
-// box — feeding a measured height back in as the plot's height is an infinite
-// loop.
+// Live { width, height } of an element, in CSS pixels. plotly-basic has no
+// ResizeObserver, so a container resized without a window resize left the plot
+// at Plotly's 450px default; the publish() before observe() is the
+// load-bearing measure-on-mount. Measure a container whose size is an INPUT to
+// the plot, never the plot's own box, or it loops forever.
 export default function useElementSize() {
   const ref = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -24,10 +13,8 @@ export default function useElementSize() {
     const el = ref.current;
     if (!el) return undefined;
     const publish = () => {
-      // clientWidth/Height, not getBoundingClientRect: the border box would
-      // include padding the plot cannot draw in, and a scrolling container's
-      // clientHeight is the visible height rather than the content height —
-      // which is exactly the budget the plot has to fit.
+      // clientWidth/Height, not getBoundingClientRect: excludes padding the
+      // plot can't draw in, and a scroller's clientHeight is its visible budget.
       setSize((previous) =>
         previous.width === el.clientWidth && previous.height === el.clientHeight
           ? previous

@@ -2,10 +2,8 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { harvestMode } from "./harvestMode.js";
 
-// Single-word cue for whether a dataset is file-based ('file' — ERDDAP need not
-// be re-queried when the file list is unchanged) or database-backed ('source' —
-// always re-queried). Plain coloured text, not a badge; the explanation lives in
-// the tooltip. When file detection didn't resolve, the cell is left empty.
+// 'file': ERDDAP isn't re-queried when the file list is unchanged; 'source':
+// always re-queried. Empty when file detection didn't resolve.
 export default function HarvestModeBadge({ dataset }) {
   const { t } = useTranslation();
   const mode = harvestMode(dataset);

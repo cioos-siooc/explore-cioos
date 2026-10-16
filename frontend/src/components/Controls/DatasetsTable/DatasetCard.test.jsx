@@ -5,9 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import DatasetCard from "./DatasetCard.jsx";
 
-// DatasetCard takes t/i18n as plain props rather than calling useTranslation
-// itself, so a bare render() with a stub translator is enough — no provider
-// wiring needed.
+// DatasetCard takes t/i18n as props, so a stub translator needs no providers.
 const t = (key) => key;
 const i18n = { language: "en" };
 

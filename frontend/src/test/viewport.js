@@ -1,10 +1,3 @@
-// A matchMedia jsdom can answer, backed by a width a test can change.
-//
-// The app branches on two rungs — WIDE_SCREEN_QUERY '(min-width: 1400px)' in
-// UIProvider and MOBILE_QUERY '(max-width: 700px)' in useMediaQuery.js — so a
-// test that wants to assert breakpoint behaviour needs to move the viewport and
-// have live queries fire 'change', which is what useMediaQuery subscribes to.
-
 export const DESKTOP_WIDTH = 1600;
 export const TABLET_WIDTH = 1024;
 export const MOBILE_WIDTH = 390;
@@ -16,11 +9,8 @@ let currentWidth = DESKTOP_WIDTH;
 let touchScreen = false;
 const liveQueries = new Set();
 
-// Only the forms this codebase writes. Anything else is a typo in a test, and
-// answering it `false` would hide that. Reduced motion is off, as on most
-// machines, so animations run their real course under test.
-// Height is never moved under test, so a (max-height) arm of a list reads as
-// a tall screen.
+// Only the forms this codebase writes; anything else is a typo, and answering
+// `false` would hide it. Height never moves, so (max-height) reads as tall.
 function evaluate(query) {
   if (query.includes(",")) return query.split(",").some(evaluate);
   if (/^\(\s*max-height:\s*\d+px\s*\)$/.test(query.trim())) return false;
@@ -54,7 +44,6 @@ export function installMatchMedia() {
         if (type === "change") listeners.delete(listener);
         if (listeners.size === 0) liveQueries.delete(mql);
       },
-      // Deprecated aliases, in case a dependency reaches for them.
       addListener: (listener) => listeners.add(listener),
       removeListener: (listener) => listeners.delete(listener),
       dispatch: () => {
@@ -67,8 +56,7 @@ export function installMatchMedia() {
   };
 }
 
-// Move the viewport and notify every subscribed query, the way a real resize
-// does. Call it inside act() when the change should flush React updates.
+// Call inside act() when the change should flush React updates.
 export function setViewportWidth(width) {
   currentWidth = width;
   window.innerWidth = width;

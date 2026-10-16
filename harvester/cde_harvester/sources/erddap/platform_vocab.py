@@ -69,17 +69,14 @@ def get_l06_codes_and_labels():
 
 
 def get_ioos_to_l06_mapping():
-    # Parse IOOS to L06 mapping
     if PLATFORM_L06_MAPPING_CSV.exists():
         logger.info(f"Loading existing IOOS to L06 mapping from {PLATFORM_L06_MAPPING_CSV}")
         return pd.read_csv(PLATFORM_L06_MAPPING_CSV, index_col="l06_code")
 
-    # download mapping
     url = "https://mmisw.org/ont/api/v0/ont?format=jsonld&iri=http://mmisw.org/ont/bodc/MapSeaVoxPlatforms2IOOSandRDIPlatforms"
     logger.info("Downloading %s", url)
     res = requests.get(url).json()
     rows = []
-    # parse mapping
     for k in res["@graph"]:
         try:
             predicate = k.get("predicate", "").split(":")[-1]

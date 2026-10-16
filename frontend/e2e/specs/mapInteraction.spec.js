@@ -14,33 +14,22 @@ import {
   lngLatAt,
 } from "../support/syntheticScene.js";
 
-// The one spec that points the mouse at the WebGL canvas itself, so hover and
-// click ranking have a regression net that runs through MapLibre rather than
-// around it. Every other spec asserts on the chrome and hides the canvas.
-//
-// Each test deep-links the camera so the spot it needs sits at the canvas
-// centre: at zoom 2.75 the whole world is served by the four recorded z2 tiles,
-// so any centre is covered without pixel maths. Both spots come from the
-// recorded tiles in e2e/fixtures/tiles — re-recording them can move the hex.
-//
-// The recorded set is hexes only, so the marker tier has a hand-built scene
-// instead (e2e/support/syntheticScene.js, encoded by build-synthetic-tiles.mjs):
-// those tests open at its centre and aim at pixel offsets from there.
+// The only spec driving the WebGL canvas itself. At zoom 2.75 the four
+// recorded z2 tiles cover the world, so each test deep-links its spot to the
+// canvas centre; re-recording e2e/fixtures/tiles can move the hex. Recorded
+// tiles are hexes only, so marker tests use the synthetic scene instead.
 
-// Every pointer event here waits on a SwiftShader frame: on a two-core runner
-// the map takes ~12s to be ready and each drawing click ~2s, which leaves the
-// multi-gesture tests no room inside the default 30s.
+// On a two-core runner the map takes ~12s to be ready and each drawing click
+// ~2s, past the default 30s.
 test.slow();
 
-// Centroid of hex pk 23357 off Vancouver Island, inside that hex alone: 18
-// days of data, and two of its four datasets are in the recorded pointQuery —
-// the card lists only datasets in the current results.
+// Hex pk 23357: 18 days, and two of its four datasets are in the recorded
+// pointQuery (the card lists only datasets in the current results).
 const HEX = { lon: -123.9624, lat: 50.7718 };
 // Inland, under no recorded hex.
 const EMPTY = { lon: -105, lat: 60 };
 
-// Not the shared app opener: that appends to the default view, whose own
-// lat/lon would win.
+// Not the shared opener: the default view's own lat/lon would win.
 const openAt = async (page, { lon, lat }, extra = "", zoom = 2.75) => {
   await page.goto(`/?lat=${lat}&lon=${lon}&zoom=${zoom}&lang=en${extra}`);
   await waitForMapReady(page);
@@ -60,7 +49,6 @@ const canvasCentre = async (page) => {
 
 const openScene = (page, extra = "") => openAt(page, CENTRE, extra, ZOOM);
 
-// A scene offset as a page coordinate.
 const sceneAt = async (page, [dx, dy]) => {
   const { x, y } = await canvasCentre(page);
   return { x: x + dx, y: y + dy };

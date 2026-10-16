@@ -39,7 +39,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Quiet until wanted: ink-40 at rest, the error red once pressed. */
 .multiCheckboxFilter .optionExclude {
   flex: 0 0 auto;
   display: inline-flex;

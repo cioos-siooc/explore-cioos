@@ -1,13 +1,3 @@
-/**
- * GET /legend
- *
- * Returns { recordsCount: { zoom0, zoom1, zoom2 } } for map legend rendering.
- * Accepts optional filter params (timeMin, timeMax, etc.).
- * Uses validatorMiddleware() so invalid filter params return 400.
- *
- * db.raw() is mocked; the SQL template is never executed.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

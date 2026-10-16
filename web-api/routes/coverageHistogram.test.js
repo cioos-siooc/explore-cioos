@@ -10,14 +10,8 @@ test.beforeEach(() => {
   resetCache();
 });
 
-/*
- * The days count is the one that used to dominate this route's latency: it
- * called day_range_overlap_days() once per (feature, bin) pair — re-unnesting
- * and re-sorting the feature's whole daterange[] on every call — and ran a
- * second full scan to total the series. Both are pinned here, because both are
- * invisible from the response: the numbers were correct throughout, only the
- * cost was not.
- */
+// The days count's query shape is pinned because its cost is invisible from
+// the response.
 
 test("the days count unions each feature's day set once, not once per bin", async () => {
   db.queueRaw([{ min: null, max: null }]);
@@ -25,11 +19,8 @@ test("the days count unions each feature's day set once, not once per bin", asyn
 
   await agent.get("/coverageHistogram").query({ count: "days" });
 
-  // The extent the bins are fitted to, then the one binned scan.
   assert.equal(db.queries.length, 2);
   assert.doesNotMatch(db.queries[1], /day_range_overlap_days/);
-  // The merge that replaced it, and the binary search over the bin edges that
-  // replaced comparing every feature against every bin.
   assert.match(db.queries[1], /starts_island/);
   assert.match(db.queries[1], /width_bucket/);
 });
@@ -45,11 +36,7 @@ test("the days count answers the series totals from the bars, in one query", asy
   const res = await agent.get("/coverageHistogram").query({ count: "days" });
 
   assert.equal(res.status, 200);
-  // One binned scan after the extent, where the entity counts take two.
   assert.equal(db.queries.length, 2);
-  // Bins tile the window exactly, so a series' total IS the sum of its bars —
-  // and the list is ranked descending, which is what the figure's top-N
-  // selection reads.
   assert.deepEqual(res.body.series, [
     { key: "b", kind: "erddap", total: 9 },
     { key: "a", kind: "erddap", total: 7 },

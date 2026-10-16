@@ -6,10 +6,7 @@ import "./tooltipStyles.css";
 
 const GAP = 6;
 
-// Hover/focus tooltip replacing react-bootstrap's OverlayTrigger + Tooltip
-// pair: <Tooltip content={...} placement='bottom'><button/></Tooltip>.
-// Attaches handlers to its single child (no extra wrapper element) and
-// renders the bubble in a portal positioned off the child's rect.
+// Attaches handlers to its single child (no wrapper) and portals the bubble.
 export default function Tooltip({
   content,
   placement = "bottom",
@@ -61,11 +58,8 @@ export default function Tooltip({
 
   let style;
   if (rect) {
-    // The side placements grow away from whichever horizontal half the trigger
-    // sits in, aligned to its near edge rather than centred on it. Centring
-    // needs a translate, and a translated box can't be kept inside the
-    // viewport without knowing its own height — which is how a trigger in a
-    // bottom corner used to push a multi-line bubble off the screen.
+    // Side placements align to the near edge rather than centring: a
+    // translated box can't be kept in the viewport without knowing its height.
     const verticalAnchor =
       rect.top + rect.height / 2 > window.innerHeight / 2
         ? { bottom: window.innerHeight - rect.bottom }
@@ -83,10 +77,8 @@ export default function Tooltip({
         style = { left: rect.right + GAP, ...verticalAnchor };
         break;
       case "left":
-        // Positioned by `right` rather than `left` + a -100% translate: a box
-        // offset from the left with only a few pixels of viewport beyond it
-        // shrink-to-fits into those pixels, so every line wrapped and the
-        // max-width never applied.
+        // `right`, not `left` + a -100% translate: near the viewport edge the
+        // box shrink-to-fit into a few pixels and max-width never applied.
         style = {
           right: window.innerWidth - rect.left + GAP,
           ...verticalAnchor,

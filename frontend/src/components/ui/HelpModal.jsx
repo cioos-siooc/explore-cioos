@@ -4,30 +4,16 @@ import Modal from "./Modal.jsx";
 
 import "./helpModalStyles.css";
 
-// The app's explainer dialog: a title/subtitle header over a list of
-// "what this is / what it does" entries, each led by the glyph the user meets
-// on the surface being explained — so the rule and the control that enforces it
-// are recognisably the same thing.
-//
-// Read-only by design. Nothing in here is a control, which is what lets it be
-// sized to the prose rather than to the working dialog it was opened from, and
-// what makes one component enough for every explainer in the app.
-//
-// The body is a lead paragraph (`children`), a list of entries (`items`), or
-// both — the lead says what the surface is, the entries what its parts do. A
-// surface with one thing to say passes the lead alone, rather than a one-row
-// list whose heading would repeat the dialog's own.
+// Read-only by design, so it sizes to the prose and one component serves every
+// explainer. Pass a lead (`children`), entries (`items`), or both.
 export default function HelpModal({
   show,
   onHide,
-  // Prefix for the heading's id, which aria-labelledby points at — a modal per
-  // surface, so the surface names it.
+  // Prefix for the heading's id, which aria-labelledby points at.
   id,
   icon,
   title,
   subtitle,
-  // [{ key, icon, title, body }] — the entries, in reading order. Left out for
-  // a dialog whose body is a lead paragraph alone.
   items,
   children,
   "data-testid": testId,

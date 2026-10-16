@@ -1,10 +1,3 @@
-/**
- * GET /obisNodes
- *
- * Returns a sorted array of { name } objects for distinct OBIS nodes
- * from cde.datasets rows where source_type = 'obis'.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

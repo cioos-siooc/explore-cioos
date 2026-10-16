@@ -56,12 +56,10 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
-// Included or excluded — either way the option constrains the filter.
 const isSet = (option) => option.isSelected || option.isExcluded;
 
-// Matches the raw title and what the user actually reads — the translated
-// label and, for EOVs, the category in either language ("physique" finds them
-// all).
+// Also matches the translated label and, for EOVs, the category in either
+// language ("physique" finds them all).
 function createOptionSubset(searchTerms, allOptions, t) {
   if (!searchTerms) return allOptions;
   const search = searchTerms.toString().toLowerCase();
@@ -75,10 +73,6 @@ function createOptionSubset(searchTerms, allOptions, t) {
   );
 }
 
-// The Filters panel: filter rows grouped into sections on the left, with the
-// open filter's options in the detail pane on the right (see styles.css —
-// the .filterOptions flyout is re-anchored inside the sheet), over a footer
-// that reports what the filters currently add up to.
 export default function FiltersPanel({ searchInputRef }) {
   const { t } = useTranslation();
   const {
@@ -139,8 +133,7 @@ export default function FiltersPanel({ searchInputRef }) {
     polygon,
   } = useSelection();
   const { openFilter, setOpenFilter, filterSearchText } = useUI();
-  // The search page's text, kept here so a visit to a filter's own page and
-  // back finds it as it was left.
+  // Kept here so a visit to a filter's own page and back finds it as left.
   const [searchText, setSearchText] = useState(filterSearchText ?? "");
   const [, resetAll] = useResetAllFilters();
   const {
@@ -153,17 +146,14 @@ export default function FiltersPanel({ searchInputRef }) {
   } = useDatasetCounts();
   const { dataLayerChoices, resetDataLayers, requestDraw } = useMapState();
 
-  // The one search box whose terms aren't a filter over options already in
-  // state — it is a query against WoRMS — so it is kept here rather than in the
-  // filter state the URL is built from.
+  // A WoRMS query rather than a filter over options in state, so it stays out
+  // of the filter state the URL is built from.
   const [scientificNameSearchTerms, setScientificNameSearchTerms] =
     useState("");
 
   const realtimeFilterName = t("realtimeFilterName");
   const inViewFilterName = t("datasetsCardOnlyInViewText");
 
-  // Same badge rule as the catalogue filters: the bare filter name while the
-  // filter is doing nothing, the chosen value(s) once it is.
   const dataLayersFilterTranslationKey = "layerSelectorLabel";
   const dataLayersChosen = chosenDataLayerKeys(dataLayerChoices);
   const dataLayerLabel = (key) => {
@@ -214,7 +204,6 @@ export default function FiltersPanel({ searchInputRef }) {
       erddapServersSelected.length > 0 &&
       erddapServersSelected.every((s) => s.isExcluded);
     const selectedTitles = [
-      // a fully selected (or fully excluded) group reads as one source
       ...(allServersSelected
         ? ["ERDDAP"]
         : allServersExcluded
@@ -243,8 +232,6 @@ export default function FiltersPanel({ searchInputRef }) {
     [startDate, endDate],
     [defaultStartDate, defaultEndDate],
   );
-  // Not one of the catalogue's own facets, so it has no options list to count:
-  // the badge names the picked species instead, on the same one/many rule.
   const scientificNamesFilterTranslationKey = "scientificNameFilterName";
   const scientificNamesPicked = [
     ...scientificNamesSelected,
@@ -259,7 +246,6 @@ export default function FiltersPanel({ searchInputRef }) {
         ? scientificNamesPicked[0]
         : scientificNamesPicked.length + t("scientificNamesMulti");
 
-  // The Any/All control, on the lists where a dataset can carry several values.
   const matchAllSwitch = (id, checked, setChecked, tipTarget) => (
     <Switch
       id={id}
@@ -279,9 +265,6 @@ export default function FiltersPanel({ searchInputRef }) {
     "(m)",
   );
 
-  // Like the scientific name search above, not a facet with an options list —
-  // idle it reads as the bare filter name, drawn it names the shape itself
-  // (the same two labels SpatialFilterButton's own menu uses).
   const spatialFilterTranslationKey = "spatialFilterFilterName";
   const hasSpatialFilter = Boolean(polygon);
   const spatialFilterBadgeTitle = hasSpatialFilter
@@ -294,8 +277,7 @@ export default function FiltersPanel({ searchInputRef }) {
   const SpatialFilterIcon =
     hasSpatialFilter && !polygonIsRectangle(polygon) ? Pentagon : BoundingBox;
 
-  // A failed /datasets leaves no catalogue total; what came back filtered is
-  // then all we know it to be (same fallback as the top bar's counter).
+  // A failed /datasets leaves no catalogue total (same fallback as the top bar).
   const totalCount = total ?? filteredCount;
 
   return (
@@ -314,8 +296,7 @@ export default function FiltersPanel({ searchInputRef }) {
           />
         )}
         <div className="filtersPanelList" data-testid="filters-panel-list">
-          {/* The way back to the search page from a filter's own page; on a
-              phone the search sits above the list instead (see styles.css). */}
+          {/* On a phone the search sits above the list instead (see styles.css). */}
           <div className="filter filtersPanelSearchRow">
             <button
               type="button"
@@ -332,9 +313,6 @@ export default function FiltersPanel({ searchInputRef }) {
             </button>
           </div>
           <FilterSection title={t("filterGroupWhat")}>
-            {/* First of the facet rows: this is the coarsest "what" there is —
-                it decides which families of data exist for the filters below
-                to narrow. */}
             <Filter
               active={dataLayersChosen.length > 0}
               badgeTitle={dataLayersBadgeTitle}
@@ -529,11 +507,8 @@ export default function FiltersPanel({ searchInputRef }) {
             </Filter>
           </FilterSection>
           <FilterSection title={t("filterGroupWhenWhere")}>
-            {/* First in the section: the drawn shape is the primary "where"
-                constraint, ahead of the derived "in view" toggle below it.
-                Picking a shape closes the modal (see SpatialFilter) so the
-                map — hidden behind the dialog otherwise — is there to draw
-                on. */}
+            {/* Picking a shape closes the modal (see SpatialFilter) so the map
+                is there to draw on. */}
             <Filter
               active={hasSpatialFilter}
               badgeTitle={spatialFilterBadgeTitle}
@@ -692,12 +667,8 @@ export default function FiltersPanel({ searchInputRef }) {
           )}
         </div>
       </div>
-      {/* Filters apply live, so there is nothing to confirm here — but the
-          dialog covers the map at every width and takes the whole screen on a
-          phone, so the one thing it owes the user is the number they are
-          filtering towards. Reset sits beside it because it is the other thing
-          you do to the whole set, rather than at the end of a list that has to
-          be scrolled past to reach it. */}
+      {/* Filters apply live; the dialog covers the map, so it owes the user
+          the number they are filtering towards. */}
       <div className="filtersPanelFooter">
         <span
           data-testid="filters-panel-count"

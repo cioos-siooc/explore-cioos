@@ -19,23 +19,13 @@ import {
 import HelpModal from "../../ui/HelpModal.jsx";
 import { bathymetrySourceUrl } from "../../config.js";
 
-// The pages an entry sends the reader out to, keyed "<section>_<item>", each as
-// the language-keyed pair the site publishes. The link's own words are
-// translated with the rest of the entry (`…_link`).
+// Keyed "<section>_<item>"; each a language-keyed URL pair.
 const ITEM_LINKS = {
   seafloor_source: bathymetrySourceUrl,
 };
 
-// The long form of one legend entry — a group, or one shape inside it. Keyed by
-// the key Legend.jsx renders it under (see renderGroup / renderSubCaption), so
-// the ⓘ beside a caption and the dialog it opens cannot come to name different
-// things.
-//
-// `lead` is a paragraph saying what the entry is; `items` name its parts, each
-// led by the glyph that part draws on the map. An entry with one thing to say
-// has the lead alone. The observations group is split three ways for that
-// reason: its label names the metric — the one thing every colour and size on
-// the map is counting — and the two shapes carrying it explain themselves.
+// Keyed by the same key Legend.jsx renders the entry under, so an ⓘ and its
+// dialog can't name different things.
 export const LEGEND_HELP_SECTIONS = {
   observations: {
     Icon: HexagonFill,
@@ -87,17 +77,13 @@ export const LEGEND_HELP_SECTIONS = {
   },
 };
 
-// One dialog for every entry rather than a component each: they differ only in
-// which strings they read, and the section key is what says which.
 export default function LegendHelpModal({ section, onHide }) {
   const { t, i18n } = useTranslation();
   const help = section && LEGEND_HELP_SECTIONS[section];
   if (!help) return null;
   const { Icon } = help;
 
-  // An entry's text, with the page it points at — when it points at one —
-  // running on from the last sentence rather than sitting on a line of its own:
-  // it is where this layer came from, not an action to take.
+  // The source link runs on from the last sentence: it is provenance, not an action.
   function itemBody(key) {
     const base = t(`legendHelp_${section}_${key}_body`);
     const links = ITEM_LINKS[`${section}_${key}`];

@@ -17,10 +17,6 @@ Every source builds its set the same way but reaches it differently:
   * OBIS          — from each occurrence's date, in `aggregate_cells`
   * ERDDAP tabledap — from an `orderByCount(".../time/86400")` per feature
 
-The two rendering helpers exist because the two load paths differ: obis_cells
-goes through COPY, which does text→type coercion and so wants a PostgreSQL array
-literal; profiles goes through `to_sql`, whose parameter binding does NOT coerce
-text[] to daterange[] and so wants psycopg2's own range objects.
 """
 
 import datetime
@@ -39,10 +35,7 @@ _BUCKET_INDEX_CEILING = 10**6
 
 
 def day_bucket_group(group_variables):
-    """The `orderByCount` group clause that buckets time into UTC days.
-
-    e.g. ("station",) -> 'station,time/86400'
-    """
+    """e.g. ("station",) -> 'station,time/86400'"""
     return ",".join(list(group_variables) + [f"time/{DAY_SECONDS}"])
 
 
@@ -51,20 +44,11 @@ def bucket_index_to_day(series, parse_dates):
 
     ERDDAP returns the group's BUCKET INDEX, not the bucket value, formatted as
     if it were the column's own type: `time/86400` comes back as
-    "1970-01-01T03:36:57Z", which is 13017 *seconds*, i.e. day index 13017
-    (2005-08-15). Read at face value every row collapses onto 1970-01-01 —
-    which is exactly how the old trajectory_cells.n_records was silently zeroed
-    (docs/trajectory-coverage.md). `orderByMin`/`orderByMax` are NOT affected;
-    they return the real extreme row, so they need no decoding.
-
-    `parse_dates` is the ERDDAP date parser, passed in so this module stays
-    independent of the ERDDAP client.
+    "1970-01-01T03:36:57Z", which is day index 13017 (2005-08-15).
+    `orderByMin`/`orderByMax` are NOT affected.
     """
     parsed = parse_dates(series)
-    # Unparseable values coerce to NaT, whose int64 form is the int64 minimum —
-    # big enough to defeat the magnitude test below AND to overflow the
-    # conversion back. Mask them out and let them stay NaT; the caller drops
-    # them.
+    # NaT's int64 form defeats the magnitude test and overflows the conversion.
     usable = parsed.notna()
     epoch = parsed.astype("int64") // 10**9
     if usable.any() and epoch[usable].abs().max() < _BUCKET_INDEX_CEILING:
@@ -73,15 +57,7 @@ def bucket_index_to_day(series, parse_dates):
 
 
 def days_to_ranges(days):
-    """Collapse a set of days into maximal runs of consecutive days.
-
-    Returns a list of (start, end_exclusive) `datetime.date` pairs, ordered.
-    Duplicates and unsorted input are fine; NaT/None are dropped.
-
-    A run is closed as soon as the next day is not the following calendar day,
-    so a station sampled every January yields one range per January rather than
-    the decades-long envelope that spans them.
-    """
+    """Ordered (start, end_exclusive) `datetime.date` runs; NaT/None dropped."""
     seen = sorted(
         {
             d.date() if isinstance(d, (pd.Timestamp, datetime.datetime)) else d
@@ -106,12 +82,7 @@ def days_to_ranges(days):
 
 
 def merge_ranges(range_lists):
-    """Union several run lists into one. The Python twin of day_union_days().
-
-    Used when rows that turn out to be the same feature are merged at load
-    time: their day sets overlap, so neither concatenating the runs nor taking
-    the longer list is right.
-    """
+    """Union several run lists into one. The Python twin of day_union_days()."""
     runs = sorted(
         (lo, hi)
         for lst in range_lists
@@ -124,7 +95,7 @@ def merge_ranges(range_lists):
     merged = [runs[0]]
     for lo, hi in runs[1:]:
         prev_lo, prev_hi = merged[-1]
-        if lo <= prev_hi:  # overlaps or abuts the current run
+        if lo <= prev_hi:
             merged[-1] = (prev_lo, max(prev_hi, hi))
         else:
             merged.append((lo, hi))
@@ -132,34 +103,17 @@ def merge_ranges(range_lists):
 
 
 def total_days(ranges):
-    """Number of days a run list covers. Mirrors day_union_days() in SQL.
-
-    The runs are disjoint and non-abutting by construction, so this is a plain
-    sum — no merge needed.
-    """
+    """Runs are disjoint and non-abutting by construction, so a plain sum."""
     return sum((hi - lo).days for lo, hi in ranges or [])
 
 
 def ranges_to_iso(ranges):
-    """Run list as plain ISO-string pairs, for the CSV round-trip.
-
-    The harvester writes list columns to the CSV as Python reprs and the loader
-    reads them back with ast.literal_eval, which only accepts literals — the
-    repr of a datetime.date is a constructor call, so the dates cannot go
-    through as themselves.
-    """
+    """ISO-string pairs: ast.literal_eval can't read back repr(date)."""
     return [[lo.isoformat(), hi.isoformat()] for lo, hi in ranges or []]
 
 
 def ranges_to_csv_cell(value):
-    """A day_ranges cell as it goes into the CSV: the repr of ISO pairs.
-
-    Every frame that carries day_ranges to a CSV needs this, and the loader's
-    parse_day_ranges is its inverse. It lives here so the two sides stay
-    together: obis_cells once went to CSV without it, and the datetime.date
-    reprs that produced could not be read back at all (ast.literal_eval only
-    accepts literals, and repr(date) is a constructor call).
-    """
+    """Inverse of the loader's parse_day_ranges."""
     return repr(ranges_to_iso(value)) if isinstance(value, (list, tuple)) else value
 
 
@@ -175,20 +129,10 @@ def ranges_from_iso(pairs):
 
 
 def ranges_to_pg_literal(ranges):
-    """PostgreSQL `daterange[]` literal, for the COPY load path.
-
-    COPY runs each field through the column's input function, so the text form
-    is coerced to daterange[] for free — unlike INSERT parameter binding, which
-    rejects text[] against a daterange[] column.
-    """
+    """`daterange[]` literal for COPY, which coerces text via the input function."""
     return "{" + ",".join(f'"[{lo.isoformat()},{hi.isoformat()})"' for lo, hi in ranges or []) + "}"
 
 
 def ranges_to_psycopg(ranges):
-    """psycopg2 DateRange objects, for the `to_sql` load path.
-
-    to_sql binds parameters rather than going through an input function, and
-    psycopg2 adapts text as text — assigning it to a daterange[] column raises
-    DatatypeMismatch. Its own range type adapts correctly.
-    """
+    """For `to_sql`: bound text[] is rejected for a daterange[] column."""
     return [DateRange(lo, hi, "[)") for lo, hi in ranges or []]

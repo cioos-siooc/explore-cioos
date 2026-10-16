@@ -11,28 +11,12 @@ import DepthRail, {
 import { clampDepth } from "../../DepthRail/depthAxis.js";
 import "../styles.css";
 
-// The Depth filter inside the Filters panel.
-//
-// It is the Time filter's twin, and deliberately so: both set a range, so both
-// are the same three-row form — a ready-made band, a start, an end — over the
-// same rail with the same teal handles. Only the axis differs, time running
-// left to right and depth running shallow to deep.
-//
-// The four bands used to be a grid of buttons and the two figures a pair of
-// number boxes that could be left in a state the filter refused to apply, with
-// a red warning under them. Nothing can be left invalid now: a typed figure
-// commits only once it is complete and inside the range the other end allows,
-// exactly as a typed date does.
 export default function DepthSelector(props) {
   const { t } = useTranslation();
   const { startDepth, endDepth, setStartDepth, setEndDepth } = props;
 
   const axis = useDepthAxis(defaultStartDepth, defaultEndDepth);
 
-  // Either end moves alone, bounded by the other — from the rail and from the
-  // fields alike. Unlike a time window, a chosen depth band is a place in the
-  // water column rather than a thickness, so dragging one end resizes it
-  // instead of sliding the whole band deeper.
   function setHandleValue(handle, value) {
     if (handle === "start") {
       setStartDepth(clampDepth(value, defaultStartDepth, endDepth));
@@ -43,8 +27,6 @@ export default function DepthSelector(props) {
 
   return (
     <div className="filterRangeSelector depthSelector">
-      {/* Each field is wrapped in its own <label>, so the text beside it is the
-          field's name to a screen reader and a click target to everyone else. */}
       <div className="filterRangeForm">
         <label className="filterRangeRow">
           <span className="filterRangeLabel">
