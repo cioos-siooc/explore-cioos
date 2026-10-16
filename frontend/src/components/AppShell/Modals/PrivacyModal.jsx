@@ -4,6 +4,7 @@ import {
   BarChartLine,
   Bug,
   Envelope,
+  GeoAlt,
   Laptop,
   Map,
   PersonCheck,
@@ -14,13 +15,15 @@ import HelpModal from "../../ui/HelpModal.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 
 // Required under Quebec's Law 25 and EU ePrivacy. Keep in step with
-// usePersistentState, sentry.js, index.html and the scheduler's email retention.
+// usePersistentState, sentry.js, index.html, regionSearch.js and the
+// scheduler's email retention.
 const SECTIONS = [
   { key: "device", Icon: Laptop },
   { key: "email", Icon: Envelope },
   { key: "errors", Icon: Bug },
   { key: "analytics", Icon: BarChartLine },
   { key: "map", Icon: Map },
+  { key: "regions", Icon: GeoAlt },
   { key: "rights", Icon: PersonCheck },
 ];
 
@@ -30,6 +33,7 @@ const LINKS = {
   guidelines: link("https://cioos.ca/privacy-guidelines/"),
   google: link("https://policies.google.com/privacy"),
   sentry: link("https://sentry.io/privacy/"),
+  nrcan: link("https://natural-resources.canada.ca/corporate/terms-conditions"),
 };
 
 export default function PrivacyModal() {

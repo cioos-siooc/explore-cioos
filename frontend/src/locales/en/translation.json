@@ -81,6 +81,8 @@
   "privacy_analytics_body": "We count visits with Plausible, run by CIOOS. It uses no cookies and keeps no personal information, only totals such as pages viewed, which site you came from, and how many download requests are submitted (with the number of datasets and the language, never your email address).",
   "privacy_map_title": "Map backgrounds",
   "privacy_map_body": "Your browser loads map backgrounds directly from their providers (EMODnet, OpenFreeMap and, for satellite imagery, Esri). Like any website, they see your IP address and which part of the map you are viewing.",
+  "privacy_regions_title": "Place-name search",
+  "privacy_regions_body": "When you type a place name in the filter search, your browser sends what you typed to Natural Resources Canada's geographical names service to find matching regions. Like any website, it sees your IP address (<nrcan>NRCan's privacy notice</nrcan>).",
   "privacy_rights_title": "Questions and requests",
   "privacy_rights_body": "To ask what we hold about you, or to have it corrected or deleted, see the <guidelines>CIOOS privacy guidelines</guidelines>.",
   "languageSelectorTitle": "Change language",

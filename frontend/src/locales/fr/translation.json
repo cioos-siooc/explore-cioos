@@ -81,6 +81,8 @@
   "privacy_analytics_body": "Nous comptons les visites avec Plausible, exploité par le SIOOC. Il n'utilise aucun témoin et ne conserve aucun renseignement personnel, seulement des totaux comme les pages consultées, le site d'où vous venez et le nombre de demandes de téléchargement soumises (avec le nombre de jeux de données et la langue, jamais votre courriel).",
   "privacy_map_title": "Fonds de carte",
   "privacy_map_body": "Votre navigateur charge les fonds de carte directement auprès de leurs fournisseurs (EMODnet, OpenFreeMap et, pour l'imagerie satellite, Esri). Comme tout site Web, ils voient votre adresse IP et la partie de la carte que vous consultez.",
+  "privacy_regions_title": "Recherche de noms de lieux",
+  "privacy_regions_body": "Lorsque vous tapez un nom de lieu dans la recherche de filtres, votre navigateur envoie ce que vous avez tapé au service de noms géographiques de Ressources naturelles Canada pour trouver les régions correspondantes. Comme tout site Web, il voit votre adresse IP (<nrcan>avis de confidentialité de RNCan</nrcan>).",
   "privacy_rights_title": "Questions et demandes",
   "privacy_rights_body": "Pour savoir ce que nous détenons à votre sujet, ou pour le faire corriger ou supprimer, consultez les <guidelines>lignes directrices du SIOOC sur la confidentialité</guidelines>.",
   "languageSelectorTitle": "Changer de langue",
