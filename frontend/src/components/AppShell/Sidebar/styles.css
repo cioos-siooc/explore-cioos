@@ -194,10 +194,8 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Names the surface, not the dataset — the dataset's own title is the
-   heading directly below, and repeating it here would just crowd the row.
-   Shrinks before the back button does, and clips rather than pushing the
-   collapse chevron off the end. */
+/* Shrinks before the back button and clips rather than pushing the chevron
+   off the end. */
 .datasetsBannerMode {
   display: inline-flex;
   align-items: center;
@@ -391,8 +389,6 @@
     display: none;
   }
 
-  /* The footer is the surface's action bar: the Download button gets a full
-     touch target. */
   .sidebarFooter {
     padding: var(--cioos-space-md) var(--cioos-space-lg);
 

@@ -5,9 +5,7 @@
   min-height: 0;
 }
 
-/* Two segments, in the brand tab strip's own look: a teal wash at rest, solid
-   teal for the open one, each with an icon, so they read as buttons that
-   switch the page rather than as a heading. */
+/* The brand tab strip's look: a teal wash at rest, solid teal when open. */
 .datasetTabs {
   flex: 0 0 auto;
   display: flex;
@@ -50,9 +48,7 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* The panel hosting this page washes its background (see .datasetsPanelDetail),
-   which is what separates a dataset page from the list it drilled in from. The
-   sections below sit on that wash as white cards. */
+/* Sections sit as white cards on the panel's wash (.datasetsPanelDetail). */
 .datasetInspectorBody {
   flex: 1 1 auto;
   min-height: 0;
@@ -76,8 +72,7 @@
   background-color: var(--cioos-white);
 }
 
-/* Same bare, no-tile icon treatment as the Filters/Download/Datasets headers,
-   inline with the title's first line so wrapped lines run beneath it. */
+/* Inline with the title's first line so wrapped lines run beneath it. */
 .datasetTitleIcon {
   margin: -3px 6px 0 0;
   vertical-align: middle;
@@ -232,11 +227,6 @@
   color: var(--cioos-ink-80);
 }
 
-/* --- Facts sheet ---
-   A spec table: one row per fact, the label in a fixed column on the left and
-   its value beside it, a hairline between rows. The eye runs down the label
-   edge to find a field and reads across for its value. On a narrow screen the
-   value drops under its label. */
 .datasetMetaSheet {
   margin: 0 0 10px;
   padding: 0 10px;
@@ -282,8 +272,6 @@
   margin: 0;
 }
 
-/* A fact is plain text; only the tags and links are chips, so the eye can tell
-   a value from a tag. */
 .metadataFact {
   font-size: var(--cioos-font-size-base);
   font-weight: 500;
@@ -291,8 +279,7 @@
   color: var(--cioos-ink);
 }
 
-/* Tags and links (ocean variables, keywords, license and source links): the exact box .filterButton uses (same pill
-   radius, hairline border, white fill, padding and font-size). */
+/* Tags and links share .filterButton's pill box. */
 .datasetMetaSheet .metadataChip {
   display: inline-flex;
   align-items: center;
@@ -348,10 +335,8 @@
   color: var(--cioos-ink-60);
 }
 
-/* Platform: the dot or hexagon the map draws this platform's markers in, so
-   the row names the colour to look for. A line box of its own rather than a
-   flex box, so the chip keeps its text baseline and stays level with its
-   label. */
+/* The dot or hexagon the map draws this platform in; a line box rather than
+   a flex box keeps the chip's text baseline level with its label. */
 .metadataPlatformGlyph {
   margin-right: 6px;
   line-height: 1;
@@ -366,9 +351,6 @@
   color: var(--cioos-ink-60);
 }
 
-/* --- Record table section ---
-   No container of its own: the header is a white card, and every record card
-   below it sits separately on the panel's sand wash. */
 .recordSection {
   display: flex;
   flex-direction: column;
@@ -472,8 +454,6 @@
   font-style: italic;
 }
 
-/* Search and sort stay on screen while the cards scroll under them, on the
-   panel's own sand so nothing shows through. */
 .recordSection .cardList {
   margin-top: 4px;
 }
@@ -500,8 +480,6 @@
   margin-bottom: -1px;
 }
 
-/* The bottom of the list stays on screen while the cards scroll under it,
-   flush with the body's edges and its floor. */
 .recordSection .pager {
   position: sticky;
   bottom: calc(-1 * var(--inspector-pad-bottom));
