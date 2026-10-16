@@ -36,8 +36,8 @@ from urllib.parse import urlparse
 from markdown_it import MarkdownIt
 
 from erddap_downloader import formats
-from erddap_downloader.download_erddap import COMPLETED, EMPTY, FAILED, IGNORED, PARTIAL
-from erddap_downloader.formats import FORMATS, sha256
+from erddap_downloader.download_erddap import COMPLETED, EMPTY, FAILED, FORMATS, IGNORED, PARTIAL
+from erddap_downloader.formats import sha256
 
 INCLUDED = (COMPLETED, PARTIAL)
 SOFTWARE_URL = "https://github.com/cioos-siooc/explore-cioos"

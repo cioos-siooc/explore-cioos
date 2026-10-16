@@ -1,11 +1,12 @@
-"""Output formats: each turns the raw ERDDAP response parts of one subset into
-the polygon-filtered file(s) shipped in the package.
+"""Rebuild this download's data files from their sources.
 
-Copied as is into every package as reproduce.py, so it must import only
-third-party libraries. Run there (`uv run reproduce.py`), it re-fetches every
-subset from its recorded request URLs into reproduced/ and compares each file
-with its sha256 in datapackage.json.
+Run `uv run reproduce.py` in the package folder (https://docs.astral.sh/uv/).
+It re-fetches every dataset from the request URLs recorded in
+datapackage.json, applies the same polygon filter, writes the files to
+reproduced/ and checks each one against the checksum of the file you received.
 
+This is the code that built the package: the downloader ships its own filter
+module (formats.py) as this script, so it imports only third-party libraries.
 Text values are read and written back as strings, so numbers keep ERDDAP's
 exact formatting; only latitude/longitude are parsed, for the polygon test.
 """
@@ -17,7 +18,6 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
 from pathlib import Path
 
 import duckdb
@@ -33,31 +33,6 @@ import xarray as xr
 # Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that 403s
 # urllib's default User-Agent.
 REQUEST_HEADERS = {"User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"}
-
-
-@dataclass(frozen=True)
-class Format:
-    key: str
-    erddap_response: str
-    extension: str
-    mediatype: str
-    # A truncated binary response is unreadable, so it can't ship as PARTIAL.
-    binary: bool
-    label: str
-
-
-FORMATS = {
-    f.key: f
-    for f in (
-        Format("csv", "csv", "csv", "text/csv", False, "CSV"),
-        Format("parquet", "parquetWMeta", "parquet", "application/vnd.apache.parquet", True, "Parquet"),
-        Format("odv", "odvTxt", "txt", "text/tab-separated-values", False, "ODV spreadsheet"),
-        Format("nccf", "ncCF", "nc", "application/x-netcdf", True, "NetCDF CF (DSG)"),
-    )
-}
-DEFAULT_FORMAT = "csv"
-# OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition of it.
-OBIS_FORMATS = ("csv", "parquet")
 
 
 def polygon_regions(polygon_wkt):

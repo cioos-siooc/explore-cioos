@@ -15,7 +15,7 @@ must update each one it affects, in the same change:
   hold).
 - `download_scheduler/download_scheduler/templates/*.j2`: the email wording.
 - Formats are listed in three places: `FORMATS` in
-  `downloader/erddap_downloader/formats.py`, `FORMATS` in
+  `downloader/erddap_downloader/download_erddap.py`, `FORMATS` in
   `web-api/routes/download.js`, `PACKAGE_FORMATS` in
   `frontend/src/state/download/DownloadProvider.jsx` (plus its
   `downloadPackageFormat_*` translations).

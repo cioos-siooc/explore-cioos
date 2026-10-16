@@ -4,6 +4,7 @@ download_erddap regroup a set of tool used by CDE to download ERDDAP datasets.
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -16,9 +17,6 @@ from erddapy import ERDDAP
 from loguru import logger
 
 from erddap_downloader.formats import (
-    DEFAULT_FORMAT,
-    FORMATS,
-    OBIS_FORMATS,
     REQUEST_HEADERS,
     polygon_regions,
     query_box,
@@ -51,6 +49,30 @@ DATASET_SIZE_LIMIT_HIT = "DATASET_SIZE_LIMIT"
 QUERY_SIZE_LIMIT_HIT = "QUERY_SIZE_LIMIT"
 
 OBIS_PARQUET_URL = "https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+
+
+@dataclass(frozen=True)
+class Format:
+    key: str
+    erddap_response: str
+    mediatype: str
+    # A truncated binary response is unreadable, so it can't ship as PARTIAL.
+    binary: bool
+    label: str
+
+
+FORMATS = {
+    f.key: f
+    for f in (
+        Format("csv", "csv", "text/csv", False, "CSV"),
+        Format("parquet", "parquetWMeta", "application/vnd.apache.parquet", True, "Parquet"),
+        Format("odv", "odvTxt", "text/tab-separated-values", False, "ODV spreadsheet"),
+        Format("nccf", "ncCF", "application/x-netcdf", True, "NetCDF CF (DSG)"),
+    )
+}
+DEFAULT_FORMAT = "csv"
+# OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition of it.
+OBIS_FORMATS = ("csv", "parquet")
 
 
 def erddap_server_to_name(server):
