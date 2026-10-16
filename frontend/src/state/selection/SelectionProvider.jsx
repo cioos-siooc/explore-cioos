@@ -33,6 +33,7 @@ import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
   PERIOD_PARAM,
   RECORD_PARAM,
+  TAB_PARAM,
   parsePeriod,
   withoutPreviewParams,
 } from "./previewParams.js";
@@ -376,6 +377,8 @@ export default function SelectionProvider({ children }) {
           // The open record and its plot params belong to the previous
           // dataset's columns, so they never carry over.
           const next = withoutPreviewParams(previous);
+          // A different dataset opens on its metadata, not on the tab left open.
+          next.delete(TAB_PARAM);
           const key = datasetUrlKey(dataset);
           if (key) {
             next.set("dataset", key.dataset);

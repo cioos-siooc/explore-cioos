@@ -1,7 +1,7 @@
 .griddapDetails {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   margin-top: 10px;
 
   /* Long variable names and ISO timestamps would otherwise push the griddap
@@ -9,17 +9,15 @@
   min-width: 0;
 }
 
-.griddapDetails > .metadataGridItem {
-  min-width: 0;
-}
-
+/* Axis and variable cards: at the sidebar's width a 5-column table collapsed
+   into unreadable slivers, so each axis/variable gets its own stacked card. */
 .griddapDimensionsList,
 .griddapVariablesList {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
   min-width: 0;
 }
@@ -30,7 +28,7 @@
   padding: 6px 8px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
-  background-color: var(--cioos-white);
+  background-color: var(--cioos-surface-2);
 }
 
 .griddapDimensionHead,
@@ -103,11 +101,17 @@
   display: inline-block;
 }
 
-.griddapWmsControls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
+/* The section's title and its show-on-map switch share the top line. */
+.griddapWmsHeader {
+  justify-content: space-between;
+}
+
+.griddapWmsHeader .form-check {
+  margin: 0;
+}
+
+.griddapWmsCard .metadataCardHeader:last-child {
+  margin-bottom: 0;
 }
 
 .griddapVariableSelector .dropdown-menu {
@@ -132,4 +136,15 @@
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
   font-style: italic;
+}
+
+/* The same heading the OBIS and tabledap sections carry
+   (see .recordSectionHeader strong). */
+.griddapCardTitle {
+  margin: 0;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-md);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--cioos-ink);
 }

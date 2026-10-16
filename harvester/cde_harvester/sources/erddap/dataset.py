@@ -10,6 +10,7 @@ from cde_harvester.core.harvest_warnings import (
     HarvestWarnings,
 )
 from cde_harvester.core.observability import run_logger
+from cde_harvester.core.record_metadata import from_erddap_globals
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import (
@@ -137,6 +138,7 @@ class Dataset:
                 "grid_variables": [self.grid_variables],
                 "grid_dimensions": [self.grid_dimensions],
                 "wms_url": [self.wms_url],
+                "metadata": [from_erddap_globals(self.globals)],
             }
         )
 

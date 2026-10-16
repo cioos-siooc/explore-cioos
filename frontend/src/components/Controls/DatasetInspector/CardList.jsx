@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { useChanged } from "../../../utilities.jsx";
 import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
@@ -58,9 +58,30 @@ export default function CardList({
     if (index >= 0) setPage(Math.floor(index / pageSize) + 1);
   }
 
+  // Whether the toolbar is pinned against the top of the scrolling body: the
+  // sentinel above it is what scrolls out of view first.
+  const sentinelRef = useRef(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = sentinel?.closest(".datasetInspectorBody");
+    if (!root) return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) =>
+        setStuck(
+          !entry.isIntersecting &&
+            entry.boundingClientRect.top < entry.rootBounds.top,
+        ),
+      { root },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
-      <div className="cardListToolbar">
+      <div className="cardListSentinel" ref={sentinelRef} aria-hidden="true" />
+      <div className="cardListToolbar" data-stuck={stuck || undefined}>
         <TableFilter
           value={filterText}
           onChange={setFilterText}

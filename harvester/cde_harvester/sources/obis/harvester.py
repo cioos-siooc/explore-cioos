@@ -15,6 +15,7 @@ from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.core.harvest_warnings import OCCURRENCES_DROPPED, HarvestWarnings
 from cde_harvester.core.obis_cells import merge_cell_partials
 from cde_harvester.core.observability import run_logger
+from cde_harvester.core.record_metadata import from_cioos_record
 from cde_harvester.core.schemas import (
     DatasetSchema,
     HarvestAttemptSchema,
@@ -321,6 +322,7 @@ class OBISHarvester(BaseHarvester):
         if df_ckan.empty:
             df_datasets["title_fr"] = None
             df_datasets["ckan_id"] = None
+            df_datasets["metadata"] = None
             return df_datasets
 
         df_datasets = df_datasets.merge(df_ckan, on="dataset_id", how="left")
@@ -332,6 +334,7 @@ class OBISHarvester(BaseHarvester):
         df_datasets["title"] = df_datasets["ckan_title"].fillna(df_datasets["title"])
 
         df_datasets.drop(columns=["ckan_eovs", "ckan_title"], inplace=True)
+        df_datasets.rename(columns={"ckan_metadata": "metadata"}, inplace=True)
 
         return df_datasets
 
@@ -347,6 +350,10 @@ class OBISHarvester(BaseHarvester):
             if record:
                 df_datasets.at[idx, "eovs"] = record["eov"]
                 df_datasets.at[idx, "summary"] = record["abstract"]["en"] or None
+                df_datasets.at[idx, "metadata"] = from_cioos_record(
+                    record,
+                    citation=self.fetch_dataset_metadata(df_datasets.at[idx, "dataset_id"]).get("citation"),
+                )
                 converted += 1
         self.logger.info(
             "Converted OBIS metadata for %d / %d datasets without a CKAN record", converted, total,

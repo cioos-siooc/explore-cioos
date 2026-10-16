@@ -460,7 +460,7 @@ def main(folder, incremental=False):
 
     # Absent from older harvest folders. NaN must become None or the JSONB
     # binding fails; NaT binds as NULL on the timestamptz columns.
-    for col in ("table_variables", "grid_variables", "grid_dimensions"):
+    for col in ("table_variables", "grid_variables", "grid_dimensions", "metadata"):
         if col in datasets.columns:
             datasets[col] = datasets[col].apply(
                 lambda x: ast.literal_eval(x) if isinstance(x, str) and x else None
