@@ -9,27 +9,17 @@ import {
   TRAJECTORY_TYPE_KEYS,
 } from "../../state/dataLayers.js";
 
-// Combine the filter-derived query string with the geometry selection into a
-// tile-URL suffix. OBIS off adds includeObis=false, OR-ed with any the Source
-// filter already emitted; a profile-type subset adds profileTypes=<comma list>
-// and a trajectory-type subset trajectoryTypes=<comma list> (empty = none). A
-// param is omitted when its layer(s) are fully on, so the URL stays clean.
-// Returns '' or '?...'.
-//
-// Trajectory cells are requested whenever a trajectory geometry is selected,
-// full stop — their counts belong to the hexes the same way every other
-// geometry's do, and there is one switch for all of them (the hex/point
-// visibility one). There used to be a second, trajectory-only hex switch here,
-// which meant trajectory data could be missing from a hexagon for a reason the
-// hex ramp had no way of showing. The track lines are unaffected either way:
-// they come from a separate source (/tiles/tracks).
+// A param is omitted when its layer(s) are fully on, so the URL stays clean;
+// includeObis=false is OR-ed with any the Source filter already emitted, and
+// an empty trajectoryTypes means none, not all.
 export function buildTileSuffix(baseQuery, dataLayers) {
   const params = new URLSearchParams(baseQuery);
   // Always written out: the API counts something else when the param is absent
   // — see HEX_METRIC.
   params.set("metric", HEX_METRIC);
   if (dataLayers) {
-    // OBIS cells are the only Point rows the API holds, so the switch maps here.
+    // OBIS cells are the only Point rows the API holds, so the switch maps
+    // here.
     if (!dataLayers.point || params.get("includeObis") === "false") {
       params.set("includeObis", "false");
     }
@@ -53,16 +43,9 @@ export function buildTileSuffix(baseQuery, dataLayers) {
   return s ? `?${s}` : "";
 }
 
-// The time filter as two instants, read back out of the map query string —
-// the same timeMin/timeMax the hexes, the points, the counts and the record
-// lists are filtered by (createDataFilterQueryString writes them, and leaves
-// them out entirely while the range is still the full default one). Bounds are
-// the API's own: date-only strings at UTC midnight, both ends inclusive, so a
-// track is clipped to exactly the span the numbers beside it are counted over.
-//
-// Not to be confused with tracksTimeWindow below, which is the scrub bar's
-// trailing window — the tracks TILES are drawn for that and deliberately
-// ignore this filter (see buildTracksTileUrl and TrajectoryDate.jsx).
+// Bounds are the API's own (date-only, UTC midnight, both inclusive), so a
+// track is clipped to exactly the span the counts beside it cover. Unlike
+// tracksTimeWindow, which the tracks tiles use and which ignores this filter.
 export function filterTimeWindow(queryString) {
   const params = new URLSearchParams(queryString);
   const instant = (value) => {
@@ -75,13 +58,9 @@ export function filterTimeWindow(queryString) {
   };
 }
 
-// UTC-day-snapped scrub window: [scrub date - N days, scrub date + 1 day),
-// or [tracksMinDate, scrub date + 1 day) for the 'all' trail (full tracks
-// up to the scrub date; see config.js). Day snapping keeps the tile URLs
-// stable so the server's URL-keyed tile cache gets hits across scrubs and
-// users. The requested trail is clamped by zoom first — a long window costs
-// far more zoomed out, where one tile can carry the whole catalogue (see
-// effectiveTrailingDays).
+// [scrub - N days, scrub + 1 day), or from tracksMinDate for the 'all' trail.
+// Day snapping keeps tile URLs stable for the server's URL-keyed cache. The
+// trail is clamped by zoom first: a long window costs far more zoomed out.
 export function tracksTimeWindow(scrub, trailing, zoom) {
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
   const days = effectiveTrailingDays(trailing, zoom);

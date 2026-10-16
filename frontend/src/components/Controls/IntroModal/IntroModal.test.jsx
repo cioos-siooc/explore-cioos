@@ -13,9 +13,6 @@ import IntroModal from "./IntroModal.jsx";
 // outside a real Sentry init — mock it out so the button renders inert.
 vi.mock("@sentry/react", () => ({ getFeedback: () => undefined }));
 
-// The modal reads UI and tips state (the selection-help link, the tips
-// switch), so it renders under the app's providers, with the same open flag
-// the app hands it.
 function Harness({ setShowModal = () => {} }) {
   const { showSelectionHelpModal, showCoverageModal } = useUI();
   const { bathymetryVisible } = useMapState();
@@ -127,9 +124,7 @@ describe("IntroModal", () => {
 
   it("the download card opens the selection help", async () => {
     const { user } = renderIntro();
-    await user.click(
-      screen.getByRole("button", { name: "What can I download?" }),
-    );
+    await user.click(screen.getByRole("button", { name: "How to download" }));
     expect(screen.getByTestId("selection-help")).toHaveTextContent("open");
   });
 

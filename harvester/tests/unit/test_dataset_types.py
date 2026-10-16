@@ -15,8 +15,8 @@ from cde_harvester.dataset_types.timeseries_profile import TimeSeriesProfileHand
 
 class TestRegistry:
     def test_supported_cdm_data_types(self):
-        # Order matters: first three must match the legacy allowlist so skip
-        # messages stay stable; trajectory types were added in M2, Grid in M3.
+        # Order matters: the first three match the legacy allowlist so skip
+        # messages stay stable.
         assert supported_cdm_data_types() == [
             "TimeSeries",
             "Profile",

@@ -1,28 +1,12 @@
 """Per-variable metadata, shaped for the database's jsonb columns.
 
-The harvester already pulls every attribute the dataset preview needs out of
-``/info/{id}/index.csv`` (see ``CONSIDERED_VARIABLE_ATTRIBUTES`` in
-``sources/erddap/dataset.py``) and pivots it onto ``dataset.df_variables``.
-Until this module existed only the griddap handler persisted any of it, as
-``datasets.grid_variables``; for tabledap the whole frame was built on every
-harvest and discarded, which left the browser with nothing but ERDDAP's
-``columnNames``/``columnTypes``/``columnUnits`` and so no way to title a plot
-panel with anything better than a BODC code like ``TE90_01``.
-
-The output is a plain list of dicts so it round-trips through the harvester's
-CSV contract (Python repr on the way out, ``ast.literal_eval`` in the loader)
-and lands in a ``jsonb`` column.
+A plain list of dicts, so it round-trips through the CSV contract (repr out,
+``ast.literal_eval`` in the loader).
 """
 
-# Persisted per variable. Deliberately NOT the whole of
-# CONSIDERED_VARIABLE_ATTRIBUTES: flag_values/flag_meanings are long strings
-# that no consumer reads yet, and colorBarContinuous/colorBarNSections describe
-# a discretisation nothing implements.
-#
-# actual_range IS carried, but read the warning in the frontend before using it
-# for an axis range: publishers leave fill sentinels inside it. On
-# mpoPmzaVikingCtdInsitu, TE90_01 (degree_C) declares
-# actual_range = -1.4899, 191277.0.
+# Not all of CONSIDERED_VARIABLE_ATTRIBUTES: flag_* and colorBar* have no
+# consumer. actual_range can contain fill sentinels (mpoPmzaVikingCtdInsitu
+# TE90_01 declares -1.4899, 191277.0); don't trust it as an axis range.
 PERSISTED_VARIABLE_ATTRIBUTES = [
     "long_name",
     "standard_name",
@@ -41,9 +25,7 @@ PERSISTED_VARIABLE_ATTRIBUTES = [
 
 
 def _clean(value):
-    """ERDDAP's absent attributes arrive as "" (get_metadata fillna's the pivot).
-    Store None instead so a jsonb consumer can tell "not declared" from "declared
-    empty", and so the column stays small."""
+    """Absent attributes arrive as "" (get_metadata fillna's the pivot)."""
     if value is None:
         return None
     text = str(value).strip()
@@ -53,11 +35,8 @@ def _clean(value):
 def extract_variables(df_variables, names=None):
     """``[{name, type, long_name, ...}]`` for each variable, in frame order.
 
-    ``names`` restricts and orders the output — the griddap handler passes the
-    ``Row Type == "variable"`` names so dimensions stay out of
-    ``grid_variables``. Tabledap callers pass nothing and get every column,
-    coordinates and cf_role variables included: the preview needs those to pick
-    a shared axis and to keep them out of the panel set.
+    ``names`` restricts and orders the output (griddap excludes dimensions);
+    tabledap keeps coordinates, which the preview needs for its shared axis.
     """
     if df_variables is None or len(df_variables) == 0:
         return []

@@ -1,13 +1,6 @@
-// The one question the mocked suite cannot answer: does a real stack — the real
-// API, a real database, the real built bundle behind nginx — actually serve a
-// working page? Run against a live base url, with no fixtures and no routing:
+// Against a real stack, no fixtures:
 //
 //   LIVE_BASE_URL=http://localhost:8098 npm run test:e2e:live
-//
-// This replaces test/frontend_loads_without_errors.js, which did the same job
-// under puppeteer. It is stricter than that script was: the original waited only
-// for 'domcontentloaded' and then closed the browser immediately, so it could
-// pass before the app had asked for anything. This waits for the map to paint.
 import { expect, test } from "@playwright/test";
 
 import { waitForMapReady, webglRenderer } from "./support/appPage.js";
@@ -34,8 +27,7 @@ test("the real api answers the catalogue queries", async ({
   page,
   baseURL,
 }) => {
-  // The frontend cannot render a dataset list the API did not send, so a green
-  // page with an empty catalogue is still a broken deployment.
+  // An empty catalogue is still a broken deployment.
   await page.goto("/");
   await waitForMapReady(page);
 

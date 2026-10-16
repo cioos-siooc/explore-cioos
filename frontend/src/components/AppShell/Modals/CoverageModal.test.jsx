@@ -8,9 +8,8 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import CoverageModal from "./CoverageModal.jsx";
 
-// Plotly draws to a real canvas and probes media queries jsdom's stub does not
-// answer (src/test/viewport.js). Nothing here is about what it renders, so it
-// stands in as the marker that the plot is mounted at all.
+// Plotly probes media queries jsdom's stub doesn't answer; the stub just marks
+// the plot as mounted.
 vi.mock(
   "../../Controls/CoverageHistogramPlot/CoverageHistogramPlot.jsx",
   () => ({
@@ -21,10 +20,8 @@ vi.mock(
 );
 
 /*
- * The figure's queries are the most expensive the API answers — seconds each
- * when its own cache is cold — and the two dropdowns are the controls people
- * move most. So what this covers is not what the figure draws but how often it
- * asks: a combination already looked at must not be fetched again.
+ * The figure's queries take seconds on a cold cache, so this covers how often
+ * it asks: a combination already seen must not be fetched again.
  */
 describe("CoverageModal", () => {
   beforeEach(() => {

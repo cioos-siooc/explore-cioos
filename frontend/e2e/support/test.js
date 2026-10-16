@@ -5,36 +5,14 @@ import { installMockApi } from "./mockApi.js";
 
 const API_ORIGIN = "http://api.test";
 
-// Console noise that says nothing about this application, so the guard below
-// reports on what is left rather than being all-or-nothing.
-//
-// Aborting an in-flight request is ordinary control flow here, not a failure:
-// MapLibre cancels tile and source requests on every view change and whenever a
-// source is removed, and the app cancels its own fetches in effect cleanups.
-// The app already treats it as such wherever it can see it (src/state/reportError.js
-// returns early on AbortError), but MapLibre's rejections surface at the window
-// where no .catch can reach them. Every spec saw three to six of these, so the
-// guard failed all 63 tests regardless of what they were asserting.
-//
-// Matched on the message rather than switched off: a genuine uncaught error
-// still fails the spec it happens in. Add a pattern here only for noise that is
-// provably outside this codebase's control.
+// MapLibre's cancelled requests reject at the window where no .catch reaches
+// them. Add a pattern only for noise provably outside this codebase's control.
 const BENIGN_CONSOLE_ERRORS = [/^AbortError: /];
 
-// The test object every mocked spec imports. Three auto-fixtures, so no spec
-// repeats setup and none can forget it.
 export const test = base.extend({
-  // Must run before any navigation. Everything in the app that means "now"
-  // derives from the clock: defaultEndDate is evaluated at module load and the
-  // trajectory scrub time defaults to today, so without this the query strings
-  // the app sends — and therefore which fixture answers, and therefore any
-  // screenshot showing a date — change at midnight.
-  //
-  // Started at FROZEN_TIME and left running rather than pinned there
-  // (setFixedTime): lodash's debounce measures its wait with Date.now(), so a
-  // clock that never moves re-arms every debounce forever, and the grid hover
-  // chip, the draw commit and the viewport ramp measurement never happened.
-  // A spec lasts seconds from midday, so the date cannot roll over under it.
+  // Before any navigation: "now" picks which fixture answers. Left running, not
+  // setFixedTime: lodash debounce reads Date.now(), and a frozen clock re-arms
+  // every debounce forever.
   frozenClock: [
     async ({ context }, use) => {
       await context.clock.setSystemTime(FROZEN_TIME);
@@ -43,16 +21,13 @@ export const test = base.extend({
     { auto: true },
   ],
 
-  // The offline network, plus the assertion that nothing escaped it.
   mockApi: [
     async ({ context, baseURL }, use) => {
       const unexpected = await installMockApi(context, {
         appOrigin: new URL(baseURL).origin,
         apiOrigin: API_ORIGIN,
       });
-      // The intro modal opens by itself until it has been closed once, and it
-      // covers everything; contextual tips would otherwise pop up under the
-      // top bar mid-spec. a11y.spec.js opens the intro from its button.
+      // The intro modal and tips would otherwise cover the page mid-spec.
       await context.addInitScript(() => {
         window.localStorage.setItem("cde.introSeen", "true");
         window.localStorage.setItem("cde.tipsEnabled", "false");
@@ -63,8 +38,6 @@ export const test = base.extend({
     { auto: true },
   ],
 
-  // The old puppeteer smoke test's one assertion, applied to every spec rather
-  // than to a single page load.
   consoleGuard: [
     async ({ page }, use) => {
       const errors = [];

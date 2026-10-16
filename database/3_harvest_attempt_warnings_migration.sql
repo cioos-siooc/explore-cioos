@@ -1,10 +1,7 @@
--- Convert cde.harvest_attempts.warnings from free text to the structured
--- jsonb list of {code, message, count?, items?} the harvester now writes.
---
--- Applied by db_migrate ([3-9]_*.sql) on every deploy, so it only acts while
--- the column is still text; a no-op on fresh volumes, where 1_schema.sql
--- already creates it as jsonb. Every pre-existing text warning came from the
--- one producer there was: features hidden from the map.
+-- Convert cde.harvest_attempts.warnings from free text to a jsonb list of
+-- {code, message, count?, items?}. Applied by db_migrate on every deploy, so it
+-- only acts while the column is still text. Every pre-existing text warning
+-- came from one producer: features hidden from the map.
 DO $$
 BEGIN
     IF EXISTS (

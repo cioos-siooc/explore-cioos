@@ -1,14 +1,8 @@
 const Module = require("node:module");
 
-// Stands in for utils/shapeQuery.js for routes that only ever call it —
-// pointQuery.js, datasetRecordsList.js, downloadEstimate.js, and (alongside
-// its own db.raw/insert calls) download.js. shapeQuery.js's own SQL-building
-// correctness is already pinned by utils/shapeQuery.test.js; these routes'
-// tests are about validation, response shaping and their OWN side effects,
-// so isolating them from shapeQuery's real SQL keeps them from having to
-// fabricate rows a real query would need.
-//
-// Must run before the route module that calls getShapeQuery is required.
+// shapeQuery's SQL is pinned by utils/shapeQuery.test.js; this keeps route
+// tests from fabricating rows a real query would need. Must install before
+// the route module that calls getShapeQuery is required.
 const shapeQueryPath = require.resolve("../utils/shapeQuery");
 
 function install() {
@@ -47,7 +41,6 @@ function install() {
 
   return {
     calls,
-    // Queue the array the next stubbed call should resolve to.
     queueResult(rows) {
       queue.push(rows);
     },

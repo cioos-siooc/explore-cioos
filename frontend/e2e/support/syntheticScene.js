@@ -1,12 +1,7 @@
-// A hand-built patch of map the recorded fixtures cannot provide: markers and
-// tracks at the marker tier. e2e/build-synthetic-tiles.mjs encodes it into
-// z7 tiles, and mapInteraction.spec.js points the mouse at the same features,
-// so both read positions from here and cannot drift apart.
-//
-// Positions are pixel offsets from the canvas centre at ZOOM, because that is
-// what the spec clicks; the generator turns them into coordinates. Dataset pks
-// are ones the recorded pointQuery holds, so the card and the dataset page can
-// resolve them like real hits.
+// Markers and tracks the recorded fixtures lack; the tile generator and the
+// spec both read positions from here so they can't drift. Positions are pixel
+// offsets from the canvas centre at ZOOM. Pks are in the recorded pointQuery so
+// they resolve like real hits.
 
 export const CENTRE = { lon: -63, lat: 43.5 };
 export const ZOOM = 7.5;

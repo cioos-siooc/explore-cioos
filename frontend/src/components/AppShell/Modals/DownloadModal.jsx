@@ -10,8 +10,6 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
-// The download-order modal, launched from the sidebar footer's Download
-// button: order review (DownloadDetails) + email submit.
 export default function DownloadModal() {
   const { t } = useTranslation();
   const { showDownloadModal, setShowDownloadModal } = useUI();

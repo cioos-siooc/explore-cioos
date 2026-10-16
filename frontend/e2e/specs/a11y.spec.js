@@ -8,8 +8,6 @@ import {
   scan,
 } from "../support/axeBaseline.js";
 
-// One entry per surface worth auditing. Each opens itself from a clean load, so
-// a failure names the state it was in.
 const STATES = {
   "default view": async (page) => {
     await openApp(page);

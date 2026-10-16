@@ -13,9 +13,7 @@ describe("BrandSearch", () => {
     installMockFetch();
   });
 
-  // The projection toggle writes nothing of its own — it flips the same map
-  // state the URL seeds and the map reads — so it is asserted through that
-  // state rather than through the button's own markup.
+  // Asserted through map state: the toggle writes nothing of its own.
   function renderBrand(url = "/") {
     const seen = [];
     function Probe() {
@@ -51,9 +49,6 @@ describe("BrandSearch", () => {
     expect(screen.getByTitle("Switch to flat map view")).toBeInTheDocument();
   });
 
-  // Same "solid primary while the thing it opens is on screen" affordance the
-  // top bar's own segments use (see .topBarButton.active) — here for the one
-  // brand-row button that opens a modal of its own.
   it("goes solid-primary while the intro modal it opens is on screen", async () => {
     window.localStorage.setItem("cde.introSeen", "true");
     const { user } = renderBrand();
@@ -76,11 +71,8 @@ describe("BrandSearch", () => {
     );
   });
 
-  // providers: "app" mounts UrlSync, but the test i18n instance (see
-  // renderWithProviders) only loads the English bundle — flip the language
-  // directly, the same way IntroModal.test.jsx does, rather than through a
-  // ?lang= that would drive i18n but leave every translated string on its
-  // English fallback.
+  // The test i18n instance only loads English, so flip the language directly
+  // (as IntroModal.test.jsx does) rather than via ?lang=.
   it("points the logo link at the French site once the language is French", async () => {
     const { i18n } = renderBrand();
     await act(async () => {

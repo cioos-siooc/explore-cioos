@@ -8,12 +8,8 @@ COPY ./harvester/pyproject.toml ./harvester/uv.lock ./harvester/README.md ./harv
 WORKDIR /app/harvester
 
 # 2. Install dependencies only (no project code yet)
-# --locked with no fallback. The fallback here used to be
-#   || (uv lock && uv sync --no-install-project)
-# which regenerated the lockfile inside the build on any mismatch — so the
-# image resolved fresh transitive versions that nothing had tested, and the
-# `--locked` on the final stage below could still pass. A mismatch is a
-# committed-lockfile problem; fail here and fix it in the repo.
+# --locked with no fallback: a lockfile mismatch must be fixed in the repo,
+# not resolved to untested versions inside the build.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
@@ -21,20 +17,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY ./harvester/cde_harvester ./cde_harvester
 COPY ./harvester/worker-entrypoint.sh ./worker-entrypoint.sh
 
-# The harvest config is deliberately NOT baked into the image — it is provided
-# at runtime so config changes never require a rebuild. Resolution order (see
-# cde_harvester/core/config.py:resolve_harvest_config_file):
-#   1. HARVEST_CONFIG_B64 env var (whole YAML file, base64 on one line; the
-#      Coolify-safe channel — raw multi-line YAML gets mangled in transit)
-#   2. HARVEST_CONFIG_FILE env var (path to a mounted file)
-#   3. a file mounted at /app/harvester/harvest_config.yaml
-# Startup fails with an actionable error when none is provided.
+# The harvest config is deliberately NOT baked in; it arrives at runtime (see
+# cde_harvester/core/config.py:resolve_harvest_config_file).
 COPY ./Obis_Datasets.json ./Obis_Datasets.json
 
-# The numbered schema files, so the "Rebuild Database" flow can recreate the schema
-# after a deploy changes the table layout (Postgres applies 1_schema.sql only on a
-# fresh volume, and db_migrate re-applies only the [3-9] function files). Read-only
-# input to cde_harvester/core/schema.py; overridable via CDE_DATABASE_DIR.
+# For the "Rebuild Database" flow (cde_harvester/core/schema.py).
 COPY ./database /app/database
 
 # 4. Install project itself

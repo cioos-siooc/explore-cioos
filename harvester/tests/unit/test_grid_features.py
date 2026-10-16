@@ -11,10 +11,8 @@ from cde_harvester.dataset_types.grid import (
 )
 from conftest import ERDDAP_URL, build_info_df, build_variables_df
 
-# Modeled on erddap.ogsl.ca/erddap/info/mpoChloroSatellitesAqua/index.csv —
-# the exact CSV shape ERDDAP emits for a griddap dataset (dimension rows carry
-# nValues/evenlySpaced/averageSpacing in Value; variable rows carry the
-# dimension list).
+# Modeled on erddap.ogsl.ca/erddap/info/mpoChloroSatellitesAqua/index.csv, the
+# exact CSV shape ERDDAP emits for a griddap dataset.
 GRID_INFO_CSV = """\
 Row Type,Variable Name,Attribute Name,Data Type,Value
 attribute,NC_GLOBAL,cdm_data_type,,Grid

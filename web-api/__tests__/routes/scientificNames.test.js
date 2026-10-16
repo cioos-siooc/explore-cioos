@@ -1,12 +1,3 @@
-/**
- * GET /scientificNames
- *
- * Typeahead lookup for OBIS scientific names with vernacular subtitles.
- * Two code paths:
- *   - ?names=A,B  — exact lookup for a list of scientific names
- *   - ?q=orca     — prefix/vernacular search
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),
@@ -42,6 +33,7 @@ describe("GET /scientificNames", () => {
         prefix: "Orcinus%",
         sub: "%Orcinus%",
         limit: 10,
+        cap: 5000,
       });
     });
 

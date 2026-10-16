@@ -33,9 +33,7 @@ test.describe("the datasets sidebar", () => {
     await page.getByTestId("topbar-datasets-button").click();
     await expect(panel).toHaveAttribute("data-expanded", "true");
 
-    // Closing is the list's own control, not the top bar's: once open it is a
-    // sheet over the map, and on a phone it covers the top bar entirely — which
-    // is why reaching back up there would be the wrong gesture to assert.
+    // On a phone the open list covers the top bar.
     await page.getByTestId("sidebar-collapse").click();
     await expect(panel).toHaveAttribute("data-expanded", "false");
   });
@@ -52,9 +50,8 @@ test.describe("the datasets sidebar", () => {
   test("keeps a dataset selected across a results refresh", async ({
     page,
   }) => {
-    // The selection is held apart from the results (SelectionProvider's
-    // shortlist) precisely so a filter change cannot empty the download
-    // basket. Nothing on screen says so, which is why it is worth a test.
+    // A filter change must not empty the download basket; nothing on screen
+    // says so.
     await openApp(page);
     const panel = page.getByTestId("sidebar-datasets");
     if ((await panel.getAttribute("data-expanded")) !== "true") {
@@ -91,9 +88,7 @@ test.describe("the datasets sidebar", () => {
   });
 
   test("a user override outlives a resize", async ({ page }) => {
-    // The rule is undocumented outside a comment in UIProvider and is exactly
-    // what a responsive-layout change breaks: once the user has made the call,
-    // the screen-size default no longer applies.
+    // Once the user has chosen, the screen-size default no longer applies.
     await page.setViewportSize(VIEWPORTS.desktop);
     await openApp(page);
     const panel = page.getByTestId("sidebar-datasets");

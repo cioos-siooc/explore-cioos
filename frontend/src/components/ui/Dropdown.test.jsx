@@ -82,10 +82,7 @@ describe("DropdownButton / Dropdown.Item", () => {
   });
 
   it("leaves the menu width to menuClassName when one is given", async () => {
-    // The floor is an inline style, so it beats any class the caller adds. A
-    // caller that passes menuClassName is reaching for the menu's width (the
-    // top bar's lone chevron needs a menu far wider than itself), and the
-    // floor would silently win over it.
+    // The floor is an inline style, so it would silently beat menuClassName.
     const user = userEvent.setup();
     const { rerender } = render(
       <DropdownButton title="Sort">

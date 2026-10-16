@@ -1,10 +1,4 @@
-/* ------------------------------------------------------------------
- * TopBar — the centered top header floating over the map. First layer:
- * the brand bar, with the tally and the merged Datasets/Filters segmented
- * pill welded in. The quick filters (QuickFilters, which brings its own
- * stylesheet) and the active-filter chips flow beneath. Everything stays centered
- * on the horizontal midline of the viewport.
- * ------------------------------------------------------------------ */
+/* TopBar: the centered header floating over the map. */
 .topBar {
   position: fixed;
   top: 12px;
@@ -27,8 +21,8 @@
   z-index: 1;
 }
 
-/* A row under the brand card (see TopBarRow). Laid out as the content it holds;
-   the grid is there for the height to open and close with the slide. */
+/* A row under the brand card (see TopBarRow); the grid lets the height open
+   and close with the slide. */
 .topBarRow {
   display: grid;
   grid-template-rows: 1fr;
@@ -48,9 +42,7 @@
   max-width: 100%;
 }
 
-/* Only while moving: clipped at the row's top edge, which is where the brand
-   card's bottom edge is, so the content reads as passing under it. Clipping
-   the rest of the time would cut off the cards' shadows. */
+/* Clipped only while moving: clipping at rest would cut the cards' shadows. */
 .topBarRow.entering,
 .topBarRow.leaving {
   overflow: hidden;
@@ -108,8 +100,7 @@
   }
 }
 
-/* Reduced motion: the row takes its height at once and only fades. The name
-   keeps the topBar prefix TopBarRow waits on. */
+/* The name keeps the topBar prefix TopBarRow waits on. */
 @media (prefers-reduced-motion: reduce) {
   .topBarRow.entering,
   .topBarRow.leaving {
@@ -142,17 +133,13 @@
   pointer-events: auto;
 }
 
-/* Merged tabs, pulled out full-bleed from below the brand row: the three
-   worded peers share the row equally (1fr each — the columns grow to fit the
-   widest label, so all three stay the same width). All of them bleed 1px past
-   the card on the left, right and bottom to cover its border, leaving no line
-   around them. */
+/* All three bleed 1px past the card's left, right and bottom to cover its
+   border. */
 .topBarActions {
   display: grid;
 
-  /* One column per peer, in DOM order: Datasets, Coverage, Filters. The count
-     is explicit, so adding a segment without widening this list drops it onto
-     an implicit SECOND grid row instead of into the strip. */
+  /* Explicit count: a new segment without widening this lands on an implicit
+     second row. */
   grid-template-columns: 1fr 1fr 1fr;
   align-items: stretch;
   margin: 0 -1px -1px;
@@ -162,9 +149,8 @@
   overflow: hidden;
 }
 
-/* Three-class prefix rather than the bare class — cheaper than !important —
-   so this wins over any generic button chrome a shared stylesheet brings in,
-   whichever order the bundler happens to emit them in. */
+/* Three-class prefix (cheaper than !important) to beat shared button chrome
+   regardless of bundler emit order. */
 .topBar .topBarActions .topBarButton {
   display: inline-flex;
   align-items: center;
@@ -172,20 +158,11 @@
   gap: 8px;
   min-width: 0;
 
-  /* min-height, not height: a long label can take a second line on a narrow
-     viewport. All three segments stretch together (the grid's align-items),
-     so the strip stays a single even band whatever the tallest one needs. */
+  /* min-height: a long label can wrap on a narrow viewport. */
   min-height: 40px;
   padding: 4px 10px;
   border: none;
-
-  /* Square, not the generic dropdown chrome's rounded corners — the row's
-     only curve is the outer one .topBarActions cuts at its own bottom
-     corners. */
   border-radius: 0;
-
-  /* Dimmed primary: a translucent teal wash that highlights the three entry
-     points without competing with the white brand row above them. */
   background-color: rgb(82 167 155 / 14%);
   font: inherit;
   font-weight: 600;
@@ -196,43 +173,28 @@
     color var(--cioos-transition-fast);
 }
 
-/* The icon and the filters badge hold their size; only text gives way. */
 .topBarButton > svg,
 .topBarCount {
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
 }
 
-/* Labels wrap instead of running past the fixed-width brand card. The break
-   points come from the strings themselves — French joins "de données" with a
-   non-breaking space so it wraps as "Jeux / de données", never "Jeux de /
-   données". There is normally room for one line; this bites on the narrowest
-   phones, and on any phone in French, where the label is both the longest and
-   set at the larger mobile type size. */
+/* Labels wrap rather than run past the fixed-width card; French joins
+   "de données" with a non-breaking space so it wraps as "Jeux / de données". */
 .topBarButtonLabel {
-  /* Floor the label at its longest word so flex shrinking can't squeeze it
-     narrower than "données" and split the word. */
+  /* So flex shrinking can't split "données". */
   min-width: min-content;
 
-  /* Centered on its own box, which for a wrapped label is as wide as its
-     longest line — so a short first line ("Jeux") sits over the middle of the
-     second rather than against the icon. That is the trade for having the
-     three segments read as one evenly-set row: they are equal-width now, and
-     a start-aligned label leaves each one's text sitting at a different
-     offset from its segment's centre. A label that fits on one line is
-     exactly as wide as its text, so this changes nothing for those. */
+  /* Centered so equal-width segments read as one evenly-set row. */
   text-align: center;
   line-height: 1.2;
 
-  /* break-word, not anywhere: a word only ever splits when it cannot fit on a
-     line of its own, so "données" drops to its own line instead of breaking
-     into "don / nées" on the narrowest phones. */
+  /* break-word, not anywhere: "données" drops to its own line instead of
+     breaking into "don / nées". */
   overflow-wrap: break-word;
 }
 
-/* Hairline weld between the tabs. Every segment gets one; the leading one —
-   the Datasets toggle — has nothing to its left to weld against and drops it
-   again below. */
+/* Hairline weld between the tabs; the leading one drops it below. */
 .topBar .topBarActions .topBarButton {
   border-left: 1px solid rgb(82 167 155 / 32%);
 }
@@ -240,18 +202,12 @@
 .topBarActions > .topBarButton:first-child {
   border-left: none;
 
-  /* Matches .topBarActions' own bottom-left radius. The row's overflow:hidden
-     clips a plain button to that curve, but .active (below) promotes the
-     button to its own compositing layer via transform + box-shadow, and that
-     layer's paint doesn't reliably clip to the ancestor's rounded corner —
-     it can leave a square sliver of the button showing past the curve.
-     Rounding the corner on the button itself removes the dependency on
-     cross-layer clipping. */
+  /* .active promotes the button to its own compositing layer, whose paint
+     doesn't reliably clip to the ancestor's rounded corner. */
   border-bottom-left-radius: var(--cioos-radius-lg);
 }
 
-/* The other end of the row — same cross-layer clipping reason as the corner
-   above. */
+/* Same cross-layer clipping reason as above. */
 .topBarActions > .topBarButton:last-child {
   border-bottom-right-radius: var(--cioos-radius-lg);
 }
@@ -264,11 +220,8 @@
   background-color: rgb(82 167 155 / 24%);
 }
 
-/* Applied-but-closed state: a shape stays drawn, or filters stay set, after
-   the menu/modal that set them has closed. Lighter than .active on purpose —
-   it says "this segment has a value" without competing with whichever
-   segment's UI is actually open right now. Same light-teal wash the rest of
-   the app already uses for "selected" (dropdown-item.active, filter chips). */
+/* Applied-but-closed: lighter than .active so it doesn't compete with the
+   segment whose UI is actually open. */
 .topBar .topBarActions .topBarButton.applied {
   background-color: var(--cioos-teal-light);
   color: var(--cioos-primary-800);
@@ -278,18 +231,9 @@
   color: var(--cioos-primary-700);
 }
 
-/* Pressed/open state (Datasets toggle open, the Coverage or Filters modal
-   up): fill with solid primary. Two neighbours can be active together (e.g.
-   the datasets sidebar open while a modal is also up)
-   — same solid fill, sitting flush with no gap between them, so without help
-   they'd read as one wide block instead of two buttons. A lightened
-   full-perimeter ring stacked on the app's shared 3D shadow (see theme.css —
-   the same raised-chip treatment as the brand bar, sidebar and legend) gives
-   every active segment its own edge on all four sides and lifts it physically
-   off the row, so it still reads as its own button whichever neighbours are
-   also lit up; raising it above the row (position+z-index) keeps that shadow
-   from being cut off by a neighbour or clipped by the row's own
-   overflow:hidden. */
+/* Two adjacent active segments would read as one block, so each gets a ring
+   on the shared 3D shadow, raised above the row so neither a neighbour nor
+   the row's overflow:hidden cuts it. */
 .topBar .topBarActions .topBarButton.active {
   position: relative;
   z-index: 1;
@@ -310,14 +254,8 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* The Filters segment carries two controls, not one: the button that opens
-   the modal, and — riding on its far edge — the toggle for the quick-filter
-   and active-filter-chip rows beneath the bar (see TopControls, QuickFilters,
-   ActiveFilterChips). Built as a container plus two real buttons rather than
-   a button nested in a button, which browsers refuse to render as written;
-   the container keeps the segment's own background/active/applied wash
-   (still ".topBarButton"), and both inner buttons go transparent so that
-   wash shows through. */
+/* Container plus two real buttons, since browsers refuse a button nested in
+   a button; the inner buttons go transparent so the segment's wash shows. */
 .topBar .topBarActions .topBarButton.topBarFiltersSegment {
   display: flex;
   align-items: stretch;
@@ -350,9 +288,7 @@
   flex: 0 0 auto;
 }
 
-/* A hairline of its own, separate from the one the whole segment already
-   gets from its left-hand neighbour, so the two controls read as split
-   rather than one continuous hit area. */
+/* Its own hairline so the two controls read as split hit areas. */
 .topBarFiltersToggle {
   flex: 0 0 auto;
   padding: 4px 10px 4px 6px;
@@ -370,10 +306,7 @@
   border-radius: var(--cioos-radius-sm);
 }
 
-/* ------------------------------------------------------------------
- * Tally — one centred line between the brand lockup and the tab strip:
- * "123/150 datasets".
- * ------------------------------------------------------------------ */
+/* Tally: "123/150 datasets" between the brand lockup and the tab strip. */
 .topBarStatusRow {
   display: flex;
   flex-direction: column;
@@ -381,8 +314,6 @@
   padding: 0 14px 4px;
 }
 
-/* The tally reads as the lockup's caption, so the brand row gives up most of
-   its bottom padding to it. */
 .brandCardTop:has(+ .topBarStatusRow) {
   padding-bottom: 2px;
 }
@@ -401,9 +332,8 @@
   transition: opacity var(--cioos-transition-fast);
 }
 
-/* The total and the filtered number stacked in one cell, the total hidden:
-   the cell is as wide as the wider of the two, the filtered one set flush
-   against the slash. */
+/* The total and the filtered number stacked in one cell, the total hidden,
+   so the cell is as wide as the wider of the two. */
 .topBarCountsFiltered {
   display: inline-grid;
   justify-items: end;
@@ -417,13 +347,11 @@
   visibility: hidden;
 }
 
-/* Dimmed while a refetch is in flight: the previous numbers stay on screen
-   rather than collapsing back to a spinner — see the sidebar counters. */
+/* Previous numbers stay on screen, dimmed, rather than flashing a spinner. */
 .topBarCountsRow.updating {
   opacity: 0.45;
 }
 
-/* Filters badge: the active-filter count, a single digit or two. */
 .topBarCount {
   display: inline-flex;
   align-items: center;
@@ -437,43 +365,30 @@
   white-space: nowrap;
 }
 
-/* On the active (teal) tab a translucent white pill keeps the badge distinct
-   from the solid fill around it. */
 .topBarButton.active .topBarCount {
   background-color: rgb(255 255 255 / 24%);
   color: var(--cioos-on-primary);
 }
 
-/* ------------------------------------------------------------------
- * Mobile: the bar stops being a centered floating card and becomes the
- * app's header — pinned to the top edge, spanning the full width, with
- * no strip of map above or beside it. See the TopLeft stylesheet for the
- * card's own side of this (square corners, no side borders, no tilt).
- * ------------------------------------------------------------------ */
+/* Mobile: the bar becomes the full-width header pinned to the top edge (see
+   the TopLeft stylesheet for the card's side). */
 @media (max-width: 700px), (max-height: 500px) {
   .topBar {
     top: 0;
     left: 0;
     right: 0;
-
-    /* The centering translate has nothing left to centre and would only pull
-       the full-width bar off the screen. */
     transform: none;
     max-width: none;
 
-    /* Load-bearing: the column centres its children, which leaves the brand
-       card shrink-to-fit — its own `width: 100%` would then resolve against
-       that shrunken box and never reach the screen edges. */
+    /* Load-bearing: centring leaves the brand card shrink-to-fit, so its
+       width: 100% would never reach the screen edges. */
     align-items: stretch;
 
-    /* Only the chips are still a floating layer under the header, so the gap
-       belongs to them rather than to the stack. */
     --top-bar-gap: 6px;
   }
 
-  /* Rows take the header's full width, as the column itself does here.
-     minmax(0, …): an auto column grows to its content, which let the
-     one-line chip row widen past the screen instead of scrolling. */
+  /* minmax(0, …): an auto column grows to its content, which let the one-line
+     chip row widen past the screen instead of scrolling. */
   .topBarRow {
     grid-template-columns: minmax(0, 1fr);
     justify-items: stretch;
@@ -483,11 +398,8 @@
     align-items: stretch;
   }
 
-  /* The header meets the screen edges square, so the tab strip's outer corners
-     — which were cut to match the floating card's — square with it. The 1px
-     side bleed goes with them: it existed to cover the card's side borders,
-     which the full-bleed header no longer draws, and left to itself it would
-     push the strip 2px past the viewport. */
+  /* Square corners, and no 1px side bleed, which would push the strip 2px
+     past the viewport. */
   .topBarActions {
     margin: 0 0 -1px;
   }
@@ -498,10 +410,6 @@
     border-radius: 0;
   }
 
-  /* Two rungs under the mobile body size: this strip is a compact segmented
-     control rather than running text, and every pixel it takes comes off the
-     map. The wrap (with the centred alignment above) stays the fallback for
-     labels that still don't fit on one line. */
   .topBarButtonLabel {
     font-size: var(--cioos-font-size-xs);
   }
@@ -533,10 +441,8 @@
     padding: 0 5px;
   }
 
-  /* The tally tucks under the wordmark instead of taking a row of its own:
-     the logo and the icon cluster are taller than the two-line wordmark, so
-     the space beside them below it was empty. The brand row dissolves into
-     the card's grid so the three can share rows with the tally. */
+  /* The tally tucks under the wordmark into space that was otherwise empty;
+     the brand row dissolves into the card's grid so they can share rows. */
   .brandCard {
     display: grid;
     grid-template-columns: 1fr minmax(0, auto) 1fr;
@@ -581,22 +487,14 @@
     grid-row: 3;
   }
 
-  /* Wraps rather than running under the icons when a filtered French tally
-     is wider than the space between them. */
   .topBarCountsRow {
     min-height: 0;
     font-size: var(--cioos-font-size-2xs);
   }
 }
 
-/* ------------------------------------------------------------------
- * Active-filter chips, flowing directly under the brand card as a floating
- * row rather than a boxed panel of its own: no enclosing card, no header
- * bar — one wrapping row of small pills. Each group is its
- * own flex chunk (name pill + its values) so a group's label never wraps away
- * from its own first value; the chunks themselves wrap onto new lines as the
- * row runs out of width.
- * ------------------------------------------------------------------ */
+/* Active-filter chips: each group (name pill + values) is one flex chunk so a
+   label never wraps away from its first value. */
 .activeFiltersPanel {
   display: flex;
   flex-wrap: wrap;
@@ -607,27 +505,14 @@
   padding: 0;
   list-style: none;
 
-  /* Sized to its own content, not pinned to the brand card's width above it —
-     a handful of chips reads as one line rather than wrapping inside a column
-     narrower than the space actually available. max-width is the real limit:
-     the viewport itself (with the shell's 24px gutter either side), so
-     flex-wrap only fires once the row genuinely runs out of room, same as
-     the mobile block below does for its own narrower width. */
+  /* Sized to content; max-width (viewport minus gutters) is the real limit. */
   width: fit-content;
   max-width: calc(100vw - 48px);
   align-self: center;
 }
 
-/* One group: its name pill immediately followed by its own value chips,
-   packed as one flex chunk so they wrap together rather than the label
-   landing on a different line than its first value.
-   A group wide enough to wrap on its own — its label plus a few chips already
-   fills the row — is forced by that wrap to the row's full width, so
-   .activeFiltersPanel's own justify-content: center has nothing left to
-   center: this element IS the row at that point. justify-content: center
-   here does for a group's own wrapped lines what the panel does for several
-   short groups sharing a line, so either way the pills read as centered
-   rather than the group's first line pinning everything to the left. */
+/* A group wide enough to wrap fills the row, leaving the panel's centring
+   nothing to do, so the group centres its own wrapped lines. */
 .activeFilterGroup {
   display: inline-flex;
   flex-wrap: wrap;
@@ -637,8 +522,6 @@
   max-width: 100%;
 }
 
-/* The group's own name and its clear-all, paired in one small pill — a tag
-   naming the values that follow it, rather than another chip among them. */
 .activeFilterGroupBubble {
   display: inline-flex;
   align-items: center;
@@ -651,9 +534,7 @@
   box-shadow: var(--cioos-shadow-float);
 }
 
-/* The clear-all sits first in the bubble, at its left. Visually paired with
-   the per-item remove buttons, but a step more prominent (solid on hover)
-   since it drops the whole group in one click. */
+/* Solid on hover: one click drops the whole group. */
 .activeFilterGroupRemove {
   flex: 0 0 auto;
   display: inline-flex;
@@ -722,8 +603,6 @@
   text-decoration: underline;
 }
 
-/* The value chips, in the primary-light teal that marks a chosen value
-   everywhere else in the app. */
 .activeFilterItem {
   display: inline-flex;
   align-items: center;
@@ -767,8 +646,7 @@
   color: var(--cioos-on-primary);
 }
 
-/* An excluded value: the error red the filter rows use for the same state,
-   and a "NOT" tag ahead of the name so it cannot be read as an include. */
+/* "NOT" tag so an excluded value cannot be read as an include. */
 .activeFilterItem.excluded {
   background-color: var(--cioos-error-bg);
   border-color: var(--cioos-error);
@@ -788,10 +666,8 @@
   background-color: var(--cioos-error);
 }
 
-/* The "+N" chip standing in for the values a group folded away (see
-   MAX_VISIBLE_VALUES) — a button, not a static count, so it reads as the way
-   to see the rest rather than a dead-end tally. Neutral rather than teal: it
-   is not a value of the filter, just a door to the ones not shown. */
+/* Neutral rather than teal: it is not a value, just a door to the hidden
+   ones (MAX_VISIBLE_VALUES). */
 .activeFilterMoreButton {
   flex: 0 0 auto;
   background-color: var(--cioos-surface-2);

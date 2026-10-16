@@ -1,12 +1,6 @@
-"""
-Unit tests for cde_harvester.core.config config resolution.
-
-This is the gate every deploy passes through: the image bakes no harvest config,
-so a bad resolution either stops the worker or — worse — silently harvests the
-wrong servers. HARVEST_CONFIG_B64 exists because raw multi-line YAML does not
-survive Coolify's env editor intact, so the round-trip tests below are the actual
-regression guard, not just parser coverage.
-"""
+"""Harvest config resolution: the image bakes no config, and HARVEST_CONFIG_B64
+exists because Coolify's env editor mangles multi-line YAML, so the round-trip
+tests below are the regression guard."""
 
 import base64
 from pathlib import Path

@@ -13,8 +13,7 @@ import {
 import { useSelection } from "../selection/SelectionProvider.jsx";
 import { useUI } from "./UIProvider.jsx";
 
-// Reports the sidebar's state and offers the two ways it changes, so the rules
-// below are asserted through the same interface the chrome uses.
+// Asserts through the same interface the chrome uses.
 function SidebarProbe() {
   const { sidebarOpen, setSidebarOpen } = useUI();
   return (
@@ -64,9 +63,8 @@ describe("the datasets sidebar default", () => {
   });
 
   it("stops following it once the user has chosen", async () => {
-    // The subtle rule, and the one a layout change is most likely to break:
-    // after an explicit toggle the screen-size default no longer applies, so a
-    // resize must not reopen a list the user put away.
+    // The subtle rule: after an explicit toggle a resize must not reopen a list
+    // the user put away.
     setViewportWidth(DESKTOP_WIDTH);
     const { user } = renderWithProviders(<SidebarProbe />, {
       providers: "app",

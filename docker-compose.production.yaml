@@ -3,22 +3,15 @@
 #
 #   docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
 #
-# .env sets COMPOSE_FILE so plain `docker compose` does the same. No profile is
-# needed any more: `scheduler` was profiled `tools` in the base file, which made
-# the download-queue consumer opt-in and left Coolify deploys without one.
+# .env sets COMPOSE_FILE so plain `docker compose` does the same.
 services:
   db:
     ports:
-      # Bound to one interface, not 0.0.0.0. This port IS needed here: the
-      # harvester and any remote prefect_worker run outside this compose
-      # project and reach Postgres over the VPN at DB_HOST_EXTERNAL
-      # (docker-compose.worker.yaml). Published bare, though, it also listened
-      # on every other interface of the host — inverted from local dev, which
-      # deliberately publishes nothing.
-      #
-      # DB_BIND_ADDRESS should be the host's VPN address (the same one
-      # DB_HOST_EXTERNAL points at). It defaults to loopback so a host that
-      # forgets to set it fails closed rather than exposing the database.
+      # Published for remote harvest workers reaching Postgres over the VPN
+      # (docker-compose.worker.yaml), but bound to one interface, not 0.0.0.0.
+      # DB_BIND_ADDRESS should be the host's VPN address (the one
+      # DB_HOST_EXTERNAL points at); it defaults to loopback so a host that
+      # forgets to set it fails closed.
       - "${DB_BIND_ADDRESS:-127.0.0.1}:${DB_PORT:-5432}:${DB_PORT:-5432}"
 
   nginx:

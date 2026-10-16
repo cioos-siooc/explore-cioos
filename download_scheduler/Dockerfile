@@ -2,21 +2,14 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm
 
 RUN apt-get -y -qq update
 
-# No gcc/libc-dev/libgeos-dev/python3-dev here on purpose. Nothing compiles:
-# uv installs every dependency from a binary wheel (shapely bundles its own
-# GEOS, psycopg2-binary its own libpq). Installing them cost far more than the
-# 11 packages suggested, because libc-dev and python3-dev drag in upgrades of
-# libc6 and python3.11 in the base image — ~18 minutes of unpacking on a loaded
-# build host, long enough that the layer never finished or cached.
+# No gcc/libc-dev/libgeos-dev/python3-dev on purpose: every dependency installs
+# from a binary wheel, and those packages drag in ~18 minutes of libc6/python3
+# upgrades on a loaded build host.
 
-# PDF generation (CREATE_PDF=True) needs wkhtmltopdf, which is opt-in at build
-# time because it is enormous: even with --no-install-recommends it pulls the
-# whole Qt/Mesa stack (libllvm15, libdrm-*, libgstreamer, wayland, xcb — ~83
-# packages) for a feature that is off by default on every deployment. Enable it
-# with:  docker compose build --build-arg INSTALL_PDF=true scheduler
-# libqt5gui5 is needed by wkhtmltopdf, and fonts-dejavu-core is named
-# explicitly because it would otherwise only arrive as a recommend — without it
-# wkhtmltopdf renders PDFs with missing glyphs.
+# PDF generation (CREATE_PDF=True) needs wkhtmltopdf, opt-in at build time
+# because it pulls the whole Qt/Mesa stack. Enable it with:
+#   docker compose build --build-arg INSTALL_PDF=true scheduler
+# fonts-dejavu-core is named explicitly: without it PDFs have missing glyphs.
 ARG INSTALL_PDF=false
 RUN if [ "$INSTALL_PDF" = "true" ]; then \
         apt-get -y -qq install --no-install-recommends \
@@ -36,8 +29,7 @@ COPY downloader ./downloader
 COPY harvester ./harvester
 
 WORKDIR /usr/src/app/download_scheduler
-# --locked, like harvester/Dockerfile: without it uv is free to re-resolve
-# and the image can pin different transitive versions than CI tested.
+# --locked: without it uv may re-resolve to versions CI never tested.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 

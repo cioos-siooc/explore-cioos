@@ -9,18 +9,10 @@ import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
-// pk 2337 / "Chicago Park District" / "mooring" come from the catalog fixtures
-// (e2e/fixtures/api/datasets.json, organizations.json, platforms.json) that
-// FilterProvider loads, so the dataset this page is handed is one the catalog
-// also knows — which is what the title bar's filter toggle needs.
-//
-// This passes `dataset` directly rather than through
-// useSelection().setInspectDataset/inspectDataset — pointsData (what
-// inspectDataset resolves against) comes from the /pointQuery fixture, a
-// third, separately-recorded set with no pk 2337 in it. Driving the real
-// open-a-dataset-page flow end to end is covered by AppShell.test.jsx; this
-// file is about DatasetInspector's own rendering given a dataset, which is
-// exactly what the direct prop lets it test independent of that mismatch.
+// pk 2337 / "Chicago Park District" / "mooring" match the catalog fixtures
+// FilterProvider loads (e2e/fixtures/api/*.json). `dataset` is passed directly
+// because the /pointQuery fixture inspectDataset resolves against has no pk
+// 2337; the real open-a-dataset flow is covered by AppShell.test.jsx.
 const DATASET = {
   pk: 2337,
   title: "A weather station",

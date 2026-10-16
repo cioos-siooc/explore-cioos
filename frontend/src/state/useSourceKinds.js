@@ -1,10 +1,8 @@
 import { ERDDAP_KEY, OBIS_KEY } from "./datasetGroups.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 
-// The ERDDAP and OBIS source lists, each set as a whole as the Filters modal's
-// ERDDAP / OBIS rows set them: `state` is "include" or "exclude" only when every
-// server (or node) is, and `toggle(target)` follows useFilterModel's rule
-// (asking for the state it is already in clears it). Empty lists are left out.
+// Each list set as a whole: `state` only when every member is. Empty lists are
+// left out.
 export default function useSourceKinds() {
   const filters = useFilters();
   return [

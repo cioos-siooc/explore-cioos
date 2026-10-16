@@ -30,21 +30,13 @@ export default function MultiCheckboxFilter({
   const { t, i18n } = useTranslation();
   const { tipHighlight } = useTips();
 
-  // Array.prototype.sort mutates in place — copy first. optionsSelected is a
-  // slice of caller state (FilterProvider's eovsSelected etc.); sorting it
-  // directly would silently reorder that state's backing array as a side
-  // effect of rendering, with no state update to signal it.
+  // Copy first: optionsSelected is caller state and sort mutates in place.
   const optionsSelectedSorted = [...optionsSelected].sort((a, b) =>
     t(a.title).localeCompare(t(b.title), i18n.language),
   );
 
-  // Nothing ticked constrains nothing, so an empty selection already means
-  // "all of them" — which is why unticking the last box is safe and lands back
-  // on the unfiltered result set rather than on an empty map. It is stored that
-  // way too (a short URL, and newly harvested options are picked up
-  // automatically instead of being absent from a frozen list of everything),
-  // and shown that way: no ticks in the default state, so the pane reports what
-  // the user has actually chosen rather than pre-answering for them.
+  // An empty selection means "all": short URLs, and newly harvested options
+  // are included automatically rather than missing from a frozen list.
   const universe = allOptions || optionsSelected;
   const isChecked = (option) => option.isSelected;
 
@@ -130,7 +122,6 @@ export default function MultiCheckboxFilter({
   function renderOption(option, isFirst) {
     let title;
     if (translatable) {
-      // Translation in title_translation
       if (
         option.titleTranslated &&
         option.titleTranslated[i18n.languages[0]] &&
@@ -138,10 +129,9 @@ export default function MultiCheckboxFilter({
       ) {
         title = option.titleTranslated[i18n.language];
       } else if (t(option.title)) {
-        // Translation in t(title)
         title = t(option.title);
       } else {
-        title = option.title; // this shouldn't really happen, but its a catch-all fallback
+        title = option.title;
       }
     } else {
       title = option.title;
@@ -160,7 +150,6 @@ export default function MultiCheckboxFilter({
     }
     const hoverText = option[`hover_${i18n.language}`] || title;
 
-    // No translation
     return (
       <Tooltip
         key={option.pk}
@@ -197,7 +186,7 @@ export default function MultiCheckboxFilter({
   return (
     <div className={"multiCheckboxFilter"}>
       {optionsSelected.length > 0 &&
-        optionsSelected.length !== allOptions.length && ( // search results exist
+        optionsSelected.length !== allOptions.length && (
           <>
             <div
               className="searchResultsButton"

@@ -1,13 +1,5 @@
-// One description of one column of a /preview payload, from whichever source is
-// available.
-//
-// The preview response always carries ERDDAP's parallel columnNames /
-// columnTypes / columnUnits arrays. Since datasets.table_variables landed it may
-// also carry columnMeta — the harvested per-variable metadata, positionally
-// aligned, null for a column the harvest does not know. That key is absent
-// entirely for a dataset not yet reharvested, which is why every field below has
-// a fallback: the plot has to work either way, and gets better labels once a
-// harvest with `incremental: false` has run.
+// columnMeta (harvested per-variable metadata) is absent for a dataset not yet
+// reharvested, so every field falls back to ERDDAP's parallel column arrays.
 //
 // Pure on purpose: the modal must classify columns BEFORE mounting the lazy
 // ~1 MB Plotly chunk, and this is the layer `node --test` can assert on.
@@ -26,13 +18,10 @@ const NUMERIC_TYPES = new Set([
   "ubyte",
 ]);
 
-// Units that identify a coordinate no matter what the column is called. 'UTC' is
-// how ERDDAP marks a time column in columnUnits — more reliable than matching
-// the name 'time', which is what this replaces.
+// 'UTC' is how ERDDAP marks a time column in columnUnits.
 const TIME_UNITS = new Set(["UTC"]);
-// ERDDAP also states a time column's units as its format string. mpoEaeTemperature
-// publishes `year` with units "CCYY-MM-DD"; without this it reads as a plottable
-// number and clutters the variable picker.
+// ERDDAP may state a time column's units as its format string
+// (mpoEaeTemperature `year`: "CCYY-MM-DD").
 const TIME_FORMAT_UNIT = /^[Cy]{2,4}[-/]?(MM|mm|M)?/;
 const LAT_UNITS = new Set(["degrees_north", "Degrees north"]);
 const LON_UNITS = new Set(["degrees_east", "Degrees east"]);
@@ -55,15 +44,11 @@ const COORDINATE_NAMES = new Set([
 ]);
 const COORDINATE_AXES = new Set(["T", "X", "Y", "Z"]);
 
-// A QC column when nothing declares it as one. The authoritative signal is
-// another variable's ancillary_variables; this is the fallback for datasets
-// harvested without metadata.
+// Fallback for datasets harvested without ancillary_variables metadata.
 const FLAG_NAME = /_(qc|qa|flag|flags)$/i;
 
-// An identifier column that declares no cf_role. `_id` in any case, or a
-// trailing camelCase `ID` (mpoEaeTemperature's `minilogID`, an instrument serial
-// whose ioos_category is only "Other"). Deliberately narrow: it must not catch a
-// variable that merely ends in the letters i-d.
+// `_id` in any case, or a trailing camelCase `ID` (mpoEaeTemperature's
+// `minilogID`). Deliberately narrow: must not catch names merely ending in i-d.
 const ID_NAME = /(_id|[a-z0-9]ID)$/;
 
 // ioos_category is authoritative where it is declared (~48% of variables).
@@ -78,12 +63,8 @@ const numberOr = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-// The dataset's own answer for which columns carry a CF role, as
-// columnName -> role. shapeQuery.js has been sending these three fields all
-// along, and they are the ONLY source of cf_role for a catalogue harvested
-// before datasets.table_variables existed: without columnMeta there are no
-// per-variable attributes at all. Both the id classification below and the
-// plot's title read the roles from here.
+// columnName -> role from the dataset's three *_id_variable fields: the only
+// cf_role source for a dataset harvested before columnMeta existed.
 function recordIdRoles(dataset) {
   const roles = new Map();
   [
@@ -96,8 +77,7 @@ function recordIdRoles(dataset) {
   return roles;
 }
 
-// Every column named by some other variable's ancillary_variables. ERDDAP
-// publishes it space- or comma-separated.
+// ERDDAP separates ancillary_variables with spaces or commas.
 function flaggedColumns(columnMeta) {
   const flags = new Set();
   (columnMeta || []).forEach((meta) => {
@@ -113,8 +93,6 @@ function flaggedColumns(columnMeta) {
 
 function classify(variable, { flagColumns }) {
   if (
-    // Set from the harvest when it knows, from the dataset's own three id fields
-    // when it does not.
     variable.cfRole ||
     ID_CATEGORIES.has(variable.ioosCategory) ||
     ID_NAME.test(variable.columnName)
@@ -142,8 +120,8 @@ function classify(variable, { flagColumns }) {
   return variable.isNumeric ? "measurement" : "other";
 }
 
-// The whole column set, in ERDDAP's order. `dataset` supplies only the cf_role
-// column names; pass nothing and id detection falls back to columnMeta's cfRole.
+// `dataset` supplies only the cf_role column names; omit it and id detection
+// falls back to columnMeta's cfRole.
 export function variablesFrom(table, dataset) {
   if (!table || !table.columnNames) return [];
   const { columnNames, columnTypes = [], columnUnits = [], columnMeta } = table;
@@ -155,17 +133,15 @@ export function variablesFrom(table, dataset) {
     const type = trimmed(columnTypes[index]) || (meta && trimmed(meta.type));
     const variable = {
       columnName,
-      // columnUnits is ERDDAP's own answer for THIS query, so it wins over the
-      // harvest, which may predate a units change.
+      // ERDDAP's answer for THIS query wins over a harvest that may predate a
+      // units change.
       unit:
         trimmed(columnUnits[index]) || (meta && trimmed(meta.units)) || null,
       type,
       isNumeric: NUMERIC_TYPES.has(String(type)),
       longName: meta && trimmed(meta.long_name),
       standardName: meta && trimmed(meta.standard_name),
-      // The harvest first, the dataset's id fields second: columnMeta is what
-      // ERDDAP itself publishes for this variable, where the dataset fields are
-      // one level of inference away.
+      // columnMeta is what ERDDAP publishes; the dataset id fields are inferred.
       cfRole:
         (meta && trimmed(meta.cf_role)) || idRoles.get(columnName) || null,
       axis: meta && trimmed(meta.axis),
@@ -185,9 +161,8 @@ export function variablesFrom(table, dataset) {
   }));
 }
 
-// "Temperature (1990 scale) ( degree_C )" once a harvest has run, "TE90_01
-// ( degree_C )" before it. standard_name sits between the two because it is at
-// least words, where a column name is often a BODC P01 code.
+// standard_name before column name: it is at least words, where a column name
+// is often a BODC P01 code.
 export function labelFor(variable) {
   if (!variable) return "";
   const name =
@@ -195,7 +170,6 @@ export function labelFor(variable) {
   return variable.unit ? `${name} ( ${variable.unit} )` : name;
 }
 
-// Same precedence without the unit — for a dropdown, where the unit is noise.
 export function shortLabelFor(variable) {
   if (!variable) return "";
   return variable.longName || variable.columnName;
@@ -209,24 +183,19 @@ export function byColumnName(variables) {
   return index;
 }
 
-// What can go in a panel: numeric, and not an axis, an id or a QC flag.
 export function measurementsOf(variables) {
   return (variables || []).filter(
     (variable) => variable.kind === "measurement",
   );
 }
 
-// The cf_role columns, in ERDDAP's order — what names the record being drawn.
-// A TimeSeriesProfile declares two (the station and the profile), and both are
-// worth saying: the station is what the user clicked, the profile is what is
-// actually on screen.
+// A TimeSeriesProfile declares two: the station clicked and the profile drawn.
 export function idVariablesFor(variables) {
   return (variables || []).filter((variable) => variable.cfRole);
 }
 
-// A depth axis has to be drawn downwards. `positive` is the only attribute that
-// says so; without it, the CF convention that `depth` increases downward and
-// `altitude` upward is the next best thing.
+// `positive` is the only attribute that says so; failing it, CF's convention
+// that depth increases downward and altitude upward.
 export function isDownwardVertical(variable) {
   if (!variable) return false;
   if (variable.positive) return variable.positive.toLowerCase() === "down";

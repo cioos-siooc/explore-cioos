@@ -1,18 +1,3 @@
-/**
- * POST /download
- *
- * Creates a download job when datasets are found for the given filters.
- * Validation via requiredShapeMiddleware (shape checks) and express-validator (email).
- *
- * NOTE: The email check (`check("email").isEmail()`) in the route registers a
- * validator but the async handler never calls validationResult(), so invalid
- * email addresses are NOT rejected at the HTTP layer — this is a known source-code
- * gap documented in docs/technical_debt.md.  Tests below assert actual behaviour.
- *
- * Shape validation rejects partial bounding boxes (some but not all of
- * latMin/latMax/lonMin/lonMax supplied).
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),
@@ -22,7 +7,6 @@ jest.mock("../../utils/redis", () => ({
 }));
 jest.mock("../../utils/shapeQuery");
 
-// dbFilter returns a mock Raw object that serialises cleanly in template literals
 jest.mock("../../utils/dbFilter", () =>
   jest.fn(() => ({
     sql: "TRUE",
@@ -39,7 +23,6 @@ const { setupDbMock } = require("../helpers/mockDb");
 
 const { setRawRows } = setupDbMock(db);
 
-// Simulate a successful db.raw response with two matching datasets
 const MATCHING_DATASETS = [
   {
     erddap_url: "https://erddap.example.com/erddap",
@@ -110,12 +93,6 @@ describe("POST /download — happy path", () => {
   });
 
   it("does not insert a download job when no datasets match", async () => {
-    // json_agg=null means the SELECT found no matching profiles/datasets.
-    // The job should NOT be queued.
-    // Note: `count` in download.js is an implicit global (undeclared variable),
-    // so its value when json_agg is null depends on prior calls in the same
-    // process — this is a known tech-debt item. We assert the observable
-    // side-effect (no DB insert) rather than the stale count value.
     setRawRows([{ json_agg: null }]);
     const insertMock = jest.fn().mockResolvedValue([1]);
     db.mockReturnValue({
@@ -150,7 +127,6 @@ describe("POST /download — shape validation", () => {
   });
 
   it("accepts request with no shape (all filters optional)", async () => {
-    // shape validation passes when neither polygon nor lat/lon bounds are given
     const res = await request(app).post("/download").send(EMAIL);
     expect(res.status).toBe(200);
   });

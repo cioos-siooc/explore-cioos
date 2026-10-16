@@ -1,14 +1,6 @@
-"""
-Unit tests for the distinct-day count OBISHarvester.aggregate_cells() puts on
-each obis_cells row.
-
-obis_cells.days feeds the map's `days` ramp (web-api/utils/hexMetric.js) and has
-to mean what cde.trajectory_hexes.days means: days that actually have data, not
-the elapsed span between the first and last occurrence. The span reading is what
-these tests exist to prevent coming back -- it averaged 2171 days per cell and
-reached 65454, which is why OBIS outweighed every other source in 87% of the
-hexes holding both.
-"""
+"""aggregate_cells() `days` counts distinct days with data, as trajectory_hexes.days
+does, not the first-to-last span (which averaged 2171 days per cell and let OBIS
+outweigh every other source)."""
 import ast
 import datetime
 
@@ -58,11 +50,8 @@ class TestDayCount:
         assert cells["days"].iloc[0] == 3
 
     def test_gap_between_days_is_not_counted(self):
-        """The whole point: two visits a decade apart are two days, not ~3650.
-
-        This is the span defect (database/5_profile_process.sql still has it for
-        profiles) -- if `days` ever tracks time_max - time_min again, this fails.
-        """
+        """Two visits a decade apart are two days, not ~3650 (the span defect;
+        database/5_profile_process.sql still has it for profiles)."""
         cells = cells_for([occurrence(0), occurrence(3650)])
         assert cells["days"].iloc[0] == 2
         span_days = (
@@ -72,17 +61,13 @@ class TestDayCount:
         assert cells["days"].iloc[0] < span_days
 
     def test_coarse_date_counts_one_day_not_its_range(self):
-        """A year-precision record spans Jan 1 -> Dec 31 but is one sampling event.
-
-        Expanding date_start..date_end would rebuild the span defect, so the day
-        comes from date_start alone.
-        """
+        """A year-precision record (Jan 1 -> Dec 31) is one sampling event, so the
+        day comes from date_start alone."""
         cells = cells_for([occurrence(0, end_day_index=364)])
         assert cells["days"].iloc[0] == 1
 
     def test_undated_occurrences_contribute_no_days(self):
-        """nunique skips NaT. Matches the old behaviour: the span expression
-        yielded NULL for these and sum() skipped it."""
+        """nunique skips NaT, so undated records add no day."""
         cells = cells_for([occurrence(None), occurrence(None)])
         assert cells["days"].iloc[0] == 0
         assert cells["n_records"].iloc[0] == 2
@@ -191,15 +176,8 @@ class TestLoaderRoundTrip:
 
 
 class TestCsvRoundTrip:
-    """obis_cells day_ranges through the CSV, the way a real run loads them.
-
-    The harvest writes CSVs and the loader reads them back in a separate task,
-    so this is the only path a deployed run ever takes. It went untested: the
-    TestLoaderRoundTrip cases above hand prepare_obis_cells_dataframe a frame
-    with no day_ranges column at all, and the CSV serialization was omitted for
-    obis_cells while profiles had it -- so every OBIS load failed in
-    merge_ranges with "not enough values to unpack (expected 2, got 1)".
-    """
+    """obis_cells day_ranges through the CSV round trip, the only path a deployed
+    run takes."""
 
     def _to_csv_and_back(self, cells, tmp_path):
         """Mirror __main__.write_dataframes -> loader read for obis_cells."""

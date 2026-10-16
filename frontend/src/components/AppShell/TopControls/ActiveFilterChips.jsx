@@ -9,23 +9,10 @@ import useActiveFilters, {
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
-// How many values a group shows before folding the rest behind a "+N" chip —
-// short enough that a group's own values stay on the one row its label pill
-// sits on, rather than sprawling the row over several lines. Clicking the
-// chip reveals the rest of that group (and only that group); a second click
-// on the button that replaces it (now reading "show fewer") folds it back.
+// Short enough that a group's values stay on its label pill's row.
 const MAX_VISIBLE_VALUES = 2;
 
-// Removable chips for every filter currently constraining the map (see
-// useActiveFilters — the same list the Filters badge counts), flowing under
-// the quick-filter buttons as the next line of the same floating toolbar
-// rather than a boxed panel of its own: one flat wrapping row of pills, no
-// enclosing card. Each group's name is its own small pill — paired with the
-// button that clears the whole group — immediately followed by its chosen
-// values as lighter pills. Clicking the name jumps to that filter's page (the
-// Filters modal, or the search palette for the title search), and each value
-// can still be dropped on its own. Clear all is the quick filters' Reset (see
-// QuickFilters).
+// Clear all is the quick filters' Reset (see QuickFilters).
 export default function ActiveFilterChips() {
   const { t } = useTranslation();
   const allFilters = useActiveFilters();
@@ -33,8 +20,7 @@ export default function ActiveFilterChips() {
   const { eovsMatchAll } = useFilters();
   const { offerTip } = useTips();
   const filtering = allFilters.length > 0;
-  // Each of these refines a filter the user has just set, so it is offered
-  // ahead of the general one, and only while it would change something.
+  // Each refines a filter just set, so it is offered ahead of the general one.
   const listFiltering = activeFilters.length > 0;
   const items = activeFilters.flatMap((f) => f.items ?? []);
   const excluding = items.some((item) => item.excluded);
@@ -51,9 +37,6 @@ export default function ActiveFilterChips() {
     ]);
   }, [filtering, offerMatchAll, listFiltering, excluding, offerTip]);
 
-  // Which groups currently show every value rather than the folded MAX_VISIBLE_VALUES —
-  // toggled by the button at the end of the group's own row, so opening one
-  // is exactly as reversible as closing it again.
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
   const toggleGroup = (key) =>
     setExpandedGroups((prev) => {
@@ -85,10 +68,6 @@ export default function ActiveFilterChips() {
             data-testid="filter-chip-group"
             data-filter-key={f.key}
           >
-            {/* The group's own name, and the button that clears all of it —
-                  paired in one small pill so the type reads as a tag rather
-                  than another chip among the values, immediately followed by
-                  those values in the same flowing row. */}
             <span className="activeFilterGroupBubble">
               <button
                 type="button"
@@ -116,8 +95,7 @@ export default function ActiveFilterChips() {
               </button>
             </span>
             {shownItems.map((item) => {
-              // Spelled out in full for the tooltip and the screen reader; the
-              // chip shows the "not" as its own tag so it reads at a glance.
+              // The chip shows the "not" as its own tag instead.
               const fullLabel = item.excluded
                 ? t("filterExcludedOption", { title: item.label })
                 : item.label;
@@ -146,10 +124,7 @@ export default function ActiveFilterChips() {
                     data-testid="filter-chip-item-remove"
                     onClick={item.remove}
                     title={t("activeFilterRemoveItemTitle")}
-                    // Every chip's X carried the same accessible name, so
-                    // "Remove filter" matched all of them at once — ambiguous for
-                    // a test and useless to a screen reader reading the page's
-                    // buttons. Composed here rather than as a new i18n key.
+                    // Unique per chip so tests and screen readers can tell them apart.
                     aria-label={`${t("activeFilterRemoveItemTitle")}: ${fullLabel}`}
                   >
                     <X size={14} aria-hidden="true" />

@@ -8,12 +8,8 @@ import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 
-// MapContainer is the adapter between the state providers and the imperative
-// Map.jsx (out of scope for unit tests — see src/test/stubs/maplibre.js's own
-// comment: real map rendering is e2e territory). This stub exposes the
-// callback props MapContainer hands to Map as plain buttons, so the tests
-// below exercise MapContainer's OWN logic (handleFeatureQuery, onMarkerClick)
-// without needing a real map.
+// Real map rendering is e2e territory; capturing Map's props lets these tests
+// drive MapContainer's own callbacks without a map.
 let latestMapProps;
 vi.mock("./Map.jsx", () => ({
   default: (props) => {

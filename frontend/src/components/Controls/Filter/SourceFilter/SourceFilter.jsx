@@ -18,10 +18,6 @@ import { featuredObisNodes } from "../../../config.js";
 import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
-// Combined data-source filter: an expandable ERDDAP group of servers and an
-// OBIS group of nodes. Each group's checkbox includes/excludes all of its
-// sources; the sources remain individually selectable inside it. OBIS lists
-// only the featured nodes until asked for the rest.
 export default function SourceFilter({
   erddapServersSelected,
   setErddapServersSelected,
@@ -34,7 +30,6 @@ export default function SourceFilter({
 
   const search = (searchTerms || "").toString().toLowerCase();
   const byTitle = (a, b) => a.title.localeCompare(b.title, i18n.language);
-  // When the search matches a group's label itself, show its every source
   const matching = (options, groupLabel) =>
     options
       .filter(
@@ -114,9 +109,6 @@ function SourceGroup({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
 
-  // Nothing ticked anywhere constrains nothing, so an empty selection already
-  // means every source — see MultiCheckboxFilter. Shown as it is stored: no
-  // ticks until the user picks something.
   const allSelected = options.length > 0 && options.every((o) => o.isSelected);
   const allExcluded = options.length > 0 && options.every((o) => o.isExcluded);
   const someSet = options.some((o) => o.isSelected || o.isExcluded);
@@ -125,8 +117,6 @@ function SourceGroup({
     setOptions(options.map((o) => (o.pk === pk ? toggle(o) : o)));
   }
 
-  // The group sets every source at once; a mixed group goes to all-included
-  // (or all-excluded) first, so the first click always means "all of it".
   function setAll({ isSelected, isExcluded }) {
     setOptions(options.map((o) => ({ ...o, isSelected, isExcluded })));
   }

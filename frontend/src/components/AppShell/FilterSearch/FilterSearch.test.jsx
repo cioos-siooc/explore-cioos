@@ -1,5 +1,5 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -10,6 +10,7 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { defaultStartDate, defaultEndDate } from "../../config.js";
+import { polygonIsRectangle } from "../../../utilities.jsx";
 import FiltersModal from "../Modals/FiltersModal.jsx";
 import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
 
@@ -18,8 +19,7 @@ describe("FilterSearch", () => {
     installMockFetch();
   });
 
-  // The search page writes nothing of its own: every pick lands in the provider
-  // state the classic filters read, so it is asserted through that state.
+  // Picks land in provider state, so they are asserted through it.
   async function renderPalette(url = "/") {
     const seen = {};
     function Probe() {
@@ -35,6 +35,8 @@ describe("FilterSearch", () => {
       seen.dataLayerChoices = useMapState().dataLayerChoices;
       seen.search = useSelection().datasetTitleSearchText;
       seen.draw = useMapState().drawRequest?.mode;
+      seen.ring = useMapState().drawRequest?.ring;
+      seen.zoom = useMapState().zoomTarget?.geometry;
       const ui = useUI();
       seen.ui = {
         showFiltersModal: ui.showFiltersModal,
@@ -288,6 +290,152 @@ describe("FilterSearch", () => {
 
     expect(seen.draw).toBe("polygon");
     expect(seen.ui.showFiltersModal).toBe(false);
+  });
+
+  // GeoNames answers in place of the fixture set's empty reply, as the unit
+  // network otherwise does for every term.
+  function answerRegions() {
+    const square = [
+      [
+        [-67, 44],
+        [-64, 44],
+        [-64, 46],
+        [-67, 46],
+        [-67, 44],
+      ],
+    ];
+    const reply = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            featureid: "fundy",
+            name: "Bay of Fundy",
+            concise: "BAY",
+          },
+          geometry: { type: "MultiPolygon", coordinates: [square] },
+        },
+        {
+          type: "Feature",
+          properties: {
+            featureid: "fundian",
+            name: "Fundian Channel",
+            concise: "SEAU",
+          },
+          geometry: { type: "MultiPoint", coordinates: [[-65.5, 42.5]] },
+        },
+      ],
+    };
+    const fallback = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) =>
+        String(input).startsWith("https://geogratis.gc.ca/")
+          ? new Response(JSON.stringify(reply), { status: 200 })
+          : fallback(input, init),
+      ),
+    );
+  }
+
+  it("filters by a region found by name, as its outline", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await user.click(await screen.findByText("Bay of Fundy"));
+
+    await waitFor(() => expect(seen.draw).toBe("shape"));
+    expect(polygonIsRectangle(seen.ring)).toBe(false);
+    expect(seen.zoom.type).toBe("MultiPolygon");
+    expect(seen.ui.showFiltersModal).toBe(false);
+  });
+
+  it("shows a spinner in the bar while NRCan answers", async () => {
+    answerRegions();
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+
+    expect(
+      within(screen.getByTestId("filter-search")).getByRole("status"),
+    ).toHaveTextContent("Searching places…");
+    await screen.findByText("Bay of Fundy");
+    expect(screen.queryByText("Searching places…")).toBeNull();
+  });
+
+  it("goes to a region without filtering when asked", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await screen.findByText("Bay of Fundy");
+    await user.click(
+      screen.getByRole("button", { name: "Go to: Bay of Fundy" }),
+    );
+
+    expect(seen.zoom.type).toBe("MultiPolygon");
+    expect(seen.draw).toBeUndefined();
+    expect(seen.ui.showFiltersModal).toBe(false);
+  });
+
+  it("goes to the active region with Shift+Enter", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await screen.findByText("Bay of Fundy");
+    while (!option("Bay of Fundy").matches("[aria-selected=true]"))
+      await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+
+    expect(seen.zoom.type).toBe("MultiPolygon");
+    expect(seen.draw).toBeUndefined();
+  });
+
+  it("only goes to a point place", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await screen.findByText("Fundian Channel");
+    expect(option("Fundian Channel")).toHaveTextContent("Go to");
+    expect(
+      screen.getAllByTestId("filter-search-option-secondary"),
+    ).toHaveLength(1);
+    await user.click(option("Fundian Channel"));
+
+    expect(seen.zoom.type).toBe("MultiPoint");
+    expect(seen.draw).toBeUndefined();
+  });
+
+  it("marks each place with the shape it filters by, or a pin", async () => {
+    answerRegions();
+    const { user, box } = await renderPalette();
+    const kind = (name) =>
+      option(name).querySelector(".filterSearchOptionState svg").classList;
+
+    await user.type(box, "fundy");
+    await screen.findByText("Bay of Fundy");
+    expect(kind("Bay of Fundy")).toContain("bi-pentagon");
+    expect(kind("Fundian Channel")).toContain("bi-geo-alt");
+
+    await user.click(screen.getByTestId("filter-search-region-box"));
+    expect(kind("Bay of Fundy")).toContain("bi-bounding-box");
+    expect(kind("Fundian Channel")).toContain("bi-geo-alt");
+  });
+
+  it("applies a region as its bounding box when asked", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await user.click(await screen.findByTestId("filter-search-region-box"));
+    expect(option("Bay of Fundy")).toHaveTextContent("Filter by Bounding box");
+    await user.click(option("Bay of Fundy"));
+
+    await waitFor(() => expect(seen.draw).toBe("shape"));
+    expect(polygonIsRectangle(seen.ring)).toBe(true);
   });
 
   it("lists a drawn area when empty, and clears it", async () => {

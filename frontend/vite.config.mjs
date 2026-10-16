@@ -4,8 +4,7 @@ import { visualizer } from "rollup-plugin-visualizer";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { fileURLToPath } from "node:url";
 
-// The harvest docs live in the repo-root docs/ folder, beside the harvester
-// they describe; the frontend image builds from the repo root to reach them.
+// The frontend image builds from the repo root to reach these.
 const harvestDocs = fileURLToPath(
   new URL("../docs/harvesting", import.meta.url),
 );
@@ -25,26 +24,18 @@ const dropPlotlyMaplibreCss = {
 };
 
 export default defineConfig(({ mode }) => {
-  // Keep the pre-Vite deploy contract: plain API_URL / BASE_URL /
-  // SENTRY_TRACES_SAMPLE_RATE env vars (Docker build args) referenced in
-  // source as process.env.* — injected here like webpack's DefinePlugin did.
+  // Deploy contract: plain env vars (Docker build args) read as process.env.*.
   const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
 
   return {
-    // Absolute base so the bundle URL resolves from the document root on
-    // deep routes (e.g. /harvest/server/:slug); otherwise the SPA fallback
-    // serves index.html for the misresolved bundle request and the app never
-    // boots on reload. Matches the router basename (BASE_URL).
+    // Absolute, or on deep routes the SPA fallback serves index.html for the
+    // misresolved bundle and the app never boots on reload.
     base: env.BASE_URL || "/",
     plugins: [
       react(),
       dropPlotlyMaplibreCss,
-      // npm run build:analyze -> treemap of bundle composition
       process.env.ANALYZE &&
         visualizer({ filename: "dist/stats.html", open: true, gzipSize: true }),
-      // Sourcemap upload + release creation — only runs when a token is
-      // configured (e.g. on the deploy host). Local/dev/PR builds without it
-      // build exactly as before, with no upload attempt.
       env.SENTRY_AUTH_TOKEN &&
         sentryVitePlugin({
           org: env.SENTRY_ORG,
@@ -68,11 +59,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 8000,
       fs: { allow: [".", harvestDocs] },
-      // Dev-only: forward /api to the docker-compose nginx (published on
-      // NGINX_PORT, default 8098, by docker-compose.override.yaml), which
-      // proxies on to web-api:5000. Keeps dev same-origin and on the exact
-      // same /api path production uses. Point at a different port or a
-      // remote stack with DEV_API_PROXY_TARGET.
+      // The docker-compose nginx (NGINX_PORT), keeping dev same-origin on the
+      // production /api path.
       proxy: {
         "/api": {
           target: env.DEV_API_PROXY_TARGET || "http://localhost:8098",
@@ -80,24 +68,18 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    // Vitest reads this file, so the unit suite inherits the define{} above —
-    // without it src/config.js throws 'API_URL is not defined' at import and the
-    // whole module graph fails to load. API_URL comes from .env.test, which
-    // loadEnv picks up because vitest runs in mode 'test'.
+    // Inherits define{} above (API_URL from .env.test); without it src/config.js
+    // throws at import.
     test: {
       environment: "jsdom",
-      // A fixed origin, because renderWithProviders seeds state through
-      // window.history and the providers read it back off window.location.
+      // renderWithProviders seeds state through window.history.
       environmentOptions: { jsdom: { url: "http://localhost:8000/" } },
       globals: true,
       setupFiles: ["./src/test/setup.js"],
       include: ["src/**/*.test.{js,jsx}"],
-      // Component styles are irrelevant to assertions and parsing them is the
-      // single biggest cost in a jsdom run.
+      // Parsing CSS is the single biggest cost in a jsdom run.
       css: false,
-      // LegendFooter imports AttributionControl/ScaleControl from maplibre-gl at
-      // module scope, which needs a WebGL canvas jsdom does not have. Anything
-      // that actually depends on map behaviour is covered by the e2e suite.
+      // maplibre-gl needs WebGL, which jsdom lacks; map behaviour is e2e-tested.
       alias: {
         "maplibre-gl": new URL("./src/test/stubs/maplibre.js", import.meta.url)
           .pathname,
@@ -111,8 +93,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "dist",
-      // Only the Sentry plugin consumes (and then deletes) the maps; without
-      // it they would ship publicly and cost ~0.8 GB of build memory.
+      // Only Sentry consumes (then deletes) maps; otherwise they'd ship publicly
+      // and cost ~0.8 GB of build memory.
       sourcemap: !!env.SENTRY_AUTH_TOKEN,
       rollupOptions: {
         output: {

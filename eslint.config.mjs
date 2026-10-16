@@ -52,9 +52,7 @@ export default [
   {
     files: ["frontend/**/*.{js,jsx,mjs}"],
     ...react.configs.flat.recommended,
-    // The root tooling package intentionally does not depend on React; the
-    // application package pins React 18.3. Detection from the root would
-    // otherwise warn before ESLint reaches app code.
+    // The root tooling package does not depend on React, so detection would warn.
     settings: { react: { version: "18.3" } },
   },
   reactHooks.configs.flat.recommended,
@@ -63,10 +61,8 @@ export default [
     rules: {
       ...shared,
       "react/prop-types": "off",
-      // All 16 rules in react-hooks/recommended are on. exhaustive-deps is the
-      // one kept at "warn" — it is the rule with legitimate exceptions (a
-      // debounce, a one-shot, an imperative map command), and each of those is
-      // marked with an eslint-disable comment saying which it is.
+      // exhaustive-deps stays at "warn": it has legitimate exceptions (a
+      // debounce, a one-shot, an imperative map command), each marked inline.
       "react-hooks/exhaustive-deps": "warn",
     },
   },
@@ -90,24 +86,16 @@ export default [
         beforeEach: "readonly",
         afterAll: "readonly",
         afterEach: "readonly",
-        // jsdom's Vitest environment exposes Node's `global` as the window
-        // object; tests swap `global.fetch` for a scenario-specific stub and
-        // restore it, which is a reassignment, not a read.
+        // Tests swap `global.fetch` for a stub and restore it.
         global: "writable",
       },
     },
     rules: {
-      // A `let latest; function Probe() { latest = useX(); return <span/>; }`
-      // pattern reads a provider's live hook output out into the surrounding
-      // test scope — Probe is deliberately a plain render target, never a
-      // component under concurrent-rendering assumptions, so the module-level
-      // reassignment this rule warns about for real components is exactly the
-      // point here. Used throughout src/state/**/*.test.jsx and friends.
+      // Tests read hook output out via `let latest; function Probe() {
+      // latest = useX(); ... }`; that module-level reassignment is the point.
       "react-hooks/globals": "off",
-      // Same reasoning one level down: a helper like recordEachRender(...)
-      // that calls a hook is only ever invoked from inside renderHook()'s own
-      // callback (see src/useChanged.test.js), which IS a valid hook context —
-      // the rule can't see that and flags the helper's name instead.
+      // Hook-calling helpers invoked only inside renderHook()'s callback are a
+      // valid hook context the rule can't see.
       "react-hooks/rules-of-hooks": "off",
     },
   },

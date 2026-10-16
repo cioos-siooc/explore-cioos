@@ -1,26 +1,9 @@
 """Bounded-memory accumulation of many small DataFrames.
 
-A harvest builds its output tables one dataset at a time. Holding every
-dataset's frame in one Python list for the whole run, then concatenating at the
-end, is what OOM-killed a 6GB container partway through a full OBIS run
-(dataset 296/971) and again on a large-profile ERDDAP run: retained per-dataset
-DataFrames plus never-reclaimed pandas allocator arenas ratchet RSS up with no
-release point until the final concat.
-
-`SpillSet` bounds that. Frames are appended per named table; every
-`flush_every` checkpoints each table's pending batch is concatenated ONCE,
-pickled to a shared temp dir and dropped from memory. `collect()` reassembles.
-Peak memory is therefore set by the flush interval, not by the dataset count.
-
-It also removes the other half of the problem: growing an accumulator with
-`df = pd.concat([df, new])` inside the loop reallocates and copies the ENTIRE
-accumulated frame on every iteration, so allocation is quadratic in dataset
-count and peak RSS is ~2x the accumulated frame at every step. Appending to a
-list and concatenating once per flush is linear.
-
-Pickle, not parquet: this is an ephemeral in-process handoff, not a durable or
-interchange format, it round-trips dtypes exactly, and pyarrow/fastparquet
-aren't dependencies here.
+Holding every dataset's frame until a final concat OOM-killed a 6GB container
+mid OBIS run. Every `flush_every` checkpoints each table's pending batch is
+concatenated once, pickled to a temp dir and dropped, so peak memory is set by
+the flush interval, not the dataset count.
 """
 import ctypes
 import gc
@@ -43,34 +26,17 @@ except (OSError, AttributeError):
 
 
 def _release_freed_pages():
-    """Return freed pages to the OS.
-
-    `gc.collect()` frees the Python OBJECTS but glibc keeps their pages on its
-    per-arena free lists, so RSS ratchets up across flushes and never comes
-    back down. Measured over one OBIS run's flush cadence: +272 MiB with
-    `gc.collect()` alone, +35 MiB with this as well.
-    """
+    """glibc keeps freed pages on its arena free lists; measured over one OBIS
+    run: +272 MiB with `gc.collect()` alone, +35 MiB with this as well."""
     if _libc is not None:
         _libc.malloc_trim(0)
 
 
 class SpillSet:
-    """Several named DataFrame accumulators sharing one temp dir and one flush
-    cadence.
+    """Named DataFrame accumulators sharing one temp dir and flush cadence.
 
-    Use as a context manager so the temp dir is removed even when the harvest
-    raises:
-
-        with SpillSet(flush_every=50) as spills:
-            spills.register("profiles", ProfileSchema.to_schema().columns.keys())
-            for dataset in datasets:
-                spills.append("profiles", features)
-                spills.checkpoint()          # once per dataset
-            df = spills.collect("profiles")  # flushes the trailing partial
-
-    `checkpoint()` is driven by the caller rather than by `append()` so that
-    several tables filled from the same dataset flush together, on dataset
-    boundaries, with one gc pass between them.
+    The caller drives `checkpoint()` (once per dataset) so tables filled from
+    the same dataset flush together, on dataset boundaries.
     """
 
     def __init__(self, flush_every=50, prefix="harvest_spill_"):
@@ -99,33 +65,23 @@ class SpillSet:
         return False
 
     def register(self, name, columns):
-        """Declare a table and the columns its empty frame must have.
-
-        The column list is also the output ordering: `collect()` emits these
-        first, in this order, then any extra columns the appended frames
-        carried. A harvest that appends nothing still gets a correctly shaped
-        empty frame, which is what keeps a no-op run from looking like a
-        source with no data.
-        """
+        """`columns` also fixes the output order, and shapes the empty frame."""
         self._columns[name] = list(columns)
         self._pending.setdefault(name, [])
         self._chunk_paths.setdefault(name, [])
 
     def append(self, name, df):
-        """Queue a frame. None and empty frames are dropped — they contribute
-        no rows and would only muddy dtype resolution at concat time."""
+        """Empty frames are dropped: they'd only muddy dtype resolution."""
         if df is None or df.empty:
             return
         self._pending[name].append(df)
 
     def checkpoint(self):
-        """Mark one unit of work (one dataset) done; flush on the interval."""
         self._checkpoints += 1
         if self._checkpoints % self.flush_every == 0:
             self.flush()
 
     def flush(self):
-        """Write every table's pending batch to disk and free the frames."""
         if self._dir is None:
             raise RuntimeError("SpillSet must be used as a context manager")
         wrote = False
@@ -142,29 +98,18 @@ class SpillSet:
             del chunk
             wrote = True
         if wrote:
-            # Return the freed arenas rather than letting them ratchet: the
-            # whole point of flushing is that RSS goes back down. gc.collect()
-            # alone does not achieve that -- it frees the objects, not the
-            # pages -- so the trim is what makes the comment above true.
             gc.collect()
             _release_freed_pages()
 
     def collect(self, name):
-        """Reassemble one table. Flushes the trailing partial batch first, so
-        callers never have to remember a final flush."""
+        """Flushes the trailing partial batch first."""
         self.flush()
         paths = self._chunk_paths[name]
         columns = self._columns[name]
         if not paths:
             return pd.DataFrame(columns=columns)
         df = pd.concat([pd.read_pickle(p) for p in paths], ignore_index=True)
-        # Every registered column, in registration order, then anything extra
-        # the frames carried. This reproduces what the previous
-        # seed-an-empty-frame-and-concat-onto-it code emitted: the seed decided
-        # the output columns, so a schema column that no dataset happened to
-        # fill still appeared (all-NaN) and still reached the CSV header. Doing
-        # it here rather than by concatenating the empty frame keeps that shape
-        # without letting an empty frame take part in dtype resolution, which
-        # in pandas 1.5 would demote typed columns to object.
+        # Reindex rather than concat an empty seed frame, which in pandas 1.5
+        # would demote typed columns to object.
         ordered = list(columns) + [c for c in df.columns if c not in columns]
         return df.reindex(columns=ordered)

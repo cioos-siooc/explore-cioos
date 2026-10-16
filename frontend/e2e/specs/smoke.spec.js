@@ -9,10 +9,7 @@ test.describe("the app boots", () => {
   });
 
   test("has a real WebGL context", async ({ page }) => {
-    // Without this the suite could go green while rendering nothing: MapLibre
-    // would fail to build, the map would never paint, and every screenshot
-    // would be blank. Chromium stopped falling back to SwiftShader on its own
-    // in 130 — see CHROMIUM_ARGS.
+    // Otherwise the suite goes green rendering nothing (see CHROMIUM_ARGS).
     await openApp(page);
     expect(
       await webglRenderer(page),
@@ -21,16 +18,12 @@ test.describe("the app boots", () => {
   });
 
   test("serves every request from a fixture", async ({ page, mockApi }) => {
-    // mockApi is asserted empty on teardown; this states the intent explicitly
-    // so a failure here reads as "something reached the network", not as an
-    // unrelated assertion.
     await openApp(page);
     expect(mockApi).toEqual([]);
   });
 
   test("leaves no cookie behind", async ({ page, context }) => {
-    // The privacy notice promises it; a cookie would also ride along on every
-    // request to the API.
+    // The privacy notice promises no cookies.
     await openApp(page);
     expect(await context.cookies()).toEqual([]);
   });

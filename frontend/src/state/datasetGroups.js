@@ -1,9 +1,5 @@
-// Grouping of the datasets list (DatasetsTable) by one dimension at a time.
-//
-// Every dimension is one of the filters, so each group header can include or
-// exclude its group in the main filters (see useGroupFilter). A group is
-// identified by a stable key, never by its label — the key has to survive a
-// language switch; labels are derived from it at render time.
+// Groups are identified by a stable key, never by label, so they survive a
+// language switch.
 
 import eovCategories from "../eovCategories.json";
 import eovs from "../eovs.json";
@@ -13,15 +9,12 @@ import { cdmDataTypeLabel } from "./dataLayers.js";
 
 export const GROUP_NONE = "none";
 
-// Keys with no natural value behind them. Prefixed so they can't collide with
-// a real organization / EOV / platform name.
+// Prefixed so they can't collide with a real organization / EOV / platform name.
 export const GRID_KEY = "__grid__";
 export const OTHER_KEY = "__other__";
 export const UNCATEGORIZED_KEY = "__uncategorized__";
 
-// The data portal and ocean variable dimensions are two levels deep: each
-// ERDDAP server and OBIS node is a group of its own, nested under its kind, and
-// each EOV under its category. A nested group's key is `parent:value`.
+// A nested group's key is `parent:value`.
 export const ERDDAP_KEY = "erddap";
 export const OBIS_KEY = "obis";
 const PARENT_KEYS_BY_DIMENSION = {
@@ -29,7 +22,6 @@ const PARENT_KEYS_BY_DIMENSION = {
   eov: Object.keys(eovCategories),
 };
 
-// An EOV the vocabulary doesn't list still has to sit in some category.
 export function eovCategory(eov) {
   return eovs.find((e) => e.value === eov)?.category || "Other";
 }
@@ -56,15 +48,13 @@ export function groupOptions(t) {
   ];
 }
 
-// Also what a ?groupBy= from an old link is checked against: the in-view and
-// selection groupings it may name are gone.
+// Also validates ?groupBy= from old links, whose in-view and selection
+// groupings are gone.
 export function isGroupDimension(groupBy) {
   return DIMENSIONS.has(groupBy);
 }
 
-// The group key(s) a dataset belongs to under the active dimension. The
-// array-valued dimensions (organization, eov) return several, so a dataset
-// shows under each of its values.
+// Array-valued dimensions return several, so a dataset shows under each.
 export function groupKeysFor(row, groupBy) {
   const isGrid = row.cdm_data_type === "Grid";
   switch (groupBy) {
@@ -92,12 +82,10 @@ export function groupKeysFor(row, groupBy) {
   }
 }
 
-// The parent groups a nested dimension opens with; empty for a flat one.
 export function parentGroupKeys(groupBy) {
   return PARENT_KEYS_BY_DIMENSION[groupBy] ?? [];
 }
 
-// The group a nested group sits in, or null at the top level.
 export function groupParent(key, groupBy) {
   if (!PARENT_KEYS_BY_DIMENSION[groupBy]) return null;
   const separator = String(key).indexOf(":");

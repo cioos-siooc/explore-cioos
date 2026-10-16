@@ -1,9 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.ckan.create_ckan_erddap_link.
-
-All outbound CKAN HTTP calls are intercepted with pytest-mock so the tests run
-offline and deterministically.
-"""
+"""Unit tests for cde_harvester.sources.ckan.create_ckan_erddap_link."""
 
 
 import pandas as pd
@@ -28,17 +23,9 @@ from conftest import (
     DATASET_ID,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _make_ckan_get(mocker, pages):
-    """
-    Patch the CKAN session builder so session.get() yields the given page
-    responses. CKAN fetching now goes through a requests.Session built by
-    _build_ckan_session() rather than the module-level requests.get.
-    Each call to list_ckan_records paginates until results empty.
-    """
+    """Patch the CKAN session builder so session.get() yields `pages` in order."""
     responses = []
     for page in pages:
         mock_resp = mocker.MagicMock()
@@ -52,10 +39,6 @@ def _make_ckan_get(mocker, pages):
         return_value=mock_session,
     )
 
-
-# ---------------------------------------------------------------------------
-# Tests: URL parsing
-# ---------------------------------------------------------------------------
 
 class TestSplitErddapUrl:
     def test_standard_tabledap_url(self):
@@ -100,10 +83,6 @@ class TestSplitErddapUrl:
             split_erddap_url("https://example.com/not/erddap")
 
 
-# ---------------------------------------------------------------------------
-# Tests: ASCII unescaping
-# ---------------------------------------------------------------------------
-
 class TestUnescapeAscii:
     def test_plain_string_unchanged(self):
         assert unescape_ascii("hello") == "hello"
@@ -130,10 +109,6 @@ class TestUnescapeAscii:
         result = unescape_ascii_list([r"Café", r"Institut für Meeresforschung"])
         assert result == ["Café", "Institut für Meeresforschung"]
 
-
-# ---------------------------------------------------------------------------
-# Tests: get_ckan_records
-# ---------------------------------------------------------------------------
 
 class TestGetCkanRecords:
     def test_returns_dataframe(self, mocker):

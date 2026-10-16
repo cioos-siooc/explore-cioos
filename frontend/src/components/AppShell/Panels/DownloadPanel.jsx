@@ -12,26 +12,11 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 /*
- * The Download panel: one page for one order.
- *
- * There are two ways to take a selection away, and they are aspects of each
- * dataset rather than two destinations to choose between:
- *
- *  - Prepared — the CDE packages the ticked datasets and mails a link. One
- *    archive, uniform variables, and a per-dataset size ceiling it refuses to
- *    exceed.
- *  - Direct — the URL of the dataset on the server that publishes it, in a
- *    format of the user's choosing. No ceiling, no wait, no CDE in the middle.
- *
- * They used to be two tabs, which meant the same datasets listed twice and the
- * ceiling on one tab explained by a link on the other. Now each card carries
- * both: its size, whether the packager will take it, and its own URL — so the
- * dataset the archive refuses is the one showing you how to fetch it anyway.
- *
- * The band of settings (which filters apply, what format the links return)
- * and the direct-link machinery live in DownloadDetails, which also hands the
- * list its own toolbar picker — this panel only owns the queue's email/submit
- * column.
+ * Prepared (CDE packages and mails a link, with a per-dataset size ceiling)
+ * and Direct (the publisher's URL, no ceiling) are aspects of each dataset
+ * card rather than two tabs, so a dataset the packager refuses shows how to
+ * fetch it anyway. This panel only owns the email/submit column; the rest is
+ * DownloadDetails.
  */
 export default function DownloadPanel() {
   const { t } = useTranslation();
@@ -93,10 +78,8 @@ export default function DownloadPanel() {
         setFilterDownloadByPolygon={setFilterDownloadByPolygon}
         setSubmissionState={setSubmissionState}
       >
-        {/* The queue column of DownloadDetails' order footer. Passed as
-            children rather than rendered there because the submission state it
-            drives lives in this panel's providers; the class is what places it
-            in the footer's grid, beside the summary and the direct links. */}
+        {/* Passed as children because the submission state lives in this
+            panel's providers; the class places it in the footer's grid. */}
         <div className="downloadFooterSection downloadSubmit">
           <label className="downloadFooterTitle" htmlFor="downloadEmailInput">
             {t("downloadEmailLabelText")}

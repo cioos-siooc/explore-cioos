@@ -1,9 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.erddap.compliance.
-
-Each test builds a mock Dataset, sets specific attributes, and verifies
-whether the compliance checker passes or rejects it with the right code.
-"""
+"""Unit tests for cde_harvester.sources.erddap.compliance."""
 
 
 from cde_harvester.core.errors import (
@@ -45,7 +40,6 @@ class TestPassesAllChecks:
 class TestRequiredVariables:
     def test_missing_time_fails(self):
         checker = _checker()
-        # Remove 'time' from variables_list
         checker.dataset.variables_list = [
             v for v in checker.dataset.variables_list if v != "time"
         ]

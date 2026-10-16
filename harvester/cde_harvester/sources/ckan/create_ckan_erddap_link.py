@@ -14,10 +14,9 @@ from urllib3.util.retry import Retry
 
 from cde_harvester.core.observability import run_logger
 
-# National CKAN has all the regions' records
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
 
-# Transient statuses worth retrying (CKAN's Cloudflare/Caddy returns these intermittently).
+# CKAN's Cloudflare/Caddy returns these intermittently.
 _RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
 
 
@@ -38,7 +37,6 @@ def _build_ckan_session() -> requests.Session:
 
 
 def _ckan_get_result(session, url):
-    """GET a CKAN action endpoint and return its `result` (clear error on non-JSON)."""
     resp = session.get(url, timeout=120)
     resp.raise_for_status()
     try:
@@ -52,13 +50,7 @@ def _ckan_get_result(session, url):
 
 
 def split_erddap_url(url):
-    """
-    Split an ERDDAP URL into it's host and dataset ID
-
-    Eg: split_erddap_url("https://data.cioospacific.ca/erddap/tabledap/IOS_BOT_Profiles.html")
-    ('https://data.cioospacific.ca', 'IOS_BOT_Profiles')
-
-    The split can also be done when the language is specified in the url, if it follows this example:
+    """Also handles a language segment, e.g.
     https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/fr/tabledap/cnodc_msc50_pacific.html
     """
 
@@ -94,7 +86,6 @@ def unescape_ascii(x):
 
 
 def remove_newlines(s):
-    # not sure why all these are needed but they seem to be
     s = s.replace("\r", "")
     s = s.replace("\n", "")
     s = s.replace("\\n", "")
@@ -104,10 +95,10 @@ def remove_newlines(s):
 
 @task(task_run_name="fetch-ckan-metadata")
 def get_ckan_records(dataset_ids, limit=None, cache=False):
-    """Fetch the full CKAN record for each harvested dataset ID (@task).
+    """Fetch the full CKAN record for each harvested dataset ID.
 
-    Returns None when CKAN is unreachable: it is enrichment only, so an outage
-    must not fail the harvest (the merge falls back to the stored metadata).
+    Returns None when CKAN is unreachable: an enrichment outage must not fail
+    the harvest (the merge falls back to the stored metadata).
     """
     try:
         records = list_ckan_records(cache)
@@ -115,7 +106,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         run_logger(logging.getLogger(__name__)).warning(f"CKAN unavailable, falling back to stored CKAN metadata: {e}")
         return None
 
-    # just used for testing
     if limit:
         records = records[0:limit]
     out = []
@@ -128,24 +118,18 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
                 (erddap_host, dataset_id) = split_erddap_url(url)
             except ValueError:
                 continue
-            # dataset_ids could be None if user wants all
             if dataset_ids and dataset_id not in dataset_ids:
                 continue
             links.append((erddap_host, dataset_id, "?" in url))
         if not links:
             continue
 
-        # retreive the data for each record
-
         title_translated = record_full.get("title_translated") or {}
-        # Kept for the commented-out ckan_summary fields below.
         notes_translated = record_full.get("notes_translated")  # noqa: F841
 
         ckan_record_text = {
             "title": title_translated.get("en"),
             "title_fr": title_translated.get("fr"),
-            # "ckan_summary": notes_translated.get("en"),
-            # "ckan_summary_fr": notes_translated.get("fr"),
         }
 
         for k, v in ckan_record_text.items():
@@ -157,7 +141,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         for contact in record_full.get("cited-responsible-party", []):
             organizations += [unescape_ascii(contact.get("organisation-name"))]
 
-        # remove duplicates, empty strings
         organizations = list(filter(None, set(organizations)))
 
         for erddap_host, dataset_id, is_subset in links:
@@ -179,8 +162,6 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "ckan_organizations": [x[3] for x in out],
         "ckan_title": [x[4]["title"] for x in out],
         "title_fr": [x[4]["title_fr"] for x in out],
-        # "ckan_summary": [x[4]["ckan_summary"] for x in out],
-        # "ckan_summary_fr": [x[4]["ckan_summary_fr"] for x in out],
         "is_subset": [x[5] for x in out],
     }
 
@@ -198,13 +179,10 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
 
 
 def list_ckan_records(cache_requests, query="res_url:*erddap*"):
-    """Fetch all CKAN records matching a package_search query (paged)."""
     logger = run_logger(logging.getLogger(__name__))
     logger.info(f"cache_requests: {cache_requests}")
     row_page_limit = 1000
     row_start = 0
-    # count total records avaiable, but we will have to page queries to get all results
-    # 1000 records per query (or as defined on the server)
     records_remaining = 1
     records_total = []
     session = _build_ckan_session()
@@ -217,11 +195,9 @@ def list_ckan_records(cache_requests, query="res_url:*erddap*"):
             + urlencode({"rows": row_page_limit, "start": row_start, "q": query})
         )
         logger.info(erddap_datasets_query)
-        # print(erddap_datasets_query)
         logger.info(f"erddap_dataset_query:\n{erddap_datasets_query}")
         if cache_requests:
             logger.info("checking for ckan cache")
-            # limit cache to 10gb
             cache = dc.Cache(
                 "ckan_harvester_cache",
                 eviction_policy="none",
@@ -244,9 +220,7 @@ def list_ckan_records(cache_requests, query="res_url:*erddap*"):
         else:
             result = _ckan_get_result(session, erddap_datasets_query)
 
-        # count of total records, regardless of paging
         count_total = result["count"]
-        # count of records in this page, eg < 1000
         records_total += result["results"]
         count_page = len(records_total)
         records_remaining = count_total - count_page

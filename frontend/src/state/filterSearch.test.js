@@ -75,6 +75,39 @@ describe("matchFilterOptions", () => {
     expect(matchFilterOptions(groups, "chlorophyll")).toEqual([]);
   });
 
+  it("keeps a searched group as its service ranked it", () => {
+    const regions = {
+      key: "region",
+      searched: true,
+      options: [
+        { id: "a", label: "Bay of Fundy" },
+        { id: "b", label: "Fundy Basin" },
+      ],
+    };
+    expect(matchFilterOptions([regions], "baie de fundy", 1)).toEqual([
+      { ...regions, options: [regions.options[0]] },
+    ]);
+    expect(matchFilterOptions([regions], "")).toEqual([]);
+  });
+
+  it("lists the group that matches the term closest first", () => {
+    const loose = {
+      key: "sources",
+      options: [{ id: "s", label: "Fundy Ocean Research Centre for Energy" }],
+    };
+    const places = {
+      key: "region",
+      searched: true,
+      options: [{ id: "a", label: "Fundy" }],
+    };
+    expect(
+      matchFilterOptions([loose, places], "fundy").map((g) => g.key),
+    ).toEqual(["region", "sources"]);
+    expect(
+      matchFilterOptions([...groups, places], "oxygen").map((g) => g.key),
+    ).toEqual(["eovs", "region"]);
+  });
+
   it("matches on matchText when an option has one", () => {
     const result = matchFilterOptions(groups, "atlantic");
     expect(result.map((g) => g.key)).toEqual(["scientificName"]);

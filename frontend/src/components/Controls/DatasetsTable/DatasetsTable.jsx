@@ -42,8 +42,7 @@ import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import "./styles.css";
 
-// Orders the groups by how many datasets each holds, not the rows — offered
-// only while the list is grouped, and its default then.
+// Offered only while the list is grouped, and its default then.
 const GROUP_SIZE = "groupSize";
 const DEFAULT_SORT = { field: "title", dir: "asc" };
 const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
@@ -52,9 +51,6 @@ const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
 // and thrash memo deps.
 const EMPTY_SET = new Set();
 
-// The datasets list, rendered as cards (replaces the old data table). Used in
-// two contexts: the sidebar results list and the download-review modal
-// (isDownloadModal), which surfaces size estimates and download status.
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
@@ -65,9 +61,6 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  // The built direct-download link per dataset pk (download modal only), so a
-  // card can show the query its own dataset would be fetched with. Built by
-  // DownloadDetails, which owns the format choice the strip below shares.
   downloadLinksByPk,
   // Kept mounted under an open dataset page, so coming back finds the same
   // page and scroll position (see DatasetsPanel).
@@ -80,22 +73,15 @@ export default function DatasetsTable({
     groupBy: selectedGroupBy,
     setGroupBy,
     selectedPks,
-    // Drops a dataset from the selection outright — aliased because the
-    // download modal's own `handleSelectDataset` prop means something
-    // narrower: whether this batch includes a dataset already in the order,
-    // not whether it is in the order at all.
+    // Aliased: the modal's own `handleSelectDataset` prop only toggles a
+    // dataset within this batch.
     handleSelectDataset: removeFromSelection,
     pointsError,
   } = useSelection();
-  // The list has no search of its own: narrowing it is the Filters modal's
-  // job, so there is one way to narrow the datasets, not two.
   const { openFilters, showFiltersModal } = useUI();
   const activeFilterCount = useActiveFilters().length;
-  // The datasets the open "what's here" card is about. They sort to the top of
-  // the list, which is what ties the card to this list at all — without it the
-  // card named datasets that could be on page 6 of 8, and there was no way to
-  // tell which rows it meant. The download modal is reviewing an order, not
-  // exploring the map, so it ignores this.
+  // The "what's here" card's datasets sort to the top, tying the card to the
+  // list; the download modal ignores them.
   const { featureQuery } = useMapState();
   const pinnedPks = useMemo(() => {
     if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET;
@@ -103,8 +89,6 @@ export default function DatasetsTable({
   }, [featureQuery, isDownloadModal]);
   const { tipHighlight } = useTips();
 
-  // The download modal is a flat review list — it never groups, whatever the
-  // sidebar is grouped by.
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
@@ -122,8 +106,6 @@ export default function DatasetsTable({
     }
   }, [hidden]);
 
-  // Sort fields differ by context: the download modal exposes the size and
-  // downloadable status; the sidebar exposes the locations and days counts.
   const grouped = isGroupDimension(groupBy);
   const sortFields = useMemo(() => {
     const base = [
@@ -171,16 +153,11 @@ export default function DatasetsTable({
   }, [isDownloadModal, grouped, t]);
 
   const [sort, setSort] = useState(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
-  // The groups the reader opened or closed against their default (see
-  // isExpanded below).
   const [toggledGroups, setToggledGroups] = useState(() => new Set());
   if (useChanged(grouped)) setSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
-  // Group size orders the groups (renderItems); the rows within them go by
-  // title.
   const rowSort = sort.field === GROUP_SIZE ? DEFAULT_SORT : sort;
 
   const groupByOptions = useMemo(() => groupOptions(t), [t]);
-  // Each group header includes or excludes its group in the main filters.
   const {
     filterFor,
     filteredKeys: ownFilterKeys,
@@ -219,16 +196,12 @@ export default function DatasetsTable({
     [t],
   );
 
-  // Search filtering happens upstream (SelectionProvider's filteredDatasets) —
-  // this just sorts whatever it's handed.
+  // Filtering happens upstream (SelectionProvider's filteredDatasets).
   const visibleRows = useMemo(() => {
     const field = sortFields.find((f) => f.id === rowSort.field);
     const factor = rowSort.dir === "asc" ? 1 : -1;
     const sorted = [...(datasets || [])].sort((a, b) => {
-      // Datasets under the last map click come first, in the chosen sort order
-      // among themselves. This rides on top of the sort rather than replacing
-      // it, so the sort control still does what it says — it just orders the two
-      // blocks separately.
+      // Map-click datasets come first; each block keeps the chosen sort.
       const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1;
       const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1;
       if (pa !== pb) return pa - pb;
@@ -252,11 +225,9 @@ export default function DatasetsTable({
     return groups;
   }, [visibleRows, groupBy]);
 
-  // Groups start closed, so a grouping reads first as its list of groups —
-  // unless every row fits on one page, when the list itself is shown. A nested
-  // dimension opens its parents, so it reads as the list of groups inside
-  // them. A new grouping, or results that cross the one-page line, drop the
-  // reader's own toggles.
+  // Groups start closed unless every row fits on one page; a nested dimension
+  // opens its parents. A new grouping, or results that cross the one-page
+  // line, drop the reader's own toggles.
   const fitsOnePage =
     [...byGroup.values()].reduce((n, rows) => n + rows.length, 0) <= pageSize;
   if (useChanged(groupBy, fitsOnePage)) setToggledGroups(new Set());
@@ -267,12 +238,10 @@ export default function DatasetsTable({
     [fitsOnePage, groupBy, toggledGroups],
   );
 
-  // The groups seen while the dimension's own filter was not narrowing it.
-  // Once it is, the groups it took out of the results — every other one when
-  // one is included, the excluded one itself — stay listed from here, empty,
-  // so that filter can still be added to or undone from the list. Refreshed
-  // only when new results land, not the moment the filter clears: until the
-  // refetch, the results still lack the group being brought back.
+  // Groups seen while the dimension's own filter was not narrowing it, so the
+  // groups that filter removed stay listed (empty) and can be added or undone.
+  // Refreshed only when new results land: until the refetch, the results still
+  // lack the group being brought back.
   const [knownGroups, setKnownGroups] = useState({ groupBy, keys: [] });
   if (knownGroups.groupBy !== groupBy || knownGroups.datasets !== datasets) {
     setKnownGroups({
@@ -295,19 +264,10 @@ export default function DatasetsTable({
     [knownGroups, ownFilterId, byGroup],
   );
 
-  // Flat render list: without grouping it's just the sorted rows; with grouping
-  // it's the rows bucketed under headers. Each entry is either
-  // { header, group, count, depth, expandable } or { row, group }, where group
-  // is the stable group
-  // key (see state/datasetGroups.js — labels are derived at render time). Rows
-  // stay in their sorted order within a group; groups are alphabetical by label
-  // with Other/Uncategorized last. Array-valued dims place a dataset under each
-  // of its values, so the total row entries can exceed the unique dataset count
-  // (the toolbar count stays unique — see below). A nested dimension adds a
-  // header per parent (depth 0) above its groups' headers (depth 1); a
-  // parent's count is its unique datasets, since a dataset can sit in several
-  // of its groups. The empty groups (emptyKeys) list after the rest, and only
-  // a parent of them opens.
+  // Entries are { header, group, count, depth, expandable } or { row, group }
+  // (group = stable key, see state/datasetGroups.js). Array-valued dims list a
+  // dataset under each of its values, so row entries can exceed the unique
+  // dataset count; a parent header's count is its unique datasets.
   const renderItems = useMemo(() => {
     if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
     const rowsOf = (key) => byGroup.get(key) ?? [];
@@ -487,18 +447,13 @@ export default function DatasetsTable({
     [datasets],
   );
 
-  // Back to page one whenever the result set or its ordering changes: page 7 of
-  // the previous results is not page 7 of these.
   useEffect(() => {
-    // Paired with the scroll reset below, which is a DOM write and so has to
-    // happen in an effect either way.
+    // Paired with the scroll reset, a DOM write that needs an effect anyway.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
     scrollListToTop();
   }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks]);
 
-  // Every page starts at its top — the reader is at a new place in the list,
-  // not where they left the scroll bar on the page before.
   const goToPage = (next) => {
     setPage(Math.min(Math.max(next, 1), pageCount));
     scrollListToTop();
@@ -512,9 +467,6 @@ export default function DatasetsTable({
     <div className="datasetsCardControls" data-testid="datasets-controls">
       {isDownloadModal ? (
         <>
-          {/* The same checkbox the rows below carry, so the control that ticks
-              them all reads as one of them rather than as a pill that lights
-              up. */}
           <label
             className="selectAllToggle"
             title={t("datasetsTableHeaderSelectAllTitle")}
@@ -529,8 +481,6 @@ export default function DatasetsTable({
           <div className="datasetsCardArrange">{sortControl}</div>
         </>
       ) : (
-        // Search, sort and grouping on one row: every row spent here is a
-        // dataset card the sidebar does not show.
         <div className="datasetsCardToolbar">
           <button
             type="button"
@@ -561,10 +511,6 @@ export default function DatasetsTable({
         </div>
       )}
 
-      {/* What the size pill and the tick/cross on each card below mean. It
-          belongs on this row rather than under the list: it is a key to the
-          cards, and read before them it saves the reader working out what the
-          colours meant after the fact. */}
       {isDownloadModal && (
         <div className="downloadLegend">
           <span className="downloadLegendItem">
@@ -601,11 +547,8 @@ export default function DatasetsTable({
       })}
     >
       {controls}
-      {/* Explains the accent DatasetCard puts on rows the last map click found
-          (see .datasetCard.fromMapClick in styles.css) — otherwise the only
-          place that colour is named is a hover tooltip on the row itself,
-          which a touch user never sees and a mouse user has no reason to go
-          looking for. Only worth saying while there is a click to explain. */}
+      {/* Otherwise the map-click accent is named only in a hover tooltip,
+          which a touch user never sees. */}
       {!isDownloadModal && pinnedPks.size > 0 && (
         <div className="datasetsCardMapClickHint">
           <span className="datasetsCardMapClickSwatch" aria-hidden="true" />

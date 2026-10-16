@@ -39,10 +39,8 @@ const query = {
   endDepth: 100,
 };
 
-// Deliberately not a rectangle — the notch at the top is what makes the ERDDAP
-// links a squared-off approximation of it, which is the caveat the strip warns
-// about. Its extent is still -140,40 to -120,60, which the export headers
-// below quote.
+// Deliberately not a rectangle, so the ERDDAP links square it off (the
+// caveat). Its extent, -140,40 to -120,60, is quoted by the export headers.
 const polygon = [
   [-140, 40],
   [-120, 40],
@@ -62,17 +60,12 @@ const rectangle = [
   [-140, 40],
 ];
 
-// What the browser was handed to save. The component asks downloadTextFile for
-// a Blob and an object URL; the setup file stubs createObjectURL globally, so
-// this replaces that stub with one that keeps what it was given.
+// Replaces the setup file's global createObjectURL stub with one that keeps
+// the Blob it was given.
 let saved;
 
-// The links column is handed its links rather than building them
-// (DownloadDetails owns that, so the cards above can show the same ones), and
-// the format pickers that decide what the links ask for now live on the
-// datasets toolbar. This stands in for that parent: the same rows and filters,
-// and the one piece of format state the pickers drive and the exports read —
-// which is the pairing these tests are about.
+// Stands in for DownloadDetails, which builds the links and owns the format
+// state the pickers drive and the exports read.
 function Harness({
   rows = [erddapRow, obisRow],
   polygon: shape = polygon,
@@ -141,8 +134,6 @@ describe("DirectDownloadLinks", () => {
 
     const script = await savedText();
     expect(script.split("\n")[0]).toBe("#!/usr/bin/env bash");
-    // The header states the filters the URLs were built from, so a script read
-    // months later says what it is a download of.
     expect(script).toContain(
       "# Filters: time 2020-01-01 to 2020-12-31; depth 0 to 100 m; bbox -140, 40, -120, 60",
     );
@@ -187,7 +178,6 @@ describe("DirectDownloadLinks", () => {
     await user.click(button(/copy urls/i));
 
     const copied = await navigator.clipboard.readText();
-    // Both data URLs, plus the catalogue record the ERDDAP dataset has.
     expect(copied.trim().split("\n")).toHaveLength(3);
     expect(
       await screen.findByRole("button", { name: /copied/i }),

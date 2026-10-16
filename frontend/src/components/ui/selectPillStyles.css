@@ -1,6 +1,3 @@
-/* SelectPill (SelectPill.jsx) — a captioned select in a pill. The datasets
-   list's sort and grouping controls sit side by side, so they are the same
-   pill; only the caption and the options differ. */
 .selectPill {
   display: inline-flex;
   align-items: center;
@@ -8,9 +5,7 @@
   min-width: 0;
   max-width: 100%;
 
-  /* No padding on the trailing edge: it belongs either to the caret (which
-     lives in the select's own padding) or to a trailing segment, which runs to
-     the pill's edge. */
+  /* The trailing edge belongs to the caret or a trailing segment. */
   padding: 0 0 0 8px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
@@ -23,9 +18,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* The app's caption idiom, the one the standalone "SORT BY" and "GROUP BY"
-   labels used before they moved inside the pills. Small enough that the value
-   beside it stays the thing being read. */
 .selectPillLabel {
   flex: 0 0 auto;
   font-family: var(--cioos-font-body);
@@ -37,23 +29,16 @@
   cursor: pointer;
 }
 
-/* The sizer alone gives the field its size — it holds the option currently
-   showing, while the select is laid over it out of flow. Left in flow, the
-   select would be as wide as its longest option, so a pill showing "None"
-   would hold the room for "Ocean variable"; in French the two pills together
-   then no longer fit the row, which is the whole point of them. Both carry the
-   same font: the width is only right while they do. */
+/* The sizer alone sizes the field; the select is laid over it out of flow, or
+   it would be as wide as its longest option and the French pills would not fit
+   the row. Both must share the same font. */
 .selectPillField {
   position: relative;
   display: inline-block;
   min-width: 0;
   max-width: 100%;
 
-  /* The rung the pager's controls sit on: these say how the list is arranged,
-     the cards below are what is being read. It also keeps both pills on one
-     row at phone width in French, where the longest pair of options
-     ("Emplacements", "Variable oceanique") is some 60px wider than in
-     English. */
+  /* Also keeps both pills on one row at phone width in French. */
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
   color: var(--cioos-ink);
@@ -65,8 +50,7 @@
   overflow: hidden;
   white-space: nowrap;
 
-  /* Internal breathing room around the selected value, with extra trailing
-     room for the caret and the width a browser gives select text. */
+  /* Extra trailing room for the caret. */
   padding: 4px 26px 4px 8px;
 }
 
@@ -84,7 +68,6 @@
   cursor: pointer;
 }
 
-/* The pill carries the focus ring for the whole control (:focus-within). */
 .selectPillField select:focus-visible {
   outline: none;
 }

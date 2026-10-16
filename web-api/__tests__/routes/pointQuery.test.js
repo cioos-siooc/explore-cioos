@@ -1,10 +1,3 @@
-/**
- * GET /pointQuery
- *
- * Delegates to getShapeQuery(req.query, doEstimate=false, getRecordsList=false).
- * No required parameters — filters are optional.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

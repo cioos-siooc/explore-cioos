@@ -65,10 +65,8 @@ describe("HarvestDataset", () => {
       (await screen.findAllByText("erddap.example.com")).length,
     ).toBeGreaterThan(0);
 
-    // The "latest attempt" summary card — the same attempt is also shown as
-    // the newest row of the history table below, so these are scoped to the
-    // card rather than asserted with a page-wide (necessarily ambiguous)
-    // getByText.
+    // Scoped to the card: the same attempt is also the history table's newest
+    // row, so a page-wide getByText is ambiguous.
     const card = document.querySelector(".harvest-latest-card");
     expect(card).toHaveTextContent("error");
     expect(card).toHaveTextContent("HTTP error");
@@ -94,10 +92,7 @@ describe("HarvestDataset", () => {
         document.querySelector(".harvest-latest-card"),
       ).toBeInTheDocument(),
     );
-    // The single history row duplicates the same attempt's error_message, so
-    // it carries its own "Request URLs" disclosure too (inside the history
-    // table's <details>, opened via "error detail" rather than this label) —
-    // scope to the summary card's own toggle.
+    // The history row has its own "Request URLs" disclosure; scope to the card.
     const card = document.querySelector(".harvest-latest-card");
     const { getByText } = within(card);
     await user.click(getByText("Request URLs (2)"));

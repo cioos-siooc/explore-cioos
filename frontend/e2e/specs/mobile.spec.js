@@ -2,9 +2,6 @@ import { expect, test } from "../support/test.js";
 import { openApp } from "../support/appPage.js";
 import { VIEWPORTS } from "../support/constants.js";
 
-// Below (max-width: 700px) the app stops being a map with chrome floating over
-// it and becomes a stack of full-screen surfaces. Everything here is about that
-// change, so it runs at one width regardless of which project selected it.
 test.use({ viewport: VIEWPORTS.mobile });
 
 test.describe("the phone layout", () => {
@@ -18,8 +15,6 @@ test.describe("the phone layout", () => {
   });
 
   test("never scrolls sideways", async ({ page }) => {
-    // The failure mode of a floating-chrome layout on a narrow screen: one
-    // control that will not fit drags the whole page horizontally.
     await openApp(page);
     const overflow = await page.evaluate(
       () =>
@@ -40,8 +35,6 @@ test.describe("the phone layout", () => {
       sidebar.boundingBox(),
       page.viewportSize(),
     ]);
-    // A sheet, not a column beside the map: it should take essentially the
-    // whole width.
     expect(sheet.width).toBeGreaterThan(viewport.width * 0.9);
   });
 
@@ -119,7 +112,6 @@ test("names every quick filter on its button, and still fits the width", async (
       row.getByTestId(testId).locator(".quickFilterCaption"),
     ).toBeVisible();
   }
-  // Icon only on a phone, so the row fits on one line.
   await expect(row.getByTestId("quick-filter-reset")).toHaveAccessibleName(
     /clear all filters/i,
   );
@@ -138,8 +130,7 @@ test("names every quick filter on its button, and still fits the width", async (
   expect(overflow, "the page scrolls horizontally").toBeLessThanOrEqual(0);
 });
 
-// A phone held landscape is wide enough to miss the width rung but too short
-// for the floating chrome: the list sat under the top bar with no rows at all.
+// Landscape phones miss the width rung but are too short for floating chrome.
 test.describe("a phone held landscape", () => {
   test.use({ viewport: { width: 844, height: 390 } });
 

@@ -1,7 +1,4 @@
-// The downloader reports per-dataset outcomes with its own vocabulary
-// (COMPLETED / PARTIAL / FAILED / EMPTY / IGNORED). Map them onto the badge
-// styles the harvest pages already define, so downloads read the same way as
-// harvest attempts without a second colour language.
+// Maps the downloader's vocabulary onto the existing harvest badge styles.
 const BADGE_CLASS = {
   COMPLETED: "success",
   PARTIAL: "skipped",
@@ -28,8 +25,7 @@ export function jobBadgeClass(status) {
   return JOB_BADGE_CLASS[status] || "skipped";
 }
 
-// Why a dataset didn't make it into the zip. Mirrors the reasons the
-// completion email gives the requester (download_scheduler.email_user).
+// Mirrors the completion email (download_scheduler.email_user).
 export function datasetReason(t, dataset) {
   if (dataset.erddap_error) return dataset.erddap_error;
   switch (dataset.last_status || dataset.status) {

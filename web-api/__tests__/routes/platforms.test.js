@@ -1,10 +1,3 @@
-/**
- * GET /platforms
- *
- * Returns an array of distinct platform name strings from cde.datasets.
- * NULL platforms are excluded by the WHERE clause in the SQL.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

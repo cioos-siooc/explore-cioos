@@ -200,8 +200,7 @@ describe("FilterProvider", () => {
       );
       expect(frenchPacific.title).toBe("SIOOC Pacifique");
     });
-    // Re-labeling is a pure client-side derivation (erddapServers.json) — it
-    // must not re-hit the catalog endpoints.
+    // Re-labeling is client-side and must not re-hit the catalog endpoints.
     expect(fetchCallsBefore()).toBe(callsBefore);
   });
 });
