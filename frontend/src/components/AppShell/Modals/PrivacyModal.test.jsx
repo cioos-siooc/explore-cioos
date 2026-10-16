@@ -37,6 +37,7 @@ describe("PrivacyModal", () => {
         "https://cioos.ca/privacy-guidelines/",
         "https://policies.google.com/privacy",
         "https://sentry.io/privacy/",
+        "https://natural-resources.canada.ca/corporate/terms-conditions",
       ]),
     );
   });

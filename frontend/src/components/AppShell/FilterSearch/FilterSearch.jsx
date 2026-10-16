@@ -2,8 +2,11 @@ import * as React from "react";
 import { useEffect, useId, useState } from "react";
 import {
   ArrowCounterclockwise,
+  BoundingBox,
   BroadcastPin,
   ChevronRight,
+  GeoAlt,
+  Pentagon,
   Search,
   SlashCircle,
   X,
@@ -13,6 +16,7 @@ import classNames from "classnames";
 
 import { server } from "../../../config.js";
 import { useDebounce } from "../../../utilities.jsx";
+import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
 import {
@@ -21,6 +25,11 @@ import {
   parsePartialRangeQuery,
 } from "../../../state/filterSearch.js";
 import { iconForKey } from "../../../state/useActiveFilters.js";
+import { regionDescription } from "../../../state/regionSearch.js";
+import {
+  useGoToRegion,
+  useRegionMatches,
+} from "../../../state/useRegionSearch.js";
 import useFilterModel from "../../../state/useFilterModel.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
@@ -69,10 +78,57 @@ function useScientificNameMatches(term, enabled) {
   return wanted && result.query === term ? result.items : [];
 }
 
+// A picked area becomes the area filter, as its outline or as the box around
+// it, and the map frames it; its `secondary` action only goes to it. A point
+// place has no outline, so picking it only goes to it.
+function useRegionGroup(regions) {
+  const { t } = useTranslation();
+  const goTo = useGoToRegion();
+  const [shape, setShape] = useState("polygon");
+  if (regions.length === 0) return null;
+
+  const shapeLabel =
+    shape === "box" ? t("drawBoundingBoxOption") : t("drawPolygonOption");
+  const ShapeIcon = shape === "box" ? BoundingBox : Pentagon;
+  return {
+    key: "region",
+    label: t("regionSearchGroup"),
+    searched: true,
+    shapes: [
+      { id: "polygon", label: t("drawPolygonOption") },
+      { id: "box", label: t("drawBoundingBoxOption") },
+    ].map((s) => ({
+      ...s,
+      pressed: shape === s.id,
+      choose: () => setShape(s.id),
+    })),
+    options: regions.map((region) => ({
+      id: region.id,
+      label: region.name,
+      // What picking it does: the shape it filters by, or a pin to go to.
+      icon: region.area ? ShapeIcon : GeoAlt,
+      hint: region.otherNames.join(" · ") || undefined,
+      description: regionDescription(region, t),
+      command: true,
+      includeOnly: true,
+      closes: true,
+      action: region.area
+        ? t("regionSearchAction", { shape: shapeLabel })
+        : t("regionSearchGoTo"),
+      toggle: () => goTo(region, shape),
+      secondary: region.area && {
+        label: t("regionSearchGoTo"),
+        run: () => goTo(region),
+      },
+    })),
+  };
+}
+
 const GROUP_ICONS = {
   quick: BroadcastPin,
   reset: ArrowCounterclockwise,
   exclude: SlashCircle,
+  region: GeoAlt,
 };
 
 function GroupIcon({ groupKey, size = 14 }) {
@@ -198,11 +254,14 @@ export default function FilterSearch({ text, setText, inputRef }) {
   const [touched, setTouched] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
+  const places = useRegionMatches(exclude ? "" : term);
+  const regionGroup = useRegionGroup(places.places);
   const groups = [
     ...useFilterModel(
       useScientificNameMatches(term, obisDataAvailable),
       exclude ? undefined : parsePartialRangeQuery(term),
     ),
+    regionGroup,
     canReset && {
       key: "reset",
       label: t("quickFilterCaptionReset"),
@@ -277,6 +336,11 @@ export default function FilterSearch({ text, setText, inputRef }) {
         ? t("filterOptionExcludeAction")
         : t("filterSearchActionAdd"));
 
+  function chooseSecondary(option) {
+    option.secondary.run();
+    setShowFiltersModal(false);
+  }
+
   function choose({ group, option }) {
     if (!term) {
       setTouched((prev) => new Set(prev).add(`${group.key}:${option.id}`));
@@ -299,7 +363,9 @@ export default function FilterSearch({ text, setText, inputRef }) {
       setActiveIndex((active + step + flat.length) % flat.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (current) choose(current);
+      if (e.shiftKey && current?.option.secondary)
+        chooseSecondary(current.option);
+      else if (current) choose(current);
     } else if (e.key === "Escape" && text) {
       // A first Escape empties the box; the next one is Modal's, and closes.
       e.stopPropagation();
@@ -334,6 +400,12 @@ export default function FilterSearch({ text, setText, inputRef }) {
           aria-controls={flat.length > 0 ? listId : undefined}
           aria-activedescendant={current ? `${listId}-${active}` : undefined}
         />
+        {places.loading && (
+          <span role="status" className="filterSearchLoading">
+            <Spinner size="sm" role={null} />
+            <span className="sr-only">{t("regionSearchLoading")}</span>
+          </span>
+        )}
         {text && (
           <button
             type="button"
@@ -372,6 +444,27 @@ export default function FilterSearch({ text, setText, inputRef }) {
                 >
                   <GroupIcon groupKey={group.key} />
                   {group.label}
+                  {group.shapes && (
+                    <span
+                      role="group"
+                      className="filterSearchGroupShapes"
+                      aria-label={t("regionSearchShape")}
+                    >
+                      {group.shapes.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className="filterSearchGroupOpen"
+                          data-testid={`filter-search-region-${s.id}`}
+                          aria-pressed={s.pressed}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={s.choose}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </span>
+                  )}
                   {group.panelName && (
                     <button
                       type="button"
@@ -411,6 +504,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
                         className="filterSearchOptionState"
                         aria-hidden="true"
                       >
+                        {option.icon && <option.icon size={14} />}
                         {!option.command && (
                           <OptionStateIcon
                             isSelected={option.state === "include"}
@@ -452,6 +546,21 @@ export default function FilterSearch({ text, setText, inputRef }) {
                       <span className="filterSearchOptionAction">
                         {actionLabel(option)}
                       </span>
+                      {option.secondary && (
+                        <button
+                          type="button"
+                          className="filterSearchOptionSecondary"
+                          data-testid="filter-search-option-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            chooseSecondary(option);
+                          }}
+                          aria-label={`${option.secondary.label}: ${option.label}`}
+                        >
+                          <GeoAlt size={12} aria-hidden="true" />
+                          {option.secondary.label}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -479,6 +588,12 @@ export default function FilterSearch({ text, setText, inputRef }) {
         {t("filterSearchKeysNavigate")}
         <kbd className="filterSearchKey">↵</kbd>
         {current ? actionLabel(current.option) : t("filterSearchKeysSelect")}
+        {current?.option.secondary && (
+          <>
+            <kbd className="filterSearchKey">⇧↵</kbd>
+            {current.option.secondary.label}
+          </>
+        )}
         <kbd className="filterSearchKey">Esc</kbd>
         {t("filterSearchKeysClose")}
       </footer>
