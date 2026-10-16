@@ -225,7 +225,7 @@ export default function IntroModal({ showModal, setShowModal }) {
                   className="introLink"
                   onClick={() => setShowSelectionHelpModal(true)}
                 >
-                  {t("sidebarSelectionHintMoreText")}
+                  {t("introFeature_download_help")}
                 </button>
               )}
             </li>
@@ -260,7 +260,10 @@ export default function IntroModal({ showModal, setShowModal }) {
 
         <footer className="introFooter">
           <div className="introFooterCards">
-            <section className="introFooterCard" data-testid="intro-tips">
+            <section
+              className="introFooterCard introTipsCard"
+              data-testid="intro-tips"
+            >
               <h2 className="introFooterHeading">
                 <Lightbulb size={18} aria-hidden="true" />
                 {t("introTipsHeading")}

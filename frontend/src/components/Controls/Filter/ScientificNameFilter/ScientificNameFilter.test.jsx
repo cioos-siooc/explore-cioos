@@ -89,10 +89,11 @@ describe("ScientificNameFilter", () => {
     ).toHaveTextContent("Killer whale");
   });
 
-  it("filters out ranks too broad to search reliably (e.g. Order, Class)", async () => {
+  it("filters out names the API flags too broad to filter on", async () => {
     mockScientificNamesSearch([
-      { scientificName: "Decapoda", rank: "Order" },
-      { scientificName: "Orcinus orca", rank: "Species" },
+      { scientificName: "Decapoda", rank: "Order", tooBroad: true },
+      { scientificName: "Cetacea", rank: "Infraorder", tooBroad: false },
+      { scientificName: "Orcinus orca", rank: "Species", tooBroad: false },
     ]);
     renderWithProviders(
       <ScientificNameFilter
@@ -110,6 +111,7 @@ describe("ScientificNameFilter", () => {
       },
     );
     expect(screen.queryByText("Decapoda")).not.toBeInTheDocument();
+    expect(screen.getByText("Cetacea")).toBeInTheDocument();
   });
 
   it("clicking an unselected suggestion adds it to the selection", async () => {

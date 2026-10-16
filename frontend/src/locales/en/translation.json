@@ -21,6 +21,7 @@
   "introFeature_search_body": "Search by keyword, or filter by what was measured, when and where.",
   "introFeature_download_title": "Get the data",
   "introFeature_download_body": "Download it, or open it where it's published.",
+  "introFeature_download_help": "How to download",
   "CIOOSDataExplorer": "CIOOS Data Explorer",
   "dataExplorer": "Data Explorer",
   "CIOOSQuote": "\"Ocean Data For Our Ocean Future\"",
