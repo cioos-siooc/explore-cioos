@@ -90,6 +90,24 @@ describe("matchFilterOptions", () => {
     expect(matchFilterOptions([regions], "")).toEqual([]);
   });
 
+  it("lists the group that matches the term closest first", () => {
+    const loose = {
+      key: "sources",
+      options: [{ id: "s", label: "Fundy Ocean Research Centre for Energy" }],
+    };
+    const places = {
+      key: "region",
+      searched: true,
+      options: [{ id: "a", label: "Fundy" }],
+    };
+    expect(
+      matchFilterOptions([loose, places], "fundy").map((g) => g.key),
+    ).toEqual(["region", "sources"]);
+    expect(
+      matchFilterOptions([...groups, places], "oxygen").map((g) => g.key),
+    ).toEqual(["eovs", "region"]);
+  });
+
   it("matches on matchText when an option has one", () => {
     const result = matchFilterOptions(groups, "atlantic");
     expect(result.map((g) => g.key)).toEqual(["scientificName"]);
