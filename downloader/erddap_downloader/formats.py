@@ -1,6 +1,9 @@
 """Output formats: each turns the raw ERDDAP response parts of one subset into
 the polygon-filtered file(s) shipped in the package.
 
+Copied as is into every package, beside reproduce.py, so it must import only
+third-party libraries.
+
 Text values are read and written back as strings, so numbers keep ERDDAP's
 exact formatting; only latitude/longitude are parsed, for the polygon test.
 """
@@ -8,11 +11,14 @@ exact formatting; only latitude/longitude are parsed, for the polygon test.
 from dataclasses import dataclass
 from pathlib import Path
 
+import duckdb
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import shapely
+import shapely.affinity
+import shapely.wkt
 import xarray as xr
 
 
@@ -39,6 +45,41 @@ FORMATS = {
 DEFAULT_FORMAT = "csv"
 # OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition of it.
 OBIS_FORMATS = ("csv", "parquet")
+
+
+def polygon_regions(polygon_wkt):
+    """The user's polygon, plus ±360° copies when it crosses the antimeridian
+    so each side gets its own query."""
+    if not polygon_wkt:
+        return []
+    regions = [shapely.wkt.loads(polygon_wkt)]
+    lon_min, _, lon_max, _ = regions[0].bounds
+    if lon_min < -180 or lon_max > 180:
+        for shift in (-360, 360):
+            shifted = shapely.affinity.translate(regions[0], xoff=shift)
+            if -180 < shifted.bounds[0] < 180 or -180 < shifted.bounds[2] < 180:
+                regions.append(shifted)
+    return regions
+
+
+def _number(value):
+    if value is None or value == "" or pd.isna(value):
+        return None
+    return float(value)
+
+
+def query_box(user_query, region):
+    """(lon_min, lat_min, lon_max, lat_max), longitudes clamped to ±180; None
+    when the query carries no complete box."""
+    if region is not None:
+        lon_min, lat_min, lon_max, lat_max = region.bounds
+    else:
+        lon_min, lat_min, lon_max, lat_max = (
+            _number(user_query.get(k)) for k in ("lon_min", "lat_min", "lon_max", "lat_max")
+        )
+        if None in (lon_min, lat_min, lon_max, lat_max):
+            return None
+    return max(lon_min, -180), lat_min, min(lon_max, 180), lat_max
 
 
 def inside(lon, lat, regions):
@@ -229,6 +270,52 @@ def write_subset(format_key, parts, regions, out_base: Path):
     and write them next to ``out_base`` (no extension). Returns
     ``[{path, n_rows, columns: [{name, unit}]}]``; [] when nothing is left."""
     return _WRITERS[format_key](parts, regions, out_base)
+
+
+def obis_frame(url, user_query, regions):
+    """The OBIS occurrences of the parquet export at ``url`` matching the query."""
+    if regions:
+        lons = [b for r in regions for b in (r.bounds[0], r.bounds[2])]
+        lats = [b for r in regions for b in (r.bounds[1], r.bounds[3])]
+        lon_min, lon_max, lat_min, lat_max = min(lons), max(lons), min(lats), max(lats)
+    else:
+        lon_min, lat_min, lon_max, lat_max = query_box(user_query, None) or (-180, -90, 180, 90)
+    lon_min, lon_max = max(lon_min, -180), min(lon_max, 180)
+    lat_min, lat_max = max(lat_min, -85.06), min(lat_max, 85.06)
+
+    # The same columns the harvester reads; reliably present across OBIS exports.
+    query = f"""
+        SELECT
+            _id                              AS id,
+            interpreted.scientificName       AS scientificName,
+            interpreted.decimalLatitude      AS latitude,
+            interpreted.decimalLongitude     AS longitude,
+            interpreted.date_start           AS date_start,
+            interpreted.date_end             AS date_end,
+            interpreted.minimumDepthInMeters AS minimumDepthInMeters,
+            interpreted.maximumDepthInMeters AS maximumDepthInMeters
+        FROM read_parquet('{url}')
+        WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
+          AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
+    """
+    df = duckdb.sql(query).df()
+
+    depth_min, depth_max = _number(user_query.get("depth_min")), _number(user_query.get("depth_max"))
+    if depth_max is not None:
+        df = df[df["minimumDepthInMeters"].fillna(0).astype(float) <= depth_max]
+    if depth_min is not None:
+        df = df[df["maximumDepthInMeters"].fillna(0).astype(float) >= depth_min]
+
+    # date_start/date_end are epoch milliseconds in the OBIS export.
+    for bound, column, keep in (("time_min", "date_end", "ge"), ("time_max", "date_start", "le")):
+        if user_query.get(bound):
+            limit = pd.to_datetime(user_query[bound], utc=True)
+            values = pd.to_datetime(df[column], unit="ms", utc=True, errors="coerce")
+            df = df[values.ge(limit) if keep == "ge" else values.le(limit)]
+
+    if regions and not df.empty:
+        df = df[inside(df["longitude"], df["latitude"], regions)]
+    return df
 
 
 def write_frame(format_key, df, out_base: Path):

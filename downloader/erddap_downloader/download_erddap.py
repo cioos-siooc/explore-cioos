@@ -9,17 +9,22 @@ from pathlib import Path
 from urllib.parse import quote, urlparse
 
 import cde_harvester.sources.erddap.client as cde_harvester
-import duckdb
-import pandas as pd
 import requests
-import shapely.affinity
-import shapely.wkt
 from cde_harvester.core.errors import HTTP_ERROR, UNKNOWN_ERROR
 from cde_harvester.core.issues import erddap_error_text
 from erddapy import ERDDAP
 from loguru import logger
 
-from erddap_downloader.formats import DEFAULT_FORMAT, FORMATS, OBIS_FORMATS, inside, write_frame, write_subset
+from erddap_downloader.formats import (
+    DEFAULT_FORMAT,
+    FORMATS,
+    OBIS_FORMATS,
+    obis_frame,
+    polygon_regions,
+    query_box,
+    write_frame,
+    write_subset,
+)
 from erddap_downloader.source_metadata import REQUEST_HEADERS, save_source_metadata
 
 ONE_MB = 10**6
@@ -58,26 +63,6 @@ def dataset_folder_name(dataset):
 
 def _now():
     return datetime.now(UTC).isoformat(timespec="seconds")
-
-
-def _number(value):
-    if value is None or value == "" or pd.isna(value):
-        return None
-    return float(value)
-
-
-def _box(user_query, region):
-    """(lon_min, lat_min, lon_max, lat_max), longitudes clamped to ±180; None
-    when the query carries no complete box."""
-    if region is not None:
-        lon_min, lat_min, lon_max, lat_max = region.bounds
-    else:
-        lon_min, lat_min, lon_max, lat_max = (
-            _number(user_query.get(k)) for k in ("lon_min", "lat_min", "lon_max", "lat_max")
-        )
-        if None in (lon_min, lat_min, lon_max, lat_max):
-            return None
-    return max(lon_min, -180), lat_min, min(lon_max, 180), lat_max
 
 
 # Characters Java regex can't take as a one-character class ([.]), and the
@@ -126,7 +111,7 @@ def get_erddap_download_url(dataset, user_query, variables, region=None, respons
         e.constraints["time<="] = user_query["time_max"]
 
     # Feature IDs already pin the selection in space.
-    box = None if extra else _box(user_query, region)
+    box = None if extra else query_box(user_query, region)
     if box:
         lon_min, lat_min, lon_max, lat_max = box
         e.constraints.update(
@@ -292,48 +277,7 @@ def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
     url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
     row["download_url_list"] = [url]
 
-    if regions:
-        lons = [b for r in regions for b in (r.bounds[0], r.bounds[2])]
-        lats = [b for r in regions for b in (r.bounds[1], r.bounds[3])]
-        lon_min, lon_max, lat_min, lat_max = min(lons), max(lons), min(lats), max(lats)
-    else:
-        lon_min, lat_min, lon_max, lat_max = _box(user_query, None) or (-180, -90, 180, 90)
-    lon_min, lon_max = max(lon_min, -180), min(lon_max, 180)
-    lat_min, lat_max = max(lat_min, -85.06), min(lat_max, 85.06)
-
-    # The same columns the harvester reads; reliably present across OBIS exports.
-    query = f"""
-        SELECT
-            _id                              AS id,
-            interpreted.scientificName       AS scientificName,
-            interpreted.decimalLatitude      AS latitude,
-            interpreted.decimalLongitude     AS longitude,
-            interpreted.date_start           AS date_start,
-            interpreted.date_end             AS date_end,
-            interpreted.minimumDepthInMeters AS minimumDepthInMeters,
-            interpreted.maximumDepthInMeters AS maximumDepthInMeters
-        FROM read_parquet('{url}')
-        WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
-          AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
-    """
-    df = duckdb.sql(query).df()
-
-    depth_min, depth_max = _number(user_query.get("depth_min")), _number(user_query.get("depth_max"))
-    if depth_max is not None:
-        df = df[df["minimumDepthInMeters"].fillna(0).astype(float) <= depth_max]
-    if depth_min is not None:
-        df = df[df["maximumDepthInMeters"].fillna(0).astype(float) >= depth_min]
-
-    # date_start/date_end are epoch milliseconds in the OBIS export.
-    for bound, column, keep in (("time_min", "date_end", "ge"), ("time_max", "date_start", "le")):
-        if user_query.get(bound):
-            limit = pd.to_datetime(user_query[bound], utc=True)
-            values = pd.to_datetime(df[column], unit="ms", utc=True, errors="coerce")
-            df = df[values.ge(limit) if keep == "ge" else values.le(limit)]
-
-    if regions and not df.empty:
-        df = df[inside(df["longitude"], df["latitude"], regions)]
-
+    df = obis_frame(url, user_query, regions)
     row["n_records"] = len(df)
     if df.empty:
         row["status"] = EMPTY
@@ -378,21 +322,6 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
     row["no_data"] = not row["files"]
     row["finished_at"] = _now()
     return row
-
-
-def polygon_regions(polygon_wkt):
-    """The user's polygon, plus ±360° copies when it crosses the antimeridian
-    so each side gets its own query."""
-    if not polygon_wkt:
-        return []
-    regions = [shapely.wkt.loads(polygon_wkt)]
-    lon_min, _, lon_max, _ = regions[0].bounds
-    if lon_min < -180 or lon_max > 180:
-        for shift in (-360, 360):
-            shifted = shapely.affinity.translate(regions[0], xoff=shift)
-            if -180 < shifted.bounds[0] < 180 or -180 < shifted.bounds[2] < 180:
-                regions.append(shifted)
-    return regions
 
 
 def get_datasets(json_query, output_path):
