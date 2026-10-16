@@ -4,6 +4,135 @@
   gap: 2px;
 }
 
+.spatialFilterPlaces {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.spatialFilterPlacesLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
+.spatialFilterPlacesLabel .filterSearch {
+  padding-right: 10px;
+  color: var(--cioos-ink);
+}
+
+.spatialFilterPlaceList {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spatialFilterPlace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.spatialFilterPlaceKind {
+  flex-shrink: 0;
+  color: var(--cioos-ink-80);
+}
+
+.spatialFilterPlaceText {
+  display: flex;
+  flex: 1 1 10em;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.spatialFilterPlaceName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cioos-ink);
+}
+
+.spatialFilterPlaceOtherNames {
+  color: var(--cioos-ink-80);
+}
+
+.spatialFilterPlaceType {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
+.spatialFilterPlaceAction {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  min-width: 30px;
+  height: 30px;
+  justify-content: center;
+  padding: 0 8px;
+  background: none;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  color: var(--cioos-ink);
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  cursor: pointer;
+}
+
+.spatialFilterPlaceAction:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-teal-light);
+}
+
+.spatialFilterPlaceAction:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.spatialFilterPlacesLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
+.spatialFilterPlaceApplied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 0 10px;
+}
+
+.spatialFilterPlaceAppliedName {
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.spatialFilterPlaceApplied a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-primary-700);
+}
+
+.spatialFilterPlacesSource {
+  margin: 6px 0 0;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
 .spatialFilterDetails {
   margin-top: 10px;
   padding-top: 10px;

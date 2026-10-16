@@ -45,6 +45,7 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
     useMapState();
   const {
     polygon,
+    areaPlace,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     onlyInView,
@@ -161,9 +162,12 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
   const boxDrawn = Boolean(polygon) && polygonIsRectangle(polygon);
   const areaOption = (mode, label, drawn) => ({
     id: mode,
-    label,
+    label:
+      drawn && areaPlace
+        ? t("spatialFilterPlaceOption", { place: areaPlace.name, shape: label })
+        : label,
     description: t("quickFilterAreaTitle"),
-    matchText: `${label} ${t("spatialFilterFilterName")}`,
+    matchText: `${label} ${t("spatialFilterFilterName")} ${drawn && areaPlace ? areaPlace.name : ""}`,
     state: drawn ? "include" : undefined,
     includeOnly: true,
     closes: !drawn,
