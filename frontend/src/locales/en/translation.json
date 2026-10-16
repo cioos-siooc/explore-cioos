@@ -563,6 +563,8 @@
   "harvest.docs.workflow": "Workflow",
   "harvest.docs.erddap": "ERDDAP",
   "harvest.docs.obis": "OBIS",
+  "harvest.docs.downloads": "Downloads",
+  "harvest.downloads.docsLink": "How download packages are built",
   "harvest.docs.notFound": "Document not found.",
   "harvest.layout.backLink": "← Data Explorer",
   "harvest.col.started": "Started",

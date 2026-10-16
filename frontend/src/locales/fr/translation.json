@@ -564,6 +564,8 @@
   "harvest.docs.workflow": "Processus",
   "harvest.docs.erddap": "ERDDAP",
   "harvest.docs.obis": "OBIS",
+  "harvest.docs.downloads": "Téléchargements",
+  "harvest.downloads.docsLink": "Construction des paquets de téléchargement",
   "harvest.docs.notFound": "Document introuvable.",
   "harvest.layout.backLink": "← Explorateur de données",
   "harvest.col.started": "Démarré",
