@@ -4,6 +4,7 @@ import {
   BoundingBox,
   Check2,
   Clipboard,
+  GeoAlt,
   Pentagon,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -16,8 +17,85 @@ import {
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../../state/ui/UIProvider.jsx";
+import {
+  useGoToRegion,
+  useRegionMatches,
+} from "../../../../state/useRegionSearch.js";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
+
+// An area becomes the area filter as its outline or its box, and any place can
+// just be gone to. Picking closes the modal so the map is in view.
+function PlaceSearch() {
+  const { t } = useTranslation();
+  const { setShowFiltersModal } = useUI();
+  const goTo = useGoToRegion();
+  const [term, setTerm] = useState("");
+  const places = useRegionMatches(term.trim());
+
+  const pick = (place, shape) => {
+    setShowFiltersModal(false);
+    goTo(place, shape);
+  };
+  const shapes = [
+    { id: "polygon", Icon: Pentagon, label: t("drawPolygonOption") },
+    { id: "box", Icon: BoundingBox, label: t("drawBoundingBoxOption") },
+  ];
+
+  return (
+    <div className="spatialFilterPlaces">
+      <label className="spatialFilterPlacesLabel">
+        {t("spatialFilterPlaceLabel")}
+        <input
+          className="filterSearch"
+          type="text"
+          data-testid="spatial-filter-place-input"
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          placeholder={t("spatialFilterPlacePlaceholder")}
+        />
+      </label>
+      <ul className="spatialFilterPlaceList" aria-live="polite">
+        {places.map((place) => (
+          <li key={place.id} className="spatialFilterPlace">
+            <span className="spatialFilterPlaceText">
+              <span className="spatialFilterPlaceName">{place.name}</span>
+              <span className="spatialFilterPlaceType">
+                {t(`regionType${place.type}`, { defaultValue: "" })}
+              </span>
+            </span>
+            {place.area &&
+              shapes.map(({ id, Icon, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="spatialFilterPlaceAction"
+                  data-testid={`spatial-filter-place-${id}`}
+                  onClick={() => pick(place, id)}
+                  aria-label={`${t("regionSearchAction", { shape: label })}: ${place.name}`}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            <button
+              type="button"
+              className="spatialFilterPlaceAction"
+              onClick={() => pick(place, "goto")}
+              title={t("regionSearchGoTo")}
+              aria-label={`${t("regionSearchGoTo")}: ${place.name}`}
+            >
+              <GeoAlt size={14} aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="spatialFilterPlacesSource">
+        {t("spatialFilterPlaceSource")}
+      </p>
+    </div>
+  );
+}
 
 // Unlike SpatialFilterButton this doesn't auto-arm the last tool on open:
 // opening this pane is browsing, not the start of drawing.
@@ -66,6 +144,7 @@ export default function SpatialFilter() {
           <span className="optionName">{t("drawPolygonOption")}</span>
         </div>
       </div>
+      <PlaceSearch />
       {hasSelection && (
         <div className="spatialFilterDetails">
           <dl className="spatialFilterBounds">
