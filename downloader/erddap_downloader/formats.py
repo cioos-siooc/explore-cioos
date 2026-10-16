@@ -1,13 +1,22 @@
 """Output formats: each turns the raw ERDDAP response parts of one subset into
 the polygon-filtered file(s) shipped in the package.
 
-Copied as is into every package, beside reproduce.py, so it must import only
-third-party libraries.
+Copied as is into every package as reproduce.py, so it must import only
+third-party libraries. Run there (`uv run reproduce.py`), it re-fetches every
+subset from its recorded request URLs into reproduced/ and compares each file
+with its sha256 in datapackage.json.
 
 Text values are read and written back as strings, so numbers keep ERDDAP's
 exact formatting; only latitude/longitude are parsed, for the polygon test.
 """
 
+import hashlib
+import json
+import shutil
+import sys
+import tempfile
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +29,10 @@ import shapely
 import shapely.affinity
 import shapely.wkt
 import xarray as xr
+
+# Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that 403s
+# urllib's default User-Agent.
+REQUEST_HEADERS = {"User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"}
 
 
 @dataclass(frozen=True)
@@ -272,19 +285,31 @@ def write_subset(format_key, parts, regions, out_base: Path):
     return _WRITERS[format_key](parts, regions, out_base)
 
 
-def obis_frame(url, user_query, regions):
-    """The OBIS occurrences of the parquet export at ``url`` matching the query."""
+def _epoch_ms(value):
+    return int(pd.to_datetime(value, utc=True).timestamp() * 1000) if value else None
+
+
+def write_obis(format_key, url, user_query, regions, out_base: Path):
+    """The OBIS occurrences of the parquet export at ``url`` matching the query,
+    as CSV or Parquet; [] when none match."""
     if regions:
-        lons = [b for r in regions for b in (r.bounds[0], r.bounds[2])]
-        lats = [b for r in regions for b in (r.bounds[1], r.bounds[3])]
-        lon_min, lon_max, lat_min, lat_max = min(lons), max(lons), min(lats), max(lats)
+        lon_min, lat_min, lon_max, lat_max = shapely.total_bounds(regions)
     else:
         lon_min, lat_min, lon_max, lat_max = query_box(user_query, None) or (-180, -90, 180, 90)
-    lon_min, lon_max = max(lon_min, -180), min(lon_max, 180)
-    lat_min, lat_max = max(lat_min, -85.06), min(lat_max, 85.06)
-
-    # The same columns the harvester reads; reliably present across OBIS exports.
-    query = f"""
+    params = {
+        "url": url,
+        "lon_min": max(lon_min, -180),
+        "lon_max": min(lon_max, 180),
+        "lat_min": max(lat_min, -85.06),
+        "lat_max": min(lat_max, 85.06),
+        "depth_min": _number(user_query.get("depth_min")),
+        "depth_max": _number(user_query.get("depth_max")),
+        "time_min": _epoch_ms(user_query.get("time_min")),
+        "time_max": _epoch_ms(user_query.get("time_max")),
+    }
+    # The same columns the harvester reads; reliably present across OBIS
+    # exports. date_start/date_end are epoch milliseconds.
+    query = """
         SELECT
             _id                              AS id,
             interpreted.scientificName       AS scientificName,
@@ -294,34 +319,22 @@ def obis_frame(url, user_query, regions):
             interpreted.date_end             AS date_end,
             interpreted.minimumDepthInMeters AS minimumDepthInMeters,
             interpreted.maximumDepthInMeters AS maximumDepthInMeters
-        FROM read_parquet('{url}')
-        WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
-          AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
+        FROM read_parquet($url)
+        WHERE interpreted.decimalLatitude  BETWEEN $lat_min AND $lat_max
+          AND interpreted.decimalLongitude BETWEEN $lon_min AND $lon_max
+          AND ($depth_max IS NULL OR coalesce(interpreted.minimumDepthInMeters, 0) <= $depth_max)
+          AND ($depth_min IS NULL OR coalesce(interpreted.maximumDepthInMeters, 0) >= $depth_min)
+          AND ($time_min IS NULL OR interpreted.date_end >= $time_min)
+          AND ($time_max IS NULL OR interpreted.date_start <= $time_max)
     """
     # Own connection: the shared default one breaks under concurrent subsets.
     with duckdb.connect() as con:
-        df = con.sql(query).df()
-
-    depth_min, depth_max = _number(user_query.get("depth_min")), _number(user_query.get("depth_max"))
-    if depth_max is not None:
-        df = df[df["minimumDepthInMeters"].fillna(0).astype(float) <= depth_max]
-    if depth_min is not None:
-        df = df[df["maximumDepthInMeters"].fillna(0).astype(float) >= depth_min]
-
-    # date_start/date_end are epoch milliseconds in the OBIS export.
-    for bound, column, keep in (("time_min", "date_end", "ge"), ("time_max", "date_start", "le")):
-        if user_query.get(bound):
-            limit = pd.to_datetime(user_query[bound], utc=True)
-            values = pd.to_datetime(df[column], unit="ms", utc=True, errors="coerce")
-            df = df[values.ge(limit) if keep == "ge" else values.le(limit)]
-
-    if regions and not df.empty:
+        df = con.execute(query, params).df()
+    if regions:
         df = df[inside(df["longitude"], df["latitude"], regions)]
-    return df
+    if df.empty:
+        return []
 
-
-def write_frame(format_key, df, out_base: Path):
-    """An in-memory table (OBIS occurrences) in ``format_key``."""
     if format_key == "parquet":
         path = out_base.with_suffix(".parquet")
         df.to_parquet(path, index=False)
@@ -330,3 +343,74 @@ def write_frame(format_key, df, out_base: Path):
         df.to_csv(path, index=False, lineterminator="\n")
     columns = [{"name": c, "unit": ""} for c in df.columns]
     return [{"path": path, "n_rows": len(df), "columns": columns}]
+
+
+def sha256(path):
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def _fetch(url, path):
+    """False when ERDDAP answers that nothing matches this request."""
+    request = urllib.request.Request(url, headers=REQUEST_HEADERS)
+    try:
+        with urllib.request.urlopen(request, timeout=600) as response, open(path, "wb") as f:
+            shutil.copyfileobj(response, f)
+    except urllib.error.HTTPError as e:
+        if e.code == 404 and b"no matching results" in e.read():
+            return False
+        raise
+    return True
+
+
+def _rebuild(subset, query, regions, out_base: Path, tmp: Path):
+    out_base.parent.mkdir(parents=True, exist_ok=True)
+    if subset["source_type"] == "obis":
+        return write_obis(subset["format"], subset["request_urls"][0], query, regions, out_base)
+    parts = []
+    for i, url in enumerate(subset["request_urls"]):
+        part = tmp / f"{subset['folder']}.part{i}"
+        if _fetch(url, part):
+            parts.append(part)
+    return write_subset(subset["format"], parts, regions, out_base) if parts else []
+
+
+def main():
+    root = Path(__file__).resolve().parent
+    out = root / "reproduced"
+    package = json.loads((root / "datapackage.json").read_text())
+    query = package["x-cde-query"]
+    regions = polygon_regions(query.get("polygon_region"))
+    expected = {r["path"]: r["hash"].removeprefix("sha256:") for r in package["resources"] if "hash" in r}
+
+    differs = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for subset in package["x-cde-subsets"]:
+            print(f"{subset['dataset_id']}:")
+            try:
+                files = _rebuild(subset, query, regions, out / subset["folder"] / subset["folder"], Path(tmp))
+            except Exception as e:
+                print(f"  failed: {type(e).__name__}: {e}")
+                differs += 1
+                continue
+            written = {f["path"].relative_to(out).as_posix(): f["path"] for f in files}
+            for path in sorted({p for p in expected if p.startswith(subset["folder"] + "/")} | set(written)):
+                if path not in written:
+                    status = "missing"
+                elif path not in expected:
+                    status = "extra"
+                else:
+                    status = "match" if sha256(written[path]) == expected[path] else "differs"
+                differs += status != "match"
+                print(f"  {status}: {path}")
+            if subset["status"] == "PARTIAL":
+                print("  note: the package copy was cut off at the size limit, so the full rebuild differs")
+
+    if differs:
+        print("\nSome files differ: the source data may have changed since the package was built.")
+    print(f"\nRebuilt files are in {out}")
+    return 1 if differs else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

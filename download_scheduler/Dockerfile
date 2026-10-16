@@ -14,10 +14,6 @@ WORKDIR /usr/src/app/download_scheduler
 # --locked: without it uv may re-resolve to versions CI never tested.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
-# Download packages ship reproduce.py.lock; its pins only change with this
-# image, so it is locked once here instead of per download.
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv run --no-sync python -c "from erddap_downloader.package import build_reproduce_lock; build_reproduce_lock()"
 
 # poll_once() touches downloads/healthz after every served poll. Missing or
 # stale means the loop is dead, hung, or cannot reach the database. The hour of

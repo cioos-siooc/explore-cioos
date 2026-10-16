@@ -1,6 +1,5 @@
 import json
 import re
-import shutil
 import subprocess
 import sys
 import threading
@@ -8,13 +7,11 @@ import time
 import tomllib
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
-from importlib.metadata import version
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote, unquote
 
 import numpy as np
-import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -81,13 +78,11 @@ def _query(*datasets, **user_query):
     }
 
 
-def _run(tmp_path, query, get=None, metadata_warnings=(), lock=None):
+def _run(tmp_path, query, get=None, metadata_warnings=()):
     get = get or (lambda url, **_: _response())
     with (
         patch("erddap_downloader.download_erddap.requests.get", side_effect=get),
         patch("erddap_downloader.download_erddap.save_source_metadata", return_value=list(metadata_warnings)),
-        # Never a lock left in the checkout by a local build_reproduce_lock().
-        patch.object(package, "REPRODUCE_LOCK", lock or tmp_path / "no.lock"),
     ):
         report = downloader_wrapper.run_download_query(download_query=query, output_folder=tmp_path / "out")
     archive = zipfile.ZipFile(report["path"])
@@ -206,16 +201,12 @@ def test_over_the_query_limit_later_datasets_are_ignored_and_over_limit_is_set(t
     assert report["over_limit"] is True
 
 
-def test_obis_falls_back_to_csv_for_a_format_it_has_no_rendition_of(tmp_path):
-    df = pd.DataFrame({"id": ["a"], "scientificName": ["Gadus morhua"], "latitude": [52.0], "longitude": [-130.0],
-                       "date_start": [1577836800000], "date_end": [1577836800000],
-                       "minimumDepthInMeters": [5.0], "maximumDepthInMeters": [5.0]})
-    duck = MagicMock()
-    duck.df.return_value = df
+def test_obis_falls_back_to_csv_for_a_format_it_has_no_rendition_of(tmp_path, monkeypatch):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
     obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
-    with patch("duckdb.connect") as connect:
-        connect.return_value.__enter__.return_value.sql.return_value = duck
-        report, archive, read = _run(tmp_path, _query(obis, format="nccf"))
+    report, archive, read = _run(tmp_path, _query(obis, format="nccf"))
 
     row = report["erddap_report"][0]
     assert row["format"] == "csv" and row["format_fallback"]
@@ -355,7 +346,7 @@ def _reproduce(tmp_path, archive, edit=None):
     root = tmp_path / "unzipped" / "cde_download_pkg001"
     if edit:
         edit(root)
-    result = subprocess.run([sys.executable, "reproduce/reproduce.py"], cwd=root, capture_output=True, text=True)
+    result = subprocess.run([sys.executable, "reproduce.py"], cwd=root, capture_output=True, text=True)
     return root, result
 
 
@@ -419,85 +410,32 @@ def test_reproduce_reports_a_source_that_changed(tmp_path):
     assert "differs: Ctd_data_example_ca/Ctd_data_example_ca.csv" in result.stdout
 
 
-def test_reproduce_script_pins_the_versions_that_built_the_package(tmp_path):
+def test_reproduce_script_pins_the_versions_of_its_lock(tmp_path):
     _, archive, read = _run(tmp_path, _query(_dataset("Ctd")))
 
-    assert read("reproduce/formats.py") == Path(formats.__file__).read_text()
-    block = re.search(r"^# /// script\n((?:#.*\n)+?)^# ///$", read("reproduce/reproduce.py"), re.MULTILINE).group(1)
+    script = read("reproduce.py")
+    assert script.endswith(Path(formats.__file__).read_text())
+    block = re.search(r"^# /// script\n((?:#.*\n)+?)^# ///$", script, re.MULTILINE).group(1)
     metadata = tomllib.loads("".join(line.removeprefix("#").removeprefix(" ") + "\n" for line in block.splitlines()))
-    assert f"pandas=={version('pandas')}" in metadata["dependencies"]
-    assert all("==" in d for d in metadata["dependencies"])
-    assert metadata["requires-python"] == f"=={sys.version_info.major}.{sys.version_info.minor}.*"
+    lock = tomllib.loads(read("reproduce.py.lock"))
+    assert read("reproduce.py.lock") == package.REPRODUCE_LOCK.read_text()
+    assert metadata["dependencies"] == [f"{r['name']}{r['specifier']}" for r in lock["manifest"]["requirements"]]
+    assert metadata["requires-python"] == lock["requires-python"]
     crate = json.loads(read("ro-crate-metadata.json"))
-    files = {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
-    assert {"reproduce/reproduce.py", "reproduce/formats.py"} <= files
+    assert {"reproduce.py", "reproduce.py.lock"} <= {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+    assert "uv run reproduce.py" in read("README.md")
 
 
-_PYTHON = f"=={sys.version_info.major}.{sys.version_info.minor}.*"
+def test_the_reproduce_lock_pins_the_image_versions():
+    # Packages are built in the download_scheduler image; relock with
+    # build_reproduce_lock() (see its docstring) when this fails.
+    image = tomllib.loads((Path(__file__).parents[2] / "download_scheduler" / "uv.lock").read_text())
+    installed = {p["name"]: f"=={p['version']}" for p in image["package"]}
+    lock = tomllib.loads(package.REPRODUCE_LOCK.read_text())
 
-
-def _lock(path, pins, python):
-    requirements = "\n".join(f'    {{ name = "{n}", specifier = "{p}" }},' for n, p in pins.items())
-    path.write_text(f'version = 1\nrequires-python = "{python}"\n\n[manifest]\nrequirements = [\n{requirements}\n]\n')
-    return path
-
-
-def _current_pins():
-    return {name: f"=={version(name)}" for name in package.REPRODUCE_DEPENDENCIES}
-
-
-def test_the_build_time_lock_ships_with_the_reproduce_script(tmp_path):
-    lock = _lock(tmp_path / "reproduce.py.lock", _current_pins(), _PYTHON)
-    _, archive, read = _run(tmp_path, _query(_dataset("Ctd")), lock=lock)
-
-    assert read("reproduce/reproduce.py.lock") == lock.read_text()
-    crate = json.loads(read("ro-crate-metadata.json"))
-    assert "reproduce/reproduce.py.lock" in {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
-    assert "uv run reproduce/reproduce.py" in read("README.md")
-    assert "You need **uv** installed on your computer" in read("README.md")
-
-
-@pytest.mark.parametrize(
-    ("pins", "python"),
-    [
-        ({**_current_pins(), "pandas": "==1.0.0"}, _PYTHON),
-        ({"pandas": _current_pins()["pandas"]}, _PYTHON),
-        (_current_pins(), "==3.12.*"),
-    ],
-    ids=["other version", "missing package", "other python"],
-)
-def test_a_lock_made_for_other_pins_is_not_shipped(tmp_path, pins, python):
-    lock = _lock(tmp_path / "reproduce.py.lock", pins, python)
-    report, archive, read = _run(tmp_path, _query(_dataset("Ctd")), lock=lock)
-
-    assert report["erddap_report"][0]["status"] == "COMPLETED"
-    assert "cde_download_pkg001/reproduce/reproduce.py.lock" not in archive.namelist()
-    assert "reproduce/reproduce.py.lock" not in {e["@id"] for e in json.loads(read("ro-crate-metadata.json"))["@graph"]}
-
-
-def test_build_reproduce_lock_locks_the_shipped_header(tmp_path, monkeypatch):
-    monkeypatch.setattr(package, "REPRODUCE_LOCK", tmp_path / "reproduce.py.lock")
-    locked = []
-
-    def uv_lock(command, **_):
-        script = Path(command[-1])
-        locked.append(script.read_text())
-        _lock(script.with_name("reproduce.py.lock"), _current_pins(), _PYTHON)
-
-    with patch("erddap_downloader.package.subprocess.run", side_effect=uv_lock):
-        package.build_reproduce_lock()
-
-    assert locked == [package._reproduce_script()]
-    assert package._current_lock() == tmp_path / "reproduce.py.lock"
-
-
-def test_reproduce_without_uv_says_to_use_uv(tmp_path):
-    shutil.copyfile(package.REPRODUCE_SCRIPT, tmp_path / "reproduce.py")
-
-    result = subprocess.run([sys.executable, "-I", "reproduce.py"], cwd=tmp_path, capture_output=True, text=True)
-
-    assert result.returncode == 1
-    assert "uv run reproduce/reproduce.py" in result.stderr
+    pins = {r["name"]: r["specifier"] for r in lock["manifest"]["requirements"]}
+    assert pins == {name: installed[name] for name in package.REPRODUCE_DEPENDENCIES}
+    assert lock["requires-python"] == image["requires-python"]
 
 
 def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
@@ -508,9 +446,32 @@ def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
     regions = formats.polygon_regions(_TRIANGLE)
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        frames = list(pool.map(lambda _: formats.obis_frame(str(export), {}, regions), range(32)))
+        written = list(
+            pool.map(lambda i: formats.write_obis("csv", str(export), {}, regions, tmp_path / str(i)), range(32))
+        )
 
-    assert [len(f) for f in frames] == [1] * 32
+    assert [f["n_rows"] for [f] in written] == [1] * 32
+
+
+@pytest.mark.parametrize(
+    ("query", "n_rows"),
+    [
+        ({}, 2),
+        ({"depth_min": "6"}, 0),
+        ({"depth_max": "4"}, 0),
+        ({"depth_min": "5", "depth_max": "5"}, 2),
+        ({"time_min": "2020-01-02"}, 0),
+        ({"time_max": "2019-12-31T23:59:59Z"}, 0),
+        ({"time_min": "2019-12-31T21:00:00-03:00", "time_max": "2020-01-01T00:00:00Z"}, 2),
+    ],
+)
+def test_obis_occurrences_are_filtered_by_depth_and_time(tmp_path, query, n_rows):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+
+    written = formats.write_obis("csv", str(export), query, [], tmp_path / "out")
+
+    assert sum(f["n_rows"] for f in written) == n_rows
 
 
 def test_the_readme_also_ships_as_a_standalone_web_page(tmp_path):
@@ -556,16 +517,12 @@ def test_each_dataset_links_to_its_source_records(tmp_path):
     assert '<a href="https://catalogue.cioos.ca/dataset/abc">Catalogue SIOOC</a>' in read("README.html")
 
 
-def test_an_obis_dataset_links_to_its_obis_page(tmp_path):
-    df = pd.DataFrame({"id": ["a"], "scientificName": ["Gadus morhua"], "latitude": [52.0], "longitude": [-130.0],
-                       "date_start": [1577836800000], "date_end": [1577836800000],
-                       "minimumDepthInMeters": [5.0], "maximumDepthInMeters": [5.0]})
-    duck = MagicMock()
-    duck.df.return_value = df
+def test_an_obis_dataset_links_to_its_obis_page(tmp_path, monkeypatch):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
     obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
-    with patch("duckdb.connect") as connect:
-        connect.return_value.__enter__.return_value.sql.return_value = duck
-        _, _, read = _run(tmp_path, _query(obis))
+    _, _, read = _run(tmp_path, _query(obis))
 
     assert "| [OBIS](<https://obis.org/dataset/abc>) |" in read("README.md")
 
@@ -659,17 +616,6 @@ def test_the_readme_opens_with_a_table_of_contents(tmp_path, language, label, se
     assert f'aria-label="{label.rstrip(" :")}"' in nav and f'href="#{quote(anchor)}"' in nav
     # Beside the body, not inside it.
     assert label not in html[html.index("<main>"):]
-
-
-def test_the_reproduce_files_sit_in_their_own_folder(tmp_path):
-    _, archive, read = _run(tmp_path, _query(_dataset("Good")))
-
-    names = set(archive.namelist())
-    assert {"cde_download_pkg001/reproduce/reproduce.py", "cde_download_pkg001/reproduce/formats.py"} <= names
-    assert "cde_download_pkg001/reproduce.py" not in names
-    crate = {e["@id"]: e for e in json.loads(read("ro-crate-metadata.json"))["@graph"]}
-    assert crate["reproduce/reproduce.py"]["name"] == "reproduce.py"
-    assert crate["reproduce/formats.py"]["encodingFormat"] == "text/x-python"
 
 
 def test_the_readme_links_back_to_the_selection_in_the_explorer(tmp_path):

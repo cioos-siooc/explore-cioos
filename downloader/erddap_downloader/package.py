@@ -8,9 +8,9 @@ downloader report plus the query that produced it.
   the request URLs, timing and outcome, failures included.
 - citations.txt/.bib/.ris, CITATION.cff, rights.txt: GBIF-style citation and
   licence files; each dataset folder also carries its own citation.txt.
-- reproduce/ (reproduce.py, formats.py, reproduce.py.lock): a uv script (PEP 723 header,
-  plus the uv lock of every transitive dependency built with the image) that
-  re-fetches and re-filters every subset.
+- reproduce.py, reproduce.py.lock: formats.py as a uv script that re-fetches
+  and re-filters every subset, with the committed uv lock of every library
+  that built the package (its PEP 723 header comes from the lock's manifest).
 
 Each subset citation follows ESIP / RDA dynamic-data-citation practice: the
 source's own citation, then the subset and the UTC time and URL it was
@@ -18,7 +18,6 @@ retrieved from.
 """
 
 import base64
-import hashlib
 import html
 import json
 import re
@@ -38,7 +37,7 @@ from markdown_it import MarkdownIt
 
 from erddap_downloader import formats
 from erddap_downloader.download_erddap import COMPLETED, EMPTY, FAILED, IGNORED, PARTIAL
-from erddap_downloader.formats import FORMATS
+from erddap_downloader.formats import FORMATS, sha256
 
 INCLUDED = (COMPLETED, PARTIAL)
 SOFTWARE_URL = "https://github.com/cioos-siooc/explore-cioos"
@@ -48,9 +47,8 @@ README_TEMPLATE = Path(__file__).parent / "readme" / "readme.html"
 README_LOGO = Path(__file__).parent / "readme" / "cioos-logo.svg"
 # Titles, citations and server errors reach the README: never pass raw HTML.
 _MARKDOWN = MarkdownIt("commonmark", {"html": False}).enable("table")
-REPRODUCE_SCRIPT = Path(__file__).parent / "shipped" / "reproduce.py"
-REPRODUCE_LOCK = REPRODUCE_SCRIPT.with_name("reproduce.py.lock")
 # formats.py's imports, plus netcdf4 for xarray's NetCDF writer.
+REPRODUCE_LOCK = Path(__file__).with_name("reproduce.py.lock")
 REPRODUCE_DEPENDENCIES = ("duckdb", "netcdf4", "numpy", "pandas", "pyarrow", "shapely", "xarray")
 
 REASONS = {
@@ -132,8 +130,8 @@ _TEXT = {
             "columns, request URLs, licences).\n"
             "- `ro-crate-metadata.json`: RO-Crate 1.2 provenance: one action per dataset with its request "
             "URLs, timing and outcome.\n"
-            "- `reproduce/`: reproduce.py, formats.py and reproduce.py.lock, the code that filtered the data to your "
-            "selection, and the exact library versions it ran with."
+            "- `reproduce.py`, `reproduce.py.lock`: the code that filtered the data to your selection, and the "
+            "exact library versions it ran with."
         ),
         "reproduce": "Reproduce this download",
         "reproduce_text": (
@@ -142,7 +140,7 @@ _TEXT = {
             "It is the only requirement; uv fetches the right Python version and the exact libraries listed at "
             "the top of reproduce.py and in reproduce.py.lock, in an isolated environment that leaves the rest "
             "of your system untouched.\n\n"
-            "Then, in this folder, run `uv run reproduce/reproduce.py`. It re-fetches every subset from its source, "
+            "Then, in this folder, run `uv run reproduce.py`. It re-fetches every subset from its source, "
             "applies the same filter, writes the files to `reproduced/` and checks each one against its "
             "checksum in datapackage.json. Running it with plain `python` instead only works if you install "
             "those libraries yourself."
@@ -215,8 +213,8 @@ _TEXT = {
             "contrôle, colonnes, URL des requêtes, licences).\n"
             "- `ro-crate-metadata.json` : provenance RO-Crate 1.2 : une action par jeu de données avec ses "
             "URL de requête, sa durée et son résultat.\n"
-            "- `reproduce/` : reproduce.py, formats.py et reproduce.py.lock, le code qui a filtré les données selon "
-            "votre sélection, et les versions exactes des bibliothèques utilisées."
+            "- `reproduce.py`, `reproduce.py.lock` : le code qui a filtré les données selon votre sélection, et "
+            "les versions exactes des bibliothèques utilisées."
         ),
         "reproduce": "Reproduire ce téléchargement",
         "reproduce_text": (
@@ -225,7 +223,7 @@ _TEXT = {
             "C'est le seul prérequis; uv récupère la bonne version de Python et les bibliothèques exactes "
             "indiquées en tête de reproduce.py et dans reproduce.py.lock, dans un environnement isolé qui ne "
             "modifie pas le reste de votre système.\n\n"
-            "Ensuite, dans ce dossier, lancez `uv run reproduce/reproduce.py`. Le script récupère de nouveau chaque "
+            "Ensuite, dans ce dossier, lancez `uv run reproduce.py`. Le script récupère de nouveau chaque "
             "sous-ensemble depuis sa source, applique le même filtre, écrit les fichiers dans `reproduced/` et "
             "vérifie chacun avec sa somme de contrôle dans datapackage.json. Avec `python` seul, il faut "
             "installer ces bibliothèques vous-même."
@@ -237,14 +235,6 @@ _TEXT = {
 
 def _lang(user_query):
     return "fr" if user_query.get("language") == "fr" else "en"
-
-
-def _sha256(path: Path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(1024**2), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def landing_url(row):
@@ -585,7 +575,6 @@ _FILE_KINDS = {
     "obis_dataset.json": ("The dataset's OBIS record", "application/json"),
     "eml.xml": ("The dataset's Ecological Metadata Language record from its IPT", "application/xml"),
     "reproduce.py": ("uv script that re-fetches and re-filters every subset of this package", "text/x-python"),
-    "formats.py": ("The filtering code that produced the data files, used by reproduce.py", "text/x-python"),
     "reproduce.py.lock": ("uv lock of every dependency of reproduce.py, transitive ones included", "application/toml"),
 }
 _ACTION_STATUSES = {"CompletedActionStatus": "Completed", "FailedActionStatus": "Failed"}
@@ -719,15 +708,6 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
     return {"@context": f"{RO_CRATE}/context", "@graph": graph}
 
 
-def _pins():
-    return {name: f"=={version(name)}" for name in REPRODUCE_DEPENDENCIES}
-
-
-def _python():
-    # The pins may have no wheels for another Python minor version.
-    return f"=={sys.version_info.major}.{sys.version_info.minor}.*"
-
-
 def _render_readme(markdown, toc_label):
     """(table of contents, body) as HTML: the page shows the table of contents
     beside the body, and section headings get the ids it links to."""
@@ -763,35 +743,38 @@ def _readme_html(markdown, user_query, lang, citations):
     )
 
 
-def _reproduce_script():
-    header = [
-        "# /// script",
-        f'# requires-python = "{_python()}"',
-        "# dependencies = [",
-        *[f'#     "{name}{pin}",' for name, pin in _pins().items()],
-        "# ]",
-        "# ///",
-    ]
-    return "\n".join(header) + "\n" + REPRODUCE_SCRIPT.read_text()
+def _script_header(pins, python):
+    return "\n".join(
+        [
+            "# /// script",
+            f'# requires-python = "{python}"',
+            "# dependencies = [",
+            *[f'#     "{name}{pin}",' for name, pin in pins.items()],
+            "# ]",
+            "# ///",
+            "",
+        ]
+    )
 
 
 def build_reproduce_lock():
-    """Run once at image build: the pins only change when the image does."""
+    """Relock after a dependency bump, from download_scheduler/ (the image's environment):
+    uv run python -c "from erddap_downloader.package import build_reproduce_lock; build_reproduce_lock()"
+    """
+    pins = {name: f"=={version(name)}" for name in REPRODUCE_DEPENDENCIES}
+    # The pins may have no wheels for another Python minor version.
+    python = f"=={sys.version_info.major}.{sys.version_info.minor}.*"
     with tempfile.TemporaryDirectory() as tmp:
         script = Path(tmp) / "reproduce.py"
-        script.write_text(_reproduce_script())
+        script.write_text(_script_header(pins, python))
         subprocess.run(["uv", "lock", "--script", str(script)], check=True)
         shutil.copyfile(script.with_name("reproduce.py.lock"), REPRODUCE_LOCK)
 
 
-def _current_lock():
-    """The build-time lock, unless missing or made for other pins (a dev
-    checkout whose dependencies moved since it was built)."""
-    if not REPRODUCE_LOCK.exists():
-        return None
+def _reproduce_script():
     lock = tomllib.loads(REPRODUCE_LOCK.read_text())
-    locked = {r["name"]: r.get("specifier") for r in lock["manifest"]["requirements"]}
-    return REPRODUCE_LOCK if locked == _pins() and lock.get("requires-python") == _python() else None
+    pins = {r["name"]: r["specifier"] for r in lock["manifest"]["requirements"]}
+    return _script_header(pins, lock["requires-python"]) + Path(formats.__file__).read_text()
 
 
 def write_package(root: Path, json_query, report):
@@ -811,7 +794,7 @@ def write_package(root: Path, json_query, report):
         if metadata:
             (folder / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False))
         for file in row["files"]:
-            file["sha256"] = _sha256(root / file["path"])
+            file["sha256"] = sha256(root / file["path"])
         if row["status"] in INCLUDED:
             (folder / "citation.txt").write_text(citation(row, metadata, user_query, lang) + "\n")
         entries.append((row, metadata, lang))
@@ -873,11 +856,8 @@ def write_package(root: Path, json_query, report):
         ],
     }
     (root / "datapackage.json").write_text(json.dumps(datapackage, indent=2, ensure_ascii=False))
-    (root / "reproduce").mkdir()
-    (root / "reproduce" / "reproduce.py").write_text(_reproduce_script())
-    shutil.copyfile(formats.__file__, root / "reproduce" / "formats.py")
-    if lock := _current_lock():
-        shutil.copyfile(lock, root / "reproduce" / "reproduce.py.lock")
+    (root / "reproduce.py").write_text(_reproduce_script())
+    shutil.copyfile(REPRODUCE_LOCK, root / "reproduce.py.lock")
 
     root_files = [
         "README.md",
@@ -888,10 +868,8 @@ def write_package(root: Path, json_query, report):
         "citations.ris",
         "CITATION.cff",
         "rights.txt",
-        "reproduce/reproduce.py",
-        "reproduce/formats.py",
-        *(["reproduce/reproduce.py.lock"] if (root / "reproduce" / "reproduce.py.lock").exists() else []),
+        "reproduce.py",
+        "reproduce.py.lock",
     ]
     crate = _ro_crate(root, user_query, entries, created, root_files)
     (root / "ro-crate-metadata.json").write_text(json.dumps(crate, indent=2, ensure_ascii=False))
-

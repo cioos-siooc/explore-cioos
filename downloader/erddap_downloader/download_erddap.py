@@ -19,13 +19,13 @@ from erddap_downloader.formats import (
     DEFAULT_FORMAT,
     FORMATS,
     OBIS_FORMATS,
-    obis_frame,
+    REQUEST_HEADERS,
     polygon_regions,
     query_box,
-    write_frame,
+    write_obis,
     write_subset,
 )
-from erddap_downloader.source_metadata import REQUEST_HEADERS, save_source_metadata
+from erddap_downloader.source_metadata import save_source_metadata
 
 ONE_MB = 10**6
 DATASET_SIZE_LIMIT = 1000 * ONE_MB
@@ -277,14 +277,9 @@ def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
     url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
     row["download_url_list"] = [url]
 
-    df = obis_frame(url, user_query, regions)
-    row["n_records"] = len(df)
-    if df.empty:
-        row["status"] = EMPTY
-        return
-    files = write_frame(fmt, df, folder / dataset_folder_name(dataset))
+    files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset))
     row["files"] = _relative(files, folder.parent)
-    row["status"] = COMPLETED
+    row["status"] = COMPLETED if files else EMPTY
 
 
 def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget, slots):

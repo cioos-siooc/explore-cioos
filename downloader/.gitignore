@@ -5,4 +5,3 @@ __pycache__
 cde_download_*
 out
 .env
-erddap_downloader/shipped/reproduce.py.lock

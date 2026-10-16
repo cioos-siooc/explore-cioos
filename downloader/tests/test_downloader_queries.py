@@ -107,18 +107,18 @@ def test_obis_download_parquet(tmp_path):
         patch("duckdb.connect") as connect,
         patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]) as save_meta,
     ):
-        duck_sql = connect.return_value.__enter__.return_value.sql
-        duck_sql.return_value = duck_result
+        duck_execute = connect.return_value.__enter__.return_value.execute
+        duck_execute.return_value = duck_result
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,
         )
 
     # DuckDB was used to read the parquet (not the tabledap path).
-    assert duck_sql.called
+    assert duck_execute.called
     # OBIS dataset metadata is fetched and saved for a successful download.
     assert save_meta.called
-    parquet_url = duck_sql.call_args[0][0]
+    parquet_url = duck_execute.call_args[0][1]["url"]
     assert ".parquet" in parquet_url and "obis-open-data" in parquet_url
 
     assert len(result["erddap_report"]) == 1
@@ -142,7 +142,7 @@ def test_obis_download_empty(tmp_path):
         patch("duckdb.connect") as connect,
         patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]),
     ):
-        connect.return_value.__enter__.return_value.sql.return_value = duck_result
+        connect.return_value.__enter__.return_value.execute.return_value = duck_result
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,

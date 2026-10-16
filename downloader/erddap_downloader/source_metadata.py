@@ -9,11 +9,8 @@ from pathlib import Path
 
 import requests
 
-# Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that 403s
-# urllib's default User-Agent.
-REQUEST_HEADERS = {
-    "User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"
-}
+from erddap_downloader.formats import REQUEST_HEADERS
+
 CKAN_PACKAGE_API = "https://catalogue.cioos.ca/api/3/action/package_show"
 OBIS_DATASET_API = "https://api.obis.org/v3/dataset/{dataset_id}"
 TIMEOUT = 60
