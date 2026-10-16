@@ -143,13 +143,9 @@ test("502s ERDDAP_UNAVAILABLE for a genuine upstream failure", async () => {
   assert.equal(res.body.upstreamStatus, null);
 });
 
-// NOTE: check(["dataset","profile"]).isLength({max:256}) with no .exists()/
-// .notEmpty() does not reject an ABSENT field in express-validator v6 — only
-// one that's present and over length. So a request missing `profile`
-// entirely reaches the handler with profile===undefined, which knex's raw
-// binding then rejects with "Undefined binding(s)" — an uncaught throw, so
-// this is a real 500 (via the app's generic error handler), not a clean 400.
-// Documented here as current behaviour, not the intended one.
+// NOTE: isLength() without .exists() does not reject an absent field in
+// express-validator v6, so a missing `profile` reaches knex as an undefined
+// binding and 500s. Documents current behaviour, not the intended one.
 test("a missing profile reaches the handler and 500s (validation doesn't catch an absent field)", async () => {
   const res = await agent.get("/preview").query({ dataset: "obs_270" });
   assert.equal(res.status, 500);

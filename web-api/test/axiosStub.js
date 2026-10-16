@@ -1,8 +1,6 @@
 const Module = require("node:module");
 
-// Stands in for axios so route tests never make a real HTTP call to ERDDAP
-// (routes/preview.js) or the CHS NONNA gateway (routes/nonna.js). Must run
-// before the route module that calls axios.get is required.
+// Must install before the route module that calls axios.get is required.
 const axiosPath = require.resolve("axios");
 
 function install() {
@@ -30,12 +28,11 @@ function install() {
 
   return {
     calls,
-    // Queue a resolved axios response, e.g. { data: {...}, status: 200 }.
     queueResponse(response) {
       queue.push(response);
     },
-    // Queue a rejection. Shape it like a real axios error (`.response.status`,
-    // `.response.data`, `.message`) when the route branches on those.
+    // Shape it like a real axios error (`.response.status`, `.response.data`)
+    // when the route branches on those.
     queueError(error) {
       queue.push(error);
     },

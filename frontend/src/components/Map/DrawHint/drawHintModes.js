@@ -1,8 +1,7 @@
-// Wraps a mapbox-gl-draw mode so it announces, as a 'draw.hint' map event,
-// which step of drawing the user is at — the stage lives in the mode's own
-// state, which nothing outside the mode can read. `hint` is null once the
-// mode stops (finished, cancelled or replaced) — announced before the mode's
-// own onStop, so the draw.create that onStop fires comes after it.
+// The drawing stage lives in the mode's own state, which nothing outside the
+// mode can read, so the mode announces it as a 'draw.hint' event. The null
+// hint is fired before the mode's own onStop so the draw.create that onStop
+// fires comes after it.
 function withDrawHint(mode, hintOf) {
   const announce = (ctx, state) =>
     ctx.map.fire("draw.hint", { hint: hintOf(state) });

@@ -1,22 +1,9 @@
 /*
- * Ocean-first basemap for the CDE map.
+ * Ocean-first basemap: EMODnet bathymetry for the world view handing over to
+ * Esri imagery at z10, under an OpenFreeMap vector overlay (rivers,
+ * boundaries, FR/EN labels). No API keys; all endpoints are CORS-open.
  *
- * Two base rasters that hand over to each other at z10: a bathymetry
- * raster (EMODnet World Base Layer — global GEBCO-derived depth shading with
- * muted grey land) for the world view, satellite imagery (Esri World Imagery)
- * for the local view. Under them sits a slim OpenMapTiles-schema vector overlay
- * (OpenFreeMap) contributing rivers and streams, boundaries, and FR/EN water &
- * place labels.
- *
- * The drawn cartography that existed to compensate for the blurred raster —
- * the CIOOS water tint and the coastline stroke — lifts off across the same
- * window. Both were answering "which side of this edge is water?", and once
- * the satellite is in, it answers that itself; leaving the stroke on would only
- * draw an OSM shoreline a few tens of metres beside the visible one.
- * No API keys; all endpoints are CORS-open.
- *
- * Data layers (hexes/points/trajectories/griddap/WMS) are inserted by Map.js
- * *below* FIRST_LABEL_LAYER_ID so labels always stay readable on top.
+ * Map.jsx inserts data layers below FIRST_LABEL_LAYER_ID so labels stay on top.
  */
 
 import { server } from "../../config";
@@ -39,20 +26,14 @@ const EMODNET_TILES =
 const ESRI_IMAGERY_TILES =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
-// CHS NONNA bathymetry, through our own API rather than direct. CHS allowlists
-// request origins exactly and 403s every other one — including the CORS
-// preflight — and MapLibre always sends an Origin for cross-origin tiles, so
-// the browser cannot fetch these itself. web-api/routes/nonna.js fetches them
-// server-side (no Origin header) and re-serves them same-origin; the reasoning
-// is written out there.
+// CHS allowlists request origins exactly (403ing the CORS preflight too), and
+// MapLibre always sends an Origin, so these go through web-api/routes/nonna.js.
 const NONNA_100_TILES = `${server}/nonna/100/{z}/{x}/{y}.png`;
 const NONNA_10_TILES = `${server}/nonna/10/{z}/{x}/{y}.png`;
 
 const CHS_ATTRIBUTION =
   'Bathymetry © <a href="https://www.charts.gc.ca/data-gestion/index-eng.html">Canadian Hydrographic Service</a> (NONNA)';
 
-// Attribution for OpenFreeMap's OSM-derived vector data (coastline, rivers,
-// boundaries, labels).
 const OSM_ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
@@ -66,8 +47,6 @@ export const LABEL_LAYER_IDS = [
 // renders under the labels.
 export const FIRST_LABEL_LAYER_ID = "label-waterway";
 
-// text-field expression for every label layer: interface language, falling
-// back to the tile's default name when no translation exists.
 export function getLabelTextField(lang) {
   return ["coalesce", ["get", `name:${lang}`], ["get", "name"]];
 }
@@ -82,11 +61,9 @@ const SHORELINE_FILTER = [
   true,
 ];
 
-// Shared between label-water and label-water-line so the two stay in sync:
-// same size/weight tiering and colour regardless of which geometry a given
-// water body happens to be stored as. Lakes get their own tier — larger and
-// bold — so freshwater names read as distinct from the ocean/sea teal text
-// around them without changing colour.
+// Shared by label-water and label-water-line so a water body labels alike
+// whichever geometry it is stored as. Lakes get a larger bold tier to read as
+// freshwater without a colour change.
 const WATER_LABEL_TEXT_SIZE = [
   "match",
   ["get", "class"],
@@ -118,31 +95,14 @@ export function buildBasemapStyle(lang = "en") {
       type: "background",
       paint: { "background-color": "#DCE8E5" },
     },
-    // The two base rasters swap at z10: EMODnet owns the world view, satellite
-    // owns the local view, and the change happens over the half zoom below z10
-    // rather than being blended across a wide range.
+    // The rasters swap over the half zoom below z10: EMODnet is pre-rendered
+    // only to z12 with featureless land, and imagery is useless at world scale.
+    // A long cross-fade would leave a band of two half-opaque rasters with
+    // NONNA unreadable on top.
     //
-    // The hand-off sits there because that is roughly where each source stops
-    // earning its place. EMODnet is pre-rendered only to z12, and its land was
-    // always a flat muted grey with no features in it, so a harbour view showed
-    // where the water ended and nothing about what it ended against. Esri's
-    // imagery is the opposite: nothing useful at world scale, everything from
-    // the regional view in.
-    //
-    // The window is deliberately short. A long cross-fade means a wide band of
-    // zooms where the map is two half-opaque rasters at once — neither the
-    // clean depth shading nor the imagery, and NONNA too faint to read on top
-    // of the pair. Half a zoom level is enough to avoid a hard cut on a smooth
-    // zoom and short enough that no resting zoom sits inside the blend.
-    //
-    // Every layer here that fades to nothing carries the maxzoom that matches
-    // its fade. MapLibre skips *drawing* a layer once its opacity reaches 0,
-    // but that is all it skips: whether a layer's geometry gets built at all is
-    // decided by minzoom/maxzoom/visibility and nothing else, so an invisible
-    // layer with no zoom bound is still fetched, parsed and tessellated on
-    // every tile all the way to z17. The bounds below are set to the zoom each
-    // fade already ends at, so nothing changes on screen — they only stop the
-    // work being done for pixels that were never going to be drawn.
+    // Every layer that fades to nothing carries a matching maxzoom: MapLibre
+    // skips drawing a zero-opacity layer but still fetches, parses and
+    // tessellates it unless minzoom/maxzoom/visibility exclude it.
     {
       id: "bathymetry",
       type: "raster",
@@ -163,15 +123,8 @@ export function buildBasemapStyle(lang = "en") {
         "raster-saturation": -0.15,
       },
     },
-    // A shoreline that stays under the satellite for the rest of the map's
-    // life, past where coastline/coastline-casing above hand off to imagery
-    // and stop. Esri's raster tiles are far slower to arrive than this vector
-    // line — OSM's water polygons are already loaded as part of the `ofm`
-    // source the labels need anyway — so on every pan to a fresh area there is
-    // a gap where imagery hasn't painted in yet. Sitting below the imagery
-    // layer means it only shows through that gap: once a satellite tile
-    // lands, its full opacity covers the line again, so this never competes
-    // with or duplicates the real shoreline the imagery shows.
+    // Esri tiles arrive far slower than this vector line, so on a pan to a
+    // fresh area it shows through the gap until the imagery paints over it.
     {
       id: "coastline-satellite-underlay",
       type: "line",
@@ -194,11 +147,8 @@ export function buildBasemapStyle(lang = "en") {
         "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1, 16, 2],
       },
     },
-    // minzoom is what stops imagery tiles being fetched at world zooms. It sits
-    // below the fade rather than on it: the ramp is short enough now that a
-    // request started when the first pixel is drawn would land after the swap
-    // is over, so the layer is mounted (and its tiles requested) half a zoom
-    // early and held at zero opacity until the hand-off begins.
+    // Mounted half a zoom before the fade so its tiles, requested then, land
+    // before the short hand-off is over.
     {
       id: "imagery",
       type: "raster",
@@ -219,37 +169,18 @@ export function buildBasemapStyle(lang = "en") {
         "raster-saturation": -0.15,
       },
     },
-    // Depth, back on top of the satellite. NONNA is transparent over land and
-    // anywhere CHS holds no soundings, so unlike the EMODnet raster it can be
-    // laid straight over the imagery without needing to be clipped to water —
-    // which MapLibre cannot do for a raster anyway. That is what makes the
-    // ocean readable at zooms where EMODnet has already faded out.
-    //
-    // Two products stacked best-resolution-last: NONNA 100 (100 m) is the broad
-    // one, NONNA 10 (10 m) draws over it and wins wherever it has data — sharp
-    // enough at z16 to show wharves and dredged channels. Both fade in together
-    // so the pair always shows the finest soundings available for a spot rather
-    // than holding the good ones back to an arbitrary zoom.
-    //
-    // Stacking them costs nothing visually even though both are translucent:
-    // they share one colour ramp, so where 10 m covers 100 m it is the same
-    // depth painted the same colour, and the blend just smooths the 100 m
-    // blockiness. Where 10 m has no soundings its tile is transparent there and
-    // the 100 m simply shows through. It does mean two tile requests per view,
-    // which is what the proxy's in-process cache is sized for.
-    //
-    // The rainbow ramp is CHS's own, baked into the tiles: the layer is
-    // published as pre-rendered RGB rather than raw depths, so an SLD colour
-    // map cannot restyle it server-side. Opacity is the tuning knob for now.
-    // That same pre-rendering is why the legend's depth axis had to be
-    // calibrated from the tiles — see bathymetryColorScale in config.js.
+    // NONNA is transparent over land and where CHS has no soundings, so it can
+    // lie straight over the imagery (MapLibre can't clip a raster to water).
+    // NONNA 10 draws over NONNA 100; they share one colour ramp, so the stack
+    // only smooths the 100 m blockiness. The ramp is baked into CHS's tiles,
+    // which is why the legend's depth axis is calibrated from them
+    // (bathymetryColorScale in config.js).
     {
       id: "bathymetry-nonna-100",
       type: "raster",
       source: "nonna100",
-      // Mounted below the fade for the same reason as the imagery, and it
-      // matters more here: these tiles come through our own proxy and are the
-      // slowest thing on the map on a cold cache.
+      // Mounted early like the imagery: these come through our proxy and are
+      // the slowest tiles on the map on a cold cache.
       minzoom: basemapPrewarmZoom,
       paint: {
         "raster-opacity": [
@@ -261,11 +192,9 @@ export function buildBasemapStyle(lang = "en") {
           bathymetryFullZoom,
           0.7,
         ],
-        // Three raster sources are stacked here, and the default 300 ms
-        // cross-fade draws both the outgoing and incoming tile for its
-        // duration. These two are translucent and sit over the satellite, so
-        // that is the most overdrawn part of the map; fading instantly also
-        // lets the parent tiles be released sooner.
+        // The default 300 ms cross-fade draws both tiles, and these translucent
+        // layers over the satellite are the most overdrawn part of the map;
+        // fading instantly also releases the parent tiles sooner.
         "raster-fade-duration": 0,
       },
     },
@@ -287,12 +216,8 @@ export function buildBasemapStyle(lang = "en") {
         "raster-fade-duration": 0,
       },
     },
-    // Pulls the sea toward CIOOS teal and unifies the raster palette while
-    // EMODnet is the base. It used to deepen with zoom, to keep a cue about
-    // which side of the shore was water once the overzoomed raster washed out;
-    // the satellite answers that question on its own, so the tint now lifts off
-    // over the same window the imagery arrives in and leaves the water reading
-    // as it actually looks.
+    // Pulls the sea toward CIOOS teal while EMODnet is the base; lifts off as
+    // the imagery arrives.
     {
       id: "water-tint",
       type: "fill",
@@ -312,24 +237,11 @@ export function buildBasemapStyle(lang = "en") {
         ],
       },
     },
-    // Coastline, for the zooms EMODnet owns. Its land/sea edge is a soft
-    // grey-to-blue gradient rather than a drawn line, and it reads worst in
-    // fjords, inlets and archipelagos where the grey land and the shallow-shelf
-    // blue sit at nearly the same value. These two vector lines (OSM water
-    // polygons, crisp at any zoom because vector tiles overzoom losslessly)
-    // draw that edge on top of the raster: a pale casing for contrast against
-    // dark water, and a dark line for contrast against land.
-    //
-    // Both fade out with the raster they were drawn for, so they are gone by
-    // z10. They were the answer to a blurred raster shore, and past the hand-off
-    // there is no raster shore left to fix — the satellite has its own, and a
-    // drawn line beside it would only be a second, wrong one.
-    //
-    // These two are why the maxzoom note above matters most: they turn the OSM
-    // water polygons into *line* geometry, which is the most expensive thing
-    // MapLibre builds, and they do it twice over — and a harbour at z16 is
-    // dense with ponds, docks and river polygons. Without the bound all of that
-    // was tessellated on every tile and then not drawn.
+    // EMODnet's land/sea edge is a soft gradient that vanishes in fjords and
+    // archipelagos, so these vector lines draw it: a pale casing against dark
+    // water, a dark line against land. They fade out with the raster by z10,
+    // and are the most expensive geometry here (water polygons as lines,
+    // twice), hence the maxzoom.
     {
       id: "coastline-casing",
       type: "line",
@@ -340,7 +252,8 @@ export function buildBasemapStyle(lang = "en") {
       layout: { "line-join": "round" },
       paint: {
         "line-color": "#F3F0EC",
-        // Off by z10, with the imagery fully in — see the coastline layer below.
+        // Off by z10, with the imagery fully in — see the coastline layer
+        // below.
         "line-opacity": [
           "interpolate",
           ["linear"],
@@ -354,8 +267,6 @@ export function buildBasemapStyle(lang = "en") {
           basemapHandoffEndZoom,
           0,
         ],
-        // Only ramps to the hand-off now; the stops past it keyed zooms the
-        // layer no longer reaches.
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.2, 10, 2.4],
       },
     },
@@ -372,11 +283,8 @@ export function buildBasemapStyle(lang = "en") {
         // against pale land, but it sits in the basemap's own hue range
         // instead of reading as ink drawn over the top of it.
         "line-color": "#33555F",
-        // Lifts off as the imagery arrives. This stroke exists because the
-        // overzoomed EMODnet shore blurred away; the satellite draws its own
-        // shore, and the OSM polygon it follows can sit tens of metres off the
-        // visible waterline at z15+, so keeping it would add a second, wrong
-        // coastline next to the real one.
+        // Lifts off as the imagery arrives: the OSM polygon can sit tens of
+        // metres off the visible waterline at z15+.
         "line-opacity": [
           "interpolate",
           ["linear"],
@@ -390,7 +298,6 @@ export function buildBasemapStyle(lang = "en") {
           basemapHandoffEndZoom,
           0,
         ],
-        // Width still ramps for the zooms where the line is visible at all.
         "line-width": [
           "interpolate",
           ["linear"],
@@ -404,23 +311,10 @@ export function buildBasemapStyle(lang = "en") {
         ],
       },
     },
-    // Watercourse centrelines — rivers, canals, and the streams/drains/ditches
-    // below them — are a z12+ detail only.
-    //
-    // OSM carries a river centreline right through wide estuaries: the
-    // Saint-Laurent is a single waterway=river all the way from the Great
-    // Lakes out to the gulf, so it drew a solid line down the middle of 30 km
-    // of open water at every zoom from 3 up. The tiles expose no flag for "this
-    // line runs inside a water polygon" (class, brunnel, intermittent and name
-    // are the only fields), so there is nothing to filter on — but any river
-    // wide enough to look wrong as a line is already mapped as a water polygon,
-    // which the coastline layer above outlines. Gating the centrelines to the
-    // zooms where you are looking at local land detail keeps them where they
-    // are the only representation of a watercourse and drops them where the
-    // polygon has it covered.
-    //
-    // Streams stay a separate layer, under the rivers: they only exist in the
-    // tiles from z12 anyway, and they want a thinner, lighter line.
+    // Centrelines are z12+ only: OSM runs a river line down wide estuaries (the
+    // Saint-Laurent through 30 km of open water) with no field to filter on,
+    // and any river wide enough to look wrong is already a water polygon.
+    // Streams stay a separate, thinner layer under the rivers.
     {
       id: "waterway-stream",
       type: "line",
@@ -486,12 +380,8 @@ export function buildBasemapStyle(lang = "en") {
       type: "line",
       source: "ofm",
       "source-layer": "boundary",
-      // Land boundaries only. The maritime halves of the same borders run
-      // clean across open water — the provincial lines through the Gulf of
-      // St Lawrence and Cabot Strait — which is noise on an ocean map. The
-      // tiles flag them, so unlike the river centrelines these can just be
-      // filtered out. `maritime` is absent on plenty of features, and a
-      // missing property compares unequal here, so those still draw.
+      // Land boundaries only: maritime borders across the Gulf are noise. A
+      // missing `maritime` compares unequal, so those features still draw.
       filter: [
         "all",
         ["<=", ["get", "admin_level"], 4],
@@ -526,10 +416,8 @@ export function buildBasemapStyle(lang = "en") {
       },
     },
     {
-      // Point-geometry water bodies only (oceans, seas, most lakes) — the
-      // elongated ones (Great Lakes among them) are LineString/MultiLineString
-      // in this source layer and are handled by label-water-line below, since
-      // a point-placed symbol can't reliably anchor on a line's geometry.
+      // Point-geometry water bodies only; elongated ones are lines, handled by
+      // label-water-line.
       id: "label-water",
       type: "symbol",
       source: "ofm",
@@ -541,24 +429,15 @@ export function buildBasemapStyle(lang = "en") {
         "text-size": WATER_LABEL_TEXT_SIZE,
         "text-letter-spacing": 0.1,
         "text-max-width": 6,
-        // Large water bodies (bays especially) are often tagged as several
-        // separate same-named point features scattered along a coastline in
-        // OSM — e.g. Hudson Bay is ~217 distinct "Hudson Bay" points. Padding
-        // this far past the glyph box makes MapLibre's own collision system
-        // treat nearby duplicates as overlapping and drop all but one,
-        // without needing to know they share a name.
+        // OSM tags big bays as many same-named points (Hudson Bay has ~217);
+        // padding this far lets collision drop all but one.
         "text-padding": 80,
       },
       paint: WATER_LABEL_PAINT,
     },
     {
-      // The elongated-water-body half of water_name (see label-water above):
-      // symbol-placement 'line-center' anchors once at the centre of the
-      // feature's line rather than trying to place a point label on a line
-      // geometry. text-rotation-alignment: 'viewport' overrides the default
-      // map-aligned rotation, which otherwise bends the text glyph-by-glyph
-      // to follow the line's own curve — upright, straight text reads more
-      // clearly for a lake name than one bent along its shoreline.
+      // 'viewport' rotation keeps the name upright and straight rather than
+      // bent glyph-by-glyph along the line.
       id: "label-water-line",
       type: "symbol",
       source: "ofm",
@@ -633,31 +512,17 @@ export function buildBasemapStyle(lang = "en") {
         type: "raster",
         tiles: [ESRI_IMAGERY_TILES],
         tileSize: 256,
-        // Declared to z23, but only actually cached that deep in populated
-        // areas: Halifax has imagery to z19, Ellesmere Island only to z17.
-        // Past its coverage the service doesn't 404 — it serves a grey "map
-        // data not yet available" tile, which would land on exactly the remote
-        // Arctic shorelines where imagery is most wanted. Cap at the level that
-        // exists everywhere and let MapLibre overzoom: soft, but never broken.
-        // z17 is ~0.8 m/px at 45°N and ~0.4 m/px at 70°N.
+        // Declared to z23 but cached only to z17 in remote areas (Ellesmere
+        // Island), past which it serves a grey "not yet available" tile rather
+        // than a 404, so overzoom from the level that exists everywhere.
         maxzoom: 17,
         attribution:
           'Imagery © <a href="https://www.esri.com">Esri</a>, Vantor, Earthstar Geographics',
       },
-      // Both products are served through the proxy, which answers a transparent
-      // tile wherever CHS has nothing.
-      //
-      // maxzoom is set to where each product runs out of actual soundings, not
-      // to the camera cap. Ground resolution at 45°N is 110692 / 2^z m/px, so
-      // z10 is 108 m/px and z13 is 13.5 m/px: a 100 m grid has nothing left to
-      // say past z10, and a 10 m grid nothing past z13. The values below give
-      // each one a further 2x of headroom and then let MapLibre overzoom.
-      //
-      // Asking for the deeper levels was requesting GeoServer to upsample the
-      // same cells for us — no extra information, but one proxy round trip and
-      // one 256x256 texture per tile per level. At z16 the pair went from ~60
-      // tile requests per viewport to ~6, and because a coarse tile covers 32x
-      // (100) or 4x (10) more ground, panning stops re-triggering them at all.
+      // The proxy answers a transparent tile wherever CHS has nothing. maxzoom
+      // is where each grid runs out of soundings (100 m past ~z10, 10 m past
+      // ~z13) plus 2x headroom: deeper levels were only upsampled server-side,
+      // and capping cut z16 requests from ~60 per viewport to ~6.
       nonna100: {
         type: "raster",
         tiles: [NONNA_100_TILES],

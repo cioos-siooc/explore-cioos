@@ -106,14 +106,12 @@ def validate(polygon, wkt_str):
     if area_deg2 < 200:  # Canada should be ~600+ deg² in lat-lon space
         sys.exit(f"  FAIL: simplified area too small ({area_deg2} deg²)")
 
-    # Round-trip
     parsed = shp_wkt.loads(wkt_str)
     if not parsed.is_valid:
         sys.exit("  FAIL: round-tripped polygon is not valid")
     if parsed.geom_type not in ("Polygon", "MultiPolygon"):
         sys.exit(f"  FAIL: unexpected geom type {parsed.geom_type}")
 
-    # Anchor checks
     from shapely.geometry import Point
     failures = []
     for name, (lon, lat) in INSIDE_ANCHORS.items():

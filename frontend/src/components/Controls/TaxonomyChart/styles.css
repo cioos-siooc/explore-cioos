@@ -1,5 +1,23 @@
+/* The chart and its header share one white card; unlike the feature list,
+   there are no separate cards to sit on the sand. */
+.taxonomySection {
+  padding: 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+.taxonomySection .recordSectionHeader {
+  margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
 .taxonomyHeader {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: flex-start;
   justify-content: space-between;
@@ -35,21 +53,77 @@
 }
 
 .taxonomyStatus {
+  position: relative;
   display: flex;
-  justify-content: center;
-  padding: 24px 0;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
 }
 
+.taxonomyPlaceholderSpinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: var(--cioos-primary-700);
+  transform: translate(-50%, -50%);
+}
+
+.taxonomyPlaceholderSunburst {
+  aspect-ratio: 1;
+  width: min(100%, 320px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--cioos-surface-2) 0 22%,
+    transparent 22% 25%,
+    var(--cioos-surface-2) 25% 48%,
+    transparent 48% 51%,
+    var(--cioos-surface-2) 51% 74%,
+    transparent 74% 77%,
+    var(--cioos-surface-2) 77% 100%
+  );
+}
+
+.taxonomyPlaceholderTree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+}
+
+.taxonomyPlaceholderTree span {
+  width: calc(60% - var(--depth) * 12%);
+  height: 22px;
+  margin-left: calc(var(--depth) * 16px);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+}
+
+/* Plotly draws at its default size before it measures the frame, so the plot
+   is taken out of flow: it can overflow the frame's box but never size it. */
 .taxonomySunburstFrame {
+  position: relative;
+  overflow: hidden;
   aspect-ratio: 1;
   width: 100%;
   max-height: 520px;
 }
 
+.taxonomyControls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.taxonomySunburst {
+  position: absolute;
+  inset: 0;
+}
+
 .taxonomyActions {
   display: flex;
-  gap: 6px;
-  justify-content: flex-end;
+  gap: 4px;
 }
 
 .taxonomyActions .recordShowAll {

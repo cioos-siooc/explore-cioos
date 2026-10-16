@@ -1,32 +1,14 @@
 """Dataset discovery for the OBIS harvester.
 
-Answers "which OBIS datasets should we harvest?" by querying the OBIS dataset
-API instead of reading a static list of UUIDs. The default selection is the
-union of:
+API quirks driving the implementation:
 
-  * every dataset contributed via the OBIS Canada node
-  * every dataset contributed via the OTN-OBIS node
-  * every dataset with occurrences inside the Canadian EEZ + land boundary
+  * ``/v3/dataset`` **ignores the ``from`` offset param**: no pagination, so
+    ``size`` must cover ``total`` and a short response fails loudly.
+  * ``geometry`` WKT over roughly 6 KB returns HTTP 400 and the boundary
+    polygon is ~11 KB; ``simplify_for_query`` shrinks it to a superset.
 
-The OBIS ``geometry`` filter is record-level exact — a dataset is returned only
-if it has occurrences inside the polygon, not merely an overlapping extent — so
-this is a much tighter selection than a bounding-box list.
-
-Two API quirks drive the implementation:
-
-  * ``/v3/dataset`` **ignores the ``from`` offset param**, so there is no
-    pagination. ``size`` large enough to cover ``total`` returns everything in
-    one response; we assert ``total == len(results)`` and fail loudly rather
-    than silently truncating.
-  * ``geometry`` WKT over roughly 6 KB in the query string returns HTTP 400,
-    and the packaged boundary polygon is ~11 KB. ``simplify_for_query`` reduces
-    it to fit while guaranteeing the result still *contains* the original, so
-    the query can only over-select — never clip a coastal dataset out.
-
-Discovery is all-or-nothing: if any single query fails, the whole thing raises.
-A partial union (say, the two node queries without the geometry query) would
-look like a legitimate but much smaller dataset list, and the db-loader's
-``prune_stale_datasets`` would then delete hundreds of real datasets.
+All-or-nothing: a partial union would look like a legitimate smaller list and
+``prune_stale_datasets`` would delete hundreds of real datasets.
 """
 import logging
 from dataclasses import dataclass, field
@@ -44,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 API_URL = "https://api.obis.org/v3/dataset"
 
-# Transient statuses worth retrying.
 _RETRY_STATUSES = (408, 429, 500, 502, 503, 504, 520, 522, 524)
 
 # Hard ceiling on the `size` param used by the retry-once path.
@@ -70,7 +51,6 @@ class ObisDiscoveryError(RuntimeError):
 
 
 def _as_tuple(value, key):
-    """Coerce a YAML scalar/list into a tuple of stripped strings."""
     if value is None:
         return ()
     if isinstance(value, str):
@@ -170,16 +150,11 @@ def _build_session() -> requests.Session:
 
 
 def simplify_for_query(polygon, tolerance=0.25, max_bytes=4500, max_attempts=6):
-    """Reduce ``polygon`` to a WKT string that fits OBIS's query-string limit.
+    """Return ``(wkt, tolerance_used)`` fitting OBIS's query-string limit.
 
-    Simplifies, then buffers *outward* by the same tolerance so the result is a
-    strict superset of the input — the query can only over-select, and the
-    full-resolution polygon still does the real filtering downstream. The mitre
-    join with ``quad_segs=1`` keeps the buffer from re-inflating the vertex
-    count, and a final light simplify cleans up the seams.
-
-    Returns ``(wkt, tolerance_used)``. Raises ObisDiscoveryError if no tolerance
-    in the escalation gets under ``max_bytes``.
+    Buffers *outward* after simplifying so the result is a strict superset: the
+    query can only over-select, never clip a coastal dataset out. The mitre join
+    with ``quad_segs=1`` keeps the buffer from re-inflating the vertex count.
     """
     if polygon is None or polygon.is_empty:
         raise ObisDiscoveryError("Cannot build a discovery geometry from an empty polygon")
@@ -213,15 +188,11 @@ def simplify_for_query(polygon, tolerance=0.25, max_bytes=4500, max_attempts=6):
 
 
 class ObisDatasetDiscovery:
-    """Resolves the set of OBIS dataset IDs to harvest."""
-
     def __init__(self, config, geo_filter=None, logger=None, session=None):
         self.config = config
         self.geo_filter = geo_filter
         self.logger = logger or globals()["logger"]
         self.session = session or _build_session()
-
-    # -- geometry ---------------------------------------------------------
 
     def _query_geometry(self):
         """(wkt, tolerance) for the geometry query, or (None, None) when disabled."""
@@ -245,9 +216,8 @@ class ObisDatasetDiscovery:
                 raise ObisDiscoveryError(f"obis_discovery.geometry is not valid WKT: {e}") from e
             return wkt, None
 
-        # "eez": reuse the polygon the geo filter already loaded when it can.
-        # Under mode="none" the filter holds no polygon, so load it directly —
-        # disabling occurrence clipping must not disable discovery.
+        # Under mode="none" the filter holds no polygon; disabling occurrence
+        # clipping must not disable discovery.
         polygon = getattr(self.geo_filter, "polygon", None)
         if polygon is None:
             polygon_file = getattr(self.geo_filter, "polygon_file", None)
@@ -258,8 +228,6 @@ class ObisDatasetDiscovery:
             tolerance=cfg.geometry_simplify_tolerance,
             max_bytes=cfg.geometry_max_bytes,
         )
-
-    # -- querying ---------------------------------------------------------
 
     def _query(self, label, params, allow_empty=False):
         """One /v3/dataset query -> list of dataset ids. Raises on anything suspect."""

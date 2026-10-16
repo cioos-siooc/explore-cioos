@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { inkOn, phylumColors } from "./taxonomy.js";
@@ -15,10 +16,7 @@ function interiorIds(node, depth, maxDepth, ids = new Set()) {
   return ids;
 }
 
-// GBIF's dataset-metrics tree: nested lists with CSS-drawn connector lines,
-// each taxon a tile of name and record count; a name opens or closes its
-// branch.
-export default function TaxonomyTree({ tree }) {
+export default function TaxonomyTree({ tree, actionsEl }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "fr" ? "fr-CA" : "en-CA";
   const colors = useMemo(() => phylumColors(tree), [tree]);
@@ -78,24 +76,28 @@ export default function TaxonomyTree({ tree }) {
     );
   }
 
+  const actions = (
+    <>
+      <button
+        type="button"
+        className="recordShowAll"
+        onClick={() => setExpanded(interiorIds(tree, 0, Infinity))}
+      >
+        {t("taxonomyShowAllText")}
+      </button>
+      <button
+        type="button"
+        className="recordShowAll"
+        onClick={() => setExpanded(new Set([tree.id]))}
+      >
+        {t("taxonomyCollapseAllText")}
+      </button>
+    </>
+  );
+
   return (
     <div className="taxonomyTree">
-      <div className="taxonomyActions">
-        <button
-          type="button"
-          className="recordShowAll"
-          onClick={() => setExpanded(interiorIds(tree, 0, Infinity))}
-        >
-          {t("taxonomyExpandAllText")}
-        </button>
-        <button
-          type="button"
-          className="recordShowAll"
-          onClick={() => setExpanded(new Set([tree.id]))}
-        >
-          {t("taxonomyCollapseAllText")}
-        </button>
-      </div>
+      {actionsEl ? createPortal(actions, actionsEl) : actions}
       <ul className="taxonomyTreeRoot">
         <li className="taxonomyTreeItem">
           <span className="taxonomyTreeTile">

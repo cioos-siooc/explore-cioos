@@ -1,5 +1,4 @@
-/* EN⇄FR toggle. Positioning comes from its host (the dock's minor-item
-   cluster); this file only keeps it clickable and legible. */
+/* Positioning comes from its host. */
 .languageSelector {
   pointer-events: all;
   text-align: center;

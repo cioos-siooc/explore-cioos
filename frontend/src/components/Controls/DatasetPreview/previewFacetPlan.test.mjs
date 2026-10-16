@@ -59,7 +59,7 @@ test("a trajectory shares whichever of lon/lat actually moves", () => {
 
 test("a trajectory with no rows yet still produces a plan", () => {
   // The payload is async; a plan that needed data would leave the first render
-  // with nothing to draw and no axis names.
+  // with nothing to draw.
   const plan = planFor("Trajectory");
   assert.ok(plan);
   assert.ok(["longitude", "latitude"].includes(plan.sharedAxis));
@@ -112,7 +112,6 @@ test("shared candidates lead with coordinates then offer every measurement", () 
   const candidates = sharedCandidatesFor(
     variablesFrom(VIKING, VIKING_DATASET),
   ).map((v) => v.columnName);
-  // Coordinates first, so the plausible answer is at the top of the dropdown...
   assert.deepEqual(candidates.slice(0, 6), [
     "time",
     "obs_lat",
@@ -121,9 +120,7 @@ test("shared candidates lead with coordinates then offer every measurement", () 
     "longitude",
     "depth",
   ]);
-  // ...but "salinity against temperature" stays reachable.
   assert.ok(candidates.includes("PSAL_01"));
-  // Ids and flags are never offered.
   assert.ok(!candidates.includes("station_id"));
 });
 
@@ -154,8 +151,6 @@ test("every variable the dataset has can be a panel at once", () => {
 });
 
 test("vis default comes from the type alone, never the payload", () => {
-  // Stability matters: /preview is async, so a default that read the columns
-  // would answer "table" first and "plot" a moment later.
   for (const type of [
     "Profile",
     "TimeSeries",
@@ -176,13 +171,11 @@ test("the plan names the cf_role columns, which is what titles the figure", () =
     "station_id",
     "profile",
   ]);
-  // Independent of the layout: a stack is titled the same way.
   assert.deepEqual(planFor("TimeSeries").titleColumns, [
     "station_id",
     "profile",
   ]);
-  // And independent of the harvest: without columnMeta the roles come from the
-  // dataset's own timeseries/profile/trajectory id fields.
+  // Without columnMeta the roles come from the dataset's own *_id_variable fields.
   assert.deepEqual(planFor("TimeSeriesProfile", VIKING_NO_META).titleColumns, [
     "station_id",
     "profile",

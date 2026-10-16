@@ -4,21 +4,10 @@ import { useFilters } from "./filters/FilterProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { formatDatasetCount } from "../utilities.jsx";
 
-// The datasets counters shown in the top bar and the sidebar (pill + footer).
-//
-// The numbers come from two independent fetches — /pointQuery for the filtered
-// set, /datasets for the catalog total — and both start out as "nothing yet",
-// which is NOT the same as zero. Rendering the raw values would flash "0
-// datasets" on every cold load, so consumers must render a spinner until
-// `ready`, and only then trust `filteredCount` / `total`.
-//
-// `ready` deliberately does not wait on the catalog total specifically: if
-// /datasets failed, catalogLoaded still resolves and the counters fall back to
-// the filtered count alone rather than spinning forever.
-//
-// `updating` marks a refetch in flight *after* the first one landed. The
-// previous counts stay on screen (dimmed) instead of collapsing back to a
-// spinner, so a filter tweak doesn't make the numbers flicker.
+// "Nothing yet" is NOT zero: consumers render a spinner until `ready`, or every
+// cold load flashes "0 datasets". `ready` doesn't wait on the catalog total, so
+// a failed /datasets falls back to the filtered count instead of spinning.
+// `updating` = refetch after the first landed; counts stay on screen dimmed.
 export default function useDatasetCounts() {
   const { t, i18n } = useTranslation();
   const { totalNumberOfDatasets, catalogLoaded } = useFilters();
@@ -29,11 +18,8 @@ export default function useDatasetCounts() {
     initialPointsQueryComplete &&
     (totalNumberOfDatasets !== undefined || catalogLoaded);
 
-  // Reflects the title-search / "only in view" narrowing too, not just the
-  // server-side filters, so the counters agree with the list they sit next to.
+  // Includes the client-side narrowing so the counters agree with the list.
   const filteredCount = filteredDatasets?.length ?? 0;
-  // Nothing filtered out (or no total to compare against): the
-  // "filtered / total" split is noise, so state the single number alone.
   const allDatasetsShown =
     !totalNumberOfDatasets || filteredCount === totalNumberOfDatasets;
 
@@ -43,7 +29,6 @@ export default function useDatasetCounts() {
     filteredCount,
     total: totalNumberOfDatasets,
     allDatasetsShown,
-    // The hover text every counter shares, matching what the label says.
     title: !ready
       ? t("datasetsCountLoadingTitle")
       : allDatasetsShown

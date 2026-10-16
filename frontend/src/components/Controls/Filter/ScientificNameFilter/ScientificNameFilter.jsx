@@ -11,16 +11,8 @@ import "../styles.css";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
 
-// The body of the Scientific Name filter: the same ticked list of options every
-// other filter in the panel shows.
-//
-// What is different about it is where the options come from — the other lists
-// are the catalogue's own facets, held in state and searched in the browser,
-// while this one is a typeahead against WoRMS by way of /scientificNames, so
-// what is offered changes with what is typed into the panel's search box. That
-// is why the picked names (included or excluded) are pinned to the top of the
-// list rather than left to the search: an option that vanished from the list the
-// moment the search moved on would be one the user could no longer clear.
+// Options come from a server typeahead, so picked names are pinned on top:
+// otherwise they'd vanish once the search moved on and couldn't be cleared.
 export default function ScientificNameFilter({
   scientificNamesSelected,
   setScientificNamesSelected,
@@ -30,16 +22,11 @@ export default function ScientificNameFilter({
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language && i18n.language.startsWith("fr") ? "fr" : "en";
-  // Already published on a pause by the pane's search box (see
-  // useSearchInput), so each value that arrives here is one the user
-  // stopped typing on — a second debounce would only delay the typeahead.
+  // Already debounced by the pane's search box.
   const searchQuery = searchTerms || "";
   const [suggestions, setSuggestions] = useState([]);
-  // Rank and common name for every name we have seen, kept so a picked name
-  // reads the same pinned at the top of the list as it did in the suggestions
-  // it was picked from — the search that offered it has usually moved on by
-  // then, and a row that loses its second line on being ticked looks like a
-  // different row.
+  // Kept so a pinned name keeps its rank/common-name line after the search
+  // that offered it has moved on.
   const [detailsByName, setDetailsByName] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -81,9 +68,7 @@ export default function ScientificNameFilter({
     return () => controller.abort();
   }, [searchQuery, lang]);
 
-  // Hydrate details for selections we don't yet know about (e.g. on page load
-  // when the names were restored from the URL). Re-runs when the locale changes so
-  // a user toggling the site language gets locale-appropriate subtitles.
+  // Hydrates names restored from the URL; re-runs on locale change.
   useEffect(() => {
     const unknown = [
       ...scientificNamesSelected,
@@ -103,14 +88,10 @@ export default function ScientificNameFilter({
         reportError("scientificNames search failed", err);
       });
     return () => controller.abort();
-    // detailsByName is read to find the names still missing, and written by
-    // mergeDetails below — listing it would feed this effect its own output.
+    // detailsByName is this effect's own output.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scientificNamesSelected, scientificNamesExcluded, lang]);
 
-  // The same include / exclude toggles as the other lists, over two plain
-  // name lists instead of per-option flags: putting a name in one list takes
-  // it out of the other.
   const toggleIn = (name, list, setList, otherList, setOtherList) => {
     if (list.includes(name)) {
       setList(list.filter((n) => n !== name));
@@ -139,8 +120,6 @@ export default function ScientificNameFilter({
     );
 
   const picked = [...scientificNamesSelected, ...scientificNamesExcluded];
-  // The picked names first, then whatever the search is offering that isn't
-  // already picked.
   const options = [
     ...picked.map((scientificName) => ({
       scientificName,

@@ -4,12 +4,9 @@ import { useTranslation } from "react-i18next";
 import { withCategoryState } from "../utilities.jsx";
 import { useFilters } from "./filters/FilterProvider.jsx";
 
-// The EOV categories in the catalogue, in the order the Filters modal groups
-// them, each set as a whole: `state` is "include" or "exclude" only when every
-// one of its EOVs is, and `toggle(target)` follows useFilterModel's rule
-// (asking for the state it is already in clears it). Matching *every* EOV of a
-// category is almost never what is meant, so including one switches match-all
-// off.
+// Each category set as a whole: `state` only when every EOV in it is. Matching
+// *every* EOV of a category is almost never meant, so including one switches
+// match-all off.
 export default function useEovCategories() {
   const { i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";

@@ -1,10 +1,3 @@
-/**
- * GET /downloadEstimate
- *
- * No required parameters. Delegates to getShapeQuery(req.query, doEstimate=true).
- * Returns [{ pk, dataset_id, size }] for each matching dataset.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

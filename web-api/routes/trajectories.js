@@ -8,11 +8,9 @@ const createDBFilter = require("../utils/dbFilter");
 const { TRAJECTORY_COVERAGE_FROM } = require("../utils/selection");
 const { tierForZoom } = require("../utils/hexTiers");
 
-// datasetPKs here is a single dataset's pk_url (same key the tile/filter
-// queries use — the plural name kept for consistency, but only one pk is
-// accepted); trajectoryId is the cf_role=trajectory_id value ('' for
-// datasets with one unnamed trajectory). The charset stays permissive for
-// glider mission names; length-capped as a safety net.
+// datasetPKs here is a single pk_url despite the plural name. trajectoryId is
+// '' for datasets with one unnamed trajectory; the charset stays permissive for
+// glider mission names.
 const trajectoryIdCheck = check("trajectoryId")
   .matches(/^[\w .:/-]*$/)
   .isLength({ max: 256 });
@@ -230,8 +228,7 @@ router.get(
           LIMIT 1))`;
     }
 
-    // The column list is what the shared filter references, as in
-    // /timeExtent's trajectory branch.
+    // The column list is what the shared filter references.
     const SQL = `
       WITH coverage AS (
         SELECT t.dataset_pk, NULL::integer AS point_pk, t.time_min, t.time_max,

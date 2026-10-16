@@ -1,70 +1,40 @@
 #!/usr/bin/env node
 
-// Must be first: Sentry instruments modules as they load, so it has to
-// initialise before ../app pulls in express.
+// Must be first: Sentry instruments modules as they load.
 require("../instrument");
-
-/**
- * Module dependencies.
- */
 
 const app = require("../app");
 const debug = require("debug")("cde-web-api:server");
 const http = require("http");
 
-/**
- * Get port from environment and store in Express.
- */
-
 const port = normalizePort(process.env.PORT || "5000");
 app.set("port", port);
 
-// The database target, not a connection: knex connects on first query, so
-// nothing here proves the DB is reachable. Logged once at startup because the
-// host/name/port are what you want in the logs when a deploy points at the
-// wrong database — see db.js.
+// knex connects lazily, so this is the target, not proof of a connection.
 console.log(
   "DB target:",
   `${process.env.DB_HOST}/${process.env.DB_NAME}:${process.env.DB_PORT || 5432}`,
 );
 
-/**
- * Create HTTP server.
- */
-
 const server = http.createServer(app);
-
-/**
- * Listen on provided port, on all network interfaces.
- */
 
 server.listen(port);
 server.on("error", onError);
 server.on("listening", onListening);
 
-/**
- * Normalize a port into a number, string, or false.
- */
-
 function normalizePort(val) {
   const port = parseInt(val, 10);
 
   if (isNaN(port)) {
-    // named pipe
     return val;
   }
 
   if (port >= 0) {
-    // port number
     return port;
   }
 
   return false;
 }
-
-/**
- * Event listener for HTTP server "error" event.
- */
 
 function onError(error) {
   if (error.syscall !== "listen") {
@@ -73,7 +43,6 @@ function onError(error) {
 
   const bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
 
-  // handle specific listen errors with friendly messages
   switch (error.code) {
     case "EACCES":
       console.error(bind + " requires elevated privileges");
@@ -87,10 +56,6 @@ function onError(error) {
       throw error;
   }
 }
-
-/**
- * Event listener for HTTP server "listening" event.
- */
 
 function onListening() {
   const addr = server.address();

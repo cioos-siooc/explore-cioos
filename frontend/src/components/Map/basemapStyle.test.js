@@ -29,7 +29,7 @@ describe("buildBasemapStyle", () => {
       "ofm",
     ]);
     const layerIds = style.layers.map((layer) => layer.id);
-    expect(new Set(layerIds).size).toBe(layerIds.length); // no duplicate ids
+    expect(new Set(layerIds).size).toBe(layerIds.length);
   });
 
   it("includes every label layer Map.js anchors data layers against", () => {

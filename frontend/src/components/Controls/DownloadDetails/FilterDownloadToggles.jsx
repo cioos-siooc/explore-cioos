@@ -9,16 +9,6 @@ import { polygonIsRectangle } from "../../../utilities.jsx";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 
-/*
- * "Apply this filter to my download" — one chip per filter that is actually
- * doing something, each toggling whether the download narrows by it.
- *
- * Lifted out of DownloadDetails so it sits above the dataset list rather than
- * inside it: both delivery routes below (a queued archive, a URL straight to
- * the source) narrow by these same switches, and there is one set of them
- * because there is one order. It shares the settings band with the link format
- * (DownloadFormats) — one row of chrome, styles in styles.css.
- */
 export default function FilterDownloadToggles({
   query,
   polygon,
@@ -133,13 +123,8 @@ export default function FilterDownloadToggles({
   );
 }
 
-/*
- * The drawn shape as text. A rectangle is four corners and reads whole; a
- * traced polygon can be dozens, so it shows its first few and its last with an
- * ellipsis between — enough to recognise which shape it is without the chip
- * growing to the width of the panel. The closing point repeats the first and
- * is left off.
- */
+// A traced polygon shows its first few points and its last; the closing point
+// repeats the first and is left off.
 function polygonSummary(polygon) {
   if (!polygon) return "";
   const point = (coordinate) =>

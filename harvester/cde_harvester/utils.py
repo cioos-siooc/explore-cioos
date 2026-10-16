@@ -11,13 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 def get_eov_to_standard_name():
-    # EOV → CF standard names mapping (synced from cioos-commons/eovs/standard_names.json)
+    # Synced from cioos-commons/eovs/standard_names.json.
     dir = os.path.dirname(os.path.realpath(__file__))
     with open(dir + "/eov_standard_names.json") as f:
         return json.loads(f.read())
 
 
-# dictionary mapping from ocean variables to standard names
 eov_to_standard_name = get_eov_to_standard_name()
 
 
@@ -35,17 +34,11 @@ def get_df_eov_to_standard_name(eov_to_standard_name):
     return pd.DataFrame(res, columns=["eov", "standard_name"])
 
 
-# dataframe mapping of ocean variables to standard names
 df_eov_to_standard_name = get_df_eov_to_standard_name(eov_to_standard_name)
 
 
 def get_standard_name_to_eovs(eov_to_standard_name):
-    """Reverse of eov_to_standard_name: CF standard name -> list of EOV keys.
-
-    Lets a single variable be tagged with the ocean variables it represents,
-    which is how both the grid variable list and the per-feature EOV detection
-    decide what a variable contributes.
-    """
+    """CF standard name -> list of EOV keys."""
     res = {}
     for eov, standard_names in eov_to_standard_name.items():
         for standard_name in standard_names:
@@ -53,7 +46,6 @@ def get_standard_name_to_eovs(eov_to_standard_name):
     return res
 
 
-# dictionary mapping from standard names to ocean variables
 standard_name_to_eovs = get_standard_name_to_eovs(eov_to_standard_name)
 
 
@@ -81,9 +73,7 @@ def erddap_time_to_iso(value):
 
 
 def intersection(lst1, lst2):
-    """
-    intersection doesnt include nulls
-    """
+    """Excludes empty strings."""
     lst3 = [value for value in lst1 if value in lst2 and value != ""]
     return lst3
 
@@ -206,5 +196,4 @@ if __name__ == "__main__":
     CF_STANDARD_NAMES_VERSION_FILE.write_text(version)
     logger.info("Saved %d CF standard names (version %s) to %s", len(names), version, CF_STANDARD_NAMES_CSV)
 
-# list of standard names that are supported by CDE
 supported_standard_names = flatten(eov_to_standard_name.values())

@@ -29,16 +29,11 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
         if "profile_id" not in profile_variables:
             return profiles_with_lat_lon, profile_variables, profile_variable_list
 
-        # Review if there's a enough samples to group by timeseries only
         profiles_per_timeseries = profiles_with_lat_lon.groupby(
             profile_variables["timeseries_id"]
         ).agg("count")[profile_variables["profile_id"]]
 
         if (profiles_per_timeseries > MAX_PROFILES_PER_TIMESERIES).any():
-            # If too many profiles per timeseries just group by timeseries_id
-            # In this case we will drop the profile ID column and remove the
-            # duplicates this creates.
-
             dropping_column = profile_variables["profile_id"]
 
             profile_variables.pop("profile_id")
@@ -51,8 +46,7 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
                 if column in profiles_with_lat_lon
             }
             if time_bounds:
-                # Time bounds came with the identity: a timeseries spans the
-                # envelope of its profiles. ERDDAP's ISO strings sort as dates.
+                # ERDDAP's ISO strings sort as dates.
                 profiles_with_lat_lon = (
                     profiles_with_lat_lon.groupby(profile_variable_list, dropna=False)
                     .agg(time_bounds)
@@ -71,12 +65,8 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
         return profiles_with_lat_lon, profile_variables, profile_variable_list
 
     def rows_per_timestep(self, dataset, profiles, profile_variable_list):
-        """Rows in one profile per feature, sampled at the earliest timestep.
-
-        One small time-constrained request: ERDDAP reads only the files that
-        hold that instant. A feature absent from the sample takes the mean of
-        those present; a failed sample counts one row per timestep.
-        """
+        """Sampled at the earliest timestep: ERDDAP then reads only the files
+        holding that instant."""
         start = ERDDAP.parse_erddap_dates(profiles["time_min"].astype(str).str.strip())
         first = str(profiles["time_min"].iloc[start.argmin()]).strip()
         try:

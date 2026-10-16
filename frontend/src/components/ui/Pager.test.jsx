@@ -8,9 +8,7 @@ import Pager, { PAGE_SIZES } from "./Pager.jsx";
 
 const noop = () => {};
 
-// Pager reads translated copy (useTranslation) for every label, so it needs
-// the real i18n instance renderWithProviders sets up — a bare render() would
-// see every t() call fall back to the raw key.
+// A bare render() would see every t() fall back to the raw key.
 const render = (ui) => renderWithProviders(ui);
 
 describe("Pager", () => {

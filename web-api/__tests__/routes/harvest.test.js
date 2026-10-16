@@ -1,15 +1,7 @@
-/**
- * GET /harvest/*
- *
- * The dashboard routes read cde.harvest_attempts, which is append-only and
- * gains a row per dataset per harvest run. Two properties matter here and are
- * invisible from the response alone, so they are asserted against the SQL:
- *
- *   - slug resolution must stay a plain indexable predicate, not a DISTINCT
- *     over the whole table (harvest_attempts_slug_idx in 1_schema.sql matches
- *     the expression character for character);
- *   - the per-dataset history must stay bounded, and must say so when it cuts.
- */
+// Asserted against the SQL because invisible from the response: slug
+// resolution must match harvest_attempts_slug_idx (1_schema.sql) character for
+// character rather than DISTINCT over the append-only table, and per-dataset
+// history must stay bounded and say when it cuts.
 
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
@@ -24,9 +16,8 @@ const request = require("supertest");
 const app = require("../../app");
 const db = require("../../db");
 
-// The harvest routes issue several db.raw calls per request with different
-// shapes, so they get a queue keyed on what the SQL is asking for rather than
-// the single shared row set setupDbMock provides.
+// Several differently shaped db.raw calls per request, so results are keyed
+// on what the SQL asks for.
 let respond;
 
 beforeEach(() => {
@@ -48,10 +39,8 @@ describe("GET /harvest/servers/:slug", () => {
 
     const slugSql = sqlFor("translate(");
     expect(slugSql).toContain("FROM cde.harvest_attempts");
-    // The whole point: no DISTINCT pass over the append-only table.
     expect(slugSql).not.toContain("DISTINCT");
-    // The expression the index in 1_schema.sql is built on. If this changes,
-    // that index silently stops being used.
+    // If this changes, the index in 1_schema.sql silently stops being used.
     expect(slugSql).toContain(
       "regexp_replace(erddap_url, '^[a-z]+://', '', 'i')",
     );
@@ -114,7 +103,6 @@ describe("GET /harvest/servers", () => {
     expect(res.status).toBe(200);
     const sql = sqlFor("latest_run_per_server");
     expect(sql).toContain("DISTINCT ON (erddap_url, source)");
-    // The pattern this replaced, and the one recentRuns was already moved off.
     expect(sql).not.toContain("FROM cde.harvest_attempts ha2");
   });
 
@@ -136,9 +124,7 @@ describe("GET /harvest/dataset/:slug/:datasetId", () => {
     status: "success",
   });
 
-  // The route asks for one row beyond the cap to detect truncation, so a
-  // fixture of exactly `limit` rows is the "not truncated" case and
-  // `limit + 1` is the truncated one.
+  // The route fetches one row beyond the cap to detect truncation.
   const runWithHistoryOf = async (count) => {
     respond = (sql) => {
       if (sql.includes("translate(")) return [{ erddap_url: "https://e.ca" }];

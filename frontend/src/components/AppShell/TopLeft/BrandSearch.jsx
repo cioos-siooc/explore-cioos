@@ -10,11 +10,8 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
-// The brand card: logo, the two-line app title lockup, and the minor actions
-// (feedback / intro / projection / language) on the top row. The logo is
-// drawn rather than loaded, and is also the app's loading indicator — see
-// CioosLogo. The centered top bar passes the merged Datasets/Filters control
-// in as children, so it renders as a second row welded into this same card.
+// The top bar passes the Datasets/Filters control in as children, welded in as
+// a second row of this card.
 
 export default function BrandSearch({ children }) {
   const { t, i18n } = useTranslation();
@@ -22,14 +19,10 @@ export default function BrandSearch({ children }) {
   const { projection, setProjection } = useMapState();
 
   const isFrench = i18n.language === "fr";
-  // The org's own site, one per language — CIOOS at the English domain, SIOOC
-  // (its French name) at its own. IntroModal's own logo link (see
-  // CIOOSLogoButtonTitle there) sends both languages to the English domain;
-  // this one splits them since the French domain exists and works.
+  // SIOOC at its own French domain (IntroModal sends both to the English one).
   const websiteUrl = isFrench ? "https://siooc.ca/" : "https://cioos.ca/";
   const globeOn = projection === "globe";
-  // Named by what pressing it does, and drawn as where it takes you — the icon
-  // is the other projection, not the current one.
+  // The icon is the other projection, not the current one.
   const projectionLabel = t(
     globeOn ? "projectionToggleToMap" : "projectionToggleToGlobe",
   );
@@ -47,7 +40,6 @@ export default function BrandSearch({ children }) {
           >
             <CioosLogo />
           </a>
-          {/* Two-line wordmark; the em word gets the large treatment. */}
           <h1 className="brandTitle" lang={isFrench ? "fr" : "en"}>
             {isFrench ? (
               <>

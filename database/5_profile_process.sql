@@ -24,11 +24,8 @@ gc_orphan_points_and_hexes()
  */
 
 
--- Helper function to process geometry and dataset linking
--- Used by both profile_process() and process_temp_profiles()
 CREATE OR REPLACE FUNCTION process_profile_geometry_and_links(target_table TEXT) RETURNS VOID AS $$
 BEGIN
-  -- Set geom from lat/lon
   EXECUTE format('
     UPDATE %I
     SET geom = ST_Transform(
@@ -38,7 +35,6 @@ BEGIN
     WHERE geom IS NULL
   ', target_table);
 
-  -- Link profiles to datasets via PK
   EXECUTE format('
     UPDATE %I p
     SET dataset_pk = d.pk
@@ -48,25 +44,10 @@ BEGIN
       AND p.dataset_pk IS NULL
   ', target_table);
 
-  -- Fallback `days`, for rows that arrived without a harvested day count.
-  --
-  -- This is an elapsed SPAN, not a count of days that have data: it counts
-  -- every empty day between a feature's first and last observation. That used
-  -- to be the only value the column ever held, and it inflated intermittent
-  -- datasets badly -- glisa_general_seasonal_erie reported 39,357 days
-  -- (1917-12-01 -> 2025-09-01) for a seasonal dataset holding roughly 430 days
-  -- of real data.
-  --
-  -- The harvester now counts the real days for the types whose features can
-  -- span more than one (TimeSeries, TimeSeriesProfile) and ships them in
-  -- `days` + `day_ranges`, so WHERE days IS NULL leaves those rows alone. The
-  -- span still applies to two cases, and is right or harmless in both:
-  --   * single-cast types (Profile), where the span IS the day set;
-  --   * a dataset whose day-count request failed, which falls back rather than
-  --     being dropped (tabledap_features._extract_day_sets).
-  --
-  -- The map does not read this column: it unions `day_ranges` instead, falling
-  -- back to the same span when that is NULL (web-api/utils/hexMetric.js).
+  -- Fallback `days` for rows without a harvested day count. This is an elapsed
+  -- SPAN, which over-counts intermittent data; it applies only to single-cast
+  -- types (where the span IS the day set) and to datasets whose day-count
+  -- request failed (tabledap_features._extract_day_sets).
   EXECUTE format('
     UPDATE %I
     SET days = date_part(''days'', time_max - time_min) + 1
@@ -76,7 +57,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Process temporary profiles table during incremental mode
 CREATE OR REPLACE FUNCTION process_temp_profiles() RETURNS VOID AS $$
 BEGIN
   PERFORM process_profile_geometry_and_links('temp_profiles');
@@ -86,10 +66,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION profile_process() RETURNS VOID AS $$
 BEGIN
-  -- AFTER LOADING PROFILE DATA:
-
-  -- Use shared function for geometry and linking
-  -- Set search path to cde schema so the function can find the profiles table
+  -- So the shared function finds cde.profiles.
   SET search_path TO cde, public;
   PERFORM process_profile_geometry_and_links('profiles');
 
@@ -113,11 +90,9 @@ BEGIN
   WHERE points.geom = profiles.geom
     AND profiles.point_pk IS NULL;
 
-  -- Note: days calculation now handled by process_profile_geometry_and_links()
 
-  -- Set number of profiles per dataset. IS DISTINCT FROM: only write rows
-  -- whose count actually changed — an unguarded UPDATE rewrites every dataset
-  -- row (dead tuples + WAL) on every load, even a no-op one.
+  -- IS DISTINCT FROM: an unguarded UPDATE rewrites every dataset row (dead
+  -- tuples + WAL) on every load, even a no-op one.
   WITH profiles_per_dataset AS (
     SELECT d.pk, COUNT(p.pk)
     FROM cde.datasets d
@@ -149,23 +124,17 @@ $$ LANGUAGE plpgsql;
 
 
 -- OBIS post-load processing, split into per-step functions so the db-loader
--- can time each step individually and surface row counts in logs. The wrapper
--- obis_process() at the bottom preserves the previous calling convention used
--- by process_incremental_update().
+-- can time each step individually.
 --
--- Drop earlier signatures if present from a prior deploy, so the new overloads
--- below (obis_process gained a rebuild_indexes arg; obis_backfill_aphia_ids
--- gained one too) replace them instead of coexisting as ambiguous overloads.
+-- Drop earlier signatures so the overloads below replace them instead of
+-- coexisting as ambiguous overloads.
 DROP FUNCTION IF EXISTS obis_process();
 DROP FUNCTION IF EXISTS obis_process(BOOLEAN);
 DROP FUNCTION IF EXISTS obis_backfill_aphia_ids();
 
 
--- geom is now a GENERATED ALWAYS AS … STORED column on obis_cells (computed
--- at INSERT time from latitude/longitude). The previous full-table UPDATE
--- rewrote every row + every index entry; the generated column eliminates
--- that pass entirely. Kept as a no-op so the loader's per-step list and the
--- back-compat wrapper continue to work.
+-- No-op: obis_cells.geom is computed at INSERT. Kept so the loader's per-step
+-- list and the back-compat wrapper keep working.
 CREATE OR REPLACE FUNCTION obis_set_geom() RETURNS bigint AS $$
 BEGIN
   RETURN 0;
@@ -188,12 +157,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Insert distinct geometries into points (skip existing). LEFT JOIN anti-join
--- over the distinct lat/lon set computes geom once per distinct point instead
--- of inside a correlated subquery for every candidate. Only unlinked cells
--- (rows this load replaced) can contribute new geometries — linked rows have
--- theirs in cde.points already — so the DISTINCT+transform runs over the
--- delta, not the whole table.
+-- Insert distinct geometries into points (skip existing). Only unlinked cells
+-- (rows this load replaced) can contribute new geometries, so the
+-- DISTINCT+transform runs over the delta, not the whole table.
 CREATE OR REPLACE FUNCTION obis_insert_points() RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
@@ -217,9 +183,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION obis_link_point_pk() RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
-  -- Points are append-only with stable pks (see 5_profile_process.sql header),
-  -- so existing links stay valid across runs and only rows that never got one
-  -- (freshly replaced cells) need the geom match — a delta-sized backfill.
+  -- Points are append-only with stable pks (see header), so only rows that
+  -- never got a link need the geom match.
   UPDATE cde.obis_cells c
   SET point_pk = p.pk
   FROM cde.points p
@@ -231,8 +196,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Single GROUP BY scan over obis_cells, then JOIN-update datasets — replaces
--- a per-dataset correlated subquery that re-scanned obis_cells N times.
 CREATE OR REPLACE FUNCTION obis_update_n_profiles() RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
@@ -256,15 +219,9 @@ $$ LANGUAGE plpgsql;
 
 -- CONCURRENTLY costs ~2x and is only needed when readers might be hitting the
 -- matview during the refresh; on a full rebuild after TRUNCATE there are none.
--- Caller passes FALSE on full rebuild; default TRUE applies for incremental.
 --
--- Only cde.obis_scientific_names is refreshed here: the web-api reads it live
--- (routes/scientificNames.js, the taxon autocomplete), so it has to track the
--- catalogue. cde.obis_scientific_name_popularity does NOT belong on the load
--- path — it exists solely to order populate_vernaculars.py's `--top N`, an
--- offline script that may not run for weeks, and rebuilding it meant an
--- unnest + GROUP BY over the whole obis_cells table after every harvest. That
--- script refreshes it itself now (see refresh_popularity there).
+-- cde.obis_scientific_name_popularity is deliberately not refreshed here: only
+-- the offline populate_vernaculars.py reads it, and it refreshes it itself.
 CREATE OR REPLACE FUNCTION obis_refresh_matviews(concurrent_refresh BOOLEAN DEFAULT TRUE) RETURNS bigint AS $$
 BEGIN
   IF concurrent_refresh THEN
@@ -359,17 +316,12 @@ $$ LANGUAGE plpgsql;
 -- catches up) leave aphia_ids as default '{}' and fall back to literal-name
 -- matching in dbFilter.js until the next vernacular populate + reprocess.
 --
--- Performance: on a full reload the GIN index on aphia_ids is dropped before the
--- bulk UPDATE and rebuilt after — rewriting it from scratch is much faster than
--- 100K+ incremental insertions. The UPDATE itself is a single hash-join via two
--- CTEs (cell_names → cell_aphias) instead of a per-row correlated subquery.
+-- On a full reload the GIN index on aphia_ids is dropped before the bulk UPDATE
+-- and rebuilt after: much faster than 100K+ incremental insertions.
 --
 -- rebuild_indexes: pass FALSE from the incremental path. DROP INDEX takes an
 -- ACCESS EXCLUSIVE lock on cde.obis_cells, which deadlocks with live web-api
--- reads (the same class of bug as the old constraint DDL); incremental touches
--- few rows, so updating with the GIN in place is cheap and lock-safe. The
--- partial scientific_names GIN is maintained automatically by Postgres as rows
--- gain aphia_ids, so it needs no manual rebuild in that mode either.
+-- reads; incremental touches few rows, so the GINs in place are cheap.
 CREATE OR REPLACE FUNCTION obis_backfill_aphia_ids(rebuild_indexes BOOLEAN DEFAULT TRUE) RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
@@ -401,11 +353,8 @@ BEGIN
     CREATE INDEX obis_cells_aphia_ids_gin
       ON cde.obis_cells USING GIN (aphia_ids);
 
-    -- Partial scientific_names GIN: only indexes cells whose aphia_ids are
-    -- still empty (the literal-name fallback in dbFilter.js is the only path
-    -- that uses this index; once aphia_ids is populated, the integer-set GIN
-    -- covers the filter). Drop+rebuild keeps the partial predicate consistent
-    -- with the rows that just got their aphia_ids set above.
+    -- Drop+rebuild keeps the partial predicate (aphia_ids still empty)
+    -- consistent with the rows that just got their aphia_ids set above.
     DROP INDEX IF EXISTS cde.obis_cells_scientific_names_gin;
     CREATE INDEX obis_cells_scientific_names_gin
       ON cde.obis_cells USING GIN (scientific_names)
@@ -417,12 +366,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Wrapper preserved for incremental callers (process_incremental_update calls
--- obis_process() directly). Full-reload path in db-loader/__main__.py invokes
--- the sub-functions individually so each gets its own _timed log line.
--- rebuild_indexes is forwarded to obis_backfill_aphia_ids(): the incremental
--- caller (process_incremental_update) passes FALSE to avoid the ACCESS EXCLUSIVE
--- DROP INDEX against live readers; full reloads leave it TRUE.
+-- Wrapper for process_incremental_update(), which passes rebuild_indexes FALSE
+-- to avoid an ACCESS EXCLUSIVE DROP INDEX against live readers. The full-reload
+-- path calls the sub-functions individually for per-step timing.
 CREATE OR REPLACE FUNCTION obis_process(
   concurrent_refresh BOOLEAN DEFAULT TRUE,
   rebuild_indexes BOOLEAN DEFAULT TRUE
@@ -440,19 +386,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Superseded by the day/hex model below: cde.trajectory_cells and its
--- cde.points linkage are gone. Dropped explicitly so a live database that ran
--- an older deploy doesn't keep dead functions around (db_migrate re-applies
--- this file on every deploy).
+-- Dropped so live databases from older deploys don't keep dead functions
+-- (db_migrate re-applies this file on every deploy).
 DROP FUNCTION IF EXISTS trajectory_insert_points();
 DROP FUNCTION IF EXISTS trajectory_update_days();
 
 
--- Trajectory per-day aggregate post-load processing. cde.trajectory_days is
--- attribute-only (records / depth / profiles per UTC day); the geometry side
--- lives in cde.trajectory_points and is swept into hexes by
--- trajectory_build_hexes() (4_create_hexes.sql). So the only pass needed here
--- is the dataset_pk backfill.
+-- cde.trajectory_days is attribute-only (geometry lives in
+-- cde.trajectory_points), so the only pass needed is the dataset_pk backfill.
 
 CREATE OR REPLACE FUNCTION trajectory_link_dataset_pk() RETURNS bigint AS $$
 DECLARE n bigint;
@@ -490,12 +431,9 @@ $$ LANGUAGE plpgsql;
 
 -- Rebuild cde.trajectory_track_stats from scratch. Cheap (one grouped scan of
 -- trajectory_points) and always consistent, so no incremental bookkeeping.
--- DELETE, not TRUNCATE: TRUNCATE takes AccessExclusiveLock, which conflicts
--- with the AccessShareLock every concurrent loader's pre-lock phase holds on
--- this table (create_temp_tables' LIKE) and with web-api readers — a live
--- three-loader deadlock was traced to exactly this statement. DELETE takes
--- RowExclusiveLock and MVCC keeps readers on the old rows until commit; the
--- table is tiny (one row per trajectory), so no TRUNCATE-speed argument.
+-- DELETE, not TRUNCATE: TRUNCATE's AccessExclusiveLock deadlocks with
+-- concurrent loaders (create_temp_tables' LIKE) and web-api readers; the table
+-- is tiny, so TRUNCATE's speed buys nothing.
 CREATE OR REPLACE FUNCTION trajectory_refresh_track_stats() RETURNS bigint AS $$
 DECLARE n bigint;
 BEGIN
@@ -506,12 +444,8 @@ BEGIN
   SELECT dataset_pk, trajectory_id, min(time), max(time), count(*),
          -- ST_Extent returns a box2d with no SRID; restore 3857 for the column
          ST_SetSRID(ST_Extent(geom)::geometry, 3857),
-         -- Median inter-fix gap = the platform's typical reporting cadence,
-         -- robust to idle periods (percentile_cont skips each track's NULL
-         -- first-row gap). A mean would conflate sailing and idle time: a
-         -- vessel sailing a few days per year at ~48min cadence "averages"
-         -- to days-to-weeks, which let between-cruise connector chords
-         -- through the /tiles/tracks gap splitting.
+         -- Median, not mean: a mean conflates sailing and idle time and lets
+         -- between-cruise chords through the /tiles/tracks gap splitting.
          percentile_cont(0.5) WITHIN GROUP (ORDER BY gap_secs)
     FROM (
       SELECT dataset_pk, trajectory_id, time, geom,
@@ -546,14 +480,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Out-of-band garbage collection for the append-only points/hexes tables:
--- points nothing references any more (datasets removed or reshaped), then hex
--- cells no remaining row references. The db-loader runs this post-commit in
--- its own short transaction under the loader advisory lock (try-lock, skipped
--- when another load is queued), so it never extends a load transaction and
--- never races another loader's linking phase. Leftover rows are invisible to
--- tile/legend queries meanwhile — those only reach points/hexes via the FKs
--- on profiles/obis_cells, and via trajectory_hexes.hex_pk.
+-- Out-of-band garbage collection for the append-only points/hexes tables. The
+-- db-loader runs this post-commit in its own short transaction under the loader
+-- advisory lock, so it never extends a load or races another loader's linking
+-- phase. Leftover rows are invisible to tile/legend queries meanwhile.
 CREATE OR REPLACE FUNCTION gc_orphan_points_and_hexes() RETURNS bigint AS $$
 DECLARE
   n bigint;
@@ -600,11 +530,10 @@ $$ LANGUAGE plpgsql;
 
 
 -- Rebuilds cde.datasets.day_ranges: each dataset's features' day sets merged
--- into disjoint ranges (gaps and islands), falling back to a feature's
--- [time_min, time_max] span where its day set is unknown — the same rule as
--- the map's `days` metric (web-api/utils/hexMetric.js). A full rebuild costs
--- ~2 s and runs once per load; it is what spares every /pointQuery the union.
--- Only rows whose ranges changed are written, like n_profiles above.
+-- into disjoint ranges, falling back to a feature's [time_min, time_max] span
+-- where its day set is unknown (the rule web-api/utils/hexMetric.js applies).
+-- ~2 s per load, and it spares every /pointQuery the union. Only changed rows
+-- are written.
 CREATE OR REPLACE FUNCTION refresh_dataset_day_ranges() RETURNS bigint AS $$
 DECLARE
   n bigint;
@@ -680,13 +609,11 @@ END;
 $$;
 
 
--- Rebuilds cde.hexes_zoom_0_rollup (see 1_schema.sql) from the three feature
--- tables, with the same row rules the tile branches apply: profiles only where
--- show_as_point, trajectory coverage at tier 0, rows without a hex or dataset
--- dropped (the tile joins would drop them). Day sets are merged per key with
--- the gaps-and-islands pass refresh_dataset_day_ranges() uses. Only changed
--- keys are written: one statement, so the DELETE (keys no longer produced) and
--- the upsert (keys still produced) never touch the same row.
+-- Rebuilds cde.hexes_zoom_0_rollup (see 1_schema.sql) with the same row rules
+-- the tile branches apply: profiles only where show_as_point, trajectory
+-- coverage at tier 0, rows without a hex or dataset dropped. Only changed keys
+-- are written, in one statement so the DELETE and the upsert never touch the
+-- same row.
 CREATE OR REPLACE FUNCTION refresh_hexes_zoom_0_rollup() RETURNS bigint AS $$
 DECLARE
   n bigint;

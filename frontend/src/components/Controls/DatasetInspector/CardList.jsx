@@ -1,27 +1,16 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { useChanged } from "../../../utilities.jsx";
 import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 
-// A searchable, sortable, paged list of cards — the dataset page's record list
-// is one of these. Cards rather than a data
-// table because this page lives in a ~420px column (a phone gives it the whole
-// viewport): a table of six columns could only be read by scrolling it
-// sideways, while a card lays the same fields out down the page and is legible
-// whole at any width. Same reason the datasets list and the griddap dimensions
-// are cards.
+// Cards rather than a table: in a ~420px column a six-column table could only
+// be read by scrolling sideways.
 //
-// The list owns searching, sorting and paging; the caller owns what one item
-// looks like (`renderItem`) and what clicking it does.
-//
-// `sortFields` is [{ id, label, type, value }] — `value(item)` reads the field
-// off an item and `type` ('string' | 'number') says how to compare it.
-// `pinnedKeys` (a Set) names items to hold at the top of the first page
-// whatever the sort (the record a map click resolved to, the trajectories that
-// crossed the selected area), and `focusKey` one to page to
-// wherever it falls (the trajectory whose track is drawn).
+// `sortFields` is [{ id, label, type: 'string' | 'number', value(item) }].
+// `pinnedKeys` hold the top of the first page whatever the sort; `focusKey`
+// is paged to wherever it falls.
 export default function CardList({
   items,
   keyOf,
@@ -44,9 +33,6 @@ export default function CardList({
     const field = sortFields.find((f) => f.id === sort.field);
     const factor = sort.dir === "asc" ? 1 : -1;
     return [...(filterRows(items, filterText) || [])].sort((a, b) => {
-      // Pinned items ride on top of the sort rather than replacing it, so the
-      // sort control still does what it says — the pin just puts them in front
-      // of the order it produces.
       const pa = pinnedKeys?.has(keyOf(a)) ? 0 : 1;
       const pb = pinnedKeys?.has(keyOf(b)) ? 0 : 1;
       if (pa !== pb) return pa - pb;
@@ -58,27 +44,44 @@ export default function CardList({
   }, [items, filterText, sort, pinnedKeys, keyOf, sortFields]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  // Clamped rather than stored: a page can vanish under the list when the
-  // search narrows the results between renders.
+  // Clamped rather than stored: the search can narrow the results between
+  // renders.
   const currentPage = Math.min(page, pageCount);
   const firstRow = (currentPage - 1) * pageSize;
 
-  // Back to page one whenever the list or its ordering changes: page 7 of the
-  // previous results is not page 7 of these.
   if (useChanged(items, filterText, sort, pageSize)) setPage(1);
 
-  // An item picked on the map can sit on any page of the list — turn to the
-  // page holding it, so the highlighted card is one the user can actually see.
-  // Runs on `items` too: the pick is usually already made when the list is
-  // still loading, and the effect above sends that arrival back to page one.
+  // Runs on `items` too: the pick usually precedes the list's arrival, which
+  // the reset above sends back to page one.
   if (useChanged(focusKey, items, pageSize) && focusKey !== undefined) {
     const index = rows.findIndex((row) => keyOf(row) === focusKey);
     if (index >= 0) setPage(Math.floor(index / pageSize) + 1);
   }
 
+  // Whether the toolbar is pinned against the top of the scrolling body: the
+  // sentinel above it is what scrolls out of view first.
+  const sentinelRef = useRef(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = sentinel?.closest(".datasetInspectorBody");
+    if (!root) return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) =>
+        setStuck(
+          !entry.isIntersecting &&
+            entry.boundingClientRect.top < entry.rootBounds.top,
+        ),
+      { root },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
-      <div className="cardListToolbar">
+      <div className="cardListSentinel" ref={sentinelRef} aria-hidden="true" />
+      <div className="cardListToolbar" data-stuck={stuck || undefined}>
         <TableFilter
           value={filterText}
           onChange={setFilterText}

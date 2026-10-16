@@ -3,16 +3,12 @@ const { polygonJSONToWKT } = require("./polygon");
 const unique = (arr) => [...new Set(arr)];
 const db = require("../db");
 
-// Hard cap on the AphiaID rolldown expansion. Selections expanding to more
-// than this many distinct AphiaIDs are rejected with HTTP 400 — a Phylum or
-// Kingdom selection blows past this and would force a multi-minute GIN OR
-// against tens of thousands of posting lists. /scientificNames flags such
-// names tooBroad so the frontend never offers them; this is the API-level
-// safety net for programmatic clients.
+// A Phylum/Kingdom rolldown would force a multi-minute GIN OR over tens of
+// thousands of posting lists. /scientificNames flags such names tooBroad for
+// the frontend; this 400 is the safety net for programmatic clients.
 const MAX_EXPANDED_APHIA_IDS = 5000;
 
-// The request parameters whose predicates read feature columns rather than
-// cde.datasets — see `datasetLevelOnly` at the end of createDBFilter.
+// Params whose predicates read feature columns rather than cde.datasets.
 const FEATURE_LEVEL_PARAMS = [
   "timeMin",
   "timeMax",
@@ -30,11 +26,9 @@ const FEATURE_LEVEL_PARAMS = [
   "excludeScientificNames",
 ];
 
-// Pre-computes the rolldown expansion in one fast query (~30ms even for
-// Phylum). Returns the set of AphiaIDs a selection rolls down to: the selected
-// names' accepted AphiaIDs (covers synonyms via shared valid_AphiaID) UNION
-// every taxon whose ancestor chain contains one. The GIN index on
-// ancestor_aphia_ids makes this index-only.
+// Selected names' accepted AphiaIDs (synonyms share valid_AphiaID) UNION every
+// taxon whose ancestor chain contains one; index-only via the GIN on
+// ancestor_aphia_ids (~30ms even for a Phylum).
 const APHIA_EXPANSION_SQL = `
       WITH selected_aids AS (
         SELECT DISTINCT aphia_id
@@ -49,45 +43,24 @@ const APHIA_EXPANSION_SQL = `
        WHERE v.ancestor_aphia_ids && ARRAY(SELECT aphia_id FROM selected_aids)
          AND v.aphia_id IS NOT NULL`;
 
-/*
- * The ONLY query this module runs — everything else it does is string
- * assembly, which is why it is injectable: with a fetcher supplied,
- * createDBFilter is pure and every predicate it emits can be asserted without
- * a live Postgres. Reached only when `scientificNames` is set.
- */
+// The only query this module runs; injectable so createDBFilter can be tested
+// without Postgres.
 async function fetchAphiaIdsFromDb(scientificNamesArr) {
   const { rows } = await db.raw(APHIA_EXPANSION_SQL, { scientificNamesArr });
   return rows.map((r) => r.aphia_id);
 }
 
-/*
- * The expansion above depends on nothing but the selected names, and every
- * route that narrows the catalogue calls createDBFilter once per request — so
- * one taxon selection fires it ~20 times for the tiles of a single viewport,
- * serially ahead of each tile's own query, plus twice more for /download
- * (getShapeQuery runs it, then the route runs it again). Measured at ~30 ms
- * even for a Phylum, that is the whole first paint of a taxon selection spent
- * re-deriving one answer.
- *
- * The PROMISE is memoized, not the value: the tiles of a viewport arrive
- * together, so caching only settled results would still let the whole batch
- * miss and fire N queries. A rejection is evicted rather than kept — the same
- * reasoning as utils/redis.js's readyPromise, where memoizing a failure pinned
- * the process to it.
- *
- * The TTL matches the route cache in utils/routePipeline.js, so a name's
- * expansion is never staler than the tile drawn from it, and the map is
- * bounded because a request's names come from a fixed-vocabulary autocomplete
- * (/scientificNames) rather than free text.
- */
+// One taxon selection would otherwise re-run the expansion ~20 times per
+// viewport (once per tile). The promise is memoized, not the value, because a
+// viewport's tiles arrive together; rejections are evicted so a failure isn't
+// pinned. The TTL matches the route cache in utils/routePipeline.js.
 const APHIA_CACHE_TTL_MS = 5 * 60 * 1000;
 const APHIA_CACHE_MAX_ENTRIES = 500;
 const aphiaCache = new Map();
 
 function memoizeAphiaFetch(fetcher) {
   return function fetchAphiaIdsMemoized(scientificNamesArr) {
-    // Sorted, so two selections of the same taxa in a different order share an
-    // entry — the frontend's order follows the click sequence.
+    // Sorted: the frontend's order follows the click sequence.
     const key = JSON.stringify([...scientificNamesArr].sort());
     const hit = aphiaCache.get(key);
     if (hit && hit.expiresAt > Date.now()) return hit.promise;
@@ -102,7 +75,6 @@ function memoizeAphiaFetch(fetcher) {
       promise,
       expiresAt: Date.now() + APHIA_CACHE_TTL_MS,
     });
-    // Map preserves insertion order, so the first key is the oldest.
     if (aphiaCache.size > APHIA_CACHE_MAX_ENTRIES) {
       aphiaCache.delete(aphiaCache.keys().next().value);
     }
@@ -114,10 +86,6 @@ const fetchAphiaIdsCached = memoizeAphiaFetch(fetchAphiaIdsFromDb);
 
 class InvalidPolygonError extends Error {
   constructor() {
-    // polygonJSONToWKT returns false for unparseable JSON, a non-array, or a
-    // ring with fewer than 4 points. Binding that false into ST_GeomFromText
-    // is a 500 on every route that takes a polygon, so reject it here as the
-    // client error it is.
     super(
       "Invalid polygon: expected a closed ring of at least 4 [lon,lat] pairs.",
     );
@@ -159,7 +127,7 @@ async function createDBFilter(
     organizationsMatch,
     scientificNamesMatch,
 
-    // These are comma separated lists
+    // comma-separated lists
     eovs,
     organizations,
     datasetPKs,
@@ -183,36 +151,22 @@ async function createDBFilter(
 
   if (eovs) {
     parameters.eovsCommaSeparatedString = unique(eovs.split(","));
-    // "all" = the dataset/feature measured every selected EOV, not just one.
     const eovsOp = eovsMatch === "all" ? "@>" : "&&";
-    // Dataset level: bare `eovs` here resolves to cde.datasets.eovs, because
-    // every route applies this blob after joining cde.datasets.
+    // Bare `eovs` resolves to cde.datasets.eovs: every route joins it first.
     filters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
-    // Feature level: cde.profiles carries the EOVs each feature actually holds
-    // (a subset of its dataset's), so a multi-EOV dataset contributes only the
-    // stations/casts that measured the selected variable instead of all of
-    // them. Applied INSIDE the profiles branch, where cde.profiles is the only
-    // table in scope and bare `eovs` is unambiguously profiles.eovs — it
-    // cannot go in `filters` above, where it would be ambiguous against
-    // datasets.eovs.
-    //
-    // Every branch reading FROM cde.profiles must apply this, or it silently
-    // keeps the old dataset-level behaviour — there is no error to catch it,
-    // which is why utils/selectionAgreement.test.js checks all five: the
-    // shape query's profilesBranch, tiles.js (the hex/point route), legend.js,
-    // timeExtent.js and download.js. Branches that cannot
-    // answer it stay dataset-level via `filters`, which is why that clause is
-    // kept there: trajectory cells and track stats, the griddap pseudo-branch,
-    // and the trajectory half of the two coverage-cell queries (/tiles/cells
-    // and the legend's coverage ramp).
+    // Per-feature EOVs (a subset of the dataset's), applied inside the
+    // profiles branch where bare `eovs` is profiles.eovs. Every branch reading
+    // cde.profiles must apply it or silently stays dataset-level —
+    // utils/selectionAgreement.test.js guards this. Branches that cannot
+    // answer it (trajectory cells, griddap) rely on the clause above.
     profileFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
     // OBIS cells carry the EOVs their taxa map to (obis_derive_eovs()), so a
     // fish selection keeps only the cells that recorded fish.
     obisFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
   }
 
-  // Both levels, like the include: a dataset that measured an excluded EOV is
-  // dropped whole, so every branch agrees with the profiles one.
+  // Both levels, so a dataset that measured an excluded EOV is dropped whole
+  // and every branch agrees with the profiles one.
   if (excludeEovs) {
     parameters.excludeEovsArr = unique(excludeEovs.split(","));
     filters.push("NOT coalesce(eovs && :excludeEovsArr, false)");
@@ -224,10 +178,8 @@ async function createDBFilter(
     filters.push("platform = any(:platformsCommaSeparatedString)");
   }
 
-  // The exclude* params below drop what they name and keep everything else —
-  // including rows where the column is NULL, which a bare `<> ALL` or
-  // `NOT (&&)` would evaluate to NULL and drop too (same trap as
-  // excludeDatasetPKs). They are ANDed on top of the include lists.
+  // exclude* params must keep NULL-column rows, which a bare `<> ALL` or
+  // `NOT (&&)` would evaluate to NULL and drop.
   if (excludePlatforms) {
     parameters.excludePlatformsArr = unique(excludePlatforms.split(","));
     filters.push("(platform IS NULL OR platform <> ALL(:excludePlatformsArr))");
@@ -242,17 +194,11 @@ async function createDBFilter(
     filters.push("time_min <= :timeMax::timestamptz");
   }
 
-  // Rectangle selection (download bbox). Matched against each feature's
-  // extent (search_geom = the profiles bbox, or the cell point for
-  // obis/trajectory) via ST_Intersects, so a feature that passes through the
-  // rectangle is found even if its display point sits outside it. Missing
-  // bounds default to the world extent so a partial rectangle still works.
+  // Matched against each feature's extent (search_geom), not its display
+  // point, so a feature passing through the rectangle is found.
   if (latMin || latMax || lonMin || lonMax) {
-    // search_geom lives in Web Mercator (EPSG:3857), so the envelope is
-    // transformed 4326->3857. Mercator is only defined to ~±85.06° latitude;
-    // transforming a ±90° envelope throws "transform: tolerance condition
-    // error" in PostGIS and crashes the request. Clamp latitude to the valid
-    // range — nothing outside it can exist in a 3857 geometry anyway.
+    // search_geom is EPSG:3857; transforming a ±90° envelope throws
+    // "tolerance condition error" in PostGIS, so clamp to Mercator's range.
     const clampLat = (v, dflt) => {
       const n = v === undefined || v === null || v === "" ? dflt : Number(v);
       return Math.max(-85.05, Math.min(85.05, n));
@@ -268,7 +214,6 @@ async function createDBFilter(
     );
   }
 
-  // disabled until we get depth data into the database
   if (depthMin) {
     parameters.depthMin = depthMin;
     filters.push("depth_max >= (:depthMin)::integer");
@@ -283,29 +228,16 @@ async function createDBFilter(
     filters.push("d.pk_url = ANY (:datasetPKs)");
   }
 
-  // The same narrowing said the other way round. A client that narrows the
-  // catalogue on its own (the datasets list: its search box, "only in view",
-  // the geometry switches) can only tell the API about it as a pk list, and a
-  // list of the datasets it KEPT runs to ~5 bytes per dataset — past roughly
-  // 2300 of them the request line is longer than the header limit and every
-  // such query 431s. Naming the ones it dropped instead is the identical
-  // filter at a fraction of the length whenever the narrowing is mild, which
-  // is the common case ("only in view" while zoomed out drops nothing at all).
-  // Callers send whichever list is shorter; see applyDatasetPKs in the
-  // frontend's utilities.
+  // Inverse of datasetPKs: past ~2300 kept pks the request line exceeds the
+  // header limit (431), so the frontend's applyDatasetPKs sends whichever
+  // list is shorter.
   if (excludeDatasetPKs) {
     parameters.excludeDatasetPKs = excludeDatasetPKs.split(",");
-    // pk_url is nullable until 5_profile_process.sql back-fills it, and
-    // `NULL <> ALL (...)` is NULL rather than TRUE — so without the guard,
-    // naming one dataset to drop would also drop every dataset that has not
-    // been back-filled yet, which sending no list at all would have kept.
+    // pk_url is NULL until 5_profile_process.sql back-fills it.
     filters.push("(d.pk_url IS NULL OR d.pk_url <> ALL (:excludeDatasetPKs))");
   }
 
   if (pointPKs) {
-    // Comma-separated, like datasetPKs/organizations above — this was binding
-    // the raw query string instead of an array, so `= ANY(:pointPKs)` never
-    // worked (Postgres can't cast "12342,34534" to an integer array).
     parameters.pointPKs = pointPKs.split(",");
     filters.push("point_pk = ANY (:pointPKs)");
   }
@@ -323,35 +255,18 @@ async function createDBFilter(
     );
   }
 
-  // Dataset-level, so it belongs in `filters` (the shared fragment) rather than
-  // profileFilters, which only ever sees cde.profiles. Being shared means the
-  // tile, legend, timeExtent, download and griddap branches all inherit it
-  // without a per-site edit -- selectionAgreement.test.js is what proves that.
-  //
-  // The predicate reads stored columns only (see dataset_is_realtime in
-  // database/8_range_functions.sql), so it is IMMUTABLE and cannot return NULL,
-  // which is why a plain boolean test is safe here: `NOT f(...)` over a
-  // three-valued result would drop rows from both sides of the facet.
-  // cdm_data_type restricts it to griddap/timeseries*/trajectory* datasets --
-  // a Profile or a bare OBIS Point is a one-off, not a live feed.
-  //
-  // verified_at, not last_updated_at: the latter only moves when the dataset's
-  // content changed, so a dead feed skipped as unchanged by an incremental
-  // harvest would keep its badge forever.
+  // dataset_is_realtime (database/8_range_functions.sql) never returns NULL,
+  // so a plain boolean test is safe. verified_at, not last_updated_at: the
+  // latter doesn't move for a dead feed an incremental harvest skips.
   if (realtimeOnly === "true") {
     filters.push(
       "dataset_is_realtime(d.coverage_time_max, d.verified_at, d.cdm_data_type)",
     );
   }
 
-  // Both live on cde.datasets; the join alias `d` is present in tile, legend
-  // and shape queries. They form the combined "Data Source" filter: ERDDAP
-  // datasets have NULL obis_nodes and OBIS datasets carry the sentinel
-  // https://obis.org as erddap_url (never offered by /erddapServers), so
-  // when both params are present a dataset matches if it comes from a
-  // selected server OR a selected node. obisNodes without erddapServers
-  // implies OBIS-only mode (the tile/legend/shape routes drop the profiles
-  // branch when this is set).
+  // Combined "Data Source" filter: ERDDAP datasets have NULL obis_nodes and
+  // OBIS datasets carry the sentinel https://obis.org as erddap_url, so with
+  // both params a dataset matches either.
   if (obisNodes) {
     parameters.obisNodesArr = obisNodes.split(",");
   }
@@ -368,9 +283,7 @@ async function createDBFilter(
     filters.push("d.erddap_url = ANY(:erddapServersArray)");
   }
 
-  // Unlike the includes above, the source excludes take no part in the
-  // OBIS-only gate (utils/selection.js): dropping a server or node narrows the
-  // selection without changing which feature sources are in it.
+  // Source excludes take no part in the OBIS-only gate (utils/selection.js).
   if (excludeErddapServers) {
     parameters.excludeErddapServersArr = excludeErddapServers.split(",");
     filters.push(
@@ -386,8 +299,6 @@ async function createDBFilter(
     const wktPolygon = polygonJSONToWKT(polygon);
     if (!wktPolygon) throw new InvalidPolygonError();
     parameters.wktPolygon = wktPolygon;
-    // Extent-based: a feature matches when its search_geom intersects the drawn
-    // polygon (was ST_Contains on the single point).
     filters.push(
       "ST_Intersects(search_geom, ST_Transform(ST_GeomFromText(:wktPolygon,4326),3857)) is true",
     );
@@ -401,8 +312,7 @@ async function createDBFilter(
         .filter(Boolean),
     );
 
-  // Non-integer ids (NULL on not_found rows) are dropped here rather than in
-  // the fetcher, so the guarantee holds whatever supplied them.
+  // NULL ids (not_found rows) are dropped here so it holds for any fetcher.
   const expandNames = async (namesArr) => {
     const expanded = (await fetchAphiaIds(namesArr)).filter((n) =>
       Number.isInteger(n),
@@ -416,22 +326,16 @@ async function createDBFilter(
     return expanded;
   };
 
-  // Rank-aware match against obis_cells.aphia_ids using the precomputed
-  // expansion (a flat int[] parameter — PG plans this as one BitmapOr over
-  // GIN posting lists, no nested InitPlan, no per-row recheck of an inline
-  // subquery). The literal scientific_names branch is the back-compat
-  // fallback for selections WoRMS never resolved (aphia_id IS NULL on
-  // not_found rows) and for any obis_cells whose aphia_ids weren't
-  // backfilled yet — e.g. freshly harvested cells before
-  // 5_profile_process.sql runs.
+  // A flat int[] param plans as one BitmapOr over GIN posting lists (no
+  // InitPlan). The scientific_names arm covers names WoRMS never resolved and
+  // cells whose aphia_ids aren't back-filled yet by 5_profile_process.sql.
   const taxonMatch = (idsParam, namesParam) =>
     `(aphia_ids && :${idsParam} OR scientific_names && :${namesParam})`;
 
   if (scientificNames) {
     const scientificNamesArr = splitNames(scientificNames);
     if (scientificNamesMatch === "all") {
-      // One rolldown per name: the cell must hold something under each of
-      // them, which a single merged expansion cannot express.
+      // One rolldown per name: a merged expansion cannot express "each of".
       const expansions = await Promise.all(
         scientificNamesArr.map((name) => expandNames([name])),
       );
@@ -449,8 +353,7 @@ async function createDBFilter(
     }
   }
 
-  // Cells only: ERDDAP features carry no taxa, so they pass an exclude, which
-  // is also why it takes no part in the OBIS-only gate (utils/selection.js).
+  // Cells only: ERDDAP features carry no taxa, so they pass an exclude.
   if (excludeScientificNames) {
     const excludeScientificNamesArr = splitNames(excludeScientificNames);
     parameters.excludeScientificNamesArr = excludeScientificNamesArr;
@@ -464,14 +367,8 @@ async function createDBFilter(
   const obisSql = obisFilters.join(" AND \n") || "TRUE";
   const profileSql = profileFilters.join(" AND \n") || "TRUE";
 
-  // `hasShared` exists because the shared fragment is the only one a caller
-  // can omit: it lands in an outer WHERE that is dropped entirely when nothing
-  // narrows it. The other two are bound inside a branch's own WHERE, where
-  // "TRUE" is the right answer and no caller ever needs to ask.
-  //
-  // `datasetLevelOnly` says every predicate reads cde.datasets alone, so a
-  // pre-aggregated row set (cde.hexes_zoom_0_rollup) answers the selection
-  // exactly; the others test a feature's own time, depth, place, EOVs or taxa.
+  // `datasetLevelOnly`: a pre-aggregated row set (cde.hexes_zoom_0_rollup)
+  // answers the selection exactly.
   return {
     shared: db.raw(sharedSql, parameters),
     obisOnly: db.raw(obisSql, parameters),
@@ -486,8 +383,6 @@ module.exports.ScientificNameSelectionTooBroadError =
   ScientificNameSelectionTooBroadError;
 module.exports.InvalidPolygonError = InvalidPolygonError;
 module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;
-// The memo is process-global, so a test that drives it has to be able to put
-// it back — same seam as utils/cache.js's _resetAdapterForTests.
 module.exports.memoizeAphiaFetch = memoizeAphiaFetch;
 module.exports.APHIA_CACHE_TTL_MS = APHIA_CACHE_TTL_MS;
 module.exports._resetAphiaCacheForTests = () => aphiaCache.clear();

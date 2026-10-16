@@ -5,15 +5,6 @@ const { getShapeQuery, getDatasetPksInShape } = require("../utils/shapeQuery");
 const { pipeline } = require("../utils/routePipeline");
 
 /**
- * /pointQuery
- *
- * This endpoint takes any of the filters, and requires either a lat/long or polygon shape
- * It needs all the filters so that it can estimate download size
- *
- * if no shape is given, it returns all datasets
- */
-
-/**
  * @swagger
  * /pointQuery:
  *   get:

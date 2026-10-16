@@ -16,20 +16,16 @@ import useMediaQuery from "./useMediaQuery.js";
 
 const UIContext = createContext();
 
-// Above this width the datasets list is shown by default — there is enough map
-// left over for it to sit beside rather than on top of. Below it the map leads
-// and the list is opened from the top bar — on phones that takes the whole
-// screen.
+// Above this the list sits beside the map by default; below it the map leads.
 const WIDE_SCREEN_QUERY = "(min-width: 1400px)";
 
 export function useUI() {
   return useContext(UIContext);
 }
 
-// "Something new arrived that lives in the sidebar — raise it." Written as an
-// adjust-during-render rather than an effect so the sidebar and the thing it is
-// being raised for land in the same paint; an effect showed one frame of the
-// closed sidebar first, which on a phone read as a dropped tap.
+// Adjust-during-render rather than an effect so the sidebar and what it is
+// raised for land in the same paint; an effect showed a frame of the closed
+// sidebar, which on a phone read as a dropped tap.
 function useRevealSidebar(value, isPresent, setSidebarOpenState) {
   if (useChanged(value) && isPresent(value)) setSidebarOpenState(true);
 }
@@ -39,66 +35,50 @@ export default function UIProvider({ children }) {
     useSelection();
 
   const wideScreen = useMediaQuery(WIDE_SCREEN_QUERY);
-  // The datasets sidebar: open by default on wide screens, closed on anything
-  // narrower, where it would take too much of the map.
   const [sidebarOpen, setSidebarOpenState] = useState(wideScreen);
-  // Set once the user opens or closes the list themselves; from then on their
-  // choice sticks and the screen-size default no longer applies.
+  // Once the user opens or closes the list, the screen-size default stops.
   const sidebarChosenRef = useRef(false);
   const setSidebarOpen = useCallback((next) => {
     sidebarChosenRef.current = true;
     setSidebarOpenState(next);
   }, []);
 
-  // Follow the breakpoint until the user makes their own call, so a window
-  // resized (or a tablet rotated) into a wide screen gets the default for the
-  // size it is now rather than keeping the one it booted at.
+  // Follow the breakpoint until the user chooses, so a resize or rotation gets
+  // the default for its current size.
   useEffect(() => {
     if (!sidebarChosenRef.current) setSidebarOpenState(wideScreen);
   }, [wideScreen]);
-  // The modal surfaces: filter management, the download order, the
-  // dataset-coverage figure, and how the download selection is made.
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showCoverageModal, setShowCoverageModal] = useState(false);
-  // The coverage figure's time axis: the timeline, or every year folded onto
-  // one Jan-to-Dec axis. Seeded from ?coverageAxis= so a link keeps it.
+  // Seeded from ?coverageAxis= so a link keeps it.
   const [coverageAxis, setCoverageAxis] = useState(() =>
     new URL(window.location.href).searchParams.get("coverageAxis") ===
     "seasonal"
       ? "seasonal"
       : "timeline",
   );
-  // The OBIS page's taxonomy chart: sunburst or GBIF-style tree, from ?taxonomy=.
   const [taxonomyView, setTaxonomyView] = useState(() =>
     new URL(window.location.href).searchParams.get("taxonomy") === "tree"
       ? "tree"
       : "sunburst",
   );
-  // How picking datasets for a download works, opened from the sidebar
-  // footer's one-line version of the same thing.
   const [showSelectionHelpModal, setShowSelectionHelpModal] = useState(false);
-  // Which filter flyout is open inside the filters modal (one at a time).
   const [openFilter, setOpenFilter] = useState();
-  // The quick filters and active-filter chips under the top bar: shown by
-  // default, put away by the toggle living on the main Filters button.
   const [quickFiltersCollapsed, setQuickFiltersCollapsed] = useState(false);
-  // The intro opens by itself until it has been closed once, so a reload
-  // before dismissing it still shows it.
+  // Persisted only on close, so a reload before dismissing still shows it.
   const [introSeen, setIntroSeen] = usePersistentState("introSeen", false);
   const [showIntroModal, setShowIntroModal] = useState(!introSeen);
   useEffect(() => {
     if (!showIntroModal) setIntroSeen(true);
   }, [showIntroModal, setIntroSeen]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  // The Filters modal on its search page rather than on whichever filter was
-  // open last — what both Filters buttons open.
+  // Opens on the search page rather than whichever filter was open last.
   const openFilters = useCallback(() => {
     setOpenFilter(undefined);
     setShowFiltersModal(true);
   }, []);
-  // The same, opened by typing (see useFilterSearchShortcut) and holding this
-  // text; null when it was opened any other way.
+  // Set when opened by typing (useFilterSearchShortcut); null otherwise.
   const [filterSearchText, setFilterSearchText] = useState(null);
   const openFilterSearch = useCallback(
     (text = "") => {
@@ -109,36 +89,22 @@ export default function UIProvider({ children }) {
   );
   if (!showFiltersModal && filterSearchText !== null) setFilterSearchText(null);
 
-  // A drawn box or polygon surfaces the matching datasets — on wide screens
-  // only: narrower, the list would cover the shape just drawn, and the top-bar
-  // counter already reports the result. These reveals don't count as the user's
-  // choice about the list, so the screen-size default still applies afterwards.
+  // Wide screens only: narrower, the list would cover the shape just drawn.
+  // These reveals don't count as the user's choice about the list.
   useRevealSidebar(
     polygon,
     (value) => wideScreen && !isEmpty(value),
     setSidebarOpenState,
   );
 
-  // A dataset page has to be somewhere the user can see it. Opening one used to
-  // imply a track click or a filter narrowed to a single dataset, both of which
-  // are covered elsewhere here; the map's "what's here" card opens pages
-  // directly, with no filter change to notice, so the panel is raised for the
-  // page itself rather than for whatever happened to precede it. Covers a share
-  // link carrying ?dataset= too, which lands with the page already open.
-  // Keyed on the pk: a results refresh hands the same open dataset back as a
-  // new object, which must not reopen a sidebar the user collapsed over it.
+  // Keyed on the pk: a results refresh hands the open dataset back as a new
+  // object, which must not reopen a sidebar the user collapsed over it.
   useRevealSidebar(inspectDataset?.pk, Boolean, setSidebarOpenState);
 
-  // Clicking a track on the map draws its platform history — surface the panel
-  // holding the page that shows it.
   useRevealSidebar(selectedTrajectory, Boolean, setSidebarOpenState);
 
-  // Adding datasets to the download from the map's "what's here" card puts
-  // something in the list's footer — show the list so the user sees the basket
-  // grow and can reach Download. Without it the card's whole effect on a phone
-  // was invisible: the sheet was closed and nothing else announced the change.
-  // Only a growing selection counts — unticking a dataset should not reopen a
-  // list the user had put away.
+  // Only a growing selection reveals the list (so the basket visibly grows on
+  // a phone); unticking must not reopen a list the user put away.
   const previousDownloadCount = useRef(0);
   useEffect(() => {
     const count = isEmpty(pointsToReview) ? 0 : pointsToReview.length;

@@ -1,18 +1,9 @@
 import { useEffect, useState } from "react";
 
-// useState for a UI preference the user sets once and expects to find again (the
-// map's layer switches, the projection, what the hex ramp counts), kept under a
-// single namespace in localStorage — and overridable by the share link the app
-// was opened at.
-//
-// This module is the only place the app keeps anything in the browser, and it
-// uses localStorage rather than cookies: a cookie rides along on every request
-// to the server, and none of this is the server's business. The privacy notice
-// (PrivacyModal) describes what is kept here, so a new key belongs there too.
-//
-// Storage is best-effort: private-mode Safari and blocked third-party storage
-// both throw on access, and a preference is never worth crashing the app over,
-// so failures fall back to the in-memory default.
+// The only place the app keeps anything in the browser. localStorage, not
+// cookies, because none of this is the server's business; PrivacyModal
+// describes what is kept, so a new key belongs there too. Best-effort:
+// private-mode Safari and blocked storage throw, falling back to the default.
 const PREFIX = "cde.";
 
 function read(key, fallback) {
@@ -33,16 +24,9 @@ function persist(key, value) {
   }
 }
 
-// Precedence on load: the URL param if the link carries one, then the stored
-// value, then the default. UrlSync writes the param back whenever the value is
-// not the default, so a copied link reproduces the map it was copied from while
-// a bare URL still opens on whatever the user last chose.
-//
-// `parse` turns the raw param into the state's own type, and is the only thing
-// standing between the query string and the app's state: the boolean switches
-// read 'false'/'true', and the projection maps `globe=true` onto its two named
-// values. So the link says what the user sees rather than naming internal
-// state, and a junk param lands on the default instead of somewhere unexpected.
+// Precedence: URL param, then stored value, then default. `parse` is the only
+// thing between the query string and app state, so a junk param lands on the
+// default.
 export function useUrlSeededPersistentState(key, param, defaultValue, parse) {
   const [value, setValue] = useState(() => {
     const raw = new URL(window.location.href).searchParams.get(param);
@@ -56,9 +40,8 @@ export function useUrlSeededPersistentState(key, param, defaultValue, parse) {
   return [value, setValue];
 }
 
-// For the preferences that describe the viewer rather than the map (which tips
-// they have already seen, whether they want tips at all), so a share link has
-// no business carrying them.
+// For preferences about the viewer rather than the map, which a share link
+// has no business carrying.
 export function usePersistentState(key, defaultValue) {
   const [value, setValue] = useState(() => read(key, defaultValue));
 
@@ -69,10 +52,8 @@ export function usePersistentState(key, defaultValue) {
   return [value, setValue];
 }
 
-// Cookies earlier versions set: the remembered download address and the
-// intro's seen flag, now in localStorage, and i18next's copy of the language,
-// which it also keeps there. Expired on load so the address stops travelling
-// with every request instead of lingering until its month runs out.
+// Cookies earlier versions set, expired on load so the address stops
+// travelling with every request.
 const LEGACY_COOKIES = ["email", "introModalOpen", "i18next"];
 
 export function clearLegacyCookies() {

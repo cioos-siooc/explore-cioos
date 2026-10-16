@@ -1,11 +1,5 @@
-"""
-Unit tests for cde_harvester.core.config.resolve_obis_config.
-
-This is the single place that decides how OBIS datasets are selected. The three
-config readers (CLI, Prefect init_config, fan-out flow) previously each parsed
-the OBIS keys themselves and drifted — which is how obis_geo_filter ended up
-silently ignored on the Prefect path.
-"""
+"""resolve_obis_config is the single place OBIS dataset selection is decided, so
+the CLI, Prefect init_config and fan-out readers cannot drift apart."""
 
 import json
 

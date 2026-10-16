@@ -1,6 +1,4 @@
-/* Status palette for the admin views. Scoped to .harvest-root: these are the
-   on-status text and surface tints the run tables need, not global brand
-   values, so they stay out of theme.css. */
+/* Scoped to .harvest-root: admin-only status tints, kept out of theme.css. */
 .harvest-root {
   --harvest-success-ink: #0e3d35;
   --harvest-error-ink: #7a1520;
@@ -144,9 +142,8 @@
   color: var(--harvest-success-ink);
 }
 
-/* ── Real-time badge (dataset_is_realtime) ───────────────────────────────────
-   Same solid badge as the dataset cards' Real-time badge (DatasetsTable/styles.css
-   .datasetCardLive), sized to the admin table's smaller type scale. */
+/* ── Real-time badge ─────────────────────────────────────────────────────────
+   Matches DatasetsTable's .datasetCardLive at the admin table's type scale. */
 .harvest-realtime-badge {
   display: inline-flex;
   align-items: center;
@@ -318,15 +315,13 @@
   border-bottom: 2px solid var(--cioos-teal-light);
 }
 
-/* A "view all" link sitting on the right of a section heading. */
 .harvest-section-link {
   float: right;
   font-size: 0.82rem;
   font-weight: 400;
 }
 
-/* Downloads queued with nothing consuming them — the scheduler being down.
-   Loud on purpose: nothing else in the UI reveals that state. */
+/* The scheduler being down. Loud on purpose: nothing else reveals it. */
 .harvest-queue-warning {
   background: var(--cioos-error-bg);
   color: var(--harvest-error-ink);
@@ -341,7 +336,6 @@
   color: var(--harvest-error-ink);
 }
 
-/* Stack traces on the download job page. */
 .harvest-error-block {
   background: var(--cioos-error-bg);
   color: var(--harvest-error-ink);
@@ -430,8 +424,7 @@
   overflow-wrap: break-word;
 }
 
-/* Non-fatal warning on an otherwise-successful dataset (amber, matches the
-   skipped palette so it reads as "heads-up", not "failure"). */
+/* Amber like skipped so it reads as "heads-up", not "failure". */
 .harvest-warning-box {
   background: var(--harvest-warn-bg);
   color: var(--harvest-warn-ink);
@@ -533,7 +526,6 @@ a.harvest-link:hover {
 
 /* ── Utilities ────────────────────────────────────────────────────────────── */
 
-/* Numeric table columns. */
 .harvest-num {
   text-align: right;
 }
@@ -543,8 +535,7 @@ a.harvest-link:hover {
   font-weight: 600;
 }
 
-/* Four rungs replacing seven near-identical inline sizes (0.72–1.2rem);
-   the widest collapse moves a cell by half a pixel. */
+/* Four rungs replacing seven near-identical inline sizes. */
 .harvest-text-xs {
   font-size: 0.72rem;
 }
@@ -585,12 +576,10 @@ a.harvest-link:hover {
   color: var(--harvest-muted-soft);
 }
 
-/* Compact control in the filter bars. */
 .harvest-btn-sm {
   padding: 0.35rem 0.8rem;
 }
 
-/* "No rows" placeholder spanning a table. */
 .harvest-empty-row {
   padding: 1.5rem;
   text-align: center;

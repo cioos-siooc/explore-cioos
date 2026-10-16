@@ -112,8 +112,7 @@ describe("DownloadDetails", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Small dataset")[0]).toBeInTheDocument();
     });
-    // Both datasets are well under the 1GB CDE limit, so both stay selected —
-    // summary reads "2 / 2".
+    // Both datasets are well under the 1GB CDE limit.
     await waitFor(() => {
       expect(document.querySelector(".downloadSummaryValue")).toHaveTextContent(
         "2 / 2",
@@ -128,9 +127,8 @@ describe("DownloadDetails", () => {
         makePoint({ pk: EST_SMALL.pk, title: "Small dataset" }),
       ],
     });
-    // pk 999999 has no matching estimate row, so its size falls back to 0 —
-    // exercise the opposite case instead: a real dataset under the limit stays
-    // selectable, confirming the merge picked up its fixture size.
+    // A real dataset under the limit stays selectable, confirming the merge
+    // picked up its fixture size.
     await waitFor(() => {
       expect(screen.getByText("Small dataset")).toBeInTheDocument();
     });
@@ -143,8 +141,6 @@ describe("DownloadDetails", () => {
     );
     const selectAll = screen.getByTitle("Select all");
     await user.click(selectAll);
-    // Selecting all off then on again should not throw and the button stays
-    // present — the toggle round-trips through DatasetsTable's own state.
     expect(selectAll).toBeInTheDocument();
   });
 
@@ -180,7 +176,6 @@ describe("DownloadDetails", () => {
         name: "Remove from the download selection: Large dataset",
       }),
     ).not.toBeInTheDocument();
-    // What the submit sends.
     expect(setPointsToDownload).toHaveBeenLastCalledWith([
       expect.objectContaining({ pk: EST_SMALL.pk }),
     ]);

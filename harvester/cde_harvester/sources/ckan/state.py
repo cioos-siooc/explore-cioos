@@ -12,6 +12,7 @@ _module_logger = logging.getLogger(__name__)
 
 PREVIOUS_CKAN_COLUMNS = [
     "erddap_url", "dataset_id", "ckan_id", "title", "title_fr", "organizations", "eovs",
+    "metadata",
 ]
 
 # An OBIS dataset's eovs also holds the EOVs derived from its taxa; only its

@@ -1,38 +1,17 @@
-/* ------------------------------------------------------------------
- * Sidebar — the left column holding the datasets card (a header naming
- * the list, the dataset list body, and the counts + Download footer).
- * The brand + Datasets/Filters entry points live in the centered top bar. On phones the datasets card takes the whole screen,
- * shown only while the top bar's Datasets button is on — closed, it
- * leaves nothing at any edge and the map reads full-screen. It arrives
- * and leaves in the direction its dismiss chevron points: from and back
- * past the left edge beside the map, up from and down off the bottom on
- * a phone.
- *
- * The griddap legend pins itself over this column's top-left corner
- * rather than stacking inside it (see the WmsLegend stylesheet), so the
- * column is a single card again.
- * ------------------------------------------------------------------ */
+/* Sidebar: the left column holding the datasets card; full-screen sheet on
+   phones. */
 
-/* Transparent positioning shell: the two cards inside carry the chrome,
-   and the empty space between/below them stays click-through to the map. */
+/* Transparent shell: empty space stays click-through to the map. */
 .sidebar {
   position: fixed;
 
-  /* Start below the centered top bar whenever it reaches over this column —
-     which it does on narrower screens, and does further down the more
-     active-filter chips are wrapped under it. TopControls publishes that reach
-     as --cioos-top-bar-space and leaves it at 0 once the bar sits clear, where
-     the column goes back to starting at the top of the map. */
+  /* --cioos-top-bar-space is published by TopControls (0 once the bar sits
+     clear of this column). */
   top: max(12px, var(--cioos-top-bar-space, 0px));
   left: 12px;
 
-  /* Stop above the tracks-mode time bar rather than running under it. --cioos-
-     time-bar-space is 0 unless the bar is mounted (TimeBar publishes its
-     measured footprint), so with the bar absent this is the plain 12px inset.
-     Past 1944px wide this undoes itself again — see the media query below —
-     because the bar is centered and only 1080px wide, and at that width its
-     left edge (half of viewport-minus-1080) has cleared this column's right
-     edge (12px inset + 420px width), leaving nothing here left to clear. */
+  /* --cioos-time-bar-space is 0 unless TimeBar is mounted; undone past 1944px
+     (see below). */
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   z-index: var(--cioos-z-shell, 30);
   display: flex;
@@ -42,10 +21,8 @@
   pointer-events: none;
 }
 
-/* 1080px (the bar's own cap) + 2 * 432px (this column's 12px inset + 420px
-   width) — the narrowest viewport whose centered bar no longer reaches the
-   column's right edge. Update this if --cioos-sidebar-width or the bar's
-   1080px cap (TimeBar/styles.css) changes. */
+/* 1080px (the time bar's cap) + 2 * 432px (inset + width): the bar no longer
+   reaches this column. Update if --cioos-sidebar-width or that cap changes. */
 @media (min-width: 1944px) {
   .sidebar {
     bottom: 12px;
@@ -56,9 +33,7 @@
   pointer-events: auto;
 }
 
-/* ------------------------------------------------------------------
- * Datasets card: header + list body + counts/Download footer.
- * ------------------------------------------------------------------ */
+/* Datasets card */
 .sidebarDatasets {
   display: flex;
   flex-direction: column;
@@ -67,27 +42,15 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-lg);
   overflow: hidden;
-
-  /* Fills the column: the list is what scrolls, not the card. */
   flex: 1 1 auto;
 
-  /* 3D depth (shared tokens; see theme.css). The panel clips its content, so
-     preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
+  /* The panel clips its content, so preserve-3d/inner-lift can't apply; the
+     shadow ladder carries the depth. */
   box-shadow: var(--cioos-shadow-3d);
 
-  /* Parked off screen — its own width plus the column's left inset, so it is
-     clear of the edge rather than peeking at it. Being asked for and dismissed
-     are the same trip in opposite directions, so this is a transition on the
-     resting position rather than a pair of keyframes: whichever of the two
-     controls did it (this card's chevron, or the top bar's Datasets button),
-     the card travels. The perspective rides along in the same transform so the
-     card keeps its 3D lift the whole way.
-
-     `visibility` travels with it because it is what makes the parked card
-     inert — out of the tab order, out of the a11y tree, deaf to clicks meant
-     for the map. It is a discrete property, so it flips at the far end of the
-     transition and never mid-flight: the card is visible for the whole exit,
-     hidden the moment it lands. */
+  /* A transition on the resting position rather than keyframes, so either
+     control travels the card. `visibility` makes the parked card inert; being
+     discrete it flips at the end of the transition, never mid-flight. */
   transform: translateX(calc(-100% - 16px)) var(--cioos-perspective);
   visibility: hidden;
   transition:
@@ -123,12 +86,11 @@
   flex: 0 0 auto;
 
   /* The label's line box (font-size-lg at line-height 1.2), so the glyph sits
-     on the title line and not between title and subtitle. */
+     on the title line. */
   height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
 
-/* Title row + subtitle, same stack as the Filters/Download modal headers. */
 .datasetsHeaderText {
   display: flex;
   flex-direction: column;
@@ -174,13 +136,7 @@
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------------
- * Dataset-details banner: replaces the datasets header while a single
- * dataset is open. Reads differently on purpose — tinted — so the card
- * is never mistaken for the list it drilled in from. The way back on the
- * left, what-you-are-looking-at on the right, and the collapse chevron
- * kept where the header's is.
- * ------------------------------------------------------------------ */
+/* Dataset-details banner: tinted so it is never mistaken for the list. */
 .datasetsBanner {
   display: flex;
   align-items: center;
@@ -190,9 +146,7 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* The row's primary control, so it is the last thing allowed to give up
-   room: the mode label beside it shrinks first (and is dropped outright at
-   phone width, below). */
+/* The last thing to give up room: the mode label shrinks first. */
 .datasetsBackButton {
   display: inline-flex;
   align-items: center;
@@ -218,8 +172,6 @@
   border-color: var(--cioos-primary-700);
 }
 
-/* The chevron leads the way the button goes — a short travel on hover, so
-   the control reads as a departure rather than a toggle. */
 .datasetsBackButtonIcon {
   flex: 0 0 auto;
   transition: transform var(--cioos-transition-fast);
@@ -242,39 +194,8 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Minimizes the page to the map card. Quieter than the back button: it
-   keeps the user where they are. */
-.datasetsMapButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: 0 0 auto;
-  padding: 5px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--cioos-radius-pill);
-  background: none;
-  font: inherit;
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
-  color: var(--cioos-primary-700);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.datasetsMapButton:hover {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-white);
-}
-
-.datasetsMapButton:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
-/* Names the surface, not the dataset — the dataset's own title is the
-   heading directly below, and repeating it here would just crowd the row.
-   Shrinks before the back button does, and clips rather than pushing the
-   collapse chevron off the end. */
+/* Shrinks before the back button and clips rather than pushing the chevron
+   off the end. */
 .datasetsBannerMode {
   display: inline-flex;
   align-items: center;
@@ -292,23 +213,17 @@
   color: var(--cioos-primary-700);
 }
 
-/* The list body sits below the toggle, visually separated by a hairline. */
 .sidebarBody {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden auto;
 
-  /* The list and a dataset's details slide in horizontally (Panels/styles.css);
-     clipped rather than scrolled, so those few frames can't flash a horizontal
-     scrollbar (a scroll box with overflow-y: auto resolves overflow-x to auto
-     unless it is set). Nothing in this column is meant to reach past its edge. */
+  /* overflow-x is clipped above so the horizontal panel slides can't flash a
+     scrollbar (overflow-y: auto would resolve overflow-x to auto). */
   border-top: 1px solid var(--cioos-hairline);
 }
 
-/* ------------------------------------------------------------------
- * Footer: how the selection is made on the left, the Download action on the right.
- * ------------------------------------------------------------------ */
 .sidebarFooter {
   display: flex;
   align-items: center;
@@ -319,12 +234,8 @@
   background-color: var(--cioos-sand, var(--cioos-surface-2));
 }
 
-/* A plain paragraph rather than a flex row: the icon is meant to read as the
-   sentence's first glyph, and flex's line-wrapping moves a whole item to the
-   next row rather than letting text flow around it — which, on the longer
-   translations, stranded the icon alone above the sentence instead of beside
-   it. Normal inline flow wraps the way running text always does, with the
-   icon staying attached to the words that follow it on every line. */
+/* A paragraph, not a flex row: flex wrapping stranded the icon alone above
+   the sentence on longer translations. */
 .sidebarFooterHint {
   flex: 1 1 auto;
   min-width: 0;
@@ -334,9 +245,7 @@
   color: var(--cioos-ink-60);
 }
 
-/* The same glyph the dataset cards are ticked with, so the sentence names the
-   control by showing it rather than describing it. Inline before the text it
-   introduces, on the text's own baseline. */
+/* The same glyph the dataset cards are ticked with. */
 .sidebarFooterHintIcon {
   display: inline-block;
   vertical-align: -2px;
@@ -359,8 +268,7 @@
   color: var(--cioos-navy);
 }
 
-/* A refetch is in flight: the numbers on screen are the previous ones, so fade
-   them rather than swapping in a spinner and making the counter flicker. */
+/* Fade the previous numbers rather than flicker a spinner. */
 .datasetsHeaderCount.updating {
   opacity: 0.55;
 }
@@ -372,8 +280,6 @@
   flex-shrink: 0;
   padding: 6px 14px;
   border: 1px solid var(--cioos-primary-700);
-
-  /* Same corner radius as the dataset cards it sits under. */
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-primary);
   font: inherit;
@@ -396,8 +302,6 @@
   cursor: default;
 }
 
-/* The label and the selection count it acts on, stacked so the button stays
-   narrow enough to leave the hint beside it. */
 .sidebarDownloadText {
   display: flex;
   flex-direction: column;
@@ -422,8 +326,6 @@
   }
 }
 
-/* Reduced motion: the count still signals the change, as a flash instead of
-   a swell. */
 @media (prefers-reduced-motion: reduce) {
   .sidebarDownloadButton:not(:disabled) .sidebarDownloadCount {
     animation: sidebarCountFlash 450ms ease-out;
@@ -436,34 +338,18 @@
   }
 }
 
-/* ------------------------------------------------------------------
- * Mobile: the card is the screen. It covers the map edge to edge — the
- * top bar included, which is what separates "I am reading the list" from
- * "I am reading the map" on a viewport too small to do both at once. It
- * is dismissed from the close button in its own top-right corner — the
- * app's one close button, grown to a touch target here by its own
- * stylesheet — rather than by uncovering something behind it.
- *
- * Closed, the card is parked below the bottom edge and inert (see the
- * base rule above), so the map has the whole screen back.
- * ------------------------------------------------------------------ */
+/* Mobile: the card covers the screen, top bar included, and parks below the
+   bottom edge when closed. */
 @media (max-width: 700px), (max-height: 500px) {
-  /* One step over the top bar — the one piece of chrome that outranks this
-     column everywhere else, and the last thing between it and the whole
-     screen. Deliberately not higher: the map's "what's here" card sits two
-     steps above the dock and stays the topmost non-modal surface here as it is
-     everywhere else, so a click's answer is never buried by the list it feeds.
-     The modals keep their own layer well above both. Held whether or not the
-     sheet is up: this shell is click-through and its card is inert while
-     parked, and dropping the layer the instant it was dismissed would pull the
-     sheet behind the top bar for the length of its exit. */
+  /* One step over the top bar, deliberately not higher: the "what's here"
+     card stays above it. Held while parked too, or the sheet would drop
+     behind the top bar during its exit. */
   .sidebar {
     inset: 0;
     width: auto;
     z-index: calc(var(--cioos-z-dock, 35) + 1);
 
-    /* Undo theme.css's phone step-up so more of the list fits on screen; the
-       small tiers stop at their desktop sizes rather than drop further. */
+    /* Undo theme.css's phone step-up so more of the list fits. */
     --cioos-font-size-3xs: 10px;
     --cioos-font-size-2xs: 10px;
     --cioos-font-size-xs: 11px;
@@ -479,15 +365,10 @@
     height: 100dvh;
     max-height: 100dvh;
 
-    /* Nothing shows past it, so it has no edges of its own to draw and no
-       plane to be lifted off — the perspective goes with them, leaving the
-       transform free to be the travel alone. */
+    /* The perspective goes too, leaving the transform as the travel alone. */
     border: none;
     border-radius: 0;
     box-shadow: none;
-
-    /* Down here the sheet is the screen, so it parks below the bottom edge
-       and rises from it rather than in from the side. */
     transform: translateY(100%);
   }
 
@@ -495,8 +376,6 @@
     transform: translateY(0);
   }
 
-  /* The header is now the top of the screen rather than the top of a card, so
-     it is sized like one — a taller row. */
   .datasetsHeader {
     padding: var(--cioos-space-md) var(--cioos-space-lg);
   }
@@ -505,20 +384,11 @@
     padding: var(--cioos-space-md) var(--cioos-space-lg);
   }
 
-  /* Type is a step larger down here and the row is no wider, so the label
-     naming the surface is dropped rather than clipped: the dataset's title is
-     the next line on screen and says the same thing in full. */
+  /* Dropped rather than clipped: the dataset title below says it in full. */
   .datasetsBannerMode {
     display: none;
   }
 
-  .datasetsMapButton {
-    margin-left: auto;
-    min-height: 40px;
-  }
-
-  /* The footer is the surface's action bar: the Download button gets a full
-     touch target. */
   .sidebarFooter {
     padding: var(--cioos-space-md) var(--cioos-space-lg);
 

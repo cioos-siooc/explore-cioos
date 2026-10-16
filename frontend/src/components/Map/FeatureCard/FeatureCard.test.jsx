@@ -262,10 +262,8 @@ describe("FeatureCard", () => {
     ).toBeInTheDocument();
   });
 
-  // The bug this endpoint exists for: the tile carries one `count` for the
-  // whole cell, so every dataset in it used to be labelled with that same
-  // number — a one-day dataset reading the same as the 1115-day mooring beside
-  // it. The figures come from /tiles/datasets now, one per dataset.
+  // The tile carries one `count` for the whole cell; each dataset needs its
+  // own.
   it("gives each dataset in a cell its own day count, not the cell's total", async () => {
     await renderReady();
     const [a, b, c] = pointQueryFixture;
@@ -352,9 +350,7 @@ describe("FeatureCard", () => {
         nonce: 12,
         lngLat: [0, 0],
         items: [{ kind: "observation", pk: row.pk, title: row.title }],
-        // No buckets: nothing to ask about, so nothing is claimed. Showing a
-        // "0 day(s)" here would be the same class of lie as showing the
-        // cell's total.
+        // No buckets: nothing to ask about, so no figure is claimed.
         buckets: { hexPks: [], pointPks: [], source: "main", z: 6 },
       });
     });

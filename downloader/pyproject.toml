@@ -7,10 +7,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "duckdb>=1.1.0",
     "erddapy>=2.2.4",
-    # download_erddap imports cde_harvester at module scope, so this is a
-    # runtime dependency. It was declared only in the dev group and happened to
-    # resolve because download_scheduler also depends on harvester; a
-    # downloader-only install (`uv sync --no-dev`) failed on import.
+    # Runtime, not dev: download_erddap imports cde_harvester at module scope.
     "harvester",
     "loguru>=0.7.3",
     "numpy>=2.1.0",

@@ -24,14 +24,19 @@ CONVERTED = {
 
 
 def _metadata(dataset_id):
-    return {"id": dataset_id, "url": f"https://ipt.example.org/ipt/resource?r={dataset_id}"}
+    return {
+        "id": dataset_id,
+        "url": f"https://ipt.example.org/ipt/resource?r={dataset_id}",
+        "citation": f"Someone (2021): OBIS {dataset_id}.",
+    }
 
 
 def _ckan(*dataset_ids):
     return pd.DataFrame(
         [
             {"dataset_id": d, "ckan_id": f"ckan-{d}", "ckan_eovs": ["fishAbundanceAndDistribution"],
-             "ckan_title": "CKAN title", "title_fr": "Titre CKAN"}
+             "ckan_title": "CKAN title", "title_fr": "Titre CKAN",
+             "ckan_metadata": {"abstract": {"en": "CKAN abstract"}}}
             for d in dataset_ids
         ],
         columns=CKAN_OBIS_COLUMNS,
@@ -75,6 +80,7 @@ def test_matched_dataset_takes_ckan_metadata_and_is_not_converted(harvester, moc
     assert row["title"] == "CKAN title"
     assert row["title_fr"] == "Titre CKAN"
     assert row["summary"] is None
+    assert row["metadata"] == {"abstract": {"en": "CKAN abstract"}}
     convert.assert_called_once_with(_metadata(UNMATCHED))
 
 
@@ -87,6 +93,11 @@ def test_unmatched_dataset_takes_converted_eovs_and_abstract(harvester, mocker):
     assert row["summary"] == "An abstract"
     assert row["title"] == f"OBIS {UNMATCHED}"
     assert pd.isna(row["title_fr"])
+    # The converter's French placeholder is dropped; the citation is OBIS's own.
+    assert row["metadata"] == {
+        "abstract": {"en": "An abstract"},
+        "citation": {"en": f"Someone (2021): OBIS {UNMATCHED}."},
+    }
 
 
 def test_declared_eovs_are_ckan_eovs_else_converted_ones(harvester, mocker):
@@ -115,6 +126,7 @@ def test_conversion_error_leaves_dataset_unenriched(harvester, mocker, tmp_path)
     assert df["eovs"].tolist() == [[], []]
     assert df["declared_eovs"].tolist() == [[], []]
     assert df["summary"].isna().all()
+    assert df["metadata"].isna().all()
     assert not any(name.endswith("_cioos.json.gz") for name in os.listdir(tmp_path))
 
 

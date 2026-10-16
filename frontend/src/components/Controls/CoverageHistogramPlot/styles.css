@@ -1,5 +1,3 @@
-/* The stacked histogram fills the plot area beneath the modal's toolbar;
-   Plotly's responsive handler tracks the container size. */
 .coverageHistogramPlot {
   width: 100%;
   height: 100%;

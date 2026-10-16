@@ -154,6 +154,9 @@ Each OBIS dataset that yields cells becomes one `cde.datasets` row with
 - **EOVs**: from the CKAN record. A dataset without a CKAN record gets them
   from its converted OBIS metadata, `other` when nothing maps.
 - **Summary**: the OBIS abstract, for a dataset without a CKAN record.
+- **Metadata**: the dataset page's descriptive metadata, from the CKAN record,
+  else from the converted OBIS metadata and OBIS's citation (see
+  [Descriptive metadata](workflow.md#descriptive-metadata)).
 - **Features**: the number of cells (`n_profiles`).
 
 ## Freshness and caching
