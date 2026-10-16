@@ -7,20 +7,27 @@ import turfSimplify from "@turf/simplify";
 // (CORS *), and it returns each named area's outline with the hit.
 export const GEONAMES_API = "https://geogratis.gc.ca/services/geoname";
 
-// The feature types that name an area someone would filter ocean data by.
-// The rest (towns, capes, mountains, roads…) are points or land.
+// The feature types someone would look for ocean data around: areas, and
+// coastal or undersea places. The rest (mountains, forests, roads…) are inland.
 export const REGION_TYPES = [
   "SEA",
   "SEAF",
   "SEAU",
   "BAY",
   "CHAN",
+  "SHL",
+  "CAPE",
+  "ISL",
   "LAKE",
   "RIV",
   "PARK",
   "GEOG",
   "PROV",
   "TERR",
+  "CITY",
+  "TOWN",
+  "VILG",
+  "UNP",
 ];
 
 // A shape travels as a ring in every filtered request's query string and in
@@ -38,15 +45,15 @@ export function regionSearchUrl(term, lang, limit = 20) {
 }
 
 // One hit per area: GeoNames lists a feature once per province that shares
-// it (the Gulf of St. Lawrence five times) under the same featureid. Only
-// areas with an outline can become a filter; undersea features are points.
+// it (the Gulf of St. Lawrence five times) under the same featureid. Every
+// hit can be gone to; only an `area` (one with an outline) can become a filter,
+// since places such as towns and undersea features are points.
 export function parseRegions(geojson) {
   const seen = new Set();
   return (geojson?.features ?? [])
     .filter(({ properties, geometry }) => {
       const id = properties?.featureid;
-      if (!id || seen.has(id)) return false;
-      if (!["Polygon", "MultiPolygon"].includes(geometry?.type)) return false;
+      if (!id || !geometry || seen.has(id)) return false;
       seen.add(id);
       return true;
     })
@@ -55,6 +62,7 @@ export function parseRegions(geojson) {
       name: properties.name,
       type: properties.concise,
       geometry,
+      area: ["Polygon", "MultiPolygon"].includes(geometry.type),
     }));
 }
 

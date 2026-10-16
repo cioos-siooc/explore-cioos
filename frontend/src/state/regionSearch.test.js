@@ -38,7 +38,7 @@ describe("regionSearchUrl", () => {
 });
 
 describe("parseRegions", () => {
-  it("keeps one hit per feature, and only those with an outline", () => {
+  it("keeps one hit per feature, and marks those with an outline as areas", () => {
     const square = [
       [
         [0, 0],
@@ -55,7 +55,11 @@ describe("parseRegions", () => {
         feature("fundy", "Polygon", square),
       ],
     });
-    expect(regions.map((r) => r.id)).toEqual(["gulf", "fundy"]);
+    expect(regions.map((r) => [r.id, r.area])).toEqual([
+      ["gulf", true],
+      ["shelf", false],
+      ["fundy", true],
+    ]);
     expect(regions[0]).toMatchObject({ name: "Bay", type: "BAY" });
   });
 

@@ -316,6 +316,15 @@ describe("FilterSearch", () => {
           },
           geometry: { type: "MultiPolygon", coordinates: [square] },
         },
+        {
+          type: "Feature",
+          properties: {
+            featureid: "fundian",
+            name: "Fundian Channel",
+            concise: "SEAU",
+          },
+          geometry: { type: "MultiPoint", coordinates: [[-65.5, 42.5]] },
+        },
       ],
     };
     const fallback = globalThis.fetch;
@@ -329,7 +338,7 @@ describe("FilterSearch", () => {
     );
   }
 
-  it("filters by a region found by name, as its outline or its box", async () => {
+  it("filters by a region found by name, as its outline", async () => {
     answerRegions();
     const { user, seen, box } = await renderPalette();
 
@@ -340,6 +349,51 @@ describe("FilterSearch", () => {
     expect(polygonIsRectangle(seen.ring)).toBe(false);
     expect(seen.zoom.type).toBe("MultiPolygon");
     expect(seen.ui.showFiltersModal).toBe(false);
+  });
+
+  it("goes to a region without filtering when asked", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await screen.findByText("Bay of Fundy");
+    await user.click(
+      screen.getByRole("button", { name: "Go to: Bay of Fundy" }),
+    );
+
+    expect(seen.zoom.type).toBe("MultiPolygon");
+    expect(seen.draw).toBeUndefined();
+    expect(seen.ui.showFiltersModal).toBe(false);
+  });
+
+  it("goes to the active region with Shift+Enter", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await screen.findByText("Bay of Fundy");
+    while (!option("Bay of Fundy").matches("[aria-selected=true]"))
+      await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+
+    expect(seen.zoom.type).toBe("MultiPolygon");
+    expect(seen.draw).toBeUndefined();
+  });
+
+  it("only goes to a point place", async () => {
+    answerRegions();
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    await screen.findByText("Fundian Channel");
+    expect(option("Fundian Channel")).toHaveTextContent("Go to");
+    expect(
+      screen.getAllByTestId("filter-search-option-secondary"),
+    ).toHaveLength(1);
+    await user.click(option("Fundian Channel"));
+
+    expect(seen.zoom.type).toBe("MultiPoint");
+    expect(seen.draw).toBeUndefined();
   });
 
   it("applies a region as its bounding box when asked", async () => {

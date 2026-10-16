@@ -23,15 +23,12 @@ import {
 } from "../../../state/filterSearch.js";
 import { iconForKey } from "../../../state/useActiveFilters.js";
 import {
-  parseRegions,
-  regionBox,
-  regionOutline,
-  regionSearchUrl,
-} from "../../../state/regionSearch.js";
+  useGoToRegion,
+  useRegionMatches,
+} from "../../../state/useRegionSearch.js";
 import useFilterModel from "../../../state/useFilterModel.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
-import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import {
@@ -41,7 +38,6 @@ import {
 import "./styles.css";
 
 const SCIENTIFIC_NAME_MIN_LENGTH = 3;
-const REGION_MIN_LENGTH = 3;
 const MATCHES_PER_GROUP = 8;
 
 // Kept with the term they answer so a stale reply is simply not shown, rather
@@ -78,51 +74,16 @@ function useScientificNameMatches(term, enabled) {
   return wanted && result.query === term ? result.items : [];
 }
 
-// Named areas from NRCan GeoNames, kept with the term they answer as the
-// scientific names are.
-function useRegionMatches(term) {
-  const { i18n } = useTranslation();
-  const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
-  const query = useDebounce(term, 300);
-  const [result, setResult] = useState({ query: "", items: [] });
-  const wanted = query.length >= REGION_MIN_LENGTH;
-
-  useEffect(() => {
-    if (!wanted) return undefined;
-    const controller = new AbortController();
-    fetchJson(regionSearchUrl(query, lang), { signal: controller.signal })
-      .then((geojson) => setResult({ query, items: parseRegions(geojson) }))
-      .catch((error) => {
-        if (error.name !== "AbortError")
-          reportError("region search failed", error);
-      });
-    return () => controller.abort();
-  }, [wanted, query, lang]);
-
-  return wanted && result.query === term ? result.items : [];
-}
-
-// A picked region becomes the area filter, as its outline or as the box
-// around it, and the map frames it.
+// A picked area becomes the area filter, as its outline or as the box around
+// it, and the map frames it; its `secondary` action only goes to it. A point
+// place has no outline, so picking it only goes to it.
 function useRegionGroup(term, exclude) {
   const { t } = useTranslation();
-  const { requestDraw, zoomToGeometry } = useMapState();
+  const goTo = useGoToRegion();
   const [shape, setShape] = useState("polygon");
   const regions = useRegionMatches(exclude ? "" : term);
   if (regions.length === 0) return null;
 
-  const apply = async (region) => {
-    zoomToGeometry(region.geometry);
-    try {
-      const ring =
-        shape === "box"
-          ? regionBox(region.geometry)
-          : await regionOutline(region.geometry);
-      requestDraw("shape", ring);
-    } catch (error) {
-      reportError("region outline failed", error);
-    }
-  };
   const shapeLabel =
     shape === "box" ? t("drawBoundingBoxOption") : t("drawPolygonOption");
   return {
@@ -144,8 +105,14 @@ function useRegionGroup(term, exclude) {
       command: true,
       includeOnly: true,
       closes: true,
-      action: t("regionSearchAction", { shape: shapeLabel }),
-      toggle: () => apply(region),
+      action: region.area
+        ? t("regionSearchAction", { shape: shapeLabel })
+        : t("regionSearchGoTo"),
+      toggle: () => goTo(region, shape),
+      secondary: region.area && {
+        label: t("regionSearchGoTo"),
+        run: () => goTo(region),
+      },
     })),
   };
 }
@@ -360,6 +327,11 @@ export default function FilterSearch({ text, setText, inputRef }) {
         ? t("filterOptionExcludeAction")
         : t("filterSearchActionAdd"));
 
+  function chooseSecondary(option) {
+    option.secondary.run();
+    setShowFiltersModal(false);
+  }
+
   function choose({ group, option }) {
     if (!term) {
       setTouched((prev) => new Set(prev).add(`${group.key}:${option.id}`));
@@ -382,7 +354,9 @@ export default function FilterSearch({ text, setText, inputRef }) {
       setActiveIndex((active + step + flat.length) % flat.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (current) choose(current);
+      if (e.shiftKey && current?.option.secondary)
+        chooseSecondary(current.option);
+      else if (current) choose(current);
     } else if (e.key === "Escape" && text) {
       // A first Escape empties the box; the next one is Modal's, and closes.
       e.stopPropagation();
@@ -556,6 +530,21 @@ export default function FilterSearch({ text, setText, inputRef }) {
                       <span className="filterSearchOptionAction">
                         {actionLabel(option)}
                       </span>
+                      {option.secondary && (
+                        <button
+                          type="button"
+                          className="filterSearchOptionSecondary"
+                          data-testid="filter-search-option-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            chooseSecondary(option);
+                          }}
+                          aria-label={`${option.secondary.label}: ${option.label}`}
+                        >
+                          <GeoAlt size={12} aria-hidden="true" />
+                          {option.secondary.label}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -583,6 +572,12 @@ export default function FilterSearch({ text, setText, inputRef }) {
         {t("filterSearchKeysNavigate")}
         <kbd className="filterSearchKey">↵</kbd>
         {current ? actionLabel(current.option) : t("filterSearchKeysSelect")}
+        {current?.option.secondary && (
+          <>
+            <kbd className="filterSearchKey">⇧↵</kbd>
+            {current.option.secondary.label}
+          </>
+        )}
         <kbd className="filterSearchKey">Esc</kbd>
         {t("filterSearchKeysClose")}
       </footer>

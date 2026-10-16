@@ -253,6 +253,27 @@
   visibility: visible;
 }
 
+.filterSearchOptionSecondary {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  color: var(--cioos-ink);
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filterSearchOptionSecondary:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-teal-light);
+}
+
 .filterSearchEmpty {
   margin: 0;
   padding: 20px 8px;
