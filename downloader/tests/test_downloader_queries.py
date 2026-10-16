@@ -104,9 +104,11 @@ def test_obis_download_parquet(tmp_path):
     duck_result.df.return_value = _OBIS_DF.copy()
 
     with (
-        patch("duckdb.sql", return_value=duck_result) as duck_sql,
+        patch("duckdb.connect") as connect,
         patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]) as save_meta,
     ):
+        duck_sql = connect.return_value.__enter__.return_value.sql
+        duck_sql.return_value = duck_result
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,
@@ -137,9 +139,10 @@ def test_obis_download_empty(tmp_path):
     duck_result.df.return_value = _OBIS_DF.iloc[2:].copy()  # only the out-of-polygon row
 
     with (
-        patch("duckdb.sql", return_value=duck_result),
+        patch("duckdb.connect") as connect,
         patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]),
     ):
+        connect.return_value.__enter__.return_value.sql.return_value = duck_result
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,

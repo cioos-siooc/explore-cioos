@@ -298,7 +298,9 @@ def obis_frame(url, user_query, regions):
         WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
           AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
     """
-    df = duckdb.sql(query).df()
+    # Own connection: the shared default one breaks under concurrent subsets.
+    with duckdb.connect() as con:
+        df = con.sql(query).df()
 
     depth_min, depth_max = _number(user_query.get("depth_min")), _number(user_query.get("depth_max"))
     if depth_max is not None:

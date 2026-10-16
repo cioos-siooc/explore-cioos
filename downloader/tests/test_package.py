@@ -7,6 +7,7 @@ import threading
 import time
 import tomllib
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -212,7 +213,8 @@ def test_obis_falls_back_to_csv_for_a_format_it_has_no_rendition_of(tmp_path):
     duck = MagicMock()
     duck.df.return_value = df
     obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
-    with patch("duckdb.sql", return_value=duck):
+    with patch("duckdb.connect") as connect:
+        connect.return_value.__enter__.return_value.sql.return_value = duck
         report, archive, read = _run(tmp_path, _query(obis, format="nccf"))
 
     row = report["erddap_report"][0]
@@ -494,3 +496,16 @@ def test_reproduce_without_uv_says_to_use_uv(tmp_path):
 
     assert result.returncode == 1
     assert "uv run reproduce.py" in result.stderr
+
+
+def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
+    # Datasets download on a thread pool; DuckDB's shared default connection
+    # breaks when two OBIS queries overlap on it.
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    regions = formats.polygon_regions(_TRIANGLE)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        frames = list(pool.map(lambda _: formats.obis_frame(str(export), {}, regions), range(32)))
+
+    assert [len(f) for f in frames] == [1] * 32
