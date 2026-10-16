@@ -10,7 +10,6 @@ body {
   margin-bottom: 10px;
 }
 
-/* Feedback icon colors */
 .submissionFeedback svg.success {
   color: var(--cioos-primary);
 }

@@ -2,17 +2,8 @@ import { vi } from "vitest";
 
 import { server } from "../config.js";
 
-// Stub fetch for the Harvest dashboard's own endpoints (${server}/harvest/...),
-// which read from cde.harvest_attempts / cde.harvest_runs / cde.download_jobs.
-// The e2e fixture set (installMockFetch, e2e/fixtures/) is recorded from the
-// main app and carries none of these — a second corpus recorded against the
-// harvest routes is out of scope here, so this stubs exactly what each test
-// asks for instead, keyed by the path useHarvestFetch requests
-// (everything after "/harvest", query string included, e.g. "/servers" or
-// "/servers/erddap-example-com?status=error").
-//
-// `routes` maps that path to the JSON body to answer with (or `null` for a
-// fetch that should 404, exercising the hook's error path).
+// The e2e fixtures carry no /harvest routes. `routes` maps the path after
+// "/harvest" (query included) to a JSON body, or `null` for a 404.
 export function installMockHarvestFetch(routes) {
   const marker = `${server}/harvest`;
   vi.stubGlobal(

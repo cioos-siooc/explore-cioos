@@ -19,49 +19,37 @@ ENV SENTRY_RELEASE=$SENTRY_RELEASE
 ENV SENTRY_ORG=$SENTRY_ORG
 ENV SENTRY_PROJECT=$SENTRY_PROJECT
 
-# SENTRY_DSN is deliberately a plain ARG, unlike the auth token below: vite
-# bakes it into the JS bundle, so it is served to every visitor regardless.
-# Making it a build secret would hide it from `docker history` and nowhere else.
-
-# SENTRY_AUTH_TOKEN is deliberately NOT an ARG/ENV. As a build ARG promoted to
-# ENV it stayed readable in the image's own metadata — `docker history` and
-# `docker inspect` hand it to anyone who can pull the image. It is now a
-# BuildKit secret, mounted only for the layer that uploads the source maps and
-# never written to a layer. Callers pass it with
+# SENTRY_DSN is a plain ARG on purpose: vite bakes it into the public bundle.
+# SENTRY_AUTH_TOKEN must NOT be an ARG/ENV (docker history/inspect would leak
+# it); it is a BuildKit secret:
 #   docker build --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN
-# or, from compose, `build.secrets` (see docker-compose.production.yaml).
+# or `build.secrets` in compose (see docker-compose.production.yaml).
 
-# Install dependencies first so source changes don't bust the npm ci layer
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --quiet
 
-# Dockerfile.dockerignore keeps the host node_modules out of this copy. Without
-# it, the laptop's dependency tree landed on top of the one npm ci had just
-# installed from the lockfile.
+# Dockerfile.dockerignore keeps the host node_modules out of this copy.
 COPY frontend/ .
 
-# The build context is the repo root (not frontend/) because the harvest docs
-# page bundles the repo-root docs/harvesting. Placed where vite.config.mjs
-# resolves it (../docs/harvesting from the app dir).
+# Why the build context is the repo root; vite.config.mjs resolves it as
+# ../docs/harvesting.
 COPY docs/harvesting /usr/src/docs/harvesting
 
-# Node's default heap cap (~2 GB) is below the build's peak (~3.3 GB with
-# sourcemaps, since mermaid joined the bundle).
+# Node's default heap cap (~2 GB) is below the build's ~3.3 GB peak.
 RUN --mount=type=secret,id=sentry_auth_token \
     SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
     NODE_OPTIONS=--max-old-space-size=4096 \
     npm run build
 
 # Stage 2 - the production environment
-# Pinned to match nginx/Dockerfile; this was untagged `nginx`, i.e. latest.
+# Pinned to match nginx/Dockerfile.
 FROM nginx:1.30.5-alpine
 COPY --from=build-deps /usr/src/app/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --chmod=755 frontend/api-proxy.sh /docker-entrypoint.d/40-api-proxy.sh
 EXPOSE 80
 
-# Serves the built SPA; index.html is the only guaranteed path.
-# wget is in the alpine image's busybox, so this adds nothing to the layer.
+# wget comes with busybox, so this adds nothing to the layer.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -q --spider http://127.0.0.1:80/ || exit 1
 

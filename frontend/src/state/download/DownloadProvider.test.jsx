@@ -16,18 +16,10 @@ function Probe() {
   download = useDownload();
   selection = useSelection();
   filters = useFilters();
-  // Wait for SelectionProvider's own initial /pointQuery load too, not just
-  // the catalog: that load settling recomputes pointsToReview and, seeing it
-  // empty (nothing pre-selected), resets pointsToDownload — a race that would
-  // otherwise clobber a value a test sets right after "ready".
-  //
-  // initialPointsQueryComplete and pointsToReview are set by two SEPARATE
-  // effects one render apart (pointsData -> pointsToReview -> the
-  // pointsToDownload reset), so initialPointsQueryComplete alone can flip
-  // true a render before that chain has actually settled. pointsToReview
-  // starts undefined and is only ever set (even to []) once that chain has
-  // run, so wait for it too — otherwise the reset can still land after a
-  // test's own act() and silently clobber what it just set.
+  // Also wait for the initial /pointQuery chain (pointsData -> pointsToReview
+  // -> pointsToDownload reset) to settle, or the reset clobbers what a test
+  // sets after "ready". initialPointsQueryComplete flips a render early;
+  // pointsToReview is only set (even to []) once the chain has run.
   const ready =
     filters.catalogLoaded &&
     selection.initialPointsQueryComplete &&

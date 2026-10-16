@@ -6,9 +6,7 @@ import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
 import { useActivity } from "./ActivityProvider.jsx";
 
-// ActivityTasks (mounted inside AppProviders, like UrlSync) is the only thing
-// that reads the providers' independent loading flags and registers them with
-// ActivityProvider — nothing renders it standalone.
+// ActivityTasks is mounted inside AppProviders; nothing renders it standalone.
 function Probe() {
   const { labelKeys } = useActivity();
   return <span data-testid="keys">{[...labelKeys].sort().join(",")}</span>;

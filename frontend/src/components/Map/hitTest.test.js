@@ -19,7 +19,8 @@ import {
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
 
 // Hits are shaped the way queryRenderedFeatures returns them: the ranking only
-// ever reads layer.id, which is the whole reason it can be tested without a map.
+// ever reads layer.id, which is the whole reason it can be tested without a
+// map.
 const hits = (...layerIds) => layerIds.map((id) => ({ layer: { id } }));
 
 const GRID = "griddap-coverage-fill";
@@ -69,8 +70,7 @@ describe("only a coverage rectangle can outrank them", () => {
   });
 });
 
-// Characterisation tests: they pin what the rules did when they were moved out
-// of Map.jsx, so a later tidy-up that changes a ranking fails here first.
+// Characterisation tests: a tidy-up that changes a ranking fails here first.
 
 const feature = (layerId, properties = {}, geometry) => ({
   type: "Feature",

@@ -2,47 +2,31 @@ import { defineConfig, devices } from "@playwright/test";
 
 import { CHROMIUM_ARGS, VIEWPORTS } from "./e2e/support/constants.js";
 
-// The origin the app is told to call. It cannot resolve, which is the point:
-// every request is answered from e2e/fixtures, and anything that escapes the
-// router fails by name instead of quietly reaching a real deployment. Matches
-// frontend/.env.test, which the dev server reads.
+// Unresolvable on purpose: anything escaping the fixture router fails by name
+// instead of reaching a real deployment. Matches frontend/.env.test.
 const API_ORIGIN = "http://api.test";
-// Deliberately not vite's dev default of 8000. reuseExistingServer would
-// otherwise happily adopt a developer's own `npm run dev` — which runs in
-// development mode against the real https://explore.cioos.ca/api — and the
-// whole suite would pass while testing the wrong thing.
+// Not vite's 8000: reuseExistingServer would adopt a developer's own
+// `npm run dev` against the real API and test the wrong thing.
 const PORT = 8010;
 
 export default defineConfig({
   testDir: "./e2e",
-  // Live smoke runs against a real stack and is selected explicitly, never by
-  // the mocked projects.
   testIgnore: "**/*.live.spec.js",
   fullyParallel: true,
-  // Every worker runs MapLibre on SwiftShader, which rasterises the whole map on
-  // the CPU. Playwright's default of one worker per two cores oversubscribes the
-  // machine badly enough that Chromium starts dropping requests
-  // (net::ERR_NETWORK_CHANGED) and the map never finishes painting — which shows
-  // up as unrelated-looking timeouts. Four is enough to keep the suite quick
-  // without starving the renderers.
+  // MapLibre rasterises on the CPU (SwiftShader); the default worker count
+  // oversubscribes it until Chromium drops requests (net::ERR_NETWORK_CHANGED)
+  // and tests time out for unrelated-looking reasons.
   workers: process.env.CI ? 2 : 4,
   forbidOnly: Boolean(process.env.CI),
-  // One local retry, not zero. Chromium in a constrained environment
-  // intermittently drops a request with net::ERR_NETWORK_CHANGED; the map then
-  // never finishes painting and the failure reads as an unrelated timeout.
-  // Playwright reports a test that only passed on retry as "flaky" rather than
-  // as a pass, so this makes the noise visible without failing the run on it.
+  // One local retry for the same ERR_NETWORK_CHANGED drops; Playwright still
+  // reports such a test as "flaky", so the noise stays visible.
   retries: process.env.CI ? 2 : 1,
   reporter: process.env.CI
     ? [["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
 
-  // One baseline set, not one per platform. With the default -{platform} suffix
-  // a developer silently grows a second set CI never compares against and both
-  // rot. There is only one renderer these are valid against, so the visual and
-  // a11y scripts run through e2e/in-container.sh — the image CI uses — rather
-  // than natively, where the fallback font stack differs and the readings move
-  // with it (npm run test:visual:update, npm run test:a11y:baseline).
+  // One baseline set, not one per platform: baselines are only valid against
+  // CI's image, so visual/a11y scripts run through e2e/in-container.sh.
   snapshotPathTemplate:
     "{testDir}/__screenshots__/{projectName}/{testFileName}/{arg}{ext}",
 
@@ -50,14 +34,9 @@ export default defineConfig({
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.01,
       animations: "disabled",
-      // Not the 5s default. toHaveScreenshot re-shoots until two consecutive
-      // captures agree before it ever compares against the baseline, and on a
-      // hosted runner rasterising through SwiftShader that handshake does not
-      // always finish in five seconds: CI failed ten of twelve visual tests
-      // with "Timeout 5000ms exceeded" while the same baselines passed in
-      // 20.9s total in the same container locally. This buys the slow machine
-      // time to settle; it does not loosen what is compared — maxDiffPixelRatio
-      // still decides whether the pixels match.
+      // Two consecutive captures must agree before comparing, and on CI's
+      // SwiftShader that took longer than the 5s default (10/12 visual tests
+      // timed out). Doesn't loosen the comparison itself.
       timeout: 20_000,
     },
   },
@@ -71,17 +50,13 @@ export default defineConfig({
   },
 
   projects: [
-    // Behavioural specs run at the three viewport regimes the app branches on.
     ...Object.entries(VIEWPORTS).map(([name, viewport]) => ({
       name,
       testMatch: ["**/specs/*.spec.js"],
       testIgnore: [
-        // Own projects, one viewport each.
         "**/specs/visual.spec.js",
         "**/specs/a11y.spec.js",
-        // mobile.spec.js is about the phone layout specifically, so it belongs
-        // to one project rather than being run three times at a viewport it
-        // then overrides back to 390px anyway.
+        // mobile.spec.js overrides to 390px anyway.
         ...(name === "mobile" ? [] : ["**/specs/mobile.spec.js"]),
       ],
       use: { ...devices["Desktop Chrome"], viewport },
@@ -96,10 +71,7 @@ export default defineConfig({
       testMatch: "**/specs/a11y.spec.js",
       use: { ...devices["Desktop Chrome"], viewport: VIEWPORTS.desktop },
     },
-    // No mock router and no webServer: this one asks whether a real stack,
-    // built and served for real, actually works. It only exists when a base url
-    // is configured, so a plain `npx playwright test` never tries to reach a
-    // deployment that is not running.
+    // Real stack, no mocks; only defined when LIVE_BASE_URL is set.
     ...(process.env.LIVE_BASE_URL
       ? [
           {
@@ -116,8 +88,7 @@ export default defineConfig({
       : []),
   ],
 
-  // `--mode test` is what makes vite load .env.test, and therefore what points
-  // the bundle at API_ORIGIN.
+  // `--mode test` makes vite load .env.test, pointing the bundle at API_ORIGIN.
   webServer: process.env.LIVE_BASE_URL
     ? undefined
     : {

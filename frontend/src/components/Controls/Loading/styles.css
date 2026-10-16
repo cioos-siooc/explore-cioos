@@ -1,8 +1,5 @@
-/* The wash is on the cover's own background rather than an `opacity` on the
-   box: opacity applies to descendants too, and would fade the logo and the
-   activity list along with it — which is right on the way out (see
-   .loading-dismissed) and wrong for the whole wait before that. The logo
-   lockup itself lives in cioosLogoStyles.css, shared with the brand card. */
+/* The wash is a background, not `opacity`: opacity would fade the logo and
+   activity list too, which is only right on the way out (.loading-dismissed). */
 .loading {
   pointer-events: none;
   position: absolute;
@@ -12,75 +9,50 @@
   align-items: center;
   justify-content: center;
   background-color: var(--cioos-scrim);
-
-  /* For the inline variant's bare mark: the stacked logo colours its own
-     parts. Both its mesh and its dots take currentColor. */
   color: var(--cioos-primary);
 }
 
-/* The first paint veils the app rather than hiding it. It sits on the splash
-   rung of the z scale, over the map and everything keyed to it, but thin enough
-   that the basemap under it reads: the coastlines are the one thing that means
-   anything before the data lands, and an opaque sheet left the user watching a
-   logo with no idea what they were looking at. What must not show through is
-   data painted on a ramp that hasn't arrived — and that is held at zero opacity
-   by the reveal gate in Map.jsx (see revealData), not by this background, so
-   thinning the wash costs nothing. The brand card and the API error banner sit
-   a rung higher and stay put; the corner activity panel steps aside on its own,
-   since this splash is already naming the same waits. */
+/* Thin enough for the basemap to read through: ramp-painted data is held at
+   zero opacity by revealData (Map.jsx), not by this background. */
 .loading-brand {
   z-index: var(--cioos-z-splash, 32);
   background-color: var(--cioos-scrim-soft, rgb(238 246 244 / 55%));
   transition: opacity 0.6s ease-out;
 }
 
-/* The app's arrival: the cover dissolves and everything behind it — map,
-   chrome and all — comes up together. Slower than the UI's own transitions
-   (--cioos-transition-slow is 0.3s) because this one is the app appearing
-   rather than a control responding, and it plays once per session. Reduced
-   motion collapses it to nothing via theme.css's blanket rule, which still
+/* Reduced motion collapses this via theme.css's blanket rule, which still
    fires the transitionend that unmounts the splash. */
 .loading-dismissed {
   opacity: 0;
 }
 
-/* The splash's own scale, one number for the whole lockup: the stacked layout
-   sizes its mark and its name off this (see cioosLogoStyles.css). Set here
-   rather than taken from the layout's own default because the splash is a
-   full-screen interstitial — it has all the room in the world, and wants less
-   of it than that, on a phone most of all. */
 .loading-brand .cioosLogo-stacked {
   font-size: var(--cioos-font-size-3xs);
 }
 
-/* The anchor the lockup keeps: sized by the logo alone, with the list of waits
-   taken out of flow beneath it. A row appearing or finishing then changes the
-   text under the logo and nothing else — the mark does not drift up and down
-   the screen as the app works through its loads. */
+/* Sized by the logo alone, with the list of waits out of flow beneath it, so
+   the mark doesn't drift as rows come and go. */
 .loadingBrand {
   position: relative;
   display: flex;
   justify-content: center;
 }
 
-/* Set apart from the lockup: the wordmark is identity, this is status. */
 .loadingActivity {
   position: absolute;
   top: calc(100% + var(--cioos-space-md, 12px));
   left: 50%;
   transform: translateX(-50%);
 
-  /* Shrink-wrap the rows rather than inherit the anchor's width, which is the
-     logo's — a long label would otherwise wrap inside the wordmark's column. */
+  /* Shrink-wrap: the anchor is the logo's width, and a long label would wrap
+     inside the wordmark's column. */
   width: max-content;
   max-width: 80vw;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
 }
 
-/* The mark on its disc matches the map's loading spinner (.cioosSpinner-lg)
-   rather than following the lockup's type, so the spinner the splash hands
-   over to is the same size. */
+/* Matches .cioosSpinner-lg, the spinner the splash hands over to. */
 .loading-brand .cioosLogo-stacked .cioosSpinner {
   width: 56px;
   height: 56px;

@@ -6,20 +6,8 @@ import { InfoCircle } from "react-bootstrap-icons";
 
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 
-// The foot of the legend card: the map's scale bar, and the ⓘ that opens the
-// basemap credits.
-//
-// Both used to stand in MapLibre's bottom-right corner, where they shared the
-// edge with the draw tools, the time bar and the zoom pill — four unrelated
-// things in one corner, each having to be lifted clear of the others. They say
-// what the map is drawn from and how far across it is, which is what the legend
-// card is for, so they live here instead: one row, and the credits behind a
-// disclosure rather than spread across the corner.
-//
-// Nothing is lost by folding them in. The scale bar is MapLibre's own control,
-// re-parented rather than reimplemented, so it still redraws on every move; the
-// credits are the real AttributionControl, so they still aggregate whatever
-// sources the style has loaded — including any added after mount.
+// Re-parents MapLibre's own scale and attribution controls into the legend card,
+// so they keep redrawing and aggregating sources added after mount.
 export default function LegendFooter() {
   const { t } = useTranslation();
   const { mapInstance } = useMapState();
@@ -27,26 +15,18 @@ export default function LegendFooter() {
   const creditsHost = useRef(null);
   const [creditsOpen, setCreditsOpen] = useState(false);
 
-  // Adopt the two controls into this card instead of handing them to
-  // map.addControl, which would put them back in a corner. onAdd/onRemove is
-  // the whole of the IControl contract — it wires the map listeners and returns
-  // the element — so calling it ourselves is the supported way to choose the
-  // parent.
-  //
-  // mapInstance is state, so this effect re-runs on its own the moment Map
-  // hands the instance over — no mapLoaded flag needed to chase it.
+  // onAdd/onRemove is the whole IControl contract, so calling it ourselves (not
+  // map.addControl, which would put them in a corner) is how to choose the parent.
   useEffect(() => {
     const map = mapInstance;
     if (!map || !scaleHost.current || !creditsHost.current) return;
 
-    // Capped short: it shares its row with the ⓘ inside a card that is at most
-    // 190px wide.
+    // Capped short: it shares a row with the ⓘ in a card at most 190px wide.
     const scale = new ScaleControl({ maxWidth: 120, unit: "metric" });
     scaleHost.current.appendChild(scale.onAdd(map));
 
-    // compact: false keeps the control expanded and inert — its own <summary>
-    // toggle is hidden in the stylesheet, because the disclosure here is the ⓘ
-    // button, and two toggles for one block of text would fight each other.
+    // compact: false keeps it expanded; its own <summary> toggle is hidden in CSS
+    // because the ⓘ button is the disclosure, and two toggles would fight.
     const credits = new AttributionControl({ compact: false });
     creditsHost.current.appendChild(credits.onAdd(map));
 
@@ -70,9 +50,8 @@ export default function LegendFooter() {
           <InfoCircle size={13} aria-hidden="true" />
         </button>
       </div>
-      {/* Mounted whether or not it is shown: the control keeps itself current
-          from the map's own events, and a host that came and went would have to
-          be re-adopted every time the ⓘ is pressed. */}
+      {/* Always mounted: a host that came and went would need re-adopting on every
+          press of the ⓘ. */}
       <div className="legendCredits" ref={creditsHost} hidden={!creditsOpen} />
     </div>
   );

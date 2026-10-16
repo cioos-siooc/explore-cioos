@@ -171,10 +171,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).toBeInTheDocument();
   });
 
-  // Sidebar selection persists through SelectionProvider's own selectedPks
-  // rather than a bulk toggle — a row selects itself into the shortlist, and
-  // there is no sidebar-wide "select all" (that control is download-modal
-  // only, where handleSelectAllDatasets/selectAll still apply).
+  // No sidebar-wide "select all": that control is download-modal only.
   it("clicking a card's own select checkbox calls handleSelectDataset with that row", async () => {
     const handleSelectDataset = vi.fn();
     const { user } = renderWithProviders(
@@ -591,10 +588,8 @@ describe("DatasetsTable (download modal)", () => {
     installMockFetch();
   });
 
-  // The modal's own checkbox (handleSelectDataset prop) only ticks a dataset
-  // in or out of this particular batch — it never takes the row off the
-  // list. Removing it from the order outright goes through SelectionProvider
-  // instead, the same state the sidebar's checkbox writes to.
+  // The modal's checkbox only toggles the batch; removal goes through
+  // SelectionProvider, the same state the sidebar's checkbox writes to.
   it("a card's remove button drops the dataset from the selection entirely, without touching the batch checkbox", async () => {
     const row = makeRow({ pk: 1, title: "Beta station", selected: true });
     let selection;
@@ -618,7 +613,6 @@ describe("DatasetsTable (download modal)", () => {
     );
     await screen.findAllByTestId("dataset-card");
 
-    // Seed the shortlist so the dataset actually starts out selected.
     act(() => selection.handleSelectDataset(row));
     await waitFor(() => expect(selection.selectedPks.has(1)).toBe(true));
 

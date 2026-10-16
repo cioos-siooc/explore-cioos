@@ -8,12 +8,7 @@ import "./modalStyles.css";
 
 const ModalContext = createContext({ onHide: () => {} });
 
-// Drop-in replacement for the react-bootstrap Modal subset this app uses.
-// Emits Bootstrap-compatible class names (.modal, .modal-dialog,
-// .modal-content, .modal-header, .modal-title, .modal-body) so the existing
-// per-component CSS keeps applying. The header's close button is the app's
-// shared one, not Bootstrap's .btn-close — a modal is dismissed with the same
-// control as every other surface here.
+// Emits Bootstrap-compatible class names so per-component CSS keeps applying.
 export default function Modal({
   show,
   onHide = () => {},
@@ -31,12 +26,8 @@ export default function Modal({
 }) {
   const contentRef = useRef(null);
 
-  // What opening does, once per opening: take focus into the dialog, and give
-  // it back to whatever had it when the dialog goes. Keyed on `show` alone —
-  // callers pass `onHide` as an inline arrow, so it is a new function on every
-  // render, and re-running this whenever the app re-rendered underneath took
-  // focus off whatever was being typed into (a search box publishing what it
-  // had, say) and put it back on the dialog itself, mid-word.
+  // Keyed on `show` alone: callers pass an inline `onHide`, and re-running on
+  // every render stole focus from inputs mid-word.
   useEffect(() => {
     if (!show) return undefined;
     const previousFocus = document.activeElement;
@@ -56,7 +47,6 @@ export default function Modal({
         event.stopPropagation();
         onHide();
       } else if (event.key === "Tab") {
-        // keep focus cycling inside the dialog
         const focusables = contentRef.current?.querySelectorAll(
           'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
         );

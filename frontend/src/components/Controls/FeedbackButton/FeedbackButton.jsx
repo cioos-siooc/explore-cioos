@@ -2,17 +2,15 @@ import * as React from "react";
 import { ChatDots } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
-// Opens Sentry's User Feedback dialog. The dialog renders inside its own shadow
-// DOM, so every label has to be handed to it from i18n at open time — it can't
-// pick up translations from our markup. CIOOS tokens still resolve inside the
-// shadow root because custom properties inherit through it.
+// Sentry's dialog renders in its own shadow DOM, so labels are handed to it from
+// i18n at open time; CIOOS tokens still resolve because custom properties inherit.
 export default function FeedbackButton({ className, size = 16, label }) {
   const { t } = useTranslation();
 
   async function openFeedbackDialog() {
     const { getFeedback } = await import("../../../sentryFeedback.js");
     const feedback = getFeedback();
-    // Sentry never initialised (blocked by an ad-blocker, or SDK load failed).
+    // Sentry never initialised (ad-blocker, or SDK load failed).
     if (!feedback) return;
 
     const form = await feedback.createForm({

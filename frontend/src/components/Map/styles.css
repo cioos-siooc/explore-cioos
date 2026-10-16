@@ -4,16 +4,10 @@
   height: 100%;
 }
 
-/* The space the globe hangs in. Outside the sphere MapLibre draws nothing and
-   leaves the canvas transparent, so this element shows through — it is the
-   only way to colour that area, as MapLibre has no sky or star field of its
-   own here.
-
-   Keyed on the projection rather than set unconditionally. In mercator the
-   canvas covers the element, so this would be invisible either way in the real
-   app — but visual.spec.js hides the canvas to take its screenshots, and an
-   unconditional dark ground would recolour every one of those baselines for a
-   view they don't cover. */
+/* MapLibre leaves the canvas transparent outside the globe, so this is the
+   only way to colour that space. Keyed on the projection because
+   visual.spec.js hides the canvas, and an unconditional dark ground would
+   recolour every mercator baseline. */
 .map[data-projection="globe"] {
   background-color: var(--cioos-globe-space);
 }
@@ -30,12 +24,8 @@
   }
 }
 
-/* The hover chip. One label per line, nothing else — see the showChip comment
-   in Map.jsx for what this replaced and why.
-   The popup's own frame is stripped back to nothing: MapLibre's default content
-   box carries padding, a radius, a white ground and a shadow, which around a
-   two-word label reads as a panel rather than a label. The chip draws its own,
-   much tighter. */
+/* MapLibre's default popup frame reads as a panel around a two-word label;
+   the chip draws its own, much tighter. */
 .mapChipPopup .maplibregl-popup-content {
   padding: 0;
   background: transparent;
@@ -91,11 +81,6 @@
 .mapChipLine:not(:first-child) {
   opacity: 0.85;
 }
-
-/* The picker that used to list overlapping gridded datasets lived here. Every
-   layer's click now lands in the same place — see FeatureCard — so the one
-   pattern that was right for one layer is the pattern for all of them, built as
-   a React component rather than DOM assembled inside a popup. */
 
 @media (max-width: 900px) {
   .map {

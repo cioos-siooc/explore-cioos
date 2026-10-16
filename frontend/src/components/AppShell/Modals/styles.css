@@ -1,38 +1,25 @@
-/* ------------------------------------------------------------------
- * FiltersModal / DownloadModal — dialog sizing for the two shell modals.
- * The panel content itself is styled in ../Panels/styles.css.
- * ------------------------------------------------------------------ */
+/* Dialog sizing for the shell modals; panel content is in ../Panels/styles.css. */
 .filtersModal .filtersModalDialog {
   max-width: min(880px, calc(100vw - 24px));
 }
 
 .filtersModal .modal-content {
-  /* Sized to the filter list's own height (the list is what forces the
-     modal's height — see .filtersPanel below) rather than forced to a fixed
-     height: a fixed height shorter than the list left it scrolling even
-     when the dialog had room to grow. The cap is only a fallback for short
-     viewports. */
+  /* Sized to the list rather than a fixed height, which left it scrolling
+     with room to grow. The cap is a fallback for short viewports. */
   max-height: min(84vh, 820px);
 
-  /* Clip the footer's flat background to the dialog's rounded corners — same
-     reasoning as the download and coverage modals below. Without it the
-     footer bar squares off the two bottom corners. */
+  /* Clips the footer's flat background to the rounded corners. */
   overflow: hidden;
 }
 
-/* Branded like the download header below it: a bare icon (no tile) ahead of a
-   title/counter row stacked over a subtitle. Pinned to its own height so a
-   short viewport shrinks the list (which already scrolls internally) rather
-   than the header. */
+/* Pinned height so a short viewport shrinks the list rather than the header. */
 .filtersModal .modal-header {
   align-items: flex-start;
   flex-shrink: 0;
 }
 
-/* Icon + text-stack as one row — kept together as Modal.Title's only content
-   so .modal-header's `justify-content: space-between` still just splits two
-   things (this title block and the close button) rather than spacing three
-   items apart and stranding the title in the middle of the row. */
+/* Icon + text stack kept as Modal.Title's only content so the header's
+   space-between still splits just two things. */
 .filtersModal .modal-title {
   display: flex;
   align-items: flex-start;
@@ -48,7 +35,7 @@
   width: 28px;
 
   /* The heading's line box (font-size-lg at line-height 1.2), so the glyph
-     sits on the title line and not between title and subtitle. */
+     sits on the title line. */
   height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
@@ -75,8 +62,6 @@
   color: var(--cioos-navy);
 }
 
-/* Same pill as the datasets toggle's count and the top bar's filter count —
-   one visual for "how many" everywhere it shows up. */
 .filtersModal .filtersModalTitleCounter {
   display: inline-flex;
   align-items: center;
@@ -90,8 +75,6 @@
   white-space: nowrap;
 }
 
-/* The open filter's name, or a static hint while none is open — the subject
-   of the dialog, not the heading. */
 .filtersModal .filtersModalTitleSubtitle {
   min-width: 0;
   overflow: hidden;
@@ -103,9 +86,6 @@
   color: var(--cioos-ink-60);
 }
 
-/* The way back to the list, at the widths where the open filter covers it.
-   Same pill as the datasets sidebar's back button — it is the same gesture
-   out of the same kind of drill-in. */
 .filtersModal .filtersModalBack {
   display: inline-flex;
   align-items: center;
@@ -134,20 +114,16 @@
 .downloadModal .modal-content {
   height: min(78vh, 820px);
 
-  /* Clip the full-bleed header + sand order bar to the modal's rounded
-     corners (tooltips render in a portal, so they still escape). */
+  /* Tooltips render in a portal, so they still escape. */
   overflow: hidden;
 }
 
-/* Branded download header: a bare icon ahead of a title/counter row stacked
-   over a helper subtitle — same pattern as the Filters header beside it. */
 .downloadModal .modal-header {
   background-color: var(--cioos-white);
   align-items: flex-start;
 }
 
-/* Icon + text-stack as one row — kept together as Modal.Title's only content,
-   same reasoning as the Filters header above. */
+/* Same reasoning as the Filters header above. */
 .downloadModal .modal-title {
   display: flex;
   align-items: flex-start;
@@ -163,7 +139,7 @@
   width: 28px;
 
   /* The heading's line box (font-size-lg at line-height 1.2), so the glyph
-     sits on the title line and not between title and subtitle. */
+     sits on the title line. */
   height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
@@ -190,7 +166,6 @@
   color: var(--cioos-navy);
 }
 
-/* Same pill as the Filters header's counter and the datasets toggle's count. */
 .downloadModalTitleCounter {
   display: inline-flex;
   align-items: center;
@@ -212,9 +187,6 @@
   color: var(--cioos-ink-60);
 }
 
-/* Dataset-coverage figure: a wide dialog whose body holds a small toolbar
-   (the Colour-by control) above the stacked histogram. The header reuses the
-   download modal's icon-tile + title treatment. */
 .coverageModal .coverageModalDialog {
   max-width: min(1040px, calc(100vw - 24px));
 }
@@ -244,9 +216,7 @@
   flex-direction: column;
 }
 
-/* Toolbar: the metric's caveats on the left, level with the Count and
-   Colour-by controls on the right. The notes wrap onto their own line above
-   the controls once the row is too narrow for both. */
+/* The notes wrap above the controls once the row is too narrow for both. */
 .coverageToolbar {
   display: flex;
   flex-wrap: wrap;
@@ -266,7 +236,6 @@
   color: var(--cioos-ink-80);
 }
 
-/* How to read the bars, not a footnote: the info glyph marks it as such. */
 .coverageToolbarNote {
   display: flex;
   align-items: flex-start;
@@ -291,8 +260,7 @@
   color: var(--cioos-ink-60);
 }
 
-/* Each option carries a line saying what it measures, so the menu wraps
-   instead of the one-line nowrap rows other dropdowns use. */
+/* Each option carries a description line, so the menu wraps. */
 .coverageOptionMenu {
   width: 300px;
   max-width: calc(100vw - 24px);
@@ -331,16 +299,13 @@
   border-color: var(--cioos-primary);
 }
 
-/* The plot fills the remaining height below the toolbar. */
 .coveragePlotArea {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
 }
 
-/* A figure being replaced: dimmed and inert while the new one loads, so the
-   shape stays readable but it is visibly not the answer to the control that
-   was just changed. The spinner sits over it rather than replacing it. */
+/* Dimmed and inert, so it visibly isn't the answer to the changed control. */
 .coveragePlotStale {
   height: 100%;
   opacity: 0.4;
@@ -364,8 +329,6 @@
   }
 }
 
-/* Laid out like the plot: a legend box top-left over a plot area with
-   gridlines and a baseline, bars packed edge to edge along it. */
 .coverageSkeleton {
   position: relative;
   height: 100%;
@@ -383,8 +346,7 @@
   animation: coverage-skeleton-pulse 1.4s ease-in-out infinite;
 }
 
-/* A shimmer per bar would flicker across 120 slivers; the bars pulse as one
-   figure instead. */
+/* A shimmer per bar would flicker across 120 slivers; pulse as one figure. */
 .coverageSkeletonBars .cioosSkeleton {
   flex: 1 1 0;
   min-width: 0;
@@ -427,7 +389,6 @@
   }
 }
 
-/* Loading / error / empty states centered in the plot area. */
 .coverageModalStatus {
   display: flex;
   align-items: center;
@@ -463,8 +424,7 @@
   }
 }
 
-/* Phones: the text around the figure steps back down from theme.css's phone
-   sizes so the chart keeps as much of the small screen as it can. */
+/* Steps back down from theme.css's phone sizes so the chart keeps the room. */
 @media (max-width: 700px), (max-height: 500px) {
   .coverageModal {
     --cioos-font-size-sm: 11px;
@@ -472,19 +432,14 @@
     --cioos-font-size-lg: 16px;
   }
 
-  /* Three equal columns, each label over its dropdown, every value on one
-     line: side by side, label and value each wrapped into a two- or
-     three-line block. Labels come before their dropdown in the markup, so a
-     column-major two-row grid stacks each pair. */
+  /* Labels precede their dropdown in the markup, so a column-major two-row
+     grid stacks each pair. */
   .coverageToolbarControls {
     display: grid;
     grid-template-rows: auto auto;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
     gap: 2px var(--cioos-space-sm);
-
-    /* Beside the notes when the phone is held sideways, under them, full
-       width, when it is upright. */
     flex: 1 1 300px;
   }
 
@@ -509,8 +464,7 @@
   }
 }
 
-/* Both modals host panels that manage their own scrolling; the body is the
-   positioned, non-padded frame they fill. */
+/* Both host panels that manage their own scrolling. */
 .filtersModal .modal-body,
 .downloadModal .modal-body {
   position: relative;
@@ -519,10 +473,8 @@
   overflow: hidden;
 }
 
-/* A flex column so the panel's flex-basis resolves against a height the
-   dialog's max-height actually caps: a height: 100% panel here had nothing
-   definite to be 100% of, grew to its list, and pushed the footer (count and
-   Clear all) below the clipped edge. */
+/* A flex column so the panel's flex-basis resolves against the dialog's
+   max-height; height: 100% had nothing definite and pushed the footer out. */
 .filtersModal .modal-body {
   display: flex;
   flex-direction: column;
@@ -535,14 +487,7 @@
   }
 }
 
-/* ------------------------------------------------------------------
- * Mobile: both dialogs take the whole viewport. A centred card with the
- * map showing around it has nothing to offer at this width — the filters
- * master/detail stacks into a single scrolling column (Panels/styles.css)
- * and the download order bar squeezes the dataset list to nothing — and
- * the close button in the header's top-right corner is the way out of
- * either, as it is for the datasets surface beside them.
- * ------------------------------------------------------------------ */
+/* Mobile: both dialogs take the whole viewport. */
 @media (max-width: 700px), (max-height: 500px) {
   .filtersModal .filtersModalDialog,
   .downloadModal .downloadModalDialog {
@@ -552,10 +497,8 @@
     margin: 0;
   }
 
-  /* Same phone type scale as the datasets sheet (Sidebar/styles.css), so the
-     full-screen surfaces read alike. The font-size re-applies the base
-     here: text without its own size inherits body's, which was computed from
-     the phone base before these tokens were overridden. */
+  /* The font-size re-applies the base: body's was computed before these
+     tokens were overridden. */
   .filtersModal,
   .downloadModal {
     font-size: var(--cioos-font-size-base);
@@ -576,17 +519,12 @@
     border-radius: 0;
   }
 
-  /* The download panel is one scrolling column at this width rather than a
-     fixed frame with a scrolling list inside it, so the body is what scrolls
-     (DownloadDetails/styles.css). */
+  /* One scrolling column here (DownloadDetails/styles.css). */
   .downloadModal .modal-body {
     overflow-y: auto;
   }
 
-  /* Clear of the home indicator on a notched phone: this body scrolls to its
-     own bottom edge, which is now the screen's. The filters modal is not here
-     because its own footer is the thing that reaches that edge, and pays the
-     inset itself (see Panels/styles.css). */
+  /* Home-indicator inset; the filters modal pays it in its own footer. */
   .downloadModal .modal-body {
     padding-bottom: env(safe-area-inset-bottom);
   }

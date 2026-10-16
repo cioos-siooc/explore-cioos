@@ -36,14 +36,11 @@ test.describe("filters", () => {
     await openApp(page);
     await page.getByTestId("topbar-filters-button").click();
 
-    // Open the ocean-variables filter and pick the first value it offers.
     await page.locator('[data-filter-name="oceanVariablesFiltername"]').click();
     const option = page.getByTestId("filter-option").first();
     const label = (await option.textContent()).trim();
     await option.click();
 
-    // The three things applying a filter must do: mark the option, announce
-    // itself as a chip, and end up in the address so the view can be shared.
     await expect(option).toHaveAttribute("data-selected", "true");
     await expect(
       page.locator('[data-filter-key="eovs"] [data-testid="filter-chip-item"]'),
@@ -75,8 +72,6 @@ test.describe("filters", () => {
   });
 
   test("a filtered link comes back as the same view", async ({ page }) => {
-    // The round trip that useUrlSync exists for: the URL is written from state,
-    // and every provider seeds itself back out of it on the next load.
     await openApp(page, "eovs=oxygen");
 
     await expect(

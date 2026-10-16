@@ -28,17 +28,9 @@ import { defaultColorFor } from "../DatasetPreview/previewColors.js";
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
 
-// One panel per variable, all sharing one axis. The arrangement per
-// cdm_data_type lives in previewFacetPlan.js and the figure itself in
-// previewFacetFigure.js — both pure, so the layout is testable without a
-// browser. This file is the controls and the sizing.
-//
-// Everything describing the plot is owned by DatasetPreview: the panels, the
-// shared axis and the display prefs live in the query string
-// (usePreviewPlotParams) so a link reproduces them, and the per-column renames
-// are plain state up there. None of it can live here, because this component is
-// unmounted every time the user flips to the Table and back — which is how the
-// axes, the plot type and the colours all used to get silently discarded.
+// Controls and sizing only; layout and figure are pure in previewFacetPlan.js /
+// previewFacetFigure.js. All plot state is owned by DatasetPreview because this
+// component unmounts on every Table/Plot flip.
 export default function DatasetPreviewPlot({
   inspectRecordID,
   data,
@@ -57,25 +49,19 @@ export default function DatasetPreviewPlot({
   customLabels,
   setCustomLabels,
   uirevision,
-  // clientHeight of the modal's one scroll container. An INPUT to the plot's
-  // height — never the plot's own box, which would be a feedback loop.
+  // An input to the plot's height, never the plot's own box (feedback loop).
   availableHeight,
 }) {
   const { t, i18n } = useTranslation();
-  // Purely local: a disclosure triangle is not worth a param, and nobody wants
-  // to share which panel they had folded open.
+  // Purely local: which panel is folded open is not worth sharing in a link.
   const [showLabels, setShowLabels] = useState(false);
 
-  // Width comes from the element that owns it: the plot area is flex-sized by
-  // the row, independent of how tall the figure ends up.
   const [plotAreaRef, plotAreaSize] = useElementSize();
   const measurements = measurementsOf(variables);
   const sharedCandidates = sharedCandidatesFor(variables);
 
-  // What names the record, and therefore what the figure is titled. Computed
-  // here as well as inside buildFigure because the title's height is part of the
-  // budget below — and it can be, without a loop: the width does not depend on
-  // the title, so the line count is known before the height is chosen.
+  // Computed here too because the title's height is part of the budget; no loop,
+  // as the width does not depend on the title.
   const title = useMemo(
     () => recordTitleFor({ plan, variablesByName, data }),
     [plan, variablesByName, data],
@@ -85,12 +71,9 @@ export default function DatasetPreviewPlot({
     panels.length,
     plotAreaSize.width,
   );
-  // The lines the title really wraps to, not the two-line worst case the sizing
-  // helpers assume on their own: at a short scroller that is the difference
-  // between three stacked panels fitting and scrolling.
+  // The actual line count, not the worst case: at a short scroller that decides
+  // whether three stacked panels fit.
   const titleLines = titleLinesFor(title, width);
-  // The whole scroller: with the plot-type control moved into the left column
-  // there is nothing above the figure to subtract.
   const height = plotHeightFor(
     plan.orientation,
     panels.length,
@@ -98,10 +81,8 @@ export default function DatasetPreviewPlot({
     titleLines,
   );
 
-  // Memoised because react-plotly.js compares `data`/`layout` by IDENTITY and
-  // calls Plotly.react() whenever either differs. A figure rebuilt on every
-  // render means a full re-plot of every panel on every keystroke in the rename
-  // field — six traces of a thousand points each.
+  // react-plotly.js re-plots whenever `data`/`layout` identity changes, e.g. on
+  // every keystroke in the rename field.
   const figure = useMemo(
     () =>
       panels.length && data
@@ -138,11 +119,8 @@ export default function DatasetPreviewPlot({
 
   const labelOf = (columnName) => labelFor(variablesByName.get(columnName));
 
-  // The variable picker. Checkbox rows rather than Dropdown.Item, because
-  // Dropdown.Item closes the menu on click (ui/Dropdown.jsx) and choosing
-  // several variables means the menu has to stay open. The menu portals to
-  // document.body with its own max-height, so however many variables a dataset
-  // has, the list scrolls there and never inside the modal.
+  // Checkbox rows, not Dropdown.Item: an Item closes the menu on click, and
+  // choosing several variables needs it open.
   const variablesToggleTitle =
     panels.length === 1
       ? shortLabelFor(variablesByName.get(panels[0]))
@@ -203,9 +181,7 @@ export default function DatasetPreviewPlot({
     </div>
   );
 
-  // Plot type. First in the column deliberately: it is the one control that
-  // changes every panel at once, and it used to sit alone in a row above the
-  // figure, which cost the figure that row's height for one dropdown.
+  // First: it is the one control that changes every panel at once.
   const plotTypeRow = (
     <div className="controlRow">
       <span className="controlCaption">{t("plotType")}</span>
@@ -234,10 +210,6 @@ export default function DatasetPreviewPlot({
     </div>
   );
 
-  // The one axis every panel is drawn against. There used to be a second
-  // dropdown of this shape — "Color by", one variable whose values shaded every
-  // panel — and this was a factory over the two; the colour of a variable is now
-  // the variable's own, picked beside its name in the panel below.
   const sharedAxisRow = (
     <div className="controlRow">
       <span className="controlCaption">
@@ -264,10 +236,7 @@ export default function DatasetPreviewPlot({
     </div>
   );
 
-  // Per-variable customisation, keyed by column name — with one panel per
-  // variable there are no fixed axis roles left to key on. A panel gets its
-  // colour as well as its name; the shared axis draws no trace, so it gets only
-  // the name.
+  // The shared axis draws no trace, so it gets a name but no colour.
   const customizeRow = (columnName, index) => (
     <div className="labelEditorRow" key={columnName}>
       <label htmlFor={`rename-${columnName}`}>{labelOf(columnName)}</label>
@@ -327,10 +296,8 @@ export default function DatasetPreviewPlot({
             <Plot
               data={figure.data}
               layout={figure.layout}
-              // Explicit width/height in the layout, so Plotly never runs
-              // plotAutoSize. That is what used to read a container height of
-              // 0px on first mount and silently fall back to its own 450px
-              // default, leaving the plot small until the next relayout.
+              // Explicit width/height so Plotly never runs plotAutoSize, which
+              // reads 0px on first mount and falls back to 450px.
               style={{ width: `${width}px`, height: `${height}px` }}
               useResizeHandler={false}
               config={{
@@ -341,9 +308,8 @@ export default function DatasetPreviewPlot({
                   "resetScale2d",
                   "pan2d",
                 ],
-                // Off deliberately: `responsive` re-measures from computed
-                // style on every window resize, which would fight the sizes
-                // above. useElementSize drives resizing instead.
+                // Off: `responsive` would fight the sizes above;
+                // useElementSize drives resizing instead.
                 responsive: false,
                 scrollZoom: true,
                 locale: i18n.language === "fr" ? "fr" : "en",

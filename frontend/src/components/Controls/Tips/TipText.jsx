@@ -4,8 +4,6 @@ import { Trans, useTranslation } from "react-i18next";
 
 import "./styles.css";
 
-// A tip's text, with each control it names by its glyph (<add/>, <exclude/>)
-// drawn with that glyph.
 export default function TipText({ tip }) {
   const { t } = useTranslation();
   const glyph = (Icon, label) => (

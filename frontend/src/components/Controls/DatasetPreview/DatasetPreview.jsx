@@ -10,10 +10,7 @@ import DatasetPreviewTable from "../DatasetPreviewTable/DatasetPreviewTable.jsx"
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import "./styles.css";
 
-// Lazy so the ~1 MB Plotly chunk only downloads when a plot is actually shown.
-// It now downloads on the first record opened rather than on the first Plot
-// click, since the plot is the default view — but it stays a separate chunk
-// behind the skeleton fallback below, and the /preview fetch runs alongside it.
+// Lazy so the ~1 MB Plotly chunk stays separate and downloads alongside /preview.
 const DatasetPreviewPlot = lazy(
   () => import("../DatasetPreviewPlot/DatasetPreviewPlot.jsx"),
 );
@@ -37,10 +34,6 @@ export default function DatasetPreview({
 }) {
   const { t } = useTranslation();
 
-  // The response arrives as parallel arrays; the table wants row objects. That
-  // is a reading of the response, so it is derived rather than copied into
-  // state by an effect — which also means there is nothing to clear when the
-  // modal closes.
   const data = useMemo(() => {
     const columnNames = datasetPreview?.table?.columnNames || [];
     const rows = datasetPreview?.table?.rows || [];
@@ -52,10 +45,8 @@ export default function DatasetPreview({
     );
   }, [datasetPreview]);
 
-  // What is being looked at and how it is drawn — all of it in the query string,
-  // so a link reproduces the plot and Back closes it. Each param is written only
-  // when it differs from what this dataset type opens on, so an untouched plot
-  // adds nothing to the URL. See usePreviewPlotParams.
+  // Plot state lives in the query string so a link reproduces the plot and Back
+  // closes it.
   const {
     variables,
     variablesByName,
@@ -75,31 +66,21 @@ export default function DatasetPreview({
     linkKey,
   } = usePreviewPlotParams(inspectDataset, datasetPreview?.table, data);
 
-  // Per-column display names. Lifted out of the plot so they survive the
-  // Table/Plot flip (which unmounts it) like everything else now does, but
-  // deliberately NOT in the URL: free text is what makes a query string
-  // unreadable, and a rename is a private annotation rather than a view.
+  // Lifted out of the plot to survive the Table/Plot flip, but deliberately not
+  // in the URL: free text makes the query string unreadable.
   const [customLabels, setCustomLabels] = useState(NO_CUSTOM_LABELS);
 
-  // Which URL the Copy button is currently claiming. Held as the copied key
-  // rather than a boolean so "still the link they copied?" is derived from the
-  // URL instead of re-synced to it: anything that changes the query string —
-  // a panel added, the shared axis moved, the map panned behind the modal —
-  // makes this stale by definition, with no effect to run and no render where
-  // the button claims a link that is no longer there.
+  // The copied key rather than a boolean, so any URL change makes it stale
+  // without an effect to re-sync it.
   const [copiedLinkKey, setCopiedLinkKey] = useState(NO_LINK_COPIED);
   const linkCopied = copiedLinkKey === linkKey;
 
-  // The modal's ONE scroll container. Measured here because its height is set by
-  // the modal (flex, capped at the viewport) and does not move when the plot
-  // grows — which is what makes it safe to feed into the plot's height. See
-  // useElementSize.
+  // The modal's one scroll container: its height is set by the modal, not the
+  // plot, so it is safe to feed into the plot's height.
   const [scrollRef, scrollSize] = useElementSize();
 
-  // A different record is a different plot: drop the previous one's names.
-  // Adjusted during render rather than from an effect — React discards this
-  // render and immediately re-runs with the cleared labels, so the new record
-  // never paints under the old record's names the way an effect would let it.
+  // Reset during render, not in an effect, so a new record never paints with
+  // the previous record's names.
   const [labelledRecordID, setLabelledRecordID] = useState(inspectRecordID);
   if (labelledRecordID !== inspectRecordID) {
     setLabelledRecordID(inspectRecordID);
@@ -107,9 +88,8 @@ export default function DatasetPreview({
   }
 
   const onModalClose = () => {
-    // One call, one history entry: setInspectRecordID clears ?preview= and every
-    // plot param together, because react-router would drop one of two writes
-    // made in the same tick (see previewParams.js).
+    // One call clears ?preview= and every plot param: react-router drops one of
+    // two writes made in the same tick (see previewParams.js).
     setInspectRecordID();
     setCustomLabels(NO_CUSTOM_LABELS);
     setRecordLoading(false);
@@ -164,9 +144,7 @@ export default function DatasetPreview({
             </h4>
 
             {dataIsReady && (
-              // The address bar is already the live mirror of the whole app
-              // state — record, plot settings, map and filters — so sharing what
-              // is on screen is the current URL and nothing more.
+              // The URL mirrors the whole app state, so it is the share link.
               <button
                 type="button"
                 className="copyLinkButton"
@@ -210,9 +188,8 @@ export default function DatasetPreview({
                           data={data}
                         />
                       ) : plan ? (
-                        // The fallback reserves height on purpose: without it the
-                        // plot mounted into a collapsed box and Plotly measured
-                        // it at zero.
+                        // The fallback reserves height: otherwise Plotly measures
+                        // a collapsed box at zero.
                         <Suspense fallback={plotSkeleton}>
                           <DatasetPreviewPlot
                             inspectRecordID={inspectRecordID}
@@ -236,9 +213,8 @@ export default function DatasetPreview({
                           />
                         </Suspense>
                       ) : (
-                        // Reachable only via ?vis=plot on a type with no layout
-                        // (Grid), or a dataset whose columns are all coordinates
-                        // and ids. The table is still right there in the header.
+                        // Only via ?vis=plot on a type with no layout (Grid), or
+                        // a dataset whose columns are all coordinates and ids.
                         <p>{t("datasetPreviewPlotNotPlottable")}</p>
                       )}
                     </>

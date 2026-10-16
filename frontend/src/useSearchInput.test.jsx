@@ -4,9 +4,6 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import { useSearchInput } from "./utilities.jsx";
 
-// A search box wired exactly as the real ones are: the text comes from the
-// caller's state, the setter is what the box publishes into, and the field
-// sits in a form so Enter and the button are the one submit.
 function SearchBox({ value, onChange, trigger, delay }) {
   const [text, setText, submit] = useSearchInput(value, onChange, {
     trigger,
@@ -29,9 +26,8 @@ function SearchBox({ value, onChange, trigger, delay }) {
   );
 }
 
-// One change event per character, as the input sees them. Typed through
-// fireEvent rather than userEvent because userEvent runs its own clock, and the
-// clock here is the thing under test.
+// fireEvent, not userEvent: userEvent runs its own clock, and the clock is
+// under test here.
 function type(text) {
   const input = screen.getByLabelText("search");
   for (let i = 1; i <= text.length; i++) {
@@ -49,8 +45,6 @@ describe("useSearchInput", () => {
     vi.useRealTimers();
   });
 
-  // The default: for a box whose search is an array filter over options
-  // already in memory, a pause is cheap enough and needs no button.
   describe('trigger "pause"', () => {
     it("shows every keystroke at once, and publishes none of them while typing", () => {
       const onChange = vi.fn();
@@ -111,8 +105,6 @@ describe("useSearchInput", () => {
     });
   });
 
-  // The free-text dataset search: every distinct value is a round of map
-  // requests, so nothing goes until it is asked for.
   describe('trigger "submit"', () => {
     it("publishes nothing while typing, however long the typing stops for", () => {
       const onChange = vi.fn();
@@ -161,8 +153,6 @@ describe("useSearchInput", () => {
     });
   });
 
-  // The rules about never losing what was asked for hold whatever publishes
-  // the box, so they are asserted against both triggers.
   describe.each(["pause", "submit"])('trigger "%s", either way', (trigger) => {
     it("publishes an emptied box at once", () => {
       const onChange = vi.fn();

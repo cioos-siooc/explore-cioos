@@ -10,24 +10,8 @@ import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
 import { FilterOption } from "../MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
-// Which observation geometries the map draws. It behaves as every other list
-// filter does: the row includes, its end button excludes, nothing picked means
-// unfiltered (all seven drawn), and the map draws the included geometries (or
-// all of them, when none is included) minus the excluded ones. The selection gates the datasets list and its counts for
-// every row (see datasetInDataLayers), and additionally gates the map's point/
-// hex tiles for the six point- and path-sampling rows — grid has no tile
-// equivalent to narrow, since griddap coverage is its own map layer.
-//
-// Each row carries a hint line: what the geometry means in plain terms and the
-// platforms that typically produce it. "TimeSeriesProfile" tells a data manager
-// exactly what it is and a visitor nothing at all, and the hint is what closes
-// that gap without renaming the CF types.
-//
-// Seven rows and nothing else. The track-lines / hex-cells switches used to
-// hang off the trajectory pair here, which put the same two controls in two
-// places once the legend grew switches of its own — and they never belonged in
-// a filter: they change how the trajectories are drawn, not which datasets are
-// selected. They live on the legend entries they key (see Legend.jsx).
+// Gates the datasets list for every row, but the map tiles only for the
+// point/path rows: griddap coverage is its own map layer.
 export default function DataLayersFilter() {
   const { t } = useTranslation();
   const { dataLayerChoices, toggleDataLayer } = useMapState();

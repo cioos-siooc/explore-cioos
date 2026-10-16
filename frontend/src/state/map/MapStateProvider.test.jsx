@@ -13,12 +13,9 @@ let latest;
 
 function Probe() {
   latest = useMapState();
-  // SelectionProvider's own initial /pointQuery load, once it settles,
-  // recomputes mapDatasetPks and — seeing no search — calls
-  // setMapDatasetPKs(undefined) via its own effect. Under enough load that
-  // load can still be in flight after legendLoading clears, and would land
-  // AFTER (and silently clobber) a value this suite sets on mapDatasetPKs —
-  // wait for both loads, not just the legend's.
+  // SelectionProvider's initial /pointQuery can settle after legendLoading
+  // clears and reset mapDatasetPKs to undefined, clobbering what this suite
+  // sets, so wait for both loads.
   const { initialPointsQueryComplete } = useSelection();
   const ready = !latest.legendLoading && initialPointsQueryComplete;
   return <span data-testid="state">{ready ? "ready" : "loading"}</span>;

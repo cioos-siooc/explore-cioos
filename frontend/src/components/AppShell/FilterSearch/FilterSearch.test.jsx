@@ -18,8 +18,7 @@ describe("FilterSearch", () => {
     installMockFetch();
   });
 
-  // The search page writes nothing of its own: every pick lands in the provider
-  // state the classic filters read, so it is asserted through that state.
+  // Picks land in provider state, so they are asserted through it.
   async function renderPalette(url = "/") {
     const seen = {};
     function Probe() {

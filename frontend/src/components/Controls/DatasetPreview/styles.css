@@ -1,33 +1,11 @@
-/* THE one scroll container of the preview modal.
- *
- * There used to be two: .modal-body scrolled because DatasetPreview passed
- * `scrollable` to Modal (ui/modalStyles.css), and this element scrolled because
- * of `height: 100%; overflow: auto`. The outer one always had ~15px to scroll,
- * from a margin-top on its only child, so it showed a permanent stub scrollbar
- * next to the real one.
- *
- * `scrollable` is no longer passed, and the clipping it provided is done here
- * instead — locally, because ui/modalStyles.css is shared with the filters and
- * download modals. The chain is: .modal-content (capped at the viewport) ->
- * .modal-body (flex column, clips) -> this element (flex child, scrolls).
- *
- * min-height: 0 on both is what lets a flex child actually shrink below its
- * content and hand the overflow to this scroller rather than to the page. */
+/* One scroll container: .modal-content (capped) -> .modal-body (flex, clips) ->
+ * .tableAndPlot (scrolls). Done locally, not via Modal `scrollable`, because
+ * ui/modalStyles.css is shared; min-height: 0 lets the flex children shrink. */
 .dataPreviewModal .modal-content {
   overflow: hidden;
 
-  /* A definite height, not the shared max-height.
-   *
-   * The plot's height is computed from the scroll container's measured height,
-   * and with only a max-height the modal is sized BY its content — so a taller
-   * plot would make a taller modal would make a bigger budget would make a
-   * taller plot. It converges on the viewport cap, but over several observer
-   * ticks, which is visible as the panel growing in steps. Fixing the height to
-   * the cap makes the budget a constant and removes the loop.
-   *
-   * A record preview also always wants the room: it is the largest thing in the
-   * app, and the previous layout was effectively full height anyway via the
-   * 560px floor it forced on the plot. */
+  /* A definite height, not max-height: the plot sizes from this container, so a
+   * content-sized modal would grow in visible steps (plot -> modal -> budget). */
   height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
 }
 
@@ -43,8 +21,7 @@
   min-height: 0;
   overflow: hidden auto;
 
-  /* Horizontal overflow belongs to the plot area, which sizes its own figure —
-     a scrollbar here would be a second one for the same axis. */
+  /* Horizontal overflow belongs to the plot area, which sizes its own figure. */
 }
 
 .backButton {
@@ -110,8 +87,6 @@
   margin-top: 0;
 }
 
-/* Copy-link button. Shares the toggle buttons' shape but not their fixed width:
-   it holds an icon plus a couple of words, and it is not a toggle. */
 .tableAndPlotGridContainer .copyLinkButton {
   height: 42px;
   display: inline-flex;
@@ -130,10 +105,7 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* The lazy chunk's placeholder. Without a floor here the container sat at its
-   minimum at exactly the moment Plotly measured it — which is how the plot
-   ended up drawn at Plotly's own 450px default until the first control
-   change. */
+/* Without a floor the container is at its minimum when Plotly measures it. */
 .datasetPreviewPlotLoading {
   display: grid;
   min-height: 420px;
@@ -143,7 +115,6 @@
   height: auto;
 }
 
-/* A header row and a few body rows, four columns wide. */
 .datasetPreviewTableSkeleton {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

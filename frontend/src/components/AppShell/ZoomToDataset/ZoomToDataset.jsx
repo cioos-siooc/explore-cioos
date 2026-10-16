@@ -7,25 +7,9 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 
-// Framing the map on the open dataset's footprint. The map never does this on
-// its own — opening a dataset page only highlights that dataset among the rest
-// (see hoverHighlightPoints in Map.jsx), it doesn't move the camera — so this
-// is the one place the camera is asked to travel, from the button below or
-// from a double-click on the dataset's title (DatasetInspector).
-//
-// The button renders into the dataset page's actions row and is styled there,
-// alongside the download and filter actions it sits with (see
-// DatasetInspector/styles.css) — a named button like both of them, since an
-// unlabelled magnifier in that row says nothing about where it would take you.
-//
-// filtered_bbox_geojson is the extent of the features the current filters
-// actually matched, so the framing follows the filters — narrowing the time
-// range or drawing a polygon reframes to what's left. Grids have no features,
-// so theirs is the coverage bbox (see shapeQuery.js).
-//
-// `framed` is true once the map already shows that extent: there is nothing
-// left to do, and the button disables itself rather than invite a no-op
-// click. Panning or zooming away brings it back.
+// The one place the camera is asked to travel to a dataset: opening a page
+// only highlights it. filtered_bbox_geojson follows the filters; grids have no
+// features, so theirs is the coverage bbox (see shapeQuery.js).
 export function useZoomToDataset() {
   const { inspectDataset } = useSelection();
   const { zoomToGeometry, mapInstance, mapView } = useMapState();
@@ -35,10 +19,8 @@ export function useZoomToDataset() {
     inspectDataset?.coverage_bbox_geojson;
   const bounds = useMemo(() => boundsFromGeoJson(footprint), [footprint]);
 
-  // mapView changes on every moveend, which is the cue to re-check the camera.
-  // mapView is not read by boundsAreFramed — it is here because the answer is
-  // measured off the live camera, and mapView changing is how this component
-  // learns the camera moved.
+  // mapView isn't read by boundsAreFramed; it changing is how this learns the
+  // camera moved.
   const framed = useMemo(
     () => boundsAreFramed(mapInstance, bounds),
     // eslint-disable-next-line react-hooks/exhaustive-deps

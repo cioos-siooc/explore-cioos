@@ -8,10 +8,8 @@ import { FIXTURES_DIR } from "./fixturesDir.js";
 
 const BASELINE = join(FIXTURES_DIR, "..", "a11y-baseline.json");
 
-// WCAG 2.0/2.1 A and AA — the level Canadian federal accessibility policy
-// targets, which is the right bar for a national service. Deliberately not
-// axe's 'best-practice' tags: they are opinionated (landmark/region rules in
-// particular) and would flood a map-first app whose chrome legitimately floats.
+// The Canadian federal bar. Not 'best-practice': its landmark/region rules
+// flood a map-first app whose chrome legitimately floats.
 export const A11Y_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 export function readBaseline() {
@@ -19,8 +17,7 @@ export function readBaseline() {
 }
 
 export async function scan(page) {
-  // A colour caught mid-transition is a different contrast ratio, so a slower
-  // runner counted a different number of nodes than the one that recorded.
+  // Mid-transition colours change contrast counts between runners.
   await page.addStyleTag({
     content:
       "*,*::before,*::after{animation:none!important;transition:none!important}",
@@ -28,9 +25,7 @@ export async function scan(page) {
   return (
     new AxeBuilder({ page })
       .withTags(A11Y_TAGS)
-      // MapLibre injects its own canvas and controls. Their accessibility is
-      // upstream's to fix and not something this codebase can change; excluding a
-      // third-party subtree is honest, whereas switching off the rules it trips
+      // Exclude upstream's subtree rather than disable rules it trips, which
       // would hide the same problems in our own markup.
       .exclude(".maplibregl-canvas-container")
       .exclude(".maplibregl-ctrl")
@@ -38,16 +33,8 @@ export async function scan(page) {
   );
 }
 
-/**
- * Assert a scan against the recorded baseline.
- *
- * Two rules, and they are what make this a ratchet rather than a mute:
- *   1. a rule that is not in the baseline at all is always a hard failure, even
- *      while other rules are being tolerated;
- *   2. a baselined rule may match fewer nodes than recorded, never more — and
- *      when it matches fewer, the message says so, so the number comes down by
- *      hand and the file keeps meaning something.
- */
+// A ratchet: any unbaselined rule fails, and a baselined one may only shrink
+// (and says so, so the baseline gets lowered by hand).
 export function expectNoNewViolations(state, results) {
   const baseline = readBaseline()[state] ?? {};
   const counted = Object.fromEntries(
@@ -79,8 +66,7 @@ export function expectNoNewViolations(state, results) {
   }
 }
 
-// Written by `npm run test:a11y:baseline`. Recording rather than asserting is a
-// one-off: the file is a to-do list, and shrinking it is an ordinary PR.
+// `npm run test:a11y:baseline`.
 export function recordBaseline(state, results) {
   const baseline = readBaseline();
   baseline[state] = Object.fromEntries(

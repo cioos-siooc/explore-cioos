@@ -33,28 +33,21 @@ import {
 } from "../../../state/tips/scenes.js";
 import "./styles.css";
 
-// What the tool is for, in the order a newcomer meets it: find data on the
-// map, narrow it down, take it away. Each card leads with the glyph of the
-// control that does it.
 const FEATURES = [
   { key: "explore", Icon: GlobeAmericas },
   { key: "search", Icon: Search },
   { key: "download", Icon: Download },
 ];
 
-// The Gulf of St. Lawrence, thick with profile and time-series stations. A
-// point frames at exactly the camera's maxZoom, just past the zoom where hexes
-// give way to markers.
+// The Gulf of St. Lawrence, thick with profile and time-series stations, framed
+// just past the zoom where hexes give way to markers.
 const STATIONS_SHOWCASE_CENTRE = {
   type: "Point",
   coordinates: [-63.914, 49.038],
 };
 const STATIONS_SHOWCASE_ZOOM = MARKER_MIN_ZOOM + 0.8;
 
-// A few of the app's views, one click away from the intro: each closes the
-// dialog and sets the app up the way a user would have, using the same
-// actions the controls do. The trajectory is left out when the catalogue has
-// none.
+// Each uses the same actions the controls do, as a user would have.
 function useShowcases(close) {
   const { pointsData, setInspectDataset, selectTrajectoryFromMap } =
     useSelection();
@@ -105,8 +98,7 @@ function useShowcases(close) {
 
 const COUNT_UP_MS = 900;
 
-// Counts up to `target` once it is known, so the catalogue's size reads as a
-// live figure rather than copy. Lands on it at once when motion is reduced.
+// Lands on `target` at once when motion is reduced.
 function useCountUp(target) {
   const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [value, setValue] = useState(0);
@@ -116,7 +108,6 @@ function useCountUp(target) {
     const start = performance.now();
     const step = (now) => {
       const progress = Math.min((now - start) / COUNT_UP_MS, 1);
-      // Ease out, so the last digits settle rather than stop dead.
       setValue(Math.round(target * (1 - (1 - progress) ** 3)));
       if (progress < 1) frame = requestAnimationFrame(step);
     };

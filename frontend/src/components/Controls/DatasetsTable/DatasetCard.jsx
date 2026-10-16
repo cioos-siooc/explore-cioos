@@ -31,33 +31,20 @@ import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
 
-// A single dataset rendered as a card. Shared shell for the sidebar list and
-// the download-review modal; the modal variant (isDownloadModal) adds the size
-// estimate, the CDE-downloadable status, where the dataset lives (its server
-// and its catalogue record) and the query that would fetch it.
 export default function DatasetCard({
   row,
   selected,
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  // This dataset's direct-download link (download modal only), already built
-  // from the map's filters and the chosen format — see downloadLinks.js.
   downloadLink,
   onSelect,
   onInspect,
-  // Drops the dataset from the order entirely (download modal only) — unlike
-  // onSelect, which only ticks it in or out of this particular batch, this
-  // takes the row off the list.
+  // Unlike onSelect (in or out of this batch), takes the row off the order.
   onRemove,
   onHover = () => {},
   onHoverEnd = () => {},
-  // This dataset is one the last map click found. It has already been sorted to
-  // the top of the list; the accent is what says why it is up there, so the
-  // reordering reads as an answer rather than as the list having shuffled
-  // itself.
   fromMapClick,
-  // For the select toggle's `data-tip-highlight` (see TipsProvider).
   tipHighlight,
   t,
   i18n,
@@ -69,8 +56,7 @@ export default function DatasetCard({
   // when the CDE can deliver it (internalDownload).
   const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload);
   const estimatesReady = !isEmpty(downloadSizeEstimates);
-  // Estimates that failed to load: the size and download status are unknown,
-  // and no amount of waiting will produce them — say so instead of spinning.
+  // Failed estimates will never arrive: say so instead of spinning.
   const estimatesFailed = !estimatesLoading && !estimatesReady;
 
   const handleSelect = (e) => {
@@ -104,10 +90,8 @@ export default function DatasetCard({
     >
       <div className="datasetCardBody">
         <div className="datasetCardHeadline">
-          {/* A plus while out, a filled tick once in — not a download sign,
-              which promised a file this click never delivers. role=checkbox
-              because that is what it is; a button carries the icon a native
-              input cannot. */}
+          {/* A button with role=checkbox: it carries an icon a native input
+              cannot. */}
           <button
             type="button"
             role="checkbox"
@@ -136,9 +120,8 @@ export default function DatasetCard({
               t={t}
             />
           </span>
-          {/* The card's keyboard and screen-reader target: the whole card
-              can't be a button because it holds the checkbox and links. Its
-              click bubbles to the card's own handler. */}
+          {/* The whole card can't be a button because it holds the checkbox
+              and links. Its click bubbles to the card's own handler. */}
           {clickable ? (
             <button
               type="button"
@@ -153,11 +136,6 @@ export default function DatasetCard({
             </span>
           )}
 
-          {/* Size and CDE-downloadable status, on the title's line rather than
-              a row of their own. Both are a glyph and a few characters wide,
-              and the ragged right of a wrapped title is the space they fit
-              in — a full-width row for them was what made these cards need to
-              be wide. */}
           {isDownloadModal && (
             <span className="datasetCardDownloadInfo">
               {estimatesReady ? (
@@ -169,11 +147,8 @@ export default function DatasetCard({
                       : "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip",
                   )}
                 >
-                  {/* The tick and the pill's colour say the same thing, and
-                      the legend above the list names both — so neither is
-                      spelled out here. The word survives on the glyph's own
-                      <title>, the way the platform dot above carries its
-                      platform, because colour alone never carries it. */}
+                  {/* Colour alone never carries the status: the word is on
+                      the glyph's own <title>. */}
                   <span className="datasetCardStatus">
                     {row.internalDownload ? (
                       <Check2Circle
@@ -201,10 +176,7 @@ export default function DatasetCard({
                     >
                       {formatSizeEstimate(row?.sizeEstimate?.filteredSize)}
                     </span>
-                    {/* What the dataset holds before the map's filters, shown
-                        only when the filters actually narrowed it — otherwise
-                        it is the pill again, in the one place with no width to
-                        spare. */}
+                    {/* Shown only when the map's filters narrowed it. */}
                     {row?.sizeEstimate?.filteredSize !==
                       row?.sizeEstimate?.unfilteredSize && (
                       <span className="datasetCardSizeTotal">
@@ -216,9 +188,6 @@ export default function DatasetCard({
                   </span>
                 </Tooltip>
               ) : estimatesFailed ? (
-                // The em dash the order bar below uses for the same failure,
-                // rather than the sentence: in this slot the sentence would be
-                // taking width from the title to say nothing is known.
                 <span
                   className="datasetCardSizeUnavailable"
                   title={t("downloadSizeUnavailableTitle")}
@@ -231,11 +200,8 @@ export default function DatasetCard({
             </span>
           )}
 
-          {/* Drops the dataset from the order outright. Separate from the
-              checkbox at the other end of this row on purpose: that one only
-              decides whether this batch includes it, and stays available for
-              a dataset the 1 GB ceiling excluded — removing it here is the
-              only way out for that one. */}
+          {/* Separate from the checkbox: for a dataset the 1 GB ceiling
+              excluded, this is the only way out of the order. */}
           {isDownloadModal && onRemove && (
             <button
               type="button"
@@ -254,10 +220,8 @@ export default function DatasetCard({
 
         <DatasetCardMeta row={row} t={t} i18n={i18n} />
 
-        {/* Where this dataset lives and how to fetch it, outside the estimates
-            branch because none of it depends on them: the one dataset the
-            queue will refuse is also the one these are wanted for, and making
-            them wait on the slowest request in the modal is what hid them. */}
+        {/* Outside the estimates branch: the dataset the queue refuses is the
+            one these links are wanted for. */}
         {isDownloadModal && (
           <div className="datasetCardSources">
             {row.erddap_url && (
@@ -273,9 +237,6 @@ export default function DatasetCard({
                 {isObis ? "OBIS" : "ERDDAP™"}
               </a>
             )}
-            {/* The CIOOS catalogue record: licence, citation and contacts,
-                which are what make a downloaded file usable later. Null for a
-                dataset the harvest never matched to a CKAN entry. */}
             {row.ckan_url && (
               <a
                 className="datasetCardSourceLink"
@@ -289,16 +250,10 @@ export default function DatasetCard({
                 {t("datasetCardCatalogueLinkText")}
               </a>
             )}
-            {/* The link that fetches data rather than opening a page, the
-                caveat that applies to it, and the copy of it. One group: what
-                arrives, what is wrong with it, and how to take it away are
-                read together or not at all. */}
             {downloadLink && (
               <span className="datasetCardDownloadGroup">
-                {/* This link asks ERDDAP for the bounding box of a shape that
-                    is not a box, so the file holds points from outside the
-                    selection. On the link itself because that is what carries
-                    the flaw — the queued zip beside it respects the polygon. */}
+                {/* ERDDAP gets the polygon's bounding box, so the file holds
+                    points outside the selection; the queued zip doesn't. */}
                 {downloadLink.polygonSquared && (
                   <Tooltip
                     placement="top"
@@ -313,9 +268,6 @@ export default function DatasetCard({
                     </span>
                   </Tooltip>
                 )}
-                {/* Icon-only, like the copy beside it: the format is set once
-                    in the footer, so spelling it on every card is noise. The
-                    tooltip and the accessible name still say what arrives. */}
                 <Tooltip
                   placement="top"
                   content={t("datasetCardDirectDownloadText", {
@@ -336,10 +288,6 @@ export default function DatasetCard({
                     <Download size={13} aria-hidden="true" />
                   </a>
                 </Tooltip>
-                {/* The URL, for the script or the note it is going into. It
-                    replaces the query this card used to print in full: a URL
-                    that is read is almost always a URL that is about to be
-                    copied, and the copy takes a line rather than four. */}
                 <Tooltip
                   placement="top"
                   content={
@@ -379,9 +327,6 @@ export default function DatasetCard({
 // The dataset's glyph, shaped like what the map draws for it: a grid for a
 // gridded footprint, a hexagon for trajectories and OBIS (shown as hex cells),
 // a dot for everything drawn as markers. Coloured by platform.
-// A sidebar card's outline while the first results are on their way, built in
-// the card's own text classes so it lands at the height of a card with a
-// two-line title.
 export function DatasetCardSkeleton() {
   return (
     <div className="datasetCard" aria-hidden="true">
@@ -442,9 +387,7 @@ function platformColorOf(platform) {
   ).color;
 }
 
-// The card's second row: where the dataset lives, what kind it is, how many
-// locations and days it holds, and whether it is live. Shared with the map's
-// "what's here" card so a dataset reads the same in both lists.
+// Shared with the map's "what's here" card so a dataset reads the same in both.
 export function DatasetCardMeta({ row, t, i18n }) {
   const isGrid = row.cdm_data_type === "Grid";
   const serverName = formatErddapServerName(
@@ -495,9 +438,6 @@ export function DatasetCardMeta({ row, t, i18n }) {
         </span>
       )}
 
-      {/* Same "still producing data" signal as the dataset inspector's
-          Last update row — on this row here since it is the card's other
-          home for small dataset-level facts. */}
       {row.is_realtime && (
         <span
           className="datasetCardLive"

@@ -19,32 +19,14 @@ import useMediaQuery, {
 } from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
 
-// How far up the bar reaches from the bottom of the viewport: its own offset
-// plus its height, which changes with the locale's label lengths. Everything
-// else sitting over the lower map — the datasets sidebar, the legend on narrow
-// screens, the zoom-to-dataset pill, MapLibre's own bottom-right stack — holds
-// clearance from this rather than from a hardcoded height.
+// Other overlays on the lower map take their clearance from this, since the
+// bar's height varies with locale label lengths.
 function measureBarSpace({ top, height }) {
   return Math.max(window.innerHeight - top, height);
 }
 
-// The bottom time bar: the time-range filter, and nothing else.
-//
-// It carried three controls once — the filter range, the trajectory date and
-// the slice of the gridded dataset being drawn — on the grounds that everything
-// time-shaped belonged on one axis. Two of those have gone to the cards that
-// describe the layers they move (see TrajectoryDate and GridTimeSlice), and
-// what is left is the one control that really is about the whole catalogue:
-// the two dates bounding what the map, the datasets list and the counts are
-// filtered to.
-//
-// One card, floating clear of the bottom edge: the range's own fields along
-// the top of it, the rail under them. It costs a strip of map, so it is only
-// mounted while the filter is actually narrowing something — otherwise the
-// range is set from the Time entry in the Filters panel and the map keeps the
-// room. Not on a phone at all: a full-catalogue axis a finger wide is not
-// something a date can be picked off, and the Filters panel is the one place
-// the range is set there.
+// Only mounted while the filter narrows something, to save map room; never on
+// phones, where a finger-wide axis can't pick a date (Filters panel instead).
 export default function TimeBar() {
   const { timeFilterActive } = useFilters();
   const isMobile = useMediaQuery(MOBILE_QUERY);
@@ -53,10 +35,7 @@ export default function TimeBar() {
   return <TimeBarSurface />;
 }
 
-// Split out so the bar's footprint is published by a component that only
-// exists while the bar does: the property is cleared on unmount, which is what
-// lets the sidebar, the legend and MapLibre's corners reclaim the bottom edge
-// the moment it goes away.
+// Split out so the published footprint is cleared on unmount.
 function TimeBarSurface() {
   const { t } = useTranslation();
   const {
@@ -80,18 +59,14 @@ function TimeBarSurface() {
     endDate,
   });
 
-  // A chosen window is a window, so the rail moves it as one: dragging either
-  // end takes the other with it and the span keeps its length. Typing a date
-  // still moves that one end on its own — and the span it leaves behind is no
-  // longer one of the ready-made ones, which is what releases the hold.
+  // Dragging either end of a quick-pick window moves it whole; typing a date
+  // changes its length, which releases the lock.
   const windowLocked = !["", "all"].includes(
     matchQuickPick(startDate, endDate, defaultStartDate),
   );
 
-  // What the typed date fields do. Each moves its own end, bounded by the other
-  // and by the filter's own legal domain rather than by the drawn axis: a date
-  // typed in here may reach outside the data, and then widens the axis to meet
-  // it.
+  // Bounded by the filter's legal domain, not the drawn axis: a typed date may
+  // reach past the data and widen the axis.
   const setFieldValue = useCallback(
     (handle, iso) => {
       if (handle === "start") {
@@ -101,8 +76,6 @@ function TimeBarSurface() {
     [setStartDate, setEndDate, startDate, endDate, maxIso],
   );
 
-  // What the rail does: the same, except that a dragged handle can't leave the
-  // axis in the first place, and that a chosen window moves whole.
   const setHandleValue = useCallback(
     (handle, iso) => {
       if (!windowLocked) return setFieldValue(handle, iso);
@@ -128,9 +101,6 @@ function TimeBarSurface() {
 
   return (
     <div className="timeBar" ref={barRef} aria-label={t("timeBarAriaLabel")}>
-      {/* The fields sit inside the card, along the top of the rail they drive,
-          rather than in a pill of their own floating above it: one surface for
-          one control. */}
       <div className="timeBarFields" role="group">
         <span className="railFieldLabel">{t("timeBarRangeLabel")}</span>
         <DateField
@@ -148,9 +118,6 @@ function TimeBarSurface() {
           max={maxIso}
           onCommit={(value) => setFieldValue("end", value)}
         />
-        {/* The ready-made windows the Filters panel spells out as a labelled
-            row. There is no room for a label here, so the picker names itself
-            until a window is chosen. */}
         <IntervalSelect
           className="railPresetSelect"
           ariaLabel={t("timeBarPresetLabel")}

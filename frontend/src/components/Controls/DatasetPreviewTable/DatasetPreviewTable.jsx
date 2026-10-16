@@ -7,9 +7,7 @@ import TableFilter, { filterRows } from "../../ui/TableFilter.jsx";
 import { splitLines } from "../../../utilities";
 
 export default function DatasetPreviewTable({ datasetPreview, data }) {
-  // Hooks run before the empty-state guard: `datasetPreview` arrives
-  // asynchronously, so returning early above them would change the hook order
-  // between renders.
+  // Hooks before the empty-state guard, or the hook order changes between renders.
   const { t } = useTranslation();
   const [filterText, setFilterText] = useState("");
 

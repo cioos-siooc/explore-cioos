@@ -5,10 +5,7 @@
 !frontend
 !docs/harvesting
 
-# node_modules is the load-bearing entry: the Dockerfile runs `npm ci` and then
-# copies frontend/, so without this the host's node_modules is copied straight
-# over the tree npm ci just installed — the image then ships whatever was on a
-# developer's laptop rather than what package-lock.json pins.
+# Load-bearing: otherwise the host node_modules overwrites the npm ci tree.
 frontend/node_modules
 frontend/dist
 frontend/.env

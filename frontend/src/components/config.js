@@ -10,16 +10,12 @@ export const defaultEndDepth = 12000;
 
 export const defaultScientificNamesSelected = [];
 export const defaultObisNodesSelected = [];
-// The OBIS nodes the Data Portal filter lists before "show more": the two
-// Canadian nodes the harvest is built around (see the harvester's OBIS
-// discovery); the others only contribute datasets inside Canadian waters.
+// Listed before "show more": the two Canadian nodes the harvest is built
+// around; the others only contribute datasets inside Canadian waters.
 export const featuredObisNodes = ["OBIS Canada", "OTN-OBIS"];
 
-// The camera a visit without ?lat/?lon/?zoom opens at. Map.jsx builds the
-// MapLibre instance from these, and MapStateProvider seeds its own view state
-// from them: the map only reports its camera once it has finished loading, and
-// everything keyed off the zoom (the legend ramps above all) would otherwise
-// have to treat "not loaded yet" as "no zoom".
+// Also seeds MapStateProvider's view state: the map only reports its camera
+// once loaded, and zoom-keyed consumers (the legend) would read "no zoom".
 export const defaultMapCenter = { lat: 63.3, lon: -95.9 };
 export const defaultMapZoom = 2.75;
 
@@ -32,28 +28,11 @@ export const defaultQuery = {
   obisNodesSelected: defaultObisNodesSelected,
 };
 
-// The one hex ramp. Every hexagon on the map — the combined hexes below z7 and
-// the trajectory/OBIS coverage hexes at and above it — is painted from this,
-// so hex darkness means the same thing at every zoom.
-//
-// It used to be four ramps: this green one plus purple for trajectory-only
-// hexes, amber for OBIS-only and plum for hexes holding both. Together with
-// the 12-colour platform palette on the point markers that put four colour
-// families on screen at once above z7, and a reader had to decode hue before
-// they could read density. What a hex holds now lives in its hover tooltip and
-// in the layer toggles; colour is reserved for how much.
-//
-// Twelve stops, not seven, so MapLibre's interpolation between them reads as
-// one continuous wash rather than a set of bands. The colours are fully
-// opaque: the whole ramp is drawn at a single layer transparency (hexOpacity in
-// Map.jsx), so a hexagon's alpha says nothing about its count and only its
-// colour does.
-//
-// The path is teal-light -> primary -> navy, all CIOOS tokens, sampled at even
-// L* steps (~6.4 apart) so no two neighbouring stops read as the same shade.
-// It starts at --cioos-teal-light (#C6E3DF) rather than the near-white sand it
-// used to open with: the pale head washed out over the basemap, so the sparsest
-// hexes read as a gap in the data instead of as one count.
+// The one hex ramp for every hexagon at every zoom, so darkness means the
+// same thing everywhere; colour is reserved for "how much". Twelve stops so
+// interpolation reads as one wash, fully opaque because the layer opacity is
+// applied once (hexOpacity in Map.jsx). CIOOS tokens teal-light -> primary ->
+// navy at even L* steps (~6.4); a paler head washed out over the basemap.
 export const colorScale = [
   "#C6E3DF", // teal-light
   "#AAD3CD",
@@ -69,118 +48,55 @@ export const colorScale = [
   "#152F37", // navy
 ];
 
-// Hex outline colour. White reads as a cell separator against every part of the
-// ramp — a mid-ramp teal disappeared into the fills it was meant to divide.
+// White separates cells against every part of the ramp; a mid-ramp teal vanished.
 export const hexOutlineColor = "#FFFFFF";
 
-// What the last map click found, wherever that answer shows up: the ring, glow
-// and fill the map draws over the clicked hex/marker/region (the
-// click-highlight-* layers in Map.jsx) and the accent the datasets list and the
-// inspector's record table put on the rows that click named. Goldenrod because
-// the ramp already owns the greens, the tracks the purple and the griddap
-// coverage the amber, so an accent from any of those would read as another data
-// layer rather than as "this is what you just asked about".
-//
-// It is also what the map paints a selected platform's drawn track in (the
-// selected-track-* layers): a track drawn because it was clicked is an answer
-// to the same question, and it used to have a crimson of its own that read as
-// another data layer beside the purple tracks and the amber coverage.
-//
-// Same pairing as trackLineColor below: the map paints from here, the chrome
-// from --cioos-map-click in components/theme.css, and the two have to stay in
-// step.
+// Click answers (click-highlight-* and selected-track-* layers, highlighted
+// rows). Goldenrod because greens, purple and amber already mean data layers.
+// Must stay in step with --cioos-map-click in components/theme.css.
 export const clickHighlightColor = "#DAA520";
 
-// What every count on the map means: the span of time a hexagon or a point
-// covers, in days. See web-api/utils/hexMetric.js — the wire value must match.
-//
-// It used to be a choice of three — days, 'records' (measurements / occurrence
-// records / position fixes) and 'datasets' — offered by a picker on the legend's
-// observations group. Days is the only one of the three that means one thing
-// across all three sources: 'records' sums three different units and some of
-// those counts are extrapolated from sampling rate rather than measured (see the
-// caveat in web-api/utils/hexMetric.js), and 'datasets' answers a different
-// question than the ramp's "how much data is here". So the picker was a control
-// whose other two settings were harder to read than its default, on the one line
-// of the legend that had to be read to understand the colours at all.
-//
-// The API still takes ?metric= and still defaults to 'records' when the param is
-// absent (DEFAULT_METRIC in web-api/utils/hexMetric.js), so this value is written
-// into every tile and /legend URL explicitly — never omitted.
+// Days is the only count that means one thing across all sources. Must match
+// web-api/utils/hexMetric.js; the API defaults to 'records' when ?metric= is
+// absent, so this is written into every tile and /legend URL explicitly.
 export const HEX_METRIC = "days";
 
-// Where the hex aggregates give way to individual markers. Was a bare 7 in
-// Map.jsx (hexMaxZoom), MapStateProvider and the Legend, which had to agree by
-// coincidence; the number lives in one place instead.
 export const MARKER_MIN_ZOOM = 7;
 
-// Is the camera in the marker tier? Not inlined as a comparison because the two
-// obvious spellings disagree on the two non-numeric zooms this actually sees:
-// mapView starts as {} (zoom undefined, before the map reports its first view)
-// and a share link's ?zoom= arrives as a string. `undefined < 7` is false, so
-// the "hexes" test silently reads the world view as the marker tier, while
-// `undefined >= 7` is also false, so the "markers" test reads it correctly —
-// two call sites, two answers, for the same camera. Coerce, and treat an
-// unknown zoom as the hex tier: the default camera is the whole world.
+// Not inlined: mapView starts as {} and ?zoom= arrives as a string, and
+// `undefined < 7` / `undefined >= 7` are both false, so the two spellings
+// disagree. Coerce, treating an unknown zoom as the hex tier.
 export const isMarkerTier = (zoom) => Number(zoom) >= MARKER_MIN_ZOOM;
 
-// The basemap hand-off window (see basemapStyle.js): the zooms over which the
-// world view (EMODnet bathymetry raster, water tint, drawn coastline) gives way
-// to the local view (Esri imagery + CHS NONNA soundings). Every layer that
-// fades in or out during the hand-off reads these two numbers, so the swap
-// stays a single coordinated event rather than several loosely-aligned ones.
-//
-// It used to run z10 → z12: a two-zoom cross-fade that left the middle of the
-// range showing both rasters at partial opacity, with the satellite still
-// half-transparent and NONNA barely readable through most of it. It now
-// completes at z10 and takes half a zoom to do it, so a harbour view is fully
-// on imagery and full-strength soundings rather than in a long blend.
+// The zooms over which the world view (EMODnet raster, water tint, coastline)
+// gives way to Esri imagery + CHS NONNA (see basemapStyle.js). Every fading
+// layer reads these so the swap stays one coordinated event.
 export const basemapHandoffStartZoom = 9.5;
 export const basemapHandoffEndZoom = 10;
-// A short lead-in where the incoming rasters are requested but still drawn at
-// zero opacity. The fade is now too quick to double as a warm-up: without this
-// the first frame of a sharp swap would be whatever parent tiles happen to be
-// cached. Keeps tiles off the wire at world zooms, where they are useless.
+// Incoming rasters are requested here but drawn at zero opacity, so a sharp
+// swap doesn't start on whatever parent tiles are cached, while keeping tiles
+// off the wire at world zooms.
 export const basemapPrewarmZoom = 9;
 
-// CHS NONNA bathymetry rides the same window — exported under its own names so
-// the raster layers and the legend entry that describes them cannot drift apart.
+// Own names so the raster layers and their legend entry cannot drift apart.
 export const bathymetryFadeInZoom = basemapHandoffStartZoom;
 export const bathymetryFullZoom = basemapHandoffEndZoom;
-// Only claim the ramp once the raster is at least half opaque — at the fade-in
-// zoom itself it is drawn at zero opacity, and a legend for an invisible layer
-// is worse than none.
+// At the fade-in zoom the raster is still invisible; claim the ramp only once
+// it is at least half opaque.
 export const bathymetryLegendMinZoom =
   (bathymetryFadeInZoom + bathymetryFullZoom) / 2;
 
-// The CHS page describing the NONNA products these rasters are drawn from,
-// which the legend's depth entry links out to. Kept here beside the ramp and
-// the zoom gates for the same reason they are: everything the legend says about
-// this basemap layer is written in one place. The Government of Canada serves
-// every page as an -eng/-fra pair, so the link follows the UI language rather
-// than sending a French reader to an English page.
+// Government of Canada serves every page as an -eng/-fra pair.
 export const bathymetrySourceUrl = {
   en: "https://charts.gc.ca/data-gestion/nonna/index-eng.html",
   fr: "https://charts.gc.ca/data-gestion/nonna/index-fra.html",
 };
 
-// The NONNA depth ramp, as (metres, colour) anchors.
-//
-// CHS publishes NONNA as pre-rendered RGB — the GeoServer style is a plain
-// "Opaque Raster" and GetFeatureInfo returns three colour bands, not depths —
-// so there is no colour map to read from the service and no GetLegendGraphic
-// worth requesting. These anchors were instead recovered from the tiles: ~730
-// NONNA 100 pixels sampled across the Scotian Shelf and slope, the Labrador
-// Sea, the Gulf of St. Lawrence, the BC shelf and slope, the Bay of Fundy and
-// three harbours, each paired with the GMRT depth at the same coordinate, then
-// reduced to the median colour per log-spaced depth band. The ramp came back
-// monotone and consistent between coasts, which is what makes a single legend
-// legitimate: red at the surface through green and teal across the first ~25 m,
-// into blue that darkens the rest of the way to the abyssal plain.
-//
-// So the colours are exactly CHS's, but the depth axis is calibrated rather
-// than declared — good to the band, not to the metre. legendBathymetryTitle
-// says as much to the user.
+// The NONNA depth ramp, as (metres, colour) anchors. CHS serves NONNA as
+// pre-rendered RGB with no colour map or useful GetLegendGraphic, so these
+// were recovered from ~730 tile pixels across both coasts paired with GMRT
+// depths (median colour per log-spaced band): exact colours, but depths good
+// to the band, not the metre (legendBathymetryTitle says so).
 export const bathymetryColorScale = [
   { depth: 2, color: "#c31800" },
   { depth: 4, color: "#c36200" },
@@ -206,52 +122,34 @@ export const bathymetryColorScale = [
   { depth: 4500, color: "#000045" },
 ];
 
-// The bar is drawn in log-depth space: the ramp spends its whole bright half on
-// the first 25 m, which a linear axis would crush into an invisible sliver.
-// Decade ticks then fall at even spacings and read as the log axis they are.
+// Log-depth axis: the ramp spends its bright half on the first 25 m, which a
+// linear axis would crush.
 export const bathymetryScaleMin = 1;
 export const bathymetryScaleMax = 5000;
 export const bathymetryTicks = [1, 10, 100, 1000, 5000];
 
-// Tracks mode (trajectory track lines + time scrub bar)
-// 'all' = no trailing cutoff: every platform's full track up to the scrub
-// date. Episodic trajectory datasets (a 2017-19 ferry, a 2016 glider
-// mission, seasonal ship expeditions) are invisible in a short trail unless
-// the user already knows each deployment's dates, so 'all' is the most
-// discoverable trail. It is NOT the default, though: at full-catalogue scale
-// 'all' assembles every platform's entire multi-decade track into each tile
-// (100k+ line features, 400k+ vertices at low zoom) and overwhelms the
-// renderer. A bounded default keeps the tiles ~20x smaller; users who want
-// full history opt into 'all'. The tracks source has no minzoom (lines render
-// at every zoom), so 'all' while zoomed out is the heavy case — guarded by the
-// bounded default, the zoom gate below, the maxzoom cap in Map.jsx and the
-// head-symbol culling, which keep the common case from crashing the tab.
+// 'all' = no trailing cutoff. Not the default: at full-catalogue scale it puts
+// 100k+ line features (400k+ vertices) in each low-zoom tile and overwhelms
+// the renderer; the bounded default keeps tiles ~20x smaller.
 export const TRAIL_ALL = "all";
 export const defaultTrailingDays = 90;
 export const trailingWindowOptions = [7, 14, 30, 90, 180, 365, TRAIL_ALL];
 
-// Zoom gate for the long trails. Tile cost grows superlinearly with the window
-// and is worst zoomed out, where one tile can assemble the whole catalogue.
 // Measured per uncached tile at z2-z5: 90 days ~7 KB / 11 ms, one year
-// ~14 KB / 70 ms, 'all' ~380 KB / 1.8 s. Dropping the long windows outright
-// would be wrong — the trajectory hexes draw all-time coverage, so tracks that
-// cannot reach as far back read as broken — so instead the long windows are
-// clamped to longTrailMaxDays below longTrailMinZoom, and load in full at or
-// above it, where a tile covers a small enough area to afford them. z5 is also
-// where the head-symbol collision culling starts to matter (see Map.jsx).
+// ~14 KB / 70 ms, 'all' ~380 KB / 1.8 s. Long windows are clamped to
+// longTrailMaxDays below this rather than dropped, since the trajectory hexes
+// draw all-time coverage and shorter tracks would read as broken.
 export const longTrailMinZoom = 5;
 export const longTrailMaxDays = 365;
 
-// The trail actually loaded at this zoom: the requested window at or above
-// longTrailMinZoom, clamped to longTrailMaxDays below it. Shared by the tracks
-// tile URL builder and the legend/TimeBar, so the UI never claims a window the
-// map is not drawing. An unknown zoom clamps, which is the cheap, honest guess.
+// Shared by the tracks tile URL and the legend/TimeBar, so the UI never claims
+// a window the map is not drawing. An unknown zoom clamps.
 export function effectiveTrailingDays(trailing, zoom) {
   if (zoom != null && zoom >= longTrailMinZoom) return trailing;
   if (trailing === TRAIL_ALL) return longTrailMaxDays;
   return Math.min(trailing, longTrailMaxDays);
 }
-// Scrub bar domain start; today is the end. Argo-era default.
+// Argo-era default; today is the end.
 export const tracksMinDate = "2000-01-01";
 export const trackLineColor = "#6749AC";
 
@@ -266,6 +164,4 @@ export const languages = [
   },
 ];
 
-// Show only datasets that were still producing data when we harvested them.
-// Off by default: nothing ticked means no constraint, like every other filter.
 export const defaultRealtimeOnly = false;
