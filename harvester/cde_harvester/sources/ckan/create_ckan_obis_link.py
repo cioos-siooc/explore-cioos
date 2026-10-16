@@ -74,23 +74,9 @@ def _stored_ckan_rows(dataset_ids, erddap_url):
 
 
 def get_ckan_obis_records(ipt_urls, erddap_url=None):
-    """Match OBIS datasets to CKAN records, one row per matched dataset.
-
-    Parameters
-    ----------
-    ipt_urls : dict[str, str | None]
-        OBIS dataset UUID -> the ``url`` (IPT resource page) from its OBIS
-        dataset metadata.
-    erddap_url : str, optional
-        The datasets' source key in cde.datasets; when CKAN is unreachable the
-        datasets fall back to the CKAN metadata stored there by a previous
-        harvest.
-
-    Returns
-    -------
-    pd.DataFrame
-        Columns: dataset_id, ckan_id, ckan_eovs, ckan_title, title_fr
-    """
+    """``ipt_urls`` maps OBIS dataset UUID -> its IPT resource page URL. When
+    CKAN is unreachable, falls back to the CKAN metadata stored under
+    ``erddap_url`` by a previous harvest."""
     log = run_logger(logger)
     try:
         records = list_ckan_records(False, OBIS_RECORDS_QUERY)

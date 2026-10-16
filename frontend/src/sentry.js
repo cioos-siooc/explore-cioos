@@ -1,8 +1,6 @@
-// Sentry bootstrap. Owns `Sentry.init` and the router instrumentation that
-// depends on it: `wrapReactRouterRouting` reads the react-router hooks that
-// `reactRouterBrowserTracingIntegration` captures during `init`, and silently
-// returns an *unwrapped* <Routes> if it runs first. Keeping both here means
-// importing this module is the only ordering requirement.
+// `wrapReactRouterRouting` silently returns an *unwrapped* <Routes> if it runs
+// before `init`; keeping both here makes importing this module the only
+// ordering requirement.
 import { useEffect } from "react";
 import * as Sentry from "@sentry/react";
 import {
@@ -13,16 +11,9 @@ import {
   matchRoutes,
 } from "react-router-dom";
 
-// The same SENTRY_DSN web-api reads at runtime, baked in at build time by
-// vite's `define` (see vite.config.mjs) — the SPA has no runtime env, so for
-// the browser it is a build arg, not a container variable. It therefore ships
-// in the bundle and is readable by anyone loading the site.
+// A build arg baked in by vite's `define`, so it is public in the bundle.
 const dsn = process.env.SENTRY_DSN;
 
-// Gated on the DSN, the same way web-api's instrument.js is: no DSN configured
-// means no client transport, so nothing is sent, no integration is set up, and
-// both the feedback dialog and route tracing stay inert. sentryFeedback.js and
-// SentryRoutes below each handle that case.
 Sentry.init({
   dsn,
   enabled: Boolean(dsn),
@@ -32,10 +23,6 @@ Sentry.init({
   sendDefaultPii: false,
   release: process.env.SENTRY_RELEASE,
   integrations: [
-    // Router-aware tracing: names pageload/navigation transactions after the
-    // matched route pattern (`/harvest/dataset/:slug/:datasetId`) instead of
-    // the raw URL, so per-record traffic groups into one transaction rather
-    // than one per id.
     Sentry.reactRouterBrowserTracingIntegration({
       useEffect,
       useLocation,
@@ -45,9 +32,7 @@ Sentry.init({
     }),
   ],
 
-  // Full tracing (1.0) adds instrumentation overhead to page load. Defaults
-  // to 1.0 in development and 0.1 in production; override at build time with
-  // SENTRY_TRACES_SAMPLE_RATE.
+  // Full tracing adds page-load overhead, so production samples 10%.
   tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE
     ? Number(process.env.SENTRY_TRACES_SAMPLE_RATE)
     : process.env.NODE_ENV === "production"
@@ -55,7 +40,4 @@ Sentry.init({
       : 1.0,
 });
 
-// Drop-in replacement for react-router's <Routes>. Falls back to the plain
-// component when tracing is not set up (no DSN), so rendering never depends on
-// Sentry being live.
 export const SentryRoutes = Sentry.wrapReactRouterRouting(Routes);

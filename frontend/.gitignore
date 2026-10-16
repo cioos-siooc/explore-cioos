@@ -1,8 +1,7 @@
 node_modules/
 dist
 
-# Test output. Snapshot baselines under e2e/specs/**-snapshots/ are committed;
-# everything here is a per-run artifact.
+# Per-run test artifacts.
 coverage/
 playwright-report/
 test-results/

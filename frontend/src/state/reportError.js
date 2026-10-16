@@ -6,9 +6,7 @@ import * as Sentry from "@sentry/react";
 const NETWORK_FAILURE =
   /^(Failed to fetch|NetworkError when attempting to fetch resource|Load failed)/;
 
-// Fetches are routinely aborted (component unmount, a newer request
-// superseding an in-flight one) — that's expected control flow, not a
-// failure worth reporting.
+// Aborts (unmount, superseded request) are expected control flow.
 export default function reportError(context, error) {
   if (error?.name === "AbortError") return;
   if (error instanceof TypeError && NETWORK_FAILURE.test(error.message)) {

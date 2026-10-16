@@ -22,8 +22,6 @@
     border-color 0.15s ease;
 }
 
-/* Active filter: teal-light fill + a thin primary ring so an applied
-   filter is unmistakable against the map. */
 .filterHeader.active {
   background-color: var(--cioos-teal-light);
   border-color: var(--cioos-primary);
@@ -38,17 +36,13 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* Nothing to narrow right now: the row stays in place, greyed and inert, with
-   its tooltip explaining what would switch it back on. */
 .filterHeader.disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Nothing happens on hover either — the row is not going to open, so it must
-   not light up as though it might. Each surface restates its own resting look
-   here, because "resting" is transparent in the panel list and white in the
-   pills over the map. */
+/* Each surface restates its own resting look: transparent in the panel list,
+   white over the map. */
 .filterHeader.disabled:hover {
   background-color: var(--cioos-white);
   border-color: var(--cioos-hairline);
@@ -59,16 +53,11 @@
   height: 28px;
 }
 
-/* Centre the label text within its fixed-height box so it lines up with the
-   icon and chevron rather than sitting at the top. */
 .filterHeader > .badgeTitle {
   display: flex;
   align-items: center;
 }
 
-/* Sits between the button and its options section, explaining what the
-   filter does (or, disabled, why it's off) as plain text — always readable,
-   no hover or tap needed. */
 .filterCaption {
   padding: 2px 12px 6px;
   color: var(--cioos-ink-60);
@@ -76,7 +65,6 @@
   line-height: 1.35;
 }
 
-/* The variable / org / dataset icon picks up the brand teal. */
 .filterHeader > svg {
   color: var(--cioos-primary);
 }
@@ -100,9 +88,7 @@
   min-width: 350px;
 }
 
-/* Utility actions inside the dropdown (Select all / Reset). Scoped to the
-   actions row rather than to every button in the pane, which also caught the
-   search field's clear button and dressed it as a pill. */
+/* Scoped to the actions row: a pane-wide rule also caught the clear button. */
 .filterOptionsActions button {
   background-color: var(--cioos-teal-light);
   color: var(--cioos-ink);
@@ -122,7 +108,6 @@
   color: var(--cioos-on-primary);
 }
 
-/* The field and its clear button as one positioned unit — see Filter.jsx. */
 .filterSearchRow {
   position: relative;
   flex: 0 0 auto;
@@ -134,8 +119,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
 
-  /* Trailing room reserved for the clear button, so long search terms run
-     behind it rather than under it. */
+  /* Room for the clear button. */
   padding: 6px 42px 6px 10px;
   font: inherit;
 }
@@ -146,8 +130,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* On the field's trailing edge and the full height of it, so it stays in the
-   field whatever the field's font size and whatever sits above it. */
 .clearFilter {
   position: absolute;
   top: 0;
@@ -198,23 +180,12 @@
   align-self: center;
 }
 
-/* ------------------------------------------------------------------
- * The two range filters — Time and Depth — share a shape: a small form
- * of labelled fields over the rail that draws what the form says. The
- * rails themselves are styled by the shared Rail stylesheet; the fields
- * borrow the time bar's date input and are boxed back up here, because a
- * field that hides its edges until pointed at belongs over the map, not
- * in a panel where it sits among labelled fields that show theirs.
- * ------------------------------------------------------------------ */
+/* Time and Depth: the fields borrow the over-map quiet inputs and are boxed
+   back up here, since in a form they sit among fields that show their edges. */
 .filterRangeSelector {
   display: flex;
   flex-direction: column;
   gap: 12px;
-
-  /* No minimum width: the Filters pane owns the width and zeroes the one the
-     filter bodies used to bring with them (see .filterOptionsBody > * in the
-     panel stylesheet), so asking for one here only reads as a promise it
-     can't keep. */
 }
 
 .filterRangeForm {
@@ -223,10 +194,6 @@
   gap: 8px;
 }
 
-/* Name then field, the whole row being the <label>. The names share a column
-   wide enough for any of them, so the fields line up under each other and each
-   form reads as one form — not spread to the far edges of a pane that is much
-   wider than the fields need. */
 .filterRangeRow {
   display: flex;
   align-items: center;
@@ -237,20 +204,14 @@
 .filterRangeLabel {
   flex: 0 0 auto;
 
-  /* Holds the longest of the names in either locale ("Profondeur min. (m)")
-     without wrapping, so every field starts at the same x — in the Depth
-     filter and in the Time filter above it alike. */
+  /* Fits the longest name in either locale ("Profondeur min. (m)"). */
   width: 130px;
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   color: var(--cioos-ink);
 }
 
-/* Same quiet box and teal focus ring as the search field above it and the
-   text inputs elsewhere in the app. */
 .filterRangeSelector .filterRangeInput {
-  /* 160px given the room, narrower rather than overflowing when the pane is
-     the phone-width one. */
   flex: 0 1 160px;
   min-width: 0;
   padding: 6px 10px;
@@ -265,8 +226,6 @@
   border-color: var(--cioos-primary);
 }
 
-/* The band pickers wear the same box as the fields under them — they are one
-   more field in the same form — but they are a choice, not something typed. */
 .filterRangeSelector .filterRangeSelect {
   cursor: pointer;
 }
@@ -277,16 +236,11 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* The rail runs the full width of the panel entry, inset far enough that the
-   label centered under a handle parked at either end still sits inside: half
-   of "12000" is wider than the 16px the rail brings with it, and the pane's
-   own padding is not enough to make up the difference. */
+/* Half of a "12000" end label is wider than the rail's own 16px inset. */
 .filterRangeSelector .rail {
   padding: 0 20px 2px;
 }
 
-/* --- "In view" filter flyout: a single labelled checkbox plus a live count
-   of datasets in the current map view. --- */
 .inViewFilterToggle {
   display: flex;
   align-items: flex-start;
@@ -310,12 +264,7 @@
   font-size: var(--cioos-font-size-sm);
 }
 
-/* ------------------------------------------------------------------
- * Phones. The filters surface is full-screen here, so everything in it
- * is a touch target rather than a pointer target: 44px minimum, and the
- * typed fields at least 16px, below which Safari zooms the whole page in
- * when one takes focus.
- * ------------------------------------------------------------------ */
+/* Phones: 44px touch targets; typed fields ≥16px or iOS Safari zooms in. */
 @media (max-width: 700px), (max-height: 500px) {
   .filterSearch {
     min-height: 44px;
@@ -339,9 +288,7 @@
     height: 44px;
   }
 
-  /* The 130px name column plus a field beside it does not fit a 360px screen
-     once the pane's padding is off it, so the form stacks: each name over its
-     own full-width field. */
+  /* The 130px name column plus a field doesn't fit a 360px screen. */
   .filterRangeRow {
     display: block;
   }

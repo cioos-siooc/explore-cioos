@@ -6,12 +6,9 @@ import classNames from "classnames";
 import useMediaQuery, { TOUCH_QUERY } from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
 
-// What to do next while a box or polygon is being drawn (see
-// drawHintModes.js), beside the pointer. Not one of the tips: it is how the
-// tool works rather than something to discover, so it shows every time and
-// stays out of the tour. A finished shape gets a few seconds of how to
-// reshape it. Until a mouse has been over the map — never, on a
-// touch screen — it sits at the foot of the map, clear of where the taps go.
+// Not one of the tips: it shows every time and stays out of the tour. Until a
+// mouse has been over the map (never, on touch) it sits at the foot of the
+// map, clear of where the taps go.
 const RESHAPE_HINT_MS = 5000;
 
 export default function DrawHint({ map }) {

@@ -17,21 +17,14 @@ _root_logger = logging.getLogger()
 
 
 def init_sentry():
-    """Identical Sentry setup previously inlined in both package __main__ modules.
-
-    Log records become breadcrumbs only (``event_level=None``). Sending every
-    WARNING as its own event meant an alert per dataset per run, grouped by log
-    message so all servers collapsed together. Dataset failures now arrive via
-    ``core.issues.report_issues``, grouped by the error the server actually
-    returned and de-duped by Sentry; unhandled exceptions are still captured by
-    Sentry's default integrations.
-    """
+    """Log records are breadcrumbs only: dataset failures are reported, grouped,
+    via ``core.issues.report_issues``."""
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN"),
         integrations=[
             LoggingIntegration(
-                level=logging.INFO,  # Capture info and above as breadcrumbs
-                event_level=None,  # Don't turn log records into events
+                level=logging.INFO,
+                event_level=None,
             ),
         ],
         environment=os.environ.get("ENVIRONMENT", "development"),
@@ -39,11 +32,7 @@ def init_sentry():
 
 
 def run_logger(fallback=None):
-    """Prefect's run logger when inside a flow/task run, else ``fallback``.
-
-    Replaces the try/except-around-get_run_logger pattern that was repeated in
-    dataset_state, prefect_pipeline and dataset.py.
-    """
+    """Prefect's run logger when inside a flow/task run, else ``fallback``."""
     if get_run_logger is not None:
         try:
             return get_run_logger()
@@ -53,11 +42,10 @@ def run_logger(fallback=None):
 
 
 def cleanup_old_logs(log_dir, days=30):
-    """Remove log files older than specified days."""
     if not os.path.exists(log_dir):
         return
 
-    cutoff_time = time.time() - (days * 86400)  # 86400 seconds in a day
+    cutoff_time = time.time() - (days * 86400)
     removed_count = 0
 
     for filename in os.listdir(log_dir):
@@ -80,29 +68,24 @@ def cleanup_old_logs(log_dir, days=30):
 
 
 def setup_logging(log_time, log_level, log_dir=None):
-    # Clean up old log files before setting up logging
     if log_dir:
         cleanup_old_logs(log_dir, days=30)
 
-    # setup logging
     logger = _root_logger
     logger.setLevel(logging.getLevelName(log_level.upper()))
     logger.handlers.clear()
 
-    # Define log format
     log_format = (
         ("%(asctime)s - " if log_time else "")
         + "%(levelname)-8s - %(name)s : %(message)s"
     )
 
-    # Add console handler
     c_handler = logging.StreamHandler()
     c_handler.setLevel(logging.getLevelName(log_level.upper()))
     c_format = logging.Formatter(log_format)
     c_handler.setFormatter(c_format)
     logger.addHandler(c_handler)
 
-    # Add file handler with timestamped filename if log directory is specified
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")

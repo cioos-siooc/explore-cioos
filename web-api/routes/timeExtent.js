@@ -12,19 +12,6 @@ const {
   unionBranches,
 } = require("../utils/selection");
 
-/*
- * /timeExtent
- *
- * The span of observation time the current selection actually covers:
- * min(time_min) .. max(time_max) over the same features the map and the
- * datasets list are built from.
- *
- * It drives the time slider's axis, which is why the time filter itself is
- * deliberately dropped from the query (see below) rather than honoured like
- * every other filter: an axis drawn from an extent that the axis's own handles
- * narrowed would collapse towards the handles on every drag.
- */
-
 /**
  * @swagger
  * /timeExtent:
@@ -66,31 +53,19 @@ const {
  *                 max: { type: string, format: date-time, nullable: true }
  */
 router.get("/", ...pipeline(), async (req, res) => {
-  // Everything except the time filter. Dropping it here rather than asking
-  // the caller not to send it keeps share links (which carry timeMin/timeMax)
-  // working without the frontend having to strip them.
+  // The time filter is dropped: this drives the time slider's axis, which
+  // would otherwise collapse towards its own handles on every drag.
   const { timeMin, timeMax, ...queryWithoutTime } = req.query;
 
   const filters = await createDBFilter(queryWithoutTime);
 
-  // Which feature sources the selection contains — utils/selection.js, shared
-  // with the map, the dataset list and the download so the axis spans the
-  // data they are built from.
   const includeProfiles = erddapVisible(req.query);
   const includeObis = obisVisible(req.query);
 
-  // Deliberately NOT restricted to show_as_point, unlike the tile and legend
+  // Deliberately not restricted to show_as_point, unlike the tile and legend
   // routes: that flag decides whether a feature can be drawn, not whether it
-  // is selected, and this axis bounds a time filter that the dataset list and
-  // the download apply to region-spanning features too. (Applying it here was
-  // the drift TODO-cde-revisions.md §P2.1 recorded — the axis and the list it
-  // bounds were computed over different feature sets.)
-  //
-  // The column list is what the shared filter can reference (time, depth,
-  // point_pk and search_geom); platform/organization_pks live on
-  // cde.datasets and resolve through the join. EOVs are the exception:
-  // cde.profiles carries its own per-feature list, so that predicate is
-  // applied in the branch below rather than after the join.
+  // is selected, and the dataset list and download include region-spanning
+  // features too.
   const profilesBranch = `SELECT dataset_pk, point_pk, time_min, time_max,
                depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles WHERE :profileFilters`;

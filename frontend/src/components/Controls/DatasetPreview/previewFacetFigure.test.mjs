@@ -39,8 +39,7 @@ const ALL_SIX = [
   "DOXY_01",
 ];
 
-// The two cf_role columns carry values, because they are what the figure is
-// titled after — the station the user clicked, and the profile actually drawn.
+// The cf_role columns carry values because the figure is titled after them.
 const DATA = Array.from({ length: 20 }, (_, i) => {
   const row = {
     station_id: "PMZA-RIKI",
@@ -56,8 +55,7 @@ const DATA = Array.from({ length: 20 }, (_, i) => {
 
 const TITLE = "Station Id: PMZA-RIKI — Profile: PMZA-RIKI-25/09/16-17:35:26";
 
-// Same dataset with the publisher's palettes declared on two measurements, to
-// exercise the colour default that comes from ERDDAP rather than from an index.
+// Publisher palettes on two measurements, to exercise the ERDDAP colour default.
 const VIKING_PALETTES = {
   ...VIKING,
   columnMeta: VIKING.columnMeta.map((meta) => {
@@ -145,8 +143,7 @@ test("stacked height grows with panel count, never below the space available", (
 });
 
 test("a collapsed container still gets a usable height", () => {
-  // This is the first-render case: the measured height is 0 until the modal
-  // lays out, and Plotly used to silently fall back to its own 450px default.
+  // First render: the measured height is 0 until the modal lays out.
   assert.ok(plotHeightFor(COLUMNS, 1, 0) > 0);
   assert.ok(plotHeightFor(ROWS, 1, undefined) > 0);
 });
@@ -170,9 +167,7 @@ test("a profile gets one shared y axis and one x axis per panel", () => {
 test("the shared depth axis is reversed, and labelled horizontally beside itself", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX);
   assert.equal(layout.yaxis.autorange, "reversed");
-  // NOT an axis title: this Plotly has no angle on one, so it would be drawn
-  // sideways. An annotation in the same place instead — beside the axis, centred
-  // on the span it labels.
+  // An annotation, not an axis title: Plotly would draw that sideways.
   assert.ok(!layout.yaxis.title);
   assert.equal(layout.annotations.length, 1);
   const label = layout.annotations[0];
@@ -242,8 +237,7 @@ test("every timeseries trace shares x and takes its own y", () => {
 });
 
 test("the first selected variable is drawn at the bottom", () => {
-  // The image stacks Variable 1 lowest; the domain order therefore runs opposite
-  // to the panel order.
+  // Variable 1 is drawn lowest, so domain order runs opposite to panel order.
   const { layout } = figure("TimeSeries", ["TE90_01", "PSAL_01", "DOXY_01"]);
   assert.ok(layout.yaxis.domain[0] < layout.yaxis3.domain[0]);
   assert.equal(
@@ -327,13 +321,10 @@ test("every stacked panel is labelled along its own axis, never rotated", () => 
   assert.equal(layout.annotations.length, ALL_SIX.length);
   for (let index = 0; index < ALL_SIX.length; index += 1) {
     const key = index === 0 ? "yaxis" : `yaxis${index + 1}`;
-    // A y axis title is the one label Plotly insists on rotating, so no panel
-    // axis carries one.
+    // Plotly always rotates a y axis title, so no panel axis carries one.
     assert.ok(!layout[key].title, `${key} has no title`);
     const [low, high] = layout[key].domain;
     const annotation = layout.annotations[index];
-    // Where the axis title would have been: centred on the axis it labels, and
-    // to the left of it.
     assert.equal(
       annotation.y,
       (low + high) / 2,
@@ -348,8 +339,7 @@ test("every stacked panel is labelled along its own axis, never rotated", () => 
 });
 
 test("a vertical axis label wraps into the gutter the margin reserves", () => {
-  // The gutter is a constant, so unlike a panel title this wraps even on the
-  // first render, before anything has been measured.
+  // The gutter is a constant, so this wraps even before anything is measured.
   const { layout } = figure("TimeSeries", ALL_SIX);
   const fits = maxCharsFor(LABEL_GUTTER_PX);
   layout.annotations.forEach((annotation) => {
@@ -357,7 +347,6 @@ test("a vertical axis label wraps into the gutter the margin reserves", () => {
       assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
     });
   });
-  // Long enough to need it: this one does not fit on one line.
   assert.ok(
     layout.annotations[1].text.includes("<br>"),
     layout.annotations[1].text,
@@ -433,8 +422,7 @@ test("a label with no unit still wraps, using every allowed line", () => {
 });
 
 test("an unknown width means do not wrap", () => {
-  // buildFigure runs once before the plot area has been measured; wrapping
-  // against a guessed width would be worse than not wrapping.
+  // Wrapping against a guessed width would be worse than not wrapping.
   assert.equal(maxCharsFor(0), 0);
   assert.equal(maxCharsFor(undefined), 0);
   assert.equal(
@@ -466,12 +454,10 @@ test("panel titles wrap to their own panel once the width is known", () => {
       assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
     });
   });
-  // And the labels that do not fit were the reason: they wrapped.
   assert.ok(
     titles.filter((text) => text.includes("<br>")).length >= 5,
     titles.join(" | "),
   );
-  // The same figure with no measured width leaves them on one line.
   const unsized = figure("TimeSeriesProfile", ALL_SIX);
   assert.ok(!unsized.layout.xaxis.title.text.includes("<br>"));
 });
@@ -494,7 +480,6 @@ test("hover text keeps the unwrapped label", () => {
   assert.ok(
     data[0].hovertemplate.startsWith("Temperature (1990 scale) ( degree_C ):"),
   );
-  // The colour dimension used to add a third line here, off customdata.
   assert.ok(!data[0].hovertemplate.includes("customdata"));
 });
 
@@ -508,16 +493,13 @@ test("each orientation reserves the edge its labels actually use", () => {
   // stack is the other way round.
   assert.ok(columns.t > columns.b);
   assert.ok(rows.b > rows.t);
-  // Neither reserves width for a rotated title any more.
   assert.equal(columns.l, rows.l);
-  // And the title is added to the top of each, never taken out of it.
   assert.equal(marginFor(COLUMNS, 2).t - columns.t, titleRoomFor(2));
   assert.equal(marginFor(ROWS, 2).t - rows.t, titleRoomFor(2));
 });
 
 test("the sizing floors pay for the gaps, so a panel really gets its minimum", () => {
-  // The floors used to be n * MIN_PANEL_PX, which ignored the gaps between the
-  // panels — so six panels were promised 150px each and drawn at 109px.
+  // The floors must count the gaps, or six panels promised 150px draw at 109px.
   for (const n of [2, 6, 14, 19]) {
     const width = plotWidthFor(COLUMNS, n, 100);
     const columns = marginFor(COLUMNS);
@@ -540,8 +522,7 @@ test("the sizing floors pay for the gaps, so a panel really gets its minimum", (
 });
 
 test("the gap is a share of a panel, not of the whole plot", () => {
-  // At a fixed 5.5% of the plotting area, nineteen panels spent 99% of the
-  // width on the eighteen gaps and each panel came out about a pixel wide.
+  // An area-relative gap left nineteen panels about a pixel wide.
   const domains = domainsFor(19, 0.22);
   const span = domains[0][1] - domains[0][0];
   assert.ok(span > 0.03, `${span} of the width per panel`);
@@ -569,8 +550,6 @@ test("a variable with no declared palette takes the next colour along", () => {
 });
 
 test("a declared colorBarPalette decides the variable's colour", () => {
-  // The publisher's own intent, harvested into table_variables: the plot opens
-  // reading roughly the way an ERDDAP graph of the same dataset does.
   const { data } = figureFrom(VIKING_PALETTES, "TimeSeriesProfile", [
     "TE90_01",
     "PSAL_01",
@@ -588,7 +567,6 @@ test("the user's colour beats both, on the line as well as the markers", () => {
   });
   assert.equal(data[1].marker.color, "#123456");
   assert.equal(data[1].line.color, "#123456");
-  // And only that one: an override is not a theme.
   assert.equal(data[0].marker.color, defaultColorFor(undefined, 0));
 });
 
@@ -603,8 +581,6 @@ test("nothing draws a colourbar any anymore, and no width is kept for one", () =
 });
 
 test("lines-only stays lines — nothing forces markers on any more", () => {
-  // Markers used to be forced whenever colouring was on, because a per-point
-  // colour has nothing to render on without one.
   const { data } = figure("TimeSeriesProfile", ["TE90_01"], { mode: "lines" });
   assert.equal(data[0].mode, "lines");
 });
@@ -698,7 +674,6 @@ test("the title costs the top margin only the lines it actually used", () => {
   assert.equal(wide.layout.margin.t, marginFor(COLUMNS, 1).t);
   assert.equal(narrow.layout.margin.t, marginFor(COLUMNS, 2).t);
   assert.ok(narrow.layout.margin.t > wide.layout.margin.t);
-  // And a stack sized for one line is shorter than one sized for the worst case.
   assert.ok(plotHeightFor(ROWS, 6, 100, 1) < plotHeightFor(ROWS, 6, 100, 2));
 });
 

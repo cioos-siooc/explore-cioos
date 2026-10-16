@@ -47,9 +47,6 @@ import ZoomToDataset, {
 } from "../../AppShell/ZoomToDataset/ZoomToDataset.jsx";
 import "./styles.css";
 
-// The grid's node count spelled out as the product of its axes —
-// longitude × latitude × time × depth = total — so the number is traceable to
-// the grid's shape rather than dropped on the reader as a bare total.
 function GridNodeCount({ dimensions }) {
   const factors = gridNodeFactors(dimensions);
   const total = totalGridNodes(dimensions);
@@ -75,15 +72,9 @@ function GridNodeCount({ dimensions }) {
   );
 }
 
-// Which CF discrete-sampling role identifies one record of this dataset, and
-// which of its variables carries that role. The record list hands every kind
-// back under the one `profile_id` key (shapeQuery.js coalesces profile_id /
-// timeseries_id, and aliases a trajectory's trajectory_id into the same slot),
-// so the column can only be named from the dataset's own cf_role variables.
-// The order below follows that coalesce, with a trajectory's own role first
-// when the dataset is one. Datasets that declare no role at all (OBIS, a
-// tabledap table with no cf_role attribute anywhere) fall back to the generic
-// "Feature ID".
+// The record list returns every role under `profile_id` (shapeQuery.js
+// coalesces them), so the role can only be named from the dataset's own
+// cf_role variables.
 const CF_ROLE_LABELS = {
   timeseries_id: "cfRoleTimeseriesIdText",
   profile_id: "cfRoleProfileIdText",
@@ -96,9 +87,7 @@ function cfRoleColumn(dataset, roleOrder, t) {
     profile_id: dataset.profile_id_variable,
     trajectory_id: dataset.trajectory_id_variable,
   };
-  // '' is the harvester's sentinel for "this dataset has no such role"
-  // (cf_role attributes are parsed as strings), and NULL means the same thing
-  // once it has been through the database.
+  // '' (the harvester's sentinel) and NULL both mean "no such role".
   const role = roleOrder.find((r) => variableFor[r]);
   return {
     label: role ? t(CF_ROLE_LABELS[role]) : t("datasetInspectorRecordIDText"),
@@ -106,10 +95,6 @@ function cfRoleColumn(dataset, roleOrder, t) {
   };
 }
 
-// A caption over a list that names the role its cards are identified by and,
-// after it, the variable carrying that role — so the list says both what its
-// IDs mean and where they came from. On a card the id has no column header to
-// carry this, and repeating it on every card would say it a hundred times.
 function IdCaption({ label, variable }) {
   return (
     <span className="recordIdCaption">
@@ -119,10 +104,6 @@ function IdCaption({ label, variable }) {
   );
 }
 
-// The metadata sheet's EOV row, expandable past this like the record list's
-// own variable tags (CardTags) — a dataset can carry a dozen ocean variables,
-// which would otherwise push the platform/record-count row that follows well
-// down the sheet.
 const EOV_VISIBLE_LIMIT = 3;
 
 // Stable identity so CardList's sort memo is not rebuilt on every render of
@@ -132,9 +113,7 @@ const recordKeyOf = (row) => row.profile_id;
 const formatPass = ({ start, end }) =>
   start === end ? start : `${start} → ${end}`;
 
-// A trajectory's passes through the selected area, each a button that plots
-// that period of its data. Condensed past a few like the variable tags, since a
-// ship on a regular route can cross the same hex hundreds of times.
+// Condensed: a ship on a regular route can cross the same hex hundreds of times.
 function PassButtons({ recordId, passes, onPlot }) {
   const { t } = useTranslation();
   const { shown, hidden, expanded, toggle } = useExpandableList(passes, 3);
@@ -176,17 +155,14 @@ function PassButtons({ recordId, passes, onPlot }) {
 
 export default function DatasetInspector({
   dataset,
-  // Shared with the sidebar header's back control (SelectionProvider), so both
-  // ways out of this page do the same thing.
   returnToList,
   setHoveredDataset,
   setInspectRecordID,
   query,
   selectedTrajectory,
   setSelectedTrajectory,
-  // The one record ({datasetPk, profileId}) an unambiguous map marker click
-  // resolved to — pins that record to the top of the table below rather than
-  // opening its preview outright, until cleared (see markerRecordPinned).
+  // {datasetPk, profileId} from a map marker click: pinned to the top of the
+  // record list rather than opening its preview outright.
   highlightedRecord,
   setHighlightedRecord,
   activeWmsOverlay,
@@ -213,14 +189,11 @@ export default function DatasetInspector({
   const [recordsAttempt, setRecordsAttempt] = useState(0);
   const inspectorRef = useRef(null);
   const isGrid = dataset.cdm_data_type === "Grid";
-  // Same CF discrete-sampling geometry the map's "Dataset geometry" layer
-  // filter switches on (dataLayers.js) — reused here so the label matches
-  // what that filter calls the same shape.
+  // Reuses the "Dataset geometry" layer filter's key so the labels match.
   const geometryKey = dataLayerKeyForDataset(dataset);
   const geometryLabel = geometryKey
     ? t(DATA_LAYER_LABEL_KEYS[geometryKey])
     : dataset.cdm_data_type;
-  // no per-record list for OBIS (external) or griddap (metadata-only)
   const hasRecordList = dataset.source_type !== "obis" && !isGrid;
   useEffect(
     () =>
@@ -231,14 +204,11 @@ export default function DatasetInspector({
       ]),
     [offerTip, isTrajectory, isRealtime, hasRecordList],
   );
-  // OBIS datasets always link out to OBIS, the rest to ERDDAP when the harvest
-  // found one; any of them can also have the CKAN URL the harvest matched.
   const hasSources =
     dataset.source_type === "obis" ||
     Boolean(dataset.erddap_url || dataset.ckan_url);
-  // Start loading rather than false: the fetch below is fired from an effect,
-  // so an initial false would paint one frame of an empty record table before
-  // the spinner appears.
+  // Starting false would paint one frame of an empty table before the effect
+  // fires the fetch.
   const [loading, setLoading] = useState(hasRecordList);
   useActivityTask("activityRecordListText", loading);
 
@@ -246,8 +216,6 @@ export default function DatasetInspector({
     dataset.source_type !== "obis" &&
     (dataset.cdm_data_type || "").includes("Trajectory");
 
-  // The clicked area: this dataset's track clicked directly, else the last
-  // click on the map (a hex, or tracks too close together to pick one).
   const { featureQuery } = useMapState();
   const clickedArea =
     selectedTrajectory?.datasetPk === dataset.pk && selectedTrajectory.area
@@ -285,9 +253,7 @@ export default function DatasetInspector({
         setRecordsError(false);
       })
       .catch((error) => {
-        // Said as a failure with a retry, not as an empty table, which would
-        // read as "this dataset has no records"; the rest of the page still
-        // reads.
+        // An empty table would read as "this dataset has no records".
         reportError("datasetRecordsList fetch failed", error);
         if (!cancelled) setRecordsError(true);
       })
@@ -297,19 +263,11 @@ export default function DatasetInspector({
     return () => {
       cancelled = true;
     };
-    // Keyed on the dataset alone. `query` is read to scope the record list to
-    // the current filters, but listing it would refetch the whole list on every
-    // filter change while the page is open; the list is refreshed when the page
-    // is reopened instead.
+    // `query` omitted on purpose: refetching the whole list on every filter
+    // change is too costly; reopening the page refreshes it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset, hasRecordList, recordsAttempt]);
 
-  // Browser Back needs no handling here: the open dataset lives in the URL
-  // (?dataset=…&server=…, owned by SelectionProvider), so popping that history
-  // entry closes the page through the router.
-
-  // Backspace backs out to the list, unless the cursor is in a field —
-  // there it still means "delete a character" (e.g. the record filter box).
   useEffect(() => {
     const typingIn = (target) =>
       target instanceof Element &&
@@ -326,10 +284,7 @@ export default function DatasetInspector({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [returnToList]);
 
-  // Swipe left (touch, trackpad two-finger, or mouse horizontal wheel) to
-  // return to the dataset list. The page's lists are cards rather than tables
-  // now, so nothing on it scrolls sideways and the gesture means one thing
-  // everywhere on the page.
+  // Swipe left (touch, trackpad, or horizontal wheel) returns to the list.
   useEffect(() => {
     const el = inspectorRef.current;
     if (!el) return undefined;
@@ -353,7 +308,6 @@ export default function DatasetInspector({
     let wheelAccumX = 0;
     let wheelTimer = null;
     const onWheel = (e) => {
-      // Only react to predominantly-horizontal gestures.
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
       wheelAccumX += e.deltaX;
       if (wheelTimer) clearTimeout(wheelTimer);
@@ -378,9 +332,6 @@ export default function DatasetInspector({
     };
   }, [returnToList]);
 
-  // Trajectory datasets list one row per mission, so their record column is the
-  // trajectory role; every other type resolves to whichever of profile_id /
-  // timeseries_id the dataset declares.
   const recordIdField = cfRoleColumn(
     dataset,
     isTrajectoryDataset
@@ -389,10 +340,6 @@ export default function DatasetInspector({
     t,
   );
 
-  // What a card can be sorted by, in place of the column headers a table would
-  // have offered. The ocean variables a record carries are not among them: a
-  // list of names has no order worth sorting on, and the search box above the
-  // cards is the way to find the records carrying one.
   const recordSortFields = useMemo(
     () => [
       {
@@ -429,10 +376,6 @@ export default function DatasetInspector({
     [t, recordIdField.label],
   );
 
-  // A record picked on the map (rather than from this list) is pinned to the
-  // front of it rather than filtering the rest away — the same "found here,
-  // sorted to the top" treatment the datasets list itself gives a map click
-  // (see DatasetsTable's pinnedPks).
   const markerRecordPinned = highlightedRecord?.datasetPk === dataset.pk;
   const pinnedKeys = useMemo(
     () =>
@@ -443,12 +386,9 @@ export default function DatasetInspector({
     [passes, markerRecordPinned, highlightedRecord],
   );
 
-  // "Show on map": a trajectory dataset's records are its trajectories
-  // (shapeQuery aliases trajectory_id into profile_id), so its cards draw the
-  // whole track; every other record is ringed where it was sampled. Either
-  // way a card gives no clue where on earth that is, so the map goes there —
-  // unlike a track clicked on the map, which is already in view (see
-  // selectTrajectoryFromMap).
+  // A trajectory's records are its tracks (shapeQuery aliases trajectory_id
+  // into profile_id), so "Show on map" draws the whole track; others are
+  // ringed where sampled.
   const onMapId = isTrajectoryDataset
     ? selectedTrajectory?.datasetPk === dataset.pk
       ? selectedTrajectory.trajectoryId
@@ -485,10 +425,7 @@ export default function DatasetInspector({
     toggle: toggleEovsExpanded,
   } = useExpandableList(dataset.eovs, EOV_VISIBLE_LIMIT);
 
-  // An ocean variable's definition, for the chip's tooltip. The catalog the
-  // Filters panel loads is the only place these are written down; the chip
-  // itself no longer toggles that filter, but it can still say what the
-  // variable means.
+  // The Filters panel's catalog is the only source of EOV definitions.
   const eovDefinitions = useMemo(
     () =>
       new Map(
@@ -500,15 +437,7 @@ export default function DatasetInspector({
     [eovsSelected],
   );
 
-  // Griddap is metadata-only and never enters the download selection
-  // (handleSelectDataset drops it), so the button says why rather than
-  // failing silently on click.
   const inDownloadSelection = selectedPks.has(dataset.pk);
-  // A real toggle, both ways: picking it up opens the download modal (there
-  // is nothing else to review it in from this page), dropping it just
-  // updates the selection — the modal is already open if that is where the
-  // click came from, and there is no order left to show for a dataset just
-  // taken out of it.
   const toggleDownloadSelection = () => {
     handleSelectDataset(dataset);
     if (!inDownloadSelection) setShowDownloadModal(true);
@@ -521,19 +450,6 @@ export default function DatasetInspector({
       onMouseEnter={() => setHoveredDataset(dataset)}
       onMouseLeave={() => setHoveredDataset()}
     >
-      {/* The title bar is pinned: it names the page, so it stays put while the
-          metadata sheet and record table scroll under it. The heading takes the
-          full width and the dataset's actions sit in a row under it — stacked
-          against the right edge they were three bare icons in a narrow column,
-          which is no place to say what any of them does. Double-clicking the
-          bar frames the map on this dataset, the same thing the zoom button
-          does, for anyone who goes for the title first; the map is otherwise
-          left where the user put it, since opening a page highlights the
-          dataset among the others rather than travelling to it.
-          The way back is the sidebar header's own back control (Sidebar.jsx),
-          which replaces the datasets banner while this page is open — one
-          control, in the one place that marks the panel as being on a dataset
-          rather than the list. */}
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
         <div className="datasetTitleHeading">
           <FileEarmarkText
@@ -543,9 +459,6 @@ export default function DatasetInspector({
           />
           <h2 className="datasetTitle">{dataset.title}</h2>
         </div>
-        {/* Every action on this page, named. These are the only things here
-            that change anything: the values in the sheet below are read, not
-            clicked. */}
         <div className="datasetTitleActions">
           <button
             type="button"
@@ -570,12 +483,10 @@ export default function DatasetInspector({
             )}
             {t("datasetInspectorDownloadText")}
           </button>
-          {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
         </div>
-        {/* A filter or the list's own narrowing can exclude a dataset whose
-            page is already open. The page stays (the user chose it), and says
-            so, since its records below now follow filters it no longer meets. */}
+        {/* A filter can exclude a dataset whose page is already open; the page
+            stays, but its records now follow filters it no longer meets. */}
         {inspectDatasetExcluded && (
           <div className="datasetNotInResults" role="status">
             <InfoCircle size={14} aria-hidden="true" />
@@ -591,10 +502,6 @@ export default function DatasetInspector({
         )}
       </div>
       <div className="datasetInspectorBody">
-        {/* The front matter, as compact as it can be read: one field per
-            line, each a small eyebrow label with its value beside it on the
-            same line (wrapping under only when the row is too narrow for
-            both). No row rules — the whitespace separates them. */}
         <dl className="datasetMetaSheet">
           <div className="metaCell">
             <dt className="metadataLabel">
@@ -613,7 +520,6 @@ export default function DatasetInspector({
               {t("datasetInspectorOceanVariablesText")}
             </dt>
             <dd className="metadataValue">
-              {/* OBIS occurrence datasets carry no ocean variables at all. */}
               {!dataset.eovs?.length && (
                 <span className="metadataEmpty">—</span>
               )}
@@ -648,11 +554,6 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
-          {/* Geometry, platform, locations and sources: a label with its
-              value(s) as badges beside it, the same badge organizations and
-              EOVs already use (same pill radius, border and padding as
-              .filterButton) — one consistent chip style across every field
-              instead of four different treatments. */}
           <div className="metaCell">
             <dt className="metadataLabel">
               {t("datasetInspectorGeometryText")}
@@ -666,8 +567,6 @@ export default function DatasetInspector({
               {t("datasetInspectorPlatformText")}
             </dt>
             <dd className="metadataValue">
-              {/* Nullable in the schema; an empty chip under a label reads as
-                  a broken field. */}
               {dataset.platform ? (
                 <span className="metadataChip">
                   <span className="metadataPlatformGlyph" aria-hidden="true">
@@ -704,11 +603,8 @@ export default function DatasetInspector({
               )}
             </dd>
           </div>
-          {/* Dataset-level freshness. coverage_time_max is the newest data the
-              server reported across EVERY record in the dataset, so for a
-              mooring network or a glider programme it is not the end of any one
-              record — which is why it is labelled on the dataset and the record
-              cards below keep their own (harvest-era) ranges. */}
+          {/* coverage_time_max spans every record, so it is not the end of any
+              one record; the record cards keep their own ranges. */}
           {dataset.coverage_time_max && (
             <div className="metaCell">
               <dt className="metadataLabel">
@@ -718,8 +614,6 @@ export default function DatasetInspector({
                 <span className="metadataChip">
                   {formatInstant(dataset.coverage_time_max)}
                 </span>
-                {/* Same badge as the dataset card's (DatasetCard.jsx) — the
-                    freshness signal sits beside the timestamp it explains. */}
                 {dataset.is_realtime && (
                   <span
                     className="datasetTitleLive"
@@ -731,9 +625,6 @@ export default function DatasetInspector({
               </dd>
             </div>
           )}
-          {/* The outbound links used to be a labelled row each; they say what
-              they are in their own text, so one "Sources" line holds them
-              all. */}
           {hasSources && (
             <div className="metaCell">
               <dt className="metadataLabel">
@@ -803,8 +694,6 @@ export default function DatasetInspector({
               </span>
               <IdCaption {...recordIdField} />
             </div>
-            {/* Names the accent ListCard puts on the pinned card below, and
-                offers the way to unpin it again. */}
             {markerRecordPinned && (
               <div className="recordMapClickHint">
                 <span className="recordMapClickSwatch" aria-hidden="true" />
@@ -854,11 +743,8 @@ export default function DatasetInspector({
                 pagerLabel={t("datasetInspectorRecordsPagerLabel")}
                 perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
                 renderItem={(row) => {
-                  // Which ocean variables this individual record carries — a
-                  // dataset's records don't all measure everything it lists.
-                  // Null for the sources with no per-record detection
-                  // (trajectory, OBIS, grid), where the dataset's own list is
-                  // the best answer available.
+                  // Null for sources with no per-record EOV detection
+                  // (trajectory, OBIS, grid).
                   const eovs = (row.eovs ?? dataset.eovs)?.map((eov) => t(eov));
                   const onMap = onMapId === row.profile_id;
                   return (
@@ -868,7 +754,6 @@ export default function DatasetInspector({
                       selected={onMap}
                       actions={
                         <>
-                          {/* A record with no id cannot be looked up again. */}
                           {row.profile_id && (
                             <button
                               type="button"

@@ -6,24 +6,15 @@ const { pipeline } = require("../utils/routePipeline");
 
 const SPARKLINE_DEPTH = 10;
 
-// Cap on the per-dataset attempt history. cde.harvest_attempts is append-only
-// and gains a row per dataset per run, so this was the one dashboard query
-// whose result grows without bound — and HarvestDataset.jsx renders every row
-// it is given into an unpaginated table. Deep enough that the answer the page
-// exists to give ("what has this dataset been doing lately") is never cut off;
-// the response says when it truncated so the page can admit it rather than
-// present a partial history as the whole one.
+// cde.harvest_attempts is append-only and HarvestDataset.jsx renders every
+// history row into an unpaginated table, so the history must be capped.
 const HISTORY_MAX_ROWS = 200;
 
 const WARNING_DATASET_SAMPLE = 20;
 
-// A hash-unchanged skip (status='skipped', reason_code='UNCHANGED') means the
-// dataset was verified as up to date — one HTTP request, nothing re-uploaded.
-// In the dataset-centric dashboard views that counts as a healthy "success"
-// with no failure reason; the fact that nothing was re-uploaded is conveyed by
-// "Last update" lagging "Last check", not by a skipped status. These SQL
-// fragments normalise an attempt's status/reason accordingly. (Per-run audit
-// views deliberately keep the raw 'skipped' so a run still shows what it did.)
+// A hash-unchanged skip means the dataset was verified up to date, so the
+// dataset-centric views count it as a healthy success. Per-run audit views
+// deliberately keep the raw 'skipped'.
 const NORM_STATUS = (col) =>
   `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN 'success' ELSE ${col}.status END`;
 const NORM_REASON = (col) =>
@@ -31,10 +22,6 @@ const NORM_REASON = (col) =>
 const NORM_ERRMSG = (col) =>
   `CASE WHEN ${col}.status = 'skipped' AND ${col}.reason_code = 'UNCHANGED' THEN NULL ELSE ${col}.error_message END`;
 
-// ── URL helpers ───────────────────────────────────────────────────────────────
-
-// Server IDs travel in the path as base64url. Only the decode lives here; the
-// encode was a dead `slugify()` — the frontend produces these slugs.
 function unslug(slug) {
   const padded = slug + "=".repeat((4 - (slug.length % 4)) % 4);
   return Buffer.from(
@@ -43,10 +30,9 @@ function unslug(slug) {
   ).toString("utf8");
 }
 
-// Slugs are a readable form of the source URL: scheme dropped, '.' and '/'
-// replaced with '-' (e.g. erddap-ogsl-ca-erddap). Resolve one back to the full
-// stored erddap_url by applying the same transform to the stored URLs. Legacy
-// base64-encoded slugs (full URLs) are still honoured so old links keep working.
+// Slugs drop the scheme and replace '.' and '/' with '-' (e.g.
+// erddap-ogsl-ca-erddap). Legacy base64 slugs are still honoured so old links
+// keep working.
 async function resolveErddapUrl(slug) {
   try {
     const decoded = unslug(slug);
@@ -54,11 +40,8 @@ async function resolveErddapUrl(slug) {
   } catch {
     /* not a base64 slug — fall through to the transform lookup */
   }
-  // Matched against the stored URLs by the same transform, which
-  // harvest_attempts_slug_idx (1_schema.sql) indexes: as a plain predicate the
-  // planner can use that index, whereas the DISTINCT subquery this replaced
-  // had to read every row of an append-only table — one full pass per request,
-  // on all three routes below, growing with every harvest run.
+  // The transform must match harvest_attempts_slug_idx (1_schema.sql) so the
+  // planner can use that index.
   // NB: avoid '?' in the regexes — knex treats it as a positional binding.
   const sql = `
     SELECT erddap_url
@@ -74,28 +57,12 @@ async function resolveErddapUrl(slug) {
   return result.rows[0] ? result.rows[0].erddap_url : slug;
 }
 
-// ── SQL query helpers ─────────────────────────────────────────────────────────
-// Knex raw uses ? as positional placeholder. Pass null for optional params —
-// the CAST(? AS text) IS NULL pattern in the SQL handles them correctly.
+// Pass null for optional params: the CAST(? AS text) IS NULL pattern in the
+// SQL handles them.
 
 async function listServers() {
-  // latest_run_per_server is one row per (server, source) describing its most
-  // recent attempt. DISTINCT ON over the (erddap_url, dataset_id,
-  // attempted_at DESC) index, rather than a GROUP BY carrying a correlated
-  // scalar subquery that re-ran a per-server ORDER BY ... LIMIT 1 for every
-  // group — the pattern recentRuns below was already restructured away from.
-  //
-  // That subquery keyed last_run_id on erddap_url alone while the group is
-  // (erddap_url, source); each group now takes the run of its own latest
-  // attempt. A URL only ever carries one source ('erddap' or 'obis' — OBIS
-  // rows use the obis.org sentinel), so the two agree on real data, and the
-  // old and new CTEs were diffed on a live database to confirm it.
-  //
-  // last_success is the server's latest run that ended 'ok': failed runs are
-  // recorded too, so the latest attempt alone can't say when it last worked.
-  // harvest_runs gains one row per run (small) and is walked newest-first; the
-  // EXISTS is a lookup on harvest_attempts' (run_id, erddap_url, ...) primary
-  // key, so the search stops at the first matching run.
+  // last_success is needed because failed runs are recorded too, so the
+  // latest attempt alone can't say when a server last worked.
   //
   // Kept out of the SQL string on purpose: knex substitutes its :name and ?
   // bindings inside `--` comments too, so prose belongs here.
@@ -143,10 +110,9 @@ async function listServers() {
 }
 
 async function recentRuns(limit = 20) {
-  // Limit the runs BEFORE joining attempts — the audit tables are append-only,
-  // so aggregating every historical attempt just to show the latest 20 runs
-  // gets slower forever. Unchanged (hash-verified) skips are counted apart from
-  // real skips so an incremental run doesn't read as hundreds of failures.
+  // Limit the runs before joining attempts: the audit tables are append-only.
+  // Unchanged skips are counted apart so an incremental run doesn't read as
+  // hundreds of failures.
   const sql = `
     WITH recent AS (
         SELECT run_id, started_at, finished_at, git_sha, status, error_message,
@@ -184,7 +150,6 @@ async function recentRuns(limit = 20) {
 
 // warnings come from the latest raw 'success' attempt, not the latest attempt:
 // an UNCHANGED skip carries none, yet the loaded data is still that harvest's.
-// The LATERAL walks harvest_attempts_dataset_idx newest-first per dataset.
 async function serverDatasets(
   erddapUrl,
   statusFilter = null,
@@ -289,8 +254,7 @@ async function serverDatasets(
 }
 
 async function datasetHistory(erddapUrl, datasetId, limit = HISTORY_MAX_ROWS) {
-  // One row over the cap, so "there is more" is answered by the same query
-  // rather than by a second COUNT over the same append-only table.
+  // One row over the cap answers "there is more" without a second COUNT.
   const sql = `
     SELECT a.run_id,
            a.attempted_at,
@@ -427,8 +391,6 @@ async function warningBreakdown(erddapUrl) {
   return result.rows;
 }
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-
 router.get(
   "/servers",
   ...pipeline({ filters: false, cacheFor: "2 minutes" }),
@@ -467,13 +429,9 @@ router.get(
     );
     res.json({
       history,
-      // Present so the page can say it is showing the most recent N rather
-      // than implying these are all the attempts there have ever been.
       historyTruncated: truncated,
       historyLimit: HISTORY_MAX_ROWS,
       meta,
-      // Latest real harvest's warnings: the latest attempt may be an
-      // UNCHANGED skip, which carries none.
       currentWarnings,
       erddap_url: erddapUrl,
     });
@@ -488,8 +446,7 @@ router.get(
   },
 );
 
-// Note: /runs/recent must be defined before /runs/:runId to avoid :runId
-// matching the literal string "recent".
+// Must stay after /runs/recent, or :runId would match "recent".
 router.get(
   "/runs/:runId",
   ...pipeline({ filters: false, cacheFor: "1 minute" }),

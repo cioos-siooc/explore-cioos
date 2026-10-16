@@ -9,7 +9,6 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
 
-// The Datasets panel: results list ⇄ single-dataset inspector drill-in.
 // All state lives in the providers, so the panel can unmount freely.
 export default function DatasetsPanel() {
   const { activeWmsOverlay, setActiveWmsOverlay } = useMapState();
@@ -30,7 +29,6 @@ export default function DatasetsPanel() {
     setHighlightedRecord,
   } = useSelection();
 
-  // Before the first /pointQuery lands there is no list to show at all.
   if (!initialPointsQueryComplete) {
     return (
       <div className="datasetsPanel" data-testid="datasets-panel">
@@ -50,15 +48,9 @@ export default function DatasetsPanel() {
       onMouseEnter={() => setHoveredDataset(inspectDataset)}
       onMouseLeave={() => setHoveredDataset()}
     >
-      {/* A refetch (filters changed, polygon redrawn) keeps the current
-          results readable underneath rather than blanking the panel — the
-          scrim just marks them as about to be replaced. */}
+      {/* A refetch keeps the current results readable under the scrim. */}
       {selectionLoading && <Loading variant="inline" />}
-      {/* The two views are deliberately not interchangeable: the list is the
-          browsing surface, a dataset page is a drill-in. Each announces itself
-          on entry (the detail slides in from the right, the list back in from
-          the left — see styles.css), and the sidebar header changes with it.
-          The list stays mounted, hidden, under a dataset page, so going back
+      {/* The list stays mounted, hidden, under a dataset page, so going back
           lands on the same page of it, scrolled to the same place. */}
       {inspectDataset && (
         <div className="datasetsPanelView datasetsPanelDetail" key="detail">

@@ -8,8 +8,6 @@ import {
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
-// How every list filter row shows its include/exclude state, so the lists
-// cannot drift apart on it.
 export const optionStateClass = ({ isSelected, isExcluded }) =>
   `optionButton ${isSelected ? "selected" : ""} ${isExcluded ? "excluded" : ""}`;
 
@@ -28,12 +26,7 @@ export function ExcludedLabel({ isExcluded }) {
   );
 }
 
-// One list filter row: the row includes the option, the button at its end
-// excludes it. Two controls side by side rather than one cycling through three
-// states, which had to be explained before anyone could use it. `label` names
-// the option for the exclude button; extra props (data-*) go on the checkbox.
-// The whole row takes the click, so the padding around the checkbox is a
-// target too; the checkbox's own click bubbles up to it.
+// Extra props (data-*) go on the checkbox; its click bubbles to the row.
 export function FilterOption({
   label,
   isSelected,

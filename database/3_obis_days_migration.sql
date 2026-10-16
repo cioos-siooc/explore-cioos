@@ -1,21 +1,8 @@
--- Add cde.obis_cells.days to databases created before it existed.
+-- Add cde.obis_cells.days to databases created before it existed (1_schema.sql
+-- only runs on a fresh volume; db_migrate applies [3-9]_*.sql on every deploy).
+-- Idempotent; a no-op on fresh volumes. Numbered 3 so it sorts ahead of
+-- 9_incremental_upsert.sql, which names the column.
 --
--- The canonical DDL is in 1_schema.sql, which only ever runs on a fresh volume.
--- This file is picked up by the db_migrate compose service, which applies
--- [3-9]_*.sql on every deploy, so live databases get the column without the
--- volume drop + full re-harvest that database/README.md otherwise requires for
--- a schema change. Adding a nullable column is safe and idempotent, and a full
--- volume drop would mean re-harvesting the entire ERDDAP catalogue to fix an
--- OBIS column.
---
--- Numbered 3 rather than 9 so it sorts ahead of 9_incremental_upsert.sql, whose
--- replace_obis_cells_from_temp() names the column. (plpgsql bodies resolve
--- columns at runtime, not at CREATE, so the reverse order would also work --
--- this just removes the question.)
---
--- No-op on fresh volumes: 1_schema.sql has already created it.
---
--- The column is NULL until each OBIS dataset is re-harvested. hexMetric.js
--- coalesces it to 0, so re-harvest OBIS BEFORE deploying the web-api change or
--- OBIS drops out of the map's `days` ramp in the interim.
+-- NULL until each OBIS dataset is re-harvested, and hexMetric.js coalesces it
+-- to 0, so OBIS reads as 0 days until then.
 ALTER TABLE cde.obis_cells ADD COLUMN IF NOT EXISTS days bigint;

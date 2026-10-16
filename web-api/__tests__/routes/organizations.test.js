@@ -1,11 +1,3 @@
-/**
- * GET /organizations
- *
- * Returns every organization ordered by name (case-insensitive).
- * Uses db("cde.organizations").orderByRaw("UPPER(name)") — the chainable Knex API.
- * changePKtoPkURL maps pk_url → pk on each row.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

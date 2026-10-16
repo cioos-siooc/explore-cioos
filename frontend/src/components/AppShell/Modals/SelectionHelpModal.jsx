@@ -11,10 +11,7 @@ import {
 import HelpModal from "../../ui/HelpModal.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 
-// The long form of the sidebar footer's one-line hint: how datasets get into a
-// download, and the three things that stop them. Each section leads with the
-// glyph the user meets on the card itself, so the rule and the control that
-// enforces it are recognisably the same thing.
+// Each section leads with the glyph the user meets on the card itself.
 const SECTIONS = [
   { key: "add", Icon: Download },
   { key: "remove", Icon: CheckCircleFill },

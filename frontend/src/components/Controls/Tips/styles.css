@@ -1,8 +1,3 @@
-/* The contextual tip (see TipCard.jsx). Sized like a chip row rather than a
-   panel: it should read as an aside to the controls, not as something to deal
-   with. Above the map chrome but under the modals, which the tip waits out
-   anyway. Bottom-left by default, since below the laptop rung the top-right is
-   too narrow beside the centered brand card. */
 .tipCard,
 .tipBadge {
   position: fixed;
@@ -16,8 +11,7 @@
   padding: var(--cioos-space-xs) var(--cioos-space-xs) var(--cioos-space-sm)
     var(--cioos-space-md);
 
-  /* Teal like the hand and the highlight ring, not white: most of what it
-     sits on (the sidebar, the dialogs, the light basemap) is white. */
+  /* Teal, not white: most of what it sits on is white. */
   background-color: color-mix(
     in srgb,
     var(--cioos-primary) 12%,
@@ -40,9 +34,6 @@
   }
 }
 
-/* Phones: the map legend holds the bottom-left, so the tip takes the
-   bottom-right. Opened, the card keeps to a reading width rather than the
-   full screen. */
 @media (max-width: 700px), (max-height: 500px) {
   .tipCard,
   .tipBadge {
@@ -56,9 +47,6 @@
   }
 }
 
-/* Hung just past the hand pointing at the control (see anchorCardStyle), so
-   control, hand and text read as one. Placed inline, over whichever corner the
-   rules above chose. */
 .tipCard.tipCardAnchored {
   inset: auto;
   animation: tipCardEnter 200ms ease-out;
@@ -160,7 +148,6 @@
   margin-right: var(--cioos-space-sm);
 }
 
-/* Only where there is a keyboard to press them on. */
 .tipCardKeys {
   margin-left: auto;
   font-size: var(--cioos-font-size-xs);
@@ -201,11 +188,7 @@
   color: var(--cioos-ink);
 }
 
-/* The control the active tip talks about (tipHighlight in TipsProvider), in
-   the tip card's own primary — the ring-and-glow recipe of the datasets list's
-   .fromMapClick card, recoloured so card, pointer and control read as one.
-   !important because it has to win over each control's own shadow — the
-   raised cards, the pressed buttons — while the tip is up. */
+/* !important to beat each control's own shadow while the tip is up. */
 [data-tip-highlight] {
   --tip-glow: color-mix(in srgb, var(--cioos-primary) 45%, transparent);
 
@@ -214,11 +197,7 @@
     0 0 10px 1px var(--tip-glow) !important;
 }
 
-/* The hand pointing at the control the active tip talks about (TipPointer).
-   Over the map chrome, under the modals the tip waits out. A badge rather than
-   a bare glyph, which washes out against the light basemap and the white
-   panels — hung from its top edge, where the fingertip is, and turned
-   over to point down from above. */
+/* A badge, not a bare glyph, which washes out on the light basemap. */
 .tipPointer {
   --tip-pointer-gap: 12px;
 
@@ -233,8 +212,6 @@
     rotate(180deg);
 }
 
-/* A nudge towards the control, not a pulse: it reads as pointing. It stops
-   short of the gap, so the hand bounces beside the control, never onto it. */
 .tipPointerBadge {
   display: flex;
   align-items: center;
@@ -263,9 +240,6 @@
   }
 }
 
-/* Inside the dialog that holds the control it names (see TipCard's inModal):
-   a row under the dialog's header rather than a floating card, and the hand
-   drawn above the dialog it points into. */
 .tipCard.tipCardInModal {
   position: static;
   inset: auto;
@@ -275,10 +249,7 @@
   box-shadow: none;
 }
 
-/* Hung by its control inside the dialog, like on the map: fixed to the
-   viewport (nothing between it and the page is transformed), and on the
-   same rung as on the map, which within the dialog puts it over the open
-   filter's pane and the sticky headers. */
+/* Fixed to the viewport: nothing between it and the page is transformed. */
 .tipCard.tipCardInModal.tipCardAnchored {
   position: fixed;
   z-index: var(--cioos-z-dock, 35);

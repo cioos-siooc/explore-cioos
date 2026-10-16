@@ -13,9 +13,6 @@ describe("TopControls", () => {
     installMockFetch();
   });
 
-  // Same "solid primary while the thing it opens is on screen" affordance the
-  // Datasets and Filters segments already carry (see .topBarButton.active) —
-  // Coverage is the third peer in that row and was missing it.
   it("goes active once the coverage modal it opens is showing", async () => {
     const user = userEvent.setup();
     renderWithProviders(<TopControls />, { providers: "app" });
@@ -30,9 +27,6 @@ describe("TopControls", () => {
     expect(coverageButton).toHaveClass("active");
   });
 
-  // The toggle rides on the far edge of the Filters segment rather than
-  // opening it (see styles.css' .topBarFiltersToggle) — a real button beside
-  // the one that opens the modal, not a second job for that same button.
   describe("the quick-filters toggle on the Filters button", () => {
     it("folds the quick filters and active-filter chips away and back", async () => {
       const user = userEvent.setup({ delay: null });

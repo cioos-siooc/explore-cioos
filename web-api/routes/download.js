@@ -16,11 +16,7 @@ const {
   TRAJECTORY_COVERAGE_FROM,
 } = require("../utils/selection");
 
-/**
- * /download
- * Requires a shape (either polygon or latMin/Max) and, in the JSON body, an
- * email — kept out of the URL so it never reaches access logs or traces.
- */
+// The email rides in the JSON body so it never reaches access logs or traces.
 
 /**
  * @swagger
@@ -86,8 +82,6 @@ router.post(
   "/",
   ...pipeline({
     shape: true,
-    // lang picks the language of the job's confirmation email and rides into
-    // cde.download_jobs as part of downloader_input.
     checks: [
       body("email").isEmail(),
       check("lang").isIn(["en", "fr"]).optional(),
@@ -118,27 +112,16 @@ router.post(
 
     const wktPolygon = polygon ? polygonJSONToWKT(polygon) : null;
 
-    // Which feature sources feed the queue. Same answer as the shape query
-    // above (utils/selection.js), so the queued set matches the size estimate
-    // the user was shown.
     const includeProfiles = erddapVisible(req.query);
     const showObis = obisVisible(req.query);
 
-    // search_geom is the geometry filters.shared matches against: the per-feature
-    // bbox for profiles (extent search), the cell point for obis, the hex polygon
-    // for trajectory coverage.
     const profilesBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
                time_min, time_max, depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles
         WHERE :profileFilters`;
-    // Trajectory coverage hexes are downloadable ERDDAP datasets too, so a
-    // selection over a glider/ship track queues its dataset.
     const trajectoryBranch = `SELECT t.dataset_pk, NULL::integer AS point_pk, t.geom, t.latitude, t.longitude,
                t.time_min, t.time_max, t.depth_min, t.depth_max, h.geom AS search_geom
         ${TRAJECTORY_COVERAGE_FROM}`;
-    // OBIS occurrence cells. The scientific-name/aphia predicate lives in
-    // filters.obisOnly (obis_cells columns) and is applied inside the branch;
-    // the shared spatial/time/source filter still applies in the outer WHERE.
     const obisBranch = `SELECT dataset_pk, point_pk, geom, latitude, longitude,
                time_min, time_max, depth_min, depth_max, geom AS search_geom
         FROM cde.obis_cells
@@ -151,8 +134,6 @@ router.post(
     // Nothing to download (e.g. a scientific-name selection with OBIS disabled).
     if (!branches.length) return res.send({ count: 0 });
 
-    // (Pre-M2 this interpolated the filter OBJECT into the SQL string instead
-    // of binding filters.shared — fixed to match the other routes.)
     const SQL = `
         WITH combined AS (
         ${branches.join("\n        UNION ALL\n        ")}
@@ -199,8 +180,6 @@ router.post(
         },
         cache_filtered: tile.json_agg,
       };
-      // add to the jobs queue
-
       const downloadJobEntry = {
         job_id: jobID,
         email,

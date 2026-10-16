@@ -3,14 +3,9 @@ import { useEffect, useState } from "react";
 import { server } from "../../../config.js";
 import reportError from "../../../state/reportError.js";
 
-// When each of a trajectory dataset's platforms was inside the selected area —
-// a hex or track clicked on the map, a drawn polygon, or the lat/lon bounds —
-// as a Map of trajectory id -> [{start, end}] (inclusive UTC days). Empty with
-// no selected area: every trajectory's whole history would answer nothing the
-// card's timeframe doesn't already say.
-//
-// `area` is the clicked point ({lngLat, z}); the server resolves it to the hex
-// of that zoom's tier, the same cell the click lit up.
+// Map of trajectory id -> [{start, end}] (inclusive UTC days) inside the
+// selected area. `area` is the clicked {lngLat, z}; the server resolves it to
+// that zoom tier's hex.
 const EMPTY = new Map();
 
 export default function useTrajectoryPasses(datasetPk, query, area) {
@@ -50,7 +45,6 @@ export default function useTrajectoryPasses(datasetPk, query, area) {
     return () => controller.abort();
   }, [url]);
 
-  // Derived, not held: a new selection shows no passes until its own answer
-  // lands, rather than the last selection's.
+  // Derived, not held, so a new selection never shows the last one's passes.
   return url && answer.url === url ? answer.passes : EMPTY;
 }

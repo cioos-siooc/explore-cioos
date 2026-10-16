@@ -1,16 +1,4 @@
-"""
-Integration test: full harvester pipeline with mocked external I/O.
-
-Steps covered (mirrors the real nightly run):
-  1. ERDDAP HTTP calls  → mocked via requests.Session.get
-  2. CKAN HTTP calls    → mocked via requests.get
-  3. ERDDAPHarvester    → runs with real Dataset/ComplianceChecker/profiles logic
-  4. CSV output         → written to tmp_path via the real __main__.main()
-  5. DB load            → SQLAlchemy engine mocked; correct SQL calls asserted
-
-The test does NOT contact any live services.  It exercises the complete
-data-flow transformation described in docs/data_flow.md.
-"""
+"""Integration test: harvest -> CSV -> DB load, with every external I/O mocked."""
 
 import ast
 import logging
@@ -38,9 +26,6 @@ from conftest import (
     _route_erddap_url,
 )
 
-# ---------------------------------------------------------------------------
-# Session-level mock for all ERDDAP HTTP calls
-# ---------------------------------------------------------------------------
 
 def _erddap_session_get(url, **kwargs):
     """Route every ERDDAP request to the right fixture CSV."""
@@ -56,17 +41,9 @@ def _ckan_side_effects():
     return [page1, page2]
 
 
-# ---------------------------------------------------------------------------
-# Step 1 + 2 + 3: Harvest phase (ERDDAP → HarvestResult)
-# ---------------------------------------------------------------------------
-
 @pytest.fixture(scope="module")
 def harvest_result(tmp_path_factory):
-    """
-    Run ERDDAPHarvester.harvest() against a fully-mocked ERDDAP server.
-    Returns (profiles_df, datasets_df, variables_df, skipped_df).
-    Uses harvest_erddap.fn() to bypass the Prefect @task decorator.
-    """
+    """Run harvest_erddap.fn() against a fully-mocked ERDDAP server."""
     with (
         patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
         patch(
@@ -83,10 +60,6 @@ def harvest_result(tmp_path_factory):
     assert not result.datasets.empty, "harvest produced no datasets"
     return result.profiles, result.datasets, result.variables, result.skipped
 
-
-# ---------------------------------------------------------------------------
-# Step 3 tests: harvest output content
-# ---------------------------------------------------------------------------
 
 class TestHarvestOutput:
     def test_compliant_dataset_is_harvested(self, harvest_result):
@@ -112,10 +85,7 @@ class TestHarvestOutput:
         assert len(row["eovs"]) > 0
 
     def test_unsupported_dataset_is_skipped(self, harvest_result):
-        """
-        allDatasets CSV includes 'test_unsupported_001' (Point type).
-        It should NOT appear in datasets (filtered before get_dataset is called).
-        """
+        """test_unsupported_001 (Point) is filtered before get_dataset is called."""
         _, datasets, _, skipped = harvest_result
         assert "test_unsupported_001" not in datasets["dataset_id"].values
 
@@ -125,20 +95,9 @@ class TestHarvestOutput:
         assert "standard_name" in variables.columns
 
 
-# ---------------------------------------------------------------------------
-# Step 4: CSV writing phase
-# ---------------------------------------------------------------------------
-
 def _submit_without_flow(task, *, as_future=False):
-    """Stand-in for Prefect ``Task.submit()`` with no flow context.
-
-    main() is a plain function (the flattened pipeline runs every step under the
-    single cde_pipeline_run @flow), but it still ``.submit()``s its tasks — which
-    needs a task runner that only a flow context provides. Rather than stand up a
-    flow just for the test, run the task's wrapped ``.fn`` synchronously here.
-    The Prefect-only ``wait_for`` kwarg is stripped. ``as_future=True`` wraps the
-    result so the caller's ``.submit(...).result()`` still works.
-    """
+    """Stand-in for Task.submit(): .submit() needs a flow context's task runner,
+    so run the wrapped .fn synchronously, dropping Prefect's wait_for kwarg."""
     def _submit(*args, wait_for=None, **kwargs):
         value = task.fn(*args, **kwargs)
         if not as_future:
@@ -152,18 +111,8 @@ def _submit_without_flow(task, *, as_future=False):
 
 @pytest.fixture(scope="module")
 def written_csv_folder(tmp_path_factory, harvest_result):
-    """
-    Run harvester __main__.main() (CKAN merge + CSV write) using the
-    harvest DataFrames from harvest_result.
-
-    Patches:
-      - harvest_erddap.submit → returns a synchronous mock future holding
-        the pre-collected HarvestResult so main() doesn't re-harvest
-      - get_ckan_records.submit / merge_and_write_csvs.submit → run their
-        wrapped fns synchronously (no flow context / task runner needed)
-      - get_run_logger → stdlib logger (no Prefect context needed)
-      - CKAN requests → fixture data
-    """
+    """Run harvester __main__.main() (CKAN merge + CSV write) on the
+    pre-collected HarvestResult, with tasks run synchronously."""
     profiles, datasets, variables, skipped = harvest_result
     tmp = tmp_path_factory.mktemp("csv_phase")
     folder = str(tmp)
@@ -176,9 +125,6 @@ def written_csv_folder(tmp_path_factory, harvest_result):
 
     with (
         patch("cde_harvester.sources.erddap.client.requests.Session") as mock_session_cls,
-        # CKAN fetching now goes through a requests.Session built by
-        # _build_ckan_session() and read with resp.json(), so patch the session
-        # builder rather than the (now unused) module-level requests.get.
         patch(
             "cde_harvester.sources.ckan.create_ckan_erddap_link._build_ckan_session",
         ) as mock_ckan_session_builder,
@@ -189,9 +135,6 @@ def written_csv_folder(tmp_path_factory, harvest_result):
         patch(
             "cde_harvester.__main__.harvest_erddap"
         ) as mock_harvest_task,
-        # get_ckan_records feeds a real DataFrame into merge; merge writes the
-        # CSVs the assertions read. Run both synchronously so the test drives the
-        # real merge + CSV-write logic without a flow context.
         patch.object(
             get_ckan_records, "submit", _submit_without_flow(get_ckan_records)
         ),
@@ -211,10 +154,6 @@ def written_csv_folder(tmp_path_factory, harvest_result):
 
         mock_harvest_task.submit.return_value = mock_future
 
-        # main() is a plain function (flattened pipeline: cde_pipeline_run is
-        # the only @flow). The .submit()ed tasks below need a task runner, which
-        # only a flow context provides — so run their wrapped fns synchronously
-        # via the patches above instead of standing up a flow just for the test.
         harvester_main(
             erddap_urls=ERDDAP_URL,
             cache_requests=False,
@@ -260,17 +199,9 @@ class TestCsvFilesWritten:
         assert pd.notna(row.get("title_fr"))
 
 
-# ---------------------------------------------------------------------------
-# Step 5: DB load phase
-# ---------------------------------------------------------------------------
-
 @pytest.fixture(scope="module")
 def db_load_calls(written_csv_folder):
-    """
-    Run db-loader main() against the written CSVs with a mocked SQLAlchemy
-    engine. Returns the list of SQL strings passed to text().
-    Uses main.fn() to bypass the Prefect @flow decorator.
-    """
+    """Run db-loader main.fn() on the written CSVs; return the SQL passed to text()."""
     engine = MagicMock()
     conn = MagicMock()
     engine.begin.return_value.__enter__.return_value = conn
@@ -305,8 +236,7 @@ def db_load_calls(written_csv_folder):
 
 class TestDbLoadPhase:
     def test_no_constraint_ddl_toggling(self, db_load_calls):
-        # Constraints are permanent now (NULL-able columns + DEFERRABLE hex FKs),
-        # so the full reload no longer drops/re-adds them via ALTER TABLE.
+        # Constraints are permanent (NULL-able columns + DEFERRABLE hex FKs).
         assert not any("drop_constraints" in c for c in db_load_calls)
 
     def test_remove_all_data_called(self, db_load_calls):

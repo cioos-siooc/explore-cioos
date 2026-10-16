@@ -1,9 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.erddap.client — the HTTP client that talks to ERDDAP servers.
-
-All HTTP calls are intercepted by patching requests.Session so no network
-traffic is produced.
-"""
+"""Unit tests for cde_harvester.sources.erddap.client; requests.Session is patched."""
 
 from unittest.mock import MagicMock, patch
 
@@ -18,9 +13,6 @@ from conftest import (
     MockStreamingResponse,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _make_erddap(all_datasets_csv=ERDDAP_ALL_DATASETS_CSV):
     """Create an ERDDAP instance with a mocked session.get."""
@@ -32,16 +24,11 @@ def _make_erddap(all_datasets_csv=ERDDAP_ALL_DATASETS_CSV):
         )
         from cde_harvester.sources.erddap.client import ERDDAP
         erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
-        erddap.session = mock_session  # expose for further assertions
-        # __init__ no longer auto-fetches the dataset list; the caller (harvest())
-        # now populates it explicitly via get_all_datasets(), so do the same here.
+        erddap.session = mock_session
+        # harvest() populates the dataset list via get_all_datasets(); mirror it.
         erddap.df_all_datasets = erddap.get_all_datasets()
     return erddap
 
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 class TestERDDAPInit:
     def test_url_is_stored(self):
@@ -65,7 +52,6 @@ class TestERDDAPInit:
         """Rows at index 1 and 2 (units + type rows) must be dropped."""
         erddap = _make_erddap()
         ids = erddap.df_all_datasets["datasetID"].tolist()
-        # The "(String)" units row must NOT appear
         assert "(String)" not in ids
         assert "test_timeseries_001" in ids
 
@@ -148,12 +134,8 @@ class TestErddapCsvToDf:
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
 
     def test_oversize_response_is_abandoned_mid_download(self):
-        """The cap must be enforced while the body streams in, not after.
-
-        Reading the whole body and only then rejecting it is what made a single
-        at-cap request cost most of a gigabyte; a server offering four times the
-        cap must never be pulled down in full.
-        """
+        """The cap must be enforced while the body streams in, so a server
+        offering four times the cap is never pulled down in full."""
         erddap = _make_erddap()
         from cde_harvester.core.errors import ResponseTooLargeError
         from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
@@ -170,12 +152,8 @@ class TestErddapCsvToDf:
         assert mock_resp.closed
 
     def test_streamed_body_decodes_like_response_text(self):
-        """Non-ASCII must survive the stream exactly as requests' .text gave it.
-
-        Handing pandas raw bytes with encoding="unicode_escape" (which is what
-        the old call passed, and which pandas ignored for a str buffer) would
-        turn every UTF-8 accent into mojibake.
-        """
+        """Non-ASCII must survive the stream exactly as requests' .text gave it
+        (encoding="unicode_escape" would turn UTF-8 accents into mojibake)."""
         erddap = _make_erddap()
         csv = "dataset_id,title\n(String),(String)\nds1,Bouée Côtière\n"
         erddap.session.get.return_value = MockResponse(

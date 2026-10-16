@@ -1,11 +1,4 @@
-"""
-Unit tests for cde_harvester.loading.loader.
-
-Tests cover:
-1. Pure helper functions (prepare_profiles_dataframe, ensure_organization_pks)
-2. Full-reload mode: correct SQL functions called, data written to right tables
-3. Incremental mode: temp tables created and process_incremental_update called
-"""
+"""Unit tests for cde_harvester.loading.loader."""
 
 from unittest.mock import MagicMock
 
@@ -20,9 +13,6 @@ from cde_harvester.loading.loader import (
     record_failed_run,
 )
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
@@ -65,10 +55,7 @@ def _patch_loader(mock_engine, mocker):
 
 
 def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
-    """
-    Shared helper: patch create_db_engine and capture SQL strings passed to text().
-    Returns the list of SQL strings that were executed.
-    """
+    """Patch create_db_engine; return the SQL strings passed to text()."""
     mock_text = _patch_loader(mock_engine, mocker)
 
     main.fn(harvest_folder, incremental=incremental)
@@ -77,11 +64,9 @@ def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
 
 
 def _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False, scalar=0):
-    """Run main() and return its summary dict. `scalar` is what every
-    `.scalar()` call yields — notably prune_stale_datasets' removed-row count,
-    which feeds the summary's `pruned` (a bare MagicMock would read as truthy
-    and make every run look changed). It has to be set on both the begin() and
-    connect() chains: the load runs on the former, the prune on the latter."""
+    """Run main() and return its summary. `scalar` feeds prune_stale_datasets'
+    removed-row count (a bare MagicMock reads as truthy, so every run would look
+    changed); set on both begin() (load) and connect() (prune) chains."""
     engine, conn = mock_engine
     conn.execute.return_value.scalar.return_value = scalar
     (
@@ -92,10 +77,6 @@ def _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False, sc
 
     return main.fn(harvest_folder, incremental=incremental)
 
-
-# ---------------------------------------------------------------------------
-# Pure function tests
-# ---------------------------------------------------------------------------
 
 class TestPrepareProfilesDataframe:
     def test_removes_altitude_columns(self, sample_profiles_df):
@@ -172,14 +153,9 @@ class TestEnsureOrganizationPks:
         assert all(isinstance(v, list) for v in result["organization_pks"])
 
 
-# ---------------------------------------------------------------------------
-# main() — full reload mode
-# ---------------------------------------------------------------------------
-
 class TestDbLoaderMainFullReload:
     def test_no_constraint_ddl_toggling(self, harvest_folder, mock_engine, mocker):
-        # Full reload no longer drops/re-adds constraints via ALTER TABLE:
-        # columns are permanently NULL-able and the hex FKs are DEFERRABLE.
+        # Constraints are permanent: NULL-able columns, DEFERRABLE hex FKs.
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
         assert not any("drop_constraints" in s for s in sql_calls)
 
@@ -204,10 +180,6 @@ class TestDbLoaderMainFullReload:
         assert any("refresh_hexes_zoom_0_rollup" in s for s in sql_calls)
 
 
-# ---------------------------------------------------------------------------
-# main() — incremental mode
-# ---------------------------------------------------------------------------
-
 class TestDbLoaderMainIncremental:
     def test_create_temp_tables_called(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
@@ -230,10 +202,6 @@ class TestDbLoaderMainIncremental:
         assert not any("drop_constraints" in s for s in sql_calls)
         assert not any("remove_all_data" in s for s in sql_calls)
 
-
-# ---------------------------------------------------------------------------
-# main() — the summary it returns
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def unchanged_harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
@@ -286,10 +254,6 @@ class TestLoadSummary:
         assert summary["changed"] is True
         assert summary["full_reload"] is True
 
-
-# ---------------------------------------------------------------------------
-# record_failed_run: a failed run still reaches the harvest dashboard
-# ---------------------------------------------------------------------------
 
 RUN_ID = "11111111-1111-1111-1111-111111111111"
 

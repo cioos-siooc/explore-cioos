@@ -1,9 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.obis.geo_filter.ObisGeoFilter.
-
-All tests use a small synthetic WKT polygon (a box over part of BC)
-written to a tmp_path file, avoiding the large Canada EEZ polygon.
-"""
+"""Unit tests for ObisGeoFilter, on a small synthetic box instead of the Canada EEZ."""
 
 import numpy as np
 import pytest
@@ -14,10 +9,8 @@ TEST_POLYGON_WKT = (
     "POLYGON((-130.0 48.0, -120.0 48.0, -120.0 55.0, -130.0 55.0, -130.0 48.0))"
 )
 
-# A point clearly inside the box
 INSIDE_LAT, INSIDE_LON = 51.0, -125.0
 
-# A point clearly outside (Atlantic Canada)
 OUTSIDE_LAT, OUTSIDE_LON = 44.0, -63.0
 
 
@@ -32,10 +25,6 @@ def polygon_file(tmp_path):
 def geo_filter(polygon_file):
     return ObisGeoFilter(mode="canada", polygon_file=polygon_file)
 
-
-# ---------------------------------------------------------------------------
-# Initialisation
-# ---------------------------------------------------------------------------
 
 class TestObisGeoFilterInit:
     def test_mode_none_sets_no_polygon(self):
@@ -59,10 +48,6 @@ class TestObisGeoFilterInit:
             assert node_id in geo_filter.exempt_node_ids
 
 
-# ---------------------------------------------------------------------------
-# is_exempt
-# ---------------------------------------------------------------------------
-
 class TestIsExempt:
     def test_known_exempt_node_returns_true(self, geo_filter):
         obis_canada_id = "7dfb2d90-9317-434d-8d4e-64adf324579a"
@@ -84,10 +69,6 @@ class TestIsExempt:
         assert gf.is_exempt({}) is True
         assert gf.is_exempt({"nodes": []}) is True
 
-
-# ---------------------------------------------------------------------------
-# extent_intersects
-# ---------------------------------------------------------------------------
 
 class TestExtentIntersects:
     def test_overlapping_extent_returns_true(self, geo_filter):
@@ -115,10 +96,6 @@ class TestExtentIntersects:
         assert gf.extent_intersects(extent) is None
 
 
-# ---------------------------------------------------------------------------
-# bounds
-# ---------------------------------------------------------------------------
-
 class TestBounds:
     def test_returns_polygon_bounding_box(self, geo_filter):
         assert geo_filter.bounds() == (-130.0, 48.0, -120.0, 55.0)
@@ -136,10 +113,6 @@ class TestBounds:
         lon_min, lat_min, lon_max, lat_max = geo_filter.bounds()
         assert not (lon_min <= OUTSIDE_LON <= lon_max and lat_min <= OUTSIDE_LAT <= lat_max)
 
-
-# ---------------------------------------------------------------------------
-# filter_points
-# ---------------------------------------------------------------------------
 
 class TestFilterPoints:
     def test_point_inside_returns_true(self, geo_filter):

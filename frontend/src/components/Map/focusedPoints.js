@@ -1,9 +1,7 @@
 import { featureHasDataset } from "./hitTest.js";
 
-// The focused dataset's markers, copied out of queryRenderedFeatures hits into
-// a GeoJSON collection so they can be redrawn above the greyed rest. A marker
-// near a tile edge is returned once per tile whose buffer holds it, hence the
-// dedupe on the promoted pk.
+// A marker near a tile edge is returned once per tile whose buffer holds it,
+// hence the dedupe on the promoted pk.
 export function focusedPointFeatures(hits, pk) {
   const byId = new Map();
   if (pk !== undefined) {

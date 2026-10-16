@@ -1,21 +1,9 @@
-"""Pandera schemas for harvester DataFrames.
-
-These define the column contract that all harvesters must produce and the
-db-loader consumes. Column names and types mirror database/1_schema.sql where
-applicable — a schema change touches two places: this file and 1_schema.sql
-(the canonical DDL, applied only on a fresh volume; table changes require a
-volume reset + re-harvest, there are no incremental table migrations).
-"""
+"""Column contract between the harvesters and the db-loader; a schema change
+touches this file and database/1_schema.sql."""
 
 import pandera.pandas as pa
 from pandera.typing import Series
 from sqlalchemy.dialects.postgresql import ARRAY, DATERANGE, INTEGER, JSONB, TEXT
-
-# --- Loader-side column metadata ------------------------------------------
-# List-valued columns are serialized by the harvester as Python-repr strings in
-# the CSVs; the loader parses them back (ast.literal_eval) and writes them as
-# PostgreSQL arrays with these dtypes. Kept here, next to the schemas, so the
-# CSV contract has a single home.
 
 DATASET_ARRAY_DTYPES = {
     "eovs": ARRAY(TEXT),
@@ -23,17 +11,14 @@ DATASET_ARRAY_DTYPES = {
     "profile_variables": ARRAY(TEXT),
     "organization_pks": ARRAY(INTEGER),
     "obis_nodes": ARRAY(TEXT),
-    # Per-variable metadata: lists of dicts, stored as jsonb.
     "table_variables": JSONB,
-    # Griddap metadata: lists of dicts, stored as jsonb.
     "grid_variables": JSONB,
     "grid_dimensions": JSONB,
 }
 
 PROFILE_ARRAY_DTYPES = {
     "eovs": ARRAY(TEXT),
-    # psycopg2 range objects, not strings — parameter binding does not coerce
-    # text[] to daterange[] (see core/day_sets.ranges_to_psycopg).
+    # psycopg2 range objects: binding does not coerce text[] to daterange[].
     "day_ranges": ARRAY(DATERANGE),
 }
 
@@ -44,71 +29,54 @@ OBIS_ARRAY_DTYPES = {
 
 
 class ProfileSchema(pa.DataFrameModel):
-    """Schema for the profiles DataFrame.
-
-    Mirrors cde.profiles in the database.
-    """
+    """Mirrors cde.profiles."""
 
     erddap_url: Series[str]
     dataset_id: Series[str]
     timeseries_id: Series[str] = pa.Field(nullable=True, default="")
     profile_id: Series[str] = pa.Field(nullable=True, default="")
-    # Representative display point (exact location, or the bbox midpoint).
+    # Display point (exact location, or the bbox midpoint).
     latitude: Series[float] = pa.Field(ge=-90, le=90)
     longitude: Series[float] = pa.Field(ge=-180, le=180)
-    # Per-feature lat/lon bounding box; the DB derives an indexed bbox geometry
-    # from these and spatial search matches against it (feature extent, not the
-    # single display point).
+    # Spatial search matches this extent, not the display point.
     latitude_min: Series[float] = pa.Field(ge=-90, le=90)
     latitude_max: Series[float] = pa.Field(ge=-90, le=90)
     longitude_min: Series[float] = pa.Field(ge=-180, le=180)
     longitude_max: Series[float] = pa.Field(ge=-180, le=180)
-    # False = feature spans a region (box diagonal > POINT_THRESHOLD_M): kept
-    # searchable + aggregated in hexes, but not drawn as an individual dot.
+    # False = box diagonal > POINT_THRESHOLD_M: in hexes but not drawn as a dot.
     show_as_point: Series[bool] = pa.Field(nullable=False, default=True)
     depth_min: Series[float] = pa.Field(nullable=True)
     depth_max: Series[float] = pa.Field(nullable=True)
     time_min: Series[pa.DateTime] = pa.Field(nullable=True)
     time_max: Series[pa.DateTime] = pa.Field(nullable=True)
     n_records: Series[float] = pa.Field(nullable=True)
-    # Mean records on days that HAVE data, not over the elapsed span — the
-    # download estimator pairs it with a day-set overlap to match
-    # (web-api/utils/shapeQuery.js).
+    # Mean over days that HAVE data, not the elapsed span
+    # (web-api/utils/shapeQuery.js relies on it).
     records_per_day: Series[float] = pa.Field(nullable=True)
     n_profiles: Series[float] = pa.Field(nullable=True)
-    # Distinct UTC days this feature holds data on, and the same set as maximal
-    # runs of consecutive days. The map UNIONS day_ranges across the features in
-    # a hex rather than summing `days`, so overlapping stations don't multiply a
-    # year of coverage into a decade (see core/day_sets.py). Both are NULL for
-    # dataset types whose features can't span more than one day — the database
-    # fills `days` from the time span there, and the web-api falls back to it.
+    # Distinct UTC days, and the same set as maximal runs. The map UNIONS
+    # day_ranges rather than summing `days`. Both NULL for single-day feature
+    # types; the database fills `days` from the time span there.
     days: Series[float] = pa.Field(nullable=True)
     day_ranges: Series[object] = pa.Field(nullable=True)
-    # The EOVs this feature actually carries — a subset of its dataset's eovs,
-    # detected from the per-variable record counts at harvest. Falls back to
-    # the dataset's full list when detection isn't possible, never empty: the
-    # web-api filters with an array overlap, so an empty list would hide the
-    # feature from every EOV selection.
+    # Subset of the dataset's eovs; never empty (falls back to the dataset's
+    # list): the web-api's array overlap would hide the feature from every EOV.
     eovs: Series[object] = pa.Field(nullable=True)
 
     class Config:
         coerce = True
-        strict = False  # allow extra columns during transition
+        strict = False
 
 
 class ObisCellSchema(pa.DataFrameModel):
-    """Schema for the obis_cells DataFrame.
-
-    Mirrors cde.obis_cells in the database.
-    """
+    """Mirrors cde.obis_cells."""
 
     dataset_id: Series[str]
     latitude: Series[float] = pa.Field(ge=-90, le=90)
     longitude: Series[float] = pa.Field(ge=-180, le=180)
-    scientific_names: Series[object]  # list column, stored as text[] in DB
+    scientific_names: Series[object]
     n_records: Series[float] = pa.Field(nullable=True)
     days: Series[float] = pa.Field(nullable=True)
-    # The same day set as `days`, as maximal runs — see ProfileSchema.
     day_ranges: Series[object] = pa.Field(nullable=True)
     time_min: Series[pa.DateTime] = pa.Field(nullable=True)
     time_max: Series[pa.DateTime] = pa.Field(nullable=True)
@@ -121,14 +89,8 @@ class ObisCellSchema(pa.DataFrameModel):
 
 
 class TrajectoryDaySchema(pa.DataFrameModel):
-    """Schema for the trajectory_days DataFrame.
-
-    Mirrors cde.trajectory_days in the database: one row per
-    (trajectory, UTC day) a Trajectory/TrajectoryProfile dataset reported on.
-    Attribute-only — WHERE the platform was that day comes from
-    TrajectoryPointSchema, which the database sweeps through the hex grid
-    (trajectory_build_hexes in database/4_create_hexes.sql).
-    """
+    """Mirrors cde.trajectory_days: one row per (trajectory, UTC day).
+    Attribute-only; location comes from TrajectoryPointSchema."""
 
     erddap_url: Series[str]
     dataset_id: Series[str]
@@ -145,15 +107,9 @@ class TrajectoryDaySchema(pa.DataFrameModel):
 
 
 class TrajectoryPointSchema(pa.DataFrameModel):
-    """Schema for the trajectory_points DataFrame.
-
-    Mirrors cde.trajectory_points in the database: one row per
-    (trajectory, retained fix) — ordered, downsampled RAW track positions
-    (per-profile fixes for TrajectoryProfile, first-fix-per-day for plain
-    Trajectory). The source both for track-line rendering and for the map's
-    hex coverage: the database sweeps the segments between these fixes through
-    the hex grid, so their spacing sets the resolution of the coverage layer.
-    """
+    """Mirrors cde.trajectory_points: downsampled raw fixes. The database sweeps
+    the segments between them through the hex grid, so their spacing sets the
+    coverage layer's resolution."""
 
     erddap_url: Series[str]
     dataset_id: Series[str]
@@ -169,20 +125,17 @@ class TrajectoryPointSchema(pa.DataFrameModel):
 
 
 class DatasetSchema(pa.DataFrameModel):
-    """Schema for the datasets DataFrame.
-
-    Mirrors cde.datasets in the database.
-    """
+    """Mirrors cde.datasets."""
 
     title: Series[str] = pa.Field(nullable=True)
     erddap_url: Series[str]
     dataset_id: Series[str]
     cdm_data_type: Series[str] = pa.Field(nullable=True)
     platform: Series[str] = pa.Field(nullable=True)
-    eovs: Series[object]  # list column, stored as text[] in DB
-    organizations: Series[object]  # list column, stored as text[] in DB
+    eovs: Series[object]
+    organizations: Series[object]
     n_profiles: Series[float] = pa.Field(nullable=True)
-    profile_variables: Series[object]  # list column
+    profile_variables: Series[object]
     timeseries_id_variable: Series[str] = pa.Field(nullable=True)
     profile_id_variable: Series[str] = pa.Field(nullable=True)
     trajectory_id_variable: Series[str] = pa.Field(nullable=True)
@@ -193,7 +146,7 @@ class DatasetSchema(pa.DataFrameModel):
     content_hash_reason: Series[str] = pa.Field(nullable=True)
     last_updated_at: Series[pa.DateTime] = pa.Field(nullable=True)
     verified_at: Series[pa.DateTime] = pa.Field(nullable=True)
-    # Griddap (metadata-only) coverage + structure; None for all other types.
+    # Griddap only.
     coverage_lat_min: Series[float] = pa.Field(nullable=True)
     coverage_lat_max: Series[float] = pa.Field(nullable=True)
     coverage_lon_min: Series[float] = pa.Field(nullable=True)
@@ -202,9 +155,9 @@ class DatasetSchema(pa.DataFrameModel):
     coverage_time_max: Series[pa.DateTime] = pa.Field(nullable=True)
     coverage_depth_min: Series[float] = pa.Field(nullable=True)
     coverage_depth_max: Series[float] = pa.Field(nullable=True)
-    table_variables: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
-    grid_variables: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
-    grid_dimensions: Series[object] = pa.Field(nullable=True)  # list of dicts -> jsonb
+    table_variables: Series[object] = pa.Field(nullable=True)
+    grid_variables: Series[object] = pa.Field(nullable=True)
+    grid_dimensions: Series[object] = pa.Field(nullable=True)
     wms_url: Series[str] = pa.Field(nullable=True)
 
     class Config:
@@ -225,10 +178,7 @@ class VerifiedDatasetSchema(pa.DataFrameModel):
 
 
 class VariableSchema(pa.DataFrameModel):
-    """Schema for the variables DataFrame.
-
-    No corresponding DB table — used internally during harvesting.
-    """
+    """No DB table; internal to harvesting."""
 
     name: Series[str]
     type: Series[str] = pa.Field(nullable=True)
@@ -243,10 +193,7 @@ class VariableSchema(pa.DataFrameModel):
 
 
 class SkippedDatasetSchema(pa.DataFrameModel):
-    """Schema for the skipped datasets DataFrame.
-
-    Mirrors cde.skipped_datasets in the database.
-    """
+    """Mirrors cde.skipped_datasets."""
 
     erddap_url: Series[str]
     dataset_id: Series[str]
@@ -258,10 +205,7 @@ class SkippedDatasetSchema(pa.DataFrameModel):
 
 
 class HarvestRunSchema(pa.DataFrameModel):
-    """Schema for the harvest_runs DataFrame (one row per harvester invocation).
-
-    Mirrors cde.harvest_runs in the database.
-    """
+    """Mirrors cde.harvest_runs."""
 
     run_id: Series[str]
     started_at: Series[pa.DateTime]
@@ -269,12 +213,9 @@ class HarvestRunSchema(pa.DataFrameModel):
     git_sha: Series[str] = pa.Field(nullable=True)
     status: Series[str]
     error_message: Series[str] = pa.Field(nullable=True)
-    # Prefect flow-run id for this harvest, so the dashboard can deep-link to
-    # the Prefect UI. Null for bare-CLI runs (no flow context).
     prefect_flow_run_id: Series[str] = pa.Field(nullable=True)
-    # 'full' (all configured sources) or 'single' (one source). triggered_source
-    # is the requested source (erddap url or 'obis'); triggered_by is the user
-    # who launched it from the dashboard (Cloudflare-Access email), if any.
+    # 'full' or 'single'. triggered_by: the dashboard user's Cloudflare-Access
+    # email, if any.
     scope: Series[str] = pa.Field(nullable=True)
     triggered_source: Series[str] = pa.Field(nullable=True)
     triggered_by: Series[str] = pa.Field(nullable=True)
@@ -285,10 +226,7 @@ class HarvestRunSchema(pa.DataFrameModel):
 
 
 class HarvestAttemptSchema(pa.DataFrameModel):
-    """Schema for the harvest_attempts DataFrame (one row per dataset per run).
-
-    Mirrors cde.harvest_attempts in the database.
-    """
+    """Mirrors cde.harvest_attempts."""
 
     run_id: Series[str]
     erddap_url: Series[str]
@@ -299,13 +237,8 @@ class HarvestAttemptSchema(pa.DataFrameModel):
     error_message: Series[str] = pa.Field(nullable=True)
     duration_ms: Series[float] = pa.Field(nullable=True)
     attempted_at: Series[pa.DateTime]
-    # Newline-joined URLs the harvester fired for this dataset. Stored as
-    # text (not text[]) because pandas + to_sql array handling needs custom
-    # dtypes; a newline-delimited blob is plenty for "show the admin what
-    # we asked for". Splitter lives in the dashboard.
+    # Newline-joined, text not text[]; the dashboard splits it.
     query_urls: Series[str] = pa.Field(nullable=True)
-    # Non-fatal note for an otherwise-successful dataset, shown on the harvest
-    # dashboard (e.g. features hidden from the map because they span a region).
     warnings: Series[str] = pa.Field(nullable=True)
 
     class Config:

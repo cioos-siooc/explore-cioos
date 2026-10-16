@@ -19,10 +19,8 @@ const BASE_PROPS = {
   dataLayers: DEFAULT_DATA_LAYERS,
 };
 
-// Legend always mounts LegendFooter (the scale bar / credits, backed by
-// MapStateProvider's mapInstance) and, once a trajectory layer is on, the
-// TrajectoryDate group — both real context consumers — so every render needs
-// the full "app" provider stack, not just i18n/router.
+// LegendFooter and TrajectoryDate are real context consumers, so every render
+// needs the full "app" provider stack.
 function renderLegend(props) {
   return renderWithProviders(<Legend {...BASE_PROPS} {...props} />, {
     providers: "app",

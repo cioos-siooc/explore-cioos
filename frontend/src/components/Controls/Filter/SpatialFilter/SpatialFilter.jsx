@@ -19,20 +19,8 @@ import { useUI } from "../../../../state/ui/UIProvider.jsx";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
 
-// The Area filter inside the Filters panel — the same drawn box/polygon as
-// the top bar's spatial filter button (SpatialFilterButton), reading the
-// same state (polygon, in SelectionProvider) and issuing the same one-shot
-// draw request (requestDraw, in MapStateProvider). Unlike that button's
-// dropdown, which floats over a corner of the still-visible map, the Filters
-// modal covers it — so picking a shape here closes the modal first, the same
-// way a phone's Filters view already hides the map, then reappears once the
-// user is done.
-//
-// No "arm the last-used tool on open" behaviour here: the button auto-arms
-// because opening its menu *is* the start of drawing, but opening this pane
-// is just browsing filters, so only an explicit click on a shape starts a
-// draw. That also means there is nothing to remember once no shape is drawn
-// — the two rows sit unhighlighted until one is.
+// Unlike SpatialFilterButton this doesn't auto-arm the last tool on open:
+// opening this pane is browsing, not the start of drawing.
 export default function SpatialFilter() {
   const { t } = useTranslation();
   const { requestDraw } = useMapState();
@@ -52,10 +40,6 @@ export default function SpatialFilter() {
       ? "box"
       : "polygon"
     : undefined;
-  // The envelope, not just the drawn ring: for a box it's the same four
-  // corners, but a freeform polygon has no single "bounding box" of its own
-  // — this is its enclosing one, the same figures a WMS/ERDDAP bbox query
-  // would need.
   const bounds = hasSelection ? polygonBounds(polygon) : undefined;
   const wkt = hasSelection ? polygonToWkt(polygon) : "";
 
@@ -84,9 +68,6 @@ export default function SpatialFilter() {
       </div>
       {hasSelection && (
         <div className="spatialFilterDetails">
-          {/* Compass layout — N over W/E over S — rather than a plain list,
-              so the four figures read as the shape's envelope, not four
-              unrelated values. */}
           <dl className="spatialFilterBounds">
             <div className="spatialFilterBoundsNorth">
               <dt>{t("spatialFilterNorth")}</dt>

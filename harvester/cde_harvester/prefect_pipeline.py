@@ -44,10 +44,8 @@ logger = logging.getLogger(__name__)
 
 
 def _run_logger():
-    """Prefect run logger when inside a run, else the module logger.
-
-    The pipeline steps below are plain methods now (not @flow), so some run
-    outside a flow context (e.g. init_config on the prod deploy path)."""
+    """Some steps run outside a flow context (e.g. init_config on the prod
+    deploy path)."""
     return run_logger(logger)
 
 # Upload at most this many bytes (tail) of the log into the markdown artifact;
@@ -56,10 +54,6 @@ _LOG_ARTIFACT_MAX_BYTES = 200_000
 
 
 def _publish_log_artifact(log_path):
-    """Upload the harvest log file as a Prefect markdown artifact (keyed
-    'harvest-log') so it's viewable from the run's Artifacts tab. If
-    HARVESTER_LOG_BASE_URL is set, also embed a clickable link to the served
-    file (served at {base}/harvester_logs/{name}). No-op outside a run context."""
     if not log_path:
         return
     try:
@@ -94,11 +88,10 @@ def _publish_log_artifact(log_path):
         )
         logger.info("Published harvest log Prefect artifact (%s)", name)
     except Exception as e:
-        # Outside a flow/task run context, or API hiccup — never fail the run for this.
+        # Never fail the run for this.
         logger.debug("Could not publish log artifact: %s", e)
 
 
-# Process work pool the worker(s) poll; flows run in-process (no spawned containers).
 POOL_NAME = "cde-process-pool"
 # @flow name of cde_pipeline_run; must match harvest-dashboard/app/config.HARVEST_FLOW_NAME.
 HARVEST_FLOW_NAME = "Harvest Source"
@@ -111,13 +104,10 @@ PRUNE_GRACE_SECONDS = 6 * 3600
 
 
 def _timestamp():
-    # UTC: these name the per-run output folders, which are compared and
-    # pruned by timestamp order (see PRUNE_GRACE_SECONDS).
     return datetime.now(UTC).strftime(TIMESTAMP_FMT)
 
 
 def _server_run_folder(base_folder, slug, timestamp):
-    """Per-server, per-run output folder: {base}/{slug}/{timestamp}."""
     return Path(base_folder) / slug / timestamp
 
 
@@ -145,7 +135,6 @@ def _harvest_file_log(log_dir, log_level, label):
 
 
 def _prune_server_run_folders(base_folder, keep=KEEP_RUNS_PER_SERVER, protect=()):
-    """Keep the newest `keep` timestamped runs per server under base_folder; reclaim older ones."""
     base = Path(base_folder)
     protect = {Path(p).resolve() for p in (protect or ())}
     now = time.time()
@@ -181,10 +170,7 @@ def deployment_slug(source):
 
 
 def _trigger_vernaculars():
-    """Queue a WoRMS backfill for the scientific names this OBIS load added.
-
-    Fire-and-forget: the harvest has already loaded, so a submit failure is
-    logged rather than failing the run."""
+    """Fire-and-forget: the harvest already loaded, so a failure only logs."""
     logger = _run_logger()
     try:
         flow_run = run_deployment(name=VERNACULARS_DEPLOYMENT, timeout=0)
@@ -199,14 +185,9 @@ def _cron_env(var_name):
 
 
 def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
-    """The list of harvestable sources: each ERDDAP url, plus "obis" when OBIS is on.
-
-    Shared by create_deployment() and cde_harvest_all_run() — the registered
-    per-source deployments and the fan-out list must never disagree, or OBIS
-    ends up registered but never triggered (or vice versa), which is silent
-    data loss. Note that under discovery `obis_dataset_ids` is empty at config
-    time, so it can't be used alone to decide whether OBIS is configured.
-    """
+    """Shared by create_deployment() and cde_harvest_all_run(): registered
+    deployments and the fan-out list must never disagree. Under discovery
+    `obis_dataset_ids` is empty at config time."""
     sources = [u.strip() for u in (erddap_urls or "").split(",") if u.strip()] \
         if isinstance(erddap_urls, str) else [u.strip() for u in (erddap_urls or []) if u and u.strip()]
     if obis_dataset_ids or (obis_discovery or {}).get("enabled", bool(obis_discovery)):
@@ -215,7 +196,7 @@ def _configured_sources(erddap_urls, obis_dataset_ids, obis_discovery):
 
 
 def _record_failed_run(run_folder, error):
-    """Put a failed run on the harvest dashboard. Never masks the run's own error."""
+    """Never masks the run's own error."""
     logger = _run_logger()
     try:
         record_failed_run(str(run_folder), f"{type(error).__name__}: {error}")
@@ -241,7 +222,6 @@ class PrefectCDEPipeline:
     triggered_by: str
 
     def init_config(self, config_file=None):
-        """Load harvest_config.yaml into this pipeline instance."""
         logger = _run_logger()
         logger.info("INIT CDE Pipeline")
         if not config_file:
@@ -258,13 +238,10 @@ class PrefectCDEPipeline:
         self.log_dir = os.environ.get("HARVESTER_LOG_DIR") or config.get("log_dir")
         self.incremental = config.get("incremental", False)
         self.flush_redis = config.get("flush_redis", False)
-        # Defaults; cde_pipeline_run() overrides these for a single-source run.
         self.source = None
         self.triggered_by = None
-        # Declarative only — discovery itself runs inside the OBIS harvest task.
-        # init_config() is also called at deployment-registration time, so a
-        # network call here would make container startup depend on api.obis.org
-        # and would fire on every ERDDAP-only per-source run.
+        # No discovery here: init_config() also runs at deployment
+        # registration, which must not depend on api.obis.org.
         obis = resolve_obis_config(config)
         logger.info("OBIS selection mode: %s", obis.mode)
         self.obis_dataset_ids = obis.dataset_ids
@@ -272,9 +249,7 @@ class PrefectCDEPipeline:
         self.obis_geo_filter = obis.geo_filter
         self.obis_folder = config.get("obis_folder")
 
-        # Parse-and-discard so a malformed OBIS block fails here — at container
-        # startup / deployment registration — instead of at the first harvest.
-        # Neither call touches the network.
+        # Fail a malformed OBIS block at registration, not the first harvest.
         ObisDiscoveryConfig.from_config(self.obis_discovery)
         ObisGeoFilter.from_config(self.obis_geo_filter)
 
@@ -282,11 +257,9 @@ class PrefectCDEPipeline:
         logger.info(f"{vars(self)}")
 
     def cde_pipeline(self):
-        """Harvest one source (or all), load to DB, optionally refresh redis."""
         logger = _run_logger()
         logger.info("Starting CDE Pipeline")
 
-        # Per-server, per-run folder {base}/{slug}/{ts} so concurrent runs don't clobber.
         base_folder = Path(self.folder)
         slug = deployment_slug(self.source) if self.source else "full"
         run_folder = _server_run_folder(base_folder, slug, _timestamp())
@@ -295,13 +268,9 @@ class PrefectCDEPipeline:
             if log_path:
                 logger.info("Writing harvest log file: %s (served at /harvester_logs/)", log_path)
 
-            # try/finally so the log file is uploaded as a Prefect artifact on
-            # both success AND failure (a failed run is exactly when the log
-            # matters); the per-dataset status table is published separately
-            # from the harvester (see __main__._publish_status_artifact).
             try:
-                # OBIS cache is shared across runs and MUST live outside the per-run tree
-                # (pruning rmtrees per-server run dirs); keep it a sibling of base_folder.
+                # The shared OBIS cache MUST live outside the per-run tree, which
+                # pruning rmtrees.
                 obis_folder = (
                     Path(self.obis_folder)
                     if self.obis_folder
@@ -313,9 +282,8 @@ class PrefectCDEPipeline:
                 )
                 logger.info("Run output folder: %s (shared OBIS cache: %s)", run_folder, obis_folder)
 
-                # Force incremental for single-source runs (full-reload would wipe
-                # other sources). Computed here so skip_unchanged is only set when
-                # the load is incremental — a skipped dataset is omitted from the CSV.
+                # A full reload would wipe other sources; skip_unchanged is only
+                # safe for incremental loads (skipped datasets are omitted).
                 effective_incremental = self.incremental or bool(self.source)
                 if self.source and not self.incremental:
                     logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
@@ -328,13 +296,8 @@ class PrefectCDEPipeline:
                 except Exception as e:
                     _record_failed_run(run_folder, e)
                     raise
-                # Prune only after a successful load so failed runs' CSVs survive.
                 _prune_server_run_folders(base_folder, protect=[run_folder])
 
-                # A run where every dataset hashed unchanged moved nothing the API
-                # serves, so dropping the cache would only make the next visitor
-                # pay for a rebuild that changes no bytes. The load itself decides
-                # this — see the summary returned by loading/loader.py:main.
                 if self.flush_redis and load_summary["changed"]:
                     logger.info("Refreshing redis cache")
                     try:
@@ -369,9 +332,6 @@ class PrefectCDEPipeline:
                 dataset_ids=self.dataset_ids,
                 obis_dataset_ids=self.obis_dataset_ids,
                 obis_folder=str(obis_folder),
-                # Both of these were previously never passed, so the
-                # documented obis_geo_filter config block was silently
-                # ignored on the Prefect (production) path.
                 obis_geo_filter=self.obis_geo_filter,
                 obis_discovery=self.obis_discovery,
                 source=self.source,
@@ -402,7 +362,6 @@ class PrefectCDEPipeline:
         )
 
     def create_process_work_pool(self, pool_name="cde-process-pool"):
-        """Create the `process` work pool (idempotent; safe under concurrent replicas)."""
         base_job_template = {
             "job_configuration": {
                 "command": "{{ command }}",
@@ -417,7 +376,6 @@ class PrefectCDEPipeline:
                 "properties": {
                     "command": {
                         "type": "string",
-                        # Must use 'uv run' because prefect lives in the uv venv.
                         "default": "uv run prefect flow-run execute",
                     },
                     "env": {"type": "object"},
@@ -446,38 +404,24 @@ class PrefectCDEPipeline:
                 )
                 logger.info("CDE process work pool created: %s", pool_name)
             except Exception as e:
-                # Another replica may have won the create race; treat as success.
                 if "already exists" in str(e).lower():
                     logger.info("CDE process work pool created concurrently: %s", pool_name)
                 else:
                     raise
 
     def create_deployment(self):
-        """Register the work pool + all deployments (idempotent)."""
         self.create_process_work_pool(POOL_NAME)
 
-        # Flow code is loaded from the package dir baked into the image, resolved
-        # from this module's location so it works locally and on every worker.
         source_dir = str(Path(__file__).resolve().parent.parent)
 
-        # Surface stdlib logging from non-flow code in the Prefect UI; everything
-        # else is inherited from the worker container's env.
         job_vars = {
             "env": {
                 "PREFECT_LOGGING_EXTRA_LOGGERS": "populate_vernaculars,cde_harvester",
-                # Escape hatch for the db-loader full-reload guard: set to 1 to
-                # permit a full reload that prunes sources missing from the
-                # incoming harvest (e.g. dropping OBIS). Empty = guard enforced.
-                # The process worker inherits this from its container env too,
-                # but set it explicitly so the guard's state travels with the
-                # deployment job vars.
                 "CDE_ALLOW_FULL_RELOAD": os.getenv("CDE_ALLOW_FULL_RELOAD", ""),
             },
         }
 
-        # Deploy cde_pipeline_run (a plain @flow function) — Prefect can't fill
-        # `self` for the bound-method flow.
-        # All-sources harvest in one run, on-demand only (the orchestrator carries the schedule).
+        # A plain @flow function: Prefect can't fill `self` for a bound method.
         harvest_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:cde_pipeline_run",
@@ -489,8 +433,6 @@ class PrefectCDEPipeline:
             job_variables=job_vars,
         )
 
-        # WoRMS vernaculars backfill: always registered, triggered after every OBIS
-        # load (see _trigger_vernaculars), plus VERNACULARS_CRON if set.
         vernaculars_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:populate_vernaculars_run",
@@ -501,9 +443,6 @@ class PrefectCDEPipeline:
             job_variables=job_vars,
         )
 
-        # One on-demand deployment per source (re-deploy updates rather than
-        # duplicates). The dashboard "Trigger harvest" button and the orchestrator
-        # both run these by name; each forces incremental db-load (see cde_pipeline).
         per_source = _configured_sources(
             self.erddap_urls, self.obis_dataset_ids, self.obis_discovery
         )
@@ -526,8 +465,6 @@ class PrefectCDEPipeline:
             source_deployment_names.append(dep_name)
             logger.info("Per-source deployment registered: %s (source=%s)", dep_name, src)
 
-        # Destructive schema rebuild, on-demand only — never scheduled, and gated on a
-        # confirm parameter matching DB_NAME (see cde_rebuild_database_run).
         rebuild_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:cde_rebuild_database_run",
@@ -538,8 +475,7 @@ class PrefectCDEPipeline:
             job_variables=job_vars,
         )
 
-        # Scheduled fan-out orchestrator: on each HARVESTER_CRON tick it triggers
-        # the per-source deployments above (registered first so they resolve at run time).
+        # Registered after the per-source deployments it triggers.
         orchestrator_id = flow.from_source(
             source=source_dir,
             entrypoint="cde_harvester/prefect_pipeline.py:cde_harvest_all_run",
@@ -562,16 +498,14 @@ class PrefectCDEPipeline:
 
 
 def _pipeline_run_name():
-    """Per-run label: every ERDDAP source -> 'harvest-erddap-{full-host}'
-    (host with dots replaced by dashes), OBIS -> 'harvest-obis', full run ->
-    'harvest-full'. This sets only the flow_run_name — the flow NAME stays
-    'Harvest Source' so the dashboard deployment lookup still works."""
+    """Only the flow_run_name: the flow NAME stays 'Harvest Source' for the
+    dashboard deployment lookup."""
     from prefect.runtime import flow_run
 
     source = (flow_run.parameters or {}).get("source")
     if not source:
         return "harvest-full"
-    slug = deployment_slug(source)  # full host, dots -> dashes (e.g. erddap-amundsenscience-com)
+    slug = deployment_slug(source)
     if slug == "obis":
         return "harvest-obis"
     return f"harvest-erddap-{slug}"
@@ -593,10 +527,6 @@ def cde_pipeline_run(
     pipeline.cde_pipeline()
 
 
-# Poll cadence and tolerance for _trigger_source_harvest's wait loop. We poll the
-# child's terminal state ourselves (rather than letting run_deployment block) so a
-# transient Prefect-API blip while WAITING doesn't masquerade as a harvest failure.
-# Only give up after the API is unreachable for ~this many consecutive polls.
 _POLL_INTERVAL_S = 5
 _MAX_CONSECUTIVE_POLL_FAILURES = 60  # ~5 min of continuous API unavailability
 
@@ -606,23 +536,15 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
     """Submit the per-source deployment for `source` and wait for it to finish; return a
     status dict (never raises).
 
-    Submit and wait are deliberately separated. A failure to SUBMIT is a genuine
-    TRIGGER_ERROR (deployment missing / API down). Once submitted, the child runs
-    independently on the worker, so a transient API error while we poll for its
-    completion is NOT a harvest failure — we log it and keep polling by flow_run id.
-    A naive run_deployment() that blocks-and-polls conflates the two: a 500 during the
-    poll (e.g. shared-Postgres commit timeouts under a 10-source fan-out) would surface
-    as TRIGGER_ERROR even though the child kept running and loaded its data. Note we do
-    NOT use @task(retries=...) for the same reason: a retry would re-submit and spawn a
-    duplicate child harvest."""
+    Submit and wait are separate: a transient API error while polling a submitted
+    child is not a harvest failure, so it is tolerated. No @task(retries=...): a
+    retry would spawn a duplicate child harvest."""
     logger = get_run_logger()
     deployment_name = f"{HARVEST_FLOW_NAME}/cde-harvester-{deployment_slug(source)}"
     params = {"source": source}
     if triggered_by:
         params["triggered_by"] = triggered_by
 
-    # Submit only (timeout=0 returns immediately without waiting). A failure here is a
-    # real trigger error.
     try:
         flow_run = run_deployment(name=deployment_name, parameters=params, timeout=0)
     except Exception as e:  # deployment missing / API error — report, don't abort the batch
@@ -634,7 +556,6 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
     base = {"source": source, "deployment": deployment_name,
             "flow_run_id": str(flow_run_id), "flow_run_name": flow_run_name}
 
-    # Wait for a terminal state, polling by id and tolerating transient read errors.
     consecutive_failures = 0
     last_error = None
     while True:
@@ -652,8 +573,7 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
                 _MAX_CONSECUTIVE_POLL_FAILURES, last_error,
             )
             if consecutive_failures >= _MAX_CONSECUTIVE_POLL_FAILURES:
-                # API unreachable for too long — surface it, but distinct from
-                # TRIGGER_ERROR: the child was submitted and may well have completed.
+                # Distinct from TRIGGER_ERROR: the child may well have completed.
                 return {**base, "state": "POLL_ERROR", "completed": False,
                         "error": f"gave up polling after {consecutive_failures} "
                                  f"consecutive failures: {last_error}"}
@@ -673,8 +593,6 @@ def cde_harvest_all_run(
 ):
     """Scheduled fan-out: trigger one independent per-source harvest job per configured source,
     wait for all, and fail red if any did not complete (a failure doesn't cancel the others)."""
-    # _run_logger() rather than get_run_logger() so the source-resolution logic
-    # below is callable (and testable) outside a flow context.
     logger = _run_logger()
 
     config_file = resolve_harvest_config_file(config_file)
@@ -757,22 +675,13 @@ def cde_rebuild_database_run(
 ):
     """DESTRUCTIVE: drop the cde schema, recreate it from database/*.sql, re-harvest.
 
-    For when a deploy changes the table layout. Postgres applies 1_schema.sql only on a
-    fresh volume and db_migrate re-applies only the [3-9] function files, so the tables
-    silently stay on the old layout and every query against a new table fails with
-    `relation "cde.x" does not exist`. This rebuilds them without volume surgery or host
-    shell access.
+    For when a deploy changes the table layout: Postgres applies 1_schema.sql only on a
+    fresh volume and db_migrate re-applies only the [3-9] function files.
 
-    ALL HARVESTED DATA IS LOST — same as deleting the Postgres volume. To proceed,
-    `confirm` must be the database name (DB_NAME); anything else aborts before touching
-    the schema, so a stray Run in the Prefect UI cannot wipe a database by accident.
+    ALL HARVESTED DATA IS LOST. `confirm` must be the database name (DB_NAME).
 
-    run_harvest: trigger "Harvest All Sources" afterwards to repopulate (the rebuilt
-    schema is empty, so the app has no data until a harvest completes).
+    run_harvest: trigger "Harvest All Sources" afterwards to repopulate.
     """
-    # _run_logger (not get_run_logger) so the flow body also works when called
-    # directly via .fn outside a run context — which is how it is tested, and how it
-    # can be driven by hand if the Prefect API is unreachable.
     logger = _run_logger()
 
     expected = check_confirmation(
@@ -784,10 +693,8 @@ def cde_rebuild_database_run(
         expected, core_db.db_host(), f" (triggered by {triggered_by})" if triggered_by else "",
     )
 
-    # The database itself may not exist: a volume that initialised before DB_NAME was
-    # set has only the default `postgres` database (POSTGRES_DB=$DB_NAME was empty), and
-    # every connection then fails with 'database "cde" does not exist'. Create it first —
-    # the rebuild cannot, since CREATE DATABASE will not run inside a transaction.
+    # A volume initialised before DB_NAME was set has only `postgres`; CREATE
+    # DATABASE can't run inside the rebuild's transaction.
     maint = core_db.maintenance_engine()
     try:
         if ensure_database(maint, expected):
@@ -809,8 +716,6 @@ def cde_rebuild_database_run(
         report["init_file"], ", ".join(report["function_files"]), report["tables_created"],
     )
 
-    # Tiles and legend ranges are cached per-geometry; after a wipe they describe data
-    # that no longer exists, so serve-stale would outlive the rebuild.
     if flush_redis:
         try:
             clearRedisCache()
@@ -824,11 +729,8 @@ def cde_rebuild_database_run(
         )
         return report
 
-    # The schema rebuild above is already committed and irreversible. A failure to
-    # SUBMIT the follow-up harvest (deployment not registered yet on a brand-new
-    # install, API hiccup) must not fail this flow: a red run after a successful drop
-    # invites someone to re-run a destructive operation that already did its job. Report
-    # it in the result and let the harvest be triggered by hand.
+    # Don't fail the flow here: a red run after a successful drop invites
+    # re-running a destructive operation that already did its job.
     logger.info("Triggering 'Harvest All Sources' to repopulate the empty schema")
     try:
         run_deployment(
@@ -873,22 +775,16 @@ def main():
     if not args.file:
         logger.error("No config file provided. Use -f to specify harvest_config.yaml")
         sys.exit(1)
-    # Honor HARVEST_CONFIG_B64 (e.g. from Coolify) at registration time too, not
-    # just at flow runtime. Registration derives the per-source deployment list
-    # from this config, so if it ignored the env var the per-source deployments
-    # would reflect the baked config while the orchestrator resolves the env var
-    # at run time — a mismatch that makes every per-source trigger fail.
+    # Resolve HARVEST_CONFIG_B64 at registration too, or the per-source
+    # deployments diverge from what the orchestrator resolves at run time.
     config_file = resolve_harvest_config_file(args.file)
     try:
         if args.deployment == "prod":
-            # 'prod' only REGISTERS deployments and exits; the worker runs them.
             pipeline = PrefectCDEPipeline()
             pipeline.init_config(config_file=config_file)
             deploy(pipeline)
         else:
-            # Local full run: go through the Harvest Source flow so init/harvest/
-            # load all execute inside a flow context (the harvest .submit() tasks
-            # need a task runner).
+            # The harvest .submit() tasks need a flow's task runner.
             cde_pipeline_run(config_file=config_file)
     except Exception as e:
         logger.error(f"CDE Pipeline failed: {e}", exc_info=True)

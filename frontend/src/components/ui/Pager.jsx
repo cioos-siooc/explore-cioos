@@ -5,17 +5,12 @@ import { useTranslation } from "react-i18next";
 
 import "./pagerStyles.css";
 
-// The page sizes every paged card list in the app offers, the first being the
-// default. One list's idea of "a page" should not differ from another's.
 export const PAGE_SIZES = [25, 50, 100];
 
-// How many numbered buttons the pager shows around the current page before it
-// falls back to ellipses (kept small — these lists live in a ~420px column).
+// Kept small: these lists live in a ~420px column.
 const PAGE_WINDOW = 1;
 
-// The page numbers to offer: always the first and last, the current page and
-// its neighbours, with '…' standing in for the runs left out. Returns e.g.
-// [1, '…', 7, 8, 9, '…', 24].
+// e.g. [1, '…', 7, 8, 9, '…', 24].
 function pageButtons(current, pageCount) {
   const wanted = new Set([1, pageCount]);
   for (
@@ -29,8 +24,7 @@ function pageButtons(current, pageCount) {
   const out = [];
   let previous = 0;
   for (const page of pages) {
-    // A single skipped page is worth showing outright — an ellipsis standing in
-    // for one number is both wider and less useful than the number.
+    // An ellipsis standing in for one number is wider and less useful than it.
     if (page - previous === 2) out.push(previous + 1);
     else if (page - previous > 2) out.push(`gap-${page}`);
     out.push(page);
@@ -39,14 +33,8 @@ function pageButtons(current, pageCount) {
   return out;
 }
 
-// The pager under a paged card list: which slice is on screen, the way to the
-// other pages, and how many items a page holds. Purely presentational — the
-// list owns `page` and `pageSize`, because only it knows what a page of its
-// own items is (a grouped list pages its rows, not its headers).
-//
-// `label` names the list for a screen reader ("Dataset list pages") and
-// `perPageLabel` its size control ("Datasets per page"); both are the caller's
-// words, since only it knows what is being paged.
+// Presentational: the list owns `page` and `pageSize`, since a grouped list
+// pages its rows, not its headers.
 export default function Pager({
   page,
   pageCount,
@@ -122,10 +110,8 @@ export default function Pager({
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
           title={perPageLabel}
         >
-          {/* The number is put in place here rather than interpolated: a
-              numeric `count` option is i18next's pluralization trigger (see
-              the note in Map.jsx), and the unit is the only translated part of
-              "25 per page" anyway. */}
+          {/* Not interpolated: a numeric `count` option triggers i18next
+              pluralization (see the note in Map.jsx). */}
           {pageSizes.map((size) => (
             <option key={size} value={size}>
               {`${size} ${t("pagerPerPageUnitText")}`}

@@ -42,24 +42,20 @@ const SelectionContext = createContext();
 
 // cdm_data_types that never render as platform-coloured point markers: grids
 // draw as a coverage footprint / WMS overlay, trajectories as coverage hexes.
-// See platformsAvailable below.
 const PLATFORMLESS_DATASET_TYPES = new Set([
   "Grid",
   "Trajectory",
   "TrajectoryProfile",
 ]);
 
-// OBIS datasets draw as coverage hexes too, but they carry cdm_data_type
-// 'Point' — which an ERDDAP dataset can legitimately be as well — so they're
-// matched on source rather than type.
+// OBIS datasets draw as coverage hexes too but carry cdm_data_type 'Point',
+// like some ERDDAP datasets, so they're matched on source.
 const isPlatformlessDataset = (row) =>
   PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) ||
   row.source_type === "obis";
 
-// What the free-text search matches a dataset on: its title, its dataset type,
-// and the name of the data portal it came from. `query` is already lowercased.
-// Shared by the datasets list and the map narrowing below, so the two always
-// agree on what a search term keeps.
+// `query` is already lowercased. Shared by the list and the map narrowing so
+// both agree on what a search term keeps.
 function datasetMatchesSearch(row, query, language) {
   return [
     row.title,
@@ -86,7 +82,6 @@ export function useSelection() {
   return useContext(SelectionContext);
 }
 
-// Note: datasets and points are exchangable terminology
 export default function SelectionProvider({ children }) {
   const { i18n } = useTranslation();
   const languageRef = useRef(i18n.language);
@@ -108,52 +103,35 @@ export default function SelectionProvider({ children }) {
     languageRef.current = i18n.language;
   }, [i18n.language]);
 
-  // Everything below that is seeded from the URL is read once, from the
-  // address the app was opened at — UrlSync owns the URL from then on and
-  // rewrites it from this state, so re-reading it here would be circular.
+  // Read once from the opening address: UrlSync owns the URL afterwards and
+  // rewrites it from this state, so re-reading it would be circular.
   const initialParams = useState(
     () => new URL(window.location.href).searchParams,
   )[0];
 
-  // The drawn selection (rectangle or free-form polygon) is part of a share
-  // link: Map re-draws it into the draw control on load, this seeds the state
-  // the /pointQuery is built from.
   const [polygon, setPolygon] = useState(() =>
     selectionFromSearchParams(initialParams),
   );
   const [pointsToDownload, setPointsToDownload] = useState();
-  // Hovering the dataset list drives a map highlight (see Map.jsx). Sweeping
-  // the cursor across the list would otherwise repaint the highlight once per
-  // card crossed — and flash the "all datasets" state in the gaps between
-  // cards — so the map follows a settled hover rather than every transit.
+  // Debounced so sweeping the cursor across the list doesn't repaint the map
+  // highlight per card crossed (and flash "all datasets" in the gaps).
   const [hoveredDatasetTarget, setHoveredDataset] = useState();
   const hoveredDataset = useDebounce(hoveredDatasetTarget, 120);
 
-  // One platform (trajectory id) picked in the dataset inspector to draw its
-  // track on the map, clipped to the time filter: {datasetPk, datasetTitle,
-  // trajectoryId, frameView, area} | undefined. `area` ({lngLat, z}) is set
-  // only by a click on the track itself.
+  // {datasetPk, datasetTitle, trajectoryId, frameView, area} | undefined.
+  // `area` ({lngLat, z}) is set only by a click on the track itself.
   const [selectedTrajectory, setSelectedTrajectory] = useState();
 
-  // The one record (timeseries_id/profile_id) an unambiguous map marker click
-  // resolved to: {datasetPk, profileId} | undefined. Distinct from
-  // inspectRecordID — that one means "show this record's preview", and is set
-  // by an explicit click on a row (here, or in the inspector's own table).
-  // This one only marks a row for the inspector to highlight and scroll to, so
-  // a marker click opens the dataset page and points at the record rather than
-  // jumping straight into the preview the user hasn't asked to see yet.
+  // {datasetPk, profileId} | undefined, set by an unambiguous marker click.
+  // Unlike inspectRecordID (open the preview), this only marks a row for the
+  // inspector to highlight and scroll to.
   const [highlightedRecord, setHighlightedRecord] = useState();
 
-  // One profile / time-series record the dataset page's "Show on map" rings on
-  // the map — what selectedTrajectory is to a trajectory:
   // {datasetPk, recordId, frameView} | undefined.
   const [mappedRecord, setMappedRecord] = useState();
 
-  // All of those as a share link carries them: the subset of the dataset the
-  // link points at — a record (?record=<profile_id>), a platform
-  // (?track=<trajectory_id>) or a record shown on the map (?onMap=<id>) — waiting for the dataset itself to resolve out
-  // of pointsData, since neither means anything without the page they are
-  // highlighted on. Consumed once, by the effect below.
+  // A share link's ?record= / ?track= / ?onMap= waits here until its dataset
+  // resolves out of pointsData. Consumed once, by the effect below.
   const [pendingHighlight, setPendingHighlight] = useState(() => {
     // A trajectory_id is legitimately '' (a dataset with a single unnamed
     // trajectory — the schema default), so presence is the test, not truth.
@@ -172,45 +150,35 @@ export default function SelectionProvider({ children }) {
   const [selectionLoading, setSelectionLoading] = useState(true);
   const [initialPointsQueryComplete, setInitialPointsQueryComplete] =
     useState(false);
-  // Keeps a failed /pointQuery from reading as "no datasets match": the list
-  // and the error banner both tell the two apart. Bumping the attempt re-runs
-  // the query for the same filters.
+  // Keeps a failed /pointQuery from reading as "no datasets match".
   const [pointsError, setPointsError] = useState(false);
   const [pointsAttempt, setPointsAttempt] = useState(0);
   const retryPointQuery = useCallback(
     () => setPointsAttempt((attempt) => attempt + 1),
     [],
   );
-  // True from the moment a record is asked for until its payload lands, so the
-  // modal opens on a spinner instead of flashing "no data". Seeded from the URL
-  // because a shared link arrives with the record already open.
+  // Seeded from the URL because a shared link arrives with the record open,
+  // and true until the payload lands so the modal shows a spinner, not "no data".
   const [recordLoading, setRecordLoading] = useState(() =>
     Boolean(initialParams.get(RECORD_PARAM)),
   );
   const [datasetPreview, setDatasetPreview] = useState();
-  // Free-text title search: a filter like any other, set from the Filters
-  // modal's search (which the sidebar's search box opens) and shown as a
-  // removable chip in ActiveFilterChips.
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
     () => initialParams.get("search") || "",
   );
   const [combinedQueries, setCombinedQueries] = useState([]);
-  // "Only in view": restrict the list to datasets whose extent overlaps the
-  // current map viewport. Lifted here (like the title search) so it also drives
-  // the shared counters and surfaces as a removable chip in ActiveFilterChips.
   const [onlyInView, setOnlyInView] = useState(
     () => initialParams.get("onlyInView") === "true",
   );
 
-  // Grouping of the datasets list. Lives here rather than in DatasetsTable so
-  // it survives the list unmounting while a dataset page replaces it.
+  // Lives here rather than in DatasetsTable so it survives the list unmounting
+  // while a dataset page replaces it.
   const [groupBy, setGroupBy] = useState(() => {
     const initialGroupBy = initialParams.get("groupBy");
     return isGroupDimension(initialGroupBy) ? initialGroupBy : GROUP_NONE;
   });
 
-  // Per-dataset bbox, computed once per result set from the filtered extent
-  // (falls back to the coverage bbox, the only one grids carry).
+  // Falls back to the coverage bbox, the only one grids carry.
   const datasetBounds = useMemo(
     () =>
       pointsData.map((row) => ({
@@ -222,17 +190,9 @@ export default function SelectionProvider({ children }) {
     [pointsData],
   );
 
-  // Platform types present in the current result set — i.e. every platform the
-  // map can draw a platform-coloured marker for under the active filters, at
-  // any zoom or camera. The legend's platform swatches key off this rather than
-  // the full catalog of platform types, so it never advertises a colour that
-  // isn't on the map.
-  //
-  // Grids and trajectories are excluded because neither renders as a point:
-  // grids show as a coverage footprint / WMS overlay, trajectories as the
-  // dedicated hex layer. Their platforms are otherwise smuggled into the
-  // legend — 'spacecraft' belongs only to grid datasets, and was showing a
-  // swatch for a marker that is never drawn.
+  // Platform types the map can draw a platform-coloured marker for under the
+  // active filters; the legend keys off this so it never advertises a colour
+  // that isn't on the map (e.g. 'spacecraft', which only grids carry).
   const platformsAvailable = useMemo(
     () =>
       [
@@ -246,12 +206,10 @@ export default function SelectionProvider({ children }) {
     [pointsData],
   );
 
-  // The live viewport changes on every pan; debounce it so a continuous drag
-  // asks for the in-view set once it settles rather than every frame.
   const viewportBounds = useDebounce(mapView?.bounds, 300);
 
-  // pks whose extent overlaps the current viewport: the instant answer, used
-  // until the server's exact one for this view lands (or where it can't ask).
+  // The instant answer, used until the server's exact one for this view lands
+  // (or where it can't ask).
   const bboxInViewPks = useMemo(() => {
     const inView = new Set();
     if (!viewportBounds) return inView;
@@ -268,15 +226,9 @@ export default function SelectionProvider({ children }) {
   });
   const datasetsInViewPks = exactInViewPks ?? bboxInViewPks;
 
-  // pointsData narrowed by the title search, matched the same way
-  // DatasetsTable's search box used to match locally: title, dataset type,
-  // and data-portal name. Derived here (rather than inside DatasetsTable) so
-  // the datasets counters (Sidebar, TopControls) reflect it too.
-  //
-  // The data-layer switches narrow it as well: turning a data type off stops
-  // the map drawing it, so the list would otherwise keep offering datasets
-  // that have no presence on the map (see state/dataLayers.js for which
-  // switch owns which dataset — Grid datasets belong to none and always stay).
+  // Derived here rather than in DatasetsTable so the counters reflect it too.
+  // The data-layer switches narrow it as well, so the list never offers
+  // datasets absent from the map (Grid datasets belong to no switch).
   const filteredDatasets = useMemo(() => {
     const query = datasetTitleSearchText.toLowerCase();
     const hasSearch = !isEmpty(datasetTitleSearchText);
@@ -298,8 +250,7 @@ export default function SelectionProvider({ children }) {
   ]);
 
   // Over filteredDatasets rather than pointsData: the title search and the
-  // data-layer switches narrow only client-side, so the raw in-view set still
-  // counted every dataset they took out ("0/N datasets (917 in view)").
+  // data-layer switches narrow only client-side.
   const inViewCount = useMemo(
     () =>
       filteredDatasets.filter((row) => datasetsInViewPks.has(row.pk)).length,
@@ -311,19 +262,11 @@ export default function SelectionProvider({ children }) {
     [filteredDatasets],
   );
 
-  // filteredDatasets as a pk list, for the queries that ask a question about
-  // the filtered data rather than draw it (the coverage figure). Everything
-  // the list narrows by — the search box, "only in view", the data-layer
-  // switches — is client-side, so a route that only ever sees the filter query
-  // string answers for datasets the user has already filtered out; handing it
-  // this list is how those three reach the API at all.
-  //
-  // Identity, not a flag, decides whether anything narrows: filteredDatasets
-  // returns pointsData itself when none of the three is active, and undefined
-  // here leaves the query as the filters wrote it (see applyDatasetPKs).
-  //
-  // Deliberately NOT mapDatasetPks: that one drops "only in view", which would
-  // rewrite every tile URL on every pan. This one is the list.
+  // For routes that answer about the filtered data rather than draw it: the
+  // search, "only in view" and data-layer switches are client-side, so this
+  // list is how they reach the API. Undefined when filteredDatasets is
+  // pointsData itself (nothing narrows). Not mapDatasetPks: that one drops
+  // "only in view", which would rewrite every tile URL on every pan.
   const filteredDatasetPks = useMemo(
     () =>
       filteredDatasets === pointsData
@@ -347,25 +290,12 @@ export default function SelectionProvider({ children }) {
     [shortlist],
   );
 
-  // Hand the map the datasets it may draw. The tile/legend/coverage queries
-  // take an include list (datasetPKs), so the narrowing is expressed as a pk
-  // list over the current results; undefined while nothing narrows them leaves
-  // those queries as the filters wrote them.
-  //
-  // The free-text search narrows it. The search is a filter rather than a display choice, so the map
-  // has to honour it — drawing markers and hexes for datasets the search has
-  // taken out of the list is the map disagreeing with its own sidebar. The
-  // other two narrowings filteredDatasets applies stay out of it: the
-  // data-layer switches already reach the map through the tile query (see
-  // Map/tileQuery.js), and "only in view" is the viewport itself, so feeding
-  // it back would rewrite every map query on every pan for no visible change.
-  //
-  // Each distinct search text here is a fresh set of tile, legend and coverage
-  // URLs, so typing a word uncached would cost a round of map requests per
-  // character — which is why every box that writes this state waits to be
-  // submitted, on Enter or on its magnifier, rather than publishing as it is
-  // typed (useSearchInput's "submit" trigger). Debouncing it here on top of
-  // that would only delay the map behind the list it has to agree with.
+  // Undefined while nothing narrows leaves the tile/legend/coverage queries as
+  // the filters wrote them. Only the search narrows it: the data-layer switches
+  // already reach the map via the tile query, and "only in view" would rewrite
+  // every map query on every pan. Each distinct search text is a fresh round of
+  // map requests, which is why every search box submits on Enter rather than
+  // publishing as typed.
   const mapDatasetPks = useMemo(() => {
     const query = datasetTitleSearchText.toLowerCase();
     const hasSearch = !isEmpty(datasetTitleSearchText);
@@ -379,15 +309,9 @@ export default function SelectionProvider({ children }) {
     setMapDatasetPKs(mapDatasetPks);
   }, [mapDatasetPks, setMapDatasetPKs]);
 
-  // The open dataset page lives in the URL (?dataset=…&server=…) rather than in
-  // component state, so Back/Forward move through it natively and the page can
-  // be linked to. useSearchParams re-renders on popstate, which is what makes
-  // the browser's Back button close the page for free.
-  //
-  // A filter that excludes the open dataset doesn't close its page — the user
-  // chose to open it, and the search state around it isn't theirs to lose it
-  // to. The last row it resolved to is kept and shown instead; the page says
-  // the dataset is no longer among the results (inspectDatasetExcluded).
+  // The open dataset page lives in the URL so Back/Forward move through it
+  // natively. A filter that excludes the open dataset doesn't close its page:
+  // the last resolved row is kept and inspectDatasetExcluded flags it.
   const resolvedInspectDataset = useMemo(
     () => pointsData.find((point) => datasetMatchesUrlKey(point, searchParams)),
     [pointsData, searchParams],
@@ -414,16 +338,14 @@ export default function SelectionProvider({ children }) {
     !filteredDatasets.some((row) => row.pk === inspectDataset.pk),
   );
 
-  // Whether the address shows the list (no dataset page). Read by
-  // setInspectDataset at call time, so it can stay stable across map pans.
+  // Read by setInspectDataset at call time, so it can stay stable across pans.
   const onListRef = useRef(!searchParams.get("dataset"));
   useEffect(() => {
     onListRef.current = !searchParams.get("dataset");
   }, [searchParams]);
 
-  // A share link that named a dataset but no camera: frame its footprint as
-  // soon as it resolves out of pointsData, same as the "Zoom to dataset"
-  // button would. Consumed once — later re-inspections don't re-trigger it.
+  // A share link that named a dataset but no camera frames its footprint once
+  // it resolves. Consumed once.
   useEffect(() => {
     if (!pendingDatasetZoom || !inspectDataset) return;
     const footprint =
@@ -438,19 +360,15 @@ export default function SelectionProvider({ children }) {
     zoomToGeometry,
   ]);
 
-  // Opening a dataset page is a navigation the user made, so it pushes an
-  // entry that Back reverses. Automatic opens/closes pass replace: true — Back
-  // should skip a step the user never took. An entry pushed straight from the
-  // list is tagged fromList, which lets returnToDatasetList go back to that
-  // list entry instead of stacking a new one on top.
+  // User opens push a history entry; automatic opens/closes pass replace: true
+  // so Back skips steps the user never took. fromList lets
+  // returnToDatasetList go back to that list entry instead of stacking a new one.
   const setInspectDataset = useCallback(
     (dataset, { replace = false } = {}) => {
       setSearchParams(
         (previous) => {
-          // The open record and its plot settings belong to the dataset page:
-          // every caller here is either closing it or moving to a DIFFERENT
-          // dataset, so carrying them over would leave params describing columns
-          // the new dataset may not even have.
+          // The open record and its plot params belong to the previous
+          // dataset's columns, so they never carry over.
           const next = withoutPreviewParams(previous);
           const key = datasetUrlKey(dataset);
           if (key) {
@@ -469,9 +387,6 @@ export default function SelectionProvider({ children }) {
     [setSearchParams],
   );
 
-  // The open record lives in the URL as well (?preview=…), for the same payoffs
-  // as the dataset above: Back closes the preview natively, and the link
-  // reproduces it.
   const inspectRecordID = searchParams.get(RECORD_PARAM) || undefined;
   const periodParam = searchParams.get(PERIOD_PARAM) || undefined;
   const inspectRecordPeriod = useMemo(
@@ -479,23 +394,19 @@ export default function SelectionProvider({ children }) {
     [periodParam],
   );
 
-  // Opening a record is a navigation the user made, so it pushes an entry Back
-  // reverses. Closing it drops the plot params in the SAME write, because
-  // react-router hands a functional updater the params from the last RENDER —
-  // not the ones a previous call in this same tick just wrote — so two calls
-  // would silently lose one of them.
+  // Closing drops the plot params in the SAME write: react-router hands a
+  // functional updater the params from the last render, so two calls in one
+  // tick would lose one of them.
   const setInspectRecordID = useCallback(
     (recordId, { replace = false, period } = {}) => {
-      // Set before the navigation, so the modal never renders "no data" in the
-      // frame between the record opening and the fetch starting.
+      // Set before navigating so the modal never renders "no data" in the
+      // frame before the fetch starts.
       if (recordId) setRecordLoading(true);
       setSearchParams(
         (previous) => {
           if (!recordId) return withoutPreviewParams(previous);
           const next = new URLSearchParams(previous);
           next.set(RECORD_PARAM, recordId);
-          // Opening a record without a period shows its latest data, so a
-          // period left from the last pass plotted must not carry over.
           if (period) next.set(PERIOD_PARAM, `${period.start}~${period.end}`);
           else next.delete(PERIOD_PARAM);
           return next;
@@ -506,42 +417,22 @@ export default function SelectionProvider({ children }) {
     [setSearchParams],
   );
 
-  // Leaving the dataset page, from wherever it is asked for — the page's own
-  // close/swipe/Backspace, or the sidebar header's back control.
-  //
-  // This used to clear the datasets filter on the way out, because opening the
-  // page was itself what had set that filter: clicking a hex or a griddap
-  // footprint overwrote it with the cell's datasets, and a single survivor then
-  // auto-opened its page, so leaving had to undo a narrowing the user never
-  // asked for. Nothing does that any more — a map click reports what it found
-  // and the filter only changes when the user presses a button — so leaving the
-  // page is now just leaving the page. Clearing here would instead discard a
-  // selection they deliberately built up.
-  //
-  // Straight back to the list entry the page was opened from, when there is
-  // one, so browser Back afterwards doesn't reopen the page just left (UrlSync
-  // rewrites the popped address from the current filters and camera). A page
-  // reached any other way (a link, a marker hop, a record preview opened on
-  // top) closes in place instead.
+  // Back to the list entry the page was opened from when there is one, so
+  // browser Back afterwards doesn't reopen it; otherwise close in place.
+  // Deliberately leaves the datasets filter alone.
   const returnToDatasetList = useCallback(() => {
     if (location.state?.fromList) navigate(-1);
     else setInspectDataset(undefined, { replace: true });
     setSelectedTrajectory();
   }, [location.state, navigate, setInspectDataset]);
 
-  // A track clicked on the map does what clicking a platform row in the dataset
-  // inspector does (DatasetInspector's onRowClicked): open that dataset's page
-  // AND draw the platform's track. Both writes happen in this one call so
-  // React batches them into a single render — which is what stops the
-  // [inspectDataset] effect below from clearing the selection it just made (it
-  // sees the new inspectDataset and the matching selectedTrajectory together).
+  // Both writes in one call so React batches them, which stops the
+  // [inspectDataset] effect below from clearing the selection just made.
   const selectTrajectoryFromMap = useCallback(
     (datasetPk, trajectoryId, datasetTitle, area) => {
-      // Re-clicking the selected track is not a toggle: track-lines stays
-      // hit-testable (just dimmed) under the selected track drawn over it, so a
-      // toggle would clear the selection on any click along it — including a
-      // click meant to read a fix tooltip. Clearing stays the platform row.
-      // It only moves the clicked area along the track.
+      // Not a toggle: track-lines stays hit-testable under the selected track,
+      // so a toggle would clear it on any click along it (e.g. reading a fix
+      // tooltip). Re-clicking only moves the clicked area.
       if (
         selectedTrajectory?.datasetPk === datasetPk &&
         selectedTrajectory?.trajectoryId === trajectoryId
@@ -550,15 +441,12 @@ export default function SelectionProvider({ children }) {
         return;
       }
 
-      // The page can only open for a dataset the current results contain —
-      // inspectDataset resolves out of pointsData. The tracks tiles apply only
-      // the dataset-level filters, so they can carry a dataset that pointQuery's
-      // depth/bbox/polygon predicates dropped; draw its track anyway and leave
-      // the URL alone. Never setInspectDataset(undefined) here — that would
-      // close whatever page was open and take the new selection down with it.
+      // Tracks tiles apply only dataset-level filters, so they can carry a
+      // dataset pointQuery dropped; draw its track anyway and leave the URL
+      // alone. Never setInspectDataset(undefined) here: it would close the open
+      // page and take the new selection with it.
       const dataset = pointsData.find((row) => row.pk === datasetPk);
-      // Skipped when this dataset's page is already open, so repeat clicks don't
-      // each push a history entry Back has to walk through.
+      // Skipped when already open, so repeat clicks don't each push history.
       if (
         dataset &&
         inspectDataset?.pk !== datasetPk &&
@@ -567,39 +455,22 @@ export default function SelectionProvider({ children }) {
         setInspectDataset(dataset);
       }
 
-      // No frameView: the user clicked this track where it is drawn, so the
-      // camera is already showing the stretch they asked about. Framing the
-      // whole voyage from here would pull them away from it — and clicking a
-      // marker or a hex doesn't move the camera either. The inspector's
-      // platform list, whose rows can name a track anywhere on earth, is the
-      // one caller that asks for framing.
+      // No frameView: the user clicked the track where it is drawn, so framing
+      // the whole voyage would pull them away from it.
       setSelectedTrajectory({
         datasetPk,
         datasetTitle: dataset?.title || datasetTitle,
         trajectoryId,
-        // The clicked point and zoom, which the dataset page resolves to the
-        // hex the click fell in (see useTrajectoryPasses).
+        // Resolved by the dataset page to the clicked hex (useTrajectoryPasses).
         area,
       });
     },
     [pointsData, inspectDataset, selectedTrajectory, setInspectDataset],
   );
 
-  // Put datasets aside into the selection, from the "what's here" card — the
-  // same thing the "+" on a dataset card does, for a set at a time. The
-  // selection is a shortlist the user is building; downloading it is one thing
-  // they can do with it afterwards, not what it is for.
-  //
-  // This deliberately does NOT touch the datasets *filter*. The card's "+" used
-  // to add to that filter, which narrowed the results to whatever had been
-  // added — and a narrowed list is a list you cannot pick anything else out of,
-  // so the second click on the map had less to offer than the first and the
-  // basket could never grow. Adding to the download selection composes instead:
-  // click around the map, keep adding, the list stays whole.
-  //
-  // Griddap datasets are metadata-only and never enter pointsToReview (see
-  // handleSelectDataset), so they are skipped here too rather than silently
-  // added and dropped later.
+  // Adds to the download selection, deliberately NOT the datasets filter: a
+  // narrowed list leaves nothing else to pick on the next map click. Griddap
+  // datasets never enter pointsToReview, so they're skipped here too.
   const addDatasetsToSelection = useCallback(
     (pks) => {
       const wanted = new Set(pks.map(Number));
@@ -641,21 +512,14 @@ export default function SelectionProvider({ children }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setSelectionLoading(false);
-    // A single remaining result used to open its own dataset page. That made
-    // the outcome of a map click depend on how dense the data happened to be —
-    // clicking a griddap footprint or a hex narrowed the filter, and you landed
-    // on a dataset page or on a one-row list depending on whether the narrowing
-    // bottomed out at exactly one. Opening a dataset page is now always an
-    // explicit act: a row in the "what's here" card, a card in the list, or a
-    // ?dataset= link.
+    // A single remaining result deliberately does NOT auto-open its page:
+    // opening one is always an explicit act.
     if (
       !isEmpty(pointsData) &&
       searchParams.get("dataset") &&
       !inspectDataset
     ) {
-      // The URL names a dataset that has never been among the results (an
-      // unknown id, or a link whose own filters exclude it): there is no row
-      // to show, so clear the params rather than carry a dead key in the URL.
+      // The URL names a dataset never among the results: clear the dead params.
       setSearchParams(
         (previous) => {
           const next = withoutPreviewParams(previous);
@@ -688,12 +552,9 @@ export default function SelectionProvider({ children }) {
     });
   }, [pointsData]);
 
-  // The pointQuery waits for the catalog so the filters it sends are hydrated
-  // from the URL first. It must not wait for a non-empty EOV list: OBIS
-  // datasets carry no EOVs, so a database holding only OBIS data produces an
-  // empty /oceanVariables and would never query at all. catalogLoaded resolves
-  // even when the fetches fail, so a dead API lands on an empty list rather
-  // than an endless spinner.
+  // Waits for the catalog so filters are hydrated from the URL first, but not
+  // for a non-empty EOV list: OBIS datasets carry no EOVs, so an OBIS-only
+  // database would never query. catalogLoaded resolves even when fetches fail.
   useEffect(() => {
     if (catalogLoaded) {
       const filtersQuery = createDataFilterQueryString(query);
@@ -704,9 +565,8 @@ export default function SelectionProvider({ children }) {
       const combinedQueries = [filtersQuery, shapeQuery]
         .filter((e) => e)
         .join("&");
-      // An open dataset page is deliberately NOT closed here: it survives a
-      // filter change as long as the dataset is still in the results. If it
-      // isn't, it closes when the new results land (see the pointsData effect).
+      // An open dataset page survives a filter change; it closes only if the
+      // new results exclude it (see the pointsData effect).
       // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
       setSelectionLoading(true);
       setCombinedQueries(combinedQueries);
@@ -734,8 +594,6 @@ export default function SelectionProvider({ children }) {
           setInitialPointsQueryComplete(true);
         } catch (error) {
           if (!current || error.name === "AbortError") return;
-          // network failure / gateway timeout: land on an empty list rather
-          // than an endless spinner
           reportError("pointQuery failed", error);
           setPointsData([]);
           setPointsError(true);
@@ -752,8 +610,6 @@ export default function SelectionProvider({ children }) {
   }, [query, polygon, catalogLoaded, pointsAttempt]);
 
   useEffect(() => {
-    // Translating a response after a locale change requires replacing the
-    // stored labels.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPointsData((previous) =>
       previous.map((point) => datasetInLanguage(point, i18n.language)),
@@ -767,8 +623,7 @@ export default function SelectionProvider({ children }) {
   }, [i18n.language]);
 
   function handleSelectDataset(point) {
-    // Griddap datasets are metadata-only: they never enter the download
-    // selection (pointsToReview) — data access is on ERDDAP directly.
+    // Griddap data access is on ERDDAP directly.
     if (point.cdm_data_type === "Grid") return;
     setShortlist((previous) => {
       const index = previous.findIndex((entry) => entry.pk === point.pk);
@@ -785,24 +640,16 @@ export default function SelectionProvider({ children }) {
     });
   }
 
-  // The WMS overlay lives only while its dataset is inspected: navigating
-  // back or to another dataset clears it (the WmsLegend close button is the
-  // other exit). Functional update on purpose — GriddapDetails auto-shows the
-  // overlay for a newly inspected dataset from a child effect, which runs
-  // before this one, so reading activeWmsOverlay from this render's closure
-  // would see the stale value and clear the overlay that was just set.
+  // Functional update on purpose: GriddapDetails auto-shows the overlay from a
+  // child effect that runs first, so this render's closure value is stale.
   useEffect(() => {
     setActiveWmsOverlay((current) =>
       current && current.pk !== inspectDataset?.pk ? undefined : current,
     );
-    // The selected track follows the inspected dataset: leaving the inspector
-    // (or moving to another dataset) clears it from the map.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setSelectedTrajectory((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current,
     );
-    // Same for a marker's highlighted record: it only means anything on the
-    // dataset page the marker opened.
     setHighlightedRecord((current) =>
       current && current.datasetPk !== inspectDataset?.pk ? undefined : current,
     );
@@ -811,9 +658,8 @@ export default function SelectionProvider({ children }) {
     );
   }, [inspectDataset, setActiveWmsOverlay]);
 
-  // The share link's highlight, once its dataset is in hand. Declared after the
-  // effect above so that on the render where the page resolves, this one runs
-  // second and its highlight isn't the stale value that one clears.
+  // Declared after the effect above so it runs second on the render where the
+  // page resolves, and its highlight isn't the one that effect clears.
   useEffect(() => {
     if (!pendingHighlight || !inspectDataset) return;
     const { record, track, onMap } = pendingHighlight;
@@ -822,8 +668,7 @@ export default function SelectionProvider({ children }) {
     if (record !== undefined) {
       setHighlightedRecord({ datasetPk: inspectDataset.pk, profileId: record });
     }
-    // No frameView: the link carries its own camera (lat/lon/zoom), and
-    // framing the whole voyage would overrule it.
+    // No frameView: the link carries its own camera.
     if (track !== undefined) {
       setSelectedTrajectory({
         datasetPk: inspectDataset.pk,
@@ -836,20 +681,10 @@ export default function SelectionProvider({ children }) {
     }
   }, [pendingHighlight, inspectDataset]);
 
-  // Fetch the open record's rows.
-  //
-  // Keyed on the dataset_id rather than on the inspectDataset object: pointsData
-  // is re-mapped through datasetsInLanguage on every language change, and the
-  // fresh object identities that produces would otherwise refetch a payload
-  // measured at up to 59 MB.
-  //
-  // Both halves have to be present, and on a link opened cold they arrive at
-  // different times — ?preview= is readable on the first render while pointsData
-  // is still empty, so inspectDataset resolves only once /pointQuery returns.
-  // Waiting is all this can do; a record left with no dataset is cleaned up
-  // where the dataset param is (setInspectDataset drops the whole preview), not
-  // here, because doing it here is what would wipe a shared link's own record
-  // before its dataset had a chance to load.
+  // Keyed on dataset_id, not inspectDataset: pointsData is re-mapped on every
+  // language change and fresh identities would refetch payloads up to 59 MB.
+  // A record left with no dataset is cleaned up by setInspectDataset, not here,
+  // or a cold shared link would lose its record before its dataset loads.
   const inspectDatasetId = inspectDataset?.dataset_id;
 
   useEffect(() => {
@@ -866,10 +701,8 @@ export default function SelectionProvider({ children }) {
     fetch(previewUrl)
       .then((response) => {
         if (response.ok) return response.json();
-        // /preview distinguishes its failures now: 404 RECORD_NOT_FOUND or
-        // NO_DATA is an empty record (expected, the modal says so), while a
-        // 502 ERDDAP_UNAVAILABLE is an outage worth reporting. Before, every
-        // upstream failure came back as `200 []` and looked like empty data.
+        // 404 RECORD_NOT_FOUND/NO_DATA is an expected empty record; 5xx is an
+        // outage worth reporting.
         if (response.status >= 500) {
           reportError(
             `preview upstream failure (${response.status})`,
@@ -917,15 +750,9 @@ export default function SelectionProvider({ children }) {
     inspectRecordID,
     inspectRecordPeriod,
     setInspectRecordID,
-    // Derived, not stored: the record param IS the open state, the same way
-    // ?dataset= is the dataset page's.
-    //
-    // Both halves, deliberately. recordLoading must NOT open it on its own: it
-    // is seeded true by a shared link, and if that link's dataset never resolves
-    // (a filter in the same link excludes it) an OR here would leave a modal
-    // open forever with nothing inside — the body needs both too. Gated like
-    // this, a cold link simply opens once its dataset lands, on the spinner
-    // recordLoading is still holding up.
+    // Both halves deliberately: recordLoading is seeded true by a shared link,
+    // so ORing it would leave an empty modal open forever if the link's
+    // dataset never resolves.
     showPreviewModal: Boolean(inspectDataset && inspectRecordID),
     recordLoading,
     setRecordLoading,

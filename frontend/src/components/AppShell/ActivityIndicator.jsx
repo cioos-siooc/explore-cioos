@@ -7,23 +7,13 @@ import { useActivity } from "../../state/activity/ActivityProvider.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import "./activityIndicatorStyles.css";
 
-// The app's single report of background work: one panel on the bottom edge,
-// centred, naming everything currently loading — the map's layers
-// individually. It replaced a pill that stood in the same place but only knew
-// about the map, and left the other loading flags to fend for themselves.
-//
-// It comes and goes with the work rather than being opened: nothing to click,
-// and nothing on screen once there is nothing left to say. The brand logo's
-// mark is the standing indicator that anything is happening at all — this
-// names the parts, for as long as there are parts to name.
+// Comes and goes with the work; the brand logo's mark is the standing
+// indicator, this names the parts.
 export default function ActivityIndicator() {
   const { t } = useTranslation();
   const { labelKeys, busy, announced } = useActivity();
-  // The first-paint splash names the same waits, in the middle of the screen
-  // and in bigger type. Two lists of one thing is one too many, so the standing
-  // panel stands down until the splash has gone. The spoken commentary below
-  // carries on either way — it is the splash's list that a screen reader would
-  // otherwise be missing.
+  // The splash names the same waits, so the panel stands down until it has
+  // gone. The spoken commentary carries on either way.
   const { firstPaintPending } = useMapState();
 
   return (
@@ -33,18 +23,13 @@ export default function ActivityIndicator() {
       {announced && !firstPaintPending && (
         <div className="activityStatus">
           <p className="activityStatusHeading">{t("activityStatusHeading")}</p>
-          {/* One mark for the whole panel, under the word it qualifies: the
-              rows below name the waits, and a spinner on each of them was the
-              same animation five times over. `presentation` because the
-              heading and the rows are the status; this is decoration on
-              them. */}
+          {/* One mark for the whole panel; `presentation` because the heading
+              and rows are the status. */}
           <Spinner size="sm" role="presentation" />
           <ActivityList labelKeys={labelKeys} />
         </div>
       )}
-      {/* The spoken running commentary, which is the list above whether or not
-          it is on screen — so a screen reader hears what is loading without
-          having to catch the panel while it is up. */}
+      {/* Spoken whether or not the panel is on screen. */}
       <span className="sr-only" role="status" aria-live="polite">
         {busy ? labelKeys.map((key) => t(key)).join(", ") : ""}
       </span>

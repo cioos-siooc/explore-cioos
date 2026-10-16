@@ -1,16 +1,6 @@
-"""
-Unit tests for OBISHarvester.harvest()'s chunked-flush memory behavior.
-
-A full discovery run (~971 datasets) OOM-killed a 6GB container mid-run
-because all_cells held every processed dataset's DataFrame in memory for the
-whole run, with no flush point until the final concat. These tests verify
-cells are periodically flushed to disk and correctly reassembled, and that
-the returned result is identical regardless of chunk size.
-
-The flushing itself now lives in core.frame_spill.SpillSet (shared with the
-ERDDAP harvester), but these stay end-to-end through OBISHarvester.harvest():
-they are the contract for the behavior, not for where it is implemented.
-"""
+"""OBISHarvester.harvest() chunked flushing: a ~971-dataset run OOM-killed a 6GB
+container holding every dataset's cells, so cells flush to disk and reassemble
+independently of chunk size. Kept end-to-end through harvest() on purpose."""
 import os
 
 import cde_harvester.core.frame_spill as frame_spill_module

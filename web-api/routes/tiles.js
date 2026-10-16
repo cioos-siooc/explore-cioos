@@ -28,50 +28,28 @@ const {
   unionBranches,
 } = require("../utils/selection");
 
-// Per-tile cap on how many trajectories a single /tiles/tracks tile assembles.
-// A low-zoom tile spans a huge area: with a long trail (e.g. "All time") its
-// candidate set is ~the whole catalogue (measured ~107k of 107k trajectories in
-// one z3 tile → a ~5 MB tile that OOMs the browser tab). The cap is applied at
-// the candidate stage (before any point is pulled), so it bounds BOTH the
-// payload and the server-side assembly cost. It is self-scaling: at high zoom a
-// tile covers a small area with far fewer than the cap, so it never bites there
-// (full detail when zoomed in); it only trims the low-zoom smear, keeping the
-// most recently-active trajectories. Coverage hexes convey overall density at
-// low zoom.
+// A low-zoom tile with a long trail otherwise holds ~the whole catalogue
+// (~107k trajectories in one z3 tile, a ~5 MB tile that OOMs the browser).
+// Applied before any point is pulled; at high zoom it never bites.
 const TRACKS_MAX_PER_TILE = 2500;
 
-// Spatial prefilter for the hex-aggregation tile queries (/tiles and
-// /tiles/cells). Without it each tile UNIONs and GROUP BYs the ENTIRE cell
-// tables (trajectory_hexes, obis_cells, profiles) and only
-// clips to the tile at the very end — ~2.5 s of CPU per tile on every request
-// (measured, buffers warm), which shows up as half-painted tiles and slow
-// layer toggles (each toggle changes the tile URL and cold-refetches). This
-// prunes each branch's scan to the tile region up front via the tables' geom
-// GiST indexes. Hex membership stays the exact authority (the tile_hexes join
-// in /tiles/cells; the final `h.geom && tile_envelope` in /tiles), so the
-// prefilter only has to be a SUPERSET of the cells under the tile's hexes:
-// expand the envelope by >= one hex diameter (hex_0 ~200 km for z<5, hex_1
-// ~20 km for z>=5) so no cell of a hex straddling the tile edge is dropped.
-// Verified byte-identical to the unfiltered query across z3-z10. Below
-// PREFILTER_MIN_ZOOM the tile covers so much of the world that the GiST scan
-// loses to a plain seq scan (measured a ~3x regression at z2), so return null
-// there and leave the query unchanged.
+// Without this each tile aggregates the entire cell tables and clips at the
+// end (~2.5 s CPU per tile). Hex membership stays the exact authority, so the
+// prefilter only has to be a superset: the envelope is expanded by more than
+// one hex diameter so no cell of a hex straddling the tile edge is dropped.
+// Below PREFILTER_MIN_ZOOM the GiST scan loses to a seq scan (~3x slower at z2).
 const PREFILTER_MIN_ZOOM = 3;
 function tileCellPrefilter(z) {
   const zi = Number(z);
   if (zi < PREFILTER_MIN_ZOOM) return null;
-  // 2.5x the cell EDGE, i.e. comfortably more than its 2x diameter — the
-  // prefilter only has to be a superset, so err wide.
+  // 2.5x the cell edge, more than its 2x diameter: err wide.
   const hexDiameterM = tierForZoom(zi).edgeMetres * 2.5;
   const tileWidthM = 40075016.686 / 2 ** zi;
   const expandM = Math.ceil(Math.max(tileWidthM * 0.25, hexDiameterM));
   return `geom && ST_Expand(ST_TileEnvelope(:z, :x, :y), ${expandM})`;
 }
 
-// A predicate restricting a trajectory table to the requested types, or '' when
-// the restriction would be a no-op. Both types requested needs no filter; none
-// requested never reaches a branch (callers drop it instead), so the emptiness
-// check here is belt-and-braces rather than a live case.
+// Type values are allowlisted in utils/dataTypes.js, so safe to inline.
 function trajectoryTypePredicate(types) {
   if (!types.length || types.length === ALL_TRAJECTORY_TYPES.length) return "";
   return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
@@ -79,9 +57,6 @@ function trajectoryTypePredicate(types) {
     .join(",")}))`;
 }
 
-// The profile-type counterpart of trajectoryTypePredicate: '' when every
-// profile type is requested (values allowlisted in utils/dataTypes.js, so
-// safe to inline).
 function profileTypePredicate(types) {
   if (!types.length || types.length === ALL_PROFILE_TYPES.length) return "";
   return `dataset_pk IN (SELECT pk FROM cde.datasets WHERE cdm_data_type IN (${types
@@ -90,23 +65,13 @@ function profileTypePredicate(types) {
 }
 
 /*
- * WHICH ROWS A REQUEST HAS IN PLAY.
+ * The tile routes and /tiles/datasets must agree exactly on which rows are in
+ * play: the card reports each dataset's share of the very cell the tile drew.
  *
- * The two tile routes and /tiles/datasets must agree on this exactly. The card
- * reports each dataset's share of the very cell the tile drew, so a predicate
- * that drifted between them would put a number on the card that the map cannot
- * account for. The branches live here once; what each caller PROJECTS around
- * them (a point geometry, a src discriminator, nothing at all) stays at the
- * call site, because that is the part that genuinely differs.
- *
- * `prefilterFor(table)` is how a caller prunes each branch's scan: the tile
- * routes pass the tile-region geometry test, /tiles/datasets the hexes or
- * points that were actually clicked. Returning null prunes nothing.
+ * `prefilterFor(table)` prunes each branch's scan; returning null prunes
+ * nothing.
  */
 
-// Shared by both builders: the source toggles, which are read the same way
-// whoever is asking. See utils/selection.js for the OBIS-only rule and
-// utils/dataTypes.js for the type vocabularies.
 function requestedSources(query) {
   const erddap = erddapVisible(query);
   const profileTypes = requestedProfileTypes(query);
@@ -134,18 +99,8 @@ function mainBranchesSQL(query, { metric, hexTier, isHexGrid, prefilterFor }) {
     includeTrajectory,
   } = requestedSources(query);
 
-  // At hex zoom we only need the hex FK and point_pk (for distinct counts);
-  // the polygon is fetched once per hex via JOIN to hexes_zoom_*. At point
-  // zoom we project the actual point geom.
   // Features spanning a region (show_as_point=false) are kept off the map
-  // entirely — excluded from both the individual dots (z>=7) and the hex
-  // aggregation counts (z<7). They remain searchable via the sidebar
-  // geospatial filters (shapeQuery has no such gate). search_geom (the bbox
-  // for profiles, the cell point otherwise) backs the shared spatial filter.
-  // When only some profile types are requested, additionally restrict the
-  // branch to datasets of those cdm_data_types (values allowlisted in
-  // utils/dataTypes.js → safe to inline). All-three or none → no type filter
-  // (none never reaches the branch).
+  // entirely but stay searchable via the sidebar (shapeQuery has no such gate).
   const profilesTypePredicate = profileTypePredicate(profileTypes);
   const profilesTypeFilter = profilesTypePredicate
     ? ` AND ${profilesTypePredicate}`
@@ -155,23 +110,13 @@ function mainBranchesSQL(query, { metric, hexTier, isHexGrid, prefilterFor }) {
            time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
     FROM cde.profiles ${metricJoin("profiles", metric)}
     WHERE ${DRAWN_AS_POINT}${profilesTypeFilter}${profilesPrefilter ? ` AND ${profilesPrefilter}` : ""} AND :profileFilters`;
-  // Both cell tables (trajectory coverage cells and OBIS occurrence cells)
-  // merge into the combined hex counts (z<7, the green ramp) but never
-  // appear as individual points (z>=7). Their cell spacing is a grid
-  // artifact, not a measurement location, so at point zoom they're shown
-  // only via the dedicated always-hex coverage layer from
-  // /tiles/cells/:z/:x/:y.mvt.
-  // Same shape as profilesTypeFilter above: restrict to the requested
-  // geometries when only some are on, and combine with the caller's prefilter
-  // into one WHERE (either, both, or neither can be present).
+  // Cell tables never appear as individual points: their spacing is a grid
+  // artifact, not a measurement location, so at point zoom they're shown only
+  // via /tiles/cells.
   const trajectoryConds = [
     prefilterFor("trajectory_hexes"),
     trajectoryTypePredicate(trajectoryTypes),
   ].filter(Boolean);
-  // cde.trajectory_hexes is already keyed on the hex, one row per
-  // (dataset, trajectory, tier, hex) — hence `hex_pk as zoom_pk` and a tier
-  // predicate where the other branches carry two hex FK columns. point_pk is
-  // NULL because trajectory coverage never renders at the point tier.
   const trajectoryBranch = `SELECT NULL::integer as point_pk, dataset_pk, hex_pk as zoom_pk, geom as point_geom, ${metricValueExpr("trajectory_hexes", metric)},
            time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
     FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
@@ -185,15 +130,11 @@ function mainBranchesSQL(query, { metric, hexTier, isHexGrid, prefilterFor }) {
 
   const branches = [];
   if (includeProfiles) branches.push(profilesBranch);
-  // Trajectory coverage cells only join the combined hex counts at hex zoom;
-  // at point zoom they're shown via the dedicated /tiles/cells layer.
   if (includeTrajectory && isHexGrid) branches.push(trajectoryBranch);
   if (includeObis && isHexGrid) branches.push(obisBranch);
   return unionBranches(branches, profilesBranch);
 }
 
-// mainBranchesSQL at the coarse hex tier, read from the rollup — the same
-// sources under the same toggles, for a dataset-level-only selection.
 function coarseRollupBranchesSQL(query, { metric }) {
   const {
     profileTypes,
@@ -221,13 +162,8 @@ function coarseRollupBranchesSQL(query, { metric }) {
   return coarseRollupBranch(metric, conds, "zoom_pk");
 }
 
-// The `combined` CTE behind /tiles/cells and /tiles/datasets?source=cells:
-// trajectory coverage and OBIS cells only, always at hex grain.
-//
-// A `src` discriminator lets one pass over the union produce both the
-// unified count that colours the hex AND the per-kind figures the hover
-// tooltip names. trajectory_id is meaningless for OBIS cells and is only
-// ever read behind its own FILTER.
+// `src` lets one pass produce both the unified hex count and the per-kind
+// tooltip figures; trajectory_id is only ever read behind its own FILTER.
 function cellsBranchesSQL(query, { metric, hexTier, prefilterFor }) {
   const { trajectoryTypes, includeObis, includeTrajectory } =
     requestedSources(query);
@@ -253,13 +189,6 @@ function cellsBranchesSQL(query, { metric, hexTier, prefilterFor }) {
   if (includeObis) branches.push(obisBranch);
   return unionBranches(branches, trajectoryBranch);
 }
-
-/**
- * /tiles/z/x/y/.mvt
- *
- * Tile generator - returns the hex shapes or points with some data attached
- * Takes all the filters
- */
 
 /**
  * @swagger
@@ -304,8 +233,6 @@ function cellsBranchesSQL(query, { metric, hexTier, prefilterFor }) {
  *               type: string
  *               format: binary
  */
-/* GET /tiles/:z/:x/:y.mvt */
-/* Retreive a vector tile by tileid */
 router.get(
   "/:z/:x/:y.mvt",
   ...pipeline({ tileParams: {} }),
@@ -314,21 +241,16 @@ router.get(
 
     const filters = await createDBFilter(req.query);
 
-    // zoom levels: 0-4,5-6,7+
     const isHexGrid = z < 7;
-    // Which hex grid this zoom aggregates on, and the three names the schema
-    // gives it — see utils/hexTiers.js. `tier` is a numeric literal from that
-    // table, never user input.
+    // `tier` is a numeric literal from utils/hexTiers.js, never user input.
     const {
       tier: hexTier,
       hexesTable,
       pointColumn: zoomPKColumn,
     } = tierForZoom(z);
-    // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
-    // What the hex/point `count` property means — see utils/hexMetric.js. The
-    // same metric must reach /legend, or the ramp domain won't match the tiles.
+    // The same metric must reach /legend, or the ramp domain won't match.
     const metric = parseMetric(req.query.metric);
 
     const combinedInner =
@@ -341,14 +263,8 @@ router.get(
             prefilterFor: () => cellPrefilter,
           });
 
-    // `count` is the same quantity at both tiers — the aggregated metric. It
-    // used to be count(distinct point_pk) at hex zoom and a sum at point zoom,
-    // so the property changed meaning mid-zoom and the hex ramp ranked a
-    // 20-year mooring level with a single CTD cast. Aggregating the same way at
-    // both tiers fixes the ramp and drops a distinct-aggregate at the same
-    // time. What the aggregate IS depends on the metric — a sum for `records`,
-    // a day-set union for `days` — which is why it comes from countAggregate
-    // rather than being spelled out here.
+    // `count` must mean the same quantity at hex and point zoom, or the ramp
+    // changes meaning mid-zoom.
     const relevantPointsSQL = isHexGrid
       ? `SELECT p.zoom_pk pk, ${countAggregate(metric, "p")} count,
                 array_to_json(array_agg(distinct d.pk_url)) datasets,
@@ -366,7 +282,6 @@ router.get(
          ${filters.hasShared ? "WHERE :filters" : ""}
          GROUP BY p.point_geom, p.point_pk, d.platform`;
 
-    // Combine profiles and obis_cells so both appear on the map
     const SQL = `
   with combined as (
     ${combinedInner}
@@ -455,8 +370,6 @@ router.get(
  *               type: string
  *               format: binary
  */
-/* GET /tiles/cells/:z/:x/:y.mvt */
-/* Trajectory + OBIS coverage cells, always rendered as hexagons regardless of zoom */
 router.get(
   "/cells/:z/:x/:y.mvt",
   ...pipeline({ tileParams: {} }),
@@ -465,14 +378,13 @@ router.get(
 
     const filters = await createDBFilter(req.query);
 
-    // Only two hex grids exist (utils/hexTiers.js); the fine one is reused
-    // uncapped past zoom 6 so coverage cells never become points.
+    // The fine hex grid is reused uncapped past zoom 6 so coverage cells never
+    // become points.
     const {
       tier: hexTier,
       hexesTable,
       pointColumn: zoomPKColumn,
     } = tierForZoom(z);
-    // Prune each branch's scan to the tile region (see tileCellPrefilter).
     const cellPrefilter = tileCellPrefilter(z);
 
     const metric = parseMetric(req.query.metric);
@@ -483,13 +395,10 @@ router.get(
       prefilterFor: () => cellPrefilter,
     });
 
-    // The tile-envelope test is applied BEFORE the aggregation (hexes are
-    // disjoint, so filtering hexes before or after grouping yields identical
-    // tiles). This bounds each tile request to the cells under the visible
-    // hexes — via the hex_0_pk/hex_1_pk indexes — instead of re-aggregating
-    // the whole cell tables per tile. Grouping is by hex pk only, with the
-    // polygon joined back afterwards, so the group sort runs over narrow rows
-    // instead of spilling hex geometries to disk.
+    // The tile-envelope test runs before aggregation (hexes are disjoint, so
+    // the result is identical) to bound the scan to the visible hexes. Grouping
+    // by hex pk only, joining the polygon back after, keeps the sort from
+    // spilling geometries to disk.
     const SQL = `
   with combined as (
     ${combinedInner}
@@ -502,13 +411,9 @@ router.get(
     ),
     agg as (
       SELECT c.zoom_pk pk,
-             -- What colours the hex: one ramp over both kinds of coverage
-             -- cell, the same quantity the main /tiles layer emits.
              ${countAggregate(metric, "c")} count,
-             -- Kept for the hover tooltip only. The ramp folds the two kinds
-             -- together; the tooltip is where the breakdown stays reachable,
-             -- since a trajectory fix and an occurrence record aren't the
-             -- same unit.
+             -- Tooltip only: a trajectory fix and an occurrence record aren't
+             -- the same unit, so the breakdown stays reachable there.
              count(distinct (c.dataset_pk, c.trajectory_id))
                FILTER (WHERE c.src = 'trajectory') trajectory_count,
              ${countAggregate(metric, "c", "c.src = 'obis'")} obis_count,
@@ -601,16 +506,13 @@ router.get(
  *                   pk: { type: integer }
  *                   count: { type: integer }
  */
-/* GET /tiles/datasets */
-/* The per-dataset split of a clicked bucket's count — see the swagger note */
 router.get(
   "/datasets",
   ...pipeline({
     checks: [
       check("z").isInt({ min: 0, max: MAX_TILE_ZOOM }),
       check("source").isIn(["main", "cells"]).optional(),
-      // Same shape as the pk lists filterValidators() already accepts, and
-      // bounded: a click gathers a handful of buckets, never hundreds.
+      // Bounded: a click gathers a handful of buckets, never hundreds.
       check(["hexes", "points"])
         .matches(/^[0-9]+(,[0-9]+)*$/)
         .isLength({ max: 2000 })
@@ -632,12 +534,7 @@ router.get(
       return res.status(400).json({ errors: ["hexes or points is required"] });
     }
 
-    // The bucket restriction, pushed down into each branch so it prunes the
-    // scan the way the tile routes' geometry prefilter does. Without it every
-    // branch reads its whole table and clips at the end (~2.5 s; see
-    // tileCellPrefilter). Each table names its bucket differently:
-    // trajectory_hexes is already keyed on the hex, the other two carry a hex
-    // FK per tier, and at point zoom the bucket is the point itself.
+    // Pushed into each branch to prune the scan, like tileCellPrefilter.
     const prefilterFor = (table) => {
       if (pointPks.length && table === "profiles") {
         return "point_pk = ANY(:pointPks)";
@@ -658,13 +555,9 @@ router.get(
             prefilterFor,
           });
 
-    // One grouping level finer than the tile's. The bucket total is NOT
-    // recomputed here — the tile already carries it, and re-deriving it by
-    // summing these parts would be wrong for `days`, where they overlap.
-    //
-    // Grouped by pk_url rather than dataset_pk because that is the id the card
-    // holds; a dataset with no pk_url yet has nothing the card could match it
-    // to, so it is dropped rather than returned unlabelled.
+    // The bucket total is not recomputed: summing these parts would be wrong
+    // for `days`, where they overlap. Grouped by pk_url because that is the id
+    // the card holds.
     const SQL = `
   with combined as (
     ${combinedInner}
@@ -741,36 +634,21 @@ router.get(
  *               type: string
  *               format: binary
  */
-/* GET /tiles/tracks/:z/:x/:y.mvt */
-/* Trajectory track lines + head positions from cde.trajectory_points */
 router.get(
   "/tracks/:z/:x/:y.mvt",
-  // The cache duration is the shared default, like the other two tile routes.
-  // It used to be spelled `cache.route({ binary: true })` — not an apicache
-  // option, and the object landed in its `duration` slot, so apicache fell
-  // back to its own 1-hour default. Nothing here can pass one by accident now.
   ...pipeline({ tileParams: {} }),
   async (req, res) => {
     const { z, x, y } = req.params;
     const { timeMin, timeMax } = req.query;
 
-    // The scrub window is the whole point of this layer; unbounded queries
-    // would assemble every trajectory's full track on every tile.
+    // Unbounded queries would assemble every trajectory's full track per tile.
     if (!timeMin || !timeMax) {
       return res
         .status(400)
         .json({ errors: ["timeMin and timeMax are required for track tiles"] });
     }
 
-    // Tracks are ERDDAP data, so the OBIS-only modes hide them wholesale —
-    // the same gate as the hex, cell, legend and shape queries, which is the
-    // point of it living in utils/selection.js. This route used to hand-pick
-    // six filter keys, which dropped scientificNames on the floor: a taxon
-    // selection left every track drawn over an otherwise OBIS-only map.
-    //
-    // Track lines are drawn for whichever trajectory geometries are switched
-    // on. With neither on the client stops asking for this layer at all, but
-    // answer honestly rather than serving every track if a request arrives.
+    // Tracks are ERDDAP data, so the OBIS-only modes hide them wholesale.
     const trajectoryTypes = requestedTrajectoryTypes(req.query);
     if (
       !erddapVisible(req.query) ||
@@ -779,49 +657,28 @@ router.get(
     ) {
       return res.status(204).send();
     }
-    // The cand CTE already joins cde.datasets, so the type test rides along
-    // there — filtering candidate trajectories before any fix is pulled.
     const trackTypeFilter =
       trajectoryTypes.length < ALL_TRAJECTORY_TYPES.length
         ? ` AND d.cdm_data_type IN (${trajectoryTypes.map((t) => `'${t}'`).join(",")})`
         : "";
 
-    // Everything except the two fragments cde.trajectory_track_stats has no
-    // column to answer: depth (tracks carry no depth extent) and pointPKs (a
-    // profile-level key). The rest — including the polygon and the lat/lon
-    // rectangle, which this route used to drop silently — applies against the
-    // per-trajectory summary row, which the `cand` CTE exposes under the names
-    // the shared filter is written in (see below).
+    // cde.trajectory_track_stats has no column for depth or pointPKs.
     const { depthMin, depthMax, pointPKs, ...trackQuery } = req.query;
     const filters = await createDBFilter(trackQuery);
 
-    // Correctness invariant: lines are assembled from the FULL time window
-    // with no per-point spatial predicate — a segment can cross a tile that
-    // neither of its endpoints is in. Spatial pruning happens only at
-    // trajectory level, against the per-trajectory summary bbox (expanded by
-    // 25% of the tile width so near-boundary tracks aren't missed), and
-    // ST_AsMVTGeom does the actual clipping with its built-in buffer.
+    // Lines are assembled with no per-point spatial predicate, since a segment
+    // can cross a tile neither endpoint is in; pruning is per trajectory only,
+    // against its bbox expanded by 25% of the tile width.
     const SQL = `
   WITH te AS (SELECT ST_TileEnvelope(:z, :x, :y) tile_envelope),
-    -- The shared filter is written against the profile column names, so the
-    -- candidate row carries them: the track's summary bbox stands in for
-    -- search_geom (the spatial predicates are ST_Intersects against an extent
-    -- either way), and the dataset columns the filter may reference ride along
-    -- under the alias d that it qualifies its dataset columns with.
-    -- Selected here rather than in the outer WHERE because a SELECT alias is
-    -- not visible to its own WHERE; the subquery has no LIMIT or grouping, so
-    -- the planner flattens it and the bbox GiST index is still used.
+    -- The shared filter is written against the profile column names and the
+    -- dataset alias d, so the candidate row carries them. A SELECT alias is
+    -- not visible to its own WHERE, hence the separate CTE; the planner
+    -- flattens it and the bbox GiST index is still used.
     cand_rows AS (
-      -- gap_secs: per-trajectory time-gap split threshold — 4x the
-      -- trajectory's MEDIAN inter-fix gap (its typical reporting cadence,
-      -- robust to idle periods; the mean fallback covers pre-migration NULL
-      -- rows), floored at 48 hours. An Argo float's ~10-day cycles never
-      -- split; a multi-expedition ship track (months dark between summers)
-      -- or a monitoring vessel idle between short cruises always does,
-      -- instead of drawing a connector chord across the map.
-      -- The threshold lives in SQL (trajectory_gap_secs, 4_create_hexes.sql)
-      -- because the hex coverage sweep applies the same one: a chord this
-      -- route refuses to draw must not light hexes either.
+      -- The gap threshold lives in SQL (4_create_hexes.sql) because the hex
+      -- coverage sweep applies the same one: a chord this route refuses to
+      -- draw must not light hexes either.
       SELECT s.dataset_pk, s.trajectory_id, s.time_min, s.time_max,
              s.bbox AS search_geom,
              trajectory_gap_secs(
@@ -844,8 +701,7 @@ router.get(
       SELECT dataset_pk, trajectory_id, gap_secs
       FROM cand_rows d
       ${filters.hasShared ? "WHERE :filters" : ""}
-      -- Cap per tile (see TRACKS_MAX_PER_TILE): keep the most recently-active
-      -- trajectories; tie-break on the pk for deterministic, cache-stable tiles.
+      -- Tie-break on the pk for deterministic, cache-stable tiles.
       ORDER BY time_max DESC, dataset_pk, trajectory_id
       LIMIT :maxTracksPerTile
     ),
@@ -859,26 +715,17 @@ router.get(
       WHERE p.time >= :timeMin::timestamptz
         AND p.time <= :timeMax::timestamptz
     ),
-    -- Split tracks into segments, three break conditions:
-    --   1. antimeridian: consecutive fixes jumping >180 deg of longitude
-    --      would draw a line looping around the globe;
-    --   2. large time gap (> per-trajectory gap_secs): no data = unknown
-    --      path — draw nothing rather than a chord through possibly-land;
-    --   3. outage chord: >50km between fixes closer than 96h in time. The
-    --      harvester densifies data-backed chords to <=25km
-    --      (TRACK_MAX_CHORD_KM), so a long chord on a sub-96h gap means a
-    --      reporting outage on a fast platform (a ferry dark for a day
-    --      covers hundreds of km) — unknown path again. The 96h guard keeps
-    --      genuinely slow reporters (an Argo float drifts ~30-100km per
-    --      10-day cycle) from being shredded by condition 3; their real
-    --      gaps are handled by condition 2's cadence-scaled threshold.
+    -- Segment breaks: an antimeridian jump; a time gap beyond gap_secs
+    -- (unknown path, so no chord through possibly-land); or >50km between
+    -- fixes under 96h apart, since the harvester densifies data-backed chords
+    -- to 25km (TRACK_MAX_CHORD_KM), so a long chord means a reporting outage.
+    -- The 96h guard keeps slow reporters like Argo floats from being shredded.
     segs AS (
       SELECT *, sum(brk) OVER (
         PARTITION BY dataset_pk, trajectory_id ORDER BY time
       ) AS seg
       FROM (
-        -- coalesce: each trajectory's first fix has no lag row, so the OR is
-        -- NULL — left as-is it would sum() into a NULL seg discarded below.
+        -- The first fix has no lag row; a NULL brk would sum into a NULL seg.
         SELECT *, coalesce((
           abs(longitude - lag(longitude) OVER w) > 180
           OR extract(epoch FROM time - lag(time) OVER w) > gap_secs
@@ -895,15 +742,8 @@ router.get(
       ) q
     ),
     lines AS (
-      -- dataset_title rides along so a track-line click can name its dataset
-      -- without a second lookup (MVT dedupes strings per layer, so the whole
-      -- tile carries one copy of each title).
-      --
-      -- time_min/time_max are the segment's own span — when this segment was
-      -- sailed, which is what a hover over it can honestly say. A single fix's
-      -- instant is not available on a line: MVT properties are per feature, and
-      -- a LineString is many fixes. Epoch ms, like head_time below, because MVT
-      -- has no timestamp type.
+      -- MVT dedupes strings per layer, so carrying dataset_title is cheap.
+      -- Times are epoch ms because MVT has no timestamp type.
       SELECT trajectory_id, pk_url, dataset_title,
              (extract(epoch FROM min(time)) * 1000)::bigint AS time_min,
              (extract(epoch FROM max(time)) * 1000)::bigint AS time_max,
@@ -913,14 +753,8 @@ router.get(
       HAVING count(*) >= 2
     ),
     heads AS (
-      -- cog: course over ground at the head — spheroid azimuth (degrees
-      -- clockwise from north) from the previous fix to the head fix. NULL
-      -- when undefined: single-fix trajectories (lag is NULL) or a
-      -- stationary platform (coincident fixes make ST_Azimuth NULL); the
-      -- frontend renders those heads as circles instead of arrows.
-      -- profile_id: the record this fix belongs to, for datasets whose
-      -- trajectories are made of profiles (NULL for a plain Trajectory, whose
-      -- fixes are not records). Free here — the head row is already this fix.
+      -- cog is NULL for single-fix or stationary trajectories; the frontend
+      -- renders those heads as circles instead of arrows.
       SELECT DISTINCT ON (dataset_pk, trajectory_id)
              trajectory_id, pk_url, dataset_title, profile_id,
              (extract(epoch FROM time) * 1000)::bigint AS head_time,
@@ -934,10 +768,8 @@ router.get(
       ORDER BY dataset_pk, trajectory_id, time DESC
     ),
     line_mvt AS (
-      -- Zoom-aware simplify before MVT encoding: tolerance = one MVT grid unit
-      -- (tile width / 4096), the resolution ST_AsMVTGeom snaps to anyway, so it
-      -- drops vertices that would collapse on encode — visually lossless, fewer
-      -- vertices to encode/transfer at low zoom where tracks carry long history.
+      -- Tolerance is one MVT grid unit, the resolution ST_AsMVTGeom snaps to
+      -- anyway, so the simplify is visually lossless.
       SELECT l.trajectory_id, l.pk_url, l.dataset_title, l.time_min, l.time_max,
              ST_AsMVTGeom(
                ST_Simplify(

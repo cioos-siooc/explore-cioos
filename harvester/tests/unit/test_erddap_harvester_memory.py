@@ -1,16 +1,6 @@
-"""
-Unit tests for ERDDAPHarvester's chunked-flush memory behavior.
-
-The ERDDAP path used to grow five accumulators with `pd.concat` inside the
-per-dataset loop and hold every one of them for the whole server. That is the
-same failure that OOM-killed a 6GB container partway through an OBIS run, and
-it took down a dev host again on a CIOOS Pacific/Atlantic harvest, where a
-single server carries hundreds of large CTD profile datasets.
-
-These mirror tests/unit/test_obis_harvester_memory.py: features are flushed to
-disk periodically and correctly reassembled, and the returned result does not
-depend on the flush interval.
-"""
+"""ERDDAPHarvester chunked flushing: a single server can carry hundreds of large
+CTD datasets, so features flush to disk and reassemble independently of the
+flush interval (mirrors test_obis_harvester_memory.py)."""
 import os
 from unittest.mock import MagicMock, patch
 
@@ -112,9 +102,7 @@ def test_final_result_is_identical_regardless_of_chunk_size():
 
 
 def test_profiles_keep_the_full_schema_columns():
-    """The accumulator used to be seeded with an empty schema-shaped frame, and
-    that seed decided the output columns — a schema column no dataset filled
-    still reached profiles.csv. Dropping it would change the CSV header."""
+    """Every schema column reaches profiles.csv even when no dataset fills it."""
     result = _harvest(n_datasets=2, flush_every=1)
     from cde_harvester.core.schemas import ProfileSchema
 

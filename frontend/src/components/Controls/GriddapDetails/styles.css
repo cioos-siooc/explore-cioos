@@ -13,8 +13,6 @@
   min-width: 0;
 }
 
-/* Axis and variable cards: at the sidebar's width a 5-column table collapsed
-   into unreadable slivers, so each axis/variable gets its own stacked card. */
 .griddapDimensionsList,
 .griddapVariablesList {
   list-style: none;

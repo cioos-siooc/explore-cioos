@@ -10,11 +10,9 @@ import { intersectBoundsWithPolygonBbox } from "../../wmsUtilities.js";
 
 const NONE_IN_VIEW = new Set();
 
-// The /pointQuery/inView request for a viewport: the filters, the viewport
-// clipped to the drawn shape's envelope as the rectangle filter, and a
-// freeform shape's ring on top. Returns null when the bbox test should answer
-// instead — a viewport wrapping the antimeridian can't be one rectangle — and
-// { empty: true } when the view and the drawn shape don't overlap at all.
+// Returns null when the bbox test should answer instead (a viewport wrapping
+// the antimeridian can't be one rectangle), and { empty: true } when the view
+// and the drawn shape don't overlap.
 export function viewportRequest(viewportBounds, query, polygon) {
   if (!viewportBounds) return null;
   const [[west, south], [east, north]] = viewportBounds;
@@ -39,10 +37,8 @@ export function viewportRequest(viewportBounds, query, polygon) {
   return { url: `${server}/pointQuery/inView?${params.join("&")}` };
 }
 
-// pks of the datasets with a matched feature inside the viewport, or null
-// while that isn't known (loading, failed, or not askable) so the caller falls
-// back to its bbox test. A dataset's bbox is a poor stand-in for an OBIS
-// dataset: its occurrences span an ocean, so its box overlaps nearly any view.
+// null while unknown so the caller falls back to its bbox test, which is poor
+// for OBIS datasets whose boxes span an ocean.
 export function useViewportDatasetPks({
   viewportBounds,
   query,
@@ -53,8 +49,7 @@ export function useViewportDatasetPks({
     () => (enabled ? viewportRequest(viewportBounds, query, polygon) : null),
     [enabled, viewportBounds, query, polygon],
   );
-  // Keyed by URL, so an answer for the previous view is never applied to this
-  // one while its own request is in flight.
+  // Keyed by URL so the previous view's answer is never applied to this one.
   const [result, setResult] = useState({ url: null, pks: null });
   const url = request?.url;
 

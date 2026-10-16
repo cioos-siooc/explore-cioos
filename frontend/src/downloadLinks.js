@@ -1,33 +1,7 @@
-/*
- * Direct download links.
- *
- * The CDE's own download is a queue: pick datasets, leave an address, wait for
- * a zip. That is the right answer for a large multi-dataset order, and the
- * wrong one for "I want this dataset, now, as CSV" — and it refuses outright
- * above 1 GB per dataset, which is exactly where a scripted download is most
- * wanted. This module builds the other answer: the URL that fetches a dataset
- * straight from the server that publishes it.
- *
- * The links carry the map's filters, because the selection they were built
- * from is a filtered one. Two things about that are worth knowing before
- * reading further:
- *
- *  - ERDDAP constrains by bounding box, not by polygon. A drawn polygon is
- *    reduced to its bounds here, so an ERDDAP link over a non-rectangular
- *    selection returns a superset of what the map showed. OBIS takes WKT and
- *    gets the polygon itself.
- *  - tabledap rejects a constraint on a variable the dataset does not declare
- *    ("Unrecognized constraint variable"), so the depth constraint is only
- *    emitted for datasets whose `has_depth` says they have one. Datasets that
- *    express depth as z or pressure get a link without it rather than a link
- *    that 400s.
- *
- * The ERDDAP query is deliberately variable-less (`.csv?&time>=…` rather than
- * `.csv?time,latitude,…&time>=…`), which returns every variable in the
- * dataset. The CDE's own downloader picks a variable subset instead
- * (downloader/erddap_downloader/download_erddap.py) because it is assembling a
- * uniform archive; a user following a link to the source wants the source.
- */
+// Direct links to each dataset's source server, carrying the map's filters.
+// ERDDAP constrains by bounding box, so a drawn polygon is squared off (OBIS
+// gets the WKT). The ERDDAP query is deliberately variable-less, returning
+// every variable: a user following a link to the source wants the source.
 
 import {
   boundsFromGeoJson,
@@ -35,16 +9,8 @@ import {
   polygonToWkt,
 } from "./utilities.jsx";
 
-/*
- * tabledap response types offered for a direct link. ERDDAP serves a few dozen
- * (`/tabledap/documentation.html`); these are the ones a person downloading
- * data actually asks for, and every one of them is a file rather than a
- * viewer. `id` is ERDDAP's own file-type name and doubles as the URL
- * extension; `ext` is what the saved file should be called, which differs
- * wherever ERDDAP names a type after its shape rather than its format.
- *
- * Names are format names — CSV, netCDF, Parquet — so they are not translated.
- */
+// `id` is ERDDAP's file type (the URL extension); `ext` is the saved file's.
+// Labels are format names, so not translated.
 export const ERDDAP_FORMATS = [
   { id: "csv", ext: "csv", label: "CSV" },
   { id: "tsv", ext: "tsv", label: "TSV" },
@@ -55,17 +21,8 @@ export const ERDDAP_FORMATS = [
   { id: "parquet", ext: "parquet", label: "Parquet" },
 ];
 
-/*
- * OBIS publishes occurrences two ways, and they trade completeness against
- * filtering rather than differing only in encoding — so this is a real choice,
- * not a format dropdown, and each option says what it costs.
- *
- *  - The v3 API applies every filter the map has (including the drawn polygon,
- *    as WKT) but serves at most 10 000 records per request. Beyond that the
- *    response is a page, not the dataset.
- *  - The open-data snapshot is the whole dataset as one Parquet file, with no
- *    filtering at all. Same object the harvester reads.
- */
+// Not just encodings: the v3 API applies every filter but caps records per
+// request; the Parquet snapshot is the whole dataset, unfiltered.
 export const OBIS_RECORD_CAP = 10000;
 
 export const OBIS_FORMATS = [
@@ -88,17 +45,8 @@ export const OBIS_FORMATS = [
 export const defaultErddapFormat = ERDDAP_FORMATS[0].id;
 export const defaultObisFormat = OBIS_FORMATS[0].id;
 
-/*
- * Which of the map's filters the links carry, resolved once for the whole set.
- *
- * The three `by*` flags are the download panel's existing "apply this filter to
- * my download" checkboxes (state/download/DownloadProvider.jsx): the same
- * switches that decide what the queued zip contains decide what the links
- * contain, so the two delivery routes can never disagree about the order.
- *
- * Returns undefined for every filter that is switched off, which is what the
- * builders below test.
- */
+// The `by*` flags are the same checkboxes that filter the queued zip, so the
+// two delivery routes can never disagree.
 export function downloadConstraints({
   query,
   polygon,
@@ -121,27 +69,15 @@ export function downloadConstraints({
   };
 }
 
-// ERDDAP wants an instant. The start of the first day and the END of the last
-// one, so a range the user reads as "these dates" includes data recorded on
-// the closing date — a midnight-to-midnight reading silently drops it.
+// End of the last day, or data recorded on the closing date is dropped.
 const dayStart = (date) => `${date}T00:00:00Z`;
 const dayEnd = (date) => `${date}T23:59:59Z`;
 
-// tabledap's operators have to survive the query string: `>` and `<` are legal
-// in a URL but ERDDAP's own examples percent-encode them, and a bare `>` is
-// mangled by enough intermediaries (mail clients, chat, spreadsheet cells)
-// that a link pasted out of this UI should not depend on it.
+// A bare `>` gets mangled by mail clients, chat and spreadsheets.
 const constrain = (variable, operator, value) =>
   `${variable}${encodeURIComponent(operator)}=${encodeURIComponent(value)}`;
 
-/*
- * The tabledap URL for one dataset.
- *
- * Every constraint must be preceded by `&`, including the first — with no
- * variable list in front of it the query opens `?&`, which looks like a typo
- * and is not: `?time>=…` is a 400 ("All constraints … must be preceded by
- * '&'").
- */
+// The leading `?&` is not a typo: ERDDAP 400s on `?time>=…` without it.
 export function erddapDownloadUrl(row, formatId, constraints = {}) {
   const server = erddapServerBase(row);
   if (!server || !row?.dataset_id) return null;
@@ -153,7 +89,7 @@ export function erddapDownloadUrl(row, formatId, constraints = {}) {
   if (constraints.endDate) {
     parts.push(constrain("time", "<", dayEnd(constraints.endDate)));
   }
-  // Only where the dataset declares the variable — see the header.
+  // tabledap 400s on a constraint for an undeclared variable.
   if (row.has_depth) {
     if (constraints.startDepth != null) {
       parts.push(constrain("depth", ">", constraints.startDepth));
@@ -177,14 +113,8 @@ export function erddapDownloadUrl(row, formatId, constraints = {}) {
     .join("")}`;
 }
 
-/*
- * The OBIS URL for one dataset: either a filtered API query or the unfiltered
- * snapshot, per the chosen option.
- *
- * `size` is pinned to the API's own maximum rather than left at its default of
- * 10 — a link that quietly returns ten records would look like a dataset with
- * ten records.
- */
+// `size` is pinned to the API maximum: the default of 10 would look like a
+// ten-record dataset.
 export function obisDownloadUrl(row, formatId, constraints = {}) {
   if (!row?.dataset_id) return null;
   if (formatId === "obisParquet") {
@@ -200,8 +130,6 @@ export function obisDownloadUrl(row, formatId, constraints = {}) {
   if (constraints.endDepth != null) {
     params.set("enddepth", constraints.endDepth);
   }
-  // OBIS takes the drawn shape itself, so an occurrence link over a polygon is
-  // exactly the selection rather than its bounding box.
   if (constraints.polygon) {
     params.set("geometry", polygonToWkt(constraints.polygon));
   }
@@ -210,18 +138,7 @@ export function obisDownloadUrl(row, formatId, constraints = {}) {
   return `https://api.obis.org/v3/occurrence?${params}`;
 }
 
-/*
- * The dataset's record in the CIOOS catalogue, as something a script can
- * fetch. `ckan_url` (built by shapeQuery from the harvested ckan_id) is the
- * human page — catalogue.cioos.ca/dataset/<id> — and that is what the UI
- * links to; the same record read through CKAN's package_show API is the same
- * page's content as JSON: licence, citation, contacts, attributes. A download
- * that keeps its metadata alongside its data wants the record, not the markup
- * that renders it, so the script and the URL list carry this form.
- *
- * Returns null for a dataset the harvest never matched to a catalogue entry
- * (ckan_id NULL makes the whole concatenation NULL upstream).
- */
+// The CKAN package_show JSON behind `ckan_url`'s human page, for scripts.
 const CKAN_DATASET_PATH = "/dataset/";
 
 export function ckanRecordUrl(ckanUrl) {
@@ -231,9 +148,7 @@ export function ckanRecordUrl(ckanUrl) {
   return `${origin}/api/3/action/package_show?id=${encodeURIComponent(id)}`;
 }
 
-// The server a dataset is served from. `erddap_server_url` is the base; older
-// rows (and the download panel's own reshaping) may only carry the landing
-// page, which is the base with /tabledap/<id>.html on the end.
+// Some rows (and the download panel's reshaping) only carry the landing page.
 function erddapServerBase(row) {
   const base = row?.erddap_server_url;
   if (base) return base.replace(/\/$/, "");
@@ -244,14 +159,8 @@ function erddapServerBase(row) {
 
 const isObis = (row) => row?.source_type === "obis";
 
-/*
- * One link per dataset, in list order.
- *
- * Grids are skipped: griddap subsetting is per-variable index ranges, not
- * constraints, so there is no honest way to carry the map's filters into one —
- * and they never reach the download selection anyway (SelectionProvider drops
- * them). A row that yields no URL is left out rather than emitted broken.
- */
+// Grids are skipped: griddap subsets by index ranges, so the map's filters
+// can't be carried into one.
 export function buildDownloadLinks(
   rows,
   { erddapFormat, obisFormat },
@@ -284,28 +193,14 @@ export function buildDownloadLinks(
         format,
         url,
         filename,
-        // The catalogue record, in both the form a person opens and the form
-        // a script saves. Null together when the dataset has no CKAN entry.
         ckanUrl: row.ckan_url || null,
         ckanRecordUrl: ckanRecordUrl(row.ckan_url),
-        // Alongside the data file rather than replacing its extension's
-        // meaning: profiles.csv and profiles.ckan.json read as one pair.
         ckanFilename: `${filename.replace(/\.[^.]+$/, "")}.ckan.json`,
-        // What this particular link could not carry, for the row to say so.
-        // A depth filter is set but the dataset has no depth variable; an
-        // ERDDAP link had to square off a polygon; the snapshot ignores
-        // filters altogether.
+        // What this link could not carry, for the row to say so.
         depthDropped:
           !obis && !row.has_depth && constraints?.startDepth != null,
-        // Every spatially-filtered ERDDAP link, not only the ones that lost
-        // area to the squaring. Gating this on the shape not already being a
-        // rectangle is defensible — a rectangle IS its own bounding box, so
-        // nothing is returned that was not selected — but it puts the sign
-        // where the user is least likely to be and takes it away from the
-        // commonest selection there is. What the reader needs to know is what
-        // the link constrains by, which is a latitude/longitude box in both
-        // cases; the wording carries the part that only applies to a drawn
-        // polygon.
+        // Rectangles too, deliberately: the reader needs to know the link
+        // constrains by a lat/lon box either way.
         polygonSquared: !obis && Boolean(constraints?.bounds),
         unfiltered: obis && format.filtered === false,
       };
@@ -313,12 +208,8 @@ export function buildDownloadLinks(
     .filter(Boolean);
 }
 
-/*
- * The name to save a link's response under. Dataset IDs are unique per server,
- * not globally, so two servers publishing the same ID would otherwise write
- * over each other halfway through a scripted download; the server slug goes in
- * front, and a numeric suffix covers whatever slips past that.
- */
+// Dataset IDs are unique per server only, so the slug prefix and suffix keep
+// a scripted download from overwriting its own files.
 function uniqueFilename(row, format, used) {
   const slug = isObis(row) ? "obis" : erddapServerSlug(erddapServerBase(row));
   const stem = `${slug}_${row.dataset_id}`.replace(/[^\w.-]+/g, "_");
@@ -327,22 +218,12 @@ function uniqueFilename(row, format, used) {
   return `${stem}${seen ? `_${seen + 1}` : ""}.${format.ext}`;
 }
 
-// ---------------------------------------------------------------------------
-// The list, as a file
-
 const csvCell = (value) => `"${String(value).replace(/"/g, '""')}"`;
 
-// Single quotes, with the one escape sequence that can end a single-quoted
-// bash word and start it again around a literal quote.
 const shellQuote = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
 
-/*
- * What the header line says the links were filtered by. Written here rather
- * than in the panel because it describes the same constraints the URLs were
- * built from — a file claiming "Filters: none" over URLs carrying a date range
- * is worse than no header at all. Plain technical notation rather than
- * translated prose: it is read beside the URLs, which are in that notation.
- */
+// Built from the same constraints as the URLs so the header can't contradict
+// them; untranslated technical notation, read beside the URLs.
 export function filterSummaryText(constraints = {}) {
   const { startDate, endDate, startDepth, endDepth, bounds } = constraints;
   const parts = [];
@@ -365,32 +246,16 @@ const header = (generatedAt, filterSummary) => [
   `# Filters: ${filterSummary || "none"}`,
 ];
 
-/*
- * Every export carries the catalogue record of every dataset that has one:
- * licence, citation and contacts are what make a downloaded file usable
- * later, and a download that arrives without them is the thing this panel
- * exists to avoid. Only a dataset the harvest never matched to a CKAN entry
- * contributes nothing.
- */
 export function linksToText(links, { generatedAt, filterSummary } = {}) {
   return [
     ...(generatedAt ? header(generatedAt, filterSummary) : []),
-    // Each catalogue record directly under the data URL it describes: read top
-    // to bottom the pair stays together, and piped to xargs they are fetched
-    // in that order.
     ...links.flatMap((link) => [link.url, link.ckanRecordUrl].filter(Boolean)),
     "",
   ].join("\n");
 }
 
-/*
- * The same list as a runnable script, which is what the URLs are usually for.
- *
- * `--fail` matters more than it looks: ERDDAP answers a query that matches
- * nothing with 404 and a text body, so without it curl writes the error into
- * the .csv and exits 0. `--continue-at -` makes a re-run resume rather than
- * restart, since these are the downloads too big for the CDE's own queue.
- */
+// --fail: ERDDAP answers an empty match with a 404 text body that curl would
+// otherwise save as the .csv. --continue-at - lets a re-run resume.
 export function linksToCurlScript(links, { generatedAt, filterSummary } = {}) {
   const obisCapped = links.some(
     (link) => link.source === "obis" && link.format.filtered,
@@ -419,9 +284,8 @@ export function linksToCurlScript(links, { generatedAt, filterSummary } = {}) {
         `curl --fail --location --retry 3 --continue-at - --output ${shellQuote(
           link.filename,
         )} ${shellQuote(link.url)}`,
-        // No --continue-at on the record: it is a few kilobytes, and asking to
-        // resume a file already complete from an earlier run requests a range
-        // the server answers 416, which --fail then turns into an exit 22.
+        // No --continue-at: resuming an already-complete file gets a 416,
+        // which --fail turns into exit 22.
         ...(record
           ? [
               `curl --fail --location --retry 3 --output ${shellQuote(
@@ -444,8 +308,7 @@ export function linksToCsv(links) {
       "format",
       "filename",
       "url",
-      // The human catalogue page here, not the API record: a CSV is read in a
-      // spreadsheet, where the useful cell is the one you click.
+      // The human page, not the API record: CSVs are read in spreadsheets.
       "catalogue_url",
     ],
     ...links.map((link) => [
@@ -461,11 +324,6 @@ export function linksToCsv(links) {
   return `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
 }
 
-/*
- * Hand the browser a generated file. Object URLs outlive the click, so the
- * revoke is what keeps a session of repeated exports from holding every
- * previous one in memory.
- */
 export function downloadTextFile(filename, text, mimeType = "text/plain") {
   const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
   const anchor = document.createElement("a");

@@ -29,10 +29,6 @@ import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
-// The map-first shell: full-bleed map with a centered top bar (brand on the
-// first layer, the merged Datasets/spatial-filter/Filters segmented control
-// on the second, active-filter chips beneath) and the datasets sidebar on the
-// left (list + counts + Download). Filters and Download open as modals.
 export default function AppShell() {
   const { t } = useTranslation();
   const {
@@ -58,21 +54,13 @@ export default function AppShell() {
 
   const [splashMounted, setSplashMounted] = useState(firstPaintPending);
 
-  // Raised whenever the splash is called for; lowered by the splash itself once
-  // it has faded. mapLoaded never goes back to false, so in practice this runs
-  // once — but keying off the condition rather than assuming that keeps the two
-  // in step if a later wait ever earns a splash of its own.
+  // Lowered by the splash itself once faded. Keyed on the condition rather
+  // than assuming it runs once, in case a later wait earns a splash too.
   if (useChanged(firstPaintPending) && firstPaintPending)
     setSplashMounted(true);
 
-  // The switches that ride on the legend entries they key, rather than sitting
-  // in the layers list below: each of these turns off exactly what one legend
-  // entry describes, so the control belongs on the thing it hides.
-  //
-  // The track-lines switch is a display choice and nothing more — flipping it
-  // never touches the geometry filter, so the datasets list and its counts are
-  // unaffected (it used to live inside that filter, where turning it off could
-  // narrow the selection).
+  // Each turns off exactly what one legend entry describes, so it rides on
+  // that entry. Display only: none of them touches the geometry filter.
   const legendControls = {
     observations: {
       key: "observations",
@@ -94,9 +82,7 @@ export default function AppShell() {
     },
   };
 
-  // The switches with no legend entry of their own — nothing on the map is
-  // coloured or shaped to key them — rendered as the layers list at the foot of
-  // the card.
+  // Switches with no legend entry of their own.
   const layerControls = [
     {
       key: "griddap",
@@ -106,49 +92,25 @@ export default function AppShell() {
     },
   ];
 
-  // The data-type switches (which families of data draw at all) used to sit
-  // below these, in the same card. They are a filter — the selection gates the
-  // datasets list and the counts as well as the map — so they now live in the
-  // Filters panel with the rest, and the legend keeps only the map-appearance
-  // switches. The legend still reads the selection to know which colour keys it
-  // is entitled to claim, which is what the props below are for.
-
   return (
     <>
-      {/* The splash covers the first map load only; a redraw after that (new
-          filters, a new polygon) happens over a map the user can already see
-          and read, so it is reported by the brand logo's own mark instead of a
-          full-screen dim.
-
-          It outlives the condition that raised it by one fade: the splash is
-          opaque, so dissolving it is what makes the map and the chrome keyed
-          to it arrive together instead of appearing all at once (see Loading).
-          Unmounting on the condition alone would cut that short, so the splash
-          itself says when it is done. */}
+      {/* Later redraws are reported by the brand logo's mark instead. The
+          splash itself says when its fade is done, so the map and chrome
+          arrive together (see Loading). */}
       {splashMounted && (
         <Loading
           dismissed={!firstPaintPending}
           onDismissed={() => setSplashMounted(false)}
         />
       )}
-      {/* Mount the map immediately rather than waiting for /legend (the app's
-          heaviest query) to resolve — first paint of the basemap and tile
-          layers no longer blocks on it. The color ramp is applied once
-          rangeLevels/coverageRangeLevels arrive via Map's setColorStops
-          effect, which guards against their being undefined until then. */}
+      {/* Mounted immediately rather than waiting for /legend, the heaviest
+          query; Map's setColorStops applies the ramp once ranges arrive. */}
       <MapContainer />
-      {/* The answer to the last click on the map. Sits directly after the map
-          because it belongs to it — it is anchored to a point on the canvas and
-          dismissed by the next click — and before the rest of the chrome, which
-          all outranks it. */}
+      {/* Directly after the map: it is anchored to the canvas, and the rest
+          of the chrome outranks it. */}
       <FeatureCard />
       <DatasetMapCorner />
       <ApiErrorBanner />
-      {/* Every wait in the app, named in one panel: the map redrawing, the
-          basemap catching up, the legend, the datasets list, a record, the
-          filter catalogue, download estimates. Each is registered with
-          ActivityProvider by whoever owns the flag; this only reports them,
-          and only while the brand logo has it open. */}
       <ActivityIndicator />
       <Sidebar />
       <TopControls />
@@ -171,14 +133,6 @@ export default function AppShell() {
         endDate={endDate}
         timeFilterActive={timeFilterActive}
       />
-      {/* The two range bars over the map: the time filter along the bottom
-          edge, the depth filter down the right one, perpendicular the way the
-          axes are. Each comes and goes with whether its filter is narrowing
-          anything, and both read their own state from the filter and map
-          providers. The marks that say where the *drawn* data sits — the
-          trajectory date, the gridded dataset's time slice — are on the cards
-          that describe those layers now (the legend, and the griddap card
-          below). */}
       <TimeBar />
       <DepthBar />
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />

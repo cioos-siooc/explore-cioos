@@ -73,8 +73,7 @@ describe("anyTrajectoryLayerOn", () => {
   });
 
   it("is false once neither is", () => {
-    // The track lines, coverage hexes, scrub bar and trajectory legend all
-    // belong to the pair, so this gates all four.
+    // Gates the track lines, coverage hexes, scrub bar and trajectory legend.
     expect(anyTrajectoryLayerOn(onlyDataLayer("profile"))).toBe(false);
   });
 });

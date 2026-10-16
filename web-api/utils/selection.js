@@ -1,119 +1,46 @@
 const { FINE } = require("./hexTiers");
 const { metricValueExpr, metricJoin } = require("./hexMetric");
 
-/*
- * What a selection is.
- *
- * A request's filters resolve to a set of FEATURE SOURCES — cde.profiles,
- * trajectory coverage hexes, OBIS occurrence cells, griddap footprints — and
- * every route that answers a question about the selection has to agree on
- * which sources are in it: the map tiles, the coverage tiles, the legend's
- * ramp domain, the time axis, the dataset list, the griddap layer and the
- * download queue.
- *
- * They each used to spell that out. The ERDDAP gate below was written eight
- * times and the OBIS gate six, verbatim, which is how /downloadEstimate and
- * /download came to disagree about whether OBIS was part of a selection, and
- * /timeExtent and the dataset list about whether a region-spanning feature
- * was. Nothing announced the divergence; every copy still ran.
- *
- * What this module does NOT own is the projection. Each route selects the
- * columns its own query needs, so a branch reads
- *
- *     `SELECT <the route's columns> ${aRowSetFromHere}`
- *
- * and only the parts that must agree across routes live here.
- */
+// Every route answering a question about a selection must agree on which
+// feature sources are in it; those shared parts live here, while each route
+// keeps its own projection (`SELECT <cols> ${rowSetFromHere}`).
 
-// ---------------------------------------------------------------------------
-// Which sources a selection contains
-
-/*
- * Whether ERDDAP-sourced data — cde.profiles, trajectory coverage and griddap
- * footprints — is part of this selection at all.
- *
- * A scientific-name filter is OBIS-only by construction: only occurrence
- * records carry taxa, so a taxon selection hides everything else. An
- * OBIS-node selection does the same, UNLESS ERDDAP servers are selected
- * alongside it — that pair is the frontend's combined "Data Source" filter,
- * which dbFilter turns into a single OR'd dataset predicate, so both feature
- * sets have to be present for that OR to mean anything.
- *
- * The map routes gate further on their own layer toggles (see
- * utils/dataTypes.js); those are display state, not part of the selection.
- */
+// Taxa are OBIS-only, so a taxon selection hides ERDDAP data. An OBIS-node
+// selection does too, unless paired with erddapServers: that pair is the
+// combined "Data Source" OR filter in dbFilter, which needs both sets.
 function erddapVisible(query) {
   return (
     !query.scientificNames && (!query.obisNodes || Boolean(query.erddapServers))
   );
 }
 
-// The OBIS layer toggle. Absent means on, so only an explicit "false" hides
-// occurrence cells.
+// Absent means on.
 function obisVisible(query) {
   return query.includeObis !== "false";
 }
 
-// ---------------------------------------------------------------------------
-// Where each source's rows come from
-
-/*
- * Restricts cde.profiles to the features the map can draw.
- *
- * A feature whose bbox spans more than POINT_THRESHOLD_M has no meaningful
- * single location (harvester/cde_harvester/dataset_types/geo.py), so the tile
- * and legend routes leave it off the map entirely — but it is still IN the
- * selection: still searchable through its stored bbox, still listed, still
- * downloadable. So this is a rendering restriction, and only the rendering
- * routes apply it.
- *
- * It is named here because that asymmetry was previously an accident:
- * /timeExtent applied it and the dataset list did not, so the time axis and
- * the list that axis bounds were computed over different features.
- */
+// A feature whose bbox spans more than POINT_THRESHOLD_M
+// (harvester/cde_harvester/dataset_types/geo.py) is left off the map but is
+// still in the selection, so only rendering routes apply this.
 const DRAWN_AS_POINT = "show_as_point";
 
-/*
- * Trajectory coverage as everything outside the map reads it: one tier only,
- * with the hex polygon joined back in.
- *
- * The polygon — not the row's centroid — is what the shared spatial filter
- * matches against, so a drawn selection smaller than a hex still selects the
- * data the track left inside it. The tile routes read this table differently
- * (their own tier, from the zoom, and no polygon join: they already have the
- * hex), which is why this covers the other three callers rather than all four.
- */
+// Not for the tile routes. The hex polygon, not the centroid, is what the
+// spatial filter matches, so a drawn selection smaller than a hex still
+// selects data the track left inside it.
 const TRAJECTORY_COVERAGE_FROM = `FROM cde.trajectory_hexes t
         JOIN ${FINE.hexesTable} h ON h.pk = t.hex_pk
         WHERE t.hex_tier = ${FINE.tier}`;
 
-/*
- * Griddap datasets are metadata-only: no feature rows at all, their coverage
- * lives on cde.datasets under coverage_* columns.
- *
- * Every caller — the shape query's griddap arm, /griddapCoverage and
- * /coverageHistogram — has to alias those columns to the names dbFilter's
- * predicates are written in (time_min, time_max, depth_min, depth_max,
- * point_pk, search_geom), because those predicates are UNQUALIFIED: a row set
- * missing one of the names makes the whole statement fail to parse. point_pk (NULL::integer, which keeps
- * grids out of map-click queries) and search_geom (d.coverage_bbox) are one
- * self-evident expression each and sit at whichever position the caller's
- * column order needs. The time and depth bounds carry a decision instead —
- * a timeless (static) grid coalesces to +-infinity so that any time filter
- * matches it, and a depthless one to zero — so they are shared, and they are
- * contiguous in every caller.
- */
+// dbFilter's predicates are unqualified, so griddap's coverage_* columns
+// must be aliased to their names. A static (timeless) grid coalesces to
+// +-infinity so any time filter matches it.
 const GRIDDAP_TIME_DEPTH_COLUMNS = `coalesce(d.coverage_time_min, '-infinity'::timestamptz) AS time_min,
                coalesce(d.coverage_time_max, 'infinity'::timestamptz) AS time_max,
                coalesce(d.coverage_depth_min, 0) AS depth_min,
                coalesce(d.coverage_depth_max, 0) AS depth_max`;
 
-/*
- * The same four columns without the static-grid coalesce above, for callers
- * that bin a grid by time rather than test it against a filter. A grid with no
- * time coverage belongs in no bin rather than in every one of them, and NULL
- * bounds fail the caller's window comparison, so the row drops out on its own.
- */
+// For callers that bin by time: a timeless grid belongs in no bin, and its
+// NULL bounds drop it from the window comparison.
 const GRIDDAP_EXACT_TIME_DEPTH_COLUMNS = `d.coverage_time_min AS time_min,
                d.coverage_time_max AS time_max,
                coalesce(d.coverage_depth_min, 0) AS depth_min,
@@ -122,29 +49,18 @@ const GRIDDAP_EXACT_TIME_DEPTH_COLUMNS = `d.coverage_time_min AS time_min,
 const GRIDDAP_FROM = `FROM cde.datasets d
         WHERE d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL`;
 
-/*
- * A cde.datasets row (aliased d) that at least one of the sources above can
- * put on the map. The loader can leave a row with none — every feature
- * dropped for an unparseable time, or a dataset now skipped upstream whose
- * old row survives — and /pointQuery never returns such a row, so a catalog
- * total that counted it would read "N-1 / N" with nothing to find.
- */
+// The loader can leave a dataset row with no features (all dropped, or
+// skipped upstream); /pointQuery never returns one, so a catalog total
+// counting it would read "N-1 / N".
 const DATASET_HAS_FEATURES = `(EXISTS (SELECT 1 FROM cde.profiles p WHERE p.dataset_pk = d.pk)
         OR EXISTS (SELECT 1 FROM cde.trajectory_hexes t
                    WHERE t.dataset_pk = d.pk AND t.hex_tier = ${FINE.tier})
         OR EXISTS (SELECT 1 FROM cde.obis_cells o WHERE o.dataset_pk = d.pk)
         OR (d.cdm_data_type = 'Grid' AND d.coverage_bbox IS NOT NULL))`;
 
-/*
- * The coarse hex tier read from cde.hexes_zoom_0_rollup (see 1_schema.sql)
- * instead of the three feature tables, for selections whose filters are all
- * dataset-level (createDBFilter's datasetLevelOnly) — nothing else can be
- * answered from a per-(hex, dataset) row. Yields dataset_pk, the hex pk under
- * `hexAs`, and metric_value, the same as the raw branches it replaces.
- *
- * @param {string[]} sourceConds  one condition per included source, each
- *                                starting `source = '<name>'`; none = no rows
- */
+// Only valid when createDBFilter's datasetLevelOnly holds: nothing else can
+// be answered from a per-(hex, dataset) row. Each sourceCond starts
+// `source = '<name>'`; none means no rows.
 function coarseRollupBranch(metric, sourceConds, hexAs) {
   const where = sourceConds.length
     ? sourceConds.map((c) => `(${c})`).join(" OR ")
@@ -154,23 +70,8 @@ function coarseRollupBranch(metric, sourceConds, hexAs) {
         WHERE ${where}`;
 }
 
-// ---------------------------------------------------------------------------
-// Assembly
-
-/*
- * The UNION ALL of a selection's branches, with the guard every caller needs
- * for the case where the selection contains no source at all (a taxon filter
- * with OBIS switched off, every layer toggled away).
- *
- * An empty UNION is not valid SQL, and neither is `${branch} WHERE FALSE` —
- * every branch here carries a WHERE of its own. So the empty set is one of the
- * real branches wrapped in a subquery: it yields no rows while keeping the
- * exact column names and types the enclosing CTE was written against, which a
- * hand-written NULL shell has to be kept in sync with by hand.
- *
- * @param {string[]} branches  the arms of the union, in order
- * @param {string}   fallback  a branch to shape the empty result set from
- */
+// An empty UNION is invalid SQL and every branch has its own WHERE, so the
+// empty set wraps a real branch to keep its column names and types.
 function unionBranches(branches, fallback) {
   if (!branches.length) {
     return `SELECT * FROM (${fallback}) empty_combined WHERE FALSE`;

@@ -34,17 +34,7 @@ import reportError from "../../../state/reportError.js";
 import "./styles.css";
 import Spinner from "../../ui/Spinner.jsx";
 
-/*
- * The order under review: every dataset in the selection as a card carrying its
- * size estimate, whether the CDE can package it, and its direct download URL —
- * then the totals and, as `children`, the order bar's own controls.
- *
- * The filter switches arrive as values only: the chips that set them sit above
- * this component (DownloadPanel), because the same switches decide both what a
- * packaged order contains and what the links carry.
- *
- * Note: datasets and points are exchangable terminology
- */
+// Note: datasets and points are interchangeable terminology here.
 export default function DownloadDetails({
   pointsToReview,
   setPointsToDownload,
@@ -65,27 +55,20 @@ export default function DownloadDetails({
 }) {
   const { t } = useTranslation();
   const [selectAll, setSelectAll] = useState(true);
-  // The download format lives here rather than with either of the things that
-  // read it, because two do: the export buttons in the footer, which take the
-  // links in bulk, and every card in the list, which shows the one query its
-  // own dataset would be fetched with. Building the links once here is what
-  // keeps the two in step — a card promising a .csv under a footer set to
-  // Parquet would be a lie about the same order. The picker itself sits in the
-  // footer's direct-links column.
+  // Lives here so the footer's exports and every card's link are built from
+  // one format and stay in step.
   const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
   const [obisFormat, setObisFormat] = useState(defaultObisFormat);
   const [pointsData, setPointsData] = useState(
     pointsToReview
-      // defensive: griddap datasets are metadata-only and must never reach
-      // the size-estimate / download-queue flow
+      // Griddap is metadata-only and must never reach the estimate/queue flow.
       .filter((ptr) => ptr.cdm_data_type !== "Grid")
       .map((ptr) => {
         return { ...ptr, downloadDisabled: false };
       }),
   );
-  // The × on a card takes the dataset out of the selection itself
-  // (SelectionProvider), not out of this copy of it. Pruned rather than
-  // re-seeded, so the rows left keep their estimates and batch ticks.
+  // Pruned rather than re-seeded, so the rows left keep their estimates and
+  // batch ticks.
   const reviewPks = pointsToReview.map((ptr) => ptr.pk).join(",");
   if (useChanged(reviewPks)) {
     const livePks = new Set(pointsToReview.map((ptr) => ptr.pk));
@@ -93,26 +76,14 @@ export default function DownloadDetails({
   }
   const [dataTotal, setDataTotal] = useState(0);
   const [downloadSizeEstimates, setDownloadSizeEstimates] = useState();
-  // Three states, not two: estimates in flight (spinner), estimates in
-  // (sizes), estimates failed (no sizes, no spinner). The old code threw from
-  // its catch handlers, which skipped the setLoading(false) chained after
-  // them — a failing /downloadEstimate spun forever, in every card and in the
-  // order summary.
+  // Failed is a third state: no sizes, but no spinner either.
   const [estimatesLoading, setEstimatesLoading] = useState(true);
-  // Reported by the corner badge as well as by the figures it stands in for:
-  // the estimate is the slowest thing in this modal and the user may well
-  // have looked away from it.
   useActivityTask("activityEstimatesText", estimatesLoading);
 
-  // The three effects below are a pipeline, and each one's dependency array is
-  // deliberately shorter than what it reads:
-  //
-  //   fetch estimates  ->  merge them into pointsData  ->  totals + basket
-  //
-  // The middle step writes `pointsData`, which the first and second both read.
-  // Listing it in either would feed the pipeline its own output. The third
-  // cannot list `downloadSizeEstimates` either: it would then run once against
-  // the pre-merge rows, where `sizeEstimate` does not exist yet.
+  // The three effects below are a pipeline (fetch estimates -> merge into
+  // pointsData -> totals + basket) whose dependency arrays are deliberately
+  // short: listing `pointsData` would feed the pipeline its own output, and
+  // listing `downloadSizeEstimates` in the third would run it on pre-merge rows.
   useEffect(() => {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -125,8 +96,6 @@ export default function DownloadDetails({
     const estimateUrl = (filterQuery) =>
       `${server}/downloadEstimate?${applyDatasetPKs(filterQuery, datasetPKs)}`;
     const unfilteredUrl = estimateUrl("");
-    // The download can be narrowed by any of the active filters; when none of
-    // them applies, the unfiltered estimate is the estimate.
     const isFiltered =
       filterDownloadByPolygon || filterDownloadByTime || filterDownloadByDepth;
     let filteredUrl = unfilteredUrl;
@@ -279,15 +248,9 @@ export default function DownloadDetails({
   }
 
   const selectedCount = pointsData.filter((point) => point.selected).length;
-  // What the direct links are built from: everything the user kept, plus the
-  // datasets the 1 GB ceiling deselected for them. Those are exactly the ones
-  // the CDE's queue refuses to deliver, which is where a direct link is worth
-  // most — leaving them out would hide the feature from the case it exists for.
-  //
-  // `!== false` rather than truthy: `selected` is only set once the size
-  // estimates land, and a direct link needs no estimate. Testing for truth
-  // would empty the links strip for as long as the slowest request in this
-  // modal takes, which reads as broken rather than as pending.
+  // Includes datasets the 1 GB ceiling deselected: the queue refuses them, so
+  // that is where a direct link matters most. `!== false` because `selected`
+  // is unset until the estimates land, and a direct link needs none.
   const linkableDatasets = useMemo(
     () =>
       pointsData.filter(
@@ -324,8 +287,6 @@ export default function DownloadDetails({
     [linkableDatasets, erddapFormat, obisFormat, constraints],
   );
 
-  // The card for a dataset shows that dataset's own query, so the list needs
-  // the links by pk rather than in order.
   const linksByPk = useMemo(
     () => new Map(links.map((link) => [link.pk, link])),
     [links],
@@ -333,8 +294,6 @@ export default function DownloadDetails({
 
   return (
     <div className="container downloadDetails">
-      {/* One row of chrome: what the order narrows by. Every row spent here is
-          a row of datasets the list below does not show. */}
       <div className="downloadBandRow">
         <FilterDownloadToggles
           query={query}
@@ -367,21 +326,14 @@ export default function DownloadDetails({
         </div>
       </div>
 
-      {/* The order's three outcomes on one band: what you picked, having it
-          emailed, and taking the URLs yourself. The last two are alternative
-          ways to ship the first, so they sit beside it rather than under it —
-          neither is a mode of the modal, and a user weighing one against the
-          other can read both without scrolling. */}
       <div className="downloadFooter">
         <div className="downloadFooterSection">
           <span className="downloadFooterTitle">
             {t("downloadDetailsSelectionTitle")}
           </span>
           <div className="downloadSummary">
-            {/* The estimates decide which datasets are downloadable, hence how
-              many stay selected — so both stats wait for them rather than
-              showing a count that is about to change under the user. If they
-              fail outright, the sizes are unknowable but the counts aren't. */}
+            {/* Both stats wait for the estimates, which decide how many stay
+              selected. */}
             <div className="downloadSummaryStat">
               {estimatesLoading ? (
                 <Spinner size="sm" className="datasetSizeTotalSpinner" />
@@ -429,13 +381,8 @@ export default function DownloadDetails({
           </div>
         </div>
 
-        {/* Column two, the queue: DownloadPanel's email field and submit. */}
         {children}
 
-        {/* Column three, the same order taken from the source instead of the
-            queue. Beside the summary rather than behind a tab, because one of
-            the things it answers ("this dataset is too large for the zip") is
-            only legible next to the figures that say so. */}
         <DirectDownloadLinks
           links={links}
           constraints={constraints}

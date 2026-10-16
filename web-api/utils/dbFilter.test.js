@@ -9,12 +9,8 @@ const {
   MAX_EXPANDED_APHIA_IDS,
 } = createDBFilter;
 
-/*
- * createDBFilter is pure string assembly apart from the scientific-name
- * expansion, which is injected here — so every one of these runs with no
- * Postgres. The predicates are asserted through knex's .toString(), which
- * interpolates the bindings the Raw carries.
- */
+// The aphia expansion is injected, so no Postgres; predicates are asserted
+// through knex's .toString(), which interpolates the bindings.
 
 test("no filters emits TRUE, not an empty predicate", async () => {
   const f = await createDBFilter({});
@@ -40,50 +36,39 @@ test("time and depth bounds are emitted as bounded, cast predicates", async () =
 });
 
 test("eovs is applied at BOTH dataset and feature level", async () => {
-  // The feature-level copy is what makes a multi-EOV dataset contribute only
-  // the casts that measured the selected variable; dropping either half is a
-  // silent behaviour change with no error to catch it.
+  // Dropping either half is a silent behaviour change.
   const f = await createDBFilter({ eovs: "temperature,salinity" });
   assert.match(f.shared.toString(), /eovs && /);
   assert.match(f.profileOnly.toString(), /eovs && /);
 });
 
 test("comma-separated keys bind as arrays, not as the raw string", async () => {
-  // pointPKs regressed exactly this way once: the query string was bound
-  // whole, so `= ANY(:pointPKs)` could never match.
   const f = await createDBFilter({
     pointPKs: "1,2,3",
     datasetPKs: "a,b",
     organizations: "7",
   });
   const sql = f.shared.toString();
-  // A postgres array literal, not the comma-separated string it arrived as —
-  // `= ANY('1,2,3')` cannot be cast to an integer array and never matches.
+  // `= ANY('1,2,3')` cannot be cast to an integer array.
   assert.match(sql, /point_pk = ANY \('\{"1","2","3"\}'\)/);
   assert.match(sql, /d\.pk_url = ANY \('\{"a","b"\}'\)/);
   assert.match(sql, /organization_pks && '\{"7"\}'/);
 });
 
 test("excludeDatasetPKs is the same narrowing written the shorter way", async () => {
-  // A client that narrows the catalogue itself can name what it kept or what
-  // it dropped; both have to reach the same predicate column, or the mild
-  // narrowings that can only be sent as a drop list would filter nothing.
   const f = await createDBFilter({ excludeDatasetPKs: "4,5" });
   assert.match(f.shared.toString(), /d\.pk_url <> ALL \('\{"4","5"\}'\)/);
 });
 
 test("excluding datasets does not drop the ones with no pk_url yet", async () => {
-  // pk_url is nullable, and `NULL <> ALL (...)` is NULL, not TRUE. Without the
-  // guard a single exclusion silently drops every dataset that
-  // 5_profile_process.sql has not back-filled — the opposite of narrowing.
+  // `NULL <> ALL (...)` is NULL: unguarded, an exclusion would drop every
+  // dataset not yet back-filled.
   const f = await createDBFilter({ excludeDatasetPKs: "4" });
   assert.match(f.shared.toString(), /d\.pk_url IS NULL OR d\.pk_url <> ALL/);
 });
 
 test("exclude params drop what they name but keep rows where the column is NULL", async () => {
-  // `NULL <> ALL (...)` and `NOT (NULL && ...)` are both NULL, so an unguarded
-  // exclusion would also drop every dataset with no platform, organisation,
-  // server or node — the opposite of "everything except X".
+  // `NULL <> ALL (...)` and `NOT (NULL && ...)` are both NULL.
   const sql = (
     await createDBFilter({
       excludePlatforms: "mooring",
@@ -113,8 +98,7 @@ test("an include and an exclude on the same filter are ANDed", async () => {
 });
 
 test("source excludes do not take part in the include OR", async () => {
-  // The include pair is one OR'd predicate (the combined Data Source filter);
-  // an exclusion must narrow on top of it, not become a third alternative.
+  // An exclusion must narrow the OR'd include pair, not join the OR.
   const sql = (
     await createDBFilter({
       obisNodes: "Node A",
@@ -141,8 +125,7 @@ test("eovsMatch=all asks for every EOV at both dataset and feature level", async
 });
 
 test("latitude is clamped to the Mercator-valid range", async () => {
-  // Transforming a ±90° envelope throws "transform: tolerance condition
-  // error" in PostGIS and 500s the request.
+  // A ±90° envelope throws "tolerance condition error" in PostGIS.
   const f = await createDBFilter({
     latMin: "-90",
     latMax: "90",
@@ -267,10 +250,9 @@ test("scientificNames expands via the injected fetcher and filters OBIS only", a
     },
   );
 
-  // De-duplicated and trimmed before it reaches the database.
   assert.deepEqual(askedFor, ["Gadus morhua", "Clupea harengus"]);
-  // OBIS-only: the shared predicate must not carry a taxon filter, or it would
-  // be applied to profiles that have no aphia_ids column.
+  // Profiles have no aphia_ids column, so the taxon filter stays out of the
+  // shared predicate.
   assert.equal(f.shared.toString(), "TRUE");
   const obis = f.obisOnly.toString();
   assert.match(obis, /aphia_ids && /);
@@ -336,21 +318,14 @@ test("the fetcher is not called when no scientific name is selected", async () =
 test("realtimeOnly adds a dataset-level freshness predicate", async () => {
   const f = await createDBFilter({ realtimeOnly: "true" });
   const sql = f.shared.toString();
-  // Qualified with `d.`, because the bare column names would be ambiguous
-  // against the feature tables the branches union together.
-  //
-  // verified_at and not last_updated_at: last_updated_at only advances when the
-  // dataset's content changed, so an incremental harvest that skips a dead feed
-  // as unchanged freezes coverage_time_max and last_updated_at together and the
-  // dataset reads realtime forever. verified_at advances on every harvest that
-  // reached the dataset, so the gap widens and the flag expires on its own.
+  // Qualified with `d.`: bare names would be ambiguous against the feature
+  // tables.
   assert.match(
     sql,
     /dataset_is_realtime\(d\.coverage_time_max, d\.verified_at, d\.cdm_data_type\)/,
   );
-  // A plain boolean test, never `NOT dataset_is_realtime(...)`: the function is
-  // IMMUTABLE over two stored columns and cannot return NULL, and a negation
-  // over a three-valued result would drop rows from both sides of the facet.
+  // Never negated: a negation over a three-valued result would drop rows
+  // from both sides of the facet.
   assert.doesNotMatch(sql, /NOT dataset_is_realtime/);
   assert.equal(f.hasShared, true);
 });

@@ -5,10 +5,8 @@ import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState } from "../map/MapStateProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 
-// The label for each layer id Map.jsx can report as loading. Kept here rather
-// than in Map.jsx so nothing in the map has to know about i18n, and phrased as
-// a thing being loaded ("Track lines") rather than as the switch that toggles
-// it ("Show track lines").
+// Here so the map needn't know about i18n; phrased as the thing loaded, not
+// the switch.
 const MAP_LAYER_LABEL_KEYS = {
   observations: "activityLayerObservations",
   tracks: "activityLayerTracks",
@@ -18,14 +16,8 @@ const MAP_LAYER_LABEL_KEYS = {
   wmsOverlay: "activityLayerWmsOverlay",
 };
 
-// Registers the provider-level loading flags with ActivityProvider. Renders
-// nothing — it exists so the providers themselves stay unaware of the activity
-// registry, the same way UrlSync owns the cross-provider URL wiring without
-// any provider knowing about the URL.
-//
-// Work owned by a single component registers itself instead (DownloadDetails'
-// size estimates, DatasetInspector's record list), because the flag never
-// leaves that component.
+// Keeps the providers unaware of the activity registry, as UrlSync does for
+// the URL. Component-owned work registers itself.
 export default function ActivityTasks() {
   const { loading, loadingLayers, legendLoading } = useMapState();
   const { selectionLoading, recordLoading } = useSelection();
@@ -37,9 +29,7 @@ export default function ActivityTasks() {
   );
   useActivityTasks(mapLayerKeys);
 
-  // Only when the map is redrawing but no layer owns up to a fetch — a style
-  // change, or tiles that resolved from cache faster than the announce delay.
-  // Naming the layers is strictly better than this when we can.
+  // Fallback for a redraw no layer owns up to (style change, fast cache hits).
   useActivityTask("mapUpdatingText", loading && mapLayerKeys.length === 0);
 
   useActivityTask("legendLoadingText", legendLoading);
