@@ -74,27 +74,34 @@ export default function WmsLegend({
       {/* Above, not over: the colorbar runs edge to edge with no free corner. */}
       <div className="wmsLegendHeader">
         {variables.length > 1 && (
-          <DropdownButton
-            className="wmsLegendVariableSelector"
-            size="sm"
-            variant="outline-secondary"
-            tooltip={t("griddapVariableSelect")}
-            title={
-              <span className="wmsLegendVariableName">
-                {overlay.variable ? variableLabel(overlay.variable) : ""}
+          <div className="wmsLegendField">
+            {variant === "inline" && (
+              <span className="wmsLegendFieldLabel">
+                {t("griddapVariableSelect")}
               </span>
-            }
-          >
-            {variables.map((variable) => (
-              <Dropdown.Item
-                key={variable.name}
-                active={variable.name === overlay.variable?.name}
-                onClick={() => setActiveWmsOverlay({ ...overlay, variable })}
-              >
-                {variableLabel(variable)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
+            )}
+            <DropdownButton
+              className="wmsLegendVariableSelector"
+              size="sm"
+              variant="outline-secondary"
+              tooltip={t("griddapVariableSelect")}
+              title={
+                <span className="wmsLegendVariableName">
+                  {overlay.variable ? variableLabel(overlay.variable) : ""}
+                </span>
+              }
+            >
+              {variables.map((variable) => (
+                <Dropdown.Item
+                  key={variable.name}
+                  active={variable.name === overlay.variable?.name}
+                  onClick={() => setActiveWmsOverlay({ ...overlay, variable })}
+                >
+                  {variableLabel(variable)}
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+          </div>
         )}
         {/* Folds back to the button; the other X turns the overlay off. */}
         {isCompact && (

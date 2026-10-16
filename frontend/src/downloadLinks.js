@@ -149,7 +149,7 @@ export function ckanRecordUrl(ckanUrl) {
 }
 
 // Some rows (and the download panel's reshaping) only carry the landing page.
-function erddapServerBase(row) {
+export function erddapServerBase(row) {
   const base = row?.erddap_server_url;
   if (base) return base.replace(/\/$/, "");
   const landing = row?.erddap_url;

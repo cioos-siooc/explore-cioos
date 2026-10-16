@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import "./plotlyGlobal.js";
 import Plotly from "plotly.js/lib/core";
@@ -21,7 +22,7 @@ const ZOOM_OUT = {
   fromcurrent: true,
 };
 
-export default function TaxonomySunburst({ tree }) {
+export default function TaxonomySunburst({ tree, actionsEl }) {
   const { t, i18n } = useTranslation();
   const graphRef = useRef(null);
   const [zoomed, setZoomed] = useState(false);
@@ -54,18 +55,20 @@ export default function TaxonomySunburst({ tree }) {
     setZoomed(false);
   }
 
+  const actions = (
+    <button
+      type="button"
+      className="recordShowAll"
+      disabled={!zoomed}
+      onClick={showAll}
+    >
+      {t("taxonomyShowAllText")}
+    </button>
+  );
+
   return (
     <>
-      <div className="taxonomyActions">
-        <button
-          type="button"
-          className="recordShowAll"
-          disabled={!zoomed}
-          onClick={showAll}
-        >
-          {t("taxonomyShowAllText")}
-        </button>
-      </div>
+      {actionsEl ? createPortal(actions, actionsEl) : actions}
       <div className="taxonomySunburstFrame">
         <Plot
           className="taxonomySunburst"

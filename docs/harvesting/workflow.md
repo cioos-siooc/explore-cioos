@@ -21,7 +21,7 @@ source servers or the local database.
 | --- | --- | --- | --- |
 | **ERDDAP** | Primary data source, one server per regional association | One row per **feature** (station, cast), trajectory track, or grid extent | [ERDDAP strategy](erddap.md) |
 | **OBIS** | Biological occurrences | One row per ~5 nmi **cell**, with its species | [OBIS strategy](obis.md) |
-| **CKAN** | Metadata enrichment only | Title (EN/FR), organizations, catalogue link; EOVs for OBIS | [CKAN](#ckan) below |
+| **CKAN** | Metadata enrichment only | Title (EN/FR), organizations, catalogue link, the dataset page's [descriptive metadata](#descriptive-metadata); EOVs for OBIS | [CKAN](#ckan) below |
 
 ```mermaid
 flowchart TD
@@ -141,7 +141,7 @@ describes the data still stored.
 | Unchanged dataset | Skipped after 1 request, rows kept | Re-harvested every run |
 | Upstream data cache | None; every harvest queries the server | `obis_cache` volume, **no expiry**: new records for an already-cached dataset are not picked up until its cache is deleted |
 | New or removed datasets | From the server's `allDatasets` listing | From [discovery](obis.md#choosing-datasets) |
-| CKAN metadata refresh | Only for re-harvested datasets: an `UNCHANGED` dataset keeps its stored CKAN title and organizations | Cached per UUID with no expiry, "not found" included |
+| CKAN metadata refresh | Only for re-harvested datasets: an `UNCHANGED` dataset keeps its stored CKAN title, organizations and descriptive metadata | Cached per UUID with no expiry, "not found" included |
 
 ## CKAN
 
@@ -178,6 +178,29 @@ conversions are cached on disk. If CKAN is unreachable, the datasets keep the
 CKAN metadata stored by the previous harvest and the rest are converted.
 
 The database then normalizes organization names into `cde.organizations`.
+
+### Descriptive metadata
+
+The dataset page's abstract, citation, DOI, license, contacts, keywords, dates,
+time and depth extent, status, update frequency, projects, history and
+resource links are stored in `cde.datasets.metadata` (jsonb).
+`core/record_metadata.py` normalizes each source into that one shape and merges
+them field by field, the first source with a value winning:
+
+1. the CKAN record (both ERDDAP and OBIS datasets);
+2. for an OBIS dataset without one, its converted OBIS metadata, plus OBIS's
+   own citation;
+3. for an ERDDAP dataset, its ACDD global attributes (`summary`, `creator_*`,
+   `publisher_*`, `contributor_*`, `license`, `keywords`, `date_*`,
+   `time_coverage_*`, `geospatial_vertical_*`, `doi`, `history`, …).
+
+Fields with an `{en, fr}` value merge per language, so a French ERDDAP summary
+fills in for a CKAN record that has only English. CKAN's placeholder values
+(`"None"`) and the converter's untranslated French text count as empty. The
+embedded ISO XML is not kept. When CKAN is unreachable, the stored metadata
+stands in for the CKAN record, like the title. A dataset not re-harvested since
+the column was added has `NULL`, and the page shows only what the other columns
+hold.
 
 ## Loading
 

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -65,15 +66,20 @@ function Harness({
   );
 }
 
-async function renderReady(props) {
+async function renderReady({ url, ...props } = {}) {
   const result = renderWithProviders(<Harness {...props} />, {
     providers: "app",
+    url,
   });
   await waitFor(() =>
     expect(screen.getByTestId("state")).toHaveTextContent("loaded"),
   );
   return result;
 }
+
+// The feature list lives on the Data tab.
+const openData = () =>
+  userEvent.click(screen.getByRole("tab", { name: "Data" }));
 
 describe("DatasetInspector", () => {
   beforeEach(() => {
@@ -87,15 +93,16 @@ describe("DatasetInspector", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows organizations, ocean variables, geometry, platform and sources", async () => {
+  it("shows ocean variables, geometry, platform and where to get the data", async () => {
     await renderReady();
-    expect(screen.getByText("Chicago Park District")).toBeInTheDocument();
-    expect(screen.getByText("Oxygen")).toBeInTheDocument();
+    expect(await screen.findByText("Oxygen")).toBeInTheDocument();
     expect(screen.getByText("subSurfaceTemperature")).toBeInTheDocument();
     // TimeSeries maps to the "Time series" data-layer label.
     expect(screen.getByText("Time series")).toBeInTheDocument();
     expect(screen.getByText("Mooring")).toBeInTheDocument();
-    const erddapLink = screen.getByRole("link", { name: /Dataset/ });
+    const erddapLink = await screen.findByRole("link", {
+      name: /Data access form/,
+    });
     expect(erddapLink).toHaveAttribute("href", DATASET.erddap_url);
   });
 
@@ -109,12 +116,11 @@ describe("DatasetInspector", () => {
         ckan_url: ckanUrl,
       },
     });
-    expect(screen.getByRole("link", { name: "View on OBIS" })).toHaveAttribute(
-      "href",
-      "https://obis.org/dataset/obis-uuid",
-    );
     expect(
-      screen.getByRole("link", { name: "Metadata (CKAN)" }),
+      await screen.findByRole("link", { name: /OBIS dataset page/ }),
+    ).toHaveAttribute("href", "https://obis.org/dataset/obis-uuid");
+    expect(
+      screen.getByRole("link", { name: /CIOOS catalogue record/ }),
     ).toHaveAttribute("href", ckanUrl);
   });
 
@@ -123,16 +129,17 @@ describe("DatasetInspector", () => {
       dataset: { ...DATASET, source_type: "obis", dataset_id: "obis-uuid" },
     });
     expect(
-      screen.getByRole("link", { name: "View on OBIS" }),
+      await screen.findByRole("link", { name: /OBIS dataset page/ }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /CKAN/ }),
+      screen.queryByRole("link", { name: /CIOOS catalogue record/ }),
     ).not.toBeInTheDocument();
   });
 
-  it("renders organization, variable and platform values as plain chips, not filter toggles", async () => {
+  it("renders variable values as plain chips, not filter toggles", async () => {
     await renderReady();
-    for (const value of ["Chicago Park District", "Oxygen", "Mooring"]) {
+    await screen.findByText("Oxygen");
+    for (const value of ["Oxygen"]) {
       const chip = screen.getByText(value);
       expect(chip).toHaveClass("metadataChip");
       expect(chip.closest("button")).toBeNull();
@@ -140,25 +147,17 @@ describe("DatasetInspector", () => {
     expect(screen.queryAllByTestId("filter-option")).toHaveLength(0);
   });
 
-  it("Download adds the dataset to the selection and opens the download", async () => {
+  it("Add puts the dataset in the selection, and again takes it out", async () => {
     const { user } = await renderReady();
-    expect(screen.getByTestId("download-modal-open")).toHaveTextContent(
-      "false",
-    );
-    await user.click(screen.getByRole("button", { name: /Download/ }));
-    await waitFor(() =>
-      expect(screen.getByTestId("download-modal-open")).toHaveTextContent(
-        "true",
-      ),
-    );
-  });
-
-  it("clicking Download again unchecks the dataset from the selection", async () => {
-    const { user } = await renderReady();
-    const button = screen.getByRole("button", { name: /Download/ });
+    const button = screen.getByRole("button", { name: /^Add/ });
+    expect(button).toHaveAttribute("aria-pressed", "false");
 
     await user.click(button);
     await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
+    expect(button).toHaveTextContent("Added");
+    expect(screen.getByTestId("download-modal-open")).toHaveTextContent(
+      "false",
+    );
 
     await user.click(button);
     await waitFor(() =>
@@ -166,11 +165,47 @@ describe("DatasetInspector", () => {
     );
   });
 
-  it("disables Download for a griddap dataset, which has none", async () => {
+  it("disables Add for a griddap dataset, which has no download", async () => {
     await renderReady({
       dataset: { ...DATASET, cdm_data_type: "Grid" },
     });
-    expect(screen.getByRole("button", { name: /Download/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Add/ })).toBeDisabled();
+  });
+
+  it("writes the open tab to the address, and opens on the one a link names", async () => {
+    const { unmount } = await renderReady();
+    const metadata = screen.getByRole("tab", { name: "Metadata" });
+    const data = screen.getByRole("tab", { name: "Data" });
+    expect(metadata).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).not.toContain("tab=");
+
+    await userEvent.click(data);
+    await waitFor(() => expect(window.location.search).toContain("tab=data"));
+    expect(data).toHaveAttribute("aria-selected", "true");
+
+    await userEvent.click(metadata);
+    await waitFor(() => expect(window.location.search).not.toContain("tab="));
+    unmount();
+
+    await renderReady({ url: "/?tab=data" });
+    expect(screen.getByRole("tab", { name: "Data" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("links the source records under the title", async () => {
+    await renderReady({
+      dataset: { ...DATASET, ckan_url: "https://catalogue.cioos.ca/dataset/x" },
+    });
+    expect(screen.getByRole("link", { name: /ERDDAP/ })).toHaveAttribute(
+      "href",
+      DATASET.erddap_url,
+    );
+    expect(screen.getByRole("link", { name: /Catalog/ })).toHaveAttribute(
+      "href",
+      "https://catalogue.cioos.ca/dataset/x",
+    );
   });
 
   it("shows the no-features message once the (empty) feature list has loaded", async () => {
@@ -202,6 +237,7 @@ describe("DatasetInspector", () => {
       ),
     );
     const { user } = await renderReady();
+    await openData();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("The features could not be loaded.");
     expect(
@@ -292,6 +328,7 @@ describe("DatasetInspector", () => {
         dataset: TRAJECTORY_DATASET,
         setInspectRecordID,
       });
+      await openData();
       const card = (await screen.findByText("cruise-b")).closest(".listCard");
       const show = within(card).getByRole("button", { name: /Show on map/ });
 
@@ -311,6 +348,7 @@ describe("DatasetInspector", () => {
         dataset: TRAJECTORY_DATASET,
         setInspectRecordID,
       });
+      await openData();
       const card = (await screen.findByText("cruise-a")).closest(".listCard");
       await user.click(screen.getByText("cruise-a"));
       expect(setInspectRecordID).not.toHaveBeenCalled();
@@ -397,6 +435,7 @@ describe("DatasetInspector", () => {
       ),
     );
     const { user } = await renderReady();
+    await openData();
     const card = (await screen.findByText("station-7")).closest(".listCard");
     const show = within(card).getByRole("button", { name: /Show on map/ });
 

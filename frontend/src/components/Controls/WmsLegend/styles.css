@@ -33,7 +33,28 @@
 }
 
 .wmsLegend.inline {
-  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.wmsLegend.inline > * {
+  max-width: 100%;
+}
+
+.wmsLegend.inline .wmsLegendHeader,
+.wmsLegend.inline .gridSlice {
+  align-self: stretch;
+}
+
+.wmsLegend.inline .gridSlice {
+  margin-top: 0;
+}
+
+.wmsLegend.inline .wmsLegendFallback {
+  align-items: center;
+  text-align: center;
 }
 
 .wmsLegendHeader:empty {
@@ -58,6 +79,25 @@
   max-width: 100%;
 }
 
+.wmsLegendField {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.wmsLegendFieldLabel {
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-80);
+}
+
+/* Takes the rest of the row, and stays one line high inside it: a long
+   long_name would otherwise wrap the header to three lines above an image
+   that already spells the name out in full. */
 .wmsLegendVariableSelector {
   flex: 1 1 auto;
   min-width: 0;

@@ -1,0 +1,435 @@
+.metadataDatePillLabel {
+  margin-right: 5px;
+  font-weight: 400;
+  color: var(--cioos-ink-80);
+}
+
+/* --- Abstract: a white card, the first thing in the scrolling body --- */
+.datasetAbstract {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+.datasetAbstractText {
+  font-size: var(--cioos-font-size-base);
+  color: var(--cioos-ink);
+}
+
+.noTranslationNote {
+  margin: 0;
+  font-size: var(--cioos-font-size-sm, 0.85em);
+  font-style: italic;
+  color: var(--cioos-ink-80);
+}
+
+/* Clamped by height rather than line count: rendered markdown is several
+   blocks (paragraphs, lists), which line-clamp cannot cut across. */
+.datasetAbstractText.clamped {
+  max-height: 12em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 60%, transparent);
+}
+
+/* "Show more" reuses .recordShowAll, which pushes itself right with an auto
+   margin meant for a flex header row. */
+.datasetAbstract .recordShowAll {
+  margin-left: 0;
+}
+
+/* Publisher prose: abstract, history, acknowledgement. */
+.metadataMarkdown {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.metadataMarkdown > :first-child {
+  margin-top: 0;
+}
+
+.metadataMarkdown > :last-child {
+  margin-bottom: 0;
+}
+
+.metadataMarkdown p,
+.metadataMarkdown ul,
+.metadataMarkdown ol {
+  margin: 0 0 6px;
+}
+
+.metadataMarkdown ul,
+.metadataMarkdown ol {
+  padding-left: 18px;
+}
+
+.metadataMarkdown h1,
+.metadataMarkdown h2,
+.metadataMarkdown h3,
+.metadataMarkdown h4 {
+  margin: 8px 0 4px;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 700;
+}
+
+.metadataMarkdown a {
+  color: var(--cioos-primary-700);
+  font-weight: 600;
+}
+
+/* --- Metadata cards, stacked under the abstract --- */
+.datasetMetadata {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.metadataCard {
+  min-width: 0;
+  padding: 7px 10px 9px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.45;
+  color: var(--cioos-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Title and its one action (copy) share the top line. */
+.metadataCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* The same eyebrow the metadata sheet labels its fields with. */
+.metadataCardTitle,
+.metadataGroupTitle {
+  margin: 0;
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cioos-ink-80);
+}
+
+.metadataGroupTitle {
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.metadataCard p {
+  margin: 0;
+}
+
+.metadataCard a,
+.datasetCredit a {
+  color: var(--cioos-primary-700);
+  font-weight: 600;
+}
+
+/* Organizations and projects: the metadata sheet's chip. */
+.metadataTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.metadataCard .metadataChip,
+.datasetCredit .metadataChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 500;
+}
+
+.metadataContactGroup,
+.metadataContextBlock {
+  margin-top: 8px;
+}
+
+.metadataCitation {
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.4;
+  color: var(--cioos-ink-80);
+}
+
+.metadataCardHeader .metadataIconButton {
+  margin-left: 0;
+}
+
+.metadataIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.metadataIconButton:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+.metadataIconButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Contacts: a small tile each, side by side where they fit. */
+.metadataContacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.metadataContact {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+}
+
+.metadataContactName {
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.metadataContactOrg {
+  color: var(--cioos-ink-80);
+}
+
+.metadataContactRoles {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-60);
+}
+
+.metadataContactRoles {
+  font-size: var(--cioos-font-size-xs);
+}
+
+/* Resources: one link card each — name, format, what it is, where it goes. */
+.metadataResources {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.metadataCard a.metadataResource {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.metadataCard a.metadataResource:hover,
+.metadataCard a.metadataResource:focus-visible {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-white);
+  outline: none;
+}
+
+.metadataCard a.metadataResource:focus-visible {
+  box-shadow: var(--cioos-focus);
+}
+
+.metadataResourceHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.metadataResourceName {
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+}
+
+.metadataResourceFormat {
+  padding: 1px 7px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  color: var(--cioos-ink-80);
+}
+
+.metadataResourceIcon {
+  margin-left: auto;
+  color: var(--cioos-ink-60);
+}
+
+.metadataResourceDescription {
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
+.metadataResourceHost {
+  font-size: var(--cioos-font-size-2xs);
+  color: var(--cioos-ink-60);
+}
+
+/* The fine print: one closed row until asked for. */
+.metadataMore > summary {
+  cursor: pointer;
+}
+
+.metadataMore > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.metadataMore[open] > summary {
+  margin-bottom: 2px;
+}
+
+/* Organizations in the pinned title block: a step under the title, tucked
+   against it. */
+.datasetCredit {
+  align-items: center;
+  margin: -4px 0 0;
+  font-size: var(--cioos-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Organizations take the shallows wash, the data's own colour for "has a
+   value", without the teal border that marks an applied filter. */
+.datasetCredit .metadataChip {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  border-color: var(--cioos-teal-light);
+  background-color: var(--cioos-teal-light);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.datasetCredit .metadataChipToggle {
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-white);
+  font-family: inherit;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+/* The citation's button sits in the action row; its popover spans the row's
+   width and floats over the page. */
+.citation {
+  margin-left: auto;
+}
+
+.citationButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border: 1px dashed var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-family: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.citationButton:hover,
+.citationButton[aria-expanded="true"] {
+  background-color: var(--cioos-surface-2);
+}
+
+.citationButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* The padding bridges the gap to the button, so the pointer can travel from
+   one to the other without the hover ending. */
+.citationPopover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding-top: 4px;
+}
+
+.citationPopoverCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  box-shadow: var(--cioos-shadow-float);
+}
+
+.citationPopoverCard .metadataCitation {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink);
+}
+
+.citationPopoverCard a {
+  color: var(--cioos-primary-700);
+  font-weight: 600;
+}
+
+.citationPopoverCard .metadataIconButton {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
+
+/* A link value (license, sources) is one of the sheet's chips, made a link:
+   the icon beside its name, and a hover that says it is clickable. */
+.datasetMetaSheet .metadataChipLink {
+  gap: 5px;
+  text-decoration: none;
+}
+
+.datasetMetaSheet .metadataChipLink:hover,
+.datasetMetaSheet .metadataChipLink:focus-visible {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+  outline: none;
+}
+
+.datasetMetaSheet .metadataChipLink:focus-visible {
+  box-shadow: var(--cioos-focus);
+}

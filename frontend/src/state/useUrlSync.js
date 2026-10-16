@@ -13,6 +13,7 @@ import {
   PERIOD_PARAM,
   PLOT_PARAMS,
   RECORD_PARAM,
+  TAB_PARAM,
 } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
@@ -24,7 +25,13 @@ import { useUI } from "./ui/UIProvider.jsx";
 // from the opening address. It rebuilds the whole search string on every pan,
 // so params owned elsewhere (SelectionProvider, usePreviewPlotParams) must be
 // listed here or they vanish when the map moves.
-const PRESERVED_PARAMS = ["server", RECORD_PARAM, PERIOD_PARAM, ...PLOT_PARAMS];
+const PRESERVED_PARAMS = [
+  "server",
+  TAB_PARAM,
+  RECORD_PARAM,
+  PERIOD_PARAM,
+  ...PLOT_PARAMS,
+];
 
 export default function UrlSync() {
   const [searchParams] = useSearchParams();

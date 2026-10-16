@@ -194,33 +194,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-.datasetsMapButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: 0 0 auto;
-  padding: 5px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--cioos-radius-pill);
-  background: none;
-  font: inherit;
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 700;
-  color: var(--cioos-primary-700);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.datasetsMapButton:hover {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-white);
-}
-
-.datasetsMapButton:focus-visible {
-  outline: none;
-  box-shadow: var(--cioos-focus);
-}
-
 /* Shrinks before the back button and clips rather than pushing the chevron
    off the end. */
 .datasetsBannerMode {
@@ -414,11 +387,6 @@
   /* Dropped rather than clipped: the dataset title below says it in full. */
   .datasetsBannerMode {
     display: none;
-  }
-
-  .datasetsMapButton {
-    margin-left: auto;
-    min-height: 40px;
   }
 
   .sidebarFooter {

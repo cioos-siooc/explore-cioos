@@ -13,6 +13,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from cde_harvester.core.observability import run_logger
+from cde_harvester.core.record_metadata import from_ckan
 
 CKAN_API_URL = "https://catalogue.cioos.ca/api/3"
 
@@ -142,6 +143,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
             organizations += [unescape_ascii(contact.get("organisation-name"))]
 
         organizations = list(filter(None, set(organizations)))
+        metadata = from_ckan(record_full)
 
         for erddap_host, dataset_id, is_subset in links:
             out.append(
@@ -152,6 +154,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
                     organizations,
                     ckan_record_text,
                     is_subset,
+                    metadata,
                 ],
             )
 
@@ -163,6 +166,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "ckan_title": [x[4]["title"] for x in out],
         "title_fr": [x[4]["title_fr"] for x in out],
         "is_subset": [x[5] for x in out],
+        "ckan_metadata": [x[6] for x in out],
     }
 
     df = pd.DataFrame(line)

@@ -1,6 +1,8 @@
 """Unit tests for cde_harvester.sources.ckan.create_ckan_erddap_link."""
 
 
+import ast
+
 import pandas as pd
 import pytest
 import requests
@@ -252,7 +254,8 @@ class TestCkanUnavailable:
             "cde_harvester.sources.ckan.create_ckan_obis_link.load_previous_ckan",
             return_value=pd.DataFrame([
                 {"erddap_url": "https://obis.org", "dataset_id": d, "ckan_id": f"ckan-{d}",
-                 "title": "Stored", "title_fr": "Stocké", "organizations": [], "eovs": ["fish"]}
+                 "title": "Stored", "title_fr": "Stocké", "organizations": [], "eovs": ["fish"],
+                 "metadata": {"abstract": {"en": "Stored abstract"}}}
                 for d in ("uuid-1", "uuid-other")
             ]),
         )
@@ -261,6 +264,7 @@ class TestCkanUnavailable:
         assert df.to_dict("records") == [{
             "dataset_id": "uuid-1", "ckan_id": "ckan-uuid-1", "ckan_eovs": ["fish"],
             "ckan_title": "Stored", "title_fr": "Stocké",
+            "ckan_metadata": {"abstract": {"en": "Stored abstract"}},
         }]
 
     def test_stored_metadata_lookup_fails_open(self, mocker):
@@ -307,6 +311,10 @@ class TestGetCkanObisRecords:
         assert df.to_dict("records") == [{
             "dataset_id": OBIS_UUID, "ckan_id": "by-uuid", "ckan_eovs": ["fishAbundanceAndDistribution"],
             "ckan_title": "by-uuid en", "title_fr": "by-uuid fr",
+            "ckan_metadata": {"resources": [
+                {"url": "https://catalogue.example/notes.pdf"},
+                {"url": f"https://obis.org/dataset/{OBIS_UUID}"},
+            ]},
         }]
 
     def test_matched_by_ipt_resource_ignoring_scheme_case_and_version(self, mocker):
@@ -350,6 +358,7 @@ class TestMergeCkanJoin:
             "organizations": [["org"], ["org"]],
             "content_hash": ["h1", "h2"],
             "content_hash_reason": [None, None],
+            "metadata": [{"abstract": {"en": "ERDDAP"}, "lineage": "history"}, {}],
         })
         df_ckan = pd.DataFrame({
             "erddap_url": [ckan_erddap_url],
@@ -358,6 +367,7 @@ class TestMergeCkanJoin:
             "ckan_organizations": [["CKAN org"]],
             "ckan_title": ["CKAN title"],
             "title_fr": ["Titre"],
+            "ckan_metadata": [{"abstract": {"en": "CKAN"}}],
         })
         merge_and_write_csvs.fn(
             str(tmp_path), erddap_datasets,
@@ -385,6 +395,7 @@ class TestMergeCkanJoin:
                 "erddap_url": "https://erddap.amundsenscience.com/erddap",
                 "dataset_id": "matched", "ckan_id": "ckan-1", "title": "Stored title",
                 "title_fr": "Titre stocké", "organizations": ["Stored org"], "eovs": ["seaSurfaceTemperature"],
+                "metadata": {"abstract": {"en": "Stored"}},
             }]),
         )
         datasets, logger = self._merge(
@@ -396,6 +407,9 @@ class TestMergeCkanJoin:
             "ckan-1", "Stored title", "Titre stocké",
         )
         assert matched["organizations"] == "['Stored org']"
+        assert ast.literal_eval(matched["metadata"]) == {
+            "abstract": {"en": "Stored"}, "lineage": "history",
+        }
         assert matched["content_hash"] == "h1"
         assert logger.warning.call_args_list[0].args[0].startswith("CKAN unavailable")
 
@@ -411,6 +425,13 @@ class TestMergeCkanJoin:
         assert datasets["title"].tolist() == ["t1", "t2"]
         assert datasets["content_hash"].isna().all()
         assert (datasets["content_hash_reason"] == HASH_CKAN_UNAVAILABLE).all()
+
+    def test_ckan_metadata_wins_over_erddap_per_field(self, mocker, tmp_path):
+        datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")
+        assert ast.literal_eval(datasets.loc["matched", "metadata"]) == {
+            "abstract": {"en": "CKAN"}, "lineage": "history",
+        }
+        assert ast.literal_eval(datasets.loc["orphan", "metadata"]) == {}
 
     def test_hash_kept_when_ckan_available(self, mocker, tmp_path):
         datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")

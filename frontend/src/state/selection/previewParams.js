@@ -9,6 +9,10 @@ export const RECORD_PARAM = "preview";
 // plotted. Absent means the record's most recent data.
 export const PERIOD_PARAM = "pperiod";
 
+// Which tab of the dataset page is open: `data` for the feature list. The
+// default, the metadata tab, is not written.
+export const TAB_PARAM = "tab";
+
 export function parsePeriod(value) {
   const [start, end] = (value || "").split("~");
   return start && end ? { start, end } : undefined;
