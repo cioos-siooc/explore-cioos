@@ -1,7 +1,8 @@
 """The self-describing files of a download package, all rendered from the
 downloader report plus the query that produced it.
 
-- README.md: the human summary (what's included, what isn't and why).
+- README.md: the human summary (what's included, what isn't and why), and
+  README.html, the same rendered as a standalone CIOOS-styled page.
 - datapackage.json: Frictionless Data Package v2 over the data files.
 - ro-crate-metadata.json: RO-Crate 1.2; one CreateAction per subset records
   the request URLs, timing and outcome, failures included.
@@ -16,6 +17,7 @@ source's own citation, then the subset and the UTC time and URL it was
 retrieved from.
 """
 
+import base64
 import hashlib
 import json
 import re
@@ -27,6 +29,9 @@ import tomllib
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
+from string import Template
+
+from markdown_it import MarkdownIt
 
 from erddap_downloader import formats
 from erddap_downloader.download_erddap import COMPLETED, EMPTY, FAILED, IGNORED, PARTIAL
@@ -36,6 +41,10 @@ INCLUDED = (COMPLETED, PARTIAL)
 SOFTWARE_URL = "https://github.com/cioos-siooc/explore-cioos"
 FRICTIONLESS_PROFILE = "https://datapackage.org/profiles/2.0/datapackage.json"
 RO_CRATE = "https://w3id.org/ro/crate/1.2"
+README_TEMPLATE = Path(__file__).parent / "readme" / "readme.html"
+README_LOGO = Path(__file__).parent / "readme" / "cioos-logo.svg"
+# Titles, citations and server errors reach the README: never pass raw HTML.
+_MARKDOWN = MarkdownIt("commonmark", {"html": False}).enable("table")
 REPRODUCE_SCRIPT = Path(__file__).parent / "shipped" / "reproduce.py"
 REPRODUCE_LOCK = REPRODUCE_SCRIPT.with_name("reproduce.py.lock")
 # formats.py's imports, plus netcdf4 for xarray's NetCDF writer.
@@ -73,8 +82,12 @@ _TEXT = {
         "format": "Format",
         "filters": "Other filters (as sent by the Data Explorer)",
         "datasets": "Datasets",
+        "dataset": "Dataset",
         "status": "Status",
         "rows": "Rows",
+        "folder": "Folder",
+        "source": "Source",
+        "catalogue": "CIOOS catalogue",
         "issues": "Not included or incomplete",
         "server": "Source response",
         "retry": "Request URL",
@@ -89,6 +102,7 @@ _TEXT = {
         "no_licence": "no licence recorded; check the source",
         "contents": "Package contents",
         "contents_text": (
+            "- `README.html`: this summary as a web page.\n"
             "- `<dataset folder>/`: the data subset, its citation.txt, and the source's own metadata records "
             "(metadata.json as shown in the Data Explorer, erddap.nccsvMetadata, ckan_iso19115.xml, "
             "obis_dataset.json, eml.xml where available).\n"
@@ -123,8 +137,12 @@ _TEXT = {
         "format": "Format",
         "filters": "Autres filtres (tels qu'envoyés par l'Explorateur)",
         "datasets": "Jeux de données",
+        "dataset": "Jeu de données",
         "status": "Statut",
         "rows": "Lignes",
+        "folder": "Dossier",
+        "source": "Source",
+        "catalogue": "Catalogue SIOOC",
         "issues": "Non inclus ou incomplets",
         "server": "Réponse de la source",
         "retry": "URL de la requête",
@@ -139,6 +157,7 @@ _TEXT = {
         "no_licence": "aucune licence enregistrée; consultez la source",
         "contents": "Contenu du paquet",
         "contents_text": (
+            "- `README.html` : ce résumé sous forme de page web.\n"
             "- `<dossier du jeu de données>/` : le sous-ensemble, son citation.txt et les fiches de métadonnées "
             "de la source (metadata.json tel qu'affiché dans l'Explorateur, erddap.nccsvMetadata, "
             "ckan_iso19115.xml, obis_dataset.json, eml.xml selon le cas).\n"
@@ -364,6 +383,15 @@ def _outcome(row, lang):
     return notes
 
 
+def _source_links(row, metadata, t):
+    links = [("OBIS" if row["source_type"] == "obis" else "ERDDAP", landing_url(row))]
+    if row.get("ckan_url"):
+        links.append((t["catalogue"], row["ckan_url"]))
+    if metadata.get("doi"):
+        links.append(("DOI", metadata["doi"]))
+    return links
+
+
 def _readme(root, user_query, entries, created, lang):
     t = _TEXT[lang]
     included = [e for e in entries if e[0]["status"] in INCLUDED]
@@ -394,12 +422,19 @@ def _readme(root, user_query, entries, created, lang):
         lines.append(f"- {t['filters']}:")
         lines += [f"  - `{k}`: {v}" for k, v in sorted(filters.items())]
 
-    lines += ["", f"## {t['datasets']}", "", f"| Dataset | {t['status']} | {t['rows']} | Folder |", "|---|---|---|---|"]
-    for row, _, _ in entries:
+    lines += [
+        "",
+        f"## {t['datasets']}",
+        "",
+        f"| {t['dataset']} | {t['status']} | {t['rows']} | {t['folder']} | {t['source']} |",
+        "|---|---|---|---|---|",
+    ]
+    for row, metadata, _ in entries:
         title = (row.get("title") or row["dataset_id"]).replace("|", "\\|")
         # A folder with nothing in it isn't kept in the zip.
-        folder = f"`{row['folder']}/`" if any((root / row["folder"]).iterdir()) else "—"
-        lines.append(f"| {title} | {row['status']} | {row['n_records']} | {folder} |")
+        folder = f"[`{row['folder']}/`]({row['folder']}/)" if any((root / row["folder"]).iterdir()) else "—"
+        sources = " · ".join(f"[{label}](<{url}>)" for label, url in _source_links(row, metadata, t))
+        lines.append(f"| {title} | {row['status']} | {row['n_records']} | {folder} | {sources} |")
 
     issues = [(row, _outcome(row, lang)) for row, _, _ in entries if _outcome(row, lang) or row["warnings"]]
     if issues:
@@ -428,6 +463,7 @@ def _readme(root, user_query, entries, created, lang):
 # description, encodingFormat for every non-data file the package can hold.
 _FILE_KINDS = {
     "README.md": ("Summary of this download: what is included, what is not and why", "text/markdown"),
+    "README.html": ("The README as a web page", "text/html"),
     "datapackage.json": ("Frictionless Data Package v2 descriptor of the data files", "application/json"),
     "citations.txt": ("A citation for each included dataset subset", "text/plain"),
     "citations.bib": ("The citations in BibTeX", "application/x-bibtex"),
@@ -585,6 +621,15 @@ def _python():
     return f"=={sys.version_info.major}.{sys.version_info.minor}.*"
 
 
+def _readme_html(markdown, user_query, lang):
+    return Template(README_TEMPLATE.read_text()).substitute(
+        lang=lang,
+        title=f"{_TEXT[lang]['title']} {user_query['job_id']}",
+        logo=base64.b64encode(README_LOGO.read_bytes()).decode(),
+        body=_MARKDOWN.render(markdown),
+    )
+
+
 def _reproduce_script():
     header = [
         "# /// script",
@@ -627,6 +672,7 @@ def write_package(root: Path, json_query, report):
     for dataset, row in zip(json_query["cache_filtered"], report["erddap_report"], strict=True):
         metadata = dataset.get("metadata") or {}
         row["title_fr"] = dataset.get("title_fr")
+        row["ckan_url"] = dataset.get("ckan_url")
         row["requested_format"] = requested
         folder = root / row["folder"]
         if metadata:
@@ -638,7 +684,9 @@ def write_package(root: Path, json_query, report):
         entries.append((row, metadata, lang))
     included = [e for e in entries if e[0]["status"] in INCLUDED]
 
-    (root / "README.md").write_text(_readme(root, user_query, entries, created, lang))
+    readme = _readme(root, user_query, entries, created, lang)
+    (root / "README.md").write_text(readme)
+    (root / "README.html").write_text(_readme_html(readme, user_query, lang))
     (root / "citations.txt").write_text("\n\n".join(citation(r, m, user_query, lg) for r, m, lg in included) + "\n")
     (root / "citations.bib").write_text("\n\n".join(_bibtex(*e[:2], user_query, e[2]) for e in included) + "\n")
     (root / "citations.ris").write_text("\n\n".join(_ris(*e[:2], user_query, e[2]) for e in included) + "\n")
@@ -652,7 +700,10 @@ def write_package(root: Path, json_query, report):
         )
     (root / "rights.txt").write_text("\n".join(rights) + "\n")
 
-    resources = [{"name": "readme", "path": "README.md", "mediatype": "text/markdown"}]
+    resources = [
+        {"name": "readme", "path": "README.md", "mediatype": "text/markdown"},
+        {"name": "readme-html", "path": "README.html", "mediatype": "text/html"},
+    ]
     for row, metadata, _ in included:
         resources += [_resource(root, row, file, _licence(metadata)) for file in row["files"]]
     failed = [
@@ -695,6 +746,7 @@ def write_package(root: Path, json_query, report):
 
     root_files = [
         "README.md",
+        "README.html",
         "datapackage.json",
         "citations.txt",
         "citations.bib",

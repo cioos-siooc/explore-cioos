@@ -126,7 +126,7 @@ def test_a_failed_dataset_is_reported_and_the_rest_ship(tmp_path):
     assert "seaSurfaceTemperature" in readme
 
     datapackage = json.loads(read("datapackage.json"))
-    [data] = [r for r in datapackage["resources"] if r["name"] != "readme"]
+    [data] = [r for r in datapackage["resources"] if not r["name"].startswith("readme")]
     assert data["path"] == "Good_data_example_ca/Good_data_example_ca.csv"
     assert data["hash"].startswith("sha256:") and data["bytes"] > 0
     assert data["dialect"] == {"commentRows": [2]}
@@ -509,3 +509,60 @@ def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
         frames = list(pool.map(lambda _: formats.obis_frame(str(export), {}, regions), range(32)))
 
     assert [len(f) for f in frames] == [1] * 32
+
+
+def test_the_readme_also_ships_as_a_standalone_web_page(tmp_path):
+    _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=_METADATA)))
+
+    html = read("README.html")
+    assert html.startswith("<!doctype html>") and '<html lang="en">' in html
+    assert "<title>CIOOS Data Explorer download pkg001</title>" in html
+    assert "<h1>CIOOS Data Explorer download pkg001</h1>" in html
+    assert "<table>" in html and '<a href="Good_data_example_ca/">' in html
+    assert 'src="data:image/svg+xml;base64,' in html
+    # Opened offline from disk: no stylesheet, script, image or font is fetched.
+    assert not re.search(r'<(link|script)\b|src="https?:|url\(', html)
+    assert "[`Good_data_example_ca/`](Good_data_example_ca/)" in read("README.md")
+    names = {r["path"] for r in json.loads(read("datapackage.json"))["resources"]}
+    assert "README.html" in names
+    crate = json.loads(read("ro-crate-metadata.json"))
+    assert "README.html" in {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+
+
+def test_source_text_cannot_inject_html_into_the_readme_page(tmp_path):
+    def get(url, **_):
+        return _response(500, text='Error {\n    message="<img src=x onerror=alert(2)>";\n}')
+
+    _, _, read = _run(tmp_path, _query(_dataset("Bad", title="<script>alert(1)</script>")), get)
+
+    html = read("README.html")
+    assert "<script>" not in html and "<img src=x" not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_each_dataset_links_to_its_source_records(tmp_path):
+    erddap = _dataset("Good", metadata=_METADATA, ckan_url="https://catalogue.cioos.ca/dataset/abc")
+    _, _, read = _run(tmp_path, _query(erddap, language="fr"))
+
+    readme = read("README.md")
+    assert "| Jeu de données | Statut | Lignes | Dossier | Source |" in readme
+    assert (
+        "[ERDDAP](<https://data.example.ca/erddap/info/Good/index.html>) · "
+        "[Catalogue SIOOC](<https://catalogue.cioos.ca/dataset/abc>) · "
+        "[DOI](<https://doi.org/10.1234/abc>)"
+    ) in readme
+    assert '<a href="https://catalogue.cioos.ca/dataset/abc">Catalogue SIOOC</a>' in read("README.html")
+
+
+def test_an_obis_dataset_links_to_its_obis_page(tmp_path):
+    df = pd.DataFrame({"id": ["a"], "scientificName": ["Gadus morhua"], "latitude": [52.0], "longitude": [-130.0],
+                       "date_start": [1577836800000], "date_end": [1577836800000],
+                       "minimumDepthInMeters": [5.0], "maximumDepthInMeters": [5.0]})
+    duck = MagicMock()
+    duck.df.return_value = df
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    with patch("duckdb.connect") as connect:
+        connect.return_value.__enter__.return_value.sql.return_value = duck
+        _, _, read = _run(tmp_path, _query(obis))
+
+    assert "| [OBIS](<https://obis.org/dataset/abc>) |" in read("README.md")

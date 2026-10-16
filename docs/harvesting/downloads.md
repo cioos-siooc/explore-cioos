@@ -145,7 +145,8 @@ zipped as `cde_download_<job_id>.zip`:
 
 ```
 cde_download_<job_id>/
-  README.md               what was included, what wasn't and why, filters, citations, licences
+  README.md               what was included (with links to each source record), what wasn't and why, filters, citations, licences
+  README.html             the same, as a standalone CIOOS-styled page (no external requests)
   datapackage.json        Frictionless Data Package v2
   ro-crate-metadata.json  RO-Crate 1.2 provenance
   citations.txt / .bib / .ris, CITATION.cff
