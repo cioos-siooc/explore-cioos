@@ -1,5 +1,6 @@
 import json
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -17,7 +18,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 import xarray as xr
-from erddap_downloader import download_erddap, downloader_wrapper, formats
+from erddap_downloader import download_erddap, downloader_wrapper, formats, package
 
 _CSV = (
     b"time,latitude,longitude,depth\n"
@@ -79,11 +80,13 @@ def _query(*datasets, **user_query):
     }
 
 
-def _run(tmp_path, query, get=None, metadata_warnings=()):
+def _run(tmp_path, query, get=None, metadata_warnings=(), lock=None):
     get = get or (lambda url, **_: _response())
     with (
         patch("erddap_downloader.download_erddap.requests.get", side_effect=get),
         patch("erddap_downloader.download_erddap.save_source_metadata", return_value=list(metadata_warnings)),
+        # Never a lock left in the checkout by a local build_reproduce_lock().
+        patch.object(package, "REPRODUCE_LOCK", lock or tmp_path / "no.lock"),
     ):
         report = downloader_wrapper.run_download_query(download_query=query, output_folder=tmp_path / "out")
     archive = zipfile.ZipFile(report["path"])
@@ -423,6 +426,71 @@ def test_reproduce_script_pins_the_versions_that_built_the_package(tmp_path):
     assert f"pandas=={version('pandas')}" in metadata["dependencies"]
     assert all("==" in d for d in metadata["dependencies"])
     assert metadata["requires-python"] == f"=={sys.version_info.major}.{sys.version_info.minor}.*"
-    assert metadata["tool"]["uv"]["exclude-newer"]
     crate = json.loads(read("ro-crate-metadata.json"))
     assert {"reproduce.py", "formats.py"} <= {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+
+
+_PYTHON = f"=={sys.version_info.major}.{sys.version_info.minor}.*"
+
+
+def _lock(path, pins, python):
+    requirements = "\n".join(f'    {{ name = "{n}", specifier = "{p}" }},' for n, p in pins.items())
+    path.write_text(f'version = 1\nrequires-python = "{python}"\n\n[manifest]\nrequirements = [\n{requirements}\n]\n')
+    return path
+
+
+def _current_pins():
+    return {name: f"=={version(name)}" for name in package.REPRODUCE_DEPENDENCIES}
+
+
+def test_the_build_time_lock_ships_with_the_reproduce_script(tmp_path):
+    lock = _lock(tmp_path / "reproduce.py.lock", _current_pins(), _PYTHON)
+    _, archive, read = _run(tmp_path, _query(_dataset("Ctd")), lock=lock)
+
+    assert read("reproduce.py.lock") == lock.read_text()
+    crate = json.loads(read("ro-crate-metadata.json"))
+    assert "reproduce.py.lock" in {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+    assert "uv run reproduce.py" in read("README.md")
+
+
+@pytest.mark.parametrize(
+    ("pins", "python"),
+    [
+        ({**_current_pins(), "pandas": "==1.0.0"}, _PYTHON),
+        ({"pandas": _current_pins()["pandas"]}, _PYTHON),
+        (_current_pins(), "==3.12.*"),
+    ],
+    ids=["other version", "missing package", "other python"],
+)
+def test_a_lock_made_for_other_pins_is_not_shipped(tmp_path, pins, python):
+    lock = _lock(tmp_path / "reproduce.py.lock", pins, python)
+    report, archive, read = _run(tmp_path, _query(_dataset("Ctd")), lock=lock)
+
+    assert report["erddap_report"][0]["status"] == "COMPLETED"
+    assert "cde_download_pkg001/reproduce.py.lock" not in archive.namelist()
+    assert "reproduce.py.lock" not in {e["@id"] for e in json.loads(read("ro-crate-metadata.json"))["@graph"]}
+
+
+def test_build_reproduce_lock_locks_the_shipped_header(tmp_path, monkeypatch):
+    monkeypatch.setattr(package, "REPRODUCE_LOCK", tmp_path / "reproduce.py.lock")
+    locked = []
+
+    def uv_lock(command, **_):
+        script = Path(command[-1])
+        locked.append(script.read_text())
+        _lock(script.with_name("reproduce.py.lock"), _current_pins(), _PYTHON)
+
+    with patch("erddap_downloader.package.subprocess.run", side_effect=uv_lock):
+        package.build_reproduce_lock()
+
+    assert locked == [package._reproduce_script()]
+    assert package._current_lock() == tmp_path / "reproduce.py.lock"
+
+
+def test_reproduce_without_uv_says_to_use_uv(tmp_path):
+    shutil.copyfile(package.REPRODUCE_SCRIPT, tmp_path / "reproduce.py")
+
+    result = subprocess.run([sys.executable, "-I", "reproduce.py"], cwd=tmp_path, capture_output=True, text=True)
+
+    assert result.returncode == 1
+    assert "uv run reproduce.py" in result.stderr

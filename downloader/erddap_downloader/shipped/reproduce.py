@@ -2,7 +2,8 @@
 request URLs, apply the same polygon filter (formats.py, the code that built
 the package) and compare each file with its sha256 in datapackage.json.
 
-Run from the unzipped package: uv run reproduce.py
+Run from the unzipped package with uv, which installs the versions declared
+above and in reproduce.py.lock: uv run reproduce.py
 Files are written to ./reproduced/; the originals are never touched.
 """
 
@@ -15,7 +16,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from formats import obis_frame, polygon_regions, write_frame, write_subset
+try:
+    from formats import obis_frame, polygon_regions, write_frame, write_subset
+except ImportError as e:
+    sys.exit(
+        f"{e}\n\nRun this script with uv, which installs its pinned dependencies:\n"
+        "    uv run reproduce.py\n"
+        "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
+    )
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "reproduced"

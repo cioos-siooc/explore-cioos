@@ -150,7 +150,7 @@ cde_download_<job_id>/
   ro-crate-metadata.json  RO-Crate 1.2 provenance
   citations.txt / .bib / .ris, CITATION.cff
   rights.txt              the licence of each dataset
-  reproduce.py, formats.py  rebuild the data files (see below)
+  reproduce.py, formats.py, reproduce.py.lock  rebuild the data files (see below)
   <dataset_id>_<host>/    one folder per dataset
     <dataset_id>_<host>.csv|parquet|txt|nc
     citation.txt
@@ -178,10 +178,15 @@ the README what each dataset returned.
 
 `formats.py` is a copy of the downloader's filtering code, and `reproduce.py` a
 [uv](https://docs.astral.sh/uv/) script whose PEP 723 header pins the Python
-minor version and the exact library versions that built the package, with
-`exclude-newer` set to its creation time. `uv run reproduce.py` re-fetches
-every subset from its request URLs, applies the same polygon filter, writes the
-files to `reproduced/` and prints `match`, `differs` or `missing` for each
+minor version and the exact library versions that built the package.
+`reproduce.py.lock` pins every transitive dependency with hashes; since those
+pins only change with the image, the scheduler's Dockerfile builds it once
+(`build_reproduce_lock()`) and every package copies it. A lock made for other
+pins (a dev checkout whose dependencies moved) is not shipped, and without one
+the script falls back to its header pins. Run with plain `python` it exits
+with a pointer to uv. `uv run reproduce.py` re-fetches every subset from its
+request URLs, applies the same polygon filter, writes the files to
+`reproduced/` and prints `match`, `differs` or `missing` for each
 against its sha256 in `datapackage.json`. A `PARTIAL` subset differs by design
 (no size limit applies locally), as does one whose source data changed.
 

@@ -7,8 +7,9 @@ downloader report plus the query that produced it.
   the request URLs, timing and outcome, failures included.
 - citations.txt/.bib/.ris, CITATION.cff, rights.txt: GBIF-style citation and
   licence files; each dataset folder also carries its own citation.txt.
-- reproduce.py + formats.py: a uv script (PEP 723, dependencies pinned to the
-  versions that built the package) that re-fetches and re-filters every subset.
+- reproduce.py + formats.py + reproduce.py.lock: a uv script (PEP 723 header,
+  plus the uv lock of every transitive dependency built with the image) that
+  re-fetches and re-filters every subset.
 
 Each subset citation follows ESIP / RDA dynamic-data-citation practice: the
 source's own citation, then the subset and the UTC time and URL it was
@@ -19,7 +20,10 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import sys
+import tempfile
+import tomllib
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -33,6 +37,7 @@ SOFTWARE_URL = "https://github.com/cioos-siooc/explore-cioos"
 FRICTIONLESS_PROFILE = "https://datapackage.org/profiles/2.0/datapackage.json"
 RO_CRATE = "https://w3id.org/ro/crate/1.2"
 REPRODUCE_SCRIPT = Path(__file__).parent / "shipped" / "reproduce.py"
+REPRODUCE_LOCK = REPRODUCE_SCRIPT.with_name("reproduce.py.lock")
 # formats.py's imports, plus netcdf4 for xarray's NetCDF writer.
 REPRODUCE_DEPENDENCIES = ("duckdb", "netcdf4", "numpy", "pandas", "pyarrow", "shapely", "xarray")
 
@@ -91,9 +96,16 @@ _TEXT = {
             "columns, request URLs, licences).\n"
             "- `ro-crate-metadata.json`: RO-Crate 1.2 provenance: one action per dataset with its request "
             "URLs, timing and outcome.\n"
-            "- `reproduce.py`, `formats.py`: the code that filtered the data to your selection. "
-            "`uv run reproduce.py` (https://docs.astral.sh/uv/) re-fetches every subset, applies the same "
-            "filter and checks each file against its checksum in datapackage.json."
+            "- `reproduce.py`, `formats.py`, `reproduce.py.lock`: the code that filtered the data to your "
+            "selection, and the exact library versions it ran with."
+        ),
+        "reproduce": "Reproduce this download",
+        "reproduce_text": (
+            "Run `uv run reproduce.py` in this folder. It re-fetches every subset from its source, applies the "
+            "same filter, writes the files to `reproduced/` and checks each one against its checksum in "
+            "datapackage.json. Use uv (https://docs.astral.sh/uv/getting-started/installation/), not plain "
+            "`python`: uv reads the dependency versions declared at the top of reproduce.py and in "
+            "reproduce.py.lock, and installs them in an isolated environment."
         ),
         "warnings": "Notes",
     },
@@ -134,9 +146,17 @@ _TEXT = {
             "contrôle, colonnes, URL des requêtes, licences).\n"
             "- `ro-crate-metadata.json` : provenance RO-Crate 1.2 : une action par jeu de données avec ses "
             "URL de requête, sa durée et son résultat.\n"
-            "- `reproduce.py`, `formats.py` : le code qui a filtré les données selon votre sélection. "
-            "`uv run reproduce.py` (https://docs.astral.sh/uv/) récupère de nouveau chaque sous-ensemble, "
-            "applique le même filtre et vérifie chaque fichier avec sa somme de contrôle dans datapackage.json."
+            "- `reproduce.py`, `formats.py`, `reproduce.py.lock` : le code qui a filtré les données selon "
+            "votre sélection, et les versions exactes des bibliothèques utilisées."
+        ),
+        "reproduce": "Reproduire ce téléchargement",
+        "reproduce_text": (
+            "Lancez `uv run reproduce.py` dans ce dossier. Le script récupère de nouveau chaque sous-ensemble "
+            "depuis sa source, applique le même filtre, écrit les fichiers dans `reproduced/` et vérifie "
+            "chacun avec sa somme de contrôle dans datapackage.json. Utilisez uv "
+            "(https://docs.astral.sh/uv/getting-started/installation/) plutôt que `python` : uv lit les "
+            "versions des dépendances déclarées en tête de reproduce.py et dans reproduce.py.lock, et les "
+            "installe dans un environnement isolé."
         ),
         "warnings": "Remarques",
     },
@@ -400,6 +420,7 @@ def _readme(root, user_query, entries, created, lang):
         licence = _licence(metadata)
         text = " ".join(filter(None, [licence.get("title"), licence.get("url")])) if licence else t["no_licence"]
         lines.append(f"- {row.get('title') or row['dataset_id']}: {text}")
+    lines += ["", f"## {t['reproduce']}", "", t["reproduce_text"]]
     lines += ["", f"## {t['contents']}", "", t["contents_text"], ""]
     return "\n".join(lines)
 
@@ -422,6 +443,7 @@ _FILE_KINDS = {
     "eml.xml": ("The dataset's Ecological Metadata Language record from its IPT", "application/xml"),
     "reproduce.py": ("uv script that re-fetches and re-filters every subset of this package", "text/x-python"),
     "formats.py": ("The filtering code that produced the data files, used by reproduce.py", "text/x-python"),
+    "reproduce.py.lock": ("uv lock of every dependency of reproduce.py, transitive ones included", "application/toml"),
 }
 _ACTION_STATUSES = {"CompletedActionStatus": "Completed", "FailedActionStatus": "Failed"}
 
@@ -554,20 +576,44 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
     return {"@context": f"{RO_CRATE}/context", "@graph": graph}
 
 
-def _reproduce_script(created):
+def _pins():
+    return {name: f"=={version(name)}" for name in REPRODUCE_DEPENDENCIES}
+
+
+def _python():
+    # The pins may have no wheels for another Python minor version.
+    return f"=={sys.version_info.major}.{sys.version_info.minor}.*"
+
+
+def _reproduce_script():
     header = [
         "# /// script",
-        # The pins may have no wheels for another Python minor version.
-        f'# requires-python = "=={sys.version_info.major}.{sys.version_info.minor}.*"',
+        f'# requires-python = "{_python()}"',
         "# dependencies = [",
-        *[f'#     "{name}=={version(name)}",' for name in REPRODUCE_DEPENDENCIES],
+        *[f'#     "{name}{pin}",' for name, pin in _pins().items()],
         "# ]",
-        "# [tool.uv]",
-        # Transitive dependencies resolve as they stood when the package was built.
-        f'# exclude-newer = "{created}"',
         "# ///",
     ]
     return "\n".join(header) + "\n" + REPRODUCE_SCRIPT.read_text()
+
+
+def build_reproduce_lock():
+    """Run once at image build: the pins only change when the image does."""
+    with tempfile.TemporaryDirectory() as tmp:
+        script = Path(tmp) / "reproduce.py"
+        script.write_text(_reproduce_script())
+        subprocess.run(["uv", "lock", "--script", str(script)], check=True)
+        shutil.copyfile(script.with_name("reproduce.py.lock"), REPRODUCE_LOCK)
+
+
+def _current_lock():
+    """The build-time lock, unless missing or made for other pins (a dev
+    checkout whose dependencies moved since it was built)."""
+    if not REPRODUCE_LOCK.exists():
+        return None
+    lock = tomllib.loads(REPRODUCE_LOCK.read_text())
+    locked = {r["name"]: r.get("specifier") for r in lock["manifest"]["requirements"]}
+    return REPRODUCE_LOCK if locked == _pins() and lock.get("requires-python") == _python() else None
 
 
 def write_package(root: Path, json_query, report):
@@ -642,8 +688,10 @@ def write_package(root: Path, json_query, report):
         ],
     }
     (root / "datapackage.json").write_text(json.dumps(datapackage, indent=2, ensure_ascii=False))
-    (root / "reproduce.py").write_text(_reproduce_script(created))
+    (root / "reproduce.py").write_text(_reproduce_script())
     shutil.copyfile(formats.__file__, root / "formats.py")
+    if lock := _current_lock():
+        shutil.copyfile(lock, root / "reproduce.py.lock")
 
     root_files = [
         "README.md",
@@ -655,6 +703,8 @@ def write_package(root: Path, json_query, report):
         "rights.txt",
         "reproduce.py",
         "formats.py",
+        *(["reproduce.py.lock"] if (root / "reproduce.py.lock").exists() else []),
     ]
     crate = _ro_crate(root, user_query, entries, created, root_files)
     (root / "ro-crate-metadata.json").write_text(json.dumps(crate, indent=2, ensure_ascii=False))
+
