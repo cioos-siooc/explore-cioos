@@ -210,7 +210,7 @@ describe("DatasetInspector", () => {
       "href",
       DATASET.erddap_url,
     );
-    expect(screen.getByRole("link", { name: /CKAN/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Catalog/ })).toHaveAttribute(
       "href",
       "https://catalogue.cioos.ca/dataset/x",
     );

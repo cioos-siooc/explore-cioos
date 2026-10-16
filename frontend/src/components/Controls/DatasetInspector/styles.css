@@ -59,9 +59,11 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+
   --inspector-pad-top: 12px;
   --inspector-pad-x: 12px;
   --inspector-pad-bottom: 24px;
+
   padding: var(--inspector-pad-top) var(--inspector-pad-x)
     var(--inspector-pad-bottom);
 }
@@ -302,8 +304,8 @@
   margin: 0;
 }
 
-/* A fact is plain text; only the lists (ocean variables, keywords) are chips,
-   so the eye can tell a value from a tag. */
+/* A fact is plain text; only the tags and links are chips, so the eye can tell
+   a value from a tag. */
 .metadataFact {
   font-size: var(--cioos-font-size-base);
   font-weight: 500;
@@ -311,7 +313,7 @@
   color: var(--cioos-ink);
 }
 
-/* Ocean variables and keywords: the exact box .filterButton uses (same pill
+/* Tags and links (ocean variables, keywords, license and source links): the exact box .filterButton uses (same pill
    radius, hairline border, white fill, padding and font-size). */
 .datasetMetaSheet .metadataChip {
   display: inline-flex;
@@ -768,6 +770,7 @@
     --inspector-pad-top: 0px;
     --inspector-pad-x: 10px;
     --inspector-pad-bottom: 20px;
+
     padding: var(--inspector-pad-top) var(--inspector-pad-x)
       var(--inspector-pad-bottom);
   }

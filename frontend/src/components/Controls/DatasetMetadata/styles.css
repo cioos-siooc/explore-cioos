@@ -409,27 +409,20 @@
   margin-left: 0;
 }
 
-/* Links to the source record, under the organizations. */
-.datasetSourceLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  font-weight: 600;
-  color: var(--cioos-primary-700);
+/* A link value (license, sources) is one of the sheet's chips, made a link:
+   the icon beside its name, and a hover that says it is clickable. */
+.datasetMetaSheet .metadataChipLink {
+  gap: 5px;
   text-decoration: none;
 }
 
-.datasetSourceLink:hover,
-.datasetSourceLink:focus-visible {
+.datasetMetaSheet .metadataChipLink:hover,
+.datasetMetaSheet .metadataChipLink:focus-visible {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-surface-2);
   outline: none;
 }
 
-.datasetSourceLink:focus-visible {
+.datasetMetaSheet .metadataChipLink:focus-visible {
   box-shadow: var(--cioos-focus);
 }

@@ -92,7 +92,11 @@ export function LicenseCell({ metadata }) {
       <dt className="metadataLabel">{t("metadataLicenseText")}</dt>
       <dd className="metadataValue">
         {license.url ? (
-          <ExternalLink href={license.url} title={title}>
+          <ExternalLink
+            href={license.url}
+            className="metadataChip metadataChipLink"
+            title={title}
+          >
             {text}
           </ExternalLink>
         ) : (
@@ -429,7 +433,7 @@ export function SourceLinksCell({ dataset }) {
     dataset.source_type === "obis"
       ? ["OBIS", `https://obis.org/dataset/${dataset.dataset_id}`]
       : ["ERDDAP™", dataset.erddap_url],
-    ["CKAN", dataset.ckan_url],
+    ["Catalog", dataset.ckan_url],
   ].filter(([, url]) => url);
   if (!links.length) return null;
   return (
@@ -440,7 +444,7 @@ export function SourceLinksCell({ dataset }) {
           <ExternalLink
             key={name}
             href={url}
-            className="datasetSourceLink"
+            className="metadataChip metadataChipLink"
             title={t("metadataSourceLinkTitle", { source: name })}
           >
             {name}
