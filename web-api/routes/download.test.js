@@ -153,6 +153,31 @@ test("queues the chosen format and the filters as sent, without the email", asyn
   assert.doesNotMatch(insert, /"filters":\{[^}]*diver@example\.com/);
 });
 
+test("links the package back to the selection in the Data Explorer", async () => {
+  shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
+  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
+  db.queueRows({});
+  const polygon = "[[-65,44],[-62,44],[-63,45],[-65,44]]";
+
+  await agent
+    .post("/download")
+    .query({
+      eovs: "seaSurfaceTemperature",
+      polygon,
+      lang: "fr",
+      format: "nccf",
+    })
+    .send(EMAIL);
+
+  const url = new URL(db.queries[1].match(/"explorer_url":"([^"]+)"/)[1]);
+  assert.equal(url.origin + url.pathname, "http://localhost:8098/");
+  assert.deepEqual(Object.fromEntries(url.searchParams), {
+    eovs: "seaSurfaceTemperature",
+    polygon,
+    lang: "fr",
+  });
+});
+
 test("defaults to CSV and passes each dataset's matched feature IDs and metadata", async () => {
   shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
   db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);

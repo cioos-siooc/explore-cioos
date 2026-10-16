@@ -22,6 +22,10 @@ const FORMATS = ["csv", "parquet", "odv", "nccf"];
 // Past this many matched features, a bounding-box request beats a regex over
 // their IDs (the downloader also caps the number of requests it splits into).
 const MAX_FEATURE_IDS = 5000;
+// The Data Explorer's public address: compose sets PUBLIC_BASE_URL to it + /api.
+const EXPLORER_URL = (
+  process.env.PUBLIC_BASE_URL || "http://localhost:8098/api"
+).replace(/\/api\/?$/, "");
 // The ID variable whose values select a feature in ERDDAP, per cdm_data_type.
 const FEATURE_ID_SQL = `CASE WHEN d.cdm_data_type IN ('TimeSeries', 'TimeSeriesProfile') THEN p.timeseries_id
                WHEN d.cdm_data_type = 'Profile' THEN p.profile_id END`;
@@ -207,6 +211,11 @@ router.post(
               ([key]) => !["polygon", "lang", "format"].includes(key),
             ),
           ),
+          // The explorer reads these same parameters back from its URL, so the
+          // package can link to the selection it was made from.
+          explorer_url: `${EXPLORER_URL}/?${new URLSearchParams(
+            Object.entries(req.query).filter(([key]) => key !== "format"),
+          )}`,
           email,
           job_id: jobID,
         },
