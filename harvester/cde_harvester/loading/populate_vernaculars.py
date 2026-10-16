@@ -2,9 +2,11 @@
 Populate cde.scientific_name_vernaculars from WoRMS.
 
 For every uncached scientific name in cde.obis_scientific_names, look up the
-AphiaID, rank, ancestor chain and English/French vernaculars via the WoRMS REST
-API. Names are processed most-recorded first, so an interrupted run still caches
-the most-impactful subset. Idempotent and resumable.
+AphiaID, rank, ancestor chain, WoRMS functional groups (for the biology EOVs, see
+obis_derive_eovs()) and English/French vernaculars via the WoRMS REST API. Names
+are processed most-recorded first, so an interrupted run still caches the
+most-impactful subset. Idempotent and resumable: resolved names whose functional
+groups were never fetched are picked up too.
 
 Usage:
     python -m cde_harvester.loading.populate_vernaculars [--top N] [--limit N]
@@ -197,20 +199,43 @@ def fetch_classification(session: requests.Session, aphia_id: int):
     return ancestors
 
 
-class ClassificationCache:
-    """Synonyms share an accepted AphiaID, so fetch its classification once."""
+def fetch_functional_groups(session: requests.Session, aphia_id: int):
+    """Only adult-stage (or stage-less) groups count: a scallop's larva is
+    zooplankton, but a scallop survey is not."""
+    url = f"{WORMS_BASE}/AphiaAttributesByAphiaID/{aphia_id}"
+    r = session.get(url, params={"include_inherited": "true"}, timeout=15)
+    if r.status_code == 204 or not r.text.strip():
+        return []
+    r.raise_for_status()
+    groups = []
+    for attribute in r.json() or []:
+        if attribute.get("measurementType") != "Functional group":
+            continue
+        stages = [
+            child.get("measurementValue")
+            for child in attribute.get("children") or []
+            if child.get("measurementType") == "Life stage"
+        ]
+        if not stages or "adult" in stages:
+            groups.append(attribute.get("measurementValue"))
+    return sorted({g for g in groups if g})
+
+
+class TaxonCache:
+    """Synonyms share an accepted AphiaID, so fetch its classification and
+    functional groups once."""
 
     def __init__(self):
-        self._cache: dict[int, list[int]] = {}
+        self._cache: dict[int, tuple[list[int], list[str] | None]] = {}
         self._lock = threading.Lock()
 
     def get(self, aphia_id: int):
         with self._lock:
             return self._cache.get(aphia_id)
 
-    def put(self, aphia_id: int, ancestors: list[int]):
+    def put(self, aphia_id: int, ancestors: list[int], functional_groups):
         with self._lock:
-            self._cache[aphia_id] = ancestors
+            self._cache[aphia_id] = (ancestors, functional_groups)
 
 
 class TaxonResult(NamedTuple):
@@ -221,18 +246,22 @@ class TaxonResult(NamedTuple):
     vernaculars_en: list[str]
     vernaculars_fr: list[str]
     status: str
+    # None = the fetch failed, so the row is picked up again by the next run.
+    functional_groups: list[str] | None = None
 
 
 UPSERT_SQL = text(
     """
     INSERT INTO cde.scientific_name_vernaculars
-        (scientific_name, aphia_id, rank, ancestor_aphia_ids,
+        (scientific_name, aphia_id, rank, ancestor_aphia_ids, functional_groups,
          vernaculars_en, vernaculars_fr, fetched_at, fetch_status)
-    VALUES (:name, :aphia_id, :rank, :ancestors, :en, :fr, now(), :status)
+    VALUES (:name, :aphia_id, :rank, :ancestors, :functional_groups,
+            :en, :fr, now(), :status)
     ON CONFLICT (scientific_name) DO UPDATE SET
         aphia_id           = EXCLUDED.aphia_id,
         rank               = EXCLUDED.rank,
         ancestor_aphia_ids = EXCLUDED.ancestor_aphia_ids,
+        functional_groups  = EXCLUDED.functional_groups,
         vernaculars_en     = EXCLUDED.vernaculars_en,
         vernaculars_fr     = EXCLUDED.vernaculars_fr,
         fetched_at         = EXCLUDED.fetched_at,
@@ -295,6 +324,9 @@ def names_to_process(conn, refresh_statuses, top_n=None):
      LEFT JOIN cde.obis_scientific_name_popularity p
             ON p.scientific_name = n.scientific_name
          WHERE v.scientific_name IS NULL
+            -- Resolved before functional groups were fetched, or that fetch
+            -- failed: without them the plankton/invertebrate EOVs can't match.
+            OR (v.aphia_id IS NOT NULL AND v.functional_groups IS NULL)
             {refresh_clause}
       ORDER BY COALESCE(p.total_records, 0) DESC, n.scientific_name
         {limit_clause}
@@ -303,7 +335,7 @@ def names_to_process(conn, refresh_statuses, top_n=None):
     return [row[0] for row in conn.execute(sql, params)]
 
 
-def _fetch_taxon_data(session, name, aid, rank, classification_cache):
+def _fetch_taxon_data(session, name, aid, rank, taxon_cache):
     """A classification failure still marks the row ok with no ancestors, for a
     later ``--refresh-status missing_classification`` pass."""
     try:
@@ -314,9 +346,12 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
         )
         return TaxonResult(name, aid, rank, [], [], [], STATUS_ERROR)
 
-    cached = classification_cache.get(aid)
+    cached = taxon_cache.get(aid)
     if cached is not None:
-        return TaxonResult(name, aid, rank, cached, en, fr, STATUS_OK)
+        ancestors, functional_groups = cached
+        return TaxonResult(
+            name, aid, rank, ancestors, en, fr, STATUS_OK, functional_groups
+        )
 
     try:
         ancestors = fetch_classification(session, aid)
@@ -325,12 +360,21 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
             "AphiaClassificationByAphiaID failed for %r (%s): %s", name, aid, exc
         )
         ancestors = []
-    classification_cache.put(aid, ancestors)
-    return TaxonResult(name, aid, rank, ancestors, en, fr, STATUS_OK)
+    try:
+        functional_groups = fetch_functional_groups(session, aid)
+    except requests.RequestException as exc:
+        logger.warning(
+            "AphiaAttributesByAphiaID failed for %r (%s): %s", name, aid, exc
+        )
+        functional_groups = None
+    taxon_cache.put(aid, ancestors, functional_groups)
+    return TaxonResult(
+        name, aid, rank, ancestors, en, fr, STATUS_OK, functional_groups
+    )
 
 
 def process_chunk(
-    session, engine, executor, names, sleep_seconds, counts, classification_cache
+    session, engine, executor, names, sleep_seconds, counts, taxon_cache
 ):
     try:
         matches = match_aphia_ids(session, names)
@@ -347,6 +391,7 @@ def process_chunk(
                         "aphia_id": None,
                         "rank": None,
                         "ancestors": [],
+                        "functional_groups": None,
                         "en": [],
                         "fr": [],
                         "status": STATUS_ERROR,
@@ -368,7 +413,7 @@ def process_chunk(
     if executor is not None:
         futures = [
             executor.submit(
-                _fetch_taxon_data, session, name, aid, rank, classification_cache
+                _fetch_taxon_data, session, name, aid, rank, taxon_cache
             )
             for name, aid, rank in pending
         ]
@@ -377,7 +422,7 @@ def process_chunk(
     else:
         for name, aid, rank in pending:
             results.append(
-                _fetch_taxon_data(session, name, aid, rank, classification_cache)
+                _fetch_taxon_data(session, name, aid, rank, taxon_cache)
             )
             time.sleep(sleep_seconds)
 
@@ -390,6 +435,7 @@ def process_chunk(
                     "aphia_id": r.aphia_id,
                     "rank": r.rank,
                     "ancestors": r.ancestors,
+                    "functional_groups": r.functional_groups,
                     "en": r.vernaculars_en,
                     "fr": r.vernaculars_fr,
                     "status": r.status,
@@ -474,7 +520,7 @@ def main():
     counts = {STATUS_OK: 0, STATUS_NOT_FOUND: 0, STATUS_ERROR: 0}
     processed = 0
 
-    classification_cache = ClassificationCache()
+    taxon_cache = TaxonCache()
     executor = (
         concurrent.futures.ThreadPoolExecutor(max_workers=workers)
         if workers > 1
@@ -490,7 +536,7 @@ def main():
                 chunk,
                 sleep_seconds,
                 counts,
-                classification_cache,
+                taxon_cache,
             )
             processed += len(chunk)
             if processed % (batch_size * 5) == 0 or processed == total:
@@ -517,7 +563,9 @@ def main():
     logger.info("Backfilling obis_cells.aphia_ids from vernaculars")
     with engine.begin() as conn:
         backfilled = conn.execute(text("SELECT obis_backfill_aphia_ids()")).scalar()
+        derived = conn.execute(text("SELECT obis_derive_eovs()")).scalar()
     logger.info("Backfilled aphia_ids into %s obis_cells", backfilled)
+    logger.info("Re-derived EOVs on %s obis_cells", derived)
 
 
 if __name__ == "__main__":
