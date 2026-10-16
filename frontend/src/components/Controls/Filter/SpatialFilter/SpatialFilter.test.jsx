@@ -176,5 +176,7 @@ describe("SpatialFilter place search", () => {
       screen.getByRole("button", { name: "Go to: Fundian Channel" }),
     ).toBeInTheDocument();
     expect(screen.getAllByTestId("spatial-filter-place-box")).toHaveLength(1);
+    expect(screen.getAllByTestId("spatial-filter-place-area")).toHaveLength(1);
+    expect(screen.getAllByTestId("spatial-filter-place-point")).toHaveLength(1);
   });
 });

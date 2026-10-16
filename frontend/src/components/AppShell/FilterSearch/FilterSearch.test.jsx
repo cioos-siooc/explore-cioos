@@ -409,6 +409,22 @@ describe("FilterSearch", () => {
     expect(seen.draw).toBeUndefined();
   });
 
+  it("marks each place with the shape it filters by, or a pin", async () => {
+    answerRegions();
+    const { user, box } = await renderPalette();
+    const kind = (name) =>
+      option(name).querySelector(".filterSearchOptionState svg").classList;
+
+    await user.type(box, "fundy");
+    await screen.findByText("Bay of Fundy");
+    expect(kind("Bay of Fundy")).toContain("bi-pentagon");
+    expect(kind("Fundian Channel")).toContain("bi-geo-alt");
+
+    await user.click(screen.getByTestId("filter-search-region-box"));
+    expect(kind("Bay of Fundy")).toContain("bi-bounding-box");
+    expect(kind("Fundian Channel")).toContain("bi-geo-alt");
+  });
+
   it("applies a region as its bounding box when asked", async () => {
     answerRegions();
     const { user, seen, box } = await renderPalette();

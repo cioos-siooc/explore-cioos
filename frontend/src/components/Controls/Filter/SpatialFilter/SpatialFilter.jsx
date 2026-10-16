@@ -64,6 +64,21 @@ function PlaceSearch() {
       <ul className="spatialFilterPlaceList" aria-live="polite">
         {places.map((place) => (
           <li key={place.id} className="spatialFilterPlace">
+            {place.area ? (
+              <Pentagon
+                className="spatialFilterPlaceKind"
+                size={14}
+                data-testid="spatial-filter-place-area"
+                aria-hidden="true"
+              />
+            ) : (
+              <GeoAlt
+                className="spatialFilterPlaceKind"
+                size={14}
+                data-testid="spatial-filter-place-point"
+                aria-hidden="true"
+              />
+            )}
             <span className="spatialFilterPlaceText">
               <span className="spatialFilterPlaceName">
                 {place.name}

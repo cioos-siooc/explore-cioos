@@ -2,9 +2,11 @@ import * as React from "react";
 import { useEffect, useId, useState } from "react";
 import {
   ArrowCounterclockwise,
+  BoundingBox,
   BroadcastPin,
   ChevronRight,
   GeoAlt,
+  Pentagon,
   Search,
   SlashCircle,
   X,
@@ -87,6 +89,7 @@ function useRegionGroup(regions) {
 
   const shapeLabel =
     shape === "box" ? t("drawBoundingBoxOption") : t("drawPolygonOption");
+  const ShapeIcon = shape === "box" ? BoundingBox : Pentagon;
   return {
     key: "region",
     label: t("regionSearchGroup"),
@@ -102,6 +105,8 @@ function useRegionGroup(regions) {
     options: regions.map((region) => ({
       id: region.id,
       label: region.name,
+      // What picking it does: the shape it filters by, or a pin to go to.
+      icon: region.area ? ShapeIcon : GeoAlt,
       hint: region.otherNames.join(" · ") || undefined,
       description: regionDescription(region, t),
       command: true,
@@ -499,6 +504,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
                         className="filterSearchOptionState"
                         aria-hidden="true"
                       >
+                        {option.icon && <option.icon size={14} />}
                         {!option.command && (
                           <OptionStateIcon
                             isSelected={option.state === "include"}

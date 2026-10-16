@@ -37,6 +37,11 @@
   padding: 4px 0;
 }
 
+.spatialFilterPlaceKind {
+  flex-shrink: 0;
+  color: var(--cioos-ink-80);
+}
+
 .spatialFilterPlaceText {
   display: flex;
   flex: 1 1 10em;
