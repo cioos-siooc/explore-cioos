@@ -110,3 +110,64 @@ body.cioos-modal-open {
     border-radius: 0;
   }
 }
+
+/* ------------------------------------------------------------------
+ * Bottom sheet (Modal's `sheet`, phones only): the dialog rises from the
+ * bottom edge over a backdrop that fades in with it, and on closing — from
+ * its close button, Escape, Back, or a drag down by its handle or header
+ * (useSheetDrag) — slides back out the way it came.
+ * ------------------------------------------------------------------ */
+.modal.sheet {
+  /* A list scrolled to its end inside the sheet stops there, rather than
+     handing the swipe on to pull-to-refresh or the map behind. */
+  overscroll-behavior: contain;
+  transition: background-color 0.5s;
+}
+
+.modal.sheet .modal-dialog {
+  align-items: flex-end;
+}
+
+/* Entering is the same transition as leaving, from a starting style rather
+   than a keyframe: a close that lands mid-rise then turns the one transition
+   around, where an entry animation would override it and the sheet would
+   never report that it had left. */
+.modal.sheet .modal-content {
+  transition: transform 0.5s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+@starting-style {
+  .modal.sheet {
+    background-color: transparent;
+  }
+
+  .modal.sheet .modal-content {
+    transform: translateY(100%);
+  }
+}
+
+.modal.sheet.sheetClosing {
+  background-color: transparent;
+  pointer-events: none;
+}
+
+.modal.sheet.sheetClosing .modal-content {
+  transform: translateY(100%);
+}
+
+/* The header is the grab area under the handle (sheetHandleStyles.css), and
+   does not scroll, so a vertical swipe on it is left to the drag. */
+.modal.sheet .modal-header {
+  touch-action: none;
+}
+
+.modal.sheet .modal-header {
+  padding-top: var(--cioos-space-lg, 16px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal.sheet,
+  .modal.sheet .modal-content {
+    transition: none;
+  }
+}

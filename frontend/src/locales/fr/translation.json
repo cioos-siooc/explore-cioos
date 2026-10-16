@@ -366,6 +366,7 @@
   "coverageButtonTitle": "Afficher la répartition des données dans le temps, par source, plateforme, type de données ou organisme",
   "coverageModalTitleText": "Couverture temporelle",
   "coverageModalSubtitleText": "Nombre de jeux de données au fil du temps, avec les filtres appliqués (ajustez le filtre de profondeur pour cibler une couche)",
+  "coverageNoteOpen": "À propos de {{section}}",
   "coverageCountByLabel": "Décompte",
   "coverageMetric_datasets": "Jeux de données",
   "coverageMetric_features": "Entités (cf_role)",
