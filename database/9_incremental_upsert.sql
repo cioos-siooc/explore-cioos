@@ -1,35 +1,15 @@
 /*
 
-Incremental mode UPSERT functions
-
-These functions handle the UPSERT operations when running in incremental mode.
-They merge data from temporary tables into the main tables.
-
-Functions:
-- create_temp_tables() - Create temporary staging tables
-- upsert_datasets_from_temp() - UPSERT datasets from temp_datasets
-- replace_profiles_from_temp() - Replace profiles for updated datasets
-- replace_obis_cells_from_temp() - Replace obis_cells for updated datasets
-- replace_trajectory_days_from_temp() - Replace trajectory_days for updated datasets
-- replace_trajectory_points_from_temp() - Replace trajectory_points for updated datasets
-- upsert_skipped_datasets_from_temp() - UPSERT skipped datasets
-- process_incremental_update() - Main orchestrator for entire incremental workflow
+Incremental mode: merge data from temporary staging tables into the main tables.
 
 */
 
 
--- Create temporary tables for incremental mode
--- These mirror the structure of main tables but without constraints
 CREATE OR REPLACE FUNCTION create_temp_tables() RETURNS VOID AS $$
 BEGIN
-  -- Create temp tables with same structure as main tables
-  -- EXCLUDING GENERATED: datasets.coverage_bbox is a GENERATED column; LIKE
-  -- would copy its expression and reject plain INSERTs. The main-table INSERT
-  -- recomputes it from the coverage_* columns.
+  -- EXCLUDING GENERATED: LIKE would copy generated expressions (coverage_bbox,
+  -- profiles.bbox) and reject plain INSERTs; the main-table INSERT recomputes them.
   CREATE TEMP TABLE IF NOT EXISTS temp_datasets (LIKE cde.datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
-  -- EXCLUDING GENERATED: profiles.bbox is a GENERATED column; LIKE would copy
-  -- its expression and reject plain INSERTs. The main-table INSERT recomputes
-  -- bbox from the lat/lon min/max columns, so the temp table doesn't carry it.
   CREATE TEMP TABLE IF NOT EXISTS temp_profiles (LIKE cde.profiles INCLUDING DEFAULTS EXCLUDING CONSTRAINTS EXCLUDING GENERATED);
   CREATE TEMP TABLE IF NOT EXISTS temp_skipped_datasets (LIKE cde.skipped_datasets INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
   CREATE TEMP TABLE IF NOT EXISTS temp_obis_cells (LIKE cde.obis_cells INCLUDING DEFAULTS EXCLUDING CONSTRAINTS);
@@ -40,8 +20,7 @@ BEGIN
   ALTER TABLE temp_trajectory_points
     ALTER COLUMN time DROP NOT NULL;
 
-  -- Explicitly drop all NOT NULL constraints from temp tables
-  -- These are column-level constraints that EXCLUDING CONSTRAINTS doesn't remove
+  -- EXCLUDING CONSTRAINTS doesn't remove column-level NOT NULL.
   ALTER TABLE temp_datasets
     ALTER COLUMN dataset_id DROP NOT NULL,
     ALTER COLUMN erddap_url DROP NOT NULL,
@@ -71,8 +50,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- UPSERT datasets from temp table into main datasets table
--- Uses (dataset_id, erddap_url) as unique key
 CREATE OR REPLACE FUNCTION upsert_datasets_from_temp() RETURNS VOID AS $$
 BEGIN
   -- Explicit column list (not SELECT *) because cde.datasets has a GENERATED
@@ -141,19 +118,16 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Replace profiles for datasets that are in temp_datasets
--- Deletes old profiles for those datasets, then inserts new ones from temp_profiles
 CREATE OR REPLACE FUNCTION replace_profiles_from_temp() RETURNS VOID AS $$
 BEGIN
-  -- Delete old profiles for updated datasets
   DELETE FROM cde.profiles p
   USING temp_datasets td
   WHERE p.dataset_id = td.dataset_id
     AND p.erddap_url = td.erddap_url;
 
-  -- Insert new profiles from temp table. Explicit column list (not SELECT *)
-  -- because cde.profiles has a GENERATED bbox column that temp_profiles omits;
-  -- pk is left out so the target assigns its own serial.
+  -- Explicit column list (not SELECT *) because cde.profiles has a GENERATED
+  -- bbox column that temp_profiles omits; pk is left out so the target assigns
+  -- its own serial.
   INSERT INTO cde.profiles (
     geom, dataset_pk, erddap_url, dataset_id, timeseries_id, profile_id,
     time_min, time_max, latitude, longitude,
@@ -172,28 +146,21 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- UPSERT skipped_datasets from temp table
--- Deletes existing entries for those datasets, then inserts new ones
 CREATE OR REPLACE FUNCTION upsert_skipped_datasets_from_temp() RETURNS VOID AS $$
 BEGIN
-  -- Delete existing entries for these datasets
   DELETE FROM cde.skipped_datasets s
   USING temp_skipped_datasets ts
   WHERE s.dataset_id = ts.dataset_id
     AND s.erddap_url = ts.erddap_url;
 
-  -- Insert new entries
   INSERT INTO cde.skipped_datasets
   SELECT * FROM temp_skipped_datasets;
 END;
 $$ LANGUAGE plpgsql;
 
 
--- Replace obis_cells for datasets that are in temp_datasets
--- Deletes old obis_cells for those datasets, then inserts new ones from temp_obis_cells
 CREATE OR REPLACE FUNCTION replace_obis_cells_from_temp() RETURNS VOID AS $$
 BEGIN
-  -- Delete old obis_cells only for updated OBIS datasets
   DELETE FROM cde.obis_cells c
   USING temp_datasets td,
         cde.datasets d
@@ -201,9 +168,8 @@ BEGIN
     AND d.dataset_id = td.dataset_id
     AND d.source_type = 'obis';
 
-  -- Insert new obis_cells from temp table. aphia_ids is pre-resolved by the
-  -- db-loader from cde.scientific_name_vernaculars at COPY time; carried
-  -- through here so the post-load backfill UPDATE sees fewer empty rows.
+  -- aphia_ids is pre-resolved by the db-loader at COPY time, so the post-load
+  -- backfill UPDATE sees fewer empty rows.
   INSERT INTO cde.obis_cells (dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, day_ranges, time_min, time_max, depth_min, depth_max)
   SELECT dataset_id, latitude, longitude, scientific_names, aphia_ids, n_records, days, day_ranges, time_min, time_max, depth_min, depth_max
   FROM temp_obis_cells
@@ -221,8 +187,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Replace trajectory_days for datasets that are in temp_datasets
--- Deletes old rows for those datasets, then inserts new ones from temp
 CREATE OR REPLACE FUNCTION replace_trajectory_days_from_temp() RETURNS VOID AS $$
 BEGIN
   DELETE FROM cde.trajectory_days c
@@ -230,10 +194,9 @@ BEGIN
   WHERE c.dataset_id = td.dataset_id
     AND c.erddap_url = td.erddap_url;
 
-  -- dataset_pk is resolved here at INSERT time (upsert_datasets_from_temp has
-  -- already run) so trajectory_link_dataset_pk() doesn't have to rewrite every
-  -- freshly-inserted row afterwards. LEFT JOIN keeps rows whose dataset is
-  -- somehow missing; the backfill pass in trajectory_process() catches those.
+  -- dataset_pk is resolved at INSERT time so trajectory_link_dataset_pk()
+  -- doesn't have to rewrite every fresh row. LEFT JOIN keeps rows whose dataset
+  -- is somehow missing; the backfill pass in trajectory_process() catches those.
   INSERT INTO cde.trajectory_days
     (dataset_pk, erddap_url, dataset_id, trajectory_id, day,
      n_records, n_profiles, depth_min, depth_max)
@@ -253,13 +216,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Replace trajectory_points for updated datasets.
 -- Unlike the other tables, the DELETE is scoped to datasets that actually
--- shipped NEW track points this run (not all of temp_datasets): track
--- extraction is best-effort in the harvester — a transient track-query
--- failure yields per-day aggregates but no points, and must not wipe the
--- dataset's existing (still valid) track, which is also what its map coverage
--- is swept from. Stale tracks self-heal on the next successful harvest.
+-- shipped NEW track points this run: track extraction is best-effort, and a
+-- transient failure must not wipe the dataset's existing track (its map
+-- coverage is swept from it).
 CREATE OR REPLACE FUNCTION replace_trajectory_points_from_temp() RETURNS VOID AS $$
 BEGIN
   DELETE FROM cde.trajectory_points p
@@ -267,8 +227,6 @@ BEGIN
   WHERE p.dataset_id = tp.dataset_id
     AND p.erddap_url = tp.erddap_url;
 
-  -- dataset_pk resolved at INSERT time, same rationale as
-  -- replace_trajectory_days_from_temp() above.
   INSERT INTO cde.trajectory_points
     (dataset_pk, erddap_url, dataset_id, trajectory_id, profile_id,
      time, latitude, longitude)
@@ -287,77 +245,49 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- Main incremental processing function
--- Orchestrates the entire incremental update workflow
 CREATE OR REPLACE FUNCTION process_incremental_update() RETURNS VOID AS $$
 DECLARE
   has_obis_delta boolean;
   traj_delta_pks integer[];
 BEGIN
-  -- 1. Process temp tables to populate computed fields
   PERFORM process_temp_profiles();
 
-  -- 2. UPSERT datasets
   PERFORM upsert_datasets_from_temp();
 
-  -- 3. Replace profiles (delete old, insert new). No constraint toggling: the
-  -- backfilled columns are permanently NULL-able and the hex FKs are DEFERRABLE
-  -- INITIALLY DEFERRED (validated at COMMIT), so this whole function stays on DML
-  -- (ROW EXCLUSIVE) and never takes the ACCESS EXCLUSIVE lock that deadlocked
-  -- with live web-api reads. See 7_constraints.sql / validate_loaded_data().
+  -- Stays on DML (ROW EXCLUSIVE) throughout: an ACCESS EXCLUSIVE lock would
+  -- deadlock with live web-api reads. See 7_constraints.sql.
   PERFORM replace_profiles_from_temp();
 
-  -- 5. Replace obis_cells (delete old, insert new)
   PERFORM replace_obis_cells_from_temp();
 
-  -- 6. Replace trajectory_days (delete old, insert new)
   PERFORM replace_trajectory_days_from_temp();
 
-  -- 6b. Replace trajectory_points (delete old, insert new); track stats are
-  -- rebuilt afterwards inside trajectory_process().
   PERFORM replace_trajectory_points_from_temp();
 
-  -- 7. UPSERT skipped datasets
   PERFORM upsert_skipped_datasets_from_temp();
 
-  -- 8. Run processing functions to populate remaining fields
-  -- Note: cde.points is append-only; profile_process() adds new profile
-  -- geometries first, then obis_process()/trajectory_process() add theirs and
-  -- backfill point_pk on the rows this load replaced (point pks are stable,
-  -- so rows from previous runs keep their links).
   PERFORM ckan_process();
   PERFORM profile_process();
 
-  -- OBIS steps only when this load actually touched OBIS data. The two
-  -- scientific-name matviews read only scientific_names/n_records from
-  -- obis_cells, so they stay valid whenever no OBIS cells changed — and their
-  -- full refresh (~1s+, growing with OBIS volume) was the single largest
-  -- fixed cost of a non-OBIS incremental load.
+  -- OBIS steps only when this load touched OBIS data: the matviews stay valid
+  -- otherwise, and their refresh (~1s+) dominates a non-OBIS incremental load.
   SELECT EXISTS (SELECT 1 FROM temp_obis_cells)
       OR EXISTS (SELECT 1 FROM temp_datasets td
                  JOIN cde.datasets d ON d.dataset_id = td.dataset_id
                  WHERE d.source_type = 'obis')
     INTO has_obis_delta;
   IF has_obis_delta THEN
-    -- obis_process(concurrent_refresh => TRUE, rebuild_indexes => FALSE):
-    -- concurrent matview refresh (live readers), and UPDATE aphia_ids in place
-    -- rather than DROP/CREATE INDEX. The drop+rebuild is a full-reload
-    -- throughput optimization; in incremental it would take ACCESS EXCLUSIVE
-    -- on obis_cells (another reader deadlock source) to save work on a small
-    -- row set.
+    -- concurrent_refresh => TRUE, rebuild_indexes => FALSE: both avoid
+    -- ACCESS EXCLUSIVE against live readers.
     PERFORM obis_process(TRUE, FALSE);
   ELSE
-    -- No OBIS delta: links and matviews are already valid. Still run the
-    -- aphia backfill (cheap — scoped to cells with empty aphia_ids) so
-    -- vernaculars added since the last OBIS load reach obis_cells without
-    -- waiting for one; it doesn't touch what the matviews read.
+    -- Still run the cheap aphia backfill so vernaculars added since the last
+    -- OBIS load reach obis_cells without waiting for one.
     PERFORM obis_backfill_aphia_ids(FALSE);
   END IF;
 
-  -- Trajectories: the same steps trajectory_process() runs for a full reload,
-  -- but the hex sweep is scoped to the datasets this load actually touched —
-  -- re-sweeping every track would make an incremental load pay a whole-corpus
-  -- cost. Skipped entirely when no trajectory data changed.
+  -- Same steps as trajectory_process(), but the hex sweep is scoped to the
+  -- datasets this load touched to avoid a whole-corpus re-sweep.
   PERFORM trajectory_link_dataset_pk();
   PERFORM trajectory_points_link_dataset_pk();
   PERFORM trajectory_refresh_track_stats();
@@ -372,38 +302,28 @@ BEGIN
     PERFORM trajectory_build_hexes(traj_delta_pks);
   END IF;
 
-  -- 9. Create hexes for profiles / obis cells
   PERFORM create_hexes();
 
-  -- 10. Validate that every required column got populated (replaces the old
-  -- set_constraints() NOT NULL re-add; a plain SELECT, no ACCESS EXCLUSIVE).
   PERFORM validate_loaded_data();
 END;
 $$ LANGUAGE plpgsql;
 
 
 -- Remove datasets that disappeared upstream, giving the incremental path
--- full-reload semantics without the TRUNCATE (whose ACCESS EXCLUSIVE lock
--- blanked the whole site for the duration of a reload).
+-- full-reload semantics without a TRUNCATE (whose ACCESS EXCLUSIVE lock blanks
+-- the site).
 --
--- Coverage: a harvest run fully enumerates each source it touches — every
--- dataset lands in temp_datasets (changed), temp_verified (skipped as
--- unchanged) or temp_skipped_datasets (errored / filtered out). So a
--- cde.datasets row of a covered source that appears in NONE of the three is
--- gone upstream and can be deleted, along with its profiles/cells rows.
--- A NO_PROFILES_FOUND skip is not protection: the harvester reached the
--- dataset and it has nothing to show, so its old row is as stale as a
--- vanished one — kept, it counts in /datasets with nothing on the map. Its
--- skipped_datasets row is kept, so the reason stays on record.
--- Sources absent from this run are never touched, so concurrent per-source
--- harvesters each prune only their own source.
+-- A harvest run fully enumerates each source it touches: every dataset lands in
+-- temp_datasets, temp_verified or temp_skipped_datasets, so a covered source's
+-- row in none of them is gone upstream. A NO_PROFILES_FOUND skip is not
+-- protection (it would count in /datasets with nothing on the map), but its
+-- skipped_datasets row is kept so the reason stays on record. Sources absent
+-- from this run are never touched, so per-source harvesters prune only their own.
 --
--- Guard: if more than max_fraction of a source's datasets would vanish at
--- once, that smells like a harvester bug / partial enumeration rather than a
--- real mass-removal — the source is skipped with a WARNING and nothing is
--- deleted for it. datasets_lookup is intentionally kept (append-only so
--- pk_url stays stable if a dataset returns); orphaned points/hexes/
--- organizations are collected post-commit by gc_orphan_points_and_hexes().
+-- Guard: if more than max_fraction of a source's datasets would vanish at once,
+-- that smells like partial enumeration; the source is skipped with a WARNING.
+-- datasets_lookup is kept append-only so pk_url stays stable if a dataset
+-- returns.
 CREATE OR REPLACE FUNCTION prune_stale_datasets(max_fraction float8 DEFAULT 0.5)
 RETURNS bigint AS $$
 DECLARE
@@ -411,9 +331,8 @@ DECLARE
   n_db bigint;
   n bigint;
 BEGIN
-  -- The db-loader creates+fills temp_verified when the harvest reported
-  -- unchanged datasets; create it empty here otherwise (also keeps this
-  -- function callable against a loader too old to know about it).
+  -- The db-loader creates+fills temp_verified only when the harvest reported
+  -- unchanged datasets.
   CREATE TEMP TABLE IF NOT EXISTS temp_verified
     (erddap_url text, dataset_id text, verified_at timestamptz);
 
@@ -466,14 +385,12 @@ BEGIN
   DELETE FROM cde.trajectory_hexes h USING _prune_candidates c
   WHERE h.dataset_pk = c.pk;
 
-  -- trajectory_points has an FK to datasets(pk); it must be cleared before the
-  -- datasets DELETE below or pruning a trajectory dataset raises a
-  -- ForeignKeyViolation (see replace_trajectory_points_from_temp()).
+  -- trajectory_points has an FK to datasets(pk), so it must be cleared before
+  -- the datasets DELETE below.
   DELETE FROM cde.trajectory_points t USING _prune_candidates c
   WHERE t.dataset_id = c.dataset_id AND t.erddap_url = c.erddap_url;
 
-  -- trajectory_track_stats has no FK (no crash) but is keyed on dataset_pk;
-  -- clear it too so pruned datasets leave no orphaned rows behind the
+  -- trajectory_track_stats has no FK but would leave orphans in the
   -- /trajectories/platforms list.
   DELETE FROM cde.trajectory_track_stats s USING _prune_candidates c
   WHERE s.dataset_pk = c.pk;

@@ -41,16 +41,10 @@ $$;
 day_union_days( daterange[] )
 
 Total number of days covered by a set of day ranges, counting overlaps once —
-the map's "days of data" metric (see web-api/utils/hexMetric.js). Ten moorings
-deployed over the same year read as 365 days, not 3650.
+the map's "days of data" metric (see web-api/utils/hexMetric.js).
 
-PostgreSQL 14's range_agg would do this natively; this database is 13.x, so the
-merge is hand-rolled. Ranges are sorted and swept once, extending the current
-island while the next range starts at or before its end. NULL and empty ranges
-are ignored, and the single-range case (every profile and OBIS cell that has
-not been re-harvested yet, and most trajectory hexes) skips the sort entirely —
-that fast path is the difference between ~3x and ~5x the cost of the plain sum
-it replaces.
+Hand-rolled because range_agg needs PostgreSQL 14 and this database is 13.x.
+The single-range fast path (most rows) skips the sort, roughly halving the cost.
 
 eg:
 
@@ -118,10 +112,8 @@ Days of the query window that the feature actually holds data on: the day set
 intersected with the window, overlaps counted once. This is the day factor in
 the download-size estimate (web-api/utils/shapeQuery.js).
 
-It exists because `records_per_day` is a rate over days WITH DATA. Pairing that
-rate with an elapsed span — which is what the estimator did for every source,
-and still does for rows whose day set is unknown — over-counts by exactly
-span/days-with-data. A NULL or empty array means "day set unknown"; the caller
+`records_per_day` is a rate over days WITH DATA, so pairing it with an elapsed
+span over-counts. A NULL or empty array means "day set unknown"; the caller
 falls back to the span rather than reading a 0 here as "no data".
 
 eg:
@@ -156,67 +148,30 @@ dataset_is_realtime( coverage_time_max, harvested_at, cdm_data_type )
 
 "Was this dataset still producing data at the moment we harvested it?"
 
-The first two arguments are stored columns on cde.datasets, so this is
-IMMUTABLE: the answer is fixed at harvest time and does not drift as the clock
-moves. That is deliberate. A now()-relative test would need the catalogue
-refreshed on a timer to stay honest, and would flip a dataset's badge between
-page loads; "this dataset is updated in real time" is a property of the
-dataset, not of this instant. The cost is that the flag ages with the harvest:
-a feed that died yesterday keeps its badge until the next harvest re-measures
-it.
+IMMUTABLE on purpose: measured against the harvest, not now(), so a badge does
+not flip between page loads; it ages until the next harvest re-measures it.
 
-coverage_time_max is the dataset's newest data as the server itself reported it
-(from the allDatasets listing, or the time dimension for grids); harvested_at is
-when we last looked at the dataset. A dataset whose newest data is less than 7
-days behind its own harvest was live at that moment. That window is deliberately
-loose: we don't distinguish strictly-real-time from near-real-time feeds (one
-"Live" badge covers both), and near-real-time sources can legitimately lag by
-more than a day for QC/processing, or simply report less often than daily. The
-default harvest cadence itself is every 3 days (HARVESTER_CRON), so a 1-day
-window would mislabel a perfectly healthy NRT feed as dead; 7 days gives enough
-slack for that lag plus a missed harvest run without also blessing feeds that
-have actually gone stale.
+7 days, not 1: near-real-time feeds lag for QC and the default harvest cadence
+is 3 days (HARVESTER_CRON), so this allows that lag plus a missed run.
 
-Callers pass verified_at, not last_updated_at. last_updated_at only moves when
-the dataset's content changed, so on an incremental harvest a dataset skipped as
-unchanged keeps the old value (the loader bumps verified_at alone --
-loading/loader.py). A feed that dies therefore freezes coverage_time_max and
-last_updated_at together, a few hours apart, and would read realtime forever:
-the "next harvest re-measures it" the paragraph above promises never arrives for
-exactly the datasets the flag is meant to catch. verified_at advances on every
-harvest that reaches the dataset, so the gap widens on its own and the flag
-turns false 7 days after the data stops.
+Callers pass verified_at, not last_updated_at: a dead feed skipped as unchanged
+keeps its old last_updated_at, which would read realtime forever.
 
-Forecast grids have a coverage_time_max in the future and so are realtime,
-which is correct -- they are continuously reissued. But some sources have
-metadata/clock errors that put coverage_time_max decades ahead (e.g. a
-time_coverage_end of 2050) -- not a forecast, just bad data. coverage_time_max
-is capped at harvested_at + 90 days, past real-world weather/ocean forecast
-horizons (days to a few months), so those bogus dates read as not realtime
-instead of forever "live".
+coverage_time_max is capped at harvested_at + 90 days (past real forecast
+horizons) so bogus metadata like a 2050 time_coverage_end is not "live".
 
-cdm_data_type gates the shape of dataset this even makes sense for: grids
-(cdm_data_type='Grid', ERDDAP's griddap) and the TimeSeries / Trajectory
-family are continuously-updated feeds, but a Profile (a one-off vertical cast,
-possibly grouped into TimeSeriesProfile/TrajectoryProfile -- those match the
-prefix, not this) or a bare Point (OBIS occurrence records) is not something a
-server "keeps producing"; recent coverage there means recent data entry, not a
-live feed. Prefix-matched rather than an exact IN-list so TimeSeries/Trajectory
-subtypes stay covered without editing this function.
+Only Grid and the TimeSeries* and Trajectory* families are continuous feeds; Profile
+and Point (OBIS) recency means recent data entry, not a live feed.
 
-NULL on either side means "unknown", which is not evidence of being live, so
-the answer is false rather than NULL. That keeps callers from needing IS TRUE /
-IS NOT TRUE to avoid three-valued logic dropping rows from both sides of the
-filter.
+NULL inputs return false rather than NULL so callers avoid three-valued logic.
 
   SELECT dataset_is_realtime(coverage_time_max, verified_at, cdm_data_type)
     FROM cde.datasets;
 
 */
 
--- Dropped first, like the functions above: CREATE OR REPLACE refuses to rename
--- an existing function's parameters, so re-applying this file over a database
--- that still has an older signature would error out mid-migration.
+-- Dropped first: CREATE OR REPLACE refuses to rename an existing function's
+-- parameters, so re-applying over an older signature would error out.
 DROP FUNCTION IF EXISTS dataset_is_realtime( timestamptz, timestamptz );
 DROP FUNCTION IF EXISTS dataset_is_realtime( timestamptz, timestamptz, text );
 CREATE OR REPLACE FUNCTION dataset_is_realtime(
