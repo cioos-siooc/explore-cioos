@@ -2,33 +2,38 @@
 download_erddap regroup a set of tool used by CDE to download ERDDAP datasets.
 """
 
-import io
-import json
-import os
-import sys
-from urllib.parse import urlparse
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib.parse import quote, urlparse
 
 import cde_harvester.sources.erddap.client as cde_harvester
+import duckdb
 import pandas as pd
 import requests
+import shapely.affinity
 import shapely.wkt
 from cde_harvester.core.errors import HTTP_ERROR, UNKNOWN_ERROR
 from cde_harvester.core.issues import erddap_error_text
 from erddapy import ERDDAP
 from loguru import logger
-from shapely.geometry import Point
 
-from erddap_downloader.download_pdf import download_pdf
+from erddap_downloader.formats import DEFAULT_FORMAT, FORMATS, OBIS_FORMATS, inside, write_frame, write_subset
+from erddap_downloader.source_metadata import REQUEST_HEADERS, save_source_metadata
 
 ONE_MB = 10**6
 DATASET_SIZE_LIMIT = 1000 * ONE_MB
 QUERY_SIZE_LIMIT = 5000 * ONE_MB
-
-# Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that 403s
-# urllib's default User-Agent, which pandas' read_csv(url) uses.
-REQUEST_HEADERS = {
-    "User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"
-}
+CHUNK_SIZE = 1024**2
+# (connect, read): a hung server becomes a FAILED subset instead of a stalled job.
+REQUEST_TIMEOUT = (30, 600)
+MAX_WORKERS = 6
+MAX_REQUESTS_PER_SERVER = 2
+# Feature-ID regexes are split so each URL stays under common proxy limits;
+# past MAX_FEATURE_REQUESTS a bounding-box request is cheaper.
+URL_BUDGET = 6000
+MAX_FEATURE_REQUESTS = 8
 
 DOWNLOADING = "DOWNLOADING"
 COMPLETED = "COMPLETED"
@@ -37,180 +42,264 @@ FAILED = "FAILED"
 EMPTY = "EMPTY"
 IGNORED = "IGNORED"
 
+DATASET_SIZE_LIMIT_HIT = "DATASET_SIZE_LIMIT"
+QUERY_SIZE_LIMIT_HIT = "QUERY_SIZE_LIMIT"
+
+OBIS_PARQUET_URL = "https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+
 
 def erddap_server_to_name(server):
-    """
-    Read erddap server url and convert it to a readable string format to be use as part of the file name output/
-    :param server: erddap server url
-    :return: erddap server string
-    """
     return urlparse(server).netloc.replace(".", "_")
 
 
-def get_variable_list(df_variables: list, all_variables: bool = True):
-    """
-    Retrieve the list of variables to download from an ERDDAP dataset.
-
-    By default returns ALL variables, so science/payload columns without a
-    cf_role are included. all_variables=False keeps only mandatory + cf_role.
-    """
-    if all_variables:
-        return df_variables["name"].to_list()
-
-    # Reduced set: mandatory coordinates plus any cf_role-tagged variable.
-    mandatory_variables = ["time", "latitude", "longitude", "depth"]  # noqa: F841 — read by the @-reference in the query below
-    variables_to_download = df_variables.query(
-        "(name in @mandatory_variables) or (cf_role != '')"
-    )["name"].to_list()
-
-    return variables_to_download
+def dataset_folder_name(dataset):
+    return "{}_{}".format(dataset["dataset_id"], erddap_server_to_name(dataset["erddap_url"]))
 
 
-def get_erddap_download_url(
-    dataset_info: dict,
-    user_constraint: dict,
-    variables_list: list,
-    polygon_region,
-    response: str = "csv",
-):
-    """
-    Method to retrieve the an ERDDAP download url based on the query provided by the user.
-    """
+def _now():
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
-    e = ERDDAP(
-        server=dataset_info["erddap_url"],
-        protocol="tabledap",
-    )
 
+def _number(value):
+    if value is None or value == "" or pd.isna(value):
+        return None
+    return float(value)
+
+
+def _box(user_query, region):
+    """(lon_min, lat_min, lon_max, lat_max), longitudes clamped to ±180; None
+    when the query carries no complete box."""
+    if region is not None:
+        lon_min, lat_min, lon_max, lat_max = region.bounds
+    else:
+        lon_min, lat_min, lon_max, lat_max = (
+            _number(user_query.get(k)) for k in ("lon_min", "lat_min", "lon_max", "lat_max")
+        )
+        if None in (lon_min, lat_min, lon_max, lat_max):
+            return None
+    return max(lon_min, -180), lat_min, min(lon_max, 180), lat_max
+
+
+# Characters Java regex can't take as a one-character class ([.]), and the
+# quote that would end ERDDAP's string; IDs containing them fall back to a box.
+_UNSAFE_ID_CHARACTERS = set('\\"[]^')
+_REGEX_SPECIAL = set(".$*+?(){}|&-")
+
+
+def _regex_literal(value):
+    return "".join(f"[{c}]" if c in _REGEX_SPECIAL else c for c in value)
+
+
+def feature_constraints(dataset):
+    """Constraints selecting exactly the features the map search matched,
+    split to fit URL_BUDGET; None when a bounding box should be used."""
+    variable = dataset.get("feature_id_variable")
+    ids = [i for i in dataset.get("feature_ids") or [] if i]
+    if not variable or not ids or any(_UNSAFE_ID_CHARACTERS & set(i) for i in ids):
+        return None
+
+    chunks, current = [], []
+    for literal in map(_regex_literal, sorted(ids)):
+        if current and len(quote("|".join([*current, literal]))) > URL_BUDGET:
+            chunks.append(current)
+            current = []
+        current.append(literal)
+    chunks.append(current)
+    if len(chunks) > MAX_FEATURE_REQUESTS:
+        return None
+    return [{f"{variable}=~": "(" + "|".join(chunk) + ")"} for chunk in chunks]
+
+
+def get_erddap_download_url(dataset, user_query, variables, region=None, response="csv", extra=None):
+    e = ERDDAP(server=dataset["erddap_url"], protocol="tabledap")
     e.response = response
-    e.dataset_id = dataset_info["dataset_id"]
+    e.dataset_id = dataset["dataset_id"]
     # Without explicit variables an unconstrained URL is ".csv?", which ERDDAP
     # answers with a 302 to its HTML info page.
-    if variables_list:
-        e.variables = variables_list
-    e.constraints = {}
+    if variables:
+        e.variables = variables
+    e.constraints = dict(extra or {})
 
-    if "time_min" in user_constraint:
-        e.constraints["time>="] = user_constraint["time_min"]
-    if "time_max" in user_constraint:
-        e.constraints["time<="] = user_constraint["time_max"]
+    if user_query.get("time_min"):
+        e.constraints["time>="] = user_query["time_min"]
+    if user_query.get("time_max"):
+        e.constraints["time<="] = user_query["time_max"]
 
-    if polygon_region != "all":
-        (
-            user_constraint["lon_min"],
-            user_constraint["lat_min"],
-            user_constraint["lon_max"],
-            user_constraint["lat_max"],
-        ) = polygon_region.bounds
+    # Feature IDs already pin the selection in space.
+    box = None if extra else _box(user_query, region)
+    if box:
+        lon_min, lat_min, lon_max, lat_max = box
+        e.constraints.update(
+            {"latitude>=": lat_min, "latitude<=": lat_max, "longitude>=": lon_min, "longitude<=": lon_max}
+        )
 
-        if (
-            "lat_min" in user_constraint
-            and "lat_max" in user_constraint
-            and "lon_min" in user_constraint
-            and "lon_max" in user_constraint
-        ):
-            # Limit longitudes to [-180 to 180] range
-            if user_constraint["lon_min"] < -180:
-                user_constraint["lon_min"] = -180
-
-            if user_constraint["lon_max"] > 180:
-                user_constraint["lon_max"] = 180
-
-            e.constraints["latitude>="] = user_constraint["lat_min"]
-            e.constraints["latitude<="] = user_constraint["lat_max"]
-
-            e.constraints["longitude>="] = user_constraint["lon_min"]
-            e.constraints["longitude<="] = user_constraint["lon_max"]
-
-    if "depth" in variables_list:
-        if "depth_min" in user_constraint and user_constraint["depth_min"]:
-            e.constraints["depth>="] = user_constraint["depth_min"]
-        if "depth_max" in user_constraint and user_constraint["depth_max"]:
-            e.constraints["depth<="] = user_constraint["depth_max"]
+    if "depth" in variables:
+        if user_query.get("depth_min"):
+            e.constraints["depth>="] = user_query["depth_min"]
+        if user_query.get("depth_max"):
+            e.constraints["depth<="] = user_query["depth_max"]
 
     return e.get_download_url()
 
 
-def save_erddap_metadata(dataset, output_path, file_name="erddap_metadata.csv"):
-    e = ERDDAP(server=dataset["erddap_url"], protocol="tabledap", response="csv")
-    e.dataset_id = dataset["dataset_id"]
-
-    metadata_url = e.get_info_url()
-
-    # Not pd.read_csv(url): urllib's UA gets 403 from WAF-protected servers.
-    resp = requests.get(metadata_url, headers=REQUEST_HEADERS, timeout=60)
-    resp.raise_for_status()
-    df_meta = pd.read_csv(io.StringIO(resp.text))
-    df_meta.insert(loc=0, column="erddap_url", value=dataset["erddap_url"])
-    df_meta.insert(loc=1, column="dataset_id", value=dataset["dataset_id"])
-
-    output_file_path = os.path.join(output_path, file_name)
-    if os.path.exists(output_file_path):
-        df_meta.to_csv(output_file_path, index=False, mode="a", header=False)
-    else:
-        df_meta.to_csv(output_file_path, index=False)
+def _variables(dataset):
+    if dataset.get("table_variables"):
+        return [v["name"] for v in dataset["table_variables"]]
+    return cde_harvester.ERDDAP(dataset["erddap_url"]).get_dataset(dataset["dataset_id"]).df_variables["name"].to_list()
 
 
-def get_file_name_output(dataset_info, output_path, extension):
-    """
-    Generate default file name output to use for each dataset downloaded.
-    """
-    file_name = "{}_{}".format(
-        dataset_info["dataset_id"], erddap_server_to_name(dataset_info["erddap_url"])
+class _QueryBudget:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.total = 0
+
+    def add(self, size):
+        with self._lock:
+            self.total += size
+            return self.total
+
+    def exceeded(self):
+        with self._lock:
+            return self.total > QUERY_SIZE_LIMIT
+
+
+class _ServerSlots:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._slots = {}
+
+    def __call__(self, url):
+        host = urlparse(url).netloc
+        with self._lock:
+            return self._slots.setdefault(host, threading.Semaphore(MAX_REQUESTS_PER_SERVER))
+
+
+def _stream_to_file(url, path: Path, already_downloaded):
+    """Returns (bytes_written, error, empty, truncated)."""
+    written = 0
+    with requests.get(url, headers=REQUEST_HEADERS, stream=True, timeout=REQUEST_TIMEOUT) as response:
+        if response.status_code != 200:
+            server_error = erddap_error_text(response)
+            error = " ".join(filter(None, [f"HTTP {response.status_code}", response.reason]))
+            error += f": {server_error}" if server_error else ""
+            # ERDDAP also answers 404 for an unknown datasetID, which is a fault.
+            empty = response.status_code == 404 and "no matching results" in server_error
+            return 0, error, empty, False
+        with open(path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+                allowed = DATASET_SIZE_LIMIT - already_downloaded - written
+                f.write(chunk[:allowed])
+                written += min(len(chunk), allowed)
+                if len(chunk) > allowed:
+                    return written, None, False, True
+    return written, None, False, False
+
+
+def _drop_partial_last_line(path: Path):
+    data = path.read_bytes()
+    path.write_bytes(data[: data.rfind(b"\n") + 1])
+
+
+def _relative(files, root: Path):
+    return [{**f, "path": f["path"].relative_to(root).as_posix(), "bytes": f["path"].stat().st_size} for f in files]
+
+
+def _row(dataset, fmt, folder_name):
+    return {
+        "erddap_url": dataset["erddap_url"],
+        "dataset_id": dataset["dataset_id"],
+        "ckan_id": dataset.get("ckan_id"),
+        "title": dataset.get("title"),
+        "source_type": dataset.get("source_type") or "erddap",
+        "cdm_data_type": dataset.get("cdm_data_type"),
+        "folder": folder_name,
+        "format": fmt,
+        "download_url_list": [],
+        "feature_constrained": False,
+        "started_at": _now(),
+        "finished_at": None,
+        "status": DOWNLOADING,
+        "reason_code": None,
+        "erddap_error": "",
+        "warnings": [],
+        "files": [],
+        "file_size": 0,
+        "bytes_downloaded": 0,
+        "n_records": 0,
+        "dataset_limit_hit": False,
+        "query_limit_hit": False,
+    }
+
+
+def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budget):
+    form = FORMATS[fmt]
+    variables = _variables(dataset)
+    constraints = feature_constraints(dataset)
+    row["feature_constrained"] = constraints is not None
+    requests_to_make = (
+        [(None, c) for c in constraints] if constraints else [(r, None) for r in regions or [None]]
     )
-    return os.path.join(output_path, f"{file_name}.{extension}")
+
+    parts, errors = [], []
+    for i, (region, extra) in enumerate(requests_to_make):
+        url = get_erddap_download_url(dataset, user_query, variables, region, form.erddap_response, extra)
+        row["download_url_list"].append(url)
+        if budget.exceeded():
+            row.update(status=IGNORED, reason_code=QUERY_SIZE_LIMIT_HIT, query_limit_hit=True)
+            continue
+        if row["dataset_limit_hit"]:
+            continue
+
+        logger.info("Download {}", url)
+        part = folder / f".part{i}"
+        written, error, empty, truncated = _stream_to_file(url, part, row["bytes_downloaded"])
+        row["bytes_downloaded"] += written
+        if error:
+            errors.append(error)
+            if not empty:
+                row.update(status=FAILED, reason_code=HTTP_ERROR)
+                logger.bind(erddap_url=dataset["erddap_url"], dataset_id=dataset["dataset_id"], download_url=url).error(
+                    "ERDDAP downloader download error: {}", error
+                )
+            continue
+        if truncated:
+            row["dataset_limit_hit"] = True
+            if form.binary:
+                part.unlink()
+                row.update(status=FAILED, reason_code=DATASET_SIZE_LIMIT_HIT)
+                errors.append(
+                    f"Over the {DATASET_SIZE_LIMIT // ONE_MB} MB per-dataset limit; "
+                    "try a smaller selection or CSV."
+                )
+                continue
+            _drop_partial_last_line(part)
+            row.update(status=PARTIAL, reason_code=DATASET_SIZE_LIMIT_HIT)
+        parts.append(part)
+
+    if parts and row["status"] != FAILED:
+        files = write_subset(fmt, parts, regions, folder / dataset_folder_name(dataset))
+        row["files"] = _relative(files, folder.parent)
+    for part in parts:
+        part.unlink()
+
+    row["erddap_error"] = "\n".join(errors)
+    if row["status"] == DOWNLOADING:
+        row["status"] = COMPLETED if row["files"] else EMPTY
 
 
-OBIS_PARQUET_URL = "https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
-OBIS_DATASET_API = "https://api.obis.org/v3/dataset/{dataset_id}"
-
-
-def save_obis_metadata(dataset_id, output_path):
-    """Write the OBIS dataset-level metadata alongside the occurrence CSV.
-    Best-effort — a failure here must not fail the download."""
-    try:
-        resp = requests.get(
-            OBIS_DATASET_API.format(dataset_id=dataset_id),
-            headers=REQUEST_HEADERS,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        results = resp.json().get("results", [])
-        metadata = results[0] if results else {}
-        out_path = os.path.join(output_path, f"{dataset_id}_obis_metadata.json")
-        with open(out_path, "w") as f:
-            json.dump(metadata, f, indent=2)
-    except Exception as e:
-        logger.warning("Failed to fetch OBIS metadata for {}: {}", dataset_id, e)
-
-
-def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
-    """
-    Download an OBIS dataset's occurrence records for the user's spatial/time/depth
-    selection from the OBIS open-data GeoParquet export (OBIS datasets are not
-    ERDDAP-backed). Returns a report entry shaped like the ERDDAP path's.
-    """
+def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
     dataset_id = dataset["dataset_id"]
     url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
+    row["download_url_list"] = [url]
 
-    # Bounding the DuckDB read server-side keeps the transfer small.
-    def _coord(key, default):
-        # Not `or`: 0.0 is a valid coordinate.
-        val = user_query.get(key)
-        if val is None or (isinstance(val, float) and pd.isna(val)) or val == "":
-            return default
-        return float(val)
-
-    if polygon_regions:
-        lons = [b for r in polygon_regions for b in (r.bounds[0], r.bounds[2])]
-        lats = [b for r in polygon_regions for b in (r.bounds[1], r.bounds[3])]
-        lon_min, lon_max = max(min(lons), -180), min(max(lons), 180)
-        lat_min, lat_max = max(min(lats), -85.06), min(max(lats), 85.06)
+    if regions:
+        lons = [b for r in regions for b in (r.bounds[0], r.bounds[2])]
+        lats = [b for r in regions for b in (r.bounds[1], r.bounds[3])]
+        lon_min, lon_max, lat_min, lat_max = min(lons), max(lons), min(lats), max(lats)
     else:
-        lon_min = max(_coord("lon_min", -180), -180)
-        lon_max = min(_coord("lon_max", 180), 180)
-        lat_min = max(_coord("lat_min", -85.06), -85.06)
-        lat_max = min(_coord("lat_max", 85.06), 85.06)
+        lon_min, lat_min, lon_max, lat_max = _box(user_query, None) or (-180, -90, 180, 90)
+    lon_min, lon_max = max(lon_min, -180), min(lon_max, 180)
+    lat_min, lat_max = max(lat_min, -85.06), min(lat_max, 85.06)
 
     # The same columns the harvester reads; reliably present across OBIS exports.
     query = f"""
@@ -227,292 +316,103 @@ def download_obis_parquet(dataset, user_query, output_path, polygon_regions):
         WHERE interpreted.decimalLatitude  BETWEEN {lat_min} AND {lat_max}
           AND interpreted.decimalLongitude BETWEEN {lon_min} AND {lon_max}
     """
+    df = duckdb.sql(query).df()
 
-    download_status = DOWNLOADING
-    file_size = 0
-    n_records = 0
-    obis_error = ""
-    reason_code = None
+    depth_min, depth_max = _number(user_query.get("depth_min")), _number(user_query.get("depth_max"))
+    if depth_max is not None:
+        df = df[df["minimumDepthInMeters"].fillna(0).astype(float) <= depth_max]
+    if depth_min is not None:
+        df = df[df["maximumDepthInMeters"].fillna(0).astype(float) >= depth_min]
+
+    # date_start/date_end are epoch milliseconds in the OBIS export.
+    for bound, column, keep in (("time_min", "date_end", "ge"), ("time_max", "date_start", "le")):
+        if user_query.get(bound):
+            limit = pd.to_datetime(user_query[bound], utc=True)
+            values = pd.to_datetime(df[column], unit="ms", utc=True, errors="coerce")
+            df = df[values.ge(limit) if keep == "ge" else values.le(limit)]
+
+    if regions and not df.empty:
+        df = df[inside(df["longitude"], df["latitude"], regions)]
+
+    row["n_records"] = len(df)
+    if df.empty:
+        row["status"] = EMPTY
+        return
+    files = write_frame(fmt, df, folder / dataset_folder_name(dataset))
+    row["files"] = _relative(files, folder.parent)
+    row["status"] = COMPLETED
+
+
+def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget, slots):
+    source_type = dataset.get("source_type") or "erddap"
+    fmt = requested_format
+    if source_type == "obis" and fmt not in OBIS_FORMATS:
+        fmt = DEFAULT_FORMAT
+
+    folder_name = dataset_folder_name(dataset)
+    folder = root / folder_name
+    folder.mkdir(parents=True, exist_ok=True)
+    row = _row(dataset, fmt, folder_name)
+    row["format_fallback"] = fmt != requested_format
+
     try:
-        import duckdb
-
-        df = duckdb.sql(query).df()
-
-        depth_min = user_query.get("depth_min")
-        depth_max = user_query.get("depth_max")
-        if depth_max not in (None, "") and not pd.isna(depth_max):
-            df = df[df["minimumDepthInMeters"].fillna(0).astype(float) <= float(depth_max)]
-        if depth_min not in (None, "") and not pd.isna(depth_min):
-            df = df[df["maximumDepthInMeters"].fillna(0).astype(float) >= float(depth_min)]
-
-        # date_start/date_end are epoch milliseconds in the OBIS export.
-        try:
-            for bound, col, op in (
-                ("time_min", "date_end", "ge"),
-                ("time_max", "date_start", "le"),
-            ):
-                val = user_query.get(bound)
-                if val:
-                    ts = pd.to_datetime(val, utc=True)
-                    coldt = pd.to_datetime(df[col], unit="ms", utc=True, errors="coerce")
-                    df = df[coldt.ge(ts) if op == "ge" else coldt.le(ts)]
-        except Exception as e:
-            logger.warning("OBIS time filter skipped for {}: {}", dataset_id, e)
-
-        # Regions include the ±360 antimeridian duplicates built by get_datasets.
-        if polygon_regions and not df.empty:
-            df[["latitude", "longitude"]] = df[["latitude", "longitude"]].astype(float)
-            inside = df.apply(
-                lambda x: any(
-                    r.contains(Point(x.longitude, x.latitude)) for r in polygon_regions
-                ),
-                axis=1,
-            )
-            df = df[inside]
-
-        n_records = len(df)
-        if not df.empty:
-            output_file_path = get_file_name_output(dataset, output_path, "csv")
-            df.to_csv(output_file_path, index=False, lineterminator="\n")
-            file_size = os.stat(output_file_path).st_size
-            save_obis_metadata(dataset_id, output_path)
-            download_status = COMPLETED
-        else:
-            download_status = EMPTY
+        with slots(dataset["erddap_url"]):
+            if source_type == "obis":
+                _download_obis(dataset, user_query, regions, fmt, row, folder)
+            else:
+                _download_erddap(dataset, user_query, regions, fmt, row, folder, budget)
     except Exception as e:
-        download_status = FAILED
-        reason_code = UNKNOWN_ERROR
-        obis_error = str(e)
-        logger.error(
-            "OBIS parquet download error for {}: {}",
-            dataset_id,
-            e,
-            extra={"dataset_id": dataset_id, "parquet_url": url},
+        # One dataset failing must not lose the rest of the user's download.
+        for file in row["files"]:
+            (root / file["path"]).unlink(missing_ok=True)
+        row.update(status=FAILED, reason_code=UNKNOWN_ERROR, files=[])
+        row["erddap_error"] = "\n".join(filter(None, [row["erddap_error"], f"{type(e).__name__}: {e}"]))
+        logger.bind(erddap_url=dataset["erddap_url"], dataset_id=dataset["dataset_id"]).exception(
+            "Downloader failed for dataset {}", dataset["dataset_id"]
+        )
+
+    row["warnings"] += save_source_metadata(dataset, folder)
+    row["file_size"] = sum(f["bytes"] for f in row["files"])
+    row["n_records"] = row["n_records"] or sum(f["n_rows"] for f in row["files"])
+    row["total_size_so_far"] = budget.add(row["file_size"])
+    row["no_data"] = not row["files"]
+    row["finished_at"] = _now()
+    return row
+
+
+def polygon_regions(polygon_wkt):
+    """The user's polygon, plus ±360° copies when it crosses the antimeridian
+    so each side gets its own query."""
+    if not polygon_wkt:
+        return []
+    regions = [shapely.wkt.loads(polygon_wkt)]
+    lon_min, _, lon_max, _ = regions[0].bounds
+    if lon_min < -180 or lon_max > 180:
+        for shift in (-360, 360):
+            shifted = shapely.affinity.translate(regions[0], xoff=shift)
+            if -180 < shifted.bounds[0] < 180 or -180 < shifted.bounds[2] < 180:
+                regions.append(shifted)
+    return regions
+
+
+def get_datasets(json_query, output_path):
+    user_query = json_query["user_query"]
+    regions = polygon_regions(user_query.get("polygon_region"))
+    requested_format = user_query.get("format") or DEFAULT_FORMAT
+    budget, slots = _QueryBudget(), _ServerSlots()
+    root = Path(output_path)
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+        rows = list(
+            pool.map(
+                lambda dataset: download_dataset(dataset, user_query, regions, requested_format, root, budget, slots),
+                json_query["cache_filtered"],
+            )
         )
 
     return {
-        "erddap_url": dataset["erddap_url"],
-        "dataset_id": dataset_id,
-        "ckan_id": dataset.get("ckan_id"),
-        "download_url_list": [url],
-        "status": download_status,
-        "file_size": file_size,
-        "bytes_downloaded": file_size,
-        "no_data": download_status in (EMPTY, FAILED),
-        "dataset_limit_hit": False,
-        "query_limit_hit": False,
-        "reason_code": reason_code,
-        "erddap_error": obis_error,
-        "n_records": n_records,
+        "erddap_report": rows,
+        "over_limit": any(row["query_limit_hit"] for row in rows),
+        "total_size": budget.total,
+        "empty_download": all(row["no_data"] for row in rows),
     }
-
-
-def filter_polygon_region(data, polygone):
-    """
-    ERDDAP is only compatible with a box method to filter lat/long data.
-    This present tool reads back the data downloaded and remove any data which is outside the provided polygone.
-    """
-    data[["latitude", "longitude"]] = data[["latitude", "longitude"]].astype(float)
-    data = data.loc[
-        data.apply(lambda x: polygone.contains(Point(x.longitude, x.latitude)), axis=1)
-    ]
-
-    return data
-
-
-def get_datasets(json_query, output_path="", create_pdf=False):
-    """
-    General method use to retrieve erddap datasets from a CDE query.
-    """
-
-    report = {
-        "erddap_report": [],
-        "over_limit": False,
-        "total_size": 0,
-        "empty_download": True,
-    }
-
-    polygon_region_wkt = json_query["user_query"].get("polygon_region")
-
-    polygon_regions = [shapely.wkt.loads(polygon_region_wkt)] if polygon_region_wkt else []
-
-    # Duplicate a polygon crossing ±180 so each side gets its own query.
-    if polygon_regions and (polygon_regions[0].bounds[0] < -180 or polygon_regions[0].bounds[2] > 180):
-        for shift in [-360, 360]:
-            new_region = shapely.affinity.translate(polygon_regions[0], xoff=shift)
-            if (
-                -180 < new_region.bounds[0] < 180
-                or -180 < new_region.bounds[2] < 180
-            ):
-                polygon_regions += [new_region]
-
-    chunksize = 1024**2  # 1MB
-
-    for dataset in json_query["cache_filtered"]:
-        if dataset.get("source_type") == "obis":
-            obis_report = download_obis_parquet(
-                dataset, json_query["user_query"], output_path, polygon_regions
-            )
-            if not obis_report["no_data"]:
-                report["empty_download"] = False
-            report["total_size"] += obis_report["file_size"]
-            obis_report["total_size_so_far"] = report["total_size"]
-            report["erddap_report"] += [obis_report]
-            continue
-
-        # Initialised outside the try so the except below can still build a
-        # report row for a dataset that blew up mid-download.
-        df = pd.DataFrame()
-        units = pd.Series(dtype=str)
-        bytes_downloaded = 0
-        file_size = 0
-        download_status = DOWNLOADING
-        download_url_list = []
-        # One entry per failed region: an antimeridian-split query issues
-        # several requests and any of them can fail.
-        erddap_errors = []
-        reason_code = None
-
-        try:
-            if (
-                "erddap_metadata" not in dataset
-                or "globals" not in dataset["erddap_metadata"]
-                or "variables" not in dataset["erddap_metadata"]
-                or dataset["erddap_metadata"]["variables"] == []
-            ):
-
-                harvest_erddap = cde_harvester.ERDDAP(dataset["erddap_url"])
-
-                harvester_dataset = harvest_erddap.get_dataset(dataset["dataset_id"])
-
-                dataset["erddap_metadata"] = harvester_dataset.df_variables
-
-            variable_list = get_variable_list(dataset["erddap_metadata"])
-
-            for polygon_region in polygon_regions or ["all"]:
-
-                download_url = get_erddap_download_url(
-                    dataset,
-                    json_query["user_query"],
-                    variable_list,
-                    polygon_region=polygon_region,
-                )
-
-                download_url_list += [download_url]
-
-                if (
-                    report["total_size"] > QUERY_SIZE_LIMIT
-                    or bytes_downloaded > DATASET_SIZE_LIMIT
-                ):
-                    download_status = IGNORED
-                    continue
-
-                logger.info(f"Download {download_url}")
-                data_downloaded = b""
-                with requests.get(
-                    download_url, headers=REQUEST_HEADERS, stream=True
-                ) as response:
-                    if response.status_code != 200:
-                        if response.status_code == 404:
-                            # ERDDAP answers 404 for "no matching data", which is
-                            # an empty result for the user, not a server problem.
-                            download_status = EMPTY
-                        else:
-                            download_status = FAILED
-                            reason_code = HTTP_ERROR
-
-                        server_error = erddap_error_text(response)
-                        erddap_errors.append(
-                            f"HTTP {response.status_code} {response.reason}"
-                            + (f": {server_error}" if server_error else "")
-                        )
-                        logger.bind(
-                            erddap_url=dataset["erddap_url"],
-                            dataset_id=dataset["dataset_id"],
-                            download_url=download_url,
-                            status_code=response.status_code,
-                        ).error(
-                            "ERDDAP downloader download error: HTTP {} - {} - {}",
-                            response.status_code,
-                            dataset["erddap_url"],
-                            server_error,
-                        )
-                        continue
-
-                    for chunk in response.iter_content(chunk_size=chunksize):
-                        bytes_downloaded += sys.getsizeof(chunk)
-                        data_downloaded += chunk
-
-                        if bytes_downloaded > DATASET_SIZE_LIMIT:
-                            download_status = PARTIAL
-                            print("Reached download limit per dataset!")
-                            break
-
-                print(f"Downloaded {bytes_downloaded/ONE_MB:.3f} MB")
-
-                # ERDDAP CSV: header on the first line, units on the second.
-                df_temp = pd.read_csv(io.BytesIO(data_downloaded), low_memory=False)
-                units = df_temp.iloc[0].replace({pd.NA: ""}).astype(str)
-                df_temp = df_temp.iloc[1:]
-
-                if polygon_region != "all":
-                    df_temp = filter_polygon_region(df_temp, polygon_region)
-
-                df = pd.concat([df, df_temp])
-            if download_status == DOWNLOADING:
-                download_status = COMPLETED
-
-            if not df.empty:
-                report["empty_download"] = False
-                if "time" in df.columns:
-                    df = df.sort_values("time")
-
-                output_file_path = get_file_name_output(dataset, output_path, "csv")
-                with open(output_file_path, "w") as f:
-                    f.write(",".join(list(df.columns)) + "\n")
-                    f.write(",".join(units.to_list()) + "\n")
-
-                    df.to_csv(f, mode="a", header=False, index=False, lineterminator="\n")
-
-                file_size = os.stat(output_file_path).st_size
-            if download_status in [COMPLETED, PARTIAL]:
-                # ckan_url is the full catalogue URL, NULL without a ckan_id.
-                if create_pdf and dataset["ckan_url"]:
-                    pdf_filename = get_file_name_output(dataset, output_path, "pdf")
-                    download_pdf(dataset["ckan_url"], pdf_filename)
-
-                save_erddap_metadata(dataset, output_path=output_path)
-
-        except Exception as e:
-            # One dataset failing must not lose the rest of the user's download.
-            download_status = FAILED
-            reason_code = UNKNOWN_ERROR
-            erddap_errors.append(f"{type(e).__name__}: {e}")
-            logger.bind(
-                erddap_url=dataset["erddap_url"],
-                dataset_id=dataset["dataset_id"],
-            ).exception("ERDDAP downloader failed for dataset {}", dataset["dataset_id"])
-
-        # Outside the try: a dataset that wrote a file and then failed (on the
-        # PDF or metadata fetch) still counts against the query size budget.
-        report["total_size"] += file_size
-
-        dataset_report = {
-            "erddap_url": dataset["erddap_url"],
-            "dataset_id": dataset["dataset_id"],
-            "ckan_id": dataset["ckan_id"],
-            "download_url_list": download_url_list,
-            "status": download_status,
-            "file_size": file_size,
-            "bytes_downloaded": bytes_downloaded,
-            "no_data": df.empty,
-            "dataset_limit_hit": bytes_downloaded > DATASET_SIZE_LIMIT,
-            "query_limit_hit": report["total_size"] > QUERY_SIZE_LIMIT,
-            "reason_code": reason_code,
-            "erddap_error": "\n".join(erddap_errors),
-            "total_size_so_far": report["total_size"],
-        }
-
-        report["erddap_report"] += [dataset_report]
-
-    return report

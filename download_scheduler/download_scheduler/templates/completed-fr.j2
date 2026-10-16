@@ -12,10 +12,13 @@ Votre téléchargement est disponible sur {{download_url}}
 Veuillez noter que certains ensembles de données de votre sélection n'ont pas pu être inclus dans ce téléchargement :
 {% for d in failed_datasets %}
 - {{ d['dataset_id'] }} — {{ d['reason_fr'] }}.
+{% if d['error'] %}
+  Réponse de la source : {{ d['error'] }}
+{% endif %}
 {% endfor %}
 {% endif %}
-Remarque : les données incluses dans ce fichier zip comprennent des observations qui ont été téléchargées à partir d'ensembles de données hébergés sur des serveurs ERDDAP en libre accès et des catalogues CKAN. Les liens vers les sources sont inclus dans cet e-mail. Veuillez vous référer aux métadonnées incluses dans les serveurs ERDDAP ainsi que les catalogues CKAN pour identifier les licences applicables et la manière correcte de citer ces ressources.
+Le fichier README.md du zip indique ce qui a été inclus et pourquoi certains jeux de données ne l'ont pas été. Le dossier de chaque jeu de données contient ses données, sa citation et ses métadonnées sources; toutes les citations sont dans citations.txt (aussi .bib, .ris et CITATION.cff) et les licences dans rights.txt. Veuillez citer chaque jeu de données utilisé.
 
-Veuillez consulter les sites Web suivants pour trouver les dernières informations sur la manière de citer correctement ces ressources :
+Les sources de ce téléchargement :
 
 {{ datasets_list }}

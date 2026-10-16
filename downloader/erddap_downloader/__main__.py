@@ -11,16 +11,11 @@ if __name__ == "__main__":
     parser.add_argument("json_query")
 
     parser.add_argument(
-        "--create_pdf", dest="create_pdf", default=False, required=False
-    )
-    parser.add_argument(
         "--output_folder", dest="output_folder", default="out", required=False
     )
 
     args = parser.parse_args()
     json_query = args.json_query
-
-    create_pdf = args.create_pdf
     output_folder = args.output_folder
 
     with open(json_query) as fid:
@@ -29,5 +24,4 @@ if __name__ == "__main__":
     downloader_wrapper.run_download_query(
         download_query=download_query,
         output_folder=output_folder,
-        create_pdf=create_pdf,
     )

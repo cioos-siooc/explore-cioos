@@ -67,12 +67,11 @@ def test_downloader_query(query, tmp_path):
             "erddap_downloader.download_erddap.requests.get",
             return_value=_mock_requests_response(),
         ),
-        patch("erddap_downloader.download_erddap.save_erddap_metadata"),
+        patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]),
     ):
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,
-            create_pdf=False,
         )
 
     assert result is not None
@@ -106,12 +105,11 @@ def test_obis_download_parquet(tmp_path):
 
     with (
         patch("duckdb.sql", return_value=duck_result) as duck_sql,
-        patch("erddap_downloader.download_erddap.save_obis_metadata") as save_meta,
+        patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]) as save_meta,
     ):
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,
-            create_pdf=False,
         )
 
     # DuckDB was used to read the parquet (not the tabledap path).
@@ -140,12 +138,11 @@ def test_obis_download_empty(tmp_path):
 
     with (
         patch("duckdb.sql", return_value=duck_result),
-        patch("erddap_downloader.download_erddap.save_obis_metadata"),
+        patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]),
     ):
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
             output_folder=tmp_path,
-            create_pdf=False,
         )
 
     entry = result["erddap_report"][0]
