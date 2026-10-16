@@ -2,10 +2,10 @@ import * as React from "react";
 import { useEffect, useRef } from "react";
 import {
   ChevronLeft,
+  Dash,
   Download,
   FileEarmarkText,
   ListUl,
-  Map as MapIcon,
   PlusCircle,
   QuestionCircle,
 } from "react-bootstrap-icons";
@@ -112,16 +112,12 @@ export default function Sidebar() {
               <FileEarmarkText size={13} aria-hidden="true" />
               {t("sidebarDatasetDetailsLabel")}
             </span>
-            <button
-              type="button"
-              className="datasetsMapButton"
-              data-testid="sidebar-collapse"
+            <CloseButton
+              label={t("sidebarShowMapTitle")}
               onClick={() => setSidebarOpen(false)}
-              title={t("sidebarShowMapTitle")}
-            >
-              <MapIcon size={14} aria-hidden="true" />
-              <span>{t("sidebarShowMapText")}</span>
-            </button>
+              icon={Dash}
+              testId="sidebar-collapse"
+            />
             <CloseButton
               label={t("closeDatasetText")}
               onClick={() => {

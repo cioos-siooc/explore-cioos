@@ -8,7 +8,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetMetadata, {
   DatasetAbstract,
   KeywordsCell,
-  LicensePill,
+  LicenseCell,
   MetadataExtentCells,
   Citation,
   Organizations,
@@ -354,10 +354,14 @@ describe("Citation", () => {
   });
 });
 
-describe("LicensePill", () => {
+describe("LicenseCell", () => {
   it("names the license briefly, its full wording on hover", () => {
-    renderWithProviders(<LicensePill metadata={METADATA} />);
-    const pill = screen.getByRole("link", { name: "License CC BY 4.0" });
+    renderWithProviders(
+      <dl>
+        <LicenseCell metadata={METADATA} />
+      </dl>,
+    );
+    const pill = screen.getByRole("link", { name: "CC BY 4.0" });
     expect(pill).toHaveAttribute(
       "title",
       "Creative Commons Attribution 4.0 International",

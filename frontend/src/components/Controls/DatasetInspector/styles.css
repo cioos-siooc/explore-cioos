@@ -59,7 +59,11 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px 12px 24px;
+  --inspector-pad-top: 12px;
+  --inspector-pad-x: 12px;
+  --inspector-pad-bottom: 24px;
+  padding: var(--inspector-pad-top) var(--inspector-pad-x)
+    var(--inspector-pad-bottom);
 }
 
 /* --- Dataset title: set like the title of a research record. The two actions
@@ -75,25 +79,15 @@
   background-color: var(--cioos-white);
 }
 
-/* The heading's own row: icon and title, with the full width to wrap into. */
-.datasetTitleHeading {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* Same bare, no-tile icon treatment as the Filters/Download/Datasets headers —
-   centered on the title's own line rather than the block's full (wrapped)
-   height. */
+/* Same bare, no-tile icon treatment as the Filters/Download/Datasets headers,
+   inline with the title's first line so wrapped lines run beneath it. */
 .datasetTitleIcon {
-  flex: 0 0 auto;
-  margin-top: 2px;
+  margin: -3px 6px 0 0;
+  vertical-align: middle;
   color: var(--cioos-primary);
 }
 
 .datasetTitle {
-  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   padding: 2px 0;
@@ -527,23 +521,37 @@
 
 .recordSection .cardListToolbar {
   position: sticky;
-  top: 0;
+
+  /* Sticky offsets stop at the scroller's padding edge, so cancel it. */
+  top: calc(-1 * var(--inspector-pad-top));
   z-index: 2;
-  padding: 0 0 4px;
-  background-color: var(--cioos-sand);
+  margin: 0 calc(-1 * var(--inspector-pad-x));
+  padding: 6px var(--inspector-pad-x);
+  border-bottom: 1px solid transparent;
 }
 
-/* The bottom of the list stays on screen while the cards scroll under it. */
+/* Only once it is pinned does it need a ground of its own to scroll under. */
+.recordSection .cardListToolbar[data-stuck] {
+  border-bottom-color: var(--cioos-hairline);
+  background-color: var(--cioos-white);
+}
+
+.cardListSentinel {
+  height: 1px;
+  margin-bottom: -1px;
+}
+
+/* The bottom of the list stays on screen while the cards scroll under it,
+   flush with the body's edges and its floor. */
 .recordSection .pager {
   position: sticky;
-  bottom: 0;
+  bottom: calc(-1 * var(--inspector-pad-bottom));
   z-index: 2;
-  margin-top: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
+  margin: 8px calc(-1 * var(--inspector-pad-x))
+    calc(-1 * var(--inspector-pad-bottom));
+  padding: 8px var(--inspector-pad-x);
+  border-top: 1px solid var(--cioos-hairline);
   background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-card);
 }
 
 .listCard {
@@ -757,7 +765,11 @@
    longer has to fit. */
 @media (max-width: 700px), (max-height: 500px) {
   .datasetInspectorBody {
-    padding: 0 10px 20px;
+    --inspector-pad-top: 0px;
+    --inspector-pad-x: 10px;
+    --inspector-pad-bottom: 20px;
+    padding: var(--inspector-pad-top) var(--inspector-pad-x)
+      var(--inspector-pad-bottom);
   }
 
   .datasetTitleBlock {

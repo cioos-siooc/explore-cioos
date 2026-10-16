@@ -23,10 +23,10 @@ import DatasetMetadata, {
   Citation,
   DatasetAbstract,
   KeywordsCell,
-  LicensePill,
+  LicenseCell,
   MetadataExtentCells,
   Organizations,
-  SourceLinks,
+  SourceLinksCell,
 } from "../DatasetMetadata/DatasetMetadata.jsx";
 import useDatasetMetadata from "../DatasetMetadata/useDatasetMetadata.js";
 import TaxonomyChart from "../TaxonomyChart/TaxonomyChart.jsx";
@@ -574,14 +574,15 @@ export default function DatasetInspector({
           control, in the one place that marks the panel as being on a dataset
           rather than the list. */}
       <div className="datasetTitleBlock" onDoubleClick={zoomToDataset}>
-        <div className="datasetTitleHeading">
+        <h2 className="datasetTitle">
           <FileEarmarkText
             className="datasetTitleIcon"
             size={20}
             aria-hidden="true"
           />
-          <h2 className="datasetTitle">{dataset.title}</h2>
-        </div>
+          {dataset.title}
+        </h2>
+        <Organizations {...metadata} />
         {/* Every action on this page, named. These are the only things here
             that change anything: the values in the sheet below are read, not
             clicked. */}
@@ -616,10 +617,7 @@ export default function DatasetInspector({
           {/* Frames the map on this dataset; vanishes once it already is. */}
           <ZoomToDataset />
           <Citation {...metadata} />
-          <LicensePill {...metadata} />
         </div>
-        <Organizations {...metadata} />
-        <SourceLinks dataset={dataset} />
         {/* A filter or the list's own narrowing can exclude a dataset whose
             page is already open. The page stays (the user chose it), and says
             so, since its records below now follow filters it no longer meets. */}
@@ -670,8 +668,8 @@ export default function DatasetInspector({
           <DatasetAbstract {...metadata} />
           {/* The facts, tiles first (what it is, how much, where and when), then
             the two lists that run long. Each cell is a small eyebrow label over
-            its value, two to a row in the sidebar. The outbound links are not
-            here: the Resources card below holds every one of them. */}
+            its value, two to a row in the sidebar. The sources link out to the
+            harvested record; the Resources card below holds the rest. */}
           <dl className="datasetMetaSheet">
             <div className="metaCell">
               <dt className="metadataLabel">
@@ -793,6 +791,8 @@ export default function DatasetInspector({
               </dd>
             </div>
             <KeywordsCell {...metadata} />
+            <LicenseCell {...metadata} />
+            <SourceLinksCell dataset={dataset} />
           </dl>
           <DatasetMetadata dataset={dataset} {...metadata} />
         </div>

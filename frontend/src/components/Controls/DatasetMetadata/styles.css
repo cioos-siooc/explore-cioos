@@ -1,36 +1,3 @@
-/* --- License, as a pill among the title block's actions --- */
-.datasetLicensePill {
-  flex: 0 1 auto;
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  padding: 3px 10px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-sand);
-  font-size: var(--cioos-font-size-xs);
-  font-weight: 600;
-  color: var(--cioos-ink);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  text-decoration: none;
-}
-
-a.datasetLicensePill:hover,
-a.datasetLicensePill:focus-visible {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
-  color: var(--cioos-primary-700);
-  outline: none;
-}
-
-a.datasetLicensePill:focus-visible {
-  box-shadow: var(--cioos-focus);
-}
-
 .metadataDatePillLabel {
   margin-right: 5px;
   font-weight: 400;
@@ -340,9 +307,11 @@ a.datasetLicensePill:focus-visible {
   margin-bottom: 2px;
 }
 
-/* Organizations in the pinned title block. */
+/* Organizations in the pinned title block: a step under the title, tucked
+   against it. */
 .datasetCredit {
   align-items: center;
+  margin: -4px 0 0;
   font-size: var(--cioos-font-size-sm);
   overflow-wrap: anywhere;
 }
@@ -355,6 +324,7 @@ a.datasetLicensePill:focus-visible {
   overflow: hidden;
   border-color: var(--cioos-teal-light);
   background-color: var(--cioos-teal-light);
+  font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   color: var(--cioos-ink);
   white-space: nowrap;
@@ -371,6 +341,10 @@ a.datasetLicensePill:focus-visible {
 
 /* The citation's button sits in the action row; its popover spans the row's
    width and floats over the page. */
+.citation {
+  margin-left: auto;
+}
+
 .citationButton {
   display: inline-flex;
   align-items: center;
@@ -436,19 +410,6 @@ a.datasetLicensePill:focus-visible {
 }
 
 /* Links to the source record, under the organizations. */
-.datasetSources {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  font-size: var(--cioos-font-size-xs);
-}
-
-.datasetSourcesLabel {
-  font-weight: 600;
-  color: var(--cioos-ink-80);
-}
-
 .datasetSourceLink {
   display: inline-flex;
   align-items: center;

@@ -79,28 +79,29 @@ function ExternalLink({ href, className, title, children }) {
   );
 }
 
-// The license as a pill in the page's title block: "License CC BY 4.0", its
-// full wording on hover.
-export function LicensePill({ metadata }) {
+// The license as a cell of the facts sheet: its short name, the full wording
+// on hover.
+export function LicenseCell({ metadata }) {
   const { t } = useTranslation();
   const license = metadata?.license;
   if (!license) return null;
-  const text = t("metadataLicensePillText", {
-    license: licenseLabel(license) ?? t("metadataLicenseCustomText"),
-  });
+  const text = licenseLabel(license) ?? t("metadataLicenseCustomText");
   const title = licenseText(license.title) || license.url;
-  return license.url ? (
-    <ExternalLink
-      href={license.url}
-      className="datasetLicensePill"
-      title={title}
-    >
-      {text}
-    </ExternalLink>
-  ) : (
-    <span className="datasetLicensePill" title={title}>
-      {text}
-    </span>
+  return (
+    <div className="metaCell">
+      <dt className="metadataLabel">{t("metadataLicenseText")}</dt>
+      <dd className="metadataValue">
+        {license.url ? (
+          <ExternalLink href={license.url} title={title}>
+            {text}
+          </ExternalLink>
+        ) : (
+          <span className="metadataFact" title={title}>
+            {text}
+          </span>
+        )}
+      </dd>
+    </div>
   );
 }
 
@@ -296,7 +297,12 @@ function CitationPopover({ citation, doi }) {
   }, [pinned]);
 
   return (
-    <span ref={ref} onMouseEnter={hoverStart} onMouseLeave={hoverEnd}>
+    <span
+      ref={ref}
+      className="citation"
+      onMouseEnter={hoverStart}
+      onMouseLeave={hoverEnd}
+    >
       <button
         type="button"
         className="citationButton"
@@ -415,8 +421,9 @@ export function Organizations({ metadata }) {
 }
 
 // The record this dataset was harvested from, and its catalogue entry: one
-// link each to ERDDAP, OBIS and CKAN, whichever the dataset has.
-export function SourceLinks({ dataset }) {
+// link each to ERDDAP, OBIS and CKAN, whichever the dataset has, as a cell of
+// the facts sheet.
+export function SourceLinksCell({ dataset }) {
   const { t } = useTranslation();
   const links = [
     dataset.source_type === "obis"
@@ -426,19 +433,21 @@ export function SourceLinks({ dataset }) {
   ].filter(([, url]) => url);
   if (!links.length) return null;
   return (
-    <div className="datasetSources">
-      <span className="datasetSourcesLabel">{t("metadataSourceText")}</span>
-      {links.map(([name, url]) => (
-        <ExternalLink
-          key={name}
-          href={url}
-          className="datasetSourceLink"
-          title={t("metadataSourceLinkTitle", { source: name })}
-        >
-          {name}
-          <BoxArrowUpRight size={10} aria-hidden="true" />
-        </ExternalLink>
-      ))}
+    <div className="metaCell">
+      <dt className="metadataLabel">{t("metadataSourcesText")}</dt>
+      <dd className="metadataValue">
+        {links.map(([name, url]) => (
+          <ExternalLink
+            key={name}
+            href={url}
+            className="datasetSourceLink"
+            title={t("metadataSourceLinkTitle", { source: name })}
+          >
+            {name}
+            <BoxArrowUpRight size={10} aria-hidden="true" />
+          </ExternalLink>
+        ))}
+      </dd>
     </div>
   );
 }
