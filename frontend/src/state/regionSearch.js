@@ -57,27 +57,76 @@ export function regionSearchUrl(term, lang, limit = 20) {
   return `${GEONAMES_API}/${lang}/geonames.geojson?${params}`;
 }
 
-// One hit per area: GeoNames lists a feature once per province that shares
-// it (the Gulf of St. Lawrence five times) under the same featureid. Every
-// hit can be gone to; only an `area` (one with an outline) can become a filter,
+// Canada Post symbols, the same in both languages, by GeoNames province code.
+// 72 (undersea) and 73 (international waters) name no province.
+const PROVINCE_SYMBOLS = {
+  10: "NL",
+  11: "PE",
+  12: "NS",
+  13: "NB",
+  24: "QC",
+  35: "ON",
+  46: "MB",
+  47: "SK",
+  48: "AB",
+  59: "BC",
+  60: "YT",
+  61: "NT",
+  62: "NU",
+};
+
+// One hit per feature: GeoNames lists a feature once per province that shares
+// it and once per official name (the Gulf of St. Lawrence five times), each
+// with the whole shape, under the same featureid. Their provinces, locations
+// and other names are gathered so same-named places can be told apart; the
+// names carry no language, so a bilingual one's `otherNames` are shown beside
+// it rather than one guessed for the UI language. Every hit
+// can be gone to; only an `area` (one with an outline) can become a filter,
 // since places such as towns and undersea features are points.
 export function parseRegions(geojson) {
-  const seen = new Set();
-  return (geojson?.features ?? [])
-    .filter(({ properties, geometry }) => {
-      const id = properties?.featureid;
-      if (!id || !geometry || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    })
-    .map(({ properties, geometry }) => ({
-      id: properties.featureid,
-      name: properties.name,
-      cgndbid: properties.cgndbid,
-      type: properties.concise,
-      geometry,
-      area: ["Polygon", "MultiPolygon"].includes(geometry.type),
-    }));
+  const byId = new Map();
+  for (const { properties, geometry } of geojson?.features ?? []) {
+    const id = properties?.featureid;
+    if (!id || !geometry) continue;
+    if (!byId.has(id)) {
+      byId.set(id, {
+        id,
+        name: properties.name,
+        cgndbid: properties.cgndbid,
+        type: properties.concise,
+        geometry,
+        area: ["Polygon", "MultiPolygon"].includes(geometry.type),
+        names: new Set(),
+        provinces: new Set(),
+        locations: new Set(),
+      });
+    }
+    const region = byId.get(id);
+    region.names.add(properties.name);
+    const province = PROVINCE_SYMBOLS[properties.province];
+    if (province) region.provinces.add(province);
+    if (properties.location) region.locations.add(properties.location);
+  }
+  return [...byId.values()].map(
+    ({ names, provinces, locations, ...region }) => ({
+      ...region,
+      otherNames: [...names].filter((n) => n !== region.name),
+      provinces: [...provinces],
+      locations: [...locations],
+    }),
+  );
+}
+
+// "Island · Kings, NB", or "Bay · NB, NS" for a place across provinces, whose
+// locations belong to one province each.
+export function regionDescription({ type, provinces, locations }, t) {
+  const where =
+    locations.length === 1 && provinces.length <= 1
+      ? [locations[0], ...provinces].join(", ")
+      : provinces.join(", ");
+  return [t(`regionType${type}`, { defaultValue: "" }), where]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 // The outer boundary of the region's largest part. The other parts of a

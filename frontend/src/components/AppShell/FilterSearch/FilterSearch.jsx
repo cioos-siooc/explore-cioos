@@ -23,6 +23,7 @@ import {
   parsePartialRangeQuery,
 } from "../../../state/filterSearch.js";
 import { iconForKey } from "../../../state/useActiveFilters.js";
+import { regionDescription } from "../../../state/regionSearch.js";
 import {
   useGoToRegion,
   useRegionMatches,
@@ -101,7 +102,8 @@ function useRegionGroup(regions) {
     options: regions.map((region) => ({
       id: region.id,
       label: region.name,
-      description: t(`regionType${region.type}`, { defaultValue: "" }),
+      hint: region.otherNames.join(" · ") || undefined,
+      description: regionDescription(region, t),
       command: true,
       includeOnly: true,
       closes: true,

@@ -8,6 +8,7 @@ import {
   parseRegions,
   prefixQuery,
   regionBox,
+  regionDescription,
   regionOutline,
   regionRecordUrl,
   regionSearchUrl,
@@ -87,6 +88,49 @@ describe("parseRegions", () => {
   it("reads an empty or missing reply as no regions", () => {
     expect(parseRegions({ features: [] })).toEqual([]);
     expect(parseRegions(undefined)).toEqual([]);
+  });
+});
+
+describe("place details", () => {
+  const row = (province, location, name = "Bay of Fundy") => ({
+    type: "Feature",
+    properties: {
+      featureid: "fundy",
+      name,
+      concise: "BAY",
+      province,
+      location,
+    },
+    geometry: { type: "MultiPolygon", coordinates: [] },
+  });
+  const t = (key) => ({ regionTypeBAY: "Bay" })[key] ?? "";
+
+  it("gathers the provinces of every row of a feature, as postal symbols", () => {
+    const [fundy] = parseRegions({
+      features: [
+        row("13", null, "Baie de Fundy"),
+        row("12", "Annapolis"),
+        row("12", "Annapolis", "Baie de Fundy"),
+      ],
+    });
+    expect(fundy).toMatchObject({
+      name: "Baie de Fundy",
+      otherNames: ["Bay of Fundy"],
+      provinces: ["NB", "NS"],
+      locations: ["Annapolis"],
+    });
+  });
+
+  it.each([
+    [["NB"], ["Kings"], "Bay · Kings, NB"],
+    [["NB", "NS"], ["Albert", "Annapolis"], "Bay · NB, NS"],
+    [["NB", "NS"], ["Annapolis"], "Bay · NB, NS"],
+    [[], ["Thunder Bay"], "Bay · Thunder Bay"],
+    [[], [], "Bay"],
+  ])("describes %j %j as %j", (provinces, locations, text) => {
+    expect(regionDescription({ type: "BAY", provinces, locations }, t)).toBe(
+      text,
+    );
   });
 });
 

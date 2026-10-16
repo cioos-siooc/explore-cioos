@@ -16,7 +16,10 @@ import {
   polygonToWkt,
 } from "../../../../utilities.jsx";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
-import { regionRecordUrl } from "../../../../state/regionSearch.js";
+import {
+  regionRecordUrl,
+  regionDescription,
+} from "../../../../state/regionSearch.js";
 import { useSelection } from "../../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../../state/ui/UIProvider.jsx";
 import {
@@ -62,9 +65,17 @@ function PlaceSearch() {
         {places.map((place) => (
           <li key={place.id} className="spatialFilterPlace">
             <span className="spatialFilterPlaceText">
-              <span className="spatialFilterPlaceName">{place.name}</span>
+              <span className="spatialFilterPlaceName">
+                {place.name}
+                {place.otherNames.length > 0 && (
+                  <span className="spatialFilterPlaceOtherNames">
+                    {" · "}
+                    {place.otherNames.join(" · ")}
+                  </span>
+                )}
+              </span>
               <span className="spatialFilterPlaceType">
-                {t(`regionType${place.type}`, { defaultValue: "" })}
+                {regionDescription(place, t)}
               </span>
             </span>
             {place.area &&

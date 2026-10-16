@@ -51,7 +51,14 @@
   color: var(--cioos-ink);
 }
 
+.spatialFilterPlaceOtherNames {
+  color: var(--cioos-ink-80);
+}
+
 .spatialFilterPlaceType {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-80);
 }
