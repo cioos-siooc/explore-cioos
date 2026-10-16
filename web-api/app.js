@@ -1,9 +1,6 @@
-// Must be required before any router module: it patches the `handle` SETTER on
-// express's Layer.prototype, so only routes registered after this line get
-// their async rejections forwarded to the error handler. Routes registered
-// earlier assign `handle` as an own property and bypass the patch entirely —
-// a rejected promise there is an unhandled rejection, which Node turns into a
-// process exit, taking every other in-flight request down with it.
+// Must be required before any router: it patches Layer.prototype's `handle`
+// setter, so routes registered earlier bypass it and a rejection there exits
+// the process.
 require("express-async-errors");
 
 const createError = require("http-errors");
@@ -42,20 +39,16 @@ const app = express();
 
 // Sentry.init() runs in instrument.js, loaded first by bin/www.
 
-// if environement variables are set via docker, leave them
-// otherwise load from .env
+// docker sets the environment; otherwise load .env
 if (!process.env.DB_USER) require("dotenv").config({ quiet: true });
 
-// CORS configuration via environment variable:
-//  - CORS_ORIGINS="*" (default) allows all origins
-//  - CORS_ORIGINS="https://a.com,https://b.com" restricts to listed origins
-//  - CORS_ORIGINS="disabled" (case-insensitive) disables CORS middleware entirely
-//  - Non-browser / same-origin server-to-server requests (no Origin header) are always allowed when CORS enabled
+// CORS_ORIGINS: "*" (default), a comma list, or "disabled". Requests with no
+// Origin header are always allowed.
 (() => {
   const raw = process.env.CORS_ORIGINS || "*";
   if (raw.toLowerCase() === "disabled") {
     console.log("CORS middleware disabled via CORS_ORIGINS=disabled");
-    return; // do not install cors()
+    return;
   }
 
   if (raw === "*") {
@@ -70,7 +63,7 @@ if (!process.env.DB_USER) require("dotenv").config({ quiet: true });
     .filter(Boolean);
   const corsOptions = {
     origin(origin, callback) {
-      if (!origin) return callback(null, true); // e.g. curl / server-side
+      if (!origin) return callback(null, true);
       if (allowed.includes(origin)) return callback(null, true);
       console.warn("CORS blocked origin", origin);
       return callback(new Error("Not allowed by CORS"));
@@ -81,10 +74,6 @@ if (!process.env.DB_USER) require("dotenv").config({ quiet: true });
   app.use(cors(corsOptions));
 })();
 
-// No view engine and no static dir. views/*.jade, public/, cookie-parser and
-// the jade engine were express-generator scaffolding in a service that only
-// ever answers JSON and vector tiles — and `jade` was never installed, so
-// every res.render() threw. Nothing here sets or reads a cookie either.
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -115,7 +104,6 @@ app.use("/trajectories", trajectoriesRouter);
 app.use("/nonna", nonnaRouter);
 app.use("/coverageHistogram", coverageHistogramRouter);
 
-// Swagger docs - conditionally enabled via ENABLE_API_DOCS environment variable
 if (process.env.ENABLE_API_DOCS !== "false") {
   app.use(
     "/docs",
@@ -125,7 +113,6 @@ if (process.env.ENABLE_API_DOCS !== "false") {
   app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
   console.log("API documentation enabled at /docs and /openapi.json");
 } else {
-  // Redirect to BASE_URL when API docs are disabled
   const redirectUrl = process.env.BASE_URL || "/";
   app.use("/docs", (_req, res) => res.redirect(redirectUrl));
   app.get("/openapi.json", (_req, res) => res.redirect(redirectUrl));
@@ -134,41 +121,25 @@ if (process.env.ENABLE_API_DOCS !== "false") {
   );
 }
 
-// catch 404 and forward to error handler
 app.use((req, res, next) => {
   next(createError(404));
 });
 
-// After the routes and the 404, before the JSON handler below — it only
-// sees errors from middleware registered above it, and it reports 500s.
+// After the routes and the 404, before the JSON handler: it only sees errors
+// from middleware registered above it.
 Sentry.setupExpressErrorHandler(app);
 
-// The one place a route error becomes a response. Routes throw (or let a
-// rejection escape — express-async-errors, required at the top of this file,
-// forwards it here) and this decides the status: `statusCode` is what
-// utils/dbFilter.js marks its client errors with, `status` is http-errors'
-// spelling, and anything unlabelled is a 500. Routes used to each re-shape the
-// same database error, in four different ways — 500, rethrow, next(err), and
-// /download answering 404 — with the `ScientificNameSelectionTooBroadError` ->
-// 400 block copy-pasted ten times.
-//
-// JSON, and the stack only outside production — express's default handler was
-// answering every error with an HTML page containing the full stack trace,
-// because the res.render() above it threw first.
+// `statusCode` is what utils/dbFilter.js marks its client errors with,
+// `status` is http-errors' spelling; anything unlabelled is a 500.
 app.use((err, req, res, next) => {
   const status = err.statusCode || err.status || 500;
   if (status >= 500) console.error(err);
 
-  // Something already started writing — the response is no longer ours to
-  // shape, so let express finalize/destroy it rather than append a JSON body
-  // to a half-sent one.
   if (res.headersSent) return next(err);
 
   res.status(status).json({
     error: err.message || "Internal Server Error",
-    // detail/hint are where Postgres puts the useful part of a query error
-    // (missing column, bad syntax); they ride along with the stack, outside
-    // production only.
+    // detail/hint are where Postgres puts the useful part of a query error.
     ...(req.app.get("env") === "development"
       ? { detail: err.detail, hint: err.hint, stack: err.stack }
       : {}),

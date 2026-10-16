@@ -5,43 +5,24 @@ const { polygonJSONToWKT } = require("./polygon");
 const { METRICS } = require("./hexMetric");
 const { ALL_PROFILE_TYPES, ALL_TRAJECTORY_TYPES } = require("./dataTypes");
 
-/*
- * The request contract, and the order the stages run in.
- *
- * Every route that takes the map's filter set used to assemble its own
- * validate -> filter -> query -> cache chain, and the stage ORDER differed:
- * /legend and /timeExtent registered the cache before the validator, /tiles
- * and /datasetRecordsList after. `pipeline()` below is the one assembly point,
- * so a route names what it needs and cannot get the order wrong.
- */
-
-// Free-text values that /platforms, /obisNodes and /erddapServers hand back
-// verbatim (platform names, OBIS node titles, ERDDAP URLs) — there is no
-// character class that holds them, and none is needed: every one is bound as a
-// query parameter, never interpolated. What is worth bounding is size, since
-// each is split into an array fed to `= ANY(...)`.
+// Free text (platform names, node titles, URLs) is always bound, never
+// interpolated, so only size is bounded.
 const MAX_LIST_LENGTH = 4000;
 
-// A comma list drawn from a fixed vocabulary. Empty means "none of them",
-// which is a real selection (every geometry of that group switched off) and
-// not the same as the param being absent — see utils/dataTypes.js.
+// Empty means "none of them" (a real selection), not absent — see
+// utils/dataTypes.js.
 const isTypeList = (all) => (value) =>
   value === "" ||
   String(value)
     .split(",")
     .every((t) => all.includes(t));
 
-/**
- * The map's filter set. Every route that narrows the catalogue takes all of
- * it, so it is validated in one place instead of per route.
- */
 function filterValidators() {
   return [
     check(["timeMin", "timeMax"]).isISO8601().optional(),
     check(["depthMin", "depthMax"])
       .isInt({ min: -999999, max: 999999 })
       .optional(),
-    // comma separated list of pks, eg pointPKs=12342,34534,456456
     check([
       "organizations",
       "excludeOrganizations",
@@ -58,8 +39,7 @@ function filterValidators() {
       .isIn(["any", "all"])
       .optional(),
     check(["scientificNames", "excludeScientificNames"])
-      // letters, digits, space, period, comma, apostrophe, parens, hyphen
-      // (accommodates subgenus notation like "Halichondria (Halichondria) phakellioides")
+      // allows subgenus notation like "Halichondria (Halichondria) phakellioides"
       .matches(/^[A-Za-z0-9 .,'()-]*$/)
       .isLength({ max: 4000 })
       .optional(),
@@ -73,16 +53,12 @@ function filterValidators() {
     ])
       .isLength({ max: MAX_LIST_LENGTH })
       .optional(),
-    // Source and layer switches. Only "false" is ever meaningful (the routes
-    // read `!== "false"`), but accepting exactly the two spellings keeps a
-    // typo'd flag from silently reading as "on".
+    // Only "false" is meaningful, but rejecting other spellings keeps a typo
+    // from silently reading as "on".
     check(["includeObis", "includeTrajectory", "realtimeOnly"])
       .isIn(["true", "false"])
       .optional(),
-    // Which number the hex ramp counts. utils/hexMetric.js defaults an absent
-    // param; a present-but-unknown one is a client bug worth reporting,
-    // because /tiles and /legend would both silently fall back and the caller
-    // would never learn its choice was ignored.
+    // /tiles and /legend would silently fall back on an unknown metric.
     check("metric").isIn(METRICS).optional(),
     check("profileTypes").custom(isTypeList(ALL_PROFILE_TYPES)).optional(),
     check("trajectoryTypes")
@@ -91,11 +67,7 @@ function filterValidators() {
   ];
 }
 
-/**
- * The drawn selection: either a polygon, or a complete lat/lon rectangle, or
- * neither. A half-specified rectangle is rejected rather than silently
- * defaulting its missing sides to the world extent.
- */
+// A half-specified rectangle is rejected rather than defaulted.
 function shapeValidators() {
   return [
     check("polygon")
@@ -104,14 +76,12 @@ function shapeValidators() {
       .optional(),
 
     check(["latMin", "latMax"]).isFloat({ min: -90, max: 90 }).optional(),
-    // 360 to accomodate mapbox world copies
+    // 360 to accommodate map world copies
     check(["lonMin", "lonMax"]).isFloat({ min: -360, max: 360 }).optional(),
     async function checkValidShape(req, res, next) {
       const { latMin, latMax, lonMin, lonMax, polygon } = req.query;
-      // this has already
       const isValidPolygon = Boolean(polygon && polygonJSONToWKT(polygon));
 
-      // these have already been checked for type and value range
       const isBoundingBox =
         latMin !== undefined ||
         latMax !== undefined ||
@@ -137,11 +107,8 @@ function shapeValidators() {
   ];
 }
 
-// Slippy-map tile coordinates. Unvalidated, a non-numeric `z` reached
-// ST_TileEnvelope / ST_Expand as NaN and came back a 500; an in-range-looking
-// but out-of-grid x/y is a request no upstream should be made to serve.
-// ST_TileEnvelope rejects zooms above 31; 22 is past the deepest tile any of
-// these layers publishes.
+// ST_TileEnvelope rejects zooms above 31; 22 is past the deepest tile any
+// layer publishes.
 const MAX_TILE_ZOOM = 22;
 
 function tileParamValidators({ maxZoom = MAX_TILE_ZOOM } = {}) {
@@ -184,76 +151,24 @@ async function errorHandler(req, res, next) {
   await next();
 }
 
-// Everything this default covers — tiles, legend, timeExtent, pointQuery,
-// datasetRecordsList, griddapCoverage, downloadEstimate, scientificNames,
-// trajectories, and the six catalog routes the app fetches on boot (datasets,
-// organizations, platforms, oceanVariables, obisNodes, erddapServers, which
-// used to pin their own 5 minutes) — is derived from the harvest, so it only
-// changes when a harvest load changes it, and the pipeline flushes redis then
-// (harvester/cde_harvester/prefect_pipeline.py). The TTL is a safety net, not
-// the invalidation mechanism: at the previous 5 minutes, a tile key (z/x/y ×
-// filter combination) almost never saw a second hit before expiring, so redis
-// was cold for practically every visitor and the harvest-time cache warm-up
-// had evaporated long before anyone arrived.
-//
-// This does NOT set how long a browser may hold the response: apicache derives
-// its cache-control max-age from this same duration, so nginx overrides the
-// browser's half at the edge (see $api_browser_cache in nginx/nginx.conf) —
-// a server-side flush cannot reach a browser cache, so the two need different
-// lifetimes.
+// Everything cached is derived from the harvest, which flushes redis
+// (harvester/cde_harvester/prefect_pipeline.py); the TTL is only a safety net.
+// apicache derives the browser max-age from this too, so nginx overrides it
+// ($api_browser_cache in nginx/nginx.conf).
 const DEFAULT_CACHE_DURATION = "24 hours";
 
-/*
- * apicache stores a response only if it has a body: its res.end patch guards
- * the write on `res._apicache.content`. Express answers a conditional request
- * by stripping the body and sending 304, so a revalidation that MISSES the
- * cache runs the full query, returns an empty 304, and stores NOTHING. The
- * entry is never written, so the next revalidation misses too — for a browser
- * that already holds an ETag the cache can never warm up, and every repeat
- * visit pays the uncached query again.
- *
- * Measured on prod (explore-v2, one z3 hex tile, redis empty): a conditional
- * GET returned 304 in 3.2 s and left redis empty; repeating it cost 3.0 s
- * again. The same tile requested WITHOUT the validator cost 3.1 s once and
- * then 15 ms from redis. The default map view is 18 such tiles.
- *
- * This stage only ever runs on a cache MISS — on a hit apicache answers from
- * its store and never calls next() — so dropping the validators here says
- * exactly "a miss must produce a response the cache can keep".
- *
- * No 304 worth having is lost. apicache compares the cached ETag against
- * If-None-Match itself (sendCachedResponse) and answers a hit with a bodiless
- * 304 without ever reaching the handler, which is the cheap revalidation
- * browsers actually want. Stripping the validators here only costs one full
- * body per key per cache lifetime — the response that fills the entry.
- */
+// apicache only stores a response with a body, and Express answers a
+// conditional request with a bodiless 304, so a revalidating miss would never
+// fill the cache (measured 3.2 s every time vs 15 ms once filled). This runs
+// only on a miss; hits still get apicache's own cheap ETag 304.
 function fullResponseForCacheMiss(req, res, next) {
   delete req.headers["if-none-match"];
   delete req.headers["if-modified-since"];
   next();
 }
 
-/**
- * The middleware chain every route registers, in one order:
- * validate -> reject -> cache -> fullResponseForCacheMiss -> handler.
- *
- * The cache comes after validation because apicache stores whatever status the
- * chain produces: with it registered first, a 400 was written to the request's
- * cache key and served from there. Validating first also means a cached entry
- * was valid at the moment it was stored. Only the miss path continues past the
- * cache, which is what lets the stage after it assume a miss.
- *
- * Returns a fresh array on every call. The old `requiredShapeMiddleware`
- * returned a module-level `express.Router()` it had `use`d the stack onto, so
- * a second route mounting it appended a second copy of every validator.
- *
- * @param {object}   [opts]
- * @param {boolean}  [opts.filters]     apply the shared map-filter validators
- * @param {boolean}  [opts.shape]       also require a coherent polygon/rectangle
- * @param {object}   [opts.tileParams]  validate :z/:x/:y ({maxZoom} to narrow)
- * @param {Array}    [opts.checks]      route-specific validators
- * @param {?string}  [opts.cacheFor]    apicache duration, or null for no cache
- */
+// Cache after validation: apicache stores whatever status the chain produces,
+// so a 400 would otherwise be cached.
 function pipeline({
   filters = true,
   shape = false,
@@ -268,8 +183,7 @@ function pipeline({
     ...(shape ? shapeValidators() : []),
     ...checks,
     errorHandler,
-    // `cacheToggle` decides per response whether it may be stored/served.
-    // Defaulting to 200 keeps a transient handler error from becoming a cache hit.
+    // Defaulting to 200-only keeps a transient error from becoming a hit.
     ...(cacheFor === null
       ? []
       : [cache.route(cacheFor, cacheToggle), fullResponseForCacheMiss]),

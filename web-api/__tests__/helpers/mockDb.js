@@ -1,25 +1,7 @@
-/**
- * Factory helpers for mocking the Knex database client.
- *
- * Two shapes are needed:
- *   - db.raw(sql, params)  → resolves to { rows: [...] }
- *   - db("table")          → thenable chainable query builder
- *
- * Knex Raw objects also expose:
- *   - .sql         (the SQL string)
- *   - .toSQL()     (returns { sql, bindings })
- * Both are used by dbFilter.js and legend.js.
- */
-
-/**
- * Build a mock for db.raw(sql, params).
- * Returns an object that is both awaitable and carries the Knex Raw metadata
- * that the application code inspects (.sql, .toSQL).
- */
 function buildRawMock(rows = [], sql = "SELECT 1") {
   return {
-    rows, // direct rows property (used by shapeQuery: rows.rows)
-    sql, // .sql property checked by shapeQuery.js
+    rows,
+    sql,
     toSQL: jest.fn(() => ({ sql, bindings: [] })),
     then: (onFulfilled, onRejected) =>
       Promise.resolve({ rows }).then(onFulfilled, onRejected),
@@ -28,11 +10,6 @@ function buildRawMock(rows = [], sql = "SELECT 1") {
   };
 }
 
-/**
- * Build a mock for db("table") — a chainable, thenable query builder.
- * Every chaining method returns `this` so multi-call chains work.
- * When awaited, resolves to `rows`.
- */
 function buildQueryBuilderMock(rows = []) {
   const qb = {
     select: jest.fn().mockReturnThis(),
@@ -48,15 +25,7 @@ function buildQueryBuilderMock(rows = []) {
   return qb;
 }
 
-/**
- * Create a complete db mock.
- *
- * Usage in test files:
- *   jest.mock('../../db');
- *   const db = require('../../db');
- *   const { setRawRows, setTableRows } = setupDbMock(db);
- *   setRawRows([{ platform: 'buoy' }]);
- */
+// Usage: jest.mock('../../db'); const { setRawRows } = setupDbMock(require('../../db'));
 function setupDbMock(mockDb) {
   let rawRows = [];
   let tableRows = [];

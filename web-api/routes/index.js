@@ -57,11 +57,6 @@ const DOWNLOAD_QUEUE_STUCK_AFTER_S = 5 * 60;
  *         description: Always throws.
  */
 
-// JSON, not res.render. These rendered .jade templates from views/, but `jade`
-// has never been in package.json — so this route, and every 404 and 500 that
-// went through the error handler below, threw "Cannot find module 'jade'" and
-// fell through to express's default handler, which answered 500 with the
-// stack trace in the response body.
 router.get("/", (req, res) => {
   res.json({ name: "CDE API", status: "ok" });
 });

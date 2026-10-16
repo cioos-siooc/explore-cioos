@@ -4,14 +4,8 @@ const router = express.Router();
 const db = require("../db");
 const { pipeline } = require("../utils/routePipeline");
 
-/**
- * /erddapServers
- *
- * Gets a list of ERDDAP server URLs. OBIS datasets carry the sentinel
- * https://obis.org as their erddap_url; they're excluded here because the
- * frontend's Data Source filter represents OBIS via /obisNodes instead.
- *
- * */
+// OBIS datasets carry the sentinel https://obis.org erddap_url; excluded
+// because the Data Source filter represents OBIS via /obisNodes.
 
 router.get("/", ...pipeline({ filters: false }), async (req, res) => {
   res.send(

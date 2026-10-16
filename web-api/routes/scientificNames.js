@@ -136,17 +136,12 @@ router.get(
       return res.json(lookupRows);
     }
 
-    // When the user query matches a vernacular, surface the matched vernacular
-    // as the subtitle so the result reads coherently (e.g. typing "killer"
-    // returns "Orcinus orca" with subtitle "killer whale" instead of the
-    // alphabetically-first WoRMS entry "grampus"). When no query is given, or
-    // only the scientific name matched, fall back to the first vernacular.
+    // The subtitle is the matched vernacular when there is one ("killer" shows
+    // Orcinus orca as "killer whale", not the first WoRMS entry "grampus").
     //
-    // Common-name hits come first, as a tree: each sits under its highest
-    // common-name-matched ancestor ("crab" lists Brachyura "crabs", then
-    // Cancridae, Cancer, Cancer borealis…). Higher ranks lead, both between
-    // groups and among siblings — each path step is keyed by its rank, then
-    // its name. Scientific-name-only hits follow.
+    // Common-name hits come first, as a tree under their highest
+    // common-name-matched ancestor, higher ranks leading; scientific-name-only
+    // hits follow.
     //
     // tooBroad is counted on the returned page only, and stops at the cap.
     const sql = `

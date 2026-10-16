@@ -1,11 +1,3 @@
-/**
- * GET /datasetRecordsList
- *
- * Requires query param `datasetPKs` (integer).
- * Returns a single dataset object with profile list.
- * Uses datasetDetailsMiddleware() which validates datasetPKs is an integer.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),
