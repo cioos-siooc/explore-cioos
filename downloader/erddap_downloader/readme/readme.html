@@ -13,6 +13,8 @@
     --cioos-teal-light: #C6E3DF;
     --cioos-sand: #F3F0EC;
     --cioos-white: #FFFFFF;
+    --muted: rgba(21, 47, 55, 0.68);
+    --rule: rgba(21, 47, 55, 0.12);
     --heading: "Sora", "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --body: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
@@ -23,81 +25,247 @@
     color: var(--cioos-navy);
     font: 400 16px/1.7 var(--body);
   }
-  header {
-    background: var(--cioos-white);
-    border-bottom: 4px solid var(--cioos-primary);
+  .bar { max-width: 1240px; margin: 0 auto; padding: 16px 24px; }
+  .logo { display: block; width: calc(100% - 24px); max-width: 196px; margin: 4px 12px 24px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 960px);
+    gap: 32px;
+    justify-content: center;
+    align-items: start;
+    max-width: 1240px;
+    margin: 32px auto 48px;
+    padding: 0 24px;
   }
-  .bar { max-width: 1040px; margin: 0 auto; padding: 16px 24px; }
-  header img { height: 48px; display: block; }
   main {
-    max-width: 1040px;
-    margin: 32px auto;
-    padding: 32px 48px 48px;
+    padding: 40px 48px 48px;
     background: var(--cioos-white);
-    border: 1px solid var(--cioos-teal-light);
+    border: 1px solid var(--rule);
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(21, 47, 55, 0.08);
     overflow-wrap: anywhere;
   }
-  h1, h2, h3 { font-family: var(--heading); line-height: 1.3; }
-  h1 { font-size: 2rem; font-weight: 700; margin: 0 0 8px; }
-  h2 {
-    font-size: 1.375rem;
-    font-weight: 600;
-    margin: 40px 0 16px;
-    padding-left: 16px;
-    border-left: 4px solid var(--cioos-primary);
-  }
-  h1 + p { margin-top: 0; opacity: 0.8; }
-  p > strong:only-child {
-    display: inline-block;
-    padding: 8px 16px;
-    background: var(--cioos-teal-light);
-    border-radius: 4px;
-  }
-  a { color: var(--cioos-primary-700); text-underline-offset: 2px; }
-  a:hover { color: var(--cioos-navy); }
-  ul { padding-left: 24px; }
-  li { margin: 4px 0; }
-  code {
-    font: 0.875em "Courier New", ui-monospace, monospace;
-    background: var(--cioos-sand);
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 16px 0;
-    font-size: 0.9375rem;
-    display: block;
-    overflow-x: auto;
-  }
-  th, td { text-align: left; padding: 8px 16px; border-bottom: 1px solid var(--cioos-teal-light); }
-  th { font-family: var(--heading); font-weight: 600; background: var(--cioos-sand); }
-  tbody tr:hover { background: rgba(198, 227, 223, 0.35); }
-  footer {
-    background: var(--cioos-navy);
-    color: rgba(255, 255, 255, 0.8);
+  .toc-nav {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding: 16px 12px;
+    background: var(--cioos-white);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
     font-size: 0.875rem;
   }
+  .toc-nav ul { margin: 0; padding: 0; list-style: none; }
+  .toc-nav li { margin: 0; }
+  .toc-nav a {
+    display: block;
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: var(--cioos-navy);
+    text-decoration: none;
+  }
+  .toc-nav a:hover { background: rgba(198, 227, 223, 0.5); }
+  .toc-nav a[aria-current="true"] { background: var(--cioos-teal-light); font-weight: 600; }
+  h1, h2, h3 { font-family: var(--heading); font-weight: 600; line-height: 1.3; }
+  h1 { font-size: 1.875rem; font-weight: 700; margin: 0 0 4px; }
+  h1 + p { margin: 0 0 16px; color: var(--muted); font-size: 0.875rem; }
+  /* The summary line and the link back to the explorer: the only paragraphs
+     made of a single bold run or a single link. */
+  main > p > a:only-child {
+    display: inline-block;
+    padding: 4px 14px;
+    border: 1px solid var(--cioos-primary-700);
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-decoration: none;
+  }
+  main > p > a:only-child:hover { background: var(--cioos-teal-light); color: var(--cioos-primary-700); }
+  main > p > strong:only-child {
+    display: inline-block;
+    padding: 4px 14px;
+    background: var(--cioos-teal-light);
+    border-radius: 999px;
+    font-size: 0.9375rem;
+  }
+  h2 { font-size: 1.375rem; margin: 56px 0 16px; }
+  h2::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 3px;
+    margin-bottom: 12px;
+    background: var(--cioos-primary);
+    border-radius: 2px;
+  }
+  h3 { font-size: 1.0625rem; margin: 32px 0 8px; }
+  a { color: var(--cioos-primary-700); text-underline-offset: 2px; }
+  a:hover { color: var(--cioos-navy); }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+  code {
+    font: 0.875em ui-monospace, "Courier New", monospace;
+    background: var(--cioos-sand);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .toc-label {
+    margin: 0 0 8px;
+    padding: 0 12px;
+    font: 600 0.75rem var(--heading);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  blockquote {
+    margin: 8px 0;
+    padding: 16px 24px 12px;
+    background: var(--cioos-white);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  blockquote p { margin: 0; }
+  blockquote + ul { margin-top: 8px; font-size: 0.875rem; color: var(--muted); }
+  .copy {
+    display: block;
+    margin: 8px 0 0 auto;
+    padding: 6px;
+    line-height: 0;
+    color: var(--cioos-primary-700);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .copy:hover { background: var(--cioos-teal-light); }
+  .copy:focus-visible { outline: 2px solid var(--cioos-navy); outline-offset: 2px; }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .table {
+    margin: 16px 0;
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 16px; border-bottom: 1px solid var(--rule); }
+  tbody tr:last-child td { border-bottom: 0; }
+  th { font: 600 0.8125rem var(--heading); background: var(--cioos-sand); white-space: nowrap; }
+  /* Datasets table: status and row count never break; room for 7 digits. */
+  h2#datasets + .table td:nth-child(2) {
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+  }
+  h2#datasets + .table :is(th, td):nth-child(3) {
+    white-space: nowrap;
+    min-width: 9ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  footer { background: var(--cioos-navy); color: rgba(255, 255, 255, 0.8); font-size: 0.875rem; text-align: center; }
   footer a { color: var(--cioos-teal-light); }
+  @media (max-width: 1023px) {
+    .layout { display: block; }
+    .toc-nav { position: static; max-height: none; margin-bottom: 16px; }
+    .toc-nav ul { columns: 2; }
+    .logo { max-width: 160px; margin: 0 12px 16px; }
+  }
   @media (max-width: 767px) {
-    main { margin: 0; padding: 24px 16px; border-radius: 0; border-width: 0; }
+    .layout { margin: 0; padding: 0; }
+    .toc-nav { margin: 0; border-width: 0 0 1px; border-radius: 0; }
+    .toc-nav ul { columns: 1; }
+    main { padding: 24px 16px; border-width: 0; border-radius: 0; }
     h1 { font-size: 1.5rem; }
   }
   @media print {
     body, main { background: var(--cioos-white); }
-    main { margin: 0; padding: 0; border: 0; box-shadow: none; max-width: none; }
+    .layout { display: block; margin: 0; padding: 0; max-width: none; }
+    .toc-nav { position: static; }
+    .toc-nav > :not(.logo) { display: none; }
+    main { padding: 0; border: 0; }
     footer { background: none; color: var(--cioos-navy); }
+    .copy { display: none; }
   }
 </style>
 </head>
 <body>
-<header><div class="bar"><img src="data:image/svg+xml;base64,$logo" alt="CIOOS | SIOOC"></div></header>
+<div class="layout">
+<nav class="toc-nav" aria-label="$toc_label">
+<img class="logo" src="data:image/svg+xml;base64,$logo" alt="CIOOS | SIOOC">
+$toc
+</nav>
 <main>
 $body
 </main>
+</div>
 <footer><div class="bar">CIOOS | SIOOC · <a href="https://cioos.ca">cioos.ca</a></div></footer>
+<script type="application/json" id="citations">$citations</script>
+<script>
+  // A copy button on each citation quote, copying the dataset's full citation.txt text.
+  const ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  const COPY_ICON = ICON + '<rect x="9" y="9" width="13" height="13" rx="2"/>'
+    + '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const COPIED_ICON = ICON + '<path d="M20 6 9 17l-5-5"/></svg>';
+  (() => {
+    const citations = JSON.parse(document.getElementById("citations").textContent);
+    for (const link of document.querySelectorAll('a[href$$="/citation.txt"]')) {
+      const text = citations[decodeURI(link.getAttribute("href")).replace(/\/citation\.txt$$/, "")];
+      const quote = link.closest("ul")?.previousElementSibling;
+      if (!text || quote?.tagName !== "BLOCKQUOTE") continue;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "copy";
+      button.title = "$copy";
+      button.setAttribute("aria-live", "polite");
+      button.innerHTML = COPY_ICON + '<span class="sr-only">$copy</span>';
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          // Some browsers deny the clipboard API to pages opened from disk.
+          const area = Object.assign(document.createElement("textarea"), { value: text });
+          document.body.append(area);
+          area.select();
+          document.execCommand("copy");
+          area.remove();
+        }
+        button.innerHTML = COPIED_ICON + '<span class="sr-only">$copied</span>';
+        setTimeout(() => (button.innerHTML = COPY_ICON + '<span class="sr-only">$copy</span>'), 2000);
+      });
+      quote.append(button);
+    }
+  })();
+
+  // Highlight the section being read in the table of contents.
+  (() => {
+    if (!("IntersectionObserver" in window)) return;
+    const links = new Map(
+      [...document.querySelectorAll(".toc-nav a")].map((a) => [decodeURIComponent(a.hash.slice(1)), a]),
+    );
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          for (const a of links.values()) a.removeAttribute("aria-current");
+          links.get(entry.target.id)?.setAttribute("aria-current", "true");
+        }
+      },
+      { rootMargin: "0px 0px -70% 0px" },
+    );
+    for (const id of links.keys()) {
+      const heading = document.getElementById(id);
+      if (heading) observer.observe(heading);
+    }
+  })();
+</script>
 </body>
 </html>

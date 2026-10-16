@@ -2,9 +2,10 @@
 request URLs, apply the same polygon filter (formats.py, the code that built
 the package) and compare each file with its sha256 in datapackage.json.
 
-Run from the unzipped package with uv, which installs the versions declared
-above and in reproduce.py.lock: uv run reproduce.py
-Files are written to ./reproduced/; the originals are never touched.
+From the unzipped package folder, with uv (it installs the versions declared
+above and in reproduce.py.lock):  uv run reproduce/reproduce.py
+Files are written to the package's reproduced/ folder; the originals are
+never touched.
 """
 
 import hashlib
@@ -21,11 +22,12 @@ try:
 except ImportError as e:
     sys.exit(
         f"{e}\n\nRun this script with uv, which installs its pinned dependencies:\n"
-        "    uv run reproduce.py\n"
+        "    uv run reproduce/reproduce.py   (from the package folder)\n"
         "Install uv: https://docs.astral.sh/uv/getting-started/installation/"
     )
 
-ROOT = Path(__file__).resolve().parent
+# This script sits in the package's reproduce/ folder.
+ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "reproduced"
 # Some ERDDAP servers sit behind a WAF that 403s urllib's default User-Agent.
 HEADERS = {"User-Agent": "CIOOS-CDE-Downloader/1.0 (+https://catalogue.cioos.ca)"}

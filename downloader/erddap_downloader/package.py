@@ -8,7 +8,7 @@ downloader report plus the query that produced it.
   the request URLs, timing and outcome, failures included.
 - citations.txt/.bib/.ris, CITATION.cff, rights.txt: GBIF-style citation and
   licence files; each dataset folder also carries its own citation.txt.
-- reproduce.py + formats.py + reproduce.py.lock: a uv script (PEP 723 header,
+- reproduce/ (reproduce.py, formats.py, reproduce.py.lock): a uv script (PEP 723 header,
   plus the uv lock of every transitive dependency built with the image) that
   re-fetches and re-filters every subset.
 
@@ -19,6 +19,7 @@ retrieved from.
 
 import base64
 import hashlib
+import html
 import json
 import re
 import shutil
@@ -28,8 +29,10 @@ import tempfile
 import tomllib
 from datetime import UTC, datetime
 from importlib.metadata import version
+from itertools import pairwise
 from pathlib import Path
 from string import Template
+from urllib.parse import urlparse
 
 from markdown_it import MarkdownIt
 
@@ -70,7 +73,20 @@ REASONS = {
 _TEXT = {
     "en": {
         "title": "CIOOS Data Explorer download",
+        "toc": "On this page:",
         "created": "Created",
+        "explorer": "Open this selection in the CIOOS Data Explorer",
+        "intro": (
+            "This package holds the data you selected in the CIOOS Data Explorer, with what you need to "
+            "understand, cite and reproduce it.\n\n"
+            "The Canadian Integrated Ocean Observing System (CIOOS) brings Canada's ocean observations together "
+            "through its regional associations (CIOOS Atlantic, CIOOS Pacific and the St. Lawrence Global "
+            "Observatory) and their partners. The Data Explorer searches their datasets, along with biodiversity "
+            "records from the Ocean Biodiversity Information System (OBIS), on a map.\n\n"
+            "When you asked for this download, each dataset was fetched directly from the server that "
+            "publishes it (an ERDDAP server or OBIS), filtered to your selection, and saved here with its "
+            "source's metadata, a citation and its licence. Each dataset stays under its provider's licence."
+        ),
         "summary": "{n} of {m} datasets included.",
         "selection": "Your selection",
         "time": "Time",
@@ -93,13 +109,19 @@ _TEXT = {
         "retry": "Request URL",
         "cite": "How to cite",
         "cite_text": (
-            "Cite every dataset you use. Each dataset folder has its own citation.txt; all citations are in "
-            "citations.txt, citations.bib, citations.ris and CITATION.cff. Each citation names the subset and "
-            "when and where it was retrieved."
+            "Cite every dataset you use. The citation to copy, which also names the subset and the request it "
+            "was retrieved with, is in each dataset folder's citation.txt; all of them are in citations.txt, "
+            "citations.bib, citations.ris and CITATION.cff."
         ),
+        "retrieved": "Retrieved",
+        "request": "Request",
+        "citation_file": "Citation to copy",
         "licences": "Licences",
-        "licences_text": "Each dataset keeps its own licence (also listed in rights.txt):",
+        "licences_text": "Each dataset keeps its own licence; check it before reusing the data (also in rights.txt).",
+        "licence": "Licence",
         "no_licence": "no licence recorded; check the source",
+        "copy": "Copy citation",
+        "copied": "Copied",
         "contents": "Package contents",
         "contents_text": (
             "- `README.html`: this summary as a web page.\n"
@@ -110,22 +132,41 @@ _TEXT = {
             "columns, request URLs, licences).\n"
             "- `ro-crate-metadata.json`: RO-Crate 1.2 provenance: one action per dataset with its request "
             "URLs, timing and outcome.\n"
-            "- `reproduce.py`, `formats.py`, `reproduce.py.lock`: the code that filtered the data to your "
+            "- `reproduce/`: reproduce.py, formats.py and reproduce.py.lock, the code that filtered the data to your "
             "selection, and the exact library versions it ran with."
         ),
         "reproduce": "Reproduce this download",
         "reproduce_text": (
-            "Run `uv run reproduce.py` in this folder. It re-fetches every subset from its source, applies the "
-            "same filter, writes the files to `reproduced/` and checks each one against its checksum in "
-            "datapackage.json. Use uv (https://docs.astral.sh/uv/getting-started/installation/), not plain "
-            "`python`: uv reads the dependency versions declared at the top of reproduce.py and in "
-            "reproduce.py.lock, and installs them in an isolated environment."
+            "You need **uv** installed on your computer: "
+            "<https://docs.astral.sh/uv/getting-started/installation/>. "
+            "It is the only requirement; uv fetches the right Python version and the exact libraries listed at "
+            "the top of reproduce.py and in reproduce.py.lock, in an isolated environment that leaves the rest "
+            "of your system untouched.\n\n"
+            "Then, in this folder, run `uv run reproduce/reproduce.py`. It re-fetches every subset from its source, "
+            "applies the same filter, writes the files to `reproduced/` and checks each one against its "
+            "checksum in datapackage.json. Running it with plain `python` instead only works if you install "
+            "those libraries yourself."
         ),
         "warnings": "Notes",
     },
     "fr": {
         "title": "Téléchargement de l'Explorateur de données du SIOOC",
+        "toc": "Sur cette page :",
         "created": "Créé le",
+        "explorer": "Ouvrir cette sélection dans l'Explorateur de données du SIOOC",
+        "intro": (
+            "Ce paquet contient les données que vous avez sélectionnées dans l'Explorateur de données du SIOOC, "
+            "avec ce qu'il faut pour les comprendre, les citer et les reproduire.\n\n"
+            "Le Système intégré d'observation des océans du Canada (SIOOC) réunit les observations océaniques "
+            "du pays grâce à ses associations régionales (SIOOC Atlantique, SIOOC Pacifique et l'Observatoire "
+            "global du Saint-Laurent) et à leurs partenaires. L'Explorateur permet de chercher leurs jeux de "
+            "données sur une carte, ainsi que les observations de biodiversité du Système d'information sur la "
+            "biodiversité océanique (OBIS).\n\n"
+            "Lors de votre demande, chaque jeu de données a été récupéré directement depuis le serveur qui le "
+            "publie (un serveur ERDDAP ou OBIS), filtré selon votre sélection, puis enregistré ici avec les "
+            "métadonnées de sa source, une citation et sa licence. Chaque jeu de données reste sous la licence "
+            "de son fournisseur."
+        ),
         "summary": "{n} jeux de données sur {m} inclus.",
         "selection": "Votre sélection",
         "time": "Temps",
@@ -148,13 +189,22 @@ _TEXT = {
         "retry": "URL de la requête",
         "cite": "Comment citer",
         "cite_text": (
-            "Citez chaque jeu de données utilisé. Chaque dossier contient son citation.txt; toutes les "
-            "citations sont dans citations.txt, citations.bib, citations.ris et CITATION.cff. Chaque citation "
-            "précise le sous-ensemble, la date et l'URL de récupération."
+            "Citez chaque jeu de données utilisé. La citation à copier, qui précise aussi le sous-ensemble et la "
+            "requête qui l'a récupéré, est dans le citation.txt de chaque dossier; toutes sont dans "
+            "citations.txt, citations.bib, citations.ris et CITATION.cff."
         ),
+        "retrieved": "Récupéré le",
+        "request": "Requête",
+        "citation_file": "Citation à copier",
         "licences": "Licences",
-        "licences_text": "Chaque jeu de données conserve sa licence (aussi dans rights.txt) :",
+        "licences_text": (
+            "Chaque jeu de données conserve sa licence; vérifiez-la avant de réutiliser les données "
+            "(aussi dans rights.txt)."
+        ),
+        "licence": "Licence",
         "no_licence": "aucune licence enregistrée; consultez la source",
+        "copy": "Copier la citation",
+        "copied": "Copié",
         "contents": "Contenu du paquet",
         "contents_text": (
             "- `README.html` : ce résumé sous forme de page web.\n"
@@ -165,17 +215,20 @@ _TEXT = {
             "contrôle, colonnes, URL des requêtes, licences).\n"
             "- `ro-crate-metadata.json` : provenance RO-Crate 1.2 : une action par jeu de données avec ses "
             "URL de requête, sa durée et son résultat.\n"
-            "- `reproduce.py`, `formats.py`, `reproduce.py.lock` : le code qui a filtré les données selon "
+            "- `reproduce/` : reproduce.py, formats.py et reproduce.py.lock, le code qui a filtré les données selon "
             "votre sélection, et les versions exactes des bibliothèques utilisées."
         ),
         "reproduce": "Reproduire ce téléchargement",
         "reproduce_text": (
-            "Lancez `uv run reproduce.py` dans ce dossier. Le script récupère de nouveau chaque sous-ensemble "
-            "depuis sa source, applique le même filtre, écrit les fichiers dans `reproduced/` et vérifie "
-            "chacun avec sa somme de contrôle dans datapackage.json. Utilisez uv "
-            "(https://docs.astral.sh/uv/getting-started/installation/) plutôt que `python` : uv lit les "
-            "versions des dépendances déclarées en tête de reproduce.py et dans reproduce.py.lock, et les "
-            "installe dans un environnement isolé."
+            "Il faut que **uv** soit installé sur votre ordinateur : "
+            "<https://docs.astral.sh/uv/getting-started/installation/>. "
+            "C'est le seul prérequis; uv récupère la bonne version de Python et les bibliothèques exactes "
+            "indiquées en tête de reproduce.py et dans reproduce.py.lock, dans un environnement isolé qui ne "
+            "modifie pas le reste de votre système.\n\n"
+            "Ensuite, dans ce dossier, lancez `uv run reproduce/reproduce.py`. Le script récupère de nouveau chaque "
+            "sous-ensemble depuis sa source, applique le même filtre, écrit les fichiers dans `reproduced/` et "
+            "vérifie chacun avec sa somme de contrôle dans datapackage.json. Avec `python` seul, il faut "
+            "installer ces bibliothèques vous-même."
         ),
         "warnings": "Remarques",
     },
@@ -241,7 +294,9 @@ def source_citation(row, metadata, lang):
     """The source's own citation text, else one built from its metadata."""
     own = _localized(metadata.get("citation"), lang)
     if own:
-        return own.strip()
+        # Harvested citations can carry HTML entities and ragged whitespace.
+        own = " ".join(html.unescape(own).split())
+        return own if own.endswith((".", "!", "?")) else own + "."
     authors = "; ".join(_authors(metadata))
     year = _year(metadata)
     head = authors + (f" ({year})" if year else "") if authors else (year or "")
@@ -319,8 +374,23 @@ def _citation_cff(entries, user_query, created):
 
 
 def _licence(metadata):
-    licence = metadata.get("license") or {}
+    licence = dict(metadata.get("license") or {})
+    if licence.get("title"):
+        licence["title"] = " ".join(html.unescape(licence["title"]).split())
     return licence if licence.get("title") or licence.get("url") else None
+
+
+def _readme_licence(licence, t):
+    if not licence:
+        return f"*{t['no_licence']}*"
+    title, url = licence.get("title"), licence.get("url")
+    if title and url:
+        return f"[{_cell(title)}](<{_md_url(url)}>)"
+    return f"<{_md_url(url)}>" if url else _cell(title)
+
+
+def _cell(text):
+    return text.replace("|", "\\|")
 
 
 def _frictionless_licence(licence):
@@ -392,13 +462,41 @@ def _source_links(row, metadata, t):
     return links
 
 
+def _md_url(url):
+    """A URL safe inside a Markdown <…> link: ERDDAP constraints carry raw '>'."""
+    return url.replace("<", "%3C").replace(">", "%3E").replace(" ", "%20")
+
+
+# A URL up to, not including, the punctuation that ends its sentence.
+_URL = re.compile(r"https?://[^\s<>]+?(?=[.,;:)]?(?:\s|$))")
+
+
+def _readme_citation(row, metadata, lang, t):
+    lines = ["", f"### {_title(row, lang)}", "", "> " + _URL.sub(r"<\g<0>>", source_citation(row, metadata, lang)), ""]
+    retrieved = datetime.fromisoformat(row["finished_at"]).astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    lines.append(f"- {t['retrieved']}: {retrieved}")
+    urls = row["download_url_list"]
+    if urls:
+        # The request URL can run to thousands of characters: link it, don't print it.
+        labels = [urlparse(urls[0]).netloc] if len(urls) == 1 else [str(i) for i in range(1, len(urls) + 1)]
+        links = [f"[{label}](<{_md_url(url)}>)" for label, url in zip(labels, urls, strict=True)]
+        lines.append(f"- {t['request']}: " + " · ".join(links))
+    lines.append(f"- {t['citation_file']}: [`{row['folder']}/citation.txt`]({row['folder']}/citation.txt)")
+    return lines
+
+
 def _readme(root, user_query, entries, created, lang):
     t = _TEXT[lang]
     included = [e for e in entries if e[0]["status"] in INCLUDED]
+    # Jobs queued before web-api recorded the explorer URL have none.
+    explorer = user_query.get("explorer_url")
     lines = [
         f"# {t['title']} {user_query['job_id']}",
         "",
         f"{t['created']}: {created}",
+        "",
+        *([f"[{t['explorer']}](<{_md_url(explorer)}>)", ""] if explorer else []),
+        t["intro"],
         "",
         f"**{t['summary'].format(n=len(included), m=len(entries))}**",
         "",
@@ -430,10 +528,10 @@ def _readme(root, user_query, entries, created, lang):
         "|---|---|---|---|---|",
     ]
     for row, metadata, _ in entries:
-        title = (row.get("title") or row["dataset_id"]).replace("|", "\\|")
+        title = _cell(row.get("title") or row["dataset_id"])
         # A folder with nothing in it isn't kept in the zip.
         folder = f"[`{row['folder']}/`]({row['folder']}/)" if any((root / row["folder"]).iterdir()) else "—"
-        sources = " · ".join(f"[{label}](<{url}>)" for label, url in _source_links(row, metadata, t))
+        sources = " · ".join(f"[{label}](<{_md_url(url)}>)" for label, url in _source_links(row, metadata, t))
         lines.append(f"| {title} | {row['status']} | {row['n_records']} | {folder} | {sources} |")
 
     issues = [(row, _outcome(row, lang)) for row, _, _ in entries if _outcome(row, lang) or row["warnings"]]
@@ -445,19 +543,28 @@ def _readme(root, user_query, entries, created, lang):
             if row["erddap_error"]:
                 lines.append(f"  - {t['server']}: {row['erddap_error'].replace(chr(10), '; ')}")
             if row["status"] not in INCLUDED or row["status"] == PARTIAL:
-                lines += [f"  - {t['retry']}: <{url}>" for url in row["download_url_list"]]
+                lines += [f"  - {t['retry']}: <{_md_url(url)}>" for url in row["download_url_list"]]
             lines += [f"  - {t['warnings']}: {w}" for w in row["warnings"]]
 
-    lines += ["", f"## {t['cite']}", "", t["cite_text"], ""]
-    lines += [f"- {citation(row, metadata, user_query, lng)}" for row, metadata, lng in included]
+    lines += ["", f"## {t['cite']}", "", t["cite_text"]]
+    for row, metadata, lng in included:
+        lines += _readme_citation(row, metadata, lng, t)
     lines += ["", f"## {t['licences']}", "", t["licences_text"], ""]
-    for row, metadata, _ in included:
-        licence = _licence(metadata)
-        text = " ".join(filter(None, [licence.get("title"), licence.get("url")])) if licence else t["no_licence"]
-        lines.append(f"- {row.get('title') or row['dataset_id']}: {text}")
+    lines += [f"| {t['dataset']} | {t['licence']} |", "|---|---|"]
+    for row, metadata, lng in included:
+        lines.append(f"| {_cell(_title(row, lng))} | {_readme_licence(_licence(metadata), t)} |")
     lines += ["", f"## {t['reproduce']}", "", t["reproduce_text"]]
     lines += ["", f"## {t['contents']}", "", t["contents_text"], ""]
-    return "\n".join(lines)
+
+    sections = [line.removeprefix("## ") for line in lines if line.startswith("## ")]
+    toc = [t["toc"], "", *[f"- [{s}](#{_slug(s)})" for s in sections], ""]
+    after_summary = lines.index(f"## {t['selection']}")
+    return "\n".join(lines[:after_summary] + toc + lines[after_summary:])
+
+
+def _slug(heading):
+    """GitHub's heading anchor, so the README's links also work on GitHub."""
+    return re.sub(r"[^\w\- ]", "", heading.lower()).replace(" ", "-")
 
 
 # description, encodingFormat for every non-data file the package can hold.
@@ -608,7 +715,7 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
         },
     )
     for name in root_files:
-        graph.append(_file_entity(name, name, (root / name).stat().st_size, (), {}))
+        graph.append(_file_entity(name, Path(name).name, (root / name).stat().st_size, (), {}))
     return {"@context": f"{RO_CRATE}/context", "@graph": graph}
 
 
@@ -621,12 +728,38 @@ def _python():
     return f"=={sys.version_info.major}.{sys.version_info.minor}.*"
 
 
-def _readme_html(markdown, user_query, lang):
+def _render_readme(markdown, toc_label):
+    """(table of contents, body) as HTML: the page shows the table of contents
+    beside the body, and section headings get the ids it links to."""
+    tokens = _MARKDOWN.parse(markdown)
+    for opening, inline in pairwise(tokens):
+        if opening.type == "heading_open" and opening.tag == "h2":
+            opening.attrSet("id", _slug(inline.content))
+    start = next(i for i, token in enumerate(tokens) if token.content == toc_label) - 1
+    end = next(i for i in range(start, len(tokens)) if tokens[i].type == "bullet_list_close") + 1
+    tokens[start].attrSet("class", "toc-label")
+    toc = _MARKDOWN.renderer.render(tokens[start:end], _MARKDOWN.options, {})
+    body = _MARKDOWN.renderer.render(tokens[:start] + tokens[end:], _MARKDOWN.options, {})
+    # A frame that scrolls a wide table sideways. Raw HTML is off, so every
+    # <table> here comes from a Markdown table.
+    return toc, body.replace("<table>", '<div class="table">\n<table>').replace("</table>", "</table>\n</div>")
+
+
+def _readme_html(markdown, user_query, lang, citations):
+    """``citations`` maps each dataset folder to the text its copy button copies."""
+    t = _TEXT[lang]
+    toc, body = _render_readme(markdown, t["toc"])
     return Template(README_TEMPLATE.read_text()).substitute(
         lang=lang,
-        title=f"{_TEXT[lang]['title']} {user_query['job_id']}",
+        title=f"{t['title']} {user_query['job_id']}",
         logo=base64.b64encode(README_LOGO.read_bytes()).decode(),
-        body=_MARKDOWN.render(markdown),
+        toc=toc,
+        toc_label=t["toc"].rstrip(" :"),
+        body=body,
+        # Escaped so citation text can't end the <script> element.
+        citations=json.dumps(citations, ensure_ascii=False).replace("<", "\\u003c"),
+        copy=t["copy"],
+        copied=t["copied"],
     )
 
 
@@ -686,7 +819,8 @@ def write_package(root: Path, json_query, report):
 
     readme = _readme(root, user_query, entries, created, lang)
     (root / "README.md").write_text(readme)
-    (root / "README.html").write_text(_readme_html(readme, user_query, lang))
+    citations = {row["folder"]: citation(row, metadata, user_query, lg) for row, metadata, lg in included}
+    (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
     (root / "citations.txt").write_text("\n\n".join(citation(r, m, user_query, lg) for r, m, lg in included) + "\n")
     (root / "citations.bib").write_text("\n\n".join(_bibtex(*e[:2], user_query, e[2]) for e in included) + "\n")
     (root / "citations.ris").write_text("\n\n".join(_ris(*e[:2], user_query, e[2]) for e in included) + "\n")
@@ -739,10 +873,11 @@ def write_package(root: Path, json_query, report):
         ],
     }
     (root / "datapackage.json").write_text(json.dumps(datapackage, indent=2, ensure_ascii=False))
-    (root / "reproduce.py").write_text(_reproduce_script())
-    shutil.copyfile(formats.__file__, root / "formats.py")
+    (root / "reproduce").mkdir()
+    (root / "reproduce" / "reproduce.py").write_text(_reproduce_script())
+    shutil.copyfile(formats.__file__, root / "reproduce" / "formats.py")
     if lock := _current_lock():
-        shutil.copyfile(lock, root / "reproduce.py.lock")
+        shutil.copyfile(lock, root / "reproduce" / "reproduce.py.lock")
 
     root_files = [
         "README.md",
@@ -753,9 +888,9 @@ def write_package(root: Path, json_query, report):
         "citations.ris",
         "CITATION.cff",
         "rights.txt",
-        "reproduce.py",
-        "formats.py",
-        *(["reproduce.py.lock"] if (root / "reproduce.py.lock").exists() else []),
+        "reproduce/reproduce.py",
+        "reproduce/formats.py",
+        *(["reproduce/reproduce.py.lock"] if (root / "reproduce" / "reproduce.py.lock").exists() else []),
     ]
     crate = _ro_crate(root, user_query, entries, created, root_files)
     (root / "ro-crate-metadata.json").write_text(json.dumps(crate, indent=2, ensure_ascii=False))

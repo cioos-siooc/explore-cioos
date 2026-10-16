@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import numpy as np
 import pandas as pd
@@ -142,7 +142,7 @@ def test_a_failed_dataset_is_reported_and_the_rest_ship(tmp_path):
     assert actions["Subset of Title Good"]["result"] == {"@id": data["path"]}
 
     citations = read("citations.txt")
-    assert citations.startswith("Hakai Institute (2021). CTD profiles. https://doi.org/10.1234/abc Subset: time")
+    assert citations.startswith("Hakai Institute (2021). CTD profiles. https://doi.org/10.1234/abc. Subset: time")
     assert "Retrieved " in citations and "Broken" not in citations
     assert "doi = {10.1234/abc}" in read("citations.bib")
     assert "TY  - DATA" in read("citations.ris")
@@ -355,7 +355,7 @@ def _reproduce(tmp_path, archive, edit=None):
     root = tmp_path / "unzipped" / "cde_download_pkg001"
     if edit:
         edit(root)
-    result = subprocess.run([sys.executable, "reproduce.py"], cwd=root, capture_output=True, text=True)
+    result = subprocess.run([sys.executable, "reproduce/reproduce.py"], cwd=root, capture_output=True, text=True)
     return root, result
 
 
@@ -422,14 +422,15 @@ def test_reproduce_reports_a_source_that_changed(tmp_path):
 def test_reproduce_script_pins_the_versions_that_built_the_package(tmp_path):
     _, archive, read = _run(tmp_path, _query(_dataset("Ctd")))
 
-    assert read("formats.py") == Path(formats.__file__).read_text()
-    block = re.search(r"^# /// script\n((?:#.*\n)+?)^# ///$", read("reproduce.py"), re.MULTILINE).group(1)
+    assert read("reproduce/formats.py") == Path(formats.__file__).read_text()
+    block = re.search(r"^# /// script\n((?:#.*\n)+?)^# ///$", read("reproduce/reproduce.py"), re.MULTILINE).group(1)
     metadata = tomllib.loads("".join(line.removeprefix("#").removeprefix(" ") + "\n" for line in block.splitlines()))
     assert f"pandas=={version('pandas')}" in metadata["dependencies"]
     assert all("==" in d for d in metadata["dependencies"])
     assert metadata["requires-python"] == f"=={sys.version_info.major}.{sys.version_info.minor}.*"
     crate = json.loads(read("ro-crate-metadata.json"))
-    assert {"reproduce.py", "formats.py"} <= {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+    files = {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+    assert {"reproduce/reproduce.py", "reproduce/formats.py"} <= files
 
 
 _PYTHON = f"=={sys.version_info.major}.{sys.version_info.minor}.*"
@@ -449,10 +450,11 @@ def test_the_build_time_lock_ships_with_the_reproduce_script(tmp_path):
     lock = _lock(tmp_path / "reproduce.py.lock", _current_pins(), _PYTHON)
     _, archive, read = _run(tmp_path, _query(_dataset("Ctd")), lock=lock)
 
-    assert read("reproduce.py.lock") == lock.read_text()
+    assert read("reproduce/reproduce.py.lock") == lock.read_text()
     crate = json.loads(read("ro-crate-metadata.json"))
-    assert "reproduce.py.lock" in {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
-    assert "uv run reproduce.py" in read("README.md")
+    assert "reproduce/reproduce.py.lock" in {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+    assert "uv run reproduce/reproduce.py" in read("README.md")
+    assert "You need **uv** installed on your computer" in read("README.md")
 
 
 @pytest.mark.parametrize(
@@ -469,8 +471,8 @@ def test_a_lock_made_for_other_pins_is_not_shipped(tmp_path, pins, python):
     report, archive, read = _run(tmp_path, _query(_dataset("Ctd")), lock=lock)
 
     assert report["erddap_report"][0]["status"] == "COMPLETED"
-    assert "cde_download_pkg001/reproduce.py.lock" not in archive.namelist()
-    assert "reproduce.py.lock" not in {e["@id"] for e in json.loads(read("ro-crate-metadata.json"))["@graph"]}
+    assert "cde_download_pkg001/reproduce/reproduce.py.lock" not in archive.namelist()
+    assert "reproduce/reproduce.py.lock" not in {e["@id"] for e in json.loads(read("ro-crate-metadata.json"))["@graph"]}
 
 
 def test_build_reproduce_lock_locks_the_shipped_header(tmp_path, monkeypatch):
@@ -495,7 +497,7 @@ def test_reproduce_without_uv_says_to_use_uv(tmp_path):
     result = subprocess.run([sys.executable, "-I", "reproduce.py"], cwd=tmp_path, capture_output=True, text=True)
 
     assert result.returncode == 1
-    assert "uv run reproduce.py" in result.stderr
+    assert "uv run reproduce/reproduce.py" in result.stderr
 
 
 def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
@@ -521,7 +523,7 @@ def test_the_readme_also_ships_as_a_standalone_web_page(tmp_path):
     assert "<table>" in html and '<a href="Good_data_example_ca/">' in html
     assert 'src="data:image/svg+xml;base64,' in html
     # Opened offline from disk: no stylesheet, script, image or font is fetched.
-    assert not re.search(r'<(link|script)\b|src="https?:|url\(', html)
+    assert not re.search(r'<link\b|<script[^>]*\ssrc=|src="https?:|url\(', html)
     assert "[`Good_data_example_ca/`](Good_data_example_ca/)" in read("README.md")
     names = {r["path"] for r in json.loads(read("datapackage.json"))["resources"]}
     assert "README.html" in names
@@ -536,7 +538,7 @@ def test_source_text_cannot_inject_html_into_the_readme_page(tmp_path):
     _, _, read = _run(tmp_path, _query(_dataset("Bad", title="<script>alert(1)</script>")), get)
 
     html = read("README.html")
-    assert "<script>" not in html and "<img src=x" not in html
+    assert "<script>alert(1)" not in html and "<img src=x" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
 
@@ -566,3 +568,130 @@ def test_an_obis_dataset_links_to_its_obis_page(tmp_path):
         _, _, read = _run(tmp_path, _query(obis))
 
     assert "| [OBIS](<https://obis.org/dataset/abc>) |" in read("README.md")
+
+
+def test_harvested_citations_are_cleaned_into_one_sentence(tmp_path):
+    metadata = {"citation": {"en": "Centre for Ocean Ventures &amp; Entrepreneurship (2026).\n  Halifax  Buoy. https://x.ca/d?local=en"}}
+    _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=metadata)))
+
+    assert read("Good_data_example_ca/citation.txt").startswith(
+        "Centre for Ocean Ventures & Entrepreneurship (2026). Halifax Buoy. https://x.ca/d?local=en. Subset:"
+    )
+
+
+def test_readme_citations_link_the_request_instead_of_printing_it(tmp_path):
+    _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=_METADATA)))
+
+    readme = read("README.md")
+    cite = readme[readme.index("## How to cite"):readme.index("## Licences")]
+    assert "### Title Good" in cite
+    assert "> Hakai Institute (2021). CTD profiles. <https://doi.org/10.1234/abc>" in cite
+    assert re.search(r"- Retrieved: \d{4}-\d\d-\d\d \d\d:\d\d UTC", cite)
+    assert "- Request: [data.example.ca](<https://data.example.ca/erddap/tabledap/Good.csv?" in cite
+    assert "- Citation to copy: [`Good_data_example_ca/citation.txt`](Good_data_example_ca/citation.txt)" in cite
+    # The request URL appears only as a link target, never as visible text.
+    assert cite.count("tabledap/Good.csv") == 1
+
+    html = read("README.html")
+    assert '<blockquote>\n<p>Hakai Institute (2021). CTD profiles. <a href="https://doi.org/10.1234/abc">' in html
+    assert ">data.example.ca</a>" in html
+
+
+def test_readme_numbers_the_requests_of_a_split_subset(tmp_path):
+    ids = [f"station_{i:04d}_{'x' * 40}" for i in range(400)]
+    dataset = _dataset("Ctd", cdm_data_type="TimeSeries", feature_id_variable="station", feature_ids=ids)
+    report, _, read = _run(tmp_path, _query(dataset))
+
+    n = len(report["erddap_report"][0]["download_url_list"])
+    assert n > 1
+    assert "- Request: [1](<https://" in read("README.md") and f" · [{n}](<https://" in read("README.md")
+
+
+def _embedded_citations(html):
+    return json.loads(re.search(r'<script type="application/json" id="citations">(.*?)</script>', html, re.S).group(1))
+
+
+def test_the_readme_page_embeds_each_full_citation_for_its_copy_button(tmp_path):
+    _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=_METADATA), language="fr"))
+
+    html = read("README.html")
+    assert _embedded_citations(html) == {"Good_data_example_ca": read("Good_data_example_ca/citation.txt").strip()}
+    assert 'title = "Copier la citation"' in html and '<span class="sr-only">Copié</span>' in html
+
+
+def test_citation_text_cannot_close_the_embedded_script(tmp_path):
+    metadata = {"citation": {"en": "Evil (2026). </script><script>alert(3)</script>"}}
+    _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=metadata)))
+
+    html = read("README.html")
+    assert "<script>alert(3)" not in html
+    assert "</script><script>alert(3)" in _embedded_citations(html)["Good_data_example_ca"]
+
+
+def test_readme_licences_are_a_table_with_linked_names(tmp_path):
+    bare = _dataset("Bare")
+    worded = _dataset("Worded", metadata={"license": {"title": "This work is licensed  under a CC&amp;BY licence"}})
+    _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=_METADATA), worded, bare))
+
+    readme = read("README.md")
+    licences = readme[readme.index("## Licences"):readme.index("## Reproduce")]
+    assert "| Dataset | Licence |" in licences
+    assert "| Title Good | [CC-BY-4.0](<https://creativecommons.org/licenses/by/4.0/>) |" in licences
+    assert "| Title Worded | This work is licensed under a CC&BY licence |" in licences
+    assert "| Title Bare | *no licence recorded; check the source* |" in licences
+    assert "This work is licensed under a CC&BY licence" in read("rights.txt")
+
+
+@pytest.mark.parametrize(
+    ("language", "label", "section", "anchor"),
+    [("en", "On this page:", "Datasets", "datasets"), ("fr", "Sur cette page :", "Jeux de données", "jeux-de-données")],
+)
+def test_the_readme_opens_with_a_table_of_contents(tmp_path, language, label, section, anchor):
+    _, _, read = _run(tmp_path, _query(_dataset("Good"), language=language))
+
+    readme = read("README.md")
+    assert readme.index(label) < readme.index("## ")
+    assert f"- [{section}](#{anchor})" in readme
+    html = read("README.html")
+    assert f'<h2 id="{anchor}">{section}</h2>' in html
+    nav = html[html.index('<nav class="toc-nav"'):html.index("</nav>")]
+    # markdown-it percent-encodes the link; browsers decode it to match the id.
+    assert f'aria-label="{label.rstrip(" :")}"' in nav and f'href="#{quote(anchor)}"' in nav
+    # Beside the body, not inside it.
+    assert label not in html[html.index("<main>"):]
+
+
+def test_the_reproduce_files_sit_in_their_own_folder(tmp_path):
+    _, archive, read = _run(tmp_path, _query(_dataset("Good")))
+
+    names = set(archive.namelist())
+    assert {"cde_download_pkg001/reproduce/reproduce.py", "cde_download_pkg001/reproduce/formats.py"} <= names
+    assert "cde_download_pkg001/reproduce.py" not in names
+    crate = {e["@id"]: e for e in json.loads(read("ro-crate-metadata.json"))["@graph"]}
+    assert crate["reproduce/reproduce.py"]["name"] == "reproduce.py"
+    assert crate["reproduce/formats.py"]["encodingFormat"] == "text/x-python"
+
+
+def test_the_readme_links_back_to_the_selection_in_the_explorer(tmp_path):
+    url = "https://explore.cioos.ca/?eovs=seaSurfaceTemperature&polygon=%5B%5B-65%2C44%5D%5D&lang=en"
+    _, _, read = _run(tmp_path, _query(_dataset("Good"), explorer_url=url))
+
+    assert f"[Open this selection in the CIOOS Data Explorer](<{url}>)" in read("README.md")
+    assert f'<a href="{url.replace("&", "&amp;")}">Open this selection' in read("README.html")
+
+
+def test_a_job_queued_before_explorer_links_still_builds_its_readme(tmp_path):
+    _, _, read = _run(tmp_path, _query(_dataset("Good")))
+    assert "Open this selection" not in read("README.md")
+
+
+@pytest.mark.parametrize(
+    ("language", "opening"),
+    [("en", "This package holds the data you selected"), ("fr", "Ce paquet contient les données")],
+)
+def test_the_readme_opens_by_explaining_the_package_and_where_its_data_came_from(tmp_path, language, opening):
+    _, _, read = _run(tmp_path, _query(_dataset("Good"), language=language))
+
+    readme = read("README.md")
+    assert readme.index(opening) < readme.index("## ")
+    assert "OBIS" in readme[: readme.index("## ")] and "ERDDAP" in readme[: readme.index("## ")]
