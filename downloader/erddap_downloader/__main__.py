@@ -26,7 +26,6 @@ if __name__ == "__main__":
     with open(json_query) as fid:
         download_query = json.load(fid)
 
-    # Run download
     downloader_wrapper.run_download_query(
         download_query=download_query,
         output_folder=output_folder,
