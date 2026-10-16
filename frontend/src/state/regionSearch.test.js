@@ -6,8 +6,10 @@ import { polygonIsRectangle } from "../utilities.jsx";
 import {
   MAX_RING_VERTICES,
   parseRegions,
+  prefixQuery,
   regionBox,
   regionOutline,
+  regionRecordUrl,
   regionSearchUrl,
 } from "./regionSearch.js";
 
@@ -34,6 +36,25 @@ describe("regionSearchUrl", () => {
     expect(url.pathname).toBe("/services/geoname/fr/geonames.geojson");
     expect(url.searchParams.get("q")).toBe("baie de fundy");
     expect(url.searchParams.get("concise").split(",")).toContain("BAY");
+  });
+});
+
+describe("prefixQuery", () => {
+  it.each([
+    ["bay of fund", "bay of fund*"],
+    ["  îles de la madel ", "îles de la madel*"],
+    ["saint-laur", "saint-laur*"],
+    ["st.", "st."],
+  ])("reads %j as %j", (term, query) => {
+    expect(prefixQuery(term)).toBe(query);
+  });
+});
+
+describe("regionRecordUrl", () => {
+  it("is the CGNDB record page in the UI language", () => {
+    expect(regionRecordUrl("DBBWO", "fr")).toBe(
+      "https://geogratis.gc.ca/services/geoname/fr/geonames/DBBWO.html",
+    );
   });
 });
 

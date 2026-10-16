@@ -85,6 +85,36 @@
   box-shadow: var(--cioos-focus);
 }
 
+.spatialFilterPlacesLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
+.spatialFilterPlaceApplied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 0 10px;
+}
+
+.spatialFilterPlaceAppliedName {
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.spatialFilterPlaceApplied a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-primary-700);
+}
+
 .spatialFilterPlacesSource {
   margin: 6px 0 0;
   font-size: var(--cioos-font-size-xs);

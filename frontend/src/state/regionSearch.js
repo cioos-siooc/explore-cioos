@@ -35,6 +35,19 @@ export const REGION_TYPES = [
 export const MAX_RING_VERTICES = 150;
 const KM_PER_DEGREE = 111;
 
+// GeoNames matches whole words only, so the last word gets a Lucene `*` to
+// match as it is typed. Not after punctuation: "st.*" matches nothing.
+export function prefixQuery(term) {
+  const words = term.trim().split(/\s+/);
+  const last = words.at(-1);
+  if (!/^[\p{L}\p{N}-]+$/u.test(last)) return term.trim();
+  return [...words.slice(0, -1), `${last}*`].join(" ");
+}
+
+export function regionRecordUrl(cgndbid, lang) {
+  return `${GEONAMES_API}/${lang}/geonames/${cgndbid}.html`;
+}
+
 export function regionSearchUrl(term, lang, limit = 20) {
   const params = new URLSearchParams({
     q: term,
@@ -60,6 +73,7 @@ export function parseRegions(geojson) {
     .map(({ properties, geometry }) => ({
       id: properties.featureid,
       name: properties.name,
+      cgndbid: properties.cgndbid,
       type: properties.concise,
       geometry,
       area: ["Polygon", "MultiPolygon"].includes(geometry.type),

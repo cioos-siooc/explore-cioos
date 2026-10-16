@@ -1,13 +1,15 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../../test/mockFetch.js";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
+import { useSelection } from "../../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../../state/ui/UIProvider.jsx";
 import { polygonIsRectangle } from "../../../../utilities.jsx";
+import QuickFilters from "../../../AppShell/QuickFilters/QuickFilters.jsx";
 import SpatialFilter from "./SpatialFilter.jsx";
 
 const square = [
@@ -21,7 +23,7 @@ const square = [
 ];
 const place = (featureid, name, concise, geometry) => ({
   type: "Feature",
-  properties: { featureid, name, concise },
+  properties: { featureid, cgndbid: featureid.toUpperCase(), name, concise },
   geometry,
 });
 const reply = {
@@ -39,16 +41,23 @@ const reply = {
 };
 
 describe("SpatialFilter place search", () => {
+  // The q of each GeoNames request; `answer(q)` is what it gets back.
+  let queries;
+  let answer;
   beforeEach(() => {
     installMockFetch();
+    queries = [];
+    answer = () => reply;
     const fallback = globalThis.fetch;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input, init) =>
-        String(input).startsWith("https://geogratis.gc.ca/")
-          ? new Response(JSON.stringify(reply), { status: 200 })
-          : fallback(input, init),
-      ),
+      vi.fn(async (input, init) => {
+        const url = new URL(String(input), "http://localhost");
+        if (url.hostname !== "geogratis.gc.ca") return fallback(input, init);
+        const q = url.searchParams.get("q");
+        queries.push(q);
+        return new Response(JSON.stringify(answer(q)), { status: 200 });
+      }),
     );
   });
 
@@ -62,12 +71,20 @@ describe("SpatialFilter place search", () => {
       const ui = useUI();
       seen.showFiltersModal = ui.showFiltersModal;
       seen.setShowFiltersModal = ui.setShowFiltersModal;
+      // The map's part: a requested shape becomes the area filter.
+      const { setPolygon } = useSelection();
+      seen.setPolygon = setPolygon;
+      const { drawRequest } = map;
+      React.useEffect(() => {
+        if (drawRequest?.mode === "shape") setPolygon(drawRequest.ring);
+      }, [drawRequest, setPolygon]);
       return null;
     }
     const user = userEvent.setup({ delay: null });
     renderWithProviders(
       <>
         <SpatialFilter />
+        <QuickFilters />
         <Probe />
       </>,
       { providers: "app" },
@@ -77,6 +94,51 @@ describe("SpatialFilter place search", () => {
     await screen.findByText("Bay of Fundy");
     return { user, seen };
   }
+
+  it("matches the last word as it is typed", async () => {
+    await renderPanel();
+
+    expect(queries.at(-1)).toBe("fundy*");
+  });
+
+  it("searches the words as written when the typed prefix finds nothing", async () => {
+    answer = (q) => (q.endsWith("*") ? { features: [] } : reply);
+    await renderPanel();
+
+    expect(queries.slice(-2)).toEqual(["fundy*", "fundy"]);
+  });
+
+  it("shows a spinner while waiting for NRCan", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(<SpatialFilter />, { providers: "app" });
+
+    await user.type(screen.getByTestId("spatial-filter-place-input"), "fun");
+
+    expect(screen.getByRole("status")).toHaveTextContent("Searching places…");
+    await screen.findByText("Bay of Fundy");
+    expect(screen.queryByText("Searching places…")).toBeNull();
+  });
+
+  it("names a picked area and links its NRCan record, until it is edited", async () => {
+    const { user, seen } = await renderPanel();
+
+    await user.click(
+      screen.getByRole("button", { name: "Filter by Polygon: Bay of Fundy" }),
+    );
+
+    const record = await screen.findByTestId("spatial-filter-place-record");
+    expect(record).toHaveAttribute(
+      "href",
+      "https://geogratis.gc.ca/services/geoname/en/geonames/FUNDY.html",
+    );
+    expect(record.closest("p")).toHaveTextContent("Bay of Fundy");
+    expect(screen.getByTestId("quick-filter-area")).toHaveAccessibleName(
+      "Area: Bay of Fundy",
+    );
+
+    act(() => seen.setPolygon([...seen.ring]));
+    expect(screen.queryByTestId("spatial-filter-place-record")).toBeNull();
+  });
 
   it("goes to a place without filtering, and closes the modal", async () => {
     const { user, seen } = await renderPanel();

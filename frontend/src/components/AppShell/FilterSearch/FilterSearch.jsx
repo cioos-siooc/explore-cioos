@@ -14,6 +14,7 @@ import classNames from "classnames";
 
 import { server } from "../../../config.js";
 import { useDebounce } from "../../../utilities.jsx";
+import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
 import {
@@ -77,11 +78,10 @@ function useScientificNameMatches(term, enabled) {
 // A picked area becomes the area filter, as its outline or as the box around
 // it, and the map frames it; its `secondary` action only goes to it. A point
 // place has no outline, so picking it only goes to it.
-function useRegionGroup(term, exclude) {
+function useRegionGroup(regions) {
   const { t } = useTranslation();
   const goTo = useGoToRegion();
   const [shape, setShape] = useState("polygon");
-  const regions = useRegionMatches(exclude ? "" : term);
   if (regions.length === 0) return null;
 
   const shapeLabel =
@@ -247,12 +247,14 @@ export default function FilterSearch({ text, setText, inputRef }) {
   const [touched, setTouched] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
+  const places = useRegionMatches(exclude ? "" : term);
+  const regionGroup = useRegionGroup(places.places);
   const groups = [
     ...useFilterModel(
       useScientificNameMatches(term, obisDataAvailable),
       exclude ? undefined : parsePartialRangeQuery(term),
     ),
-    useRegionGroup(term, exclude),
+    regionGroup,
     canReset && {
       key: "reset",
       label: t("quickFilterCaptionReset"),
@@ -391,6 +393,12 @@ export default function FilterSearch({ text, setText, inputRef }) {
           aria-controls={flat.length > 0 ? listId : undefined}
           aria-activedescendant={current ? `${listId}-${active}` : undefined}
         />
+        {places.loading && (
+          <span role="status" className="filterSearchLoading">
+            <Spinner size="sm" role={null} />
+            <span className="sr-only">{t("regionSearchLoading")}</span>
+          </span>
+        )}
         {text && (
           <button
             type="button"

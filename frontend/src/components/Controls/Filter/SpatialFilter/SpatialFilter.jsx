@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   BoundingBox,
   Check2,
+  BoxArrowUpRight,
   Clipboard,
   GeoAlt,
   Pentagon,
@@ -15,12 +16,14 @@ import {
   polygonToWkt,
 } from "../../../../utilities.jsx";
 import { useMapState } from "../../../../state/map/MapStateProvider.jsx";
+import { regionRecordUrl } from "../../../../state/regionSearch.js";
 import { useSelection } from "../../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../../state/ui/UIProvider.jsx";
 import {
   useGoToRegion,
   useRegionMatches,
 } from "../../../../state/useRegionSearch.js";
+import Spinner from "../../../ui/Spinner.jsx";
 import "../MultiCheckboxFilter/styles.css";
 import "./styles.css";
 
@@ -31,7 +34,7 @@ function PlaceSearch() {
   const { setShowFiltersModal } = useUI();
   const goTo = useGoToRegion();
   const [term, setTerm] = useState("");
-  const places = useRegionMatches(term.trim());
+  const { places, loading } = useRegionMatches(term.trim());
 
   const pick = (place, shape) => {
     setShowFiltersModal(false);
@@ -90,6 +93,12 @@ function PlaceSearch() {
           </li>
         ))}
       </ul>
+      {loading && (
+        <div role="status" className="spatialFilterPlacesLoading">
+          <Spinner size="sm" role={null} />
+          {t("regionSearchLoading")}
+        </div>
+      )}
       <p className="spatialFilterPlacesSource">
         {t("spatialFilterPlaceSource")}
       </p>
@@ -100,9 +109,9 @@ function PlaceSearch() {
 // Unlike SpatialFilterButton this doesn't auto-arm the last tool on open:
 // opening this pane is browsing, not the start of drawing.
 export default function SpatialFilter() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { requestDraw } = useMapState();
-  const { polygon } = useSelection();
+  const { polygon, areaPlace } = useSelection();
   const { setShowFiltersModal } = useUI();
 
   const [wktCopied, setWktCopied] = useState(false);
@@ -147,6 +156,25 @@ export default function SpatialFilter() {
       <PlaceSearch />
       {hasSelection && (
         <div className="spatialFilterDetails">
+          {areaPlace && (
+            <p className="spatialFilterPlaceApplied">
+              <span className="spatialFilterPlaceAppliedName">
+                {areaPlace.name}
+              </span>
+              <a
+                href={regionRecordUrl(
+                  areaPlace.cgndbid,
+                  i18n.language?.startsWith("fr") ? "fr" : "en",
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="spatial-filter-place-record"
+              >
+                {t("spatialFilterPlaceRecord")}
+                <BoxArrowUpRight size={12} aria-hidden="true" />
+              </a>
+            </p>
+          )}
           <dl className="spatialFilterBounds">
             <div className="spatialFilterBoundsNorth">
               <dt>{t("spatialFilterNorth")}</dt>

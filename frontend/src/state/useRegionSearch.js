@@ -6,16 +6,20 @@ import fetchJson from "./fetchJson.js";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import {
   parseRegions,
+  prefixQuery,
   regionBox,
   regionOutline,
   regionSearchUrl,
 } from "./regionSearch.js";
 import reportError from "./reportError.js";
+import { useSelection } from "./selection/SelectionProvider.jsx";
 
 export const REGION_MIN_LENGTH = 3;
 
 // Places from NRCan GeoNames, kept with the term they answer so a stale reply
-// is simply not shown, rather than cleared by an effect.
+// is simply not shown, rather than cleared by an effect. Matched as typed
+// first, then as written when that finds nothing. `loading` holds from the
+// keystroke, through the debounce, to the reply.
 export function useRegionMatches(term) {
   const { i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
@@ -26,23 +30,37 @@ export function useRegionMatches(term) {
   useEffect(() => {
     if (!wanted) return undefined;
     const controller = new AbortController();
-    fetchJson(regionSearchUrl(query, lang), { signal: controller.signal })
-      .then((geojson) => setResult({ query, items: parseRegions(geojson) }))
+    const search = (q) =>
+      fetchJson(regionSearchUrl(q, lang), { signal: controller.signal }).then(
+        parseRegions,
+      );
+    const prefixed = prefixQuery(query);
+    search(prefixed)
+      .then((items) =>
+        items.length || prefixed === query ? items : search(query),
+      )
+      .then((items) => setResult({ query, items }))
       .catch((error) => {
-        if (error.name !== "AbortError")
-          reportError("region search failed", error);
+        if (error.name === "AbortError") return;
+        reportError("region search failed", error);
+        setResult({ query, items: [] });
       });
     return () => controller.abort();
   }, [wanted, query, lang]);
 
-  return wanted && result.query === term ? result.items : [];
+  const answered = result.query === term;
+  return {
+    places: term.length >= REGION_MIN_LENGTH && answered ? result.items : [],
+    loading: term.length >= REGION_MIN_LENGTH && !answered,
+  };
 }
 
 // Frames a place on the map and, for `shape` 'polygon' or 'box', makes an
-// area the area filter as its outline or the box around it. A point place
-// can only be gone to.
+// area the area filter as its outline or the box around it, named after it.
+// A point place can only be gone to.
 export function useGoToRegion() {
   const { requestDraw, zoomToGeometry } = useMapState();
+  const { setAreaPlace } = useSelection();
   return useCallback(
     async (region, shape = "goto") => {
       zoomToGeometry(region.geometry);
@@ -52,11 +70,12 @@ export function useGoToRegion() {
           shape === "box"
             ? regionBox(region.geometry)
             : await regionOutline(region.geometry);
+        setAreaPlace({ name: region.name, cgndbid: region.cgndbid, ring });
         requestDraw("shape", ring);
       } catch (error) {
         reportError("region outline failed", error);
       }
     },
-    [requestDraw, zoomToGeometry],
+    [requestDraw, setAreaPlace, zoomToGeometry],
   );
 }

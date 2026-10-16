@@ -131,6 +131,7 @@ export default function FiltersPanel({ searchInputRef }) {
     setOnlyInView,
     inViewCount,
     polygon,
+    areaPlace,
   } = useSelection();
   const { openFilter, setOpenFilter, filterSearchText } = useUI();
   // Kept here so a visit to a filter's own page and back finds it as left.
@@ -268,11 +269,12 @@ export default function FiltersPanel({ searchInputRef }) {
   const spatialFilterTranslationKey = "spatialFilterFilterName";
   const hasSpatialFilter = Boolean(polygon);
   const spatialFilterBadgeTitle = hasSpatialFilter
-    ? t(
+    ? (areaPlace?.name ??
+      t(
         polygonIsRectangle(polygon)
           ? "drawBoundingBoxOption"
           : "drawPolygonOption",
-      )
+      ))
     : t(spatialFilterTranslationKey);
   const SpatialFilterIcon =
     hasSpatialFilter && !polygonIsRectangle(polygon) ? Pentagon : BoundingBox;

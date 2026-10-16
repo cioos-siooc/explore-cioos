@@ -36,6 +36,11 @@
   color: var(--cioos-ink);
 }
 
+.filterSearchLoading {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .filterSearchClear {
   display: inline-flex;
   flex: 0 0 auto;

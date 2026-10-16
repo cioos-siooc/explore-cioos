@@ -27,8 +27,14 @@ import "./styles.css";
 export default function QuickFilters() {
   const { t, i18n } = useTranslation();
   const { requestDraw, zoom } = useMapState();
-  const { polygon, onlyInView, setOnlyInView, inViewCount, realtimeCount } =
-    useSelection();
+  const {
+    polygon,
+    areaPlace,
+    onlyInView,
+    setOnlyInView,
+    inViewCount,
+    realtimeCount,
+  } = useSelection();
   const { ready: countsReady } = useDatasetCounts();
   const { realtimeOnly, setRealtimeOnly } = useFilters();
   const { offerTip, tipHighlight } = useTips();
@@ -111,8 +117,16 @@ export default function QuickFilters() {
           onClick={() => setAreaMenuOpen(!areaMenuOpen)}
           aria-expanded={areaMenuOpen}
           aria-controls={areaMenuOpen ? areaMenuId : undefined}
-          title={t("quickFilterAreaTitle")}
-          aria-label={t("spatialFilterFilterName")}
+          title={
+            areaPlace
+              ? `${t("spatialFilterFilterName")}: ${areaPlace.name}`
+              : t("quickFilterAreaTitle")
+          }
+          aria-label={
+            areaPlace
+              ? `${t("spatialFilterFilterName")}: ${areaPlace.name}`
+              : t("spatialFilterFilterName")
+          }
         >
           {polygonActive ? (
             <Pentagon size={18} aria-hidden="true" />
