@@ -1,10 +1,5 @@
-"""
-Unit tests for the discovery hook in cde_harvester.sources.obis.harvester.
-
-Covers the handoff between discovery and the harvester, and the guard that stops
-an empty dataset list from looking like "OBIS has no data" (which would let the
-db-loader prune every OBIS dataset out of the database).
-"""
+"""Discovery -> OBISHarvester handoff, and the guard that stops an empty dataset list
+reading as "OBIS has no data" (which would let the db-loader prune every OBIS dataset)."""
 
 from unittest.mock import MagicMock
 

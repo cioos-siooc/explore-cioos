@@ -1,10 +1,5 @@
-"""
-Unit tests for cde_harvester.sources.erddap.dataset.Dataset.
-
-Dataset.__init__ calls get_metadata() immediately, which calls
-erddap_server.erddap_csv_to_df. The mock_erddap_server fixture wires
-that method to return the standard info fixture so no HTTP calls occur.
-"""
+"""Unit tests for Dataset; mock_erddap_server serves the info fixture, so the
+get_metadata() call in __init__ makes no HTTP request."""
 
 import pandas as pd
 from conftest import (
@@ -83,12 +78,7 @@ class TestDatasetMetadataParsing:
 
 
 class TestPlottingAttributes:
-    """The attributes the faceted dataset preview needs.
-
-    All of these ride in on the same /info/ document get_metadata() already
-    downloads; they reach df_variables only because they are listed in
-    CONSIDERED_VARIABLE_ATTRIBUTES.
-    """
+    """Preview attributes reach df_variables only via CONSIDERED_VARIABLE_ATTRIBUTES."""
 
     def test_allowlist_covers_the_plotting_attributes(self):
         from cde_harvester.sources.erddap.dataset import (
@@ -179,12 +169,7 @@ class TestPlottingAttributes:
 
 
 class TestTableVariables:
-    """datasets.table_variables — the per-variable metadata the preview reads.
-
-    Before this column existed the whole df_variables frame was rebuilt on every
-    harvest and thrown away for tabledap, leaving the browser unable to title a
-    plot panel with anything but the raw column name.
-    """
+    """datasets.table_variables: the per-variable metadata the preview reads."""
 
     def test_one_entry_per_variable_in_frame_order(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)

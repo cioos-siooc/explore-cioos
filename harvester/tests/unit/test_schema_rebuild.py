@@ -144,9 +144,8 @@ class TestConfirmationGate:
 
 
 class TestDbNameResolution:
-    """The guard must resolve DB_NAME the way the connection does. Reading os.environ
-    directly made the flow fail with "DB_NAME is not set" on a worker whose engine
-    resolves it via load_dotenv from the run's working directory."""
+    """The guard must resolve DB_NAME the way the connection does (including
+    load_dotenv), not straight from os.environ."""
 
     def test_db_name_reads_dotenv_from_cwd(self, tmp_path, monkeypatch):
         from cde_harvester.core import db as core_db
@@ -175,9 +174,7 @@ class TestDbNameResolution:
 
 
 class TestDotenvSearchesAncestors:
-    """The .env is as likely to sit at the app root as in the harvester dir, and the flow
-    run's cwd is the harvester dir. Only checking $CWD/.env is what let DB_NAME look unset
-    to the guard while harvests connected fine."""
+    """The .env may sit at the app root or in the harvester dir (the flow run's cwd)."""
 
     def test_db_name_found_in_parent_directory(self, tmp_path, monkeypatch):
         from cde_harvester.core import db as core_db
@@ -233,8 +230,7 @@ class TestDotenvSearchesAncestors:
 
 class TestRequiredDbSettings:
     """A fresh Coolify deployment supplies none of the DB_* settings (see
-    .env.coolify.sample). Without them the worker used to start, register deployments,
-    and then fail inside every flow run — so they are reported up front instead."""
+    .env.coolify.sample), so they are reported up front, not inside every flow run."""
 
     def test_missing_settings_are_all_reported(self, tmp_path, monkeypatch):
         from cde_harvester.core import db as core_db
@@ -273,7 +269,7 @@ class TestRequiredDbSettings:
         assert core_db.missing_db_settings() == ["DB_NAME"]
 
     def test_database_url_names_every_missing_setting(self, tmp_path, monkeypatch):
-        """Was a bare KeyError naming only the first gap, with no hint it was config."""
+        """Every gap is named, and the error says it is configuration."""
         from cde_harvester.core import db as core_db
 
         for v in core_db.REQUIRED_DB_SETTINGS:
@@ -381,9 +377,8 @@ class _FakeEngine:
 
 
 class TestConfirmationMessagesAreDistinct:
-    """An empty confirm (the default, i.e. a Quick run) and a wrong confirm are different
-    operator mistakes and must not read the same — four consecutive red runs were spent
-    partly because 'Refusing to rebuild' looked like the previous env bug."""
+    """An empty confirm (the default, i.e. a Quick run) and a wrong confirm are
+    different operator mistakes and must not read the same."""
 
     def test_empty_confirm_says_it_is_expected_and_how_to_pass_it(self):
         with pytest.raises(ValueError) as exc:
@@ -533,11 +528,9 @@ class TestFlowCreatesMissingDatabase:
 
 
 class TestSearchPathIsolation:
-    """1_schema.sql ends with `SET search_path TO cde, public`. The db image's entrypoint
-    runs each file in its own psql process, so that SET never reaches 3_*..9_* and their
-    functions land in `public` — where the app looks for them. Applying every file on one
-    connection let the SET leak, creating them in `cde` instead, and the db-loader failed
-    with `function create_temp_tables() does not exist` AFTER a successful harvest."""
+    """1_schema.sql ends with `SET search_path TO cde, public`. The db image runs each
+    file in its own psql, so 3_*..9_* functions land in `public`, where the app looks;
+    applying every file on one connection would leak the SET and put them in `cde`."""
 
     def test_search_path_is_reset_before_each_file(self, tmp_path):
         f = tmp_path / "9_x.sql"

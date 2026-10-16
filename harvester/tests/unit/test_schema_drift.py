@@ -1,13 +1,5 @@
-"""Guardrail: the Pandera CSV contract must stay a subset of database/1_schema.sql.
-
-The harvester->db-loader column contract lives in cde_harvester/core/schemas.py
-and must be mirrored by the DDL (see database/README.md for the change
-procedure). This test parses the CREATE TABLE statements out of 1_schema.sql
-and fails when a Pandera schema declares a column the DDL doesn't have —
-catching the "updated the schema, forgot the SQL" drift before it reaches a
-deploy. The reverse (DDL columns absent from the Pandera schemas) is fine:
-several DB columns are filled by stored procedures, not the CSVs.
-"""
+"""Guardrail: every Pandera CSV column (core/schemas.py) must exist in
+database/1_schema.sql. The reverse is fine: stored procedures fill some DB columns."""
 
 import re
 from pathlib import Path

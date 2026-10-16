@@ -1,10 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.erddap.harvester.harvest_erddap.
-
-The ERDDAP class constructor is patched so no HTTP calls are made.
-Individual Dataset objects are returned as pre-built MagicMocks.
-harvest_erddap is a Prefect @task; .fn() bypasses the task wrapper.
-"""
+"""Unit tests for harvest_erddap; ERDDAP is patched and .fn() bypasses the @task."""
 
 from unittest.mock import MagicMock, patch
 
@@ -21,28 +15,20 @@ from conftest import (
     build_mock_dataset,
 )
 
-# ---------------------------------------------------------------------------
-# Fixture helpers
-# ---------------------------------------------------------------------------
 
 def _make_erddap_mock(datasets: list[tuple], domain: str = "test.erddap.com"):
-    """
-    Build a mock ERDDAP instance whose df_all_datasets contains the given rows.
-    Each tuple is (datasetID, cdm_data_type).
-    """
+    """Mock ERDDAP whose df_all_datasets holds (datasetID, cdm_data_type) rows."""
     mock_erddap = MagicMock()
     mock_erddap.domain = domain
     mock_erddap.url = ERDDAP_URL
 
     df = pd.DataFrame(datasets, columns=["datasetID", "cdm_data_type"])
     mock_erddap.df_all_datasets = df
-    # harvest() now (re)loads the dataset list via get_all_datasets() rather than
-    # reading a pre-set df_all_datasets attribute, so stub the call too.
+    # harvest() reloads the list via get_all_datasets(), so stub the call too.
     mock_erddap.get_all_datasets.return_value = df
     mock_erddap.get_logger.return_value = __import__("logging").getLogger("test")
-    # Caching: harvest_dataset() unpacks get_croissant_fingerprint() into
-    # (content_hash, has_files, reason). Stub it so the bare MagicMock doesn't
-    # unpack to 0 values; has_files=False means skip_unchanged never triggers.
+    # get_croissant_fingerprint() is unpacked into (content_hash, has_files,
+    # reason); has_files=False means skip_unchanged never triggers.
     mock_erddap.get_croissant_fingerprint.return_value = (None, False, None)
     return mock_erddap
 
@@ -65,11 +51,7 @@ def _make_profiles_df():
 
 
 def _run_harvest(erddap_mock, dataset_mock=None, limit=None):
-    """
-    Patch erddap_harvester.ERDDAP and get_profiles, then call harvest_erddap.
-    Returns a HarvestResult with .profiles, .datasets, .variables, .skipped.
-    Uses .fn() to bypass the Prefect @task decorator.
-    """
+    """Patch ERDDAP and get_profiles, then run harvest_erddap.fn()."""
     with (
         patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
         patch("cde_harvester.sources.erddap.harvester.extract_features") as mock_extract_features,
@@ -179,13 +161,8 @@ class TestHarvestErddapSkipping:
 
 
 class TestListingTimeCoverage:
-    """The harvest loop reads minTime/maxTime off the allDatasets listing.
-
-    Worth pinning rather than trusting: the columns are read with getattr()
-    defaults so an older server without them still harvests, which means a
-    mistyped column name would not raise -- it would silently leave every
-    dataset with no coverage and no dataset flagged realtime.
-    """
+    """minTime/maxTime are read with getattr() defaults, so a mistyped column
+    name would silently leave every dataset without coverage instead of raising."""
 
     def _harvest_with_listing(self, columns, row):
         erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])

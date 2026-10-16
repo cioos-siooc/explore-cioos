@@ -1,16 +1,6 @@
-"""
-Regression tests for the OBIS wiring in cde_harvester.prefect_pipeline.
-
-Two real bugs are pinned here:
-
-  1. `cde_pipeline()` never passed `obis_geo_filter` to `harvester_main`, so the
-     documented config block was silently ignored on the Prefect (production)
-     path. `test_cde_pipeline_passes_obis_geo_filter_and_discovery` is the test
-     that would have caught it.
-  2. Deployment registration and the fan-out source list both gated on a
-     non-empty `obis_dataset_ids`. Under discovery that list is empty at config
-     time, so OBIS would silently stop being harvested.
-"""
+"""OBIS wiring in cde_harvester.prefect_pipeline: obis_geo_filter must reach
+harvester_main, and OBIS must stay scheduled when discovery leaves
+obis_dataset_ids empty at config time."""
 
 
 import pytest
@@ -42,10 +32,6 @@ def config_file(tmp_path, monkeypatch):
     return _write
 
 
-# ---------------------------------------------------------------------------
-# _configured_sources
-# ---------------------------------------------------------------------------
-
 class TestConfiguredSources:
     def test_includes_obis_under_discovery_with_no_ids(self):
         sources = _configured_sources(
@@ -73,10 +59,6 @@ class TestConfiguredSources:
     def test_empty_when_nothing_configured(self):
         assert _configured_sources("", [], None) == []
 
-
-# ---------------------------------------------------------------------------
-# init_config
-# ---------------------------------------------------------------------------
 
 class TestInitConfig:
     def test_discovery_config_leaves_dataset_ids_empty(self, config_file):
@@ -123,10 +105,6 @@ class TestInitConfig:
         assert p.obis_discovery is None
 
 
-# ---------------------------------------------------------------------------
-# cde_pipeline -> harvester_main
-# ---------------------------------------------------------------------------
-
 class TestCdePipelineWiring:
     def test_cde_pipeline_passes_obis_geo_filter_and_discovery(
         self, config_file, tmp_path, monkeypatch
@@ -146,7 +124,6 @@ class TestCdePipelineWiring:
         p.init_config(config_file(config))
         p.cde_pipeline()
 
-        # The bug: neither of these was ever passed.
         assert captured["obis_geo_filter"] == {
             "mode": "canada", "exempt_node_ids": [NODE_A, NODE_B],
         }
@@ -205,10 +182,6 @@ class TestVernacularsTrigger:
         p.source = "obis"
         p.cde_pipeline()
 
-
-# ---------------------------------------------------------------------------
-# cde_harvest_all_run fan-out
-# ---------------------------------------------------------------------------
 
 class TestFanOut:
     def test_obis_in_fanout_under_discovery(self, config_file, monkeypatch):

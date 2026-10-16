@@ -1,12 +1,5 @@
-"""
-The redis cache-flush gate in cde_harvester.prefect_pipeline.
-
-A harvest used to drop the whole cache on every run, whether or not the load
-changed anything. In production every run is incremental, so a run where every
-dataset hashed unchanged still wiped redis — and the next visitor paid to
-rebuild responses that were byte-for-byte what had just been thrown away.
-The load now reports what it did, and the flush is gated on it.
-"""
+"""The redis cache-flush gate in cde_harvester.prefect_pipeline: in production every
+run is incremental, so a run that changed nothing must leave the cache warm."""
 
 import pytest
 import yaml
