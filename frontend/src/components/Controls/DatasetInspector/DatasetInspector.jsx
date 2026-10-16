@@ -222,9 +222,8 @@ export default function DatasetInspector({
       ]),
     [offerTip, isTrajectory, isRealtime, hasRecordList],
   );
-  // Start loading rather than false: the fetch below is fired from an effect,
-  // so an initial false would paint one frame of an empty record table before
-  // the spinner appears.
+  // Starting false would paint one frame of an empty table before the effect
+  // fires the fetch.
   const [loading, setLoading] = useState(hasRecordList);
   useActivityTask("activityRecordListText", loading);
 
@@ -453,21 +452,15 @@ export default function DatasetInspector({
     [eovsSelected],
   );
 
-  // Griddap is metadata-only and never enters the selection
-  // (handleSelectDataset drops it), so the button says why rather than
-  // failing silently on click.
   const inSelection = selectedPks.has(dataset.pk);
 
-  // Metadata (what it is, who made it) and Data (its features) are separate
-  // pages of the dataset. Both stay mounted, so a feature search and its page
-  // survive a trip to the other tab. Whatever points at a feature (a map
-  // click, a trajectory pass, "Show on map") belongs to Data, so it opens
-  // there.
+  // Both tabs stay mounted so a feature search and its page survive a trip to
+  // the other; anything pointing at a feature belongs to Data and opens it.
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const tab = searchParams.get(TAB_PARAM) === "data" ? "data" : "metadata";
-  // The tab is in the address (?tab=data), so a link opens on it. Replace, not
-  // push: flipping between two views of one page is not a place to go Back to.
+  // Replace, not push: flipping between views of one page is not a place to go
+  // Back to.
   const setTab = useCallback(
     (key) =>
       setSearchParams(
@@ -486,8 +479,7 @@ export default function DatasetInspector({
     markerRecordPinned || passes.size > 0 || onMapId !== undefined;
   useEffect(() => {
     if (jumpToData && tab !== "data") setTab("data");
-    // Only a feature newly pointed at moves the tab, not the user's own switch
-    // back to Metadata while it stays pointed at.
+    // Only a newly pointed-at feature moves the tab, not the user's own switch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpToData]);
   useEffect(() => {
@@ -514,9 +506,6 @@ export default function DatasetInspector({
           values={[dataset.title_translated, metadata?.abstract]}
         />
         <Organizations {...metadata} />
-        {/* Every action on this page, named. These are the only things here
-            that change anything: the values in the sheet below are read, not
-            clicked. */}
         <div className="datasetTitleActions">
           <button
             type="button"
@@ -595,10 +584,6 @@ export default function DatasetInspector({
           hidden={tab !== "metadata"}
         >
           <DatasetAbstract {...metadata} />
-          {/* The facts, tiles first (what it is, how much, where and when), then
-            the two lists that run long. Each cell is a small eyebrow label over
-            its value, two to a row in the sidebar. The sources link out to the
-            harvested record; the Resources card below holds the rest. */}
           <dl className="datasetMetaSheet">
             <div className="metaCell">
               <dt className="metadataLabel">
@@ -613,8 +598,6 @@ export default function DatasetInspector({
                 {t("datasetInspectorPlatformText")}
               </dt>
               <dd className="metadataValue">
-                {/* Nullable in the schema; an empty chip under a label reads as
-                  a broken field. */}
                 {dataset.platform ? (
                   <span className="metadataFact">
                     <span className="metadataPlatformGlyph" aria-hidden="true">
@@ -651,11 +634,8 @@ export default function DatasetInspector({
                 )}
               </dd>
             </div>
-            {/* Dataset-level freshness. coverage_time_max is the newest data the
-              server reported across EVERY record in the dataset, so for a
-              mooring network or a glider programme it is not the end of any one
-              record — which is why it is labelled on the dataset and the record
-              cards below keep their own (harvest-era) ranges. */}
+            {/* coverage_time_max spans every record, so it is not the end of any
+                one record's range. */}
             {dataset.coverage_time_max && (
               <div className="metaCell">
                 <dt className="metadataLabel">
@@ -665,8 +645,6 @@ export default function DatasetInspector({
                   <span className="metadataFact">
                     {formatInstant(dataset.coverage_time_max)}
                   </span>
-                  {/* Same badge as the dataset card's (DatasetCard.jsx) — the
-                    freshness signal sits beside the timestamp it explains. */}
                   {dataset.is_realtime && (
                     <span
                       className="datasetTitleLive"
@@ -684,7 +662,6 @@ export default function DatasetInspector({
                 {t("datasetInspectorOceanVariablesText")}
               </dt>
               <dd className="metadataValue">
-                {/* OBIS occurrence datasets carry no ocean variables at all. */}
                 {!dataset.eovs?.length && (
                   <span className="metadataEmpty">—</span>
                 )}
@@ -757,8 +734,6 @@ export default function DatasetInspector({
                 </span>
                 <IdCaption {...recordIdField} />
               </div>
-              {/* Names the accent ListCard puts on the pinned card below, and
-                offers the way to unpin it again. */}
               {markerRecordPinned && (
                 <div className="recordMapClickHint">
                   <span className="recordMapClickSwatch" aria-hidden="true" />
@@ -808,11 +783,6 @@ export default function DatasetInspector({
                   pagerLabel={t("datasetInspectorRecordsPagerLabel")}
                   perPageLabel={t("datasetInspectorRecordsPerPageLabel")}
                   renderItem={(row) => {
-                    // Which ocean variables this individual record carries — a
-                    // dataset's records don't all measure everything it lists.
-                    // Null for the sources with no per-record detection
-                    // (trajectory, OBIS, grid), where the dataset's own list is
-                    // the best answer available.
                     const eovs = (row.eovs ?? dataset.eovs)?.map((eov) =>
                       t(eov),
                     );
@@ -824,7 +794,6 @@ export default function DatasetInspector({
                         selected={onMap}
                         actions={
                           <>
-                            {/* A record with no id cannot be looked up again. */}
                             {row.profile_id && (
                               <button
                                 type="button"
