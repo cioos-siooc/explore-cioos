@@ -113,6 +113,12 @@ export default function SelectionProvider({ children }) {
   const [polygon, setPolygon] = useState(() =>
     selectionFromSearchParams(initialParams),
   );
+  // The place an area filter was picked from ({name, cgndbid, ring}). It names
+  // the filter only while the filter is that very ring: any edit or new
+  // drawing sets a new array, and the name goes with it.
+  const [areaPlaceShape, setAreaPlace] = useState();
+  const areaPlace =
+    polygon && areaPlaceShape?.ring === polygon ? areaPlaceShape : undefined;
   const [pointsToDownload, setPointsToDownload] = useState();
   // Debounced so sweeping the cursor across the list doesn't repaint the map
   // highlight per card crossed (and flash "all datasets" in the gaps).
@@ -727,6 +733,8 @@ export default function SelectionProvider({ children }) {
   const value = {
     polygon,
     setPolygon,
+    areaPlace,
+    setAreaPlace,
     pointsToReview,
     pointsToDownload,
     setPointsToDownload,

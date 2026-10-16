@@ -39,11 +39,15 @@ export function appliedOptions(group) {
   return applied.filter((o) => !covered.has(o.id));
 }
 
-// groups: [{ key, options: [{ label, matchText?, state, ... }] }]. With no term, the
-// options already applied (see appliedOptions), so the bar doubles as the list
-// to remove them from (plus any `keep(groupKey, option)` names, so one just
-// removed stays listed); otherwise the options that match the term, closest
-// first.
+// groups: [{ key, searched?, options: [{ label, matchText?, state, ... }] }]. With
+// no term, the options already applied (see appliedOptions), so the bar doubles
+// as the list to remove them from (plus any `keep(groupKey, option)` names, so
+// one just removed stays listed); otherwise the options that match the term,
+// closest first, and the groups ordered by their closest match so a group
+// that names the term outright is not listed below loose matches elsewhere. A
+// `searched` group was already matched against the term by the service it came
+// from: its options are kept as it ranked them, and only placed by how closely
+// they read like the term.
 export function matchFilterOptions(
   groups,
   term,
@@ -51,31 +55,40 @@ export function matchFilterOptions(
   keep = () => false,
 ) {
   const needle = term.trim();
+  if (!needle) {
+    return groups
+      .map((group) => {
+        const applied = new Set(appliedOptions(group));
+        return {
+          ...group,
+          options: group.options.filter(
+            (o) => applied.has(o) || keep(group.key, o),
+          ),
+        };
+      })
+      .filter((group) => group.options.length > 0);
+  }
   // A typo in a short word leaves too little of it to go on: "DFO" one letter
   // off matches half the catalogue. Short terms match near exactly, and the
   // tolerance grows with the term.
   const looseness = needle.length <= 3 ? 0.1 : needle.length <= 5 ? 0.25 : 0.35;
   return groups
     .map((group) => {
-      if (needle) {
-        const fuse = new Fuse(group.options, {
-          ...FUSE_OPTIONS,
-          threshold: looseness,
-        });
-        return {
-          ...group,
-          options: fuse.search(needle, { limit }).map(({ item }) => item),
-        };
-      }
-      const applied = new Set(appliedOptions(group));
-      return {
-        ...group,
-        options: group.options.filter(
-          (o) => applied.has(o) || keep(group.key, o),
-        ),
-      };
+      const fuse = new Fuse(group.options, {
+        ...FUSE_OPTIONS,
+        includeScore: true,
+        threshold: group.searched ? 1 : looseness,
+      });
+      const hits = fuse.search(needle, { limit });
+      const score = hits[0]?.score ?? 1;
+      const options = group.searched
+        ? group.options.slice(0, limit)
+        : hits.map(({ item }) => item);
+      return { group: { ...group, options }, score };
     })
-    .filter((group) => group.options.length > 0);
+    .filter(({ group }) => group.options.length > 0)
+    .sort((a, b) => a.score - b.score)
+    .map(({ group }) => group);
 }
 
 // Matched against deburred text, so the French words are spelled unaccented
