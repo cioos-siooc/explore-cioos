@@ -49,8 +49,14 @@ export default function UrlSync() {
   const location = useLocation();
   // Back/Forward land on an address written when that entry was left — before
   // the filters changed inside a sheet that Back has just closed, say — so a
-  // pop is rewritten from the current state like any change to it.
-  const poppedTo = useNavigationType() === "POP" ? location.key : null;
+  // pop is rewritten from the current state like any change to it. Held until
+  // the next pop: the replace that ends one (the page load counts as a pop)
+  // must not rewrite too, or it drops a param its writer just set.
+  const navigationType = useNavigationType();
+  const [poppedTo, setPoppedTo] = useState(location.key);
+  if (navigationType === "POP" && location.key !== poppedTo) {
+    setPoppedTo(location.key);
+  }
 
   const { query } = useFilters();
   const {
