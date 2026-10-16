@@ -285,6 +285,8 @@
   "cfRoleProfileIdText": "ID de profil",
   "cfRoleTrajectoryIdText": "ID de trajectoire",
   "metadataShowMoreText": "Afficher plus",
+  "metadataNoFrenchText": "Aucune traduction française n'est disponible pour ce jeu de données.",
+  "metadataNoEnglishText": "Aucune version anglaise n'est disponible pour ce jeu de données.",
   "metadataShowLessText": "Afficher moins",
   "metadataCopyCitationText": "Copier la citation",
   "metadataCopiedText": "Citation copiée",

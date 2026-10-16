@@ -23,11 +23,13 @@ const KEYWORD_LIMIT = 3;
 // "Show more".
 const ABSTRACT_CLAMP_LENGTH = 700;
 
+const pageLanguage = (language) => (language?.startsWith("fr") ? "fr" : "en");
+
 // A {en, fr} value in the page's language, else whichever language exists:
 // most records are bilingual, but an OBIS or ERDDAP-only one is English only.
 export function localized(value, language) {
   if (!value || typeof value === "string") return value || undefined;
-  const lang = language?.startsWith("fr") ? "fr" : "en";
+  const lang = pageLanguage(language);
   return value[lang] || value[lang === "fr" ? "en" : "fr"];
 }
 
@@ -170,6 +172,24 @@ export function KeywordsCell({ metadata }) {
         )}
       </dd>
     </div>
+  );
+}
+
+// Says so when a {en, fr} value (the title, the abstract) has nothing in the
+// page's language, since localized() then shows the other one without telling.
+export function NoTranslationNote({ values }) {
+  const { t, i18n } = useTranslation();
+  const language = pageLanguage(i18n.language);
+  if (
+    !values.some(
+      (value) => value && typeof value === "object" && !value[language],
+    )
+  )
+    return null;
+  return (
+    <p className="noTranslationNote">
+      {t(language === "fr" ? "metadataNoFrenchText" : "metadataNoEnglishText")}
+    </p>
   );
 }
 

@@ -284,6 +284,8 @@
   "cfRoleProfileIdText": "Profile ID",
   "cfRoleTrajectoryIdText": "Trajectory ID",
   "metadataShowMoreText": "Show more",
+  "metadataNoFrenchText": "No French translation is available for this dataset.",
+  "metadataNoEnglishText": "No English version is available for this dataset.",
   "metadataShowLessText": "Show less",
   "metadataCopyCitationText": "Copy citation",
   "metadataCopiedText": "Citation copied",

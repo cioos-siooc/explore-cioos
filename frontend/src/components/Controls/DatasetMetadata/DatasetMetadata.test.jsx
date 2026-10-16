@@ -11,6 +11,7 @@ import DatasetMetadata, {
   LicenseCell,
   MetadataExtentCells,
   Citation,
+  NoTranslationNote,
   Organizations,
   localized,
 } from "./DatasetMetadata.jsx";
@@ -45,6 +46,38 @@ describe("localized", () => {
     expect(localized({ en: "en" }, "fr")).toBe("en");
     expect(localized({ fr: "fr" }, "en")).toBe("fr");
     expect(localized(undefined, "en")).toBeUndefined();
+  });
+});
+
+describe("NoTranslationNote", () => {
+  it("says when the page's language has no translation", async () => {
+    const { i18n } = renderWithProviders(
+      <NoTranslationNote values={[{ en: "Title", fr: null }, undefined]} />,
+    );
+    expect(screen.queryByText(/No English version/)).not.toBeInTheDocument();
+    await act(() => i18n.changeLanguage("fr"));
+    expect(screen.getByText(/No French translation/)).toBeInTheDocument();
+  });
+
+  it("stays quiet when every value is translated", async () => {
+    const { i18n } = renderWithProviders(
+      <NoTranslationNote
+        values={[
+          { en: "T", fr: "T" },
+          { en: "A", fr: "A" },
+        ]}
+      />,
+    );
+    await act(() => i18n.changeLanguage("fr"));
+    expect(screen.queryByText(/No French translation/)).not.toBeInTheDocument();
+  });
+
+  it("flags an abstract that lacks the language even when the title has it", async () => {
+    const { i18n } = renderWithProviders(
+      <NoTranslationNote values={[{ en: "T", fr: "T" }, { en: "A" }]} />,
+    );
+    await act(() => i18n.changeLanguage("fr"));
+    expect(screen.getByText(/No French translation/)).toBeInTheDocument();
   });
 });
 

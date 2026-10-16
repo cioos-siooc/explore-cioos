@@ -25,6 +25,7 @@ import DatasetMetadata, {
   KeywordsCell,
   LicenseCell,
   MetadataExtentCells,
+  NoTranslationNote,
   Organizations,
   SourceLinksCell,
 } from "../DatasetMetadata/DatasetMetadata.jsx";
@@ -582,6 +583,9 @@ export default function DatasetInspector({
           />
           {dataset.title}
         </h2>
+        <NoTranslationNote
+          values={[dataset.title_translated, metadata?.abstract]}
+        />
         <Organizations {...metadata} />
         {/* Every action on this page, named. These are the only things here
             that change anything: the values in the sheet below are read, not
