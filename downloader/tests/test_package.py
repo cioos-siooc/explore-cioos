@@ -1,13 +1,23 @@
 import json
+import re
+import subprocess
+import sys
 import threading
 import time
+import tomllib
 import zipfile
+from importlib.metadata import version
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import unquote
 
+import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
-from erddap_downloader import download_erddap, downloader_wrapper
+import xarray as xr
+from erddap_downloader import download_erddap, downloader_wrapper, formats
 
 _CSV = (
     b"time,latitude,longitude,depth\n"
@@ -276,3 +286,143 @@ def test_downloads_run_concurrently_but_at_most_two_per_server(tmp_path):
 
     assert peak == {"data.example.ca": 2, "other.example.ca": 2}
     assert [r["dataset_id"] for r in report["erddap_report"]] == [d["dataset_id"] for d in datasets]
+
+
+# Inside: (-133, 50). Outside but within the bounding box: (-126, 55).
+_TRIANGLE = "POLYGON((-135 48, -125 48, -135 56, -135 48))"
+_POINTS = [(50.0, -133.0), (55.0, -126.0)]
+
+
+def _raw_csv(path):
+    path.write_text(
+        "time,latitude,longitude,depth\nUTC,degrees_north,degrees_east,m\n"
+        + "".join(f"2020-01-01T00:00:00Z,{lat},{lon},5.0\n" for lat, lon in _POINTS)
+    )
+
+
+def _raw_odv(path):
+    path.write_text(
+        "//<Creator>x</Creator>\n"
+        "Cruise\tStation\tType\tyyyy-mm-ddThh:mm:ss.sss\tLongitude [degrees_east]\tLatitude [degrees_north]\n"
+        + "".join(f"\t\t*\t2020-01-01T00:00:00.000Z\t{lon}\t{lat}\n" for lat, lon in _POINTS)
+    )
+
+
+def _raw_parquet(path):
+    lats, lons = zip(*_POINTS, strict=True)
+    table = pa.table({"latitude": lats, "longitude": lons}).replace_schema_metadata({"latitude_units": "degrees_north"})
+    pq.write_table(table, path)
+
+
+def _raw_nccf(path):
+    lats, lons = zip(*_POINTS, strict=True)
+    xr.Dataset(
+        {
+            "rowSize": ("profile", np.array([1, 1], dtype="int32"), {"sample_dimension": "obs"}),
+            "latitude": ("profile", np.array(lats)),
+            "longitude": ("profile", np.array(lons)),
+            "depth": ("obs", np.array([5.0, 6.0])),
+        },
+        attrs={"featureType": "profile", "geospatial_lat_min": 50.0, "geospatial_lat_max": 55.0},
+    ).to_netcdf(path)
+
+
+def _raw_obis(path):
+    lats, lons = zip(*_POINTS, strict=True)
+    interpreted = pa.StructArray.from_arrays(
+        [
+            pa.array(["Gadus morhua"] * 2),
+            pa.array(lats),
+            pa.array(lons),
+            pa.array([1577836800000] * 2),
+            pa.array([1577836800000] * 2),
+            pa.array([5.0] * 2),
+            pa.array([5.0] * 2),
+        ],
+        names=["scientificName", "decimalLatitude", "decimalLongitude", "date_start", "date_end",
+               "minimumDepthInMeters", "maximumDepthInMeters"],
+    )
+    pq.write_table(pa.table({"_id": ["a", "b"], "interpreted": interpreted}), path)
+
+
+def _reproduce(tmp_path, archive, edit=None):
+    archive.extractall(tmp_path / "unzipped")
+    root = tmp_path / "unzipped" / "cde_download_pkg001"
+    if edit:
+        edit(root)
+    result = subprocess.run([sys.executable, "reproduce.py"], cwd=root, capture_output=True, text=True)
+    return root, result
+
+
+def _point_requests_at(raw):
+    def edit(root):
+        datapackage = json.loads((root / "datapackage.json").read_text())
+        for subset in datapackage["x-cde-subsets"]:
+            subset["request_urls"] = [raw.as_uri()]
+        (root / "datapackage.json").write_text(json.dumps(datapackage))
+
+    return edit
+
+
+@pytest.mark.parametrize(
+    ("fmt", "write_raw"),
+    [("csv", _raw_csv), ("odv", _raw_odv), ("parquet", _raw_parquet), ("nccf", _raw_nccf)],
+)
+def test_reproduce_rebuilds_every_erddap_format_identically(tmp_path, fmt, write_raw):
+    raw = tmp_path / "raw"
+    write_raw(raw)
+    report, archive, _ = _run(
+        tmp_path, _query(_dataset("Ctd"), format=fmt, polygon_region=_TRIANGLE),
+        lambda url, **_: _response(body=raw.read_bytes()),
+    )
+    assert report["erddap_report"][0]["n_records"] == 1
+
+    root, result = _reproduce(tmp_path, archive, _point_requests_at(raw))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    [data] = report["erddap_report"][0]["files"]
+    assert f"match: {data['path']}" in result.stdout
+    assert (root / "reproduced" / data["path"]).read_bytes() == (root / data["path"]).read_bytes()
+
+
+@pytest.mark.parametrize("fmt", ["csv", "parquet"])
+def test_reproduce_rebuilds_obis_subsets_identically(tmp_path, monkeypatch, fmt):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    report, archive, _ = _run(tmp_path, _query(obis, format=fmt, polygon_region=_TRIANGLE))
+    assert report["erddap_report"][0]["n_records"] == 1
+
+    _, result = _reproduce(tmp_path, archive)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"match: abc_obis_org/abc_obis_org.{fmt}" in result.stdout
+
+
+def test_reproduce_reports_a_source_that_changed(tmp_path):
+    raw = tmp_path / "raw"
+    _raw_csv(raw)
+    _, archive, _ = _run(
+        tmp_path, _query(_dataset("Ctd"), polygon_region=_TRIANGLE), lambda url, **_: _response(body=raw.read_bytes())
+    )
+    raw.write_text(raw.read_text().replace("5.0", "7.0"))
+
+    _, result = _reproduce(tmp_path, archive, _point_requests_at(raw))
+
+    assert result.returncode == 1
+    assert "differs: Ctd_data_example_ca/Ctd_data_example_ca.csv" in result.stdout
+
+
+def test_reproduce_script_pins_the_versions_that_built_the_package(tmp_path):
+    _, archive, read = _run(tmp_path, _query(_dataset("Ctd")))
+
+    assert read("formats.py") == Path(formats.__file__).read_text()
+    block = re.search(r"^# /// script\n((?:#.*\n)+?)^# ///$", read("reproduce.py"), re.MULTILINE).group(1)
+    metadata = tomllib.loads("".join(line.removeprefix("#").removeprefix(" ") + "\n" for line in block.splitlines()))
+    assert f"pandas=={version('pandas')}" in metadata["dependencies"]
+    assert all("==" in d for d in metadata["dependencies"])
+    assert metadata["requires-python"] == f"=={sys.version_info.major}.{sys.version_info.minor}.*"
+    assert metadata["tool"]["uv"]["exclude-newer"]
+    crate = json.loads(read("ro-crate-metadata.json"))
+    assert {"reproduce.py", "formats.py"} <= {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}

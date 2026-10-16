@@ -150,6 +150,7 @@ cde_download_<job_id>/
   ro-crate-metadata.json  RO-Crate 1.2 provenance
   citations.txt / .bib / .ris, CITATION.cff
   rights.txt              the licence of each dataset
+  reproduce.py, formats.py  rebuild the data files (see below)
   <dataset_id>_<host>/    one folder per dataset
     <dataset_id>_<host>.csv|parquet|txt|nc
     citation.txt
@@ -163,7 +164,8 @@ source. The two manifests serve different readers:
   size, media type, columns with units, the request URLs (`sources`) and
   licence. A CSV's units row is declared as a comment row, so Frictionless
   validates the table. Datasets with no file are listed under `x-cde-failed`,
-  and the full query under `x-cde-query`.
+  and the full query under `x-cde-query`. `x-cde-subsets` lists each included
+  subset's folder, source, format and request URLs for `reproduce.py`.
 - **`ro-crate-metadata.json`** records provenance: one `CreateAction` per
   dataset, with the source dataset (by DOI, else its landing page), the request
   URLs, start and end times, and `CompletedActionStatus` or
@@ -171,6 +173,17 @@ source. The two manifests serve different readers:
 
 A download that matched nothing still produces a zip, so the user can read in
 the README what each dataset returned.
+
+### Reproducing a package
+
+`formats.py` is a copy of the downloader's filtering code, and `reproduce.py` a
+[uv](https://docs.astral.sh/uv/) script whose PEP 723 header pins the Python
+minor version and the exact library versions that built the package, with
+`exclude-newer` set to its creation time. `uv run reproduce.py` re-fetches
+every subset from its request URLs, applies the same polygon filter, writes the
+files to `reproduced/` and prints `match`, `differs` or `missing` for each
+against its sha256 in `datapackage.json`. A `PARTIAL` subset differs by design
+(no size limit applies locally), as does one whose source data changed.
 
 ### Citations
 

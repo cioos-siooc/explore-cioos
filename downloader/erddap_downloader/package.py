@@ -7,6 +7,8 @@ downloader report plus the query that produced it.
   the request URLs, timing and outcome, failures included.
 - citations.txt/.bib/.ris, CITATION.cff, rights.txt: GBIF-style citation and
   licence files; each dataset folder also carries its own citation.txt.
+- reproduce.py + formats.py: a uv script (PEP 723, dependencies pinned to the
+  versions that built the package) that re-fetches and re-filters every subset.
 
 Each subset citation follows ESIP / RDA dynamic-data-citation practice: the
 source's own citation, then the subset and the UTC time and URL it was
@@ -16,10 +18,13 @@ retrieved from.
 import hashlib
 import json
 import re
+import shutil
+import sys
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 
+from erddap_downloader import formats
 from erddap_downloader.download_erddap import COMPLETED, EMPTY, FAILED, IGNORED, PARTIAL
 from erddap_downloader.formats import FORMATS
 
@@ -27,6 +32,9 @@ INCLUDED = (COMPLETED, PARTIAL)
 SOFTWARE_URL = "https://github.com/cioos-siooc/explore-cioos"
 FRICTIONLESS_PROFILE = "https://datapackage.org/profiles/2.0/datapackage.json"
 RO_CRATE = "https://w3id.org/ro/crate/1.2"
+REPRODUCE_SCRIPT = Path(__file__).parent / "shipped" / "reproduce.py"
+# formats.py's imports, plus netcdf4 for xarray's NetCDF writer.
+REPRODUCE_DEPENDENCIES = ("duckdb", "netcdf4", "numpy", "pandas", "pyarrow", "shapely", "xarray")
 
 REASONS = {
     "en": {
@@ -82,7 +90,10 @@ _TEXT = {
             "- `datapackage.json`: Frictionless Data Package v2 describing the data files (checksums, "
             "columns, request URLs, licences).\n"
             "- `ro-crate-metadata.json`: RO-Crate 1.2 provenance: one action per dataset with its request "
-            "URLs, timing and outcome."
+            "URLs, timing and outcome.\n"
+            "- `reproduce.py`, `formats.py`: the code that filtered the data to your selection. "
+            "`uv run reproduce.py` (https://docs.astral.sh/uv/) re-fetches every subset, applies the same "
+            "filter and checks each file against its checksum in datapackage.json."
         ),
         "warnings": "Notes",
     },
@@ -122,7 +133,10 @@ _TEXT = {
             "- `datapackage.json` : Frictionless Data Package v2 décrivant les fichiers de données (sommes de "
             "contrôle, colonnes, URL des requêtes, licences).\n"
             "- `ro-crate-metadata.json` : provenance RO-Crate 1.2 : une action par jeu de données avec ses "
-            "URL de requête, sa durée et son résultat."
+            "URL de requête, sa durée et son résultat.\n"
+            "- `reproduce.py`, `formats.py` : le code qui a filtré les données selon votre sélection. "
+            "`uv run reproduce.py` (https://docs.astral.sh/uv/) récupère de nouveau chaque sous-ensemble, "
+            "applique le même filtre et vérifie chaque fichier avec sa somme de contrôle dans datapackage.json."
         ),
         "warnings": "Remarques",
     },
@@ -406,6 +420,8 @@ _FILE_KINDS = {
     "ckan_package.json": ("The dataset's CIOOS catalogue (CKAN) record", "application/json"),
     "obis_dataset.json": ("The dataset's OBIS record", "application/json"),
     "eml.xml": ("The dataset's Ecological Metadata Language record from its IPT", "application/xml"),
+    "reproduce.py": ("uv script that re-fetches and re-filters every subset of this package", "text/x-python"),
+    "formats.py": ("The filtering code that produced the data files, used by reproduce.py", "text/x-python"),
 }
 _ACTION_STATUSES = {"CompletedActionStatus": "Completed", "FailedActionStatus": "Failed"}
 
@@ -538,6 +554,22 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
     return {"@context": f"{RO_CRATE}/context", "@graph": graph}
 
 
+def _reproduce_script(created):
+    header = [
+        "# /// script",
+        # The pins may have no wheels for another Python minor version.
+        f'# requires-python = "=={sys.version_info.major}.{sys.version_info.minor}.*"',
+        "# dependencies = [",
+        *[f'#     "{name}=={version(name)}",' for name in REPRODUCE_DEPENDENCIES],
+        "# ]",
+        "# [tool.uv]",
+        # Transitive dependencies resolve as they stood when the package was built.
+        f'# exclude-newer = "{created}"',
+        "# ///",
+    ]
+    return "\n".join(header) + "\n" + REPRODUCE_SCRIPT.read_text()
+
+
 def write_package(root: Path, json_query, report):
     """Write the package files into ``root`` (the folder that gets zipped)."""
     user_query = json_query["user_query"]
@@ -597,8 +629,21 @@ def write_package(root: Path, json_query, report):
         "resources": resources,
         "x-cde-query": {k: v for k, v in user_query.items() if k not in ("email",)},
         "x-cde-failed": failed,
+        "x-cde-subsets": [
+            {
+                "dataset_id": row["dataset_id"],
+                "folder": row["folder"],
+                "source_type": row["source_type"],
+                "format": row["format"],
+                "status": row["status"],
+                "request_urls": row["download_url_list"],
+            }
+            for row, _, _ in included
+        ],
     }
     (root / "datapackage.json").write_text(json.dumps(datapackage, indent=2, ensure_ascii=False))
+    (root / "reproduce.py").write_text(_reproduce_script(created))
+    shutil.copyfile(formats.__file__, root / "formats.py")
 
     root_files = [
         "README.md",
@@ -608,6 +653,8 @@ def write_package(root: Path, json_query, report):
         "citations.ris",
         "CITATION.cff",
         "rights.txt",
+        "reproduce.py",
+        "formats.py",
     ]
     crate = _ro_crate(root, user_query, entries, created, root_files)
     (root / "ro-crate-metadata.json").write_text(json.dumps(crate, indent=2, ensure_ascii=False))
