@@ -1522,6 +1522,17 @@ export default function CreateMap({
       endDrawing();
       return;
     }
+    if (drawRequest.mode === "shape") {
+      endDrawing();
+      const [featureId] = drawPolygon.current.add({
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [drawRequest.ring] },
+      });
+      drawPolygon.current.changeMode("direct_select", { featureId });
+      highlightPoints(drawRequest.ring);
+      setPolygon(drawRequest.ring);
+      return;
+    }
     map.current.getCanvas().style.cursor = "crosshair";
     deleteAllShapes();
     creatingPolygon.current = true;
