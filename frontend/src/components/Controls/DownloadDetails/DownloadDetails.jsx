@@ -5,10 +5,11 @@ import isEmpty from "lodash-es/isEmpty";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
 import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
-import DownloadFormats from "./DownloadFormats.jsx";
+import DownloadScript from "./DownloadScript.jsx";
 import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
+import { useDownload } from "../../../state/download/DownloadProvider.jsx";
 
 import {
   applyDatasetPKs,
@@ -26,8 +27,6 @@ import {
 import { server } from "../../../config.js";
 import {
   buildDownloadLinks,
-  defaultErddapFormat,
-  defaultObisFormat,
   downloadConstraints,
 } from "../../../downloadLinks.js";
 import reportError from "../../../state/reportError.js";
@@ -54,11 +53,8 @@ export default function DownloadDetails({
   children,
 }) {
   const { t } = useTranslation();
+  const { scriptUrl, packageFormat } = useDownload();
   const [selectAll, setSelectAll] = useState(true);
-  // Lives here so the footer's exports and every card's link are built from
-  // one format and stay in step.
-  const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
-  const [obisFormat, setObisFormat] = useState(defaultObisFormat);
   const [pointsData, setPointsData] = useState(
     pointsToReview
       // Griddap is metadata-only and must never reach the estimate/queue flow.
@@ -248,9 +244,9 @@ export default function DownloadDetails({
   }
 
   const selectedCount = pointsData.filter((point) => point.selected).length;
-  // Includes datasets the 1 GB ceiling deselected: the queue refuses them, so
-  // that is where a direct link matters most. `!== false` because `selected`
-  // is unset until the estimates land, and a direct link needs none.
+  // Includes datasets the 1 GB ceiling deselected: the queue refuses them, and
+  // the script has no ceiling. `!== false` because `selected` is unset until
+  // the estimates land.
   const linkableDatasets = useMemo(
     () =>
       pointsData.filter(
@@ -258,38 +254,26 @@ export default function DownloadDetails({
       ),
     [pointsData],
   );
+  const scriptPks = linkableDatasets.map((point) => point.pk);
 
+  // A polygon can only reach ERDDAP as its bounding box, so direct links
+  // would hold data the package filters out; the script handles it.
+  const polygonFiltered = Boolean(polygon?.length && filterDownloadByPolygon);
   const constraints = useMemo(
     () =>
       downloadConstraints({
         query,
-        polygon,
         byTime: filterDownloadByTime,
         byDepth: filterDownloadByDepth,
-        byPolygon: filterDownloadByPolygon,
       }),
-    [
-      query,
-      polygon,
-      filterDownloadByTime,
-      filterDownloadByDepth,
-      filterDownloadByPolygon,
-    ],
+    [query, filterDownloadByTime, filterDownloadByDepth],
   );
-
   const links = useMemo(
     () =>
-      buildDownloadLinks(
-        linkableDatasets,
-        { erddapFormat, obisFormat },
-        constraints,
-      ),
-    [linkableDatasets, erddapFormat, obisFormat, constraints],
-  );
-
-  const linksByPk = useMemo(
-    () => new Map(links.map((link) => [link.pk, link])),
-    [links],
+      polygonFiltered
+        ? []
+        : buildDownloadLinks(linkableDatasets, packageFormat, constraints),
+    [polygonFiltered, linkableDatasets, packageFormat, constraints],
   );
 
   return (
@@ -321,7 +305,6 @@ export default function DownloadDetails({
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
-            downloadLinksByPk={linksByPk}
           />
         </div>
       </div>
@@ -383,19 +366,12 @@ export default function DownloadDetails({
 
         {children}
 
-        <DirectDownloadLinks
-          links={links}
-          constraints={constraints}
-          formatControls={
-            <DownloadFormats
-              links={links}
-              erddapFormat={erddapFormat}
-              setErddapFormat={setErddapFormat}
-              obisFormat={obisFormat}
-              setObisFormat={setObisFormat}
-            />
-          }
-        />
+        <div className="downloadFooterSection directLinks">
+          <DownloadScript url={scriptUrl(scriptPks)} count={scriptPks.length} />
+          {!polygonFiltered && (
+            <DirectDownloadLinks links={links} constraints={constraints} />
+          )}
+        </div>
       </div>
     </div>
   );

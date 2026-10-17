@@ -684,42 +684,6 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
-.datasetCardDownloadGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.datasetCardLinkWarning {
-  display: inline-flex;
-  align-items: center;
-  color: var(--cioos-warn);
-}
-
-.datasetCardIconLink {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  background: transparent;
-  color: var(--cioos-ink-40);
-  cursor: pointer;
-  transition: color var(--cioos-transition-fast);
-}
-
-@media (hover: hover) {
-  .datasetCardIconLink:hover {
-    color: var(--cioos-primary-700);
-    background-color: var(--cioos-surface-2);
-  }
-}
-
-.datasetCardIconLink:focus-visible {
-  outline: 2px solid var(--cioos-primary-700);
-  outline-offset: 1px;
-}
-
 .downloadableIcon.success {
   color: var(--cioos-success);
 }

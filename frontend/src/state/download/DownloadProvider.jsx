@@ -127,7 +127,8 @@ export default function DownloadProvider({ children }) {
     submitRequest();
   }
 
-  function submitRequest() {
+  // The selection as both the package queue and the download script read it.
+  function downloadQuery(pks) {
     const downloadQuery = { ...query };
     if (
       (startDate !== defaultStartDate || endDate !== defaultEndDate) &&
@@ -145,13 +146,24 @@ export default function DownloadProvider({ children }) {
     }
     // A Datasets filter already writes datasetPKs; applyDatasetPKs replaces it,
     // because a repeated key reaches the API as an array and 500s.
-    let url = `${server}/download?${applyDatasetPKs(
+    let queryString = `${applyDatasetPKs(
       createDataFilterQueryString(downloadQuery),
-      pointsToDownload.map((point) => point.pk),
+      pks,
     )}&lang=${i18n.language}&format=${packageFormat}`;
     if (polygon && filterDownloadByPolygon) {
-      url += `&polygon=${JSON.stringify(polygon)}`;
+      queryString += `&polygon=${JSON.stringify(polygon)}`;
     }
+    return queryString;
+  }
+
+  function scriptUrl(pks) {
+    return `${server}/download/script?${downloadQuery(pks)}`;
+  }
+
+  function submitRequest() {
+    const url = `${server}/download?${downloadQuery(
+      pointsToDownload.map((point) => point.pk),
+    )}`;
     // The address goes in the body: a URL is written to access logs and
     // recorded by Sentry's request tracing, and a body is not.
     fetch(url, {
@@ -194,6 +206,7 @@ export default function DownloadProvider({ children }) {
     setPackageFormat,
     handleEmailChange,
     handleSubmission,
+    scriptUrl,
   };
 
   return (

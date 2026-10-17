@@ -236,21 +236,32 @@ describe("DownloadDetails", () => {
     );
   });
 
-  it("shows the direct links and each card's download link up front", () => {
-    renderDetails({
-      pointsToReview: [
-        makePoint({
-          pk: EST_SMALL.pk,
-          dataset_id: "small",
-          erddap_url: "https://example.org/erddap/tabledap/small.html",
-        }),
-      ],
-    });
+  it("offers direct links without a polygon filter, and only the script with one", () => {
+    const polygon = [
+      [-65, 44],
+      [-62, 44],
+      [-63, 45],
+      [-65, 44],
+    ];
+    const { rerender } = renderDetails();
     expect(screen.getByTestId("direct-links")).toBeInTheDocument();
-    expect(screen.getByTestId("download-formats")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^Download / })).toHaveAttribute(
-      "href",
-      expect.stringContaining("/tabledap/small."),
+
+    rerender(detailsElement({ polygon, filterDownloadByPolygon: true }));
+    expect(screen.queryByTestId("direct-links")).not.toBeInTheDocument();
+    expect(screen.getByTestId("download-script")).toBeInTheDocument();
+  });
+
+  it("links the download script to the package's selection and format", () => {
+    renderDetails();
+    const link = screen.getByRole("link", { name: "Download script" });
+    const url = new URL(link.getAttribute("href"), "http://localhost");
+    expect(url.pathname).toMatch(/\/download\/script$/);
+    expect(url.searchParams.get("datasetPKs")).toBe(
+      `${EST_SMALL.pk},${EST_LARGE.pk}`,
+    );
+    expect(url.searchParams.get("format")).toBe("csv");
+    expect(screen.getByTestId("download-script")).toHaveTextContent(
+      "2 datasets",
     );
   });
 });
