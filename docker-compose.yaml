@@ -44,6 +44,7 @@ x-db-env: &db-env
 
 services:
   db:
+    restart: unless-stopped
     build: ./database
     platform: linux/x86_64
     # Parallel workers allocate shared memory in /dev/shm; Docker's 64MB default
@@ -133,6 +134,7 @@ services:
       db_migrate:
         condition: service_completed_successfully
   nginx:
+    restart: unless-stopped
     build:
         context: ./nginx
         dockerfile: Dockerfile
@@ -175,6 +177,7 @@ services:
     volumes:
       - downloads:/usr/src/app/download_scheduler/downloads
   frontend:
+    restart: unless-stopped
     build:
       # Repo root, not ./frontend: the harvest docs page bundles docs/harvesting.
       context: .
@@ -356,6 +359,7 @@ services:
     restart: unless-stopped
 
   redis:
+    restart: unless-stopped
     # Pinned. `redis:alpine` is a floating tag: the cache could cross a major
     # version on any rebuild.
     image: redis:8.10-alpine

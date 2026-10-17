@@ -149,8 +149,8 @@ export default function MapStateProvider({ children }) {
   );
   // The nonce lets the same extent be re-requested after panning away.
   const [zoomTarget, setZoomTarget] = useState();
-  // mode is 'box', 'polygon' or 'clear'; the nonce lets the same mode be
-  // re-requested.
+  // mode is 'box', 'polygon', 'clear', or 'shape' with a ready-made `ring`
+  // (a region picked by name); the nonce lets the same mode be re-requested.
   const [drawRequest, setDrawRequest] = useState();
   // For a caller with no click to give (the tips tour). Answered once the map
   // has settled, so a camera move requested alongside it lands first.
@@ -187,8 +187,8 @@ export default function MapStateProvider({ children }) {
     if (geometry) setZoomTarget({ geometry, camera, nonce: Date.now() });
   }, []);
 
-  const requestDraw = useCallback((mode) => {
-    setDrawRequest({ mode, nonce: Date.now() });
+  const requestDraw = useCallback((mode, ring) => {
+    setDrawRequest({ mode, ring, nonce: Date.now() });
   }, []);
 
   const requestFeatureQueryAt = useCallback((lngLat) => {
