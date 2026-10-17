@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-from erddap_downloader import downloader_wrapper
+from cioos_downloader import downloader_wrapper
 
 QUERIES = list((Path(__file__).parent / "queries").glob("*.json"))
 
@@ -16,17 +16,7 @@ _FAKE_CSV_BYTES = (
     b"2020-01-01T00:00:00Z,52.0,-130.0,5.0\r\n"
 )
 
-_FAKE_VARS = pd.DataFrame(
-    {"name": ["time", "latitude", "longitude", "depth"], "cf_role": ["", "", "", ""]}
-)
-
-
-def _mock_erddap_class():
-    """Mock for cde_harvester.sources.erddap.client — returns a fake dataset with minimal variable metadata."""
-    instance = MagicMock()
-    instance.get_dataset.return_value.df_variables = _FAKE_VARS
-    cls = MagicMock(return_value=instance)
-    return cls
+_FAKE_VARS = ["time", "latitude", "longitude", "depth"]
 
 
 def _mock_requests_response():
@@ -55,19 +45,16 @@ def test_queries_exist():
 def test_downloader_query(query, tmp_path):
     query_data = json.loads(query.read_text())
     with (
+        patch("cioos_downloader.download_erddap._variables", return_value=_FAKE_VARS),
         patch(
-            "erddap_downloader.download_erddap.cde_harvester.ERDDAP",
-            new=_mock_erddap_class(),
-        ),
-        patch(
-            "erddap_downloader.download_erddap.ERDDAP",
+            "cioos_downloader.download_erddap.ERDDAP",
             new=_mock_erddapy_class(),
         ),
         patch(
-            "erddap_downloader.download_erddap.requests.get",
+            "cioos_downloader.download_erddap.requests.get",
             return_value=_mock_requests_response(),
         ),
-        patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]),
+        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
     ):
         result = downloader_wrapper.run_download_query(
             download_query=query_data,
@@ -105,7 +92,7 @@ def test_obis_download_parquet(tmp_path):
 
     with (
         patch("duckdb.connect") as connect,
-        patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]) as save_meta,
+        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]) as save_meta,
     ):
         duck_execute = connect.return_value.__enter__.return_value.execute
         duck_execute.return_value = duck_result
@@ -140,7 +127,7 @@ def test_obis_download_empty(tmp_path):
 
     with (
         patch("duckdb.connect") as connect,
-        patch("erddap_downloader.download_erddap.save_source_metadata", return_value=[]),
+        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
     ):
         connect.return_value.__enter__.return_value.execute.return_value = duck_result
         result = downloader_wrapper.run_download_query(

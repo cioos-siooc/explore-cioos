@@ -2,6 +2,9 @@
 download_erddap regroup a set of tool used by CDE to download ERDDAP datasets.
 """
 
+import io
+import re
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -9,21 +12,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
-import cde_harvester.sources.erddap.client as cde_harvester
+import pandas as pd
 import requests
-from cde_harvester.core.errors import HTTP_ERROR, UNKNOWN_ERROR
-from cde_harvester.core.issues import erddap_error_text
 from erddapy import ERDDAP
 from loguru import logger
 
-from erddap_downloader.formats import (
+from cioos_downloader.formats import (
     REQUEST_HEADERS,
     polygon_regions,
     query_box,
     write_obis,
     write_subset,
 )
-from erddap_downloader.source_metadata import save_source_metadata
+from cioos_downloader.source_metadata import save_source_metadata
 
 ONE_MB = 10**6
 DATASET_SIZE_LIMIT = 1000 * ONE_MB
@@ -45,6 +46,8 @@ FAILED = "FAILED"
 EMPTY = "EMPTY"
 IGNORED = "IGNORED"
 
+HTTP_ERROR = "HTTP_ERROR"
+UNKNOWN_ERROR = "UNKNOWN_ERROR"
 DATASET_SIZE_LIMIT_HIT = "DATASET_SIZE_LIMIT"
 QUERY_SIZE_LIMIT_HIT = "QUERY_SIZE_LIMIT"
 
@@ -73,6 +76,11 @@ FORMATS = {
 DEFAULT_FORMAT = "csv"
 # OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition of it.
 OBIS_FORMATS = ("csv", "parquet")
+
+
+# ERDDAP error envelope: Error { code=500; message="Query error: ..."; }
+_ERDDAP_MESSAGE_RE = re.compile(r'message\s*=\s*"(.*?)"\s*;?\s*\}?\s*$', re.DOTALL | re.IGNORECASE)
+MAX_ERROR_CHARS = 500
 
 
 def erddap_server_to_name(server):
@@ -117,6 +125,10 @@ def feature_constraints(dataset):
     return [{f"{variable}=~": "(" + "|".join(chunk) + ")"} for chunk in chunks]
 
 
+def _day_bound(value, time_of_day):
+    return value + time_of_day if len(value) == len("YYYY-MM-DD") else value
+
+
 def get_erddap_download_url(dataset, user_query, variables, region=None, response="csv", extra=None):
     e = ERDDAP(server=dataset["erddap_url"], protocol="tabledap")
     e.response = response
@@ -127,10 +139,11 @@ def get_erddap_download_url(dataset, user_query, variables, region=None, respons
         e.variables = variables
     e.constraints = dict(extra or {})
 
+    # The UI sends whole days; a bare date would end the range at its midnight.
     if user_query.get("time_min"):
-        e.constraints["time>="] = user_query["time_min"]
+        e.constraints["time>="] = _day_bound(user_query["time_min"], "T00:00:00Z")
     if user_query.get("time_max"):
-        e.constraints["time<="] = user_query["time_max"]
+        e.constraints["time<="] = _day_bound(user_query["time_max"], "T23:59:59Z")
 
     # Feature IDs already pin the selection in space.
     box = None if extra else query_box(user_query, region)
@@ -152,12 +165,32 @@ def get_erddap_download_url(dataset, user_query, variables, region=None, respons
 def _variables(dataset):
     if dataset.get("table_variables"):
         return [v["name"] for v in dataset["table_variables"]]
-    return cde_harvester.ERDDAP(dataset["erddap_url"]).get_dataset(dataset["dataset_id"]).df_variables["name"].to_list()
+    info_url = ERDDAP(dataset["erddap_url"]).get_info_url(dataset["dataset_id"], response="csv")
+    with requests.get(info_url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT) as response:
+        response.raise_for_status()
+        info = pd.read_csv(io.StringIO(response.text))
+    return info.loc[info["Row Type"] == "variable", "Variable Name"].to_list()
+
+
+def _server_error(response):
+    """ERDDAP's error message, else the body's first line, without tags."""
+    text = getattr(response, "text", None)
+    if not isinstance(text, str) or not text.strip():
+        return ""
+    match = _ERDDAP_MESSAGE_RE.search(text.strip())
+    if match:
+        text = match.group(1)
+    else:
+        text = re.sub(r"<[^>]+>", " ", text.strip())
+        text = next((line for line in text.splitlines() if line.strip()), "")
+    return " ".join(text.split())[:MAX_ERROR_CHARS]
 
 
 class _QueryBudget:
-    def __init__(self):
+    def __init__(self, dataset_limit, query_limit):
         self._lock = threading.Lock()
+        self.dataset_limit = dataset_limit
+        self.query_limit = query_limit
         self.total = 0
 
     def add(self, size):
@@ -167,7 +200,7 @@ class _QueryBudget:
 
     def exceeded(self):
         with self._lock:
-            return self.total > QUERY_SIZE_LIMIT
+            return self.total > self.query_limit
 
 
 class _ServerSlots:
@@ -181,12 +214,12 @@ class _ServerSlots:
             return self._slots.setdefault(host, threading.Semaphore(MAX_REQUESTS_PER_SERVER))
 
 
-def _stream_to_file(url, path: Path, already_downloaded):
+def _stream_to_file(url, path: Path, already_downloaded, limit):
     """Returns (bytes_written, error, empty, truncated)."""
     written = 0
     with requests.get(url, headers=REQUEST_HEADERS, stream=True, timeout=REQUEST_TIMEOUT) as response:
         if response.status_code != 200:
-            server_error = erddap_error_text(response)
+            server_error = _server_error(response)
             error = " ".join(filter(None, [f"HTTP {response.status_code}", response.reason]))
             error += f": {server_error}" if server_error else ""
             # ERDDAP also answers 404 for an unknown datasetID, which is a fault.
@@ -194,7 +227,7 @@ def _stream_to_file(url, path: Path, already_downloaded):
             return 0, error, empty, False
         with open(path, "wb") as f:
             for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-                allowed = DATASET_SIZE_LIMIT - already_downloaded - written
+                allowed = limit - already_downloaded - written
                 f.write(chunk[:allowed])
                 written += min(len(chunk), allowed)
                 if len(chunk) > allowed:
@@ -259,7 +292,7 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
 
         logger.info("Download {}", url)
         part = folder / f".part{i}"
-        written, error, empty, truncated = _stream_to_file(url, part, row["bytes_downloaded"])
+        written, error, empty, truncated = _stream_to_file(url, part, row["bytes_downloaded"], budget.dataset_limit)
         row["bytes_downloaded"] += written
         if error:
             errors.append(error)
@@ -275,7 +308,7 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
                 part.unlink()
                 row.update(status=FAILED, reason_code=DATASET_SIZE_LIMIT_HIT)
                 errors.append(
-                    f"Over the {DATASET_SIZE_LIMIT // ONE_MB} MB per-dataset limit; "
+                    f"Over the {budget.dataset_limit // ONE_MB} MB per-dataset limit; "
                     "try a smaller selection or CSV."
                 )
                 continue
@@ -341,11 +374,16 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
     return row
 
 
-def get_datasets(json_query, output_path):
+def get_datasets(json_query, output_path, size_limits=True):
     user_query = json_query["user_query"]
     regions = polygon_regions(user_query.get("polygon_region"))
     requested_format = user_query.get("format") or DEFAULT_FORMAT
-    budget, slots = _QueryBudget(), _ServerSlots()
+    # The limits protect the server; a user's own run has none.
+    if size_limits:
+        budget = _QueryBudget(DATASET_SIZE_LIMIT, QUERY_SIZE_LIMIT)
+    else:
+        budget = _QueryBudget(sys.maxsize, sys.maxsize)
+    slots = _ServerSlots()
     root = Path(output_path)
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:

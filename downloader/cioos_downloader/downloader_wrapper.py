@@ -2,9 +2,9 @@ import os
 import shutil
 from pathlib import Path
 
-from erddap_downloader import download_erddap
-from erddap_downloader.package import write_package
-from erddap_downloader.zip_folder import zip_folder
+from cioos_downloader import download_erddap
+from cioos_downloader.package import write_package
+from cioos_downloader.zip_folder import zip_folder
 
 
 def run_download_query(download_query, output_folder):

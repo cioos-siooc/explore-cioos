@@ -63,7 +63,7 @@ required):
 ```sh
 ./test_downloader.sh tests/queries/no_polygon.json
 # or directly:
-uv run python -m erddap_downloader tests/queries/no_polygon.json --output_folder out
+uv run python -m cioos_downloader tests/queries/no_polygon.json --output_folder out
 ```
 
 ### Dataset types

@@ -35,9 +35,9 @@ from urllib.parse import urlparse
 
 from markdown_it import MarkdownIt
 
-from erddap_downloader import formats
-from erddap_downloader.download_erddap import COMPLETED, EMPTY, FAILED, FORMATS, IGNORED, PARTIAL
-from erddap_downloader.formats import sha256
+from cioos_downloader import formats
+from cioos_downloader.download_erddap import COMPLETED, EMPTY, FAILED, FORMATS, IGNORED, PARTIAL
+from cioos_downloader.formats import sha256
 
 INCLUDED = (COMPLETED, PARTIAL)
 SOFTWARE_URL = "https://github.com/cioos-siooc/explore-cioos"
@@ -121,8 +121,8 @@ _TEXT = {
         "copy": "Copy citation",
         "copied": "Copied",
         "contents": "Package contents",
+        "contents_html": "- `README.html`: this summary as a web page.",
         "contents_text": (
-            "- `README.html`: this summary as a web page.\n"
             "- `<dataset folder>/`: the data subset, its citation.txt, and the source's own metadata records "
             "(metadata.json as shown in the Data Explorer, erddap.nccsvMetadata, ckan_iso19115.xml, "
             "obis_dataset.json, eml.xml where available).\n"
@@ -204,8 +204,8 @@ _TEXT = {
         "copy": "Copier la citation",
         "copied": "Copié",
         "contents": "Contenu du paquet",
+        "contents_html": "- `README.html` : ce résumé sous forme de page web.",
         "contents_text": (
-            "- `README.html` : ce résumé sous forme de page web.\n"
             "- `<dossier du jeu de données>/` : le sous-ensemble, son citation.txt et les fiches de métadonnées "
             "de la source (metadata.json tel qu'affiché dans l'Explorateur, erddap.nccsvMetadata, "
             "ckan_iso19115.xml, obis_dataset.json, eml.xml selon le cas).\n"
@@ -475,7 +475,7 @@ def _readme_citation(row, metadata, lang, t):
     return lines
 
 
-def _readme(root, user_query, entries, created, lang):
+def _readme(root, user_query, entries, created, lang, readme_html):
     t = _TEXT[lang]
     included = [e for e in entries if e[0]["status"] in INCLUDED]
     # Jobs queued before web-api recorded the explorer URL have none.
@@ -544,7 +544,7 @@ def _readme(root, user_query, entries, created, lang):
     for row, metadata, lng in included:
         lines.append(f"| {_cell(_title(row, lng))} | {_readme_licence(_licence(metadata), t)} |")
     lines += ["", f"## {t['reproduce']}", "", t["reproduce_text"]]
-    lines += ["", f"## {t['contents']}", "", t["contents_text"], ""]
+    lines += ["", f"## {t['contents']}", "", *([t["contents_html"]] if readme_html else []), t["contents_text"], ""]
 
     sections = [line.removeprefix("## ") for line in lines if line.startswith("## ")]
     toc = [t["toc"], "", *[f"- [{s}](#{_slug(s)})" for s in sections], ""]
@@ -618,7 +618,7 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
             "@id": "#cde-downloader",
             "@type": "SoftwareApplication",
             "name": "CIOOS Data Explorer downloader",
-            "version": version("downloader"),
+            "version": version("cioos-downloader"),
             "url": SOFTWARE_URL,
         },
         {"@id": "https://cioos.ca", "@type": "Organization", "name": "CIOOS"},
@@ -759,7 +759,7 @@ def _script_header(pins, python):
 
 def build_reproduce_lock():
     """Relock after a dependency bump, from download_scheduler/ (the image's environment):
-    uv run python -c "from erddap_downloader.package import build_reproduce_lock; build_reproduce_lock()"
+    uv run python -c "from cioos_downloader.package import build_reproduce_lock; build_reproduce_lock()"
     """
     pins = {name: f"=={version(name)}" for name in REPRODUCE_DEPENDENCIES}
     # The pins may have no wheels for another Python minor version.
@@ -777,8 +777,9 @@ def _reproduce_script():
     return _script_header(pins, lock["requires-python"]) + Path(formats.__file__).read_text()
 
 
-def write_package(root: Path, json_query, report):
-    """Write the package files into ``root`` (the folder that gets zipped)."""
+def write_package(root: Path, json_query, report, readme_html=True):
+    """Write the package files into ``root`` (the folder that gets zipped).
+    The download script skips README.html: its CIOOS page is for the emailed zip."""
     user_query = json_query["user_query"]
     lang = _lang(user_query)
     created = datetime.now(UTC).isoformat(timespec="seconds")
@@ -800,10 +801,11 @@ def write_package(root: Path, json_query, report):
         entries.append((row, metadata, lang))
     included = [e for e in entries if e[0]["status"] in INCLUDED]
 
-    readme = _readme(root, user_query, entries, created, lang)
+    readme = _readme(root, user_query, entries, created, lang, readme_html)
     (root / "README.md").write_text(readme)
-    citations = {row["folder"]: citation(row, metadata, user_query, lg) for row, metadata, lg in included}
-    (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
+    if readme_html:
+        citations = {row["folder"]: citation(row, metadata, user_query, lg) for row, metadata, lg in included}
+        (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
     (root / "citations.txt").write_text("\n\n".join(citation(r, m, user_query, lg) for r, m, lg in included) + "\n")
     (root / "citations.bib").write_text("\n\n".join(_bibtex(*e[:2], user_query, e[2]) for e in included) + "\n")
     (root / "citations.ris").write_text("\n\n".join(_ris(*e[:2], user_query, e[2]) for e in included) + "\n")
@@ -817,10 +819,9 @@ def write_package(root: Path, json_query, report):
         )
     (root / "rights.txt").write_text("\n".join(rights) + "\n")
 
-    resources = [
-        {"name": "readme", "path": "README.md", "mediatype": "text/markdown"},
-        {"name": "readme-html", "path": "README.html", "mediatype": "text/html"},
-    ]
+    resources = [{"name": "readme", "path": "README.md", "mediatype": "text/markdown"}]
+    if readme_html:
+        resources.append({"name": "readme-html", "path": "README.html", "mediatype": "text/html"})
     for row, metadata, _ in included:
         resources += [_resource(root, row, file, _licence(metadata)) for file in row["files"]]
     failed = [
@@ -861,7 +862,7 @@ def write_package(root: Path, json_query, report):
 
     root_files = [
         "README.md",
-        "README.html",
+        *(["README.html"] if readme_html else []),
         "datapackage.json",
         "citations.txt",
         "citations.bib",

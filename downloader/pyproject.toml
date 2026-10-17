@@ -1,5 +1,5 @@
 [project]
-name = "downloader"
+name = "cioos-downloader"
 version = "0.1.0"
 description = "CIOOS Explorer ERDDAP/OBIS downloader."
 readme = "README.md"
@@ -7,25 +7,19 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "duckdb>=1.1.0",
     "erddapy>=2.2.4",
-    # Runtime, not dev: download_erddap imports cde_harvester at module scope.
-    "harvester",
     "loguru>=0.7.3",
     "markdown-it-py>=4.0.0",
     "netcdf4>=1.7.5",
     "numpy>=2.1.0",
     "pandas>=2.2.3",
     "pyarrow>=26.0.0",
-    "sentry-sdk>=2.38.0",
+    "requests>=2.31.0",
     "shapely>=2.1.1",
     "xarray>=2026.9.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["erddap_downloader"]
-
-[tool.uv.sources]
-harvester = { path = "../harvester", editable = true }
-
+packages = ["cioos_downloader"]
 
 [build-system]
 requires = ["hatchling >= 1.26"]

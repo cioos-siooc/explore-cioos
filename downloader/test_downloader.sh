@@ -17,7 +17,7 @@ rm -rf cde_download_* out
 if [ -n "$1" ]; then
     query_file="$1"
     echo "Running downloader on ${query_file} (live)"
-    uv run python -m erddap_downloader "${query_file}" --output_folder out
+    uv run python -m cioos_downloader "${query_file}" --output_folder out
     zip_file=$(ls out/*.zip 2>/dev/null | head -1) || true
     if [ -n "${zip_file}" ]; then
         unzip -o "${zip_file}" -d out/unzipped

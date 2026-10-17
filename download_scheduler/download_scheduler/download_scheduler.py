@@ -6,9 +6,9 @@ import traceback
 
 import sentry_sdk
 from cde_harvester.core.issues import error_signature, report_issues
+from cioos_downloader import downloader_wrapper
+from cioos_downloader.package import REASONS
 from dotenv import load_dotenv
-from erddap_downloader import downloader_wrapper
-from erddap_downloader.package import REASONS
 from jinja2 import Environment, FileSystemLoader
 from loguru import logger
 from sentry_sdk.integrations.loguru import LoguruIntegration

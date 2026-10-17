@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 
-from erddap_downloader.formats import REQUEST_HEADERS
+from cioos_downloader.formats import REQUEST_HEADERS
 
 CKAN_PACKAGE_API = "https://catalogue.cioos.ca/api/3/action/package_show"
 OBIS_DATASET_API = "https://api.obis.org/v3/dataset/{dataset_id}"

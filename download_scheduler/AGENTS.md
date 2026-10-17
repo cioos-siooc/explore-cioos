@@ -10,12 +10,12 @@ must update each one it affects, in the same change:
 
 - `docs/harvesting/downloads.md`: the step-by-step doc, rendered in the app at
   `/harvest/docs/downloads` (limits, status table, file layout, citation form).
-- `downloader/erddap_downloader/package.py`: the README text (`_TEXT`, both
+- `downloader/cioos_downloader/package.py`: the README text (`_TEXT`, both
   languages), `REASONS`, and `_FILE_KINDS` (one entry per file a package can
   hold).
 - `download_scheduler/download_scheduler/templates/*.j2`: the email wording.
 - Formats are listed in three places: `FORMATS` in
-  `downloader/erddap_downloader/download_erddap.py`, `FORMATS` in
+  `downloader/cioos_downloader/download_erddap.py`, `FORMATS` in
   `web-api/routes/download.js`, `PACKAGE_FORMATS` in
   `frontend/src/state/download/DownloadProvider.jsx` (plus its
   `downloadPackageFormat_*` translations).

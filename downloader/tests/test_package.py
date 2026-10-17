@@ -16,7 +16,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 import xarray as xr
-from erddap_downloader import download_erddap, downloader_wrapper, formats, package
+from cioos_downloader import download_erddap, downloader_wrapper, formats, package, script
 
 _CSV = (
     b"time,latitude,longitude,depth\n"
@@ -81,8 +81,8 @@ def _query(*datasets, **user_query):
 def _run(tmp_path, query, get=None, metadata_warnings=()):
     get = get or (lambda url, **_: _response())
     with (
-        patch("erddap_downloader.download_erddap.requests.get", side_effect=get),
-        patch("erddap_downloader.download_erddap.save_source_metadata", return_value=list(metadata_warnings)),
+        patch("cioos_downloader.download_erddap.requests.get", side_effect=get),
+        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=list(metadata_warnings)),
     ):
         report = downloader_wrapper.run_download_query(download_query=query, output_folder=tmp_path / "out")
     archive = zipfile.ZipFile(report["path"])
@@ -260,6 +260,60 @@ def test_a_box_is_sent_even_without_a_polygon(tmp_path):
 
     _run(tmp_path, _query(_dataset("Boxed")), get)
     assert "latitude>=48.0" in urls[0] and "longitude<=-125.0" in urls[0]
+
+
+
+def test_a_date_only_range_keeps_the_whole_last_day(tmp_path):
+    urls = []
+
+    def get(url, **_):
+        urls.append(unquote(url))
+        return _response()
+
+    _run(tmp_path, _query(_dataset("Days")), get)
+    # erddapy sends times as epoch seconds: 2019-01-01T00:00:00Z and 2021-01-01T23:59:59Z.
+    assert "time>=1546300800" in urls[0] and "time<=1609545599" in urls[0]
+
+
+def test_variables_come_from_the_erddap_info_page_when_not_harvested(tmp_path):
+    info = (
+        "Row Type,Variable Name,Attribute Name,Data Type,Value\n"
+        "attribute,NC_GLOBAL,title,String,T\n"
+        "variable,time,,double,\n"
+        "variable,temperature,,float,\n"
+    )
+    urls = []
+
+    def get(url, **_):
+        urls.append(unquote(url))
+        return _response(text=info) if "/info/" in url else _response()
+
+    _run(tmp_path, _query(_dataset("Unharvested", table_variables=None)), get)
+    assert urls[0] == "https://data.example.ca/erddap/info/Unharvested/index.csv"
+    assert "/tabledap/Unharvested.csv?time,temperature&" in urls[1]
+    assert "depth>=" not in urls[1]
+
+
+def test_the_download_script_builds_the_package_without_limits_or_the_html_readme(tmp_path, monkeypatch):
+    monkeypatch.setattr(download_erddap, "DATASET_SIZE_LIMIT", 10)
+    monkeypatch.chdir(tmp_path)
+    query = _query(_dataset("Good", metadata=_METADATA))
+    del query["user_query"]["email"]
+    with (
+        patch("cioos_downloader.download_erddap.requests.get", return_value=_response()),
+        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
+    ):
+        assert script.run(query) == 0
+
+    root = tmp_path / "cde_download_pkg001"
+    names = {p.relative_to(root).as_posix() for p in root.rglob("*")}
+    assert (root / "Good_data_example_ca/Good_data_example_ca.csv").read_bytes() == _CSV
+    assert {"README.md", "citations.txt", "citations.bib", "citations.ris", "CITATION.cff", "rights.txt"} <= names
+    assert {"Good_data_example_ca/citation.txt", "Good_data_example_ca/metadata.json"} <= names
+    assert "README.html" not in names
+    assert "README.html" not in (root / "README.md").read_text()
+    crate = (root / "ro-crate-metadata.json").read_text()
+    assert "README.html" not in crate
 
 
 def test_downloads_run_concurrently_but_at_most_two_per_server(tmp_path):

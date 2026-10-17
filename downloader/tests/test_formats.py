@@ -3,7 +3,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 import xarray as xr
-from erddap_downloader.formats import write_subset
+from cioos_downloader.formats import write_subset
 from shapely.geometry import box
 
 # Rows at lon -130 are inside, rows at lon -100 outside.
