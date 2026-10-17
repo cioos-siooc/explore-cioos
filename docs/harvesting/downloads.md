@@ -69,7 +69,7 @@ take the same job. It is deliberately not on the Prefect pool (see the README's
 
 ## 4. Fetching each dataset
 
-The downloader (`downloader/erddap_downloader/download_erddap.py`) fetches
+The downloader (`downloader/cioos_downloader/download_erddap.py`) fetches
 datasets in parallel: 6 at a time overall, and at most 2 at a time per server,
 so one ERDDAP isn't hammered. A dataset that fails never stops the others.
 
@@ -86,7 +86,8 @@ One tabledap request per subset, in the chosen format's ERDDAP response type:
 
 How the request is constrained:
 
-1. **Time and depth** always go to ERDDAP.
+1. **Time and depth** always go to ERDDAP. The panel's dates are whole days,
+   so the range runs from 00:00:00Z on the first to 23:59:59Z on the last.
 2. **Space:** when the dataset came with `feature_ids`, ERDDAP is asked for
    exactly those features (`profile=~"(id1|id2|…)"`). Otherwise the request
    carries the polygon's bounding box, or the lat/lon box when no polygon was
@@ -99,7 +100,8 @@ How the request is constrained:
    numbers keep ERDDAP's formatting.
 
 The variable list comes from the harvested `table_variables`; only datasets
-harvested before that column existed fall back to asking ERDDAP.
+harvested before that column existed fall back to the dataset's ERDDAP info page
+(`/info/<id>/index.csv`).
 
 ### OBIS
 
@@ -182,7 +184,7 @@ the README what each dataset returned.
 `reproduce.py` is the downloader's filtering module (`formats.py`) as a
 [uv](https://docs.astral.sh/uv/) script, shipped with `reproduce.py.lock`, the
 uv lock of every dependency with hashes. The lock is committed at
-`downloader/erddap_downloader/reproduce.py.lock` and the script's PEP 723
+`downloader/cioos_downloader/reproduce.py.lock` and the script's PEP 723
 header (Python minor version, exact library versions) is read from its
 manifest, so the two always agree. A test fails when the lock's pins drift from
 `download_scheduler/uv.lock` (the image that builds packages); relock with
@@ -192,6 +194,40 @@ every subset from its request URLs, applies the same polygon filter, writes the
 files to `reproduced/` and prints `match`, `differs` or `missing` for each
 against its sha256 in `datapackage.json`. A `PARTIAL` subset differs by design
 (no size limit applies locally), as does one whose source data changed.
+
+### The download script
+
+The Download panel's **Python script** builds the same package on the user's
+computer, with no email, queue or size limit. `GET /download/script` takes the
+panel's query (the ticked datasets plus any the 1 GB ceiling deselected, and
+the package format) and returns a [uv](https://docs.astral.sh/uv/) script that
+holds the same `user_query` and `cache_filtered` a queued job gets, minus the
+email. Its PEP 723 header installs `downloader` from the public repository's
+archive at the commit the API was deployed from (`SOURCE_COMMIT`, set by
+`deploy.yml`; `development-v2` when unset), with `exclude-newer` set to when it
+was generated, so every run resolves the same libraries. Running it calls
+`cioos_downloader.script.run()`: `get_datasets` without the size limits, then
+`write_package` without README.html, into `cde_download_<job>/`.
+
+The selection is written into the script as a Python literal (`QUERY = {…}`)
+laid out as `ruff format` would, so the user can read and edit it.
+
+The script runs the code at that commit, so `cioos-downloader` must stay
+installable on its own: it must never depend on the harvester (or anything
+server-only).
+
+### Direct links
+
+Without a polygon filter, the panel also lists each dataset's raw source URL
+(copy, curl script, URL list or CSV), built in the browser
+(`frontend/src/downloadLinks.js`). ERDDAP links request the package format's
+file type with the same time and depth bounds; OBIS links use the v3 API (JSON,
+at most 10,000 records). The curl script writes `cde_download/` with the
+package's folder and file names: each dataset's data plus its source records
+(`erddap.nccsvMetadata` or `obis_dataset.json`, and CKAN's `ckan_package.json`).
+Citations and licences need the package code, so its header points to the
+Python script. With a polygon the links are hidden: ERDDAP could only take its
+bounding box, so only the script matches the package.
 
 ### Citations
 

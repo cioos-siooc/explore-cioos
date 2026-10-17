@@ -124,6 +124,9 @@ services:
       REDIS_HOST: redis
       # Server URL shown in the Swagger UI and openapi.json.
       PUBLIC_BASE_URL: ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/api
+      # The commit the download script pins the downloader to (deploy.yml and
+      # Coolify set it); unset, scripts track development-v2.
+      SOURCE_COMMIT: ${SOURCE_COMMIT:-}
     expose:
       - "5000"
     depends_on:
