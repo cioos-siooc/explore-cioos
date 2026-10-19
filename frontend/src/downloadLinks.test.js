@@ -162,21 +162,22 @@ describe("buildDownloadLinks", () => {
       "csv",
       allFilters,
     );
-    const folder = "ios_ctd_profiles_data_cioospacific_ca";
-    expect(erddap.path).toBe(`${folder}/${folder}.csv`);
+    const name = "ios_ctd_profiles_data_cioospacific_ca";
+    const folder = `data/${name}`;
+    expect(erddap.path).toBe(`${folder}/${name}.csv`);
     expect(erddap.records).toEqual([
       {
-        path: `${folder}/erddap.nccsvMetadata`,
+        path: `${folder}/metadata/erddap.nccsvMetadata`,
         url: "https://data.cioospacific.ca/erddap/tabledap/ios_ctd_profiles.nccsvMetadata",
       },
       {
-        path: `${folder}/ckan_package.json`,
+        path: `${folder}/metadata/ckan_package.json`,
         url: "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
       },
     ]);
     expect(obis.records).toEqual([
       {
-        path: `${obisRow.dataset_id}_obis_org/obis_dataset.json`,
+        path: `data/${obisRow.dataset_id}_obis_org/metadata/obis_dataset.json`,
         url: `https://api.obis.org/v3/dataset/${obisRow.dataset_id}`,
       },
     ]);
@@ -270,7 +271,7 @@ describe("the exported list", () => {
 
   it("fetches each source record into its dataset's folder", () => {
     const script = linksToCurlScript(links, meta);
-    const folder = "ios_ctd_profiles_data_cioospacific_ca";
+    const folder = "data/ios_ctd_profiles_data_cioospacific_ca/metadata";
     expect(script).toContain(
       `fetch '${folder}/ckan_package.json' 'https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e'`,
     );

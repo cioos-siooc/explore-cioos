@@ -133,7 +133,7 @@ describe("DownloadScript", () => {
     const script = await savedText();
     expect(script).toContain("/tabledap/ios_ctd_profiles.parquetWMeta?");
     expect(script).toContain(
-      "'ios_ctd_profiles_data_cioospacific_ca/ios_ctd_profiles_data_cioospacific_ca.parquet'",
+      "'data/ios_ctd_profiles_data_cioospacific_ca/ios_ctd_profiles_data_cioospacific_ca.parquet'",
     );
   });
 

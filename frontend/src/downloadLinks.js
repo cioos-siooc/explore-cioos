@@ -1,7 +1,7 @@
 // Direct links to each dataset's source server, offered only when no polygon
 // filters the download: without one, what the source returns is what the
-// package holds. Files are named as in the package (dataset folders, source
-// metadata records); citations need the package code, so the Python script. The ERDDAP query is deliberately variable-less, returning
+// package holds. Files are named as in the package (data/<dataset folder>/,
+// source metadata records in its metadata/); citations need the package code, so the Python script. The ERDDAP query is deliberately variable-less, returning
 // every variable: a user following a link to the source wants the source.
 
 // The ERDDAP file type behind each package format (FORMATS in
@@ -114,16 +114,17 @@ function metadataRecords(row, folder, obis) {
   const records = [
     obis
       ? {
-          path: `${folder}/obis_dataset.json`,
+          path: `${folder}/metadata/obis_dataset.json`,
           url: `https://api.obis.org/v3/dataset/${row.dataset_id}`,
         }
       : {
-          path: `${folder}/erddap.nccsvMetadata`,
+          path: `${folder}/metadata/erddap.nccsvMetadata`,
           url: `${erddapServerBase(row)}/tabledap/${row.dataset_id}.nccsvMetadata`,
         },
   ];
   const ckan = ckanRecordUrl(row.ckan_url);
-  if (ckan) records.push({ path: `${folder}/ckan_package.json`, url: ckan });
+  if (ckan)
+    records.push({ path: `${folder}/metadata/ckan_package.json`, url: ckan });
   return records;
 }
 
@@ -142,7 +143,8 @@ export function buildDownloadLinks(rows, packageFormat, constraints) {
         : erddapDownloadUrl(row, format.id, constraints);
       if (!url) return null;
 
-      const folder = datasetFolder(row);
+      const name = datasetFolder(row);
+      const folder = `data/${name}`;
       return {
         pk: row.pk,
         datasetId: row.dataset_id,
@@ -151,7 +153,7 @@ export function buildDownloadLinks(rows, packageFormat, constraints) {
         format,
         url,
         folder,
-        path: `${folder}/${folder}.${format.ext}`,
+        path: `${folder}/${name}.${format.ext}`,
         records: metadataRecords(row, folder, obis),
         ckanUrl: row.ckan_url || null,
         // What this link could not carry, for the row to say so.
@@ -206,7 +208,7 @@ export function linksToCurlScript(links, { generatedAt, filterSummary } = {}) {
     ...header(generatedAt, filterSummary),
     "#",
     "# Writes cde_download/ laid out like the Data Explorer's download package:",
-    "# one folder per dataset with its data and its sources' metadata records.",
+    "# data/<dataset folder>/ with its data and, in metadata/, its sources' records.",
     "# Citations, licences and the polygon filter are not included: the Data",
     "# Explorer's Python script builds the full package (uv run <script>).",
     ...(obisCapped
