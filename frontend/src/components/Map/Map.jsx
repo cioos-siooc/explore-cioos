@@ -84,6 +84,7 @@ import {
 import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
 import { focusedPointFeatures } from "./focusedPoints.js";
+import { selectionLayerFilter } from "./selectionFilter.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // Captured before the overrides below replace them.
@@ -378,6 +379,21 @@ const griddapLayerIds = ["griddap-coverage-fill", "griddap-coverage-line"];
 const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
 
 const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
+
+const TRACK_HEAD_HAS_COURSE = ["has", "cog"];
+// Hidden outside a drawn shape, as the dataset list leaves them out: they can't
+// be hovered or clicked, and the map lays out less. Values are
+// each layer's own filter.
+const SELECTION_FILTERED_LAYERS = {
+  hexes: undefined,
+  points: undefined,
+  "points-halo": undefined,
+  "coverage-hexes": undefined,
+  "coverage-hex-outlines": undefined,
+  "track-lines": undefined,
+  "track-heads": TRACK_HEAD_HAS_COURSE,
+  "track-heads-fixed": ["!", TRACK_HEAD_HAS_COURSE],
+};
 
 // The eslint-disable react-hooks/exhaustive-deps comments below: effects call
 // helpers rebuilt on every render (the component re-renders on every map
@@ -1189,6 +1205,8 @@ export default function CreateMap({
   // Bumped on every overlay change so stale in-flight GetMap loads are dropped.
   const wmsRenderToken = useRef(0);
   const polygonRef = useRef(null);
+  // Read by map event handlers and the layer filters.
+  const selectionRing = useRef(polygon);
   // An overlay set before the style loaded hid layers that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
   const revealedWmsPk = useRef();
@@ -1564,6 +1582,11 @@ export default function CreateMap({
     return () => removeWmsOverlay();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWmsOverlay, polygon]);
+
+  useEffect(() => {
+    selectionRing.current = polygon;
+    applySelectionFilter();
+  }, [polygon]);
 
   function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
@@ -2408,7 +2431,7 @@ export default function CreateMap({
       type: "symbol",
       source: "tracks",
       "source-layer": "track-heads",
-      filter: ["has", "cog"],
+      filter: SELECTION_FILTERED_LAYERS["track-heads"],
       layout: {
         visibility: tracksVisibility,
         "icon-image": "track-head-arrow",
@@ -2430,7 +2453,7 @@ export default function CreateMap({
       type: "circle",
       source: "tracks",
       "source-layer": "track-heads",
-      filter: ["!", ["has", "cog"]],
+      filter: SELECTION_FILTERED_LAYERS["track-heads-fixed"],
       layout: { visibility: tracksVisibility },
       paint: {
         "circle-color": trackLineColor,
@@ -2443,6 +2466,16 @@ export default function CreateMap({
     // Freshly created layers carry no focus paint.
     trackFocusApplied.current = undefined;
     applyTrackFocus();
+  }
+
+  function applySelectionFilter() {
+    Object.entries(SELECTION_FILTERED_LAYERS).forEach(([layerId, filter]) => {
+      if (!map.current?.getLayer(layerId)) return;
+      map.current.setFilter(
+        layerId,
+        selectionLayerFilter(filter, selectionRing.current),
+      );
+    });
   }
 
   function addSelectedTrackLayers() {
@@ -2815,6 +2848,18 @@ export default function CreateMap({
       }
       if (draw.getMode().includes("draw")) return;
 
+      // Outside the drawn shape is out of the selection.
+      const ring = selectionRing.current;
+      if (
+        ring &&
+        !turfPointsWithinPolygon(
+          helpers.point([e.lngLat.lng, e.lngLat.lat]),
+          helpers.polygon([ring]),
+        ).features.length
+      ) {
+        return;
+      }
+
       const hits = hitsAt(e.point);
       const markerHits = hits.filter(
         (feature) => feature.layer.id === "points",
@@ -3004,6 +3049,7 @@ export default function CreateMap({
       addClickHighlightLayers();
       addTrackLayers();
       addSelectedTrackLayers();
+      applySelectionFilter();
 
       applyLayerVisibility();
 
