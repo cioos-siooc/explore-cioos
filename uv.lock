@@ -273,6 +273,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "requests" },
+    { name = "rich" },
     { name = "shapely" },
     { name = "xarray" },
 ]
@@ -288,6 +289,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pyarrow", specifier = ">=26.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
+    { name = "rich", specifier = ">=14" },
     { name = "shapely", specifier = ">=2.1.1" },
     { name = "xarray", specifier = ">=2026.9.0" },
 ]
