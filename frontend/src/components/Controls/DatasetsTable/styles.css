@@ -432,9 +432,11 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
+/* Takes the toolbar's spare room in the sidebar, capped for the widened one. */
 .datasetsCardFilters {
   flex: 1 1 auto;
   min-width: 44px;
+  max-width: 180px;
   overflow: hidden;
   white-space: nowrap;
   display: inline-flex;
