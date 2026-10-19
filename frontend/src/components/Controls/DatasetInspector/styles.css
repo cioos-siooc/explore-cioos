@@ -51,6 +51,8 @@
 /* Sections sit as white cards on the panel's wash (.datasetsPanelDetail). */
 .datasetInspectorBody {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow-y: auto;
 
@@ -387,7 +389,19 @@
   color: var(--cioos-ink-60);
 }
 
+/* The data panel fills its scroller, so the record pager sits at its base
+   even under a short list. */
+.datasetPanel-data:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+.datasetPanel-data {
+  flex: 1 0 auto;
+}
+
 .recordSection {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
 }
@@ -491,7 +505,7 @@
 }
 
 .recordSection .cardList {
-  margin-top: 4px;
+  margin: 4px 0 8px;
 }
 
 .recordSection .cardListToolbar {
@@ -520,7 +534,7 @@
   position: sticky;
   bottom: calc(-1 * var(--inspector-pad-bottom));
   z-index: 2;
-  margin: 8px calc(-1 * var(--inspector-pad-x))
+  margin: auto calc(-1 * var(--inspector-pad-x))
     calc(-1 * var(--inspector-pad-bottom));
   padding: 8px var(--inspector-pad-x);
   border-top: 1px solid var(--cioos-hairline);
