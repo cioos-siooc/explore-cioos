@@ -685,13 +685,11 @@ export default function CreateMap({
     onFirstPaint();
   }
 
-  // A measured range wins over the global tier, so nothing later can change
-  // the colours. Without one, reveal only once /legend has returned AND the
-  // tiles have arrived (an empty result or an off-screen focused dataset has
-  // nothing to measure); otherwise tiles landing later double-colour the map.
+  // Called with the tiles loaded, so a measured range is final. Without one (an
+  // empty result or an off-screen focused dataset) the /legend tier must be in
+  // too, or it lands later and double-colours the map.
   function revealDataIfRamped(measuredRange) {
-    if (measuredRange !== undefined) return revealData();
-    if (!rangeLevelsRef.current || !hexSourcesLoaded()) return;
+    if (measuredRange === undefined && !rangeLevelsRef.current) return;
     revealData();
   }
 
@@ -1080,15 +1078,14 @@ export default function CreateMap({
     if (!map.current || !map.current.isStyleLoaded()) return;
     const key = rampKey();
     if (rampMeasuredFor.current === key) return;
+    // Tiles still in flight: hold what's painted and measure at the next idle.
+    // Mid-load the rendered hexes include the previous zoom's stand-in tiles,
+    // and each re-colouring relayouts every loaded tile (see IS_DIMMED), which
+    // slowed the very tiles being waited on.
+    if (!hexSourcesLoaded()) return;
     const range = measureVisibleHexRange(rampFocusPk.current);
-    if (range !== undefined) {
-      // Only a real measurement pins the key, holding colours through a drag.
-      rampMeasuredFor.current = key;
-    } else if (!hexSourcesLoaded()) {
-      // Tiles still in flight: hold what's painted and retry at the next idle.
-      // Treating "can't tell" as "nothing here" re-coloured the map twice.
-      return;
-    }
+    // Pinned, holding colours through a drag.
+    if (range !== undefined) rampMeasuredFor.current = key;
     // Loaded and empty IS an answer, so the global tier takes over. Not pinned:
     // panning into data at this zoom should find it at the next idle.
 
