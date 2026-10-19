@@ -88,4 +88,22 @@ describe("CoverageHistogramPlot", () => {
     expect(data[0].customdata[0]).toContain("<b>Dec 24 – Dec 31</b>");
     expect(layout.xaxis.tickformat).toBe("%b");
   });
+
+  it("outlines bars only while each is wide enough to show it", () => {
+    const outlineAt = (plotWidth) => {
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+        configurable: true,
+        get: () => plotWidth,
+      });
+      try {
+        traces([{ key: "a", kind: "erddap", total: 1 }]);
+        return plotProps.mock.lastCall[0].data[0].marker.line.width;
+      } finally {
+        // Uncovers jsdom's own, on Element.prototype.
+        delete HTMLElement.prototype.clientWidth;
+      }
+    };
+    expect(outlineAt(600)).toBe(1);
+    expect(outlineAt(4)).toBe(0);
+  });
 });
