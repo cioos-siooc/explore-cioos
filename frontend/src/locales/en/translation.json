@@ -950,6 +950,8 @@
   "filterSearchHelpTitle": "Type to find a filter, then select a result to apply it. Select it again to remove it.",
   "filterSearchOpenInPanel": "See every {{filter}} option",
   "filterSearchAllOptions": "All options",
+  "filterSearchShowMore": "Show {{count}} more",
+  "filterSearchShowMoreAction": "Show",
   "filterSearchHelpBrowse": "Or pick a filter from the list to see all of its options:",
   "filterSearchHelpFilters": "Variables, platforms, organizations…",
   "filterSearchHelpFiltersExamples": [

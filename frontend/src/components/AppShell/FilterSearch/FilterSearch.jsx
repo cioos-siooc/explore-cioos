@@ -4,6 +4,7 @@ import {
   ArrowCounterclockwise,
   BoundingBox,
   BroadcastPin,
+  ChevronDown,
   ChevronRight,
   GeoAlt,
   Pentagon,
@@ -43,6 +44,7 @@ import "./styles.css";
 
 const SCIENTIFIC_NAME_MIN_LENGTH = 3;
 const MATCHES_PER_GROUP = 8;
+const SHOWN_PER_GROUP = 4;
 
 // Kept with the term they answer so a stale reply is simply not shown, rather
 // than cleared by an effect.
@@ -252,6 +254,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
   // Picking leaves the list as it is, so several values can be picked in a
   // row; the empty box would otherwise drop a value the moment it was removed.
   const [touched, setTouched] = useState(() => new Set());
+  const [expanded, setExpanded] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
   const places = useRegionMatches(exclude ? "" : term);
@@ -316,6 +319,29 @@ export default function FilterSearch({ text, setText, inputRef }) {
     ...shown.filter((g) => g.key !== "region"),
     ...shown.filter((g) => g.key === "region"),
   ];
+  // The rest of a group is an option too, so the arrow keys reach it; with an
+  // empty box a group lists what's applied, which is never cut.
+  if (term) {
+    shown = shown.map((group) => {
+      const hidden = group.options.length - SHOWN_PER_GROUP;
+      if (hidden <= 1 || expanded.has(group.key)) return group;
+      return {
+        ...group,
+        options: [
+          ...group.options.slice(0, SHOWN_PER_GROUP),
+          {
+            id: "more",
+            label: t("filterSearchShowMore", { count: hidden }),
+            icon: ChevronDown,
+            command: true,
+            includeOnly: true,
+            action: t("filterSearchShowMoreAction"),
+            toggle: () => setExpanded((prev) => new Set(prev).add(group.key)),
+          },
+        ],
+      };
+    });
+  }
   const flat = shown.flatMap((group) =>
     group.options.map((option) => ({ group, option })),
   );
@@ -358,6 +384,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
   function clearText() {
     setText("");
     setTouched(new Set());
+    setExpanded(new Set());
     setActiveIndex(0);
   }
 
@@ -398,6 +425,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
           onChange={(e) => {
             setText(e.target.value);
             setTouched(new Set());
+            setExpanded(new Set());
             setActiveIndex(0);
           }}
           onKeyDown={onKeyDown}
