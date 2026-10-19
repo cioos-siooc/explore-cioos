@@ -229,3 +229,15 @@ def test_abstract_html_becomes_markdown():
     assert from_cioos_record(record)["abstract"] == {
         "en": "Objective: larvae & scallops\n\nSee:\n- one\n- two\n\n<https://example.org> **kept**",
     }
+
+
+def test_abstract_html_source_indentation_is_not_a_code_block():
+    record = {"abstract": {"en": "\n    <p>First.\n    More.</p>\n    <p>Second.</p>\n  "}}
+    assert from_cioos_record(record)["abstract"] == {"en": "First.\nMore.\n\nSecond."}
+
+
+def test_keywords_are_unescaped():
+    record = {"keywords": {"en": ["EARTH SCIENCE &gt; ANIMALS/VERTEBRATES &gt; FISH"]}}
+    assert from_cioos_record(record)["keywords"] == {
+        "en": ["EARTH SCIENCE > ANIMALS/VERTEBRATES > FISH"],
+    }
