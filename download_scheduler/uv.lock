@@ -262,7 +262,7 @@ wheels = [
 ]
 
 [[package]]
-name = "cioos-downloader"
+name = "cioos-data-explorer-downloader"
 version = "0.1.0"
 source = { editable = "../downloader" }
 dependencies = [
@@ -509,7 +509,7 @@ name = "download-scheduler"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "cioos-downloader" },
+    { name = "cioos-data-explorer-downloader" },
     { name = "harvester" },
     { name = "jinja2" },
     { name = "loguru" },
@@ -527,7 +527,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cioos-downloader", editable = "../downloader" },
+    { name = "cioos-data-explorer-downloader", editable = "../downloader" },
     { name = "harvester", editable = "../harvester" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "loguru", specifier = ">=0.7.3" },

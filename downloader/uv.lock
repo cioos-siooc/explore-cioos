@@ -62,7 +62,7 @@ wheels = [
 ]
 
 [[package]]
-name = "cioos-downloader"
+name = "cioos-data-explorer-downloader"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

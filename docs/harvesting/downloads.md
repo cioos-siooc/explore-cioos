@@ -210,7 +210,7 @@ was generated, so every run resolves the same libraries. Running it calls
 The selection is written into the script as a Python literal (`QUERY = {…}`)
 laid out as `ruff format` would, so the user can read and edit it.
 
-The script runs the code at that commit, so `cioos-downloader` must stay
+The script runs the code at that commit, so `cioos-data-explorer-downloader` must stay
 installable on its own: it must never depend on the harvester (or anything
 server-only).
 

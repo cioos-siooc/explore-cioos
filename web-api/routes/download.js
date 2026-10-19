@@ -87,7 +87,7 @@ function downloadScript(manifest, now) {
   return [
     "# /// script",
     '# requires-python = "==3.13.*"',
-    `# dependencies = ["cioos-downloader @ ${DOWNLOADER_URL}"]`,
+    `# dependencies = ["cioos-data-explorer-downloader @ ${DOWNLOADER_URL}"]`,
     "# [tool.uv]",
     // Resolves the same library versions on every run of this script.
     `# exclude-newer = "${now.toISOString()}"`,

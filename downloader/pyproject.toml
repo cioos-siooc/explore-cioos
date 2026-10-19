@@ -1,5 +1,5 @@
 [project]
-name = "cioos-downloader"
+name = "cioos-data-explorer-downloader"
 version = "0.1.0"
 description = "CIOOS Explorer ERDDAP/OBIS downloader."
 readme = "README.md"

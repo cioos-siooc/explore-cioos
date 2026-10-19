@@ -612,7 +612,7 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
             "@id": "#cde-downloader",
             "@type": "SoftwareApplication",
             "name": "CIOOS Data Explorer downloader",
-            "version": version("cioos-downloader"),
+            "version": version("cioos-data-explorer-downloader"),
             "url": SOFTWARE_URL,
         },
         {"@id": "https://cioos.ca", "@type": "Organization", "name": "CIOOS"},
@@ -743,7 +743,7 @@ def _reproduce_script(user_query, created):
         [
             "# /// script",
             '# requires-python = "==3.13.*"',
-            f'# dependencies = ["cioos-downloader @ {url}"]',
+            f'# dependencies = ["cioos-data-explorer-downloader @ {url}"]',
             "# [tool.uv]",
             # Resolves the libraries as they were when the package was built.
             f'# exclude-newer = "{created}"',

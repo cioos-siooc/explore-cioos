@@ -473,7 +473,7 @@ def test_reproduce_script_installs_the_downloader_that_built_the_package(tmp_pat
     _, archive, read = _run(tmp_path, _query(_dataset("Ctd"), downloader_url=url))
 
     metadata = _script_metadata(read("reproduce.py"))
-    assert metadata["dependencies"] == [f"cioos-downloader @ {url}"]
+    assert metadata["dependencies"] == [f"cioos-data-explorer-downloader @ {url}"]
     created = json.loads(read("datapackage.json"))["created"]
     assert metadata["tool"]["uv"]["exclude-newer"] == created
     crate = json.loads(read("ro-crate-metadata.json"))
@@ -485,7 +485,7 @@ def test_reproduce_script_of_an_older_job_tracks_the_development_branch(tmp_path
     _, _, read = _run(tmp_path, _query(_dataset("Ctd")))
 
     assert _script_metadata(read("reproduce.py"))["dependencies"] == [
-        f"cioos-downloader @ {package.DEFAULT_DOWNLOADER_URL}"
+        f"cioos-data-explorer-downloader @ {package.DEFAULT_DOWNLOADER_URL}"
     ]
 
 
