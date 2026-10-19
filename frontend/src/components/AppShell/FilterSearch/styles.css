@@ -36,9 +36,48 @@
   color: var(--cioos-ink);
 }
 
-.filterSearchLoading {
-  display: inline-flex;
-  flex: 0 0 auto;
+/* An indeterminate line along the box's bottom edge while places, the slow
+   part of the search, are still on their way. */
+.filterSearchField.busy {
+  position: relative;
+  overflow: hidden;
+}
+
+.filterSearchField.busy::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  height: 2px;
+  background-color: var(--cioos-primary);
+  animation: filterSearchBusy 1.2s ease-in-out infinite;
+}
+
+@keyframes filterSearchBusy {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filterSearchField.busy::after {
+    width: 100%;
+    animation: none;
+  }
+}
+
+.filterSearchPendingText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
 }
 
 .filterSearchClear {
