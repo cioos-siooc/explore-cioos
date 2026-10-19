@@ -108,10 +108,11 @@ def test_a_failed_dataset_is_reported_and_the_rest_ship(tmp_path):
     assert "disk on fire" in rows["Broken"]["erddap_error"]
 
     names = set(archive.namelist())
-    assert "cde_download_pkg001/Good_data_example_ca/Good_data_example_ca.csv" in names
-    assert "cde_download_pkg001/Good_data_example_ca/citation.txt" in names
-    assert "cde_download_pkg001/Good_data_example_ca/metadata.json" in names
-    assert not any(n.startswith("cde_download_pkg001/Broken_data_example_ca/Broken") for n in names)
+    assert "cde_download_pkg001/data/Good_data_example_ca/Good_data_example_ca.csv" in names
+    assert "cde_download_pkg001/data/Good_data_example_ca/citation.txt" in names
+    assert "cde_download_pkg001/data/Good_data_example_ca/metadata/metadata.json" in names
+    assert not any(n.startswith("cde_download_pkg001/data/Broken_data_example_ca/Broken") for n in names)
+    assert not any(n.endswith("CITATION.cff") for n in names)
 
     readme = read("README.md")
     assert "1 of 2 datasets included" in readme
@@ -121,7 +122,7 @@ def test_a_failed_dataset_is_reported_and_the_rest_ship(tmp_path):
 
     datapackage = json.loads(read("datapackage.json"))
     [data] = [r for r in datapackage["resources"] if not r["name"].startswith("readme")]
-    assert data["path"] == "Good_data_example_ca/Good_data_example_ca.csv"
+    assert data["path"] == "data/Good_data_example_ca/Good_data_example_ca.csv"
     assert data["hash"].startswith("sha256:") and data["bytes"] > 0
     assert data["dialect"] == {"commentRows": [2]}
     assert data["licenses"] == [{"path": "https://creativecommons.org/licenses/by/4.0/", "title": "CC-BY-4.0"}]
@@ -134,19 +135,20 @@ def test_a_failed_dataset_is_reported_and_the_rest_ship(tmp_path):
     assert actions["Subset of Title Broken"]["actionStatus"]["@id"].endswith("FailedActionStatus")
     assert "disk on fire" in actions["Subset of Title Broken"]["error"]
     assert actions["Subset of Title Good"]["result"] == {"@id": data["path"]}
+    [folder] = [e for e in crate["@graph"] if e["@id"] == "data/Good_data_example_ca/"]
+    assert {"@id": "data/Good_data_example_ca/metadata/metadata.json"} in folder["hasPart"]
 
-    citations = read("citations.txt")
+    citations = read("citation/citations.txt")
     assert citations.startswith("Hakai Institute (2021). CTD profiles. https://doi.org/10.1234/abc. Subset: time")
     assert "Retrieved " in citations and "Broken" not in citations
-    assert "doi = {10.1234/abc}" in read("citations.bib")
-    assert "TY  - DATA" in read("citations.ris")
-    assert 'doi: "10.1234/abc"' in read("CITATION.cff")
-    assert "https://creativecommons.org/licenses/by/4.0/" in read("rights.txt")
+    assert "doi = {10.1234/abc}" in read("citation/citations.bib")
+    assert "TY  - DATA" in read("citation/citations.ris")
+    assert "https://creativecommons.org/licenses/by/4.0/" in read("citation/licences.txt")
 
 
 def test_citation_falls_back_to_the_title_and_landing_page_without_metadata(tmp_path):
     _, _, read = _run(tmp_path, _query(_dataset("Bare")))
-    assert read("Bare_data_example_ca/citation.txt").startswith(
+    assert read("data/Bare_data_example_ca/citation.txt").startswith(
         "Title Bare. https://data.example.ca/erddap/info/Bare/index.html. Subset:"
     )
 
@@ -189,7 +191,7 @@ def test_a_text_format_over_the_dataset_limit_ships_whole_lines_as_partial(tmp_p
     report, _, read = _run(tmp_path, _query(_dataset("Big")), lambda url, **_: _response(body=body))
     row = report["erddap_report"][0]
     assert row["status"] == "PARTIAL"
-    assert read("Big_data_example_ca/Big_data_example_ca.csv").endswith("5.0\n")
+    assert read("data/Big_data_example_ca/Big_data_example_ca.csv").endswith("5.0\n")
 
 
 def test_over_the_query_limit_later_datasets_are_ignored_and_over_limit_is_set(tmp_path, monkeypatch):
@@ -209,7 +211,7 @@ def test_obis_falls_back_to_csv_for_a_format_it_has_no_rendition_of(tmp_path, mo
 
     row = report["erddap_report"][0]
     assert row["format"] == "csv" and row["format_fallback"]
-    assert "cde_download_pkg001/abc_obis_org/abc_obis_org.csv" in archive.namelist()
+    assert "cde_download_pkg001/data/abc_obis_org/abc_obis_org.csv" in archive.namelist()
     assert "was delivered as CSV" in read("README.md")
 
 
@@ -307,9 +309,11 @@ def test_the_download_script_builds_the_package_without_limits_or_the_html_readm
 
     root = tmp_path / "cde_download_pkg001"
     names = {p.relative_to(root).as_posix() for p in root.rglob("*")}
-    assert (root / "Good_data_example_ca/Good_data_example_ca.csv").read_bytes() == _CSV
-    assert {"README.md", "citations.txt", "citations.bib", "citations.ris", "CITATION.cff", "rights.txt"} <= names
-    assert {"Good_data_example_ca/citation.txt", "Good_data_example_ca/metadata.json"} <= names
+    assert (root / "data/Good_data_example_ca/Good_data_example_ca.csv").read_bytes() == _CSV
+    assert {"README.md", "reproduce.py", "datapackage.json", "ro-crate-metadata.json"} <= names
+    citation_files = {"citations.txt", "citations.bib", "citations.ris", "licences.txt"}
+    assert {f"citation/{f}" for f in citation_files} <= names
+    assert {"data/Good_data_example_ca/citation.txt", "data/Good_data_example_ca/metadata/metadata.json"} <= names
     assert "README.html" not in names
     assert "README.html" not in (root / "README.md").read_text()
     crate = (root / "ro-crate-metadata.json").read_text()
@@ -491,7 +495,7 @@ def test_reproduce_rebuilds_obis_subsets_identically(tmp_path, monkeypatch, fmt)
     _, result = _reproduce(tmp_path, archive)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert f"match: abc_obis_org/abc_obis_org.{fmt}" in result.stdout
+    assert f"match: data/abc_obis_org/abc_obis_org.{fmt}" in result.stdout
 
 
 def test_reproduce_reports_a_source_that_changed(tmp_path):
@@ -505,7 +509,7 @@ def test_reproduce_reports_a_source_that_changed(tmp_path):
     _, result = _reproduce(tmp_path, archive, _point_requests_at(raw))
 
     assert result.returncode == 1
-    assert "differs: Ctd_data_example_ca/Ctd_data_example_ca.csv" in result.stdout
+    assert "differs: data/Ctd_data_example_ca/Ctd_data_example_ca.csv" in result.stdout
 
 
 def _script_metadata(script):
@@ -577,11 +581,11 @@ def test_the_readme_also_ships_as_a_standalone_web_page(tmp_path):
     assert html.startswith("<!doctype html>") and '<html lang="en">' in html
     assert "<title>CIOOS Data Explorer download pkg001</title>" in html
     assert "<h1>CIOOS Data Explorer download pkg001</h1>" in html
-    assert "<table>" in html and '<a href="Good_data_example_ca/">' in html
+    assert "<table>" in html and '<a href="data/Good_data_example_ca/">' in html
     assert 'src="data:image/svg+xml;base64,' in html
     # Opened offline from disk: no stylesheet, script, image or font is fetched.
     assert not re.search(r'<link\b|<script[^>]*\ssrc=|src="https?:|url\(', html)
-    assert "[`Good_data_example_ca/`](Good_data_example_ca/)" in read("README.md")
+    assert "[`data/Good_data_example_ca/`](data/Good_data_example_ca/)" in read("README.md")
     names = {r["path"] for r in json.loads(read("datapackage.json"))["resources"]}
     assert "README.html" in names
     crate = json.loads(read("ro-crate-metadata.json"))
@@ -604,12 +608,13 @@ def test_each_dataset_links_to_its_source_records(tmp_path):
     _, _, read = _run(tmp_path, _query(erddap, language="fr"))
 
     readme = read("README.md")
-    assert "| Jeu de données | Statut | Lignes | Dossier | Source |" in readme
+    docs = readme[readme.index("## Documentation") : readme.index("## Reproduire")]
+    assert "- **Title Good**: [`metadata/`](data/Good_data_example_ca/metadata/) · " in docs
     assert (
         "[ERDDAP](<https://data.example.ca/erddap/info/Good/index.html>) · "
         "[Catalogue SIOOC](<https://catalogue.cioos.ca/dataset/abc>) · "
         "[DOI](<https://doi.org/10.1234/abc>)"
-    ) in readme
+    ) in docs
     assert '<a href="https://catalogue.cioos.ca/dataset/abc">Catalogue SIOOC</a>' in read("README.html")
 
 
@@ -620,14 +625,14 @@ def test_an_obis_dataset_links_to_its_obis_page(tmp_path, monkeypatch):
     obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
     _, _, read = _run(tmp_path, _query(obis))
 
-    assert "| [OBIS](<https://obis.org/dataset/abc>) |" in read("README.md")
+    assert "[OBIS](<https://obis.org/dataset/abc>)" in read("README.md")
 
 
 def test_harvested_citations_are_cleaned_into_one_sentence(tmp_path):
     metadata = {"citation": {"en": "Centre for Ocean Ventures &amp; Entrepreneurship (2026).\n  Halifax  Buoy. https://x.ca/d?local=en"}}
     _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=metadata)))
 
-    assert read("Good_data_example_ca/citation.txt").startswith(
+    assert read("data/Good_data_example_ca/citation.txt").startswith(
         "Centre for Ocean Ventures & Entrepreneurship (2026). Halifax Buoy. https://x.ca/d?local=en. Subset:"
     )
 
@@ -636,12 +641,14 @@ def test_readme_citations_link_the_request_instead_of_printing_it(tmp_path):
     _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=_METADATA)))
 
     readme = read("README.md")
-    cite = readme[readme.index("## How to cite"):readme.index("## Licences")]
+    cite = readme[readme.index("## How to cite") : readme.index("## Documentation")]
     assert "### Title Good" in cite
     assert "> Hakai Institute (2021). CTD profiles. <https://doi.org/10.1234/abc>" in cite
     assert re.search(r"- Retrieved: \d{4}-\d\d-\d\d \d\d:\d\d UTC", cite)
     assert "- Request: [data.example.ca](<https://data.example.ca/erddap/tabledap/Good.csv?" in cite
-    assert "- Citation to copy: [`Good_data_example_ca/citation.txt`](Good_data_example_ca/citation.txt)" in cite
+    assert (
+        "- Citation to copy: [`data/Good_data_example_ca/citation.txt`](data/Good_data_example_ca/citation.txt)"
+    ) in cite
     # The request URL appears only as a link target, never as visible text.
     assert cite.count("tabledap/Good.csv") == 1
 
@@ -668,7 +675,8 @@ def test_the_readme_page_embeds_each_full_citation_for_its_copy_button(tmp_path)
     _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=_METADATA), language="fr"))
 
     html = read("README.html")
-    assert _embedded_citations(html) == {"Good_data_example_ca": read("Good_data_example_ca/citation.txt").strip()}
+    citation = read("data/Good_data_example_ca/citation.txt").strip()
+    assert _embedded_citations(html) == {"data/Good_data_example_ca": citation}
     assert 'title = "Copier la citation"' in html and '<span class="sr-only">Copié</span>' in html
 
 
@@ -678,26 +686,27 @@ def test_citation_text_cannot_close_the_embedded_script(tmp_path):
 
     html = read("README.html")
     assert "<script>alert(3)" not in html
-    assert "</script><script>alert(3)" in _embedded_citations(html)["Good_data_example_ca"]
+    assert "</script><script>alert(3)" in _embedded_citations(html)["data/Good_data_example_ca"]
 
 
-def test_readme_licences_are_a_table_with_linked_names(tmp_path):
+def test_the_readme_data_table_links_each_folder_and_names_its_licence(tmp_path):
     bare = _dataset("Bare")
     worded = _dataset("Worded", metadata={"license": {"title": "This work is licensed  under a CC&amp;BY licence"}})
     _, _, read = _run(tmp_path, _query(_dataset("Good", metadata=_METADATA), worded, bare))
 
     readme = read("README.md")
-    licences = readme[readme.index("## Licences"):readme.index("## Reproduce")]
-    assert "| Dataset | Licence |" in licences
-    assert "| Title Good | [CC-BY-4.0](<https://creativecommons.org/licenses/by/4.0/>) |" in licences
-    assert "| Title Worded | This work is licensed under a CC&BY licence |" in licences
-    assert "| Title Bare | *no licence recorded; check the source* |" in licences
-    assert "This work is licensed under a CC&BY licence" in read("rights.txt")
+    data = readme[readme.index("## Data") : readme.index("## Your selection")]
+    assert "| Dataset | Rows | Folder | Licence |" in data
+    good = "[`data/Good_data_example_ca/`](data/Good_data_example_ca/)"
+    assert f"| Title Good | 1 | {good} | [CC-BY-4.0](<https://creativecommons.org/licenses/by/4.0/>) |" in data
+    assert "| This work is licensed under a CC&BY licence |" in data
+    assert "| *no licence recorded; check the source* |" in data
+    assert "This work is licensed under a CC&BY licence" in read("citation/licences.txt")
 
 
 @pytest.mark.parametrize(
     ("language", "label", "section", "anchor"),
-    [("en", "On this page:", "Datasets", "datasets"), ("fr", "Sur cette page :", "Jeux de données", "jeux-de-données")],
+    [("en", "On this page:", "Data", "data"), ("fr", "Sur cette page :", "Données", "données")],
 )
 def test_the_readme_opens_with_a_table_of_contents(tmp_path, language, label, section, anchor):
     _, _, read = _run(tmp_path, _query(_dataset("Good"), language=language))
@@ -728,12 +737,34 @@ def test_a_job_queued_before_explorer_links_still_builds_its_readme(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("language", "opening"),
-    [("en", "This package holds the data you selected"), ("fr", "Ce paquet contient les données")],
+    ("language", "opening", "data", "about"),
+    [
+        ("en", "The data you selected", "## Data", "## About this package"),
+        ("fr", "Les données que vous avez sélectionnées", "## Données", "## À propos de ce paquet"),
+    ],
 )
-def test_the_readme_opens_by_explaining_the_package_and_where_its_data_came_from(tmp_path, language, opening):
+def test_the_readme_leads_with_the_data_and_ends_with_where_it_came_from(tmp_path, language, opening, data, about):
     _, _, read = _run(tmp_path, _query(_dataset("Good"), language=language))
 
     readme = read("README.md")
+    sections = [line for line in readme.splitlines() if line.startswith("## ")]
     assert readme.index(opening) < readme.index("## ")
-    assert "OBIS" in readme[: readme.index("## ")] and "ERDDAP" in readme[: readme.index("## ")]
+    assert sections[0] == data and sections[-1] == about
+    about_text = readme[readme.index(about) :]
+    assert "OBIS" in about_text and "ERDDAP" in about_text
+
+
+def test_the_readme_explains_each_file_and_how_to_open_the_formats_it_holds(tmp_path, monkeypatch):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    _, _, read = _run(tmp_path, _query(obis, format="parquet"))
+
+    readme = read("README.md")
+    files = readme[readme.index("## Files in this package") : readme.index("## Your selection")]
+    assert "`pandas.read_parquet`" in files and "`pandas.read_csv`" not in files
+    for name in ("citation.txt", "metadata.json", "citations.bib", "licences.txt", "datapackage.json", "reproduce.py"):
+        assert f"`{name}`" in files
+    assert "(#reproduce-this-download)" in files
+    assert "[Files in this package](#files-in-this-package)" in readme[: readme.index("## Files in this package")]

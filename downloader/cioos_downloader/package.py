@@ -6,8 +6,10 @@ downloader report plus the query that produced it.
 - datapackage.json: Frictionless Data Package v2 over the data files.
 - ro-crate-metadata.json: RO-Crate 1.2; one CreateAction per subset records
   the request URLs, timing and outcome, failures included.
-- citations.txt/.bib/.ris, CITATION.cff, rights.txt: GBIF-style citation and
-  licence files; each dataset folder also carries its own citation.txt.
+- data/<folder>/: each subset's data, its citation.txt and, in metadata/, its
+  source's own metadata records.
+- citation/citations.txt/.bib/.ris, citation/licences.txt: GBIF-style citation
+  and licence files for every included subset.
 - reproduce.py: a uv script that installs the downloader that built the
   package from the public repository and re-fetches and re-filters every subset.
 
@@ -68,8 +70,11 @@ _TEXT = {
         "created": "Created",
         "explorer": "Open this selection in the CIOOS Data Explorer",
         "intro": (
-            "This package holds the data you selected in the CIOOS Data Explorer, with what you need to "
-            "understand, cite and reproduce it.\n\n"
+            "The data you selected in the CIOOS Data Explorer are in `data/`: one folder per dataset with its "
+            "data file, its citation and its source's metadata."
+        ),
+        "about": "About this package",
+        "about_text": (
             "The Canadian Integrated Ocean Observing System (CIOOS) brings Canada's ocean observations together "
             "through its regional associations (CIOOS Atlantic, CIOOS Pacific and the St. Lawrence Global "
             "Observatory) and their partners. The Data Explorer searches their datasets, along with biodiversity "
@@ -88,12 +93,10 @@ _TEXT = {
         "anywhere": "anywhere",
         "format": "Format",
         "filters": "Other filters (as sent by the Data Explorer)",
-        "datasets": "Datasets",
+        "data": "Data",
         "dataset": "Dataset",
-        "status": "Status",
         "rows": "Rows",
         "folder": "Folder",
-        "source": "Source",
         "catalogue": "CIOOS catalogue",
         "issues": "Not included or incomplete",
         "server": "Source response",
@@ -101,30 +104,82 @@ _TEXT = {
         "cite": "How to cite",
         "cite_text": (
             "Cite every dataset you use. The citation to copy, which also names the subset and the request it "
-            "was retrieved with, is in each dataset folder's citation.txt; all of them are in citations.txt, "
-            "citations.bib, citations.ris and CITATION.cff."
+            "was retrieved with, is in each dataset folder's citation.txt; all of them are in "
+            "citation/citations.txt, citation/citations.bib and citation/citations.ris."
         ),
         "retrieved": "Retrieved",
         "request": "Request",
         "citation_file": "Citation to copy",
-        "licences": "Licences",
-        "licences_text": "Each dataset keeps its own licence; check it before reusing the data (also in rights.txt).",
+        "licences_text": (
+            "Each dataset keeps its own licence; check it before reusing the data (all in citation/licences.txt)."
+        ),
         "licence": "Licence",
         "no_licence": "no licence recorded; check the source",
         "copy": "Copy citation",
         "copied": "Copied",
-        "contents": "Package contents",
-        "contents_html": "- `README.html`: this summary as a web page.",
+        "contents": "Files in this package",
+        "contents_link": "What each file is and how to open it: [{section}](#{anchor}).",
+        "documentation": "Documentation",
+        "documentation_text": (
+            "Each dataset folder's `metadata/` holds its source's own records (described under "
+            "[{section}](#{anchor})); the other links open the dataset at its source."
+        ),
+        "contents_data": (
+            "### Data: `data/<dataset folder>/`\n\n"
+            "One folder per dataset, named after its ID and the server it came from:"
+        ),
+        "open": {
+            "csv": (
+                "`<dataset folder>.csv`: comma-separated text. It opens in any spreadsheet, or in Python with "
+                "`pandas.read_csv`. Files from ERDDAP have the column names on the first row and their units on "
+                "the second (skip it with `skiprows=[1]`); files from OBIS have no units row."
+            ),
+            "parquet": (
+                "`<dataset folder>.parquet`: a compressed column table, much smaller and faster to read than "
+                "CSV. Open it with `pandas.read_parquet`, DuckDB, or R's `arrow::read_parquet`; units, where the "
+                "source gives them, are in the file's metadata."
+            ),
+            "odv": (
+                "`<dataset folder>.txt`: an ODV spreadsheet, tab-separated text with `//` comment lines at the "
+                "top. Open it in Ocean Data View (File > Open), or as tab-separated text in other tools."
+            ),
+            "nccf": (
+                "`<dataset folder>.nc`: NetCDF following the CF discrete sampling geometry conventions, with "
+                "every variable's attributes. Open it with `xarray.open_dataset`, Panoply or Ocean Data View. A "
+                "subset fetched in several requests comes as `_part1.nc`, `_part2.nc`…"
+            ),
+        },
+        "contents_dataset": (
+            "- `citation.txt`: the citation of this subset, ready to paste into a reference list.\n"
+            "- `metadata/`: the source's own description of the dataset, as published:\n"
+            "  - `metadata.json`: what the Data Explorer shows (title, abstract, contacts, licence, keywords).\n"
+            "  - `erddap.nccsvMetadata`: ERDDAP's global and variable attributes (units, long names, CF "
+            "standard names), as text.\n"
+            "  - `ckan_iso19115.xml` or `ckan_package.json`: the CIOOS catalogue record (ISO 19115-3), for "
+            "metadata tools.\n"
+            "  - `obis_dataset.json`, `eml.xml`: the OBIS record and the dataset's Ecological Metadata Language "
+            "record.\n\n"
+            "Each folder only has the records its source publishes."
+        ),
+        "contents_citation": (
+            "### Citation and licences: `citation/`\n\n"
+            "- `citations.txt`: every dataset's citation, one paragraph each.\n"
+            "- `citations.bib`: the same in BibTeX, for LaTeX, or to import into Zotero, Mendeley or JabRef.\n"
+            "- `citations.ris`: the same in RIS, to import into EndNote, Zotero or Mendeley.\n"
+            "- `licences.txt`: each dataset's licence and its link; check it before sharing the data or "
+            "publishing work built on it."
+        ),
+        "contents_package": "### About the package",
+        "contents_html": "- `README.html`: this page, to open in a web browser.",
         "contents_text": (
-            "- `<dataset folder>/`: the data subset, its citation.txt, and the source's own metadata records "
-            "(metadata.json as shown in the Data Explorer, erddap.nccsvMetadata, ckan_iso19115.xml, "
-            "obis_dataset.json, eml.xml where available).\n"
-            "- `datapackage.json`: Frictionless Data Package v2 describing the data files (checksums, "
-            "columns, request URLs, licences).\n"
-            "- `ro-crate-metadata.json`: RO-Crate 1.2 provenance: one action per dataset with its request "
-            "URLs, timing and outcome.\n"
-            "- `reproduce.py`: a script that rebuilds the data files with the code that filtered them to your "
-            "selection."
+            "- `README.md`: this page as plain text.\n"
+            "- `reproduce.py`: rebuilds the data files from their sources (see "
+            "[{reproduce}](#{reproduce_anchor})).\n"
+            "- `datapackage.json`: a Frictionless Data Package describing each data file: checksum, columns "
+            "and units, request URLs and licence. Check the files with `frictionless validate datapackage.json`, "
+            "or load them with the Frictionless libraries.\n"
+            "- `ro-crate-metadata.json`: RO-Crate provenance: which source each file came from, when, and with "
+            "which request. Repositories and workflow tools that read RO-Crate use it."
         ),
         "reproduce": "Reproduce this download",
         "reproduce_text": (
@@ -147,8 +202,11 @@ _TEXT = {
         "created": "Créé le",
         "explorer": "Ouvrir cette sélection dans l'Explorateur de données du SIOOC",
         "intro": (
-            "Ce paquet contient les données que vous avez sélectionnées dans l'Explorateur de données du SIOOC, "
-            "avec ce qu'il faut pour les comprendre, les citer et les reproduire.\n\n"
+            "Les données que vous avez sélectionnées dans l'Explorateur de données du SIOOC sont dans `data/` : "
+            "un dossier par jeu de données avec son fichier de données, sa citation et les métadonnées de sa source."
+        ),
+        "about": "À propos de ce paquet",
+        "about_text": (
             "Le Système intégré d'observation des océans du Canada (SIOOC) réunit les observations océaniques "
             "du pays grâce à ses associations régionales (SIOOC Atlantique, SIOOC Pacifique et l'Observatoire "
             "global du Saint-Laurent) et à leurs partenaires. L'Explorateur permet de chercher leurs jeux de "
@@ -169,12 +227,10 @@ _TEXT = {
         "anywhere": "partout",
         "format": "Format",
         "filters": "Autres filtres (tels qu'envoyés par l'Explorateur)",
-        "datasets": "Jeux de données",
+        "data": "Données",
         "dataset": "Jeu de données",
-        "status": "Statut",
         "rows": "Lignes",
         "folder": "Dossier",
-        "source": "Source",
         "catalogue": "Catalogue SIOOC",
         "issues": "Non inclus ou incomplets",
         "server": "Réponse de la source",
@@ -183,32 +239,83 @@ _TEXT = {
         "cite_text": (
             "Citez chaque jeu de données utilisé. La citation à copier, qui précise aussi le sous-ensemble et la "
             "requête qui l'a récupéré, est dans le citation.txt de chaque dossier; toutes sont dans "
-            "citations.txt, citations.bib, citations.ris et CITATION.cff."
+            "citation/citations.txt, citation/citations.bib et citation/citations.ris."
         ),
         "retrieved": "Récupéré le",
         "request": "Requête",
         "citation_file": "Citation à copier",
-        "licences": "Licences",
         "licences_text": (
             "Chaque jeu de données conserve sa licence; vérifiez-la avant de réutiliser les données "
-            "(aussi dans rights.txt)."
+            "(toutes dans citation/licences.txt)."
         ),
         "licence": "Licence",
         "no_licence": "aucune licence enregistrée; consultez la source",
         "copy": "Copier la citation",
         "copied": "Copié",
-        "contents": "Contenu du paquet",
-        "contents_html": "- `README.html` : ce résumé sous forme de page web.",
+        "contents": "Fichiers de ce paquet",
+        "contents_link": "Le rôle de chaque fichier et comment l'ouvrir : [{section}](#{anchor}).",
+        "documentation": "Documentation",
+        "documentation_text": (
+            "Le dossier `metadata/` de chaque jeu de données contient les fiches de sa source (décrites dans "
+            "[{section}](#{anchor})); les autres liens ouvrent le jeu de données à sa source."
+        ),
+        "contents_data": (
+            "### Données : `data/<dossier du jeu de données>/`\n\n"
+            "Un dossier par jeu de données, nommé d'après son identifiant et le serveur d'où il provient :"
+        ),
+        "open": {
+            "csv": (
+                "`<dossier>.csv` : texte séparé par des virgules. Il s'ouvre dans tout tableur, ou en Python avec "
+                "`pandas.read_csv`. Les fichiers d'ERDDAP ont les noms de colonnes sur la première ligne et leurs "
+                "unités sur la deuxième (à ignorer avec `skiprows=[1]`); ceux d'OBIS n'ont pas de ligne d'unités."
+            ),
+            "parquet": (
+                "`<dossier>.parquet` : une table compressée par colonnes, bien plus petite et rapide à lire qu'un "
+                "CSV. Ouvrez-la avec `pandas.read_parquet`, DuckDB ou `arrow::read_parquet` en R; les unités, "
+                "quand la source les donne, sont dans les métadonnées du fichier."
+            ),
+            "odv": (
+                "`<dossier>.txt` : un tableur ODV, texte séparé par des tabulations avec des lignes de "
+                "commentaires `//` en tête. Ouvrez-le dans Ocean Data View (File > Open), ou comme texte séparé "
+                "par des tabulations dans d'autres outils."
+            ),
+            "nccf": (
+                "`<dossier>.nc` : NetCDF selon les conventions CF de géométrie d'échantillonnage discrète, avec "
+                "les attributs de chaque variable. Ouvrez-le avec `xarray.open_dataset`, Panoply ou Ocean Data "
+                "View. Un sous-ensemble récupéré en plusieurs requêtes est livré en `_part1.nc`, `_part2.nc`…"
+            ),
+        },
+        "contents_dataset": (
+            "- `citation.txt` : la citation de ce sous-ensemble, prête à coller dans une liste de références.\n"
+            "- `metadata/` : la description du jeu de données publiée par sa source :\n"
+            "  - `metadata.json` : ce qu'affiche l'Explorateur (titre, résumé, contacts, licence, mots-clés).\n"
+            "  - `erddap.nccsvMetadata` : les attributs globaux et des variables d'ERDDAP (unités, noms longs, "
+            "noms standard CF), en texte.\n"
+            "  - `ckan_iso19115.xml` ou `ckan_package.json` : la fiche du catalogue SIOOC (ISO 19115-3), pour "
+            "les outils de métadonnées.\n"
+            "  - `obis_dataset.json`, `eml.xml` : la fiche OBIS et la fiche Ecological Metadata Language du "
+            "jeu de données.\n\n"
+            "Chaque dossier ne contient que les fiches que sa source publie."
+        ),
+        "contents_citation": (
+            "### Citations et licences : `citation/`\n\n"
+            "- `citations.txt` : la citation de chaque jeu de données, un paragraphe chacune.\n"
+            "- `citations.bib` : les mêmes en BibTeX, pour LaTeX ou à importer dans Zotero, Mendeley ou JabRef.\n"
+            "- `citations.ris` : les mêmes en RIS, à importer dans EndNote, Zotero ou Mendeley.\n"
+            "- `licences.txt` : la licence de chaque jeu de données et son lien; vérifiez-la avant de partager "
+            "les données ou de publier un travail qui s'en sert."
+        ),
+        "contents_package": "### À propos du paquet",
+        "contents_html": "- `README.html` : cette page, à ouvrir dans un navigateur web.",
         "contents_text": (
-            "- `<dossier du jeu de données>/` : le sous-ensemble, son citation.txt et les fiches de métadonnées "
-            "de la source (metadata.json tel qu'affiché dans l'Explorateur, erddap.nccsvMetadata, "
-            "ckan_iso19115.xml, obis_dataset.json, eml.xml selon le cas).\n"
-            "- `datapackage.json` : Frictionless Data Package v2 décrivant les fichiers de données (sommes de "
-            "contrôle, colonnes, URL des requêtes, licences).\n"
-            "- `ro-crate-metadata.json` : provenance RO-Crate 1.2 : une action par jeu de données avec ses "
-            "URL de requête, sa durée et son résultat.\n"
-            "- `reproduce.py` : un script qui reconstruit les fichiers de données avec le code qui les a filtrés "
-            "selon votre sélection."
+            "- `README.md` : cette page en texte brut.\n"
+            "- `reproduce.py` : reconstruit les fichiers de données depuis leurs sources (voir "
+            "[{reproduce}](#{reproduce_anchor})).\n"
+            "- `datapackage.json` : un Frictionless Data Package décrivant chaque fichier de données : somme de "
+            "contrôle, colonnes et unités, URL des requêtes et licence. Vérifiez les fichiers avec "
+            "`frictionless validate datapackage.json`, ou chargez-les avec les bibliothèques Frictionless.\n"
+            "- `ro-crate-metadata.json` : provenance RO-Crate : la source de chaque fichier, quand et par quelle "
+            "requête il a été récupéré. Les dépôts et outils de flux de travail qui lisent RO-Crate s'en servent."
         ),
         "reproduce": "Reproduire ce téléchargement",
         "reproduce_text": (
@@ -325,39 +432,6 @@ def _ris(row, metadata, user_query, lang):
     return "\n".join(lines)
 
 
-def _yaml_string(value):
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _citation_cff(entries, user_query, created):
-    lines = [
-        "cff-version: 1.2.0",
-        "message: >-",
-        "  This download combines subsets of the datasets listed under references; cite each one you use.",
-        "type: dataset",
-        f"title: {_yaml_string('CIOOS Data Explorer download ' + user_query['job_id'])}",
-        "authors:",
-        f"  - name: {_yaml_string('CIOOS Data Explorer')}",
-        f"date-released: {created[:10]}",
-        f"url: {_yaml_string(SOFTWARE_URL)}",
-        "references:",
-    ]
-    for row, metadata, lang in entries:
-        lines += [
-            "  - type: data",
-            f"    title: {_yaml_string(_title(row, lang))}",
-            "    authors:",
-            *[f"      - name: {_yaml_string(a)}" for a in _authors(metadata) or ["Unknown"]],
-            f"    url: {_yaml_string(landing_url(row))}",
-            f"    notes: {_yaml_string(subset_note(row, user_query))}",
-        ]
-        if metadata.get("doi"):
-            lines.append(f"    doi: {_yaml_string(metadata['doi'].removeprefix('https://doi.org/'))}")
-        if _year(metadata):
-            lines.append(f"    year: {_year(metadata)}")
-    return "\n".join(lines) + "\n"
-
-
 def _licence(metadata):
     licence = dict(metadata.get("license") or {})
     if licence.get("title"):
@@ -466,13 +540,26 @@ def _readme_citation(row, metadata, lang, t):
         labels = [urlparse(urls[0]).netloc] if len(urls) == 1 else [str(i) for i in range(1, len(urls) + 1)]
         links = [f"[{label}](<{_md_url(url)}>)" for label, url in zip(labels, urls, strict=True)]
         lines.append(f"- {t['request']}: " + " · ".join(links))
-    lines.append(f"- {t['citation_file']}: [`{row['folder']}/citation.txt`]({row['folder']}/citation.txt)")
+    path = f"data/{row['folder']}/citation.txt"
+    lines.append(f"- {t['citation_file']}: [`{path}`]({path})")
     return lines
 
 
-def _readme(root, user_query, entries, created, lang, readme_html):
+def _readme_contents(included, readme_html, t):
+    formats = {row["format"] for row, _, _ in included}
+    lines = [t["contents_data"], ""]
+    lines += [f"- {t['open'][key]}" for key in FORMATS if key in formats]
+    lines += [t["contents_dataset"], "", t["contents_citation"], "", t["contents_package"], ""]
+    if readme_html:
+        lines.append(t["contents_html"])
+    lines.append(t["contents_text"].format(reproduce=t["reproduce"], reproduce_anchor=_slug(t["reproduce"])))
+    return lines
+
+
+def _readme(user_query, entries, created, lang, readme_html):
     t = _TEXT[lang]
     included = [e for e in entries if e[0]["status"] in INCLUDED]
+    contents = {"section": t["contents"], "anchor": _slug(t["contents"])}
     # Jobs queued before web-api recorded the explorer URL have none.
     explorer = user_query.get("explorer_url")
     lines = [
@@ -481,13 +568,36 @@ def _readme(root, user_query, entries, created, lang, readme_html):
         f"{t['created']}: {created}",
         "",
         *([f"[{t['explorer']}](<{_md_url(explorer)}>)", ""] if explorer else []),
-        t["intro"],
+        f"**{t['summary'].format(n=len(included), m=len(entries))}** {t['intro']}",
         "",
-        f"**{t['summary'].format(n=len(included), m=len(entries))}**",
-        "",
-        f"## {t['selection']}",
+        f"## {t['data']}",
         "",
     ]
+    if included:
+        lines += [
+            f"| {t['dataset']} | {t['rows']} | {t['folder']} | {t['licence']} |",
+            "|---|---|---|---|",
+        ]
+        for row, metadata, lng in included:
+            folder = f"[`data/{row['folder']}/`](data/{row['folder']}/)"
+            licence = _readme_licence(_licence(metadata), t)
+            lines.append(f"| {_cell(_title(row, lng))} | {row['n_records']} | {folder} | {licence} |")
+        lines += ["", t["licences_text"], "", t["contents_link"].format(**contents)]
+
+    issues = [(row, _outcome(row, lang)) for row, _, _ in entries if _outcome(row, lang) or row["warnings"]]
+    if issues:
+        lines += ["", f"## {t['issues']}", ""]
+        for row, notes in issues:
+            lines.append(f"- **{row.get('title') or row['dataset_id']}** (`{row['dataset_id']}`)")
+            lines += [f"  - {n}." for n in notes]
+            if row["erddap_error"]:
+                lines.append(f"  - {t['server']}: {row['erddap_error'].replace(chr(10), '; ')}")
+            if row["status"] not in INCLUDED or row["status"] == PARTIAL:
+                lines += [f"  - {t['retry']}: <{_md_url(url)}>" for url in row["download_url_list"]]
+            lines += [f"  - {t['warnings']}: {w}" for w in row["warnings"]]
+
+    lines += ["", f"## {t['contents']}", "", *_readme_contents(included, readme_html, t)]
+    lines += ["", f"## {t['selection']}", ""]
     if user_query.get("time_min") or user_query.get("time_max"):
         lines.append(f"- {t['time']}: {user_query.get('time_min') or '…'} – {user_query.get('time_max') or '…'}")
     if user_query.get("depth_min") is not None or user_query.get("depth_max") is not None:
@@ -505,46 +615,22 @@ def _readme(root, user_query, entries, created, lang, readme_html):
         lines.append(f"- {t['filters']}:")
         lines += [f"  - `{k}`: {v}" for k, v in sorted(filters.items())]
 
-    lines += [
-        "",
-        f"## {t['datasets']}",
-        "",
-        f"| {t['dataset']} | {t['status']} | {t['rows']} | {t['folder']} | {t['source']} |",
-        "|---|---|---|---|---|",
-    ]
-    for row, metadata, _ in entries:
-        title = _cell(row.get("title") or row["dataset_id"])
-        # A folder with nothing in it isn't kept in the zip.
-        folder = f"[`{row['folder']}/`]({row['folder']}/)" if any((root / row["folder"]).iterdir()) else "—"
-        sources = " · ".join(f"[{label}](<{_md_url(url)}>)" for label, url in _source_links(row, metadata, t))
-        lines.append(f"| {title} | {row['status']} | {row['n_records']} | {folder} | {sources} |")
-
-    issues = [(row, _outcome(row, lang)) for row, _, _ in entries if _outcome(row, lang) or row["warnings"]]
-    if issues:
-        lines += ["", f"## {t['issues']}", ""]
-        for row, notes in issues:
-            lines.append(f"- **{row.get('title') or row['dataset_id']}** (`{row['dataset_id']}`)")
-            lines += [f"  - {n}." for n in notes]
-            if row["erddap_error"]:
-                lines.append(f"  - {t['server']}: {row['erddap_error'].replace(chr(10), '; ')}")
-            if row["status"] not in INCLUDED or row["status"] == PARTIAL:
-                lines += [f"  - {t['retry']}: <{_md_url(url)}>" for url in row["download_url_list"]]
-            lines += [f"  - {t['warnings']}: {w}" for w in row["warnings"]]
-
-    lines += ["", f"## {t['cite']}", "", t["cite_text"]]
-    for row, metadata, lng in included:
-        lines += _readme_citation(row, metadata, lng, t)
-    lines += ["", f"## {t['licences']}", "", t["licences_text"], ""]
-    lines += [f"| {t['dataset']} | {t['licence']} |", "|---|---|"]
-    for row, metadata, lng in included:
-        lines.append(f"| {_cell(_title(row, lng))} | {_readme_licence(_licence(metadata), t)} |")
+    if included:
+        lines += ["", f"## {t['cite']}", "", t["cite_text"]]
+        for row, metadata, lng in included:
+            lines += _readme_citation(row, metadata, lng, t)
+        lines += ["", f"## {t['documentation']}", "", t["documentation_text"].format(**contents), ""]
+        for row, metadata, lng in included:
+            records = f"[`metadata/`](data/{row['folder']}/metadata/)"
+            sources = " · ".join(f"[{label}](<{_md_url(url)}>)" for label, url in _source_links(row, metadata, t))
+            lines.append(f"- **{_title(row, lng)}**: {records} · {sources}")
     lines += ["", f"## {t['reproduce']}", "", t["reproduce_text"]]
-    lines += ["", f"## {t['contents']}", "", *([t["contents_html"]] if readme_html else []), t["contents_text"], ""]
+    lines += ["", f"## {t['about']}", "", t["about_text"], ""]
 
     sections = [line.removeprefix("## ") for line in lines if line.startswith("## ")]
     toc = [t["toc"], "", *[f"- [{s}](#{_slug(s)})" for s in sections], ""]
-    after_summary = lines.index(f"## {t['selection']}")
-    return "\n".join(lines[:after_summary] + toc + lines[after_summary:])
+    first_section = lines.index(f"## {t['data']}")
+    return "\n".join(lines[:first_section] + toc + lines[first_section:])
 
 
 def _slug(heading):
@@ -560,8 +646,7 @@ _FILE_KINDS = {
     "citations.txt": ("A citation for each included dataset subset", "text/plain"),
     "citations.bib": ("The citations in BibTeX", "application/x-bibtex"),
     "citations.ris": ("The citations in RIS", "application/x-research-info-systems"),
-    "CITATION.cff": ("Citation File Format record of this download and its sources", "application/x-yaml"),
-    "rights.txt": ("The licence of each included dataset", "text/plain"),
+    "licences.txt": ("The licence of each included dataset", "text/plain"),
     "citation.txt": ("Citation for this dataset subset", "text/plain"),
     "metadata.json": ("The dataset's metadata as shown in the CIOOS Data Explorer", "application/json"),
     "erddap.nccsvMetadata": ("The dataset's ERDDAP global and variable attributes (NCCSV)", "text/csv"),
@@ -620,7 +705,7 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
             "@id": "#mixed-licences",
             "@type": "CreativeWork",
             "name": "Each dataset keeps its own licence",
-            "description": "See rights.txt and each dataset folder's license.",
+            "description": "See citation/licences.txt and each dataset folder's license.",
         },
         *[
             {"@id": f"http://schema.org/{status}", "@type": "ActionStatusType", "name": name}
@@ -636,9 +721,9 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
             graph.append(entity)
 
     for i, (row, metadata, lang) in enumerate(entries):
-        folder = root / row["folder"]
-        files = sorted(p for p in folder.iterdir() if p.is_file())
-        file_ids = [f"{row['folder']}/{p.name}" for p in files]
+        folder_id = f"data/{row['folder']}/"
+        files = sorted(p for p in (root / folder_id).rglob("*") if p.is_file())
+        file_ids = [folder_id + p.relative_to(root / folder_id).as_posix() for p in files]
         source_id = metadata.get("doi") or landing_url(row)
         # A CreativeWork, not a Dataset: a Dataset is a data entity, which
         # RO-Crate requires to be inside the crate.
@@ -664,7 +749,7 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
             continue
         licence = _licence(metadata)
         folder_entity = {
-            "@id": f"{row['folder']}/",
+            "@id": folder_id,
             "@type": "Dataset",
             "name": _title(row, lang),
             "description": f"Data and metadata for the subset of {row['dataset_id']}",
@@ -678,7 +763,7 @@ def _ro_crate(root: Path, user_query, entries, created, root_files):
         if row["status"] in INCLUDED:
             folder_entity["creditText"] = citation(row, metadata, user_query, lang)
         graph.append(folder_entity)
-        has_part.append({"@id": f"{row['folder']}/"})
+        has_part.append({"@id": folder_id})
         data_files = {Path(f["path"]).name for f in row["files"]}
         for path, file_id in zip(files, file_ids, strict=True):
             graph.append(_file_entity(file_id, path.name, path.stat().st_size, data_files, row))
@@ -782,9 +867,9 @@ def write_package(root: Path, json_query, report, readme_html=True):
         row["title_fr"] = dataset.get("title_fr")
         row["ckan_url"] = dataset.get("ckan_url")
         row["requested_format"] = requested
-        folder = root / row["folder"]
+        folder = root / "data" / row["folder"]
         if metadata:
-            (folder / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False))
+            (folder / "metadata" / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False))
         for file in row["files"]:
             file["sha256"] = sha256(root / file["path"])
         if row["status"] in INCLUDED:
@@ -792,23 +877,24 @@ def write_package(root: Path, json_query, report, readme_html=True):
         entries.append((row, metadata, lang))
     included = [e for e in entries if e[0]["status"] in INCLUDED]
 
-    readme = _readme(root, user_query, entries, created, lang, readme_html)
+    readme = _readme(user_query, entries, created, lang, readme_html)
     (root / "README.md").write_text(readme)
     if readme_html:
-        citations = {row["folder"]: citation(row, metadata, user_query, lg) for row, metadata, lg in included}
+        citations = {f"data/{row['folder']}": citation(row, metadata, user_query, lg) for row, metadata, lg in included}
         (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
-    (root / "citations.txt").write_text("\n\n".join(citation(r, m, user_query, lg) for r, m, lg in included) + "\n")
-    (root / "citations.bib").write_text("\n\n".join(_bibtex(*e[:2], user_query, e[2]) for e in included) + "\n")
-    (root / "citations.ris").write_text("\n\n".join(_ris(*e[:2], user_query, e[2]) for e in included) + "\n")
-    (root / "CITATION.cff").write_text(_citation_cff(included, user_query, created))
-    rights = []
+    cite = root / "citation"
+    cite.mkdir(exist_ok=True)
+    (cite / "citations.txt").write_text("\n\n".join(citation(r, m, user_query, lg) for r, m, lg in included) + "\n")
+    (cite / "citations.bib").write_text("\n\n".join(_bibtex(*e[:2], user_query, e[2]) for e in included) + "\n")
+    (cite / "citations.ris").write_text("\n\n".join(_ris(*e[:2], user_query, e[2]) for e in included) + "\n")
+    licences = []
     for row, metadata, _ in included:
         licence = _licence(metadata) or {}
-        rights.append(
+        licences.append(
             f"{row.get('title') or row['dataset_id']} ({landing_url(row)}): "
             + (" ".join(filter(None, [licence.get("title"), licence.get("url")])) or "no licence recorded")
         )
-    (root / "rights.txt").write_text("\n".join(rights) + "\n")
+    (cite / "licences.txt").write_text("\n".join(licences) + "\n")
 
     resources = [{"name": "readme", "path": "README.md", "mediatype": "text/markdown"}]
     if readme_html:
@@ -854,11 +940,10 @@ def write_package(root: Path, json_query, report, readme_html=True):
         "README.md",
         *(["README.html"] if readme_html else []),
         "datapackage.json",
-        "citations.txt",
-        "citations.bib",
-        "citations.ris",
-        "CITATION.cff",
-        "rights.txt",
+        "citation/citations.txt",
+        "citation/citations.bib",
+        "citation/citations.ris",
+        "citation/licences.txt",
         "reproduce.py",
     ]
     crate = _ro_crate(root, user_query, entries, created, root_files)

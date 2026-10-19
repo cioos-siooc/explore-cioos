@@ -336,7 +336,7 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
     if parts and row["status"] != FAILED:
         _stage(progress, dataset, f"writing {form.label}" + (" inside the polygon" if regions else ""))
         files = write_subset(fmt, parts, regions, folder / dataset_folder_name(dataset))
-        row["files"] = _relative(files, folder.parent)
+        row["files"] = files
     for part in parts:
         part.unlink()
 
@@ -352,7 +352,7 @@ def _download_obis(dataset, user_query, regions, fmt, row, folder: Path, progres
     _stage(progress, dataset, f"querying the OBIS export {url}")
 
     files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset))
-    row["files"] = _relative(files, folder.parent)
+    row["files"] = files
     row["status"] = COMPLETED if files else EMPTY
 
 
@@ -363,8 +363,8 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
         fmt = DEFAULT_FORMAT
 
     folder_name = dataset_folder_name(dataset)
-    folder = root / folder_name
-    folder.mkdir(parents=True, exist_ok=True)
+    folder = root / "data" / folder_name
+    (folder / "metadata").mkdir(parents=True, exist_ok=True)
     row = _row(dataset, fmt, folder_name)
     row["format_fallback"] = fmt != requested_format
 
@@ -373,10 +373,11 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
             _download_obis(dataset, user_query, regions, fmt, row, folder, progress)
         else:
             _download_erddap(dataset, user_query, regions, fmt, row, folder, budget, progress)
+        row["files"] = _relative(row["files"], root)
     except Exception as e:
         # One dataset failing must not lose the rest of the user's download.
         for file in row["files"]:
-            (root / file["path"]).unlink(missing_ok=True)
+            Path(file["path"]).unlink(missing_ok=True)
         row.update(status=FAILED, reason_code=UNKNOWN_ERROR, files=[])
         row["erddap_error"] = "\n".join(filter(None, [row["erddap_error"], f"{type(e).__name__}: {e}"]))
         logger.bind(erddap_url=dataset["erddap_url"], dataset_id=dataset["dataset_id"]).exception(
@@ -384,7 +385,7 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
         )
 
     _stage(progress, dataset, "fetching the source metadata records")
-    row["warnings"] += save_source_metadata(dataset, folder)
+    row["warnings"] += save_source_metadata(dataset, folder / "metadata")
     row["file_size"] = sum(f["bytes"] for f in row["files"])
     row["n_records"] = row["n_records"] or sum(f["n_rows"] for f in row["files"])
     row["total_size_so_far"] = budget.add(row["file_size"])

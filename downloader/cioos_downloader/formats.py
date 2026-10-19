@@ -358,14 +358,15 @@ def reproduce(root: Path):
     with tempfile.TemporaryDirectory() as tmp:
         for subset in package["x-cde-subsets"]:
             print(f"{subset['dataset_id']}:")
+            folder = f"data/{subset['folder']}"
             try:
-                files = _rebuild(subset, query, regions, out / subset["folder"] / subset["folder"], Path(tmp))
+                files = _rebuild(subset, query, regions, out / folder / subset["folder"], Path(tmp))
             except Exception as e:
                 print(f"  failed: {type(e).__name__}: {e}")
                 differs += 1
                 continue
             written = {f["path"].relative_to(out).as_posix(): f["path"] for f in files}
-            for path in sorted({p for p in expected if p.startswith(subset["folder"] + "/")} | set(written)):
+            for path in sorted({p for p in expected if p.startswith(folder + "/")} | set(written)):
                 if path not in written:
                     status = "missing"
                 elif path not in expected:

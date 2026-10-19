@@ -130,7 +130,7 @@ Every dataset ends in one status, recorded with the server's own error text:
 
 ## 5. Source metadata
 
-Each dataset's folder receives the source's own records, copied as is
+Each dataset folder's `metadata/` receives the source's own records, copied as is
 (`source_metadata.py`). A record that can't be fetched is a note in the README,
 never a failed dataset.
 
@@ -148,23 +148,27 @@ zipped as `cde_download_<job_id>.zip`:
 
 ```
 cde_download_<job_id>/
-  README.md               link back to the selection in the Data Explorer, table of contents,
-                          what was included (with links to each source record), what wasn't
-                          and why, filters, citations, licences
+  README.md               data first: each included dataset's folder, rows and licence, then
+                          what wasn't included and why, what each file is and how to open it
+                          (open hints only for the formats present), the selection, citations,
+                          links to each source record, how to reproduce, and what the package is
   README.html             the same, as a standalone page (no external requests) with a copy button per citation
+  data/
+    <dataset_id>_<host>/  one folder per dataset
+      <dataset_id>_<host>.csv|parquet|txt|nc
+      citation.txt
+      metadata/           metadata.json, erddap.nccsvMetadata, ckan_iso19115.xml, obis_dataset.json, eml.xml
+  citation/
+    citations.txt / .bib / .ris
+    licences.txt          the licence of each dataset
+  reproduce.py            rebuild the data files (see below)
   datapackage.json        Frictionless Data Package v2
   ro-crate-metadata.json  RO-Crate 1.2 provenance
-  citations.txt / .bib / .ris, CITATION.cff
-  rights.txt              the licence of each dataset
-  reproduce.py            rebuild the data files (see below)
-  <dataset_id>_<host>/    one folder per dataset
-    <dataset_id>_<host>.csv|parquet|txt|nc
-    citation.txt
-    metadata.json, erddap.nccsvMetadata, ckan_iso19115.xml, obis_dataset.json, eml.xml
 ```
 
-The layout follows GBIF downloads: data plus a citation and licence file per
-source. The two manifests serve different readers:
+The data is what the user came for, so it sits in one place; the citation and
+licence of every dataset are grouped in `citation/`. The two manifests stay at
+the root, where their specifications require them, and serve different readers:
 
 - **`datapackage.json`** describes each data file for tools: its path, sha256,
   size, media type, columns with units, the request URLs (`sources`) and
@@ -260,7 +264,6 @@ The files validate with the standard tools:
 
 ```sh
 uvx frictionless validate datapackage.json
-uvx --from cffconvert cffconvert --validate -i CITATION.cff
 uvx --from roc-validator rocrate-validator validate -np -p ro-crate-1.2 -l required .
 ```
 
