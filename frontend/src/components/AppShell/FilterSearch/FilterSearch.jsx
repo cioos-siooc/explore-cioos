@@ -309,7 +309,13 @@ export default function FilterSearch({ text, setText, inputRef }) {
       ...shown.filter((g) => g.key !== "text"),
     ];
   }
-  shown = [...pinned, ...shown];
+  // Places come last, where their slower answer lands without shifting the
+  // suggestions already being read.
+  shown = [
+    ...pinned,
+    ...shown.filter((g) => g.key !== "region"),
+    ...shown.filter((g) => g.key === "region"),
+  ];
   const flat = shown.flatMap((group) =>
     group.options.map((option) => ({ group, option })),
   );

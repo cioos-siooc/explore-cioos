@@ -294,7 +294,7 @@ describe("FilterSearch", () => {
 
   // GeoNames answers in place of the fixture set's empty reply, as the unit
   // network otherwise does for every term.
-  function answerRegions() {
+  function answerRegions(name = "Bay of Fundy") {
     const square = [
       [
         [-67, 44],
@@ -311,7 +311,7 @@ describe("FilterSearch", () => {
           type: "Feature",
           properties: {
             featureid: "fundy",
-            name: "Bay of Fundy",
+            name,
             concise: "BAY",
           },
           geometry: { type: "MultiPolygon", coordinates: [square] },
@@ -364,6 +364,23 @@ describe("FilterSearch", () => {
     await screen.findByText("Bay of Fundy");
     expect(screen.queryByText("Searching places…")).toBeNull();
     expect(box).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("lists places after the other suggestions", async () => {
+    answerRegions("Pacific");
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "pacific");
+    await screen.findByText("Fundian Channel");
+
+    const labels = screen
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    const firstPlace = labels.findIndex((l) => l.startsWith("Pacific"));
+    expect(labels.findIndex((l) => l.includes("CIOOS Pacific"))).toBeLessThan(
+      firstPlace,
+    );
+    expect(labels.at(-1)).toContain("Fundian Channel");
   });
 
   it("goes to a region without filtering when asked", async () => {
