@@ -293,7 +293,7 @@ def test_variables_come_from_the_erddap_info_page_when_not_harvested(tmp_path):
     assert "depth>=" not in urls[1]
 
 
-def test_the_download_script_builds_the_package_without_limits_or_the_html_readme(tmp_path, monkeypatch):
+def test_the_download_script_builds_the_package_without_limits_or_the_html_readme(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(download_erddap, "DATASET_SIZE_LIMIT", 10)
     monkeypatch.chdir(tmp_path)
     query = _query(_dataset("Good", metadata=_METADATA))
@@ -303,6 +303,7 @@ def test_the_download_script_builds_the_package_without_limits_or_the_html_readm
         patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
     ):
         assert script.run(query) == 0
+    assert "Good: COMPLETED, 1 file(s)" in capsys.readouterr().out
 
     root = tmp_path / "cde_download_pkg001"
     names = {p.relative_to(root).as_posix() for p in root.rglob("*")}
@@ -315,7 +316,7 @@ def test_the_download_script_builds_the_package_without_limits_or_the_html_readm
     assert "README.html" not in crate
 
 
-def test_downloads_run_concurrently_but_at_most_two_per_server(tmp_path):
+def test_servers_download_concurrently_but_each_serves_one_request_at_a_time(tmp_path):
     active, peak, lock = {}, {}, threading.Lock()
 
     def get(url, **_):
@@ -333,8 +334,40 @@ def test_downloads_run_concurrently_but_at_most_two_per_server(tmp_path):
     ]
     report, _, _ = _run(tmp_path, _query(*datasets), get)
 
-    assert peak == {"data.example.ca": 2, "other.example.ca": 2}
+    assert peak == {"data.example.ca": 1, "other.example.ca": 1}
     assert [r["dataset_id"] for r in report["erddap_report"]] == [d["dataset_id"] for d in datasets]
+
+
+def test_progress_hears_each_dataset_stage_bytes_and_outcome_in_order(tmp_path):
+    events = []
+
+    class Recorder(download_erddap.Progress):
+        def stage(self, dataset, text):
+            events.append((dataset["dataset_id"], "stage", text.split(":")[0]))
+
+        def received(self, dataset, n_bytes):
+            events.append((dataset["dataset_id"], "bytes", n_bytes))
+
+        def finished(self, dataset, row):
+            events.append((dataset["dataset_id"], "finished", row["status"]))
+
+    with (
+        patch("cioos_downloader.download_erddap.requests.get", return_value=_response()),
+        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
+    ):
+        download_erddap.get_datasets(_query(_dataset("A0"), _dataset("A1")), tmp_path, progress=Recorder())
+
+    assert events == [
+        (dataset_id, *event)
+        for dataset_id in ("A0", "A1")
+        for event in [
+            ("stage", "request 1/1"),
+            ("bytes", len(_CSV)),
+            ("stage", "writing CSV"),
+            ("stage", "fetching the source metadata records"),
+            ("finished", "COMPLETED"),
+        ]
+    ]
 
 
 # Inside: (-133, 50). Outside but within the bounding box: (-126, 55).

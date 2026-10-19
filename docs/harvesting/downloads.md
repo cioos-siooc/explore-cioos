@@ -70,8 +70,9 @@ take the same job. It is deliberately not on the Prefect pool (see the README's
 ## 4. Fetching each dataset
 
 The downloader (`downloader/cioos_downloader/download_erddap.py`) fetches
-datasets in parallel: 6 at a time overall, and at most 2 at a time per server,
-so one ERDDAP isn't hammered. A dataset that fails never stops the others.
+datasets from up to 6 servers in parallel, but one at a time per server (one
+worker per server), so no ERDDAP ever serves two of our requests at once. A
+dataset that fails never stops the others.
 
 ### ERDDAP
 
@@ -205,7 +206,11 @@ archive at the commit the API was deployed from (`SOURCE_COMMIT`, set by
 `deploy.yml`; `development-v2` when unset), with `exclude-newer` set to when it
 was generated, so every run resolves the same libraries. Running it calls
 `cioos_downloader.script.run()`: `get_datasets` without the size limits, then
-`write_package` without README.html, into `cde_download_<job>/`.
+`write_package` without README.html, into `cde_download_<job>/`. While it
+runs, it logs each step (every request URL, the writing and metadata steps,
+each dataset's outcome) above a progress bar of datasets done and one live bar
+per server being downloaded from, showing the current dataset, bytes received
+and speed; `get_datasets` reports those through its `progress` hooks.
 
 The selection is written into the script as a Python literal (`QUERY = {…}`)
 laid out as `ruff format` would, so the user can read and edit it.

@@ -6,6 +6,7 @@ import io
 import re
 import sys
 import threading
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -32,8 +33,8 @@ QUERY_SIZE_LIMIT = 5000 * ONE_MB
 CHUNK_SIZE = 1024**2
 # (connect, read): a hung server becomes a FAILED subset instead of a stalled job.
 REQUEST_TIMEOUT = (30, 600)
+# Servers downloaded from at once; each server gets one request at a time.
 MAX_WORKERS = 6
-MAX_REQUESTS_PER_SERVER = 2
 # Feature-ID regexes are split so each URL stays under common proxy limits;
 # past MAX_FEATURE_REQUESTS a bounding-box request is cheaper.
 URL_BUDGET = 6000
@@ -81,6 +82,29 @@ OBIS_FORMATS = ("csv", "parquet")
 # ERDDAP error envelope: Error { code=500; message="Query error: ..."; }
 _ERDDAP_MESSAGE_RE = re.compile(r'message\s*=\s*"(.*?)"\s*;?\s*\}?\s*$', re.DOTALL | re.IGNORECASE)
 MAX_ERROR_CHARS = 500
+
+
+def server(dataset):
+    return urlparse(dataset["erddap_url"]).netloc
+
+
+class Progress:
+    """Hooks for a caller showing a download as it runs; the server ignores them.
+    Calls for one server come from one thread, in order."""
+
+    def stage(self, dataset, text):
+        pass
+
+    def received(self, dataset, n_bytes):
+        pass
+
+    def finished(self, dataset, row):
+        pass
+
+
+def _stage(progress, dataset, text):
+    logger.info("{}: {}", dataset["dataset_id"], text)
+    progress.stage(dataset, text)
 
 
 def erddap_server_to_name(server):
@@ -162,9 +186,10 @@ def get_erddap_download_url(dataset, user_query, variables, region=None, respons
     return e.get_download_url()
 
 
-def _variables(dataset):
+def _variables(dataset, progress):
     if dataset.get("table_variables"):
         return [v["name"] for v in dataset["table_variables"]]
+    _stage(progress, dataset, "reading the variable list")
     info_url = ERDDAP(dataset["erddap_url"]).get_info_url(dataset["dataset_id"], response="csv")
     with requests.get(info_url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT) as response:
         response.raise_for_status()
@@ -203,18 +228,7 @@ class _QueryBudget:
             return self.total > self.query_limit
 
 
-class _ServerSlots:
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._slots = {}
-
-    def __call__(self, url):
-        host = urlparse(url).netloc
-        with self._lock:
-            return self._slots.setdefault(host, threading.Semaphore(MAX_REQUESTS_PER_SERVER))
-
-
-def _stream_to_file(url, path: Path, already_downloaded, limit):
+def _stream_to_file(url, path: Path, already_downloaded, limit, on_chunk):
     """Returns (bytes_written, error, empty, truncated)."""
     written = 0
     with requests.get(url, headers=REQUEST_HEADERS, stream=True, timeout=REQUEST_TIMEOUT) as response:
@@ -230,6 +244,7 @@ def _stream_to_file(url, path: Path, already_downloaded, limit):
                 allowed = limit - already_downloaded - written
                 f.write(chunk[:allowed])
                 written += min(len(chunk), allowed)
+                on_chunk(min(len(chunk), allowed))
                 if len(chunk) > allowed:
                     return written, None, False, True
     return written, None, False, False
@@ -271,9 +286,9 @@ def _row(dataset, fmt, folder_name):
     }
 
 
-def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budget):
+def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budget, progress):
     form = FORMATS[fmt]
-    variables = _variables(dataset)
+    variables = _variables(dataset, progress)
     constraints = feature_constraints(dataset)
     row["feature_constrained"] = constraints is not None
     requests_to_make = (
@@ -290,16 +305,18 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
         if row["dataset_limit_hit"]:
             continue
 
-        logger.info("Download {}", url)
+        _stage(progress, dataset, f"request {i + 1}/{len(requests_to_make)}: {url}")
         part = folder / f".part{i}"
-        written, error, empty, truncated = _stream_to_file(url, part, row["bytes_downloaded"], budget.dataset_limit)
+        written, error, empty, truncated = _stream_to_file(
+            url, part, row["bytes_downloaded"], budget.dataset_limit, lambda n: progress.received(dataset, n)
+        )
         row["bytes_downloaded"] += written
         if error:
             errors.append(error)
             if not empty:
                 row.update(status=FAILED, reason_code=HTTP_ERROR)
                 logger.bind(erddap_url=dataset["erddap_url"], dataset_id=dataset["dataset_id"], download_url=url).error(
-                    "ERDDAP downloader download error: {}", error
+                    "{}: download error: {}", dataset["dataset_id"], error
                 )
             continue
         if truncated:
@@ -317,6 +334,7 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
         parts.append(part)
 
     if parts and row["status"] != FAILED:
+        _stage(progress, dataset, f"writing {form.label}" + (" inside the polygon" if regions else ""))
         files = write_subset(fmt, parts, regions, folder / dataset_folder_name(dataset))
         row["files"] = _relative(files, folder.parent)
     for part in parts:
@@ -327,17 +345,18 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
         row["status"] = COMPLETED if row["files"] else EMPTY
 
 
-def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
+def _download_obis(dataset, user_query, regions, fmt, row, folder: Path, progress):
     dataset_id = dataset["dataset_id"]
     url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
     row["download_url_list"] = [url]
+    _stage(progress, dataset, f"querying the OBIS export {url}")
 
     files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset))
     row["files"] = _relative(files, folder.parent)
     row["status"] = COMPLETED if files else EMPTY
 
 
-def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget, slots):
+def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget, progress):
     source_type = dataset.get("source_type") or "erddap"
     fmt = requested_format
     if source_type == "obis" and fmt not in OBIS_FORMATS:
@@ -350,11 +369,10 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
     row["format_fallback"] = fmt != requested_format
 
     try:
-        with slots(dataset["erddap_url"]):
-            if source_type == "obis":
-                _download_obis(dataset, user_query, regions, fmt, row, folder)
-            else:
-                _download_erddap(dataset, user_query, regions, fmt, row, folder, budget)
+        if source_type == "obis":
+            _download_obis(dataset, user_query, regions, fmt, row, folder, progress)
+        else:
+            _download_erddap(dataset, user_query, regions, fmt, row, folder, budget, progress)
     except Exception as e:
         # One dataset failing must not lose the rest of the user's download.
         for file in row["files"]:
@@ -365,16 +383,26 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
             "Downloader failed for dataset {}", dataset["dataset_id"]
         )
 
+    _stage(progress, dataset, "fetching the source metadata records")
     row["warnings"] += save_source_metadata(dataset, folder)
     row["file_size"] = sum(f["bytes"] for f in row["files"])
     row["n_records"] = row["n_records"] or sum(f["n_rows"] for f in row["files"])
     row["total_size_so_far"] = budget.add(row["file_size"])
     row["no_data"] = not row["files"]
     row["finished_at"] = _now()
+    logger.info(
+        "{}: {}, {} file(s), {:.1f} MB, {} records",
+        dataset["dataset_id"],
+        row["status"],
+        len(row["files"]),
+        row["file_size"] / ONE_MB,
+        row["n_records"],
+    )
+    progress.finished(dataset, row)
     return row
 
 
-def get_datasets(json_query, output_path, size_limits=True):
+def get_datasets(json_query, output_path, size_limits=True, progress=None):
     user_query = json_query["user_query"]
     regions = polygon_regions(user_query.get("polygon_region"))
     requested_format = user_query.get("format") or DEFAULT_FORMAT
@@ -383,16 +411,22 @@ def get_datasets(json_query, output_path, size_limits=True):
         budget = _QueryBudget(DATASET_SIZE_LIMIT, QUERY_SIZE_LIMIT)
     else:
         budget = _QueryBudget(sys.maxsize, sys.maxsize)
-    slots = _ServerSlots()
+    progress = progress or Progress()
     root = Path(output_path)
+    datasets = json_query["cache_filtered"]
+
+    # One worker per server, so no ERDDAP server ever serves two of our requests at once.
+    by_server = defaultdict(list)
+    for i, dataset in enumerate(datasets):
+        by_server[server(dataset)].append(i)
+    rows = [None] * len(datasets)
+
+    def download_server(indexes):
+        for i in indexes:
+            rows[i] = download_dataset(datasets[i], user_query, regions, requested_format, root, budget, progress)
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        rows = list(
-            pool.map(
-                lambda dataset: download_dataset(dataset, user_query, regions, requested_format, root, budget, slots),
-                json_query["cache_filtered"],
-            )
-        )
+        list(pool.map(download_server, by_server.values()))
 
     return {
         "erddap_report": rows,
