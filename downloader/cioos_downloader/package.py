@@ -8,9 +8,8 @@ downloader report plus the query that produced it.
   the request URLs, timing and outcome, failures included.
 - citations.txt/.bib/.ris, CITATION.cff, rights.txt: GBIF-style citation and
   licence files; each dataset folder also carries its own citation.txt.
-- reproduce.py, reproduce.py.lock: formats.py as a uv script that re-fetches
-  and re-filters every subset, with the committed uv lock of every library
-  that built the package (its PEP 723 header comes from the lock's manifest).
+- reproduce.py: a uv script that installs the downloader that built the
+  package from the public repository and re-fetches and re-filters every subset.
 
 Each subset citation follows ESIP / RDA dynamic-data-citation practice: the
 source's own citation, then the subset and the UTC time and URL it was
@@ -21,11 +20,6 @@ import base64
 import html
 import json
 import re
-import shutil
-import subprocess
-import sys
-import tempfile
-import tomllib
 from datetime import UTC, datetime
 from importlib.metadata import version
 from itertools import pairwise
@@ -35,7 +29,6 @@ from urllib.parse import urlparse
 
 from markdown_it import MarkdownIt
 
-from cioos_downloader import formats
 from cioos_downloader.download_erddap import COMPLETED, EMPTY, FAILED, FORMATS, IGNORED, PARTIAL
 from cioos_downloader.formats import sha256
 
@@ -47,9 +40,9 @@ README_TEMPLATE = Path(__file__).parent / "readme" / "readme.html"
 README_LOGO = Path(__file__).parent / "readme" / "cioos-logo.svg"
 # Titles, citations and server errors reach the README: never pass raw HTML.
 _MARKDOWN = MarkdownIt("commonmark", {"html": False}).enable("table")
-# formats.py's imports, plus netcdf4 for xarray's NetCDF writer.
-REPRODUCE_LOCK = Path(__file__).with_name("reproduce.py.lock")
-REPRODUCE_DEPENDENCIES = ("duckdb", "netcdf4", "numpy", "pandas", "pyarrow", "shapely", "xarray")
+# The web API records the commit it was deployed from in the query; jobs
+# queued before it did track the development branch.
+DEFAULT_DOWNLOADER_URL = f"{SOFTWARE_URL}/archive/development-v2.tar.gz#subdirectory=downloader"
 
 REASONS = {
     "en": {
@@ -130,20 +123,21 @@ _TEXT = {
             "columns, request URLs, licences).\n"
             "- `ro-crate-metadata.json`: RO-Crate 1.2 provenance: one action per dataset with its request "
             "URLs, timing and outcome.\n"
-            "- `reproduce.py`, `reproduce.py.lock`: the code that filtered the data to your selection, and the "
-            "exact library versions it ran with."
+            "- `reproduce.py`: a script that rebuilds the data files with the code that filtered them to your "
+            "selection."
         ),
         "reproduce": "Reproduce this download",
         "reproduce_text": (
             "You need **uv** installed on your computer: "
             "<https://docs.astral.sh/uv/getting-started/installation/>. "
-            "It is the only requirement; uv fetches the right Python version and the exact libraries listed at "
-            "the top of reproduce.py and in reproduce.py.lock, in an isolated environment that leaves the rest "
-            "of your system untouched.\n\n"
+            "It is the only requirement; uv fetches the right Python version, the Data Explorer's downloader at "
+            "the version that built this package and the libraries it needs as they were when it was built, "
+            "listed at the top of reproduce.py, in an isolated environment that leaves the rest of your system "
+            "untouched.\n\n"
             "Then, in this folder, run `uv run reproduce.py`. It re-fetches every subset from its source, "
             "applies the same filter, writes the files to `reproduced/` and checks each one against its "
             "checksum in datapackage.json. Running it with plain `python` instead only works if you install "
-            "those libraries yourself."
+            "the downloader yourself."
         ),
         "warnings": "Notes",
     },
@@ -213,20 +207,21 @@ _TEXT = {
             "contrôle, colonnes, URL des requêtes, licences).\n"
             "- `ro-crate-metadata.json` : provenance RO-Crate 1.2 : une action par jeu de données avec ses "
             "URL de requête, sa durée et son résultat.\n"
-            "- `reproduce.py`, `reproduce.py.lock` : le code qui a filtré les données selon votre sélection, et "
-            "les versions exactes des bibliothèques utilisées."
+            "- `reproduce.py` : un script qui reconstruit les fichiers de données avec le code qui les a filtrés "
+            "selon votre sélection."
         ),
         "reproduce": "Reproduire ce téléchargement",
         "reproduce_text": (
             "Il faut que **uv** soit installé sur votre ordinateur : "
             "<https://docs.astral.sh/uv/getting-started/installation/>. "
-            "C'est le seul prérequis; uv récupère la bonne version de Python et les bibliothèques exactes "
-            "indiquées en tête de reproduce.py et dans reproduce.py.lock, dans un environnement isolé qui ne "
-            "modifie pas le reste de votre système.\n\n"
+            "C'est le seul prérequis; uv récupère la bonne version de Python, le téléchargeur de l'Explorateur "
+            "dans la version qui a construit ce paquet et les bibliothèques dont il a besoin telles qu'elles "
+            "étaient à ce moment, indiqués en tête de reproduce.py, dans un environnement isolé qui ne modifie "
+            "pas le reste de votre système.\n\n"
             "Ensuite, dans ce dossier, lancez `uv run reproduce.py`. Le script récupère de nouveau chaque "
             "sous-ensemble depuis sa source, applique le même filtre, écrit les fichiers dans `reproduced/` et "
             "vérifie chacun avec sa somme de contrôle dans datapackage.json. Avec `python` seul, il faut "
-            "installer ces bibliothèques vous-même."
+            "installer le téléchargeur vous-même."
         ),
         "warnings": "Remarques",
     },
@@ -575,7 +570,6 @@ _FILE_KINDS = {
     "obis_dataset.json": ("The dataset's OBIS record", "application/json"),
     "eml.xml": ("The dataset's Ecological Metadata Language record from its IPT", "application/xml"),
     "reproduce.py": ("uv script that re-fetches and re-filters every subset of this package", "text/x-python"),
-    "reproduce.py.lock": ("uv lock of every dependency of reproduce.py, transitive ones included", "application/toml"),
 }
 _ACTION_STATUSES = {"CompletedActionStatus": "Completed", "FailedActionStatus": "Failed"}
 
@@ -743,38 +737,35 @@ def _readme_html(markdown, user_query, lang, citations):
     )
 
 
-def _script_header(pins, python):
+def _reproduce_script(user_query, created):
+    url = user_query.get("downloader_url") or DEFAULT_DOWNLOADER_URL
     return "\n".join(
         [
             "# /// script",
-            f'# requires-python = "{python}"',
-            "# dependencies = [",
-            *[f'#     "{name}{pin}",' for name, pin in pins.items()],
-            "# ]",
+            '# requires-python = "==3.13.*"',
+            f'# dependencies = ["cioos-downloader @ {url}"]',
+            "# [tool.uv]",
+            # Resolves the libraries as they were when the package was built.
+            f'# exclude-newer = "{created}"',
             "# ///",
+            '"""Rebuild this download\'s data files from their sources.',
+            "",
+            "Run `uv run reproduce.py` in this folder (https://docs.astral.sh/uv/). It",
+            "re-fetches every dataset from the request URLs recorded in datapackage.json,",
+            "applies the same polygon filter, writes the files to reproduced/ and checks",
+            "each one against the checksum of the file you received.",
+            '"""',
+            "",
+            "import sys",
+            "from pathlib import Path",
+            "",
+            "from cioos_downloader.formats import reproduce",
+            "",
+            'if __name__ == "__main__":',
+            "    sys.exit(reproduce(Path(__file__).resolve().parent))",
             "",
         ]
     )
-
-
-def build_reproduce_lock():
-    """Relock after a dependency bump, from download_scheduler/ (the image's environment):
-    uv run python -c "from cioos_downloader.package import build_reproduce_lock; build_reproduce_lock()"
-    """
-    pins = {name: f"=={version(name)}" for name in REPRODUCE_DEPENDENCIES}
-    # The pins may have no wheels for another Python minor version.
-    python = f"=={sys.version_info.major}.{sys.version_info.minor}.*"
-    with tempfile.TemporaryDirectory() as tmp:
-        script = Path(tmp) / "reproduce.py"
-        script.write_text(_script_header(pins, python))
-        subprocess.run(["uv", "lock", "--script", str(script)], check=True)
-        shutil.copyfile(script.with_name("reproduce.py.lock"), REPRODUCE_LOCK)
-
-
-def _reproduce_script():
-    lock = tomllib.loads(REPRODUCE_LOCK.read_text())
-    pins = {r["name"]: r["specifier"] for r in lock["manifest"]["requirements"]}
-    return _script_header(pins, lock["requires-python"]) + Path(formats.__file__).read_text()
 
 
 def write_package(root: Path, json_query, report, readme_html=True):
@@ -857,8 +848,7 @@ def write_package(root: Path, json_query, report, readme_html=True):
         ],
     }
     (root / "datapackage.json").write_text(json.dumps(datapackage, indent=2, ensure_ascii=False))
-    (root / "reproduce.py").write_text(_reproduce_script())
-    shutil.copyfile(REPRODUCE_LOCK, root / "reproduce.py.lock")
+    (root / "reproduce.py").write_text(_reproduce_script(user_query, created))
 
     root_files = [
         "README.md",
@@ -870,7 +860,6 @@ def write_package(root: Path, json_query, report, readme_html=True):
         "CITATION.cff",
         "rights.txt",
         "reproduce.py",
-        "reproduce.py.lock",
     ]
     crate = _ro_crate(root, user_query, entries, created, root_files)
     (root / "ro-crate-metadata.json").write_text(json.dumps(crate, indent=2, ensure_ascii=False))

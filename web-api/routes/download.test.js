@@ -220,6 +220,9 @@ test("serves a download script that embeds the selection, pinned and without an 
     script,
     /# dependencies = \["cioos-downloader @ https:\/\/github\.com\/cioos-siooc\/explore-cioos\/archive\/[\w.-]+\.tar\.gz#subdirectory=downloader"\]/,
   );
+  // The package's reproduce.py installs the same downloader.
+  const url = script.match(/cioos-downloader @ (\S+)"\]/)[1];
+  assert.ok(script.includes(`        "downloader_url": "${url}",\n`));
   assert.match(script, /^# {3}obs_270: Line "A" north$/m);
   assert.match(script, /^ {12}"title": 'Line "A"\\nnorth',$/m);
   assert.match(script, /^ {12}"feature_ids": \[\n {16}"x",\n {12}\],$/m);

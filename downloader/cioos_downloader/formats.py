@@ -1,12 +1,7 @@
-"""Rebuild this download's data files from their sources.
+"""The downloader's per-format writers and polygon filter, and reproduce(),
+which a package's reproduce.py runs to rebuild its data files from their
+sources with this same code.
 
-Run `uv run reproduce.py` in the package folder (https://docs.astral.sh/uv/).
-It re-fetches every dataset from the request URLs recorded in
-datapackage.json, applies the same polygon filter, writes the files to
-reproduced/ and checks each one against the checksum of the file you received.
-
-This is the code that built the package: the downloader ships its own filter
-module (formats.py) as this script, so it imports only third-party libraries.
 Text values are read and written back as strings, so numbers keep ERDDAP's
 exact formatting; only latitude/longitude are parsed, for the polygon test.
 """
@@ -14,7 +9,6 @@ exact formatting; only latitude/longitude are parsed, for the polygon test.
 import hashlib
 import json
 import shutil
-import sys
 import tempfile
 import urllib.error
 import urllib.request
@@ -350,8 +344,10 @@ def _rebuild(subset, query, regions, out_base: Path, tmp: Path):
     return write_subset(subset["format"], parts, regions, out_base) if parts else []
 
 
-def main():
-    root = Path(__file__).resolve().parent
+def reproduce(root: Path):
+    """Re-fetch every subset of the package in ``root`` from the request URLs
+    recorded in datapackage.json, write it to reproduced/ and compare each file
+    with the checksum of the one in the package."""
     out = root / "reproduced"
     package = json.loads((root / "datapackage.json").read_text())
     query = package["x-cde-query"]
@@ -385,7 +381,3 @@ def main():
         print("\nSome files differ: the source data may have changed since the package was built.")
     print(f"\nRebuilt files are in {out}")
     return 1 if differs else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

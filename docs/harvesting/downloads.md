@@ -155,7 +155,7 @@ cde_download_<job_id>/
   ro-crate-metadata.json  RO-Crate 1.2 provenance
   citations.txt / .bib / .ris, CITATION.cff
   rights.txt              the licence of each dataset
-  reproduce.py, reproduce.py.lock  rebuild the data files (see below)
+  reproduce.py            rebuild the data files (see below)
   <dataset_id>_<host>/    one folder per dataset
     <dataset_id>_<host>.csv|parquet|txt|nc
     citation.txt
@@ -181,14 +181,12 @@ the README what each dataset returned.
 
 ### Reproducing a package
 
-`reproduce.py` is the downloader's filtering module (`formats.py`) as a
-[uv](https://docs.astral.sh/uv/) script, shipped with `reproduce.py.lock`, the
-uv lock of every dependency with hashes. The lock is committed at
-`downloader/cioos_downloader/reproduce.py.lock` and the script's PEP 723
-header (Python minor version, exact library versions) is read from its
-manifest, so the two always agree. A test fails when the lock's pins drift from
-`download_scheduler/uv.lock` (the image that builds packages); relock with
-`build_reproduce_lock()`, run from `download_scheduler/`. uv is the only thing
+`reproduce.py` is a [uv](https://docs.astral.sh/uv/) script that, like the
+download script below, installs `downloader` from the public repository's
+archive: at the `downloader_url` the web API records in `user_query` (the
+commit it was deployed from; the `development-v2` archive for jobs queued
+without one), with `exclude-newer` set to when the package was built. It calls
+`cioos_downloader.formats.reproduce()` on its own folder. uv is the only thing
 the user installs: from the package folder, `uv run reproduce.py` re-fetches
 every subset from its request URLs, applies the same polygon filter, writes the
 files to `reproduced/` and prints `match`, `differs` or `missing` for each

@@ -282,6 +282,8 @@ async function downloadSelection(query) {
       Object.entries(query).filter(([key]) => key !== "format"),
     )}`,
     job_id: uuidv4().substr(0, 6),
+    // Installed by the package's reproduce.py, like by the download script.
+    downloader_url: DOWNLOADER_URL,
   };
   return { datasets, userQuery };
 }

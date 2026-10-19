@@ -7,7 +7,6 @@ import time
 import tomllib
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import quote, unquote
 
@@ -464,32 +463,30 @@ def test_reproduce_reports_a_source_that_changed(tmp_path):
     assert "differs: Ctd_data_example_ca/Ctd_data_example_ca.csv" in result.stdout
 
 
-def test_reproduce_script_pins_the_versions_of_its_lock(tmp_path):
-    _, archive, read = _run(tmp_path, _query(_dataset("Ctd")))
-
-    script = read("reproduce.py")
-    assert script.endswith(Path(formats.__file__).read_text())
+def _script_metadata(script):
     block = re.search(r"^# /// script\n((?:#.*\n)+?)^# ///$", script, re.MULTILINE).group(1)
-    metadata = tomllib.loads("".join(line.removeprefix("#").removeprefix(" ") + "\n" for line in block.splitlines()))
-    lock = tomllib.loads(read("reproduce.py.lock"))
-    assert read("reproduce.py.lock") == package.REPRODUCE_LOCK.read_text()
-    assert metadata["dependencies"] == [f"{r['name']}{r['specifier']}" for r in lock["manifest"]["requirements"]]
-    assert metadata["requires-python"] == lock["requires-python"]
+    return tomllib.loads("".join(line.removeprefix("#").removeprefix(" ") + "\n" for line in block.splitlines()))
+
+
+def test_reproduce_script_installs_the_downloader_that_built_the_package(tmp_path):
+    url = "https://github.com/cioos-siooc/explore-cioos/archive/abc123.tar.gz#subdirectory=downloader"
+    _, archive, read = _run(tmp_path, _query(_dataset("Ctd"), downloader_url=url))
+
+    metadata = _script_metadata(read("reproduce.py"))
+    assert metadata["dependencies"] == [f"cioos-downloader @ {url}"]
+    created = json.loads(read("datapackage.json"))["created"]
+    assert metadata["tool"]["uv"]["exclude-newer"] == created
     crate = json.loads(read("ro-crate-metadata.json"))
-    assert {"reproduce.py", "reproduce.py.lock"} <= {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
+    assert "reproduce.py" in {e["@id"] for e in crate["@graph"] if e["@type"] == "File"}
     assert "uv run reproduce.py" in read("README.md")
 
 
-def test_the_reproduce_lock_pins_the_image_versions():
-    # Packages are built in the download_scheduler image; relock with
-    # build_reproduce_lock() (see its docstring) when this fails.
-    image = tomllib.loads((Path(__file__).parents[2] / "download_scheduler" / "uv.lock").read_text())
-    installed = {p["name"]: f"=={p['version']}" for p in image["package"]}
-    lock = tomllib.loads(package.REPRODUCE_LOCK.read_text())
+def test_reproduce_script_of_an_older_job_tracks_the_development_branch(tmp_path):
+    _, _, read = _run(tmp_path, _query(_dataset("Ctd")))
 
-    pins = {r["name"]: r["specifier"] for r in lock["manifest"]["requirements"]}
-    assert pins == {name: installed[name] for name in package.REPRODUCE_DEPENDENCIES}
-    assert lock["requires-python"] == image["requires-python"]
+    assert _script_metadata(read("reproduce.py"))["dependencies"] == [
+        f"cioos-downloader @ {package.DEFAULT_DOWNLOADER_URL}"
+    ]
 
 
 def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
