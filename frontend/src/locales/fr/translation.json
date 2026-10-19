@@ -953,6 +953,8 @@
   "filterSearchHelpTitle": "Tapez pour trouver un filtre, puis sélectionnez un résultat pour l'appliquer. Sélectionnez-le de nouveau pour le retirer.",
   "filterSearchOpenInPanel": "Voir toutes les options de {{filter}}",
   "filterSearchAllOptions": "Toutes les options",
+  "filterSearchShowMore": "Afficher {{count}} de plus",
+  "filterSearchShowMoreAction": "Afficher",
   "filterSearchHelpBrowse": "Ou choisissez un filtre dans la liste pour voir toutes ses options :",
   "filterSearchHelpFilters": "Variables, plateformes, organisations…",
   "filterSearchHelpFiltersExamples": [
