@@ -31,6 +31,7 @@ import DatasetMetadata, {
 } from "../DatasetMetadata/DatasetMetadata.jsx";
 import useDatasetMetadata from "../DatasetMetadata/useDatasetMetadata.js";
 import TaxonomyChart from "../TaxonomyChart/TaxonomyChart.jsx";
+import TimeDistribution from "../TimeDistribution/TimeDistribution.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
@@ -708,6 +709,11 @@ export default function DatasetInspector({
           aria-labelledby="datasetTab-data"
           hidden={tab !== "data"}
         >
+          {/* Mounted only while shown, so a page left on Metadata never loads
+              the Plotly chunk. */}
+          {tab === "data" && (
+            <TimeDistribution datasetPk={dataset.pk} query={query} />
+          )}
           {isGrid && (
             <GriddapDetails
               dataset={dataset}

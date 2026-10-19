@@ -10,6 +10,12 @@ import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 
+// Plotly needs a real canvas, and its chunk is slow enough to import under a
+// loaded test run to time out unrelated assertions.
+vi.mock("../CoverageHistogramPlot/CoverageHistogramPlot.jsx", () => ({
+  default: () => <div data-testid="time-distribution-plot" />,
+}));
+
 // pk 2337 / "Chicago Park District" / "mooring" match the catalog fixtures
 // FilterProvider loads (e2e/fixtures/api/*.json). `dataset` is passed directly
 // because the /pointQuery fixture inspectDataset resolves against has no pk
@@ -247,6 +253,23 @@ describe("DatasetInspector", () => {
     failing = false;
     await user.click(within(alert).getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("station-7")).toBeInTheDocument();
+  });
+
+  it("charts the dataset's time distribution under the active filters, on Data only", async () => {
+    await renderReady({ query: "depthMax=50" });
+    const histogramUrls = () =>
+      fetch.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes("/coverageHistogram?"));
+    expect(histogramUrls()).toEqual([]);
+
+    await openData();
+    expect(
+      await screen.findByTestId("time-distribution-plot"),
+    ).toBeInTheDocument();
+    const params = new URL(histogramUrls()[0]).searchParams;
+    expect(params.get("datasetPKs")).toBe(String(DATASET.pk));
+    expect(params.get("depthMax")).toBe("50");
   });
 
   it("falls back to the generic Feature ID label when the dataset names no cf_role variable", async () => {
