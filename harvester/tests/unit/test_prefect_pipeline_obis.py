@@ -1,16 +1,6 @@
-"""
-Regression tests for the OBIS wiring in cde_harvester.prefect_pipeline.
-
-Two real bugs are pinned here:
-
-  1. `cde_pipeline()` never passed `obis_geo_filter` to `harvester_main`, so the
-     documented config block was silently ignored on the Prefect (production)
-     path. `test_cde_pipeline_passes_obis_geo_filter_and_discovery` is the test
-     that would have caught it.
-  2. Deployment registration and the fan-out source list both gated on a
-     non-empty `obis_dataset_ids`. Under discovery that list is empty at config
-     time, so OBIS would silently stop being harvested.
-"""
+"""OBIS wiring in cde_harvester.prefect_pipeline: obis_geo_filter must reach
+harvester_main, and OBIS must stay scheduled when discovery leaves
+obis_dataset_ids empty at config time."""
 
 
 import pytest
@@ -42,10 +32,6 @@ def config_file(tmp_path, monkeypatch):
     return _write
 
 
-# ---------------------------------------------------------------------------
-# _configured_sources
-# ---------------------------------------------------------------------------
-
 class TestConfiguredSources:
     def test_includes_obis_under_discovery_with_no_ids(self):
         sources = _configured_sources(
@@ -73,10 +59,6 @@ class TestConfiguredSources:
     def test_empty_when_nothing_configured(self):
         assert _configured_sources("", [], None) == []
 
-
-# ---------------------------------------------------------------------------
-# init_config
-# ---------------------------------------------------------------------------
 
 class TestInitConfig:
     def test_discovery_config_leaves_dataset_ids_empty(self, config_file):
@@ -123,10 +105,6 @@ class TestInitConfig:
         assert p.obis_discovery is None
 
 
-# ---------------------------------------------------------------------------
-# cde_pipeline -> harvester_main
-# ---------------------------------------------------------------------------
-
 class TestCdePipelineWiring:
     def test_cde_pipeline_passes_obis_geo_filter_and_discovery(
         self, config_file, tmp_path, monkeypatch
@@ -139,13 +117,13 @@ class TestCdePipelineWiring:
         monkeypatch.setattr(prefect_pipeline, "harvester_main", fake_harvester_main)
         monkeypatch.setattr(prefect_pipeline, "db_loader_main", lambda **kw: None)
         monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "_trigger_vernaculars", lambda: None)
 
         config = dict(DISCOVERY_CONFIG, folder=str(tmp_path / "harvest"))
         p = PrefectCDEPipeline()
         p.init_config(config_file(config))
         p.cde_pipeline()
 
-        # The bug: neither of these was ever passed.
         assert captured["obis_geo_filter"] == {
             "mode": "canada", "exempt_node_ids": [NODE_A, NODE_B],
         }
@@ -153,9 +131,57 @@ class TestCdePipelineWiring:
         assert captured["obis_dataset_ids"] == []
 
 
-# ---------------------------------------------------------------------------
-# cde_harvest_all_run fan-out
-# ---------------------------------------------------------------------------
+class TestVernacularsTrigger:
+    @pytest.fixture
+    def triggered(self, config_file, tmp_path, monkeypatch):
+        """Run cde_pipeline() for `source`; return the deployments it submitted."""
+        monkeypatch.setattr(prefect_pipeline, "harvester_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "db_loader_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
+
+        def _run(source, config=DISCOVERY_CONFIG):
+            calls = []
+
+            def fake_run_deployment(name, **kw):
+                calls.append(name)
+                return type("FlowRun", (), {"id": "x"})()
+
+            monkeypatch.setattr(prefect_pipeline, "run_deployment", fake_run_deployment)
+            p = PrefectCDEPipeline()
+            p.init_config(config_file(dict(config, folder=str(tmp_path / "harvest"))))
+            p.source = source
+            p.cde_pipeline()
+            return calls
+
+        return _run
+
+    def test_obis_run_triggers_vernaculars(self, triggered):
+        assert triggered("obis") == [prefect_pipeline.VERNACULARS_DEPLOYMENT]
+
+    def test_full_run_with_obis_triggers_vernaculars(self, triggered):
+        assert triggered(None) == [prefect_pipeline.VERNACULARS_DEPLOYMENT]
+
+    def test_erddap_run_does_not_trigger(self, triggered):
+        assert triggered("https://data.cioospacific.ca/erddap") == []
+
+    def test_full_run_without_obis_does_not_trigger(self, triggered):
+        config = {"erddap_urls": ["https://data.cioospacific.ca/erddap"], "folder": "harvest"}
+        assert triggered(None, config) == []
+
+    def test_trigger_failure_does_not_fail_the_harvest(self, config_file, tmp_path, monkeypatch):
+        monkeypatch.setattr(prefect_pipeline, "harvester_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "db_loader_main", lambda **kw: None)
+        monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
+
+        def boom(name, **kw):
+            raise RuntimeError("deployment not found")
+
+        monkeypatch.setattr(prefect_pipeline, "run_deployment", boom)
+        p = PrefectCDEPipeline()
+        p.init_config(config_file(dict(DISCOVERY_CONFIG, folder=str(tmp_path / "harvest"))))
+        p.source = "obis"
+        p.cde_pipeline()
+
 
 class TestFanOut:
     def test_obis_in_fanout_under_discovery(self, config_file, monkeypatch):

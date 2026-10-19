@@ -11,11 +11,29 @@ import {
 // Typo-tolerant, and blind to case and accents, so "temprature" finds
 // "Température" and the French facet labels are as reachable as the English
 // ones. ignoreLocation, as a dataset title names its subject anywhere in it.
+// Extended search matches each word on its own and needs them all, so "sea
+// temperature" finds "Sea surface temperature" in either order.
+const optionText = (option) => option.matchText ?? option.label;
 const FUSE_OPTIONS = {
-  keys: [{ name: "text", getFn: (option) => option.matchText ?? option.label }],
+  keys: [{ name: "text", getFn: optionText }],
   ignoreDiacritics: true,
   ignoreLocation: true,
+  useExtendedSearch: true,
 };
+
+// Characters extended search reads as operators, taken as plain spaces.
+const OPERATORS = /['"!^=$|]/g;
+
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// A word met inside another ("sea" in "Research") reads less like what was
+// meant than one met at a word's start, so it ranks after.
+function startsWords(option, words) {
+  const text = deburr(optionText(option)).toLowerCase();
+  return words.every((word) =>
+    new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(word)}`).test(text),
+  );
+}
 
 // A leading "-", "not" or "sauf" asks for the value to be excluded rather than
 // included, the same include / exclude pair every list filter offers. The
@@ -28,31 +46,77 @@ export function parseFilterQuery(text) {
   return { term: trimmed.replace(EXCLUDE_PREFIX, "").trim(), exclude };
 }
 
-// groups: [{ key, options: [{ label, matchText?, state, ... }] }]. With no term, the
-// options already applied, so the bar doubles as the list to remove them from
-// (plus any `keep(groupKey, option)` names, so one just removed stays listed);
-// otherwise the options that match the term, closest first.
+// The options of a group that are set. A shortcut set as a whole (an EOV
+// category, ERDDAP, OBIS) stands in for the options it covers, so it reads as
+// one filter; a partly set one is not listed, the options it covers are.
+export function appliedOptions(group) {
+  const applied = group.options.filter((o) => o.state);
+  const covered = new Set(
+    applied.filter((o) => o.shortcut).flatMap((o) => o.covers),
+  );
+  return applied.filter((o) => !covered.has(o.id));
+}
+
+// groups: [{ key, searched?, options: [{ label, matchText?, state, ... }] }]. With
+// no term, the options already applied (see appliedOptions), so the bar doubles
+// as the list to remove them from (plus any `keep(groupKey, option)` names, so
+// one just removed stays listed); otherwise the options that match the term,
+// closest first, and the groups ordered by their closest match so a group
+// that names the term outright is not listed below loose matches elsewhere. A
+// `searched` group was already matched against the term by the service it came
+// from: its options are kept as it ranked them, and only placed by how closely
+// they read like the term.
 export function matchFilterOptions(
   groups,
   term,
   limit = 5,
   keep = () => false,
 ) {
-  const needle = term.trim();
+  const needle = term.replace(OPERATORS, " ").trim();
+  if (!needle) {
+    return groups
+      .map((group) => {
+        const applied = new Set(appliedOptions(group));
+        return {
+          ...group,
+          options: group.options.filter(
+            (o) => applied.has(o) || keep(group.key, o),
+          ),
+        };
+      })
+      .filter((group) => group.options.length > 0);
+  }
   // A typo in a short word leaves too little of it to go on: "DFO" one letter
-  // off matches half the catalogue. Short terms match near exactly, and the
-  // tolerance grows with the term.
-  const looseness = needle.length <= 3 ? 0.1 : needle.length <= 5 ? 0.25 : 0.35;
+  // off matches half the catalogue, "oxygen" two off matches "Histriophoca".
+  // Each word is matched on its own, so the shortest sets the tolerance: none
+  // up to four letters, then about one typo in five.
+  const words = deburr(needle).toLowerCase().split(/\s+/);
+  const shortest = Math.min(...words.map((word) => word.length));
+  const looseness = shortest <= 4 ? 0.1 : shortest <= 7 ? 0.2 : 0.3;
   return groups
-    .map((group) => ({
-      ...group,
-      options: needle
-        ? new Fuse(group.options, { ...FUSE_OPTIONS, threshold: looseness })
-            .search(needle, { limit })
-            .map(({ item }) => item)
-        : group.options.filter((o) => o.state || keep(group.key, o)),
-    }))
-    .filter((group) => group.options.length > 0);
+    .map((group) => {
+      const fuse = new Fuse(group.options, {
+        ...FUSE_OPTIONS,
+        includeScore: true,
+        threshold: group.searched ? 1 : looseness,
+      });
+      const hits = fuse
+        .search(needle)
+        .map(({ item, score }) => ({
+          item,
+          score: startsWords(item, words) ? score : 0.5 + score / 2,
+        }))
+        .sort((a, b) => a.score - b.score)
+        .slice(0, limit);
+      const score = hits[0]?.score ?? 1;
+      const options = group.searched
+        ? group.options.slice(0, limit)
+        : hits.map(({ item }) => item);
+      return { group: { ...group, options }, score };
+    })
+    .filter(({ group }) => group.options.length > 0)
+    .sort((a, b) => a.score - b.score)
+    .map(({ group }) => group);
 }
 
 // Matched against deburred text, so the French words are spelled unaccented

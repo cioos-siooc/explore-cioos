@@ -13,6 +13,7 @@ const SERVERS = [
     n_skipped: 2,
     n_error: 1,
     last_attempted_at: "2024-03-01T00:00:00Z",
+    last_success_at: "2024-02-28T00:00:00Z",
   },
 ];
 const RUNS = [
@@ -63,6 +64,19 @@ describe("HarvestOverview", () => {
     expect(await screen.findByText("erddap.example.com")).toBeInTheDocument();
     expect(screen.getByText("✓ 40")).toBeInTheDocument();
     expect(screen.getByText("✗ 1")).toBeInTheDocument();
+  });
+
+  it("shows when each server last harvested successfully", async () => {
+    renderWithProviders(<HarvestOverview />);
+    expect(await screen.findByText(/Last success:/)).toBeInTheDocument();
+  });
+
+  it("says so when a server has never harvested successfully", async () => {
+    stubRoutes({ "/servers": [{ ...SERVERS[0], last_success_at: null }] });
+    renderWithProviders(<HarvestOverview />);
+    expect(
+      await screen.findByText("No successful run on record"),
+    ).toBeInTheDocument();
   });
 
   it("shows the recent-runs table with status and totals", async () => {

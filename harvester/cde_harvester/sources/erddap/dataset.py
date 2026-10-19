@@ -1,12 +1,16 @@
 import logging
 from datetime import UTC, datetime
 
-import numpy as np
 import pandas as pd
 import requests
 from requests.exceptions import HTTPError
 
+from cde_harvester.core.harvest_warnings import (
+    UNKNOWN_PLATFORM_VOCABULARY,
+    HarvestWarnings,
+)
 from cde_harvester.core.observability import run_logger
+from cde_harvester.core.record_metadata import from_erddap_globals
 from cde_harvester.core.variables import extract_variables
 from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
 from cde_harvester.utils import (
@@ -21,31 +25,9 @@ def is_valid_duration(duration):
         pd.Timedelta(duration)
         return True
     except (ValueError, TypeError):
-        # pd.Timedelta rejects an unparseable string with ValueError and a
-        # non-string with TypeError; anything else here is a real bug.
         return False
 
 
-# Per-variable attributes pulled out of /info/{id}/index.csv and kept on
-# df_variables. ERDDAP publishes far more than this; anything not listed here is
-# dropped when get_metadata() pivots the info frame.
-#
-#   identity/units    cf_role, standard_name, units, long_name, axis,
-#                     actual_range   - the original set, used for EOV mapping,
-#                     CF-role detection and the griddap variable/dimension jsonb.
-#   colour            colorBar*      - the publisher's intended colour ramp and
-#                     range for a variable. Only ~18% of variables declare a
-#                     palette, so consumers must have a default.
-#   grouping          ioos_category  - variable families (Temperature, Salinity,
-#                     Optical Properties, Identifier...), ~48% coverage.
-#   axis direction    positive       - "down" | "up" on a vertical coordinate.
-#                     A depth axis has to be drawn reversed and this is the only
-#                     attribute that says so; ~41 variables declare it.
-#   quality flags     flag_values, flag_meanings, ancillary_variables - how a QC
-#                     flag column announces itself, so plots can exclude them.
-#
-# tests/conftest.py imports this list rather than restating it: the fixtures
-# built by build_variables_df() must pivot exactly what production pivots.
 # ACDD organization attributes mapped onto the CKAN (ISO 19115 CI_RoleCode)
 # roles the organizations filter is scoped by.
 ACDD_ORGANIZATION_ROLES = {
@@ -55,6 +37,10 @@ ACDD_ORGANIZATION_ROLES = {
     "contributor": "contributor",
 }
 
+# Attributes kept on df_variables when get_metadata() pivots the info frame;
+# everything else ERDDAP publishes is dropped. Only ~18% of variables declare a
+# colorBar palette, so consumers must have a default. tests/conftest.py imports
+# this list so fixtures pivot exactly what production pivots.
 CONSIDERED_VARIABLE_ATTRIBUTES = [
     "cf_role",
     "standard_name",
@@ -81,16 +67,13 @@ class Dataset:
         self.erddap_server = erddap_server
         self.logger = self.get_logger()
 
-        # ERDDAP allDatasets dataStructure this dataset was listed under
-        # ("table" | "grid"); drives the cdm_data_type fallback for grids.
+        # "table" | "grid"; drives the cdm_data_type fallback for grids.
         self.data_structure = data_structure
         self.erddap_url = erddap_server.url
         self.erddap_csv_to_df = erddap_server.erddap_csv_to_df
-        # Every ERDDAP HTTP request made for this dataset (info, tabledap
-        # queries, distinct(), orderByMinMax(), …) is appended here by
-        # ERDDAP.erddap_csv_to_df so harvest_attempts can record exactly
-        # what was fired. Lets an ERDDAP admin reproduce the failure.
+        # Recorded in harvest_attempts so an ERDDAP admin can reproduce a failure.
         self.queried_urls = []
+        self.warnings = HarvestWarnings(self.logger)
         self.cdm_data_type = ""
         self.globals = {}
         self.platform = "unknown"
@@ -103,10 +86,10 @@ class Dataset:
         self.num_columns = 0
         self.first_eov_column = ""
         self.content_hash = None
-        # Why content_hash is None (a HASH_* code); None when a hash was produced.
+        # HASH_* code explaining a None content_hash
         self.content_hash_reason = None
 
-        # Griddap metadata (set by the Grid handler; None for tabledap types).
+        # Set by the Grid handler; None for tabledap types.
         self.df_info = None
         self.wms_url = None
         self.coverage_lat_min = None
@@ -119,13 +102,9 @@ class Dataset:
         self.coverage_depth_max = None
         self.grid_variables = None
         self.grid_dimensions = None
-        # Dataset-level time coverage from the allDatasets listing (ISO strings,
-        # set by the harvest loop). For tabledap this is the only coverage a
-        # dataset gets; for grids the dimension-derived value above wins.
+        # From the allDatasets listing; for grids the dimension-derived value wins.
         self.listing_time_min = None
         self.listing_time_max = None
-        # Per-variable metadata for every column, griddap and tabledap alike.
-        # get_metadata() fills it; see core/variables.py for why.
         self.table_variables = None
 
         self.get_metadata()
@@ -136,7 +115,6 @@ class Dataset:
         self.df = pd.DataFrame(
             {
                 "title": [self.globals["title"]],
-                # "summary": [self.globals["summary"]],
                 "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
@@ -155,15 +133,11 @@ class Dataset:
                 "content_hash_reason": [self.content_hash_reason],
                 "last_updated_at": [now],
                 "verified_at": [now],
-                # lat/lon/depth extent: griddap only (None for tabledap).
                 "coverage_lat_min": [self.coverage_lat_min],
                 "coverage_lat_max": [self.coverage_lat_max],
                 "coverage_lon_min": [self.coverage_lon_min],
                 "coverage_lon_max": [self.coverage_lon_max],
-                # Grid handler's dimension-derived extent wins; the
-                # allDatasets listing fills it in for every other type.
-                # get_df() runs after extract_features(), so by here the grid
-                # values are already set and this `or` only fills the gap.
+                # Runs after extract_features(), so grid values are already set.
                 "coverage_time_min": [
                     self.coverage_time_min or self.listing_time_min],
                 "coverage_time_max": [
@@ -174,6 +148,7 @@ class Dataset:
                 "grid_variables": [self.grid_variables],
                 "grid_dimensions": [self.grid_dimensions],
                 "wms_url": [self.wms_url],
+                "metadata": [from_erddap_globals(self.globals)],
             }
         )
 
@@ -185,23 +160,16 @@ class Dataset:
         )
 
     def get_max_min(self, vars):
-        """
-        Get max/min values for each of certain variables, in each profile
-        usually time,depth (lat/long are handle differently since the min of
-        lat,lon might not be a point in the dataset)
-        """
-
+        """Per-profile min/max of the last of ``vars``, grouped by the rest."""
         url = f"{','.join(vars)}" + requests.utils.quote(
             f'&orderByMinMax("{",".join(vars)}")'
         )
 
         df = self.dataset_tabledap_query(url)
 
-        # something went wrong
         if df.empty:
             return df
 
-        # first_var = vars[0]
         last_var = vars[-1]
         index_vars = vars[0:-1]
         df["maxmin"] = ""
@@ -218,18 +186,22 @@ class Dataset:
 
         return df_min_max
 
-    def get_profile_ids(self):
+    def get_profile_ids(self, collapse_time_profile_ids=False):
         df_variables = self.df_variables
 
-        # Organize dataset variables by their cf_roles
-        # eg profile_variable={'profile_id': 'hakai_id', 'timeseries_id': 'station'}
+        # e.g. {'profile_id': 'hakai_id', 'timeseries_id': 'station'}
         profile_variables = (
             df_variables.set_index("cf_role", drop=False)
             .query('cf_role != ""')[["cf_role", "name"]]["name"]
             .to_dict()
         )
+        if collapse_time_profile_ids and profile_variables.get("profile_id") == "time":
+            # One "profile" per record timestamp: enumerating them scans the
+            # whole dataset (dap.oceannetworks.ca's sensor streams 504 or exceed
+            # the size cap), only for the handler to collapse to timeseries.
+            profile_variables.pop("profile_id")
 
-        # sorting so the url is consistent every time for query caching
+        # sorted so the url is stable for query caching
         profile_variable_list = sorted(profile_variables.values())
         self.profile_variables = profile_variables
 
@@ -242,29 +214,47 @@ class Dataset:
         if not profile_variables:
             return []
 
-        # Enumerate feature identities only. lat/lon are NOT requested here:
-        # a distinct() including them returns one row per GPS fix on a moving
-        # feature. Per-feature lat/lon min/max (the bounding box) is fetched
-        # separately in tabledap_features via orderByMinMax, which is bounded
-        # by feature count regardless of how much the feature moves.
-        profile_ids = self.dataset_tabledap_query(
-            f"{','.join(profile_variable_list)}&distinct()"
-        )
+        # distinct() of the ids alone measured ~0.2s on every ONC and
+        # cioospacific dataset tried; an orderByMinMax over time scans every
+        # record and 504s on dap.oceannetworks.ca's long sensor streams.
+        # Moving-feature lat/lon is left to tabledap_features: a distinct()
+        # with it returns one row per GPS fix.
+        identity = list(profile_variable_list)
+        subset_variables = self.subset_variables()
+        if set(profile_variable_list) <= subset_variables:
+            # Served from the pre-built subset table, where a lat/lon is
+            # per-feature by declaration, so it comes along for the bbox.
+            identity += [
+                v for v in ("latitude", "longitude")
+                if v in subset_variables and v not in profile_variable_list
+            ]
+        profile_ids = self.dataset_tabledap_query(f"{','.join(identity)}&distinct()")
+
+        if profile_ids.empty and "time" not in profile_variable_list:
+            # ERDDAP drops rows whose requested columns are ALL missing, so a
+            # cf_role column that is never filled (seagull-erddap's `platform`)
+            # empties the distinct(). Pairing it with time keeps one row per
+            # feature, and the time bounds come along.
+            profile_ids = self.get_max_min(
+                profile_variable_list + ["time"]
+            ).reset_index()
 
         if profile_ids.empty:
             return profile_ids
 
-        self.profile_ids = profile_ids
+        self.profile_ids = profile_ids.drop_duplicates(profile_variable_list)
         return profile_ids
 
+    def subset_variables(self):
+        return {
+            v.strip() for v in self.globals.get("subsetVariables", "").split(",")
+            if v.strip()
+        }
+
     def get_count(self, vars, groupby, time_min, time_max):
-        """
-        Get count for each of certain variables, in each profile
-        counting for a single day and extrapolating, otherwise this takes forever on high frequency datasets
-        if its a single profile, get a single day. If its multple profiles it could be hard to pick a day that
-        each profile has data for, and the profiles could be sequential with no time overlap
-        def get_count(self, vars, groupby):
-        """
+        """Per-profile counts. A single-profile dataset counts 30 days and
+        extrapolates (a full count takes forever at high frequency); with several
+        profiles no one window is sure to overlap them all."""
         time_query = ""
         is_single_profile_dataset = len(self.profile_ids) == 1
         # parse_erddap_date returns tz-aware UTC; the fallback must match or
@@ -274,26 +264,6 @@ class Dataset:
         if str(time_max) == "NaT":
             time_max = datetime.now(UTC).isoformat()
         days_in_dataset = (pd.to_datetime(time_max) - pd.to_datetime(time_min)).days
-
-        # Estimate records count per profile using time_coverage_resolution
-        # For now this is only used with single-profile datasets
-        # TODO use each profile's min/max time and then it can be used for any
-        # dataset using time_coverage_resolution
-        time_coverage_resolution = self.globals.get("time_coverage_resolution")
-
-        if (
-            is_single_profile_dataset
-            and time_coverage_resolution
-            and is_valid_duration(time_coverage_resolution)
-        ):
-            self.logger.debug("Using time_coverage_resolution for count")
-            df_profile_ids = self.profile_ids.copy()
-            readings_per_day = np.timedelta64(1, "D") / pd.Timedelta(
-                time_coverage_resolution
-            )
-            total_records = readings_per_day * days_in_dataset
-            df_profile_ids["time"] = total_records
-            return df_profile_ids
 
         extraplolation_days = 30
         skip_full_count = (
@@ -310,7 +280,6 @@ class Dataset:
 
         url = ",".join(vars) + f'&orderByCount("{",".join(groupby)}")' + time_query
 
-        # Dont fail the dataset when the count fails
         try:
             df_count = self.dataset_tabledap_query(url)
         except HTTPError as e:
@@ -338,21 +307,13 @@ class Dataset:
                 eov_names.isin(eov_to_standard_name[eov])
             ]
             if not eov_columns.empty:
-                # check if list of standard names in this EOV overlaps with list of standard names in this dataset
-
-                # set first_eov_column, which is used to set default column in preview
+                # default column in the preview
                 self.first_eov_column = eov_columns.iloc[0]["name"]
                 eovs.append(eov)
         return eovs
 
     def get_eov_variables(self):
-        """{variable name: [eov, ...]} for every variable whose standard_name
-        maps to at least one EOV.
-
-        The dataset-level get_eovs() above is the union of these. Per-feature
-        EOV detection counts these variables per feature to find out which of
-        the dataset's EOVs each feature actually carries.
-        """
+        """{variable name: [eov, ...]} for every variable mapped to an EOV."""
         eov_variables = {}
         for name, row in self.df_variables.iterrows():
             eovs = standard_name_to_eovs.get(eov_standard_name(row.get("standard_name")))
@@ -393,17 +354,15 @@ class Dataset:
             else:
                 self.logger.error("Found unsupported L06 platform: %s", platform)
 
-        self.logger.warning(
-            "Found platform='%s' without known vocabulary='%s', setting to 'unknown'",
-            platform,
-            platform_vocabulary,
+        self.warnings.add(
+            UNKNOWN_PLATFORM_VOCABULARY,
+            f"Platform '{platform}' has no known vocabulary "
+            f"(platform_vocabulary='{platform_vocabulary}'); set to 'unknown'",
+            items=[platform],
         )
         return "unknown"
 
     def get_metadata(self):
-        "get all the global and variable metadata for a dataset"
-
-        # transform this JSON to an easier to use format
         url = "/info/" + self.id + "/index.csv"
         # erddap_csv_to_df's skiprows defaults to (1,)
         df = self.erddap_csv_to_df(url, skiprows=[], dataset=self).fillna("")
@@ -412,8 +371,7 @@ class Dataset:
             self.logger.error("Dataset metadata not found")
             return df
 
-        # Keep the raw info frame: the Grid handler reads its Row Type ==
-        # "dimension"/"variable" rows (tabledap types never need it).
+        # The Grid handler reads its "dimension"/"variable" rows.
         self.df_info = df
 
         # Read by the @-reference in the df.query() below, which ruff
@@ -447,9 +405,8 @@ class Dataset:
         globals_dict = df_global["Value"].to_dict()
 
         self.variables_list = df_variables["name"].to_list()
-        # Griddap datasets may omit the cdm_data_type global; they are always
-        # Grid. Tabledap datasets keep the hard requirement (empty string
-        # fails the supported-type check downstream, as before).
+        # Griddap datasets may omit cdm_data_type; for tabledap an empty string
+        # fails the supported-type check downstream.
         self.cdm_data_type = globals_dict.get(
             "cdm_data_type", "Grid" if self.data_structure == "grid" else ""
         )
@@ -464,8 +421,7 @@ class Dataset:
         self.table_variables = extract_variables(df_variables)
         self.eovs = self.get_eovs()
 
-        # Try to get organizations list from globals, starting with "institution"
-        # See https://wiki.esipfed.org/Attribute_Convention_for_Data_Discovery_1-3
+        # https://wiki.esipfed.org/Attribute_Convention_for_Data_Discovery_1-3
         organization_fields = ["institution"]
 
         group_type = ["group", "institution"]

@@ -6,11 +6,10 @@ import * as React from "react";
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import TipCard from "../../Controls/Tips/TipCard.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 
-// Seeded entirely through the address, the way a share link arrives: every
-// provider reads its slice out of window.location, so one URL sets up the
-// filters, the map camera and the list's own narrowing at once.
+// Seeded through the address, the way a share link arrives.
 function open(search) {
   return renderWithProviders(<ActiveFilterChips />, {
     url: `/?${search}`,
@@ -19,9 +18,7 @@ function open(search) {
 }
 
 const groups = () => screen.queryAllByTestId("filter-chip-group");
-// Chips are addressed by which filter they belong to, never by position: the
-// groups render in a fixed order today, but that is a layout decision and not
-// something these assertions should depend on.
+// Addressed by filter key, never position: group order is a layout decision.
 const group = (key) => document.querySelector(`[data-filter-key="${key}"]`);
 
 describe("ActiveFilterChips", () => {
@@ -62,9 +59,7 @@ describe("ActiveFilterChips", () => {
     expect(excluded.querySelector(".activeFilterItemNot")).toHaveTextContent(
       "not",
     );
-    // Its remove button names the whole thing, "not" included.
     expect(within(excluded).getByRole("button")).toHaveAccessibleName(/: not /);
-    // Geometry chips follow the same rule.
     expect(
       within(group("dataLayers")).getByTestId("filter-chip-item"),
     ).toHaveAttribute("data-excluded", "true");
@@ -159,8 +154,7 @@ describe("ActiveFilterChips", () => {
   });
 
   it("gives each remove button a name that says what it removes", async () => {
-    // They all read "Remove filter" before, which matched every chip at once —
-    // ambiguous for a test and useless to a screen reader.
+    // Each X must have a unique accessible name.
     open("eovs=oxygen&platforms=mooring");
     await waitFor(() => expect(groups().length).toBeGreaterThanOrEqual(2));
 
@@ -171,7 +165,6 @@ describe("ActiveFilterChips", () => {
     expect(names.some((name) => name.includes("Oxygen"))).toBe(true);
   });
 
-  // A quick filter's own button lights up instead (see QuickFilters).
   it("leaves the quick filters to their buttons", async () => {
     open(
       "search=temperature&onlyInView=true&realtimeOnly=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",
@@ -216,6 +209,41 @@ describe("ActiveFilterChips", () => {
     expect(seen).toEqual({
       showFiltersModal: true,
       filterSearchText: "temperature",
+    });
+  });
+
+  describe("tips", () => {
+    // A returning visitor: tips stay quiet on a first visit.
+    function openWithTips(search) {
+      window.localStorage.setItem("cde.introSeen", "true");
+      return renderWithProviders(
+        <>
+          <ActiveFilterChips />
+          <TipCard />
+        </>,
+        { url: `/?${search}`, providers: "app" },
+      );
+    }
+
+    it("offers Match all once several variables are included", async () => {
+      openWithTips("eovs=oxygen,subSurfaceTemperature");
+      expect(await screen.findByTestId("tip-card")).toHaveTextContent(
+        /Match all/,
+      );
+    });
+
+    it("offers excluding when a filter only includes", async () => {
+      openWithTips("eovs=oxygen");
+      expect(await screen.findByTestId("tip-card")).toHaveTextContent(
+        /leave things out/,
+      );
+    });
+
+    it("falls back to the share link once the user already excludes", async () => {
+      openWithTips("eovs=oxygen&excludeEovs=subSurfaceTemperature");
+      expect(await screen.findByTestId("tip-card")).toHaveTextContent(
+        /page address/,
+      );
     });
   });
 });

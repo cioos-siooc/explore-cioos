@@ -1,9 +1,4 @@
-"""Unit tests for cde_harvester.core.issues.
-
-Covers the two properties the grouping depends on: the same complaint about
-different values collapses into one signature, and genuinely different complaints
-stay apart — plus the extraction of ERDDAP's own error message out of a response.
-"""
+"""Unit tests for cde_harvester.core.issues."""
 
 from unittest.mock import MagicMock, patch
 
@@ -29,10 +24,6 @@ ERDDAP_ERROR_BODY = """Error {
 }"""
 
 
-# ---------------------------------------------------------------------------
-# erddap_error_text
-# ---------------------------------------------------------------------------
-
 def test_extracts_message_from_erddap_error_envelope():
     assert erddap_error_text(_Response(ERDDAP_ERROR_BODY)) == (
         "java.lang.RuntimeException: Query error: "
@@ -52,10 +43,6 @@ def test_returns_empty_string_when_there_is_no_usable_body(response):
     """Must never raise — it describes an error path, it can't become one."""
     assert erddap_error_text(response) == ""
 
-
-# ---------------------------------------------------------------------------
-# error_signature
-# ---------------------------------------------------------------------------
 
 def test_same_complaint_about_different_variables_shares_a_signature():
     a = error_signature('Query error: Unrecognized constraint variable="sea_water_temperature"')
@@ -98,10 +85,6 @@ def test_signature_is_stable_and_bounded():
 def test_blank_input_signatures_to_empty(raw):
     assert error_signature(raw) == ""
 
-
-# ---------------------------------------------------------------------------
-# group_issues
-# ---------------------------------------------------------------------------
 
 def _attempt(dataset_id, erddap_url, error_message, status="error",
              reason_code="HTTP_ERROR", query_urls=None):
@@ -181,10 +164,6 @@ def test_accepts_a_dataframe_with_null_columns():
 def test_empty_input_yields_no_groups(records):
     assert group_issues(records) == []
 
-
-# ---------------------------------------------------------------------------
-# report_issues
-# ---------------------------------------------------------------------------
 
 def test_reports_one_sentry_event_per_group_with_a_scoped_fingerprint():
     records = [

@@ -18,15 +18,13 @@ select distinct unnest(organizations) from cde.datasets ON CONFLICT DO NOTHING;
 INSERT INTO cde.organizations_lookup (name)
 SELECT name FROM cde.organizations ON CONFLICT DO NOTHING;
 
--- IS DISTINCT FROM guards: only write rows whose value actually changed —
--- unguarded, these rewrote every organizations/datasets row on every load.
+-- IS DISTINCT FROM guards keep loads from rewriting every unchanged row.
 UPDATE cde.organizations
 SET pk_url=organizations_lookup.pk
 FROM cde.organizations_lookup
 WHERE organizations_lookup.name=organizations.name
   AND organizations.pk_url IS DISTINCT FROM organizations_lookup.pk;
 
--- convert organization list of names into list of pks
 UPDATE cde.datasets d
 SET organization_pks = sub.pks
 FROM (

@@ -65,10 +65,8 @@ describe("HarvestDataset", () => {
       (await screen.findAllByText("erddap.example.com")).length,
     ).toBeGreaterThan(0);
 
-    // The "latest attempt" summary card — the same attempt is also shown as
-    // the newest row of the history table below, so these are scoped to the
-    // card rather than asserted with a page-wide (necessarily ambiguous)
-    // getByText.
+    // Scoped to the card: the same attempt is also the history table's newest
+    // row, so a page-wide getByText is ambiguous.
     const card = document.querySelector(".harvest-latest-card");
     expect(card).toHaveTextContent("error");
     expect(card).toHaveTextContent("HTTP error");
@@ -94,10 +92,7 @@ describe("HarvestDataset", () => {
         document.querySelector(".harvest-latest-card"),
       ).toBeInTheDocument(),
     );
-    // The single history row duplicates the same attempt's error_message, so
-    // it carries its own "Request URLs" disclosure too (inside the history
-    // table's <details>, opened via "error detail" rather than this label) —
-    // scope to the summary card's own toggle.
+    // The history row has its own "Request URLs" disclosure; scope to the card.
     const card = document.querySelector(".harvest-latest-card");
     const { getByText } = within(card);
     await user.click(getByText("Request URLs (2)"));
@@ -161,5 +156,68 @@ describe("HarvestDataset", () => {
       "href",
       `https://obis.org/dataset/${DATASET_ID}`,
     );
+  });
+
+  it("lists the latest successful harvest's warnings even when the latest attempt is an unchanged skip", async () => {
+    installMockHarvestFetch({
+      [PATH]: {
+        history: [
+          { ...OLDER, run_id: "r2", warnings: null },
+          {
+            ...OLDER,
+            warnings: [
+              { code: "FEATURES_DROPPED", message: "2 dropped" },
+              { code: "DAY_COUNT_FALLBACK", message: "time span" },
+            ],
+          },
+        ],
+        meta: null,
+        currentWarnings: [
+          {
+            code: "NON_CF_STANDARD_NAMES",
+            message: "2 names are not CF",
+            count: 2,
+            items: ["foo_bar", "baz_qux"],
+          },
+        ],
+        erddap_url: "https://erddap.example.com/erddap",
+      },
+    });
+    const { user } = renderDataset();
+    await waitFor(() =>
+      expect(
+        document.querySelector(".harvest-latest-card"),
+      ).toBeInTheDocument(),
+    );
+    const box = document.querySelector(
+      ".harvest-latest-card .harvest-warning-box",
+    );
+    expect(box).toHaveTextContent(
+      "Non-CF standard names (2): 2 names are not CF",
+    );
+    await user.click(within(box).getByText("Affected items (2)"));
+    expect(within(box).getByText("foo_bar")).toBeVisible();
+
+    const table = document.querySelector(".harvest-table");
+    const marker = within(table).getByText("⚠ 2");
+    expect(marker.getAttribute("title")).toContain("2 dropped");
+  });
+
+  it("renders no warning box when the latest success had none", async () => {
+    installMockHarvestFetch({
+      [PATH]: {
+        history: [OLDER],
+        meta: null,
+        currentWarnings: null,
+        erddap_url: "https://erddap.example.com/erddap",
+      },
+    });
+    renderDataset();
+    await waitFor(() =>
+      expect(
+        document.querySelector(".harvest-latest-card"),
+      ).toBeInTheDocument(),
+    );
+    expect(document.querySelector(".harvest-warning-box")).toBeNull();
   });
 });

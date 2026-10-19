@@ -8,9 +8,8 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import CoverageModal from "./CoverageModal.jsx";
 
-// Plotly draws to a real canvas and probes media queries jsdom's stub does not
-// answer (src/test/viewport.js). Nothing here is about what it renders, so it
-// stands in as the marker that the plot is mounted at all.
+// Plotly probes media queries jsdom's stub doesn't answer; the stub just marks
+// the plot as mounted.
 vi.mock(
   "../../Controls/CoverageHistogramPlot/CoverageHistogramPlot.jsx",
   () => ({
@@ -21,10 +20,8 @@ vi.mock(
 );
 
 /*
- * The figure's queries are the most expensive the API answers — seconds each
- * when its own cache is cold — and the two dropdowns are the controls people
- * move most. So what this covers is not what the figure draws but how often it
- * asks: a combination already looked at must not be fetched again.
+ * The figure's queries take seconds on a cold cache, so this covers how often
+ * it asks: a combination already seen must not be fetched again.
  */
 describe("CoverageModal", () => {
   beforeEach(() => {
@@ -83,6 +80,17 @@ describe("CoverageModal", () => {
     expect(histogramCalls()).toHaveLength(2);
   });
 
+  it("asks for the seasonal view when it is picked", async () => {
+    const user = open();
+    await waitFor(() => expect(histogramCalls()).toHaveLength(1));
+    expect(histogramCalls()[0]).toContain("view=timeline");
+
+    await user.click(screen.getByTestId("coverage-view-dropdown-toggle"));
+    await user.click(screen.getAllByTestId("coverage-view-option")[1]);
+    await waitFor(() => expect(histogramCalls()).toHaveLength(2));
+    expect(histogramCalls()[1]).toContain("view=seasonal");
+  });
+
   it("keeps the previous figure on screen while the next one loads", async () => {
     const user = open();
     await waitFor(() => expect(histogramCalls()).toHaveLength(1));
@@ -135,5 +143,23 @@ describe("CoverageModal", () => {
     await waitFor(() =>
       expect(document.querySelector(".coveragePlotCurrent")).not.toBeNull(),
     );
+  });
+
+  it("opens the note for the chosen count from the ⓘ beside its label", async () => {
+    const user = open();
+    // Days is the default count, and the one that adds up past the calendar.
+    await user.click(await screen.findByTestId("coverage-note-button"));
+    expect(screen.getByTestId("coverage-note-modal")).toHaveTextContent(
+      /added together/,
+    );
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("coverage-note-modal")).not.toBeInTheDocument();
+    expect(screen.getByTestId("coverage-modal")).toBeInTheDocument();
+
+    await chooseCount(user, "Datasets");
+    expect(
+      screen.queryByTestId("coverage-note-button"),
+    ).not.toBeInTheDocument();
   });
 });

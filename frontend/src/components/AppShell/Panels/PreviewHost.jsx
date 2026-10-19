@@ -6,10 +6,8 @@ const DatasetPreview = React.lazy(
   () => import("../../Controls/DatasetPreview/DatasetPreview.jsx"),
 );
 
-// Keeps the record-preview modal mounted at the shell level so it survives
-// panel swaps (its open/close state lives in the selection provider). The
-// modal and its data table load on the first open, then stay mounted so later
-// opens and closes animate as before.
+// Mounted at the shell level so it survives panel swaps; loads on first open,
+// then stays mounted so later opens and closes animate.
 export default function PreviewHost() {
   const {
     datasetPreview,
@@ -18,6 +16,7 @@ export default function PreviewHost() {
     setInspectDataset,
     showPreviewModal,
     inspectRecordID,
+    inspectRecordPeriod,
     setInspectRecordID,
     recordLoading,
     setRecordLoading,
@@ -35,6 +34,7 @@ export default function PreviewHost() {
         setInspectDataset={setInspectDataset}
         showModal={showPreviewModal}
         inspectRecordID={inspectRecordID}
+        inspectRecordPeriod={inspectRecordPeriod}
         setInspectRecordID={setInspectRecordID}
         recordLoading={recordLoading}
         setRecordLoading={setRecordLoading}

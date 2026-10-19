@@ -1,5 +1,3 @@
-/* The inspector owns its scrolling: the title block stays pinned at the top
-   and only the body below it scrolls. */
 .datasetInspector {
   height: 100%;
   display: flex;
@@ -7,19 +5,63 @@
   min-height: 0;
 }
 
-/* The panel hosting this page washes its background (see .datasetsPanelDetail),
-   which is what separates a dataset page from the list it drilled in from. The
-   sections below sit on that wash as white cards. */
+/* The brand tab strip's look: a teal wash at rest, solid teal when open. */
+.datasetTabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
+}
+
+.datasetTab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--cioos-radius);
+  background-color: rgb(82 167 155 / 14%);
+  font-family: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.datasetTab:hover {
+  background-color: rgb(82 167 155 / 24%);
+}
+
+.datasetTab[aria-selected="true"] {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.datasetTab:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* Sections sit as white cards on the panel's wash (.datasetsPanelDetail). */
 .datasetInspectorBody {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px 12px 24px;
+
+  --inspector-pad-top: 12px;
+  --inspector-pad-x: 12px;
+  --inspector-pad-bottom: 24px;
+
+  padding: var(--inspector-pad-top) var(--inspector-pad-x)
+    var(--inspector-pad-bottom);
 }
 
-/* --- Dataset title: set like the title of a research record. The two actions
-   that belong to the dataset — filter the map to it, frame the map on it —
-   share the line at the right edge. --- */
 .datasetTitleBlock {
   flex: 0 0 auto;
   display: flex;
@@ -30,25 +72,14 @@
   background-color: var(--cioos-white);
 }
 
-/* The heading's own row: icon and title, with the full width to wrap into. */
-.datasetTitleHeading {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* Same bare, no-tile icon treatment as the Filters/Download/Datasets headers —
-   centered on the title's own line rather than the block's full (wrapped)
-   height. */
+/* Inline with the title's first line so wrapped lines run beneath it. */
 .datasetTitleIcon {
-  flex: 0 0 auto;
-  margin-top: 2px;
+  margin: -3px 6px 0 0;
+  vertical-align: middle;
   color: var(--cioos-primary);
 }
 
 .datasetTitle {
-  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   padding: 2px 0;
@@ -60,10 +91,6 @@
   color: var(--cioos-ink);
 }
 
-/* "Real-time": same solid orange badge as the dataset card's (.datasetCardLive),
-   sized to this page's larger type scale. Sits beside the Last update chip in
-   the metadata sheet, so no margin nudge is needed — the field's own
-   flex-start row keeps it level with the timestamp. */
 .datasetTitleLive {
   flex: 0 0 auto;
   display: inline-flex;
@@ -78,19 +105,15 @@
   white-space: nowrap;
 }
 
-/* A row of their own under the heading. Beside the title they had room for an
-   icon and nothing else; across the full width each one can say what it does,
-   which is the whole point of them being here. */
 .datasetTitleActions {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
 }
 
-/* Every action in this row, including the zoom button ZoomToDataset renders
-   into it: a small bordered button carrying its icon and its name. Defined
-   here because this row is the only place any of them appears. */
+/* Also styles the button ZoomToDataset renders into this row. */
 .datasetTitleAction,
 .datasetTitleActions .zoomToDatasetButton {
   display: inline-flex;
@@ -108,7 +131,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
-  color: var(--cioos-primary-700, var(--cioos-primary));
+  color: var(--cioos-primary-700);
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -135,9 +158,41 @@
   transform: translateY(1px);
 }
 
-/* Griddap: no download to add to a selection. The button stays in place and
-   its tooltip says why, rather than the row losing a control from one dataset
-   to the next. */
+.datasetNotInResults {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  padding: 6px 9px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-warn-bg);
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.datasetNotInResults svg {
+  flex: 0 0 auto;
+  color: var(--cioos-warn);
+}
+
+.datasetNotInResultsBack {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--cioos-primary-700);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.datasetNotInResultsBack:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 .datasetTitleAction:disabled {
   color: var(--cioos-ink-60);
   background-color: var(--cioos-surface-2);
@@ -149,8 +204,6 @@
   background-color: var(--cioos-surface-2);
 }
 
-/* Filtering is a state, not a one-shot action: while the map is narrowed to
-   this dataset the button stays filled, and its icon is the solid funnel. */
 .datasetTitleAction.active {
   background-color: var(--cioos-primary);
   border-color: var(--cioos-primary);
@@ -164,7 +217,6 @@
   color: var(--cioos-white);
 }
 
-/* Shared eyebrow label for every metadata field. */
 .metadataLabel {
   display: block;
   margin-bottom: 6px;
@@ -175,41 +227,41 @@
   color: var(--cioos-ink-80);
 }
 
-/* --- Metadata record sheet ---
-   The front matter of a journal article, compressed: one field per line, each
-   a tiny eyebrow label with its value beside it on the same line — the same
-   label/value baseline pairing the record cards use (.listCardField). Rows
-   stack in a single column so every field reads label-left/value-right down
-   one edge; whitespace does the dividing, so there are no rules and no label
-   gutter eating the width. */
-
-/* No top rule of its own: the pinned title block above already draws one. */
 .datasetMetaSheet {
-  display: grid;
-  gap: 3px;
   margin: 0 0 10px;
-  padding: 7px 10px;
+  padding: 0 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius);
   background-color: var(--cioos-white);
 }
 
-/* Label and value share a line while there is room for both, and the value
-   drops under its label when there isn't — the same wrapping rule
-   .listCardField uses on the record cards. */
 .datasetMetaSheet .metaCell {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 2px 10px;
   align-items: baseline;
-  gap: 2px 8px;
-  min-width: 0;
+  padding: 7px 0;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.datasetMetaSheet .metaCell:first-child {
+  border-top: 0;
 }
 
 .datasetMetaSheet .metadataLabel {
-  flex: 0 0 auto;
-  margin-bottom: 0;
-  font-size: var(--cioos-font-size-2xs);
-  line-height: 1.2;
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cioos-ink-80);
+}
+
+@media (max-width: 400px) {
+  .datasetMetaSheet .metaCell {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .metadataValue {
@@ -217,33 +269,32 @@
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
-}
-
-.datasetMetaSheet .metadataValue {
-  flex: 1 1 140px;
   margin: 0;
-
-  /* Chips wrap onto new lines when there are many; top-align them so each
-     wrapped row lines up cleanly under the label. */
-  align-items: flex-start;
-  align-content: flex-start;
-  gap: 4px;
 }
 
-/* Last update: a single chip plus its Real-time badge, never several chips
-   wrapping onto their own lines — so unlike the top-aligned default above,
-   the badge can center on the chip's own height instead of its top edge. */
-.datasetMetaSheet .metadataValueCentered {
-  align-items: center;
+.metadataFact {
+  font-size: var(--cioos-font-size-base);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--cioos-ink);
 }
 
-/* Chips sit flush inside their field; the field's gap handles spacing. */
+/* Tags and links share .filterButton's pill box. */
 .datasetMetaSheet .metadataChip {
+  display: inline-flex;
+  align-items: center;
   margin: 0;
+  padding: 2px 12px;
+  text-align: left;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--cioos-ink);
 }
 
-/* Grid node count: the axis factors read as small stacked value/name pairs,
-   with the total as the bold figure the row is really about. */
 .gridNodeCount {
   display: flex;
   flex-wrap: wrap;
@@ -284,40 +335,8 @@
   color: var(--cioos-ink-60);
 }
 
-.gridNodeTotal {
-  font-size: var(--cioos-font-size-md);
-  font-weight: 700;
-  color: var(--cioos-ink);
-  white-space: nowrap;
-}
-
-/* A badge for a value that isn't itself a filter (geometry, the record
-   count) or that is a link rather than a button (the source links) — the
-   exact box .filterButton uses (same pill radius, hairline border, white
-   fill, padding and font-size), so every field's value reads as one
-   consistent badge family regardless of what renders it. */
-.datasetMetaSheet .metadataChip,
-.datasetMetaSheet .metadataLink {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 12px;
-  text-align: left;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius-pill);
-  background-color: var(--cioos-white);
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.3;
-}
-
-.datasetMetaSheet .metadataChip {
-  font-weight: 500;
-  color: var(--cioos-ink);
-}
-
-/* Platform: the dot or hexagon the map draws this platform's markers in, so
-   the row names the colour to look for. A line box of its own rather than a
-   flex box, so the chip keeps its text baseline and stays level with its
-   label. */
+/* The dot or hexagon the map draws this platform in; a line box rather than
+   a flex box keeps the chip's text baseline level with its label. */
 .metadataPlatformGlyph {
   margin-right: 6px;
   line-height: 1;
@@ -327,44 +346,22 @@
   vertical-align: -0.1em;
 }
 
-/* A field the harvest left empty (an OBIS dataset's ocean variables, a
-   dataset with no platform code): the dash holds the row's shape without
-   pretending there is a value to read. */
 .datasetMetaSheet .metadataEmpty {
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink-60);
 }
 
-/* Source links (ERDDAP / CKAN / OBIS): the same badge, coloured and weighted
-   like a link so it still reads as clickable. */
-.datasetMetaSheet .metadataLink {
-  font-weight: 600;
-  color: var(--cioos-primary-700);
-  text-decoration: none;
-}
-
-.datasetMetaSheet .metadataLink:hover,
-.datasetMetaSheet .metadataLink:focus-visible {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
-  outline: none;
-}
-
-.datasetMetaSheet .metadataLink:focus-visible {
-  box-shadow: var(--cioos-focus);
-}
-
-/* --- Record table section --- */
 .recordSection {
-  margin-bottom: 12px;
-  padding: 12px;
-  border: 1px solid var(--cioos-hairline);
-  border-radius: var(--cioos-radius);
-  background-color: var(--cioos-white);
+  display: flex;
+  flex-direction: column;
 }
 
 .recordSectionHeader {
-  margin-bottom: 10px;
+  margin-bottom: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
 }
 
 .recordSectionHeader strong {
@@ -380,9 +377,6 @@
   color: var(--cioos-ink-80);
 }
 
-/* Explains the accent conditionalRowStyles puts on the record pinned to the
-   top of the table below — see markerRecordPinned in DatasetInspector.jsx.
-   Same shape as DatasetsTable's .datasetsCardMapClickHint. */
 .recordMapClickHint {
   display: flex;
   align-items: center;
@@ -422,10 +416,6 @@
   background-color: var(--cioos-surface-2);
 }
 
-/* The caption over a record list: the CF role its ids carry
-   (cf_role=profile_id / timeseries_id / trajectory_id) and, after it, the
-   variable carrying that role — set in mono so it reads as the source column's
-   own name rather than more prose. */
 .recordIdCaption {
   display: block;
   margin-top: 2px;
@@ -443,15 +433,6 @@
   overflow-wrap: anywhere;
 }
 
-/* --- Record cards (ListCard.jsx, listed by CardList.jsx) ---
-   The lists these replace were data tables ~550px wide inside a column that is
-   often half that, so every one of them had to be read by dragging it
-   sideways. A card puts the same fields down the page instead: the id on its
-   own line, then one label/value line per field, so a record reads whole at
-   any width. */
-
-/* Search and sort on one row, as the datasets list's own toolbar has them
-   (.datasetsCardToolbar). */
 .cardListToolbar {
   display: flex;
   flex-wrap: wrap;
@@ -473,11 +454,41 @@
   font-style: italic;
 }
 
-/* The pager sits inside the section's white card, so it needs no background or
-   top rule of its own beyond the hairline. */
+.recordSection .cardList {
+  margin-top: 4px;
+}
+
+.recordSection .cardListToolbar {
+  position: sticky;
+
+  /* Sticky offsets stop at the scroller's padding edge, so cancel it. */
+  top: calc(-1 * var(--inspector-pad-top));
+  z-index: 2;
+  margin: 0 calc(-1 * var(--inspector-pad-x));
+  padding: 6px var(--inspector-pad-x);
+  border-bottom: 1px solid transparent;
+}
+
+/* Only once it is pinned does it need a ground of its own to scroll under. */
+.recordSection .cardListToolbar[data-stuck] {
+  border-bottom-color: var(--cioos-hairline);
+  background-color: var(--cioos-white);
+}
+
+.cardListSentinel {
+  height: 1px;
+  margin-bottom: -1px;
+}
+
 .recordSection .pager {
-  padding: 8px 0 0;
-  background: none;
+  position: sticky;
+  bottom: calc(-1 * var(--inspector-pad-bottom));
+  z-index: 2;
+  margin: 8px calc(-1 * var(--inspector-pad-x))
+    calc(-1 * var(--inspector-pad-bottom));
+  padding: 8px var(--inspector-pad-x);
+  border-top: 1px solid var(--cioos-hairline);
+  background-color: var(--cioos-white);
 }
 
 .listCard {
@@ -499,16 +510,11 @@
   pointer-events: none;
 }
 
-/* A bar has no text baseline to align on. */
 .listCardSkeleton .listCardField {
   align-items: center;
 }
 
-/* The record a map click resolved to, held at the top of the list: the same
-   goldenrod ring, glow and fill the map puts on the marker that named it
-   (--cioos-map-click, see theme.css), so the two ends of that click are
-   recognisably one thing. A ring rather than a thicker border, so marking a
-   card costs it no layout. */
+/* Matches the map's click marker; a ring rather than a border costs no layout. */
 .listCard.pinned {
   border-color: var(--cioos-map-click);
   box-shadow:
@@ -517,12 +523,8 @@
     var(--cioos-shadow-card);
 }
 
-/* The record drawn on the map (a trajectory's track, or a ringed station), in the goldenrod the map now
-   draws that track in (--cioos-map-click, see theme.css) — the same pairing as
-   .pinned above, and for the same reason: this row and that line are two ends
-   of one answer. It carried the track purple while the map drew the selected
-   track in a crimson of its own, so the row matched neither. Ring-less, so the
-   record a click resolved to still stands out from it. */
+/* Matches the goldenrod the map draws this record in; ring-less so .pinned
+   still stands out from it. */
 .listCard.selected {
   border-color: var(--cioos-map-click);
   background-color: var(--cioos-map-click-surface);
@@ -571,16 +573,12 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* A record's "Show on map", pressed in the same goldenrod its card and what
-   the map draws for it wear (.listCard.selected). */
 .listCardButton[aria-pressed="true"] {
   border-color: var(--cioos-map-click);
   background-color: var(--cioos-map-click);
   color: var(--cioos-ink);
 }
 
-/* The id is what the card is called: given the width of the card and set in
-   mono, since it is a value out of the dataset rather than prose. */
 .listCardId {
   font-family: ui-monospace, monospace;
   font-size: var(--cioos-font-size-base);
@@ -597,9 +595,6 @@
   margin: 0;
 }
 
-/* Label and value share a line while there is room for both, and the value
-   drops under its label when there isn't — which is what keeps a long value
-   readable in a narrow column instead of squeezed into a sliver. */
 .listCardField {
   display: flex;
   flex-wrap: wrap;
@@ -628,15 +623,8 @@
   overflow-wrap: anywhere;
 }
 
-/* A field whose value is one atomic token — a timestamp range — rather than
-   prose. Label and value hold one line together: the value is sized to its
-   content (not the 140px basis above) and never breaks mid-date, and the
-   label gives up the 96px gutter that aligns the other fields' values. That
-   gutter is what costs the row its line — the widest range formatInstantRange
-   produces is 230px, and 96 + 230 leaves too little for the scrollbar this
-   column carries. Below 700px the label still takes a line of its own (see
-   the media query at the end of this file): the range is 266px at that type
-   size against a card narrower than that, so one line isn't on offer. */
+/* The label gives up the 96px gutter: the widest range formatInstantRange
+   produces is 230px, and 96 + 230 leaves no room for the column's scrollbar. */
 .listCardFieldNowrap .listCardFieldLabel {
   min-width: 0;
 }
@@ -647,11 +635,6 @@
   overflow-wrap: normal;
 }
 
-/* Ocean variables: quiet tags, not the filter chips the metadata sheet uses —
-   these say what one record measured, they don't filter anything. Only the
-   first few are shown (see CardTags) — the rest are behind the "+n" beside
-   them, which is a tag in the page's link colour so it reads as the one item
-   in the row that can be pressed. */
 .listCardTag,
 .listCardTagsMore {
   padding: 1px 7px;
@@ -668,9 +651,7 @@
   cursor: pointer;
 }
 
-/* The card's own hover wash is the same surface-2 the tags sit on, which
-   swallows their bubble outline whole. Lift the tags onto white so they stay
-   visible against the hovered card. */
+/* The card's hover wash is the tags' own surface-2, which would swallow them. */
 .listCard:hover .listCardTag {
   background-color: var(--cioos-white);
 }
@@ -685,35 +666,39 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Mobile: the page has the whole screen here rather than a 420px column beside
-   the map, so what it gives up is padding and the label gutter — not type size.
-   The 0.9em this used to shrink the body to was paying for a width the page no
-   longer has to fit. */
 @media (max-width: 700px), (max-height: 500px) {
   .datasetInspectorBody {
-    padding: 0 10px 20px;
+    --inspector-pad-top: 0px;
+    --inspector-pad-x: 10px;
+    --inspector-pad-bottom: 20px;
+
+    padding: var(--inspector-pad-top) var(--inspector-pad-x)
+      var(--inspector-pad-bottom);
   }
 
   .datasetTitleBlock {
     padding: 8px 10px;
   }
 
-  /* No room for a label gutter: the value takes the line under its label. */
   .listCardFieldLabel {
     min-width: 100%;
   }
 
-  /* Matches the specificity of .listCardFieldNowrap's desktop rule above, so
-     a timeframe label stacks over its value here like every other field. */
+  /* Matches the specificity of .listCardFieldNowrap's desktop rule above. */
   .listCardFieldNowrap .listCardFieldLabel {
     min-width: 100%;
   }
 
-  /* One line isn't on offer at this type size, so let the range wrap rather
-     than run past the card on the narrowest phones. overflow-wrap stays
-     normal, so a break can only land beside the arrow, never inside a date. */
+  /* overflow-wrap stays normal so a break lands beside the arrow, never
+     inside a date. */
   .listCardFieldNowrap .listCardFieldValue {
     flex: 1 1 140px;
     white-space: normal;
   }
+}
+
+.passButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }

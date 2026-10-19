@@ -1,17 +1,6 @@
-/* The activity status panel, on the bottom edge and centred: the app's report
-   of what it is working on, put where the eye already is rather than off in a
-   corner it has to be found in.
-
-   It shares that edge with the time bar, which owns the bottom centre and
-   publishes its reach, and with the API error banner, which sits on the bar and
-   publishes its own — a figure that already includes the bar's clearance, so
-   the two are alternatives rather than a sum. Each is 0 while its surface is
-   absent.
-
-   Above the modal rung deliberately. Work goes on behind a modal — the
-   download modal's size estimates, a filter change still redrawing the map —
-   and a report that vanished whenever a dialog opened would be covering only
-   part of the app. */
+/* Bottom offsets: the error banner's figure already includes the time bar's
+   clearance, so the two are alternatives, not a sum. Above the modal rung
+   deliberately: work goes on behind modals. */
 .activityIndicator {
   position: fixed;
   left: 50%;
@@ -25,13 +14,10 @@
   flex-direction: column;
   align-items: center;
 
-  /* The wrapper is as tall as the open panel, so it must not swallow clicks on
-     the map around it — only the panel itself takes pointer events. */
+  /* Only the panel itself takes pointer events, so the map stays clickable. */
   pointer-events: none;
 }
 
-/* Heading, then one mark, then the rows — a single centred column, read
-   straight down. */
 .activityStatus {
   pointer-events: auto;
   display: flex;
@@ -43,9 +29,7 @@
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius, 8px);
 
-  /* Translucent rather than the opaque white other floating cards use: this
-     one sits directly over the map's own centre of attention, and a solid
-     card there blocks more of it than a status report needs to. */
+  /* Translucent: it sits over the map's centre of attention. */
   background-color: rgb(255 255 255 / 78%);
   box-shadow: var(--cioos-shadow-float);
   font-size: var(--cioos-font-size-sm);
@@ -53,7 +37,6 @@
 }
 
 .activityStatusHeading {
-  /* The column owns the spacing between the three blocks. */
   margin: 0;
   font-size: var(--cioos-font-size-2xs);
   font-weight: 600;
@@ -64,4 +47,29 @@
 
 .activityStatus .cioosSpinner {
   color: var(--cioos-primary);
+}
+
+/* Phones: the centre of a narrow map is all of it, so it moves to the corner. */
+@media (max-width: 700px), (max-height: 500px) {
+  .activityIndicator {
+    left: auto;
+    right: 8px;
+    transform: none;
+    align-items: flex-end;
+  }
+
+  .activityStatus {
+    max-width: min(180px, calc(100vw - 16px));
+    padding: 5px 8px;
+    gap: 3px;
+    font-size: var(--cioos-font-size-2xs);
+  }
+
+  .activityStatusHeading {
+    font-size: var(--cioos-font-size-3xs);
+  }
+
+  .activityStatus .activityList {
+    gap: 2px;
+  }
 }

@@ -10,11 +10,14 @@ import {
 import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
+import { eovCategory } from "../datasetGroups.js";
 import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
 
 import platformsJSONfile from "../../platforms.json";
+// Both copied verbatim from cioos-commons/eovs/ (eov.json, categories.json).
 import eovsJSONfile from "../../eovs.json";
+import eovCategoriesJSONfile from "../../eovCategories.json";
 import erddapServersJSONfile from "../../erddapServers.json";
 import { server } from "../../config.js";
 import {
@@ -70,8 +73,7 @@ export default function FilterProvider({ children }) {
   const [eovsSelected, setEovsSelected] = useState(defaultEovsSelected);
   const debouncedEovsSelected = useDebounce(eovsSelected, 500);
   const [eovsSearchTerms, setEovsSearchTerms] = useState("");
-  // Any (default) or All of the included options, on the lists where a
-  // dataset can carry several values. Not debounced, like realtimeOnly.
+  // Not debounced, like realtimeOnly.
   const [eovsMatchAll, setEovsMatchAll] = useState(false);
 
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected);
@@ -79,8 +81,9 @@ export default function FilterProvider({ children }) {
   const [orgsSearchTerms, setOrgsSearchTerms] = useState("");
   const [orgsMatchAll, setOrgsMatchAll] = useState(false);
   // Contact roles (owner, custodian...) the organization selection is scoped
-  // to; none ticked means any role. Not debounced, like orgsMatchAll.
+  // to; none ticked means any role.
   const [orgRolesSelected, setOrgRolesSelected] = useState([]);
+  const debouncedOrgRolesSelected = useDebounce(orgRolesSelected, 500);
 
   const [datasetsSelected, setDatasetsSelected] = useState(
     defaultDatatsetsSelected,
@@ -94,15 +97,12 @@ export default function FilterProvider({ children }) {
   const debouncedPlatformsSelected = useDebounce(platformsSelected, 500);
   const [platformsSearchTerms, setPlatformsSearchTerms] = useState("");
 
-  // Source filter (ERDDAP servers + OBIS nodes): the two lists stay separate
-  // under the hood — they map to different API parameters — but render as a
-  // single "Data Source" filter.
+  // Two lists because they map to different API parameters, rendered as one
+  // "Data Source" filter.
   const [erddapServerSelections, setErddapServersSelected] = useState(
     defaultErddapServersSelected,
   );
-  // Only `url` and `isSelected` are stored; the label is a function of the
-  // language, so it is applied here instead of being mirrored into the
-  // selections by an effect that re-ran on every language switch.
+  // Only `url` and `isSelected` are stored; the label depends on the language.
   const erddapServersSelected = useMemo(
     () =>
       erddapServerSelections.map((server) => ({
@@ -125,8 +125,7 @@ export default function FilterProvider({ children }) {
   const debouncedObisNodesSelected = useDebounce(obisNodesSelected, 500);
   const [sourcesSearchTerms, setSourcesSearchTerms] = useState("");
 
-  // Not debounced: a single toggle, unlike the list filters where a burst of
-  // clicks would otherwise fire a request each.
+  // Not debounced: a single toggle, unlike the list filters.
   const [realtimeOnly, setRealtimeOnly] = useState(defaultRealtimeOnly);
 
   const [startDate, setStartDate] = useState(defaultStartDate);
@@ -139,7 +138,6 @@ export default function FilterProvider({ children }) {
   const [endDepth, setEndDepth] = useState(defaultEndDepth);
   const debouncedEndDepth = useDebounce(endDepth, 500);
 
-  // Scientific name filter (OBIS only)
   const [scientificNamesSelected, setScientificNamesSelected] = useState(
     defaultScientificNamesSelected,
   );
@@ -166,20 +164,14 @@ export default function FilterProvider({ children }) {
   const allObisNodesExcluded =
     obisNodesSelected.length > 0 &&
     obisNodesSelected.every((n) => n.isExcluded);
-  // OBIS data is shown unless the source filter is active without any OBIS
-  // node selected, or excludes every node. Drives the scientific-name filter's
-  // disabled state.
   const showObis =
     (!anyServersSelected || anyObisNodesSelected) && !allObisNodesExcluded;
-  // No OBIS nodes returned from /obisNodes means the database has no OBIS data,
-  // so OBIS-only UI (the Scientific Name filter) is hidden entirely.
+  // An empty /obisNodes means no OBIS data, so OBIS-only UI is hidden.
   const obisDataAvailable = obisNodesSelected.length > 0;
 
-  // The query every fetch in the app is keyed on. Built straight from the
-  // debounced selections rather than mirrored into state by an effect keyed on
-  // them: useDebounce is a trailing debounce, so at the moment it fires the
-  // debounced value already equals the live one, and a memo over the same
-  // inputs lands the same object one render earlier and with no extra pass.
+  // A memo, not effect-mirrored state: at the moment the trailing debounce
+  // fires the debounced value equals the live one, so this lands one render
+  // earlier with no extra pass.
   const query = useMemo(
     () => ({
       startDate: debouncedStartDate,
@@ -190,9 +182,7 @@ export default function FilterProvider({ children }) {
       orgsSelected: debouncedOrgsSelected,
       datasetsSelected: debouncedDatasetsSelected,
       platformsSelected: debouncedPlatformsSelected,
-      // Scientific name only applies to OBIS data; when OBIS isn't shown the
-      // filter is disabled in the UI, so don't apply stale selections to the
-      // query (the selection state is preserved for when OBIS is re-enabled).
+      // Stale selections are kept in state for when OBIS is re-enabled.
       scientificNamesSelected: showObis ? debouncedScientificNamesSelected : [],
       scientificNamesExcluded: showObis ? debouncedScientificNamesExcluded : [],
       obisNodesSelected: debouncedObisNodesSelected,
@@ -200,7 +190,7 @@ export default function FilterProvider({ children }) {
       realtimeOnly,
       eovsMatchAll,
       orgsMatchAll,
-      orgRolesSelected,
+      orgRolesSelected: debouncedOrgRolesSelected,
       scientificNamesMatchAll,
     }),
     [
@@ -219,20 +209,15 @@ export default function FilterProvider({ children }) {
       realtimeOnly,
       eovsMatchAll,
       orgsMatchAll,
-      orgRolesSelected,
+      debouncedOrgRolesSelected,
       scientificNamesMatchAll,
       showObis,
     ],
   );
 
-  // How much observation time the current selection actually covers, which is
-  // what the time slider draws its axis over — there is no point handing a
-  // hundred years of rail to a selection that starts in 2012.
-  //
-  // The time filter is left out of the request on purpose: the extent is what
-  // a time selection is made against, so letting the selection narrow it would
-  // walk the axis inwards on every drag. Leaving it out also makes the URL
-  // stable while the user scrubs, so changing dates costs no fetch at all.
+  // The time slider's axis. The time filter is left out of the request on
+  // purpose: the selection is made against the extent, so letting it narrow
+  // the extent would walk the axis inwards on every drag (and cost a fetch).
   const [timeExtent, setTimeExtent] = useState();
   const extentQueryString = useMemo(() => {
     if (isEmpty(query)) return undefined;
@@ -249,13 +234,11 @@ export default function FilterProvider({ children }) {
       `${server}/timeExtent${extentQueryString ? "?" + extentQueryString : ""}`,
     )
       .then((extent) => {
-        // A selection matching nothing comes back as nulls; keep the axis as
-        // it is rather than collapsing it to an empty domain.
+        // A selection matching nothing comes back as nulls; keep the axis.
         if (!cancelled && extent?.min && extent?.max) setTimeExtent(extent);
       })
       .catch((error) => {
-        // The axis falls back to the full filterable domain, so this is a
-        // cosmetic loss — never a reason to break the bar.
+        // The axis falls back to the full domain, so this is cosmetic.
         reportError("time extent fetch failed", error);
       });
     return () => {
@@ -263,25 +246,19 @@ export default function FilterProvider({ children }) {
     };
   }, [extentQueryString]);
 
-  // "Is this filter doing anything?" is just the selection compared with the
-  // defaults, so it is derived during render rather than mirrored into state
-  // by an effect keyed on the debounced query. That effect left a window —
-  // one debounce long — where the dates had moved but the flag had not, and
-  // TimeRail reads the two together to size its axis.
+  // Derived during render: an effect on the debounced query left a window
+  // where the dates had moved but the flag had not, and TimeRail reads both.
   const timeFilterActive =
     startDate !== defaultStartDate || endDate !== defaultEndDate;
   const depthFilterActive =
     startDepth !== defaultStartDepth || endDepth !== defaultEndDepth;
 
-  // Set when any catalog fetch fails (e.g. API gateway timeouts) so the UI
-  // can surface a retry instead of silently empty filters.
+  // So the UI can offer a retry instead of silently empty filters.
   const [catalogError, setCatalogError] = useState(false);
-  // Set once all catalog fetches have settled (successfully or not) — lets
-  // consumers distinguish "still loading" from "loaded but empty".
+  // Distinguishes "still loading" from "loaded but empty".
   const [catalogLoaded, setCatalogLoaded] = useState(false);
 
-  // One-shot catalog fetches, seeded with any selections carried in the URL
-  // so share links hydrate the filters. Retryable via loadCatalog().
+  // Seeded with any selections carried in the URL. Retryable via loadCatalog().
   const loadCatalog = useCallback(() => {
     setCatalogError(false);
     const filtersFromURL = Object.fromEntries(
@@ -339,9 +316,6 @@ export default function FilterProvider({ children }) {
     const platformsFromURL = platforms?.split(",") || [];
     const platformsExcludedFromURL = excludePlatforms?.split(",") || [];
 
-    /* /platforms returns array of platform names:
-      ['abc', 'def', ...]
-    */
     const platformsRequest = fetchJson(`${server}/platforms`).then(
       (platforms) => {
         setPlatformsSelected(
@@ -370,12 +344,15 @@ export default function FilterProvider({ children }) {
       setEovsSelected(
         eovs.map((eov, index) => {
           const eovMetadata = eovsJSONfile.find((e) => e.value === eov);
+          const category = eovCategory(eov);
 
           return {
             title: eov,
             isSelected: eovsFromURL.includes(eov),
             isExcluded: eovsExcludedFromURL.includes(eov),
             pk: index,
+            category,
+            categoryTranslated: eovCategoriesJSONfile[category],
             hover_en: eovMetadata?.["definition EN"],
             hover_fr: eovMetadata?.["definition FR"],
           };
@@ -416,8 +393,7 @@ export default function FilterProvider({ children }) {
       },
     );
 
-    // OBIS nodes — distinct list from /obisNodes. Names double as the pk
-    // since the schema stores text[] (no per-node lookup table).
+    // Names double as the pk: the schema stores text[], no per-node table.
     const obisNodesFromURL = (obisNodes?.split(",") || []).map((s) =>
       decodeURIComponent(s),
     );
@@ -465,7 +441,7 @@ export default function FilterProvider({ children }) {
     const erddapServersFromURL = erddapServers?.split(",") || [];
     const erddapServersExcludedFromURL = excludeErddapServers?.split(",") || [];
     // Legacy share links used includeObis=false with no server list to mean
-    // "ERDDAP data only" — that now reads as every server selected.
+    // "ERDDAP data only", which now reads as every server selected.
     const selectAllServers =
       includeObis === "false" && erddapServersFromURL.length === 0;
 
@@ -473,8 +449,7 @@ export default function FilterProvider({ children }) {
       (servers) => {
         setErddapServersSelected(
           servers
-            // OBIS datasets carry https://obis.org as their erddap_url
-            // sentinel; OBIS is represented by its node group instead.
+            // OBIS datasets carry https://obis.org as an erddap_url sentinel.
             .filter((serverUrl) => serverUrl !== "https://obis.org")
             .map((serverUrl, index) => ({
               url: serverUrl,
@@ -487,10 +462,8 @@ export default function FilterProvider({ children }) {
       },
     );
 
-    // Surface a retry banner if anything failed — the API responding with
-    // gateway timeouts leaves filters empty and the app unusable otherwise.
-    // 4xx responses (e.g. an older API without /obisNodes) mean the endpoint
-    // is absent, not that the service is down, so they only log.
+    // 4xx (e.g. an older API without /obisNodes) means the endpoint is absent,
+    // not that the service is down, so it only logs.
     Promise.allSettled([
       platformsRequest,
       eovsRequest,
@@ -508,15 +481,11 @@ export default function FilterProvider({ children }) {
       if (serviceDown) setCatalogError(true);
       setCatalogLoaded(true);
     });
-    // Reads the URL and module-level config only — nothing from this render.
   }, []);
 
   useEffect(() => {
-    // Kicking off the catalogue fetches is the one thing this provider has to
-    // do on mount, and loadCatalog clears the retry banner before it starts.
-    // That clear is a synchronous setState in an effect body, which is what
-    // the rule is about; there is no cascade to avoid here, since the flag is
-    // already false on the render that runs this.
+    // loadCatalog clears the retry banner synchronously; the flag is already
+    // false on this render, so there is no cascade.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCatalog();
   }, [loadCatalog]);
@@ -567,8 +536,7 @@ export default function FilterProvider({ children }) {
     setScientificNamesExcluded([]);
   }
 
-  // Human label for a single multi-select option, matching how
-  // MultiCheckboxFilter renders it (translated title where available).
+  // Matches how MultiCheckboxFilter renders it.
   const optionLabel = (option, translatable) => {
     let title = option.title;
     if (translatable) {

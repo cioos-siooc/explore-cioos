@@ -12,29 +12,13 @@ import {
 import { useChanged } from "../../../utilities.jsx";
 import "./styles.css";
 
-// The depth slider, built the same way the time one is: the shared Rail, given
-// a warped axis and a pair of teal handles bounding the depth filter. It draws
-// the Depth entry in the Filters panel and the strip down the right edge of the
-// map, which are the same control in two surfaces.
-//
-// It carried a third mark once — the amber level of the gridded dataset being
-// drawn — which now sits on the griddap card beside the colorbar it changes
-// (see GridSlice). Presentational: every value comes in as a prop and every
-// change goes out through onCommit.
-
-// Keyboard step per key, in metres. Arrows walk 1 m for the exact figure; the
-// coarser steps are what make a 12 km domain navigable without a mouse.
 function keyboardStepMetres(event) {
   if (event.key === "PageUp" || event.key === "PageDown") return 500;
   return event.shiftKey ? 50 : 1;
 }
 
-// A depth input that lets you finish typing, for the same reason DateField
-// does: a controlled field that clamped every keystroke would rewrite "1" as
-// the minimum before "1000" could be finished. Nothing is clamped here — a
-// value is either complete and in range, in which case it commits, or it is
-// still being typed, in which case it is held locally. Leaving with an unusable
-// value restores the committed one.
+// Not clamped per keystroke (that would rewrite "1" before "1000" is typed);
+// see DateField.
 export function isCommittable(value, min, max) {
   if (!/^\d{1,5}$/.test(value)) return false;
   const depth = Number(value);
@@ -45,8 +29,6 @@ export function DepthField({ value, min, max, onCommit, label, className }) {
   const [draft, setDraft] = useState(String(value));
   const [editing, setEditing] = useState(false);
 
-  // Follow the committed value while the field is idle — the rail and the share
-  // link both move it — but never while it is being typed into.
   if (useChanged(value, editing) && !editing) setDraft(String(value));
 
   return (
@@ -74,11 +56,8 @@ export function DepthField({ value, min, max, onCommit, label, className }) {
   );
 }
 
-// The ready-made bands the Range picker offers — the same four the filter has
-// always had, which were a row of buttons before the two range filters were
-// made one control. Each is a place in the water column rather than a
-// thickness, which is why (unlike a time window) dragging one end of a chosen
-// band just resizes it.
+// Places in the water column, not thicknesses, so (unlike time windows)
+// dragging one end of a band resizes it.
 export const DEPTH_PRESETS = [
   { key: "0-100", start: 0, end: 100, label: "0–100 m" },
   { key: "0-500", start: 0, end: 500, label: "0–500 m" },
@@ -86,8 +65,6 @@ export const DEPTH_PRESETS = [
   { key: "1000+", start: 1000, end: 12000, label: "1000 m +" },
 ];
 
-// Which ready-made band the current range is, if any — so the picker shows the
-// user's own choice rather than falling back to naming itself.
 export function matchDepthPreset(startDepth, endDepth, min, max) {
   if (startDepth === min && endDepth === max) return "all";
   const match = DEPTH_PRESETS.find(
@@ -96,8 +73,6 @@ export function matchDepthPreset(startDepth, endDepth, min, max) {
   return match ? match.key : "";
 }
 
-// The band picker, one line high, matching the Interval picker in the Time
-// filter above it.
 export function DepthPresetSelect({
   startDepth,
   endDepth,
@@ -124,8 +99,6 @@ export function DepthPresetSelect({
         }
       }}
     >
-      {/* A range set by hand is not one of these, so the closed select falls
-          back to naming what it is for. */}
       {!value && (
         <option value="" disabled>
           {t("depthSelectorPresetLabel")}
@@ -141,10 +114,8 @@ export function DepthPresetSelect({
   );
 }
 
-// The axis the Filters panel's rail draws: the whole filterable water column,
-// the same 0–12000 m whatever the selection holds, since there is no
-// /depthExtent to narrow it to. The bar over the map builds its own instead —
-// it has a gridded dataset's levels to fit as well.
+// Unlike time there is no /depthExtent, so the axis is the whole filterable
+// column.
 export function useDepthAxis(min, max) {
   return useMemo(() => createDepthAxis(min, max), [min, max]);
 }

@@ -8,12 +8,8 @@ import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 
-// MapContainer is the adapter between the state providers and the imperative
-// Map.jsx (out of scope for unit tests — see src/test/stubs/maplibre.js's own
-// comment: real map rendering is e2e territory). This stub exposes the
-// callback props MapContainer hands to Map as plain buttons, so the tests
-// below exercise MapContainer's OWN logic (handleFeatureQuery, onMarkerClick)
-// without needing a real map.
+// Real map rendering is e2e territory; capturing Map's props lets these tests
+// drive MapContainer's own callbacks without a map.
 let latestMapProps;
 vi.mock("./Map.jsx", () => ({
   default: (props) => {
@@ -66,21 +62,40 @@ describe("MapContainer", () => {
     expect(typeof latestMapProps.onFeatureQuery).toBe("function");
   });
 
-  it("handleFeatureQuery ignores a click that found something while a dataset is open", async () => {
+  it("handleFeatureQuery records a click while a dataset is open, leaving the page open", async () => {
     await renderReady();
     latestSelection.setInspectDataset(ROW);
     await waitFor(() =>
       expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk),
     );
 
-    latestMapProps.onFeatureQuery({
+    const query = {
       nonce: 1,
       lngLat: [0, 0],
       items: [{ kind: "observation" }],
-    });
+    };
+    latestMapProps.onFeatureQuery(query);
 
+    await waitFor(() => expect(latestMapState.featureQuery).toBe(query));
     expect(latestSelection.inspectDataset?.pk).toBe(ROW.pk);
-    expect(latestMapState.featureQuery).toBeFalsy();
+  });
+
+  it("handleFeatureQuery replaces a clicked track's area with the newer click", async () => {
+    await renderReady();
+    latestSelection.selectTrajectoryFromMap(ROW.pk, "track-1", ROW.title, {
+      lngLat: [1, 1],
+      z: 7,
+    });
+    await waitFor(() =>
+      expect(latestSelection.selectedTrajectory?.area).toBeDefined(),
+    );
+
+    latestMapProps.onFeatureQuery({ nonce: 2, lngLat: [0, 0], items: [] });
+
+    await waitFor(() =>
+      expect(latestSelection.selectedTrajectory?.area).toBeUndefined(),
+    );
+    expect(latestSelection.selectedTrajectory?.trajectoryId).toBe("track-1");
   });
 
   it("handleFeatureQuery does not touch the open dataset page for a null (cleared) query", async () => {

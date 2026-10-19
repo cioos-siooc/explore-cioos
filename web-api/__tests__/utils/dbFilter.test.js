@@ -1,11 +1,3 @@
-/**
- * Unit tests for utils/dbFilter.js — createDBFilter
- *
- * createDBFilter is async; it returns { shared, obisOnly, profileOnly, hasShared }.
- * db.raw is called twice per invocation (once for shared filters, once for obisOnly).
- * We capture both calls and assert on the first (shared) call for non-OBIS filters.
- */
-
 jest.mock("../../db");
 
 const db = require("../../db");
@@ -15,9 +7,7 @@ let rawCalls = [];
 
 beforeEach(() => {
   rawCalls = [];
-  // The AphiaID expansion is memoized process-wide (see dbFilter.js), so
-  // without this a case that expands "Orcinus orca" hands its answer to the
-  // next case that uses the same name under a different mock.
+  // The AphiaID expansion is memoized process-wide.
   createDBFilter._resetAphiaCacheForTests();
   db.mockImplementation(() => ({}));
   db.raw = jest.fn((sql, params) => {
@@ -129,12 +119,7 @@ describe("createDBFilter", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// OBIS-specific filter params
-// These use a separate beforeEach because the scientificNames path calls
-// db.raw twice (expansion query + the final shared/obisOnly pair), requiring
-// a thenable mock for the first call.
-// ---------------------------------------------------------------------------
+// The scientificNames path needs a thenable mock for the expansion query.
 
 describe("createDBFilter — obisNodes filter", () => {
   beforeEach(() => {
@@ -241,10 +226,8 @@ describe("createDBFilter — scientificNames filter", () => {
     });
 
     const result = await createDBFilter({ scientificNames: "Orcinus orca" });
-    // First call is the expansion query
     expect(rawCalls[0].sql).toContain("scientific_name_vernaculars");
     expect(rawCalls[0].params.scientificNamesArr).toEqual(["Orcinus orca"]);
-    // obisOnly SQL should contain the combined AphiaID + name match.
     expect(result.obisOnly.sql).toContain("aphia_ids && :expandedAphiaIds");
   });
 
@@ -323,7 +306,6 @@ describe("createDBFilter — scientificNames filter", () => {
   it("non-integer aphia_ids are filtered out before cap check", async () => {
     const rawCalls = [];
     db.mockImplementation(() => ({}));
-    // Mix valid ints with null/string — should filter to just the int
     db.raw = jest.fn((sql, params) => {
       rawCalls.push({ sql: sql || "", params: params || {} });
       if (rawCalls.length === 1) {
@@ -343,12 +325,7 @@ describe("createDBFilter — scientificNames filter", () => {
   });
 });
 
-/*
- * The memo exists because every route calls createDBFilter once per request,
- * so one taxon selection re-derived the same expansion ~20 times for the tiles
- * of a single viewport. It is exercised through memoizeAphiaFetch rather than
- * the module-level instance so a case can count calls to its own fetcher.
- */
+// Through memoizeAphiaFetch so a case can count calls to its own fetcher.
 describe("AphiaID expansion memo", () => {
   const { memoizeAphiaFetch, APHIA_CACHE_TTL_MS } = createDBFilter;
 
@@ -356,8 +333,8 @@ describe("AphiaID expansion memo", () => {
     const fetcher = jest.fn(() => Promise.resolve([1, 2]));
     const memoized = memoizeAphiaFetch(fetcher);
 
-    // Issued together, as the tiles of one viewport are: the promise is
-    // memoized, not just the settled value, so the batch shares one query.
+    // A viewport's tiles arrive together: the promise is memoized, not just
+    // the settled value.
     const results = await Promise.all([
       memoized(["Orcinus orca"]),
       memoized(["Orcinus orca"]),
@@ -416,8 +393,6 @@ describe("AphiaID expansion memo", () => {
     const memoized = memoizeAphiaFetch(fetcher);
 
     await expect(memoized(["Orcinus orca"])).rejects.toThrow("db down");
-    // A blip must not pin the process to it for the whole TTL — the same
-    // reasoning as utils/redis.js's readyPromise.
     await expect(memoized(["Orcinus orca"])).resolves.toEqual([3]);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });

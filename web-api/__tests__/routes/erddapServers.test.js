@@ -1,9 +1,3 @@
-/**
- * GET /erddapServers
- *
- * Returns a sorted array of distinct ERDDAP server URLs from cde.datasets.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

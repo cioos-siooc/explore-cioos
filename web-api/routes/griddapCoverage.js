@@ -10,14 +10,7 @@ const {
   GRIDDAP_FROM,
 } = require("../utils/selection");
 
-/**
- * /griddapCoverage
- *
- * GeoJSON FeatureCollection of the bounding boxes of griddap (gridded,
- * metadata-only) datasets matching the shared filters. Feeds the optional
- * "gridded dataset coverage" map layer — dataset counts are tens of rows, so
- * no pagination or tiling is needed.
- */
+// Dataset counts are tens of rows, so no pagination or tiling is needed.
 
 /**
  * @swagger
@@ -37,19 +30,13 @@ const {
  *               type: object
  */
 router.get("/", ...pipeline(), async (req, res) => {
-  // Griddap is ERDDAP-only, so an OBIS-only selection contains none of it —
-  // see utils/selection.js for what makes a selection OBIS-only.
   if (!erddapVisible(req.query)) {
     return res.send({ type: "FeatureCollection", features: [] });
   }
 
   const filters = await createDBFilter(req.query);
 
-  // The CTE aliases the coverage_* columns back to the names dbFilter's
-  // unqualified predicates expect — see utils/selection.js, which the shape
-  // query's griddap arm takes the same aliases from. `d.*` keeps every dataset
-  // column the shared filters may reference (pk_url, eovs, platform,
-  // organization_pks, obis_nodes, erddap_url) alongside them.
+  // `d.*` keeps every dataset column the shared filters may reference.
   const sql = `WITH grids AS (
         SELECT d.*,
                ${GRIDDAP_TIME_DEPTH_COLUMNS},

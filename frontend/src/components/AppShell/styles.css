@@ -1,24 +1,20 @@
-/* API failure banner: bottom center, above everything but modals — the top
-   center is the brand/Datasets/Filters bar. */
+/* Bottom centre: the top centre is the brand/Datasets/Filters bar. */
 .apiErrorBanner {
   position: fixed;
 
-  /* Stacked above the time bar, which holds the bottom center now that it is
-     always mounted. TimeBar publishes its measured footprint. */
+  /* TimeBar publishes its measured footprint. */
   bottom: calc(12px + var(--cioos-time-bar-space, 0px));
   left: 50%;
   transform: translateX(-50%);
 
-  /* On the dock rung, which is above the first-paint splash: a data service
-     that isn't answering means the splash never lifts, and this is the only
-     thing on screen that says why. */
+  /* Above the splash: a dead data service means the splash never lifts, and
+     this is the only thing that says why. */
   z-index: var(--cioos-z-dock, 35);
   display: flex;
   align-items: center;
   gap: 10px;
 
-  /* Sized to its text, not to the half-viewport that left: 50% leaves a fixed
-     box to shrink into — which wrapped it a word per line on phones. */
+  /* 50% left a fixed box that wrapped a word per line on phones. */
   width: max-content;
   max-width: calc(100vw - 24px);
   padding: 10px 16px;

@@ -1,8 +1,3 @@
-/* The contextual tip (see TipCard.jsx). Sized like a chip row rather than a
-   panel: it should read as an aside to the controls, not as something to deal
-   with. Above the map chrome but under the modals, which the tip waits out
-   anyway. Bottom-left by default, since below the laptop rung the top-right is
-   too narrow beside the centered brand card. */
 .tipCard,
 .tipBadge {
   position: fixed;
@@ -15,10 +10,18 @@
   width: min(360px, calc(100vw - 24px));
   padding: var(--cioos-space-xs) var(--cioos-space-xs) var(--cioos-space-sm)
     var(--cioos-space-md);
-  background-color: var(--cioos-white);
-  border: 1px solid var(--cioos-hairline);
+
+  /* Teal, not white: most of what it sits on is white. */
+  background-color: color-mix(
+    in srgb,
+    var(--cioos-primary) 12%,
+    var(--cioos-white)
+  );
+  border: 2px solid var(--cioos-primary);
   border-radius: var(--cioos-radius);
-  box-shadow: var(--cioos-shadow-float);
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
   font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-sm);
   color: var(--cioos-ink);
@@ -31,9 +34,6 @@
   }
 }
 
-/* Phones: the map legend holds the bottom-left, so the tip takes the
-   bottom-right. Opened, the card keeps to a reading width rather than the
-   full screen. */
 @media (max-width: 700px), (max-height: 500px) {
   .tipCard,
   .tipBadge {
@@ -47,17 +47,41 @@
   }
 }
 
+.tipCard.tipCardAnchored {
+  inset: auto;
+  animation: tipCardEnter 200ms ease-out;
+}
+
+.tipCard.tipCardAnchored.tipCardAbove {
+  --tip-card-enter: 8px;
+}
+
+@keyframes tipCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--tip-card-enter, -8px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tipCard.tipCardAnchored {
+    animation: none;
+  }
+}
+
 .tipBadgeButton {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--cioos-hairline);
+  border: 2px solid var(--cioos-white);
   border-radius: 50%;
-  background-color: var(--cioos-white);
-  box-shadow: var(--cioos-shadow-float);
-  color: var(--cioos-primary);
+  background-color: var(--cioos-primary);
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
+  color: var(--cioos-on-primary);
   cursor: pointer;
 }
 
@@ -97,7 +121,7 @@
 
 @media (hover: hover) {
   .tipCardStep:hover {
-    background-color: var(--cioos-surface-2);
+    background-color: var(--cioos-white);
     color: var(--cioos-ink);
   }
 }
@@ -117,12 +141,45 @@
   color: var(--cioos-primary);
 }
 
+.tipCardFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--cioos-space-sm);
+  margin-right: var(--cioos-space-sm);
+}
+
+.tipCardKeys {
+  margin-left: auto;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+}
+
+@media (hover: none) {
+  .tipCardKeys {
+    display: none;
+  }
+}
+
+.tipCardKeys kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-white);
+  font-family: inherit;
+  font-size: var(--cioos-font-size-2xs);
+  line-height: 1.5;
+  text-align: center;
+  color: var(--cioos-ink);
+}
+
 .tipCardLink {
   padding: 0;
   border: 0;
   background: none;
   font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -131,11 +188,7 @@
   color: var(--cioos-ink);
 }
 
-/* The control the active tip talks about (tipHighlight in TipsProvider), in
-   the tip card's own primary — the ring-and-glow recipe of the datasets list's
-   .fromMapClick card, recoloured so card, pointer and control read as one.
-   !important because it has to win over each control's own shadow — the
-   raised cards, the pressed buttons — while the tip is up. */
+/* !important to beat each control's own shadow while the tip is up. */
 [data-tip-highlight] {
   --tip-glow: color-mix(in srgb, var(--cioos-primary) 45%, transparent);
 
@@ -144,11 +197,7 @@
     0 0 10px 1px var(--tip-glow) !important;
 }
 
-/* The hand pointing at the control the active tip talks about (TipPointer).
-   Over the map chrome, under the modals the tip waits out. A badge rather than
-   a bare glyph, which washes out against the light basemap and the white
-   panels — hung from its top edge, where the fingertip is, and turned
-   over to point down from above. */
+/* A badge, not a bare glyph, which washes out on the light basemap. */
 .tipPointer {
   --tip-pointer-gap: 12px;
 
@@ -163,8 +212,6 @@
     rotate(180deg);
 }
 
-/* A nudge towards the control, not a pulse: it reads as pointing. It stops
-   short of the gap, so the hand bounces beside the control, never onto it. */
 .tipPointerBadge {
   display: flex;
   align-items: center;
@@ -191,4 +238,27 @@
   .tipPointerBadge {
     animation: none;
   }
+}
+
+.tipCard.tipCardInModal {
+  position: static;
+  inset: auto;
+  flex-shrink: 0;
+  width: auto;
+  margin: 0 var(--cioos-space-md) var(--cioos-space-sm);
+  box-shadow: none;
+}
+
+/* Fixed to the viewport: nothing between it and the page is transformed. */
+.tipCard.tipCardInModal.tipCardAnchored {
+  position: fixed;
+  z-index: var(--cioos-z-dock, 35);
+  margin: 0;
+  box-shadow:
+    0 0 10px 2px color-mix(in srgb, var(--cioos-primary) 45%, transparent),
+    var(--cioos-shadow-float);
+}
+
+.tipPointer.tipPointerOverModal {
+  z-index: calc(var(--cioos-z-modal, 1055) + 1);
 }

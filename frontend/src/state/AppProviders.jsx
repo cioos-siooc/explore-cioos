@@ -10,11 +10,9 @@ import UIProvider from "./ui/UIProvider.jsx";
 import TipsProvider from "./tips/TipsProvider.jsx";
 import UrlSync from "./useUrlSync.js";
 
-// Provider order matters: MapState reads Filter (query); Selection reads
-// Filter + MapState; Download reads Filter + Selection; UI reads Selection;
-// Tips reads UI (it holds back while the intro or any modal is up).
-// Activity is outermost because anything, at any depth, may declare that it is
-// waiting on something.
+// Provider order matters: MapState reads Filter; Selection reads Filter +
+// MapState; Download reads Filter + Selection; UI reads Selection; Tips reads
+// UI. Activity is outermost because anything may declare a wait.
 export default function AppProviders({ children }) {
   return (
     <ActivityProvider>

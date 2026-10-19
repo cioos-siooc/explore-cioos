@@ -2,20 +2,11 @@ import { expect, test } from "../support/test.js";
 import { openApp } from "../support/appPage.js";
 import { VIEWPORTS } from "../support/constants.js";
 
-// The WebGL canvas is taken out of every shot below. SwiftShader's raster is
-// not bit-identical across drivers and MapLibre's tile fade is not fully
-// deterministic, so including it would make these permanently red — and what
-// actually regresses is the chrome around it: the sidebar, the chips, the
-// legend, the modals, and above all the phone layout.
-//
-// Hidden rather than handed to toHaveScreenshot's `mask`: the canvas is a
-// full-viewport underlay, and a mask paints the locator's bounding box with no
-// regard for what floats above it — so masking the map filled every screenshot
-// with solid magenta and the baselines asserted nothing at all. `visibility`
-// rather than `display` keeps it in flow, so nothing above it moves.
+// The canvas is hidden: SwiftShader's raster isn't bit-identical across drivers.
+// Not `mask`, which paints over everything floating above the full-viewport
+// canvas; `visibility` rather than `display` keeps layout unchanged.
 async function settle(page) {
-  // Belt and braces alongside the config's animations:'disabled' — that stops
-  // CSS animations, this stops anything mid-transition at capture time.
+  // animations:'disabled' doesn't stop transitions caught mid-way.
   await page.addStyleTag({
     content: `
       *,*::before,*::after{animation:none!important;transition:none!important}

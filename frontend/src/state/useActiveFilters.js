@@ -15,13 +15,12 @@ import {
   Water,
 } from "react-bootstrap-icons";
 
+import { appliedOptions } from "./filterSearch.js";
 import useFilterModel from "./useFilterModel.js";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 
-// The same icon FiltersPanel shows on that filter's own row (see
-// FiltersPanel.jsx's `icon` prop per <Filter>), so a chip and the row it came
-// from read as the same filter at a glance.
+// Same icon as the filter's FiltersPanel row.
 const ICON_FOR_KEY = {
   text: Search,
   realtime: BroadcastPin,
@@ -38,9 +37,7 @@ const ICON_FOR_KEY = {
   dataLayers: Stack,
 };
 
-// createElement, not JSX: this is a plain .js module (no esbuild JSX loader
-// configured for that extension — see vite.config.mjs), and renaming it to
-// .jsx isn't worth doing for the one element this hook returns.
+// createElement, not JSX: no JSX loader for .js (see vite.config.mjs).
 export function iconForKey(key) {
   const Icon = ICON_FOR_KEY[key];
   return Icon
@@ -48,30 +45,24 @@ export function iconForKey(key) {
     : null;
 }
 
-// The quick filters' own buttons light up while they are set (see
-// QuickFilters), so the chips leave them out.
 export const QUICK_FILTER_KEYS = new Set(["area", "inView", "realtime"]);
 
-// Every filter currently narrowing the map, quick filters included, as one
-// list of groups: `{ key, label, icon, goToFilter, removeAll, items }`, one
-// item per applied value. Read off useFilterModel, the same description the
-// search palette lists, so the chips, the Filters badge that counts them and
-// the palette's own applied list cannot disagree.
+// `{ key, label, icon, goToFilter, removeAll, items }` per group, read off
+// useFilterModel so chips, the Filters badge and the palette cannot disagree.
 export default function useActiveFilters() {
   const model = useFilterModel();
   const { datasetTitleSearchText } = useSelection();
   const { setShowFiltersModal, setOpenFilter, openFilterSearch } = useUI();
 
   return model.flatMap((group) => {
-    const applied = group.options.filter((o) => o.state);
+    const applied = appliedOptions(group);
     if (applied.length === 0) return [];
     return {
       key: group.key,
       label: group.label,
       icon: iconForKey(group.key),
       removeAll: group.clear,
-      // The title search has no row of its own in the Filters modal: it is
-      // the palette's (see FilterSearch).
+      // The title search has no Filters modal row: it is the palette's.
       goToFilter: group.panelName
         ? () => {
             setOpenFilter(group.panelName);

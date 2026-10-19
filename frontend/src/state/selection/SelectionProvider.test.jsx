@@ -11,8 +11,7 @@ import { erddapServerSlug } from "../../utilities.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 
 let latest;
-// The map side of the same render, so the suite can assert that a narrowing
-// made here actually reaches the queries the map draws from.
+// So the suite can assert a narrowing reaches the map's queries.
 let latestMapState;
 let latestFilters;
 
@@ -135,6 +134,75 @@ describe("SelectionProvider", () => {
     expect(latest.inspectDataset).toBeUndefined();
   });
 
+  it("keeps an open dataset page when a filter excludes it, flagged out of the results", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    expect(latest.inspectDatasetExcluded).toBe(false);
+
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/pointQuery?")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(pointQueryFixture.slice(1))),
+          );
+        }
+        return realFetch(input, init);
+      }),
+    );
+    act(() => latestFilters.setStartDate("2020-01-01"));
+    await waitFor(() =>
+      expect(latest.pointsData).toHaveLength(pointQueryFixture.length - 1),
+    );
+
+    expect(latest.inspectDataset?.dataset_id).toBe(fixtureRow.dataset_id);
+    expect(latest.inspectDatasetExcluded).toBe(true);
+    expect(new URL(window.location.href).searchParams.get("dataset")).toBe(
+      fixtureRow.dataset_id,
+    );
+  });
+
+  it("flags the open dataset out of the results when the title search excludes it", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(false));
+
+    act(() => latest.setDatasetTitleSearchText("no-title-matches-this"));
+    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(true));
+    expect(latest.inspectDataset?.pk).toBe(target.pk);
+  });
+
+  it("goes back to the list entry a dataset page was opened from", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const entriesBefore = window.history.length;
+    act(() => latest.setInspectDataset(target));
+    await waitFor(() => expect(latest.inspectDataset?.pk).toBe(target.pk));
+    expect(window.history.length).toBe(entriesBefore + 1);
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(
+      new URL(window.location.href).searchParams.get("dataset"),
+    ).toBeNull();
+    // Popped back to the list entry, not a new one stacked on the page's.
+    expect(window.history.length).toBe(entriesBefore + 1);
+    expect(window.history.state?.usr?.fromList).toBeFalsy();
+  });
+
+  it("closes a linked dataset page in place, with no list entry to go back to", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    const entries = window.history.length;
+
+    act(() => latest.returnToDatasetList());
+    await waitFor(() => expect(latest.inspectDataset).toBeUndefined());
+    expect(window.history.length).toBe(entries);
+  });
+
   it("handleSelectDataset toggles a dataset into pointsToReview and counts it", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];
@@ -209,27 +277,7 @@ describe("SelectionProvider", () => {
     );
   });
 
-  it("listSearchText narrows listedDatasets only — not the counters or the map", async () => {
-    await renderLoaded();
-    const target = latest.pointsData[0];
-    const needle = target.title.slice(0, 6);
-    act(() => latest.setListSearchText(needle));
-    await waitFor(() => {
-      expect(latest.listedDatasets).toContain(target);
-      expect(
-        latest.listedDatasets.every((row) =>
-          row.title.toLowerCase().includes(needle.toLowerCase()),
-        ),
-      ).toBe(true);
-    });
-    expect(latest.filteredDatasets).toBe(latest.pointsData);
-    expect(latest.filteredDatasetPks).toBeUndefined();
-    expect(
-      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
-    ).toBeNull();
-  });
-
-  it("inViewCount counts the filtered datasets in view — the title search moves it, the list search does not", async () => {
+  it("inViewCount counts the filtered datasets in view — the title search moves it", async () => {
     // The fixture rows carry no bbox; give every one the same point so a
     // world-sized viewport has them all in view.
     const mockedFetch = globalThis.fetch;
@@ -270,11 +318,6 @@ describe("SelectionProvider", () => {
 
     act(() => latest.setDatasetTitleSearchText("zzzzqqq"));
     await waitFor(() => expect(latest.inViewCount).toBe(0));
-
-    act(() => latest.setDatasetTitleSearchText(""));
-    act(() => latest.setListSearchText("zzzzqqq"));
-    await waitFor(() => expect(latest.listedDatasets).toHaveLength(0));
-    expect(latest.inViewCount).toBe(latest.pointsData.length);
   });
 
   it("the server's in-view answer overrides a bbox that merely overlaps the view", async () => {
@@ -327,12 +370,10 @@ describe("SelectionProvider", () => {
     expect(latest.filteredDatasetPks).toBeUndefined();
 
     act(() => latest.setOnlyInView(true));
-    // No fixture row carries a bbox, so nothing is in view: the figure is
-    // asked for an empty dataset list rather than left unnarrowed, which is
-    // what stops it answering for the datasets the filter just removed.
+    // Asked for an empty list rather than left unnarrowed, so the figure
+    // doesn't answer for datasets the filter just removed.
     await waitFor(() => expect(latest.filteredDatasetPks).toEqual([]));
-    // The map deliberately ignores this one — feeding the viewport back into
-    // the tile queries would rewrite every one of them on every pan.
+    // The map deliberately ignores it, or every tile query would change per pan.
     expect(
       new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
     ).toBeNull();
@@ -352,41 +393,28 @@ describe("SelectionProvider", () => {
     expect(latest.datasetPreview).toBeDefined();
   });
 
-  it("groups by a dimension and hides datasets belonging only to hidden groups", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
+  it("previews one period of a record, and drops it when the record reopens without one", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });
+    const period = { start: "2020-01-03", end: "2020-01-05" };
+    act(() => latest.setInspectRecordID("STATION_001", { period }));
+    await waitFor(() => expect(latest.inspectRecordPeriod).toEqual(period));
+    expect(window.location.search).toContain("pperiod=2020-01-03%7E2020-01-05");
+    const previewUrl = globalThis.fetch.mock.calls
+      .map(([input]) => String(input))
+      .find((url) => url.includes("/preview?"));
+    expect(previewUrl).toContain(
+      "&timeMin=2020-01-03T00:00:00Z&timeMax=2020-01-05T23:59:59Z",
+    );
 
-    const target = latest.pointsData[0];
-    act(() => latest.toggleGroupHidden(target.platform));
-    await waitFor(() => {
-      const stillHidingTarget = latest.pointsData
-        .filter((p) => p.platform === target.platform)
-        .every((p) => latest.hiddenDatasetPks.has(p.pk));
-      expect(stillHidingTarget).toBe(true);
-    });
-
-    act(() => latest.showAllGroups());
-    await waitFor(() => expect(latest.hiddenDatasetPks.size).toBe(0));
-  });
-
-  it("switching groupBy drops whatever was hidden under the old dimension", async () => {
-    await renderLoaded();
-    act(() => latest.setGroupBy("platform"));
-    await waitFor(() => expect(latest.groupBy).toBe("platform"));
-    act(() => latest.toggleGroupHidden(latest.pointsData[0].platform));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(1));
-
-    act(() => latest.setGroupBy("type"));
-    await waitFor(() => expect(latest.hiddenGroups.size).toBe(0));
+    act(() => latest.setInspectRecordID("STATION_001"));
+    await waitFor(() => expect(latest.inspectRecordPeriod).toBeUndefined());
   });
 
   it("addDatasetsToSelection puts the named pks aside, ignoring one absent from the results", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];
-    // 888888 is not a pk in pointsData at all — addDatasetsToSelection only
-    // adds pks it can resolve to a row, so it's silently dropped, the same
-    // way a Grid row's pk would be (see the callback's own comment).
+    // 888888 resolves to no row, so it is silently dropped like a Grid pk.
     act(() => latest.addDatasetsToSelection([target.pk, 888888]));
     await waitFor(() => {
       expect(latest.selectedPks.has(target.pk)).toBe(true);
@@ -426,6 +454,34 @@ describe("SelectionProvider", () => {
     );
     // A toggle would have cleared it; the guard leaves it exactly as it was.
     expect(latest.selectedTrajectory).toBe(selectionBefore);
+  });
+
+  it("re-clicking the selected track elsewhere moves only the clicked area", async () => {
+    await renderLoaded();
+    const target = latest.pointsData[0];
+    const first = { lngLat: [-63, 44], z: 7 };
+    const second = { lngLat: [-62, 45], z: 8 };
+    act(() =>
+      latest.selectTrajectoryFromMap(target.pk, "track-1", target.title, first),
+    );
+    await waitFor(() => expect(latest.selectedTrajectory?.area).toBe(first));
+
+    act(() =>
+      latest.selectTrajectoryFromMap(
+        target.pk,
+        "track-1",
+        target.title,
+        second,
+      ),
+    );
+    await waitFor(() =>
+      expect(latest.selectedTrajectory).toEqual({
+        datasetPk: target.pk,
+        datasetTitle: target.title,
+        trajectoryId: "track-1",
+        area: second,
+      }),
+    );
   });
 
   it("restores a ?onMap= record once its dataset page resolves, and writes it back", async () => {

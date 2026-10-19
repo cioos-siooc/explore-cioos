@@ -15,15 +15,14 @@ import {
   useSearchInput,
 } from "../../../utilities";
 
+import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
 export default function Filter({
   active,
   badgeTitle,
   tooltip,
-  // A filter that has nothing to narrow right now (Scientific Name with OBIS
-  // switched off): shown greyed rather than hidden, so it doesn't come and go
-  // from the list, with `disabledTooltip` saying what would bring it back.
+  // Greyed rather than hidden so rows don't come and go from the list.
   disabled,
   disabledTooltip,
   icon,
@@ -37,37 +36,29 @@ export default function Filter({
   searchPlaceholder,
   resetButton,
   infoButton,
+  tipTarget,
   children,
 }) {
   const { t } = useTranslation();
+  const { tipHighlight } = useTips();
 
-  // Open/Closed state for filter dropdown
   const [filterOpen, setFilterOpen] = useState(controlled ? openFilter : false);
   const wrapperRef = useRef(null);
   useOutsideAlerter(wrapperRef, setFilterOpen, false);
 
-  // A controlled Filter follows the panel's idea of which row is open, but it
-  // keeps its own state so an outside click can still close it. Mirroring the
-  // prop during render rather than in an effect keeps the two from disagreeing
-  // for a frame.
+  // Own state so an outside click can close a controlled Filter; mirrored
+  // during render, not in an effect, so the two never disagree for a frame.
   if (useChanged(openFilter) && controlled) setFilterOpen(openFilter);
 
-  // Its search re-filters a list thousands of options long, so the box shows
-  // what is typed and publishes it once typing pauses — see useSearchInput.
+  // Debounced: the search re-filters a list thousands of options long.
   const [searchText, setSearchText, submitSearch] = useSearchInput(
     searchTerms ?? "",
     setSearchTerms,
   );
 
-  // This is the filter being edited. Controlled, that also takes the panel
-  // agreeing it is the open one; either way a disabled row never opens.
   const isOpen = filterOpen && (!controlled || Boolean(openFilter));
   const paneShown = isOpen && !disabled;
 
-  // `active` (this filter constrains something) and `open` (this is the filter
-  // whose options the pane is showing) are different facts and get different
-  // styling — in the master/detail panel especially, where several rows can be
-  // active at once and exactly one is being edited.
   const filterButton = (
     <button
       data-testid="filter-header"
@@ -75,9 +66,7 @@ export default function Filter({
         isOpen ? "open" : ""
       } ${disabled ? "disabled" : ""}`}
       aria-current={isOpen ? "true" : undefined}
-      // aria-disabled rather than the `disabled` attribute: a disabled button
-      // takes no pointer events, and the caption explaining why it is off is
-      // the whole point of leaving the row there.
+      // Not `disabled`: that would drop pointer events on the explained row.
       aria-disabled={disabled ? "true" : undefined}
       onClick={() => {
         if (disabled) return;
@@ -93,7 +82,6 @@ export default function Filter({
     </button>
   );
 
-  // Using tabIndex to enable onBlur() focus loss capturing: https://stackoverflow.com/a/37491578
   return (
     <div
       className="filter"
@@ -102,26 +90,19 @@ export default function Filter({
       data-filter-name={filterName}
     >
       {filterButton}
-      {/* A disabled row never opens, so its explanation has nowhere else to
-          live — shown as plain text right under the row itself, always
-          readable, no hover or tap needed. */}
       {disabled && (disabledTooltip || tooltip) && (
         <div className="filterCaption">{disabledTooltip || tooltip}</div>
       )}
       {paneShown && (
         <div className="filterOptions" data-testid="filter-options">
-          {/* What this filter does, at the top of its section and above the
-              inputs below — plain text again, not a hover/tap tooltip. */}
           {tooltip && <div className="filterOptionsCaption">{tooltip}</div>}
-          {/* The field and its clear button are one unit, so the button can
-              be positioned against the field rather than against the pane —
-              whose first child is a caption of unpredictable height, which is
-              what used to leave the button sitting on the caption instead of
-              in the field. */}
+          {/* Wrapped so the clear button positions against the field, not the
+              pane (whose caption has unpredictable height). */}
           {searchable && (
-            // A form, so Enter means "don't wait out the delay".
+            // A form, so Enter skips the debounce.
             <form
               className="filterSearchRow"
+              data-tip-highlight={tipHighlight(tipTarget)}
               onSubmit={(e) => {
                 e.preventDefault();
                 submitSearch();
@@ -140,7 +121,7 @@ export default function Filter({
                   type="button"
                   className="clearFilter"
                   onClick={() => setSearchText("")}
-                  title={t("filterClearSearchTitle")} // 'Clear search terms'
+                  title={t("filterClearSearchTitle")}
                   aria-label={t("filterClearSearchTitle")}
                 >
                   <X size={20} aria-hidden="true" />
@@ -148,16 +129,9 @@ export default function Filter({
               )}
             </form>
           )}
-          {/* The options themselves are the one scrolling region: the pane
-              fills the modal, so the list grows into it and the actions below
-              stay put instead of being pushed off the end of a long list. */}
           <div className="filterOptionsBody">{children}</div>
-          {/* No Select all: an all-ticked selection and an empty one both
-              narrow nothing (see MultiCheckboxFilter on why empty means all),
-              so the button was a second, wordier Reset — and the one way they
-              differ ran the wrong way, an explicit list of every current option
-              excluding the records that have none and the options harvested
-              after it was built. */}
+          {/* No Select all: an explicit all-list would exclude records with
+              no value and options harvested later; empty already means all. */}
           {(resetButton || infoButton) && (
             <div className="filterOptionsActions">
               {resetButton && (
@@ -165,10 +139,6 @@ export default function Filter({
                   {t("resetButtonText")}
                 </button>
               )}
-              {/* No Close button: the filter row toggles itself shut, clicking
-                  outside closes it, and filters apply live — so a button whose
-                  only job was to dismiss a pane you can leave by looking away
-                  was just one more thing between the user and the options. */}
               {infoButton && (
                 <a
                   className="filterInfoButton"

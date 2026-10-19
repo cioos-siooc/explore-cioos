@@ -5,12 +5,11 @@ import isEmpty from "lodash-es/isEmpty";
 
 import Modal from "../../ui/Modal.jsx";
 import DownloadPanel from "../Panels/DownloadPanel.jsx";
+import TipCard from "../../Controls/Tips/TipCard.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
-// The download-order modal, launched from the sidebar footer's Download
-// button: order review (DownloadDetails) + email submit.
 export default function DownloadModal() {
   const { t } = useTranslation();
   const { showDownloadModal, setShowDownloadModal } = useUI();
@@ -22,6 +21,7 @@ export default function DownloadModal() {
       show={showDownloadModal}
       onHide={() => setShowDownloadModal(false)}
       className="downloadModal"
+      sheet
       data-testid="download-modal"
       dialogClassName="downloadModalDialog"
       aria-labelledby="downloadModalTitle"
@@ -51,6 +51,7 @@ export default function DownloadModal() {
           </span>
         </Modal.Title>
       </Modal.Header>
+      <TipCard inModal="download" />
       <Modal.Body>
         <DownloadPanel />
       </Modal.Body>

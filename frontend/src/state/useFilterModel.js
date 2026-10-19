@@ -7,6 +7,7 @@ import {
   defaultEndDepth,
 } from "../components/config.js";
 import eovsJSONfile from "../eovs.json";
+import eovCategoriesJSONfile from "../eovCategories.json";
 import {
   generateRangeSelectBadgeTitle,
   polygonIsRectangle,
@@ -20,37 +21,31 @@ import {
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
+import useEovCategories from "./useEovCategories.js";
+import useSourceKinds from "./useSourceKinds.js";
 
 const stateOf = (option) =>
   option.isSelected ? "include" : option.isExcluded ? "exclude" : undefined;
 
-// Every filter, as groups of `{ id, label, description?, state, toggle }`
-// options: the one description the chips, the Filters badge, the search
-// palette and reset all read, so none of them can disagree about what is set.
-// An option is applied when it has a `state`; `toggle(target)` follows the
-// geometry switches' rule (see toggledDataLayerChoice): asking for the state
-// an option is already in clears it. Each writes the same provider state the
-// classic filter UI does, so both stay in step and the URL carries either.
-//
-// A group carries `panelName`, the Filters modal row it is set from, and
-// `clear`, which drops all of it. An option may also carry `closes` (the
-// palette closes once it is picked, as a draw happens on the map behind it),
-// `action` (the verb to show instead of Add / Remove) and `includeOnly` (it
-// cannot be excluded).
-//
-// scientificNameMatches are WoRMS hits for the palette's term, which only the
-// API can produce; the picked names are always offered so they can be removed.
-// typedRange is a time or depth range read off that term (see
-// parseRangeQuery): its group is `pinned`, offered as typed rather than
-// matched against it.
+// Every filter, as groups of `{ id, label, description?, state, toggle }`: the
+// one description the chips, Filters badge, search palette and reset all read,
+// so none can disagree. `toggle(target)` on the current state clears it (see
+// toggledDataLayerChoice). Groups carry `panelName` and `clear`; options may
+// carry `closes` (palette closes on pick), `action`, `includeOnly`, and
+// `shortcut` with `covers` (listed as applied in place of the options it
+// covers when all are set, see appliedOptions). A typedRange group is
+// `pinned`: offered as typed rather than matched.
 export default function useFilterModel(scientificNameMatches = [], typedRange) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const filters = useFilters();
+  const eovCategories = useEovCategories();
+  const sourceKinds = useSourceKinds();
   const { dataLayerChoices, toggleDataLayer, resetDataLayers, requestDraw } =
     useMapState();
   const {
     polygon,
+    areaPlace,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     onlyInView,
@@ -167,9 +162,12 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
   const boxDrawn = Boolean(polygon) && polygonIsRectangle(polygon);
   const areaOption = (mode, label, drawn) => ({
     id: mode,
-    label,
+    label:
+      drawn && areaPlace
+        ? t("spatialFilterPlaceOption", { place: areaPlace.name, shape: label })
+        : label,
     description: t("quickFilterAreaTitle"),
-    matchText: `${label} ${t("spatialFilterFilterName")}`,
+    matchText: `${label} ${t("spatialFilterFilterName")} ${drawn && areaPlace ? areaPlace.name : ""}`,
     state: drawn ? "include" : undefined,
     includeOnly: true,
     closes: !drawn,
@@ -265,8 +263,8 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
       "(m)",
     ),
     (() => {
-      // Shown by the same name the Filters list gives it, but matched on its
-      // eovs.json names too, so it is found by its name in either language.
+      // Also matched on eovs.json names and category, so it is found in either
+      // language.
       const group = listGroup(
         "eovs",
         t("oceanVariablesFiltername"),
@@ -278,17 +276,31 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
       );
       return {
         ...group,
-        options: group.options.map((option, i) => {
-          const eov = eovsJSONfile.find(
-            (e) => e.value === filters.eovsSelected[i].title,
-          );
-          return eov
-            ? {
-                ...option,
-                matchText: `${eov["label EN"]} ${eov["label FR"]}`,
-              }
-            : option;
-        }),
+        options: [
+          ...eovCategories.map((c) => ({
+            id: `category-${c.category}`,
+            label: c.label,
+            description: t("filterSearchCategoryDescription", {
+              count: c.count,
+            }),
+            matchText: `${c.names.en} ${c.names.fr}`,
+            state: c.state,
+            shortcut: true,
+            covers: c.members.map((o) => `${o.pk}`),
+            toggle: c.toggle,
+          })),
+          ...group.options.map((option, i) => {
+            const eov = eovsJSONfile.find(
+              (e) => e.value === filters.eovsSelected[i].title,
+            );
+            return eov
+              ? {
+                  ...option,
+                  matchText: `${eov["label EN"]} ${eov["label FR"]} ${eovCategoriesJSONfile[eov.category].en} ${eovCategoriesJSONfile[eov.category].fr}`,
+                }
+              : option;
+          }),
+        ],
       };
     })(),
     listGroup(
@@ -324,6 +336,17 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
       panelName: "sourceFilterName",
       // pk values collide between the two lists, hence the prefixed ids.
       options: [
+        ...sourceKinds.map((kind) => ({
+          id: `source-${kind.key}`,
+          label: kind.label,
+          description: t("filterSearchSourceKindDescription", {
+            count: kind.members.length,
+          }),
+          state: kind.state,
+          shortcut: true,
+          covers: kind.members.map((o) => `${kind.key}-${o.pk}`),
+          toggle: kind.toggle,
+        })),
         ...listOptions(
           filters.erddapServersSelected,
           filters.setErddapServersSelected,

@@ -1,23 +1,17 @@
-// Loaded as the very first statement of bin/www, before express is required.
-// v8+ auto-instrumentation patches modules as they load, so anything required
-// ahead of Sentry.init is never instrumented.
+// Must load before express: auto-instrumentation patches modules as they
+// load.
 const Sentry = require("@sentry/node");
 
 require("dotenv").config({ quiet: true });
 
-// Gated on the DSN, not on ENVIRONMENT: this used to test
-// `ENVIRONMENT === "production"`, but .env.production sets
-// `juno-cioos-co-production`, so Sentry was never initialised in production.
+// Gated on the DSN, not ENVIRONMENT: .env.production sets
+// `juno-cioos-co-production`, not `production`.
 if (process.env.SENTRY_DSN) {
-  // Tracing every request adds per-request overhead across the initial-load
-  // burst, so sample a fraction by default. Override with
-  // SENTRY_TRACES_SAMPLE_RATE.
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.ENVIRONMENT || "development",
     release: process.env.SENTRY_RELEASE,
-    // Sentry is hosted in the US and /download's body carries the user's
-    // email: request bodies stay out of events, and so does the IP.
+    // Sentry is US-hosted and /download's body carries the user's email.
     sendDefaultPii: false,
     integrations: [Sentry.requestDataIntegration({ include: { data: false } })],
     tracesSampleRate: process.env.SENTRY_TRACES_SAMPLE_RATE

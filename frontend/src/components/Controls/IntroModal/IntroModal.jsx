@@ -23,7 +23,9 @@ import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { MARKER_MIN_ZOOM } from "../../config.js";
-import useMediaQuery from "../../../state/ui/useMediaQuery.js";
+import useMediaQuery, {
+  REDUCED_MOTION_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
@@ -33,28 +35,21 @@ import {
 } from "../../../state/tips/scenes.js";
 import "./styles.css";
 
-// What the tool is for, in the order a newcomer meets it: find data on the
-// map, narrow it down, take it away. Each card leads with the glyph of the
-// control that does it.
 const FEATURES = [
   { key: "explore", Icon: GlobeAmericas },
   { key: "search", Icon: Search },
   { key: "download", Icon: Download },
 ];
 
-// The Gulf of St. Lawrence, thick with profile and time-series stations. A
-// point frames at exactly the camera's maxZoom, just past the zoom where hexes
-// give way to markers.
+// The Gulf of St. Lawrence, thick with profile and time-series stations, framed
+// just past the zoom where hexes give way to markers.
 const STATIONS_SHOWCASE_CENTRE = {
   type: "Point",
   coordinates: [-63.914, 49.038],
 };
 const STATIONS_SHOWCASE_ZOOM = MARKER_MIN_ZOOM + 0.8;
 
-// A few of the app's views, one click away from the intro: each closes the
-// dialog and sets the app up the way a user would have, using the same
-// actions the controls do. The trajectory is left out when the catalogue has
-// none.
+// Each uses the same actions the controls do, as a user would have.
 function useShowcases(close) {
   const { pointsData, setInspectDataset, selectTrajectoryFromMap } =
     useSelection();
@@ -105,10 +100,9 @@ function useShowcases(close) {
 
 const COUNT_UP_MS = 900;
 
-// Counts up to `target` once it is known, so the catalogue's size reads as a
-// live figure rather than copy. Lands on it at once when motion is reduced.
+// Lands on `target` at once when motion is reduced.
 function useCountUp(target) {
-  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reduced = useMediaQuery(REDUCED_MOTION_QUERY);
   const [value, setValue] = useState(0);
   useEffect(() => {
     if (!target || reduced) return undefined;
@@ -116,7 +110,6 @@ function useCountUp(target) {
     const start = performance.now();
     const step = (now) => {
       const progress = Math.min((now - start) / COUNT_UP_MS, 1);
-      // Ease out, so the last digits settle rather than stop dead.
       setValue(Math.round(target * (1 - (1 - progress) ** 3)));
       if (progress < 1) frame = requestAnimationFrame(step);
     };
@@ -150,10 +143,11 @@ export default function IntroModal({ showModal, setShowModal }) {
       show={showModal}
       size="xl"
       centered
-      aria-labelledby="introModalTitle"
+      aria-label={t("CIOOSDataExplorer")}
       onHide={close}
       scrollable
       className="introModal"
+      sheet
       fullscreen="lg-down"
     >
       <Modal.Header closeButton>
@@ -168,8 +162,8 @@ export default function IntroModal({ showModal, setShowModal }) {
         >
           <CioosLogo />
         </a>
-        <Modal.Title className="introTitle" id="introModalTitle">
-          <span className="introTitleName">{t("CIOOSDataExplorer")}</span>
+        <Modal.Title className="introTitle">
+          <span className="introTitleName">{t("dataExplorer")}</span>
           <span className="tagLine">{t("CIOOSQuote")}</span>
         </Modal.Title>
       </Modal.Header>
@@ -225,7 +219,7 @@ export default function IntroModal({ showModal, setShowModal }) {
                   className="introLink"
                   onClick={() => setShowSelectionHelpModal(true)}
                 >
-                  {t("sidebarSelectionHintMoreText")}
+                  {t("introFeature_download_help")}
                 </button>
               )}
             </li>
@@ -260,7 +254,10 @@ export default function IntroModal({ showModal, setShowModal }) {
 
         <footer className="introFooter">
           <div className="introFooterCards">
-            <section className="introFooterCard" data-testid="intro-tips">
+            <section
+              className="introFooterCard introTipsCard"
+              data-testid="intro-tips"
+            >
               <h2 className="introFooterHeading">
                 <Lightbulb size={18} aria-hidden="true" />
                 {t("introTipsHeading")}

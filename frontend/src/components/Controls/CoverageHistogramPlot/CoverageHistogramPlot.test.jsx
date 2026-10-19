@@ -70,4 +70,22 @@ describe("CoverageHistogramPlot", () => {
     expect(new Set(colors).size).toBe(2);
     expect(colors[1]).not.toBe(colorOf("mooring"));
   });
+
+  it("labels seasonal bars by week of the year, with no year", () => {
+    plotProps.mockClear();
+    renderWithProviders(
+      <CoverageHistogramPlot
+        histogram={{
+          count: "days",
+          view: "seasonal",
+          timeBinEdges: ["2001-12-24T00:00:00Z", "2002-01-01T00:00:00Z"],
+          series: [{ key: "Hakai", kind: "organization" }],
+          cells: [[1, "Hakai", 3]],
+        }}
+      />,
+    );
+    const { data, layout } = plotProps.mock.lastCall[0];
+    expect(data[0].customdata[0]).toContain("<b>Dec 24 – Dec 31</b>");
+    expect(layout.xaxis.tickformat).toBe("%b");
+  });
 });

@@ -1,11 +1,5 @@
-// Stand-in for maplibre-gl in jsdom (aliased in vite.config.mjs's test block).
-//
-// The library needs a WebGL canvas at import time, which jsdom has no
-// implementation for. Only three modules reach for it — Map.jsx,
-// DatasetPreviewPlot.jsx and LegendFooter.jsx — and the first two are e2e
-// territory. LegendFooter only ever constructs these two controls to read the
-// attribution/scale markup out of them, so inert classes are enough for the
-// Legend to render in a component test.
+// maplibre-gl needs WebGL at import time, which jsdom lacks. LegendFooter only
+// reads markup out of these controls, so inert classes suffice.
 
 class NoopControl {
   constructor(options = {}) {
@@ -55,8 +49,7 @@ export class LngLatBounds {
   }
 }
 
-// A map instance that accepts every call the app makes and reports nothing as
-// loaded. A component test that needs real map behaviour is in the wrong suite.
+// Tests needing real map behaviour belong in e2e.
 export class Map {
   constructor(options = {}) {
     this.options = options;

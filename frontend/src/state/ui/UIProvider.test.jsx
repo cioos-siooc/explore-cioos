@@ -13,8 +13,7 @@ import {
 import { useSelection } from "../selection/SelectionProvider.jsx";
 import { useUI } from "./UIProvider.jsx";
 
-// Reports the sidebar's state and offers the two ways it changes, so the rules
-// below are asserted through the same interface the chrome uses.
+// Asserts through the same interface the chrome uses.
 function SidebarProbe() {
   const { sidebarOpen, setSidebarOpen } = useUI();
   return (
@@ -64,9 +63,8 @@ describe("the datasets sidebar default", () => {
   });
 
   it("stops following it once the user has chosen", async () => {
-    // The subtle rule, and the one a layout change is most likely to break:
-    // after an explicit toggle the screen-size default no longer applies, so a
-    // resize must not reopen a list the user put away.
+    // The subtle rule: after an explicit toggle a resize must not reopen a list
+    // the user put away.
     setViewportWidth(DESKTOP_WIDTH);
     const { user } = renderWithProviders(<SidebarProbe />, {
       providers: "app",
@@ -127,6 +125,41 @@ describe("revealing the sidebar for a drawn shape", () => {
     await waitFor(() => expect(state()).toBe("closed"));
 
     await user.click(screen.getByRole("button", { name: "draw" }));
+    expect(state()).toBe("closed");
+  });
+});
+
+describe("revealing the sidebar for a dataset page", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
+  function PageProbe() {
+    const { pointsData, setInspectDataset } = useSelection();
+    return (
+      <>
+        <SidebarProbe />
+        <button type="button" onClick={() => setInspectDataset(pointsData[0])}>
+          open
+        </button>
+      </>
+    );
+  }
+
+  it("opens for a page, and stays closed over it when the results refresh", async () => {
+    setViewportWidth(DESKTOP_WIDTH);
+    const { user, i18n } = renderWithProviders(<PageProbe />, {
+      providers: "app",
+    });
+    await waitFor(() => expect(state()).toBe("open"));
+    await user.click(screen.getByRole("button", { name: "toggle" }));
+
+    await user.click(screen.getByRole("button", { name: "open" }));
+    await waitFor(() => expect(state()).toBe("open"));
+
+    // Re-translating the results hands the same dataset back as a new object.
+    await user.click(screen.getByRole("button", { name: "toggle" }));
+    await act(async () => i18n.changeLanguage("fr"));
     expect(state()).toBe("closed");
   });
 });

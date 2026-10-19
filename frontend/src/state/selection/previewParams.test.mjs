@@ -17,11 +17,8 @@ test("the preview owns the record param and the plot params", () => {
 });
 
 test("retired params are still cleaned up, and never written again", () => {
-  // Written by earlier versions of the plot and never read again, but a link
-  // made then must not leave orphans in the address bar once the modal closes.
-  //
-  //   px/py/p2/pscale2  two axis roles plus an overlaid second variable
-  //   pcolor/pscale     the colour dimension, replaced by per-variable colours
+  // Never read again, but an old link must not leave orphans once the modal
+  // closes.
   for (const param of ["px", "py", "p2", "pscale2", "pcolor", "pscale"]) {
     assert.ok(PREVIEW_PARAMS.includes(param), param);
     assert.ok(!PLOT_PARAMS.includes(param), `${param} must not be written`);
@@ -68,13 +65,9 @@ test("no preview param collides with one the map or the filters already use", ()
     "search",
     "onlyInView",
     "groupBy",
-    "hiddenGroups",
     "dataset",
     "server",
-    // The dataset page's own params, added alongside the preview and the
-    // reason it is `preview` and not `record`: the first two are the
-    // highlight (a pinned row, a drawn platform), then the griddap slice
-    // wmsSliceParams writes, then where the "what's here" card was opened.
+    // The dataset page's own params: highlight, griddap slice, card position.
     "record",
     "track",
     "var",
@@ -106,10 +99,8 @@ test("closing the preview strips all of its params and touches nothing else", ()
 });
 
 test("the dataset page highlight survives closing the preview", () => {
-  // `record` and `track` are the highlight — the row a marker click pinned and
-  // the platform whose track is drawn — not the preview. Closing the plot must
-  // leave the page still pointing at them, which is why the preview took
-  // `preview` rather than the `record` name it once had.
+  // `record` and `track` are the highlight, not the preview: closing the plot
+  // must leave the page still pointing at them.
   const params = new URLSearchParams(
     "dataset=X&record=R1&track=T1&preview=R1&pvars=TE90_01",
   );

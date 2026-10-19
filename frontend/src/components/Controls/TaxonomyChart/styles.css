@@ -1,0 +1,246 @@
+/* The chart and its header share one white card; unlike the feature list,
+   there are no separate cards to sit on the sand. */
+.taxonomySection {
+  padding: 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+.taxonomySection .recordSectionHeader {
+  margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.taxonomyHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.taxonomyViewToggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+}
+
+.taxonomyViewToggle button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--cioos-radius-pill);
+  background: none;
+  color: var(--cioos-ink-80);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.taxonomyViewToggle button:hover {
+  background-color: var(--cioos-surface-2);
+}
+
+.taxonomyViewToggle button[aria-pressed="true"] {
+  background-color: var(--cioos-primary-700);
+  color: var(--cioos-on-primary);
+}
+
+.taxonomyStatus {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.taxonomyPlaceholderSpinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: var(--cioos-primary-700);
+  transform: translate(-50%, -50%);
+}
+
+.taxonomyPlaceholderSunburst {
+  aspect-ratio: 1;
+  width: min(100%, 320px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--cioos-surface-2) 0 22%,
+    transparent 22% 25%,
+    var(--cioos-surface-2) 25% 48%,
+    transparent 48% 51%,
+    var(--cioos-surface-2) 51% 74%,
+    transparent 74% 77%,
+    var(--cioos-surface-2) 77% 100%
+  );
+}
+
+.taxonomyPlaceholderTree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+}
+
+.taxonomyPlaceholderTree span {
+  width: calc(60% - var(--depth) * 12%);
+  height: 22px;
+  margin-left: calc(var(--depth) * 16px);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+}
+
+/* Plotly draws at its default size before it measures the frame, so the plot
+   is taken out of flow: it can overflow the frame's box but never size it. */
+.taxonomySunburstFrame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  width: 100%;
+  max-height: 520px;
+}
+
+.taxonomyControls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.taxonomySunburst {
+  position: absolute;
+  inset: 0;
+}
+
+.taxonomyActions {
+  display: flex;
+  gap: 4px;
+}
+
+.taxonomyActions .recordShowAll {
+  margin-left: 0;
+}
+
+.taxonomyActions .recordShowAll:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Connector lines after GBIF's occurrenceTaxonomyTree: a vertical pipe down
+   each list and a short horizontal stub into every tile. */
+.taxonomyTree {
+  --taxonomy-inset: 0.75em;
+
+  overflow-x: auto;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.4;
+}
+
+.taxonomyTree ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.taxonomyTreeLines > .taxonomyTreeItem {
+  position: relative;
+  margin-top: 0.5em;
+  margin-left: 10px;
+  padding-left: var(--taxonomy-inset);
+}
+
+.taxonomyTreeLines > .taxonomyTreeItem::before {
+  position: absolute;
+  top: -0.5em;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background-color: var(--cioos-hairline);
+  content: "";
+}
+
+.taxonomyTreeLines > .taxonomyTreeItem:last-child::before {
+  bottom: auto;
+  height: calc(0.5em + 0.75em);
+}
+
+.taxonomyTreeLines > .taxonomyTreeItem > .taxonomyTreeTile::after {
+  position: absolute;
+  top: 0.75em;
+  left: calc(-1 * var(--taxonomy-inset));
+  width: var(--taxonomy-inset);
+  height: 1px;
+  background-color: var(--cioos-hairline);
+  content: "";
+}
+
+.taxonomyTreeTile {
+  position: relative;
+  display: inline-flex;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-surface-2);
+  white-space: nowrap;
+}
+
+.taxonomyTreeTile[data-ink] {
+  border-color: rgb(0 0 0 / 12%);
+  background-color: var(--taxon-color);
+}
+
+.taxonomyTreeTile[data-ink="light"] {
+  color: var(--cioos-white);
+}
+
+.taxonomyTreeName,
+.taxonomyTreeCount {
+  padding: 2px 6px;
+}
+
+.taxonomyTreeName {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+button.taxonomyTreeName {
+  cursor: pointer;
+}
+
+button.taxonomyTreeName:hover {
+  background-color: rgb(255 255 255 / 35%);
+}
+
+button.taxonomyTreeName[aria-expanded="false"]::after {
+  margin-left: 4px;
+  color: var(--cioos-ink-40);
+  content: "+";
+}
+
+.taxonomyTreeCount {
+  border-left: 1px solid var(--cioos-hairline);
+  color: var(--cioos-ink-60);
+  font-variant-numeric: tabular-nums;
+}
+
+.taxonomyTreeTile[data-ink] .taxonomyTreeCount {
+  border-left-color: rgb(0 0 0 / 12%);
+  color: inherit;
+  opacity: 0.8;
+}
+
+.taxonomyTreeTile[data-ink]
+  button.taxonomyTreeName[aria-expanded="false"]::after {
+  color: inherit;
+  opacity: 0.7;
+}

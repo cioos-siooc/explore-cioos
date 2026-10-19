@@ -21,13 +21,6 @@ const { pipeline } = require("../utils/routePipeline");
  *               items: { type: string }
  */
 
-/**
- * /oceanVariables
- *
- * Gets a list of ocean variables, in english camelCase format. Only the ones used by datasets will be returned.
- *
- * */
-
 router.get("/", ...pipeline({ filters: false }), async (req, res) => {
   res.send(
     (

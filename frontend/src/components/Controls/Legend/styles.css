@@ -1,14 +1,24 @@
-/* Compact floating legend card, bottom-right corner of the map — the keys on
-   the right, the "what's here" card on the left, both down on the bottom edge
-   where they are read against the map rather than over the top bar. */
+/* Grows with viewport width from 1600px to 2400px. The dialog is portalled out
+   of the card, so it needs the sizes too. */
+.mapLegend,
+.legendModal {
+  --legend-grow: clamp(0px, 100vw - 1600px, 800px);
+  --legend-gutter: calc(9px + var(--legend-grow) / 200);
+  --legend-swatch: calc(12px + var(--legend-grow) / 200);
+  --legend-row: calc(15px + var(--legend-grow) / 200);
+  --legend-bar: calc(10px + var(--legend-grow) / 200);
+  --legend-switch: calc(16px + var(--legend-grow) / 200);
+}
+
 .mapLegend {
-  /* The card holds the corner itself; the time bar, which owns the bottom
-     edge, is the one thing it clears. */
+  /* Clears the time bar, which owns the bottom edge. */
   --legend-corner-offset: calc(12px + var(--cioos-time-bar-space, 0px));
 
-  /* Viewport held clear above the card, so a long list of keys stops short of
-     the centered top bar instead of running the height of the screen. */
+  /* Stops a long key list short of the centred top bar. */
   --legend-top-reserve: 108px;
+  --cioos-font-size-3xs: calc(10px + var(--legend-grow) / 400);
+  --cioos-font-size-2xs: calc(10px + var(--legend-grow) / 400);
+  --cioos-font-size-xs: calc(11px + var(--legend-grow) / 400);
 
   position: fixed;
   right: 12px;
@@ -19,14 +29,11 @@
   border-radius: var(--cioos-radius);
   display: flex;
   flex-direction: column;
-  min-width: 124px;
-  max-width: 190px;
+  min-width: calc(124px + var(--legend-grow) / 32);
+  max-width: calc(190px + var(--legend-grow) / 20);
 
-  /* Two ceilings, whichever is lower: the reserve above, and the foot of the
-     depth strip down the right edge when one is up — this card sits under that
-     strip now that it holds the bottom of the same edge. DepthBar publishes the
-     foot; the term is 0, and so never the lower of the two, while the strip
-     isn't mounted. */
+  /* The lower of the top reserve and the foot of the depth strip, which DepthBar
+     publishes (0 while unmounted). */
   max-height: min(
     calc(100vh - var(--legend-top-reserve) - var(--legend-corner-offset)),
     calc(
@@ -34,13 +41,11 @@
     )
   );
 
-  /* The card no longer scrolls as a whole: its body does (below), so the
-     header stays reachable and the footer's scale bar stays on screen however
-     long the list of keys grows. */
+  /* The body scrolls instead, keeping the header and scale bar on screen. */
   overflow: hidden;
 
-  /* 3D depth (shared tokens; see theme.css). The card scrolls, so
-     preserve-3d/inner-lift can't apply here; the shadow ladder carries it. */
+  /* The card clips, so preserve-3d/inner-lift can't apply here; the shadow
+     ladder carries the depth. */
   transform: var(--cioos-perspective);
   box-shadow: var(--cioos-shadow-3d);
 }
@@ -52,7 +57,7 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 5px 9px;
+  padding: calc(5px + var(--legend-grow) / 400) var(--legend-gutter);
   border: none;
   background: transparent;
   font-family: var(--cioos-font-body);
@@ -74,26 +79,20 @@
 }
 
 .legendBody {
-  /* The one part of the card that scrolls; min-height lets it actually shrink
-     inside the flex column rather than pushing the footer off the bottom. */
+  /* min-height lets it shrink inside the flex column rather than pushing the
+     footer off the bottom. */
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 9px 6px;
+  padding: 0 var(--legend-gutter) calc(6px + var(--legend-grow) / 400);
 }
 
-/* One group of related entries — the observations, the tracks, the seafloor, the
-   keyless layers. Set off from its neighbours by a rule and by more space than
-   anything inside it uses, so the grouping reads before the labels are. */
 .legendGroup + .legendGroup {
   margin-top: 7px;
   border-top: 1px solid var(--cioos-hairline);
   padding-top: 6px;
 }
 
-/* A group's label line: the switch for everything in the group, then its name.
-   The switch keeps its intrinsic width and the label takes the rest, so a long
-   translation ellipsizes rather than squeezing the control. */
 .legendGroupLabelRow {
   display: flex;
   align-items: center;
@@ -109,12 +108,10 @@
   margin: 0;
 }
 
-/* The group's name. Upper case and full ink; the sub-captions inside it
-   are sentence case and ink-80, which is the whole of the hierarchy at 10px —
-   two uppercase levels would have looked like one. */
+/* Upper case against sentence-case sub-captions: two uppercase levels read as
+   one at 10px. */
 .legendGroupLabel {
-  /* Shrinks to its words rather than taking the row: the ⓘ that follows reads
-     as belonging to this label, not as a control parked in the corner. */
+  /* Shrinks to its words so the ⓘ after it reads as belonging to it. */
   flex: 0 1 auto;
   min-width: 0;
   font-size: var(--cioos-font-size-2xs);
@@ -123,16 +120,12 @@
   text-transform: uppercase;
   color: var(--cioos-ink);
 
-  /* Wraps rather than nowrap: the card is capped at 190px and the longer French
-     labels ran past it, where the card's overflow simply cut them off. */
+  /* Wraps: longer French labels ran past the 190px cap and were cut off. */
   line-height: 1.25;
 }
 
-/* The ⓘ that opens a caption's long form (see LegendHelpModal). It follows the
-   words it explains — group label or sub-caption — rather than sitting at the
-   end of the row, so what it is about is read off its position. Sized as a
-   footnote marker like the credits button in the card's foot, not as a control
-   competing with the switches. */
+/* Follows the words it explains rather than ending the row, so what it is
+   about is read off its position. */
 .legendInfoButton {
   flex: 0 0 auto;
   display: inline-flex;
@@ -156,13 +149,10 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* One entry inside a group: its caption, then its swatches or bar. */
 .legendSubsection {
   margin-top: 5px;
 }
 
-/* An entry's caption, one level under the group label: the shape it draws, then
-   its name. */
 .legendSubCaption {
   display: flex;
   align-items: center;
@@ -175,8 +165,6 @@
   line-height: 1.25;
 }
 
-/* Inherits the caption's colour unless the icon sets its own (the hexagon
-   carries a ramp colour, the circles are drawn in the caption ink). */
 .legendSubIcon {
   flex: 0 0 auto;
 }
@@ -187,8 +175,7 @@
   padding: 1px 0 3px;
 }
 
-/* Waiting on /legend — stands in for the color bar, so the card keeps its
-   shape instead of collapsing and then jumping back open. */
+/* Keeps the card's shape while /legend loads instead of collapsing. */
 .legendLoading {
   display: flex;
   align-items: center;
@@ -203,12 +190,8 @@
   color: var(--cioos-primary);
 }
 
-/* A key whose layer is switched off. Desaturated as well as faded: colour is
-   the encoding that has stopped applying, so draining it says more than fading
-   alone. It goes on the swatches and labels only, never on a caption row: every
-   switch lives on a caption, and opacity on an ancestor cannot be undone by a
-   descendant, so a dimmed caption would drag the control that turns the layer
-   back on down with it. */
+/* Never on a caption row: every switch lives on one, and an ancestor's opacity
+   can't be undone by the switch that turns the layer back on. */
 .legendDimmed {
   opacity: 0.45;
   filter: grayscale(0.9);
@@ -220,15 +203,11 @@
   gap: 0;
 }
 
-/* A pair of short entries that belong on one row (the point-size key). Wraps
-   rather than overflowing if a translation runs long. */
 .legendItems.inline {
   flex-flow: row wrap;
   gap: 2px 10px;
 }
 
-/* Those labels are the whole point of the row, so let them size themselves
-   instead of inheriting the ellipsis the stacked entries want. */
 .legendItems.inline .legendItemLabel {
   overflow: visible;
 }
@@ -237,25 +216,21 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 15px;
+  min-height: var(--legend-row);
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink);
   line-height: 1.15;
 }
 
-/* The marker size key, laid out on one line: "○ ≤ 1 < ●". Horizontal because
-   it is a single scale read left to right, not a list of independent entries
-   like the platform colours below it. */
 .legendSizeKey {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 4px;
-  min-height: 15px;
+  min-height: var(--legend-row);
 
-  /* Indented off the card's left edge. The row leads with a 6px circle inside a
-     12px swatch box, so its ink starts further right than the colour bar's does
-     and the row read as if it were hanging off the edge. */
+  /* Its small circle centred in a 12px swatch box otherwise read as hanging off
+     the card's edge. */
   padding-left: 4px;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink);
@@ -265,7 +240,7 @@
 .legendItem .legendSwatch,
 .legendSizeKey .legendSwatch {
   flex: 0 0 auto;
-  width: 12px;
+  width: var(--legend-swatch);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -279,13 +254,13 @@
 }
 
 .legendPointCircle.small {
-  width: 6px;
-  height: 6px;
+  width: calc(var(--legend-swatch) / 2);
+  height: calc(var(--legend-swatch) / 2);
 }
 
 .legendPointCircle.large {
-  width: 12px;
-  height: 12px;
+  width: var(--legend-swatch);
+  height: var(--legend-swatch);
 }
 
 .legendItemLabel {
@@ -294,17 +269,15 @@
   text-overflow: ellipsis;
 }
 
-/* Continuous color bar for hex ramps, drawn in the scale's (log-like) space
-   with count ticks at each stop. */
 .legendColorBar {
-  height: 10px;
+  height: var(--legend-bar);
   border-radius: 3px;
   border: 1px solid var(--cioos-hairline);
 }
 
 .legendColorBarTicks {
   position: relative;
-  height: 12px;
+  height: calc(12px + var(--legend-grow) / 400);
   margin-top: 3px;
 }
 
@@ -327,13 +300,8 @@
   transform: translateX(-100%);
 }
 
-/* Map-layer switches, integrated into the legend card. Scoped-down switch
-   chrome keeps the section compact alongside the color bar.
-
-   These stand in their group's label row rather than under it (see
-   renderGroup), so they shrink to their words the way a group label does — the
-   ⓘ that follows reads as belonging to the switch it names, and a long label
-   wraps inside the card instead of pushing the button off the end. */
+/* These stand in their group's label row (see renderGroup), so they shrink to
+   their words like a group label does. */
 .legendLayerItems {
   flex: 0 1 auto;
   min-width: 0;
@@ -342,21 +310,20 @@
   gap: 4px;
 }
 
-/* Scoped to the whole card, not just .legendLayerItems: the hex/point
-   visibility switch now sits up in the ramp title row and has to match the
-   switches further down. */
+/* Card-wide: the observations switch sits in a group label row and has to
+   match these. */
 .mapLegend .form-check.form-switch {
   gap: 6px;
 }
 
 .mapLegend .form-switch .form-check-input {
-  width: 28px;
-  height: 16px;
+  width: calc(var(--legend-switch) + 12px);
+  height: var(--legend-switch);
 }
 
 .mapLegend .form-switch .form-check-input::before {
-  width: 12px;
-  height: 12px;
+  width: calc(var(--legend-switch) - 4px);
+  height: calc(var(--legend-switch) - 4px);
 }
 
 .mapLegend .form-switch .form-check-input:checked::before {
@@ -369,20 +336,14 @@
   color: var(--cioos-ink);
 }
 
-/* ------------------------------------------------------------------
- * The card's foot: the scale bar and the basemap credits, adopted from
- * MapLibre's bottom-right corner (see LegendFooter.jsx). Outside the collapse
- * and outside the scrolling body, so it holds the bottom edge of the card
- * whatever the keys above it are doing.
- * ------------------------------------------------------------------ */
+/* Card foot (see LegendFooter.jsx), outside the collapse and the scrolling body. */
 .legendFooter {
   flex: 0 0 auto;
   border-top: 1px solid var(--cioos-hairline);
-  padding: 4px 9px 5px;
+  padding: calc(4px + var(--legend-grow) / 400) var(--legend-gutter)
+    calc(5px + var(--legend-grow) / 400);
 }
 
-/* The scale to the left, the ⓘ to the right — one row, the height of the
-   button. */
 .legendFooterRow {
   display: flex;
   align-items: center;
@@ -391,18 +352,13 @@
   min-height: 18px;
 }
 
-/* Clips rather than widening the card if a scale label ever runs long (it is
-   capped at 120px by the control itself). */
 .legendScale {
   min-width: 0;
   overflow: hidden;
 }
 
-/* MapLibre's own scale element, restyled for a white card: its default is a
-   translucent white plate with a heavy near-black rule, drawn to stand off
-   satellite imagery. In here it has nothing to stand off, so it keeps only the
-   part that carries the meaning — the bracket under the label, whose width is
-   the distance. */
+/* MapLibre's default plate is drawn to stand off imagery; on a white card keep
+   only the bracket, whose width is the distance. */
 .legendScale .maplibregl-ctrl {
   margin: 0;
 }
@@ -419,8 +375,6 @@
   text-align: center;
 }
 
-/* The ⓘ disclosure. Sized to its icon: it is a footnote marker, not a control
-   competing with the switches above it. */
 .legendCreditsButton {
   flex: 0 0 auto;
   display: inline-flex;
@@ -444,9 +398,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* The credits themselves, opened by the ⓘ. Wrapped, at the tick labels' size:
-   the whole attribution line is here, it is simply not spread across the map
-   until it is asked for. */
 .legendCredits {
   margin-top: 4px;
   max-height: 96px;
@@ -471,11 +422,8 @@
   text-decoration: underline;
 }
 
-/* Phones keep the bottom-left corner: the bottom-right is the tip card's
-   here, and there is no room on this width for the two side by side.
-   700px is the app's own mobile rung (MOBILE_QUERY in useMediaQuery), the same
-   one Legend.jsx branches on to render the keys as a dialog, so the corner and
-   the markup move together rather than at two numbers that can drift. */
+/* Phones: the bottom-right corner is the tip card's. 700px is MOBILE_QUERY
+   (useMediaQuery), the breakpoint Legend.jsx branches on. */
 @media (max-width: 700px), (max-height: 500px) {
   .mapLegend {
     --legend-top-reserve: 136px;
@@ -491,33 +439,17 @@
   }
 }
 
-/* ------------------------------------------------------------------
- * Mobile: the card keeps its corner and gives up its middle. The header
- * row opens the keys as a dialog centred over the map instead of
- * unfolding them in place (see Legend.jsx), and the foot — the scale bar
- * and the basemap credits — stays where it is, since it reads the map
- * rather than the keys and is as useful with the keys away.
- *
- * Nothing here is behind a media query: Legend.jsx adds .legendCompact
- * and renders the dialog only in compact mode, and gating them again here
- * would be a second copy of that breakpoint to keep in step with the
- * first. The card's own corner and offsets are already right — they come
- * from the 700px rule above, which this width is inside.
- * ------------------------------------------------------------------ */
+/* Compact (mobile): not behind a media query, since Legend.jsx only adds
+   .legendCompact in compact mode and a second breakpoint copy would drift. */
 
-/* The card holds the desktop type sizes instead of the phone step-up: it is a
-   glance over the map, and the full keys are a tap away in the dialog. */
+/* Desktop type sizes, not the phone step-up: the full keys are a tap away. */
 .legendCompact {
-  --cioos-font-size-3xs: 10px;
-  --cioos-font-size-2xs: 10px;
-  --cioos-font-size-xs: 11px;
+  --legend-grow: 0px;
 
   min-width: 96px;
   max-width: 136px;
 }
 
-/* The header is the control that opens the rest now, so it is sized as one
-   rather than as a caption with a collapse arrow on the end. */
 .legendCompact .legendHeader {
   gap: 6px;
   min-height: 26px;
@@ -525,8 +457,10 @@
   color: var(--cioos-ink);
 }
 
+/* A pixel of overflow would draw a scrollbar down the card's side on phones. */
 .legendCompact .legendBody {
   padding: 0 6px 4px;
+  overflow: visible;
 }
 
 .legendCompact .legendFooter {
@@ -541,10 +475,7 @@
   color: var(--cioos-primary);
 }
 
-/* The hex ramp, the one key left on the card: the observations group label row
-   — the metric and its switch — and the bar under it. It is the whole of the
-   body here, so the bar drops the top spacing an entry uses to stand apart from
-   the entries beside it; it has none, only its own label row. */
+/* The bar is the whole body here, so it drops an entry's top spacing. */
 .legendCompactRamp {
   flex: 0 0 auto;
 }
@@ -553,33 +484,24 @@
   margin-top: 0;
 }
 
-/* The keys, centred over the map. Sized to what it holds rather than to the
-   screen: unlike the datasets list and the filters this is a glance, and a
-   full-screen dialog for four rows of swatches would read as a page the user
-   had navigated to. */
+/* Sized to its content: a full-screen dialog for a few rows reads as a page. */
 .legendModal .modal-dialog {
   max-width: min(340px, calc(100vw - 24px));
 }
 
-/* Long enough to need it, the keys scroll inside the dialog rather than
-   overflowing the content box, which does not scroll on its own. */
+/* The content box does not scroll on its own. */
 .legendModal .modal-body {
   min-height: 0;
   overflow-y: auto;
 }
 
-/* The card's own scroll box and 9px gutter were the price of sitting beside the
-   map; centred over it, the dialog body owns both. (The 190px cap and the
-   shrunken switch chrome are scoped to `.mapLegend`, which is not an ancestor
-   here, so the keys get their full width and the switches their full size back
-   without anything having to undo them.) */
+/* The dialog body owns scroll and gutter here; the .mapLegend-scoped caps don't
+   reach it. */
 .legendModal .legendBody {
   padding: 0;
   overflow: visible;
 }
 
-/* The bars carry the reading, so they get the height to be read at a glance
-   rather than the 10px they need beside a map. */
 .legendModal .legendColorBar {
   height: 14px;
 }

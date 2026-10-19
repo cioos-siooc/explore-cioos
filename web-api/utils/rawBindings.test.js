@@ -2,21 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const knex = require("knex");
 
-/*
- * Pins the contract that lets dbFilter keep returning knex Raw objects rather
- * than plain strings: a fragment is interpolated, with its own nested
- * bindings, by whichever knex instance executes the outer query.
- *
- * Six call sites depend on this — shapeQuery, griddapCoverage, tiles, legend,
- * download and timeExtent all bind `filters.shared` into their own db.raw.
- * Nothing else records it, and it is the reason TODO §P2.2's "pass the
- * database in" was judged unnecessary: a Raw is already independent of the
- * instance that made it.
- *
- * Both instances here are query-builder-only — knex does not connect until a
- * query executes, which is also why every other test in this directory can
- * assert real SQL with no Postgres running.
- */
+// dbFilter returns knex Raw fragments that routes bind into their own
+// db.raw; each must be interpolated, with its nested bindings, by whichever
+// knex instance runs the outer query. knex never connects until a query
+// executes, so no Postgres is needed.
 
 const builderOnly = () => knex({ client: "pg" });
 
@@ -58,8 +47,7 @@ test("the outer query's own bindings coexist with the fragment's", () => {
   const a = builderOnly();
   const b = builderOnly();
 
-  // The shape query does exactly this: :timeMin belongs to the outer SQL while
-  // :filters carries its own copy of the same value.
+  // As in the shape query: :timeMin is in the outer SQL and in :filters.
   const fragment = a.raw("time_max >= :timeMin::timestamptz", {
     timeMin: "2020-01-01",
   });

@@ -7,16 +7,14 @@ import { useMapState } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import usePublishedFootprint from "../../state/ui/usePublishedFootprint.js";
 
-// How far up the bottom centre the banner reaches, plus a gap — already
-// including whatever it is itself holding off the time bar, so a surface
-// stacking on top of it reads this figure alone (see ActivityIndicator).
+// Includes the time-bar clearance, so a surface stacking on the banner reads
+// this figure alone.
 const BANNER_STACK_GAP = 8;
 function measureBannerSpace({ top }) {
   return window.innerHeight - top + BANNER_STACK_GAP;
 }
 
-// Shown when the catalog or dataset-list fetches failed (e.g. API gateway
-// timeouts): the filters and dataset list would otherwise sit silently empty.
+// Otherwise the filters and dataset list would sit silently empty.
 export default function ApiErrorBanner() {
   const { catalogError, loadCatalog } = useFilters();
   const { loadLegend } = useMapState();
@@ -37,9 +35,7 @@ export default function ApiErrorBanner() {
   );
 }
 
-// Split out so the footprint is published by a component that only exists
-// while the banner does: the property is cleared on unmount, and whatever was
-// stacking on the banner drops back onto the time bar.
+// Split out so the footprint property is cleared when the banner unmounts.
 function BannerSurface({ text, onRetry }) {
   const { t } = useTranslation();
   const bannerRef = useRef(null);

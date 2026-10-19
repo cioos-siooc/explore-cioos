@@ -3,9 +3,7 @@ import { Search } from "react-bootstrap-icons";
 
 import "./tableFilterStyles.css";
 
-// Case-insensitive substring filter across every value of each row. Used
-// with DataTable to replace the search box react-data-table-component-
-// extensions used to provide.
+// Case-insensitive substring filter across every value of each row.
 export function filterRows(rows, filterText) {
   if (!filterText) return rows;
   const query = filterText.toLowerCase();
@@ -18,8 +16,6 @@ export function filterRows(rows, filterText) {
   );
 }
 
-// The search box every list in the app shares — the datasets list, a dataset
-// page's records, a record's preview table — so each looks and behaves alike.
 export default function TableFilter({ value, onChange, placeholder }) {
   return (
     <label className="tableFilterWrap">

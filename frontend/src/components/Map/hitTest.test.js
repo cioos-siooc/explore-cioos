@@ -14,11 +14,13 @@ import {
   loadTurfUnion,
   trackFeatureIn,
   trackItemsIn,
+  withoutGridHighlight,
 } from "./hitTest.js";
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
 
 // Hits are shaped the way queryRenderedFeatures returns them: the ranking only
-// ever reads layer.id, which is the whole reason it can be tested without a map.
+// ever reads layer.id, which is the whole reason it can be tested without a
+// map.
 const hits = (...layerIds) => layerIds.map((id) => ({ layer: { id } }));
 
 const GRID = "griddap-coverage-fill";
@@ -68,8 +70,7 @@ describe("only a coverage rectangle can outrank them", () => {
   });
 });
 
-// Characterisation tests: they pin what the rules did when they were moved out
-// of Map.jsx, so a later tidy-up that changes a ranking fails here first.
+// Characterisation tests: a tidy-up that changes a ranking fails here first.
 
 const feature = (layerId, properties = {}, geometry) => ({
   type: "Feature",
@@ -497,5 +498,17 @@ describe("featureHasDataset", () => {
       false,
     );
     expect(featureHasDataset(feature("hexes", {}), 3)).toBe(false);
+  });
+});
+
+describe("withoutGridHighlight", () => {
+  const tagged = (role) => ({ type: "Feature", properties: { role } });
+
+  it("drops the clicked grid boxes and their merged fill, keeping the rest", () => {
+    const highlight = {
+      type: "FeatureCollection",
+      features: [tagged("outline"), tagged("fill"), tagged("both")],
+    };
+    expect(withoutGridHighlight(highlight).features).toEqual([tagged("both")]);
   });
 });

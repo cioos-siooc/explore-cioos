@@ -10,14 +10,9 @@ const {
   fullResponseForCacheMiss,
 } = require("./routePipeline");
 
-/*
- * The pipeline is exercised through a real express app rather than by calling
- * the middlewares directly: the thing under test IS the assembled chain, and
- * express-validator only populates its result from a request that actually
- * went through the router. `cacheFor: null` keeps apicache — and therefore
- * redis — out of it; the cache stage's POSITION is asserted structurally
- * instead, at the bottom of this file.
- */
+// Through a real express app: express-validator only populates its result
+// from a routed request. `cacheFor: null` keeps apicache out; the cache
+// stage's position is asserted structurally at the bottom.
 function serve(stages, handler = (req, res) => res.json({ ok: true })) {
   const app = express();
   app.get("/probe/:z?/:x?/:y?", ...stages, handler);
@@ -47,9 +42,7 @@ test("pipeline returns a fresh chain per call", () => {
   const a = pipeline({ cacheFor: null });
   const b = pipeline({ cacheFor: null });
   assert.notStrictEqual(a, b);
-  // The bug this replaces: requiredShapeMiddleware `use`d its stack onto a
-  // module-level router, so the second route to mount it got two copies of
-  // every validator and the length grew with each call.
+  // Mounting twice must not stack duplicate validators.
   assert.strictEqual(a.length, b.length);
 });
 
@@ -113,8 +106,7 @@ test("params that used to reach the query unvalidated are now rejected", async (
 });
 
 test("an empty type list is a selection, not a malformed one", async () => {
-  // profileTypes= / trajectoryTypes= is how the map says "none of that
-  // geometry" — distinct from the param being absent, which means "all".
+  // Empty means "none of that geometry"; absent means "all".
   const stages = pipeline({ cacheFor: null });
   assert.strictEqual(await statusOf(stages, "/probe?profileTypes="), 200);
   assert.strictEqual(await statusOf(stages, "/probe?trajectoryTypes="), 200);
@@ -159,9 +151,6 @@ test("route-specific checks run in the same chain", async () => {
 });
 
 test("a handler error carries its own status out", async () => {
-  // How every route now reports a client error: throw, and let the app-level
-  // handler read statusCode. dbFilter's InvalidPolygonError and
-  // ScientificNameSelectionTooBroadError are the two that matter.
   const stages = pipeline({ cacheFor: null });
   const tooBroad = () => {
     const err = new Error("too broad");
@@ -181,10 +170,7 @@ test("a handler error carries its own status out", async () => {
 });
 
 test("the cache is the last stage before the handler", () => {
-  // Order is the whole point of this module: /legend and /timeExtent used to
-  // register the cache FIRST, which let apicache store a 400 under the
-  // request's key. After errorHandler come the cache and its miss companion,
-  // and nothing else.
+  // A cache registered before validation would store a 400.
   const stages = pipeline();
   assert.strictEqual(stages.length, pipeline({ cacheFor: null }).length + 2);
   assert.strictEqual(stages[stages.length - 3], errorHandler);
@@ -193,18 +179,13 @@ test("the cache is the last stage before the handler", () => {
 });
 
 test("the cache-miss stage is registered only when caching is on", () => {
-  // Without a cache there is nothing to fill, so a 304 is pure win and the
-  // conditional headers must survive.
+  // Without a cache a 304 is pure win, so conditional headers must survive.
   assert.ok(!pipeline({ cacheFor: null }).includes(fullResponseForCacheMiss));
 });
 
-/*
- * A browser revalidating a stale-but-ETagged response, which node:fetch cannot
- * model: undici attaches `cache-control: no-cache` to every request it makes,
- * and express's `req.fresh` returns false the moment it sees that — so a
- * conditional GET over fetch comes back 200 no matter what the server does.
- * The raw client sends exactly the two headers a browser would.
- */
+// node:fetch can't model a revalidation: undici adds `cache-control:
+// no-cache`, which makes express's req.fresh false. The raw client sends
+// exactly the two headers a browser would.
 function revalidate(stagesBeforeHandler) {
   const app = express();
   app.get("/probe", ...stagesBeforeHandler, (req, res) =>
@@ -230,15 +211,6 @@ function revalidate(stagesBeforeHandler) {
 }
 
 test("a cache miss answers a conditional request with a full body", async () => {
-  /*
-   * The regression this stage exists to prevent: apicache only stores a
-   * response that HAS a body, and Express answers If-None-Match by stripping
-   * the body and sending 304. A revalidation that missed the cache therefore
-   * ran the whole query and stored nothing, so the entry was never written and
-   * the next revalidation missed too — measured at ~3 s per repeat on prod,
-   * indefinitely. Past the cache stage a request is a miss by construction, so
-   * it has to come back as something the cache can keep.
-   */
   const client = revalidate([fullResponseForCacheMiss]);
   try {
     const { etag } = await client.request();

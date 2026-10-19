@@ -1,6 +1,3 @@
-/* Modal chrome. The header is the brand lockup the app's own header wears
-   (the drawn mark and name), a divider, and the dialog's title over the
-   tagline. */
 .introModal .modal-content {
   border: none;
   overflow: hidden;
@@ -14,16 +11,17 @@
   background-color: var(--cioos-white);
 }
 
-/* The close button keeps the far end of the row. */
 .introModal .modal-header > .closeButton {
   margin-left: auto;
 }
 
 .introBrand {
+  /* Not inline: the line box would hang descender space under the lockup and
+     ride it above the title's centre. */
+  display: flex;
   flex: none;
   padding-right: var(--cioos-space-lg);
   border-right: 1px solid var(--cioos-hairline);
-  font-size: var(--cioos-font-size-lg);
   color: var(--cioos-navy);
   text-decoration: none;
 }
@@ -42,8 +40,6 @@
   color: var(--cioos-navy);
 }
 
-/* The tagline ("Ocean Data For Our Ocean Future") reads as a quiet
-   subtitle, not competing with the product name. */
 .introModal .tagLine {
   font-family: var(--cioos-font-body);
   font-size: var(--cioos-font-size-sm);
@@ -68,11 +64,6 @@
   color: var(--cioos-navy);
 }
 
-/* The hero: what the Explorer is, over the navy the brand's dark surfaces
-   use, with the catalogue's live size beside it. Two columns wherever there is
-   the width for them, so it stays a banner rather than a screenful. The waves
-   drift slowly along its foot — the one bit of motion that says "ocean"
-   without an image. */
 .introHero {
   position: relative;
   display: grid;
@@ -142,7 +133,6 @@
   gap: var(--cioos-space-sm);
 }
 
-/* Stacked down the right edge, divided from the copy by a hairline. */
 .introStats {
   position: relative;
   display: flex;
@@ -194,8 +184,6 @@
   transform: translateY(-1px);
 }
 
-/* "See it in action": one-click jumps into a few of the app's views, as a row
-   of tiles whose arrow nudges forward on hover — they go somewhere. */
 .introShowcases {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -269,8 +257,6 @@
   transform: translateX(3px);
 }
 
-/* The three steps of using the tool, numbered, as cards that arrive one after
-   another. */
 .introFeatures {
   counter-reset: intro-step;
   display: grid;
@@ -335,8 +321,6 @@
   }
 }
 
-/* The housekeeping, as three matching cards: tips, feedback, and how to come
-   back here. Each names its control by the glyph the user will look for. */
 .introFooter {
   margin-top: var(--cioos-space-xl);
   padding-top: var(--cioos-space-lg);
@@ -425,39 +409,277 @@
   cursor: pointer;
 }
 
-/* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). The
-   brand and tagline are on the app's own header, and here they would only
-   crowd the title and the close button; the hero stacks. */
+@media (max-width: 992px) {
+  .introFeatures,
+  .introShowcases,
+  .introFooterCards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile: the dialog is already full-screen here (fullscreen='lg-down'). */
 @media (max-width: 700px), (max-height: 500px) {
-  .introBrand,
+  /* The phone type scale the other full-screen modals use (AppShell/Modals/styles.css). */
+  .introModal {
+    font-size: var(--cioos-font-size-base);
+
+    --cioos-font-size-sm: 11px;
+    --cioos-font-size-base: 13px;
+    --cioos-font-size-md: 14px;
+    --cioos-font-size-lg: 16px;
+    --cioos-font-size-xl: 18px;
+  }
+
   .introModal .tagLine {
     display: none;
   }
 
   .introModal .modal-header {
+    gap: var(--cioos-space-md);
     padding: var(--cioos-space-sm) var(--cioos-space-md);
+  }
+
+  /* No divider: on a phone the logo and the title read as one lockup. */
+  .introBrand {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  /* The brand card's phone size (AppShell/TopLeft/styles.css). Written out
+     because this modal's type scale above redefines --cioos-font-size-xl. */
+  .introBrand .cioosLogo-inline {
+    font-size: min(28px, 6.5vw);
+  }
+
+  .introBrand .cioosLogoName {
+    font-size: 0.7em;
+  }
+
+  .introTitle {
+    line-height: 1;
+  }
+
+  .introModal .modal-body {
+    padding: var(--cioos-space-sm);
   }
 
   .introHero {
     grid-template-columns: 1fr;
-    padding: var(--cioos-space-lg) var(--cioos-space-md) 48px;
+    gap: var(--cioos-space-sm);
+    padding: var(--cioos-space-md) var(--cioos-space-md) 28px;
+  }
+
+  .introHeroWaves {
+    height: 24px;
+  }
+
+  .introHeroTitle {
+    font-size: var(--cioos-font-size-xl);
+  }
+
+  .introHeroText {
+    margin-bottom: var(--cioos-space-sm);
+    line-height: 1.45;
+  }
+
+  .introCta {
+    padding: 6px 16px;
   }
 
   .introStats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--cioos-space-md);
-    padding: var(--cioos-space-md) 0 0;
+    padding: var(--cioos-space-sm) 0 0;
     border-top: 1px solid rgb(255 255 255 / 20%);
     border-left: 0;
   }
-}
 
-@media (max-width: 992px) {
+  .introStatValue {
+    font-size: 1.25rem;
+  }
+
   .introFeatures,
   .introShowcases,
   .introFooterCards {
-    grid-template-columns: 1fr;
+    gap: var(--cioos-space-sm);
+  }
+
+  .introFeatures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: var(--cioos-space-sm);
+  }
+
+  .introFeature {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--cioos-space-xs);
+    padding: var(--cioos-space-sm) var(--cioos-space-xs);
+    border: 0;
+    background: color-mix(in srgb, var(--cioos-teal-light) 35%, transparent);
+    box-shadow: none;
+    text-align: center;
+  }
+
+  .introFeature > h3 {
+    margin: 0;
+    font-size: var(--cioos-font-size-md);
+    line-height: 1.25;
+  }
+
+  /* Side by side, the order already reads; the numbers only add width. */
+  .introFeature h3::before {
+    content: none;
+  }
+
+  .introFeature .introLink {
+    margin-top: 0;
+    font-size: var(--cioos-font-size-sm);
+  }
+
+  .introFeature p,
+  .introShowcaseBody,
+  .introShowcaseArrow {
+    display: none;
+  }
+
+  .introFeatureIcon {
+    width: 32px;
+    height: 32px;
+    background: var(--cioos-white);
+  }
+
+  .introFeatureIcon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .introHeading {
+    margin: var(--cioos-space-md) 0 var(--cioos-space-xs);
+  }
+
+  .introShowcases {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--cioos-space-xs);
+  }
+
+  .introShowcases > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .introShowcase {
+    gap: var(--cioos-space-xs);
+    padding: var(--cioos-space-xs);
+    border-radius: var(--cioos-radius);
+  }
+
+  .introShowcaseTitle {
+    font-size: var(--cioos-font-size-sm);
+    line-height: 1.25;
+  }
+
+  .introShowcaseIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .introFooter {
+    margin-top: var(--cioos-space-md);
+    padding-top: var(--cioos-space-sm);
+  }
+
+  .introFooterCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .introFooterCard {
+    gap: var(--cioos-space-xs);
+    padding: var(--cioos-space-sm);
+  }
+
+  .introTipsCard {
+    flex-flow: row wrap;
+    align-items: center;
+    grid-column: 1 / -1;
+  }
+
+  .introTipsCard > .introFooterHeading {
+    flex-basis: 100%;
+  }
+
+  .introTipsCard > .form-switch {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .introTipsCard > .introFooterAction {
+    flex: none;
+  }
+
+  .introFooterHeading {
+    font-size: var(--cioos-font-size-base);
+  }
+
+  .introFooterCard:not(:last-child) p {
+    display: none;
+  }
+
+  .introFooterAction {
+    align-self: flex-start;
+    padding: 4px 12px;
+    font-size: var(--cioos-font-size-sm);
+  }
+
+  .introFooterCard p {
+    font-size: var(--cioos-font-size-sm);
+    line-height: 1.4;
+  }
+}
+
+@media (max-width: 700px) {
+  .introHero {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .introHeroCopy {
+    display: contents;
+  }
+
+  .introHeroTitle,
+  .introHeroText {
+    position: relative;
+    grid-column: 1 / -1;
+  }
+
+  .introHeroText {
+    margin: 0;
+  }
+
+  .introStats {
+    display: flex;
+    flex-direction: row;
+    grid-area: 3 / 1;
+    padding: 0;
+    border-top: 0;
+  }
+
+  .introHeroActions {
+    position: relative;
+    grid-area: 3 / 2;
+  }
+}
+
+@media (max-height: 500px) and (min-width: 701px) {
+  .introHero {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .introStats {
+    display: flex;
+    padding: 0 0 0 var(--cioos-space-md);
+    border-top: 0;
+    border-left: 1px solid rgb(255 255 255 / 20%);
   }
 }
 

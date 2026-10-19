@@ -1,79 +1,57 @@
-// The data-type layers the map draws, and how a dataset row maps onto them.
-//
-// Three places need to agree on this: MapStateProvider (the state and its
-// ?layers= round-trip), Map.jsx (the tile-query params) and SelectionProvider
-// (which datasets the sidebar list shows). Keeping the key list and the
-// key -> cdm_data_type mapping here is what makes the panel and the map show
-// the same thing.
+// Shared by MapStateProvider (?layers= round-trip), Map.jsx (tile-query
+// params) and SelectionProvider (list narrowing) so all three agree.
 
-// Switch labels, in the order the switches render. The key order is also the
-// order of the ?layers= comma list.
-//
-// Most of these are the CF discrete-sampling geometries a dataset declares
-// (cdm_data_type), which is why the filter calls itself "Dataset geometry" —
-// the choice is about the SHAPE of the observations, not the subject matter.
-// The order follows the taxonomy: the three that sample a fixed place, then
-// the two that sample along a path, then the occurrence records, then the
-// gridded (griddap) datasets — not a discrete-sampling geometry at all, but
-// the shape question still applies and datasets need somewhere to be found.
-// The two trajectory rows are kept adjacent because the track/hex display
-// options render once, under the pair.
-//
-// 'trajectories' (plural) is the plain-Trajectory key. It keeps its old name
-// so the ?layers= links already in the wild still resolve.
+// Key order is the ?layers= order and the render order (fixed-place, path,
+// occurrence, gridded); the two trajectory rows stay adjacent because their
+// display options render once under the pair. 'trajectories' keeps its old
+// name so links in the wild resolve; LEGACY_DATA_LAYER_KEYS maps 'obis' to
+// 'point'.
 export const DATA_LAYER_LABEL_KEYS = {
   profile: "layerProfile",
   timeseries: "layerTimeseries",
   timeseriesProfile: "layerTimeseriesProfile",
   trajectories: "layerTrajectories",
   trajectoryProfile: "layerTrajectoryProfile",
-  obis: "layerObis",
+  point: "layerPoint",
   grid: "layerGrid",
 };
 
-// The one-line hint under each label: what the geometry means in plain terms,
-// and the platforms that typically produce it. Same keys as above.
 export const DATA_LAYER_HINT_KEYS = {
   profile: "layerProfileHint",
   timeseries: "layerTimeseriesHint",
   timeseriesProfile: "layerTimeseriesProfileHint",
   trajectories: "layerTrajectoriesHint",
   trajectoryProfile: "layerTrajectoryProfileHint",
-  obis: "layerObisHint",
+  point: "layerPointHint",
   grid: "layerGridHint",
 };
 
-// The two path-sampling geometries. They share every table and every map layer
-// (coverage cells, track lines), so the switches differ only in which
-// cdm_data_types they name on the wire — see TRAJECTORY_TYPE_KEYS.
+// They share every table and map layer, differing only in the cdm_data_types
+// named on the wire (TRAJECTORY_TYPE_KEYS).
 export const TRAJECTORY_LAYER_KEYS = ["trajectories", "trajectoryProfile"];
 
-// Is either path-sampling layer on? The track lines, the coverage hexes, the
-// time scrub bar and the trajectory legend all belong to the pair rather than
-// to one of them.
 export const anyTrajectoryLayerOn = (dataLayers) =>
   !dataLayers || TRAJECTORY_LAYER_KEYS.some((key) => dataLayers[key]);
 
 export const DATA_LAYER_KEYS = Object.keys(DATA_LAYER_LABEL_KEYS);
 
+const LEGACY_DATA_LAYER_KEYS = { obis: "point" };
+
+export const currentDataLayerKey = (key) => LEGACY_DATA_LAYER_KEYS[key] ?? key;
+
 export const ALL_DATA_LAYERS = Object.fromEntries(
   DATA_LAYER_KEYS.map((key) => [key, true]),
 );
 
-// What a first visit shows: everything. This filter works like the catalogue
-// filters beside it — "nothing picked" means unfiltered, not empty — and the
-// unfiltered answer for a geometry selector is every geometry.
+// Like the catalogue filters, "nothing picked" means unfiltered, i.e. every
+// geometry.
 export const DEFAULT_DATA_LAYERS = ALL_DATA_LAYERS;
 
-// Is the map drawing every geometry? Only a non-default selection is worth
-// writing to the URL, and nothing else about the drawn map is default-ish.
+// Only a non-default selection is worth writing to the URL.
 export const allDataLayersOn = (dataLayers) =>
   !dataLayers || DATA_LAYER_KEYS.every((key) => dataLayers[key]);
 
-// What the user picked, as {key: "include" | "exclude"} with unpicked keys
-// absent — the same include / exclude model as the catalogue lists.
-// The drawn map below is derived from it, so the map, the datasets list and
-// the URL keep reading one {key: drawn} object.
+// {key: "include" | "exclude"}, unpicked keys absent.
 export const toggledDataLayerChoice = (choice, target) =>
   choice === target ? undefined : target;
 
@@ -90,61 +68,50 @@ export function dataLayersFromChoices(choices) {
   );
 }
 
-// The picked geometries, in render order.
 export const chosenDataLayerKeys = (choices) =>
   DATA_LAYER_KEYS.filter((key) => choices[key]);
 
-// Whether the trajectory layers draw their track lines, which is the one
-// trajectory-specific display choice left (their cells are hexes like every
-// other geometry's, under the same hex/point switch). On by default: the lines
-// are the more legible first view of a voyage.
+// On by default: the lines are the more legible first view of a voyage.
 export const DEFAULT_TRACKS_MODE = true;
 
-// The cdm_data_types that share cde.profiles. The tile query names them
-// directly (profileTypes=<comma list>), so this doubles as the wire mapping.
+// The tile query names them directly (profileTypes=), so this doubles as the
+// wire mapping.
 export const PROFILE_TYPE_KEYS = [
   ["profile", "Profile"],
   ["timeseries", "TimeSeries"],
   ["timeseriesProfile", "TimeSeriesProfile"],
 ];
 
-// The cdm_data_types that share cde.trajectory_hexes / cde.trajectory_points,
-// same idea: the tile query names them as trajectoryTypes=<comma list>.
+// Named on the wire as trajectoryTypes=.
 export const TRAJECTORY_TYPE_KEYS = [
   ["trajectories", "Trajectory"],
   ["trajectoryProfile", "TrajectoryProfile"],
 ];
 
-const TYPE_TO_KEY = new Map(
-  [...PROFILE_TYPE_KEYS, ...TRAJECTORY_TYPE_KEYS].map(([key, type]) => [
+// Point is OBIS occurrences today; an ERDDAP Point dataset would join the same
+// switch once the harvester admits the type.
+const TYPE_TO_KEY = new Map([
+  ...[...PROFILE_TYPE_KEYS, ...TRAJECTORY_TYPE_KEYS].map(([key, type]) => [
     type,
     key,
   ]),
-);
+  ["Point", "point"],
+  ["Grid", "grid"],
+]);
 
-// Which switch governs a dataset, or undefined when none does. OBIS datasets
-// carry cdm_data_type 'Point' — which an ERDDAP dataset can legitimately be
-// too — so they're matched on source first, the same way SelectionProvider
-// tells them apart. Griddap datasets carry cdm_data_type 'Grid' and are
-// matched on that, same as every other geometry — the gridded-coverage map
-// switch (griddapCoverageVisible) stays independent of this filter, the same
-// way the trajectory track-lines switch is independent of the trajectory
-// rows: both are map appearance, not dataset admission.
+// undefined when no switch governs it. griddapCoverageVisible is map
+// appearance, independent of this filter.
 export function dataLayerKeyForDataset(row) {
-  if (row.source_type === "obis") return "obis";
-  if (row.cdm_data_type === "Grid") return "grid";
   return TYPE_TO_KEY.get(row.cdm_data_type);
 }
 
-// A cdm_data_type in the geometry filter's own words, so a type reads the same
-// on a card, a group heading and the coverage chart as in the filter. A type
-// no switch names (e.g. OBIS 'Point', the same word in French) is shown as-is.
+// So a type reads the same on cards, group headings and the coverage chart as
+// in the filter.
 export function cdmDataTypeLabel(type, t) {
   const key = dataLayerKeyForDataset({ cdm_data_type: type });
   return key ? t(DATA_LAYER_LABEL_KEYS[key]) : type;
 }
 
-// Is this dataset drawn under the current layer selection?
 export function datasetInDataLayers(row, dataLayers) {
   if (!dataLayers) return true;
   const key = dataLayerKeyForDataset(row);

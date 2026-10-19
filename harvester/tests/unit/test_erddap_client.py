@@ -1,9 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.erddap.client — the HTTP client that talks to ERDDAP servers.
-
-All HTTP calls are intercepted by patching requests.Session so no network
-traffic is produced.
-"""
+"""Unit tests for cde_harvester.sources.erddap.client; requests.Session is patched."""
 
 from unittest.mock import MagicMock, patch
 
@@ -18,9 +13,6 @@ from conftest import (
     MockStreamingResponse,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _make_erddap(all_datasets_csv=ERDDAP_ALL_DATASETS_CSV):
     """Create an ERDDAP instance with a mocked session.get."""
@@ -32,16 +24,11 @@ def _make_erddap(all_datasets_csv=ERDDAP_ALL_DATASETS_CSV):
         )
         from cde_harvester.sources.erddap.client import ERDDAP
         erddap = ERDDAP(ERDDAP_URL, cache_requests=False)
-        erddap.session = mock_session  # expose for further assertions
-        # __init__ no longer auto-fetches the dataset list; the caller (harvest())
-        # now populates it explicitly via get_all_datasets(), so do the same here.
+        erddap.session = mock_session
+        # harvest() populates the dataset list via get_all_datasets(); mirror it.
         erddap.df_all_datasets = erddap.get_all_datasets()
     return erddap
 
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 class TestERDDAPInit:
     def test_url_is_stored(self):
@@ -65,7 +52,6 @@ class TestERDDAPInit:
         """Rows at index 1 and 2 (units + type rows) must be dropped."""
         erddap = _make_erddap()
         ids = erddap.df_all_datasets["datasetID"].tolist()
-        # The "(String)" units row must NOT appear
         assert "(String)" not in ids
         assert "test_timeseries_001" in ids
 
@@ -121,6 +107,21 @@ class TestErddapCsvToDf:
         with pytest.raises(requests.exceptions.HTTPError):
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
 
+    def test_504_is_not_retried_immediately(self):
+        from cde_harvester.sources.erddap.client import _RETRY_STATUSES
+        assert 504 not in _RETRY_STATUSES
+
+    def test_504_records_the_dataset_for_a_deferred_retry(self):
+        erddap = _make_erddap()
+        erddap.session.get.return_value = MockResponse(
+            text="Gateway Time-out", status_code=504,
+            url=ERDDAP_URL + "/tabledap/ds.csv"
+        )
+        dataset = MagicMock(id="ds", erddap_url=ERDDAP_URL, queried_urls=[])
+        with pytest.raises(requests.exceptions.HTTPError):
+            erddap.erddap_csv_to_df("/tabledap/ds.csv", dataset=dataset)
+        assert list(erddap.gateway_timeouts) == ["ds"]
+
     def test_response_too_large_raises(self):
         erddap = _make_erddap()
         from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
@@ -133,12 +134,8 @@ class TestErddapCsvToDf:
             erddap.erddap_csv_to_df("/tabledap/ds.csv")
 
     def test_oversize_response_is_abandoned_mid_download(self):
-        """The cap must be enforced while the body streams in, not after.
-
-        Reading the whole body and only then rejecting it is what made a single
-        at-cap request cost most of a gigabyte; a server offering four times the
-        cap must never be pulled down in full.
-        """
+        """The cap must be enforced while the body streams in, so a server
+        offering four times the cap is never pulled down in full."""
         erddap = _make_erddap()
         from cde_harvester.core.errors import ResponseTooLargeError
         from cde_harvester.sources.erddap.client import MAX_RESPONSE_SIZE
@@ -155,12 +152,8 @@ class TestErddapCsvToDf:
         assert mock_resp.closed
 
     def test_streamed_body_decodes_like_response_text(self):
-        """Non-ASCII must survive the stream exactly as requests' .text gave it.
-
-        Handing pandas raw bytes with encoding="unicode_escape" (which is what
-        the old call passed, and which pandas ignored for a str buffer) would
-        turn every UTF-8 accent into mojibake.
-        """
+        """Non-ASCII must survive the stream exactly as requests' .text gave it
+        (encoding="unicode_escape" would turn UTF-8 accents into mojibake)."""
         erddap = _make_erddap()
         csv = "dataset_id,title\n(String),(String)\nds1,Bouée Côtière\n"
         erddap.session.get.return_value = MockResponse(
@@ -188,3 +181,38 @@ class TestParseErddapDate:
         from cde_harvester.sources.erddap.client import ERDDAP
         result = ERDDAP.parse_erddap_date("not-a-date")
         assert pd.isna(result)
+
+
+class TestCroissantVersionGate:
+    CROISSANT = '{"distribution": [{"@type": "cr:FileObject", "name": "a.nc"}]}'
+
+    def _erddap_with(self, version_text):
+        erddap = _make_erddap()
+        erddap.session.get.reset_mock()
+        erddap.session.get.side_effect = lambda url, **kw: MockResponse(
+            text=version_text if url.endswith("/version") else self.CROISSANT
+        )
+        return erddap
+
+    def _requested(self, erddap):
+        return [c.args[0] for c in erddap.session.get.call_args_list]
+
+    def test_old_erddap_skips_croissant_request(self):
+        from cde_harvester.core.errors import HASH_CROISSANT_UNSUPPORTED
+        erddap = self._erddap_with("ERDDAP_version=2.25\n")
+        assert erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1") == (
+            None, False, HASH_CROISSANT_UNSUPPORTED
+        )
+        assert not any(u.endswith(".croissant") for u in self._requested(erddap))
+
+    def test_version_is_fetched_once_per_server(self):
+        erddap = self._erddap_with("ERDDAP_version=2.25\n")
+        erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        erddap.get_croissant_fingerprint(ERDDAP_URL, "ds2")
+        assert self._requested(erddap) == [ERDDAP_URL + "/version"]
+
+    @pytest.mark.parametrize("version_text", ["ERDDAP_version=2.28\n", "garbage"])
+    def test_supported_or_unknown_version_fetches_croissant(self, version_text):
+        erddap = self._erddap_with(version_text)
+        digest, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert digest and has_files and reason is None

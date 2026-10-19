@@ -22,6 +22,16 @@ const Sentry = require("@sentry/node");
  *         name: profile
  *         required: true
  *         schema: { type: string }
+ *       - in: query
+ *         name: timeMin
+ *         schema: { type: string, format: date-time }
+ *         description: >
+ *           With timeMax, limits the preview to that period (e.g. one pass of
+ *           a trajectory through a selected area) instead of the record's
+ *           most recent rows.
+ *       - in: query
+ *         name: timeMax
+ *         schema: { type: string, format: date-time }
  *     responses:
  *       200:
  *         description: >
@@ -49,39 +59,18 @@ const { pipeline } = require("../utils/routePipeline");
 const { ALL_TRAJECTORY_TYPES } = require("../utils/dataTypes");
 const { trimPreviewRows } = require("../utils/previewRows");
 
-// A record id goes into ERDDAP as a regex constraint (`=~"..."`), and ERDDAP
-// regexes are Java regexes matched against the WHOLE value. Escaping the
-// metacharacters therefore turns the constraint back into exact equality, which
-// is what the caller means. Unescaped, an id containing '.', '(' or '+' matched
-// the wrong rows or made ERDDAP throw.
+// ERDDAP regex constraints match the whole value, so escaping metacharacters
+// turns `=~` back into exact equality.
 const REGEX_METACHARACTERS = /[.\\+*?[\]^$(){}|]/g;
 const escapeErddapRegex = (value) =>
   String(value).replace(REGEX_METACHARACTERS, "\\$&");
 
-// Fixed vocabulary, not user input, so it is safe to inline into the SQL — the
-// same reasoning tiles.js's trajectoryTypePredicate() relies on.
+// Fixed vocabulary, not user input, so it is safe to inline into the SQL.
 const TRAJECTORY_TYPES_SQL = ALL_TRAJECTORY_TYPES.map((t) => `'${t}'`).join(
   ",",
 );
 
-/*
- * /preview
- *
- * Gets ~1000 rows from an ERDDAP dataset for one record.
- *
- * Records live in one of two places depending on cdm_data_type, which is why
- * this query has two branches rather than one join:
- *
- *   Profile / TimeSeries / TimeSeriesProfile -> cde.profiles
- *   Trajectory / TrajectoryProfile           -> cde.trajectory_track_stats
- *                                               + cde.trajectory_days
- *
- * Trajectories never get a cde.profiles row (the harvester routes their
- * features to trajectory_days instead), so the single-table version of this
- * query returned zero rows and threw for every trajectory record — while
- * shapeQuery.js's trajectory branch happily listed those records in the UI for
- * the user to click.
- */
+// Trajectories never get a cde.profiles row, hence the two branches.
 const FEATURE_SQL = `
 WITH ds AS (
   SELECT pk, dataset_id, erddap_url, cdm_data_type, table_variables,
@@ -89,7 +78,6 @@ WITH ds AS (
   FROM   cde.datasets
   WHERE  dataset_id = :dataset
 ),
--- One cde.profiles row per record; records_per_day is harvested per profile.
 profile_feature AS (
   SELECT p.dataset_pk,
          COALESCE(p.profile_id, p.timeseries_id) AS feature_id,
@@ -101,9 +89,6 @@ profile_feature AS (
   JOIN   ds ON ds.pk = p.dataset_pk
   WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
 ),
--- Time bounds come from the per-track summary (real timestamps); the record
--- count and cadence are summed from the day buckets, the same derivation
--- shapeQuery.js uses for its trajectory branch.
 trajectory_feature AS (
   SELECT s.dataset_pk,
          s.trajectory_id AS feature_id,
@@ -129,21 +114,17 @@ SELECT ds.dataset_id,
        ds.erddap_url,
        ds.cdm_data_type,
        ds.table_variables,
-       -- The ERDDAP column to constrain on. A TimeSeriesProfile sets BOTH
-       -- timeseries_id_variable and profile_id_variable, and the record shown in
-       -- the UI is the station, so timeseries wins. A TrajectoryProfile sets
-       -- both trajectory_id_variable and profile_id_variable, and there the
-       -- record is the trajectory — so a flat COALESCE over all three would
-       -- pick the wrong column. Hence the explicit branch on type.
+       -- TimeSeriesProfile and TrajectoryProfile both also set
+       -- profile_id_variable, but the record is the station / trajectory, so a
+       -- flat COALESCE over all three would pick the wrong column.
        CASE WHEN ds.cdm_data_type IN (${TRAJECTORY_TYPES_SQL})
               THEN ds.trajectory_id_variable
               ELSE COALESCE(ds.timeseries_id_variable, ds.profile_id_variable)
        END AS profile_variable,
        f.feature_id AS profile_id,
        f.n_records,
-       -- ::text renders '2024-01-02 03:04:05+00' -- a literal space and a
-       -- non-Z offset, both of which go straight into an ERDDAP URL. Same
-       -- to_char idiom shapeQuery.js's records CTE uses.
+       -- Not a text cast, whose space and non-Z offset would go straight
+       -- into an ERDDAP URL.
        to_char(win.new_start_time AT TIME ZONE 'UTC',
                'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS new_start_time,
        (win.new_start_time IS NULL
@@ -152,10 +133,8 @@ SELECT ds.dataset_id,
 FROM   feature f
 JOIN   ds ON ds.pk = f.dataset_pk
 CROSS JOIN LATERAL (
-  -- Widen back from time_max by however many hours it takes to gather about
-  -- NUM_RECORDS rows at this record's own cadence. A cadence of zero (or NULL)
-  -- cannot size a window and used to raise a division-by-zero; it now falls
-  -- through to "fetch the whole record" instead.
+  -- A zero or NULL cadence cannot size a window; it falls through to
+  -- fetching the whole record.
   SELECT CASE WHEN COALESCE(f.records_per_day, 0) > 0
                 THEN f.time_max
                      - (interval '1 hour'
@@ -167,30 +146,24 @@ LIMIT 1`;
 router.get(
   "/",
   ...pipeline({
-    // dataset and profile are the only params this route reads; the shared
-    // filter set does not apply to it. Both are bound into the query below, so
-    // the caps are about size, not injection.
     filters: false,
-    // Cache the good answer, never the failure: this is the one data route that
-    // calls ERDDAP live, so an uncached error meant every render re-hit a server
-    // that had just failed.
+    // Never cache a live-ERDDAP failure.
     cacheFor: "5 minutes",
     cacheToggle: cache.onlyOk,
-    checks: [check(["dataset", "profile"]).isLength({ max: 256 })],
+    checks: [
+      check(["dataset", "profile"]).isLength({ max: 256 }),
+      check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
+    ],
   }),
   async (req, res, next) => {
     const NUM_RECORDS = 1000;
-    const { dataset, profile } = req.query;
+    const { dataset, profile, timeMin, timeMax } = req.query;
 
     // NOTE: filtered by dataset_id alone, so a dataset_id published on two
-    // ERDDAP servers resolves to whichever row sorts first. That ambiguity
-    // predates this route taking a `server` param; the frontend only ever sends
-    // the id. LIMIT 1 makes the pick explicit rather than accidental.
+    // ERDDAP servers resolves to whichever row sorts first.
     const rows = await db.raw(FEATURE_SQL, { profile, dataset, NUM_RECORDS });
 
     if (!rows.rows?.length) {
-      // Either the dataset_id is unknown or that record does not belong to it.
-      // Both are the caller asking for something that isn't there, not a fault.
       return res
         .status(404)
         .send({ error: "RECORD_NOT_FOUND", dataset, profile });
@@ -208,8 +181,6 @@ router.get(
     } = rows.rows[0];
 
     if (!profile_variable) {
-      // No cf_role variable to constrain on: without it the query would read
-      // `&null=~"..."` and ERDDAP would reject it. Say so instead.
       return res.status(422).send({
         error: "NO_RECORD_ID_VARIABLE",
         dataset: dataset_id,
@@ -221,32 +192,20 @@ router.get(
       `"${escapeErddapRegex(profile_id)}"`,
     )}`;
     let erddapQuery = `${erddap_url}/tabledap/${dataset_id}.json?&${constraint}`;
-    if (!use_whole_profile) {
-      // Lower bound only. This used to also send `&time<${time_max}` -- the
-      // harvested maximum -- to guard "against records added since the last
-      // harvest", which meant a near-real-time dataset's plot always stopped
-      // where the last harvest stopped. Those newer records are the point, so
-      // the ceiling is gone and trimPreviewRows() keeps the newest of whatever
-      // comes back. (The old bound was also strict, so it excluded the
-      // record's own final row.)
-      //
-      // The window start stays anchored on this record's own time_max, not on
-      // the dataset's: in a dataset with many stations or missions the newest
-      // data usually belongs to a different record, so anchoring on the
-      // dataset would start the window after a quieter record's last row and
-      // return nothing. The cost of an open upper end is up to one harvest
-      // interval of extra rows for a high-cadence live record -- the same
-      // exposure the use_whole_profile branch below already carries.
+    if (timeMin || timeMax) {
+      if (timeMin) erddapQuery += `&time>=${new Date(timeMin).toISOString()}`;
+      if (timeMax) erddapQuery += `&time<=${new Date(timeMax).toISOString()}`;
+    } else if (!use_whole_profile) {
+      // Lower bound only, so near-real-time records newer than the last
+      // harvest still show. Anchored on this record's own time_max, not the
+      // dataset's, whose newest data usually belongs to another record.
       erddapQuery += `&time>${new_start_time}`;
     }
 
     console.log("Fetching preview from ", erddapQuery);
     try {
       const { data } = await axios.get(erddapQuery, {
-        // A record with no usable cadence falls through to use_whole_profile,
-        // and some of those are hundreds of thousands of rows — tens of MB that
-        // this route downloads only to slice off the first 1000. Neither bound
-        // existed before, so one such record could pin a worker indefinitely.
+        // use_whole_profile records can be tens of MB.
         timeout: 60000,
         maxContentLength: 100 * 1024 * 1024,
         maxBodyLength: 100 * 1024 * 1024,
@@ -258,19 +217,11 @@ router.get(
           .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
       }
       trimPreviewRows(data.table, NUM_RECORDS);
-      // Per-variable metadata (long_name, cf_role, colorBar*, ...) harvested
-      // from ERDDAP's /info document. Attached here rather than in
-      // shapeQuery.js on purpose: that one feeds /pointQuery, which would then
-      // carry ~15 KB per dataset for every dataset in view to serve one modal.
-      //
-      // ERDDAP's column order is authoritative — the harvest can be older than
-      // the dataset, so a column may exist in one and not the other. Indexing
-      // by name and emitting null for anything unmatched keeps columnMeta the
-      // same length as columnNames, so the frontend can zip them positionally.
-      //
-      // The key is omitted entirely when the dataset has never been harvested
-      // with this column, which is what lets the frontend tell "no metadata"
-      // (fall back to column names) from "metadata says nothing about this one".
+      // Attached here rather than in shapeQuery.js, which would then carry
+      // ~15 KB per dataset to /pointQuery. Kept positionally aligned with
+      // ERDDAP's columnNames since the harvest may be older than the dataset;
+      // omitted entirely when never harvested, so the frontend can tell "no
+      // metadata" apart.
       if (Array.isArray(table_variables)) {
         const byName = new Map(
           table_variables.map((variable) => [variable.name, variable]),
@@ -282,8 +233,7 @@ router.get(
       return res.send(data);
     } catch (error) {
       // ERDDAP answers "no matching results" with a 404, or a 500 whose body
-      // says so. That is an empty record, not an outage, and must not be
-      // reported as one.
+      // says so: an empty record, not an outage.
       const status = error.response?.status;
       const body = String(error.response?.data ?? "");
       const isEmpty =
@@ -296,9 +246,6 @@ router.get(
           .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
       }
 
-      // A real upstream failure. Previously this returned `200 []`, so the
-      // frontend could not tell it apart from an empty record and Sentry only
-      // ever saw a message with no context.
       console.error("Preview upstream failure", status, error.message);
       Sentry.captureException(error, {
         tags: { route: "preview", erddap_status: status ?? "none" },

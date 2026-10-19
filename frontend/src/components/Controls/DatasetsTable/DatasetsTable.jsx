@@ -1,16 +1,18 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import {
-  CaretDownFill,
-  CaretRightFill,
   Check2Circle,
-  Eye,
-  EyeSlash,
+  CheckSquare,
+  ChevronRight,
+  Filter,
+  SlashCircle,
+  Square,
   XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -19,31 +21,36 @@ import classNames from "classnames";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
+import useActiveFilters from "../../../state/useActiveFilters.js";
+import useGroupFilter from "../../../state/useGroupFilter.js";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
   GROUP_NONE,
-  HIDEABLE_DIMENSIONS,
   groupKeysFor,
   groupLabel,
   groupOptions,
+  groupParent,
   isGroupDimension,
+  parentGroupKeys,
   sortGroupKeys,
 } from "../../../state/datasetGroups.js";
-import { useSearchInput } from "../../../utilities.jsx";
+import { useChanged } from "../../../utilities.jsx";
 import DatasetCard from "./DatasetCard.jsx";
 import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
-import TableFilter from "../../ui/TableFilter.jsx";
 import "./styles.css";
 
-// Stable default so an absent datasetsInViewPks prop (e.g. the download modal)
-// doesn't create a new Set every render and thrash memo deps.
+// Offered only while the list is grouped, and its default then.
+const GROUP_SIZE = "groupSize";
+const DEFAULT_SORT = { field: "title", dir: "asc" };
+const GROUP_SIZE_SORT = { field: GROUP_SIZE, dir: "desc" };
+
+// Stable empty set, so an unpinned list doesn't create a new Set every render
+// and thrash memo deps.
 const EMPTY_SET = new Set();
 
-// The datasets list, rendered as cards (replaces the old data table). Used in
-// two contexts: the sidebar results list and the download-review modal
-// (isDownloadModal), which surfaces size estimates and download status.
 export default function DatasetsTable({
   handleSelectAllDatasets,
   handleSelectDataset,
@@ -54,42 +61,27 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  // The built direct-download link per dataset pk (download modal only), so a
-  // card can show the query its own dataset would be fetched with. Built by
-  // DownloadDetails, which owns the format choice the strip below shares.
   downloadLinksByPk,
-  datasetsInViewPks = EMPTY_SET,
+  // Kept mounted under an open dataset page, so coming back finds the same
+  // page and scroll position (see DatasetsPanel).
+  hidden = false,
 }) {
   const { t, i18n } = useTranslation();
-  // The search, grouping and hidden groups live in SelectionProvider: they
-  // outlive this list while a dataset page replaces it, the hidden groups
-  // decide what the map draws, and all of them are carried in the URL.
+  // The grouping lives in SelectionProvider: it outlives this list while a
+  // dataset page replaces it, and is carried in the URL.
   const {
-    listSearchText,
-    setListSearchText,
     groupBy: selectedGroupBy,
     setGroupBy,
-    hiddenGroups,
-    toggleGroupHidden,
-    showAllGroups,
     selectedPks,
-    // Drops a dataset from the selection outright — aliased because the
-    // download modal's own `handleSelectDataset` prop means something
-    // narrower: whether this batch includes a dataset already in the order,
-    // not whether it is in the order at all.
+    // Aliased: the modal's own `handleSelectDataset` prop only toggles a
+    // dataset within this batch.
     handleSelectDataset: removeFromSelection,
     pointsError,
   } = useSelection();
-  // Narrows only this list (see listedDatasets), so it can follow the typing.
-  const [searchText, setSearchText] = useSearchInput(
-    listSearchText,
-    setListSearchText,
-  );
-  // The datasets the open "what's here" card is about. They sort to the top of
-  // the list, which is what ties the card to this list at all — without it the
-  // card named datasets that could be on page 6 of 8, and there was no way to
-  // tell which rows it meant. The download modal is reviewing an order, not
-  // exploring the map, so it ignores this.
+  const { openFilters, showFiltersModal } = useUI();
+  const activeFilterCount = useActiveFilters().length;
+  // The "what's here" card's datasets sort to the top, tying the card to the
+  // list; the download modal ignores them.
   const { featureQuery } = useMapState();
   const pinnedPks = useMemo(() => {
     if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET;
@@ -97,17 +89,35 @@ export default function DatasetsTable({
   }, [featureQuery, isDownloadModal]);
   const { tipHighlight } = useTips();
 
-  // The download modal is a flat review list — it never groups, whatever the
-  // sidebar is grouped by.
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
   const listRef = useRef(null);
+  // A display:none list loses its scroll offset, so it is remembered here and
+  // put back when the list shows again.
+  const scrollTopRef = useRef(0);
+  const scrollListToTop = () => {
+    scrollTopRef.current = 0;
+    if (listRef.current) listRef.current.scrollTop = 0;
+  };
+  useLayoutEffect(() => {
+    if (!hidden && listRef.current) {
+      listRef.current.scrollTop = scrollTopRef.current;
+    }
+  }, [hidden]);
 
-  // Sort fields differ by context: the download modal exposes the size and
-  // downloadable status; the sidebar exposes the locations and days counts.
+  const grouped = isGroupDimension(groupBy);
   const sortFields = useMemo(() => {
     const base = [
+      ...(grouped
+        ? [
+            {
+              id: GROUP_SIZE,
+              label: t("datasetsCardSortGroupSizeText"),
+              type: "number",
+            },
+          ]
+        : []),
       { id: "title", label: t("datasetsTableHeaderTitleText"), type: "string" },
       { id: "type", label: t("datasetsTableHeaderTypeText"), type: "string" },
       {
@@ -140,15 +150,20 @@ export default function DatasetsTable({
       });
     }
     return base;
-  }, [isDownloadModal, t]);
+  }, [isDownloadModal, grouped, t]);
 
-  const [sort, setSort] = useState({ field: "title", dir: "asc" });
-  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const [sort, setSort] = useState(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
+  const [toggledGroups, setToggledGroups] = useState(() => new Set());
+  if (useChanged(grouped)) setSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
+  const rowSort = sort.field === GROUP_SIZE ? DEFAULT_SORT : sort;
 
   const groupByOptions = useMemo(() => groupOptions(t), [t]);
-  // Hiding a group takes its datasets off the map. Not offered for the
-  // viewport-based dimension ('inView'), whose membership changes on every pan.
-  const canHideGroups = HIDEABLE_DIMENSIONS.has(groupBy);
+  const {
+    filterFor,
+    filteredKeys: ownFilterKeys,
+    narrowed: ownFilterSet,
+  } = useGroupFilter(groupBy);
+  const ownFilterId = ownFilterKeys.join("\n");
 
   const sortValue = useCallback(
     (row, field) => {
@@ -181,69 +196,168 @@ export default function DatasetsTable({
     [t],
   );
 
-  // Search filtering happens upstream (SelectionProvider's listedDatasets) —
-  // this just sorts whatever it's handed.
+  // Filtering happens upstream (SelectionProvider's filteredDatasets).
   const visibleRows = useMemo(() => {
-    const field = sortFields.find((f) => f.id === sort.field);
-    const factor = sort.dir === "asc" ? 1 : -1;
+    const field = sortFields.find((f) => f.id === rowSort.field);
+    const factor = rowSort.dir === "asc" ? 1 : -1;
     const sorted = [...(datasets || [])].sort((a, b) => {
-      // Datasets under the last map click come first, in the chosen sort order
-      // among themselves. This rides on top of the sort rather than replacing
-      // it, so the sort control still does what it says — it just orders the two
-      // blocks separately.
+      // Map-click datasets come first; each block keeps the chosen sort.
       const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1;
       const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1;
       if (pa !== pb) return pa - pb;
-      const va = sortValue(a, sort.field);
-      const vb = sortValue(b, sort.field);
+      const va = sortValue(a, rowSort.field);
+      const vb = sortValue(b, rowSort.field);
       if (field?.type === "number") return (va - vb) * factor;
       return String(va).localeCompare(String(vb), i18n.language) * factor;
     });
     return sorted;
-  }, [datasets, sort, i18n.language, pinnedPks, sortFields, sortValue]);
+  }, [datasets, rowSort, i18n.language, pinnedPks, sortFields, sortValue]);
 
-  // Flat render list: without grouping it's just the sorted rows; with grouping
-  // it's the rows bucketed under headers. Each entry is either
-  // { header, group, count } or { row, group }, where group is the stable group
-  // key (see state/datasetGroups.js — labels are derived at render time). Rows
-  // stay in their sorted order within a group; groups are alphabetical by label
-  // with Other/Uncategorized last. Array-valued dims place a dataset under each
-  // of its values, so the total row entries can exceed the unique dataset count
-  // (the toolbar count stays unique — see below).
-  const renderItems = useMemo(() => {
-    if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
-    const byGroup = new Map();
+  const byGroup = useMemo(() => {
+    const groups = new Map();
+    if (!isGroupDimension(groupBy)) return groups;
     for (const row of visibleRows) {
-      for (const key of groupKeysFor(
-        row,
-        groupBy,
-        datasetsInViewPks,
-        selectedPks,
-      )) {
-        if (!byGroup.has(key)) byGroup.set(key, []);
-        byGroup.get(key).push(row);
+      for (const key of groupKeysFor(row, groupBy)) {
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
       }
     }
-    const items = [];
-    for (const key of sortGroupKeys(
-      byGroup.keys(),
+    return groups;
+  }, [visibleRows, groupBy]);
+
+  // Groups start closed unless every row fits on one page; a nested dimension
+  // opens its parents. A new grouping, or results that cross the one-page
+  // line, drop the reader's own toggles.
+  const fitsOnePage =
+    [...byGroup.values()].reduce((n, rows) => n + rows.length, 0) <= pageSize;
+  if (useChanged(groupBy, fitsOnePage)) setToggledGroups(new Set());
+  const isExpanded = useCallback(
+    (key) =>
+      (fitsOnePage || parentGroupKeys(groupBy).includes(key)) !==
+      toggledGroups.has(key),
+    [fitsOnePage, groupBy, toggledGroups],
+  );
+
+  // Groups seen while the dimension's own filter was not narrowing it, so the
+  // groups that filter removed stay listed (empty) and can be added or undone.
+  // Refreshed only when new results land: until the refetch, the results still
+  // lack the group being brought back.
+  const [knownGroups, setKnownGroups] = useState({ groupBy, keys: [] });
+  if (knownGroups.groupBy !== groupBy || knownGroups.datasets !== datasets) {
+    setKnownGroups({
       groupBy,
-      t,
-      i18n.language,
-    )) {
-      const rows = byGroup.get(key);
-      items.push({ header: true, group: key, count: rows.length });
-      if (!collapsedGroups.has(key)) {
-        for (const row of rows) items.push({ row, group: key });
+      datasets,
+      keys:
+        ownFilterSet && knownGroups.groupBy === groupBy
+          ? knownGroups.keys
+          : [...byGroup.keys()],
+    });
+  }
+  const emptyKeys = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...knownGroups.keys,
+          ...ownFilterId.split("\n").filter(Boolean),
+        ]),
+      ].filter((key) => !byGroup.has(key)),
+    [knownGroups, ownFilterId, byGroup],
+  );
+
+  // Entries are { header, group, count, depth, expandable } or { row, group }
+  // (group = stable key, see state/datasetGroups.js). Array-valued dims list a
+  // dataset under each of its values, so row entries can exceed the unique
+  // dataset count; a parent header's count is its unique datasets.
+  const renderItems = useMemo(() => {
+    if (!isGroupDimension(groupBy)) return visibleRows.map((row) => ({ row }));
+    const rowsOf = (key) => byGroup.get(key) ?? [];
+    const sortKeys = (keys, sizeOf) => {
+      const sorted = sortGroupKeys(keys, groupBy, t, i18n.language);
+      if (sort.field === GROUP_SIZE) {
+        const factor = sort.dir === "asc" ? 1 : -1;
+        sorted.sort((a, b) => (sizeOf(a) - sizeOf(b)) * factor);
       }
+      // The groups the results no longer hold go under the ones they do.
+      return [
+        ...sorted.filter((key) => sizeOf(key) > 0),
+        ...sorted.filter((key) => sizeOf(key) === 0),
+      ];
+    };
+    const items = [];
+    const pushGroups = (keys, depth) => {
+      for (const key of sortKeys(keys, (k) => rowsOf(k).length)) {
+        const rows = rowsOf(key);
+        items.push({
+          header: true,
+          group: key,
+          count: rows.length,
+          depth,
+          expandable: rows.length > 0,
+        });
+        if (rows.length > 0 && isExpanded(key)) {
+          for (const row of rows) items.push({ row, group: key });
+        }
+      }
+    };
+    const keys = [...byGroup.keys(), ...emptyKeys];
+    if (parentGroupKeys(groupBy).length === 0) {
+      pushGroups(keys, 0);
+    } else {
+      const childrenByParent = new Map();
+      for (const key of keys) {
+        const parent = groupParent(key, groupBy);
+        if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
+        childrenByParent.get(parent).push(key);
+      }
+      // A group with no parent (datasets without an EOV) is a plain group
+      // among the parents.
+      const topLevel = childrenByParent.get(null) ?? [];
+      childrenByParent.delete(null);
+      const parentSize = (parent) =>
+        childrenByParent.has(parent)
+          ? new Set(childrenByParent.get(parent).flatMap(rowsOf)).size
+          : rowsOf(parent).length;
+      for (const parent of sortKeys(
+        [...childrenByParent.keys(), ...topLevel],
+        parentSize,
+      )) {
+        if (!childrenByParent.has(parent)) {
+          pushGroups([parent], 0);
+          continue;
+        }
+        items.push({
+          header: true,
+          group: parent,
+          count: parentSize(parent),
+          depth: 0,
+          expandable: true,
+        });
+        if (isExpanded(parent)) {
+          pushGroups(childrenByParent.get(parent), 1);
+        }
+      }
+    }
+    // Each header's share of the largest group at its depth sizes its data bar.
+    const maxByDepth = [];
+    for (const item of items) {
+      if (item.header) {
+        maxByDepth[item.depth] = Math.max(
+          maxByDepth[item.depth] ?? 0,
+          item.count,
+        );
+      }
+    }
+    for (const item of items) {
+      if (item.header) item.share = item.count / (maxByDepth[item.depth] || 1);
     }
     return items;
   }, [
     visibleRows,
     groupBy,
-    collapsedGroups,
-    datasetsInViewPks,
-    selectedPks,
+    byGroup,
+    emptyKeys,
+    isExpanded,
+    sort,
     i18n.language,
     t,
   ]);
@@ -263,10 +377,10 @@ export default function DatasetsTable({
   const firstRow = (currentPage - 1) * pageSize;
 
   // This page's slice of the render list. Headers don't consume the page's
-  // budget: a group header is re-shown at the top of every page its rows run
-  // onto, so a page opened mid-group still says which group it is in. A
-  // collapsed group has no rows of its own, so its header shows on the page
-  // its position falls into — once, never twice.
+  // budget: an open group's header (and its parent's) is re-shown at the top
+  // of every page its rows run onto, so a page opened mid-group still says
+  // which group it is in. A collapsed group has no rows of its own, so its
+  // header shows on the page its position falls into — once, never twice.
   const pageItems = useMemo(() => {
     // The last page runs to the end so that collapsed groups trailing the final
     // row still land somewhere — with an exact multiple of pageSize there is no
@@ -277,36 +391,35 @@ export default function DatasetsTable({
         : firstRow + pageSize;
     const out = [];
     let rowIndex = 0;
-    let pendingHeader = null;
+    // The open headers enclosing the current position, one per depth, and
+    // whether this page has shown each yet.
+    let openHeaders = [];
+    const emitted = new Set();
+    const emit = (item) => {
+      for (const header of openHeaders) {
+        if (!emitted.has(header)) {
+          out.push(header);
+          emitted.add(header);
+        }
+      }
+      out.push(item);
+    };
     for (const item of renderItems) {
       if (item.header) {
-        if (collapsedGroups.has(item.group)) {
-          pendingHeader = null;
-          if (rowIndex >= firstRow && rowIndex < lastRow) out.push(item);
-        } else {
-          pendingHeader = item;
+        openHeaders = openHeaders.slice(0, item.depth);
+        if (item.expandable && isExpanded(item.group)) {
+          openHeaders.push(item);
+        } else if (rowIndex >= firstRow && rowIndex < lastRow) {
+          emit(item);
         }
         continue;
       }
       if (rowIndex >= lastRow) break;
-      if (rowIndex >= firstRow) {
-        if (pendingHeader) {
-          out.push(pendingHeader);
-          pendingHeader = null;
-        }
-        out.push(item);
-      }
+      if (rowIndex >= firstRow) emit(item);
       rowIndex++;
     }
     return out;
-  }, [
-    renderItems,
-    firstRow,
-    pageSize,
-    currentPage,
-    pageCount,
-    collapsedGroups,
-  ]);
+  }, [renderItems, firstRow, pageSize, currentPage, pageCount, isExpanded]);
 
   // The what's here tip points at one of the click's datasets that can be
   // ticked in, while this list rather than the card holds them (see Sidebar).
@@ -317,8 +430,8 @@ export default function DatasetsTable({
       pinnedPks.has(Number(item.row.pk)),
   );
 
-  const toggleGroupCollapsed = (group) => {
-    setCollapsedGroups((prev) => {
+  const toggleGroupExpanded = (group) => {
+    setToggledGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
       else next.add(group);
@@ -334,21 +447,16 @@ export default function DatasetsTable({
     [datasets],
   );
 
-  // Back to page one whenever the result set or its ordering changes: page 7 of
-  // the previous results is not page 7 of these.
   useEffect(() => {
-    // Paired with the scroll reset below, which is a DOM write and so has to
-    // happen in an effect either way.
+    // Paired with the scroll reset, a DOM write that needs an effect anyway.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
-    if (listRef.current) listRef.current.scrollTop = 0;
+    scrollListToTop();
   }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks]);
 
-  // Every page starts at its top — the reader is at a new place in the list,
-  // not where they left the scroll bar on the page before.
   const goToPage = (next) => {
     setPage(Math.min(Math.max(next, 1), pageCount));
-    if (listRef.current) listRef.current.scrollTop = 0;
+    scrollListToTop();
   };
 
   const sortControl = (
@@ -359,9 +467,6 @@ export default function DatasetsTable({
     <div className="datasetsCardControls" data-testid="datasets-controls">
       {isDownloadModal ? (
         <>
-          {/* The same checkbox the rows below carry, so the control that ticks
-              them all reads as one of them rather than as a pill that lights
-              up. */}
           <label
             className="selectAllToggle"
             title={t("datasetsTableHeaderSelectAllTitle")}
@@ -376,14 +481,26 @@ export default function DatasetsTable({
           <div className="datasetsCardArrange">{sortControl}</div>
         </>
       ) : (
-        // Search, sort and grouping on one row: every row spent here is a
-        // dataset card the sidebar does not show.
         <div className="datasetsCardToolbar">
-          <TableFilter
-            value={searchText}
-            onChange={setSearchText}
-            placeholder={t("datasetsListSearchPlaceholder")}
-          />
+          <button
+            type="button"
+            className={classNames("datasetsCardFilters", {
+              active: showFiltersModal,
+              applied: !showFiltersModal && activeFilterCount > 0,
+            })}
+            data-testid="datasets-filters-button"
+            onClick={openFilters}
+            aria-pressed={showFiltersModal}
+            title={t("dockFiltersCountTitle", { count: activeFilterCount })}
+          >
+            <Filter size={13} aria-hidden="true" />
+            {t("filtersMenuButton")}
+            {activeFilterCount > 0 && (
+              <span className="datasetsCardFiltersCount">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
           {sortControl}
           <SelectPill
             label={t("datasetsCardGroupByLabel")}
@@ -391,29 +508,9 @@ export default function DatasetsTable({
             options={groupByOptions}
             onChange={setGroupBy}
           />
-          {hiddenGroups.size > 0 && (
-            <button
-              type="button"
-              className="datasetsCardShowAllGroups"
-              onClick={showAllGroups}
-              title={t("datasetsCardGroupShowAllText", {
-                count: hiddenGroups.size,
-              })}
-              aria-label={t("datasetsCardGroupShowAllText", {
-                count: hiddenGroups.size,
-              })}
-            >
-              <Eye size={13} aria-hidden="true" />
-              {hiddenGroups.size}
-            </button>
-          )}
         </div>
       )}
 
-      {/* What the size pill and the tick/cross on each card below mean. It
-          belongs on this row rather than under the list: it is a key to the
-          cards, and read before them it saves the reader working out what the
-          colours meant after the fact. */}
       {isDownloadModal && (
         <div className="downloadLegend">
           <span className="downloadLegendItem">
@@ -450,18 +547,21 @@ export default function DatasetsTable({
       })}
     >
       {controls}
-      {/* Explains the accent DatasetCard puts on rows the last map click found
-          (see .datasetCard.fromMapClick in styles.css) — otherwise the only
-          place that colour is named is a hover tooltip on the row itself,
-          which a touch user never sees and a mouse user has no reason to go
-          looking for. Only worth saying while there is a click to explain. */}
+      {/* Otherwise the map-click accent is named only in a hover tooltip,
+          which a touch user never sees. */}
       {!isDownloadModal && pinnedPks.size > 0 && (
         <div className="datasetsCardMapClickHint">
           <span className="datasetsCardMapClickSwatch" aria-hidden="true" />
           {t("datasetsCardMapClickHint")}
         </div>
       )}
-      <div className="datasetsCardList" ref={listRef}>
+      <div
+        className="datasetsCardList"
+        ref={listRef}
+        onScroll={(event) => {
+          if (!hidden) scrollTopRef.current = event.currentTarget.scrollTop;
+        }}
+      >
         {visibleRows.length === 0 ? (
           <div className="datasetsCardEmpty">
             {t(
@@ -491,9 +591,6 @@ export default function DatasetsTable({
                   onInspect={isDownloadModal ? undefined : setInspectDataset}
                   onHover={setHoveredDataset}
                   onHoverEnd={() => setHoveredDataset()}
-                  hiddenFromMap={
-                    item.group !== undefined && hiddenGroups.has(item.group)
-                  }
                   fromMapClick={pinnedPks.has(Number(item.row.pk))}
                   tipHighlight={tipHighlight(
                     item === whatsHereTarget && "whatsHere",
@@ -503,48 +600,73 @@ export default function DatasetsTable({
                 />
               );
             }
-            const collapsed = collapsedGroups.has(item.group);
-            const hidden = hiddenGroups.has(item.group);
-            const label = groupLabel(item.group, groupBy, t);
+            const collapsed = !isExpanded(item.group);
+            const filter = filterFor(item.group);
+            const label = groupLabel(item.group, groupBy, t, i18n.language);
             return (
               <div
                 key={`group:${item.group}`}
-                className={classNames("datasetsCardGroupHeader", { hidden })}
+                className={classNames("datasetsCardGroupHeader", {
+                  open: !collapsed && item.expandable,
+                  empty: item.count === 0,
+                  included: filter?.state === "include",
+                  excluded: filter?.state === "exclude",
+                  nested: item.depth > 0,
+                })}
+                style={{ "--group-share": item.share }}
               >
                 <button
                   type="button"
                   className="datasetsCardGroupToggle"
-                  onClick={() => toggleGroupCollapsed(item.group)}
-                  aria-expanded={!collapsed}
+                  onClick={() => toggleGroupExpanded(item.group)}
+                  aria-expanded={item.expandable ? !collapsed : undefined}
+                  disabled={!item.expandable}
                 >
-                  {collapsed ? (
-                    <CaretRightFill size={10} aria-hidden="true" />
-                  ) : (
-                    <CaretDownFill size={10} aria-hidden="true" />
-                  )}
+                  <ChevronRight
+                    className="datasetsCardGroupCaret"
+                    size={11}
+                    aria-hidden="true"
+                  />
                   <span className="datasetsCardGroupTitle" title={label}>
                     {label}
                   </span>
                   <span className="datasetsCardGroupCount">{item.count}</span>
                 </button>
-                {canHideGroups && (
-                  <button
-                    type="button"
-                    className="datasetsCardGroupHide"
-                    onClick={() => toggleGroupHidden(item.group)}
-                    aria-pressed={hidden}
-                    title={
-                      hidden
-                        ? t("datasetsCardGroupShowOnMapTitle")
-                        : t("datasetsCardGroupHideFromMapTitle")
-                    }
-                  >
-                    {hidden ? (
-                      <EyeSlash size={13} aria-hidden="true" />
-                    ) : (
-                      <Eye size={13} aria-hidden="true" />
-                    )}
-                  </button>
+                {filter && (
+                  <>
+                    <button
+                      type="button"
+                      className="datasetsCardGroupFilter"
+                      onClick={() => filter.toggle("include")}
+                      aria-pressed={filter.state === "include"}
+                      aria-label={`${t("datasetsCardGroupIncludeAction")}: ${label}`}
+                      title={t(
+                        filter.state === "include"
+                          ? "datasetsCardGroupUnincludeTitle"
+                          : "datasetsCardGroupIncludeTitle",
+                      )}
+                    >
+                      {filter.state === "include" ? (
+                        <CheckSquare size={13} aria-hidden="true" />
+                      ) : (
+                        <Square size={13} aria-hidden="true" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="datasetsCardGroupFilter exclude"
+                      onClick={() => filter.toggle("exclude")}
+                      aria-pressed={filter.state === "exclude"}
+                      aria-label={`${t("filterOptionExcludeAction")}: ${label}`}
+                      title={t(
+                        filter.state === "exclude"
+                          ? "filterOptionUnexcludeTitle"
+                          : "filterOptionExcludeTitle",
+                      )}
+                    >
+                      <SlashCircle size={13} aria-hidden="true" />
+                    </button>
+                  </>
                 )}
               </div>
             );

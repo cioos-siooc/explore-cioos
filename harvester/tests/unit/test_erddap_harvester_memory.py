@@ -1,16 +1,6 @@
-"""
-Unit tests for ERDDAPHarvester's chunked-flush memory behavior.
-
-The ERDDAP path used to grow five accumulators with `pd.concat` inside the
-per-dataset loop and hold every one of them for the whole server. That is the
-same failure that OOM-killed a 6GB container partway through an OBIS run, and
-it took down a dev host again on a CIOOS Pacific/Atlantic harvest, where a
-single server carries hundreds of large CTD profile datasets.
-
-These mirror tests/unit/test_obis_harvester_memory.py: features are flushed to
-disk periodically and correctly reassembled, and the returned result does not
-depend on the flush interval.
-"""
+"""ERDDAPHarvester chunked flushing: a single server can carry hundreds of large
+CTD datasets, so features flush to disk and reassemble independently of the
+flush interval (mirrors test_obis_harvester_memory.py)."""
 import os
 from unittest.mock import MagicMock, patch
 
@@ -112,9 +102,7 @@ def test_final_result_is_identical_regardless_of_chunk_size():
 
 
 def test_profiles_keep_the_full_schema_columns():
-    """The accumulator used to be seeded with an empty schema-shaped frame, and
-    that seed decided the output columns — a schema column no dataset filled
-    still reached profiles.csv. Dropping it would change the CSV header."""
+    """Every schema column reaches profiles.csv even when no dataset fills it."""
     result = _harvest(n_datasets=2, flush_every=1)
     from cde_harvester.core.schemas import ProfileSchema
 
@@ -167,3 +155,62 @@ def test_chunk_temp_directory_is_cleaned_up_even_on_error():
 
     assert seen_dirs, "expected the harvest to create a chunk temp dir"
     assert not os.path.isdir(seen_dirs[0])
+
+
+def test_gateway_timeouts_are_retried_once_at_the_end_of_the_pass():
+    """A dataset that hit a 504 is held back and harvested again after the
+    rest, and only the retry's outcome is recorded."""
+    harvester = ERDDAPHarvester(ERDDAP_URL)
+    erddap_mock = _erddap_mock(3)
+    erddap_mock.gateway_timeouts = {}
+    calls = []
+
+    def get_dataset(dataset_id, *a, **kw):
+        calls.append(dataset_id)
+        if calls.count("ds_0") == 1 and dataset_id == "ds_0":
+            erddap_mock.gateway_timeouts[dataset_id] = 0.0
+        ds = build_mock_dataset()
+        ds.id = dataset_id
+        return ds
+
+    erddap_mock.get_dataset.side_effect = get_dataset
+    with (
+        patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+        patch("cde_harvester.sources.erddap.harvester.extract_features",
+              side_effect=_features_for),
+        patch("cde_harvester.sources.erddap.harvester.time.sleep") as sleep,
+        patch("cde_harvester.sources.erddap.harvester.time.monotonic", return_value=60.0),
+    ):
+        result = harvester.harvest()
+
+    assert calls == ["ds_0", "ds_1", "ds_2", "ds_0"]
+    sleep.assert_called_once_with(20 * 60 - 60.0)
+    assert result.attempts["dataset_id"].tolist() == ["ds_1", "ds_2", "ds_0"]
+    assert sorted(result.profiles["dataset_id"]) == ["ds_0", "ds_1", "ds_2"]
+
+
+def test_oversize_responses_are_not_retried_after_a_gateway_timeout():
+    """A dataset that 504ed but then failed on the size cap would hit the
+    cap again; it is recorded on the first pass."""
+    from cde_harvester.core.errors import ResponseTooLargeError
+
+    harvester = ERDDAPHarvester(ERDDAP_URL)
+    erddap_mock = _erddap_mock(1)
+    erddap_mock.gateway_timeouts = {}
+    calls = []
+
+    def get_dataset(dataset_id, *a, **kw):
+        calls.append(dataset_id)
+        erddap_mock.gateway_timeouts[dataset_id] = 0.0
+        raise ResponseTooLargeError("too big")
+
+    erddap_mock.get_dataset.side_effect = get_dataset
+    with (
+        patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+        patch("cde_harvester.sources.erddap.harvester.time.sleep") as sleep,
+    ):
+        result = harvester.harvest()
+
+    assert calls == ["ds_0"]
+    sleep.assert_not_called()
+    assert result.attempts["reason_code"].tolist() == ["RESPONSE_TOO_LARGE"]

@@ -2,12 +2,8 @@ import * as React from "react";
 import { useLayoutEffect, useRef, useState } from "react";
 import classNames from "classnames";
 
-// A slot under the brand card whose content slides out from under the card as
-// it appears and back under it as it goes, the slot's height opening and
-// closing with it so the rows below follow rather than jump. `contentKey` names
-// what the slot holds (null for nothing): a change of key is a swap, run one
-// after the other — the old content goes up under the card, then the new one
-// comes down from it. Content already up on first render is simply there.
+// `contentKey` names what the slot holds (null for nothing); a key change runs
+// old-out then new-in. Content present on first render is simply there.
 export default function TopBarRow({ contentKey, children }) {
   const [shown, setShown] = useState(
     contentKey == null ? null : { key: contentKey, children },
@@ -36,8 +32,7 @@ export default function TopBarRow({ contentKey, children }) {
     }
   }
 
-  // Nothing to wait for where the slide doesn't run (no stylesheet, as under
-  // jsdom): a phase that won't fire animationend ends at once.
+  // Where the slide doesn't run (jsdom) animationend never fires, so end now.
   useLayoutEffect(() => {
     if (!phase || !rowRef.current) return;
     if (!getComputedStyle(rowRef.current).animationName.startsWith("topBar"))

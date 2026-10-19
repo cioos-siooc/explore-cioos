@@ -16,11 +16,14 @@ export function setAllOptionsIsSelectedTo(isSelected, options, setOptions) {
   );
 }
 
-// The click cycle of a list filter option: neutral -> include ->
-// exclude -> neutral. The two flags are mutually exclusive, and `isSelected`
-// keeps meaning "included" everywhere it was already read.
-// A list filter's option is included by clicking it and excluded by its own
-// button (see FilterOption); each click toggles one state and clears the other.
+// A whole EOV category at once, like SourceFilter's OBIS group: a mixed
+// category goes to all-included (or all-excluded) first.
+export const withCategoryState = (options, category, state) =>
+  options.map((opt) =>
+    opt.category === category ? { ...opt, ...state } : opt,
+  );
+
+// Include and exclude are mutually exclusive; `isSelected` means "included".
 export const toggleOptionIncluded = (option) => ({
   ...option,
   isSelected: !option.isSelected,
@@ -33,16 +36,8 @@ export const toggleOptionExcluded = (option) => ({
   isExcluded: !option.isExcluded,
 });
 
-/*
- * A download size as the modal shows it. Every byte figure there comes from
- * /downloadEstimate, which counts rows against the filters and multiplies —
- * it is never a measured file size, so the tilde travels with the number
- * rather than being stated once in a legend: the figures are read one card at
- * a time, and a bare "1.2GB" beside a dataset reads as a fact about that file.
- *
- * A null size is one the estimate could not give (OBIS datasets, or a dataset
- * the response did not cover): it reads as a dash, never as zero bytes.
- */
+// Sizes come from /downloadEstimate, never a measured file, so every figure
+// carries its own tilde. A null size (no estimate, e.g. OBIS) is a dash, not 0.
 export function formatSizeEstimate(size) {
   return Number.isFinite(size) ? `~${bytes(size)}` : "—";
 }
@@ -61,9 +56,8 @@ export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-// Unlike `generateRangeSelectBadgeTitle`, which takes an already-translated
-// title, this one looks up several keys, so the caller hands it its own `t`
-// rather than the helper calling `useTranslation` outside a component.
+// Takes the caller's `t`: it looks up several keys and can't call
+// useTranslation outside a component.
 export function generateMultipleSelectBadgeTitle(
   t,
   badgeTitle,
@@ -80,7 +74,6 @@ export function generateMultipleSelectBadgeTitle(
       const title = capitalizeFirstLetter(t(option.title));
       return option.isExcluded ? t("filterExcludedOption", { title }) : title;
     } else {
-      // More than 0 or 1 options are selected
       const mapping = {
         oceanVariablesFiltername: "oceanVariablesMulti",
         platformsFilterName: "platformsMulti",
@@ -133,7 +126,6 @@ export function validateEmail(email) {
   return re.test(String(email).toLowerCase());
 }
 
-// create a URL query string from an object
 function objectToURL(obj) {
   return Object.entries(obj)
     .filter(([k, v]) => k && v != null && v !== "")
@@ -158,14 +150,11 @@ export function createDataFilterQueryString(query) {
     scientificNamesMatchAll,
   } = query;
 
-  // pulling together a query object that doesn't contain a ton of values from the defaultQuery object (which is composed of the defaultABCSelected objects)
   const queryWithoutDefaults = Object.keys(defaultQuery).reduce(
-    // going through each
     (accumulatorObject, field) => {
       if (query[field] !== defaultQuery[field]) {
-        // checking that the value of each property in the query object has been changed in order to include those values in the url
         accumulatorObject[field] = query[field];
-      } // otherwise properties are left at their defaults, and excluded from the url.
+      }
       return accumulatorObject;
     },
     {},
@@ -173,9 +162,9 @@ export function createDataFilterQueryString(query) {
   let platforms, datasetPKs, orgPKs;
 
   const eovs = eovsSelected
-    .filter((eov) => eov.isSelected) // pulling the selected eov names out (these don't have pks)
+    .filter((eov) => eov.isSelected)
     .map((eov) => eov.title)
-    .join(); // create the comma delimited list of eovs
+    .join();
   // With a single include "all" and "any" are the same selection, so the param
   // is left off rather than giving one selection two URLs and two cache keys.
   const matchParam = (matchAll, includedCount) =>
@@ -212,9 +201,9 @@ export function createDataFilterQueryString(query) {
     datasetPKs = "";
   } else {
     datasetPKs = datasetsSelected
-      .filter((dataset) => dataset.isSelected) // getting the selected datasets out
-      .map((dataset) => dataset.pk) // getting the pks of the selected datasets using the dataset title to access the pk
-      .join(); // create the comma delimited list of dataset pks
+      .filter((dataset) => dataset.isSelected)
+      .map((dataset) => dataset.pk)
+      .join();
   }
 
   const orgRoles = (orgRolesSelected || [])
@@ -232,21 +221,18 @@ export function createDataFilterQueryString(query) {
     orgPKs = "";
   } else {
     orgPKs = orgsSelected
-      .filter((org) => org.isSelected) // getting the selected orgs out
-      .map((org) => org.pk) // getting the pks of the selected organizations using the orgs title to access the pk
-      .join(); // create the comma delimited list of org pks
+      .filter((org) => org.isSelected)
+      .map((org) => org.pk)
+      .join();
   }
   const { startDepth, endDepth, startDate, endDate } = queryWithoutDefaults;
 
   const namesList = (names) => (names || []).map(encodeURIComponent).join(",");
   const scientificNames = namesList(scientificNamesSelected);
 
-  // Combined "Data Source" filter (ERDDAP servers + OBIS nodes). No selection
-  // — or everything selected — means no source filtering. A server-only
-  // selection hides OBIS via includeObis=false; node names are always emitted
-  // when any node is picked (even all of them) because their presence is what
-  // tells the API to keep OBIS rows while servers are also filtered, and to
-  // hide ERDDAP profiles when no servers are selected.
+  // Node names are sent whenever any node is picked (even all of them): their
+  // presence tells the API to keep OBIS rows while servers are also filtered,
+  // and to hide ERDDAP profiles when no servers are selected.
   const selectedServers = (erddapServersSelected || []).filter(
     (s) => s.isSelected,
   );
@@ -281,7 +267,6 @@ export function createDataFilterQueryString(query) {
   }
 
   const apiMappedQuery = {
-    // These properties are specified by the API's schema
     eovs,
     eovsMatch,
     excludeEovs: excludedList(eovsSelected, (e) => e.title),
@@ -309,8 +294,7 @@ export function createDataFilterQueryString(query) {
     scientificNamesMatch,
     excludeScientificNames: namesList(scientificNamesExcluded),
     obisNodes,
-    // Only ever sent when on; objectToURL drops empty strings, so the default
-    // leaves the URL (and the API request) untouched.
+    // objectToURL drops "", so the default leaves the URL and cache key untouched.
     realtimeOnly: realtimeOnly ? "true" : "",
   };
 
@@ -321,49 +305,28 @@ export function createDataFilterQueryString(query) {
 // log instead of linear.
 const LOG_SCALE_MIN_RATIO = 100;
 
-// returns an array of {stop: num, color: string} objects
-//
-// Two shapes, picked by how wide the range is rather than how big its maximum
-// is. There used to be a third — a power curve with exponent 5 — from when the
-// ramp counted distinct locations per hex; every current metric is better
-// served by one of these two, and the power curve actively hurt them (over a
-// [1, 15] dataset-count range it collapsed to stops 1|2|6|15, putting almost
-// every hexagon in the lightest shade).
 export function generateColorStops(colorScale, range) {
-  // Ranges arrive from /legend and can be absent (still in flight), or [null,
-  // null] when the filters match nothing. Neither is a scale.
+  // Absent while /legend is in flight, [null, null] when filters match nothing.
   if (!range || !Number.isFinite(range[1]) || range[1] <= 0) return [];
   let colors;
   let scale;
-  // scaleLog cannot have 0 in its domain, so the low end is clamped to 1 —
-  // safe because these are counts, and a hex that survives the aggregation
-  // holds at least one thing.
+  // scaleLog can't take 0; safe because a surviving hex counts at least 1.
   const lo = Math.max(Number.isFinite(range[0]) ? range[0] : 1, 1);
   const hi = range[1];
   if (hi / lo >= LOG_SCALE_MIN_RATIO) {
-    // Measurement and day counts span five to eight orders of magnitude. Any
-    // linear spacing over that puts all but a handful of hexes in the lightest
-    // color, which reads as "there's nothing here" across most of the map. Log
-    // spacing is what makes the middle of the distribution visible.
-    //
-    // The scale is built value -> index and inverted, since the caller wants
-    // index -> value and a log domain of [0, n-1] would be the illegal
-    // direction.
+    // Counts span 5-8 orders of magnitude; linear spacing would paint nearly
+    // every hex the lightest shade. Built value -> index and inverted because a
+    // log domain of [0, n-1] is illegal.
     colors = colorScale;
     const logScale = scaleLog()
       .domain([lo, hi])
       .range([0, colors.length - 1]);
     scale = (index) => logScale.invert(index);
   } else {
-    // Narrow ranges — dataset counts run about 1..19 — spread evenly. When
-    // there are fewer distinct values than colors, thin the ramp so each value
-    // gets its own shade instead of two shades sharing a value. Thin by
-    // sampling across the whole ramp rather than taking a prefix: a prefix of a
-    // 12-stop ramp that starts in pale teal would paint a 1..3 range entirely
-    // in the lightest end, and "3 datasets" would look like nothing.
+    // Fewer values than colors: sample across the whole ramp, not a prefix,
+    // or a 1..3 range would sit entirely in the pale end and read as nothing.
+    // A one-value range takes the middle of the ramp.
     const span = Math.floor(hi) - Math.floor(lo) + 1;
-    // A one-value range takes the middle of the ramp, not its first stop: with
-    // nothing to compare against, the honest shade is a mid one.
     colors =
       span < colorScale.length
         ? Array.from(
@@ -382,10 +345,7 @@ export function generateColorStops(colorScale, range) {
   }
   const colorStops = colors.map((color, index) => {
     return {
-      // The top stop is pinned to the range max rather than floored: on the
-      // log scale invert() lands a hair under it (499.999... for a max of
-      // 500), and a legend whose last tick reads one less than the real
-      // maximum looks like a bug.
+      // Not floored: log invert() lands a hair under the max (499.999... for 500).
       stop: index === colors.length - 1 ? hi : Math.floor(scale(index)),
       color,
     };
@@ -393,7 +353,6 @@ export function generateColorStops(colorScale, range) {
   const result = [];
   const map = new Map();
   colorStops.forEach((colorStop) => {
-    // ensure there aren't duplicates
     if (!map.has(colorStop.stop)) {
       map.set(colorStop.stop, true);
       result.push(colorStop);
@@ -402,23 +361,14 @@ export function generateColorStops(colorScale, range) {
   return result;
 }
 
-// The dataset count shown on the Datasets entry points: "filtered / total"
-// while a filter narrows the catalog, and just the total once nothing is
-// filtered out (or before the total is known).
 export function formatDatasetCount(filtered, total, locale) {
   const format = (n) => n.toLocaleString(locale);
   if (!total || filtered === total) return format(total || filtered);
   return `${format(filtered)} / ${format(total)}`;
 }
 
-// The instants either list carries, formatted as the UTC they are: the record
-// list spells them out in UTC (see shapeQuery.js) and the platform list sends
-// timestamptz, which JSON serializes as UTC too, so a Z is the truth in both
-// and no local-time conversion is wanted — an oceanographic record's time is
-// the time it was taken at sea, not the reader's wall clock.
-//
-// Where the two ends share a day, the second one drops it: a cast that ran
-// from 18:32 to 19:05 says so in one line rather than repeating the date.
+// Both APIs send UTC, and a record's time is when it was taken at sea, not the
+// reader's wall clock, so there is deliberately no local-time conversion.
 export function formatInstantRange(min, max) {
   const from = splitInstant(min);
   const to = splitInstant(max);
@@ -430,16 +380,12 @@ export function formatInstantRange(min, max) {
   return `${from.day} ${from.time}Z → ${to.day} ${to.time}Z`;
 }
 
-// One instant, under the same UTC rule: a single fix's time on the map's
-// hover chip, and the degenerate ends of the range above.
 export function formatInstant(value) {
   const at = splitInstant(value);
   return at ? `${at.day} ${at.time}Z` : undefined;
 }
 
-// Either shape an instant reaches the app in: an ISO string from JSON, or the
-// epoch milliseconds a vector tile carries (MVT has no timestamp type, so the
-// track tiles encode their times as numbers).
+// ISO string from JSON, or epoch ms from a vector tile (MVT has no timestamp type).
 function splitInstant(value) {
   if (value === null || value === undefined || value === "") return undefined;
   const iso =
@@ -448,8 +394,6 @@ function splitInstant(value) {
   return { day, time: (rest || "00:00").slice(0, 5) };
 }
 
-// "min – max", or the one bound that exists, or the single value when the two
-// are the same.
 export function formatRange(min, max, unit = "") {
   const suffix = unit ? ` ${unit}` : "";
   if (min === null || min === undefined) {
@@ -462,91 +406,48 @@ export function formatRange(min, max, unit = "") {
 }
 
 export function useDebounce(value, delay) {
-  // State and setters for debounced value
   const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(
-    () => {
-      // Update debounced value after delay
-      const handler = setTimeout(() => {
-        setDebouncedValue(value);
-      }, delay);
-      // Cancel the timeout if value changes (also on delay change or unmount)
-      // This is how we prevent debounced value from updating if value is changed ...
-      // .. within the delay period. Timeout gets cleared and restarted.
-      return () => {
-        clearTimeout(handler);
-      };
-    },
-    [value, delay], // Only re-call effect if value or delay changes
-  );
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
   return debouncedValue;
 }
 
-// A search box that doesn't set the whole app to work on every keystroke: the
-// typed text is local, so the field itself stays instant, and it is published
-// to the state the rest of the app reacts to — an options list's search terms,
-// or the free-text dataset search behind the map, the list and the counters —
-// on whichever trigger suits what that search costs.
-//
-// `trigger` is what publishes a non-empty box:
-//   - "pause" (the default) publishes once typing stops for `delay`. Right for
-//     a box narrowing an options list already in memory, where publishing is
-//     an array filter, and for the scientific-name typeahead, whose whole job
-//     is to offer names as they are typed.
-//   - "submit" publishes nothing until `submit()` — Enter, or the magnifier
-//     beside the field. Right for the free-text dataset search, where each
-//     distinct value is a fresh round of tile, legend and coverage requests
-//     (see SelectionProvider): a pause is only a guess at when the word is
-//     finished, and it guesses wrong often enough to spend a whole round of
-//     those on "temperat" on the way to "temperature".
-//
-// Returns the text to show, the setter its onChange calls, and submit, so the
-// markup, the placeholder and the clear button stay with whichever component
-// owns them.
-//
-// Two rules hold on either trigger, both about never losing what was asked for:
-//   - Emptying the box publishes at once. Undoing a search has to read as the
-//     clear button working, and an empty search is the cheapest query there is.
-//   - A box that goes away with typing unpublished publishes it on the way out,
-//     so typing into a filter pane and closing it straight after searches for
-//     what was typed rather than for nothing. That holds under "submit" too:
-//     not having pressed Enter is a weaker signal than having typed the word.
-//
-// A change to `value` from anywhere else — Reset, a chip removed, a share link
-// — is adopted into the box; this hook's own published value arriving back is
-// not, or every keystroke after a publish would be overwritten by it.
+// Typed text stays local and is published to app state on `trigger`:
+// "pause" after `delay` (cheap in-memory option lists, typeaheads), or "submit"
+// on submit() only — for the dataset search, where each published value costs a
+// round of tile/legend/coverage requests and a pause would spend one on
+// "temperat". Either way, emptying publishes at once and unpublished text is
+// published on unmount, so nothing typed is lost.
 export function useSearchInput(
   value,
   onChange,
   { trigger = "pause", delay = 300 } = {},
 ) {
   const [text, setText] = useState(value);
-  // The value last published from here. State rather than a ref because it is
-  // read during render, to tell our own value coming back around from a change
-  // made anywhere else.
+  // State, not a ref: read during render to tell our own value coming back
+  // from an outside change.
   const [published, setPublished] = useState(value);
   const timer = useRef(undefined);
-  // What the timer and the unmount flush read, both of them outliving the
-  // render that scheduled them. Written in a layout effect: refs must not be
-  // written during render, and a passive effect can still be pending when a
-  // timer armed before it fires.
+  // Layout effect: refs must not be written during render, and a passive
+  // effect can still be pending when a timer armed before it fires.
   const latest = useRef({ text, published, onChange });
   useLayoutEffect(() => {
     latest.current = { text, published, onChange };
   });
 
-  // A change made anywhere else — Reset, a chip removed, a share link — replaces
-  // what is in the box. Mirrored during render rather than in an effect (see
-  // useChanged) so the box never paints a frame of the text it has been told to
-  // drop.
+  // Outside changes (Reset, chip removed, share link) replace the box, mirrored
+  // during render so it never paints a frame of the dropped text.
   if (useChanged(value) && value !== published) {
     setPublished(value);
     setText(value);
   }
 
-  // Typing that hadn't landed by the time the box went away — a filter pane
-  // closed right after a word was typed into it — is published on the way out
-  // rather than lost.
   useEffect(
     () => () => {
       clearTimeout(timer.current);
@@ -564,23 +465,17 @@ export function useSearchInput(
   function change(next) {
     setText(next);
     clearTimeout(timer.current);
-    // Emptied, it publishes there and then — see above.
     if (next === "") {
       publish(next);
       return;
     }
     if (trigger !== "pause") return;
     timer.current = setTimeout(() => {
-      // Only while the box still holds what was typed — a value taken from
-      // outside since then has already replaced it, and publishing this would
-      // undo that.
+      // An outside value adopted since then must not be undone.
       if (latest.current.text === next) publish(next);
     }, delay);
   }
 
-  // Enter, or the magnifier. Publishes the box as it stands whatever the
-  // trigger: a pause-triggered box told to search now has no reason to sit out
-  // the rest of its delay.
   function submit() {
     clearTimeout(timer.current);
     if (text !== published) publish(text);
@@ -589,11 +484,8 @@ export function useSearchInput(
   return [text, change, submit];
 }
 
-// Which of the three tiers the ramp is drawn from, for a zoom. Every zoom maps
-// onto one: an unknown zoom (the map hasn't reported its camera yet) takes the
-// widest tier rather than falling out of the switch — a caller that got
-// `undefined` back could only read it as "no data", which is a different thing
-// entirely.
+// An unknown zoom (camera not reported yet) takes the widest tier: undefined
+// would read as "no data".
 export function getCurrentRangeLevel(rangeLevels, zoom) {
   if (!rangeLevels) return undefined;
   const level = Number(zoom);
@@ -602,23 +494,16 @@ export function getCurrentRangeLevel(rangeLevels, zoom) {
   return rangeLevels.zoom2;
 }
 
-// The rungs a quantized count domain is allowed to land on, within each decade.
-// Coarse enough that an ordinary pan lands on the same rung it started from —
-// which is the whole point: an unquantized viewport domain would shift by a few
-// counts on every drag, repainting the ramp and renumbering the legend for a
-// change nobody can see.
+// Coarse enough that an ordinary pan stays on the same rung; an unquantized
+// viewport domain would repaint the ramp and legend on every drag.
 const NICE_MANTISSAS = [1, 1.5, 2, 3, 5, 7, 10];
 
-// Snap a positive count out to the nearest rung, away from the middle of the
-// domain: 'up' for a maximum, 'down' for a minimum, so quantizing only ever
-// widens a range and never clips a hex out of its own ramp.
+// Snaps outward only, so quantizing never clips a hex out of the ramp.
 function snapCount(value, direction) {
   if (!Number.isFinite(value) || value <= 0) return undefined;
   const base = 10 ** Math.floor(Math.log10(value));
   const mantissa = value / base;
-  // The float slack absorbs the log10/pow round trip, which lands a clean 100
-  // on 99.99999999999999 often enough to matter — without it, a maximum of 100
-  // would snap up to 150.
+  // Float slack: the log10/pow round trip turns 100 into 99.999... (-> 150).
   const rung =
     direction === "up"
       ? NICE_MANTISSAS.find((m) => m >= mantissa - 1e-9)
@@ -626,10 +511,7 @@ function snapCount(value, direction) {
   return Math.max(1, Math.round(rung * base));
 }
 
-// Widen a measured [min, max] onto the rungs above. Counts, so the result is
-// integral and never below 1; anything that isn't a usable range (no data on
-// screen, a null max from a query that matched nothing) comes back undefined,
-// which every caller reads as "use the global domain instead".
+// undefined means "use the global domain instead".
 export function quantizeCountRange(range) {
   if (!Array.isArray(range)) return undefined;
   const hi = snapCount(range[1], "up");
@@ -638,26 +520,17 @@ export function quantizeCountRange(range) {
   return [Math.min(lo, hi), hi];
 }
 
-// Are two [min, max] ranges the same domain? Used to drop no-op ramp repaints
-// and the state updates that would re-render the legend behind them.
 export function rangesEqual(a, b) {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   return a[0] === b[0] && a[1] === b[1];
 }
 
-// Does a [min, max] range describe any data? The API answers a query that
-// matched nothing with [null, null] (min/max over no rows), so "empty" isn't
-// enough of a test — and a null max would otherwise render as an empty ramp
-// with no explanation.
+// The API answers a query that matched nothing with [null, null].
 export function rangeLevelHasData(rangeLevel) {
   return Array.isArray(rangeLevel) && Number.isFinite(rangeLevel[1]);
 }
 
-// returns true for rectangles, false for rotated rectangles
-// [[west, south], [east, north]] for any GeoJSON geometry (the coordinate
-// nesting differs per type, so just walk down to the [lng, lat] positions).
-// Returns null when the geometry carries no coordinates.
 export function boundsFromGeoJson(geometry) {
   const positions = [];
   const collect = (coordinates) => {
@@ -687,11 +560,8 @@ export function boundsFromGeoJson(geometry) {
   ];
 }
 
-// Axis-aligned overlap test for two bounds in [[west,south],[east,north]] form
-// — the shape both boundsFromGeoJson and MapLibre's getBounds().toArray()
-// produce. Used to flag which datasets fall inside the current map view.
-// Antimeridian-crossing extents aren't special-cased (neither is the rest of
-// the bbox code); a dataset straddling 180° is treated by its raw min/max.
+// Antimeridian-crossing extents aren't special-cased (nor is the rest of the
+// bbox code).
 export function boundsIntersect(a, b) {
   if (!a || !b) return false;
   const [[aw, as], [ae, an]] = a;
@@ -699,14 +569,8 @@ export function boundsIntersect(a, b) {
   return aw <= be && ae >= bw && as <= bn && an >= bs;
 }
 
-// Camera the "zoom to dataset" action asks for: the extent centred in the part
-// of the canvas no panel covers (see mapCoverPadding), with an even margin on
-// every side. maxZoom keeps a pin-sized extent from slamming the camera to
-// street level.
-//
-// Shared with ZoomToDataset, which asks the map what camera these bounds would
-// produce and compares it to the live one — that comparison is how the button
-// knows the view is already right, and it only agrees if the padding matches.
+// Shared with ZoomToDataset's already-framed check, which only agrees if the
+// padding matches.
 const ZOOM_TO_DATASET_BASE_PADDING = 60;
 
 export function zoomToDatasetCamera(map) {
@@ -722,9 +586,6 @@ export function zoomToDatasetCamera(map) {
   };
 }
 
-// True when the map is already showing `bounds` the way zoomToGeometry would
-// frame them: same zoom (within a fraction of a level) and the same centre
-// (within a few dozen screen pixels, so the tolerance scales with the view).
 export function boundsAreFramed(map, bounds) {
   if (!map || !bounds) return false;
   const camera = map.cameraForBounds(bounds, zoomToDatasetCamera(map));
@@ -734,8 +595,7 @@ export function boundsAreFramed(map, bounds) {
   return offset < 40;
 }
 
-// An element's viewport rect with its transforms ignored, so a panel still
-// sliding in reads where it will come to rest rather than where it is mid-flight.
+// Ignores transforms, so a panel still sliding in reads where it will rest.
 export function layoutRect(element) {
   let left = 0;
   let top = 0;
@@ -751,9 +611,7 @@ export function layoutRect(element) {
   };
 }
 
-// The map padding that keeps clear of the panels floating over it. Each panel
-// gives up whichever canvas edge costs the least free area: the left column
-// takes the left, a phone's bottom sheet the bottom.
+// Each panel claims whichever canvas edge costs the least free area.
 export function coverPadding(canvas, covers) {
   const width = canvas.right - canvas.left;
   const height = canvas.bottom - canvas.top;
@@ -777,9 +635,7 @@ export function coverPadding(canvas, covers) {
 
 const MIN_FREE_MAP_SIZE = 120;
 
-// coverPadding for the panels on screen now — each marks itself with
-// data-map-cover while it is. None at all when they leave too little map to
-// frame anything in, as a phone's full-screen sidebar does.
+// None when too little map is left to frame anything (phone full-screen sidebar).
 export function mapCoverPadding(map) {
   const none = { top: 0, right: 0, bottom: 0, left: 0 };
   if (!map) return none;
@@ -795,8 +651,6 @@ export function mapCoverPadding(map) {
     : padding;
 }
 
-// The smallest pan that brings screen box `box` inside `free`, `margin` clear
-// of its edges; null when the box is too big to fit there at this zoom.
 export function revealOffset(box, free, margin) {
   const shift = (lo, hi, freeLo, freeHi) => {
     if (hi - lo > freeHi - freeLo - 2 * margin) return null;
@@ -821,10 +675,6 @@ export function polygonIsRectangle(polygon) {
   return lons.length === 2 && lats.length === 2;
 }
 
-// The envelope of any polygon ring — a rectangle's own four corners, or the
-// enclosing box of a freeform shape's. Numbers, not display strings: callers
-// round or label as their own context needs (a query string wants
-// .toFixed(4) keys, a readout wants labelled, unrounded figures).
 export function polygonBounds(polygon) {
   const lons = polygon.map((e) => e[0]);
   const lats = polygon.map((e) => e[1]);
@@ -837,7 +687,6 @@ export function polygonBounds(polygon) {
   };
 }
 
-// translate a rectangular polygon to a bounding box query using lat/long min/max
 function polygonToMaxMins(polygon) {
   const { west, south, east, north } = polygonBounds(polygon);
 
@@ -849,9 +698,8 @@ function polygonToMaxMins(polygon) {
   };
 }
 
-// The `polygon` ring is already closed everywhere it's produced (turf's
-// bboxPolygon, mapbox-gl-draw's own rings, selectionFromSearchParams below),
-// so it needs no extra closing point here.
+// The ring is already closed everywhere it's produced (turf, mapbox-gl-draw,
+// selectionFromSearchParams).
 export function polygonToWkt(polygon) {
   const ring = polygon.map(([lon, lat]) => `${lon} ${lat}`).join(", ");
   return `POLYGON((${ring}))`;
@@ -859,7 +707,6 @@ export function polygonToWkt(polygon) {
 
 export function createSelectionQueryString(polygon) {
   if (polygonIsRectangle(polygon)) {
-    // res = { latMin, lonMin, latMax, lonMax }
     const res = polygonToMaxMins(polygon);
 
     return objectToURL(res);
@@ -867,10 +714,6 @@ export function createSelectionQueryString(polygon) {
   return "polygon=" + JSON.stringify(polygon);
 }
 
-// Inverse of createSelectionQueryString: rebuild the drawn selection from a
-// share link, either from the rectangle bounds or the polygon ring. Returns the
-// coordinate ring the app carries as `polygon`, or undefined when the link
-// holds no selection.
 export function selectionFromSearchParams(searchParams) {
   const polygon = searchParams.get("polygon");
   if (polygon) {
@@ -897,35 +740,20 @@ export function selectionFromSearchParams(searchParams) {
   ];
 }
 
-// No dataset carries pk 0, so this is how a caller asks for nothing at all —
-// an empty datasetPKs would read as "no dataset filter" and return everything.
+// No dataset has pk 0; an empty datasetPKs would mean "no filter" instead.
 const NO_DATASETS_PK = "0";
 
-// Narrows a filter query string to an explicit dataset list, for the narrowings
-// the API has no parameter of its own for. Each caller brings its own list,
-// because they narrow by different things: the map draws the shown groups
-// (SelectionProvider's mapDatasetPks), the coverage figure covers the datasets
-// the list is showing (filteredDatasetPks). `datasetPKs` is undefined while
-// nothing narrows, which leaves the query untouched.
-//
-// `allDatasetPKs` — the result set the list was narrowed FROM — is what keeps
-// the URL inside the request-line limit. A pk costs ~5 bytes and a comma
-// another three once encoded, so naming much over 2000 datasets is a 431 from
-// the server rather than a query; a narrowing that drops few datasets is sent
-// as the ones it dropped instead (excludeDatasetPKs), which is the same filter
-// written the shorter way. Without it the caller always names what it kept,
-// which is fine for a narrowing that keeps little (a title search) and breaks
-// for one that keeps nearly everything ("only in view", zoomed out).
+// `allDatasetPKs` (the set narrowed FROM) keeps the URL under the request-line
+// limit: naming over ~2000 pks is a 431, so a narrowing that drops few is sent
+// as excludeDatasetPKs instead.
 export function applyDatasetPKs(queryString, datasetPKs, allDatasetPKs) {
   if (!datasetPKs) return queryString;
   const params = new URLSearchParams(queryString);
   const kept = new Set(datasetPKs);
   const dropped = (allDatasetPKs || []).filter((pk) => !kept.has(pk));
   if (allDatasetPKs && dropped.length < datasetPKs.length) {
-    // Nothing dropped is no narrowing at all — say nothing rather than send an
-    // empty param the API would have to decide the meaning of. The query may
-    // already exclude datasets of its own (the Datasets filter), and those
-    // must survive this narrowing rather than be overwritten by it.
+    // Merge with the Datasets filter's own exclusions; nothing dropped sends no
+    // param at all.
     const alreadyExcluded = params.get("excludeDatasetPKs")?.split(",") ?? [];
     const excluded = [...new Set([...alreadyExcluded, ...dropped.map(String)])];
     if (excluded.length > 0)
@@ -952,18 +780,9 @@ export function filterObjectPropertyByPropertyList(
   return result;
 }
 
-// React's "adjusting state when an input changes", as a hook: true on the one
-// render where `value` differs from the previous render's, false otherwise.
-//
-// Mirroring an input into state during render — `if (changed) setDraft(value)` —
-// is what the React docs prescribe over an effect for this, and it lands the
-// copy in the same paint as the input; an effect paints one frame of the stale
-// copy first. React re-runs the component immediately on a render-phase update,
-// so nothing else sees the intermediate state.
-//
-// Compares by identity, and takes several values for the common "any of these
-// moved" case: pass primitives, or values that keep their identity while they
-// have not changed.
+// React's "adjusting state when an input changes" pattern: true on the render
+// where any value changed (by identity). Mirroring during render rather than in
+// an effect avoids painting one frame of the stale copy.
 export function useChanged(...values) {
   const [previous, setPrevious] = useState(values);
   if (
@@ -979,18 +798,13 @@ export function useChanged(...values) {
 // https://stackoverflow.com/questions/32553158/detect-click-outside-react-component
 export function useOutsideAlerter(ref, callback, value) {
   useEffect(() => {
-    /**
-     * Alert if clicked on outside of element
-     */
     function handleClickOutside(event) {
       if (ref.current && !ref.current.contains(event.target)) {
         callback(value);
       }
     }
-    // Bind the event listener
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      // Unbind the event listener on clean up
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [ref, callback, value]);
@@ -1008,7 +822,6 @@ export function getCookieValue(cookieName) {
 export function formatErddapServerName(url, lang = "en", serversData = null) {
   if (!url) return "";
 
-  // If serversData is provided, use it to look up the server name
   if (serversData && Array.isArray(serversData)) {
     const server = serversData.find((s) => s.url === url);
     if (server) {
@@ -1016,12 +829,10 @@ export function formatErddapServerName(url, lang = "en", serversData = null) {
     }
   }
 
-  // Fallback: extract domain from URL
   try {
     const urlObj = new URL(url);
     return urlObj.hostname;
   } catch {
-    // If URL parsing fails, try to extract domain manually
     const match = url.match(/:\/\/([^/]+)/);
     if (match && match[1]) {
       return match[1];
@@ -1029,21 +840,12 @@ export function formatErddapServerName(url, lang = "en", serversData = null) {
     return url;
   }
 }
-// --- The open dataset page, as URL params -----------------------------------
-// A dataset is addressed by `?dataset=<dataset_id>&server=<server-slug>`. Both
-// halves come from the source (the server's own id for the dataset, and the
-// server's URL), never from our database, so a link survives a full re-harvest —
-// unlike the dataset's pk. dataset_id alone is not enough: it is only unique
-// within one ERDDAP server, and OBIS ids are a separate namespace.
-//
-// Both directions go through these helpers, so switching to, say, a hash of the
-// pair would be a change to this block alone.
+// A dataset link is `?dataset=<dataset_id>&server=<server-slug>`, both from the
+// source rather than our pk, so it survives a re-harvest; dataset_id is only
+// unique within one server.
 
-// The server URL as a readable slug, matching the convention the harvest
-// dashboard already uses (slugify() in web-api/routes/harvest.js): scheme
-// dropped, '.' and '/' replaced with '-'. OBIS datasets carry a sentinel
-// erddap_url of https://obis.org, so they slug to 'obis-org' and need no
-// special case.
+// Matches slugify() in web-api/routes/harvest.js. OBIS's sentinel erddap_url
+// https://obis.org slugs to 'obis-org'.
 export function erddapServerSlug(url) {
   if (!url) return "";
   return url
@@ -1060,9 +862,7 @@ export function datasetUrlKey(row) {
   };
 }
 
-// Does this dataset row correspond to the dataset the URL points at? Links
-// shared before the server slug existed carry `dataset` alone; those still
-// resolve, on the dataset_id by itself.
+// Links shared before the server slug existed carry `dataset` alone.
 export function datasetMatchesUrlKey(row, searchParams) {
   const dataset = searchParams.get("dataset");
   if (!dataset || row?.dataset_id !== dataset) return false;
@@ -1071,7 +871,6 @@ export function datasetMatchesUrlKey(row, searchParams) {
   return datasetUrlKey(row)?.server === server;
 }
 
-// make table column headers more readable
 export function splitLines(s) {
   const split = s.split(" ");
   return (
@@ -1083,9 +882,6 @@ export function splitLines(s) {
   );
 }
 
-// Split an ordered [lon, lat] coordinate run where consecutive fixes jump
-// more than 180 degrees of longitude (antimeridian crossing) so a track
-// never draws a line looping around the globe. Returns an array of runs.
 export function splitAtAntimeridian(coords) {
   if (!coords || coords.length === 0) return [];
   const runs = [[coords[0]]];
@@ -1099,23 +895,12 @@ export function splitAtAntimeridian(coords) {
   return runs;
 }
 
-// Split an ordered [lon, lat] track into runs, three break conditions
-// (mirrors the segs CTE in web-api /tiles/tracks so the selected-platform
-// view and the tile layer segment identically):
-//   1. antimeridian crossing (consecutive fixes jump >180 deg of longitude);
-//   2. large time gap — over 4x the track's MEDIAN inter-fix gap (its
-//      typical reporting cadence, robust to idle periods — a mean would let
-//      a vessel idle between short cruises draw between-cruise connector
-//      chords), floored at 48h: an Argo float's ~10-day cycles never split,
-//      a ship dark for months between expeditions always does;
-//   3. outage chord — >50km between fixes closer than 96h in time. The
-//      harvester densifies data-backed chords to <=25km, so a long chord on
-//      a sub-96h gap is a reporting outage on a fast platform: the true
-//      path is unknown, draw nothing rather than a chord through
-//      possibly-land. The 96h guard protects slow reporters (Argo drifts
-//      30-100km per cycle) from being shredded by this condition.
-// `times` is the parallel timestamp array from /trajectories/track; without
-// it (or under 2 fixes) this degrades to the antimeridian-only split.
+// Mirrors the segs CTE in web-api /tiles/tracks; keep the two in sync. Breaks at:
+//   1. antimeridian crossings;
+//   2. gaps over 4x the MEDIAN inter-fix gap (a mean lets idle periods draw
+//      between-cruise chords), floored at 48h so Argo cycles never split;
+//   3. >50km chords under 96h: the harvester densifies real chords to <=25km,
+//      so these are reporting outages; the 96h guard spares slow Argo drifts.
 export function splitTrackRuns(coords, times) {
   if (!coords || coords.length === 0) return [];
   if (!times || times.length !== coords.length || coords.length < 2) {
@@ -1155,10 +940,8 @@ export function splitTrackRuns(coords, times) {
   return runs;
 }
 
-// Initial great-circle bearing from [lon, lat] point a to point b, in
-// degrees clockwise from north, [0, 360). Returns null for coincident
-// points (direction undefined). The frontend twin of the ST_Azimuth-based
-// cog the /tiles/tracks heads layer carries.
+// Degrees clockwise from north, [0, 360); twin of the ST_Azimuth cog in
+// /tiles/tracks.
 export function initialBearing(a, b) {
   if (a[0] === b[0] && a[1] === b[1]) return null;
   const rad = Math.PI / 180;
@@ -1171,11 +954,8 @@ export function initialBearing(a, b) {
   return (Math.atan2(y, x) / rad + 360) % 360;
 }
 
-// A '#RRGGBB' from the palette, given an alpha channel, in the CSS form
-// MapLibre parses. Anything that is not a six-digit hex comes back untouched:
-// an unparseable colour throws out of setPaintProperty and takes the rest of
-// the paint pass with it, so a palette entry written in some other notation
-// should degrade to opaque rather than to 'rgba(NaN, NaN, NaN, 1)'.
+// Non-hex colours pass through untouched: an unparseable colour throws out of
+// setPaintProperty and aborts the rest of the paint pass.
 export function withAlpha(color, alpha) {
   const match = /^#([0-9a-f]{6})$/i.exec(color);
   if (!match) return color;

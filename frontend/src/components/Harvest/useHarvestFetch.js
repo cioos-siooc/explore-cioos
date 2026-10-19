@@ -2,10 +2,7 @@ import { useState, useEffect } from "react";
 import { server } from "../../config.js";
 import reportError from "../../state/reportError.js";
 
-// The path is the whole cache key: every caller builds it from the ids it
-// varies on, so it is also the complete dependency list. It used to take a
-// separate `deps` array, which the linter could not check and which every
-// caller filled with exactly the values already in the path.
+// The path is the whole cache key and the complete dependency list.
 export default function useHarvestFetch(path) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);

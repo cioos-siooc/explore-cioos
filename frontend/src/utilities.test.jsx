@@ -29,10 +29,7 @@ import {
 import { defaultQuery } from "./components/config.js";
 import erddapServers from "./erddapServers.json";
 
-// The filter query object the app carries. defaultQuery holds only the fields
-// createDataFilterQueryString compares against defaults; the *Selected arrays
-// are always supplied by FilterProvider, so a bare object here is not a valid
-// input and the helper below is what a real caller looks like.
+// defaultQuery lacks the *Selected arrays FilterProvider always supplies.
 function makeQuery(overrides = {}) {
   return {
     ...defaultQuery,

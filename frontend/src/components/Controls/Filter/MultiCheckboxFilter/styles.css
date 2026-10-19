@@ -39,7 +39,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Quiet until wanted: ink-40 at rest, the error red once pressed. */
 .multiCheckboxFilter .optionExclude {
   flex: 0 0 auto;
   display: inline-flex;
@@ -123,4 +122,12 @@
 
 .multiCheckboxFilter .optionColorCircle {
   margin-left: 10px;
+}
+
+.multiCheckboxFilter .optionGroupButton .optionName {
+  font-weight: 600;
+}
+
+.multiCheckboxFilter .optionGroupChildren {
+  margin-left: 25px;
 }

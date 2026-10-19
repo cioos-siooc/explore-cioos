@@ -143,13 +143,9 @@ test("502s ERDDAP_UNAVAILABLE for a genuine upstream failure", async () => {
   assert.equal(res.body.upstreamStatus, null);
 });
 
-// NOTE: check(["dataset","profile"]).isLength({max:256}) with no .exists()/
-// .notEmpty() does not reject an ABSENT field in express-validator v6 — only
-// one that's present and over length. So a request missing `profile`
-// entirely reaches the handler with profile===undefined, which knex's raw
-// binding then rejects with "Undefined binding(s)" — an uncaught throw, so
-// this is a real 500 (via the app's generic error handler), not a clean 400.
-// Documented here as current behaviour, not the intended one.
+// NOTE: isLength() without .exists() does not reject an absent field in
+// express-validator v6, so a missing `profile` reaches knex as an undefined
+// binding and 500s. Documents current behaviour, not the intended one.
 test("a missing profile reaches the handler and 500s (validation doesn't catch an absent field)", async () => {
   const res = await agent.get("/preview").query({ dataset: "obs_270" });
   assert.equal(res.status, 500);
@@ -163,4 +159,40 @@ test("escapes ERDDAP regex metacharacters in the profile id constraint", async (
 
   // encodeURIComponent turns the escaped "\+" into "%5C%2B".
   assert.match(axios.calls[0].url, /a%5C\.b%5C%2Bc/);
+});
+
+test("a requested period replaces the cadence window in the ERDDAP query", async () => {
+  db.queueRaw([
+    {
+      ...FEATURE_ROW,
+      use_whole_profile: false,
+      new_start_time: "2024-02-01T00:00:00Z",
+    },
+  ]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["time"], rows: [["2020-01-03"]] } },
+  });
+
+  const res = await agent.get("/preview").query({
+    dataset: "obs_270",
+    profile: "1",
+    timeMin: "2020-01-03T00:00:00Z",
+    timeMax: "2020-01-05T23:59:59Z",
+  });
+
+  assert.equal(res.status, 200);
+  const { url } = axios.calls[0];
+  assert.match(
+    url,
+    /&time>=2020-01-03T00:00:00\.000Z&time<=2020-01-05T23:59:59\.000Z$/,
+  );
+  assert.doesNotMatch(url, /time>2024/);
+});
+
+test("rejects a period that is not an ISO 8601 instant", async () => {
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1", timeMin: "yesterday" });
+  assert.equal(res.status, 400);
+  assert.equal(axios.calls.length, 0);
 });

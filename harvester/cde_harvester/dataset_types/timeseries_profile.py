@@ -1,12 +1,23 @@
 """Handler for cdm_data_type=TimeSeriesProfile (profiles at fixed stations)."""
 
+import pandas as pd
+from requests.exceptions import HTTPError
+
+from cde_harvester.core.harvest_warnings import RECORD_COUNT_ESTIMATED
 from cde_harvester.dataset_types import tabledap_features
 from cde_harvester.dataset_types.base import DatasetTypeHandler
+from cde_harvester.sources.erddap.client import ERDDAP, ResponseTooLargeError
+
+# Past this many profiles in any one timeseries, features collapse to one per
+# timeseries rather than one per profile.
+MAX_PROFILES_PER_TIMESERIES = 2000
 
 
 class TimeSeriesProfileHandler(DatasetTypeHandler):
     features_span_multiple_days = True
     cdm_data_type = "TimeSeriesProfile"
+    # A profile per timestamp always exceeds MAX_PROFILES_PER_TIMESERIES.
+    collapse_time_profile_ids = True
 
     def extract_features(self, dataset):
         return tabledap_features.extract_features(dataset, self)
@@ -15,24 +26,34 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
         self, dataset, profiles_with_lat_lon, profiles, profile_variables,
         profile_variable_list,
     ):
-        # Review if there's a enough samples to group by timeseries only
+        if "profile_id" not in profile_variables:
+            return profiles_with_lat_lon, profile_variables, profile_variable_list
+
         profiles_per_timeseries = profiles_with_lat_lon.groupby(
             profile_variables["timeseries_id"]
         ).agg("count")[profile_variables["profile_id"]]
 
-        if len(profiles_per_timeseries > 2000):
-            # If too many profiles per timeseries just group by timeseries_id
-            # In this case we will drop the profile ID column and remove the
-            # duplicates this creates.
-
+        if (profiles_per_timeseries > MAX_PROFILES_PER_TIMESERIES).any():
             dropping_column = profile_variables["profile_id"]
 
             profile_variables.pop("profile_id")
             profile_variable_list = list(profile_variables.values())
 
-            profiles_with_lat_lon = profiles_with_lat_lon.drop(
-                dropping_column, axis=1
-            ).drop_duplicates()
+            profiles_with_lat_lon = profiles_with_lat_lon.drop(dropping_column, axis=1)
+            time_bounds = {
+                column: how
+                for column, how in (("time_min", "min"), ("time_max", "max"))
+                if column in profiles_with_lat_lon
+            }
+            if time_bounds:
+                # ERDDAP's ISO strings sort as dates.
+                profiles_with_lat_lon = (
+                    profiles_with_lat_lon.groupby(profile_variable_list, dropna=False)
+                    .agg(time_bounds)
+                    .reset_index()
+                )
+            else:
+                profiles_with_lat_lon = profiles_with_lat_lon.drop_duplicates()
 
             timeseries_id_with_count = profiles_per_timeseries.to_frame(
                 name="n_profiles"
@@ -42,3 +63,31 @@ class TimeSeriesProfileHandler(DatasetTypeHandler):
             profiles_with_lat_lon.reset_index(inplace=True)
 
         return profiles_with_lat_lon, profile_variables, profile_variable_list
+
+    def rows_per_timestep(self, dataset, profiles, profile_variable_list):
+        """Sampled at the earliest timestep: ERDDAP then reads only the files
+        holding that instant."""
+        start = ERDDAP.parse_erddap_dates(profiles["time_min"].astype(str).str.strip())
+        first = str(profiles["time_min"].iloc[start.argmin()]).strip()
+        try:
+            sample = dataset.dataset_tabledap_query(
+                ",".join(profile_variable_list + ["time"]) + f"&time={first}"
+            )
+        except (HTTPError, ResponseTooLargeError):
+            sample = pd.DataFrame()
+
+        rows = pd.Series(dtype=float)
+        if not sample.empty:
+            rows = (
+                sample.astype(dict.fromkeys(profile_variable_list, str))
+                .groupby(profile_variable_list)
+                .size()
+                .reindex(tabledap_features._string_key(profiles.index))
+            )
+        if rows.isna().all():
+            dataset.warnings.add(
+                RECORD_COUNT_ESTIMATED,
+                "Could not sample rows per profile; counting one record per timestep",
+            )
+            return 1
+        return pd.Series(rows.fillna(rows.mean()).to_numpy(), index=profiles.index)

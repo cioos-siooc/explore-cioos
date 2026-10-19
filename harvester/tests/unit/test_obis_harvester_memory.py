@@ -1,22 +1,20 @@
-"""
-Unit tests for OBISHarvester.harvest()'s chunked-flush memory behavior.
-
-A full discovery run (~971 datasets) OOM-killed a 6GB container mid-run
-because all_cells held every processed dataset's DataFrame in memory for the
-whole run, with no flush point until the final concat. These tests verify
-cells are periodically flushed to disk and correctly reassembled, and that
-the returned result is identical regardless of chunk size.
-
-The flushing itself now lives in core.frame_spill.SpillSet (shared with the
-ERDDAP harvester), but these stay end-to-end through OBISHarvester.harvest():
-they are the contract for the behavior, not for where it is implemented.
-"""
+"""OBISHarvester.harvest() chunked flushing: a ~971-dataset run OOM-killed a 6GB
+container holding every dataset's cells, so cells flush to disk and reassemble
+independently of chunk size. Kept end-to-end through harvest() on purpose."""
 import os
 
 import cde_harvester.core.frame_spill as frame_spill_module
 import pandas as pd
 import pytest
+from cde_harvester.sources.obis import harvester as obis_harvester
 from cde_harvester.sources.obis.harvester import OBISHarvester
+
+
+@pytest.fixture(autouse=True)
+def offline_metadata_enrichment(monkeypatch):
+    """harvest() ends with a CKAN query and a metadata conversion, both over the network."""
+    monkeypatch.setattr(obis_harvester, "get_ckan_obis_records", lambda *args, **kwargs: pd.DataFrame())
+    monkeypatch.setattr(OBISHarvester, "convert_metadata", lambda self, dataset_id: None)
 
 
 class AlwaysExemptGeoFilter:

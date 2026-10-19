@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from urllib.parse import unquote
 
 import pandas as pd
+from cde_harvester.core.harvest_warnings import HarvestWarnings
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
     MAX_TRACK_POINTS_CAP,
@@ -87,6 +88,7 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
     dataset.erddap_url = ERDDAP_URL
     dataset.cdm_data_type = cdm_data_type
     dataset.logger = logging.getLogger("test")
+    dataset.warnings = HarvestWarnings(dataset.logger)
     dataset.globals = {
         "time_coverage_start": "2021-01-01T00:00:00Z",
         "time_coverage_end": "2021-01-20T00:00:00Z",
@@ -103,6 +105,9 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
     # extract_day_stats caches the per-profile fix frame on the dataset so
     # extract_track_points reuses it; a MagicMock would hand back a Mock.
     dataset._trajectory_profile_fixes = None
+    # Active trajectory-day count extract_day_stats leaves for
+    # extract_track_points to size its bucket.
+    dataset._trajectory_day_count = 3
 
     def fake_query(url):
         plain = unquote(url)
@@ -120,8 +125,6 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
             if fail_server_binning:
                 raise HTTPError("500: No operator found in constraint")
             return _day_count_df()
-        if plain.startswith("traj_id&distinct"):
-            return pd.DataFrame({"traj_id": ["m1"]})
         # fallback full-column download (chunked): 6 fixes on 6 distinct days.
         # Longitudes zigzag ~1.5km (beyond the DP tolerance) so the shape pass
         # keeps every fix.
@@ -204,11 +207,61 @@ class TestDayStatsExtraction:
         assert dataset.trajectory_id_variable == "traj_id"
         assert len(dataset.profile_ids) == 1  # one mission -> datasets.n_profiles
 
+    def test_trajectory_list_comes_from_day_rows_not_distinct(self):
+        dataset = build_trajectory_dataset()
+        extract_day_stats(dataset)
+        urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
+        assert not any("distinct()" in u for u in urls)
+        assert dataset.profile_ids["traj_id"].tolist() == ["m1"]
+
+    def test_constant_depth_comes_from_actual_range(self):
+        # A ship's fixed intake depth: the per-day depth query would only
+        # repeat what the metadata already says.
+        dataset = build_trajectory_dataset()
+        dataset.df_variables = pd.DataFrame(
+            [
+                {"name": "traj_id", "cf_role": "trajectory_id", "actual_range": ""},
+                {"name": "depth", "cf_role": "", "actual_range": "3.0, 3.0"},
+            ]
+        ).set_index("name", drop=False)
+        days = extract_day_stats(dataset)
+        urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
+        assert not any("orderByMinMax" in u for u in urls)
+        assert (days["depth_min"] == 3.0).all() and (days["depth_max"] == 3.0).all()
+
+    def test_varying_depth_range_still_queries(self):
+        dataset = build_trajectory_dataset()
+        dataset.df_variables = pd.DataFrame(
+            [
+                {"name": "traj_id", "cf_role": "trajectory_id", "actual_range": ""},
+                {"name": "depth", "cf_role": "", "actual_range": "0.0, 100.0"},
+            ]
+        ).set_index("name", drop=False)
+        days = extract_day_stats(dataset).sort_values("day")
+        assert days["depth_max"].tolist() == [100.0, 80.0]
+
     def test_dispatch_via_registry(self):
         dataset = build_trajectory_dataset()
         days = extract_features(dataset)
         assert len(days) == 2
         assert get_handler("Trajectory").feature_kind == "trajectory_days"
+
+    def test_depth_query_with_no_rows_keeps_the_days(self):
+        # A glider whose depth column is all NaN: ERDDAP answers the per-day
+        # depth query with a no-data 404, which arrives as a column-less frame.
+        dataset = build_trajectory_dataset()
+        inner = dataset.dataset_tabledap_query.side_effect
+
+        def no_depth_rows(url):
+            if "orderByMinMax" in unquote(url):
+                return pd.DataFrame()
+            return inner(url)
+
+        dataset.dataset_tabledap_query = MagicMock(side_effect=no_depth_rows)
+        days = extract_day_stats(dataset)
+        assert len(days) == 2
+        assert days["n_records"].sum() == 800
+        assert dataset.warnings.codes() == ["DEPTH_RANGE_UNAVAILABLE"]
 
     def test_no_depth_variable_fills_zero(self):
         days = extract_day_stats(build_trajectory_dataset(with_depth=False))
@@ -216,9 +269,8 @@ class TestDayStatsExtraction:
         assert (days["depth_max"] == 0).all()
 
     def test_no_position_grouping_requested(self):
-        # Regression: the previous design asked ERDDAP to bin latitude and
-        # longitude onto a 1/12-degree grid, which is what left hex rows unlit
-        # north of ~57N. Nothing may group by position any more.
+        # Binning lat/lon onto a grid left hex rows unlit north of ~57N;
+        # nothing may group by position.
         dataset = build_trajectory_dataset()
         extract_day_stats(dataset)
         urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
@@ -287,11 +339,8 @@ class TestFallback:
         assert days["n_records"].sum() == 6
 
     def test_chunks_by_month_not_year(self):
-        # A high-frequency trajectory's full download can itself exceed
-        # MAX_RESPONSE_SIZE within a single year-wide window (seen in
-        # practice); monthly chunking bounds that far more reliably. Jan 1 ->
-        # Mar 15 spans parts of 3 calendar months -> 3 chunk queries, not the
-        # single query the old yearly chunking would have issued.
+        # A high-frequency full download can exceed MAX_RESPONSE_SIZE within a
+        # year; monthly chunks bound it. Jan 1 -> Mar 15 spans 3 months -> 3 queries.
         dataset = MagicMock()
         dataset.logger = logging.getLogger("test")
         dataset.globals = {
@@ -412,11 +461,33 @@ class TestTrackPointExtraction:
         assert points["profile_id"].isna().all()
         assert points["time"].is_monotonic_increasing
         urls = [unquote(c.args[0]) for c in ds.dataset_tabledap_query.call_args_list]
-        # Day-level probe, then a finer refine query sized from the probe's
-        # own row count (3 active days -> clamp(3*86400/150000, 600, 86400),
-        # i.e. floored at the 10-minute minimum bucket).
+        # One query, its bucket sized from the trajectory-day count
+        # extract_day_stats found (3 -> clamp(3*86400/300000, 600, 86400),
+        # i.e. floored at the 10-minute minimum bucket) — no day-level probe.
+        assert urls == ['traj_id,time,latitude,longitude&orderByMin("traj_id,time/600,time")']
+
+    def test_failed_fine_query_retries_daily(self):
+        ds = _dataset_for_tracks("Trajectory")
+        inner = ds.dataset_tabledap_query.side_effect
+
+        def fine_fails(url):
+            if "time/600" in unquote(url):
+                raise HTTPError("504 Gateway Time-out")
+            return inner(url)
+
+        ds.dataset_tabledap_query = MagicMock(side_effect=fine_fails)
+        points = extract_track_points(ds, per_profile=False)
+        assert len(points) == 3
+        urls = [unquote(c.args[0]) for c in ds.dataset_tabledap_query.call_args_list]
         assert any('orderByMin("traj_id,time/86400,time")' in u for u in urls)
-        assert any('orderByMin("traj_id,time/600,time")' in u for u in urls)
+
+    def test_bucket_sized_from_day_stats(self):
+        ds = build_trajectory_dataset()
+        extract_day_stats(ds)
+        extract_track_points(ds, per_profile=False)
+        assert ds._trajectory_day_count == 2
+        urls = [unquote(c.args[0]) for c in ds.dataset_tabledap_query.call_args_list]
+        assert sum("orderByMin(" in u for u in urls) == 1
 
     def test_fallback_downsamples_per_day(self):
         # orderByMin raises -> monthly-chunk raw download, reduced locally.
@@ -559,19 +630,15 @@ class TestChooseTrackIntervalSeconds:
         assert _choose_track_interval_seconds(1) == TRACK_MIN_INTERVAL_SECONDS
 
     def test_ceilings_at_one_day_for_very_long_low_activity_deployments(self):
-        # A very long-running, near-daily reporter never gets coarser than the
-        # old fixed "1 day" behavior -- no regression there.
+        # A long-running, near-daily reporter never gets coarser than 1 day.
         assert _choose_track_interval_seconds(500_000) == TRACK_MAX_INTERVAL_SECONDS
 
     def test_zero_active_days_stays_at_day_level(self):
         assert _choose_track_interval_seconds(0) == TRACK_MAX_INTERVAL_SECONDS
 
     def test_immune_to_a_single_outlier_active_day(self):
-        """A single corrupt-timestamp fix that lands on a day far outside the
-        real deployment window only adds one active day to the count -- unlike
-        a max(time)-min(time) duration, which that same outlier would blow up
-        to years (seen in practice on a live C-PROOF glider dataset, where one
-        fix landed 25 years before an otherwise ~2-week deployment)."""
+        """A corrupt-timestamp outlier adds one active day, not the years a
+        max(time)-min(time) duration would (seen live on a C-PROOF glider)."""
         real_deployment_active_days = 14
         with_one_outlier_day = real_deployment_active_days + 1
 

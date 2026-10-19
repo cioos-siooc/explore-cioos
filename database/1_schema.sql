@@ -1,13 +1,6 @@
-/*
-    Create the tables
-
- */
-
--- NOTE: Postgres runs this file ONCE, on a fresh volume, and db_migrate never
--- re-applies it (the DROP TABLEs below would wipe live data). A column added
--- here therefore reaches new databases only: per database/README.md this repo
--- is fresh-only, so a schema change means dropping the volume and re-harvesting
--- rather than migrating a live database in place.
+-- Postgres runs this file ONCE, on a fresh volume, and db_migrate never
+-- re-applies it (the DROP TABLEs below would wipe live data): a schema change
+-- means dropping the volume and re-harvesting.
 
 
 -- We are using features from PostGIS 3
@@ -17,12 +10,10 @@ CREATE schema cde;
 SET search_path TO cde, public;
 
 -- (i, j) are the cell coordinates in PostGIS's origin-anchored hexagon grid
--- (ST_HexagonGrid/ST_Hexagon): geom is fully determined by (i, j) and the cell
--- size (100 km for zoom_0, 10 km for zoom_1). This natural key is what keeps
--- hex pks stable across loads — create_hexes() upserts on (i, j) and never
--- deletes, so a cell that already exists keeps its pk forever. Nullable (not
--- NOT NULL) so create_hexes() can insert a cell and set (i, j) within the same
--- load without a mid-transaction constraint failure.
+-- (ST_HexagonGrid, 100 km for zoom_0, 10 km for zoom_1). This natural key keeps
+-- hex pks stable across loads: create_hexes() upserts on (i, j) and never
+-- deletes. Nullable so create_hexes() can insert a cell and set (i, j) within
+-- the same load without a mid-transaction constraint failure.
 DROP TABLE IF EXISTS hexes_zoom_0;
 CREATE TABLE hexes_zoom_0 (
     pk serial PRIMARY KEY,
@@ -47,7 +38,6 @@ CREATE UNIQUE INDEX hexes_zoom_1_ij_key ON cde.hexes_zoom_1 (i, j);
 
 
 
--- ERDDAP Datasets
 DROP TABLE IF EXISTS datasets;
 CREATE TABLE datasets (
     pk serial PRIMARY KEY,
@@ -82,12 +72,9 @@ CREATE TABLE datasets (
     -- Why content_hash is NULL (HASH_* code: database-backed, Croissant fetch error, …);
     -- NULL when a hash was produced. Lets the dashboard explain unhashed datasets.
     content_hash_reason TEXT,
-    -- Two different clocks: last_updated_at moves only when the dataset's
-    -- content changed, verified_at on every harvest that reached it (the
-    -- loader bumps it alone for datasets skipped as unchanged). verified_at is
-    -- therefore "when we last looked", and the timestamp that
-    -- dataset_is_realtime() (8_range_functions.sql) measures
-    -- coverage_time_max against.
+    -- last_updated_at moves only when content changed; verified_at on every
+    -- harvest that reached the dataset (including ones skipped as unchanged).
+    -- dataset_is_realtime() measures coverage_time_max against verified_at.
     last_updated_at timestamptz,
     verified_at timestamptz,
     -- Dataset-level coverage. lat/lon/depth are griddap-only (metadata-only
@@ -104,10 +91,8 @@ CREATE TABLE datasets (
     coverage_time_max timestamptz,
     coverage_depth_min double precision,
     coverage_depth_max double precision,
-    -- Per-variable metadata for every dataset type, harvested from
-    -- /info/{id}/index.csv: long_name, units, cf_role, axis, colorBar*, ...
-    -- See harvester/cde_harvester/core/variables.py. NULL until a dataset is
-    -- (re)harvested, so consumers must tolerate its absence.
+    -- Per-variable metadata from /info/{id}/index.csv. NULL until a dataset
+    -- is (re)harvested, so consumers must tolerate its absence.
     table_variables jsonb,
     grid_variables jsonb,
     grid_dimensions jsonb,
@@ -138,6 +123,10 @@ CREATE TABLE datasets (
     -- hundreds of thousands of feature ranges per request. Rebuilt after each
     -- load by refresh_dataset_day_ranges() (5_profile_process.sql).
     day_ranges daterange[],
+    -- The dataset page's descriptive metadata (abstract, citation, contacts,
+    -- license, ...), normalized and merged CKAN > OBIS > ERDDAP by
+    -- harvester/cde_harvester/core/record_metadata.py. NULL until re-harvested.
+    metadata jsonb,
     UNIQUE(dataset_id, erddap_url)
 );
 
@@ -162,9 +151,8 @@ CREATE TABLE points (
     geom geometry(Point,3857),
     -- FKs are DEFERRABLE INITIALLY DEFERRED: profiles are inserted with NULL
     -- hex pks and backfilled by create_hexes() within the load transaction, so
-    -- the reference is only valid again at COMMIT (checked there, not
-    -- per-statement). Deferring also keeps loads off ALTER TABLE / ACCESS
-    -- EXCLUSIVE, which used to deadlock with live web-api reads.
+    -- the reference is only valid again at COMMIT. Deferring also keeps loads
+    -- off ALTER TABLE / ACCESS EXCLUSIVE, which deadlocks with live web-api reads.
     hex_0_pk integer CONSTRAINT hexes_zoom_0_points_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
     hex_1_pk integer CONSTRAINT hexes_zoom_1_points_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED
 );
@@ -177,10 +165,6 @@ CREATE INDEX ON points USING GIST (geom);
 CREATE UNIQUE INDEX points_geom_key ON cde.points (geom);
 
 
--- profiles/timeseries per dataset
--- hex polygon geometries are stored on cde.hexes_zoom_0/1; only the FK is
--- carried here. Tile / legend queries JOIN to those tables when polygon geom
--- is needed.
 DROP TABLE IF EXISTS profiles;
 CREATE TABLE profiles (
     pk serial PRIMARY KEY,
@@ -192,9 +176,8 @@ CREATE TABLE profiles (
     profile_id text,
     time_min timestamptz,
     time_max timestamptz,
-    -- Representative display point (exact location, or the bounding-box
-    -- midpoint for features that span a region). geom (above) is the Point
-    -- built from these for the point/hex map layers.
+    -- Representative display point: exact location, or the bounding-box
+    -- midpoint for features that span a region.
     latitude double precision,
     longitude double precision,
     -- Per-feature lat/lon bounding box. bbox is the indexed geometry spatial
@@ -225,9 +208,7 @@ CREATE TABLE profiles (
     -- operator, so an empty list would hide the feature from every selection.
     eovs text[],
     -- Hex FKs are DEFERRABLE INITIALLY DEFERRED for the same reason as on
-    -- cde.points above: create_hexes() rebuilds+relinks within the transaction
-    -- and the reference is validated at COMMIT, keeping loads off ACCESS
-    -- EXCLUSIVE DDL that deadlocked with live reads.
+    -- cde.points above.
     hex_0_pk integer CONSTRAINT hexes_zoom_0_foreign REFERENCES hexes_zoom_0(pk) DEFERRABLE INITIALLY DEFERRED,
     hex_1_pk integer CONSTRAINT hexes_zoom_1_foreign REFERENCES hexes_zoom_1(pk) DEFERRABLE INITIALLY DEFERRED,
     point_pk INTEGER,
@@ -260,32 +241,12 @@ CREATE INDEX ON profiles(dataset_pk);
 -- every tile/legend/shape query; without GIN it seq-scans the largest table in
 -- the app on every pan.
 CREATE INDEX ON profiles USING GIN (eovs);
--- The time and depth filters (utils/dbFilter.js) reach every cell table as a
--- pair of one-sided comparisons. Three of the four earn an index; measured on
--- a copy of production (376 k rows, 805 MB, ~2.2 kB/row), which is the only
--- scale and distribution these numbers mean anything at:
---
---   time_max >= :timeMin    the START date. 12% of rows at 2020: 55 -> 16 ms.
---                           4% at 2024: 27 -> 5 ms.
---   time_min <= :timeMax    the END date. 24% of rows at 1990: 72 -> 31 ms.
---   depth_max >= :depthMin  deep features. 7% at >= 1000 m: 42 -> 19 ms.
---
---   depth_min <= :depthMax  NOT indexed, and cannot be: the predicate asks
---                           "does this feature start above the selected
---                           floor", which is true of 97% of rows because
---                           almost everything starts near the surface. It
---                           stayed on a seq scan with an index available.
---
--- Only `time_min` is a close call, and only because production's catalogue is
--- historical: profiles' median `time_max` is 2003 and its data reaches back to
--- 1917, so "before 1990" really does select a quarter of it. On a recent-heavy
--- database the same index goes unused — this pair was chosen from the
--- distribution, not from the column names.
---
--- All three are used only when a filter is genuinely narrow. The default range
--- (1900..today, the whole water column) sends both time predicates and
--- correctly gets a seq scan, so they cost nothing when they cannot help.
--- See the P3 measurements in TODO-cde-revisions.md.
+-- The time and depth filters (utils/dbFilter.js) arrive as one-sided
+-- comparisons; measured on a production copy (376 k rows), narrow filters gain
+-- 2-5x from these three indexes. depth_min <= :depthMax is NOT indexed: 97% of
+-- rows start near the surface, so it stays a seq scan even with an index. The
+-- time_min index pays off only because production is historical (median
+-- time_max 2003); the default full range correctly seq-scans.
 CREATE INDEX ON profiles (time_max);
 CREATE INDEX ON profiles (time_min);
 CREATE INDEX ON profiles (depth_max);
@@ -296,9 +257,8 @@ CREATE INDEX ON profiles (depth_max);
 DROP TABLE IF EXISTS obis_cells;
 CREATE TABLE obis_cells (
     pk serial PRIMARY KEY,
-    -- geom is computed at INSERT time from latitude/longitude. Avoids the
-    -- post-load full-table UPDATE that previously rewrote every row + every
-    -- index entry. See obis_set_geom() in 5_profile_process.sql (now a no-op).
+    -- geom is computed at INSERT time so no post-load full-table UPDATE has
+    -- to rewrite every row and index entry.
     dataset_pk integer,
     dataset_id text,
     latitude double precision,
@@ -306,12 +266,9 @@ CREATE TABLE obis_cells (
     geom geometry(Point, 3857) GENERATED ALWAYS AS
       (ST_Transform(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326), 3857)) STORED,
     scientific_names text[] DEFAULT '{}',
-    -- WoRMS AphiaIDs corresponding to scientific_names. Populated post-harvest
-    -- by joining each name to cde.scientific_name_vernaculars; see
-    -- 5_profile_process.sql. Drives the rank-aware filter rolldown in
-    -- web-api/utils/dbFilter.js — selecting a higher-rank name expands to a
-    -- small integer set of descendant AphiaIDs and we test overlap on this
-    -- column instead of building a 100k+ name array per tile request.
+    -- WoRMS AphiaIDs for scientific_names, populated post-harvest. The
+    -- rank-aware filter rolldown (web-api/utils/dbFilter.js) tests overlap on
+    -- this small integer set instead of building a 100k+ name array per tile.
     aphia_ids integer[] NOT NULL DEFAULT '{}',
     n_records bigint,
     -- Distinct UTC days with at least one dated occurrence in this cell.
@@ -328,8 +285,6 @@ CREATE TABLE obis_cells (
     time_max timestamptz,
     depth_min double precision,
     depth_max double precision,
-    -- hex polygon geometries live on cde.hexes_zoom_0/1; only the FK is
-    -- carried here. Tile / legend queries JOIN to get the polygon.
     hex_0_pk integer,
     hex_1_pk integer,
     point_pk integer,
@@ -357,26 +312,21 @@ CREATE INDEX obis_cells_scientific_names_gin ON cde.obis_cells USING GIN (scient
   WHERE coalesce(array_length(aphia_ids, 1), 0) = 0;
 CREATE INDEX obis_cells_aphia_ids_gin         ON cde.obis_cells USING GIN (aphia_ids);
 -- Same three as cde.profiles above, and same reasoning for why depth_min is
--- left out. Untested against real data: production carries no OBIS rows yet,
--- so these are sized from the identical predicate shape rather than measured.
+-- left out.
 CREATE INDEX ON obis_cells (time_max);
 CREATE INDEX ON obis_cells (time_min);
 CREATE INDEX ON obis_cells (depth_max);
 
 -- FILLFACTOR leaves room on each page for HOT updates on non-indexed columns
--- (dataset_pk, point_pk, hex_*_pk are filled by post-load UPDATEs). Reduces
--- bloat from those passes; modest effect now that the geom UPDATE is gone.
+-- (dataset_pk, point_pk, hex_*_pk are filled by post-load UPDATEs).
 ALTER TABLE cde.obis_cells SET (fillfactor = 80);
 ALTER TABLE cde.points SET (fillfactor = 80);
 
 
 -- Trajectory / TrajectoryProfile per-day ERDDAP aggregates: one row per
--- (trajectory, UTC day), produced by the trajectory dataset-type handler via
--- server-side day-bucket grouping (orderByCount / orderByMinMax on
--- "<traj>,time/86400"). Deliberately carries NO geometry: where a platform was
--- on a given day comes from cde.trajectory_points, not from this table. The
--- two are joined by day in trajectory_build_hexes() (4_create_hexes.sql).
--- Small: a few rows per trajectory-day for the whole catalogue.
+-- (trajectory, UTC day), from server-side day-bucket grouping. Deliberately
+-- carries NO geometry: positions come from cde.trajectory_points, joined by
+-- day in trajectory_build_hexes() (4_create_hexes.sql).
 DROP TABLE IF EXISTS trajectory_days;
 CREATE TABLE trajectory_days (
     pk serial PRIMARY KEY,
@@ -406,15 +356,11 @@ CREATE INDEX trajectory_days_dataset_pk_idx ON trajectory_days (dataset_pk, traj
 -- Trajectory coverage, one row per (dataset, trajectory, hex tier, hex).
 -- DERIVED, not harvested: trajectory_build_hexes() (4_create_hexes.sql) sweeps
 -- each track's segments through the hex grid, so a hex lights up when the
--- track PASSED THROUGH it. The previous design binned positions to a
--- 1/12-degree lat/lon grid on the ERDDAP server and lit the single hex holding
--- each bin centre; because 1/12 degree of latitude is 9.28 km / cos(lat) in
--- EPSG:3857 metres while a hex row is a fixed 17.3 km, whole hex rows along a
--- track went unlit north of ~57N (horizontal striping).
+-- track PASSED THROUGH it. Binning fix positions instead leaves whole hex rows
+-- unlit north of ~57N (a lat/lon bin shrinks below a 3857 hex row).
 --
 -- `days` is a COUNT OF DISTINCT UTC DAYS in the hex, not a time span: a ship
--- crossing the same place each January contributes one day per visit, where
--- the old per-cell span contributed the whole eleven months between them.
+-- crossing the same place each January contributes one day per visit.
 DROP TABLE IF EXISTS trajectory_hexes;
 CREATE TABLE trajectory_hexes (
     pk serial PRIMARY KEY,
@@ -586,13 +532,9 @@ CREATE INDEX obis_scientific_names_trgm
   ON cde.obis_scientific_names USING GIN (scientific_name gin_trgm_ops);
 
 -- Per-name OBIS record totals, used by populate_vernaculars.py to order names
--- by popularity (so --top N targets the most-impactful subset). The unnest +
--- GROUP BY over the full obis_cells table is a multi-minute scan, so we cache
--- it as a materialized view rather than recomputing on every script run.
--- Refreshed by that script, not by the harvest load: it has no runtime reader,
--- so rebuilding it after every harvest paid a multi-minute scan for a consumer
--- that may not run for weeks (obis_scientific_names, which the web-api DOES
--- read live, is still refreshed in 5_profile_process.sql).
+-- by popularity (--top N). Materialized because the scan takes minutes, and
+-- refreshed by that script rather than the harvest load since nothing reads it
+-- at runtime.
 DROP MATERIALIZED VIEW IF EXISTS cde.obis_scientific_name_popularity;
 CREATE MATERIALIZED VIEW cde.obis_scientific_name_popularity AS
   SELECT sn AS scientific_name,
@@ -631,7 +573,6 @@ CREATE INDEX scientific_name_vernaculars_ancestors_gin
   ON cde.scientific_name_vernaculars USING GIN (ancestor_aphia_ids);
 
 
---
 DROP TABLE IF EXISTS download_jobs;
 CREATE TABLE download_jobs (
     pk SERIAL PRIMARY KEY,
@@ -673,9 +614,8 @@ CREATE TABLE cde.datasets_lookup (
 );
 
 -- Harvest audit log: one row per harvester invocation, one row per
--- (dataset, run) attempt. Consumed by the harvest-dashboard service so an
--- ERDDAP admin can self-serve "why didn't my dataset get harvested?".
--- skipped_datasets above is kept as the "current state" view used elsewhere.
+-- (dataset, run) attempt, consumed by the harvest dashboard. skipped_datasets
+-- above is the "current state" view used elsewhere.
 DROP TABLE IF EXISTS cde.harvest_attempts;
 DROP TABLE IF EXISTS cde.harvest_runs;
 
@@ -693,11 +633,9 @@ CREATE TABLE cde.harvest_runs (
 );
 CREATE INDEX harvest_runs_started_at_idx
     ON cde.harvest_runs (started_at DESC);
--- NOTE: applying this file DROP/CREATEs harvest_runs, wiping audit history. It
--- is not part of the db_migrate glob ([3-9]_*.sql) for that reason — a live
--- database gets column changes by hand, and this file describes the target
--- shape. (It used to point at database/migrations/add-harvest-run-prefect-columns.sql,
--- which has never existed in this repo.)
+-- Applying this file DROP/CREATEs harvest_runs, wiping audit history, so it is
+-- outside the db_migrate glob ([3-9]_*.sql): a live database gets column
+-- changes by hand.
 
 CREATE TABLE cde.harvest_attempts (
     run_id        uuid NOT NULL REFERENCES cde.harvest_runs(run_id) ON DELETE CASCADE,
@@ -714,10 +652,9 @@ CREATE TABLE cde.harvest_attempts (
     -- splits on \n and renders each as a clickable link so an admin can
     -- replay the exact requests to debug a failure.
     query_urls    text,
-    -- Non-fatal note for an otherwise-successful dataset, surfaced on the
-    -- harvest dashboard (e.g. features hidden from the map because they span
-    -- a region larger than the point threshold).
-    warnings      text,
+    -- Non-fatal notes, surfaced on the harvest dashboard: a JSON array of
+    -- {code, message, count?, items?} (codes in core/harvest_warnings.py).
+    warnings      jsonb,
     PRIMARY KEY (run_id, erddap_url, dataset_id)
 );
 CREATE INDEX harvest_attempts_dataset_idx

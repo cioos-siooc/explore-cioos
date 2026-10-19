@@ -43,18 +43,13 @@ import "./styles.css";
 import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
-// Abbreviate large counts so the color-bar ticks stay short (e.g. 12345 -> 12k).
-// Goes up to billions: the ramp now counts measurements, not locations, and a
-// full-catalogue maximum runs into the millions — "1700k" is not an
-// improvement on "1.7M".
+// Up to billions: a full-catalogue maximum runs into the millions.
 const COUNT_UNITS = [
   [1e9, "B"],
   [1e6, "M"],
   [1e3, "k"],
 ];
-// `singleDigit` drops the fraction — "4k", never "4.2k". The marker size key
-// lays its two values out side by side, where width is the scarce dimension and
-// a decimal buys precision nobody reads off a pair of circles.
+// `singleDigit` drops the fraction: the marker size key is short on width.
 function formatCount(value, singleDigit = false) {
   if (!Number.isFinite(value)) return "";
   for (const [size, suffix] of COUNT_UNITS) {
@@ -70,31 +65,23 @@ function formatCount(value, singleDigit = false) {
   return `${value}`;
 }
 
-// Abbreviate the depth ticks the same way, so "1000" doesn't run into the end
-// of the compact bar.
 function formatDepth(metres) {
   return metres >= 1000 ? `${metres / 1000}k` : `${metres}`;
 }
 
-// Position along the bathymetry bar, 0..1, for a depth in metres. The bar is
-// logarithmic (see bathymetryColorScale) so this is a log interpolation.
+// 0..1 along the bar; the bar is logarithmic (see bathymetryColorScale).
 const LOG_MIN = Math.log10(bathymetryScaleMin);
 const LOG_SPAN = Math.log10(bathymetryScaleMax) - LOG_MIN;
 function depthPosition(metres) {
   return (Math.log10(metres) - LOG_MIN) / LOG_SPAN;
 }
 
-// The hex entry's icon colour: a cell from the middle of the ramp, which is what
-// an average hexagon looks like on the map. Picking an end of the ramp would have
-// made the icon claim a count.
-// The tips whose control is on this card (see tipHighlight's callers here).
-const LEGEND_TIPS = ["griddedCoverage", "nonna"];
+const LEGEND_TIPS = ["trajectory"];
 
+// Mid-ramp: either end would make the icon claim a count.
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)];
 
-// Choose which stop indices get a tick label. Keeps every stop when there are
-// few, otherwise thins to an evenly spaced subset (always including the first
-// and last) so labels don't overlap on the compact bar.
+// Evenly spaced subset, always keeping first and last, so labels don't overlap.
 function pickTickIndices(n, maxTicks = 5) {
   if (maxTicks < 2) return [0];
   if (n <= maxTicks) return Array.from({ length: n }, (_, i) => i);
@@ -104,109 +91,60 @@ function pickTickIndices(n, maxTicks = 5) {
   return [...indices];
 }
 
-// Compact floating legend card (top-right), under one collapse.
-//
-// Its contents are grouped by the KIND OF THING on the map, each group under its
-// own label: the observations (the hex ramp, the marker size and platform
-// keys), the trajectory tracks, the seafloor depth ramp, and the layers with no
-// key of their own. A flat list of captions could not say which of them belonged
-// together — "Platform type" sat at the same level as "Depth (m)" though one
-// describes the data and the other the basemap under it.
-//
-// A group's label row carries the switch for everything in that group, so a
-// group is exactly what one switch hides, and each entry inside is a sub-caption
-// one level down. That is also why the marker keys live with the hex ramp rather
-// than in a group of their own: hexes and markers are the same observations at
-// different zooms, under the same switch.
-//
-// There is exactly one switch for the hexagons, on the observations group, and
-// it covers every hexagon whatever kind of data it holds.
-//
-// Under all of it, outside the collapse, the card's foot carries what the map
-// itself is measured and made from: the scale bar and the basemap credits (see
-// LegendFooter).
+// A group's label row carries the switch that hides the whole group, which is
+// why the marker keys sit with the hex ramp: same observations, other zooms.
 export default function Legend({
-  // The point-tier range, which the marker size key reads.
+  // Point-tier range, read by the marker size key.
   currentRangeLevel,
-  // The one domain every hexagon on the map is coloured over, whatever kind of
-  // data it holds — see MapStateProvider.
+  // The one domain every hexagon is coloured over (see MapStateProvider).
   hexRangeLevel,
-  // True when that domain is the extent of the hexes on screen rather than the
-  // whole catalogue's, which is what makes the bar's numbers move with the
-  // camera. It earns a tooltip, not a line: it is the answer to a question the
-  // bar raises only for the people who notice it.
+  // The domain is the on-screen hexes' extent, so the ticks move with the camera.
   hexRangeScaledToView = false,
   loading,
   zoom,
   platformsAvailable = [],
-  // { observations, bathymetry, tracks }, each { key, label, checked, onChange }
-  // — the switches that ride on legend captions. Absent members simply render
-  // their entry without a switch.
+  // { observations, bathymetry, tracks }, each { key, label, checked, onChange };
+  // absent members render their entry without a switch.
   controls = {},
   layerControls = [],
   dataLayers,
 }) {
   const { t } = useTranslation();
-  // The card's collapse, and the only thing that hides any of this: open, it
-  // shows the whole list — the ramps, their ticks, the marker keys, the track
-  // lines, the remaining layer switches; closed, it is the header row alone.
   const [legendOpen, setLegendOpen] = useState(true);
-  // On a phone the card would take a quarter of the map to say what the map is
-  // already showing, so it shrinks to a single button in the corner and the
-  // keys move behind it, opening centred over the map when they are asked for.
-  // That is the right trade for a legend: it is read in glances, not kept open.
   const compact = useMediaQuery(MOBILE_QUERY);
   const { activeTip } = useTips();
-  // A tip about something on the card opens it as the tip arrives, so there is
-  // something to point at (see tipHighlight) — once, so the card still folds
-  // away while the tip is up.
+  // Opened once per tip, so the card can still be folded while the tip is up.
   const [tipOpenedFor, setTipOpenedFor] = useState(activeTip);
   if (activeTip !== tipOpenedFor) {
     setTipOpenedFor(activeTip);
     if (LEGEND_TIPS.includes(activeTip)) setLegendOpen(true);
   }
   const [detailOpen, setDetailOpen] = useState(false);
-  // Which explanation is open, by its LEGEND_HELP_SECTIONS key — one dialog for
-  // every ⓘ on the card, whether it sits on a group label or on one of the
-  // shapes inside it (see LegendHelpModal).
+  // A LEGEND_HELP_SECTIONS key; one dialog serves every ⓘ on the card.
   const [helpSection, setHelpSection] = useState();
 
-  // Fall back to the default selection when the prop is absent (older callers /
-  // initial render) — all-on would claim legend entries the map isn't drawing.
+  // Not all-on: that would claim legend entries the map isn't drawing.
   const layers = dataLayers || DEFAULT_DATA_LAYERS;
   const markerTier = isMarkerTier(zoom);
   const trajectoryOn = anyTrajectoryLayerOn(layers);
-  // Read off the control rather than passed twice: it is the same boolean.
   const tracksMode = Boolean(controls.tracks?.checked);
-  // The hex/point layer is switched off (the toggle in the ramp title row).
-  // Its key stays put — the switch has to keep something to sit beside, and the
-  // numbers are still worth reading — but muted: a fully saturated ramp under
-  // an off switch reads as a live layer.
+  // Muted rather than removed: the switch needs something to sit beside, and a
+  // saturated ramp under an off switch reads as a live layer.
   const observationsHidden = controls.observations
     ? !controls.observations.checked
     : false;
 
-  // Which geometries are drawn as hexagons right now. Below the marker tier
-  // everything is: the profile families, the trajectory cells and the
-  // occurrence cells are summed into one hexes layer. At the marker tier the
-  // profile families have become individual points, so the only hexes left are
-  // the trajectory/occurrence coverage cells.
-  //
-  // Nothing here is gated on a per-geometry display switch: the selection in the
-  // geometry filter is the only thing that decides which kinds of data reach the
-  // hexagons (see buildTileSuffix).
+  // At the marker tier the profile families are points, so only the
+  // trajectory/occurrence cells remain hexes. Only the geometry filter decides
+  // what reaches the hexagons (see buildTileSuffix).
   const profileFamilyOn =
     layers.profile || layers.timeseries || layers.timeseriesProfile;
-  const cellsAsHexes = layers.obis || trajectoryOn;
+  const cellsAsHexes = layers.point || trajectoryOn;
   const hexesOnMap = markerTier
     ? cellsAsHexes
     : profileFamilyOn || cellsAsHexes;
-  // The marker keys (size, platform colours) describe the point tier only.
   const pointsOnMap = markerTier && profileFamilyOn;
 
-  // The ⓘ that opens a caption's long form, sitting immediately after the words
-  // it belongs to. Null for a caption with no entry in LEGEND_HELP_SECTIONS, so
-  // a caption and its explanation are wired together in one place.
   function renderHelpButton(key) {
     if (!LEGEND_HELP_SECTIONS[key]) return null;
     const label = t("legendHelpOpen", {
@@ -225,27 +163,14 @@ export default function Legend({
     );
   }
 
-  // One group: its label row — the switch for everything in the group, then the
-  // group's title — and its contents. The label row is never dimmed; it holds
-  // the control that turns the group back on.
-  //
-  // `label` is the group's name, or any node standing in for one — a group
-  // whose rows are already self-describing switches passes those rows here
-  // instead, since a name for them would only name the leftovers and the ⓘ
-  // has to sit beside something.
-  //
-  // `idSuffix` distinguishes the switch from a second copy of the same control
-  // elsewhere on screen: in compact mode the observations group is rendered both
-  // on the card and inside the keys dialog, and two inputs sharing an id is
-  // invalid whether or not a label happens to point at it.
+  // `idSuffix`: in compact mode the observations group renders both on the card
+  // and in the keys dialog, and two inputs must not share an id.
   function renderGroup(
     key,
     label,
     { control, tooltip, idSuffix = "" } = {},
     children,
   ) {
-    // Every group has a long form, so the ⓘ closes the label row whatever the
-    // group put in it.
     const help = renderHelpButton(key);
     return (
       <div className="legendGroup" key={key}>
@@ -275,16 +200,6 @@ export default function Legend({
     );
   }
 
-  // A caption one level down from a group label: it names one entry inside the
-  // group, with the shape that entry draws on the map beside it. Sentence case
-  // against the group labels' upper case, which is what keeps the two levels
-  // apart at this size; the icon is what tells the entries apart at a glance,
-  // since "Hexes" and "Markers" are the same length and weight.
-  //
-  // `help` is the LEGEND_HELP_SECTIONS key for this entry, when it has an
-  // explanation of its own: the hexes and the markers are the same count drawn
-  // two ways, and what each of them is doing is not something the group's label
-  // — the metric they share — can say for them.
   function renderSubCaption(caption, { icon, tooltip, help } = {}) {
     return (
       <div className="legendSubCaption" title={tooltip}>
@@ -295,11 +210,8 @@ export default function Legend({
     );
   }
 
-  // Continuous color bar for a hex ramp. The hex counts follow a non-linear
-  // (power/log) scale, so the colors are spaced evenly by their scale index
-  // rather than by value — a linear-value axis would collapse the ramp into the
-  // dominant high-count color. Count ticks are drawn at each stop (thinned to
-  // keep the compact bar legible), which naturally reads as a log axis.
+  // Stops are spaced by scale index, not value: the counts are power/log scaled
+  // and a linear-value axis would collapse into the dominant high-count colour.
   function renderColorBar(scale, rangeLevel, dimmed, maxTicks) {
     const colorStops = generateColorStops(scale, rangeLevel);
     if (!colorStops || !colorStops.length) return null;
@@ -312,16 +224,12 @@ export default function Legend({
             .map((cs, i) => `${cs.color} ${((i / denom) * 100).toFixed(1)}%`)
             .join(", ")})`;
     const tickIndices = pickTickIndices(n, maxTicks);
-    // /legend clamps the ramp's top to a high percentile so one outlier
-    // dataset can't flatten the whole scale (see rampRange in
-    // web-api/routes/legend.js). When it did clamp, the top tick is not the
-    // real maximum — say "264k+", not "264k".
+    // /legend clamps the top to a high percentile (rampRange in
+    // web-api/routes/legend.js), so a clamped top tick isn't the real maximum.
     const clamped = rangeLevel?.[2] > rangeLevel?.[1];
     return (
       <div
         className={classNames({ legendDimmed: dimmed })}
-        // Why the numbers under the bar move when the map does. Only when they
-        // do: a bar drawn over the catalogue's domain has nothing to explain.
         title={hexRangeScaledToView ? t("legendScaledToView") : undefined}
       >
         <div
@@ -356,29 +264,18 @@ export default function Legend({
     );
   }
 
-  // Only the platform types the current result set actually contains — the
-  // catalog's full palette would otherwise promise markers the map never draws.
+  // The catalog's full palette would promise markers the map never draws.
   const platformSwatches = platformColors.filter((pc) =>
     platformsAvailable.includes(pc.platform),
   );
 
-  // The observations group's title: what the hex colours and the marker sizes
-  // count, which is days of data everywhere on the map (see HEX_METRIC). It was
-  // a dropdown while the ramp could count records or datasets instead; now it
-  // is the plain label it titles. The entries under it say which shape is
-  // carrying the count (see renderSubCaption), so the title doesn't have to.
   function renderMetricTitle() {
-    // Nothing on the map is keyed to a count (tracks only, say): a title for a
-    // ramp that isn't there names nothing.
     if (!hexesOnMap && !pointsOnMap) return null;
     return t("legendMetricDays");
   }
 
-  // Stands in for the ramp when this tier has no counts to show yet. /legend is
-  // still in flight and there's no ramp from a previous query to fall back on:
-  // the counts are unknown, not zero. Saying "No Data" then (as this did) tells
-  // the user their filters excluded everything, which is a guess — and usually a
-  // wrong one.
+  // While /legend is in flight with no previous ramp the counts are unknown, not
+  // zero: "No Data" would wrongly say the filters excluded everything.
   function renderMissingCounts() {
     if (loading) {
       return (
@@ -395,34 +292,16 @@ export default function Legend({
     );
   }
 
-  // No counts at all for this tier yet — the group's title still says what they
-  // would have counted, so this stands where its entries would be rather than
-  // under one of them. The tier's primary count is the hexes below the marker
-  // tier and the points at it.
+  // The tier's primary count: hexes below the marker tier, points at it.
   function renderCountStatus() {
     if (!hexesOnMap && !pointsOnMap) return null;
     if (!isEmpty(markerTier ? currentRangeLevel : hexRangeLevel)) return null;
     return renderMissingCounts();
   }
 
-  // The one hex gradient. It is shown whenever there are hexagons on the map,
-  // and it is the same gradient for all of them — profile families, trajectory
-  // cells and occurrence records alike. There is deliberately no second ramp
-  // for the coverage cells: colour means "how much data" everywhere on the map,
-  // and WHAT a hexagon holds is in its hover tooltip, where a second colour
-  // domain under the same green scale could never have said it.
-  //
-  // A missing hex domain at the marker tier is not an error to report: the points
-  // carry the reading there and the hexes are the coverage cells drawn over them,
-  // so there is simply no bar to draw (see renderCountStatus for the case where
-  // the tier has no counts at all).
-  //
-  // `labelled` is false only on the compact card, which shows the bar under the
-  // group's label row and nothing else (see compactRamp). It used to be false
-  // whenever the markers were away too — a caption naming the one entry present
-  // was a line spent saying nothing — but the caption now carries the ⓘ that
-  // explains what a hexagon is, and the zooms where the markers are away are
-  // exactly the zooms where that question gets asked.
+  // Deliberately one ramp for every kind of hexagon: what a hexagon holds is in
+  // its tooltip, not in a second colour domain. `labelled` is false only on the
+  // compact card (see compactRamp).
   function renderHexEntry(labelled, maxTicks) {
     if (!hexesOnMap || isEmpty(hexRangeLevel)) return null;
     return (
@@ -449,18 +328,12 @@ export default function Legend({
     );
   }
 
-  // The CHS NONNA depth ramp. It keys a basemap raster rather than the data, so
-  // it is its own group — named and switched at group level like the rest, and
-  // untouched by the observations switch.
   function renderBathymetryBar() {
-    // zoom is undefined until the map first reports its view, and `undefined <
-    // n` is false — so test for the zoom being known as well, or the bar
-    // flashes on before the raster it describes exists.
+    // zoom is undefined until the map first reports its view, and `undefined < n`
+    // is false, so the bar would flash on before its raster exists.
     if (!Number.isFinite(zoom) || zoom < bathymetryLegendMinZoom) return null;
     const hidden = controls.bathymetry ? !controls.bathymetry.checked : false;
-    // Anchors sit at their own depths, so the gradient is uneven by design:
-    // the first stop's colour flats out to the left edge (everything shallower
-    // than it is that red) and the last stop's to the right edge.
+    // Anchors sit at their own depths, so the gradient is uneven by design.
     const gradient = `linear-gradient(to right, ${bathymetryColorScale
       .map(
         ({ depth, color }) =>
@@ -497,26 +370,14 @@ export default function Legend({
     );
   }
 
-  // The marker keys: how big a circle is, and what colour it is. Both describe
-  // the markers, which are the same observations as the hexes at a closer zoom —
-  // so they are sub-entries of the observations group rather than a group of
-  // their own, under its switch, and they dim with it.
   function renderMarkerKeys() {
-    // A missing range is reported by renderHexRamp, which owns the status line
-    // for this tier — the keys just stay away.
+    // A missing range is reported by renderCountStatus.
     if (!pointsOnMap || isEmpty(currentRangeLevel)) return null;
-    // Points are keyed to days of data, like the hexes (HEX_METRIC). One line
-    // rather than a stacked pair, and one number rather than both ends of the ramp:
-    // "○ ≤ 1 < ●" — at or below the ramp's floor a marker is drawn at the
-    // small radius, and it grows from there. radiusExpression (Map.jsx)
-    // clamps below `lo`, so the floor is the value worth naming; the top of
-    // the ramp is what "bigger circle" already says.
+    // radiusExpression (Map.jsx) clamps below `lo`, so the floor is the value
+    // worth naming.
     const [lo, hi] = currentRangeLevel;
-    // That same expression drops to one flat radius when the range is
-    // degenerate — every location holding the same number of days, which is
-    // common zoomed right in, where the answer is usually "1", and more common
-    // since the count became a union of day sets rather than a sum. There is no
-    // "grows from there" to show then, so the large circle goes away.
+    // That expression goes flat when the range is degenerate (common zoomed in), so
+    // there is no larger circle to show.
     const ramped = Number.isFinite(lo) && Number.isFinite(hi) && hi > lo;
     const dimClass = classNames("legendSubsection", {
       legendDimmed: observationsHidden,
@@ -552,9 +413,8 @@ export default function Legend({
         </div>
         {platformSwatches.length > 0 && (
           <div className={dimClass}>
-            {/* No icon: a neutral filled circle here is the same shape as the
-                swatches right below, and in grey it read as the "Unknown"
-                platform rather than as a heading for all of them. */}
+            {/* No icon: a grey filled circle read as the "Unknown" platform rather than
+                as a heading. */}
             {renderSubCaption(t("legendPlatformType"))}
             <div className="legendItems">
               {platformSwatches.map((pc) => (
@@ -577,16 +437,6 @@ export default function Legend({
     );
   }
 
-  // The trajectory group's body: the track line and the heading arrowhead,
-  // each carrying the control that sets what it draws — the trailing window on
-  // the line, the date on the arrowhead, and the rail that scrubs it under
-  // both. Drawn by TrajectoryDate, which owns the keys as well as the controls:
-  // they are the same two rows, and a key whose value is set somewhere else is
-  // how the date came to be a floating pill over the bottom of the map.
-  //
-  // The group appears while at least one trajectory geometry is in the filter
-  // selection; the trajectory cells themselves are keyed by the hex ramp in the
-  // observations group, like every other geometry's.
   function renderTrackKeys() {
     if (!trajectoryOn) return null;
     return (
@@ -596,10 +446,6 @@ export default function Legend({
     );
   }
 
-  // The switches with nothing on the map keyed to them (gridded coverage).
-  // They are a group like the rest, labelled as what they are —
-  // layers with no key — rather than left as loose rows at the foot of the card
-  // where they read as trailing off the group above them.
   function renderLayerSwitches() {
     if (!layerControls.length) return null;
     return (
@@ -618,25 +464,12 @@ export default function Legend({
     );
   }
 
-  // Built up front so a group can be left out entirely when it would be empty —
-  // a label with nothing under it is worse than no label.
   const countStatus = renderCountStatus();
   const markerKeys = renderMarkerKeys();
   const hexEntry = renderHexEntry(true);
-  // The one key the compact card keeps on the map. Everything else in the body
-  // names a shape or a colour the map is already showing — a track line looks
-  // like a track line — but what a hexagon's green is worth in days of data is
-  // a reading nothing on the map can give, so it is the part that has to stay
-  // out where it can be read against the cells.
-  // Four ticks, not the five the card affords: this bar is as wide as a phone
-  // corner allows, and the labels are what run into each other first.
+  // The compact card keeps only the hex ramp: its days-of-data reading is the one
+  // key the map can't give. Four ticks fit a phone corner.
   const compactHexEntry = compact ? renderHexEntry(false, 4) : null;
-  // The bar under the same label row it gets in the standing card: the group
-  // title — the metric, in the group labels' upper case — and the switch that
-  // hides the layer it keys. It is the observations group with everything but
-  // the bar left out, so it is built with renderGroup rather than restyled to
-  // look like one; the dialog behind the header then shows the same group in
-  // full, with the marker keys and the platform colours the card left out.
   const compactRamp =
     compactHexEntry &&
     renderGroup(
@@ -654,15 +487,8 @@ export default function Legend({
   const bathymetryBar = renderBathymetryBar();
   const layerSwitches = renderLayerSwitches();
 
-  // In order: the data, then how the moving platforms among it are drawn, then
-  // the seafloor under it, then the layers that key nothing. Ordered from the
-  // reader's question outwards — "what am I looking at" before "what is under
-  // it" — rather than by which entries happen to be colour ramps.
-  //
-  // The last group has no label of its own: its rows are labelled switches
-  // already, and any name for them would be a name for "the rest". They stand
-  // in the label row itself rather than under an empty one, which is what puts
-  // the group's ⓘ beside the words it explains instead of alone above them.
+  // The last group's switches are labelled already, so they stand in its label
+  // row, which puts the group's ⓘ beside them.
   const groups = [
     (countStatus || hexEntry || markerKeys) &&
       renderGroup(
@@ -695,20 +521,9 @@ export default function Legend({
     layerSwitches && renderGroup("layers", layerSwitches),
   ].filter(Boolean);
 
-  // Compact is the same card with its body cut down to the hex ramp: the header
-  // row, which now opens the rest of the keys in a dialog instead of unfolding
-  // them in place; the ramp, which is the one key worth standing on the map
-  // (see compactRamp); and the foot, which reads the map rather than the
-  // keys. Three short rows in the corner instead of a quarter of the screen —
-  // the rest of a legend is read in glances, and on a phone the glance is worth
-  // more than the standing card.
-  //
-  // Keeping the card (rather than swapping in a bare button) is what keeps the
-  // rest true for free: the ref, and so the footprint the griddap legend stacks
-  // against, is still on the thing in the corner; the corner itself is the one
-  // the card already moves to below 900px; and the scale bar and the basemap
-  // credits stay exactly one tap away, mounted once — LegendFooter adopts
-  // MapLibre's own controls, so a second copy would fight this one for them.
+  // Compact keeps the card rather than a bare button: the griddap legend stacks
+  // against its footprint, and LegendFooter adopts MapLibre's own controls so it
+  // must stay mounted exactly once.
   return (
     <div className={classNames("mapLegend", { legendCompact: compact })}>
       <button
@@ -738,14 +553,9 @@ export default function Legend({
             <div className="legendBody legendCompactRamp">{compactRamp}</div>
           )
         : legendOpen && <div className="legendBody">{groups}</div>}
-      {/* Outside the collapse: the scale bar reads the map rather than the
-          keys, so it is as useful with the card shut as open — closed, the card
-          is its header row and the scale row, and nothing more. */}
+      {/* Outside the collapse: the scale bar is as useful with the card shut. */}
       <LegendFooter />
-      {/* The long form of whichever caption's ⓘ was pressed. Outside the
-          compact dialog rather than inside it: the same ⓘ are on the standing
-          card, and one mount is what keeps the two from drifting into two
-          different explanations. */}
+      {/* One mount for the card and the compact dialog, so their ⓘ can't drift. */}
       <LegendHelpModal
         section={helpSection}
         onHide={() => setHelpSection(undefined)}

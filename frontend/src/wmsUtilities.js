@@ -1,11 +1,6 @@
-// Helpers for the griddap WMS overlay.
-//
-// ERDDAP's built-in WMS serves EPSG:4326 only, while MapLibre raster-tile
-// sources require EPSG:3857 tiles. The overlay is therefore a single
-// viewport-sized MapLibre `image` source: one WMS 1.1.0 GetMap per (debounced)
-// moveend, warped from equirectangular to Mercator row-by-row on an offscreen
-// canvas before it's handed to the map. Without the warp, features at
-// Canadian latitudes land 1-2 degrees of latitude off at low zoom.
+// ERDDAP's WMS serves EPSG:4326 only and MapLibre raster tiles need 3857, so
+// the overlay is one viewport-sized `image` source warped to Mercator per
+// moveend; unwarped, Canadian latitudes land 1-2 degrees off at low zoom.
 
 import { server } from "./config";
 
@@ -59,24 +54,14 @@ export function buildWmsGetMapUrl({
   return `${wmsUrl}?${params.toString()}`;
 }
 
-// The width the legend is asked for, and the width the card is built to show
-// it at. ERDDAP draws the legend's text at a fixed size whatever image size is
-// requested — a wider one gets a wider colorbar and the same 11px type — so
-// there is no "larger" version to fetch, only a version that isn't scaled down
-// afterwards. The card therefore sizes itself to the image (see the WmsLegend
-// stylesheet), rather than the image to the card.
+// ERDDAP draws legend text at a fixed size whatever the width, so the card
+// sizes itself to the image rather than scaling it.
 export const GRIDDAP_LEGEND_WIDTH = 360;
 
-// ERDDAP's WMS has no GetLegendGraphic; the griddap .png endpoint's
-// &.legend=Only mode is the colorbar source. The query must constrain every
-// dimension in dataset order: the slice being drawn on the map for time and
-// for the vertical axis, the first level of any other non-spatial dimension,
-// and strided lat/lon to keep the server-side read cheap (the legend only
-// depends on the variable's palette + range).
-//
-// The slice is named rather than left at `last` because ERDDAP writes the
-// constraints it was given into the image, underneath the dataset title — so
-// the caption the card leans on says what is actually on the map.
+// ERDDAP's WMS has no GetLegendGraphic, so this uses griddap .png
+// &.legend=Only, which must constrain every dimension in dataset order; lat/lon
+// are strided to keep the read cheap. The drawn slice is named rather than
+// `last` because ERDDAP prints the constraints into the legend's caption.
 export function buildGriddapLegendUrl({
   erddapUrl,
   variable,
@@ -94,8 +79,7 @@ export function buildGriddapLegendUrl({
       if (dim.name === "time") {
         return time ? `[(${normalizeIsoTime(time)})]` : "[(last)]";
       }
-      // Back from the WMS request's altitude into whatever the dataset's own
-      // axis counts in — the same negation either way round.
+      // Altitude back to the axis's own units: the negation is its own inverse.
       if (
         dim === verticalDimension &&
         elevation !== undefined &&
@@ -113,10 +97,6 @@ export function buildGriddapLegendUrl({
   );
 }
 
-// The WMS default: the first variable representing a currently-selected EOV,
-// then the first representing any of the dataset's EOVs, then the first
-// variable. `variable.eovs` is attached at harvest time (empty on datasets
-// harvested before that change, so the final fallback keeps the overlay usable).
 export function pickDefaultVariable(variables, selectedEovTitles) {
   const list = variables || [];
   const selected = selectedEovTitles || [];
@@ -129,12 +109,7 @@ export function pickDefaultVariable(variables, selectedEovTitles) {
   );
 }
 
-// The slice of the grid the overlay is drawing, as share-link params and back
-// — the variable, the instant, and the level. What the map is painting rather
-// than what the dataset offers, so a link reopens the page on the same field
-// instead of on the dataset's defaults. Named short like the rest of the
-// link's params (see UrlSync); `z` is the ELEVATION the WMS request carries,
-// which is altitude, not depth (see toElevation).
+// `z` is the WMS ELEVATION, which is altitude, not depth.
 export function wmsSliceParams(overlay) {
   const params = {};
   if (overlay.variable?.name) params.var = overlay.variable.name;
@@ -151,28 +126,15 @@ export function wmsSliceFromParams(searchParams) {
   const time = searchParams.get("date");
   const elevation = Number.parseFloat(searchParams.get("z"));
   if (variable) slice.variable = variable;
-  // Only a time the rails can place: they snap it onto one of the axis's own
-  // nodes by arithmetic (see GridSlice), and NaN snaps to NaN — which reaches
-  // `new Date(...).toISOString()` and throws, taking the card down with it.
+  // An unparseable time snaps to NaN and throws in toISOString(), crashing the card.
   if (time && Number.isFinite(Date.parse(time))) slice.time = time;
   if (Number.isFinite(elevation)) slice.elevation = elevation;
   return Object.keys(slice).length ? slice : undefined;
 }
 
-/*
- * The live time axis, read from ERDDAP on demand.
- *
- * A rolling griddap product -- many satellite grids keep only the last week or
- * two -- moves both ends of its time axis between harvests, so the harvested
- * copy in `grid_dimensions` would cap the slider short of the newest slice (and
- * on a fast-rolling grid, point at slices the server has already dropped).
- * Reading it when the WMS view opens is what lets the catalogue harvest stay
- * infrequent: nothing has to be kept warm for the slider to be right.
- *
- * Resolves to null rather than throwing on any failure, including a static grid
- * with no time axis (the route answers 404). The caller then keeps the harvested
- * dimensions, which is exactly the behaviour this replaced.
- */
+// Rolling grids move both ends of their time axis between harvests, so the
+// harvested axis would be stale. Null on any failure (a static grid 404s) means
+// keep the harvested dimensions.
 export async function fetchGriddapTimeRange(datasetId) {
   if (!datasetId) return null;
   try {
@@ -187,19 +149,9 @@ export async function fetchGriddapTimeRange(datasetId) {
   }
 }
 
-/*
- * Substitute the live time axis for the harvested one, for the rails' benefit.
- *
- * Applied only to the overlay descriptor that GridSlice and WmsLegend read --
- * never to `dataset.grid_dimensions`, which the inspector's axis cards and
- * GridNodeCount present as harvested fact.
- *
- * Takes the live n_values along with the bounds, and that pairing is the point:
- * gridAxisNodes() derives its step as (max - min) / (count - 1), so moving one
- * end without the count silently stretches every step and lands each marker
- * between slices instead of on one. A field the server did not report falls back
- * to the harvested value.
- */
+// Overlay descriptor only, never `dataset.grid_dimensions` (shown as harvested
+// fact). n_values must move with the bounds: gridAxisNodes() derives its step
+// from both, so updating one alone lands markers between slices.
 export function withLiveTimeDimension(dimensions, liveTime) {
   const dims = dimensions || [];
   if (!liveTime) return dims;
@@ -223,17 +175,6 @@ export function withLiveTimeDimension(dimensions, liveTime) {
   return next;
 }
 
-// The griddap overlay descriptor consumed by the Map image source and the
-// WmsLegend card. Shared by the auto-show-on-inspect effect and the manual
-// "show on map" toggle so both default the variable the same way.
-//
-// `liveTime` is the time axis as the server reports it now
-// (fetchGriddapTimeRange), or null/undefined to keep the harvested one.
-//
-// `slice` is a share link's remembered slice (wmsSliceFromParams), honoured as
-// far as this dataset can: a variable it doesn't serve falls back to the
-// default pick, and a time or level between two of its own nodes is snapped
-// onto one by the rails that read them.
 export function buildWmsOverlay(dataset, selectedEovTitles, slice, liveTime) {
   const dimensions = withLiveTimeDimension(dataset.grid_dimensions, liveTime);
   const variables = dataset.grid_variables || [];
@@ -256,11 +197,7 @@ export function buildWmsOverlay(dataset, selectedEovTitles, slice, liveTime) {
   };
 }
 
-// Clip the WMS request/display extent to the active spatial filter: the
-// intersection of the current viewport bounds and the filter polygon's
-// bounding box. Returns null when the filter lies outside the viewport (the
-// caller skips the render). `polygonRing` is a [lng, lat][] ring, as stored by
-// SelectionProvider.
+// Null when the filter lies outside the viewport.
 export function intersectBoundsWithPolygonBbox(bounds, polygonRing) {
   if (!polygonRing || polygonRing.length < 4) return bounds;
   let west = Infinity;
@@ -290,10 +227,7 @@ function mercatorY(latDeg) {
   return Math.log(Math.tan(Math.PI / 4 + lat / 2));
 }
 
-// Resample an equirectangular (EPSG:4326) GetMap image onto a Mercator grid:
-// every destination row is uniform in Mercator Y, its latitude picks the
-// source row (uniform in latitude). One 1-px-high drawImage per output row —
-// a few ms for a viewport-sized image.
+// One 1-px-high drawImage per output row: a few ms for a viewport-sized image.
 export function warpEquirectToMercator(
   img,
   latMinDeg,
@@ -333,12 +267,7 @@ export function getTimeDimension(dimensions) {
   return (dimensions || []).find((dim) => dim.name === "time");
 }
 
-// The slices a grid axis actually holds, as plain numbers: its two endpoints
-// and how many nodes lie between them. ERDDAP's axes are evenly spaced, so the
-// nodes can be reconstructed from the harvested metadata alone — which is what
-// lets the markers on the time and depth bars land on slices the dataset has
-// rather than on interpolated values between them. Null when the axis is
-// missing, degenerate, or a single slice (nothing to move along).
+// ERDDAP axes are evenly spaced, so nodes rebuild from endpoints and count.
 export function gridAxisNodes(min, max, count) {
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
   if (!count || count < 2) return null;
@@ -363,9 +292,7 @@ export function toElevation(verticalDimension, value) {
   return verticalDimension.name === "depth" ? -value : value;
 }
 
-// Only the range endpoints are known from the harvested metadata; the default
-// level is the endpoint nearest the surface. (ERDDAP snaps TIME/ELEVATION to
-// the nearest grid node, so interpolated slider values are safe too.)
+// The endpoint nearest the surface.
 export function defaultElevation(dimensions) {
   const verticalDim = getVerticalDimension(dimensions);
   if (
@@ -390,9 +317,6 @@ export function formatGridSize(dimensions) {
   return `${lon.n_values}×${lat.n_values}`;
 }
 
-// Node count broken down into its factors, e.g. longitude × latitude × time ×
-// depth. Spatial axes lead (the order the count is usually quoted in); any
-// dimension the grid doesn't have is simply absent.
 const GRID_NODE_DIMENSION_ORDER = [
   "longitude",
   "latitude",

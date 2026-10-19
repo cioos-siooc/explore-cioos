@@ -11,10 +11,9 @@ import {
   isDownwardVertical,
 } from "./previewVariables.js";
 
-// The real payload shape of /api/preview?dataset=mpoPmzaVikingCtdInsitu — a
-// TimeSeriesProfile with 14 columns: 4 coordinates + 2 lat/lon observation
-// columns, 2 cf_role ids, and 6 measurements. This is the dataset the faceting
-// was reported against.
+// The real /api/preview?dataset=mpoPmzaVikingCtdInsitu payload: a
+// TimeSeriesProfile with 4 coordinates, 2 lat/lon observation columns, 2 cf_role
+// ids and 6 measurements.
 const VIKING = {
   columnNames: [
     "station_id",
@@ -155,8 +154,7 @@ const VIKING_DATASET = {
   profile_id_variable: "profile",
 };
 
-// Same dataset as a catalogue that has not been reharvested since
-// datasets.table_variables was added: no columnMeta key at all.
+// Same dataset before a reharvest: no columnMeta key at all.
 const VIKING_NO_META = {
   columnNames: VIKING.columnNames,
   columnTypes: VIKING.columnTypes,
@@ -206,8 +204,7 @@ test("cf_role columns are ids, not panels", () => {
 });
 
 test("the dataset id columns are excluded even with no columnMeta", () => {
-  // This is the only path to id detection before a reharvest: shapeQuery.js has
-  // been sending these three names all along.
+  // The only path to id detection before a reharvest.
   const index = byColumnName(variablesFrom(VIKING_NO_META, VIKING_DATASET));
   assert.equal(index.get("station_id").kind, "id");
   assert.equal(index.get("profile").kind, "id");
@@ -267,8 +264,6 @@ test("a _qc suffix is dropped when no metadata declares the link", () => {
 });
 
 test("ioos_category Identifier / Time / Location are honoured", () => {
-  // Authoritative where declared (~48% of variables) and it needs no naming
-  // convention to work.
   const table = {
     columnNames: ["record_id", "year", "site", "temperature"],
     columnTypes: ["int", "uint", "float", "float"],
@@ -288,8 +283,6 @@ test("ioos_category Identifier / Time / Location are honoured", () => {
 });
 
 test("an ERDDAP time-format unit marks a coordinate", () => {
-  // mpoEaeTemperature publishes `year` as units "CCYY-MM-DD"; as a plain number
-  // it cluttered the variable picker.
   const table = {
     columnNames: ["year", "temperature"],
     columnTypes: ["uint", "float"],
@@ -301,8 +294,7 @@ test("an ERDDAP time-format unit marks a coordinate", () => {
 });
 
 test("an ID-suffixed column is an id even when nothing declares it", () => {
-  // minilogID is an instrument serial number whose ioos_category is only
-  // "Other" — the name is the only signal there is.
+  // minilogID's ioos_category is only "Other"; the name is the only signal.
   const table = {
     columnNames: ["minilogID", "sensor_id", "temperature", "fluid", "humid"],
     columnTypes: ["int", "int", "float", "float", "float"],
@@ -311,7 +303,6 @@ test("an ID-suffixed column is an id even when nothing declares it", () => {
   const index = byColumnName(variablesFrom(table, {}));
   assert.equal(index.get("minilogID").kind, "id");
   assert.equal(index.get("sensor_id").kind, "id");
-  // The rule must not catch a variable that merely ends in the letters i-d.
   assert.equal(index.get("fluid").kind, "measurement");
   assert.equal(index.get("humid").kind, "measurement");
   assert.equal(index.get("temperature").kind, "measurement");
@@ -394,21 +385,17 @@ test("a cf_role is read from the harvest, or inferred from the dataset", () => {
   assert.equal(index.get("profile").cfRole, "profile_id");
   assert.equal(index.get("TE90_01").cfRole, null);
 
-  // No columnMeta at all — the state of every dataset until a harvest with
-  // incremental: false runs — so the roles come from the three fields
-  // shapeQuery.js has been sending all along.
+  // No columnMeta at all, so the roles come from the dataset's id fields.
   const noMeta = byColumnName(variablesFrom(VIKING_NO_META, VIKING_DATASET));
   assert.equal(noMeta.get("station_id").cfRole, "timeseries_id");
   assert.equal(noMeta.get("profile").cfRole, "profile_id");
 
-  // And with neither, nothing is invented.
   const neither = byColumnName(variablesFrom(VIKING_NO_META, {}));
   assert.equal(neither.get("station_id").cfRole, null);
 });
 
 test("the harvest wins where the two disagree", () => {
-  // The dataset fields are one inference away from what ERDDAP publishes per
-  // variable, so they only fill a gap.
+  // The dataset fields only fill a gap.
   const index = byColumnName(
     variablesFrom(VIKING, {
       ...VIKING_DATASET,
@@ -424,8 +411,7 @@ test("the id columns come back in ERDDAP order — that is title order", () => {
     idVariablesFor(variables).map((variable) => variable.columnName),
     ["station_id", "profile"],
   );
-  // An id by name or by ioos_category is not a cf_role and does not name the
-  // record: mpoEaeTemperature's minilogID is an instrument serial.
+  // An id by name or ioos_category is not a cf_role and does not name the record.
   const table = {
     columnNames: ["minilogID", "TE90"],
     columnTypes: ["String", "float"],

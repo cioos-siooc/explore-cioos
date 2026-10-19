@@ -1,10 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.obis.discovery.
-
-No network: every HTTP call goes through an injected fake session. The one test
-that touches real data reads the packaged boundary polygon off disk to pin the
-validated simplify recipe.
-"""
+"""Unit tests for cde_harvester.sources.obis.discovery; HTTP goes through a fake session."""
 
 from unittest.mock import MagicMock
 
@@ -45,10 +39,7 @@ def geo_filter(polygon_file):
 
 
 def fake_session(responses):
-    """Session whose .get() returns queued payloads in order.
-
-    Each entry is either a dict payload, or an Exception to raise.
-    """
+    """Session whose .get() returns queued payloads in order (an Exception entry raises)."""
     session = MagicMock()
     queue = list(responses)
 
@@ -68,10 +59,6 @@ def fake_session(responses):
 def payload(ids):
     return {"total": len(ids), "results": [{"id": i} for i in ids]}
 
-
-# ---------------------------------------------------------------------------
-# ObisDiscoveryConfig.from_config
-# ---------------------------------------------------------------------------
 
 class TestDiscoveryConfig:
     def test_absent_block_is_disabled(self):
@@ -121,10 +108,6 @@ class TestDiscoveryConfig:
         assert cfg.geometry == "eez"
 
 
-# ---------------------------------------------------------------------------
-# simplify_for_query
-# ---------------------------------------------------------------------------
-
 class TestSimplifyForQuery:
     def test_result_contains_original(self):
         wkt, _ = simplify_for_query(TEST_POLYGON, tolerance=0.25, max_bytes=4500)
@@ -156,10 +139,6 @@ class TestSimplifyForQuery:
         assert len(wkt.encode()) <= 4500
         assert shp_wkt.loads(wkt).contains(polygon)
 
-
-# ---------------------------------------------------------------------------
-# _query
-# ---------------------------------------------------------------------------
 
 class TestQuery:
     def _discovery(self, responses, **cfg_overrides):
@@ -208,10 +187,6 @@ class TestQuery:
         d = self._discovery([payload([])])
         assert d._query("geometry", {"geometry": "..."}, allow_empty=True) == []
 
-
-# ---------------------------------------------------------------------------
-# discover()
-# ---------------------------------------------------------------------------
 
 class TestDiscover:
     def _discover(self, responses, geo_filter=None, **cfg):

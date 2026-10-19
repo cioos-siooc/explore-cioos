@@ -90,9 +90,9 @@ Postgres or Docker behaviour. Keep that.
 - One concern per PR. The backlog items in `TODO-cde-revisions.md` are written
   to be taken one at a time.
 - `CODEOWNERS` requests review automatically.
-- Deploys are automatic on `master` (production) and `development`
-  (development) once **Integration Tests** passes — see
-  `.github/workflows/deploy.yml`.
+- Deploys are triggered by publishing a GitHub release, not by merging: `beta*`
+  deploys beta, `vX.Y.Z-rc.N` staging, `vX.Y.Z` production — see
+  "Deployment" in `README.md` and `.github/workflows/deploy.yml`.
 
 ## Things that will bite you
 

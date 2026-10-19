@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import Modal from "../../ui/Modal.jsx";
 import FiltersPanel from "../Panels/FiltersPanel.jsx";
+import TipCard from "../../Controls/Tips/TipCard.jsx";
 import { useFilterSearchShortcut } from "../FilterSearch/FilterSearch.jsx";
 import useMediaQuery, {
   MOBILE_QUERY,
@@ -13,10 +14,7 @@ import useActiveFilters from "../../../state/useActiveFilters.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
-// The filter-management modal, launched from the Filters button beside the
-// sidebar, or on its search page from anywhere (see useFilterSearchShortcut).
-// Hosts the master/detail FiltersPanel; filters apply to the map live, so
-// closing is just dismissal — there is no confirm step.
+// Filters apply live, so closing is just dismissal.
 export default function FiltersModal() {
   const { t } = useTranslation();
   const activeFilterCount = useActiveFilters().length;
@@ -30,14 +28,13 @@ export default function FiltersModal() {
   } = useUI();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   useFilterSearchShortcut(openFilterSearch);
-  // The search box takes the caret, except on a phone opened from the Filters
-  // button: there the keyboard would cover the list it was opened to browse.
+  // Not focused on a phone opened from the Filters button: the keyboard would
+  // cover the list it was opened to browse.
   const searchInputRef = useRef(null);
   const focusSearch = !isMobile || filterSearchText !== null;
 
-  // openFilter is a translation key for most filters but an already-translated
-  // label for the two range ones (see FiltersPanel), and i18next returns an
-  // unknown key unchanged — so t() is the right call for both shapes.
+  // A translation key for most filters, an already-translated label for the
+  // range ones; i18next returns unknown keys unchanged, so t() suits both.
   const openFilterName = openFilter ? t(openFilter) : "";
 
   return (
@@ -45,6 +42,7 @@ export default function FiltersModal() {
       show={showFiltersModal}
       onHide={() => setShowFiltersModal(false)}
       className="filtersModal"
+      sheet
       data-testid="filters-modal"
       dialogClassName="filtersModalDialog"
       aria-labelledby="filtersModalTitle"
@@ -57,10 +55,8 @@ export default function FiltersModal() {
           </span>
           <span className="filtersModalTitleText">
             <span className="filtersModalTitleRow">
-              {/* On a phone the open filter covers the list it was chosen from
-                  (Panels/styles.css), so this is the way back to it. At wider
-                  widths the list is still on screen beside the filter, and the
-                  open filter's name is only ever named below, in the subtitle. */}
+              {/* On a phone the open filter covers the list, so this is the
+                  way back. */}
               {isMobile && openFilterName ? (
                 <button
                   type="button"
@@ -93,6 +89,7 @@ export default function FiltersModal() {
           </span>
         </Modal.Title>
       </Modal.Header>
+      <TipCard inModal="filters" />
       <Modal.Body>
         <FiltersPanel searchInputRef={searchInputRef} />
       </Modal.Body>

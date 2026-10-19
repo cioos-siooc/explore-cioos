@@ -1,26 +1,18 @@
-"""
-Unit tests for cde_harvester.loading.loader.
-
-Tests cover:
-1. Pure helper functions (prepare_profiles_dataframe, ensure_organization_pks)
-2. Full-reload mode: correct SQL functions called, data written to right tables
-3. Incremental mode: temp tables created and process_incremental_update called
-"""
+"""Unit tests for cde_harvester.loading.loader."""
 
 from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
 from cde_harvester.loading.loader import (
+    _append_run_audit,
     ensure_organization_pks,
     load_cells_copy,
     main,
     prepare_profiles_dataframe,
+    record_failed_run,
 )
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
@@ -63,10 +55,7 @@ def _patch_loader(mock_engine, mocker):
 
 
 def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
-    """
-    Shared helper: patch create_db_engine and capture SQL strings passed to text().
-    Returns the list of SQL strings that were executed.
-    """
+    """Patch create_db_engine; return the SQL strings passed to text()."""
     mock_text = _patch_loader(mock_engine, mocker)
 
     main.fn(harvest_folder, incremental=incremental)
@@ -75,11 +64,9 @@ def _run_main(harvest_folder, mock_engine, mocker, incremental=False):
 
 
 def _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False, scalar=0):
-    """Run main() and return its summary dict. `scalar` is what every
-    `.scalar()` call yields — notably prune_stale_datasets' removed-row count,
-    which feeds the summary's `pruned` (a bare MagicMock would read as truthy
-    and make every run look changed). It has to be set on both the begin() and
-    connect() chains: the load runs on the former, the prune on the latter."""
+    """Run main() and return its summary. `scalar` feeds prune_stale_datasets'
+    removed-row count (a bare MagicMock reads as truthy, so every run would look
+    changed); set on both begin() (load) and connect() (prune) chains."""
     engine, conn = mock_engine
     conn.execute.return_value.scalar.return_value = scalar
     (
@@ -90,10 +77,6 @@ def _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False, sc
 
     return main.fn(harvest_folder, incremental=incremental)
 
-
-# ---------------------------------------------------------------------------
-# Pure function tests
-# ---------------------------------------------------------------------------
 
 class TestPrepareProfilesDataframe:
     def test_removes_altitude_columns(self, sample_profiles_df):
@@ -170,14 +153,9 @@ class TestEnsureOrganizationPks:
         assert all(isinstance(v, list) for v in result["organization_pks"])
 
 
-# ---------------------------------------------------------------------------
-# main() — full reload mode
-# ---------------------------------------------------------------------------
-
 class TestDbLoaderMainFullReload:
     def test_no_constraint_ddl_toggling(self, harvest_folder, mock_engine, mocker):
-        # Full reload no longer drops/re-adds constraints via ALTER TABLE:
-        # columns are permanently NULL-able and the hex FKs are DEFERRABLE.
+        # Constraints are permanent: NULL-able columns, DEFERRABLE hex FKs.
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=False)
         assert not any("drop_constraints" in s for s in sql_calls)
 
@@ -202,10 +180,6 @@ class TestDbLoaderMainFullReload:
         assert any("refresh_hexes_zoom_0_rollup" in s for s in sql_calls)
 
 
-# ---------------------------------------------------------------------------
-# main() — incremental mode
-# ---------------------------------------------------------------------------
-
 class TestDbLoaderMainIncremental:
     def test_create_temp_tables_called(self, harvest_folder, mock_engine, mocker):
         sql_calls = _run_main(harvest_folder, mock_engine, mocker, incremental=True)
@@ -228,10 +202,6 @@ class TestDbLoaderMainIncremental:
         assert not any("drop_constraints" in s for s in sql_calls)
         assert not any("remove_all_data" in s for s in sql_calls)
 
-
-# ---------------------------------------------------------------------------
-# main() — the summary it returns
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def unchanged_harvest_folder(tmp_path, sample_datasets_df, sample_profiles_df, sample_skipped_df):
@@ -283,3 +253,89 @@ class TestLoadSummary:
         summary = _run_main_summary(harvest_folder, mock_engine, mocker, incremental=False)
         assert summary["changed"] is True
         assert summary["full_reload"] is True
+
+
+RUN_ID = "11111111-1111-1111-1111-111111111111"
+
+
+def _write_audit(folder, run_status, run_error=None):
+    pd.DataFrame([{
+        "run_id": RUN_ID,
+        "started_at": "2026-10-09T00:00:00Z",
+        "finished_at": "2026-10-09T00:10:00Z",
+        "status": run_status,
+        "error_message": run_error,
+    }]).to_csv(folder / "harvest_runs.csv", index=False)
+    pd.DataFrame([
+        {"run_id": RUN_ID, "erddap_url": "https://e/erddap", "dataset_id": "ok",
+         "status": "success", "reason_code": None, "error_message": None,
+         "attempted_at": "2026-10-09T00:05:00Z"},
+        {"run_id": RUN_ID, "erddap_url": "https://e/erddap", "dataset_id": "bad",
+         "status": "error", "reason_code": "HTTP_ERROR", "error_message": "500",
+         "attempted_at": "2026-10-09T00:06:00Z"},
+    ]).to_csv(folder / "harvest_attempts.csv", index=False)
+
+
+@pytest.fixture
+def record(mock_engine, mocker):
+    """Run record_failed_run against a run folder; returns the (runs, attempts)
+    frames it appended, or None when it only updated an existing run."""
+    engine, conn = mock_engine
+    mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
+    appended = mocker.patch("cde_harvester.loading.loader._append_run_audit")
+
+    def _record(folder, error, already_committed=False):
+        conn.execute.return_value.rowcount = 1 if already_committed else 0
+        assert record_failed_run(str(folder), error)
+        if not appended.called:
+            return None
+        _con, runs, attempts = appended.call_args.args
+        return runs, attempts
+
+    return _record
+
+
+class TestRecordFailedRun:
+    def test_harvest_failure_keeps_its_own_message_and_attempts(self, tmp_path, record):
+        _write_audit(tmp_path, "failed", "RuntimeError: No datasets harvested")
+        runs, attempts = record(tmp_path, "RuntimeError: No datasets harvested")
+        assert runs.loc[0, "status"] == "failed"
+        assert runs.loc[0, "error_message"] == "RuntimeError: No datasets harvested"
+        assert list(attempts["status"]) == ["success", "error"]
+
+    def test_load_failure_marks_harvested_datasets_as_not_loaded(self, tmp_path, record):
+        _write_audit(tmp_path, "ok")
+        runs, attempts = record(tmp_path, "OperationalError: deadlock")
+        assert runs.loc[0, "status"] == "failed"
+        assert runs.loc[0, "error_message"] == "OperationalError: deadlock"
+        ok = attempts.set_index("dataset_id").loc["ok"]
+        assert (ok["status"], ok["reason_code"]) == ("error", "LOAD_FAILED")
+        assert ok["error_message"] == "OperationalError: deadlock"
+        bad = attempts.set_index("dataset_id").loc["bad"]
+        assert (bad["status"], bad["reason_code"]) == ("error", "HTTP_ERROR")
+
+    def test_failure_after_commit_only_flags_the_run(self, tmp_path, record):
+        _write_audit(tmp_path, "ok")
+        assert record(tmp_path, "boom", already_committed=True) is None
+
+    def test_missing_audit_csvs_record_nothing(self, tmp_path, mock_engine, mocker):
+        engine, _conn = mock_engine
+        mocker.patch("cde_harvester.loading.loader.create_db_engine", return_value=engine)
+        assert record_failed_run(str(tmp_path), "boom") is False
+        engine.begin.assert_not_called()
+
+
+class TestAppendRunAudit:
+    def test_warnings_are_written_as_parsed_jsonb(self, mocker):
+        to_sql = mocker.patch.object(pd.DataFrame, "to_sql", autospec=True)
+        attempts = pd.DataFrame({
+            "dataset_id": ["a", "b"],
+            "warnings": ['[{"code": "FEATURES_HIDDEN", "message": "m"}]', None],
+        })
+        _append_run_audit(MagicMock(), None, attempts)
+        written, table = to_sql.call_args.args[:2]
+        assert table == "harvest_attempts"
+        assert written["warnings"].tolist() == [
+            [{"code": "FEATURES_HIDDEN", "message": "m"}], None,
+        ]
+        assert type(to_sql.call_args.kwargs["dtype"]["warnings"]).__name__ == "JSONB"

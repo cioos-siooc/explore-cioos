@@ -1,6 +1,4 @@
-/* The Filters modal's search page, in the detail pane beside the list (the
-   same slot an open filter's options take; see Panels/styles.css): the box
-   stays put while the results under it scroll. */
+/* The box stays put while the results under it scroll. */
 .filterSearchPage {
   position: absolute;
   inset: 12px 12px 12px 296px;
@@ -36,6 +34,50 @@
   font: inherit;
   font-size: var(--cioos-font-size-lg);
   color: var(--cioos-ink);
+}
+
+/* An indeterminate line along the box's bottom edge while places, the slow
+   part of the search, are still on their way. */
+.filterSearchField.busy {
+  position: relative;
+  overflow: hidden;
+}
+
+.filterSearchField.busy::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  height: 2px;
+  background-color: var(--cioos-primary);
+  animation: filterSearchBusy 1.2s ease-in-out infinite;
+}
+
+@keyframes filterSearchBusy {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filterSearchField.busy::after {
+    width: 100%;
+    animation: none;
+  }
+}
+
+.filterSearchPendingText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-60);
 }
 
 .filterSearchClear {
@@ -94,8 +136,6 @@
   color: var(--cioos-ink-60);
 }
 
-/* To the filter's own page, for the options a search does not reach (its
-   whole list, the match-all switch, the date and depth pickers). */
 .filterSearchGroupOpen {
   display: inline-flex;
   align-items: center;
@@ -134,8 +174,6 @@
   cursor: pointer;
 }
 
-/* Applied values read as they do in the Filters lists: a teal row for
-   included, a red struck-through one for excluded. */
 .filterSearchOption[data-state="include"] {
   background-color: var(--cioos-teal-light);
 }
@@ -152,15 +190,12 @@
   text-decoration: line-through;
 }
 
-/* The keyboard position, drawn as an outline rather than a fill so it stays
-   visible on top of an applied row's own colour. */
+/* An outline, not a fill, so it stays visible over an applied row's colour. */
 .filterSearchOption.active {
   background-color: var(--cioos-surface-2);
   box-shadow: inset 0 0 0 1px var(--cioos-primary-700);
 }
 
-/* Typing an exclusion ("-", "not"): the row Enter would act on, and its
-   action, turn red, the colour excluded values carry everywhere. */
 .filterSearchPage.excluding .filterSearchOption.active {
   background-color: var(--cioos-error-bg);
   box-shadow: inset 0 0 0 1px var(--cioos-error-700);
@@ -221,6 +256,22 @@
   color: var(--cioos-error);
 }
 
+.filterSearchOption.shortcut:not([data-state="exclude"]) {
+  background-color: var(--cioos-teal-light);
+}
+
+.filterSearchOptionTag {
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary-700);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  color: var(--cioos-white);
+}
+
 .filterSearchOptionHint {
   margin-left: 6px;
   font-weight: 400;
@@ -244,6 +295,27 @@
 
 .filterSearchOption.active .filterSearchOptionAction {
   visibility: visible;
+}
+
+.filterSearchOptionSecondary {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  color: var(--cioos-ink);
+  font: inherit;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filterSearchOptionSecondary:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-teal-light);
 }
 
 .filterSearchEmpty {
@@ -289,8 +361,7 @@
   color: var(--cioos-ink);
 }
 
-/* Held to the label's width, so naming the other categories wraps under it
-   rather than widening the column every row shares. */
+/* Held to the label's width so it wraps rather than widening the shared column. */
 .filterSearchHelpNote {
   width: 0;
   min-width: 100%;
@@ -371,10 +442,8 @@
   margin-left: 8px;
 }
 
-/* Phone: one column, so the search sits above the list rather than beside
-   it, and takes the whole surface only once something is typed (see
-   .filtersPanel.searching in Panels/styles.css). The key legend (no keyboard
-   to speak of) and the help give their room back to the list. */
+/* Phone: the search takes the whole surface only once something is typed (see
+   .filtersPanel.searching in Panels/styles.css). */
 @media (max-width: 700px), (max-height: 500px) {
   .filterSearchPage {
     position: static;

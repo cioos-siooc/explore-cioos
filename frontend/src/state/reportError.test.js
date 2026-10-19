@@ -38,4 +38,42 @@ describe("reportError", () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
+
+  it.each([
+    "Failed to fetch (explore.dev.cioos.ca)",
+    "NetworkError when attempting to fetch resource.",
+    "Load failed",
+  ])(
+    "groups a network failure (%s) into one warning across call sites",
+    (message) => {
+      const consoleWarn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+      const error = new TypeError(message);
+
+      reportError("legend fetch failed", error);
+
+      expect(consoleWarn).toHaveBeenCalledWith("legend fetch failed:", error);
+      expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+        level: "warning",
+        fingerprint: ["fetch-network-failure"],
+        tags: { context: "legend fetch failed" },
+      });
+      consoleWarn.mockRestore();
+    },
+  );
+
+  it("still reports an unrelated TypeError as an error", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const error = new TypeError("x is undefined");
+
+    reportError("pointQuery failed", error);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+      tags: { context: "pointQuery failed" },
+    });
+    consoleError.mockRestore();
+  });
 });

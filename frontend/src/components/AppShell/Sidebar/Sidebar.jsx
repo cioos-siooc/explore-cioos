@@ -1,10 +1,11 @@
 import * as React from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
+  Dash,
   Download,
   FileEarmarkText,
   ListUl,
-  Map as MapIcon,
   PlusCircle,
   QuestionCircle,
 } from "react-bootstrap-icons";
@@ -12,27 +13,25 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
+import { useChanged } from "../../../utilities.jsx";
 import CloseButton from "../../ui/CloseButton.jsx";
+import useSheetDrag from "../../ui/useSheetDrag.js";
 import DatasetsPanel from "../Panels/DatasetsPanel.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
+import useBackDismiss from "../../../state/ui/useBackDismiss.js";
+import useMediaQuery, {
+  MOBILE_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
+import "../../ui/sheetHandleStyles.css";
 
-// The left column: the datasets card — a header naming the list, the list
-// itself, and the Download footer. (The brand and the
-// Datasets/Filters entry points live in the centered top bar, which is also
-// what asks for this card.) On phones the same card takes the whole screen;
-// closed, nothing of it is left at any edge.
-// Drilling into a single dataset swaps that header for a banner naming the way
-// back and the surface in view: the card hosts two different surfaces, and the
-// header is what tells them apart.
-// The list's way out is the app's one close button, in the corner. A dataset
-// page has two: Map minimizes it to a card (see DatasetMapCard), keeping the
-// map keyed to it, and the X leaves the dataset and closes the card, as the
-// minimized card's own X does.
+// A dataset page swaps the header for a banner so the two surfaces the card
+// hosts can be told apart. Map minimizes the page to a card (DatasetMapCard),
+// keeping the map keyed to it; the X leaves the dataset.
 export default function Sidebar() {
   const { t } = useTranslation();
   const { pointsToReview, inspectDataset, returnToDatasetList } =
@@ -43,9 +42,8 @@ export default function Sidebar() {
     setShowDownloadModal,
     setShowSelectionHelpModal,
   } = useUI();
-  const { tipHighlight } = useTips();
-  // Until `ready`, there is no dataset count to show — not even a zero. See
-  // useDatasetCounts.
+  const { offerTip, tipHighlight } = useTips();
+  // Until `ready` there is no count to show, not even a zero.
   const {
     ready: countsReady,
     updating: countsUpdating,
@@ -54,12 +52,28 @@ export default function Sidebar() {
   } = useDatasetCounts();
 
   const expanded = sidebarOpen;
-  // The panel is on a single dataset rather than the list. The banner swaps
-  // with it, so the card never leaves the user guessing which of the two
-  // surfaces they are on — and the way back is in the banner, not buried in
-  // the dataset's own title block.
+  // On a phone the card is a bottom sheet like the Filters, Download and
+  // Coverage ones: dragged down by its handle or header, and closed by Back.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const cardRef = useRef(null);
+  const startDrag = useSheetDrag(cardRef, () => setSidebarOpen(false));
+  // Raised over a dataset page (a map click, a share link, the minimized
+  // card), the sheet takes no history entry: it would sit above the page's own,
+  // and leaving the page from in here and then closing the sheet would pop back
+  // onto the page just left. Back closes the page first instead.
+  const [backable, setBackable] = useState(false);
+  if (useChanged(expanded) && expanded) setBackable(!inspectDataset);
+  useBackDismiss(isMobile && expanded && backable, () => setSidebarOpen(false));
   const inspecting = Boolean(inspectDataset);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
+  // Adding to the selection is when download tips start to matter.
+  const lastSelectedCount = useRef(selectedCount);
+  useEffect(() => {
+    if (selectedCount > lastSelectedCount.current) {
+      offerTip(["filtersCutDownload", "directLinks"]);
+    }
+    lastSelectedCount.current = selectedCount;
+  }, [selectedCount, offerTip]);
 
   const collapseButton = (
     <CloseButton
@@ -76,15 +90,28 @@ export default function Sidebar() {
       data-testid="sidebar"
     >
       <section
+        ref={cardRef}
         className={classNames("sidebarDatasets", { expanded })}
         data-testid="sidebar-datasets"
         data-expanded={expanded}
         data-map-cover={expanded || undefined}
+        onPointerDown={
+          isMobile
+            ? (event) => {
+                if (
+                  event.target.closest(
+                    ".sheetHandle, .datasetsHeader, .datasetsBanner",
+                  )
+                )
+                  startDrag(event);
+              }
+            : undefined
+        }
       >
+        {isMobile && <div className="sheetHandle" aria-hidden="true" />}
         {inspecting ? (
           <div className="datasetsBanner">
-            {/* The label names the destination rather than the surface it
-                leaves, so it needs no tooltip to say where it goes. */}
+            {/* Names the destination, so it needs no tooltip. */}
             <button
               type="button"
               className="datasetsBackButton"
@@ -102,16 +129,12 @@ export default function Sidebar() {
               <FileEarmarkText size={13} aria-hidden="true" />
               {t("sidebarDatasetDetailsLabel")}
             </span>
-            <button
-              type="button"
-              className="datasetsMapButton"
-              data-testid="sidebar-collapse"
+            <CloseButton
+              label={t("sidebarShowMapTitle")}
               onClick={() => setSidebarOpen(false)}
-              title={t("sidebarShowMapTitle")}
-            >
-              <MapIcon size={14} aria-hidden="true" />
-              <span>{t("sidebarShowMapText")}</span>
-            </button>
+              icon={Dash}
+              testId="sidebar-collapse"
+            />
             <CloseButton
               label={t("closeDatasetText")}
               onClick={() => {
@@ -156,8 +179,7 @@ export default function Sidebar() {
           <DatasetsPanel />
         </div>
         <footer className="sidebarFooter" data-testid="sidebar-footer">
-          {/* The per-card control is a bare icon, so the line naming it sits
-              beside the button it feeds; the full sentence is its tooltip. */}
+          {/* The per-card control is a bare icon, so this line names it. */}
           <p
             className="sidebarFooterHint"
             title={t("sidebarSelectionHintTitle")}
@@ -182,7 +204,9 @@ export default function Sidebar() {
           <button
             type="button"
             className="sidebarDownloadButton"
-            data-tip-highlight={tipHighlight("sizeLimit")}
+            data-tip-highlight={
+              tipHighlight("filtersCutDownload") || tipHighlight("directLinks")
+            }
             disabled={selectedCount === 0}
             onClick={() => setShowDownloadModal(true)}
             title={t("dockDownloadCountTitle", { count: selectedCount })}
@@ -190,8 +214,7 @@ export default function Sidebar() {
             <Download size={16} aria-hidden="true" />
             <span className="sidebarDownloadText">
               {t("downloadModalButtonText")}
-              {/* Keyed on the count so each add or removal replays the pulse,
-                  tying the card's + to the button it fed. */}
+              {/* Keyed on the count so each change replays the pulse. */}
               <span className="sidebarDownloadCount" key={selectedCount}>
                 {t("sidebarCountsSelected", { count: selectedCount })}
               </span>

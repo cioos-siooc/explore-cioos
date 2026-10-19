@@ -23,6 +23,7 @@ from cde_harvester.core.errors import (
     ResponseTooLargeError,
 )
 from cde_harvester.core.frame_spill import SpillSet
+from cde_harvester.core.harvest_warnings import FEATURES_HIDDEN, TRACKS_UNAVAILABLE
 from cde_harvester.core.issues import erddap_error_text
 from cde_harvester.core.schemas import (
     DatasetSchema,
@@ -52,10 +53,8 @@ logger = logging.getLogger(__name__)
 
 
 def _attempt_urls(erddap_url, dataset, dataset_id):
-    """URLs to record for a failed attempt. Prefer the dataset's own
-    queried_urls, but when the failure happened during construction
-    (get_metadata) the dataset object never reached the caller, so fall
-    back to the metadata URL — the request that would have run first."""
+    """A failure during construction (get_metadata) leaves no dataset object,
+    so fall back to the metadata URL, the request that would have run first."""
     queried = getattr(dataset, "queried_urls", None)
     if queried:
         return queried
@@ -65,18 +64,11 @@ def _attempt_urls(erddap_url, dataset, dataset_id):
 def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
                    error_message=None, duration_ms=None, query_urls=None,
                    warnings=None):
-    """Build one harvest_attempts.csv row (kept identical to the legacy
-    record_attempt closure so the harvest-dashboard contract is unchanged).
-
-    ``warnings`` is a non-fatal note surfaced on the harvest dashboard for an
-    otherwise-successful dataset (e.g. features hidden from the map because
-    they span a region)."""
+    """One harvest_attempts.csv row; the shape is the harvest-dashboard contract."""
     urls = list(query_urls or [])
     return {
         "run_id": run_id,
-        # Store the full configured URL (scheme + host + /erddap path) — not
-        # erddap.domain which is just the hostname — so the harvest-dashboard
-        # can build correct /tabledap/ links without a server-list lookup.
+        # Full URL, not erddap.domain: the dashboard builds /tabledap/ links from it.
         "erddap_url": erddap_url.rstrip("/"),
         "dataset_id": dataset_id,
         "source": "erddap",
@@ -92,16 +84,10 @@ def _build_attempt(run_id, erddap_url, dataset_id, status, reason_code=None,
 
 @dataclass
 class DatasetHarvestResult:
-    """Outcome of harvesting a single dataset (success or non-error skip)."""
-
     status: str                      # "success" | "skipped" | "skipped_unchanged"
     attempt: dict                    # one harvest_attempts.csv row
     features: pd.DataFrame = None    # populated only on success
-    # Which HarvestResult attribute `features` belongs in: "profiles" for
-    # point-like types, "trajectory_days" for trajectory per-day aggregates.
-    feature_kind: str = "profiles"
-    # Secondary output (trajectory types only): ordered, downsampled track
-    # fixes for HarvestResult.trajectory_points / cde.trajectory_points.
+    feature_kind: str = "profiles"   # HarvestResult attribute `features` belongs in
     track_points: pd.DataFrame = None
     dataset_df: pd.DataFrame = None
     variables: pd.DataFrame = None
@@ -110,22 +96,20 @@ class DatasetHarvestResult:
 
 
 class DatasetHarvestError(Exception):
-    """Error outcome of harvest_dataset; carries the audit data the caller persists."""
-
     def __init__(self, attempt, skipped_reason_code, message):
         super().__init__(message)
-        self.attempt = attempt                       # error row for harvest_attempts.csv
+        self.attempt = attempt
         self.skipped_reason_code = skipped_reason_code
 
 
-class ERDDAPHarvester(BaseHarvester):
-    """Harvester for ERDDAP servers."""
+# ERDDAP keeps compiling after the gateway gives up (up to ~20 min on
+# dap.oceannetworks.ca) and serves the cached result to the retry.
+GATEWAY_TIMEOUT_RETRY_DELAY = 20 * 60
 
-    # How many datasets' output rows to hold before spilling them to disk (see
-    # core.frame_spill.SpillSet, which owns the mechanism and the rationale).
-    # A server like cioospacific/cioosatlantic carries hundreds of large CTD
-    # profile datasets; holding every one's features until the end of the
-    # server exhausted the container the same way a full OBIS run did.
+
+class ERDDAPHarvester(BaseHarvester):
+    # Datasets held in memory before spilling to disk (core.frame_spill.SpillSet):
+    # hundreds of large CTD datasets on one server exhausted the container.
     DATASET_FLUSH_EVERY = 50
 
     def __init__(self, erddap_url, limit_dataset_ids=None, cache_requests=False,
@@ -151,8 +135,6 @@ class ERDDAPHarvester(BaseHarvester):
         return {}
 
     def harvest(self) -> HarvestResult:
-        # The SpillSet owns a temp dir, so it must be closed even when the
-        # harvest raises; _harvest holds the actual logic.
         with SpillSet(
             flush_every=self.DATASET_FLUSH_EVERY, prefix="erddap_harvest_"
         ) as spills:
@@ -163,8 +145,7 @@ class ERDDAPHarvester(BaseHarvester):
         attempt_records = []
         verified_rows = []
         hostname = urlparse(self.erddap_url).hostname
-        # Same key as the datasets rows: prune_stale_datasets() matches skips
-        # against cde.datasets on it, so a bare hostname never protected one.
+        # prune_stale_datasets() matches skips against cde.datasets on this key.
         erddap_url = self.erddap_url.rstrip("/")
         datasets_to_skip = self.get_datasets_to_skip().get(hostname, [])
 
@@ -225,7 +206,6 @@ class ERDDAPHarvester(BaseHarvester):
                 cdm_type = unsupported_datasets.loc[
                     unsupported_datasets["datasetID"] == dataset_id, "cdm_data_type"
                 ].iloc[0]
-                # No server request issued; record the skip with the info URL.
                 attempt_records.append(_build_attempt(
                     self.run_id, self.erddap_url, dataset_id,
                     status="skipped",
@@ -239,7 +219,6 @@ class ERDDAPHarvester(BaseHarvester):
         if erddap.df_all_datasets.empty:
             raise RuntimeError("No datasets found")
 
-        # Pre-filter the skip-list: these issue no server request.
         on_skip_list = [d for d in df_all_datasets["datasetID"] if d in datasets_to_skip]
         for dataset_id in on_skip_list:
             erddap_logger.info(
@@ -255,69 +234,78 @@ class ERDDAPHarvester(BaseHarvester):
             ))
         if on_skip_list:
             df_all_datasets = df_all_datasets.query("datasetID not in @on_skip_list")
-        # Serial: never hit a server with concurrent requests.
-        total = len(df_all_datasets)
-        for i, df_dataset_row in enumerate(df_all_datasets.itertuples(index=False)):
-            dataset_id = df_dataset_row.datasetID
-            # allDatasets listing extras: which dataStructure the row came from
-            # (tagged by get_all_datasets) and the WMS request URL (griddap
-            # only; empty/NaN when the server has WMS disabled).
-            data_structure = getattr(df_dataset_row, "dataStructure", "table")
-            wms_url = getattr(df_dataset_row, "wms", None)
+
+        def harvest_row(row, idx):
+            data_structure = getattr(row, "dataStructure", "table")
+            wms_url = getattr(row, "wms", None)
             if not isinstance(wms_url, str) or not wms_url:
                 wms_url = None
-            # The listing already carries the server's own view of each
-            # dataset's time coverage, so dataset-level coverage costs no extra
-            # request. It is the only coverage a tabledap dataset gets (the Grid
-            # handler derives its own from the dimension metadata, and wins).
-            # Older ERDDAPs omit these columns entirely, hence getattr.
-            listing_time_min = erddap_time_to_iso(
-                getattr(df_dataset_row, "minTime", None))
-            listing_time_max = erddap_time_to_iso(
-                getattr(df_dataset_row, "maxTime", None))
+            # Older ERDDAPs omit minTime/maxTime, hence getattr.
             try:
-                result = harvest_dataset(
-                    erddap, dataset_id,
+                return harvest_dataset(
+                    erddap, row.datasetID,
                     previous_hashes=previous_hashes,
                     skip_unchanged=self.skip_unchanged,
-                    run_id=self.run_id, idx=i + 1, total=total,
+                    run_id=self.run_id, idx=idx, total=total,
                     data_structure=data_structure, wms_url=wms_url,
-                    listing_time_min=listing_time_min,
-                    listing_time_max=listing_time_max,
+                    listing_time_min=erddap_time_to_iso(getattr(row, "minTime", None)),
+                    listing_time_max=erddap_time_to_iso(getattr(row, "maxTime", None)),
                 )
-                attempt_records.append(result.attempt)
-                if result.status == "success":
-                    if result.feature_kind == "trajectory_days":
-                        spills.append("trajectory_days", result.features)
-                    elif result.feature_kind == "dataset_extent":
-                        # Metadata-only (griddap): the extent lives on the
-                        # dataset row itself, no feature table.
-                        pass
-                    else:
-                        spills.append("profiles", result.features)
-                    spills.append("trajectory_points", result.track_points)
-                    spills.append("datasets", result.dataset_df)
-                    spills.append("variables", result.variables)
-                elif result.status == "skipped_unchanged":
-                    verified_rows.append({
-                        "erddap_url": self.erddap_url.rstrip("/"),
-                        "dataset_id": dataset_id,
-                        "verified_at": result.verified_at,
-                    })
-                elif result.skipped_reason_code:
-                    skipped_datasets_reasons += [
-                        [erddap_url, dataset_id, result.skipped_reason_code]
-                    ]
             except DatasetHarvestError as e:
-                # Record the error and continue to the next dataset.
-                attempt_records.append(e.attempt)
-                skipped_datasets_reasons += [
-                    [erddap_url, dataset_id, e.skipped_reason_code]
-                ]
-            finally:
-                # One unit of work done, whatever the outcome — the spill
-                # cadence must not stall on a server that errors a lot.
-                spills.checkpoint()
+                return e
+
+        def record(dataset_id, outcome):
+            attempt_records.append(outcome.attempt)
+            if isinstance(outcome, DatasetHarvestError):
+                skipped_datasets_reasons.append(
+                    [erddap_url, dataset_id, outcome.skipped_reason_code]
+                )
+            elif outcome.status == "success":
+                if outcome.feature_kind == "trajectory_days":
+                    spills.append("trajectory_days", outcome.features)
+                elif outcome.feature_kind == "dataset_extent":
+                    # Metadata-only: the extent lives on the dataset row.
+                    pass
+                else:
+                    spills.append("profiles", outcome.features)
+                spills.append("trajectory_points", outcome.track_points)
+                spills.append("datasets", outcome.dataset_df)
+                spills.append("variables", outcome.variables)
+            elif outcome.status == "skipped_unchanged":
+                verified_rows.append({
+                    "erddap_url": erddap_url,
+                    "dataset_id": dataset_id,
+                    "verified_at": outcome.verified_at,
+                })
+            elif outcome.skipped_reason_code:
+                skipped_datasets_reasons.append(
+                    [erddap_url, dataset_id, outcome.skipped_reason_code]
+                )
+            # Whatever the outcome, so a server that errors a lot still spills.
+            spills.checkpoint()
+
+        # Serial: never hit a server with concurrent requests.
+        total = len(df_all_datasets)
+        deferred = []
+        for i, row in enumerate(df_all_datasets.itertuples(index=False)):
+            outcome = harvest_row(row, i + 1)
+            # An oversize response is deterministic; only a 504 may resolve.
+            if (row.datasetID in erddap.gateway_timeouts
+                    and outcome.skipped_reason_code != RESPONSE_TOO_LARGE):
+                deferred.append(row)
+            else:
+                record(row.datasetID, outcome)
+
+        for i, row in enumerate(deferred):
+            timed_out_at = erddap.gateway_timeouts.pop(row.datasetID)
+            wait = GATEWAY_TIMEOUT_RETRY_DELAY - (time.monotonic() - timed_out_at)
+            erddap_logger.info(
+                "Retrying %s after a gateway timeout (%d/%d, waiting %.0fs)",
+                row.datasetID, i + 1, len(deferred), max(wait, 0),
+            )
+            if wait > 0:
+                time.sleep(wait)
+            record(row.datasetID, harvest_row(row, i + 1))
 
         skipped_columns = list(SkippedDatasetSchema.to_schema().columns.keys())
 
@@ -344,11 +332,7 @@ class ERDDAPHarvester(BaseHarvester):
             if verified_rows else empty_verified
         )
 
-        # One explicit breakdown line per server so the outcome mix is visible
-        # at a glance instead of buried in per-dataset INFO lines. Counted from
-        # the attempt records — the authoritative per-dataset audit (the
-        # skipped_datasets table also contains error rows, so it can't tell
-        # skips and errors apart).
+        # Counted from attempts: skipped_datasets also holds error rows.
         statuses = df_attempts["status"].value_counts() if not df_attempts.empty else {}
         n_harvested = int(statuses.get("success", 0))
         n_unchanged = len(df_verified)
@@ -371,7 +355,6 @@ class ERDDAPHarvester(BaseHarvester):
                 df_verified["dataset_id"].to_list(),
             )
 
-        # Return the results
         return HarvestResult(
             profiles=spills.collect("profiles"),
             datasets=spills.collect("datasets"),
@@ -388,20 +371,11 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                     run_id=None, idx=None, total=None,
                     data_structure="table", wms_url=None,
                     listing_time_min=None, listing_time_max=None):
-    """Harvest one ERDDAP dataset (plain function; reuses `erddap`, never rebuilds it).
-
-    Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError on
-    error (carrying the audit row the caller persists).
-
-    When ``skip_unchanged`` and the dataset's Croissant lists files whose hash
-    matches ``previous_hashes``, returns early as "skipped_unchanged" — one HTTP
-    request, no metadata or profile queries.
-    """
+    """Returns DatasetHarvestResult on success/skip; raises DatasetHarvestError
+    on error (carrying the audit row the caller persists)."""
     log = erddap.get_logger()
     erddap_url = erddap.url
     t0 = time.monotonic()
-    # Pre-declare so the exception handlers can still pull queried_urls if
-    # get_dataset() succeeded before failing.
     dataset = None
     progress = f" {idx}/{total}" if idx and total else ""
     try:
@@ -435,8 +409,6 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
         dataset.listing_time_min = listing_time_min
         dataset.listing_time_max = listing_time_max
         dataset.content_hash = new_hash
-        # Record why there's no hash (database-backed, fetch failure, …) so the
-        # harvest dashboard can distinguish "correctly unhashed" from "failed".
         dataset.content_hash_reason = hash_reason
         compliance_checker = CDEComplianceChecker(dataset)
 
@@ -456,38 +428,31 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                         error_message="Dataset passed compliance but feature extraction returned no rows",
                         duration_ms=duration_ms,
                         query_urls=dataset.queried_urls,
+                        warnings=dataset.warnings.to_json(),
                     ),
                 )
-            # Secondary output for trajectory types: ordered track fixes.
-            # Best-effort — a failed track query must never fail a dataset
-            # whose coverage cells succeeded.
+            # Best-effort: a failed track query must never fail the dataset.
             df_track_points = None
             try:
                 df_track_points = extract_track_points(dataset)
-            except Exception:
-                log.warning(
-                    "Track-point extraction failed for %s; coverage cells "
-                    "kept, tracks skipped", dataset_id, exc_info=True,
+            except Exception as e:
+                log.debug("Track-point extraction failed", exc_info=True)
+                dataset.warnings.add(
+                    TRACKS_UNAVAILABLE,
+                    f"Track-point extraction failed ({type(e).__name__}: {e}); "
+                    "coverage kept, tracks skipped",
                 )
             duration_ms = int((time.monotonic() - t0) * 1000)
             log.info("complete")
-            # Non-fatal warning: features spanning a region (>POINT_THRESHOLD_M)
-            # are hidden from the map (kept searchable). Surface it per dataset
-            # on the harvest dashboard. Only the profiles pipeline sets
-            # show_as_point; trajectory cells don't carry it.
-            warnings = None
             if "show_as_point" in df_features.columns:
                 n_hidden = int((~df_features["show_as_point"].astype(bool)).sum())
                 if n_hidden:
-                    log.warning(
-                        "%d of %d features span more than %d m and are hidden "
-                        "from the map (still searchable)",
-                        n_hidden, len(df_features), POINT_THRESHOLD_M,
-                    )
-                    warnings = (
+                    dataset.warnings.add(
+                        FEATURES_HIDDEN,
                         f"{n_hidden} of {len(df_features)} features span more than "
                         f"{POINT_THRESHOLD_M} m and are hidden from the map "
-                        "(still searchable via geospatial filters)."
+                        "(still searchable via geospatial filters).",
+                        count=n_hidden,
                     )
             return DatasetHarvestResult(
                 status="success",
@@ -501,11 +466,11 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                     status="success",
                     duration_ms=duration_ms,
                     query_urls=dataset.queried_urls,
-                    warnings=warnings,
+                    warnings=dataset.warnings.to_json(),
                 ),
             )
 
-        # Failed compliance — a legitimate skip, NOT an error (task stays green).
+        # Failed compliance is a legitimate skip, NOT an error.
         duration_ms = int((time.monotonic() - t0) * 1000)
         return DatasetHarvestResult(
             status="skipped",
@@ -517,14 +482,13 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                 error_message=getattr(compliance_checker, "failure_details", None),
                 duration_ms=duration_ms,
                 query_urls=dataset.queried_urls,
+                warnings=dataset.warnings.to_json(),
             ),
         )
     except HTTPError as e:
         duration_ms = int((time.monotonic() - t0) * 1000)
         response = e.response
-        # The status line alone is not diagnostic — every ERDDAP failure is a
-        # 500. requests attaches the response, so ERDDAP's own error message is
-        # right here; record it so issues group by what actually went wrong.
+        # Every ERDDAP failure is a 500; its own error message is what's diagnostic.
         server_error = erddap_error_text(response)
         detail = f"HTTP {response.status_code} {response.reason}"
         if server_error:
@@ -590,8 +554,7 @@ def harvest_erddap(erddap_url, limit_dataset_ids=None, cache_requests=False,
                    run_id=None, skip_unchanged=False):
     """Prefect task wrapper for ERDDAPHarvester.
 
-    Stays a @task (not a subflow) so multiple servers harvest concurrently via
-    .submit() — Prefect subflows run sequentially, tasks don't.
+    A @task, not a subflow, so servers harvest concurrently via .submit().
     """
     harvester = ERDDAPHarvester(
         erddap_url, limit_dataset_ids, cache_requests,

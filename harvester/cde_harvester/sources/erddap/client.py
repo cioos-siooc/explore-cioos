@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-# The ERDDAP class contains functions relating to querying the ERDDAP server
-
 import hashlib
 import io
 import json
 import logging
 import re
 import tempfile
+import time
 from urllib.parse import unquote, urlparse
 
 import diskcache as dc
@@ -21,6 +20,7 @@ from urllib3.util.retry import Retry
 from cde_harvester.core.errors import (
     HASH_CROISSANT_HTTP_ERROR,
     HASH_CROISSANT_UNREADABLE,
+    HASH_CROISSANT_UNSUPPORTED,
     HASH_FEDERATED_UNRESOLVED,
     HASH_NO_FILE_LIST,
     ResponseTooLargeError,
@@ -29,25 +29,17 @@ from cde_harvester.sources.erddap.dataset import Dataset
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-# size in bytes
+# bytes
 MAX_RESPONSE_SIZE = 2e8
 
-# Bodies are streamed into a SpooledTemporaryFile: anything under this stays in
-# memory, anything larger transparently becomes a real file on disk. Most ERDDAP
-# metadata answers are a few KB, so the common case never touches the disk,
-# while a multi-hundred-MB orderByCount no longer has to fit in RAM.
+# Bodies above this spill to disk, so a multi-hundred-MB orderByCount needn't fit in RAM.
 SPOOL_MAX_IN_MEMORY = 8 * 1024 * 1024
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 class _SpooledBody(tempfile.SpooledTemporaryFile):
-    """SpooledTemporaryFile that io.TextIOWrapper will accept.
-
-    Python 3.10's SpooledTemporaryFile is not a full IOBase — it has no
-    readable/writable/seekable, which TextIOWrapper requires before it will
-    wrap a stream. Python 3.11 added them; this bridges the gap until the
-    runtime moves, and can be deleted then.
-    """
+    """Python 3.10's SpooledTemporaryFile lacks the readable/writable/seekable
+    TextIOWrapper requires; 3.11 added them, so this can go once on 3.11+."""
 
     def readable(self):
         return True
@@ -58,22 +50,24 @@ class _SpooledBody(tempfile.SpooledTemporaryFile):
     def seekable(self):
         return True
 
-# Transient HTTP statuses we should retry. 500 is included even though some
-# ERDDAPs use it semantically for "no data" / "query too big"; those responses
-# have a body we still need to inspect, so the retry only kicks in when the
-# server keeps returning 500 across attempts — i.e. it really is broken.
-# 413 is here because seagull-erddap's WAF returns it when the harvester
-# issues parallel requests too quickly; the queries themselves are tiny and
-# succeed when retried after backoff.
-# 408 (Request Timeout) and 520 (Cloudflare "unknown error") are transient
-# timeouts seen on the cioosatlantic/cioospacific CTD-profile endpoints under
-# load; the same queries succeed on a later attempt, so retry rather than skip.
-_RETRY_STATUSES = (408, 413, 500, 502, 503, 504, 520, 522, 524)
+# 500 is retried even though some ERDDAPs use it for "no data" / "query too big":
+# the body is still inspected once retries are exhausted. 413 comes from
+# seagull-erddap's WAF on parallel requests; 408/520 are transient timeouts on
+# cioosatlantic/cioospacific. 504 is deliberately absent: ERDDAP keeps compiling
+# and caches the result, so the harvester retries at the end of the pass instead
+# (see gateway_timeouts).
+_RETRY_STATUSES = (408, 413, 500, 502, 503, 520, 522, 524)
 
 
 _ERDDAP_SOURCE_RE = re.compile(
     r"(https?://.+?/erddap)/(tabledap|griddap)/([^/?.\s]+)"
 )
+
+
+# ERDDAP added the .croissant endpoint in 2.28.
+CROISSANT_MIN_VERSION = (2, 28)
+
+_ERDDAP_VERSION_RE = re.compile(r"ERDDAP_version=(\d+)\.(\d+)")
 
 
 def _croissant_source_url(doc):
@@ -82,9 +76,7 @@ def _croissant_source_url(doc):
 
 
 def _parse_erddap_source(source_url):
-    """(erddap_base, dap, dataset_id) when source_url is another ERDDAP's data
-    URL; dap is "tabledap" or "griddap" so federated hops keep the right
-    endpoint."""
+    """(erddap_base, dap, dataset_id) when source_url is another ERDDAP's data URL."""
     match = _ERDDAP_SOURCE_RE.match(source_url) if source_url else None
     return (match.group(1), match.group(2), match.group(3)) if match else None
 
@@ -106,14 +98,11 @@ def _build_retry_session() -> requests.Session:
 
 
 class ERDDAP:
-    "Stores the ERDDAP server URL and functions related to querying it"
-
     def __init__(self, erddap_url, cache_requests=False):
         super().__init__()
         self.cache_requests = cache_requests
 
         if cache_requests:
-            # limit cache to 10gb
             self.cache = dc.Cache(
                 "harvester_cache",
                 eviction_policy="none",
@@ -129,6 +118,11 @@ class ERDDAP:
         self.domain = urlparse(erddap_url).netloc
         self.host_slug = self.domain.lower().replace(".", "-")  # for the task run label
         self.session = _build_retry_session()
+        # {dataset_id: monotonic time of its first 504}; the harvester defers
+        # these datasets to a second pass.
+        self.gateway_timeouts = {}
+        # {erddap_base: bool}; federated hops can land on other servers.
+        self._croissant_supported = {}
 
         try:
             self.logger = get_run_logger()
@@ -143,17 +137,11 @@ class ERDDAP:
             raise RuntimeError(f"URL Must start wih http or https: {erddap_url}")
 
         if not erddap_url.endswith("/erddap"):
-            # ERDDAP URL almost always ends in /erddap
             logger.warning("URL doesn't end in /erddap, trying anyway")
-        # df_all_datasets is fetched lazily by the caller via get_all_datasets().
 
     @task(task_run_name="list-datasets-{self.host_slug}", cache_policy=NO_CACHE)
     def get_all_datasets(self, data_structures=("table",)):
-        """Request the ERDDAP allDatasets list (its own @task for UI visibility).
-
-        allDatasets indexes both table and grid datasets; one request is made
-        per requested dataStructure (the registered dataset-type handlers
-        decide which structures the pipeline harvests — only "table" today)."""
+        """Request the ERDDAP allDatasets list, one request per dataStructure."""
         try:
             self.logger.info("Fetching all datasets from ERDDAP server: %s", self.url)
             frames = []
@@ -177,13 +165,8 @@ class ERDDAP:
             return pd.DataFrame()
 
     def parse_erddap_date(s):
-        """ERDDAP dates come either as timestamps or ISO 8601 datetimes.
-
-        Always return tz-aware UTC. Without utc=True the epoch path returned
-        naive timestamps and the ISO path returned aware ones, so downstream
-        subtraction in get_count() raised tz-naive/tz-aware TypeErrors when
-        the two bounds happened to come from different formats.
-        """
+        """ERDDAP dates come either as timestamps or ISO 8601 datetimes; always
+        tz-aware UTC so bounds from different formats can be subtracted."""
         is_timestamp = s.startswith("1.") or s.startswith("-1.")
 
         if is_timestamp:
@@ -202,7 +185,7 @@ class ERDDAP:
         return pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
 
     def erddap_csv_to_df(self, url, skiprows=(1,), dataset=None):
-        """If theres an error in the request, this raises up to the dataset loop, so this dataset gets skipped"""
+        """Errors raise up to the dataset loop, so the dataset gets skipped."""
         if dataset:
             logger = dataset.logger
             erddap_url = dataset.erddap_url
@@ -214,20 +197,18 @@ class ERDDAP:
         url_combined = erddap_url + url
 
         decoded_url = unquote(url_combined)
-        # Prefect's log viewer auto-links bare URLs but stops at "(" and
-        # quotes, truncating ERDDAP queries like orderByMinMax("...") and
-        # distinct(). Percent-encode just those characters so the whole URL
-        # stays clickable; ERDDAP decodes them server-side either way.
+        # Prefect's log viewer stops auto-linking at "(" and quotes; encode them
+        # so the whole URL stays clickable.
         log_url = decoded_url.translate(
             str.maketrans({"(": "%28", ")": "%29", '"': "%22", " ": "%20"})
         )
         logger.info(f"Requesting: {log_url}")
-        # Record exactly what we requested so the dashboard can show the
-        # admin a clickable, reproducible link list per dataset attempt.
         if dataset is not None:
             dataset.queried_urls.append(decoded_url)
 
         response, body = self._fetch(url_combined, decoded_url, logger)
+        if response.status_code == 504 and dataset is not None:
+            self.gateway_timeouts.setdefault(dataset.id, time.monotonic())
 
         try:
             original_hostname = urlparse(url_combined).hostname
@@ -263,16 +244,10 @@ class ERDDAP:
                 logger.error("Query too big for the server")
                 no_data = True
             elif response.status_code != 200:
-                # Report if not All OK
                 response.raise_for_status()
             else:
-                # Decode exactly the way requests' .text would have (same
-                # encoding, same errors="replace"), but incrementally as pandas
-                # reads instead of building one big str up front. read_csv is
-                # deliberately NOT given encoding="unicode_escape" here: pandas
-                # ignores that for an already-decoded text buffer, which is what
-                # it always got, and applying it to raw bytes would turn every
-                # UTF-8 accent into mojibake.
+                # Not encoding="unicode_escape": applied to raw bytes it turns
+                # every UTF-8 accent into mojibake.
                 text_body = io.TextIOWrapper(
                     body, encoding=response.encoding or "utf-8", errors="replace"
                 )
@@ -285,20 +260,11 @@ class ERDDAP:
             body.close()
 
     def _fetch(self, url_combined, decoded_url, logger):
-        """GET a URL, returning (response, body) where body is a seekable binary
-        stream positioned at 0.
+        """Return (response, body), body a seekable binary stream at 0.
 
-        The body is streamed in and abandoned the moment it crosses
-        MAX_RESPONSE_SIZE, so an oversize query costs the cap rather than its
-        full size. Reading response.content instead materialized the entire body
-        first and only then allowed us to reject it — and on the success path it
-        was materialized three more times (bytes, decoded str, StringIO copy)
-        before pandas even saw it, which is how a single at-cap request came to
-        need most of a gigabyte.
-
-        Non-200 bodies are read whole on purpose: they are small ERDDAP error
-        pages, and the caller matches on their .text to tell "no matching
-        results" and "requesting too much data" apart from a real failure.
+        A 200 body is streamed and abandoned past MAX_RESPONSE_SIZE. Non-200
+        bodies are read whole on purpose: they are small error pages the caller
+        matches on .text.
         """
         if self.cache_requests and url_combined in self.cache:
             status_code, url, reason, encoding, content = self.cache[url_combined]
@@ -318,11 +284,8 @@ class ERDDAP:
 
         if self.cache_requests:
             logger.debug("CACHE MISS")
-            # diskcache pickles values, so store the parts actually used rather
-            # than the Response object — a streamed Response has no reusable
-            # .content to pickle. This re-materializes the body in memory, which
-            # is why caching stays a local-development convenience
-            # (harvest_config.production.yaml runs with cache: False).
+            # A streamed Response can't be pickled; this re-materializes the body
+            # in memory, so caching stays a local-development convenience.
             content = body.read()
             body.seek(0)
             self.cache[url_combined] = (
@@ -333,7 +296,6 @@ class ERDDAP:
 
     @staticmethod
     def _spool(response, decoded_url):
-        """Stream a 200 body to a spooled temp file, aborting past the cap."""
         spool = _SpooledBody(max_size=SPOOL_MAX_IN_MEMORY)
         total = 0
         try:
@@ -353,19 +315,18 @@ class ERDDAP:
 
     def get_croissant_fingerprint(self, erddap_base, dataset_id, _hops=0,
                                   dap="tabledap"):
-        """Return (content_hash, has_files, reason) from the dataset's Croissant ld+json.
+        """Return (content_hash, has_files, reason) from the dataset's Croissant.
 
-        Pulls ERDDAP's generated Croissant straight from the .croissant data
-        endpoint. has_files is True only when it lists source files; the hash is a
-        reliable change signal only then, so database-backed datasets (no file list)
-        are never skipped. Federated datasets are followed to their origin (max 3
-        hops). reason explains *why* there is no hash (a HASH_* code) and is None
-        when a hash was produced. Fail-open: (None, False, <reason>) on any error.
+        The hash is a reliable change signal only when source files are listed,
+        so database-backed datasets are never skipped. Federated datasets are
+        followed to their origin (max 3 hops). Fail-open: (None, False, <HASH_*
+        reason>) on any error.
         """
         erddap_base = erddap_base.rstrip("/")
+        if not self._supports_croissant(erddap_base):
+            return None, False, HASH_CROISSANT_UNSUPPORTED
         try:
-            # Small metadata doc — don't inherit the 1h data-query timeout; a
-            # hung .croissant endpoint would otherwise stall every dataset.
+            # Not the 1h data-query timeout: a hung endpoint would stall every dataset.
             response = self.session.get(
                 f"{erddap_base}/{dap}/{dataset_id}.croissant", timeout=60
             )
@@ -391,13 +352,27 @@ class ERDDAP:
         if _hops < 3:
             origin = _parse_erddap_source(_croissant_source_url(doc))
             if origin:
-                # Propagate the origin's outcome (hash or its own reason).
                 return self.get_croissant_fingerprint(
                     origin[0], origin[2], _hops + 1, dap=origin[1]
                 )
             return None, False, HASH_NO_FILE_LIST
 
         return None, False, HASH_FEDERATED_UNRESOLVED
+
+    def _supports_croissant(self, erddap_base):
+        """False only when the server reports a version older than 2.28; an
+        unreadable version stays fail-open and lets .croissant be tried."""
+        if erddap_base not in self._croissant_supported:
+            try:
+                response = self.session.get(f"{erddap_base}/version", timeout=60)
+                match = _ERDDAP_VERSION_RE.search(response.text)
+            except requests.RequestException:
+                match = None
+            self._croissant_supported[erddap_base] = (
+                not match
+                or tuple(map(int, match.groups())) >= CROISSANT_MIN_VERSION
+            )
+        return self._croissant_supported[erddap_base]
 
     def get_dataset(self, dataset_id, data_structure="table"):
         return Dataset(self, dataset_id, data_structure=data_structure)

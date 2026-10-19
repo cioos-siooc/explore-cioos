@@ -1,4 +1,3 @@
-# from sqlalchemy import JSON, Text
 import json
 import logging
 import os
@@ -23,7 +22,6 @@ schema_path = os.path.join(this_directory, "templates")
 template_loader = FileSystemLoader(searchpath=schema_path)
 template_env = Environment(loader=template_loader)
 
-# check if docker has set env variables, if not load from .env
 envs = os.environ
 
 if not os.getenv("DB_HOST"):
@@ -32,10 +30,8 @@ if not os.getenv("DB_HOST"):
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     integrations=[
-        # Log records become breadcrumbs only. Turning every ERROR into its own
-        # event meant an alert per failed job; failures are now reported grouped
-        # by the error itself (see cde_harvester.core.issues) and de-duped by
-        # Sentry, so a known-broken server stops re-alerting on every run.
+        # Log records become breadcrumbs only, so failures are reported once,
+        # grouped by error (see run_download) instead of one alert per job.
         LoguruIntegration(level=logging.INFO, event_level=None),
     ],
     environment=os.environ.get("ENVIRONMENT", "development"),
@@ -152,9 +148,7 @@ def email_user(email, status, zip_filename, downloader_output, language):
 
             dataset_urls += [out]
 
-    # Join with a single "/" — DOWNLOAD_WAF_URL has no trailing slash (compose
-    # sets "<domain>/downloads"), so plain concatenation produced
-    # ".../downloadscde_download_xxx.zip".
+    # DOWNLOAD_WAF_URL may lack a trailing slash.
     download_url = envs["DOWNLOAD_WAF_URL"].rstrip("/") + "/" + zip_filename
 
     email_subject = {
@@ -212,10 +206,8 @@ def email_user(email, status, zip_filename, downloader_output, language):
 def run_download(row):
     pk = row["pk"]
 
-    # Update status
     status = ""
     zip_filename = None
-    # Run Download
     downloader_input = json.loads(row["downloader_input"])
     user_query = downloader_input["user_query"]
 
@@ -225,14 +217,12 @@ def run_download(row):
     downloader_error = ""
 
     try:
-        # Run download
         downloader_output = downloader_wrapper.run_download_query(
             download_query=downloader_input,
             output_folder=output_folder,
             create_pdf=create_pdf,
         )
 
-        # Download Completed. Update Status
         status = "completed"
 
     except Exception as e:
@@ -243,9 +233,8 @@ def run_download(row):
             job_id=user_query["job_id"],
             pk=pk,
         ).error(e)
-        # Log records no longer become Sentry events, so report the crash
-        # explicitly. Fingerprinting on the normalized exception text groups
-        # every job that fails the same way into one issue instead of one per job.
+        # Fingerprinting on the normalized exception text groups every job that
+        # fails the same way into one Sentry issue.
         with sentry_sdk.new_scope() as scope:
             scope.fingerprint = [
                 "downloader", "job-failed", error_signature(f"{type(e).__name__}: {e}")
@@ -265,7 +254,6 @@ def run_download(row):
             },
         )
     else:
-        # these probably dont both need to be here
         if downloader_output.get("zip_file_size") == 0 or downloader_output.get(
             "empty_download"
         ):
@@ -309,9 +297,6 @@ def run_download(row):
         downloader_input["user_query"]["language"],
     )
 
-    # Returned so run_download_observed can decide the Prefect run's state. The
-    # row and the user's email are already written by this point; this is only
-    # the outcome label.
     return status
 
 
@@ -330,15 +315,8 @@ def fail_job(pk, error):
     )
 
 
-# --- Prefect observability ---------------------------------------------------
-# Each download runs as its own Prefect flow run, so the queue is visible in the
-# same UI as the harvests — per-job state, duration and log lines — instead of
-# only a status column in cde.download_jobs that someone has to query by hand.
-#
-# Opt-in via PREFECT_API_URL, which compose sets for the scheduler service. With
-# it unset (a bare local run, or a deployment with no Prefect server) Prefect
-# would quietly stand up its own ephemeral backing store and record runs where
-# nobody is looking, so skip the wrapper and behave exactly as before.
+# Each download runs as its own Prefect flow run. Opt-in via PREFECT_API_URL:
+# unset, Prefect would quietly stand up an ephemeral store nobody looks at.
 DOWNLOAD_FLOW_NAME = "Download Job"
 
 # Outcomes of run_download that should show as a FAILED flow run. no-data and
@@ -363,10 +341,8 @@ def _prefect_enabled():
 def _mirror_logs_to_prefect():
     """Forward loguru output to the active Prefect run logger; returns the sink id.
 
-    Without this a download's flow run has no logs at all: the scheduler and the
-    downloader both log through loguru, which Prefect knows nothing about
-    (PREFECT_LOGGING_EXTRA_LOGGERS only reaches stdlib loggers). Returns None
-    outside a run context, so the caller knows there is no sink to remove.
+    PREFECT_LOGGING_EXTRA_LOGGERS only reaches stdlib loggers, not loguru.
+    Returns None outside a run context.
     """
     from prefect import get_run_logger
 
@@ -426,9 +402,8 @@ def process_next_job():
     nothing to do) and False when the job could not even be claimed, so the
     caller can back off instead of spinning against a database that is down.
 
-    Errors are contained here deliberately. Nothing supervises this worker, so
-    an exception that escapes the polling loop kills it silently and leaves
-    every later download queued forever with no error surfaced to anyone.
+    Errors are contained here deliberately: nothing supervises this worker, so
+    an escaped exception would silently leave every later download queued.
     """
     try:
         row = get_a_download_job()
@@ -463,11 +438,9 @@ def poll_once():
     return serving
 
 
-# The address is kept only as long as the job needs it, plus a week for a user
-# who writes back about a download (the privacy notice promises 7 days). Jobs
-# still queued or running keep theirs: run_download reads it to send the result.
-# The domain stays, for usage statistics; COALESCE covers a job queued before
-# web-api started recording it.
+# The privacy notice promises 7 days of email retention after a job finishes;
+# queued/running jobs keep theirs because run_download emails the result. The
+# domain stays for usage statistics.
 FORGET_EMAILS_SQL = text(
     """
     UPDATE cde.download_jobs
@@ -498,15 +471,12 @@ def update_download_jobs(pk, row, session=None):
     """Update one download_jobs row. Values are bound, never interpolated.
 
     Column names come from the literals in this module, so they are safe to
-    format into the statement; values are not — they carry tracebacks and the
-    downloader's JSON report. Those used to be interpolated too, which is why
-    callers stripped "%" and "'" out of every value by hand before passing it.
+    format into the statement; values carry tracebacks and JSON reports.
     """
     assignments = []
     params = {"pk": pk}
     for key, value in row.items():
         if value is SQL_NOW:
-            # A SQL expression, not a value — the database clock, not ours.
             assignments.append(f"{key} = NOW()")
         else:
             assignments.append(f"{key} = :{key}")
@@ -517,7 +487,5 @@ def update_download_jobs(pk, row, session=None):
         # Caller owns the transaction/commit (see get_a_download_job).
         session.execute(text(sql), params)
     else:
-        # SQLAlchemy 2.0 removed Engine.execute(); run in an auto-committing
-        # transaction via engine.begin().
         with engine.begin() as conn:
             conn.execute(text(sql), params)

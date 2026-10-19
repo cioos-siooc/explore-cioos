@@ -1,8 +1,8 @@
-# CLAUDE.md
+# AGENTS.md
 
 CDE (CIOOS Data Explorer): harvests oceanographic dataset metadata from ERDDAP,
 OBIS and CKAN into PostgreSQL/PostGIS and serves a map-first search/download UI
-over it. Six services; each has its own `CLAUDE.md` (loaded only when working
+over it. Six services; each has its own `AGENTS.md` (loaded only when working
 there): `harvester/`, `database/`, `web-api/`, `frontend/`, `downloader/`,
 `download_scheduler/`.
 
@@ -28,7 +28,7 @@ Gotchas worth knowing without opening the README:
 - **Think before coding**: Don't assume. Don't hide confusion. Surface tradeoffs.
 - **Simplicity first**: Minimum code that solves the problem. Nothing speculative.
 - **Surgical Changes**: Touch only what you must. Clean up only your own mess.
-- **Lint before calling any change done**: a `PostToolUse` hook (`.claude/hooks/lint-on-edit.sh`) already enforces this automatically.
+- **Lint before calling any change done**: run the sub-project's linter (README → **Linting and tests**). Claude Code does it automatically via the `PostToolUse` hook `.claude/hooks/lint-on-edit.sh`; other agents run it themselves.
 - **New features need tests**: add unit tests (and e2e/integration where warranted) using each sub-project's existing patterns.
 - **Flag tests that changes break**: if an edit changes behavior an existing test asserts on, tell the user which test(s) need rewriting instead of silently weakening the assertion.
 - **Code is the documentation**: keep comments to the strict minimum (only non-obvious _why_, never _what_); don't add docs/docstrings/READMEs unless requested.

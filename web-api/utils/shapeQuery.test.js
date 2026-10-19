@@ -4,14 +4,7 @@ const assert = require("node:assert/strict");
 const { buildShapeSql } = require("./shapeQuery");
 const { FINE } = require("./hexTiers");
 
-/*
- * The shape query is the largest SQL contract in the service and feeds
- * /datasetRecordsList, /pointQuery and /downloadEstimate. buildShapeSql
- * assembles it without executing, so which branches a selection produces can
- * be asserted with no Postgres.
- *
- * Branch fingerprints — each is a string unique to one arm of the UNION.
- */
+// Branch fingerprints: each is a string unique to one arm of the UNION.
 const PROFILES = /FROM cde\.profiles/;
 const TRAJECTORY = /FROM cde\.trajectory_hexes/;
 const OBIS = /FROM cde\.obis_cells/;
@@ -24,7 +17,6 @@ test("the default selection unions profiles, trajectory and obis", async () => {
   assert.match(sql, PROFILES);
   assert.match(sql, TRAJECTORY);
   assert.match(sql, OBIS);
-  // Grids are metadata-only and never appear in the estimate path.
   assert.doesNotMatch(sql, GRIDDAP);
 });
 
@@ -55,17 +47,18 @@ test("an obisNodes selection hides profiles unless erddapServers is set alongsid
   assert.doesNotMatch(nodesOnly.sql, PROFILES);
   assert.match(nodesOnly.sql, OBIS);
 
-  // Combined Source filter: both are OR'd in the shared dataset filter, so
-  // both feature sets have to be present for that OR to mean anything.
   const combined = await build({ obisNodes: "n1", erddapServers: "https://e" });
   assert.match(combined.sql, PROFILES);
   assert.match(combined.sql, TRAJECTORY);
   assert.match(combined.sql, OBIS);
 });
 
+test("rows carry their OBIS nodes so the list can group by data portal", async () => {
+  const { sql } = await build({});
+  assert.match(sql, /d\.obis_nodes,/);
+});
+
 test("an empty branch set still yields runnable SQL that matches nothing", async () => {
-  // Every arm suppressed at once: the guard must emit a WHERE FALSE shell, not
-  // an empty UNION that fails to parse.
   const { sql } = await build(
     { scientificNames: "Gadus morhua", includeObis: "false" },
     { fetchAphiaIds: async () => [126436] },
@@ -113,8 +106,7 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
 
   const plain = await build({}, { doEstimate: false });
   assert.doesNotMatch(plain.sql, /records_count/);
-  // The estimate's bindings must not linger: knex rejects a named binding the
-  // SQL does not reference. The time window stays, for the days column.
+  // knex rejects a named binding the SQL does not reference.
   assert.deepEqual(Object.keys(plain.params).sort(), [
     "depthVariableProbe",
     "filters",
@@ -126,18 +118,12 @@ test("doEstimate toggles the size estimate and its bindings together", async () 
 });
 
 test("the estimate is a day-set overlap, not an elapsed span", async () => {
-  // records_per_day is a rate over days WITH DATA, so pairing it with an
-  // elapsed span over-counts a seasonal station by span/days-with-data.
   const { sql } = await build({ timeMin: "2020-01-01", timeMax: "2021-01-01" });
   assert.match(sql, /day_range_overlap_days\(p\.day_ranges/);
-  // The span remains the fallback for features harvested before day sets.
   assert.match(sql, /range_intersection_length\(tstzrange/);
 });
 
 test("the obis arm derives records_per_day from its occurrence count, not a zero", async () => {
-  // A zero rate made every OBIS estimate 0. The denominator switches on
-  // day_ranges exactly as the estimate's day factor does, so an unfiltered
-  // estimate sums to the cell's n_records.
   const { sql } = await build({});
   const from = sql.indexOf("FROM cde.obis_cells");
   const obisArm = sql.slice(sql.lastIndexOf("SELECT", from), from);
@@ -173,59 +159,39 @@ test("the three filter fragments are passed as bindings, not inlined", async () 
 });
 
 test("record collapsing stamps its extents in UTC", async () => {
-  // Left to json_agg these would carry whatever offset the session's timezone
-  // happens to be.
   const { sql } = await build({});
   assert.match(sql, /AT TIME ZONE 'UTC'/);
 });
 
-/*
- * These two were characterisation tests pinning the drift
- * TODO-cde-revisions.md §P2.1 recorded. §P2.1 resolved it, so they now assert
- * the agreed contract rather than merely recording what the code happened to
- * do. utils/selectionAgreement.test.js checks the other routes against the
- * same two rules.
- */
 test("the profiles arm does NOT filter on show_as_point", async () => {
-  // show_as_point decides whether the MAP can draw a feature, not whether the
-  // selection contains it — a region-spanning feature is still listed, still
-  // estimated and still downloadable. Only the tile and legend routes apply
-  // it; /timeExtent used to as well, which computed the time axis over a
-  // different feature set than the list that axis bounds.
+  // A region-spanning feature is still listed, estimated and downloadable;
+  // only the tile and legend routes drop it.
   const { sql } = await build({});
   assert.doesNotMatch(sql, /show_as_point/);
 });
 
 test("the trajectory arm is pinned to one tier", async () => {
-  // Coverage rows exist at both tiers describing the same data, so reading
-  // both would double-count every estimate. Which tier is FINE's, from
-  // utils/hexTiers.js — the one place that answers it.
+  // Both tiers hold the same data; reading both double-counts.
   const { sql } = await build({});
   assert.match(sql, new RegExp(`t\\.hex_tier = ${FINE.tier}\\b`));
   assert.match(sql, new RegExp(`JOIN ${FINE.hexesTable} h`));
 });
 
 test("the dataset payload carries the freshness fields the frontend reads", async () => {
-  // DatasetInspector and DatasetCard read these off /pointQuery rather than
-  // fetching, and wmsUtilities falls back to coverage_time_max, so dropping
-  // them from the select list would break the UI with no server-side error.
+  // The UI reads these off /pointQuery; dropping one fails with no
+  // server-side error.
   const { sql } = await build({});
   assert.match(sql, /AS coverage_time_max/);
   assert.match(sql, /AS is_realtime/);
-  // Stamped in UTC with a Z, like the record extents — these reach the browser
-  // as strings and are parsed there.
+  // Parsed by the browser as strings.
   assert.match(sql, /to_char\(d\.coverage_time_max AT TIME ZONE 'UTC'/);
 });
 
 test("has_depth is projected, and its probe is bound rather than inlined", async () => {
-  // The frontend's direct-download links carry the depth filter only for
-  // datasets that expose a `depth` variable — tabledap 400s on the rest.
   const { sql, params } = await build({}, { doEstimate: false });
   assert.match(sql, /AS has_depth/);
   assert.match(sql, /table_variables @> :depthVariableProbe::jsonb/);
   assert.deepEqual(JSON.parse(params.depthVariableProbe), [{ name: "depth" }]);
-  // Bound, not inlined: an inlined probe would put a JSON object literal
-  // straight into the SQL text.
   assert.doesNotMatch(sql, /@> '\[/);
 });
 
@@ -235,7 +201,6 @@ test("the datasets list reads days from the stored day set, clipped to the time 
     list.sql,
     /day_range_overlap_days\(d\.day_ranges,\s+daterange\(:timeMin::date/,
   );
-  // Never unioned per request: that is what cost ~3 s cold.
   assert.doesNotMatch(list.sql, /day_union_days/);
 
   const estimate = await build({}, { doEstimate: true, getRecordsList: false });
@@ -243,8 +208,7 @@ test("the datasets list reads days from the stored day set, clipped to the time 
 });
 
 test("features are aggregated per dataset_pk before the dataset metadata joins in", async () => {
-  // Grouping on d.pk alongside the wide metadata row made the planner sort
-  // every matched feature to disk: 8-9.8 s -> 2.2 s unfiltered on prod data.
+  // Grouping on d.pk sorted every matched feature to disk: 8-9.8 s -> 2.2 s.
   for (const opts of [
     { doEstimate: false, getRecordsList: false },
     { doEstimate: true, getRecordsList: false },

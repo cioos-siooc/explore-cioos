@@ -99,9 +99,6 @@ def test_unclaimable_job_returns_false_so_the_caller_backs_off(monkeypatch):
 
 
 def test_fail_job_records_the_error_verbatim(updates):
-    # update_download_jobs binds its values now, so nothing has to be mangled on
-    # the way in. This used to strip every "%" and "'" out of the message
-    # because the statement was built by f-string.
     message = "boom 50% of the time, it's bad"
     ds.fail_job(7, message)
 

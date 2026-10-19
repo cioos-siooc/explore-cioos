@@ -2,9 +2,6 @@ import { expect, test } from "../support/test.js";
 import { openApp } from "../support/appPage.js";
 import { VIEWPORTS } from "../support/constants.js";
 
-// Below (max-width: 700px) the app stops being a map with chrome floating over
-// it and becomes a stack of full-screen surfaces. Everything here is about that
-// change, so it runs at one width regardless of which project selected it.
 test.use({ viewport: VIEWPORTS.mobile });
 
 test.describe("the phone layout", () => {
@@ -18,8 +15,6 @@ test.describe("the phone layout", () => {
   });
 
   test("never scrolls sideways", async ({ page }) => {
-    // The failure mode of a floating-chrome layout on a narrow screen: one
-    // control that will not fit drags the whole page horizontally.
     await openApp(page);
     const overflow = await page.evaluate(
       () =>
@@ -40,8 +35,6 @@ test.describe("the phone layout", () => {
       sidebar.boundingBox(),
       page.viewportSize(),
     ]);
-    // A sheet, not a column beside the map: it should take essentially the
-    // whole width.
     expect(sheet.width).toBeGreaterThan(viewport.width * 0.9);
   });
 
@@ -55,6 +48,43 @@ test.describe("the phone layout", () => {
     expect(dialog.width).toBeGreaterThan(page.viewportSize().width * 0.9);
   });
 
+  test("closes a sheet on Back, keeping what was chosen in it", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.getByTestId("topbar-filters-button").click();
+    await page.locator('[data-filter-name="oceanVariablesFiltername"]').click();
+    await page.getByTestId("filter-option").first().click();
+    await expect(page).toHaveURL(/eovs=/);
+
+    await page.goBack();
+
+    await expect(page.getByTestId("filters-modal")).toHaveCount(0);
+    await expect(page.getByTestId("map-container")).toBeVisible();
+    await expect(page).toHaveURL(/eovs=/);
+  });
+
+  test("puts a sheet away when dragged down by its header", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.getByTestId("topbar-datasets-button").click();
+    const sheet = page.getByTestId("sidebar-datasets");
+    await expect(sheet).toHaveAttribute("data-expanded", "true");
+    // Risen all the way, so the header is where it was measured.
+    await expect(sheet).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+
+    const header = await sheet.locator(".datasetsHeader").boundingBox();
+    const x = header.x + header.width / 3;
+    const y = header.y + header.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 300, { steps: 10 });
+    await page.mouse.up();
+
+    await expect(sheet).toHaveAttribute("data-expanded", "false");
+  });
+
   test("keeps the top controls reachable", async ({ page }) => {
     await openApp(page);
     const bar = await page.getByTestId("top-bar").boundingBox();
@@ -65,7 +95,7 @@ test.describe("the phone layout", () => {
   });
 });
 
-test("names every quick filter under its button, and still fits the width", async ({
+test("names every quick filter on its button, and still fits the width", async ({
   page,
 }) => {
   await openApp(page);
@@ -74,7 +104,6 @@ test("names every quick filter under its button, and still fits the width", asyn
     ["quick-filter-area", "Area"],
     ["quick-filter-in-view", "In view"],
     ["quick-filter-realtime", "Real-time"],
-    ["quick-filter-reset", "Reset"],
   ]) {
     await expect(
       row.getByTestId(testId).locator(".quickFilterCaption"),
@@ -83,6 +112,15 @@ test("names every quick filter under its button, and still fits the width", asyn
       row.getByTestId(testId).locator(".quickFilterCaption"),
     ).toBeVisible();
   }
+  await expect(row.getByTestId("quick-filter-reset")).toHaveAccessibleName(
+    /clear all filters/i,
+  );
+  const tops = await row
+    .locator(".quickFilterButton")
+    .evaluateAll((buttons) =>
+      buttons.map((b) => b.getBoundingClientRect().top),
+    );
+  expect(new Set(tops).size, "the quick filters wrap").toBe(1);
 
   const overflow = await page.evaluate(
     () =>
@@ -92,8 +130,7 @@ test("names every quick filter under its button, and still fits the width", asyn
   expect(overflow, "the page scrolls horizontally").toBeLessThanOrEqual(0);
 });
 
-// A phone held landscape is wide enough to miss the width rung but too short
-// for the floating chrome: the list sat under the top bar with no rows at all.
+// Landscape phones miss the width rung but are too short for floating chrome.
 test.describe("a phone held landscape", () => {
   test.use({ viewport: { width: 844, height: 390 } });
 

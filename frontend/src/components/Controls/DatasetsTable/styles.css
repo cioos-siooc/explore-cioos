@@ -1,7 +1,3 @@
-/* DatasetsTable — the datasets list rendered as cards (DatasetCard.jsx), used
-   in the sidebar and the download-review modal (.downloadModal). Fills its
-   container's height: the controls (search, sort, grouping) stay put and only the
-   card list (.datasetsCardList) scrolls. */
 .datasetsTable {
   height: 100%;
   display: flex;
@@ -10,9 +6,6 @@
   text-align: left;
 }
 
-/* --- Controls: in the sidebar one row of search, sort and grouping (both
-   ui/SelectPill.jsx); in the download modal select-all, sort and the format
-   pickers. --- */
 .datasetsCardControls {
   flex: 0 0 auto;
   display: flex;
@@ -23,24 +16,15 @@
   background-color: var(--cioos-white);
 }
 
-/* Wraps only when the search box would drop below a usable width — the
-   narrowest phone, or long French captions. */
 .datasetsCardToolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
 }
 
-/* Keeps its label at every width, unlike the two pills below it: it is the one
-   control here that commits the reader to something — every dataset in the
-   results joins the download — and the search box beside it still has room to
-   be typed in without the row it would take to spell that out.
-
-   A label around the same checkbox the rows carry: what it does is tick every
-   box below, so it says so by being one. It used to be a pill that filled with
-   teal, which stated its own state in a second visual language and left the
-   boxes it controls to state theirs in the first. */
+/* Keeps its label at every width: it is the one control here that commits
+   the reader to something. */
 .selectAllToggle {
   flex: 0 0 auto;
   display: inline-flex;
@@ -55,10 +39,8 @@
   cursor: pointer;
 }
 
-/* Drawn rather than left to accent-color: the browser picks the checkmark's
-   own colour from the accent's luminance, and against this mid teal it chooses
-   near-black. The tick is the one part that has to stay legible, so the box
-   carries the teal and the tick is white on top of it. */
+/* Drawn rather than left to accent-color: against this mid teal the browser
+   picks a near-black checkmark. */
 .selectAllToggle input {
   appearance: none;
   display: grid;
@@ -77,10 +59,8 @@
   background-color: var(--cioos-primary);
 }
 
-/* place-content centres the tick's own box; the translate centres the ink
-   inside it. Rotating an L of two borders 45deg leaves its ink sitting
-   sqrt(2)/2 below the box it is drawn in, so centring the box alone hangs the
-   tick high — measured at 0.7px, which is what comes back off. */
+/* Rotating an L of two borders 45deg leaves its ink ~0.7px below its box;
+   the translate takes that back off. */
 .selectAllToggle input:checked::after {
   content: "";
   width: 4px;
@@ -99,7 +79,6 @@
   color: var(--cioos-ink);
 }
 
-/* The download modal's sort and format pickers. */
 .datasetsCardArrange {
   display: flex;
   flex-wrap: wrap;
@@ -107,25 +86,14 @@
   gap: 6px;
 }
 
-/* --- Download modal: one row, not three.
-   The sidebar stacks its toolbar over its arrange row because both are full of
-   controls. The modal has two — select-all and sort — and the size legend, so
-   the three sit inline with the legend pushed to the right, and the rows saved
-   go to the cards. --- */
 .datasetsTable.downloadModal .datasetsCardControls {
   flex-flow: row wrap;
   align-items: center;
   gap: 6px 12px;
 }
 
-/* --- One dataset per row, full width. The card reflows to use that width
-   rather than stacking short rows down the middle of it — see
-   .datasetCard.downloadModal .datasetCardBody below. --- */
-
-/* Which datasets the CDE can deliver directly: the key to the size pill and
-   the tick/cross on every card below. margin-left rather than an order change
-   so that when the row is too narrow to hold all three it is the legend —
-   the only one of the three that is read once — that wraps away. */
+/* margin-left rather than an order change, so the legend is what wraps away
+   when the row is too narrow. */
 .downloadLegend {
   display: flex;
   flex-wrap: wrap;
@@ -166,7 +134,6 @@
   color: var(--cioos-error);
 }
 
-/* --- Card list: the one scroll region --- */
 .datasetsCardList {
   flex: 1 1 auto;
   min-height: 0;
@@ -178,8 +145,6 @@
 }
 
 .datasetsCardEmpty {
-  /* Spans the modal's grid: "no datasets" is about the list, not its first
-     cell. Inert in the sidebar's single column. */
   grid-column: 1 / -1;
   padding: 24px 12px;
   text-align: center;
@@ -187,7 +152,6 @@
   font-style: italic;
 }
 
-/* Names the accent .datasetCard.fromMapClick puts on rows below — see there. */
 .datasetsCardMapClickHint {
   display: flex;
   align-items: center;
@@ -206,22 +170,8 @@
   box-shadow: 0 0 0 2px var(--cioos-map-click-glow);
 }
 
-/* --- Add to download: the first thing on the title's line, ahead of the
-   platform dot. No pill, no ground of its own — the glyph carries the whole
-   control, and which glyph it is says which way the click goes: a download
-   sign while the dataset is out of the order, a ticked circle once it is in.
-   That reads straight down the left edge of the list, so "which of these have
-   I picked?" is one glance rather than one row at a time.
-
-   Height-matched to the title's first line, like the platform dot beside it,
-   so the three sit on one baseline however the title wraps.
-
-   min-height, not height: the figure is the title's line box, which is what
-   these slots line up against — but it is a floor, not a ceiling. A fixed
-   height leaves a 16px glyph 0.75px of slack in a 17.5px box and anything
-   taller (the size pill, which is 20.5px once its padding is counted) hanging
-   out of the bottom of a box that cannot grow, which is what cropped the
-   circles and the checkbox. --- */
+/* min-height (the title's line box), not height: a fixed height crops
+   anything taller, like the 20.5px size pill. */
 .datasetCardSelect {
   flex: 0 0 auto;
   display: inline-flex;
@@ -235,8 +185,6 @@
   transition: color var(--cioos-transition-fast);
 }
 
-/* In the order: the selection's own teal, the same state the card's border and
-   the sidebar's Download button are in. */
 .datasetCardSelect.checked {
   color: var(--cioos-primary-700);
 }
@@ -253,14 +201,11 @@
   border-radius: 50%;
 }
 
-/* Griddap is metadata-only, and in the modal a dataset over the 1 GB ceiling is
-   one the queue will refuse: neither can enter the download. */
 .datasetCardSelect:disabled {
   color: var(--cioos-hairline);
   cursor: not-allowed;
 }
 
-/* --- Card --- */
 .datasetCard {
   position: relative;
   display: flex;
@@ -276,19 +221,9 @@
     background-color var(--cioos-transition-fast);
 }
 
-/* Sorted to the top because the last map click found it here — wearing the same
-   goldenrod ring, glow and fill the map itself puts on the hex or marker that
-   was clicked (--cioos-map-click, see theme.css), so the two ends of that click
-   are recognisably one thing rather than a colour each. It is a colour no data
-   layer uses, which is what lets it sit next to the teal of the selection
-   without either being mistaken for the other.
-   `box-shadow`, not a wider `border`, does the "thicker" part: a real 2px
-   border would grow the card by 2px and jostle its neighbours in the list every
-   time a row's state changed; a shadow ring reads the same but costs no layout.
-   The glow applies to selected rows too — it says where the row came from,
-   which is orthogonal to whether it is in the download — while the wash is
-   left to `:not(.selected)`, the selection's own teal border being the more
-   important of the two facts about such a row. */
+/* Matches the map's click goldenrod. box-shadow rather than a wider border, so
+   a state change doesn't jostle the list; the wash is left to :not(.selected)
+   so the selection's teal border wins. */
 .datasetCard.fromMapClick {
   box-shadow:
     0 0 0 2px var(--cioos-map-click-glow),
@@ -309,7 +244,6 @@
   background-color: var(--cioos-surface-2);
 }
 
-/* The title button is what takes focus; the ring goes on the whole card. */
 .datasetCard.clickable:has(.datasetCardTitle:focus-visible) {
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
@@ -331,9 +265,7 @@ button.datasetCardTitle:focus-visible {
   border-color: var(--cioos-primary);
 }
 
-/* --- Group headers: sticky within the scroll region so the current group
-   stays labelled while scrolling. The label toggles collapse; the trailing eye
-   takes the group's datasets off the map (they stay in the list). --- */
+/* Opaque, since it sticks over the cards scrolling beneath it. */
 .datasetsCardGroupHeader {
   position: sticky;
   top: 0;
@@ -342,61 +274,142 @@ button.datasetCardTitle:focus-visible {
   align-items: center;
   gap: 2px;
   width: 100%;
-  margin: 4px 0 2px;
-  padding: 0 4px 0 8px;
-  border-bottom: 1px solid var(--cioos-hairline);
+  min-height: 32px;
+  padding: 0 2px 0 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+
+  --group-bar: color-mix(in srgb, var(--cioos-primary) 22%, transparent);
+
   background-color: var(--cioos-surface-2);
+  background-image: linear-gradient(
+    to right,
+    var(--group-bar) calc(var(--group-share, 0) * 100%),
+    transparent 0
+  );
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast);
+}
+
+.datasetsCardGroupHeader:hover {
+  border-color: var(--cioos-primary);
+}
+
+.datasetsCardGroupHeader.open {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-teal-light);
 }
 
 .datasetsCardGroupToggle {
   flex: 1 1 auto;
   min-width: 0;
+  align-self: stretch;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 0;
+  padding: 4px 4px 4px 8px;
   border: none;
+  border-radius: var(--cioos-radius);
   background: none;
   color: var(--cioos-ink);
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
+  line-height: 1.2;
   text-align: left;
   cursor: pointer;
 }
 
-.datasetsCardGroupToggle:hover {
-  color: var(--cioos-primary-700);
+.datasetsCardGroupToggle:focus-visible,
+.datasetsCardGroupFilter:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
-.datasetsCardGroupHide {
+.datasetsCardGroupHeader.open .datasetsCardGroupToggle {
+  color: var(--cioos-primary-800);
+}
+
+.datasetsCardGroupCaret {
+  flex: 0 0 auto;
+  color: var(--cioos-primary);
+  transition: transform var(--cioos-transition-fast);
+}
+
+.datasetsCardGroupHeader.open .datasetsCardGroupCaret {
+  color: var(--cioos-primary-700);
+  transform: rotate(90deg);
+}
+
+.datasetsCardGroupFilter {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  padding: 5px;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   border: none;
-  border-radius: var(--cioos-radius-sm, 4px);
+  border-radius: var(--cioos-radius-sm);
   background: none;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-60);
   cursor: pointer;
+  transition:
+    color var(--cioos-transition-fast),
+    background-color var(--cioos-transition-fast);
 }
 
-.datasetsCardGroupHide:hover {
+.datasetsCardGroupFilter:hover {
   color: var(--cioos-primary-700);
   background-color: var(--cioos-white);
 }
 
-/* Hidden from the map: the header and its cards stay legible but recede. */
-.datasetsCardGroupHeader.hidden .datasetsCardGroupToggle {
-  color: var(--cioos-ink-40);
+.datasetsCardGroupFilter.exclude:hover {
+  color: var(--cioos-error);
 }
 
-.datasetsCardGroupHeader.hidden .datasetsCardGroupHide {
+.datasetsCardGroupHeader.included .datasetsCardGroupFilter:not(.exclude) {
   color: var(--cioos-primary-700);
 }
 
-.datasetCard.hiddenFromMap {
-  opacity: 0.55;
+.datasetsCardGroupHeader.excluded {
+  --group-bar: color-mix(in srgb, var(--cioos-error) 15%, transparent);
+
+  border-color: var(--cioos-error);
+  background-color: var(--cioos-error-bg);
+}
+
+.datasetsCardGroupHeader.excluded .datasetsCardGroupTitle {
+  text-decoration: line-through;
+}
+
+.datasetsCardGroupHeader.excluded .datasetsCardGroupFilter.exclude {
+  color: var(--cioos-error);
+}
+
+.datasetsCardGroupHeader.empty {
+  border-style: dashed;
+  background-color: var(--cioos-white);
+}
+
+.datasetsCardGroupHeader.empty .datasetsCardGroupToggle {
+  color: var(--cioos-ink-60);
+  font-weight: 400;
+  cursor: default;
+}
+
+.datasetsCardGroupHeader.empty .datasetsCardGroupCaret {
+  visibility: hidden;
+}
+
+.datasetsCardGroupHeader.empty.excluded {
+  background-color: var(--cioos-error-bg);
+}
+
+.datasetsCardGroupHeader.nested {
+  top: 34px;
+  margin-left: 12px;
+  width: calc(100% - 12px);
 }
 
 .datasetsCardGroupTitle {
@@ -406,15 +419,16 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
-/* "Show all on map": only present while something is hidden, and then only as
-   the eye and the count — the sentence is the tooltip and the accessible name,
-   so an occasional control doesn't take a row of the arrange line from the two
-   permanent ones. */
-.datasetsCardShowAllGroups {
+.datasetsCardFilters {
+  flex: 1 1 auto;
+  min-width: 44px;
+  overflow: hidden;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 9px;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
@@ -424,31 +438,72 @@ button.datasetCardTitle:focus-visible {
   cursor: pointer;
 }
 
-.datasetsCardShowAllGroups:focus-visible {
+.datasetsCardFilters svg {
+  color: var(--cioos-primary);
+}
+
+.datasetsCardFilters:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsCardFilters:focus-visible {
   outline: none;
   border-color: var(--cioos-primary);
   box-shadow: var(--cioos-focus);
 }
 
-.datasetsCardShowAllGroups:hover {
+.datasetsCardFilters.applied {
   border-color: var(--cioos-primary);
-  background-color: var(--cioos-surface-2);
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary-800);
+}
+
+.datasetsCardFilters.active {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.datasetsCardFilters.active svg {
+  color: var(--cioos-on-primary);
+}
+
+.datasetsCardFiltersCount {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.datasetsCardFilters.active .datasetsCardFiltersCount {
+  background-color: var(--cioos-on-primary);
+  color: var(--cioos-primary);
 }
 
 .datasetsCardGroupCount {
   flex: 0 0 auto;
-  min-width: 20px;
-  padding: 1px 7px;
+  min-width: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-pill);
   background-color: var(--cioos-white);
-  color: var(--cioos-ink-60);
+  color: var(--cioos-ink-80);
   font-family: var(--cioos-font-body, inherit);
   font-size: var(--cioos-font-size-xs);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
-/* --- Card body --- */
+.datasetsCardGroupHeader.open .datasetsCardGroupCount {
+  border-color: var(--cioos-primary);
+  color: var(--cioos-primary-800);
+}
+
 .datasetCardBody {
   flex: 1 1 auto;
   min-width: 0;
@@ -457,13 +512,8 @@ button.datasetCardTitle:focus-visible {
   gap: 6px;
 }
 
-/* Across the modal's full width the same four rows stacked would be four short
-   lines down the left of a wide white band. Two of them are short by nature —
-   what the dataset is, and where to get it — so they share a row, one pushed to
-   each end; the title and the query, the two that can run long, keep the whole
-   width. Grid rather than a wrapper element around the pair: the placement is
-   the only thing that differs between the two contexts the card renders in, and
-   the sidebar's single column is the same markup with no rule applied. */
+/* Grid rather than a wrapper element: the sidebar renders the same markup in
+   a single column with no rule applied. */
 .datasetCard.downloadModal .datasetCardBody {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -475,17 +525,12 @@ button.datasetCardTitle:focus-visible {
   grid-column: 1 / -1;
 }
 
-/* Sitting at the right end of the row the meta line opens is what tells the
-   two apart: what the dataset is at one end, how to get hold of it at the
-   other. */
 .datasetCard.downloadModal .datasetCardSources {
   justify-content: flex-end;
 }
 
-/* Below the width where the dialog goes full-screen (Modals/styles.css) there
-   is no width to share: the `auto` track holds the links at full size and the
-   meta line is squeezed to its longest word. So the pair stops sharing a row
-   and the card is the stack it is in the sidebar. */
+/* Below the full-screen dialog width the `auto` track would squeeze the meta
+   line to its longest word. */
 @media (max-width: 700px), (max-height: 500px) {
   .datasetCard.downloadModal .datasetCardBody {
     display: flex;
@@ -504,8 +549,6 @@ button.datasetCardTitle:focus-visible {
   gap: 7px;
 }
 
-/* Platform dot: a box exactly one title line tall, so the dot sits centered on
-   the title's first line rather than drifting down on wrapped titles. */
 .datasetCardPlatform {
   flex: 0 0 auto;
   display: inline-flex;
@@ -514,9 +557,7 @@ button.datasetCardTitle:focus-visible {
 }
 
 .datasetCardTitle {
-  /* Takes whatever the platform dot and the status slot leave, and no more:
-     without min-width a long unbroken title refuses to shrink and pushes the
-     slot off the card. */
+  /* Without min-width a long unbroken title pushes the slot off the card. */
   flex: 1 1 auto;
   min-width: 0;
   font-family: var(--cioos-font-display);
@@ -527,9 +568,6 @@ button.datasetCardTitle:focus-visible {
   overflow-wrap: anywhere;
 }
 
-/* "Real-time": same solid orange badge as the dataset inspector's, sized down
-   to the card's smaller type scale. flex: 0 0 auto so it keeps its shape next
-   to the title's flex: 1 1 auto instead of stretching with it. */
 .datasetCardLive {
   flex: 0 0 auto;
   display: inline-flex;
@@ -565,9 +603,6 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-ink-40);
 }
 
-/* --- Download-modal extras: the size and status slot at the end of the title
-   line. Height-matched to the title's first line like the platform dot at the
-   other end, so the two sit on one baseline however the title wraps. --- */
 .datasetCardDownloadInfo {
   flex: 0 0 auto;
   display: inline-flex;
@@ -579,9 +614,6 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
-/* Takes the dataset out of the order outright — the one destructive control
-   on the card, so it gets the error colour on hover rather than the teal
-   every other affordance here uses. */
 .datasetCardRemove {
   flex: 0 0 auto;
   display: inline-flex;
@@ -635,10 +667,6 @@ button.datasetCardTitle:focus-visible {
   font-size: var(--cioos-font-size-xs);
 }
 
-/* --- Where the dataset lives, and how to fetch it: the publishing server's
-   page, the CIOOS catalogue record, and the direct download. Its own row
-   rather than the tail of the size/status line, because it is three links on
-   the narrowest card and one of them wraps there. --- */
 .datasetCardSources {
   display: flex;
   flex-wrap: wrap;
@@ -656,18 +684,12 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
-/* The three parts of one offer. A tighter gap than .datasetCardSources' own,
-   so the warning and the copy read as belonging to the link between them
-   rather than as two more entries in the row of links. */
 .datasetCardDownloadGroup {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-/* The link fetches a bounding box rather than the shape that was drawn. Amber
-   on the card, spelled out on hover and to a screen reader: at this size the
-   glyph can only say "there is something to know about this link". */
 .datasetCardLinkWarning {
   display: inline-flex;
   align-items: center;
@@ -715,10 +737,6 @@ button.datasetCardTitle:focus-visible {
   font-size: var(--cioos-font-size-xs);
 }
 
-/* --- Direct download link (download modal only; see DatasetLink.jsx) ---
-   A second line under the size/status row, on the same hairline rhythm: the
-   URL that fetches this dataset from its own server, what it will return, and
-   what it could not carry. */
 .datasetCardLink {
   display: flex;
   flex-direction: column;
@@ -734,9 +752,6 @@ button.datasetCardTitle:focus-visible {
   min-width: 0;
 }
 
-/* What following the link returns. The row's other text says which dataset
-   and which server; this is the only place the chosen format appears per
-   dataset, and ERDDAP and OBIS rows do not share it. */
 .datasetCardLinkFormat {
   flex: 0 0 auto;
   padding: 1px 7px;
@@ -748,10 +763,6 @@ button.datasetCardTitle:focus-visible {
   letter-spacing: 0.02em;
 }
 
-/* One line, ellipsised. A download URL carrying every constraint runs to a
-   couple of hundred characters; wrapped, it would be the tallest thing on the
-   card and the list would stop being scannable. The full text is in the title
-   attribute and one click away in the clipboard. */
 .datasetCardLinkUrl {
   flex: 1 1 auto;
   overflow: hidden;
@@ -795,9 +806,6 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-success);
 }
 
-/* Where the URL is not quite the selection on screen: a squared-off polygon, a
-   dropped depth constraint, an unfiltered snapshot. Warn-coloured rather than
-   error — the link works, it just answers a slightly wider question. */
 .datasetCardLinkNote {
   display: flex;
   gap: 6px;
@@ -812,9 +820,8 @@ button.datasetCardTitle:focus-visible {
   margin-top: 2px;
 }
 
-/* Phone, download modal only: the panel around this list has become one
-   scrolling column (DownloadDetails/styles.css), so the list gives up its own
-   scroll rather than holding a second one inside the page's. */
+/* The panel around this list scrolls as one column on phones
+   (DownloadDetails/styles.css), so the list gives up its own scroll. */
 @media (max-width: 700px), (max-height: 500px) {
   .datasetsTable.downloadModal,
   .datasetsTable.downloadModal .datasetsCardList {

@@ -43,6 +43,21 @@ const DATASETS = [
   },
 ];
 const REASONS = [{ reason_code: "HTTP_ERROR", n: 1 }];
+const WARNINGS = [
+  {
+    code: "NON_CF_STANDARD_NAMES",
+    n_datasets: 1,
+    total_count: 4,
+    dataset_ids: ["obs_270"],
+  },
+];
+const WARNED = {
+  ...DATASETS[0],
+  warnings: [
+    { code: "NON_CF_STANDARD_NAMES", message: "4 non-CF names", count: 4 },
+    { code: "DAY_COUNT_FALLBACK", message: "used the time span" },
+  ],
+};
 
 function renderServer(url = `/harvest/server/${SLUG}`) {
   return renderWithProviders(
@@ -58,6 +73,7 @@ describe("HarvestServer", () => {
     installMockHarvestFetch({
       [`/servers/${SLUG}`]: DATASETS,
       [`/reasons/${SLUG}`]: REASONS,
+      [`/warnings/${SLUG}`]: WARNINGS,
     });
   });
 
@@ -130,5 +146,66 @@ describe("HarvestServer", () => {
     });
     renderServer();
     expect(await screen.findByText("No datasets found.")).toBeInTheDocument();
+  });
+
+  it("lists the server's warnings by code with dataset and total counts", async () => {
+    renderServer();
+    const summary = await screen.findByText("Warnings (1)");
+    const details = summary.closest("details");
+    expect(details).toHaveTextContent("Non-CF standard names");
+    const cells = details.querySelectorAll("tbody td");
+    expect(cells[1]).toHaveTextContent("1");
+    expect(cells[2]).toHaveTextContent("4");
+  });
+
+  it("clicking a warning filters the table via the warning URL param, and the chip clears it", async () => {
+    const { user } = renderServer();
+    await screen.findByText("obs_270");
+    installMockHarvestFetch({
+      [`/servers/${SLUG}`]: DATASETS,
+      [`/servers/${SLUG}?warning=NON_CF_STANDARD_NAMES`]: [WARNED],
+      [`/reasons/${SLUG}`]: REASONS,
+      [`/warnings/${SLUG}`]: WARNINGS,
+    });
+    await user.click(screen.getByText("Warnings (1)"));
+    await user.click(
+      screen.getByRole("button", { name: /Non-CF standard names/ }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("obs_512")).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/Warning: Non-CF standard names/),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove warning filter" }),
+    );
+    expect(await screen.findByText("obs_512")).toBeInTheDocument();
+    expect(screen.queryByText(/Warning: /)).not.toBeInTheDocument();
+  });
+
+  it("seeds the warning filter from the URL", async () => {
+    installMockHarvestFetch({
+      [`/servers/${SLUG}?warning=NON_CF_STANDARD_NAMES`]: [WARNED],
+      [`/reasons/${SLUG}`]: REASONS,
+      [`/warnings/${SLUG}`]: WARNINGS,
+    });
+    renderServer(`/harvest/server/${SLUG}?warning=NON_CF_STANDARD_NAMES`);
+    expect(await screen.findByText("obs_270")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Warning: Non-CF standard names/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the first warning's label plus how many more in the reason column", async () => {
+    installMockHarvestFetch({
+      [`/servers/${SLUG}`]: [WARNED],
+      [`/reasons/${SLUG}`]: [],
+      [`/warnings/${SLUG}`]: [],
+    });
+    renderServer();
+    const cell = await screen.findByText(/Non-CF standard names \+1 more/);
+    expect(cell).toHaveAttribute("title", "4 non-CF names\nused the time span");
   });
 });

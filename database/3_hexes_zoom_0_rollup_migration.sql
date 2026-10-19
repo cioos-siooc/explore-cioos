@@ -1,9 +1,8 @@
 -- Add cde.hexes_zoom_0_rollup to databases created before it existed.
 --
 -- 1_schema.sql only runs on a fresh volume; db_migrate applies [3-9]_*.sql on
--- every deploy, so this creates the table on live databases, and the backfill
--- at the end of 5_profile_process.sql fills it (sorted after this file). The
--- DDL must match 1_schema.sql. No-op on fresh volumes.
+-- every deploy. The backfill at the end of 5_profile_process.sql fills it. The
+-- DDL must match 1_schema.sql.
 CREATE TABLE IF NOT EXISTS cde.hexes_zoom_0_rollup (
     hex_pk integer NOT NULL,
     dataset_pk integer NOT NULL,

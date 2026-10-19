@@ -15,8 +15,7 @@ function Probe() {
 
 const group = (key) => latest.find((f) => f.key === key);
 
-// Seeded through the address, the way a share link arrives: one URL sets up
-// the catalogue facets, the map camera and the list's own narrowing at once.
+// Seeded through the address, the way a share link arrives.
 function open(search) {
   return renderWithProviders(<Probe />, {
     url: `/?${search}`,
@@ -48,17 +47,20 @@ describe("useActiveFilters", () => {
     );
   });
 
-  // The geometry layers live in MapState rather than FilterProvider, which is
-  // why the count the Filters badge shows used to come up short when one was
-  // on.
+  // Every server ticked is the ERDDAP row's doing, so it reads as that one
+  // filter rather than one chip per server.
+  it("lists a whole source kind as one item", async () => {
+    open("includeObis=false");
+    await waitFor(() => expect(keys()).toEqual(["sources"]));
+    expect(group("sources").items).toMatchObject([{ label: "ERDDAP" }]);
+  });
+
+  // The geometry layers live in MapState rather than FilterProvider.
   it("counts a narrowed geometry selection", async () => {
     open("layers=profile");
     await waitFor(() => expect(keys()).toContain("dataLayers"));
   });
 
-  // The quick filters light their own buttons too, but a chip is what names
-  // the value (the title term, the shape) and drops it, the same way it does
-  // for every other filter.
   it("lists the quick filters like any other", async () => {
     open(
       "search=temperature&onlyInView=true&latMin=48.0000&lonMin=-130.0000&latMax=55.0000&lonMax=-120.0000",

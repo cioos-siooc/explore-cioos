@@ -26,50 +26,27 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
 
-// Gap held between the bottom of the top bar and whatever it pushes down. Half
-// the 12px inset the shell uses elsewhere: this one is spent on every viewport
-// narrow enough for the bar to reach over the left column, and it comes
-// straight off the top of that column — where the datasets card and the
-// griddap legend are stacked and the height is already spoken for.
+// Half the shell's usual 12px inset: on narrow viewports it comes straight off
+// the left column, whose height is already spoken for.
 const TOP_BAR_GAP = 6;
 
-// How far down the top bar reaches over the datasets column on the left. The bar
-// is centered and grows downward as active-filter chips wrap onto new rows, so
-// with a few filters applied it hangs well below the brand card and over the top
-// of that column — hence a measurement rather than a fixed clearance.
-//
-// It only reaches the column on narrower viewports: once the screen is wide
-// enough for the centered bar to sit clear of it, this is 0 and the datasets
-// card starts at the top of the map again.
+// Measured, not fixed: the bar grows downward as chips wrap and overhangs the
+// left column on narrower viewports (0 once the screen is wide enough).
 function measureTopBarSpace(rect) {
   const column = document.querySelector(".sidebar")?.getBoundingClientRect();
   if (column && rect.left >= column.right) return 0;
   return rect.bottom + TOP_BAR_GAP;
 }
 
-// Centered top header. First layer: the brand bar. Second layer: the dataset
-// tally (shown / in view / total), which is what the layer below acts on.
-// Third layer, a single segmented pill of three equal-width peers — Datasets
-// (opens/closes the left datasets sidebar) and Coverage (opens the
-// time-distribution histogram) are the two ways to look at the current
-// selection, and Filters (opens the filters modal) is the one way to change
-// it. Every segment carries a dimmed-primary wash so they read as the map's
-// primary entry points.
-//
-// Under the card, on the map rather than in it, the quick filters (see
-// QuickFilters) — the ones that act on the map instead of on a list of
-// options. The active-filter chips flow beneath those, staying centered. Both
-// fold away with the small chevron riding on the far side of the Filters
-// segment: it reads as part of the button that already names the filter
-// state, rather than another control among the ones it hides.
+// The quick filters and chips sit on the map under the card; they fold away
+// with the chevron on the Filters segment, which already names filter state.
 export default function TopControls() {
   const { t } = useTranslation();
-  // The same list the chips below render, so the badge can never report a
-  // different number of filters than the row under it names.
+  // The same list the chips render, so the badge can't disagree with them.
   const activeFilterCount = useActiveFilters().length;
   const {
     showFiltersModal,
-    setShowFiltersModal,
+    openFilters,
     showCoverageModal,
     setShowCoverageModal,
     sidebarOpen,
@@ -80,10 +57,8 @@ export default function TopControls() {
   const { inspectDataset } = useSelection();
   const { tipHighlight } = useTips();
   const isMobile = useMediaQuery(MOBILE_QUERY);
-  // A dataset page minimized to the map: the quick filters give way, since
-  // they act on the whole catalogue rather than on the one dataset the map is
-  // keyed to. On a phone the card naming it takes their place under the
-  // header; wider, it sits in the bottom-left corner (see DatasetMapCorner).
+  // The quick filters act on the whole catalogue, so they give way while the
+  // map is keyed to one minimized dataset.
   const datasetMinimized = Boolean(inspectDataset) && !sidebarOpen;
 
   const barRef = useRef(null);
@@ -100,8 +75,7 @@ export default function TopControls() {
             type="button"
             className={classNames("topBarButton", { active: sidebarOpen })}
             data-testid="topbar-datasets-button"
-            // A minimized dataset page comes back as it was left; the page's
-            // own Return to datasets is the way to the list.
+            // A minimized dataset page comes back as it was left.
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-pressed={sidebarOpen}
             title={
@@ -126,10 +100,8 @@ export default function TopControls() {
             data-tip-highlight={tipHighlight("timeCoverage")}
             onClick={() => setShowCoverageModal(true)}
             aria-pressed={showCoverageModal}
-            // "Time coverage", not the "Time" the label would otherwise want
-            // to be: that is already the time *filter's* own name
-            // (timeframeFilterName), and it names a chip that can be on screen
-            // at the same moment.
+            // "Time coverage", because "Time" already names the time filter's
+            // chip, which can be on screen at the same moment.
             title={t("coverageButtonTitle")}
           >
             <BarChartLine size={18} aria-hidden="true" />
@@ -139,9 +111,7 @@ export default function TopControls() {
           </button>
           <div
             className={classNames("topBarButton topBarFiltersSegment", {
-              // Solid while the modal itself is open; once it's closed, any
-              // applied filters keep the button in the lighter "applied"
-              // wash instead of dropping all the way back to baseline.
+              // Once closed, applied filters keep the lighter "applied" wash.
               active: showFiltersModal,
               applied: !showFiltersModal && activeFilterCount > 0,
             })}
@@ -150,7 +120,7 @@ export default function TopControls() {
               type="button"
               className="topBarFiltersOpen"
               data-testid="topbar-filters-button"
-              onClick={() => setShowFiltersModal(true)}
+              onClick={openFilters}
               aria-pressed={showFiltersModal}
               title={t("dockFiltersCountTitle", { count: activeFilterCount })}
             >

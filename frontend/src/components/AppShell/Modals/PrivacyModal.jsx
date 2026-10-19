@@ -4,6 +4,7 @@ import {
   BarChartLine,
   Bug,
   Envelope,
+  GeoAlt,
   Laptop,
   Map,
   PersonCheck,
@@ -13,27 +14,26 @@ import {
 import HelpModal from "../../ui/HelpModal.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 
-// Required reading under Quebec's Law 25 and the EU's ePrivacy rules: what the
-// app keeps on the device, what leaves it and for whom. Keep it in step with
-// usePersistentState (the device), sentry.js and index.html (the services),
-// and the download scheduler's email retention.
+// Required under Quebec's Law 25 and EU ePrivacy. Keep in step with
+// usePersistentState, sentry.js, index.html, regionSearch.js and the
+// scheduler's email retention.
 const SECTIONS = [
   { key: "device", Icon: Laptop },
   { key: "email", Icon: Envelope },
   { key: "errors", Icon: Bug },
   { key: "analytics", Icon: BarChartLine },
   { key: "map", Icon: Map },
+  { key: "regions", Icon: GeoAlt },
   { key: "rights", Icon: PersonCheck },
 ];
 
-// The CIOOS privacy guidelines promise a link to the privacy policy of any
-// third party that handles a visitor's personal data: Google sends the
-// download emails, Sentry receives feedback.
+// The CIOOS privacy guidelines promise a link to each third party's policy.
 const link = (href) => <a href={href} target="_blank" rel="noreferrer" />;
 const LINKS = {
   guidelines: link("https://cioos.ca/privacy-guidelines/"),
   google: link("https://policies.google.com/privacy"),
   sentry: link("https://sentry.io/privacy/"),
+  nrcan: link("https://natural-resources.canada.ca/corporate/terms-conditions"),
 };
 
 export default function PrivacyModal() {

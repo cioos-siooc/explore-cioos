@@ -7,10 +7,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import LegendFooter from "./LegendFooter.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 
-// Map.jsx is out of scope for unit tests (see src/test/stubs/maplibre.js) — but
-// LegendFooter only needs a mapInstance object to adopt its scale/attribution
-// controls onto, which the maplibre-gl stub's Map class provides well enough
-// for onAdd/onRemove to run without throwing.
+// The maplibre-gl stub Map is enough for the controls' onAdd/onRemove to run.
 import { Map as StubMap } from "maplibre-gl";
 
 function Harness() {

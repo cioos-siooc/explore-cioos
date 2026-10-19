@@ -18,26 +18,10 @@ import {
 import "../../Controls/DatasetsTable/styles.css";
 import "./styles.css";
 
-// The "what's here" card: the single answer to a click anywhere on the map.
-//
-// One gesture used to mean six different things depending on which layer owned
-// the pixel — fly to zoom 7, build a hidden 20px bbox filter, overwrite the
-// datasets filter, open a dataset page, or clear everything — arbitrated by a
-// ladder of stand-aside tests the user could not see. Map.jsx now gathers
-// everything under the click and hands it here; this card names what it found
-// and puts each consequence behind its own button. Nothing happens on open.
-//
-// It is also what makes the map usable by touch. Every hover tooltip's content
-// appears here too, so a device with no hover loses nothing, and on a phone the
-// card is a half-height sheet rather than a popup — the map stays visible above
-// it, which is the only way to see what a selection did.
-//
-// It never competes with the datasets sidebar for the same corner: the sidebar
-// already sorts and outlines the datasets a click found (see DatasetsTable's
-// pinnedPks), so once it is open the card would be a second, redundant answer
-// to the same click sitting on top of the first. It is one or the other.
+// Every hover tooltip's content appears here too, so a device with no hover
+// loses nothing. Never shown beside the open datasets sidebar, which already
+// sorts and outlines what a click found (DatasetsTable's pinnedPks).
 
-// How far a stack has to grow before the list scrolls rather than the card.
 const VISIBLE_ROWS = 5;
 
 const KIND_ORDER = ["track", "observation", "grid"];
@@ -59,21 +43,13 @@ export default function FeatureCard() {
 
   const [expanded, setExpanded] = useState(false);
 
-  // The card travels on and off screen rather than appearing and vanishing
-  // (see styles.css), so it outlives the query that filled it: dismissing it
-  // clears `featureQuery` at once — that is also what un-rings the region on
-  // the map — and a card that blanked halfway out would be a worse exit than
-  // none. This holds the last answer so it is still the one on screen while it
-  // leaves. Adjusted during render rather than in an effect, the same shape
-  // useChanged is built on.
+  // The card slides off screen, but dismissing clears `featureQuery` at once;
+  // this holds the last answer so the card doesn't blank halfway out.
   const [held, setHeld] = useState(featureQuery);
   if (featureQuery && featureQuery !== held) setHeld(featureQuery);
   const query = featureQuery ?? held;
 
-  // What each dataset under the click contributes to the cell's figure. The
-  // tile only carries the cell TOTAL, which is why this is asked for
-  // separately — see the hook. Empty until it lands, so a row shows no figure
-  // rather than the cell's, which is what every row used to show.
+  // Empty until it lands, so a row shows no figure rather than the cell's.
   const datasetDays = useCellDatasetDays(query, combinedQueries, dataLayers);
 
   const close = useCallback(() => setFeatureQuery(null), [setFeatureQuery]);
@@ -82,7 +58,6 @@ export default function FeatureCard() {
   // left in.
   if (useChanged(query?.nonce)) setExpanded(false);
 
-  // Escape closes, like every other dismissable surface in the app.
   useEffect(() => {
     if (!featureQuery) return undefined;
     const onKeyDown = (e) => {
@@ -92,33 +67,33 @@ export default function FeatureCard() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [featureQuery, close]);
 
-  // Held back by the open sidebar — see the comment up top — and by a dataset
-  // view, which is keyed to one dataset rather than to what a click found. The
-  // query itself is left alone so the card picks back up where it left off
-  // once neither is in the way.
+  // The query is left alone so the card picks back up once neither the
+  // sidebar nor a dataset view is in the way.
   const open = Boolean(featureQuery) && !sidebarOpen && !inspectDataset;
+  // Species records under the click make it the moment to say they can be
+  // searched for by name.
+  const hasObis =
+    open &&
+    (query?.items || []).some(
+      (item) =>
+        pointsData.find((row) => Number(row.pk) === item.pk)?.source_type ===
+        "obis",
+    );
   useEffect(() => {
-    if (open) offerTip("whatsHere");
-  }, [open, offerTip]);
+    if (open) offerTip([...(hasObis ? ["speciesName"] : []), "whatsHere"]);
+  }, [open, hasObis, offerTip]);
   // Nothing has been clicked yet in this session: there is no card to park.
   if (!query) return null;
 
-  // The hex and point tiles carry dataset pks but no titles, so an observation
-  // row has to resolve against the current results to have anything to say —
-  // and one that doesn't resolve is genuinely not in the list the buttons act
-  // on, so it is dropped.
-  //
-  // Tracks and grids are the other way round: they come from their own sources,
-  // which apply only the dataset-level filters, so they can still be drawn for a
-  // dataset that pointQuery's depth/bbox/polygon predicates dropped — and they
-  // carry their own titles. Dropping those rows would leave something plainly
-  // visible on the map that the card claimed was not there. They stay, and only
-  // the actions that genuinely need a result row are withheld.
+  // Observation rows resolve against the current results (the tiles carry no
+  // titles), and one that doesn't is not in the list the buttons act on, so it
+  // is dropped. Tracks and grids carry their own titles and only dataset-level
+  // filters, so they can be drawn for a dataset pointQuery dropped; they stay,
+  // with the result-row actions withheld.
   const byPk = new Map(pointsData.map((row) => [Number(row.pk), row]));
 
-  // A marker click's featureQuery is deliberately item-less (see Map.jsx's
-  // handleMapClick): it opens the dataset page directly and only sets this to
-  // pin the dataset in the list, so the card itself has nothing to list.
+  // A marker click's featureQuery is deliberately item-less (Map.jsx's
+  // handleMapClick): it only pins the dataset in the list.
   const rows = (query.items || [])
     .map((item) => {
       const row = byPk.get(item.pk);
@@ -127,18 +102,13 @@ export default function FeatureCard() {
         ...item,
         title: row?.title || item.title,
         platform: row?.platform || item.platform,
-        // undefined until the breakdown lands, and for a track or grid, which
-        // have no cell figure of their own.
+        // undefined until the breakdown lands, and for a track or grid.
         count: datasetDays.get(item.pk),
         row,
-        // A dataset page resolves out of pointsData. A track without one still
-        // opens: selectTrajectoryFromMap draws the platform's history either
-        // way and leaves the page alone when it can't resolve the dataset,
-        // which is exactly what clicking the track used to do.
+        // A track without a result row still opens: selectTrajectoryFromMap
+        // draws the platform's history and leaves the page alone.
         openable: item.kind === "track" || Boolean(row),
-        // Griddap is metadata-only: it never enters the selection, and the
-        // list's own button is disabled for one, so the card says the same
-        // rather than offering a button that would quietly do nothing.
+        // Griddap is metadata-only and never enters the selection.
         selectable: item.kind !== "grid" && row?.cdm_data_type !== "Grid",
         inSelection: selectedPks.has(row?.pk),
       };
@@ -150,16 +120,12 @@ export default function FeatureCard() {
         (b.count || 0) - (a.count || 0),
     );
 
-  // Everything under the click resolved away (all of it filtered out of the
-  // current results): say so rather than showing an empty card.
   const empty = rows.length === 0;
   const shown = expanded ? rows : rows.slice(0, VISIBLE_ROWS);
   const hidden = rows.length - shown.length;
 
   const openDataset = (entry) => {
     if (entry.kind === "track") {
-      // Same call the inspector's platform table makes: open the page and draw
-      // the platform's track in one batched write.
       selectTrajectoryFromMap(entry.pk, entry.trajectoryId, entry.title);
       close();
       return;
@@ -170,16 +136,11 @@ export default function FeatureCard() {
     }
   };
 
-  // Adding a row keeps the card open: picking two of the five datasets under
-  // one click is the normal case, and closing after the first would make the
-  // user click the same hex again for the second.
-  //
-  // "Selection", not "download": these datasets are being set aside. Downloading
-  // is one thing you can then do with them, from the list's footer.
+  // Adding keeps the card open: picking several datasets under one click
+  // is the normal case.
   const addOne = (pk) => addDatasetsToSelection([pk]);
 
-  // The list card's glyph. A track row without a result row still is a
-  // trajectory, and a grid row without one still a grid.
+  // A track or grid row without a result row still gets its kind's glyph.
   const kindIcon = (entry) => (
     <DatasetPlatformIcon
       platform={entry.platform}
@@ -197,9 +158,6 @@ export default function FeatureCard() {
       total: Number(value || 0).toLocaleString(i18n.language),
     });
 
-  // Pinned to the bottom-left corner of the map on desktop and to the bottom
-  // edge on phones — see styles.css, where the media query overrides `left`,
-  // `inset` and friends wholesale, the direction it travels in included.
   return (
     <div
       data-testid="feature-card"
@@ -254,28 +212,18 @@ export default function FeatureCard() {
                   : entry.kind === "grid"
                     ? t("featureCardGrid")
                     : [
-                        // No figure yet (or the request failed): the row says
-                        // what it can rather than showing a number that isn't
-                        // this dataset's.
+                        // No figure yet (or the request failed): show none
+                        // rather than a number that isn't this dataset's.
                         entry.count === undefined
                           ? null
                           : countLabel(entry.count),
-                        // An aggregate cell is a neighbourhood, not a place:
-                        // say so rather than implying the precision an
-                        // individual marker has.
                         entry.aggregate ? t("featureCardNearby") : null,
                       ]
                         .filter(Boolean)
                         .join(" · ");
-              // Laid out like the datasets list's card (DatasetCard): the whole
-              // card opens the dataset, the download toggle sits on the title's
-              // line, and the lines below run the card's full width.
-              //
-              // A gridded footprint the current results don't contain has no
-              // page to open — the rectangles come from their own source and
-              // outlive the filter that dropped the dataset. It still reads as
-              // a card (it is genuinely here); it just isn't one pretending to
-              // lead somewhere.
+              // A grid the current results don't contain has no page to open:
+              // the rectangles come from their own source and outlive the
+              // filter.
               return (
                 <div
                   className={classNames("featureCardRow", {
@@ -288,20 +236,16 @@ export default function FeatureCard() {
                   }
                 >
                   <span className="featureCardRowHeadline">
-                    {/* Ticks the dataset into the download selection, with the
-                        list checkbox's glyphs: a plus while out, a tick once
-                        in. */}
                     <button
                       type="button"
                       className={classNames("featureCardRowAdd", {
                         isSelected: entry.inSelection,
                       })}
                       onClick={(e) => {
-                        // The card itself opens the dataset page.
                         e.stopPropagation();
                         addOne(entry.pk);
                       }}
-                      // One is enough to point at. The sidebar list's own
+                      // One is enough to point at; the sidebar list's own
                       // toggle stands in for it while the card is held back
                       // (see DatasetsTable).
                       data-tip-highlight={tipHighlight(
@@ -330,8 +274,8 @@ export default function FeatureCard() {
                     <span className="featureCardRowIcon">
                       {kindIcon(entry)}
                     </span>
-                    {/* The row's keyboard target, as on DatasetCard: the row
-                        holds the add button, so it can't be a button itself. */}
+                    {/* The row holds the add button, so it can't be a button
+                        itself. */}
                     {entry.openable ? (
                       <button type="button" className="featureCardRowTitle">
                         {entry.title}
