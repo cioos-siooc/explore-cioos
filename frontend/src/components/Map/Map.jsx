@@ -85,6 +85,7 @@ import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
 import { focusedPointFeatures } from "./focusedPoints.js";
 import { selectionLayerFilter } from "./selectionFilter.js";
+import { createTileRetry } from "./tileRetry.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // Captured before the overrides below replace them.
@@ -479,6 +480,16 @@ export default function CreateMap({
     [hexMaxZoom, COVERAGE_HEX_OPACITY_STOPS[0][1]],
   ];
   const [draw] = useState(() => new MapboxDraw(drawControlOptions));
+  // refreshTiles is the one public call that reloads an errored tile.
+  const [tileRetry] = useState(() =>
+    createTileRetry({
+      refresh: (sourceId, tile) => {
+        if (map.current?.getSource(sourceId)) {
+          map.current.refreshTiles(sourceId, [tile]);
+        }
+      },
+    }),
+  );
   const drawPolygon = useRef(draw);
   const doFinalCheck = useRef(false);
   const layersLoaded = useRef(false);
@@ -552,6 +563,7 @@ export default function CreateMap({
     if (!map.current || !map.current.getSource("tracks")) return;
     const zoom = map.current.getZoom();
     appliedTrailRef.current = effectiveTrailingDays(trailing, zoom);
+    tileRetry.reset("tracks");
     // setTiles clears the source's tile cache and reloads the viewport tiles.
     map.current
       .getSource("tracks")
@@ -569,6 +581,7 @@ export default function CreateMap({
     )
       return;
     const { tileQuery, cellTileQuery } = tileUrls(queryString);
+    HEX_SOURCE_IDS.forEach((id) => tileRetry.reset(id));
     map.current.getSource("cde-tiles").setTiles([tileQuery]);
     map.current.getSource("cde-cells").setTiles([cellTileQuery]);
   }
@@ -3130,6 +3143,16 @@ export default function CreateMap({
       if (!focusedDatasetPk.current) return;
       if (!e.isSourceLoaded || !dataSourceIds.includes(e.sourceId)) return;
       hoverHighlightPoints(focusedDatasetPk.current);
+    });
+
+    // Aborted requests (tiles left behind mid-zoom) don't fire 'error'. Any
+    // listener stops MapLibre's own console.error, hence the log; the message,
+    // since a minified error class logs as its two-letter name.
+    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks"];
+    map.current.on("error", (e) => {
+      console.error(e.error?.message ?? e.error);
+      if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
+      tileRetry.onError(e.sourceId, e.tile.tileID.canonical);
     });
 
     map.current.on("idle", () => {
