@@ -35,7 +35,7 @@ describe("UrlSync", () => {
     installMockFetch();
   });
 
-  it("keeps a dataset page widened across a map pan, and drops it with the page", async () => {
+  it("keeps the card widened across a map pan, and back on the list", async () => {
     renderWithProviders(<Probe />, {
       providers: "app",
       url: `/?dataset=${pointQueryFixture[0].dataset_id}&wide=1`,
@@ -47,7 +47,9 @@ describe("UrlSync", () => {
 
     act(() => hooks.selection.returnToDatasetList());
     await waitFor(() => expect(params().has("dataset")).toBe(false));
-    expect(params().has("wide")).toBe(false);
+    act(() => hooks.mapState.setMapView({ lat: 49, lon: -124, zoom: 5 }));
+    await waitFor(() => expect(params().get("zoom")).toBe("5"));
+    expect(params().get("wide")).toBe("1");
   });
 
   it("syncs i18n to a ?lang= the link was opened with", async () => {

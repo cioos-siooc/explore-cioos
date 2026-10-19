@@ -70,21 +70,20 @@ export default function Sidebar() {
   if (useChanged(expanded) && expanded) setBackable(!inspectDataset);
   useBackDismiss(isMobile && expanded && backable, () => setSidebarOpen(false));
   const inspecting = Boolean(inspectDataset);
+  // Wide is the card's, not the page's: the list and a dataset page share it.
+  // Hiding the card keeps it, so it reopens the size it was left, as a
+  // minimized window does.
   const [wideParam, setWide] = useWideView();
-  const wide = inspecting && wideParam;
+  const wide = expanded && wideParam;
   useEffect(() => {
     if (!wide) return undefined;
+    // On window, so anything nearer that answers Escape (a dialog, the filter
+    // search, a pinned citation) stops or claims it first.
     const onKeyDown = (event) => {
-      // An open dialog (a record preview) owns Escape.
-      if (
-        event.key !== "Escape" ||
-        document.body.classList.contains("cioos-modal-open")
-      )
-        return;
-      setWide(false);
+      if (event.key === "Escape" && !event.defaultPrevented) setWide(false);
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [wide, setWide]);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
   // Adding to the selection is when download tips start to matter.
@@ -96,11 +95,14 @@ export default function Sidebar() {
     lastSelectedCount.current = selectedCount;
   }, [selectedCount, offerTip]);
 
-  const collapseButton = (
+  // Minimize, maximize, close: the order window controls use. A phone's card
+  // is already a full-screen sheet.
+  const wideButton = !isMobile && (
     <CloseButton
-      label={t("sidebarCollapseTitle")}
-      onClick={() => setSidebarOpen(false)}
-      testId="sidebar-collapse"
+      label={t(wide ? "sidebarNarrowViewTitle" : "sidebarWideViewTitle")}
+      onClick={() => setWide(!wide)}
+      icon={wide ? WindowSidebar : WindowMaximize}
+      testId="sidebar-wide-toggle"
     />
   );
 
@@ -161,24 +163,11 @@ export default function Sidebar() {
               </span>
               <CloseButton
                 label={t("sidebarShowMapTitle")}
-                onClick={() => {
-                  setWide(false);
-                  setSidebarOpen(false);
-                }}
+                onClick={() => setSidebarOpen(false)}
                 icon={WindowMinimize}
                 testId="sidebar-collapse"
               />
-              {/* Minimize, maximize, close: the order window controls use. */}
-              {!isMobile && (
-                <CloseButton
-                  label={t(
-                    wide ? "sidebarNarrowViewTitle" : "sidebarWideViewTitle",
-                  )}
-                  onClick={() => setWide(!wide)}
-                  icon={wide ? WindowSidebar : WindowMaximize}
-                  testId="sidebar-wide-toggle"
-                />
-              )}
+              {wideButton}
               <CloseButton
                 label={t("closeDatasetText")}
                 onClick={() => {
@@ -216,7 +205,12 @@ export default function Sidebar() {
                   {t("datasetsToggleSubtitleText")}
                 </span>
               </span>
-              {collapseButton}
+              {wideButton}
+              <CloseButton
+                label={t("sidebarCollapseTitle")}
+                onClick={() => setSidebarOpen(false)}
+                testId="sidebar-collapse"
+              />
             </div>
           )}
           <div className="sidebarBody" data-testid="sidebar-body">

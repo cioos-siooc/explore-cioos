@@ -87,7 +87,7 @@ describe("Sidebar wide view", () => {
         url: `/?dataset=${pointQueryFixture[0].dataset_id}${query}`,
       },
     );
-    await screen.findByTestId("sidebar-wide-toggle");
+    await screen.findByTestId("sidebar-back");
     return result;
   }
 
@@ -120,15 +120,49 @@ describe("Sidebar wide view", () => {
     );
   });
 
-  it("leaves Escape to a dialog open over it", async () => {
+  it("leaves Escape to whatever nearer answers it first", async () => {
     const { user } = await renderDatasetPage("&wide=1");
-    document.body.classList.add("cioos-modal-open");
-    try {
-      await user.keyboard("{Escape}");
-      expect(screen.getByTestId("sidebar")).toHaveClass("wide");
-    } finally {
-      document.body.classList.remove("cioos-modal-open");
+    // A dialog stops it; a pinned citation claims it.
+    for (const answer of ["stopPropagation", "preventDefault"]) {
+      const handler = (event) => event.key === "Escape" && event[answer]();
+      document.addEventListener("keydown", handler);
+      try {
+        await user.keyboard("{Escape}");
+        expect(screen.getByTestId("sidebar")).toHaveClass("wide");
+      } finally {
+        document.removeEventListener("keydown", handler);
+      }
     }
+  });
+
+  it("widens the datasets list too, and a dataset opened from it stays wide", async () => {
+    const { user } = renderWithProviders(
+      <>
+        <Sidebar />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("state")).toHaveTextContent("ready"),
+    );
+    await user.click(screen.getByTestId("sidebar-wide-toggle"));
+    await waitFor(() => expect(window.location.search).toContain("wide=1"));
+    expect(screen.getByTestId("sidebar")).toHaveClass("wide");
+
+    act(() => latestSelection.setInspectDataset(pointQueryFixture[0]));
+    await screen.findByTestId("sidebar-back");
+    expect(screen.getByTestId("sidebar")).toHaveClass("wide");
+  });
+
+  it("reopens at the size it was hidden at, like a minimized window", async () => {
+    const { user } = await renderDatasetPage("&wide=1");
+    await user.click(screen.getByTestId("sidebar-collapse"));
+    await waitFor(() =>
+      expect(screen.getByTestId("sidebar")).not.toHaveClass("wide"),
+    );
+    expect(screen.queryByTestId("sidebar-scrim")).not.toBeInTheDocument();
+    expect(window.location.search).toContain("wide=1");
   });
 
   it("is not offered on a phone, where the page is already full-screen", async () => {

@@ -4,8 +4,8 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import { WIDE_PARAM } from "./previewParams.js";
 import useMediaQuery, { MOBILE_QUERY } from "../ui/useMediaQuery.js";
 
-// Replace, not push: widening a page is not a place to go Back to. A phone's
-// page is already a full-screen sheet, so a wide link opens it as one there.
+// Replace, not push: widening the card is not a place to go Back to. A phone's
+// card is already a full-screen sheet, so a wide link opens it as one there.
 export default function useWideView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();

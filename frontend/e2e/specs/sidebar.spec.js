@@ -133,4 +133,33 @@ test.describe("the datasets sidebar", () => {
     await expect(page.getByRole("tablist")).toBeVisible();
     await expect(page.getByTestId("sidebar-scrim")).toHaveCount(0);
   });
+
+  test("widens the datasets list into a grid of cards", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "a phone's list is already full-screen",
+    );
+    await openApp(page);
+    const panel = page.getByTestId("sidebar-datasets");
+    if ((await panel.getAttribute("data-expanded")) !== "true") {
+      await page.getByTestId("topbar-datasets-button").click();
+    }
+    await page.getByTestId("sidebar-wide-toggle").click();
+    await expect(page).toHaveURL(/[?&]wide=1/);
+
+    // Two cards side by side: the second starts on the first one's row.
+    const cards = page.getByTestId("dataset-card");
+    await expect(cards.nth(1)).toBeVisible();
+    const [first, second] = await Promise.all([
+      cards.nth(0).boundingBox(),
+      cards.nth(1).boundingBox(),
+    ]);
+    expect(second.y).toBeCloseTo(first.y, 0);
+    expect(second.x).toBeGreaterThan(first.x);
+
+    await page.getByTestId("sidebar-scrim").click({ position: { x: 5, y: 5 } });
+    await expect(page).not.toHaveURL(/[?&]wide=/);
+  });
 });

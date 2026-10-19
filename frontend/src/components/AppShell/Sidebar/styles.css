@@ -33,8 +33,8 @@
   pointer-events: auto;
 }
 
-/* The dataset page widened over the map (useWideView), above the rest of the
-   shell but under any dialog. Phones never get here: the page is already a
+/* The card widened over the map (useWideView), above the rest of the
+   shell but under any dialog. Phones never get here: the card is already a
    full-screen sheet. */
 .sidebar.wide {
   left: 50%;

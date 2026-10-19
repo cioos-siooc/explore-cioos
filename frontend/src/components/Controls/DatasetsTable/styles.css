@@ -144,6 +144,19 @@
   padding: 10px;
 }
 
+/* Widened over the map (useWideView), the cards flow into a grid under
+   full-width group headers. Only the sidebar's list: the Download modal's is
+   the same table. */
+.sidebar.wide .datasetsCardList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-content: start;
+}
+
+.sidebar.wide .datasetsCardGroupHeader {
+  grid-column: 1 / -1;
+}
+
 .datasetsCardEmpty {
   grid-column: 1 / -1;
   padding: 24px 12px;

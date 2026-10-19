@@ -34,7 +34,6 @@ import { useUI } from "./ui/UIProvider.jsx";
 const PRESERVED_PARAMS = [
   "server",
   TAB_PARAM,
-  WIDE_PARAM,
   RECORD_PARAM,
   PERIOD_PARAM,
   ...PLOT_PARAMS,
@@ -107,6 +106,8 @@ export default function UrlSync() {
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
+      // Owned by useWideView.
+      ...(searchParams.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
       ...(dataset ? { dataset } : {}),
       // Carried through only while a dataset is open, so they don't linger as
       // stale keys for a closed page.
