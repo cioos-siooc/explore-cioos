@@ -422,6 +422,7 @@ button.datasetCardTitle:focus-visible {
 .datasetsCardFilters {
   flex: 1 1 auto;
   min-width: 44px;
+  max-width: 10rem;
   overflow: hidden;
   white-space: nowrap;
   display: inline-flex;
