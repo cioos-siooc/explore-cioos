@@ -351,17 +351,19 @@ describe("FilterSearch", () => {
     expect(seen.ui.showFiltersModal).toBe(false);
   });
 
-  it("shows a spinner in the bar while NRCan answers", async () => {
+  it("marks the bar busy and holds a places row while NRCan answers", async () => {
     answerRegions();
     const { user, box } = await renderPalette();
 
     await user.type(box, "fundy");
 
+    expect(box).toHaveAttribute("aria-busy", "true");
     expect(
       within(screen.getByTestId("filter-search")).getByRole("status"),
-    ).toHaveTextContent("Searching places…");
+    ).toHaveTextContent("Places (NRCan GeoNames)Searching places…");
     await screen.findByText("Bay of Fundy");
     expect(screen.queryByText("Searching places…")).toBeNull();
+    expect(box).toHaveAttribute("aria-busy", "false");
   });
 
   it("goes to a region without filtering when asked", async () => {

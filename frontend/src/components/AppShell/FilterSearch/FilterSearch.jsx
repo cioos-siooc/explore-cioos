@@ -378,7 +378,9 @@ export default function FilterSearch({ text, setText, inputRef }) {
       className={classNames("filterSearchPage", { excluding: exclude })}
       data-testid="filter-search"
     >
-      <div className="filterSearchField">
+      <div
+        className={classNames("filterSearchField", { busy: places.loading })}
+      >
         <Search size={20} aria-hidden="true" />
         <input
           ref={inputRef}
@@ -399,13 +401,8 @@ export default function FilterSearch({ text, setText, inputRef }) {
           aria-expanded={flat.length > 0}
           aria-controls={flat.length > 0 ? listId : undefined}
           aria-activedescendant={current ? `${listId}-${active}` : undefined}
+          aria-busy={places.loading}
         />
-        {places.loading && (
-          <span role="status" className="filterSearchLoading">
-            <Spinner size="sm" role={null} />
-            <span className="sr-only">{t("regionSearchLoading")}</span>
-          </span>
-        )}
         {text && (
           <button
             type="button"
@@ -581,6 +578,18 @@ export default function FilterSearch({ text, setText, inputRef }) {
               inputRef.current?.focus();
             }}
           />
+        )}
+        {places.loading && (
+          <div role="status" className="filterSearchPending">
+            <span className="filterSearchGroupLabel">
+              <GroupIcon groupKey="region" />
+              {t("regionSearchGroup")}
+            </span>
+            <span className="filterSearchPendingText">
+              <Spinner size="sm" role={null} />
+              {t("regionSearchLoading")}
+            </span>
+          </div>
         )}
       </div>
       <footer className="filterSearchKeys" aria-hidden="true">
