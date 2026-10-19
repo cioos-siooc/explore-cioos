@@ -17,6 +17,12 @@ Please note: some datasets in your selection could not be included in this downl
 {% endif %}
 {% endfor %}
 {% endif %}
+{% if fallback_datasets %}
+These datasets are in CSV rather than the format you chose:
+{% for d in fallback_datasets %}
+- {{ d['dataset_id'] }} — {{ d['reason'] }}.
+{% endfor %}
+{% endif %}
 The README.md in the zip lists what was included and why anything was left out. Each dataset's folder holds its data, its citation and its source metadata; all citations are in citations.txt (also .bib, .ris and CITATION.cff) and the licences in rights.txt. Please cite every dataset you use.
 
 The sources of this download:

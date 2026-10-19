@@ -316,6 +316,18 @@ def test_the_download_script_builds_the_package_without_limits_or_the_html_readm
     assert "README.html" not in crate
 
 
+def test_the_download_script_says_which_datasets_fell_back_to_csv(tmp_path, monkeypatch, capsys):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    monkeypatch.chdir(tmp_path)
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    with patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]):
+        script.run(_query(obis, format="nccf"))
+
+    assert "abc  was delivered as CSV: NetCDF CF (DSG) is not available for this source" in capsys.readouterr().out
+
+
 def test_servers_download_concurrently_but_each_serves_one_request_at_a_time(tmp_path):
     active, peak, lock = {}, {}, threading.Lock()
 

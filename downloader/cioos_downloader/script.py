@@ -15,8 +15,8 @@ from rich.progress import BarColumn, Progress, ProgressColumn, SpinnerColumn, Te
 from rich.text import Text
 
 from cioos_downloader import download_erddap
-from cioos_downloader.download_erddap import get_datasets
-from cioos_downloader.package import write_package
+from cioos_downloader.download_erddap import FORMATS, get_datasets
+from cioos_downloader.package import REASONS, write_package
 
 
 class _Transfer(ProgressColumn):
@@ -99,6 +99,8 @@ def run(manifest):
     print()
     for row in report["erddap_report"]:
         error = row["erddap_error"].splitlines()[0] if row["erddap_error"] else ""
+        if row["format_fallback"] and row["files"]:
+            error = REASONS["en"]["fallback"].format(format=FORMATS[row["requested_format"]].label)
         print(f"{row['status']:>9}  {row['dataset_id']}  {error}")
     print(f"\nFiles are in {root}; README.md lists what is included and how to cite it.")
     return 1 if report["empty_download"] else 0

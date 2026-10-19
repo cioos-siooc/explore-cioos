@@ -174,6 +174,16 @@ def test_included_statuses_are_cited_not_listed_as_omitted(sent, status):
     assert "could not be included in this download" not in body
 
 
+def test_obis_dataset_delivered_as_csv_is_listed_in_both_languages(sent):
+    obis = _obis_dataset("a1b2c3") | {"format_fallback": True, "requested_format": "odv"}
+    ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset(), obis), "en")
+
+    body = sent[0][1]
+    assert "- a1b2c3 — was delivered as CSV: ODV spreadsheet is not available for this source." in body
+    assert "- a1b2c3 — a été livré en CSV : ODV spreadsheet n'est pas disponible pour cette source." in body
+    assert body.count("rather than the format you chose") == 1
+
+
 def test_unknown_status_falls_back_to_generic_reason(sent):
     ds.email_user(
         "a@b.ca", "completed", "z.zip", _report(_erddap_dataset("Odd", status="WEIRD")), "en"

@@ -7,6 +7,7 @@ import traceback
 import sentry_sdk
 from cde_harvester.core.issues import error_signature, report_issues
 from cioos_downloader import downloader_wrapper
+from cioos_downloader.download_erddap import FORMATS
 from cioos_downloader.package import REASONS
 from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
@@ -95,6 +96,7 @@ def email_user(email, status, zip_filename, downloader_output, language):
 
     dataset_urls = []
     failed_datasets = []
+    fallback_datasets = []
     if downloader_output:
         for dataset in downloader_output["erddap_report"]:
             # OBIS datasets aren't on an ERDDAP server (erddap_url is the
@@ -110,10 +112,11 @@ def email_user(email, status, zip_filename, downloader_output, language):
                     dataset["erddap_url"] + "/info/" + dataset["dataset_id"] + "/index.html"
                 )
 
+            title = dataset.get("title")
+            label = f"{title} ({dataset['dataset_id']})" if title else dataset["dataset_id"]
             if dataset.get("status") not in _INCLUDED:
-                title = dataset.get("title")
                 failed_datasets += [{
-                    "dataset_id": f"{title} ({dataset['dataset_id']})" if title else dataset["dataset_id"],
+                    "dataset_id": label,
                     "reason": REASONS["en"].get(dataset.get("status"), "could not be included"),
                     "reason_fr": REASONS["fr"].get(dataset.get("status"), "n'a pas pu être inclus"),
                     # The server's own words; the README has the full text and URLs.
@@ -121,6 +124,14 @@ def email_user(email, status, zip_filename, downloader_output, language):
                 }]
                 # Don't cite a dataset that isn't in the zip.
                 continue
+
+            if dataset.get("format_fallback"):
+                requested = FORMATS[dataset["requested_format"]].label
+                fallback_datasets += [{
+                    "dataset_id": label,
+                    "reason": REASONS["en"]["fallback"].format(format=requested),
+                    "reason_fr": REASONS["fr"]["fallback"].format(format=requested),
+                }]
 
             out = {"source_label": source_label, "source_url": source_url}
             if dataset["ckan_id"]:
@@ -171,6 +182,7 @@ def email_user(email, status, zip_filename, downloader_output, language):
                 download_url=download_url,
                 status=status,
                 failed_datasets=failed_datasets,
+                fallback_datasets=fallback_datasets,
             )
         ]
         subject += [email_subject[status][language_option]]

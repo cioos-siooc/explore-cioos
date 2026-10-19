@@ -17,6 +17,12 @@ Veuillez noter que certains ensembles de données de votre sélection n'ont pas 
 {% endif %}
 {% endfor %}
 {% endif %}
+{% if fallback_datasets %}
+Ces jeux de données sont en CSV plutôt que dans le format choisi :
+{% for d in fallback_datasets %}
+- {{ d['dataset_id'] }} — {{ d['reason_fr'] }}.
+{% endfor %}
+{% endif %}
 Le fichier README.md du zip indique ce qui a été inclus et pourquoi certains jeux de données ne l'ont pas été. Le dossier de chaque jeu de données contient ses données, sa citation et ses métadonnées sources; toutes les citations sont dans citations.txt (aussi .bib, .ris et CITATION.cff) et les licences dans rights.txt. Veuillez citer chaque jeu de données utilisé.
 
 Les sources de ce téléchargement :
