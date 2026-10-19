@@ -63,13 +63,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      # Must match @playwright/test in frontend/package.json exactly — a
-      # mismatch fails with "Executable doesn't exist at /ms-playwright/…".
-      # Bump the two together.
-      #
-      # Running in the container is what makes the a11y node counts
-      # reproducible: it is the same image e2e/in-container.sh uses locally,
-      # so fonts and Chromium match rather than differing per machine.
+      # Must match @playwright/test in frontend/package.json exactly; bump the
+      # two together. The same image as e2e/in-container.sh keeps a11y node
+      # counts reproducible.
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       # Chromium dies on the default 64MB /dev/shm.
       options: --ipc=host
@@ -85,16 +81,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Behaviour at the three viewport regimes, plus the a11y ratchet: these
-      # assert through data-testid and user-visible text (a11y through axe),
-      # which survive restyling by design, so they gate every push and PR.
-      #
-      # The visual (screenshot) suite is NOT here — it moved to
-      # .github/workflows/build_and_test.yml, gated on a published release
-      # rather than on every push/PR. This workflow gates nothing on its own
-      # (deploy.yml only watches the "Integration Tests" workflow), so a
-      # pixel-diff check belongs in the pipeline that actually decides
-      # whether a release ships, not in this one.
+      # These assert through data-testid and user-visible text, which survive
+      # restyling, so they gate every push and PR. The visual suite lives in
+      # build_and_test.yml, gated on a published release.
       - name: Run the behavioural and accessibility suites
         run: npx playwright test --project=desktop --project=tablet --project=mobile --project=a11y
         env:

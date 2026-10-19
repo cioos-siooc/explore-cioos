@@ -4,21 +4,11 @@ import { useTranslation } from "react-i18next";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import { SWATCHES } from "../DatasetPreview/previewColors.js";
 
-// The colour one variable draws in. Twelve preset swatches, "back to what the
-// dataset says", and a native field for anything else.
+// `color` is the override (null when drawing in `defaultColor`).
 //
-// `color` is the OVERRIDE — null when the variable is still drawing in the colour
-// its ERDDAP colorBarPalette implies, which is what `defaultColor` holds. Both
-// are needed: the chip shows the colour in use, the menu shows whether it is a
-// choice or a default.
-//
-// WHY THE CUSTOM FIELD IS DEBOUNCED
-// React's onChange on <input type="color"> is the DOM `input` event, which fires
-// on every pointer move inside the OS colour dialog. Each one would rewrite the
-// query string and re-plot every panel, so the chip follows the pointer from
-// local state and the choice is committed once the pointer has been still for a
-// moment. The field is also deliberately NOT a Dropdown.Item: an Item closes the
-// menu on click (ui/Dropdown.jsx), and the menu has to outlive the dialog.
+// The custom field is debounced: onChange on <input type="color"> fires on every
+// pointer move in the OS dialog, and each would rewrite the URL and re-plot. It
+// is deliberately not a Dropdown.Item, which would close the menu on click.
 const COMMIT_DELAY_MS = 250;
 
 export default function VariableColorPicker({

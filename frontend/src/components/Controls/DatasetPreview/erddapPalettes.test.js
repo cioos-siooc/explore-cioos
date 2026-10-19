@@ -2,9 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { paletteFor } from "./erddapPalettes.js";
 
-// paletteColorFor/contrastOnWhite/MIN_TRACE_CONTRAST are exhaustively covered
-// by previewColors.test.mjs (node:test). paletteFor itself — the raw ramp
-// lookup those build on — wasn't exercised directly by anything there.
+// The rest of this module is covered by previewColors.test.mjs.
 describe("paletteFor", () => {
   it("returns the five-stop Plotly ramp for a mapped palette name", () => {
     const ramp = paletteFor("KT_thermal");

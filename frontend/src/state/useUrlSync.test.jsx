@@ -9,10 +9,8 @@ import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 
-// UrlSync (src/state/useUrlSync.js) is already mounted inside AppProviders —
-// it is the sole writer of window.location. There is nothing to render it
-// standalone against; instead these drive real state through the same
-// providers it reads, under the full app tree, and read the URL back.
+// UrlSync is mounted inside AppProviders, so these drive real state through
+// the full app tree and read the URL back.
 let hooks;
 
 function Probe() {
@@ -59,18 +57,13 @@ describe("UrlSync", () => {
 
   it("keeps the search's dataset list out of the link — only the expression", async () => {
     renderWithProviders(<Probe />, { providers: "app" });
-    // The results themselves, not `ready`: this is the one test here that
-    // reaches into pointsData, which SelectionProvider fills from its own
-    // /pointQuery — a different request from the catalogue fetches `ready`
-    // reports on, and not always the first one home.
+    // pointsData, not `ready`: it comes from a different request than the
+    // catalogue fetches `ready` reports on.
     await waitFor(() =>
       expect(hooks.selection.pointsData.length).toBeGreaterThan(0),
     );
 
-    // The search narrows what the map draws by naming the matching datasets
-    // (mapQueryString's datasetPKs, see SelectionProvider). That list is a
-    // derived, map-only thing: it belongs in the map's own requests, never in
-    // the link — a shared URL carries the expression and re-derives the rest.
+    // The derived datasetPKs are map-only and must never reach the link.
     const needle = hooks.selection.pointsData[0].title.slice(0, 6);
     act(() => hooks.selection.setDatasetTitleSearchText(needle));
     await waitFor(() =>
@@ -130,6 +123,20 @@ describe("UrlSync", () => {
     );
     expect(hooks.ui.coverageAxis).toBe("seasonal");
     await waitFor(() => expect(params().get("coverageAxis")).toBe("seasonal"));
+  });
+
+  it("records the taxonomy chart only when it is the tree", async () => {
+    renderWithProviders(<Probe />, { providers: "app" });
+    await waitFor(() =>
+      expect(screen.getByTestId("ready")).toHaveTextContent("loaded"),
+    );
+    expect(params().has("taxonomy")).toBe(false);
+
+    act(() => hooks.ui.setTaxonomyView("tree"));
+    await waitFor(() => expect(params().get("taxonomy")).toBe("tree"));
+
+    act(() => hooks.ui.setTaxonomyView("sunburst"));
+    await waitFor(() => expect(params().has("taxonomy")).toBe(false));
   });
 
   it("records the observations-layer switch only when turned off", async () => {

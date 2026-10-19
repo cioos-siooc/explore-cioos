@@ -21,7 +21,7 @@ source servers or the local database.
 | --- | --- | --- | --- |
 | **ERDDAP** | Primary data source, one server per regional association | One row per **feature** (station, cast), trajectory track, or grid extent | [ERDDAP strategy](erddap.md) |
 | **OBIS** | Biological occurrences | One row per ~5 nmi **cell**, with its species | [OBIS strategy](obis.md) |
-| **CKAN** | Metadata enrichment only | Title (EN/FR), organizations, catalogue link; EOVs for OBIS | [CKAN](#ckan) below |
+| **CKAN** | Metadata enrichment only | Title (EN/FR), organizations, catalogue link, the dataset page's [descriptive metadata](#descriptive-metadata); EOVs for OBIS | [CKAN](#ckan) below |
 
 ```mermaid
 flowchart TD
@@ -36,7 +36,7 @@ flowchart TD
     ckan --> csv["Run folder of CSVs"]
 
     o --> ohv["OBIS strategy:<br/>discovery, occurrences to cells"]
-    ohv --> ockan["CKAN: lookup per OBIS UUID"]
+    ohv --> ockan["CKAN: match records by OBIS<br/>or IPT link, else convert<br/>the OBIS metadata"]
     ockan --> csv
 
     csv --> stage["Stage CSVs into temp tables<br/>(no advisory lock)"]
@@ -111,6 +111,28 @@ and [OBIS](obis.md#reason-codes) pages. Each attempt also
 records the query URLs used. Errors are grouped per server and distinct error
 before being sent to Sentry, so only a new problem raises an alert.
 
+### Warnings
+
+A dataset can also carry **warnings**: non-fatal problems recorded on its
+attempt, shown on its dashboard page and counted per code on its server's page.
+They are not sent to Sentry. A hash-`UNCHANGED` attempt carries none, so the
+dashboard shows the warnings of the dataset's last `success` attempt, which
+describes the data still stored.
+
+| Code | Meaning |
+| --- | --- |
+| `FEATURES_HIDDEN` | Features spanning more than 1 km are hidden from the map (still searchable) |
+| `FEATURES_DROPPED` | Features removed: latitude/longitude out of range, depth outside -100..15 000 m, no record count, or an unparseable time |
+| `OCCURRENCES_DROPPED` | OBIS occurrences dropped for coordinates outside the Web Mercator range |
+| `NON_CF_STANDARD_NAMES` | `standard_name` values not in the CF table (ioos_qc `*_test` names excluded) |
+| `UNKNOWN_PLATFORM_VOCABULARY` | `platform` set without a recognized `platform_vocabulary`; stored as `unknown` |
+| `DAY_COUNT_FALLBACK` | Per-feature day sets unavailable; `days` comes from the time span (an over-count) |
+| `RECORD_COUNT_ESTIMATED` | Rows per profile could not be sampled; one record counted per timestep |
+| `DEPTH_RANGE_UNAVAILABLE` | Trajectory per-day depth range failed or returned no values; days kept at depth 0 |
+| `PROFILE_COUNT_UNAVAILABLE` | Trajectory per-day profile count failed; days kept without it |
+| `TRACKS_UNAVAILABLE` | Track-point extraction failed; coverage kept, no track drawn |
+| `TRAJECTORY_DATA_INCOMPLETE` | Chunked trajectory download skipped a time window after an HTTP error |
+
 ## Change detection and freshness
 
 | | ERDDAP | OBIS |
@@ -119,7 +141,7 @@ before being sent to Sentry, so only a new problem raises an alert.
 | Unchanged dataset | Skipped after 1 request, rows kept | Re-harvested every run |
 | Upstream data cache | None; every harvest queries the server | `obis_cache` volume, **no expiry**: new records for an already-cached dataset are not picked up until its cache is deleted |
 | New or removed datasets | From the server's `allDatasets` listing | From [discovery](obis.md#choosing-datasets) |
-| CKAN metadata refresh | Only for re-harvested datasets: an `UNCHANGED` dataset keeps its stored CKAN title and organizations | Cached per UUID with no expiry, "not found" included |
+| CKAN metadata refresh | Only for re-harvested datasets: an `UNCHANGED` dataset keeps its stored CKAN title, organizations and descriptive metadata | Cached per UUID with no expiry, "not found" included |
 
 ## CKAN
 
@@ -143,13 +165,42 @@ previous harvest. Datasets that have nothing stored are loaded without
 enrichment, and their change hash is cleared so the next run re-harvests them
 instead of skipping them as unchanged.
 
-**OBIS datasets.** Each OBIS UUID is looked up individually through the OBIS
-XML harvest source (`xml_location_url`). A match supplies the **EOVs** (OBIS
-has none of its own), the French title, the CKAN title and the catalogue
-link. Lookups are cached on disk, including "not found" results. A failed
-lookup falls back to the stored metadata and is never cached as "not found".
+**OBIS datasets.** After the OBIS datasets are harvested, one paged
+`package_search` (`res_url:*obis.org* OR res_url:*ipt*`) fetches every
+national-catalogue record linking an OBIS dataset page
+(`obis.org/dataset/<uuid>`) or an IPT resource page. A dataset matches by its
+UUID, else by the IPT resource page its OBIS metadata gives as `url` (scheme-,
+case- and version-insensitive). A match supplies the **EOVs** (OBIS has none of
+its own), the French title, the CKAN title and the catalogue link. A dataset
+with no match gets its EOVs and summary from its OBIS metadata, converted by
+[cioos-metadata-conversion](https://github.com/cioos-siooc/cioos-metadata-conversion);
+conversions are cached on disk. If CKAN is unreachable, the datasets keep the
+CKAN metadata stored by the previous harvest and the rest are converted.
 
 The database then normalizes organization names into `cde.organizations`.
+
+### Descriptive metadata
+
+The dataset page's abstract, citation, DOI, license, contacts, keywords, dates,
+time and depth extent, status, update frequency, projects, history and
+resource links are stored in `cde.datasets.metadata` (jsonb).
+`core/record_metadata.py` normalizes each source into that one shape and merges
+them field by field, the first source with a value winning:
+
+1. the CKAN record (both ERDDAP and OBIS datasets);
+2. for an OBIS dataset without one, its converted OBIS metadata, plus OBIS's
+   own citation;
+3. for an ERDDAP dataset, its ACDD global attributes (`summary`, `creator_*`,
+   `publisher_*`, `contributor_*`, `license`, `keywords`, `date_*`,
+   `time_coverage_*`, `geospatial_vertical_*`, `doi`, `history`, …).
+
+Fields with an `{en, fr}` value merge per language, so a French ERDDAP summary
+fills in for a CKAN record that has only English. CKAN's placeholder values
+(`"None"`) and the converter's untranslated French text count as empty. The
+embedded ISO XML is not kept. When CKAN is unreachable, the stored metadata
+stands in for the CKAN record, like the title. A dataset not re-harvested since
+the column was added has `NULL`, and the page shows only what the other columns
+hold.
 
 ## Loading
 

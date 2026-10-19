@@ -1,11 +1,3 @@
-// Download-job views for the harvest dashboard.
-//
-// Everything here is derived from cde.download_jobs — no extra tables. The
-// downloader already records a per-dataset outcome in the job's erddap_report
-// JSON (status, byte counts, the ERDDAP error text when one was caught), so a
-// dataset-level view of what users are downloading is a query, not a schema
-// change.
-//
 // NOTE: download_jobs.email is deliberately never selected. The harvest
 // dashboard has no authentication at any layer, so exposing it here would
 // publish requesters' email addresses.
@@ -18,23 +10,17 @@ const { pipeline } = require("../utils/routePipeline");
 
 const RECENT_JOB_LIMIT = 25;
 
-// erddap_report is a text column holding the downloader's JSON result, but it
-// is empty for a queued job and holds a stack trace for a job that died before
-// the downloader returned. Guard the cast so one bad row can't 500 the route:
-// Postgres 13 has no pg_input_is_valid(), so screen on the leading brace.
+// erddap_report is empty for a queued job and holds a stack trace for one that
+// died early. Postgres 13 has no pg_input_is_valid(), so screen on the brace.
 const REPORT_JSON = (col) =>
   `CASE WHEN ${col}.erddap_report LIKE '{%' THEN ${col}.erddap_report::jsonb END`;
 
-// Datasets that made it into the zip. Anything else was left out, and the
-// per-dataset status says why (mirrors _INCLUDED in download_scheduler).
+// Mirrors _INCLUDED in download_scheduler.
 const INCLUDED = "('COMPLETED', 'PARTIAL')";
 
-// ── SQL query helpers ─────────────────────────────────────────────────────────
-
 async function recentJobs(limit = RECENT_JOB_LIMIT) {
-  // Limit the jobs BEFORE expanding their reports — download_jobs is
-  // append-only, so exploding every historical report to show the latest 25
-  // gets slower forever.
+  // Limit the jobs before expanding their reports: download_jobs is
+  // append-only.
   const sql = `
     WITH recent AS (
         SELECT pk, job_id, time, status, time_start, time_complete,
@@ -69,8 +55,6 @@ async function recentJobs(limit = RECENT_JOB_LIMIT) {
 }
 
 async function datasetOutcomes(statusFilter = null, q = null) {
-  // One row per dataset ever requested, ordered so the datasets that fail most
-  // sort to the top — that is the actionable end of this table.
   const sql = `
     WITH exploded AS (
         SELECT j.job_id,
@@ -159,9 +143,8 @@ async function jobDatasets(jobId) {
 }
 
 async function summary() {
-  // Headline counters for the dashboard card. 'open' jobs older than a few
-  // minutes mean nothing is consuming the queue — that is the state the
-  // scheduler being down produces, and it is otherwise invisible.
+  // Stale 'open' jobs mean nothing is consuming the queue, which is otherwise
+  // invisible.
   const sql = `
     SELECT COUNT(*)                                                       AS n_jobs,
            COUNT(*) FILTER (WHERE status = 'completed')                   AS n_completed,
@@ -177,8 +160,6 @@ async function summary() {
   const result = await db.raw(sql);
   return result.rows[0];
 }
-
-// ── Routes ────────────────────────────────────────────────────────────────────
 
 router.get(
   "/summary",
@@ -210,8 +191,7 @@ router.get(
   },
 );
 
-// Defined after /summary, /recent and /datasets so those literals aren't
-// swallowed by :jobId.
+// Must stay after the literal routes, or :jobId would swallow them.
 router.get(
   "/:jobId",
   ...pipeline({ filters: false, cacheFor: "1 minute" }),

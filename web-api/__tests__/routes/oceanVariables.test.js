@@ -1,10 +1,3 @@
-/**
- * GET /oceanVariables
- *
- * Returns an array of distinct ocean variable name strings
- * by unnesting the eovs array column across all datasets.
- */
-
 jest.mock("../../db");
 jest.mock("../../utils/cache", () => ({
   route: () => (_req, _res, next) => next(),

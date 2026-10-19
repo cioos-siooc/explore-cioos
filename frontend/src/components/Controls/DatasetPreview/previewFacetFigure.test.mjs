@@ -51,8 +51,7 @@ const ALL_SIX = [
   "DOXY_01",
 ];
 
-// The two cf_role columns carry values, because they are what the figure is
-// titled after — the station the user clicked, and the profile actually drawn.
+// The cf_role columns carry values because the figure is titled after them.
 const DATA = Array.from({ length: 20 }, (_, i) => {
   const row = {
     station_id: "PMZA-RIKI",
@@ -68,8 +67,7 @@ const DATA = Array.from({ length: 20 }, (_, i) => {
 
 const TITLE = "Station Id: PMZA-RIKI — Profile: PMZA-RIKI-25/09/16-17:35:26";
 
-// Same dataset with the publisher's palettes declared on two measurements, to
-// exercise the colour default that comes from ERDDAP rather than from an index.
+// Publisher palettes on two measurements, to exercise the ERDDAP colour default.
 const VIKING_PALETTES = {
   ...VIKING,
   columnMeta: VIKING.columnMeta.map((meta) => {
@@ -191,8 +189,7 @@ test("every timeseries trace shares x and takes its own y", () => {
 });
 
 test("the first selected variable is drawn at the bottom", () => {
-  // The image stacks Variable 1 lowest; the domain order therefore runs opposite
-  // to the panel order.
+  // Variable 1 is drawn lowest, so domain order runs opposite to panel order.
   const { layout } = figure("TimeSeries", ["TE90_01", "PSAL_01", "DOXY_01"]);
   assert.ok(layout.yaxis.domain[0] < layout.yaxis3.domain[0]);
   assert.equal(
@@ -353,12 +350,10 @@ test("panel titles wrap to their own panel once the width is known", () => {
         assert.ok(line.length <= fits, `"${line}" (${line.length} > ${fits})`);
       });
   });
-  // And the labels that do not fit were the reason: they wrapped.
   assert.ok(
     titles.filter((text) => text.includes("<br>")).length >= 5,
     titles.join(" | "),
   );
-  // The same figure with no measured width leaves them on one line.
   const unsized = figure("TimeSeriesProfile", ALL_SIX);
   assert.ok(!unsized.layout.xaxis.title.text.includes("<br>"));
 });
@@ -500,8 +495,6 @@ test("a variable with no declared palette takes the next colour along", () => {
 });
 
 test("a declared colorBarPalette decides the variable's colour", () => {
-  // The publisher's own intent, harvested into table_variables: the plot opens
-  // reading roughly the way an ERDDAP graph of the same dataset does.
   const { data } = figureFrom(VIKING_PALETTES, "TimeSeriesProfile", [
     "TE90_01",
     "PSAL_01",
@@ -519,7 +512,6 @@ test("the user's colour beats both, on the line as well as the markers", () => {
   });
   assert.equal(data[1].marker.color, "#123456");
   assert.equal(data[1].line.color, "#123456");
-  // And only that one: an override is not a theme.
   assert.equal(data[0].marker.color, defaultColorFor(undefined, 0));
 });
 
@@ -658,7 +650,6 @@ test("the title costs the top margin only the lines it actually used", () => {
     marginFor(COLUMNS, 2, panelTitleLines(narrow.layout)).t,
   );
   assert.ok(narrow.layout.margin.t > wide.layout.margin.t);
-  // And a stack sized for one line is shorter than one sized for the worst case.
   assert.ok(plotHeightFor(ROWS, 6, 100, 1) < plotHeightFor(ROWS, 6, 100, 2));
 });
 

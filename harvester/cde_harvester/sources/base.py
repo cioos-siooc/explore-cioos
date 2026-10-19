@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class HarvestResult:
-    """Standardized output for all harvesters."""
-
     profiles: DataFrame[ProfileSchema]
     datasets: DataFrame[DatasetSchema]
     variables: DataFrame[VariableSchema]
@@ -51,7 +49,6 @@ class HarvestResult:
             self.verified = pd.DataFrame(columns=VerifiedDatasetSchema.to_schema().columns.keys())
 
     def validate(self):
-        """Validate all DataFrames against their schemas."""
         for name, schema in [
             ("profiles", ProfileSchema),
             ("datasets", DatasetSchema),
@@ -67,17 +64,6 @@ class HarvestResult:
 
 
 class BaseHarvester(ABC):
-    """Abstract base class for CDE harvesters.
-
-    All harvesters must implement the harvest() method which returns
-    a HarvestResult containing the harvested DataFrames.
-    """
-
     @abstractmethod
     def harvest(self) -> HarvestResult:
-        """Execute the harvest process.
-
-        Returns:
-            HarvestResult: The harvested data.
-        """
         pass

@@ -16,10 +16,6 @@
   margin: 0;
 }
 
-/* --- Header: back affordance + modal title ---
-   Replaces the old absolutely-positioned floating back button (which forced a
-   100px left pad on the filter row). Sits flush under the modal's teal top
-   border, in sand, like a proper modal header. */
 .downloadDetailsHeader {
   display: flex;
   align-items: center;
@@ -61,12 +57,6 @@
   color: var(--cioos-primary);
 }
 
-/* --- Settings band: one row in sand above the dataset list, holding the two
-   settings that decide what the order is — which of the map's filters it
-   narrows by (FilterDownloadToggles) and what the direct links return
-   (DownloadFormats). Each is a captioned group; they share the row so the
-   chrome costs one row rather than two, and wrap onto their own lines when
-   there is no width for that. --- */
 .downloadBandRow {
   display: flex;
   flex-wrap: wrap;
@@ -171,10 +161,6 @@
   cursor: not-allowed;
 }
 
-/* --- Dataset table viewport ---
-   Flexes to fill whatever's left of the panel's fixed height once the
-   filter band / legend / summary rows take theirs; the table itself
-   (fixedHeader + 100% scroll height) owns the one scroll region. */
 .downloadDataRow.row {
   flex: 1 1 auto;
   min-height: 0;
@@ -187,8 +173,6 @@
   min-height: 0;
 }
 
-/* --- Format pickers, in the footer's direct-links column
-   (see DownloadFormats). --- */
 .downloadFormats {
   display: inline-flex;
   flex-wrap: wrap;
@@ -202,9 +186,6 @@
   gap: 6px;
 }
 
-/* What the chosen OBIS option costs — the 10 000-record page cap, or the
-   snapshot's total lack of filtering. It changes with the select beside it, so
-   it reads as that select's caption rather than as a footnote. */
 .downloadFormatsObisNote {
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-60);
@@ -212,26 +193,10 @@
   line-height: 1.15;
 }
 
-/* ------------------------------------------------------------------
- * Order footer — the three things a reviewed order leads to, side by side:
- * what you picked | have it emailed | take the URLs yourself.
- *
- * Horizontal because the second and third are alternative delivery routes for
- * one selection. Stacked, choosing between them meant scrolling past one to
- * read the other, and the pair spent ~180px of a fixed-height modal — rows the
- * dataset list above wanted back. The summary leads because both routes ship
- * whatever it counts.
- *
- * Columns collapse in the order they can afford to: the links block, widest
- * and with the most to say, drops to a full-width row of its own first; below
- * that everything stacks.
- * ------------------------------------------------------------------ */
+/* --- Order footer: summary | email | direct links. --- */
 .downloadFooter {
   flex: 0 0 auto;
   display: grid;
-
-  /* The email column gets the weight: the links column is two pickers and two
-     buttons, which wrap cleanly. The summary takes what its figures need. */
   grid-template-columns: auto minmax(240px, 1.5fr) minmax(260px, 1fr);
   align-items: stretch;
   border-top: 1px solid var(--cioos-hairline);
@@ -247,28 +212,18 @@
   padding: 12px 16px;
 }
 
-/* Hairlines between the columns, not around them: one band divided, rather
-   than three cards set down on it. */
 .downloadFooterSection + .downloadFooterSection {
   border-left: 1px solid var(--cioos-hairline);
 }
 
-/* One caption style across all three, so they read as peers rather than as a
-   heading with two footnotes.
-
-   Wraps, unlike the other captions in this file: these sit in columns that are
-   a third of the modal, and the French for "Email download link to" is half as
-   long again as the English. A caption on two lines costs a row; one that
-   cannot wrap runs into the column beside it. */
+/* Wraps, unlike the other captions here: the French for "Email download link
+   to" is half as long again as the English. */
 .downloadFooterTitle {
   display: flex;
   flex-wrap: wrap;
 
-  /* Centred, not baseline-aligned: an svg's baseline is its bottom edge, so
-     the help icon in the links caption sat its full 16px above the baseline
-     and pushed that caption's text down a few pixels out of step with the two
-     beside it. Centring within a line box the icon cannot outgrow puts all
-     three captions' text on the same line whatever is inline with them. */
+  /* Centred, not baseline-aligned: an svg's baseline is its bottom edge, which
+     pushed the links caption out of step with the other two. */
   align-items: center;
   align-content: flex-start;
   gap: 4px;
@@ -291,8 +246,7 @@
   margin: 0;
 }
 
-/* --- Column 1: what the order is. Both figures wait on the size estimates,
-   which also decide how many datasets stay selected. --- */
+/* --- Column 1: order summary --- */
 .downloadSummary {
   display: flex;
   align-items: center;
@@ -338,14 +292,11 @@
   color: var(--cioos-ink-60);
 }
 
-/* Stand-in for a figure still being estimated; the size comes from the
-   spinner's own `size` prop. */
 .downloadDetails .datasetSizeTotalSpinner {
   opacity: 0.3;
 }
 
-/* --- Column 2: the queue. Email in, zip out (rendered by DownloadPanel as
-   this component's children). --- */
+/* --- Column 2: the queue (DownloadPanel's children) --- */
 .downloadSubmitRow {
   display: flex;
   flex-wrap: wrap;
@@ -355,8 +306,7 @@
 }
 
 /* Basis rather than `auto` + `min-width: 0`: an auto-basis field shrinks
-   forever and never lets the row wrap, so a narrow column ends in a one-letter
-   input beside a full-width button instead of the two on separate lines. */
+   forever and never lets the row wrap. */
 .downloadSubmit .emailAddress {
   flex: 1 1 200px;
   min-width: 140px;
@@ -389,9 +339,7 @@
   cursor: not-allowed;
 }
 
-/* Holds its line whether or not there is anything to say, so a submission's
-   result does not shove the column it lands in. The padding is reserved too;
-   only the ground appears with a result. */
+/* Reserves its line and padding so a result does not shove the column. */
 .downloadSubmit .submissionFeedback {
   display: flex;
   align-items: flex-start;
@@ -431,9 +379,8 @@
   cursor: pointer;
 }
 
-/* The result on its status ground. Ink carries the sentence and the glyph the
-   hue, as .directLinksWarning does, since neither hue clears 4.5:1 as text on
-   its own tint. */
+/* Ink carries the sentence and the glyph the hue: neither hue clears 4.5:1 as
+   text on its own tint. */
 .downloadSubmit .submissionFeedback.success {
   background-color: var(--cioos-success-bg);
   color: var(--cioos-ink);
@@ -454,12 +401,8 @@
   color: var(--cioos-error-700);
 }
 
-/* --- Column 3: the same order taken from the source instead of the queue.
-   The export buttons, with the caveats about what the links could not carry
-   under them — which is what the slack beside the buttons is held for. --- */
+/* --- Column 3: direct links --- */
 
-/* Sits in the caption's own row rather than under it: the count is what the
-   caption is counting, and the column has rows to spare for the buttons. */
 .directLinksCount {
   font-size: var(--cioos-font-size-sm);
   font-weight: 400;
@@ -525,8 +468,6 @@
   cursor: not-allowed;
 }
 
-/* Caveats about the links as built. Pushed to the foot of the column so they
-   stay the last thing in it however many there are. */
 .directLinksNotes {
   display: flex;
   flex-direction: column;
@@ -541,11 +482,6 @@
   display: none;
 }
 
-/* The one note that is a warning rather than a footnote: the ERDDAP links
-   carry the bounding box of the drawn shape, so the file holds data from
-   outside it. Given the warning's ground because the grey micro-copy it used
-   to be sat under four buttons at the foot of a long modal and was, in
-   practice, not there at all. */
 .directLinksWarning {
   display: flex;
   align-items: flex-start;
@@ -554,10 +490,8 @@
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-warn-bg);
 
-  /* Ink rather than --cioos-warn: the amber that reads as a warning against
-     white does not clear 4.5:1 against its own tint (3.4:1 measured). The
-     glyph carries the colour — it only has 3:1 to meet — and the sentence
-     stays legible, the same division .legendBadge makes. */
+  /* Ink rather than --cioos-warn: the amber is 3.4:1 against its own tint.
+     The glyph (3:1 to meet) carries the colour. */
   color: var(--cioos-ink);
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
@@ -566,15 +500,11 @@
 
 .directLinksWarning svg {
   flex: 0 0 auto;
-
-  /* Centred on the first line of the sentence rather than on the block, so a
-     wrapped warning does not leave the glyph floating in the middle of it. */
   margin-top: 2px;
   color: var(--cioos-warn);
 }
 
-/* --- Collapse. The links column is the one that stops fitting first (two
-   pickers and two buttons), so it is the one that leaves the row. --- */
+/* --- Collapse: the links column leaves the row first. --- */
 @media (max-width: 1040px) {
   .downloadFooter {
     grid-template-columns: auto minmax(240px, 1fr);
@@ -586,8 +516,6 @@
     border-top: 1px solid var(--cioos-hairline);
   }
 
-  /* Back to a row across the full width, where the notes can sit beside the
-     buttons instead of under them. */
   .directLinksNotes {
     flex-flow: row wrap;
     gap: 4px 14px;
@@ -605,11 +533,9 @@
 }
 
 @media (max-width: 700px), (max-height: 500px) {
-  /* At this width the panel is the whole screen and the fixed frame has
-     nothing left to give the card list once the band, the toolbar, the legend
-     and the order bar have taken theirs. So the frame goes: the modal body
-     scrolls (Modals/styles.css) and every zone here takes its natural height,
-     the list included (DatasetsTable/styles.css). */
+  /* The fixed frame has nothing left for the card list at this width, so the
+     modal body scrolls (Modals/styles.css) and every zone takes its natural
+     height. */
   .downloadDetails.container {
     height: auto;
   }

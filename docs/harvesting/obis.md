@@ -37,7 +37,7 @@ flowchart TD
     agg --> none{"Any occurrences / cells?"}
     none -- no --> skip["Skip: NO_OCCURRENCES /<br/>NO_VALID_COORDINATES"]
     none -- yes --> ds["Dataset row + cells"]
-    ds --> ckan["CKAN lookup per UUID:<br/>EOVs, French title"]
+    ds --> ckan["CKAN match: EOVs, French title<br/>(no match: EOVs, summary from<br/>cioos-metadata-conversion)"]
     ckan --> tables[("cde.datasets (cdm_data_type = Point)<br/>cde.obis_cells")]
 ```
 
@@ -97,7 +97,8 @@ immediately.
 | Region check | Datasets from the exempt nodes are kept whole. Any other dataset whose extent misses the region is skipped before any occurrence is fetched. A missing or unreadable extent falls through to the occurrence filter. | 0 | `OUT_OF_REGION` |
 | Occurrences | DuckDB reads the dataset's parquet from the OBIS open-data bucket on S3: only the 7 columns needed, and only rows with valid coordinates inside the region's bounding box. If that fails before any row arrives, the REST API is paged instead (10 000 rows per page, no bounding-box filter); a failure after rows arrived fails the attempt. | 1, or 1 per REST page (cached) | `NO_OCCURRENCES` |
 | Cells | Each chunk is aggregated to cells (below), then the per-chunk results are merged | 0 | `NO_VALID_COORDINATES` |
-| CKAN | One lookup per UUID, after all datasets are harvested (see [CKAN](workflow.md#ckan)) | 0–1 (cached) | never fails the dataset |
+| CKAN | One catalogue search for the whole run, after all datasets are harvested (see [CKAN](workflow.md#ckan)) | 0 (one per run) | never fails the dataset |
+| Metadata conversion | Datasets without a CKAN record: cioos-metadata-conversion derives EOVs from the taxonomy and eMoF measurements in the dataset's parquet | 3 (cached) | never fails the dataset |
 
 Chunks are ~200 k rows from parquet, 100 k rows from the cache and one REST
 page from the API.
@@ -116,7 +117,8 @@ corrupt cached file cannot fail every retry.
 Within each chunk:
 
 1. Drop occurrences without coordinates, or outside the Web Mercator range
-   (|lat| > 85.06°, |lon| > 180°).
+   (|lat| > 85.06°, |lon| > 180°). Out-of-range drops are recorded as an
+   `OCCURRENCES_DROPPED` [warning](workflow.md#warnings).
 2. Unless the dataset is exempt, keep only points inside the boundary
    polygon.
 3. Snap each position to the 1/12° grid.
@@ -149,7 +151,12 @@ Each OBIS dataset that yields cells becomes one `cde.datasets` row with
   else the UUID.
 - **Organizations**: the OBIS institutes.
 - **OBIS nodes**: the contributing nodes (used by the nodes filter).
-- **EOVs**: from the CKAN record. A dataset without a CKAN record has none.
+- **EOVs**: from the CKAN record. A dataset without a CKAN record gets them
+  from its converted OBIS metadata, `other` when nothing maps.
+- **Summary**: the OBIS abstract, for a dataset without a CKAN record.
+- **Metadata**: the dataset page's descriptive metadata, from the CKAN record,
+  else from the converted OBIS metadata and OBIS's citation (see
+  [Descriptive metadata](workflow.md#descriptive-metadata)).
 - **Features**: the number of cells (`n_profiles`).
 
 ## Freshness and caching
@@ -158,14 +165,13 @@ OBIS has no change signal like ERDDAP's Croissant hash. Every OBIS run
 re-harvests and reloads the whole dataset list, which is also how added and
 withdrawn datasets are picked up.
 
-Metadata, occurrences and CKAN lookups are cached as gzip JSON in the
+Metadata, occurrences and converted metadata are cached as gzip JSON in the
 `obis_cache` volume, shared across runs. **The cache has no expiry.** A
 dataset's occurrences are downloaded once, and later runs rebuild its cells
 from the cached copy. New records published upstream for an
 already-harvested dataset are therefore not picked up until its cache files
 are deleted. The cache is cleared automatically only between failed
-attempts, and then only the metadata and occurrence files, never the CKAN
-lookup.
+attempts.
 
 Two cached results stick until deleted by hand:
 

@@ -17,9 +17,7 @@ import {
   datasetLink,
 } from "./format.js";
 
-// An 'open' or 'downloading' job that has sat past this is the shape of a
-// scheduler that isn't running: requests are accepted, nothing consumes them,
-// and the requester never gets their email. Worth calling out loudly, since
+// A job sitting past this means the scheduler isn't running. Loud because
 // nothing else in the UI reveals it.
 function QueueWarning({ summary, t }) {
   const stuck = Number(summary.n_stuck || 0) + Number(summary.n_stalled || 0);

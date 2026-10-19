@@ -1,43 +1,14 @@
-/* The scroll container of the preview modal — for the TABLE view.
- *
- * The plot view fills it exactly instead (a three-pane row at height: 100%, see
- * DatasetPreviewPlot/styles.css), so it has nothing to scroll there and the
- * parameters pane and the plot pane are the only scrollers on screen. Don't
- * "fix" that as duplication: three scrollers is the point, and it is what keeps
- * a growing parameters list from moving the figure.
- *
- * There used to be two scrollers here, both for the same content: .modal-body
- * scrolled because DatasetPreview passed `scrollable` to Modal
- * (ui/modalStyles.css), and this element scrolled because of
- * `height: 100%; overflow: auto`. The outer one always had ~15px to scroll,
- * from a margin-top on its only child, so it showed a permanent stub scrollbar
- * next to the real one.
- *
- * `scrollable` is no longer passed, and the clipping it provided is done here
- * instead — locally, because ui/modalStyles.css is shared with the filters and
- * download modals. The chain is: .modal-content (capped at the viewport) ->
- * .modal-body (flex column, clips) -> this element (flex child, scrolls).
- *
- * min-height: 0 on both is what lets a flex child actually shrink below its
- * content and hand the overflow to this scroller rather than to the page. */
+/* One scroll container: .modal-content (capped) -> .modal-body (flex, clips) ->
+ * .tableAndPlot (scrolls). Done locally, not via Modal `scrollable`, because
+ * ui/modalStyles.css is shared; min-height: 0 lets the flex children shrink.
+ * Only the table view scrolls here: the plot view fills it exactly, leaving its
+ * parameters and plot panes as the scrollers (DatasetPreviewPlot/styles.css). */
 .dataPreviewModal .modal-content {
   overflow: hidden;
 
-  /* A definite height, not the shared max-height.
-   *
-   * The plot's height is computed from the scroll container's measured height,
-   * and with only a max-height the modal is sized BY its content — so a taller
-   * plot would make a taller modal would make a bigger budget would make a
-   * taller plot. It converges on the viewport cap, but over several observer
-   * ticks, which is visible as the panel growing in steps. Fixing the height to
-   * the cap makes the budget a constant and removes the loop.
-   *
-   * A record preview also always wants the room: it is the largest thing in the
-   * app, and the previous layout was effectively full height anyway via the
-   * 560px floor it forced on the plot.
-   *
-   * Definite here is also what makes the height definite all the way down, so
-   * the plot's pane row can take it as a percentage basis. */
+  /* A definite height, not max-height: the plot sizes from this container, so a
+   * content-sized modal would grow in visible steps (plot -> modal -> budget).
+   * Definite all the way down, so the plot's pane row can use it as a % basis. */
   height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
 }
 
@@ -53,8 +24,7 @@
   min-height: 0;
   overflow: hidden auto;
 
-  /* Horizontal overflow belongs to the plot area, which sizes its own figure —
-     a scrollbar here would be a second one for the same axis. */
+  /* Horizontal overflow belongs to the plot area, which sizes its own figure. */
 }
 
 .backButton {
@@ -136,11 +106,8 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* The lazy chunk's placeholder. Without a floor here the container sat at its
-   minimum at exactly the moment Plotly measured it — which is how the plot
-   ended up drawn at Plotly's own 450px default until the first control
-   change. It reserves the box the panes will take, so the modal does not jump
-   when the chunk lands. */
+/* Without a floor the container is at its minimum when Plotly measures it.
+   Reserves the panes' box so the modal does not jump when the chunk lands. */
 .datasetPreviewPlotLoading {
   display: grid;
   height: 100%;
@@ -165,7 +132,6 @@
   height: auto;
 }
 
-/* A header row and a few body rows, four columns wide. */
 .datasetPreviewTableSkeleton {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

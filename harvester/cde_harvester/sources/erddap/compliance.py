@@ -4,6 +4,7 @@ from cde_harvester.core.errors import (
     MISSING_REQUIRED_VARS,
     NO_SUPPORTED_VARIABLES,
 )
+from cde_harvester.core.harvest_warnings import NON_CF_STANDARD_NAMES
 from cde_harvester.utils import (
     eov_standard_name,
     intersection,
@@ -23,10 +24,9 @@ class CDEComplianceChecker:
         self.failure_reason_code = failure_reason_code
 
     def check_required_variables(self):
-        # make sure LLAT variables exist. Depth/Altitude is assumed to be 0 if it doesnt exist
+        # Depth/altitude defaults to 0 when absent.
         # https://coastwatch.pfeg.noaa.gov/erddap/download/setupDatasetsXml.html#LLAT
-        # Grids only need lat/lon: static grids (no time axis) are valid
-        # metadata-only datasets.
+        # Static grids (no time axis) are valid metadata-only datasets.
         if self.dataset.cdm_data_type == "Grid":
             required_variables = ["latitude", "longitude"]
         else:
@@ -45,25 +45,26 @@ class CDEComplianceChecker:
         return True
 
     def check_supported_cf_name(self):
-        """Check if there are any supported (mapped to GOOS) CF standard names in
-        the dataset."""
-
         standard_names_in_dataset = (
             self.dataset.df_variables.query("standard_name != ''")["standard_name"]
             .unique()
             .tolist()
         )
 
-        #  List non-CF standard names
+        # ioos_qc flag variables carry "<variable>_<test>_test" names by design.
         non_standard_names = [
-            x for x in standard_names_in_dataset if not is_cf_standard_name(x)
+            x for x in standard_names_in_dataset
+            if not is_cf_standard_name(x) and not x.endswith("_test")
         ]
         if non_standard_names:
-            self.logger.warn(
-                "Found unstandard standard_name:" + str(non_standard_names)
+            self.dataset.warnings.add(
+                NON_CF_STANDARD_NAMES,
+                f"{len(non_standard_names)} standard_name(s) not in the CF "
+                "standard name table",
+                items=non_standard_names,
+                count=len(non_standard_names),
             )
 
-        #  This dataset has at least one standard name mapped to GOOS
         supported_variables = intersection(
             supported_standard_names,
             [eov_standard_name(x) for x in standard_names_in_dataset],
@@ -74,9 +75,7 @@ class CDEComplianceChecker:
         return True
 
     def cde_ingest_flag(self):
-        """
-        ERDDAP Admins can prevent a dataset from ingestion into CDE with cde_ingest=False
-        """
+        """ERDDAP admins opt a dataset out of CDE with the global cde_ingest=False."""
         cde_ingest = self.dataset.globals.get("cde_ingest", "")
 
         if cde_ingest.lower() == "false":

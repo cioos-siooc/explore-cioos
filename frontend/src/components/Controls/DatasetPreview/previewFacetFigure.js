@@ -1,14 +1,7 @@
-// The Plotly figure for a faceted record preview: one panel per selected
-// variable, all sharing one axis.
-//
-// WHY EXPLICIT AXIS DOMAINS AND NOT layout.grid
-// plotly.js-basic-dist-min bundles the grid component, but resolves a grid into
-// axis domains inside supplyLayoutDefaults — i.e. only against a real DOM. Doing
-// the arithmetic here (see previewFacetSizing) makes this function's return
-// value the thing under test, assertable under `node --test` with no browser.
-//
-// Every label is an axis title, so it runs along its axis and is centred on it —
-// Plotly writes a y axis title sideways — and gets `automargin`.
+// Explicit axis domains rather than layout.grid: Plotly resolves a grid only
+// against a real DOM, and computing them here (see previewFacetSizing) keeps the
+// layout assertable under `node --test`. Every label is an axis title, so it
+// runs along its axis (a y axis title sideways) and gets `automargin`.
 
 import { COLUMNS, ROWS } from "./previewFacetPlan.js";
 import {
@@ -109,12 +102,10 @@ const ARRANGEMENTS = { [COLUMNS]: COLUMNS_LAYOUT, [ROWS]: ROWS_LAYOUT };
 
 const TITLE_JOIN = " — ";
 const VALUE_JOIN = ", ";
-// A record window can legitimately span more than one profile; naming all of
-// them would be a paragraph, so three and a count.
+// A record window can span several profiles; naming all would be a paragraph.
 const MAX_TITLE_VALUES = 3;
 
-// Every value the column actually takes over these rows, first seen first,
-// blanks and ERDDAP's own empty spellings dropped.
+// First seen first; blanks and ERDDAP's "NaN" dropped.
 function distinctValues(data, columnName) {
   const seen = [];
   const known = new Set();
@@ -129,14 +120,9 @@ function distinctValues(data, columnName) {
   return seen;
 }
 
-/**
- * What names the record on screen: one entry per cf_role column, in ERDDAP's
- * order, as "<its label>: <its value>".
- *
- * For a TimeSeriesProfile the record id is the STATION while the thing drawn is
- * one PROFILE, which nothing else on screen names. A column present but empty is
- * skipped rather than printed as a bare "Profile: ".
- */
+// One "<label>: <value>" per cf_role column, in ERDDAP's order. For a
+// TimeSeriesProfile the record id is the station while what is drawn is one
+// profile, which nothing else on screen names.
 export function recordTitleFor({ plan, variablesByName, data }) {
   const columns = (plan && plan.titleColumns) || [];
   return columns
@@ -222,13 +208,8 @@ function labellerFor(variablesByName, labels) {
   return { titleFor, hoverLine };
 }
 
-// Pinned inside the top margin: yref 'container' with y 1 and yanchor 'top'
-// puts the first line's cap top exactly pad.t below the top of the image.
-//
-// title.automargin is deliberately NOT set. It exists in this bundle and it
-// only ever grows a margin — but it grows it inside a height that is fixed
-// here, so a push nobody predicted would silently shrink every panel below
-// the MIN_PANEL_PX the floor promised. Reserved by hand instead.
+// title.automargin deliberately unset: it would grow the margin inside a fixed
+// height and silently shrink panels below MIN_PANEL_PX.
 const layoutTitleFor = (wrappedTitle) => ({
   text: wrappedTitle,
   font: { size: TITLE_FONT_PX },
@@ -284,8 +265,6 @@ export function buildFigure({
   const { shared: sharedLetter, panel: panelLetter } = arrangement;
   const domains = domainsFor(panels.length, arrangement.gap);
 
-  // Only the lines the title actually needs are paid for, which is why the wrap
-  // happens before the margin is chosen.
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
 
@@ -417,8 +396,8 @@ export function buildFigure({
     const domain = domains[index];
     const panelTitle = titleFor(columnName);
 
-    // domainsFor counts up from 0, and 0 is the BOTTOM of a Plotly y axis, so a
-    // stack's panel order already puts the first selected variable lowest.
+    // In a stack, y domains count up from the bottom, so the first variable is
+    // lowest.
     layout[axisKey(panelLetter, index)] = {
       domain,
       anchor: sharedLetter,
@@ -426,8 +405,7 @@ export function buildFigure({
       ...(arrangement.panelTitleSide
         ? { side: arrangement.panelTitleSide }
         : {}),
-      // Wrapped to its OWN panel: six panels in a 1140px modal are ~170px
-      // each, and one unwrapped long_name covers three.
+      // Wrapped to its own panel's width, not the plot's.
       title: axisTitle(
         panelTitles[index] ?? wrapAlong(panelTitle, panelLetter, domain),
       ),

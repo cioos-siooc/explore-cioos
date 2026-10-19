@@ -49,12 +49,8 @@ test("nothing matched: returns count 0 and never inserts a job", async () => {
 });
 
 test("a taxon selection with OBIS disabled queues nothing at all, without a branch query", async () => {
-  // getShapeQuery runs unconditionally (it's what produces the size estimate
-  // the job is stamped with), and so — earlier still — does createDBFilter,
-  // which for a scientificNames selection resolves it to aphia ids via its
-  // own single db.raw call (utils/dbFilter.js's fetchAphiaIdsFromDb). Only
-  // the route's OWN branches array ends up empty, so only ITS db.raw never
-  // runs.
+  // createDBFilter still makes its own db.raw call to resolve the taxon to
+  // aphia ids; only the route's own query never runs.
   shapeQuery.queueResult([]);
   db.queueRaw([{ aphia_id: 126436 }]);
   const res = await agent
@@ -100,12 +96,8 @@ test("keeps the email out of the log line", async () => {
   assert.ok(logged.every((line) => !line.includes(EMAIL.email)));
 });
 
-// The route's own comment claims "requires a shape (either polygon or
-// latMin/Max)", but pipeline()'s shapeValidators() (utils/routePipeline.js)
-// treats "neither a polygon nor any bbox param" as a VALID, unbounded
-// selection — it only rejects a HALF-specified bbox (see the next test). So
-// an emailed request naming no shape at all is accepted, not 400ed, and
-// queues against whatever getShapeQuery resolves to.
+// shapeValidators() treats no shape at all as a valid, unbounded selection;
+// it only rejects a half-specified bbox (see the next test).
 test("with no shape at all, still accepted — queues against an unbounded selection", async () => {
   shapeQuery.queueResult([]);
   db.queueRaw([{ json_agg: null }]);

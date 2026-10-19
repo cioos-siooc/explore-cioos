@@ -1,24 +1,25 @@
-"""
-Unit tests for the bbox pre-filter in OBISHarvester.iter_occurrences.
-
-geo_filter.bounds() gives a bounding box that is a strict superset of the
-Canada EEZ polygon: any point outside it is guaranteed to also fail the
-precise polygon test that aggregate_cells runs later. Passing it into the
-DuckDB query narrows what the parquet reader has to materialize for
-global/out-of-region datasets (e.g. ESAS, iNaturalist) without changing which
-occurrences end up kept -- see geo_filter.py's bounds() docstring.
-"""
+"""bbox pre-filter in OBISHarvester.iter_occurrences: geo_filter.bounds() is a strict
+superset of the EEZ polygon, so it narrows the DuckDB scan without changing which
+occurrences are kept."""
 import os
 
 import duckdb
 import pandas as pd
 import pytest
+from cde_harvester.sources.obis import harvester as obis_harvester
 from cde_harvester.sources.obis.harvester import OBISHarvester
 
 RESULT_COLUMNS = [
     "decimalLatitude", "decimalLongitude", "date_start", "date_end",
     "minimumDepthInMeters", "maximumDepthInMeters", "scientificName",
 ]
+
+
+@pytest.fixture(autouse=True)
+def offline_metadata_enrichment(monkeypatch):
+    """harvest() ends with a CKAN query and a metadata conversion, both over the network."""
+    monkeypatch.setattr(obis_harvester, "get_ckan_obis_records", lambda *args, **kwargs: pd.DataFrame())
+    monkeypatch.setattr(OBISHarvester, "convert_metadata", lambda self, dataset_id: None)
 
 
 @pytest.fixture
@@ -93,11 +94,6 @@ class TestGetOccurrencesBbox:
         assert "BETWEEN -180 AND 180" in query
 
 
-# ---------------------------------------------------------------------------
-# harvest() wiring: exempt datasets fetch unbounded, others get the geo
-# filter's polygon bounds as a pre-filter.
-# ---------------------------------------------------------------------------
-
 class StubGeoFilter:
     mode = "canada"
 
@@ -158,10 +154,6 @@ class TestHarvestBboxWiring:
 
         assert seen_bbox == [(-130.0, 48.0, -120.0, 55.0)]
 
-
-# ---------------------------------------------------------------------------
-# Chunked fetch: the stream contract, and the duckdb connection's lifetime.
-# ---------------------------------------------------------------------------
 
 class TestChunkedFetch:
     def test_chunks_are_yielded_until_the_empty_terminator(self, harvester, monkeypatch):

@@ -27,28 +27,14 @@ import useSourceKinds from "./useSourceKinds.js";
 const stateOf = (option) =>
   option.isSelected ? "include" : option.isExcluded ? "exclude" : undefined;
 
-// Every filter, as groups of `{ id, label, description?, state, toggle }`
-// options: the one description the chips, the Filters badge, the search
-// palette and reset all read, so none of them can disagree about what is set.
-// An option is applied when it has a `state`; `toggle(target)` follows the
-// geometry switches' rule (see toggledDataLayerChoice): asking for the state
-// an option is already in clears it. Each writes the same provider state the
-// classic filter UI does, so both stay in step and the URL carries either.
-//
-// A group carries `panelName`, the Filters modal row it is set from, and
-// `clear`, which drops all of it. An option may also carry `closes` (the
-// palette closes once it is picked, as a draw happens on the map behind it),
-// `action` (the verb to show instead of Add / Remove), `includeOnly` (it
-// cannot be excluded) and `shortcut` (it sets other options of its group at
-// once, as an EOV category does; `covers` names their ids, and while the whole
-// of them is set the shortcut is listed as applied in their place — see
-// appliedOptions).
-//
-// scientificNameMatches are WoRMS hits for the palette's term, which only the
-// API can produce; the picked names are always offered so they can be removed.
-// typedRange is a time or depth range read off that term (see
-// parseRangeQuery): its group is `pinned`, offered as typed rather than
-// matched against it.
+// Every filter, as groups of `{ id, label, description?, state, toggle }`: the
+// one description the chips, Filters badge, search palette and reset all read,
+// so none can disagree. `toggle(target)` on the current state clears it (see
+// toggledDataLayerChoice). Groups carry `panelName` and `clear`; options may
+// carry `closes` (palette closes on pick), `action`, `includeOnly`, and
+// `shortcut` with `covers` (listed as applied in place of the options it
+// covers when all are set, see appliedOptions). A typedRange group is
+// `pinned`: offered as typed rather than matched.
 export default function useFilterModel(scientificNameMatches = [], typedRange) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
@@ -59,6 +45,7 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
     useMapState();
   const {
     polygon,
+    areaPlace,
     datasetTitleSearchText,
     setDatasetTitleSearchText,
     onlyInView,
@@ -175,9 +162,12 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
   const boxDrawn = Boolean(polygon) && polygonIsRectangle(polygon);
   const areaOption = (mode, label, drawn) => ({
     id: mode,
-    label,
+    label:
+      drawn && areaPlace
+        ? t("spatialFilterPlaceOption", { place: areaPlace.name, shape: label })
+        : label,
     description: t("quickFilterAreaTitle"),
-    matchText: `${label} ${t("spatialFilterFilterName")}`,
+    matchText: `${label} ${t("spatialFilterFilterName")} ${drawn && areaPlace ? areaPlace.name : ""}`,
     state: drawn ? "include" : undefined,
     includeOnly: true,
     closes: !drawn,
@@ -273,9 +263,8 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
       "(m)",
     ),
     (() => {
-      // Shown by the same name the Filters list gives it, but matched on its
-      // eovs.json names and category too, so it is found by either in either
-      // language. Each category is offered as well, to set all of it at once.
+      // Also matched on eovs.json names and category, so it is found in either
+      // language.
       const group = listGroup(
         "eovs",
         t("oceanVariablesFiltername"),

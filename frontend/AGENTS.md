@@ -10,7 +10,7 @@
 
 ## Design work
 
-UI design, critique and polish go through the `impeccable` skill. It isn't vendored here; install it user-level (`~/.claude/skills/impeccable`). Its committed context is `DESIGN.md`, `PRODUCT.md` and `.impeccable/design.json` at the repo root — keep them in sync with `src/components/theme.css`; per-machine state under `.impeccable/` stays untracked.
+UI design, critique and polish go through the `impeccable` skill. It isn't vendored here; install it in your agent's user-level skills directory (e.g. `~/.claude/skills/impeccable` for Claude Code). Its committed context is `DESIGN.md`, `PRODUCT.md` and `.impeccable/design.json` at the repo root — keep them in sync with `src/components/theme.css`; per-machine state under `.impeccable/` stays untracked.
 
 ## Frontend-only dev
 

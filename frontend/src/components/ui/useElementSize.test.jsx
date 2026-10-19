@@ -4,8 +4,7 @@ import { act, render, screen } from "@testing-library/react";
 
 import useElementSize from "./useElementSize.js";
 
-// jsdom never computes real layout, so clientWidth/clientHeight are 0 unless
-// explicitly stubbed — this stands in for "the element actually has a box".
+// jsdom never computes layout, so clientWidth/Height are 0 unless stubbed.
 function stubClientBox(el, width, height) {
   Object.defineProperty(el, "clientWidth", {
     value: width,
@@ -45,9 +44,7 @@ function LateHarness({ mounted }) {
 describe("useElementSize", () => {
   it("starts at zero before anything is measured", () => {
     render(<Harness />);
-    // ResizeObserver is a no-op stub under jsdom (setup.js), and jsdom itself
-    // never lays out a real box, so the mount-time measure reads 0x0 here —
-    // this just pins that starting point.
+    // ResizeObserver is a no-op stub under jsdom, so mount reads 0x0.
     expect(screen.getByTestId("box")).toHaveTextContent("0x0");
   });
 

@@ -1,25 +1,7 @@
-/* ------------------------------------------------------------------
- * The range slider, wherever it appears — the time bar along the bottom
- * of the map, the Time and Depth entries in the Filters panel, the depth
- * strip down the right edge, and the two rails that ride on cards: the
- * trajectory date in the map legend and the gridded dataset's time slice
- * on the griddap card. Only the chrome around it differs; the track, its
- * handles and its tick labels are the same control and are styled once,
- * here. What is peculiar to one rail (the purple scrub marker and its
- * trail band) is styled beside that rail instead.
- *
- * The track and the tick row are both full-width children of a box inset
- * far enough that a handle parked at either end, and the label centered
- * under it, still sit inside. Every label is centered on its tick —
- * pinning the end ones inside instead would make them reach twice as far
- * towards their neighbour as the spacing pass that placed them assumed,
- * which is how they collide.
- * ------------------------------------------------------------------ */
+/* Labels are centred on their ticks, never pinned inside at the ends: that
+   would make them reach twice as far as the spacing pass assumed. */
 .rail {
   padding: 0 16px;
-
-  /* Nothing here is text to copy — it is labels on a control, and dragging a
-     handle used to sweep a selection across them. */
   user-select: none;
   -webkit-user-select: none;
 }
@@ -44,7 +26,6 @@
   background-color: var(--cioos-hairline);
 }
 
-/* The filtered span. */
 .railFill {
   position: absolute;
   top: 50%;
@@ -54,15 +35,8 @@
   background-color: var(--cioos-primary);
 }
 
-/* The handles carry every box property explicitly and are written one level
-   deeper than they need to be. They are <button>s, and the surfaces this rail
-   drops into style their own buttons — the Filters panel gives every button in
-   it a 30px pill with padding and margins, which turned these into pale
-   lozenges parked below the rail. `.rail x` outranks that.
- *
- * No white ring on them either: at this size it ate most of the handle and
- * left a pale dot that was hard to pick out against the rail. The colour goes
- * edge to edge and a soft shadow does the separating. */
+/* `.rail x` specificity and explicit box props: host surfaces (the Filters
+   panel) style their own buttons as 30px pills. */
 .rail .railHandle {
   position: absolute;
   top: 50%;
@@ -84,7 +58,6 @@
   outline: none;
 }
 
-/* Range ends: round, teal, sitting on the rail. */
 .rail .railHandleRange {
   width: 12px;
   height: 12px;
@@ -109,9 +82,6 @@
   font-size: var(--cioos-font-size-xs);
   line-height: 1;
   font-variant-numeric: tabular-nums;
-
-  /* Read at a glance against the map showing through — the 40% ink these
-     started at was too faint to scan. */
   color: var(--cioos-ink-60);
 }
 
@@ -123,24 +93,12 @@
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------------
- * Running down instead of across. Only the geometry changes: the track
- * becomes a column with the axis minimum at the top, and the labels move
- * to its left. Depth is the reason it exists — a water column drawn
- * sideways asks the reader to rotate it in their head every time — so
- * the same rail serves the strip down the edge of the map.
- * ------------------------------------------------------------------ */
 .railVertical {
-  /* Track first in the markup, labels second; reversed here so the labels
-     sit on the leading edge where they are read from. */
   display: flex;
   flex-direction: row-reverse;
   align-items: stretch;
   gap: 4px;
   height: 100%;
-
-  /* The inset that keeps a handle parked at either end, and its label, inside
-     the box — the horizontal rail's left/right padding, turned. */
   padding: 8px 0;
 }
 
@@ -164,8 +122,6 @@
   margin: 0 0 0 -1.5px;
 }
 
-/* Down the middle of the track, at the height its value sits at (the height
-   itself comes in as an inline style, the way `left` does across). */
 .railVertical .railHandle {
   left: 50%;
 }
@@ -173,18 +129,13 @@
 .railVertical .railTicks {
   flex: 1 1 auto;
 
-  /* Wide enough for a five-digit metre count, and said here rather than left to
-     the labels themselves — they are absolutely positioned, so they contribute
-     no width of their own and would otherwise be squeezed out of the box by
-     whatever else the surface holds. */
+  /* Absolutely positioned labels contribute no width of their own. */
   min-width: 30px;
   height: auto;
   text-align: right;
 }
 
 .railVertical .railTicks {
-  /* Smaller than across: down here they are a column of short numbers running
-     beside the track, read as a scale, not labels standing on their own. */
   font-size: var(--cioos-font-size-2xs);
 }
 
@@ -194,15 +145,8 @@
   transform: translateY(-50%);
 }
 
-/* ------------------------------------------------------------------
- * Markers: a mark that says where something *is* rather than what is
- * filtered — the trajectory date, and the time slice of the gridded
- * dataset being drawn. A narrow upright bar rather than another circle,
- * because on the rail it shares with the filter range it can sit
- * anywhere among those handles — including exactly on one — so it has to
- * read as a different kind of thing and stay grabbable on top of them.
- * The colour is the mark's own; the shape is shared.
- * ------------------------------------------------------------------ */
+/* Markers say where something is, not what is filtered, so they are a bar
+   rather than a circle and stay grabbable on top of range handles. */
 .rail .railHandleMarker {
   width: 6px;
   height: 18px;
@@ -224,18 +168,6 @@
   box-shadow: 0 0 0 3px rgb(251 176 59 / 55%);
 }
 
-/* ------------------------------------------------------------------
- * The quiet fields that go with a rail: plain text until pointed at, so
- * a row of them on a card over the map doesn't read as a form. Each host
- * tints its own in the colour of the mark that field moves — teal for the
- * filter range, purple for the trajectory date, amber for the gridded
- * slice — which is the whole of the colour key now that the fields sit
- * inside the cards that name them.
- *
- * Shared by the time bar, the depth bar and the two rails on cards; the
- * Filters panel boxes the same fields back up into a proper form instead
- * (see the Filter stylesheet).
- * ------------------------------------------------------------------ */
 .railValueInput {
   user-select: text;
   -webkit-user-select: text;
@@ -260,8 +192,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Plain body type, just weighted — the tint and the colour do the work that a
-   caps/tracking treatment would, and at this size they do it better. */
 .railFieldLabel {
   flex-shrink: 0;
   font-size: var(--cioos-font-size-xs);
@@ -291,16 +221,8 @@
   background-color: var(--cioos-white);
 }
 
-/* One mark, one step, for a value that walks a grid rather than a calendar:
-   the slices of a gridded dataset are routinely thinner than a pixel of any
-   rail, and these are the only way to land on the one next door. The same
-   button steps the trajectory date a day at a time.
-
-   Neutral here and tinted by whoever hosts it, in the colour of the mark it
-   moves. Written with every box property it needs rather than leaning on the
-   base button styles: it renders inside two cards that are themselves dropped
-   into other surfaces (the legend, and the griddap card inside the dataset
-   page), and a host that pills its own buttons must not reshape these. */
+/* Explicit box props so host surfaces that pill their buttons can't reshape
+   these. */
 .railStep {
   display: inline-flex;
   align-items: center;

@@ -1,36 +1,11 @@
-"""Rebuild the CDE schema from the numbered files in ``database/``.
+"""Rebuild the CDE schema from the numbered files in ``database/``. DESTROYS ALL DATA.
 
-Why this exists
----------------
-``database/1_schema.sql`` is the only place ``cde.profiles``, ``cde.trajectory_hexes``
-and friends are ever created, and Postgres runs it exactly once — via
-``/docker-entrypoint-initdb.d`` on a **fresh** data volume. ``db_migrate`` re-applies
-only ``[3-9]_*.sql``, which are pure ``CREATE OR REPLACE FUNCTION``; every table
-reference in them sits inside a PL/pgSQL body, which Postgres does not validate at
-creation time.
+Postgres runs ``1_schema.sql`` only on a fresh volume and ``db_migrate`` re-applies
+only the ``[3-9]_*.sql`` functions (whose table references Postgres doesn't validate),
+so a table-layout change migrates "cleanly" and then fails at the first query.
 
-So a deploy that changes the table layout (e.g. the 2026-08-20 replacement of
-``trajectory_cells`` with ``trajectory_hexes`` + ``trajectory_days``) reports a clean,
-successful migration while leaving the database on the old schema. The mismatch only
-surfaces later, at the first query: ``relation "cde.trajectory_hexes" does not exist``.
-
-Recovering from that used to mean deleting the Postgres volume (destroying the harvest
-and needing host shell access) or hand-running psql inside the db container. This module
-does the same thing from the harvester, so it can be driven as a Prefect deployment.
-
-What it does NOT do
--------------------
-Preserve data. ``DROP SCHEMA cde CASCADE`` is exactly as destructive as dropping the
-volume; the point is only that it needs no volume surgery and no host shell. Callers are
-responsible for confirming intent and for re-harvesting afterwards.
-
-Why not just re-run 1_schema.sql
---------------------------------
-It is not idempotent against a populated database. ``CREATE schema cde`` has no
-``IF NOT EXISTS``, the 18 ``DROP TABLE`` statements carry no ``CASCADE`` (so the 10
-foreign keys block them in file order), and the two materialized views have no preceding
-drop. Re-running it half-applies and leaves the schema wrecked. Dropping the schema
-first sidesteps all of that ordering.
+Re-running 1_schema.sql alone isn't idempotent (no IF NOT EXISTS / CASCADE), hence
+dropping the schema first.
 """
 
 import os
@@ -39,26 +14,17 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-# Applied by the db container's entrypoint on a fresh volume; holds every CREATE TABLE.
 INIT_SQL_NAME = "1_schema.sql"
-# The function/procedure files db_migrate re-applies on every deploy. DROP SCHEMA
-# CASCADE takes the functions with it, so a rebuild has to re-apply these too.
+# DROP SCHEMA CASCADE takes the functions with it.
 FUNCTION_SQL_GLOB = "[3-9]_*.sql"
 
 SCHEMA_NAME = "cde"
 
-# Don't wait indefinitely for ACCESS EXCLUSIVE. Idle pooled connections (web-api) don't
-# hold table locks, but an in-flight query or a stray open transaction does, and a
-# rebuild that blocks forever is worse than one that fails with a clear message.
+# An in-flight query or stray open transaction would otherwise block forever.
 DEFAULT_LOCK_TIMEOUT = "30s"
 
 
 def database_dir(explicit=None):
-    """Directory holding the numbered SQL files.
-
-    ``CDE_DATABASE_DIR`` wins, then the image path baked by harvester/Dockerfile, then
-    the repo checkout (so this is runnable from a dev tree without env setup).
-    """
     if explicit:
         return Path(explicit)
     env_dir = os.getenv("CDE_DATABASE_DIR")
@@ -72,13 +38,8 @@ def database_dir(explicit=None):
 
 
 def check_confirmation(confirm, db_name=None, host=None):
-    """Raise unless ``confirm`` names the database being rebuilt.
-
-    The rebuild is exposed as a Prefect deployment, which means a Run button in the UI
-    sits one click away from destroying a harvest. Requiring the database name to be
-    typed makes that click deliberate, and makes it hard to wipe the wrong environment
-    by re-running a flow that was parameterised for another one.
-    """
+    """Raise unless ``confirm`` names the database being rebuilt, so a one-click
+    Prefect Run can't wipe it (or the wrong environment)."""
     expected = db_name if db_name is not None else os.environ.get("DB_NAME", "")
     if not expected:
         from dotenv import find_dotenv
@@ -96,10 +57,7 @@ def check_confirmation(confirm, db_name=None, host=None):
     if confirm != expected:
         where = f" on {host}" if host else ""
         if not confirm:
-            # The common case, and it is NOT a misconfiguration: `confirm` defaults to
-            # empty so a one-click Run in the Prefect UI cannot wipe a database. Say so,
-            # because an operator who just fixed a real env problem reads any red run as
-            # "still broken" and goes looking for another bug.
+            # Say it's expected: operators read any red run as "still broken".
             raise ValueError(
                 f"No confirmation given, so nothing was touched. This flow DESTROYS ALL "
                 f"DATA in the '{expected}' database{where}, so it requires the database "
@@ -117,18 +75,13 @@ def check_confirmation(confirm, db_name=None, host=None):
 
 
 def _numeric_prefix(path):
-    """Sort key so 9_* follows 5_* rather than sorting lexically."""
     match = re.match(r"(\d+)", path.name)
     return (int(match.group(1)) if match else 0, path.name)
 
 
 def schema_files(directory=None):
-    """``(init_file, [function_files...])`` in the order they must be applied.
-
-    Raises FileNotFoundError when the init file is missing — that means the SQL was
-    never copied into the image, and going ahead would drop the schema with no way to
-    recreate it.
-    """
+    """``(init_file, [function_files...])`` in application order. Raises when the
+    init file is missing rather than drop a schema it can't recreate."""
     directory = Path(directory) if directory else database_dir()
     init = directory / INIT_SQL_NAME
     if not init.is_file():
@@ -142,22 +95,13 @@ def schema_files(directory=None):
 
 
 def ensure_database(maint_engine, name):
-    """``CREATE DATABASE name`` if it is absent. Returns True when it had to be created.
+    """``CREATE DATABASE name`` if absent; True when created.
 
-    A deployment whose Postgres volume initialised BEFORE DB_NAME was set has no `cde`
-    database at all: the db service passes ``POSTGRES_DB=$DB_NAME``, so an empty value
-    leaves the image creating only the default ``postgres`` database. Everything then
-    fails with ``FATAL: database "cde" does not exist`` — and the rebuild cannot dig
-    itself out, because ``1_schema.sql`` assumes it is already connected to the target
-    and ``CREATE DATABASE`` cannot run inside a transaction.
-
-    Runs against the maintenance database (``postgres``), which always exists. Mirrors
-    the ``prefect`` service's own ensure_db bootstrap, except that one connects to
-    DB_NAME and so cannot help when DB_NAME is what is missing.
+    A volume initialised before DB_NAME was set (empty ``POSTGRES_DB``) has only the
+    ``postgres`` database. ``maint_engine`` connects to ``postgres``.
     """
     if '"' in name:
-        # Identifier interpolation below cannot be parameterised; refuse anything that
-        # could break out of the quoting rather than escaping it cleverly.
+        # Identifiers can't be parameterised; refuse rather than escape.
         raise ValueError(f"Refusing to create a database with a quote in its name: {name!r}")
     with maint_engine.connect() as conn:
         exists = conn.execute(
@@ -169,31 +113,20 @@ def ensure_database(maint_engine, name):
     return True
 
 
-# The search_path Postgres gives a fresh session. The db image's entrypoint runs each
-# .sql file in its OWN psql invocation, so a `SET search_path` inside one file never
-# reaches the next; restoring this before every file reproduces that isolation.
+# The db entrypoint runs each .sql file in its own psql session; restoring this
+# before every file reproduces that isolation.
 DEFAULT_SEARCH_PATH = '"$user", public'
 
 
 def _apply_sql_file(conn, path):
-    """Execute one whole .sql file in the current transaction, at the default search_path.
+    """Execute one whole .sql file at the default search_path.
 
-    The search_path reset is essential, not cosmetic. ``1_schema.sql`` ends with
-    ``SET search_path TO cde, public``. On a fresh volume that is harmless because the
-    entrypoint runs every file as a separate psql process, so ``3_*``..``9_*`` create their
-    functions at the DEFAULT search_path and they land in ``public`` — which is where the
-    app looks for them (``SELECT create_temp_tables()`` etc.). Applying all the files in one
-    connection, as this module does, would otherwise let that SET persist and create every
-    function in ``cde``, where the db-loader cannot see it:
-    ``function create_temp_tables() does not exist``.
+    The reset is essential: ``1_schema.sql`` ends with ``SET search_path TO cde, public``,
+    which would otherwise create every later function in ``cde`` instead of ``public``,
+    where the app calls them.
 
-    Goes down to the raw DBAPI cursor rather than ``text()`` or ``exec_driver_sql``.
-    These files are full of dollar-quoted PL/pgSQL bodies, ``::`` casts and ``%`` in
-    format strings: ``text()`` would try to parse ``:name`` bindparams out of them, and
-    ``exec_driver_sql`` hands psycopg2 an empty params mapping, which makes it attempt
-    ``%`` interpolation and fail with "immutabledict is not a sequence". psycopg2 does no
-    interpolation at all when ``execute`` is given no parameters, and happily runs
-    multiple semicolon-separated statements in one call.
+    Raw DBAPI cursor: ``text()`` would parse ``:name`` bindparams out of ``::`` casts,
+    and ``exec_driver_sql`` makes psycopg2 attempt ``%`` interpolation.
     """
     cursor = conn.connection.cursor()
     try:
@@ -204,19 +137,12 @@ def _apply_sql_file(conn, path):
 
 
 def rebuild_schema(engine, directory=None, lock_timeout=DEFAULT_LOCK_TIMEOUT):
-    """Drop and recreate the ``cde`` schema. DESTROYS ALL DATA.
-
-    Everything runs in ONE transaction: a failure part-way (a lock timeout, a syntax
-    error in a hand-edited file) rolls back to the pre-rebuild schema rather than
-    leaving the half-dropped mess a bare psql run would.
-
-    Returns a report dict for the caller to log.
-    """
+    """Drop and recreate the ``cde`` schema in ONE transaction, so a failure
+    part-way rolls back. DESTROYS ALL DATA."""
     init, functions = schema_files(directory)
 
     with engine.begin() as conn:
         conn.execute(text(f"SET lock_timeout = '{lock_timeout}'"))
-        # IF EXISTS so this also works as a first-time bootstrap against an empty DB.
         conn.execute(text(f"DROP SCHEMA IF EXISTS {SCHEMA_NAME} CASCADE"))
         _apply_sql_file(conn, init)
         for path in functions:

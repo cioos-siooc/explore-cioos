@@ -20,20 +20,11 @@ const {
   unionBranches,
 } = require("../utils/selection");
 
-// The ramp's domain, as [min, rampMax, trueMax], over a subquery whose bucket
-// value is aliased `count`.
-//
-// rampMax is a high percentile rather than the true maximum, because record
-// counts have a long and partly bogus tail. Measured on the full catalogue:
-// hex counts run 1 .. 1.7e11, but the 99th percentile is 264k — the maximum is
-// one mis-harvested fluorometer claiming 310 million records/day (its sibling
-// CTD on the same deployment reports 2.8M). Ramping to the true max would put
-// the median hex at 29% of a log ramp and hand the entire top half to a single
-// bad dataset. Clamping saturates the top 1% at the darkest colour, which is
-// what a reader expects of the darkest colour anyway.
-//
-// trueMax is carried so the legend can mark a clamped top tick with "+"
-// instead of claiming a maximum that isn't the maximum.
+// [min, rampMax, trueMax]. rampMax is a percentile because record counts have
+// a long, partly bogus tail: hex counts run to 1.7e11 while the 99th
+// percentile is 264k, so ramping to the true max would hand the top half of
+// the ramp to one mis-harvested dataset. trueMax lets the legend mark a
+// clamped top tick with "+".
 const RAMP_MAX_PERCENTILE = 0.99;
 function rampRange() {
   return `json_build_array(
@@ -42,15 +33,6 @@ function rampRange() {
     max(count)
   )`;
 }
-
-/*
- * /legend
- *
- * Get the range of counts for the hexes/points to set the color and legend text
- * in the front end
- *
- * Takes all the filters, returns a number range for each of the 3 major zoom levels
- */
 
 /**
  * @swagger
@@ -133,34 +115,20 @@ function rampRange() {
 router.get("/", ...pipeline(), async (req, res) => {
   const filters = await createDBFilter(req.query);
   // Must match the metric the tiles were requested with, or the ramp domain
-  // won't match the numbers being ramped — see utils/hexMetric.js.
+  // won't match the numbers being ramped.
   const metric = parseMetric(req.query.metric);
-  // Which feature sources the selection contains — utils/selection.js, shared
-  // with the tile routes so the ramp's domain is over what the tiles draw.
   const includeObis = obisVisible(req.query);
   const includeProfiles = erddapVisible(req.query);
 
-  // GROUP BY the hex FK (integer) instead of the polygon geom; the polygon
-  // lives on cde.hexes_zoom_0/1 and isn't needed here — only the summed
-  // metric per bucket.
-  // search_geom (bbox for profiles, cell point otherwise) backs the shared
-  // spatial filter, matching tiles/shapeQuery. DRAWN_AS_POINT gates profiles
-  // out of every tier (hex and point) so the legend ranges match the tiles,
-  // which keep large-region features off the map entirely.
+  // DRAWN_AS_POINT gates profiles out of every tier so the ranges match the
+  // tiles, which keep large-region features off the map entirely.
   const profilesBranch = `SELECT hex_0_pk, hex_1_pk, point_pk, dataset_pk, ${metricValueExpr("profiles", metric)},
                time_min, time_max, latitude, longitude, depth_min, depth_max, bbox AS search_geom
         FROM cde.profiles ${metricJoin("profiles", metric)}
         WHERE ${DRAWN_AS_POINT} AND :profileFilters`;
-  // Trajectory and OBIS coverage cells merge into the hex-tier ranges
-  // (zoom0/zoom1, the green ramp) but not the point-tier range (zoom2) — at
-  // that zoom they only render via the dedicated always-hex coverage layer,
-  // whose own range comes from the second query below.
-  // cde.trajectory_hexes carries ONE hex per row plus its tier (each tier's
-  // day count is aggregated independently), so the two hex FK columns the
-  // other branches select are split out of hex_pk here. The NULL that leaves
-  // in the other tier's column is why sub1/sub2 below exclude NULL keys —
-  // otherwise every tier-1 row would pile into one bogus hex_0 bucket and
-  // stretch the ramp domain.
+  // cde.trajectory_hexes carries one hex per row plus its tier, so the other
+  // tier's column is NULL; that is why sub1/sub2 below exclude NULL keys, or
+  // every tier-1 row would pile into one bogus hex_0 bucket.
   const trajectoryBranch = `SELECT CASE WHEN hex_tier = 0 THEN hex_pk END AS hex_0_pk,
                CASE WHEN hex_tier = 1 THEN hex_pk END AS hex_1_pk,
                NULL::integer AS point_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
@@ -178,16 +146,12 @@ router.get("/", ...pipeline(), async (req, res) => {
   const combinedHexInner = unionBranches(hexBranches, profilesBranch);
 
   // Only profiles reach the point tier: both cell tables are drawn as hexes
-  // at every zoom, so counting them here would ramp the point circles
-  // against data they don't contain.
+  // at every zoom.
   const combinedPointInner = unionBranches(
     includeProfiles ? [profilesBranch] : [],
     profilesBranch,
   );
 
-  // A dataset-level selection takes the zoom0 ramp from the rollup, gated as
-  // the hex branches above are (trajectory rides with profiles, no type
-  // filter); hex_records then only feeds zoom1.
   const zoom0FromRollup = filters.datasetLevelOnly;
   const rollupConds = [];
   if (includeProfiles) {
@@ -228,10 +192,8 @@ router.get("/", ...pipeline(), async (req, res) => {
         ),
         ${zoom0Records}
 
-        -- Not count(distinct point_pk): the ramp ranks hexes by how much data
-        -- they hold, so its domain has to be over the same quantity the tiles
-        -- emit as \`count\`, aggregated the same way (countAggregate) — a sum
-        -- for \`records\`, a day-set union for \`days\`.
+        -- Aggregated exactly as the tiles aggregate \`count\`, or the domain
+        -- won't match what is ramped.
         sub1 AS (SELECT ${rampRange()} zoom0 FROM (SELECT ${countAggregate(metric, zoom0Source)} count FROM ${zoom0Source} WHERE hex_0_pk IS NOT NULL GROUP BY hex_0_pk) s),
         sub2 AS (SELECT ${rampRange()} zoom1 FROM (SELECT ${countAggregate(metric, "hex_records")} count FROM hex_records WHERE hex_1_pk IS NOT NULL GROUP BY hex_1_pk) s),
         sub3 AS (SELECT ${rampRange()} zoom2 FROM (SELECT ${countAggregate(metric, "point_records")} count FROM point_records GROUP BY point_pk) s)
@@ -239,28 +201,15 @@ router.get("/", ...pipeline(), async (req, res) => {
         SELECT * from sub1,sub2,sub3
         `;
 
-  // The always-hex coverage layer (trajectory + OBIS cells), which takes
-  // over from the main hexes at z>=7. Both kinds now share one ramp, so
-  // this is one domain over both — it used to be three separate ranges
-  // feeding three separate colour scales (purple / amber / plum), which put
-  // four colour families on screen at once at high zoom.
+  // Coverage layer: only the hex_1 tier is needed, since below z7 these cells
+  // fold into the main hexes and the layer reuses hexes_zoom_1 past z6.
   //
-  // Only the hex_1 tier is needed: below z7 these cells are folded into the
-  // main hexes above, and the layer reuses hexes_zoom_1 uncapped past z6.
-  //
-  // Gating mirrors /tiles/cells. Note the frontend currently sends only the
-  // filter query (which carries includeObis) to /legend, not the data-layer
-  // toggles, so includeTrajectory defaults to on here — same as before this
-  // change.
+  // The frontend sends only the filter query to /legend, not the data-layer
+  // toggles, so includeTrajectory defaults to on here.
   const includeTrajectoryCells =
     req.query.includeTrajectory !== "false" && includeProfiles;
-  // Every branch carries the columns the shared dataset filter predicates
-  // against (time, depth, position), not just the ones this query groups on.
-  // dbFilter emits unqualified time_min/depth_min/... predicates, so a branch
-  // that omits them makes the whole statement fail to parse — which is what
-  // made /legend 500 for every request carrying a time or depth filter,
-  // silently leaving the map without a ramp domain exactly when the user
-  // narrowed it.
+  // dbFilter emits unqualified time_min/depth_min/... predicates, so every
+  // branch must carry those columns or the statement fails to parse.
   const trajectoryCoverageBranch = `SELECT hex_pk AS hex_1_pk, dataset_pk, ${metricValueExpr("trajectory_hexes", metric)},
         time_min, time_max, latitude, longitude, depth_min, depth_max, geom AS search_geom
         FROM cde.trajectory_hexes ${metricJoin("trajectory_hexes", metric)}
@@ -273,9 +222,8 @@ router.get("/", ...pipeline(), async (req, res) => {
   const coverageBranches = [];
   if (includeTrajectoryCells) coverageBranches.push(trajectoryCoverageBranch);
   if (includeObis) coverageBranches.push(obisCoverageBranch);
-  // The empty case wraps a real branch rather than spelling out a typed NULL
-  // shell: metric_value is a bigint for two metrics and a daterange for the
-  // third, and a hand-written shell had to be kept in step with that by hand.
+  // The empty case wraps a real branch rather than a typed NULL shell because
+  // metric_value's type depends on the metric.
   const coverageInner = unionBranches(coverageBranches, obisCoverageBranch);
 
   const coverageSql = `
@@ -295,10 +243,7 @@ router.get("/", ...pipeline(), async (req, res) => {
         SELECT * from sub1
         `;
 
-  // Both aggregations scan the same large tables independently; run them
-  // concurrently rather than back-to-back so legend latency is bounded by
-  // the slower, not their sum. The legend gates first map paint, so this is
-  // on the critical path.
+  // Concurrent because the legend gates first map paint.
   const [rows, coverageRows] = await Promise.all([
     db.raw(sql, {
       filters: filters.shared,

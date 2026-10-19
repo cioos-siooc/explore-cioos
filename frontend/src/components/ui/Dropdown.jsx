@@ -13,43 +13,26 @@ import "./dropdownStyles.css";
 
 const DropdownContext = createContext({ close: () => {} });
 
-// Replacement for react-bootstrap's DropdownButton + Dropdown.Item pair,
-// emitting Bootstrap-compatible class names (.dropdown, .dropdown-toggle,
-// .dropdown-menu, .dropdown-item) so existing overrides keep applying. The
-// menu portals into document.body rather than sitting inside .dropdown: a
-// couple of call sites (e.g. the Legend layers card) live inside a scrolling,
-// transformed ancestor, which clips an in-place absolutely-positioned menu
-// no matter its own position value. Positioning is computed from the
-// toggle's bounding rect instead of relying on CSS containment.
+const VIEWPORT_MARGIN = 8;
+
+// Emits Bootstrap-compatible class names so existing overrides keep applying.
+// The menu portals into document.body because some call sites live inside a
+// scrolling, transformed ancestor that clips an in-place absolute menu.
 // `title` is the toggle's *content*; `tooltip` is the HTML title attribute.
 export function DropdownButton({
   title,
   tooltip,
   className = "",
   toggleClassName = "",
-  // Extra class(es) for the menu itself. The menu portals into document.body
-  // rather than nesting under `className` (see below), so a caller after
-  // more than the default white/rounded-sm/shadow-md chrome — a bigger radius,
-  // different padding — can't reach it with a descendant selector off its own
-  // wrapper and needs this instead.
+  // The menu portals out of `className`, so descendant selectors can't reach it.
   menuClassName = "",
   size,
   variant,
-  // 'start' (default) lines the menu's left edge up with the toggle's, which
-  // reads fine once the menu is about as wide as its toggle (the two
-  // existing callers, both text buttons). 'center' anchors the menu under
-  // the toggle's midpoint instead via transform: translateX(-50%) — needed
-  // once the toggle is much narrower than its menu (an icon-only button, say),
-  // where left-alignment leaves the menu looking like it belongs to whatever
-  // sits to the toggle's right instead. 'end' lines the menu's right edge up
-  // with the toggle's — for a toggle sitting at the right edge of its row (the
-  // top bar's quick-filters caret), where either of the other two would hang a
-  // menu wider than the toggle out past the row it belongs to.
+  // 'start' aligns left edges, 'center' centres under a toggle much narrower
+  // than its menu (icon buttons), 'end' aligns right edges for a toggle at the
+  // right edge of its row.
   align = "start",
-  // Fires whenever the menu opens/closes. The toggle's own open/closed state
-  // otherwise stays private to this component — callers that need to style
-  // the toggle differently while its menu is up (see topBarQuickFiltersToggle)
-  // use this to mirror it into their own state.
+  // For callers that style the toggle while its menu is up.
   onOpenChange,
   disabled,
   children,
@@ -67,37 +50,31 @@ export function DropdownButton({
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
 
-  // Recomputed on resize, not just when the menu opens — the toggle is
-  // typically inside a centered, width-dependent layout (the top bar's
-  // brand card, say), so a viewport resize while the menu is open moves the
-  // toggle out from under a position that was only ever measured once.
+  // Recomputed on resize: the toggle usually sits in a width-dependent layout.
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return;
     function updateMenuStyle() {
       const rect = buttonRef.current.getBoundingClientRect();
-      const base = {
+      // Floor at the toggle's width, except with menuClassName: an inline
+      // style would beat the width that class sets.
+      const minWidth = menuClassName ? 0 : rect.width;
+      const width = Math.max(menuRef.current?.offsetWidth ?? 0, minWidth);
+      const left =
+        align === "center"
+          ? rect.left + rect.width / 2 - width / 2
+          : align === "end"
+            ? rect.right - width
+            : rect.left;
+      // Kept on screen: a menu wider than the room on its aligned side (a
+      // 300px menu ending at a phone's first column) would otherwise hang
+      // off the edge.
+      const maxLeft = window.innerWidth - VIEWPORT_MARGIN - width;
+      setMenuStyle({
         position: "fixed",
         top: rect.bottom + 2,
-        // Floor the menu at its toggle's width so a text button's menu never
-        // looks narrower than the thing it hangs off. Skipped when the caller
-        // passed menuClassName, because this is an inline style and would beat
-        // the width that class was added to set — an icon-only toggle wants
-        // its menu far wider than the toggle, not as narrow.
-        ...(menuClassName ? {} : { minWidth: rect.width }),
-      };
-      if (align === "center")
-        setMenuStyle({
-          ...base,
-          left: rect.left + rect.width / 2,
-          transform: "translateX(-50%)",
-        });
-      else if (align === "end")
-        setMenuStyle({
-          ...base,
-          left: rect.right,
-          transform: "translateX(-100%)",
-        });
-      else setMenuStyle({ ...base, left: rect.left });
+        left: Math.max(VIEWPORT_MARGIN, Math.min(left, maxLeft)),
+        ...(menuClassName ? {} : { minWidth }),
+      });
     }
     updateMenuStyle();
     window.addEventListener("resize", updateMenuStyle);
@@ -149,7 +126,15 @@ export function DropdownButton({
             <div
               className={`dropdown-menu show ${menuClassName}`}
               ref={menuRef}
-              style={menuStyle}
+              // Fixed and hidden for the first layout pass, so it is measured
+              // at its own width rather than the body's.
+              style={
+                menuStyle ?? {
+                  position: "fixed",
+                  left: 0,
+                  visibility: "hidden",
+                }
+              }
             >
               {children}
             </div>
@@ -177,6 +162,5 @@ function DropdownItem({ onClick = () => {}, active, children, ...rest }) {
   );
 }
 
-// Namespace object so `<Dropdown.Item>` call sites only need their import
-// changed.
+// So `<Dropdown.Item>` call sites only need their import changed.
 export const Dropdown = { Item: DropdownItem };

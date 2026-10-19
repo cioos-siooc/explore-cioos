@@ -62,14 +62,9 @@ const Plot = createPlotlyComponent(Plotly);
 
 const PINNED_AXIS_CONFIG = { staticPlot: true, displayModeBar: false };
 
-// One panel per variable, all sharing one axis. The arrangement per
-// cdm_data_type lives in previewFacetPlan.js, the box in previewFacetSizing.js
-// and the figure in previewFacetFigure.js — all pure, so the layout is testable
-// without a browser. This file is the controls.
-//
-// Everything describing the plot comes from PreviewPlotProvider: it is held
-// above this component because this one is unmounted every time the user flips
-// to the Table and back.
+// Controls only; layout, box and figure are pure in previewFacetPlan.js /
+// previewFacetSizing.js / previewFacetFigure.js. All plot state comes from
+// PreviewPlotProvider because this component unmounts on every Table/Plot flip.
 export default function DatasetPreviewPlot() {
   const { t, i18n } = useTranslation();
   const {
@@ -118,8 +113,7 @@ export default function DatasetPreviewPlot() {
     setPaneCollapsed,
   } = usePreviewPlot();
 
-  // Purely local: a disclosure triangle is not worth a param, and nobody wants
-  // to share which panel they had folded open.
+  // Purely local: which panel is folded open is not worth sharing in a link.
   const [showLabels, setShowLabels] = useState(false);
   // Only for the cursor and the text-selection lock while a drag is live.
   const [resizing, setResizing] = useState(false);
@@ -177,10 +171,8 @@ export default function DatasetPreviewPlot() {
     (isColorLayout ? colorX : sharedAxis) === POSITION_INDEX_COLUMN,
   );
 
-  // Memoised because react-plotly.js compares `data`/`layout` by IDENTITY and
-  // calls Plotly.react() whenever either differs. A figure rebuilt on every
-  // render means a full re-plot of every panel on every keystroke in the rename
-  // field — six traces of a thousand points each.
+  // react-plotly.js re-plots whenever `data`/`layout` identity changes, e.g. on
+  // every keystroke in the rename field.
   const figure = useMemo(() => {
     if (!panels.length || !plotData) return null;
     if (isColorLayout) {
@@ -303,10 +295,7 @@ export default function DatasetPreviewPlot() {
     </DropdownButton>
   );
 
-  // Per-variable customisation, keyed by column name — with one panel per
-  // variable there are no fixed axis roles left to key on. A panel gets its
-  // colour as well as its name; the shared axis draws no trace, so it gets only
-  // the name.
+  // The shared axis draws no trace, so it gets a name but no colour.
   const customizeRow = (columnName, index) => (
     <div className="labelEditorRow" key={columnName}>
       <label htmlFor={`rename-${columnName}`}>{labelOf(columnName)}</label>
@@ -611,10 +600,8 @@ export default function DatasetPreviewPlot() {
                 layout={split.figure.layout}
                 onInitialized={readPinnedView}
                 onUpdate={readPinnedView}
-                // Explicit width/height in the layout, so Plotly never runs
-                // plotAutoSize. That is what used to read a container height of
-                // 0px on first mount and silently fall back to its own 450px
-                // default, leaving the plot small until the next relayout.
+                // Explicit width/height so Plotly never runs plotAutoSize, which
+                // reads 0px on first mount and falls back to 450px.
                 style={{ width: `${width}px`, height: `${height}px` }}
                 useResizeHandler={false}
                 config={{
@@ -625,9 +612,8 @@ export default function DatasetPreviewPlot() {
                     "resetScale2d",
                     "pan2d",
                   ],
-                  // Off deliberately: `responsive` re-measures from computed
-                  // style on every window resize, which would fight the sizes
-                  // above. useElementSize drives resizing instead.
+                  // Off: `responsive` would fight the sizes above;
+                  // useElementSize drives resizing instead.
                   responsive: false,
                   scrollZoom: true,
                   locale: i18n.language === "fr" ? "fr" : "en",

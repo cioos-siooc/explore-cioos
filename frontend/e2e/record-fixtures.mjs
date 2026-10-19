@@ -1,16 +1,9 @@
-// Record the fixture set the test suites replay, by driving a real browser
-// against a live deployment.
+// Record the fixtures the suites replay from a live deployment.
 //
 //   node e2e/record-fixtures.mjs [--base=https://explore.cioos.ca] [--max-rows=40]
 //
-// Every state the specs need is deep-linkable (useUrlSync.js is the sole writer
-// of the URL, and every provider seeds itself back out of it), so the recorder
-// navigates by address and never has to know the UI. That is also why it stays
-// correct as the chrome changes.
-//
-// Recorded payloads are real API responses, truncated to --max-rows so the
-// committed JSON stays reviewable in a diff. Refresh with the same command; see
-// e2e/fixtures/README.md for when that is worth doing.
+// Navigates by deep link only, so it never has to know the UI. Payloads are
+// truncated to --max-rows to stay reviewable in a diff.
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -38,9 +31,7 @@ const args = Object.fromEntries(
 const BASE = args.base || "https://explore.cioos.ca";
 const MAX_ROWS = Number(args["max-rows"] || 40);
 
-// Keep fixtures small enough to read. Only top-level arrays and the common
-// { rows: [...] } envelope are truncated — nothing else is reshaped, so what is
-// replayed still has the real payload's structure.
+// Only truncates; nothing is reshaped, so replays keep the real structure.
 function truncate(value) {
   if (Array.isArray(value)) return value.slice(0, MAX_ROWS);
   if (value && typeof value === "object") {
@@ -73,12 +64,8 @@ const browser = await chromium.launch({ args: CHROMIUM_ARGS });
 const context = await browser.newContext({
   viewport: { width: 1600, height: 900 },
 });
-// The same clock the specs run under (started at FROZEN_TIME, then running —
-// see e2e/support/test.js), so recorded query strings, which carry today's date
-// as the default time bound, match what the specs request.
+// The specs' clock, so recorded query strings (dated "today") match theirs.
 await context.clock.setSystemTime(FROZEN_TIME);
-// The intro modal is dismissed in the specs too; recording with it up would
-// capture a first-visit state the tests never reach.
 await context.addCookies([
   { name: "introModalOpen", value: "false", url: BASE },
 ]);
@@ -90,9 +77,7 @@ const appOrigin = new URL(BASE).origin;
 page.on("response", async (response) => {
   const url = new URL(response.url());
   try {
-    // Origin as well as path: Sentry's ingest endpoint is /api/<id>/envelope/
-    // and the analytics beacon is /api/event, both of which a path-only test
-    // would happily record as API fixtures.
+    // Origin too: Sentry and the analytics beacon also post to /api/ paths.
     if (url.origin === appOrigin && url.pathname.startsWith("/api/")) {
       const key = fixtureKey(response.url());
       if (key.isTile) {
@@ -113,8 +98,7 @@ page.on("response", async (response) => {
       await write(externalKey(response.url()) + extension, body);
     }
   } catch (error) {
-    // A response body that has already been discarded (a redirect, an aborted
-    // request) is not worth failing the whole recording over.
+    // Bodies of redirects and aborted requests are already discarded.
     console.warn("  skipped", url.pathname, "-", error.message);
   }
 });
@@ -122,8 +106,7 @@ page.on("response", async (response) => {
 for (const [name, search] of Object.entries(RECORDED_VIEWS)) {
   console.log(`\nrecording "${name}" ${search}`);
   await page.goto(`${BASE}/${search}`, { waitUntil: "domcontentloaded" });
-  // Not a readiness assertion — the recorder wants everything the page asks
-  // for, including whatever arrives after first paint.
+  // Fixed wait, not readiness: it wants requests made after first paint too.
   await page.waitForTimeout(12_000);
 }
 

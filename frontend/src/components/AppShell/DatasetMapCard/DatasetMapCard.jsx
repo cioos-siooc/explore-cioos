@@ -14,16 +14,9 @@ import useMediaQuery, {
 } from "../../../state/ui/useMediaQuery.js";
 import "./styles.css";
 
-// The dataset page, minimized: closing the sidebar while a dataset is open
-// keeps the map keyed to that dataset (the others grey, its WMS layer drawn),
-// so this card names it, reopens its page, and is the one way out. A gridded
-// dataset's colorbar and slice controls ride in the same card rather than in a
-// second one elsewhere on screen, since they describe the same dataset.
-//
-// On a phone it hangs under the header (see TopControls). Wider, it sits in
-// the sidebar's own bottom-left corner, out of the middle of the map the
-// dataset is drawn on, and takes turns there with the "what's here" card the
-// way the sidebar does.
+// Closing the sidebar keeps the map keyed to the open dataset, so this card
+// names it, reopens its page and is the one way out. Wider than a phone it
+// takes turns with the "what's here" card in the sidebar's corner.
 export function DatasetMapCorner() {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const { inspectDataset } = useSelection();
@@ -79,7 +72,6 @@ export default function DatasetMapCard({ dataset, className }) {
           <FileEarmarkText size={12} aria-hidden="true" />
           {t("datasetMapCardDetailsText")}
         </button>
-        {/* A dataset with no footprint has nothing to frame. */}
         {canZoom && (
           <button
             type="button"
@@ -92,9 +84,7 @@ export default function DatasetMapCard({ dataset, className }) {
           </button>
         )}
       </div>
-      {/* No close of its own here: the card's X already leaves the dataset,
-          and a second X for the layer alone would read as the same thing. The
-          page's Show on map switch turns the layer off. */}
+      {/* No close of its own: a second X would read as leaving the dataset. */}
       {overlay && (
         <WmsLegend
           overlay={overlay}

@@ -88,7 +88,9 @@ flowchart TD
    `HASH_FEDERATED_UNRESOLVED`, or `HASH_CKAN_UNAVAILABLE` after a CKAN
    outage) is stored and shown as the dataset's harvest mode on the dashboard.
 4. **Metadata.** The dataset `info` page: global attributes and per-variable
-   attributes (`standard_name`, `cf_role`, `actual_range`, units).
+   attributes (`standard_name`, `cf_role`, `actual_range`, units). Besides
+   driving the steps below, the global attributes are also kept as the
+   dataset's [descriptive metadata](#descriptive-metadata).
 5. **Compliance checks** (a failure is a skip, not an error):
    - `cde_ingest=false` global opts the dataset out (`INGEST_FLAG_FALSE`);
    - `time`, `latitude`, `longitude` are required (`Grid`: lat/lon only)
@@ -156,14 +158,17 @@ Antimeridian-crossing boxes are measured the short way.
    days counts its first 30 days and extrapolates.
 
 A failed step 2 never drops the dataset: when the day set is unknown the
-database derives `days` from the time span (an over-count). Step 3 is
+database derives `days` from the time span (an over-count), and the attempt
+carries a `DAY_COUNT_FALLBACK` [warning](workflow.md#warnings). Step 3 is
 required: if it fails, no feature has a record count and the dataset ends as
 `NO_PROFILES_FOUND` (or `RESPONSE_TOO_LARGE` when the response passed the
 cap).
 
 Features are also dropped when their position, time bounds or depth are
 unusable: no lat/lon box or time bounds, latitude outside ±90°, longitude
-outside ±180°, depth below 15 000 m or above 100 m altitude.
+outside ±180°, depth below 15 000 m or above 100 m altitude. The attempt
+records them as a `FEATURES_DROPPED` [warning](workflow.md#warnings) with a
+sample of the feature ids.
 
 **Type differences**
 
@@ -186,9 +191,11 @@ response scales with trajectory-days, not with the full-resolution track:
 - **Per-day stats** (`cde.trajectory_days`): one row per (trajectory, UTC
   day) with the record count (`orderByCount("<trajectory_id>,time/86400")`)
   and depth range (`orderByMinMax(...,depth)`; skipped when `depth`'s
-  `actual_range` is constant). `TrajectoryProfile` also counts distinct
-  profiles per day with `orderByMin("<trajectory_id>,<profile_id>,time")`,
-  whose result is reused for the track.
+  `actual_range` is constant; best-effort, so a failed or empty depth
+  query, e.g. an all-NaN `depth`, keeps the days at depth 0).
+  `TrajectoryProfile` also counts distinct profiles per day with
+  `orderByMin("<trajectory_id>,<profile_id>,time")`, whose result is reused
+  for the track.
 - **Track points** (`cde.trajectory_points`): ordered, downsampled fixes.
   - `Trajectory`: one `orderByMin("<trajectory_id>,time/<interval>,time")`,
     the interval sized from the active trajectory-day count so the response
@@ -225,6 +232,29 @@ The track is best-effort: a failed or oversized track extraction never fails
 a dataset whose per-day stats succeeded, and the loader then keeps the
 dataset's previously stored track.
 
+## Descriptive metadata
+
+Every harvested dataset (tabledap and griddap) also stores what its ACDD global
+attributes say about it, with no extra request, in `cde.datasets.metadata`
+(jsonb) for the dataset page:
+
+| Field | ERDDAP global attributes |
+| --- | --- |
+| Abstract | `summary` (French: `summary_fr`, `summary_fra`) |
+| Citation, acknowledgement | `citation`, `acknowledgement` |
+| DOI | `doi` |
+| License | `license` (a link when it is a URL, else the text) |
+| Contacts | `creator_*` (cited author), `publisher_*`, `contributor_name` / `contributor_role` |
+| Keywords | `keywords` (French: `keywords_fr`) |
+| Dates | `date_created`, `date_issued`, `date_modified` |
+| Time and depth extent | `time_coverage_start`/`end`, `geospatial_vertical_min`/`max` |
+| Projects, history | `project`, `history` |
+| Links | `infoUrl`, URLs in `references` |
+
+These fill in only what the CKAN record leaves empty, field by field. CKAN
+wins where it has a value. See
+[Descriptive metadata](workflow.md#descriptive-metadata) for the merge.
+
 ## `Grid` (griddap)
 
 Metadata only — no data request and no per-feature rows. From the `info`
@@ -247,7 +277,7 @@ A grid with no usable lat/lon extent is skipped as `NO_PROFILES_FOUND`.
 
 | Harvest output | Table | What the loader adds |
 | --- | --- | --- |
-| Dataset row (all types) | `cde.datasets` | CKAN title, organizations and link ([CKAN](workflow.md#ckan)); merged day ranges |
+| Dataset row (all types) | `cde.datasets` | CKAN title, organizations and link ([CKAN](workflow.md#ckan)); merged day ranges; [descriptive metadata](#descriptive-metadata) merged with CKAN's |
 | Point-like features | `cde.profiles` | Map point in `cde.points`, hex membership for the map layer |
 | Trajectory day stats and track | `cde.trajectory_days`, `cde.trajectory_points` | Track summary, then the hex sweep into `cde.trajectory_hexes` |
 | Grid | `cde.datasets` only | — |

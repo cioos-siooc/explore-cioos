@@ -5,15 +5,9 @@ import classNames from "classnames";
 import Spinner from "../../ui/Spinner.jsx";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 
-// The dataset tally — "123/150 datasets" — centred between the brand lockup
-// and the Datasets/Filters tabs.
-//
-// With nothing filtered out, the total alone: "150/150" said it twice. Once
-// filtered, the filtered number holds the total's width (a hidden copy of the
-// total sits under it), so further filtering never shifts the line.
-//
-// Until `ready` there is no count to show — not even a zero — so the strip is a
-// spinner. See useDatasetCounts.
+// With nothing filtered out, the total alone ("150/150" said it twice). The
+// filtered number holds the total's width via a hidden copy, so filtering
+// never shifts the line. A spinner until `ready` (see useDatasetCounts).
 export default function DatasetCounts() {
   const { t, i18n } = useTranslation();
   const {
@@ -25,8 +19,7 @@ export default function DatasetCounts() {
     title,
   } = useDatasetCounts();
 
-  // A failed /datasets leaves no catalogue total; what came back filtered is
-  // then all we know it to be.
+  // A failed /datasets leaves no catalogue total.
   const totalCount = total ?? filteredCount;
   const format = new Intl.NumberFormat(i18n.language).format;
 

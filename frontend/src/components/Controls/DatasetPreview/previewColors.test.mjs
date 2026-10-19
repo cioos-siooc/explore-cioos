@@ -14,11 +14,7 @@ import {
   paletteColorFor,
 } from "./erddapPalettes.js";
 
-// The ten palettes that cover ~95% of declared usage, and the one colour each
-// one is projected onto. Written out rather than derived, because this table is
-// what a reader of the plot actually sees — and because "temperature is magenta,
-// salinity is blue, chlorophyll is green" is the whole point of reading the
-// publisher's colorBarPalette in the first place.
+// Written out rather than derived: this table is what a reader of the plot sees.
 const PALETTE_COLORS = {
   KT_thermal: "#a52c60",
   KT_haline: "#1a5a92",
@@ -67,7 +63,6 @@ test("without a palette the colour is the panel position, and it wraps", () => {
   assert.equal(defaultColorFor(undefined, 1), SWATCHES[1]);
   assert.equal(defaultColorFor(null, SWATCHES.length), SWATCHES[0]);
   assert.equal(defaultColorFor(null, SWATCHES.length + 2), SWATCHES[2]);
-  // A missing index is the first panel, not a crash.
   assert.equal(defaultColorFor(null, undefined), SWATCHES[0]);
 });
 
@@ -80,7 +75,6 @@ test("a colour is one spelling: six lowercase digits behind a hash", () => {
   assert.equal(normalizeColor("#A52C60"), "#a52c60");
   assert.equal(normalizeColor("a52c60"), "#a52c60");
   assert.equal(normalizeColor(" #a52c60 "), "#a52c60");
-  // Three-digit hex, names and junk are all refused rather than guessed at.
   assert.equal(normalizeColor("#abc"), null);
   assert.equal(normalizeColor("red"), null);
   assert.equal(normalizeColor("#a52c6"), null);
@@ -94,7 +88,6 @@ test("the param round-trips, sorted so one choice is one URL", () => {
   const param = formatColorsParam(colors);
   assert.equal(param, "PSAL_01~1a5a92,TE90_01~a52c60");
   assert.deepEqual(parseColorsParam(param), colors);
-  // Picked in the other order, spelled the same way.
   assert.equal(
     formatColorsParam({ TE90_01: "#a52c60", PSAL_01: "#1a5a92" }),
     param,
@@ -118,8 +111,6 @@ test("a link naming columns this dataset lacks loses only those", () => {
 });
 
 test("an unreadable entry is dropped, never defaulted", () => {
-  // Half a colour map beats a thrown render: this has to survive a hand-edited
-  // URL and anything an older or newer version wrote.
   assert.deepEqual(
     parseColorsParam("TE90_01~zzzzzz,PSAL_01,~ffffff,,PRES_01~123456"),
     { PRES_01: "#123456" },
@@ -127,8 +118,7 @@ test("an unreadable entry is dropped, never defaulted", () => {
 });
 
 test("the pair separator survives the query string", () => {
-  // URLSearchParams percent-encodes both `~` and `,` (as pvars already lives
-  // with), so what matters is that they come back.
+  // URLSearchParams percent-encodes `~` and `,`; what matters is they come back.
   const param = formatColorsParam({ TE90_01: "#a52c60", PSAL_01: "#1a5a92" });
   const written = new URLSearchParams({ pcolors: param }).toString();
   assert.ok(written.includes("%7E"), written);

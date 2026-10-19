@@ -1,33 +1,20 @@
-"""Harvest sources.
-
-One subpackage per kind of source the CDE pipeline harvests from:
-``erddap`` (one instance per configured server URL), ``obis`` (one monolithic
-source) and ``ckan`` (metadata enrichment, not a BaseHarvester). All
-harvesters implement :class:`cde_harvester.sources.base.BaseHarvester` and
-return a :class:`~cde_harvester.sources.base.HarvestResult`.
-"""
+"""Harvest sources: ``erddap`` (one per server URL), ``obis`` (one monolithic
+source) and ``ckan`` (metadata enrichment, not a BaseHarvester)."""
 
 import base64
 from urllib.parse import urlparse
 
-# OBIS is harvested as one monolithic source; in the audit it is recorded
-# under this sentinel erddap_url (sources.obis.harvester.OBIS_SOURCE_URL).
-# Accept a few spellings so a dashboard/UI caller can ask for OBIS without
-# knowing the exact sentinel.
+# Spellings of the OBIS sentinel erddap_url (sources.obis.harvester.OBIS_SOURCE_URL)
+# so a dashboard caller needn't know it exactly.
 OBIS_ALIASES = {"obis", "https://obis.org", "http://obis.org", "obis.org"}
 
 
 def resolve_source(source, erddap_urls_list):
-    """Resolve a requested ``source`` to a single ERDDAP url or the literal 'obis'.
+    """Resolve ``source`` (URL, hostname, dashboard slug or OBIS alias) to one
+    ERDDAP url or 'obis'; None when falsy (= full harvest).
 
-    Lenient on input: accepts the full configured URL, its hostname, the
-    dashboard's urlsafe-base64 slug, or an OBIS alias. Returns None when
-    ``source`` is falsy (= full harvest, no narrowing).
-
-    Raises ValueError if it does not resolve to exactly one configured source.
-    A typo MUST hard-fail before any harvest or DB write — a silently-empty
-    single-source harvest could otherwise be mistaken for "this source has no
-    datasets".
+    Raises ValueError unless exactly one source matches: a typo MUST hard-fail
+    before any DB write, or an empty harvest could read as "no datasets".
     """
     if not source:
         return None

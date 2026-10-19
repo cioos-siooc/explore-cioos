@@ -5,23 +5,11 @@ import Spinner from "./Spinner.jsx";
 import { useActivity } from "../../state/activity/ActivityProvider.jsx";
 import "./cioosLogoStyles.css";
 
-// The CIOOS/SIOOC logo, as the animated mark plus live text — no wordmark
-// image. Drawing the name rather than loading NationalLogo{English,French}.png
-// means it scales, switches language with the rest of the UI, is readable to a
-// screen reader, and takes the mark's own animation: the logo *is* the app's
-// loading indicator, pulsing while work is in flight and holding still when
-// there is none. See cioosLogoStyles.css for how the type is matched to the
-// wordmark's outlines.
-//
-// layout='stacked' is the full lockup — mark above the name, organisation name
-// underneath — for the first-paint splash, which has the room for it. It is on
-// screen only while the app is loading, so it always animates; the registry it
-// would otherwise ask is empty there anyway, the splash being rendered outside
-// AppProviders.
-// layout='inline' is the compact pairing (mark beside the name, no full name)
-// worn by the brand card, where the row is ~100px wide and the full name would
-// land at four pixels tall. That one is permanent, so it moves only while there
-// is something to move for.
+// Live text rather than the wordmark PNGs so it scales, switches language and
+// is screen-readable; the mark doubles as the app's loading indicator. See
+// cioosLogoStyles.css for the type matching. 'stacked' (splash) always
+// animates, since it renders outside AppProviders; 'inline' (brand card) moves
+// only while work is in flight.
 export default function CioosLogo({ layout = "inline", className = "" }) {
   const { t } = useTranslation();
   const { announced } = useActivity();
@@ -35,7 +23,6 @@ export default function CioosLogo({ layout = "inline", className = "" }) {
       } ${className}`.trim()}
     >
       {stacked ? (
-        // The splash: the same disc the map's loading spinner wears.
         <span className="cioosSpinnerDisc">
           <Spinner size="lg" role="presentation" />
         </span>

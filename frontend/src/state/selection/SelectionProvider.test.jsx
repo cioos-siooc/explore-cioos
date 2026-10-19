@@ -11,8 +11,7 @@ import { erddapServerSlug } from "../../utilities.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 
 let latest;
-// The map side of the same render, so the suite can assert that a narrowing
-// made here actually reaches the queries the map draws from.
+// So the suite can assert a narrowing reaches the map's queries.
 let latestMapState;
 let latestFilters;
 
@@ -371,12 +370,10 @@ describe("SelectionProvider", () => {
     expect(latest.filteredDatasetPks).toBeUndefined();
 
     act(() => latest.setOnlyInView(true));
-    // No fixture row carries a bbox, so nothing is in view: the figure is
-    // asked for an empty dataset list rather than left unnarrowed, which is
-    // what stops it answering for the datasets the filter just removed.
+    // Asked for an empty list rather than left unnarrowed, so the figure
+    // doesn't answer for datasets the filter just removed.
     await waitFor(() => expect(latest.filteredDatasetPks).toEqual([]));
-    // The map deliberately ignores this one — feeding the viewport back into
-    // the tile queries would rewrite every one of them on every pan.
+    // The map deliberately ignores it, or every tile query would change per pan.
     expect(
       new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
     ).toBeNull();
@@ -471,9 +468,7 @@ describe("SelectionProvider", () => {
   it("addDatasetsToSelection puts the named pks aside, ignoring one absent from the results", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];
-    // 888888 is not a pk in pointsData at all — addDatasetsToSelection only
-    // adds pks it can resolve to a row, so it's silently dropped, the same
-    // way a Grid row's pk would be (see the callback's own comment).
+    // 888888 resolves to no row, so it is silently dropped like a Grid pk.
     act(() => latest.addDatasetsToSelection([target.pk, 888888]));
     await waitFor(() => {
       expect(latest.selectedPks.has(target.pk)).toBe(true);

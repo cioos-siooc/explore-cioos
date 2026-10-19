@@ -1,20 +1,7 @@
-"""Unit tests for per-feature day sets (cde.profiles.days / day_ranges).
-
-The map's `days` metric counts the distinct UTC days a hex holds data for. It
-gets there by unioning per-feature day SETS rather than summing per-feature day
-counts, so these tests guard two separate things:
-
-  * that a feature's day set holds the days it actually has data on, not the
-    elapsed span between its first and last observation (the defect this
-    replaces: glisa_general_seasonal_erie reported 39,357 days for ~430 days of
-    real data);
-  * that the set survives the CSV and to_sql round trips intact, because a
-    silently-dropped or mis-typed column would put every row back on the span
-    fallback without failing anything.
-
-test_obis_cell_days.py is the sibling of this file for the OBIS source, and
-database/8_range_functions.sql holds the SQL twin of the merge logic.
-"""
+"""Per-feature day sets (cde.profiles.days / day_ranges): a set must hold the days
+with data, not the first-to-last span, and survive the CSV and to_sql round trips
+(a dropped column silently reverts every row to the span fallback). Siblings:
+test_obis_cell_days.py and database/8_range_functions.sql."""
 
 import datetime
 import logging
@@ -32,6 +19,7 @@ from cde_harvester.core.day_sets import (
     ranges_to_psycopg,
     total_days,
 )
+from cde_harvester.core.harvest_warnings import DAY_COUNT_FALLBACK, HarvestWarnings
 from cde_harvester.dataset_types.profile import ProfileHandler
 from cde_harvester.dataset_types.tabledap_features import (
     MAX_DAY_COUNT_ROWS,
@@ -71,6 +59,7 @@ class FakeDataset:
         self.response = response if response is not None else pd.DataFrame()
         self.raises = raises
         self.queries = []
+        self.warnings = HarvestWarnings(LOG)
 
     def dataset_tabledap_query(self, url):
         self.queries.append(url)
@@ -118,12 +107,7 @@ class TestDaySetsFromErddap:
         assert out.loc["S1", "days"] == 1
 
     def test_gap_between_days_is_not_counted(self, one_station):
-        """The span defect, stated as a test.
-
-        Two observations a year apart are two days of data, not the 366 the
-        elapsed span would claim. If `days` ever tracks time_max - time_min
-        again, this fails.
-        """
+        """Two observations a year apart are two days of data, not a 366-day span."""
         ds = FakeDataset(day_count_response(
             [("S1", "2020-01-01"), ("S1", "2020-12-31")]
         ))
@@ -209,6 +193,7 @@ class TestFallsBackInsteadOfFailing:
     def test_query_error_falls_back(self, one_station, error):
         ds = FakeDataset(raises=error)
         assert _extract_day_sets(ds, one_station, ["station_id"], LOG) is None
+        assert ds.warnings.codes() == [DAY_COUNT_FALLBACK]
 
     def test_empty_response_falls_back(self, one_station):
         # An ERDDAP too old for orderBy interval grouping answers 500 with a
@@ -247,6 +232,7 @@ class TestFallsBackInsteadOfFailing:
         ds = FakeDataset(day_count_response([("S1", "2020-03-01")]))
         assert _extract_day_sets(ds, frame, ["station_id"], LOG) is None
         assert ds.queries == []
+        assert ds.warnings.codes() == [DAY_COUNT_FALLBACK]
 
     def test_a_large_but_plausible_dataset_is_still_asked(self, one_station):
         """The cap must not skip the intermittent datasets it exists to help.

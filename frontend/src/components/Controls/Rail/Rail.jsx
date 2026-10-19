@@ -3,45 +3,22 @@ import React, { useCallback, useMemo, useRef } from "react";
 import useElementSize from "../../ui/useElementSize.js";
 import "./styles.css";
 
-// The slider every range control in the app is drawn with — the time rail (the
-// bar along the bottom of the map, and the Time entry in the Filters panel) and
-// the depth rail (the panel's Depth entry, and the strip down the right edge of
-// the map). Same track, same teal handles, same tick labels, so setting a depth
-// range is recognisably the same act as setting a time range.
-//
-// Unit-agnostic on purpose: everything it handles is a plain number placed by
-// an `axis`, which is the only thing that knows what the numbers mean —
-// milliseconds on a warped calendar in one case, metres on a warped water
-// column in the other.
-//
+// Unit-agnostic: only `axis` knows what the numbers mean.
 //   axis: { min, max, minText, maxText, toPos(value) -> 0..1, toValue(0..1) }
-//
-// It runs either way round. Horizontal is the default and reads left to right;
-// vertical reads top to bottom, which is the only way a water column can be
-// drawn — the axis minimum is the surface and belongs at the top. Position 0 is
-// the axis minimum in both, so nothing but the geometry changes.
-//
-// Presentational: every value comes in as a prop and every change goes out
-// through onCommit.
+// Position 0 is the axis minimum in both orientations (top when vertical).
 
 export default function Rail({
   axis,
   // [{ key, value, label, valueText, className }] — the draggable marks.
   handles,
-  // [{ key, from, to, className, title }] — the stretches drawn on the track
-  // behind them: the filled range, and whatever else the caller shades.
+  // [{ key, from, to, className, title }] — shaded stretches of the track.
   bands = [],
-  // (railLengthPx) => [{ key, value, label }]. Given the measured length because
-  // which labels fit is a question about pixels, not about values.
+  // (railLengthPx) => [{ key, value, label }]
   ticksFor,
-  // (value, handleKey) => value. Rounding applied to everything committed —
-  // whole days, whole metres. Handed the handle because marks on one rail can
-  // land on different grids: the filter range walks days, while the marker
-  // saying which slice of a gridded dataset is drawn can only land on a node
-  // that dataset actually holds.
+  // (value, handleKey) => value. Per handle, since marks on one rail can snap
+  // to different grids.
   snap = (value) => value,
-  // (event, handleKey) => step in axis units, so each rail — and each mark on
-  // it — sets its own keyboard pace.
+  // (event, handleKey) => keyboard step in axis units.
   stepFor,
   onCommit,
   // (handleKey, value). When given, a handle drag reports here and commits
@@ -56,7 +33,6 @@ export default function Rail({
   const draggedValueRef = useRef(null);
   const railLength = vertical ? trackSize.height : trackSize.width;
 
-  // Where a pointer sits along the track, 0..1 from the axis minimum.
   const positionFromPointer = useCallback(
     (event) => {
       const rect = trackRef.current?.getBoundingClientRect();
@@ -76,8 +52,6 @@ export default function Rail({
 
   function beginDrag(key) {
     return (event) => {
-      // Keep the press off the track handler below, and off the browser's own
-      // text-selection / scroll gestures while a handle is being dragged.
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.setPointerCapture?.(event.pointerId); // optional: jsdom lacks it
@@ -111,10 +85,8 @@ export default function Rail({
     draggedValueRef.current = null;
   }
 
-  // A press anywhere on the track moves whichever handle is closest to it, so
-  // the common "show me from here" gesture doesn't need the handle grabbed
-  // first. Closeness is measured in axis position, not in axis units — that's
-  // what the eye is judging on a warped axis.
+  // Closeness in axis position, not units: that's what the eye judges on a
+  // warped axis.
   function onTrackPointerDown(event) {
     const pos = positionFromPointer(event);
     const nearest = handles.reduce((best, handle) =>
@@ -126,10 +98,8 @@ export default function Rail({
     onCommit(nearest.key, valueFromPointer(nearest.key, event));
   }
 
-  // Arrows follow the rail: left/right along a horizontal one, up/down along a
-  // vertical one, and "up" on a water column means towards the surface. Both
-  // pairs are accepted either way round — a key that does nothing on a slider
-  // is worse than one that does the obvious thing.
+  // Both arrow pairs work in either orientation; "up" on a water column means
+  // towards the surface.
   function onHandleKeyDown(handle) {
     return (event) => {
       const step = stepFor
@@ -160,8 +130,6 @@ export default function Rail({
     [ticksFor, railLength],
   );
 
-  // The one place the two orientations differ: which edge a position is
-  // measured from, and which way a span is drawn.
   const at = (value) =>
     vertical
       ? { top: `${axis.toPos(value) * 100}%` }

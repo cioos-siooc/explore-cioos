@@ -4,26 +4,12 @@ import { server } from "../../../config.js";
 import reportError from "../../../state/reportError.js";
 import { buildTileSuffix } from "../tileQuery.js";
 
-// What each dataset under the click contributes to the cell's figure.
-//
-// The tile cannot answer this. A hex carries one `count` — the whole bucket's
-// figure — and a flat list of the datasets in it, so the card used to hand
-// every dataset that same number: a hex reading 1120 days made a one-day
-// dataset and a 1115-day mooring both claim 1120. For the days metric the
-// bucket total is a UNION of the datasets' day sets, so it is not divisible
-// into per-dataset figures after the fact; only the rows behind it can be
-// re-aggregated, which is what /tiles/datasets does.
-//
-// It is fetched per click rather than baked into every tile deliberately.
-// Measured on dev, carrying the breakdown on the tiles cost +19% on /tiles and
-// +41% on /tiles/cells for every cache miss — paid on every tile a pan touches,
-// to serve a number only read when someone actually clicks a hex. The same
-// answer costs ~70 ms once per click here, and is cached server-side like
-// every other route.
-//
-// Returns a Map of dataset pk -> count: empty while the request is in flight,
-// and if it fails. The card reads it with .get(), so a miss renders as no
-// figure at all rather than a wrong one.
+// A hex's `count` is a UNION of its datasets' day sets, so per-dataset figures
+// can't be derived from the tile; /tiles/datasets re-aggregates the rows.
+// Fetched per click rather than baked into tiles: that measured +19% on /tiles
+// and +41% on /tiles/cells per cache miss, versus ~70 ms per click here.
+// Empty while in flight or on failure, so a miss renders no figure rather than
+// a wrong one.
 const EMPTY = new Map();
 
 // Clicking along a coastline walks back and forth over the same few hexes, so
@@ -41,19 +27,12 @@ export default function useCellDatasetDays(query, combinedQueries, dataLayers) {
   const hexes = buckets?.hexPks?.join(",") || "";
   const points = buckets?.pointPks?.join(",") || "";
 
-  // A marker-click query carries no items and no buckets (see Map.jsx's
-  // handleMapClick): it opens the dataset page directly and the card has
-  // nothing to list, so there is nothing to ask about either.
-  //
-  // The markers inside a clicked coverage hex are profiles, which only the
-  // main source has, while the hex itself is asked of `cells` — so that click
-  // takes one request per source. At any other zoom a click hits hexes or
-  // markers, never both, and this is a single request as before.
+  // A marker-click query carries no items or buckets. A coverage hex's markers
+  // are profiles only the main source has, so that click takes one request per
+  // source.
   let url = null;
   if (hexes || points) {
-    // buildTileSuffix is what the tile layers themselves are requested with,
-    // so the metric and the layer switches cannot drift from the tile this is
-    // describing — the whole point of asking the same question of the API.
+    // The tiles' own suffix, so the metric and layer switches cannot drift.
     const suffix = buildTileSuffix(combinedQueries, dataLayers).replace(
       /^\?/,
       "",

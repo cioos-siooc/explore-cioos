@@ -1,7 +1,6 @@
-/* A fixed width rather than the title's: shrink-wrapped, a short title left
-   the two buttons too narrow to sit side by side. Scrolls rather than running
-   off the screen once a gridded dataset's legend is open in it, but vertically
-   only and without a scrollbar: a bar eats into a card this narrow. */
+/* Fixed width: shrink-wrapped, a short title left the two buttons too narrow
+   to sit side by side. Scrolls vertically without a scrollbar, which would eat
+   into a card this narrow. */
 .datasetMapCard {
   display: flex;
   flex-direction: column;
@@ -17,15 +16,12 @@
   box-shadow: var(--cioos-shadow-float);
 }
 
-/* Wide enough to show the WMS legend at the size ERDDAP drew it — see
-   GRIDDAP_LEGEND_WIDTH in wmsUtilities. */
+/* Shows the WMS legend at the size ERDDAP drew it (GRIDDAP_LEGEND_WIDTH). */
 .datasetMapCard.withOverlay {
   width: min(376px, calc(100vw - 24px));
 }
 
-/* The sidebar's corner, held above the time bar and clear of the top bar the
-   way the sidebar column is (Sidebar/styles.css). Parked off the left edge
-   while the "what's here" card holds the corner, on the same curve. */
+/* Same clearances as the sidebar column (Sidebar/styles.css). */
 .datasetMapCard.corner {
   position: fixed;
   left: 12px;
@@ -57,8 +53,6 @@
   gap: 6px;
 }
 
-/* Two lines, then an ellipsis: enough to tell datasets apart, with the full
-   title on hover and on the page one tap away. */
 .datasetMapCardTitle {
   flex: 1 1 auto;
   min-width: 0;
@@ -74,21 +68,17 @@
   color: var(--cioos-primary-700);
 }
 
-/* Held to the corner, level with the title's first line, however many lines
-   the title runs to (CloseButton centres itself by default). */
+/* Level with the title's first line (CloseButton centres itself by default). */
 .datasetMapCardHead .closeButton {
   align-self: flex-start;
 }
 
-/* Under the title, the two buttons a matched pair: the same width, whichever
-   label is longer. */
 .datasetMapCardActions {
   display: flex;
   gap: 6px;
   padding-right: 4px;
 }
 
-/* The top bar's entry-point wash (see TopControls/styles.css), as a pill. */
 .datasetMapCardButton {
   display: inline-flex;
   flex: 1 1 0;
@@ -118,7 +108,6 @@
   color: var(--cioos-primary);
 }
 
-/* Reopening the page is what the card is for. */
 .datasetMapCardButton.primary {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-primary);
@@ -146,8 +135,6 @@
   box-shadow: var(--cioos-focus);
 }
 
-/* Phones: the top bar is a full-width header whose rows stretch; the card
-   hangs under it inset from the edges, like the chips. */
 @media (max-width: 700px), (max-height: 500px) {
   .datasetMapCard,
   .datasetMapCard.withOverlay {

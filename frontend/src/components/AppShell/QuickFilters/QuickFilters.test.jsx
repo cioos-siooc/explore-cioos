@@ -11,9 +11,8 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
 import QuickFilters from "./QuickFilters.jsx";
 
-// A rectangle and a free shape, as a share link delivers them: the Area button
-// reads its lit state and marked shape off the shape on the map, so both are
-// decided by these params alone (see polygonIsRectangle).
+// The Area button's state is decided by these params alone (see
+// polygonIsRectangle).
 const BOX = "latMin=40&lonMin=-70&latMax=50&lonMax=-60";
 const FREE_SHAPE = `polygon=${encodeURIComponent(
   JSON.stringify([
@@ -29,9 +28,7 @@ describe("QuickFilters", () => {
     installMockFetch();
   });
 
-  // The row writes nothing of its own: the Area menu sends the same one-shot
-  // requestDraw the map already answers, asserted through that shared state
-  // rather than through the markup.
+  // Asserted through the shared requestDraw state, not the markup.
   function renderRow(url = "/") {
     const seen = { search: [], draw: [], onlyInView: [], realtimeOnly: [] };
     function Probe() {
@@ -257,9 +254,7 @@ describe("QuickFilters", () => {
     });
   });
 
-  // There is only the one reset, for the modal filters the chips show and the
-  // quick ones together — mounted alongside ActiveFilterChips here rather than
-  // in that component's own tests, since it renders no reset of its own.
+  // Here rather than in ActiveFilterChips' tests, which renders no reset.
   it("the single reset clears the modal filter along with the quick ones", async () => {
     const user = userEvent.setup({ delay: null });
     renderWithProviders(

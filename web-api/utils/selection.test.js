@@ -13,12 +13,7 @@ const {
 } = require("./selection");
 const { FINE } = require("./hexTiers");
 
-/*
- * The gates below were copied across eight and six call sites respectively
- * before this module existed, and the copies drifted. These pin the truth
- * table; utils/selectionAgreement.test.js checks that every route still asks
- * this module rather than answering for itself.
- */
+// The truth table; utils/selectionAgreement.test.js checks routes ask it.
 
 test("a plain selection contains both ERDDAP and OBIS data", () => {
   assert.equal(erddapVisible({}), true);
@@ -26,8 +21,7 @@ test("a plain selection contains both ERDDAP and OBIS data", () => {
 });
 
 test("a scientific-name selection is OBIS-only", () => {
-  // Only occurrence records carry taxa, so a taxon filter cannot be answered
-  // by any ERDDAP source — including alongside a server selection.
+  // Taxa are OBIS-only, even alongside a server selection.
   assert.equal(erddapVisible({ scientificNames: "Gadus morhua" }), false);
   assert.equal(
     erddapVisible({
@@ -43,9 +37,6 @@ test("excluding a taxon keeps ERDDAP, which carries none to exclude", () => {
 });
 
 test("an obisNodes selection is OBIS-only unless erddapServers joins it", () => {
-  // The pair is the frontend's combined Data Source filter, which dbFilter
-  // turns into one OR'd dataset predicate — both feature sets have to be
-  // present for that OR to select anything.
   assert.equal(erddapVisible({ obisNodes: "n1" }), false);
   assert.equal(
     erddapVisible({ obisNodes: "n1", erddapServers: "https://e" }),
@@ -57,14 +48,11 @@ test("an obisNodes selection is OBIS-only unless erddapServers joins it", () => 
 test("only an explicit includeObis=false hides occurrence cells", () => {
   assert.equal(obisVisible({ includeObis: "false" }), false);
   assert.equal(obisVisible({ includeObis: "true" }), true);
-  // Anything else, including an absent param from an older client, is "on".
+  // Absent (older clients) means on.
   assert.equal(obisVisible({ includeObis: "" }), true);
 });
 
 test("the trajectory row set pins one tier and joins its polygon", () => {
-  // Coverage exists at both tiers describing the same data; reading both
-  // double-counts. The polygon (not the centroid) is what the spatial filter
-  // matches, so a selection smaller than a hex still finds what is inside it.
   assert.match(
     TRAJECTORY_COVERAGE_FROM,
     new RegExp(`WHERE t\\.hex_tier = ${FINE.tier}$`),
@@ -76,15 +64,11 @@ test("the trajectory row set pins one tier and joins its polygon", () => {
 });
 
 test("the griddap row set aliases coverage_* to the names dbFilter uses", () => {
-  // dbFilter's predicates are unqualified, so a griddap row set missing one of
-  // these names makes the whole statement fail to parse.
   for (const name of ["time_min", "time_max", "depth_min", "depth_max"]) {
     assert.match(GRIDDAP_TIME_DEPTH_COLUMNS, new RegExp(`AS ${name}\\b`));
   }
-  // A timeless grid must match any time filter rather than none.
   assert.match(GRIDDAP_TIME_DEPTH_COLUMNS, /'-infinity'::timestamptz/);
   assert.match(GRIDDAP_TIME_DEPTH_COLUMNS, /'infinity'::timestamptz/);
-  // Both the aliases and the row set are written against the same alias.
   assert.match(GRIDDAP_FROM, /FROM cde\.datasets d\b/);
   assert.match(GRIDDAP_FROM, /d\.cdm_data_type = 'Grid'/);
 });
@@ -93,9 +77,6 @@ test("the exact griddap row set keeps the aliases but not the time coalesce", ()
   for (const name of ["time_min", "time_max", "depth_min", "depth_max"]) {
     assert.match(GRIDDAP_EXACT_TIME_DEPTH_COLUMNS, new RegExp(`AS ${name}\\b`));
   }
-  // The whole point of this variant: a grid with no time coverage must leave
-  // its bounds NULL so a caller binning by time drops it, rather than landing
-  // in every bin it has.
   assert.doesNotMatch(GRIDDAP_EXACT_TIME_DEPTH_COLUMNS, /infinity/);
   assert.match(
     GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
@@ -105,7 +86,7 @@ test("the exact griddap row set keeps the aliases but not the time coalesce", ()
     GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
     /d\.coverage_time_max AS time_max/,
   );
-  // Depth still coalesces: a depthless grid is at the surface, not nowhere.
+  // A depthless grid is at the surface, not nowhere.
   assert.match(
     GRIDDAP_EXACT_TIME_DEPTH_COLUMNS,
     /coalesce\(d\.coverage_depth_min, 0\)/,
@@ -126,9 +107,6 @@ test("a single branch is emitted with no UNION at all", () => {
 });
 
 test("an empty selection wraps a real branch rather than an empty UNION", () => {
-  // Every branch carries a WHERE of its own, so `${branch} WHERE FALSE` is a
-  // syntax error — and a hand-written NULL shell has to be kept in step with
-  // the branch's column names and types by hand.
   const branch = "SELECT a, b FROM t WHERE :filters";
   const sql = unionBranches([], branch);
   assert.equal(sql, `SELECT * FROM (${branch}) empty_combined WHERE FALSE`);

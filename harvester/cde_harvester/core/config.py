@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 def load_config(config_file):
-    # get config settings from file, eg harvest_config.yaml
     with open(config_file) as stream:
         try:
             config = yaml.safe_load(stream)
@@ -24,7 +23,6 @@ def load_config(config_file):
 
 
 def load_obis_dataset_ids(dataset_ids=None, datasets_file=None):
-    """Resolve OBIS dataset IDs, loading from JSON file if needed."""
     if dataset_ids:
         return dataset_ids
     if datasets_file:
@@ -60,10 +58,7 @@ def resolve_obis_config(config, dataset_ids=None, datasets_file=None, discover=N
       3. obis_datasets_file              -> mode "file"
       4. nothing                         -> mode "off"
 
-    This lives in one place because the three config readers (the CLI, the
-    Prefect pipeline's init_config, and the fan-out flow) previously each parsed
-    the OBIS keys themselves and drifted — which is how `obis_geo_filter` ended
-    up being silently ignored on the Prefect path.
+    Shared by every config reader so they can't drift apart.
     """
     config = config or {}
     geo_filter_cfg = config.get("obis_geo_filter") or {}

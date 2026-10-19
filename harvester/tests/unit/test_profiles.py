@@ -1,10 +1,4 @@
-"""
-Unit tests for the shared tabledap feature pipeline (dataset_types.tabledap_features).
-
-Uses a fully-configured MagicMock dataset so that extract_features can exercise
-its real logic (DataFrame manipulation, bad-geometry filtering, etc.) without
-any HTTP calls.
-"""
+"""Unit tests for dataset_types.tabledap_features on a fully-configured MagicMock dataset."""
 
 import pandas as pd
 import pytest
@@ -16,9 +10,6 @@ from conftest import (
     build_mock_dataset,
 )
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def single_station_dataset():
@@ -35,21 +26,12 @@ def no_profile_dataset(single_station_dataset):
 
 @pytest.fixture
 def bad_geometry_dataset(single_station_dataset):
-    """Dataset whose single feature has a latitude out of valid range.
-
-    The bad coordinate now comes from the feature's bounding box (the
-    single-feature metadata shortcut), not get_profile_ids — that's where the
-    pipeline sources lat/lon since the bbox change.
-    """
+    """Dataset whose single feature's bounding box has an out-of-range latitude."""
     df_vars = single_station_dataset.df_variables
     df_vars.loc["latitude", "actual_range"] = "95.0,95.0"   # > 90 → invalid
     df_vars.loc["longitude", "actual_range"] = "-125.0,-125.0"
     return single_station_dataset
 
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 class TestGetProfilesHappyPath:
     def test_returns_dataframe(self, single_station_dataset):
@@ -142,6 +124,9 @@ class TestGetProfilesEmptyAndEdgeCases:
         """Profiles with latitude > 90 must be removed by the bad-geometry filter."""
         result = get_profiles(bad_geometry_dataset)
         assert result.empty
+        dropped = {w["code"]: w for w in bad_geometry_dataset.warnings}["FEATURES_DROPPED"]
+        assert dropped["count"] == 1
+        assert dropped["items"] == ["STATION_001"]
 
     def test_unparseable_time_feature_filtered_out(self, single_station_dataset):
         """A time pandas can't represent (year 0019, a typo for 2019) coerces
@@ -169,10 +154,6 @@ class TestGetProfilesEmptyAndEdgeCases:
         assert "profile_id" in result.columns
         assert (result["profile_id"] == "").all()
 
-
-# ---------------------------------------------------------------------------
-# Per-feature EOV detection
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def two_station_dataset(single_station_dataset):
@@ -326,10 +307,6 @@ class TestPerFeatureEovs:
         assert list(result["eovs"].iloc[0]) == list(single_station_dataset.eovs)
         single_station_dataset.get_eov_variables.assert_not_called()
 
-
-# ---------------------------------------------------------------------------
-# Metadata first: fewer full-data scans
-# ---------------------------------------------------------------------------
 
 STATIONS = ["STATION_001", "STATION_002"]
 

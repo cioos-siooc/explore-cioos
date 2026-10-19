@@ -1,7 +1,3 @@
-/* The two-line row layout (name + hint) and the wrapping are shared with every
-   other filter body — see .filtersPanel .optionButton in Panels/styles.css.
-   What is specific to this filter is the hint itself. */
-
 .dataLayersFilter .optionHint {
   display: block;
   font-size: var(--cioos-font-size-xs);

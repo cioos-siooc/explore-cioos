@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from urllib.parse import unquote
 
 import pandas as pd
+from cde_harvester.core.harvest_warnings import HarvestWarnings
 from cde_harvester.dataset_types import extract_features, get_handler
 from cde_harvester.dataset_types.trajectory_features import (
     MAX_TRACK_POINTS_CAP,
@@ -87,6 +88,7 @@ def build_trajectory_dataset(cdm_data_type="Trajectory", with_depth=True,
     dataset.erddap_url = ERDDAP_URL
     dataset.cdm_data_type = cdm_data_type
     dataset.logger = logging.getLogger("test")
+    dataset.warnings = HarvestWarnings(dataset.logger)
     dataset.globals = {
         "time_coverage_start": "2021-01-01T00:00:00Z",
         "time_coverage_end": "2021-01-20T00:00:00Z",
@@ -244,15 +246,31 @@ class TestDayStatsExtraction:
         assert len(days) == 2
         assert get_handler("Trajectory").feature_kind == "trajectory_days"
 
+    def test_depth_query_with_no_rows_keeps_the_days(self):
+        # A glider whose depth column is all NaN: ERDDAP answers the per-day
+        # depth query with a no-data 404, which arrives as a column-less frame.
+        dataset = build_trajectory_dataset()
+        inner = dataset.dataset_tabledap_query.side_effect
+
+        def no_depth_rows(url):
+            if "orderByMinMax" in unquote(url):
+                return pd.DataFrame()
+            return inner(url)
+
+        dataset.dataset_tabledap_query = MagicMock(side_effect=no_depth_rows)
+        days = extract_day_stats(dataset)
+        assert len(days) == 2
+        assert days["n_records"].sum() == 800
+        assert dataset.warnings.codes() == ["DEPTH_RANGE_UNAVAILABLE"]
+
     def test_no_depth_variable_fills_zero(self):
         days = extract_day_stats(build_trajectory_dataset(with_depth=False))
         assert (days["depth_min"] == 0).all()
         assert (days["depth_max"] == 0).all()
 
     def test_no_position_grouping_requested(self):
-        # Regression: the previous design asked ERDDAP to bin latitude and
-        # longitude onto a 1/12-degree grid, which is what left hex rows unlit
-        # north of ~57N. Nothing may group by position any more.
+        # Binning lat/lon onto a grid left hex rows unlit north of ~57N;
+        # nothing may group by position.
         dataset = build_trajectory_dataset()
         extract_day_stats(dataset)
         urls = [unquote(c.args[0]) for c in dataset.dataset_tabledap_query.call_args_list]
@@ -321,11 +339,8 @@ class TestFallback:
         assert days["n_records"].sum() == 6
 
     def test_chunks_by_month_not_year(self):
-        # A high-frequency trajectory's full download can itself exceed
-        # MAX_RESPONSE_SIZE within a single year-wide window (seen in
-        # practice); monthly chunking bounds that far more reliably. Jan 1 ->
-        # Mar 15 spans parts of 3 calendar months -> 3 chunk queries, not the
-        # single query the old yearly chunking would have issued.
+        # A high-frequency full download can exceed MAX_RESPONSE_SIZE within a
+        # year; monthly chunks bound it. Jan 1 -> Mar 15 spans 3 months -> 3 queries.
         dataset = MagicMock()
         dataset.logger = logging.getLogger("test")
         dataset.globals = {
@@ -615,19 +630,15 @@ class TestChooseTrackIntervalSeconds:
         assert _choose_track_interval_seconds(1) == TRACK_MIN_INTERVAL_SECONDS
 
     def test_ceilings_at_one_day_for_very_long_low_activity_deployments(self):
-        # A very long-running, near-daily reporter never gets coarser than the
-        # old fixed "1 day" behavior -- no regression there.
+        # A long-running, near-daily reporter never gets coarser than 1 day.
         assert _choose_track_interval_seconds(500_000) == TRACK_MAX_INTERVAL_SECONDS
 
     def test_zero_active_days_stays_at_day_level(self):
         assert _choose_track_interval_seconds(0) == TRACK_MAX_INTERVAL_SECONDS
 
     def test_immune_to_a_single_outlier_active_day(self):
-        """A single corrupt-timestamp fix that lands on a day far outside the
-        real deployment window only adds one active day to the count -- unlike
-        a max(time)-min(time) duration, which that same outlier would blow up
-        to years (seen in practice on a live C-PROOF glider dataset, where one
-        fix landed 25 years before an otherwise ~2-week deployment)."""
+        """A corrupt-timestamp outlier adds one active day, not the years a
+        max(time)-min(time) duration would (seen live on a C-PROOF glider)."""
         real_deployment_active_days = 14
         with_one_outlier_day = real_deployment_active_days + 1
 

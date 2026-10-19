@@ -1,9 +1,9 @@
-// What to draw for a record: which axis every panel shares, which way the panels
-// stack, and which variables get a panel by default. CDM_LAYOUTS below holds the
-// whole vocabulary, one row per cdm_data_type, after CDE_Graphs_SANDBOX.png.
+// What to draw for a record: the axis every panel shares, which way the panels
+// stack, and the default panels. CDM_LAYOUTS below holds one row per
+// cdm_data_type, after CDE_Graphs_SANDBOX.png.
 //
-// Pure: no React, no Plotly. DatasetPreview asks whether a plot is possible at
-// all before mounting the lazy chunk, and this is what answers.
+// Pure (no React, no Plotly): DatasetPreview asks whether a plot is possible
+// before mounting the lazy chunk.
 
 import {
   idVariablesFor,
@@ -36,10 +36,8 @@ const verticalCoordinate = (variables) =>
         variable.columnName.toLowerCase() === "depth"),
   );
 
-// Whichever of latitude / longitude actually moves over the record. The image
-// writes this as max([lat],[lon]): a north-south track is best read against
-// latitude, an east-west one against longitude, and picking the wrong one
-// collapses the plot onto a single value.
+// Whichever of latitude / longitude moves more over the record: the other would
+// collapse the plot onto a single value.
 function trackCoordinate(variables, data) {
   const candidates = ["longitude", "latitude"]
     .map((standardName) =>
@@ -260,9 +258,7 @@ function defaultPanelCandidatesFor(variables, sharedAxis) {
   );
 }
 
-// The panels a record opens on: the dataset's own first EOV column when it is
-// plottable, else the first candidate. One panel, matching what the preview
-// showed before faceting.
+// The dataset's first EOV column when plottable, else the first candidate.
 function defaultPanelsFor(dataset, variables, shared) {
   const candidates = defaultPanelCandidatesFor(
     variables,
@@ -341,15 +337,10 @@ function planFrom(dataset, orientation, shared, variables, panelDefaults) {
   return {
     orientation,
     sharedAxis: shared.columnName,
-    // A depth axis runs downwards; nothing else is reversed.
     sharedReversed: orientation === COLUMNS && isDownwardVertical(shared),
     sharedCandidates: sharedCandidatesFor(variables, dataset).map(
       (variable) => variable.columnName,
     ),
-    // What names the record: the cf_role columns, which the figure turns into
-    // its title. Here rather than in the figure because this is the module that
-    // answers "what is drawn", and because it keeps the figure's inputs to a
-    // plan plus a payload.
     titleColumns: idVariablesFor(variables).map(
       (variable) => variable.columnName,
     ),
@@ -357,9 +348,7 @@ function planFrom(dataset, orientation, shared, variables, panelDefaults) {
   };
 }
 
-// Resolve a plan against the user's choices. The shared axis is never also a
-// panel, and a column named in a link that this dataset does not have is
-// dropped rather than drawn empty.
+// A column named in a link that this dataset lacks is dropped, not drawn empty.
 export function resolvePanels(panels, variables, sharedAxis) {
   const available = new Set(
     (variables || []).map((variable) => variable.columnName),
@@ -374,13 +363,10 @@ export function resolvePanels(panels, variables, sharedAxis) {
   });
 }
 
-// Table or plot when the link says nothing. Deliberately decided from cdm_data_type ALONE, never from the payload: the
-// /preview fetch is async, so a default that consulted the columns would answer
-// "table" on the first render and "plot" once the rows landed, bouncing the user
-// between views mid-load. The type is what says whether a layout exists at all;
-// a plottable type with no plottable column is rare and better reported by the
-// plot than by silently reverting to the table — see plotBlockerFor, which is
-// what reports it.
+// Table or plot when the link says nothing. Decided from cdm_data_type alone,
+// never the payload: /preview is async, so a column-based default would bounce
+// from "table" to "plot" once rows landed. A plottable type with no plottable
+// column is reported by plotBlockerFor instead.
 export function defaultVisFor(dataset) {
   return layoutFor(dataset) ? "plot" : "table";
 }

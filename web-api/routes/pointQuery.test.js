@@ -3,10 +3,8 @@ const assert = require("node:assert/strict");
 
 const shapeQueryStub = require("../test/shapeQueryStub");
 
-// shapeQuery.js has its own thorough SQL-building test suite
-// (utils/shapeQuery.test.js) — this route is a thin passthrough, so its own
-// tests are about wiring: what it hands getShapeQuery and what it does with
-// the result, not shapeQuery's SQL.
+// A thin passthrough: these test wiring, not shapeQuery's SQL
+// (utils/shapeQuery.test.js).
 const shapeQuery = shapeQueryStub.install();
 
 const { createTestApp } = require("../test/testApp");
@@ -49,11 +47,8 @@ test("does not cache a failed time-filter query", async () => {
   assert.equal(shapeQuery.calls.length, 2);
 });
 
-// Unlike /download and /datasetRecordsList's shape counterparts, this route
-// runs pipeline() with its shape:false default (see the route's own comment:
-// "if no shape is given, it returns all datasets") — a half-specified bbox or
-// a malformed polygon string is passed straight through to getShapeQuery
-// rather than rejected here.
+// Unlike /download, this route runs pipeline() with shape:false, so a bad
+// shape is passed straight through rather than rejected here.
 test("passes even a malformed polygon param straight through to getShapeQuery", async () => {
   shapeQuery.queueResult([]);
   const res = await agent.get("/pointQuery").query({ polygon: "not json" });

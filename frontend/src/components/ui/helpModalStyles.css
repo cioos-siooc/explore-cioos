@@ -1,22 +1,10 @@
-/* ------------------------------------------------------------------
- * HelpModal — the app's explainer dialog (see HelpModal.jsx). A narrow
- * read-only column: no controls, so it is sized to the prose rather than
- * to the working dialogs it is opened from. The header carries the same
- * icon + title/subtitle treatment as those dialogs.
- * ------------------------------------------------------------------ */
+/* HelpModal: read-only, so sized to the prose. */
 .helpModal .helpModalDialog {
   max-width: min(560px, calc(100vw - 24px));
 }
 
-/* Clip the header's own background to the modal's rounded corners, as the
-   working dialogs do — without it the header paints square over them.
-
-   Deliberately never full-bleed, at any size: this dialog is a footnote opened
-   from something the user was reading, and one that takes the whole screen
-   reads as a page they navigated to and have to find their way back from. It
-   stays a card with the map or the panel showing around it, capped short of the
-   viewport on small monitors and short windows, and scrolls its own body when
-   the prose is longer than that. */
+/* Clip the header to the rounded corners. Never full-bleed: a footnote that
+   takes the whole screen reads as a page to navigate back from. */
 .helpModal .modal-content {
   overflow: hidden;
   max-height: min(640px, calc(100vh - 2 * var(--cioos-space-lg, 16px)));
@@ -34,16 +22,14 @@
 }
 
 .helpModal .modal-body {
-  /* Now that .modal-content clips, the body is what scrolls when the prose is
-     taller than the viewport — and a column flex item only shrinks to that
-     point once its automatic minimum is lifted. */
+  /* A column flex item only shrinks to let the body scroll once its automatic
+     minimum is lifted. */
   min-height: 0;
   padding: var(--cioos-space-md) var(--cioos-space-lg) var(--cioos-space-lg);
   overflow-y: auto;
 
-  /* The lead paragraph and the entry list are the two blocks a body can hold;
-     the column owns the space between them so neither has to carry a margin
-     that would be wrong when it stands alone. */
+  /* The gap lives on the column so neither block carries a margin that would
+     be wrong when it stands alone. */
   display: flex;
   flex-direction: column;
   gap: var(--cioos-space-lg);
@@ -57,7 +43,7 @@
   width: 28px;
 
   /* The heading's line box (font-size-lg at line-height 1.2), so the glyph
-     sits on the title line and not between title and subtitle. */
+     sits on the title line. */
   height: calc(var(--cioos-font-size-lg) * 1.2);
   color: var(--cioos-primary);
 }
@@ -85,10 +71,8 @@
   color: var(--cioos-ink-60);
 }
 
-/* The lead paragraph: what this surface is, before its parts are named (see
-   HelpModal.jsx). A step up in size and leading from the entries below it, so
-   the eye starts here and the list reads as detail under it — and held to a
-   comfortable measure, since the dialog is wider than prose wants to be. */
+/* A step up from the entries so the eye starts here, held to a comfortable
+   measure since the dialog is wider than prose wants. */
 .helpModalText {
   margin: 0;
   max-width: 54ch;
@@ -97,9 +81,7 @@
   color: var(--cioos-ink-80);
 }
 
-/* Set off from the entries under it by a rule rather than by space alone: with
-   both blocks present the lead is a standfirst, and at this width the gap on
-   its own was not enough to say so. Only when a list follows. */
+/* A rule, not just space: at this width the gap alone didn't mark a standfirst. */
 .helpModalText:not(:last-child) {
   padding-bottom: var(--cioos-space-md);
   border-bottom: 1px solid var(--cioos-hairline);
@@ -113,7 +95,6 @@
   margin: 0;
 }
 
-/* Glyph in its own column so both lines of text share one left edge. */
 .helpModalItem {
   display: grid;
   grid-template-columns: 20px 1fr;
@@ -148,9 +129,7 @@
   color: var(--cioos-ink-80);
 }
 
-/* A page an entry sends the reader out to — the same leading ↗ glyph every
-   external link in the app carries, set inline so it runs on from the sentence
-   it belongs to rather than reading as a button. */
+/* Inline so it runs on from its sentence rather than reading as a button. */
 .helpModalLink {
   display: inline-flex;
   align-items: center;
@@ -171,9 +150,8 @@
   border-radius: var(--cioos-radius-sm);
 }
 
-/* Phones: theme.css steps the type up because phone surfaces go full-screen,
-   but this one stays a card over the map, so it drops below even the desktop
-   sizes to fit the small screen. */
+/* Stays a card over the map on phones, so it drops below even the desktop
+   sizes rather than taking theme.css's phone step-up. */
 @media (max-width: 700px), (max-height: 500px) {
   .helpModal {
     --cioos-font-size-sm: 11px;

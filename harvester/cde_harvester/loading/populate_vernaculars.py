@@ -1,27 +1,10 @@
 """
 Populate cde.scientific_name_vernaculars from WoRMS.
 
-For every distinct scientific name in cde.obis_scientific_names that is not yet
-cached, look up the AphiaID via the WoRMS REST API and then fetch the taxon's
-rank, full ancestor chain (for rank-aware filter rolldown), and vernacular
-(common) names. English (eng) and French (fra) vernaculars are stored in
-separate text[] columns so the API can serve the right one based on locale.
-
-Name lookup is batched via AphiaRecordsByMatchNames (up to 50 names per call;
-returns rank + valid_AphiaID inline). Vernacular and classification calls are
-issued concurrently per chunk via a thread pool, since WoRMS has no batch
-endpoint for either and serial round-trip latency is the real bottleneck
-(each call ≈ 300 ms server-side). Classification fetches are deduped across
-the run via an in-memory cache keyed on accepted AphiaID, so synonyms only
-trigger one classification call between them.
-
-Names are processed in descending order of OBIS record count, so an interrupted
-run still leaves the most-impactful subset cached. Pass --top N to populate only
-the top-N most-common species (useful for a quick triage backfill before the
-long tail).
-
-The script is idempotent and resumable: only names missing from the cache table
-(or, with --refresh-status, names whose previous fetch failed) are processed.
+For every uncached scientific name in cde.obis_scientific_names, look up the
+AphiaID, rank, ancestor chain and English/French vernaculars via the WoRMS REST
+API. Names are processed most-recorded first, so an interrupted run still caches
+the most-impactful subset. Idempotent and resumable.
 
 Usage:
     python -m cde_harvester.loading.populate_vernaculars [--top N] [--limit N]
@@ -51,16 +34,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("populate_vernaculars")
 
-# Silence urllib3's generic "Retrying (Retry(total=3, …)) after connection
-# broken by '…': /rest/…" warning — our LoggingRetry below emits a richer line
-# with the full URL and remaining attempts, so leaving the default in would
-# just duplicate every retry.
+# LoggingRetry logs a richer line for every retry urllib3 would warn about.
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 
 
 class LoggingRetry(Retry):
-    """urllib3.Retry that logs each retry with full URL and reason."""
-
     def increment(
         self,
         method=None,
@@ -99,30 +77,21 @@ class LoggingRetry(Retry):
 
 WORMS_BASE = "https://www.marinespecies.org/rest"
 
-# WoRMS publishes no hard rate limit, only "considerate use" guidance. With
-# --workers > 1 the per-call sleep is dropped — total throughput is bounded by
-# response latency × worker count instead. The --rate flag still applies in
-# single-worker mode and to the batch lookup call.
+# WoRMS publishes no hard rate limit, only "considerate use" guidance.
 DEFAULT_RATE_PER_SEC = 20
 DEFAULT_BATCH_SIZE = 50  # AphiaRecordsByMatchNames accepts up to 50 names per call.
 DEFAULT_WORKERS = 8
 
-# Status sentinels stored in fetch_status.
 STATUS_OK = "ok"
 STATUS_NOT_FOUND = "not_found"
 STATUS_ERROR = "error"
 
-# Sentinel accepted by --refresh-status to retarget rows that pre-date the
-# rank/classification columns (or whose classification fetch errored out).
-# Translated by names_to_process into a column-level condition rather than a
-# fetch_status check, since the rows in question typically have status='ok'.
+# --refresh-status sentinel; matched on columns, not fetch_status, since
+# those rows have status='ok'.
 SENTINEL_MISSING_CLASSIFICATION = "missing_classification"
 
 
 def build_engine(workers: int = DEFAULT_WORKERS):
-    # Pool sized to the worker count so threads don't contend on connections.
-    # We only ever take a connection inside the per-chunk transaction, so
-    # `workers + 2` is plenty (one for the main thread + headroom).
     engine = create_db_engine(pool_size=workers + 2, max_overflow=4)
     engine.connect().close()
     logger.info("Connected to %s", db_host())
@@ -133,23 +102,17 @@ def build_session(workers: int = DEFAULT_WORKERS):
     s = requests.Session()
     s.headers["User-Agent"] = "cioos-cde/populate_vernaculars (+https://cioos.ca)"
     s.headers["Accept"] = "application/json"
-    # Auto-retry transient server-side issues: stale keep-alive disconnects
-    # (RemoteDisconnected), 429 rate-limit pushes, and 5xx server errors.
-    # Connection errors are retried by default; status_forcelist covers HTTP
-    # responses that succeeded in reaching us but the server signalled retry.
     retry = LoggingRetry(
         total=4,
         connect=4,
         read=4,
-        backoff_factor=0.5,  # 0.5s, 1s, 2s, 4s between attempts
+        backoff_factor=0.5,
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=frozenset(["GET"]),
         raise_on_status=False,
         respect_retry_after_header=True,
     )
-    # Connection pool sized to the worker count to avoid the urllib3
-    # "Connection pool is full, discarding connection" churn that thrashes
-    # WoRMS with TLS reconnects when --workers exceeds the default.
+    # A pool smaller than the worker count thrashes WoRMS with TLS reconnects.
     adapter = requests.adapters.HTTPAdapter(
         pool_connections=workers + 2,
         pool_maxsize=workers + 2,
@@ -161,17 +124,10 @@ def build_session(workers: int = DEFAULT_WORKERS):
 
 
 def match_aphia_ids(session: requests.Session, names: list[str]):
-    """Batch-resolve scientific names to (AphiaID, rank) pairs.
-
-    Returns a list parallel to ``names``: each entry is ``(aphia_id, rank)`` where
-    ``aphia_id`` prefers ``valid_AphiaID`` (the accepted-name id for synonyms) and
-    ``rank`` is the WoRMS rank string (e.g. ``"Genus"``). Both fields are ``None``
-    when WoRMS had no match. Raises requests.RequestException on transport / HTTP
-    errors so the caller can fall back to per-name handling.
-    """
+    """List parallel to ``names`` of ``(aphia_id, rank)``, ``(None, None)`` when
+    unmatched."""
     if not names:
         return []
-    # PHP-style array params: scientificnames[]=Name1&scientificnames[]=Name2...
     params = [("scientificnames[]", n) for n in names] + [("marine_only", "false")]
     url = f"{WORMS_BASE}/AphiaRecordsByMatchNames?{urlencode(params)}"
     r = session.get(url, timeout=60)
@@ -185,8 +141,7 @@ def match_aphia_ids(session: requests.Session, names: list[str]):
             out.append((None, None))
             continue
         first = matches[0]
-        # Prefer valid_AphiaID (the accepted-name id) since vernaculars hang off
-        # accepted names; fall back to AphiaID if valid is missing.
+        # Vernaculars hang off accepted names.
         aid = first.get("valid_AphiaID") or first.get("AphiaID")
         rank = first.get("rank")
         if not (isinstance(aid, int) and aid > 0):
@@ -199,7 +154,6 @@ def match_aphia_ids(session: requests.Session, names: list[str]):
 
 
 def fetch_vernaculars(session: requests.Session, aphia_id: int):
-    """Return (vernaculars_en, vernaculars_fr) preserving WoRMS order."""
     url = f"{WORMS_BASE}/AphiaVernacularsByAphiaID/{aphia_id}"
     r = session.get(url, timeout=15)
     if r.status_code == 204 or not r.text.strip():
@@ -222,14 +176,8 @@ def fetch_vernaculars(session: requests.Session, aphia_id: int):
 
 
 def fetch_classification(session: requests.Session, aphia_id: int):
-    """Return the strict-ancestor AphiaID list for a taxon, root-first.
-
-    WoRMS returns a nested chain (Superdomain → ... → queried taxon) where each
-    node has ``AphiaID``, ``rank``, ``scientificname``, and a single ``child``.
-    The leaf has ``child: null`` and is the queried taxon — its AphiaID is the
-    one we passed in, so we exclude it. Everything above is an ancestor used by
-    the rolldown filter.
-    """
+    """Strict-ancestor AphiaIDs, root-first; the leaf (``child: null``) is the
+    queried taxon itself."""
     url = f"{WORMS_BASE}/AphiaClassificationByAphiaID/{aphia_id}"
     r = session.get(url, timeout=15)
     if r.status_code == 204 or not r.text.strip():
@@ -243,7 +191,6 @@ def fetch_classification(session: requests.Session, aphia_id: int):
     while isinstance(node, dict):
         child = node.get("child")
         aid = node.get("AphiaID")
-        # Strict ancestor: only count nodes that have a child below them.
         if child is not None and isinstance(aid, int) and aid > 0:
             ancestors.append(aid)
         node = child
@@ -251,8 +198,7 @@ def fetch_classification(session: requests.Session, aphia_id: int):
 
 
 class ClassificationCache:
-    """Run-wide cache so multiple synonyms with the same accepted AphiaID
-    only trigger one /AphiaClassificationByAphiaID call between them."""
+    """Synonyms share an accepted AphiaID, so fetch its classification once."""
 
     def __init__(self):
         self._cache: dict[int, list[int]] = {}
@@ -296,19 +242,8 @@ UPSERT_SQL = text(
 
 
 def refresh_popularity(engine):
-    """Refresh cde.obis_scientific_name_popularity, this script's ordering input.
-
-    The view exists only to order ``--top N`` by OBIS record count, and this is
-    its only reader — so it is refreshed here, once per run, instead of on the
-    load path. ``obis_refresh_matviews()`` used to rebuild it after every
-    harvest (an unnest + GROUP BY over the whole obis_cells table) to serve a
-    script that may not run for weeks.
-
-    CONCURRENTLY so a run started while the site is up doesn't take an ACCESS
-    EXCLUSIVE lock on the view; it needs the unique index the view already
-    carries. A failure is logged and tolerated — a stale ordering is a worse
-    ``--top N`` choice, not a wrong result, and the run can still do its work.
-    """
+    """This script is the view's only reader, so it is refreshed here rather
+    than on the load path. A failure only makes the ordering stale."""
     try:
         with engine.begin() as conn:
             conn.execute(
@@ -327,22 +262,12 @@ def refresh_popularity(engine):
 
 
 def names_to_process(conn, refresh_statuses, top_n=None):
-    """Return scientific_names to process, ordered by OBIS record popularity.
-
-    Names with the most observations come first so an interrupted run still
-    leaves the most-impactful subset cached. ``top_n`` caps the result list.
-    """
-    # Two refresh axes can apply at once: explicit fetch_status values (e.g.
-    # 'error', 'not_found') and the missing_classification sentinel that targets
-    # rows populated before the rank/classification columns existed.
     refresh_clauses = []
     params = {}
     statuses = set(refresh_statuses)
     if SENTINEL_MISSING_CLASSIFICATION in statuses:
         statuses.discard(SENTINEL_MISSING_CLASSIFICATION)
-        # status='ok' rows that have an aphia_id but no ancestors: pre-existing
-        # rows from the vernacular-only era, or rows whose classification fetch
-        # errored (we keep those at status='ok' since vernaculars succeeded).
+        # A failed classification fetch keeps status='ok' (vernaculars landed).
         refresh_clauses.append(
             "(v.fetch_status = '" + STATUS_OK + "' "
             "AND v.aphia_id IS NOT NULL "
@@ -360,12 +285,7 @@ def names_to_process(conn, refresh_statuses, top_n=None):
         limit_clause = "LIMIT :top_n"
         params["top_n"] = top_n
 
-    # Popularity is precomputed in cde.obis_scientific_name_popularity, which
-    # this script refreshes above — it is the view's only reader, so the load
-    # path no longer pays for it (see refresh_popularity).
-    # Recomputing it inline here was a multi-minute unnest+GROUP BY over the
-    # whole obis_cells table — fine for a 6-hour backfill, but disastrous for
-    # short --top N runs that pay the bootstrap cost without amortising it.
+    # Precomputed: inline it is a multi-minute unnest+GROUP BY over obis_cells.
     sql = text(
         f"""
         SELECT n.scientific_name
@@ -384,14 +304,8 @@ def names_to_process(conn, refresh_statuses, top_n=None):
 
 
 def _fetch_taxon_data(session, name, aid, rank, classification_cache):
-    """Worker: fetch vernaculars + (cached) classification for one (name, AphiaID).
-
-    Classification fetches are deduped across the run via ``classification_cache``;
-    a name whose accepted AphiaID was already seen reuses the cached ancestor list.
-    Classification failures are non-fatal — vernaculars still land and the row is
-    marked ok with an empty ancestor list, which a later
-    ``--refresh-status missing_classification`` pass can fill in.
-    """
+    """A classification failure still marks the row ok with no ancestors, for a
+    later ``--refresh-status missing_classification`` pass."""
     try:
         en, fr = fetch_vernaculars(session, aid)
     except requests.RequestException as exc:
@@ -418,10 +332,6 @@ def _fetch_taxon_data(session, name, aid, rank, classification_cache):
 def process_chunk(
     session, engine, executor, names, sleep_seconds, counts, classification_cache
 ):
-    """Resolve a chunk of names and persist results.
-
-    All upserts for the chunk are committed in a single transaction.
-    """
     try:
         matches = match_aphia_ids(session, names)
     except requests.RequestException as exc:
@@ -447,7 +357,6 @@ def process_chunk(
         return
     time.sleep(sleep_seconds)
 
-    # Split into immediate misses (no AphiaID) and pending taxon-data fetches.
     results: list[TaxonResult] = []
     pending = []
     for name, (aid, rank) in zip(names, matches, strict=True):
@@ -466,7 +375,6 @@ def process_chunk(
         for fut in concurrent.futures.as_completed(futures):
             results.append(fut.result())
     else:
-        # Serial path: keep the per-call throttle.
         for name, aid, rank in pending:
             results.append(
                 _fetch_taxon_data(session, name, aid, rank, classification_cache)
@@ -605,13 +513,7 @@ def main():
         counts[STATUS_ERROR],
     )
 
-    # Propagate the freshly-populated vernaculars into obis_cells.aphia_ids so
-    # the rank-aware Scientific Name filter works immediately, without waiting
-    # for the next harvest/load. Without this, a first-time vernaculars run
-    # fills scientific_name_vernaculars but leaves every obis_cell's aphia_ids
-    # empty until a subsequent load runs the backfill. Idempotent and cheap:
-    # obis_backfill_aphia_ids() only touches cells whose aphia_ids are still
-    # empty (see 5_profile_process.sql).
+    # So the Scientific Name filter works without waiting for the next load.
     logger.info("Backfilling obis_cells.aphia_ids from vernaculars")
     with engine.begin() as conn:
         backfilled = conn.execute(text("SELECT obis_backfill_aphia_ids()")).scalar()

@@ -4,9 +4,7 @@ import { join } from "node:path";
 import { fixtureKey } from "./fixtureKey.js";
 import { FIXTURES_DIR } from "./fixturesDir.js";
 
-// Reading fixtures off disk, with the fallback rule that keeps the fixture count
-// sane. Used by the Playwright router and by the jsdom fetch stub, so a fixture
-// recorded once answers in both suites.
+// Used by both the Playwright router and the jsdom fetch stub.
 
 function read(relativePath) {
   try {
@@ -17,17 +15,9 @@ function read(relativePath) {
   }
 }
 
-/**
- * Resolve a request to fixture bytes.
- *
- * Query-specific first, then the bare endpoint. Most endpoints (/platforms,
- * /organizations, /oceanVariables, …) answer the same thing whatever the query,
- * so only the handful whose response must differ under a filter — /pointQuery
- * and /legend, which is what makes the counts change — need a keyed variant.
- *
- * @returns { body, contentType } or undefined, which callers must treat as a
- *          loud failure naming `missingPath` rather than an empty response.
- */
+// Query-specific first, then the bare endpoint: most endpoints answer the same
+// whatever the query, so only /pointQuery and /legend need keyed variants.
+// `missingPath` must be treated as a loud failure, not an empty response.
 export function resolveFixture(url) {
   const key = fixtureKey(url);
 
@@ -40,9 +30,7 @@ export function resolveFixture(url) {
             ? "image/png"
             : "application/x-protobuf",
         }
-      : // A tile with no recorded fixture is not an error: 204 is how MapLibre is
-        // told "nothing here", and recording every tile of every view would be a
-        // fixture set nobody could review.
+      : // An unrecorded tile is "nothing here" (204), not an error.
         { empty: true };
   }
 

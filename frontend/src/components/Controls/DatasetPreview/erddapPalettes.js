@@ -1,27 +1,11 @@
-// ERDDAP colour palettes, mapped to Plotly colorscales.
-//
-// A publisher declares its intended ramp per variable as `colorBarPalette`,
-// naming one of 42 server-side .cpt files. Those files are not downloadable
-// (/erddap/download/*.cpt and /erddap/images/*.cpt both 404), so the name-to-
-// colour mapping has to live here.
-//
-// Only ten are mapped, because ten cover ~95% of declared usage across the OGSL
-// catalogue: YellowRed 107 variables, KT_algae 58, KT_deep 20, KT_haline 17,
-// TopographyDepth 16, KT_thermal 12, KT_solar 6, KT_dense 6, KT_turbid 5,
-// Rainbow a small tail. The KT_* names are cmocean (Thyng et al.). Anything
-// unmapped falls through to the index palette in previewColors.js — 82% declare
-// no palette at all, so that fallback IS the common case.
-//
-// WHOLE RAMPS, READ TWO WAYS
-// previewColorScales.js draws a ramp as a ramp, for the colour dimension: one
-// column shading every panel, through one colourbar. previewColors.js reads the
-// same table for a single solid colour per variable, via paletteColorFor()
-// below, which projects a ramp down to one of its stops. Both are the
-// publisher's declared intent, at two resolutions — and the projection is only
-// defensible next to what it projects, which is why they share one table.
+// ERDDAP `colorBarPalette` names mapped to colours. The server's .cpt files 404
+// (/erddap/download/*.cpt, /erddap/images/*.cpt), so the mapping lives here.
+// These ten cover ~95% of declared usage in the OGSL catalogue; the rest fall
+// through to the index palette in previewColors.js. KT_* are cmocean.
+// Whole ramps, read two ways: previewColorScales.js draws them for the colour
+// dimension, and paletteColorFor() projects one to a single stop per variable.
 
-// Approximations of the cmocean ramps in Plotly's [position, css-colour] form.
-// Five stops each: enough to be recognisable, small enough to read.
+// Five-stop approximations in Plotly's [position, css-colour] form.
 const PALETTES = {
   KT_thermal: [
     [0, "#042333"],
@@ -95,7 +79,6 @@ const PALETTES = {
   ],
 };
 
-// A palette name Plotly can use, or undefined.
 export function paletteFor(name) {
   return name ? PALETTES[name] : undefined;
 }
@@ -110,20 +93,16 @@ function luminance(hex) {
   return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
 }
 
-// Panels are drawn on white, so this is the contrast that decides whether a
-// stop can be a marker.
 export function contrastOnWhite(hex) {
   return 1.05 / (luminance(hex) + 0.05);
 }
 
-// 4:1 is below the 4.5 WCAG asks of body text and above the 3 it asks of large
-// text — a 4px marker is neither, and 4 is what keeps every one of the ten
-// palettes able to answer with a stop it actually declares.
+// Between WCAG's 3 (large text) and 4.5 (body text); 4 is what lets every
+// mapped palette answer with a stop it actually declares.
 export const MIN_TRACE_CONTRAST = 4;
 
-// Stop indices from the middle of a ramp outwards, ends last, the higher index
-// first on a tie. The middle of a cmocean ramp is its most saturated part; the
-// ends are the near-white and near-black the ramp fades to.
+// Middle outwards: a cmocean ramp's middle is its most saturated part, its ends
+// near-white and near-black.
 function sampleOrder(length) {
   const middle = Math.floor((length - 1) / 2);
   return Array.from({ length }, (_, index) => index).sort(
@@ -131,21 +110,8 @@ function sampleOrder(length) {
   );
 }
 
-/**
- * One solid colour standing in for a whole ramp: walking out from the middle
- * stop, the first one that clears MIN_TRACE_CONTRAST against white.
- *
- * Sampled rather than tabulated so that editing a ramp above cannot leave a
- * hand-picked colour behind pointing at the old one. What it currently yields —
- * thermal magenta, haline blue, algae green, YellowRed red — is asserted in
- * previewColors.test.mjs, and so is the contrast floor.
- *
- * Two ramps can answer with near-identical colours (KT_haline #1a5a92 and
- * TopographyDepth #1a5b9e are both blue ramps), and two variables declaring the
- * same palette get the same colour. Each variable has its own panel, so a repeat
- * is not ambiguous the way it would be in an overlay — and every colour is
- * user-changeable.
- */
+// Sampled rather than tabulated so editing a ramp cannot leave a stale
+// hand-picked colour behind; current outputs are asserted in previewColors.test.mjs.
 export function paletteColorFor(name) {
   const ramp = paletteFor(name);
   if (!ramp || !ramp.length) return undefined;

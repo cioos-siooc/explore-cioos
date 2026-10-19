@@ -14,24 +14,12 @@ import TimeRail, {
 import { clampIso, todayIso } from "../../TimeRail/timeAxis.js";
 import "../styles.css";
 
-// The Time filter inside the Filters panel.
-//
-// It is the same control as the bar along the bottom of the map — the same
-// warped axis, the same teal handles, the same typeable dates, the same
-// ready-made windows — because it sets the same two values. What differs is the
-// shape they take. Over the map they are a pill that reads as a label until
-// pointed at, because they are sitting on the map; in here there is room to
-// spell them out, so they are a plain three-row form: a label, a field, one row
-// per thing being set, like every other field in the panel.
 export default function TimeSelector(props) {
   const { t } = useTranslation();
   const { timeExtent, timeFilterActive } = useFilters();
   const { startDate, endDate, setStartDate, setEndDate } = props;
 
   const maxIso = todayIso();
-  // Same axis the bar over the map draws, for the same reason: it spans the
-  // data the current selection covers, and only widens past that when the
-  // filter itself has been set outside it.
   const { axis } = useTimeAxis({
     timeExtent,
     timeFilterActive,
@@ -39,17 +27,14 @@ export default function TimeSelector(props) {
     endDate,
   });
 
-  // Typing in a field moves that end alone, bounded by the other.
   function setFieldValue(handle, iso) {
     if (handle === "start")
       setStartDate(clampIso(iso, defaultStartDate, endDate));
     else setEndDate(clampIso(iso, startDate, maxIso));
   }
 
-  // A chosen window moves whole: on the rail, dragging either end takes the
-  // other with it and the window keeps its length. Typing a date is still free
-  // to change that length, and doing so is what releases the hold — the same
-  // rule as the bar over the map.
+  // Same rule as TimeBar: a quick-pick window drags whole until typing
+  // changes its length.
   const windowLocked = !["", "all"].includes(
     matchQuickPick(startDate, endDate, defaultStartDate),
   );
@@ -71,9 +56,6 @@ export default function TimeSelector(props) {
 
   return (
     <div className="filterRangeSelector timeSelector">
-      {/* Each field is wrapped in its own <label>, so the text beside it is the
-          field's name to a screen reader and a click target to everyone else —
-          no aria-label standing in for a label that is right there. */}
       <div className="filterRangeForm">
         <label className="filterRangeRow">
           <span className="filterRangeLabel">{t("timeBarPresetLabel")}</span>

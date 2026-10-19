@@ -12,14 +12,9 @@ import { usePersistentState } from "../usePersistentState.js";
 import { useUI } from "../ui/UIProvider.jsx";
 import useTourStages from "./useTourStages.js";
 
-// Every tip, in the order the About dialog pages through them. The copy is
-// `tip_<key>` in the locale files. Most are also offered on the map the first
-// time the user does the thing they are about (see offerTip's callers); the
-// rest are only reachable from the dialog.
-//
-// Ordered the way a search goes — find, narrow, look, take away — and limited
-// to what changes what the user finds or gets. How a control works belongs on
-// the control (its hint or tooltip), not here.
+// Order the About dialog pages through them; copy is `tip_<key>` in the locale
+// files. Limited to what changes what the user finds or gets: how a control
+// works belongs on the control.
 export const TIPS = [
   "whatsHere",
   "inView",
@@ -36,9 +31,7 @@ export const TIPS = [
   "shareLink",
 ];
 
-// The tips whose control lives in a dialog, by the dialog that holds it. While
-// that dialog is open the tip is shown inside it (see TipCard's `inModal`), and
-// the tour opens it for them (see useTourStages).
+// While that dialog is open the tip is shown inside it, and the tour opens it.
 export const TIP_MODALS = {
   speciesName: "filters",
   exclude: "filters",
@@ -47,8 +40,7 @@ export const TIP_MODALS = {
   directLinks: "download",
 };
 
-// Outside the provider (leaf-component tests render without it) offering a
-// tip is a no-op rather than a crash.
+// Leaf-component tests render without the provider, so the default no-ops.
 const TipsContext = createContext({
   offerTip: () => {},
   tipHighlight: () => undefined,
@@ -71,12 +63,10 @@ export default function TipsProvider({ children }) {
   const [tipsEnabled, setTipsEnabled] = usePersistentState("tipsEnabled", true);
   const [seenTips, setSeenTips] = usePersistentState("seenTips", []);
   const [activeTip, setActiveTip] = useState();
-  // Paging through every tip on request (from the About dialog) rather than
-  // being offered one: none of the rules below apply while it runs.
+  // None of the offer rules below apply while touring.
   const [touring, setTouring] = useState(false);
 
-  // The intro opens by itself only on a first visit, and already covers the
-  // basics — a tip on top of that would be one thing too many on day one.
+  // The intro already covers the basics on a first visit.
   const [firstVisit] = useState(showIntroModal);
   const shownThisLoad = useRef(false);
 
@@ -86,21 +76,16 @@ export default function TipsProvider({ children }) {
     showDownloadModal ||
     showCoverageModal ||
     showSelectionHelpModal;
-  // offerTip is called from map event handlers registered once, so it has to
-  // be stable and read the latest state through a ref. Seeded, not left empty:
-  // children's mount effects run before this component's own.
+  // offerTip is called from map handlers registered once, so it reads state
+  // through a ref. Seeded because children's mount effects run first.
   const gate = useRef({ tipsEnabled, seenTips, modalOpen, touring });
   useEffect(() => {
     gate.current = { tipsEnabled, seenTips, modalOpen, touring };
   }, [tipsEnabled, seenTips, modalOpen, touring]);
 
-  // Takes one key or several in priority order, and offers the first not yet
-  // seen — so a page with a specific tip of its own falls back to the general
-  // one once that has been read.
-  //
-  // One tip per visit at most, each tip once ever, and never behind a modal:
-  // an offer made while one is up (a filter set from the Filters dialog, say)
-  // waits for it to close. The latest such offer wins.
+  // Offers the first unseen of the given keys. One tip per visit, each once
+  // ever, never behind a modal: an offer made while one is up waits for it to
+  // close, and the latest wins.
   const pendingTip = useRef();
   const offerTip = useCallback(
     (keys) => {
@@ -128,24 +113,21 @@ export default function TipsProvider({ children }) {
     offerTip(key);
   }, [modalOpen, offerTip]);
 
-  // For the `data-tip-highlight` attribute of the control a tip talks about,
-  // so the tip card's text has something on screen to point at. Undefined,
-  // not false, so React drops the attribute rather than writing "false".
+  // Undefined, not false, so React drops the attribute.
   const tipHighlight = useCallback(
     (key) => (key && key === activeTip) || undefined,
     [activeTip],
   );
 
-  // Read at call time: the stages close over the selection and the catalogue,
-  // which change far more often than a step is taken.
+  // The stages close over the selection and catalogue, which change far more
+  // often than a step is taken.
   const { stages, skipped } = useTourStages();
   const stagesRef = useRef(stages);
   useEffect(() => {
     stagesRef.current = stages;
   });
 
-  // The dialog a step opened, closed again once the tour moves off it, so the
-  // next step's control isn't left behind it. One the user opened stays open.
+  // So the next step's control isn't left behind it; one the user opened stays.
   const tourModal = useRef();
   const closeTourModal = useCallback(() => {
     if (tourModal.current === "filters") setShowFiltersModal(false);
@@ -173,8 +155,8 @@ export default function TipsProvider({ children }) {
     },
     [showTourStep],
   );
-  // The tips the tour pages through. The one up stays in the count even if
-  // its control has since gone, so stepping on from it still works.
+  // The one up stays in the count even if its control has gone, so stepping
+  // on still works.
   const tourTips = TIPS.filter((key) => key === activeTip || !skipped.has(key));
 
   // Stepping on from an offered tip turns it into a tour.

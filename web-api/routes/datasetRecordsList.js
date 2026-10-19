@@ -29,16 +29,6 @@ const router = express.Router();
  *         description: Dataset record list summary.
  */
 
-/**
- * /datasetRecordsList
- *
- * This endpoint takes any of the filters and requires a dataset PK
- * It needs all the filters so that it can estimate download size
- *
- * It is called when a user clicks to see details on a dataset
- *
- * Shape is not required
- */
 router.get(
   "/",
   ...pipeline({ checks: [check("datasetPKs").isInt()] }),

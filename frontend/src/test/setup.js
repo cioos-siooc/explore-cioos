@@ -6,15 +6,10 @@ import { installMatchMedia, resetViewport } from "./viewport.js";
 
 expect.extend(matchers);
 
-// --- shims for the browser APIs this app uses and jsdom does not implement ---
+// Shims for browser APIs jsdom does not implement.
 
-// useMediaQuery.js (and through it UIProvider, Sidebar, Legend, the rails) calls
-// window.matchMedia on first render. See ./viewport.js for the width it answers
-// against and how a test changes it.
 installMatchMedia();
 
-// The rails measure themselves, and usePublishedFootprint reports panel sizes
-// into CSS custom properties. Both observe; neither reads a real box in jsdom.
 class NoopObserver {
   observe() {}
   unobserve() {}
@@ -26,10 +21,8 @@ class NoopObserver {
 globalThis.ResizeObserver ??= NoopObserver;
 globalThis.IntersectionObserver ??= NoopObserver;
 
-// Node 26 defines its own experimental `localStorage` global, which shadows the
-// one jsdom would otherwise install and is `undefined` unless node is started
-// with --localstorage-file. usePersistentState reads window.localStorage
-// directly, so without this every stored preference read throws.
+// Node 26's experimental `localStorage` global shadows jsdom's and is
+// `undefined` unless node is started with --localstorage-file.
 if (!window.localStorage) {
   const store = new Map();
   const storage = {
@@ -52,24 +45,17 @@ if (!window.localStorage) {
   });
 }
 
-// Download flows hand a blob to the browser to save.
 globalThis.URL.createObjectURL ??= () => "blob:test";
 globalThis.URL.revokeObjectURL ??= () => {};
 
-// Anything that probes for a drawing context gets a clear "no" rather than a
-// jsdom "not implemented" console error.
+// A clear "no" rather than jsdom's "not implemented" console error.
 HTMLCanvasElement.prototype.getContext = () => null;
 
-// jsdom has no layout, so these are no-ops rather than errors.
 Element.prototype.scrollTo ??= () => {};
 Element.prototype.scrollIntoView ??= () => {};
 
-// Vitest reuses one jsdom global for every test in a file, and this app writes
-// to three pieces of shared browser state that would otherwise leak between
-// them: the address (every provider seeds from window.location, and useUrlSync
-// rewrites it), localStorage (usePersistentState's cde.* preferences, among
-// them whether the intro modal is on screen at all) and document.cookie (the
-// legacy cookies clearLegacyCookies expires).
+// Vitest reuses one jsdom global per file; the address, localStorage and
+// cookies would otherwise leak between tests.
 afterEach(() => {
   cleanup();
   resetViewport();

@@ -116,7 +116,7 @@ test("without an index a trajectory falls back to whichever of lon/lat moves", (
 
 test("a trajectory with no rows yet still produces a plan", () => {
   // The payload is async; a plan that needed data would leave the first render
-  // with nothing to draw and no axis names.
+  // with nothing to draw.
   const plan = planFor("Trajectory");
   assert.ok(plan);
   assert.ok(["longitude", "latitude"].includes(plan.sharedAxis));
@@ -305,8 +305,6 @@ test("every variable the dataset has can be a panel at once", () => {
 });
 
 test("vis default comes from the type alone, never the payload", () => {
-  // Stability matters: /preview is async, so a default that read the columns
-  // would answer "table" first and "plot" a moment later.
   for (const type of [
     "Profile",
     "TimeSeries",
@@ -327,13 +325,11 @@ test("the plan names the cf_role columns, which is what titles the figure", () =
     "station_id",
     "profile",
   ]);
-  // Independent of the layout: a stack is titled the same way.
   assert.deepEqual(planFor("TimeSeries").titleColumns, [
     "station_id",
     "profile",
   ]);
-  // And independent of the harvest: without columnMeta the roles come from the
-  // dataset's own timeseries/profile/trajectory id fields.
+  // Without columnMeta the roles come from the dataset's own *_id_variable fields.
   assert.deepEqual(planFor("TimeSeriesProfile", VIKING_NO_META).titleColumns, [
     "station_id",
     "profile",

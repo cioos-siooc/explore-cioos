@@ -8,98 +8,49 @@ const { pipeline } = require("../utils/routePipeline");
 const router = express.Router();
 
 /*
- * /nonna/:layer/:z/:x/:y.png
- *
- * Server-side proxy for CHS NONNA bathymetry tiles.
- *
- * Why this exists at all: NONNA's GeoServer sits behind a gateway that
- * allowlists request origins EXACTLY. A request carrying
- * `Origin: https://data.chs-shc.ca` gets 200 plus a matching
- * access-control-allow-origin; every other origin — explore.cioos.ca, any
- * localhost, even foo.data.chs-shc.ca — gets a bare 403, and so does the CORS
- * preflight. Because the gateway sets access-control-allow-credentials: true it
- * cannot answer with a wildcard, so origins have to be enumerated one by one.
- *
- * That is fatal for the browser but invisible from here: a server-side request
- * sends no Origin header, and no-Origin requests return 200. Node fetches the
- * tile, Express serves it same-origin with the API's own CORS headers, and
- * MapLibre is happy.
- *
- * It is specifically MapLibre that needs this. It sets
- * `image.crossOrigin = 'anonymous'` on every cross-origin tile, so an Origin
- * header always goes out, and WebGL refuses to upload a non-origin-clean image
- * to a texture — there is no opt-out. A Leaflet/OpenLayers `<img>` tile layer
- * sends no Origin and can still load NONNA directly today, which is why this
- * used to work before the map moved to MapLibre.
- *
- * If CHS ever allowlists the explore.cioos.ca origin, this route can be deleted
- * and the frontend pointed straight at the upstream URL.
+ * NONNA's gateway allowlists request origins exactly and 403s every other
+ * Origin, including the CORS preflight. MapLibre always sends an Origin
+ * (crossOrigin = 'anonymous', required for WebGL textures), while a
+ * server-side request sends none and succeeds. If CHS ever allowlists
+ * explore.cioos.ca, this route can be deleted.
  */
 
 const NONNA_WMTS =
   "https://nonna-geoserver.data.chs-shc.ca/geoserver/gwc/service/wmts";
 
-// The two published grids. NONNA 10 is the 10 m product — sharp enough at z16
-// to show individual wharves — but it only covers surveyed areas; NONNA 100 is
-// the 100 m product with broader coverage. Requests for anything else are
-// rejected here rather than forwarded, so this cannot be used to bounce
-// arbitrary requests off the API.
+// Allowlisted so this cannot be used to bounce arbitrary requests off the API.
 const LAYERS = {
   10: "nonna:NONNA 10",
   100: "nonna:NONNA 100",
 };
 
-// GeoWebCache's Web Mercator gridset. Its tile indices are the ordinary XYZ
-// ones (top-left origin), so {z}/{x}/{y} maps straight onto
-// tilematrix/tilecol/tilerow — verified against Halifax harbour.
+// Its tile indices are ordinary XYZ (top-left origin), so {z}/{x}/{y} maps
+// straight onto tilematrix/tilecol/tilerow.
 const TILE_MATRIX_SET = "EPSG:900913";
 
 const MAX_ZOOM = 21;
 const UPSTREAM_TIMEOUT_MS = 15000;
 
-// Upstream answers 200 with a fully transparent PNG wherever it holds no data
-// (outside Canadian waters, unsurveyed areas, past its deepest level), so
-// out-of-coverage needs no special handling. This is only for the case where
-// upstream is unreachable or errors: serving a transparent tile keeps the map
-// clean instead of painting MapLibre's error state over the water.
-// A full 256x256 rather than a 1x1: MapLibre uploads whatever it gets straight
-// to a texture, so matching the tile size avoids any rescale on the error path.
+// Served when upstream errors, so the map stays clean. A full 256x256 rather
+// than 1x1 so MapLibre's texture upload needs no rescale.
 const TRANSPARENT_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAABFUlEQVR42u3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBPAAB2ClDBAAAAABJRU5ErkJggg==",
   "base64",
 );
 
-// Tiles are static, so they cache hard. A week in the browser; the in-process
-// cache below is what spares the upstream on cold clients.
 const BROWSER_MAX_AGE_S = 604800;
-// A failed fetch must NOT be cached for a week — one upstream blip would blank
-// the layer for every visitor until the header expired.
+// One upstream blip must not blank the layer for a week.
 const ERROR_MAX_AGE_S = 60;
 
 /*
- * Two cache levels: a small in-process map (L1) in front of redis (L2).
+ * An in-process map (L1) in front of redis (L2). L2 is redis directly rather
+ * than utils/cache, whose apicache adapter String()s values and mangles PNG
+ * bytes; node-redis must also be told to return Buffers (the type mapping in
+ * ensureRedis) or it corrupts them the same way. The v4 idiom
+ * `commandOptions({ returnBuffers: true })` no longer exists in v5 and would
+ * fail silently.
  *
- * L2 is redis directly rather than utils/cache. The apicache path there stores
- * through an adapter doing `typeof value === 'string' ? value : String(value)`,
- * and String()-ing a Buffer decodes it as UTF-8, which mangles PNG bytes —
- * measured: an 18,896-byte tile came back as a 34,517-byte string with a
- * different md5. Talking to redis directly avoids that, but only if the read
- * side is told to hand back Buffers: node-redis decodes replies as strings by
- * default and would corrupt them the same way. Hence the type mapping below —
- * verified byte-identical (md5 match) on a round trip through redis 5.8.
- * Note `commandOptions({ returnBuffers: true })`, the node-redis v4 idiom, no
- * longer exists in v5; it is `undefined`, so it would fail silently.
- *
- * L2 is what makes pre-warming a region worthwhile: it survives restarts, is
- * shared across API instances, and is bounded by redis's own maxmemory policy
- * rather than this process's heap. Warming a whole region needs redis sized for
- * it — the full pyramid for both products is a few hundred GB, so warm regions,
- * not the country.
- *
- * L1 sizing: measured tiles run ~5-40 KB, so the 3000 default is ~120 MB at the
- * absolute worst (every entry a dense 40 KB NONNA 10 tile) and more like 40-60
- * MB in practice. Override with NONNA_TILE_CACHE_MAX where the container is
- * memory-tight.
+ * L1: tiles run ~5-40 KB, so the 3000 default is ~120 MB at worst.
  */
 const TILE_CACHE_MAX =
   Number(process.env.NONNA_TILE_CACHE_MAX) > 0
@@ -129,23 +80,14 @@ function cacheSet(key, body) {
   tileCache.set(key, { body, expires: Date.now() + TILE_CACHE_TTL_MS });
 }
 
-// Tiles are static: CHS republishes NONNA on a slow cycle, so a month is safe
-// and keeps a warmed region warm.
+// CHS republishes NONNA on a slow cycle, so a month is safe.
 const REDIS_TTL_S = 30 * 24 * 60 * 60;
 const redisKey = (key) => `nonna:tile:${key}`;
 
-// Reads and writes are bounded for the same reason the connect is (see
-// utils/redis): the tile cache is an optimisation and must fail in
-// milliseconds rather than hang the bathymetry layer.
+// The tile cache is an optimisation and must fail fast rather than hang the
+// bathymetry layer.
 const REDIS_OP_TIMEOUT_MS = 1000;
 
-/*
- * Resolves to a redis client that returns Buffers, or null if redis is not
- * usable right now. The connect lifecycle — single-flight, timeout, retry
- * window — lives in utils/redis, which owns the client that utils/cache shares
- * with this module; all that is left here is the Buffer type mapping the tile
- * bodies need.
- */
 async function ensureRedis() {
   const client = await ensureConnected();
   if (!client) return null;
@@ -231,11 +173,7 @@ function sendTile(res, body, maxAgeSeconds) {
  *       400:
  *         description: Unknown layer, or tile coordinates outside the zoom's grid.
  */
-/* GET /nonna/:layer/:z/:x/:y.png */
-// The tile-coordinate check is the shared one (utils/routePipeline.js) — it
-// rejects out-of-grid indices rather than forwarding them, because upstream
-// would answer anyway and each forwarded request is one we made CHS serve.
-// No apicache: this route runs its own two-tier tile cache below.
+// No apicache: this route runs its own two-tier tile cache.
 router.get(
   "/:layer/:z/:x/:y.png",
   ...pipeline({
@@ -263,8 +201,6 @@ router.get(
       return sendTile(res, cached, BROWSER_MAX_AGE_S);
     }
 
-    // L2. Promote into L1 on the way out so a region being panned around does not
-    // pay the redis round trip per tile.
     const fromRedis = await redisGet(key);
     if (fromRedis) {
       cacheSet(key, fromRedis);
@@ -291,14 +227,11 @@ router.get(
 
       const body = Buffer.from(upstream.data);
       cacheSet(key, body);
-      // Not awaited: the tile is already in hand, and a slow or dead redis must
-      // not hold up the response. redisSet swallows its own errors.
+      // Not awaited: a slow redis must not hold up the response.
       redisSet(key, body);
       return sendTile(res, body, BROWSER_MAX_AGE_S);
     } catch (e) {
-      // A 403 here means CHS changed the allowlist or the gateway rules; anything
-      // else is a timeout or an upstream error. Either way the map should stay
-      // usable, so serve a transparent tile on a short TTL.
+      // A 403 here means CHS changed the allowlist or the gateway rules.
       console.error(
         `NONNA tile ${key} failed:`,
         e.response ? `upstream ${e.response.status}` : e.message,

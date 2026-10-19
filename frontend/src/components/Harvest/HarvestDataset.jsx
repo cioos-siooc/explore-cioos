@@ -8,6 +8,7 @@ import HarvestModeBadge from "./HarvestModeBadge.jsx";
 import HarvestRealtimeBadge from "./HarvestRealtimeBadge.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
+import warningLabel from "./warningLabel.js";
 import { hostname, fmtDt, fmtDurationMs, datasetLink } from "./format.js";
 
 function QueryUrls({ blob, isError }) {
@@ -38,6 +39,34 @@ function QueryUrls({ blob, isError }) {
   );
 }
 
+function WarningList({ warnings }) {
+  const { t } = useTranslation();
+  return (
+    <div className="harvest-warning-box">
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {warnings.map((w, i) => (
+          <li key={`${w.code}-${i}`}>
+            ⚠ <strong title={w.code}>{warningLabel(t, w.code)}</strong>
+            {w.count != null && ` (${w.count})`}: {w.message}
+            {w.items?.length > 0 && (
+              <details>
+                <summary className="harvest-clickable harvest-text-sm">
+                  {t("harvest.warnings.items", { count: w.items.length })}
+                </summary>
+                <ul className="harvest-mono harvest-text-sm">
+                  {w.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function HarvestDataset() {
   const { t } = useTranslation();
   const { slug, datasetId } = useParams();
@@ -48,6 +77,7 @@ export default function HarvestDataset() {
 
   const history = (data && data.history) || [];
   const meta = data && data.meta;
+  const currentWarnings = data?.currentWarnings || [];
   const latest = history[0];
   // The slug is a transformed source URL; the full erddap_url (and a clean
   // hostname for display) come from the API response.
@@ -166,8 +196,8 @@ export default function HarvestDataset() {
           {latest.error_message && (
             <div className="harvest-error-box">{latest.error_message}</div>
           )}
-          {latest.warnings && (
-            <div className="harvest-warning-box">⚠ {latest.warnings}</div>
+          {currentWarnings.length > 0 && (
+            <WarningList warnings={currentWarnings} />
           )}
           {latest.query_urls && (
             <details open={latest.status === "error"}>
@@ -216,6 +246,19 @@ export default function HarvestDataset() {
                 {row.reason_code && (
                   <span className="harvest-text-sm" title={row.reason_code}>
                     {reasonLabel(t, row.reason_code)}
+                  </span>
+                )}
+                {row.warnings?.length > 0 && (
+                  <span
+                    className="harvest-warning-text"
+                    title={[
+                      t("harvest.warnings.count", {
+                        count: row.warnings.length,
+                      }),
+                      ...row.warnings.map((w) => w.message),
+                    ].join("\n")}
+                  >
+                    ⚠ {row.warnings.length}
                   </span>
                 )}
                 {row.error_message && (

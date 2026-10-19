@@ -40,19 +40,14 @@ export default function DownloadProvider({ children }) {
   const { query, startDate, endDate, startDepth, endDepth } = useFilters();
   const { polygon, pointsToDownload } = useSelection();
 
-  // The address is kept on this device only when the user asks for it, and
-  // unticking the box forgets it at once.
   const [savedEmail, setSavedEmail] = usePersistentState("email", "");
   const [email, setEmail] = useState(savedEmail);
   const [rememberEmail, setRememberEmailState] = useState(Boolean(savedEmail));
   const [submissionState, setSubmissionState] = useState();
-  // Why the last submission failed: "network", "rejected" (4xx) or "server".
   const [failureReason, setFailureReason] = useState();
 
-  // Whether each filter is carried into the download. These are checkboxes the
-  // user owns, so they are state — but they start out matching the filters that
-  // are actually doing something, and go back to matching them whenever those
-  // change (see the reset below).
+  // User-owned checkboxes, re-seeded to match the active filters whenever
+  // those change (see below).
   const [filterDownloadByTime, setFilterDownloadByTime] = useState(false);
   const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false);
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false);
@@ -60,11 +55,8 @@ export default function DownloadProvider({ children }) {
   const emailValid = validateEmail(email);
   const polygonFilterActive = !isEmpty(polygon);
 
-  // Re-seeding the checkboxes when the filters move is React's "adjust state
-  // when an input changes" — done during render against the previous value
-  // rather than in an effect, so the panel never paints one frame with the
-  // previous filters' boxes ticked. `query` carries the debounced filter
-  // values, so comparing it is the same test the boxes are seeded from.
+  // During render, not in an effect, so the panel never paints a frame with
+  // the previous filters' boxes ticked.
   if (useChanged(query)) {
     setFilterDownloadByTime(
       query.startDate !== defaultStartDate || query.endDate !== defaultEndDate,
@@ -77,22 +69,17 @@ export default function DownloadProvider({ children }) {
 
   if (useChanged(polygon)) setFilterDownloadByPolygon(polygonFilterActive);
 
-  // Emptying the selection retires whatever the last submission said about it.
-  // The submit button is disabled while the selection is empty either way, so
-  // this only clears the message.
+  // The submit button is already disabled while empty; this clears the message.
   if (useChanged(pointsToDownload) && isEmpty(pointsToDownload)) {
     setSubmissionState(undefined);
   }
 
-  // What the panel shows under the submit button — a pure reading of the
-  // submission state, so it is derived here rather than pushed into a second
-  // piece of state that has to be kept in step with the first.
   const submissionFeedback = useMemo(() => {
     switch (submissionState) {
       case "submitted":
         return {
           icon: <Spinner size="sm" className="submissionSpinner" />,
-          text: t("submissionStateTextSubmitting"), // 'Submitting...'
+          text: t("submissionStateTextSubmitting"),
         };
       case "successful":
         return {
@@ -111,8 +98,7 @@ export default function DownloadProvider({ children }) {
 
   function handleEmailChange(value) {
     setEmail(value);
-    // Editing the address retracts the previous attempt's verdict: it was
-    // about a different recipient.
+    // The previous verdict was about a different recipient.
     setSubmissionState(undefined);
   }
 
@@ -132,8 +118,7 @@ export default function DownloadProvider({ children }) {
         language: i18n.language,
       },
     });
-    // Submitting is what the click does, so it happens here rather than in an
-    // effect watching for the state to become "submitted".
+    // Here rather than in an effect watching for "submitted".
     submitRequest();
   }
 

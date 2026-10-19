@@ -1,5 +1,3 @@
-// Shared display formatters for the Harvest dashboard pages.
-
 export function hostname(url) {
   try {
     return new URL(url).hostname || url;
@@ -50,7 +48,6 @@ export function fmtBytes(bytes) {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
-// Link to the dataset on its source (ERDDAP data page or OBIS).
 export function datasetLink(erddapUrl, datasetId, source) {
   if (source === "obis") return `https://obis.org/dataset/${datasetId}`;
   try {
@@ -60,8 +57,8 @@ export function datasetLink(erddapUrl, datasetId, source) {
   }
 }
 
-// Run-page views keep raw statuses for audit fidelity; this maps a
-// hash-verified skip to its own 'unchanged' display status there.
+// Run pages keep raw statuses for audit fidelity; this maps a hash-verified
+// skip to its own 'unchanged' display status.
 export function displayStatus(attempt) {
   return attempt.status === "skipped" && attempt.reason_code === "UNCHANGED"
     ? "unchanged"

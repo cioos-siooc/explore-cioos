@@ -6,16 +6,7 @@ const http = require("node:http");
 
 const { createCache, _resetAdapterForTests } = require("./cache");
 
-/*
- * The behaviour under test is the degradation path, which used to be a live
- * bug: a single failed connect was memoized as a decision, so one redis blip
- * at startup pinned the process to apicache's per-process in-memory store
- * until it was restarted — behind one console.warn.
- *
- * A fake redis module stands in for utils/redis so both branches, and the
- * retry between them, run in one process. apicache's adapter is a
- * process-global, hence the reset between tests.
- */
+// apicache's adapter is process-global, hence the reset between tests.
 
 function fakeClient() {
   const calls = [];
@@ -69,7 +60,6 @@ test("a failed connect degrades to in-memory WITHOUT latching", async () => {
     "no adapter installed while redis is down, so apicache uses its own store",
   );
 
-  // The retry: this is what the old memoized-failure version could never do.
   const mw2 = await cache.ensureReady();
   assert.equal(redis.state.attempts, 2, "the second request must re-ask redis");
   assert.equal(typeof mw2, "function");
@@ -92,8 +82,6 @@ test("the adapter is installed exactly once, however many requests arrive", asyn
     cache.ensureReady(),
   ]);
 
-  // apicache is a singleton; re-installing would swap the adapter under
-  // in-flight cache reads for no reason.
   assert.equal(
     apicache.options().redisClient,
     first,
@@ -103,10 +91,6 @@ test("the adapter is installed exactly once, however many requests arrive", asyn
 });
 
 test("the adapter speaks the node_redis v2 API apicache expects", async () => {
-  // apicache 1.6.3 gates every read and write on a plain `.connected` boolean
-  // and calls callback-style hset/hgetall/expire/del. Passed a raw redis@5
-  // client, `redis.connected` is undefined, so NOTHING is ever cached and
-  // every request recomputes against Postgres.
   const client = fakeClient();
   const cache = createCache({ redis: fakeRedis({ client }) });
   await cache.ensureReady();
@@ -125,8 +109,7 @@ test("the adapter speaks the node_redis v2 API apicache expects", async () => {
   await new Promise((resolve) => adapter.hset("k", "f", { a: 1 }, resolve));
   assert.deepEqual(client.calls.at(-1), ["hSet", "k", "f", "[object Object]"]);
 
-  // EXPIRE needs a positive integer; apicache passes duration(ms)/1000, which
-  // is fractional for anything under a second.
+  // apicache passes duration(ms)/1000, fractional under a second.
   await new Promise((resolve) => adapter.expire("k", 0.4, resolve));
   assert.deepEqual(client.calls.at(-1), ["expire", "k", 1]);
 
@@ -154,29 +137,10 @@ test("route() is a middleware factory that resolves the backend per request", as
   );
 });
 
-/*
- * The store path, end to end through real apicache.
- *
- * apicache writes an entry only when the response it sees has a body
- * (`res._apicache.content` in its res.end patch). Express answers a
- * conditional request by stripping the body and sending 304, so a browser
- * holding an ETag could revalidate forever against an empty cache: each
- * request ran the full query, returned 304, and stored nothing, so the entry
- * was never written and the next request missed too. On prod that was ~3 s of
- * Postgres per map tile per revalidation, permanently — the cache could not
- * warm up for anyone who had visited before.
- *
- * routePipeline's fullResponseForCacheMiss closes it; this pins the
- * consequence that matters, which the pipeline's own unit test cannot see:
- * whether an entry actually lands.
- */
-/*
- * apicache.clear() with no target only empties its memory store — the
- * clear-by-key branch is the one that calls clearTimeout, so a bare clear()
- * leaves the entry's expiry timer (here 24 h) armed and the test runner hangs
- * on an open handle. The unit-test script runs without --test-force-exit, so
- * clearing has to go key by key.
- */
+// End to end through real apicache: whether an entry actually lands, which
+// routePipeline's own unit test cannot see.
+// A bare apicache.clear() leaves each entry's expiry timer armed and the
+// runner (no --test-force-exit) hangs on the open handle; clear by key.
 function clearAll() {
   apicache.getIndex().all.forEach((key) => apicache.clear(key));
 }
@@ -203,8 +167,6 @@ function countingApp(stages) {
   return { get, runs: () => handlerRuns, close: () => server.close() };
 }
 
-// A browser that already holds an ETag, revalidating against a cold cache —
-// the state every returning visitor is in after a deploy or a harvest flush.
 async function revalidateTwiceAgainstColdCache(stages) {
   clearAll();
   const app = countingApp(stages);
@@ -244,8 +206,7 @@ test("a conditional request that misses the cache still fills it", async () => {
 });
 
 test("without the stage the cache can never fill from a revalidation", async () => {
-  // The regression itself. Kept executable so the fix above cannot be dropped
-  // silently: every repeat re-runs the query and nothing is ever stored.
+  // Kept executable so the fix cannot be dropped silently.
   const { runs, statuses, entries } = await revalidateTwiceAgainstColdCache([
     apicache.middleware("24 hours"),
   ]);
@@ -255,11 +216,6 @@ test("without the stage the cache can never fill from a revalidation", async () 
   assert.equal(runs, 3, "every revalidation pays the query again");
 });
 
-/*
- * Compression of the stored body (see the header comment in cache.js). The
- * adapter is the only thing that touches the bytes, so these drive it directly
- * rather than through a route.
- */
 function storingClient() {
   const hashes = new Map();
   return {
@@ -290,7 +246,6 @@ test("the response body is stored compressed, and only the body", async () => {
   const client = storingClient();
   const adapter = await adapterOver(client);
 
-  // What apicache actually writes: the whole cache object as one JSON string.
   const body = JSON.stringify({ status: 200, data: "x".repeat(5000) });
   await new Promise((r) => adapter.hset("k", "response", body, r));
   await new Promise((r) => adapter.hset("k", "duration", 86400000, r));
@@ -312,9 +267,7 @@ test("the response body is stored compressed, and only the body", async () => {
 });
 
 test("a Buffer body survives the round trip byte for byte", async () => {
-  // Every .mvt tile is a Buffer, and it is Buffer-ness that makes the stored
-  // JSON balloon (one byte becomes 3-4 ASCII chars), so it is the case that
-  // matters most. apicache JSON-serializes it and rebuilds it on the way out.
+  // .mvt tiles are Buffers, the case where stored JSON balloons most.
   const client = storingClient();
   const adapter = await adapterOver(client);
 
@@ -337,8 +290,7 @@ test("a Buffer body survives the round trip byte for byte", async () => {
 });
 
 test("an entry written before compression still reads", async () => {
-  // A rolling deploy, or a rollback, leaves unmarked values in redis. They
-  // must not read as garbage.
+  // A rolling deploy or rollback leaves unmarked values in redis.
   const client = storingClient();
   const adapter = await adapterOver(client);
   client.hashes.set("legacy", { response: '{"status":200}', duration: "1000" });
@@ -348,8 +300,6 @@ test("an entry written before compression still reads", async () => {
 });
 
 test("an unreadable body reads as a miss instead of throwing", async () => {
-  // apicache parses this inside its own callback, where a throw would escape
-  // as an unhandled exception and take the process down. A miss regenerates.
   const client = storingClient();
   const adapter = await adapterOver(client);
   client.hashes.set("bad", {
@@ -362,13 +312,6 @@ test("an unreadable body reads as a miss instead of throwing", async () => {
 });
 
 test("the store is queued synchronously, so EXPIRE cannot beat the key", async () => {
-  /*
-   * apicache issues hset(response) -> hset(duration) -> expire(key) back to
-   * back without awaiting. If compression deferred the hSet to a later tick,
-   * EXPIRE would reach redis before the key existed, return 0, and the entry
-   * would sit there with no TTL until eviction. Pins the ordering, which is
-   * why packResponse is the sync zlib call.
-   */
   const client = storingClient();
   const adapter = await adapterOver(client);
 

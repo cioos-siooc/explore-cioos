@@ -1,9 +1,4 @@
-"""
-Unit tests for cde_harvester.sources.erddap.compliance.
-
-Each test builds a mock Dataset, sets specific attributes, and verifies
-whether the compliance checker passes or rejects it with the right code.
-"""
+"""Unit tests for cde_harvester.sources.erddap.compliance."""
 
 
 from cde_harvester.core.errors import (
@@ -12,6 +7,7 @@ from cde_harvester.core.errors import (
     MISSING_REQUIRED_VARS,
     NO_SUPPORTED_VARIABLES,
 )
+from cde_harvester.core.harvest_warnings import NON_CF_STANDARD_NAMES
 from cde_harvester.sources.erddap.compliance import CDEComplianceChecker
 from conftest import (
     ERDDAP_INFO_CSV,
@@ -44,7 +40,6 @@ class TestPassesAllChecks:
 class TestRequiredVariables:
     def test_missing_time_fails(self):
         checker = _checker()
-        # Remove 'time' from variables_list
         checker.dataset.variables_list = [
             v for v in checker.dataset.variables_list if v != "time"
         ]
@@ -82,7 +77,7 @@ class TestSupportedCFName:
         assert checker.check_supported_cf_name() is False
         assert checker.failure_reason_code == NO_SUPPORTED_VARIABLES
 
-    def test_modifier_is_valid_but_not_an_eov_measurement(self, caplog):
+    def test_modifier_is_valid_but_not_an_eov_measurement(self):
         checker = _checker()
         checker.dataset.df_variables.loc["temperature", "standard_name"] = (
             "sea_water_temperature status_flag"
@@ -90,7 +85,27 @@ class TestSupportedCFName:
 
         assert checker.check_supported_cf_name() is False
         assert checker.failure_reason_code == NO_SUPPORTED_VARIABLES
-        assert "Found unstandard standard_name" not in caplog.text
+        assert not checker.dataset.warnings
+
+    def test_non_cf_name_is_recorded_as_a_warning(self):
+        checker = _checker()
+        checker.dataset.df_variables.loc["temperature", "standard_name"] = (
+            "sea_water_temprature"
+        )
+
+        checker.check_supported_cf_name()
+        [warning] = checker.dataset.warnings
+        assert warning["code"] == NON_CF_STANDARD_NAMES
+        assert warning["items"] == ["sea_water_temprature"]
+
+    def test_ioos_qc_flag_names_are_not_flagged(self):
+        checker = _checker()
+        checker.dataset.df_variables.loc["temperature", "standard_name"] = (
+            "sea_water_temperature_spike_test"
+        )
+
+        checker.check_supported_cf_name()
+        assert not checker.dataset.warnings
 
 
 class TestIngestFlag:

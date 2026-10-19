@@ -1,11 +1,5 @@
-"""Registry of ERDDAP dataset-type handlers.
-
-The registry drives both the allDatasets listing filter (via
-``supported_data_structures()``) and the per-dataset cdm_data_type allowlist
-(via ``supported_cdm_data_types()``). To support a new type, write a
-:class:`~cde_harvester.dataset_types.base.DatasetTypeHandler` subclass and
-``register()`` it below — nothing else needs to change.
-"""
+"""Registry of ERDDAP dataset-type handlers; register() a new
+DatasetTypeHandler below to support another cdm_data_type."""
 
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 
@@ -21,17 +15,14 @@ def get_handler(cdm_data_type):
 
 
 def supported_cdm_data_types():
-    """Allowlist of cdm_data_type values the pipeline can harvest."""
     return list(_REGISTRY)
 
 
 def supported_data_structures():
-    """ERDDAP allDatasets dataStructure values to list ("table" and/or "grid")."""
     return tuple(dict.fromkeys(h.data_structure for h in _REGISTRY.values()))
 
 
 def extract_features(dataset):
-    """Dispatch feature extraction to the handler for this dataset's type."""
     handler = get_handler(dataset.cdm_data_type)
     if handler is None:
         raise KeyError(
@@ -48,12 +39,8 @@ def feature_kind_for(cdm_data_type):
 
 
 def extract_track_points(dataset):
-    """Dispatch the secondary track-point extraction (trajectory types only).
-
-    Returns a TrajectoryPointSchema-shaped frame, or None for types without
-    track output. Call after extract_features() — the trajectory extraction
-    relies on the CF-role variables it resolves.
-    """
+    """Call after extract_features(): the trajectory extraction relies on the
+    CF-role variables it resolves."""
     handler = get_handler(dataset.cdm_data_type)
     if handler is None:
         return None
