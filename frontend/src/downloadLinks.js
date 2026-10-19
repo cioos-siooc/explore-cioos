@@ -270,13 +270,17 @@ export function linksToCsv(links) {
   return `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
 }
 
-export function downloadTextFile(filename, text, mimeType = "text/plain") {
-  const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
+export function saveUrl(url, filename = "") {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
+}
+
+export function downloadTextFile(filename, text, mimeType = "text/plain") {
+  const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
+  saveUrl(url, filename);
   URL.revokeObjectURL(url);
 }

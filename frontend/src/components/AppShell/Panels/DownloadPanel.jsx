@@ -4,22 +4,18 @@ import classNames from "classnames";
 import isEmpty from "lodash-es/isEmpty";
 
 import DownloadDetails from "../../Controls/DownloadDetails/DownloadDetails.jsx";
-import SelectPill from "../../ui/SelectPill.jsx";
 import Switch from "../../ui/Switch.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import {
-  PACKAGE_FORMATS,
-  useDownload,
-} from "../../../state/download/DownloadProvider.jsx";
+import { useDownload } from "../../../state/download/DownloadProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 /*
  * The package (CDE builds and mails it, with a size ceiling) and the download
  * script (the same package built on the user's computer, no ceiling) share
- * one selection and format. This panel only owns the email/submit column; the
- * rest is DownloadDetails.
+ * one selection and format. This panel only owns the email option; the rest
+ * is DownloadDetails.
  */
 export default function DownloadPanel() {
   const { t } = useTranslation();
@@ -47,8 +43,6 @@ export default function DownloadPanel() {
     filterDownloadByPolygon,
     setFilterDownloadByPolygon,
     polygonFilterActive,
-    packageFormat,
-    setPackageFormat,
     handleEmailChange,
     handleSubmission,
   } = useDownload();
@@ -84,27 +78,11 @@ export default function DownloadPanel() {
         setSubmissionState={setSubmissionState}
       >
         {/* Passed as children because the submission state lives in this
-            panel's providers; the class places it in the footer's grid. */}
-        <div className="downloadFooterSection downloadSubmit">
+            panel's providers; DownloadDetails sets it beside the script. */}
+        <div className="downloadDeliveryOption downloadSubmit">
           <label className="downloadFooterTitle" htmlFor="downloadEmailInput">
             {t("downloadEmailLabelText")}
           </label>
-          <SelectPill
-            label={t("downloadPackageFormatLabel")}
-            value={packageFormat}
-            options={PACKAGE_FORMATS.map((id) => ({
-              id,
-              label: t(`downloadPackageFormat_${id}`),
-            }))}
-            onChange={setPackageFormat}
-            data-testid="download-package-format"
-          />
-          {["odv", "nccf"].includes(packageFormat) &&
-            pointsToDownload.some((point) => point.source_type === "obis") && (
-              <p className="downloadEmailNotice">
-                {t("downloadPackageFormatObisNote")}
-              </p>
-            )}
           <div className="downloadSubmitRow">
             <input
               id="downloadEmailInput"

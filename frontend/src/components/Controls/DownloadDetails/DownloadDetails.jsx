@@ -4,12 +4,15 @@ import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
-import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
+import DownloadFormat from "./DownloadFormat.jsx";
 import DownloadScript from "./DownloadScript.jsx";
 import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
-import { useDownload } from "../../../state/download/DownloadProvider.jsx";
+import {
+  OBIS_FORMATS,
+  useDownload,
+} from "../../../state/download/DownloadProvider.jsx";
 
 import {
   applyDatasetPKs,
@@ -255,6 +258,9 @@ export default function DownloadDetails({
     [pointsData],
   );
   const scriptPks = linkableDatasets.map((point) => point.pk);
+  const obisCount = linkableDatasets.filter(
+    (point) => point.source_type === "obis",
+  ).length;
 
   // A polygon can only reach ERDDAP as its bounding box, so direct links
   // would hold data the package filters out; the script handles it.
@@ -305,72 +311,92 @@ export default function DownloadDetails({
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
+            obisFallbackFormat={
+              OBIS_FORMATS.includes(packageFormat)
+                ? undefined
+                : t("downloadPackageFormat_csv")
+            }
+            pagerExtra={
+              <div className="downloadSummary">
+                {/* Both stats wait for the estimates, which decide how many
+                    stay selected. */}
+                <div className="downloadSummaryStat">
+                  {estimatesLoading ? (
+                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
+                  ) : (
+                    <span className="downloadSummaryValue">
+                      {selectedCount}
+                      <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
+                    </span>
+                  )}
+                  <span className="downloadSummaryLabel">
+                    {t("downloadDetailsDownloadInfoDatasets")}
+                  </span>
+                </div>
+                <div className="downloadSummaryDivider" aria-hidden="true" />
+                <div className="downloadSummaryStat">
+                  {estimatesLoading ? (
+                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
+                  ) : downloadSizeEstimates ? (
+                    <span
+                      className="downloadSummaryValue"
+                      title={
+                        dataTotal.filteredPartial || dataTotal.unfilteredPartial
+                          ? t("downloadSizePartialTitle")
+                          : undefined
+                      }
+                    >
+                      {formatSizeEstimate(dataTotal.filteredSize)}
+                      {dataTotal.filteredPartial && "+"}
+                      <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
+                        dataTotal.unfilteredSize,
+                      )}${dataTotal.unfilteredPartial ? "+" : ""}`}</span>
+                    </span>
+                  ) : (
+                    <span
+                      className="downloadSummaryValue downloadSummaryValueMuted"
+                      title={t("downloadSizeUnavailableTitle")}
+                    >
+                      {t("downloadSizeUnavailable")}
+                    </span>
+                  )}
+                  <span className="downloadSummaryLabel">
+                    {t("downloadDetailsDownloadInfoDownloadSize")}
+                  </span>
+                </div>
+              </div>
+            }
           />
         </div>
       </div>
 
       <div className="downloadFooter">
-        <div className="downloadFooterSection">
-          <span className="downloadFooterTitle">
-            {t("downloadDetailsSelectionTitle")}
-          </span>
-          <div className="downloadSummary">
-            {/* Both stats wait for the estimates, which decide how many stay
-              selected. */}
-            <div className="downloadSummaryStat">
-              {estimatesLoading ? (
-                <Spinner size="sm" className="datasetSizeTotalSpinner" />
-              ) : (
-                <span className="downloadSummaryValue">
-                  {selectedCount}
-                  <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
-                </span>
-              )}
-              <span className="downloadSummaryLabel">
-                {t("downloadDetailsDownloadInfoDatasets")}
+        {/* Two ways to the same package, so they share one section. */}
+        <div className="downloadFooterSection downloadDelivery">
+          <div className="downloadDeliveryHeader">
+            <div className="downloadDeliveryHeading">
+              <span className="downloadFooterTitle">
+                {t("downloadDeliveryTitle")}
               </span>
+              <p className="downloadDeliveryIntro">
+                {t("downloadDeliveryIntro")}
+              </p>
             </div>
-            <div className="downloadSummaryDivider" aria-hidden="true" />
-            <div className="downloadSummaryStat">
-              {estimatesLoading ? (
-                <Spinner size="sm" className="datasetSizeTotalSpinner" />
-              ) : downloadSizeEstimates ? (
-                <span
-                  className="downloadSummaryValue"
-                  title={
-                    dataTotal.filteredPartial || dataTotal.unfilteredPartial
-                      ? t("downloadSizePartialTitle")
-                      : undefined
-                  }
-                >
-                  {formatSizeEstimate(dataTotal.filteredSize)}
-                  {dataTotal.filteredPartial && "+"}
-                  <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
-                    dataTotal.unfilteredSize,
-                  )}${dataTotal.unfilteredPartial ? "+" : ""}`}</span>
-                </span>
-              ) : (
-                <span
-                  className="downloadSummaryValue downloadSummaryValueMuted"
-                  title={t("downloadSizeUnavailableTitle")}
-                >
-                  {t("downloadSizeUnavailable")}
-                </span>
-              )}
-              <span className="downloadSummaryLabel">
-                {t("downloadDetailsDownloadInfoDownloadSize")}
-              </span>
-            </div>
+            <DownloadFormat obisCount={obisCount} />
           </div>
-        </div>
-
-        {children}
-
-        <div className="downloadFooterSection directLinks">
-          <DownloadScript url={scriptUrl(scriptPks)} count={scriptPks.length} />
-          {!polygonFiltered && (
-            <DirectDownloadLinks links={links} constraints={constraints} />
-          )}
+          <div className="downloadDeliveryOptions">
+            {children}
+            <span className="downloadDeliveryOr" aria-hidden="true">
+              {t("downloadDeliveryOr")}
+            </span>
+            <DownloadScript
+              url={scriptUrl(scriptPks)}
+              count={scriptPks.length}
+              links={links}
+              constraints={constraints}
+              polygonFiltered={polygonFiltered}
+            />
+          </div>
         </div>
       </div>
     </div>

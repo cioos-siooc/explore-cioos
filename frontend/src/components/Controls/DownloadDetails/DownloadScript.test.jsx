@@ -3,7 +3,7 @@ import { screen } from "@testing-library/react";
 import * as React from "react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
-import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
+import DownloadScript from "./DownloadScript.jsx";
 import {
   buildDownloadLinks,
   downloadConstraints,
@@ -41,15 +41,29 @@ const query = {
 let saved;
 
 // Stands in for DownloadDetails, which builds the links from the package
-// format and the time/depth switches.
-function Harness({ rows = [erddapRow, obisRow], format = "csv" }) {
+// format and the time/depth switches, and drops them under a polygon.
+function Harness({
+  rows = [erddapRow, obisRow],
+  format = "csv",
+  polygonFiltered = false,
+}) {
   const constraints = downloadConstraints({
     query,
     byTime: true,
     byDepth: true,
   });
-  const links = buildDownloadLinks(rows, format, constraints);
-  return <DirectDownloadLinks links={links} constraints={constraints} />;
+  const links = polygonFiltered
+    ? []
+    : buildDownloadLinks(rows, format, constraints);
+  return (
+    <DownloadScript
+      url="/api/download/script?datasetPKs=1,2&format=csv"
+      count={rows.length}
+      links={links}
+      constraints={constraints}
+      polygonFiltered={polygonFiltered}
+    />
+  );
 }
 
 function open(props = {}) {
@@ -58,12 +72,12 @@ function open(props = {}) {
 
 const button = (name) => screen.getByRole("button", { name });
 async function saveAs(user, name) {
-  await user.click(button(/save as/i));
+  await user.click(button(/script or links/i));
   await user.click(button(name));
 }
 const savedText = () => saved.at(-1).text();
 
-describe("DirectDownloadLinks", () => {
+describe("DownloadScript", () => {
   beforeEach(() => {
     saved = [];
     vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
@@ -76,9 +90,27 @@ describe("DirectDownloadLinks", () => {
     vi.restoreAllMocks();
   });
 
-  it("counts the links it would hand over", () => {
-    open();
-    expect(screen.getByTestId("direct-links")).toHaveTextContent("2 links");
+  it("saves the Python script from the package's script URL", async () => {
+    const clicked = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      function () {
+        clicked.push(this.getAttribute("href"));
+      },
+    );
+    const { user } = open();
+    await saveAs(user, /python script/i);
+    expect(clicked).toEqual(["/api/download/script?datasetPKs=1,2&format=csv"]);
+  });
+
+  it("offers only the Python script under a polygon filter, and says why", async () => {
+    const { user } = open({ polygonFiltered: true });
+    expect(screen.getByTestId("download-script")).toHaveTextContent(
+      /only the Python script/i,
+    );
+    await user.click(button(/script or links/i));
+    expect(button(/python script/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /curl/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /copy urls/i })).toBeNull();
   });
 
   it("writes a curl script carrying the map's filters", async () => {
@@ -124,35 +156,32 @@ describe("DirectDownloadLinks", () => {
 
   it("puts the URL list on the clipboard", async () => {
     const { user } = open();
-    await user.click(button(/copy urls/i));
+    await saveAs(user, /copy urls/i);
 
     const copied = await navigator.clipboard.readText();
     expect(copied.trim().split("\n")).toHaveLength(5);
-    expect(
-      await screen.findByRole("button", { name: /copied/i }),
-    ).toBeVisible();
+    expect(await screen.findByText("URLs copied.")).toBeVisible();
   });
 
   it("says what the links could not carry", () => {
     open({ rows: [{ ...erddapRow, has_depth: false }, obisRow] });
-    const panel = screen.getByTestId("direct-links");
+    const panel = screen.getByTestId("download-script");
     expect(panel).toHaveTextContent(/no depth variable/i);
     expect(panel).toHaveTextContent(/OBIS API/i);
   });
 
   it("stays quiet about filters that were carried in full", () => {
     open({ rows: [erddapRow] });
-    const panel = screen.getByTestId("direct-links");
+    const panel = screen.getByTestId("download-script");
     expect(panel).not.toHaveTextContent(/depth variable/i);
     expect(panel).not.toHaveTextContent(/OBIS/i);
   });
 
   it("has nothing to offer for an empty selection", () => {
     open({ rows: [] });
-    expect(screen.getByTestId("direct-links")).toHaveTextContent(
+    expect(screen.getByTestId("download-script")).toHaveTextContent(
       "No datasets selected",
     );
-    expect(button(/save as/i)).toBeDisabled();
-    expect(button(/copy urls/i)).toBeDisabled();
+    expect(button(/script or links/i)).toBeDisabled();
   });
 });

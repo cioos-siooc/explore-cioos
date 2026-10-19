@@ -28,6 +28,8 @@ const DownloadContext = createContext();
 // The format the packaged download is written in; ODV and NetCDF have no
 // OBIS rendition, so OBIS datasets fall back to CSV (see downloader formats.py).
 export const PACKAGE_FORMATS = ["csv", "parquet", "odv", "nccf"];
+// The downloader's OBIS_FORMATS: other formats reach OBIS datasets as CSV.
+export const OBIS_FORMATS = ["csv", "parquet"];
 
 const FAILURE_TEXT_KEYS = {
   network: "submissionStateTextFailedNetwork",

@@ -32,6 +32,7 @@ export default function DatasetCard({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
+  obisFallbackFormat,
   onSelect,
   onInspect,
   // Unlike onSelect (in or out of this batch), takes the row off the order.
@@ -217,6 +218,16 @@ export default function DatasetCard({
             one these links are wanted for. */}
         {isDownloadModal && (
           <div className="datasetCardSources">
+            {isObis && obisFallbackFormat && (
+              <span
+                className="datasetCardFormatTag"
+                title={t("datasetCardObisFallbackTitle", {
+                  format: obisFallbackFormat,
+                })}
+              >
+                {t("datasetCardObisFallbackText")}
+              </span>
+            )}
             {row.erddap_url && (
               <a
                 className="datasetCardSourceLink"
