@@ -8,10 +8,15 @@ import {
   heightBudgetFor,
   marginFor,
   panelPitch,
+  pinnedAxisSizeFor,
   plotHeightFor,
   plotWidthFor,
   titleRoomFor,
+  LABEL_LINE_PX,
   MIN_PANEL_PX,
+  PINNED_AXIS_LINES,
+  PINNED_EDGE_PX,
+  TICK_ROOM_PX,
 } from "./previewFacetSizing.js";
 
 test("one panel fills the plotting area", () => {
@@ -83,15 +88,42 @@ test("each orientation reserves the edge its labels actually use", () => {
   // Without the title, which sits at the top of both.
   const columns = marginFor(COLUMNS, 0);
   const rows = marginFor(ROWS, 0);
-  // A profile's panel titles are on top and nothing is drawn at its bottom; a
-  // stack is the other way round.
+  // A profile's panel titles are on top and nothing is drawn at its bottom.
   assert.ok(columns.t > columns.b);
-  assert.ok(rows.b > rows.t);
-  // Neither reserves width for a rotated title any more.
-  assert.equal(columns.l, rows.l);
+  // The shared axis is in its pinned strip, so the figure keeps only an edge
+  // there: a profile's left, a stack's bottom. A stack's left labels its panels.
+  assert.equal(columns.l, PINNED_EDGE_PX);
+  assert.equal(rows.b, PINNED_EDGE_PX);
+  assert.ok(rows.l > PINNED_EDGE_PX);
   // And the title is added to the top of each, never taken out of it.
   assert.equal(marginFor(COLUMNS, 2).t - columns.t, titleRoomFor(2));
   assert.equal(marginFor(ROWS, 2).t - rows.t, titleRoomFor(2));
+});
+
+test("the pinned strip reserves the room the figure gave up", () => {
+  // Its tick labels, then a two-line title running along the axis.
+  assert.equal(PINNED_AXIS_LINES, 2);
+  assert.equal(
+    pinnedAxisSizeFor(COLUMNS),
+    TICK_ROOM_PX + PINNED_AXIS_LINES * LABEL_LINE_PX,
+  );
+  assert.equal(pinnedAxisSizeFor(COLUMNS), 88);
+  assert.equal(pinnedAxisSizeFor(ROWS), 72);
+});
+
+test("a profile's top margin pays for every line of its panel titles", () => {
+  // Below the figure title, so a title wrapped to three lines cannot climb
+  // into it.
+  assert.equal(
+    marginFor(COLUMNS, 1, 3).t - marginFor(COLUMNS, 1, 1).t,
+    2 * LABEL_LINE_PX,
+  );
+  assert.equal(
+    marginFor(COLUMNS, 2, 3).t - marginFor(COLUMNS, 0, 3).t,
+    titleRoomFor(2),
+  );
+  // A stack's panel titles are beside their axes, not above them.
+  assert.equal(marginFor(ROWS, 1, 3).t, marginFor(ROWS, 1, 1).t);
 });
 
 test("the sizing floors pay for the gaps, so a panel really gets its minimum", () => {

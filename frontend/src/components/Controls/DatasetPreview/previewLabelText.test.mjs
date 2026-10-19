@@ -41,6 +41,18 @@ test("past the line cap the name is truncated and the unit survives", () => {
   assert.equal(lines[2], "( mg m-3 )");
 });
 
+test("a word longer than the line is cut to fit, never left to overflow", () => {
+  // A bare column name has no space to break at, and would run into the next
+  // panel's label.
+  const lines = wrapLabel("sea_water_practical_salinity ( PSU )", 12).split(
+    "<br>",
+  );
+  assert.equal(lines.length, 2);
+  assert.ok(lines[0].length <= 12, lines[0]);
+  assert.ok(lines[0].endsWith("…"));
+  assert.equal(lines[1], "( PSU )");
+});
+
 test("a label with no unit still wraps, using every allowed line", () => {
   const lines = wrapLabel(
     "some very long variable name with no unit",

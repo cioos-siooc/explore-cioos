@@ -430,6 +430,7 @@
   "datasetPreviewPlotWantedTrack": "une colonne de longitude, de latitude ou de temps",
   "datasetPreviewPlotWantedMeasurement": "au moins une colonne de mesure",
   "datasetPreviewPlotCustomizePlot": "Personnaliser le graphique",
+  "datasetPreviewPlotInvertYAxis": "Inverser l'axe Y",
   "datasetPreviewPlotColor": "Couleur",
   "datasetPreviewPlotColorBy": "Colorer selon",
   "datasetPreviewPlotLayout": "Disposition",

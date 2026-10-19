@@ -43,6 +43,7 @@ import {
   plotWidthFor,
   COLORBAR_ROOM_PX,
   COLUMN_GAP,
+  PINNED_AXIS_LINES,
   ROW_GAP,
   TITLE_PAD_PX,
 } from "./previewFacetSizing.js";
@@ -257,6 +258,7 @@ const layoutTitleFor = (wrappedTitle) => ({
  * @param sharedText    one string per row naming where that row is, or null
  * @param size          { width, height }
  * @param uirevision    changes whenever the axis set changes
+ * @param reversedYAxes the columns whose Y axis is drawn downwards
  */
 export function buildFigure({
   plan,
@@ -274,6 +276,7 @@ export function buildFigure({
   sharedText = null,
   size = {},
   uirevision,
+  reversedYAxes = new Set(plan.sharedReversed ? [sharedAxis] : []),
 }) {
   const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
 
@@ -298,23 +301,40 @@ export function buildFigure({
   // leaving the panel's trace the markers and the hover.
   const coloredLine = hasColorBar && mode.includes("lines");
 
-  const margin = marginFor(plan.orientation, titleLines);
   // 0 until the plot area has been measured, and maxCharsFor turns that into
-  // "leave the label alone".
+  // "leave the label alone". The width needs only the side margins, so it is
+  // known before the top margin is.
+  const sideMargin = marginFor(plan.orientation, titleLines);
   const plottingWidth = size.width
-    ? Math.max(size.width - margin.l - margin.r, 0)
+    ? Math.max(size.width - sideMargin.l - sideMargin.r, 0)
     : 0;
+  // A panel title wraps across its own panel; on top, its lines are what the
+  // top margin reserves, so they never climb into the figure title.
+  const panelTitles = panels.map((columnName, index) =>
+    panelLetter === "x"
+      ? wrapLabel(
+          titleFor(columnName),
+          maxCharsFor(plottingWidth * (domains[index][1] - domains[index][0])),
+        )
+      : null,
+  );
+  const panelTitleLines = Math.max(
+    1,
+    ...panelTitles.map((text) => (text ? text.split("<br>").length : 1)),
+  );
+  const margin = marginFor(plan.orientation, titleLines, panelTitleLines);
   const plottingHeight = size.height
     ? Math.max(size.height - margin.t - margin.b, 0)
     : 0;
   // A title wraps against the length of its own axis: across for x, along for y.
-  const wrapAlong = (text, letter, domain) =>
+  const wrapAlong = (text, letter, domain, maxLines) =>
     wrapLabel(
       text,
       maxCharsFor(
         (letter === "y" ? plottingHeight : plottingWidth) *
           (domain[1] - domain[0]),
       ),
+      maxLines,
     );
   const binLimit = coloredLine
     ? lineBinLimitFor({
@@ -384,8 +404,12 @@ export function buildFigure({
           },
         }
       : {}),
-    ...(plan.sharedReversed ? { autorange: "reversed" } : {}),
-    title: axisTitle(wrapAlong(sharedTitle, sharedLetter, [0, 1])),
+    ...(sharedLetter === "y" && reversedYAxes.has(sharedAxis)
+      ? { autorange: "reversed" }
+      : {}),
+    title: axisTitle(
+      wrapAlong(sharedTitle, sharedLetter, [0, 1], PINNED_AXIS_LINES), // the pinned strip's fixed room
+    ),
   };
 
   const lineTraces = [];
@@ -404,8 +428,13 @@ export function buildFigure({
         : {}),
       // Wrapped to its OWN panel: six panels in a 1140px modal are ~170px
       // each, and one unwrapped long_name covers three.
-      title: axisTitle(wrapAlong(panelTitle, panelLetter, domain)),
+      title: axisTitle(
+        panelTitles[index] ?? wrapAlong(panelTitle, panelLetter, domain),
+      ),
       zeroline: false,
+      ...(panelLetter === "y" && reversedYAxes.has(columnName)
+        ? { autorange: "reversed" }
+        : {}),
     };
 
     const sharedValues = (data || []).map((row) => row[sharedAxis]);
@@ -521,6 +550,7 @@ const COLORBAR_PAD_PX = 10;
  * figure, and only a stack is guaranteed never to scroll them out of view.
  *
  * @param scales { [columnName]: scaleName } — the user's overrides only
+ * @param yReversed draw Y downwards; by default when Y is a depth or a pressure
  */
 export function buildColorFigure({
   variablesByName,
@@ -536,6 +566,7 @@ export function buildColorFigure({
   sharedText = null,
   size = {},
   uirevision,
+  yReversed = isDownwardVertical(variablesByName.get(yAxis)),
 }) {
   const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
   const domains = domainsFor(panels.length, ROW_GAP);
@@ -550,7 +581,8 @@ export function buildColorFigure({
   const plottingHeight = size.height
     ? Math.max(size.height - margin.t - margin.b, 0)
     : 0;
-  const wrapAlong = (text, pixels) => wrapLabel(text, maxCharsFor(pixels));
+  const wrapAlong = (text, pixels, maxLines) =>
+    wrapLabel(text, maxCharsFor(pixels), maxLines);
   const binLimit = mode.includes("lines")
     ? lineBinLimitFor({ panelCount: panels.length, axisPixels: plottingWidth })
     : 0;
@@ -582,11 +614,12 @@ export function buildColorFigure({
           ticktext: sharedTicks.ticktext,
         }
       : {}),
-    title: axisTitle(wrapAlong(titleFor(xAxis), plottingWidth)),
+    title: axisTitle(
+      wrapAlong(titleFor(xAxis), plottingWidth, PINNED_AXIS_LINES), // the pinned strip's fixed room
+    ),
   };
 
   const yTitle = titleFor(yAxis);
-  const yReversed = isDownwardVertical(variablesByName.get(yAxis));
   const xValues = (data || []).map((row) => row[xAxis]);
   const yValues = (data || []).map((row) => row[yAxis]);
 
@@ -629,7 +662,12 @@ export function buildColorFigure({
           tickfont: { size: TICK_FONT_PX },
           ...(dimension.ticks || {}),
           title: {
-            text: titleFor(columnName),
+            // Along its own bar, like the panel's Y title: unwrapped, a long
+            // name runs past the bar into its neighbours'.
+            text: wrapAlong(
+              titleFor(columnName),
+              plottingHeight * (domain[1] - domain[0]),
+            ),
             side: "right",
             font: { size: LABEL_FONT_PX },
           },

@@ -23,6 +23,7 @@ test("the preview owns the record param and the plot params", () => {
     "pcx",
     "pcy",
     "pzscales",
+    "pyflip",
     "pstep",
   ]);
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {

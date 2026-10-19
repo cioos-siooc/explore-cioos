@@ -18,7 +18,7 @@ export const MAX_TITLE_LINES = 2;
 // generous: overestimating wraps a label one word early, underestimating puts
 // two panel titles on top of each other.
 const CHAR_PX_PER_FONT_PX = 0.58;
-const MAX_LABEL_LINES = 3;
+export const MAX_LABEL_LINES = 3;
 
 // labelFor writes "long_name ( unit )", and the unit group is both the tail of
 // every label and the part that collides first, so it gets its own line.
@@ -38,6 +38,7 @@ function greedyLines(text, maxChars) {
   text
     .split(/\s+/)
     .filter(Boolean)
+    .map((word) => ellipsize(word, maxChars))
     .forEach((word) => {
       if (!current) {
         current = word;
@@ -61,8 +62,8 @@ export function ellipsize(text, maxChars) {
  * Break a label onto as many lines as it needs, with <br> — what Plotly reads
  * inside a title or an annotation, and what it counts when growing a margin.
  *
- * A word is never split: a single long token overflows its panel slightly
- * rather than being mangled. Past `maxLines` the NAME is truncated and the unit
+ * A word longer than a line is ellipsized rather than left to overflow into
+ * the next panel's label. Past `maxLines` the NAME is truncated and the unit
  * line is always kept — a label whose unit went missing reads as a different
  * quantity.
  */

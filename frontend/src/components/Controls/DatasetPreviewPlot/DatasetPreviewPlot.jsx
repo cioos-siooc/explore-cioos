@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronBarLeft, ChevronBarRight } from "react-bootstrap-icons";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
@@ -16,12 +16,14 @@ import "./styles.css";
 import Plotly from "plotly.js-basic-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import frLocale from "plotly.js-locales/fr";
+import isEqual from "lodash-es/isEqual";
 
 import { labelFor, shortLabelFor } from "../DatasetPreview/previewVariables.js";
 import {
   axisDirectionsFor,
   panelCandidatesFor,
   sharedCandidatesFor,
+  COLUMNS,
   ROWS,
 } from "../DatasetPreview/previewFacetPlan.js";
 import {
@@ -29,6 +31,12 @@ import {
   buildFigure,
   plotBoxFor,
 } from "../DatasetPreview/previewFacetFigure.js";
+import { pinnedAxisSizeFor } from "../DatasetPreview/previewFacetSizing.js";
+import {
+  pinnedAxisFigureFor,
+  pinnedViewFor,
+  splitPinnedAxis,
+} from "../DatasetPreview/previewPinnedAxis.js";
 import {
   clampPaneWidth,
   PANE_DEFAULT_PX,
@@ -51,6 +59,8 @@ const PROFILE_RECORD_TYPES = ["TimeSeriesProfile", "TrajectoryProfile"];
 
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
+
+const PINNED_AXIS_CONFIG = { staticPlot: true, displayModeBar: false };
 
 // One panel per variable, all sharing one axis. The arrangement per
 // cdm_data_type lives in previewFacetPlan.js, the box in previewFacetSizing.js
@@ -90,6 +100,9 @@ export default function DatasetPreviewPlot() {
     setColorY,
     variableScales,
     setVariableScale,
+    yAxisColumns,
+    reversedYAxes,
+    setYAxisReversed,
     plotType,
     setPlotType,
     profiles,
@@ -186,6 +199,7 @@ export default function DatasetPreviewPlot() {
             sharedText: onPositionAxis ? trackIndex.labels : null,
             size: { width, height },
             uirevision: `${inspectRecordID}|${uirevision}`,
+            yReversed: reversedYAxes.has(colorY),
           })
         : null;
     }
@@ -205,6 +219,7 @@ export default function DatasetPreviewPlot() {
       sharedText: onPositionAxis ? trackIndex.labels : null,
       size: { width, height },
       uirevision: `${inspectRecordID}|${uirevision}`,
+      reversedYAxes,
     });
   }, [
     isColorLayout,
@@ -228,7 +243,35 @@ export default function DatasetPreviewPlot() {
     height,
     inspectRecordID,
     uirevision,
+    reversedYAxes,
   ]);
+
+  // The shared axis leaves the scroller for a strip beside it, so its scale and
+  // title stay in view while the panels scroll — see previewPinnedAxis.js.
+  const pinnedOrientation = isColorLayout ? ROWS : plan.orientation;
+  const split = useMemo(
+    () => figure && splitPinnedAxis(figure, pinnedOrientation),
+    [figure, pinnedOrientation],
+  );
+  const [pinnedView, setPinnedView] = useState(null);
+  // Fired after every draw and every zoom; the main Plot redraws on each render
+  // (its config is a fresh object), so an unchanged view must not re-render.
+  const readPinnedView = useCallback(
+    (_figure, graphDiv) => {
+      const next = pinnedViewFor(graphDiv._fullLayout, pinnedOrientation);
+      setPinnedView((previous) => (isEqual(previous, next) ? previous : next));
+    },
+    [pinnedOrientation],
+  );
+  const pinnedFigure = useMemo(
+    () =>
+      split && pinnedView
+        ? pinnedAxisFigureFor(split.axis, pinnedView, pinnedOrientation)
+        : null,
+    [split, pinnedView, pinnedOrientation],
+  );
+  const pinnedThickness = pinnedAxisSizeFor(pinnedOrientation);
+  const pinnedLeft = pinnedOrientation === COLUMNS;
 
   const labelOf = (columnName) => labelFor(variablesByName.get(columnName));
   const toggleLabel = (text) => (
@@ -299,6 +342,19 @@ export default function DatasetPreviewPlot() {
           }
         />
       </div>
+      {yAxisColumns.includes(columnName) && (
+        <label className="labelEditorCheckbox">
+          <input
+            type="checkbox"
+            checked={reversedYAxes.has(columnName)}
+            onChange={(event) =>
+              setYAxisReversed(columnName, event.target.checked)
+            }
+            aria-label={`${t("datasetPreviewPlotInvertYAxis")}: ${labelOf(columnName)}`}
+          />
+          {t("datasetPreviewPlotInvertYAxis")}
+        </label>
+      )}
     </div>
   );
 
@@ -545,37 +601,65 @@ export default function DatasetPreviewPlot() {
           </div>
         )}
 
-        <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
-          {figure ? (
-            <Plot
-              data={figure.data}
-              layout={figure.layout}
-              // Explicit width/height in the layout, so Plotly never runs
-              // plotAutoSize. That is what used to read a container height of
-              // 0px on first mount and silently fall back to its own 450px
-              // default, leaving the plot small until the next relayout.
-              style={{ width: `${width}px`, height: `${height}px` }}
-              useResizeHandler={false}
-              config={{
-                displaylogo: false,
-                modeBarButtonsToRemove: [
-                  "select2d",
-                  "lasso2d",
-                  "resetScale2d",
-                  "pan2d",
-                ],
-                // Off deliberately: `responsive` re-measures from computed
-                // style on every window resize, which would fight the sizes
-                // above. useElementSize drives resizing instead.
-                responsive: false,
-                scrollZoom: true,
-                locale: i18n.language === "fr" ? "fr" : "en",
-              }}
-            />
-          ) : (
-            <p className="datasetPreviewPlotEmpty">
-              {t("datasetPreviewPlotNoVariablesSelected")}
-            </p>
+        <div
+          className={`datasetPreviewPlotBody ${pinnedLeft ? "isPinnedLeft" : "isPinnedBelow"}`}
+        >
+          <div className="datasetPreviewPlotArea" ref={plotAreaRef}>
+            {split ? (
+              <Plot
+                data={split.figure.data}
+                layout={split.figure.layout}
+                onInitialized={readPinnedView}
+                onUpdate={readPinnedView}
+                // Explicit width/height in the layout, so Plotly never runs
+                // plotAutoSize. That is what used to read a container height of
+                // 0px on first mount and silently fall back to its own 450px
+                // default, leaving the plot small until the next relayout.
+                style={{ width: `${width}px`, height: `${height}px` }}
+                useResizeHandler={false}
+                config={{
+                  displaylogo: false,
+                  modeBarButtonsToRemove: [
+                    "select2d",
+                    "lasso2d",
+                    "resetScale2d",
+                    "pan2d",
+                  ],
+                  // Off deliberately: `responsive` re-measures from computed
+                  // style on every window resize, which would fight the sizes
+                  // above. useElementSize drives resizing instead.
+                  responsive: false,
+                  scrollZoom: true,
+                  locale: i18n.language === "fr" ? "fr" : "en",
+                }}
+              />
+            ) : (
+              <p className="datasetPreviewPlotEmpty">
+                {t("datasetPreviewPlotNoVariablesSelected")}
+              </p>
+            )}
+          </div>
+
+          {split && (
+            <div
+              className="pinnedAxis"
+              // Sized before the figure is drawn, so the scroller beside it is
+              // measured at its final size.
+              style={
+                pinnedLeft
+                  ? { width: `${pinnedThickness}px` }
+                  : { height: `${pinnedThickness}px` }
+              }
+            >
+              {pinnedFigure && (
+                <Plot
+                  data={pinnedFigure.data}
+                  layout={pinnedFigure.layout}
+                  useResizeHandler={false}
+                  config={PINNED_AXIS_CONFIG}
+                />
+              )}
+            </div>
           )}
         </div>
 

@@ -2,12 +2,17 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import { variablesFrom, byColumnName } from "./previewVariables.js";
+import {
+  variablesFrom,
+  byColumnName,
+  isDownwardVertical,
+} from "./previewVariables.js";
 import { positionRowsFor, trackIndexFor } from "./previewTrackIndex.js";
 import { distanceRowsFor, trackDistancesFor } from "./previewTrackDistance.js";
 import {
   colorCandidatesFor,
   colorPlotAxesFor,
+  COLUMNS,
   facetPlanFor,
   resolvePanels,
   defaultVisFor,
@@ -367,6 +372,47 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams, variableScales],
   );
 
+  // Each variable on a Y axis is drawn downwards by default when it is a depth
+  // or a pressure. `pyflip` lists the ones turned the other way, keyed by column
+  // like `pcolors`, so a flip survives the variable leaving Y and coming back.
+  const yAxisColumns = useMemo(
+    () =>
+      (isColorLayout
+        ? [colorY]
+        : plan && plan.orientation === COLUMNS
+          ? [sharedAxis]
+          : panels
+      ).filter(Boolean),
+    [isColorLayout, colorY, plan, sharedAxis, panels],
+  );
+  const reversedByDefault = useCallback(
+    (columnName) => isDownwardVertical(variablesByName.get(columnName)),
+    [variablesByName],
+  );
+  const flippedColumns = useMemo(
+    () => paramToList(searchParams.get("pyflip")),
+    [searchParams],
+  );
+  const reversedYAxes = useMemo(
+    () =>
+      new Set(
+        yAxisColumns.filter(
+          (columnName) =>
+            reversedByDefault(columnName) !==
+            flippedColumns.includes(columnName),
+        ),
+      ),
+    [yAxisColumns, reversedByDefault, flippedColumns],
+  );
+  const setYAxisReversed = useCallback(
+    (columnName, reversed) => {
+      const next = flippedColumns.filter((name) => name !== columnName);
+      if (reversed !== reversedByDefault(columnName)) next.push(columnName);
+      setParams({ pyflip: next.length ? next.join(",") : null });
+    },
+    [setParams, flippedColumns, reversedByDefault],
+  );
+
   const modeParam = searchParams.get("pmode");
   const plotType = PLOT_MODES.some((mode) => mode.value === modeParam)
     ? modeParam
@@ -387,9 +433,11 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   // Changes whenever the axis SET changes, so Plotly does not try to restore a
   // zoom onto an axis that no longer exists after a panel is added or removed.
-  const uirevision = isColorLayout
+  // A flipped Y counts too: a kept zoom would hold the old direction's range.
+  const axisSet = isColorLayout
     ? `color|${colorX || ""}|${colorY || ""}|${panels.join(",")}`
     : `${sharedAxis || ""}|${panels.join(",")}`;
+  const uirevision = `${axisSet}|${[...reversedYAxes].join(",")}`;
 
   // Anything that alters the link the Copy button would hand over. The whole
   // search string, not just the plot params: panning the map changes the link
@@ -424,6 +472,9 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     setColorY,
     variableScales,
     setVariableScale,
+    yAxisColumns,
+    reversedYAxes,
+    setYAxisReversed,
     plotType,
     setPlotType,
     step,

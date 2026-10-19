@@ -118,6 +118,22 @@ test("the shared depth axis is reversed, and titled along itself", () => {
   assert.equal(layout.annotations, undefined);
 });
 
+test("the user can draw the shared depth axis upwards", () => {
+  const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
+    reversedYAxes: new Set(),
+  });
+  assert.equal(layout.yaxis.autorange, undefined);
+});
+
+test("a stack reverses only the panels it is asked to", () => {
+  const { layout } = figure("TimeSeries", ["TE90_01", "PSAL_01"], {
+    reversedYAxes: new Set(["PSAL_01"]),
+  });
+  assert.equal(layout.yaxis.autorange, undefined);
+  assert.equal(layout.yaxis2.autorange, "reversed");
+  assert.equal(layout.xaxis.autorange, undefined);
+});
+
 test("profile panel titles sit on top, one per variable", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01", "PSAL_01"]);
   assert.equal(layout.xaxis.side, "top");
@@ -345,6 +361,25 @@ test("panel titles wrap to their own panel once the width is known", () => {
   // The same figure with no measured width leaves them on one line.
   const unsized = figure("TimeSeriesProfile", ALL_SIX);
   assert.ok(!unsized.layout.xaxis.title.text.includes("<br>"));
+});
+
+test("a profile's top margin holds its tallest panel title", () => {
+  const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
+    size: { width: 1140, height: 620 },
+  });
+  const tallest = Math.max(
+    ...ALL_SIX.map(
+      (_, index) =>
+        layout[index === 0 ? "xaxis" : `xaxis${index + 1}`].title.text.split(
+          "<br>",
+        ).length,
+    ),
+  );
+  assert.ok(tallest > 1);
+  assert.equal(
+    layout.margin.t,
+    marginFor(COLUMNS, titleLinesFor(TITLE, 1140), tallest).t,
+  );
 });
 
 test("one panel is wide enough not to wrap", () => {
@@ -587,6 +622,9 @@ test("a window spanning several profiles names three and counts the rest", () =>
   );
 });
 
+const panelTitleLines = (layout) =>
+  layout.xaxis.title.text.split("<br>").length;
+
 test("the title is drawn where Plotly draws a title, and not by automargin", () => {
   const { layout } = figure("TimeSeriesProfile", ALL_SIX, {
     size: { width: 1140, height: 620 },
@@ -611,8 +649,14 @@ test("the title costs the top margin only the lines it actually used", () => {
   const narrow = figure("TimeSeriesProfile", ["TE90_01"], {
     size: { width: 340, height: 620 },
   });
-  assert.equal(wide.layout.margin.t, marginFor(COLUMNS, 1).t);
-  assert.equal(narrow.layout.margin.t, marginFor(COLUMNS, 2).t);
+  assert.equal(
+    wide.layout.margin.t,
+    marginFor(COLUMNS, 1, panelTitleLines(wide.layout)).t,
+  );
+  assert.equal(
+    narrow.layout.margin.t,
+    marginFor(COLUMNS, 2, panelTitleLines(narrow.layout)).t,
+  );
   assert.ok(narrow.layout.margin.t > wide.layout.margin.t);
   // And a stack sized for one line is shorter than one sized for the worst case.
   assert.ok(plotHeightFor(ROWS, 6, 100, 1) < plotHeightFor(ROWS, 6, 100, 2));
@@ -621,7 +665,10 @@ test("the title costs the top margin only the lines it actually used", () => {
 test("no title means no title and no room reserved for one", () => {
   const { layout } = figure("TimeSeriesProfile", ["TE90_01"], { title: "" });
   assert.ok(!layout.title);
-  assert.equal(layout.margin.t, marginFor(COLUMNS, 0).t);
+  assert.equal(
+    layout.margin.t,
+    marginFor(COLUMNS, 0, panelTitleLines(layout)).t,
+  );
   assert.equal(titleRoomFor(0), 0);
   assert.equal(titleLinesFor("", 1140), 0);
 });
@@ -1076,6 +1123,12 @@ test("every colour panel titles its Y, reverses depth and zooms with the first",
   assert.equal(layout.yaxis2.matches, "y");
 });
 
+test("the user can draw a colour plot's depth upwards", () => {
+  const { layout } = colorFigure(["TE90_01", "PSAL_01"], { yReversed: false });
+  assert.equal(layout.yaxis.autorange, undefined);
+  assert.equal(layout.yaxis2.autorange, undefined);
+});
+
 test("each panel's colourbar spans exactly its panel and names its variable", () => {
   const { data, layout } = colorFigure(["TE90_01", "PSAL_01"]);
   [
@@ -1090,6 +1143,23 @@ test("each panel's colourbar spans exactly its panel and names its variable", ()
     assert.equal(colorbar.yanchor, "middle", name);
     assert.equal(colorbar.title.text, label, name);
     assert.equal(data[index].marker.coloraxis, name);
+  });
+});
+
+test("each colourbar title wraps to its own panel's height", () => {
+  const { layout } = colorFigure(["TE90_01", "PSAL_01", "DOXY_01"], {
+    size: { width: 1000, height: 500 },
+  });
+  const plottingHeight = 500 - layout.margin.t - layout.margin.b;
+  ["coloraxis", "coloraxis2", "coloraxis3"].forEach((name, index) => {
+    const [start, end] =
+      layout[index === 0 ? "yaxis" : `yaxis${index + 1}`].domain;
+    const fits = maxCharsFor(plottingHeight * (end - start));
+    const lines = layout[name].colorbar.title.text.split("<br>");
+    assert.ok(lines.length > 1, name);
+    lines
+      .filter((line) => !/^\( .* \)$/.test(line)) // a unit is never cut
+      .forEach((line) => assert.ok(line.length <= fits, `${name}: "${line}"`));
   });
 });
 
@@ -1168,4 +1238,28 @@ test("plotBoxFor sizes a colour plot as a stack, whatever the record's type", ()
   });
   assert.equal(box.width, 799);
   assert.ok(box.height > 400);
+});
+
+// --- the pinned shared axis --------------------------------------------------
+
+const LONG_NAME =
+  "a renamed axis whose label keeps going well past any line it could fit on";
+const lineCount = (text) => text.split("<br>").length;
+
+test("a profile's shared title fits its pinned strip: two lines, unit kept", () => {
+  const { layout } = figure("TimeSeriesProfile", ["TE90_01"], {
+    labels: { depth: LONG_NAME },
+    size: { width: 600, height: 400 },
+  });
+  assert.equal(lineCount(layout.yaxis.title.text), 2);
+  assert.ok(layout.yaxis.title.text.endsWith("<br>( m )"));
+});
+
+test("a colour plot's X title fits its pinned strip: two lines, unit kept", () => {
+  const { layout } = colorFigure(["TE90_01"], {
+    labels: { time: LONG_NAME },
+    size: { width: 400, height: 400 },
+  });
+  assert.equal(lineCount(layout.xaxis.title.text), 2);
+  assert.ok(layout.xaxis.title.text.endsWith("<br>( UTC )"));
 });

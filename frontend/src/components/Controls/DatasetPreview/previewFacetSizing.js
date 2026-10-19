@@ -6,25 +6,50 @@
 // worth asserting on its own.
 
 import { COLUMNS } from "./previewFacetPlan.js";
-import { MAX_TITLE_LINES } from "./previewLabelText.js";
+import { MAX_LABEL_LINES, MAX_TITLE_LINES } from "./previewLabelText.js";
 
 // Left of every vertical axis: room for its tick labels, then room for the
 // axis's own label, which runs along the axis and so needs only its line
-// height — two 18px lines here, automargin covers a third. Reserved on the left
-// in both orientations, because both put a labelled vertical axis there.
+// height — two 18px lines here, automargin covers a third. Reserved by a
+// stack's margin and by a profile's pinned strip, both left of a vertical axis.
 export const TICK_ROOM_PX = 40;
 export const LABEL_GUTTER_PX = 48;
 
+// Above a profile's panels: their tick labels and the title standoff. The panel
+// titles' own lines are added per line, so they never reach the figure title.
+export const TOP_TICK_ROOM_PX = 28;
+// 18px at Plotly's LINE_SPACING of 1.3 is 23.4.
+export const LABEL_LINE_PX = 24;
+
+// The shared axis is drawn in a strip of its own outside the scroller (see
+// previewPinnedAxis.js), so it stays in view however far the panels scroll: a
+// profile's on the left, a stack's at the bottom. The figure keeps only enough
+// of that edge not to clip the axis line. The title is capped at two lines,
+// because a strip sized from its title would feed back into the figure's size.
+export const PINNED_AXIS_LINES = 2;
+const BOTTOM_TICK_ROOM_PX = 24;
+export const PINNED_EDGE_PX = 4;
+
+export function pinnedAxisSizeFor(orientation) {
+  const tickRoom = orientation === COLUMNS ? TICK_ROOM_PX : BOTTOM_TICK_ROOM_PX;
+  return tickRoom + PINNED_AXIS_LINES * LABEL_LINE_PX;
+}
+
 // Orientation-dependent because the two layouts spend their other edges
 // differently: a profile puts its panel titles on TOP and nothing at the
-// bottom, a stack puts its shared axis at the BOTTOM.
+// bottom, a stack labels each panel's own axis on the LEFT.
 const COLUMNS_MARGIN = {
-  l: TICK_ROOM_PX + LABEL_GUTTER_PX,
+  l: PINNED_EDGE_PX,
   r: 26,
-  t: 64,
+  t: TOP_TICK_ROOM_PX,
   b: 22,
 };
-const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 72 };
+const ROWS_MARGIN = {
+  l: TICK_ROOM_PX + LABEL_GUTTER_PX,
+  r: 26,
+  t: 30,
+  b: PINNED_EDGE_PX,
+};
 
 // Right of a colour plot's panels: each one's own colourbar, its tick labels and
 // its sideways title.
@@ -42,12 +67,25 @@ export function titleRoomFor(lineCount) {
 }
 
 /**
- * `titleLines` defaults to the worst case, so the sizing floors reserve room
- * for a title they cannot measure; buildFigure passes the count it wrapped to.
+ * Both line counts default to the worst case, so the sizing floors reserve room
+ * for labels they cannot measure; buildFigure passes the counts it wrapped to.
+ * `panelTitleLines` only counts for a profile, whose panel titles are on top.
  */
-export function marginFor(orientation, titleLines = MAX_TITLE_LINES) {
-  const base = orientation === COLUMNS ? COLUMNS_MARGIN : ROWS_MARGIN;
-  return { ...base, t: base.t + titleRoomFor(titleLines) };
+export function marginFor(
+  orientation,
+  titleLines = MAX_TITLE_LINES,
+  panelTitleLines = MAX_LABEL_LINES,
+) {
+  if (orientation !== COLUMNS) {
+    return { ...ROWS_MARGIN, t: ROWS_MARGIN.t + titleRoomFor(titleLines) };
+  }
+  return {
+    ...COLUMNS_MARGIN,
+    t:
+      COLUMNS_MARGIN.t +
+      panelTitleLines * LABEL_LINE_PX +
+      titleRoomFor(titleLines),
+  };
 }
 
 // Gap between panels, as a fraction of ONE PANEL rather than of the whole

@@ -129,6 +129,63 @@ describe("usePreviewPlotParams", () => {
     });
   });
 
+  describe("inverting a Y axis", () => {
+    it("draws depth downwards without adding to the link", () => {
+      open();
+      expect(api.yAxisColumns).toEqual(["depth"]);
+      expect(api.reversedYAxes.has("depth")).toBe(true);
+      expect(param("pyflip")).toBeNull();
+    });
+
+    it("writes the flip and deletes it on the way back", async () => {
+      open();
+      await run(() => api.setYAxisReversed("depth", false));
+      expect(param("pyflip")).toBe("depth");
+      expect(api.reversedYAxes.has("depth")).toBe(false);
+
+      await run(() => api.setYAxisReversed("depth", true));
+      expect(param("pyflip")).toBeNull();
+    });
+
+    it("does not reverse a non-vertical Y unless asked", async () => {
+      open("playout=color&pcy=salinity");
+      expect(api.yAxisColumns).toEqual(["salinity"]);
+      expect(api.reversedYAxes.has("salinity")).toBe(false);
+
+      await run(() => api.setYAxisReversed("salinity", true));
+      expect(param("pyflip")).toBe("salinity");
+      expect(api.reversedYAxes.has("salinity")).toBe(true);
+    });
+
+    it("gives every panel of a stack its own Y axis to flip", async () => {
+      renderWithProviders(
+        <Probe dataset={{ ...DATASET, cdm_data_type: "TimeSeries" }} />,
+        { url: "/?pvars=temperature,salinity" },
+      );
+      expect(api.yAxisColumns).toEqual(["temperature", "salinity"]);
+
+      await run(() => api.setYAxisReversed("salinity", true));
+      expect(api.reversedYAxes.has("salinity")).toBe(true);
+      expect(api.reversedYAxes.has("temperature")).toBe(false);
+    });
+
+    it("keeps a variable's flip while it leaves Y and comes back", async () => {
+      open("playout=color&pcy=salinity&pyflip=salinity");
+      await run(() => api.setColorY("depth"));
+      expect(api.reversedYAxes.has("depth")).toBe(true);
+
+      await run(() => api.setColorY("salinity"));
+      expect(api.reversedYAxes.has("salinity")).toBe(true);
+    });
+
+    it("changes uirevision, so a kept zoom cannot hold the old direction", async () => {
+      open();
+      const before = api.uirevision;
+      await run(() => api.setYAxisReversed("depth", false));
+      expect(api.uirevision).not.toBe(before);
+    });
+  });
+
   describe("a link naming something this dataset does not have", () => {
     it("falls back to the plan's own axis", () => {
       open("paxis=not_a_column");

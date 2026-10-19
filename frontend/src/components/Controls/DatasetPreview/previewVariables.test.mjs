@@ -434,6 +434,16 @@ test("depth is downward by declaration, and by CF convention without it", () => 
   assert.equal(isDownwardVertical(null), false);
 });
 
+test("sea water pressure is downward, like depth", () => {
+  assert.equal(
+    isDownwardVertical({
+      columnName: "PRES",
+      standardName: "sea_water_pressure",
+    }),
+    true,
+  );
+});
+
 test("a cf_role is read from the harvest, or inferred from the dataset", () => {
   const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET));
   assert.equal(index.get("station_id").cfRole, "timeseries_id");

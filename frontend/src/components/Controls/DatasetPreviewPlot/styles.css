@@ -244,6 +244,27 @@
   overflow: auto;
 }
 
+/* The scroller and the pinned shared axis beside it: below a stack, left of a
+ * profile — the edge whose axis would otherwise scroll out of view. */
+.datasetPreviewPlotBody {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.datasetPreviewPlotBody.isPinnedBelow {
+  flex-direction: column;
+}
+
+.datasetPreviewPlotBody.isPinnedLeft {
+  flex-direction: row-reverse;
+}
+
+.pinnedAxis {
+  flex: 0 0 auto;
+}
+
 /* Plotly's hovermode "x" repeats the time in a box on the axis; every panel's
    hover box already leads with it, and no layout attribute turns it off. */
 .datasetPreviewPlotArea .hoverlayer .axistext {
@@ -305,6 +326,16 @@
   flex-direction: column;
   gap: 6px;
   margin-top: 4px;
+}
+
+.labelEditorCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--cioos-font-size-2xs);
+  color: var(--cioos-ink-80);
+  cursor: pointer;
 }
 
 .labelEditorRow {

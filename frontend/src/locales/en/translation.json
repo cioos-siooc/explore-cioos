@@ -429,6 +429,7 @@
   "datasetPreviewPlotWantedTrack": "a longitude, latitude or time column",
   "datasetPreviewPlotWantedMeasurement": "at least one measurement column",
   "datasetPreviewPlotCustomizePlot": "Customize plot",
+  "datasetPreviewPlotInvertYAxis": "Invert Y axis",
   "datasetPreviewPlotColor": "Color",
   "datasetPreviewPlotColorBy": "Color by",
   "datasetPreviewPlotLayout": "Layout",

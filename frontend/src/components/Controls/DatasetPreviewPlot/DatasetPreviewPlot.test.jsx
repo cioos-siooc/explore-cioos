@@ -22,6 +22,7 @@ vi.mock("react-plotly.js/factory", () => ({
           data-testid="plotly"
           data-traces={data.length}
           data-hovermode={layout.hovermode}
+          data-y-autorange={layout.yaxis.autorange}
         />
       );
     },
@@ -141,6 +142,46 @@ describe("DatasetPreviewPlot", () => {
       .closest(".labelEditorRow");
     expect(row.querySelector(".colorScaleChip")).not.toBeNull();
     expect(row.querySelector(".dropdownButtonSwatch")).toBeNull();
+  });
+
+  it("inverts the Y axis from its variable's row, checked for a depth", async () => {
+    const user = open();
+    const plot = await plotted();
+    await user.click(screen.getByText(/Customize plot/));
+    expect(
+      screen.getAllByRole("checkbox", { name: /Invert Y axis/ }),
+    ).toHaveLength(1); // a profile's panels are on X
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Invert Y axis: depth ( m )",
+    });
+    expect(checkbox).toBeChecked();
+    expect(plot).toHaveAttribute("data-y-autorange", "reversed");
+
+    await user.click(checkbox);
+
+    expect(checkbox).not.toBeChecked();
+    expect(screen.getByTestId("plotly")).not.toHaveAttribute(
+      "data-y-autorange",
+    );
+  });
+
+  it("pins a profile's shared axis left of the scroller, outside it", async () => {
+    open();
+    await plotted();
+    const strip = document.querySelector(".pinnedAxis");
+    expect(
+      document.querySelector(".datasetPreviewPlotArea").contains(strip),
+    ).toBe(false);
+    expect(strip.parentElement).toHaveClass("isPinnedLeft");
+    expect(strip).toHaveStyle({ width: "88px" });
+  });
+
+  it("pins a stack's shared axis below the scroller", async () => {
+    open("/", { ...DATASET, cdm_data_type: "TimeSeries" });
+    await plotted();
+    const strip = document.querySelector(".pinnedAxis");
+    expect(strip.parentElement).toHaveClass("isPinnedBelow");
+    expect(strip).toHaveStyle({ height: "72px" });
   });
 
   it("names a record of many casts in a header row above the figure", async () => {

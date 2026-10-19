@@ -50,6 +50,22 @@ test("profile types face across, sharing a reversed depth axis", () => {
   }
 });
 
+test("a profile sharing a sea water pressure axis is reversed", () => {
+  const table = {
+    columnNames: ["PRES", "TEMP"],
+    columnTypes: ["float", "float"],
+    columnUnits: ["dbar", "degree_C"],
+    columnMeta: [
+      { name: "PRES", axis: "Z", standard_name: "sea_water_pressure" },
+      { name: "TEMP", standard_name: "sea_water_temperature" },
+    ],
+  };
+  const dataset = { cdm_data_type: "Profile" };
+  const plan = facetPlanFor(dataset, variablesFrom(table, dataset));
+  assert.equal(plan.sharedAxis, "PRES");
+  assert.equal(plan.sharedReversed, true);
+});
+
 test("a timeseries stacks, sharing time, and is not reversed", () => {
   const plan = planFor("TimeSeries");
   assert.equal(plan.orientation, ROWS);

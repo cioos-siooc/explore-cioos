@@ -260,5 +260,10 @@ export function isDownwardVertical(variable) {
     variable.columnName ||
     ""
   ).toLowerCase();
-  return name === "depth" || name === "pressure" || name.startsWith("depth");
+  return (
+    name === "depth" ||
+    name === "pressure" ||
+    name === "sea_water_pressure" ||
+    name.startsWith("depth")
+  );
 }

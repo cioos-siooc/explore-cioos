@@ -59,6 +59,9 @@ export function parsePeriod(value) {
 //   pcy      the colour plot's Y   (default: depth, else a measurement)
 //   pzscales the colour plot's scale per variable, `column~Scale` comma-
 //            separated             (default: as for pzscale)
+//   pyflip   the columns whose Y axis is drawn opposite to its default,
+//            comma-separated       (default: none; a depth or pressure on Y
+//                                  is drawn downwards)
 //   pstep    which profile INSIDE the record is drawn, by the value of the
 //            dataset's cf_role=profile_id column
 //                                  (default: none, meaning the window
@@ -76,6 +79,7 @@ export const PLOT_PARAMS = [
   "pcx",
   "pcy",
   "pzscales",
+  "pyflip",
   STEP_PARAM,
 ];
 
