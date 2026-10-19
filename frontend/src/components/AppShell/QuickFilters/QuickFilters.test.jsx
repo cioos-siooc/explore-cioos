@@ -30,13 +30,20 @@ describe("QuickFilters", () => {
 
   // Asserted through the shared requestDraw state, not the markup.
   function renderRow(url = "/") {
-    const seen = { search: [], draw: [], onlyInView: [], realtimeOnly: [] };
+    const seen = {
+      search: [],
+      draw: [],
+      zoom: [],
+      onlyInView: [],
+      realtimeOnly: [],
+    };
     function Probe() {
       const { datasetTitleSearchText, onlyInView } = useSelection();
-      const { drawRequest } = useMapState();
+      const { drawRequest, zoomTarget } = useMapState();
       const { realtimeOnly } = useFilters();
       seen.search.push(datasetTitleSearchText);
       seen.draw.push(drawRequest?.mode);
+      seen.zoom.push(zoomTarget?.geometry);
       seen.onlyInView.push(onlyInView);
       seen.realtimeOnly.push(realtimeOnly);
       return null;
@@ -100,6 +107,31 @@ describe("QuickFilters", () => {
 
     expect(screen.getByTestId(on)).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId(off)).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("offers a zoom to the drawn shape only while there is one", async () => {
+    renderRow();
+    expect(screen.queryByTestId("quick-filter-zoom-area")).toBeNull();
+  });
+
+  it("zooms the map to the drawn shape", async () => {
+    const { user, seen } = renderRow(`/?${FREE_SHAPE}`);
+
+    await user.click(screen.getByTestId("quick-filter-zoom-area"));
+
+    await waitFor(() =>
+      expect(seen.zoom.at(-1)).toEqual({
+        type: "Polygon",
+        coordinates: [
+          [
+            [-70, 40],
+            [-60, 45],
+            [-65, 50],
+            [-70, 40],
+          ],
+        ],
+      }),
+    );
   });
 
   it("clears the drawn shape from the Area menu", async () => {

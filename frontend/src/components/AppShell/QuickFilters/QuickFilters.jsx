@@ -7,6 +7,7 @@ import {
   Eye,
   Pentagon,
   Trash,
+  ZoomIn,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
@@ -26,7 +27,7 @@ import "./styles.css";
 // shape. Captions because a touch screen has no hover to show the title.
 export default function QuickFilters() {
   const { t, i18n } = useTranslation();
-  const { requestDraw, zoom } = useMapState();
+  const { requestDraw, zoom, zoomToGeometry } = useMapState();
   const {
     polygon,
     areaPlace,
@@ -181,6 +182,23 @@ export default function QuickFilters() {
           </div>
         )}
       </div>
+      {hasShape && (
+        <button
+          type="button"
+          className="quickFilterButton"
+          data-testid="quick-filter-zoom-area"
+          onClick={() =>
+            zoomToGeometry({ type: "Polygon", coordinates: [polygon] })
+          }
+          title={t("quickFilterZoomAreaTitle")}
+          aria-label={t("quickFilterZoomAreaTitle")}
+        >
+          <ZoomIn size={18} aria-hidden="true" />
+          <span className="quickFilterCaption" aria-hidden="true">
+            {t("quickFilterCaptionZoomArea")}
+          </span>
+        </button>
+      )}
       <button
         type="button"
         className={classNames("quickFilterButton", { applied: onlyInView })}
