@@ -1,0 +1,46 @@
+import * as React from "react";
+
+// Windows 11's caption glyphs (minimize, maximize) and a sidebar one, drawn to
+// the extent and stroke weight of the shared X (CloseButton) so the three read
+// as one row of window controls.
+function Glyph({ children, ...props }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="0.7"
+      strokeLinejoin="round"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+}
+
+export function WindowMinimize(props) {
+  return (
+    <Glyph {...props}>
+      <path d="M4.5 8h7" />
+    </Glyph>
+  );
+}
+
+export function WindowMaximize(props) {
+  return (
+    <Glyph {...props}>
+      <rect x="4.5" y="4.5" width="7" height="7" rx="1" />
+    </Glyph>
+  );
+}
+
+// What a widened page goes back to: the window with the sidebar down its left.
+export function WindowSidebar(props) {
+  return (
+    <Glyph {...props}>
+      <rect x="4.5" y="4.5" width="7" height="7" rx="1" />
+      <path d="M7 4.5v7" />
+    </Glyph>
+  );
+}

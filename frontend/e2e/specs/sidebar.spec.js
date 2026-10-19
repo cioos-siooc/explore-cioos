@@ -101,4 +101,36 @@ test.describe("the datasets sidebar", () => {
     await page.setViewportSize(VIEWPORTS.desktop);
     await expect(panel).toHaveAttribute("data-expanded", "false");
   });
+
+  test("widens a dataset page over the map, and Escape returns it to the sidebar", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "mobile",
+      "a phone's dataset page is already full-screen",
+    );
+    await openApp(page, "dataset=HakaiBIOOSBuoy1hour");
+    const panel = page.getByTestId("sidebar-datasets");
+    if ((await panel.getAttribute("data-expanded")) !== "true") {
+      await page.getByTestId("topbar-datasets-button").click();
+    }
+    const narrowWidth = (await panel.boundingBox()).width;
+
+    await page.getByTestId("sidebar-wide-toggle").click();
+    await expect(page).toHaveURL(/[?&]wide=1/);
+    await expect(page.getByTestId("sidebar-scrim")).toBeVisible();
+    await expect(page.getByRole("tablist")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Metadata" })).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Data", exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(async () => (await panel.boundingBox()).width)
+      .toBeGreaterThan(narrowWidth * 1.5);
+
+    await page.keyboard.press("Escape");
+    await expect(page).not.toHaveURL(/[?&]wide=/);
+    await expect(page.getByRole("tablist")).toBeVisible();
+    await expect(page.getByTestId("sidebar-scrim")).toHaveCount(0);
+  });
 });

@@ -779,6 +779,8 @@
   "datasetMapCardDetailsText": "Details",
   "singleDatasetZoomText": "Zoom in",
   "closeDatasetText": "Close this dataset",
+  "sidebarWideViewTitle": "Widen this page over the map",
+  "sidebarNarrowViewTitle": "Return this page to the sidebar",
   "sidebarShowMapTitle": "Show the map — the dataset stays open in a card",
   "sidebarShowDatasetTitle": "Show the dataset page",
   "sidebarCollapseTitle": "Hide the dataset list",

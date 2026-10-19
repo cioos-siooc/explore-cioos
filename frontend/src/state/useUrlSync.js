@@ -19,6 +19,7 @@ import {
   PLOT_PARAMS,
   RECORD_PARAM,
   TAB_PARAM,
+  WIDE_PARAM,
 } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
@@ -33,6 +34,7 @@ import { useUI } from "./ui/UIProvider.jsx";
 const PRESERVED_PARAMS = [
   "server",
   TAB_PARAM,
+  WIDE_PARAM,
   RECORD_PARAM,
   PERIOD_PARAM,
   ...PLOT_PARAMS,

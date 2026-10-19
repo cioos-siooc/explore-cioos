@@ -13,6 +13,9 @@ export const PERIOD_PARAM = "pperiod";
 // default, the metadata tab, is not written.
 export const TAB_PARAM = "tab";
 
+// `1` when the dataset page is widened over the map; absent is the sidebar.
+export const WIDE_PARAM = "wide";
+
 export function parsePeriod(value) {
   const [start, end] = (value || "").split("~");
   return start && end ? { start, end } : undefined;
