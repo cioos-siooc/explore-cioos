@@ -1,104 +1,136 @@
+/* 12px matches the gap under the time distribution above, so every section
+   on the page sits the same distance apart. */
 .griddapDetails {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 12px;
 
   /* Long variable names and ISO timestamps would otherwise push the griddap
      section wider than the sidebar column. */
   min-width: 0;
 }
 
-/* Axis and variable cards: at the sidebar's width a 5-column table collapsed
-   into unreadable slivers, so each axis/variable gets its own stacked card. */
-.griddapDimensionsList,
+.griddapCardTitle + .griddapVariablesList,
+.griddapCardTitle + .griddapDimensionsList {
+  margin-top: 6px;
+}
+
 .griddapVariablesList {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   margin: 0;
   padding: 0;
   min-width: 0;
 }
 
-.griddapDimension,
 .griddapVariable {
+  display: block;
+  width: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border: 1px solid var(--cioos-hairline);
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-surface-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 
-.griddapDimensionHead,
+button.griddapVariable {
+  cursor: pointer;
+}
+
+button.griddapVariable:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-white);
+}
+
+button.griddapVariable:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+button.griddapVariable[aria-pressed="true"] {
+  border-color: var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
+}
+
 .griddapVariableHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
 }
 
-.griddapDimensionHead {
-  justify-content: space-between;
-}
-
-.griddapVariableHead {
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.griddapDimensionName,
-.griddapVariableLabel {
+.griddapVariableLabel,
+.griddapDimensionName {
   font-size: var(--cioos-font-size-sm);
   font-weight: 600;
   color: var(--cioos-ink);
   overflow-wrap: anywhere;
 }
 
-.griddapDimensionNodes {
-  flex-shrink: 0;
-  font-size: var(--cioos-font-size-2xs);
-  color: var(--cioos-ink-60);
-  white-space: nowrap;
-}
-
-.griddapDimensionRange {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 5px;
-  margin-top: 2px;
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink);
-}
-
-.griddapDimensionBound {
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-
-.griddapDimensionArrow,
-.griddapDimensionUnits,
-.griddapVariableUnits {
-  color: var(--cioos-ink-60);
-}
-
 .griddapVariableUnits {
   font-size: var(--cioos-font-size-xs);
-  white-space: nowrap;
-}
-
-.griddapDimensionSpacing,
-.griddapVariableName {
-  margin-top: 2px;
-  font-size: var(--cioos-font-size-2xs);
   color: var(--cioos-ink-60);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .griddapVariableName {
   display: inline-block;
+  font-size: var(--cioos-font-size-2xs);
+  color: var(--cioos-ink-60);
+  overflow-wrap: anywhere;
+}
+
+/* Reference info, so hairline-separated rows rather than cards: name on the
+   left, range on the right, node count and resolution underneath. */
+.griddapDimensionsList {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.griddapDimension {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: baseline;
+  padding: 4px 0;
+  min-width: 0;
+}
+
+.griddapDimension + .griddapDimension {
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.griddapDimensionRange,
+.griddapDimensionMeta {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.griddapDimensionRange {
+  font-size: var(--cioos-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--cioos-ink);
+  text-align: right;
+}
+
+.griddapDimensionMeta {
+  grid-column: 1 / -1;
+  font-size: var(--cioos-font-size-2xs);
+  color: var(--cioos-ink-60);
+}
+
+.griddapDimensionMeta:empty {
+  display: none;
+}
+
+.griddapDimensionMuted {
+  color: var(--cioos-ink-60);
 }
 
 /* The section's title and its show-on-map switch share the top line. */
