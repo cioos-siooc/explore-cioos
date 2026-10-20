@@ -6,6 +6,8 @@ export const MOBILE_QUERY = "(max-width: 700px), (max-height: 500px)";
 
 export const TOUCH_QUERY = "(hover: none)";
 
+export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
 // For when the markup itself differs; layout belongs in CSS.
 // useSyncExternalStore rather than effect-mirrored state, which rendered one
 // frame at the wrong rung.

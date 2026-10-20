@@ -42,6 +42,7 @@ export default function FiltersModal() {
       show={showFiltersModal}
       onHide={() => setShowFiltersModal(false)}
       className="filtersModal"
+      sheet
       data-testid="filters-modal"
       dialogClassName="filtersModalDialog"
       aria-labelledby="filtersModalTitle"

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import useWideView from "../../../state/selection/useWideView.js";
 import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 
 // The one place the camera is asked to travel to a dataset: opening a page
@@ -13,6 +14,7 @@ import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 export function useZoomToDataset() {
   const { inspectDataset } = useSelection();
   const { zoomToGeometry, mapInstance, mapView } = useMapState();
+  const [, setWide] = useWideView();
 
   const footprint =
     inspectDataset?.filtered_bbox_geojson ||
@@ -27,9 +29,12 @@ export function useZoomToDataset() {
     [mapInstance, bounds, mapView],
   );
 
+  // A widened page covers the map the camera is about to move.
   const zoomToDataset = useCallback(() => {
-    if (footprint) zoomToGeometry(footprint);
-  }, [footprint, zoomToGeometry]);
+    if (!footprint) return;
+    setWide(false);
+    zoomToGeometry(footprint);
+  }, [footprint, zoomToGeometry, setWide]);
 
   return { zoomToDataset, canZoom: Boolean(bounds), framed };
 }

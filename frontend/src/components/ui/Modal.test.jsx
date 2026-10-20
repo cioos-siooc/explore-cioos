@@ -1,9 +1,18 @@
 import * as React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import Modal from "./Modal.jsx";
+import { MOBILE_WIDTH, setViewportWidth } from "../../test/viewport.js";
+
+// jsdom has no PointerEvent; a MouseEvent carries the coordinates, and the
+// fields the drag reads are added to it.
+function pointer(target, type, clientY) {
+  const event = new MouseEvent(type, { bubbles: true, clientY, button: 0 });
+  Object.defineProperty(event, "isPrimary", { value: true });
+  fireEvent(target, event);
+}
 
 describe("Modal", () => {
   it("renders nothing when show is false", () => {
@@ -35,6 +44,49 @@ describe("Modal", () => {
     );
     await user.keyboard("{Escape}");
     expect(onHide).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes only the top dialog on Escape, keeping the body locked under it", async () => {
+    const user = userEvent.setup();
+    const hideOuter = vi.fn();
+    const hideInner = vi.fn();
+    const { rerender } = render(
+      <>
+        <Modal show onHide={hideOuter}>
+          <Modal.Body>outer</Modal.Body>
+        </Modal>
+        <Modal show={false} onHide={hideInner}>
+          <Modal.Body>inner</Modal.Body>
+        </Modal>
+      </>,
+    );
+    rerender(
+      <>
+        <Modal show onHide={hideOuter}>
+          <Modal.Body>outer</Modal.Body>
+        </Modal>
+        <Modal show onHide={hideInner}>
+          <Modal.Body>inner</Modal.Body>
+        </Modal>
+      </>,
+    );
+    await user.keyboard("{Escape}");
+    expect(hideInner).toHaveBeenCalledTimes(1);
+    expect(hideOuter).not.toHaveBeenCalled();
+
+    rerender(
+      <>
+        <Modal show onHide={hideOuter}>
+          <Modal.Body>outer</Modal.Body>
+        </Modal>
+        <Modal show={false} onHide={hideInner}>
+          <Modal.Body>inner</Modal.Body>
+        </Modal>
+      </>,
+    );
+    expect(document.body).toHaveClass("cioos-modal-open");
+    await user.keyboard("{Escape}");
+    expect(hideOuter).toHaveBeenCalledTimes(1);
   });
 
   it("calls onHide on a backdrop click, but not on a click inside the dialog", async () => {
@@ -127,5 +179,62 @@ describe("Modal", () => {
     expect(
       screen.getByRole("dialog", { name: "CIOOS Data Explorer" }),
     ).toBeInTheDocument();
+  });
+
+  describe("as a sheet on a phone", () => {
+    function Sheet({ show = true, onHide = () => {} }) {
+      return (
+        <Modal show={show} onHide={onHide} sheet>
+          <Modal.Header closeButton>
+            <Modal.Title>Filters</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>content</Modal.Body>
+        </Modal>
+      );
+    }
+
+    it("is a centred dialog with no handle above the phone rung", () => {
+      render(<Sheet />);
+      expect(screen.getByRole("dialog")).not.toHaveClass("sheet");
+      expect(document.querySelector(".sheetHandle")).toBeNull();
+    });
+
+    it("stays mounted after closing until its slide out ends", () => {
+      setViewportWidth(MOBILE_WIDTH);
+      const { rerender } = render(<Sheet />);
+      expect(screen.getByRole("dialog")).toHaveClass("sheet");
+      rerender(<Sheet show={false} />);
+      const sheet = document.querySelector(".modal.sheetClosing");
+      expect(sheet).toBeInTheDocument();
+      const content = sheet.querySelector(".modal-content");
+      act(() => {
+        fireEvent.transitionEnd(content, { propertyName: "transform" });
+      });
+      expect(document.querySelector(".modal")).toBeNull();
+    });
+
+    it("is dismissed by a drag down from its header", () => {
+      setViewportWidth(MOBILE_WIDTH);
+      const onHide = vi.fn();
+      render(<Sheet onHide={onHide} />);
+      const title = screen.getByText("Filters");
+      pointer(title, "pointerdown", 100);
+      pointer(window, "pointermove", 160);
+      pointer(window, "pointermove", 400);
+      pointer(window, "pointerup", 400);
+      expect(onHide).toHaveBeenCalledTimes(1);
+    });
+
+    it("is not dragged from its body, or by a tap on its header", () => {
+      setViewportWidth(MOBILE_WIDTH);
+      const onHide = vi.fn();
+      render(<Sheet onHide={onHide} />);
+      pointer(screen.getByText("content"), "pointerdown", 100);
+      pointer(window, "pointermove", 400);
+      pointer(window, "pointerup", 400);
+      pointer(screen.getByText("Filters"), "pointerdown", 100);
+      pointer(window, "pointerup", 102);
+      expect(onHide).not.toHaveBeenCalled();
+    });
   });
 });

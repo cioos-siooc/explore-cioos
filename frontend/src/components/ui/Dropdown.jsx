@@ -13,6 +13,8 @@ import "./dropdownStyles.css";
 
 const DropdownContext = createContext({ close: () => {} });
 
+const VIEWPORT_MARGIN = 8;
+
 // Emits Bootstrap-compatible class names so existing overrides keep applying.
 // The menu portals into document.body because some call sites live inside a
 // scrolling, transformed ancestor that clips an in-place absolute menu.
@@ -53,26 +55,26 @@ export function DropdownButton({
     if (!open || !buttonRef.current) return;
     function updateMenuStyle() {
       const rect = buttonRef.current.getBoundingClientRect();
-      const base = {
+      // Floor at the toggle's width, except with menuClassName: an inline
+      // style would beat the width that class sets.
+      const minWidth = menuClassName ? 0 : rect.width;
+      const width = Math.max(menuRef.current?.offsetWidth ?? 0, minWidth);
+      const left =
+        align === "center"
+          ? rect.left + rect.width / 2 - width / 2
+          : align === "end"
+            ? rect.right - width
+            : rect.left;
+      // Kept on screen: a menu wider than the room on its aligned side (a
+      // 300px menu ending at a phone's first column) would otherwise hang
+      // off the edge.
+      const maxLeft = window.innerWidth - VIEWPORT_MARGIN - width;
+      setMenuStyle({
         position: "fixed",
         top: rect.bottom + 2,
-        // Floor at the toggle's width, except with menuClassName: an inline
-        // style would beat the width that class sets.
-        ...(menuClassName ? {} : { minWidth: rect.width }),
-      };
-      if (align === "center")
-        setMenuStyle({
-          ...base,
-          left: rect.left + rect.width / 2,
-          transform: "translateX(-50%)",
-        });
-      else if (align === "end")
-        setMenuStyle({
-          ...base,
-          left: rect.right,
-          transform: "translateX(-100%)",
-        });
-      else setMenuStyle({ ...base, left: rect.left });
+        left: Math.max(VIEWPORT_MARGIN, Math.min(left, maxLeft)),
+        ...(menuClassName ? {} : { minWidth }),
+      });
     }
     updateMenuStyle();
     window.addEventListener("resize", updateMenuStyle);
@@ -124,7 +126,15 @@ export function DropdownButton({
             <div
               className={`dropdown-menu show ${menuClassName}`}
               ref={menuRef}
-              style={menuStyle}
+              // Fixed and hidden for the first layout pass, so it is measured
+              // at its own width rather than the body's.
+              style={
+                menuStyle ?? {
+                  position: "fixed",
+                  left: 0,
+                  visibility: "hidden",
+                }
+              }
             >
               {children}
             </div>

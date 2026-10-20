@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useNavigationType,
+  useSearchParams,
+} from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -14,6 +19,7 @@ import {
   PLOT_PARAMS,
   RECORD_PARAM,
   TAB_PARAM,
+  WIDE_PARAM,
 } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
@@ -42,6 +48,16 @@ export default function UrlSync() {
   const dataset = searchParams.get("dataset");
   const navigate = useNavigate();
   const location = useLocation();
+  // Back/Forward land on an address written when that entry was left — before
+  // the filters changed inside a sheet that Back has just closed, say — so a
+  // pop is rewritten from the current state like any change to it. Held until
+  // the next pop: the replace that ends one (the page load counts as a pop)
+  // must not rewrite too, or it drops a param its writer just set.
+  const navigationType = useNavigationType();
+  const [poppedTo, setPoppedTo] = useState(location.key);
+  if (navigationType === "POP" && location.key !== poppedTo) {
+    setPoppedTo(location.key);
+  }
 
   const { query } = useFilters();
   const {
@@ -90,6 +106,8 @@ export default function UrlSync() {
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
+      // Owned by useWideView.
+      ...(searchParams.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
       ...(dataset ? { dataset } : {}),
       // Carried through only while a dataset is open, so they don't linger as
       // stale keys for a closed page.
@@ -167,9 +185,8 @@ export default function UrlSync() {
     mappedRecord,
     coverageAxis,
     taxonomyView,
-    // Back/Forward lands on an address written when that entry was left;
-    // rewrite it from the current state.
     dataset,
+    poppedTo,
   ]);
 
   // `i18n` deliberately excluded: `lang` can still read last render's

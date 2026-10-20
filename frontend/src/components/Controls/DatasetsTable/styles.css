@@ -144,6 +144,25 @@
   padding: 10px;
 }
 
+/* Widened over the map (useWideView), the cards flow into a grid under
+   full-width group headers. Only the sidebar's list: the Download modal's is
+   the same table. */
+.sidebar.wide .datasetsCardList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-content: start;
+}
+
+.sidebar.wide .datasetsCardGroupHeader {
+  grid-column: 1 / -1;
+}
+
+/* A row's cards share its height; the meta line keeps to their base so the
+   row reads across whatever the titles' lengths. */
+.sidebar.wide .datasetCard .datasetCardMeta {
+  margin-top: auto;
+}
+
 .datasetsCardEmpty {
   grid-column: 1 / -1;
   padding: 24px 12px;
@@ -419,9 +438,11 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
+/* Takes the toolbar's spare room in the sidebar, capped for the widened one. */
 .datasetsCardFilters {
   flex: 1 1 auto;
   min-width: 44px;
+  max-width: 180px;
   overflow: hidden;
   white-space: nowrap;
   display: inline-flex;

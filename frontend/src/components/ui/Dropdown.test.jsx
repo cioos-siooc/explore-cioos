@@ -116,4 +116,25 @@ describe("DropdownButton / Dropdown.Item", () => {
     expect(screen.getByText("A-Z")).toHaveClass("active");
     expect(screen.getByText("Z-A")).not.toHaveClass("active");
   });
+
+  it("keeps a menu wider than the room beside its toggle on screen", async () => {
+    // A 300px end-aligned menu under a toggle ending 100px from the left edge
+    // would start at -200px.
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      left: 40,
+      right: 100,
+      width: 60,
+      bottom: 30,
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(300);
+    const user = userEvent.setup();
+    render(
+      <DropdownButton title="Sort" menuClassName="wideMenu" align="end">
+        <Dropdown.Item>A-Z</Dropdown.Item>
+      </DropdownButton>,
+    );
+    await user.click(screen.getByRole("button", { name: "Sort" }));
+    expect(document.querySelector(".dropdown-menu").style.left).toBe("8px");
+    vi.restoreAllMocks();
+  });
 });
