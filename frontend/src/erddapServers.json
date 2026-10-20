@@ -58,5 +58,10 @@
     "url": "https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap",
     "label_en": "DFO MEDS",
     "label_fr": "MPO SDMM"
+  },
+  {
+    "url": "https://salishsea.eos.ubc.ca/erddap",
+    "label_en": "SalishSeaCast (UBC)",
+    "label_fr": "SalishSeaCast (UBC)"
   }
 ]

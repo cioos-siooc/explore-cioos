@@ -71,7 +71,9 @@ flowchart TD
 1. **Listing.** One `allDatasets` request per data structure (`table`,
    `grid`) per server, restricted to public datasets. Its `minTime`/`maxTime`
    are the time coverage stored for tabledap datasets, and the last fallback
-   for grids. If the listing fails, the server yields no datasets and the run
+   for grids. A single-feature dataset whose time range is open-ended (no
+   `maxTime`, e.g. ONC's live deployments) is stored as ongoing up to the
+   harvest, so it can count as real-time. If the listing fails, the server yields no datasets and the run
    fails without loading (see [Orchestration](workflow.md#orchestration)).
 2. **Pre-filters, no request issued.** When the harvest config sets
    `dataset_ids`, every other dataset is dropped without an attempt record
