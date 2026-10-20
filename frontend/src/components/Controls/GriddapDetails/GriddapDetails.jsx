@@ -64,6 +64,21 @@ export default function GriddapDetails({
     if (pendingWmsSlice) setPendingWmsSlice(undefined);
   }
 
+  function selectVariable(variable) {
+    if (overlayActive) {
+      setActiveWmsOverlay({ ...activeWmsOverlay, variable });
+    } else {
+      setActiveWmsOverlay(
+        buildWmsOverlay(
+          dataset,
+          selectedEovTitles,
+          { variable: variable.name },
+          liveTime.time,
+        ),
+      );
+    }
+  }
+
   // Keyed on the pk alone so toggling the overlay off doesn't re-show it; waits
   // for the live axis so the slider doesn't jump under the user.
   useEffect(() => {
@@ -75,7 +90,7 @@ export default function GriddapDetails({
   function formatDimensionValue(value) {
     if (value === null || value === undefined) return "—";
     if (typeof value === "number") {
-      return Number.isInteger(value) ? value : value.toFixed(4);
+      return Number.isInteger(value) ? value : Number(value.toFixed(4));
     }
     return String(value).replace("T", " ").replace("+00:00", "Z");
   }
@@ -113,57 +128,74 @@ export default function GriddapDetails({
         <div className="metadataCard griddapNoWms">{t("griddapNoWmsText")}</div>
       )}
       <div className="metadataCard">
-        <h3 className="griddapCardTitle">{t("griddapDimensionsTitle")}</h3>
-        <ul className="griddapDimensionsList">
-          {dimensions.map((dim) => (
-            <li key={dim.name} className="griddapDimension">
-              <div className="griddapDimensionHead">
-                <span className="griddapDimensionName">{dim.name}</span>
-                <span className="griddapDimensionNodes">
-                  {dim.n_values?.toLocaleString()}{" "}
-                  {t("griddapDimensionNodes").toLowerCase()}
+        <h3 className="griddapCardTitle">{t("griddapVariablesTitle")}</h3>
+        <ul className="griddapVariablesList">
+          {variables.map((variable) => {
+            const content = (
+              <>
+                <span className="griddapVariableHead">
+                  <span className="griddapVariableLabel">
+                    {variableLabel(variable)}
+                  </span>
+                  {variable.units && (
+                    <span className="griddapVariableUnits">
+                      ({variable.units})
+                    </span>
+                  )}
                 </span>
-              </div>
-              <div className="griddapDimensionRange">
-                <span className="griddapDimensionBound">
-                  {formatDimensionValue(dim.min)}
-                </span>
-                <span className="griddapDimensionArrow">→</span>
-                <span className="griddapDimensionBound">
-                  {formatDimensionValue(dim.max)}
-                </span>
-                {dim.units && (
-                  <span className="griddapDimensionUnits">{dim.units}</span>
+                <code className="griddapVariableName">{variable.name}</code>
+              </>
+            );
+            return (
+              <li key={variable.name}>
+                {dataset.wms_url ? (
+                  <button
+                    type="button"
+                    className="griddapVariable"
+                    aria-pressed={
+                      overlayActive &&
+                      activeWmsOverlay.variable?.name === variable.name
+                    }
+                    title={t("griddapVariableShowTitle")}
+                    onClick={() => selectVariable(variable)}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div className="griddapVariable">{content}</div>
                 )}
-              </div>
-              {dim.spacing && (
-                <div className="griddapDimensionSpacing">
-                  {t("griddapDimensionResolution")}: {dim.spacing}
-                </div>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </div>
       <div className="metadataCard">
-        <h3 className="griddapCardTitle">{t("griddapVariablesTitle")}</h3>
-        <ul className="griddapVariablesList">
-          {variables.map((variable) => (
-            <li key={variable.name} className="griddapVariable">
-              <div className="griddapVariableHead">
-                <span className="griddapVariableLabel">
-                  {variableLabel(variable)}
-                </span>
-                {variable.units && (
-                  <span className="griddapVariableUnits">
-                    ({variable.units})
-                  </span>
+        <h3 className="griddapCardTitle">{t("griddapDimensionsTitle")}</h3>
+        <dl className="griddapDimensionsList">
+          {dimensions.map((dim) => (
+            <div key={dim.name} className="griddapDimension">
+              <dt className="griddapDimensionName">{dim.name}</dt>
+              <dd className="griddapDimensionRange">
+                {formatDimensionValue(dim.min)}
+                <span className="griddapDimensionMuted"> → </span>
+                {formatDimensionValue(dim.max)}
+                {dim.units && (
+                  <span className="griddapDimensionMuted"> {dim.units}</span>
                 )}
-              </div>
-              <code className="griddapVariableName">{variable.name}</code>
-            </li>
+              </dd>
+              <dd className="griddapDimensionMeta">
+                {[
+                  dim.n_values != null &&
+                    `${dim.n_values.toLocaleString()} ${t("griddapDimensionNodes").toLowerCase()}`,
+                  dim.spacing &&
+                    `${t("griddapDimensionResolution").toLowerCase()} ${dim.spacing}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </dd>
+            </div>
           ))}
-        </ul>
+        </dl>
       </div>
     </div>
   );
