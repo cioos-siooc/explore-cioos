@@ -48,9 +48,14 @@ export function fixtureKey(rawUrl) {
 // the first-paint splash never lifts.
 export const EXTERNAL_HOSTS = new Set([
   "tiles.openfreemap.org",
-  "tiles.emodnet-bathymetry.eu",
   "server.arcgisonline.com",
 ]);
+
+// Basemap rasters the API proxies (web-api/routes/emodnet.js): neither recorded
+// nor replayed, but blanked like the third-party ones above.
+export function isProxiedBasemapTile(url) {
+  return /\/emodnet\/\d+\/\d+\/\d+\.webp$/.test(url.pathname);
+}
 
 export function externalKey(rawUrl) {
   const url = new URL(rawUrl);

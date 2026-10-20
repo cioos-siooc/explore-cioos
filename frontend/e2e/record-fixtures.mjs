@@ -14,6 +14,7 @@ import { chromium } from "@playwright/test";
 import {
   EXTERNAL_HOSTS,
   externalKey,
+  isProxiedBasemapTile,
   fixtureKey,
 } from "./support/fixtureKey.js";
 import {
@@ -78,6 +79,7 @@ page.on("response", async (response) => {
   const url = new URL(response.url());
   try {
     // Origin too: Sentry and the analytics beacon also post to /api/ paths.
+    if (isProxiedBasemapTile(url)) return;
     if (url.origin === appOrigin && url.pathname.startsWith("/api/")) {
       const key = fixtureKey(response.url());
       if (key.isTile) {
