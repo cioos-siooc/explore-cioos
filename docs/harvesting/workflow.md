@@ -144,6 +144,13 @@ describes the data still stored.
 | New or removed datasets | From the server's `allDatasets` listing | From [discovery](obis.md#choosing-datasets) |
 | CKAN metadata refresh | Only for re-harvested datasets: an `UNCHANGED` dataset keeps its stored CKAN title, organizations and descriptive metadata | Cached per UUID with no expiry, "not found" included |
 
+To push a harvester or schema change to datasets that would otherwise be skipped
+as `UNCHANGED`, either bump `HARVEST_VERSION` in
+`cde_harvester/sources/erddap/client.py` (it is mixed into every stored hash, so
+the next run after deploy re-harvests every ERDDAP dataset once), or run
+*Harvest Source* / *Harvest All Sources* with `force=true` for a one-off. Both
+keep the load incremental and leave OBIS and its cache alone.
+
 ## CKAN
 
 CKAN is enrichment only. A CKAN outage never fails a harvest. ERDDAP and OBIS

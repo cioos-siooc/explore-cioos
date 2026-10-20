@@ -2,6 +2,7 @@
 harvester_main, and OBIS must stay scheduled when discovery leaves
 obis_dataset_ids empty at config time."""
 
+import logging
 
 import pytest
 import yaml
@@ -195,15 +196,31 @@ class TestFanOut:
                 return {"source": self.source, "deployment": "d", "state": "COMPLETED",
                         "completed": True, "flow_run_id": "x"}
 
-        def fake_submit(src, triggered_by):
-            triggered.append(src)
+        def fake_submit(src, triggered_by, force):
+            triggered.append((src, force))
             return FakeFuture(src)
 
         monkeypatch.setattr(
             prefect_pipeline._trigger_source_harvest, "submit", fake_submit, raising=False
         )
         prefect_pipeline.cde_harvest_all_run.fn(config_file(DISCOVERY_CONFIG))
-        assert triggered == ["https://data.cioospacific.ca/erddap", "obis"]
+        assert triggered == [("https://data.cioospacific.ca/erddap", False), ("obis", False)]
+        triggered.clear()
+        prefect_pipeline.cde_harvest_all_run.fn(config_file(DISCOVERY_CONFIG), force=True)
+        assert [f for _, f in triggered] == [True, True]
+
+    @pytest.mark.parametrize("force, expected", [(False, {}), (True, {"force": True})])
+    def test_force_is_passed_to_the_child_run(self, monkeypatch, force, expected):
+        params = {}
+
+        def fake_run_deployment(name, parameters, timeout):
+            params.update(parameters)
+            raise RuntimeError("stop before polling")
+
+        monkeypatch.setattr(prefect_pipeline, "run_deployment", fake_run_deployment)
+        monkeypatch.setattr(prefect_pipeline, "get_run_logger", logging.getLogger)
+        prefect_pipeline._trigger_source_harvest.fn("obis", force=force)
+        assert params == {"source": "obis", **expected}
 
     def test_no_sources_raises(self, config_file):
         with pytest.raises(ValueError, match="No sources configured"):
