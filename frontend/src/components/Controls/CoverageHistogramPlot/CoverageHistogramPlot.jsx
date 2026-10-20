@@ -10,7 +10,7 @@ import erddapServers from "../../../erddapServers.json";
 import platformColors from "../../platformColors";
 import { escapeHtml, formatErddapServerName } from "../../../utilities";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
-import useMediaQuery from "../../../state/ui/useMediaQuery.js";
+import useElementSize from "../../ui/useElementSize.js";
 
 Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
@@ -30,10 +30,10 @@ const SERIES_COLORS = [
 ];
 const OTHER_COLOR = "#a7b8bc";
 
-// Below the width at which the coverage dialog stops growing (1040px + its
-// 24px gutter), bars get too thin for their white outlines: Plotly strokes
-// every side, so the edges outweigh the fill.
-const NARROW_QUERY = "(max-width: 1064px)";
+// Thinner bars lose their white outlines: Plotly strokes every side, so the
+// edges outweigh the fill. Judged per bar, as the figure's width and bin count
+// both vary.
+const MIN_OUTLINED_BAR_PX = 6;
 
 const DAY_MS = 24 * 3600 * 1000;
 const YEAR_MS = 365.25 * DAY_MS;
@@ -86,7 +86,7 @@ function formatPeriod(startMs, endMs, locale, seasonal) {
 export default function CoverageHistogramPlot({ histogram }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "fr" ? "fr-CA" : "en-CA";
-  const narrow = useMediaQuery(NARROW_QUERY);
+  const [plotRef, { width: plotWidth }] = useElementSize();
 
   const COUNT_LABELS = {
     features: "coverageCountFeatures",
@@ -190,8 +190,10 @@ export default function CoverageHistogramPlot({ histogram }) {
     };
   }, [histogram, locale, i18n.language, t, countLabel, seasonal]);
 
+  const outlined = plotWidth / binCenters.length >= MIN_OUTLINED_BAR_PX;
+
   return (
-    <div className="coverageHistogramPlot">
+    <div className="coverageHistogramPlot" ref={plotRef}>
       <Plot
         data={traces.map((trace) => ({
           type: "bar",
@@ -201,7 +203,7 @@ export default function CoverageHistogramPlot({ histogram }) {
           width: binWidths,
           marker: {
             color: trace.color,
-            line: { color: "#ffffff", width: narrow ? 0 : 1 },
+            line: { color: "#ffffff", width: outlined ? 1 : 0 },
           },
           customdata: trace.hoverText,
           hovertemplate: "%{customdata}<extra></extra>",
