@@ -54,6 +54,7 @@ import {
 } from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
 import { DatasetPlatformIcon } from "../DatasetsTable/DatasetCard.jsx";
+import { platformLabel } from "../../../platformVocab.js";
 import ListCard, {
   CardField,
   CardTags,
@@ -636,7 +637,7 @@ export default function DatasetInspector({
                         decorative
                       />
                     </span>
-                    {t(dataset.platform)}
+                    {platformLabel(dataset.platform, i18n.language)}
                   </span>
                 ) : (
                   <span className="metadataEmpty">—</span>
