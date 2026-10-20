@@ -41,46 +41,18 @@ const allFilters = downloadConstraints({
     startDepth: 0,
     endDepth: 100,
   },
-  polygon: [
-    [-140, 40],
-    [-120, 40],
-    [-120, 60],
-    [-140, 60],
-    [-140, 40],
-  ],
   byTime: true,
   byDepth: true,
-  byPolygon: true,
 });
-
-const formats = { erddapFormat: "csv", obisFormat: "obisJson" };
 
 describe("downloadConstraints", () => {
   it("drops each filter the download switches turn off", () => {
     const none = downloadConstraints({
       query: { startDate: "2020-01-01", endDate: "2020-12-31", startDepth: 0 },
-      polygon: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 0],
-      ],
       byTime: false,
       byDepth: false,
-      byPolygon: false,
     });
-    expect(none.startDate).toBeUndefined();
-    expect(none.startDepth).toBeUndefined();
-    expect(none.bounds).toBeNull();
-    expect(none.polygon).toBeUndefined();
-  });
-
-  it("reduces a polygon to bounds while keeping the ring for OBIS", () => {
-    expect(allFilters.bounds).toEqual([
-      [-140, 40],
-      [-120, 60],
-    ]);
-    expect(allFilters.polygon).toHaveLength(5);
+    expect(Object.values(none).every((v) => v === undefined)).toBe(true);
   });
 });
 
@@ -96,16 +68,6 @@ describe("erddapDownloadUrl", () => {
     const url = erddapDownloadUrl(erddapRow, "csv", allFilters);
     expect(decodeURIComponent(url)).toContain("time<=2020-12-31T23:59:59Z");
     expect(decodeURIComponent(url)).toContain("time>=2020-01-01T00:00:00Z");
-  });
-
-  it("constrains latitude and longitude from the polygon's bounds", () => {
-    const url = decodeURIComponent(
-      erddapDownloadUrl(erddapRow, "nc", allFilters),
-    );
-    expect(url).toContain("latitude>=40");
-    expect(url).toContain("latitude<=60");
-    expect(url).toContain("longitude>=-140");
-    expect(url).toContain("longitude<=-120");
   });
 
   it("omits the depth constraint for a dataset with no depth variable", () => {
@@ -139,118 +101,95 @@ describe("erddapDownloadUrl", () => {
     expect(url).toBe("https://catalogue.hakai.org/erddap/tabledap/abc.csv?");
   });
 
-  it("offers only file formats, each with a saved extension", () => {
-    for (const format of ERDDAP_FORMATS) {
+  it("maps every package format to an ERDDAP file type", () => {
+    expect(Object.keys(ERDDAP_FORMATS)).toEqual([
+      "csv",
+      "parquet",
+      "odv",
+      "nccf",
+    ]);
+    for (const format of Object.values(ERDDAP_FORMATS)) {
       expect(format.ext).toMatch(/^\w+$/);
     }
   });
 });
 
 describe("obisDownloadUrl", () => {
-  it("sends the polygon itself, and pins the page size to the API maximum", () => {
-    const url = new URL(obisDownloadUrl(obisRow, "obisJson", allFilters));
+  it("carries time and depth, and pins the page size to the API maximum", () => {
+    const url = new URL(obisDownloadUrl(obisRow, allFilters));
     const params = url.searchParams;
     expect(params.get("datasetid")).toBe(obisRow.dataset_id);
     expect(params.get("startdate")).toBe("2020-01-01");
     expect(params.get("enddate")).toBe("2020-12-31");
     expect(params.get("startdepth")).toBe("0");
     expect(params.get("enddepth")).toBe("100");
-    expect(params.get("geometry")).toBe(
-      "POLYGON((-140 40, -120 40, -120 60, -140 60, -140 40))",
-    );
+    expect(params.has("geometry")).toBe(false);
     expect(params.get("size")).toBe(String(OBIS_RECORD_CAP));
-  });
-
-  it("ignores every filter for the full-dataset snapshot", () => {
-    expect(obisDownloadUrl(obisRow, "obisParquet", allFilters)).toBe(
-      `https://obis-open-data.s3.amazonaws.com/occurrence/${obisRow.dataset_id}.parquet`,
-    );
   });
 });
 
 describe("buildDownloadLinks", () => {
   it("routes each row to its own source", () => {
-    const links = buildDownloadLinks([erddapRow, obisRow], formats, allFilters);
+    const links = buildDownloadLinks([erddapRow, obisRow], "csv", allFilters);
     expect(links.map((link) => link.source)).toEqual(["erddap", "obis"]);
     expect(links[0].url).toContain("/tabledap/");
     expect(links[1].url).toContain("api.obis.org");
   });
 
+  it("asks ERDDAP for the package format's file type, OBIS for API JSON", () => {
+    const [erddap, obis] = buildDownloadLinks(
+      [erddapRow, obisRow],
+      "parquet",
+      allFilters,
+    );
+    expect(erddap.url).toContain("/tabledap/ios_ctd_profiles.parquetWMeta?");
+    expect(erddap.path).toMatch(/\.parquet$/);
+    expect(obis.path).toMatch(/\.json$/);
+  });
+
   it("skips grids, which have no constraint-based subsetting", () => {
     const links = buildDownloadLinks(
       [{ ...erddapRow, cdm_data_type: "Grid" }],
-      formats,
+      "csv",
       allFilters,
     );
     expect(links).toEqual([]);
   });
 
-  it("names files by server and dataset, and never twice the same", () => {
-    const links = buildDownloadLinks(
-      [erddapRow, { ...erddapRow, pk: 3 }],
-      formats,
+  it("lays files out as the package does: one folder per dataset", () => {
+    const [erddap, obis] = buildDownloadLinks(
+      [erddapRow, obisRow],
+      "csv",
       allFilters,
     );
-    expect(links[0].filename).toBe(
-      "data-cioospacific-ca-erddap_ios_ctd_profiles.csv",
-    );
-    expect(links[1].filename).toBe(
-      "data-cioospacific-ca-erddap_ios_ctd_profiles_2.csv",
-    );
+    const name = "ios_ctd_profiles_data_cioospacific_ca";
+    const folder = `data/${name}`;
+    expect(erddap.path).toBe(`${folder}/${name}.csv`);
+    expect(erddap.records).toEqual([
+      {
+        path: `${folder}/metadata/erddap.nccsvMetadata`,
+        url: "https://data.cioospacific.ca/erddap/tabledap/ios_ctd_profiles.nccsvMetadata",
+      },
+      {
+        path: `${folder}/metadata/ckan_package.json`,
+        url: "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
+      },
+    ]);
+    expect(obis.records).toEqual([
+      {
+        path: `data/${obisRow.dataset_id}_obis_org/metadata/obis_dataset.json`,
+        url: `https://api.obis.org/v3/dataset/${obisRow.dataset_id}`,
+      },
+    ]);
   });
 
-  it("flags what a link could not carry", () => {
-    const [depthless, obis] = buildDownloadLinks(
-      [{ ...erddapRow, has_depth: false }, obisRow],
-      { ...formats, obisFormat: "obisParquet" },
+  it("flags a depth filter the link could not carry", () => {
+    const [depthless] = buildDownloadLinks(
+      [{ ...erddapRow, has_depth: false }],
+      "csv",
       allFilters,
     );
     expect(depthless.depthDropped).toBe(true);
-    expect(depthless.polygonSquared).toBe(true);
-    expect(obis.unfiltered).toBe(true);
-  });
-
-  it("flags the box on every spatially filtered ERDDAP link", () => {
-    const triangle = downloadConstraints({
-      polygon: [
-        [-140, 40],
-        [-120, 40],
-        [-130, 60],
-        [-140, 40],
-      ],
-      byPolygon: true,
-    });
-    for (const constraints of [allFilters, triangle]) {
-      const [erddap, obis] = buildDownloadLinks(
-        [erddapRow, obisRow],
-        formats,
-        constraints,
-      );
-      // A rectangle is its own bounding box and a polygon is not, but either
-      // way the link constrains by a box and the reader is told which.
-      expect(erddap.polygonSquared).toBe(true);
-      // OBIS takes the drawn shape itself, so its link loses nothing.
-      expect(obis.polygonSquared).toBe(false);
-    }
-  });
-
-  it("says nothing about a box when no area filter is applied", () => {
-    const [erddap] = buildDownloadLinks(
-      [erddapRow],
-      formats,
-      // An area is drawn, but the download is not being narrowed by it.
-      downloadConstraints({
-        polygon: [
-          [-140, 40],
-          [-120, 40],
-          [-120, 60],
-          [-140, 60],
-          [-140, 40],
-        ],
-        byPolygon: false,
-      }),
-    );
-    expect(erddap.polygonSquared).toBe(false);
   });
 });
 
@@ -271,7 +210,7 @@ describe("ckanRecordUrl", () => {
 describe("filterSummaryText", () => {
   it("says what the URLs were filtered by, in the URLs' own terms", () => {
     expect(filterSummaryText(allFilters)).toBe(
-      "time 2020-01-01 to 2020-12-31; depth 0 to 100 m; bbox -140, 40, -120, 60",
+      "time 2020-01-01 to 2020-12-31; depth 0 to 100 m",
     );
   });
 
@@ -283,31 +222,39 @@ describe("filterSummaryText", () => {
 });
 
 describe("the exported list", () => {
-  const links = buildDownloadLinks([erddapRow, obisRow], formats, allFilters);
+  const links = buildDownloadLinks([erddapRow, obisRow], "csv", allFilters);
   const meta = { generatedAt: "2026-09-10T00:00:00Z", filterSummary: "time" };
 
   it("is one URL per line under a commented header", () => {
     const lines = linksToText(links, meta).trim().split("\n");
     expect(lines.filter((line) => line.startsWith("#"))).toHaveLength(3);
-    // Two data URLs, plus the catalogue record of the one dataset that has one.
-    expect(lines.filter((line) => line.startsWith("http"))).toHaveLength(3);
+    // Two data URLs, two source records and one catalogue record.
+    expect(lines.filter((line) => line.startsWith("http"))).toHaveLength(5);
   });
 
-  it("is a curl script that fails loudly and resumes", () => {
+  it("is a curl script that skips a failed file instead of stopping", () => {
     const script = linksToCurlScript(links, meta);
     expect(script.split("\n")[0]).toBe("#!/usr/bin/env bash");
-    expect(script).toContain("set -euo pipefail");
+    expect(script).toContain("set -uo pipefail");
+    expect(script).not.toContain("set -e");
     expect(script).toContain("--fail");
-    expect(script).toContain("--continue-at -");
+    expect(script).toContain('--user-agent "$UA"');
+    expect(script).toContain("mkdir -p cde_download && cd cde_download");
     // Every URL is quoted: '&' unquoted would background the command.
-    for (const link of links) expect(script).toContain(`'${link.url}'`);
+    for (const link of links) {
+      expect(script).toContain(`fetch '${link.path}' '${link.url}'`);
+    }
+  });
+
+  it("points to the Python script for what it can't build", () => {
+    expect(linksToCurlScript(links, meta)).toMatch(/Citations.*Python script/s);
   });
 
   it("warns about the OBIS page cap only when an OBIS API link is in it", () => {
     expect(linksToCurlScript(links, meta)).toContain(
       `at most ${OBIS_RECORD_CAP} records`,
     );
-    const erddapOnly = buildDownloadLinks([erddapRow], formats, allFilters);
+    const erddapOnly = buildDownloadLinks([erddapRow], "csv", allFilters);
     expect(linksToCurlScript(erddapOnly, meta)).not.toContain(
       "records per request",
     );
@@ -316,34 +263,21 @@ describe("the exported list", () => {
   it("escapes quotes rather than breaking the shell word", () => {
     const quoted = buildDownloadLinks(
       [{ ...erddapRow, title: "it's here" }],
-      formats,
+      "csv",
       allFilters,
     );
     expect(linksToCurlScript(quoted, meta)).toContain("# it's here");
   });
 
-  it("fetches each catalogue record beside its dataset", () => {
+  it("fetches each source record into its dataset's folder", () => {
     const script = linksToCurlScript(links, meta);
+    const folder = "data/ios_ctd_profiles_data_cioospacific_ca/metadata";
     expect(script).toContain(
-      "'https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e'",
+      `fetch '${folder}/ckan_package.json' 'https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e'`,
     );
-    expect(script).toContain(
-      "'data-cioospacific-ca-erddap_ios_ctd_profiles.ckan.json'",
-    );
-    // Resuming a complete metadata file would 416; only the data file resumes.
-    const metadataLine = script
-      .split("\n")
-      .find((line) => line.includes("package_show"));
-    expect(metadataLine).not.toContain("--continue-at");
-    // The OBIS row has no catalogue entry, so it contributes no second line.
+    expect(script).toContain(`fetch '${folder}/erddap.nccsvMetadata'`);
+    // The OBIS row has no catalogue entry, so it contributes no CKAN line.
     expect(script.match(/package_show/g)).toHaveLength(1);
-
-    const urls = linksToText(links, meta).trim().split("\n");
-    expect(
-      urls.indexOf(
-        "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
-      ),
-    ).toBe(urls.findIndex((line) => line.includes("/tabledap/")) + 1);
   });
 
   it("gives the CSV the page a person clicks, not the API record", () => {
@@ -360,13 +294,13 @@ describe("the exported list", () => {
     const csv = linksToCsv(
       buildDownloadLinks(
         [{ ...erddapRow, title: 'Profiles, "inshore"' }],
-        formats,
+        "csv",
         allFilters,
       ),
     );
     const [header, row] = csv.trim().split("\n");
     expect(header).toBe(
-      '"dataset_id","title","source","format","filename","url","catalogue_url"',
+      '"dataset_id","title","source","format","path","url","catalogue_url"',
     );
     expect(row).toContain('"Profiles, ""inshore"""');
   });

@@ -696,6 +696,18 @@ button.datasetCardTitle:focus-visible {
   font-size: var(--cioos-font-size-sm);
 }
 
+/* Ink carries the word, as on the download notice: --cioos-warn is the
+   glyph's hue, not a text colour on its own tint. */
+.datasetCardFormatTag {
+  padding: 0 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-warn-bg);
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .datasetCardSourceLink {
   display: inline-flex;
   align-items: center;
@@ -703,42 +715,6 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-primary-700);
   font-weight: 600;
   white-space: nowrap;
-}
-
-.datasetCardDownloadGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.datasetCardLinkWarning {
-  display: inline-flex;
-  align-items: center;
-  color: var(--cioos-warn);
-}
-
-.datasetCardIconLink {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  background: transparent;
-  color: var(--cioos-ink-40);
-  cursor: pointer;
-  transition: color var(--cioos-transition-fast);
-}
-
-@media (hover: hover) {
-  .datasetCardIconLink:hover {
-    color: var(--cioos-primary-700);
-    background-color: var(--cioos-surface-2);
-  }
-}
-
-.datasetCardIconLink:focus-visible {
-  outline: 2px solid var(--cioos-primary-700);
-  outline-offset: 1px;
 }
 
 .downloadableIcon.success {

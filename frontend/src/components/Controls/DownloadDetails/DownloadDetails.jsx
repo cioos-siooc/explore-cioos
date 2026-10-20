@@ -4,11 +4,15 @@ import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
-import DirectDownloadLinks from "./DirectDownloadLinks.jsx";
-import DownloadFormats from "./DownloadFormats.jsx";
+import DownloadFormat from "./DownloadFormat.jsx";
+import DownloadScript from "./DownloadScript.jsx";
 import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
+import {
+  OBIS_FORMATS,
+  useDownload,
+} from "../../../state/download/DownloadProvider.jsx";
 
 import {
   applyDatasetPKs,
@@ -26,8 +30,6 @@ import {
 import { server } from "../../../config.js";
 import {
   buildDownloadLinks,
-  defaultErddapFormat,
-  defaultObisFormat,
   downloadConstraints,
 } from "../../../downloadLinks.js";
 import reportError from "../../../state/reportError.js";
@@ -54,11 +56,8 @@ export default function DownloadDetails({
   children,
 }) {
   const { t } = useTranslation();
+  const { scriptUrl, packageFormat } = useDownload();
   const [selectAll, setSelectAll] = useState(true);
-  // Lives here so the footer's exports and every card's link are built from
-  // one format and stay in step.
-  const [erddapFormat, setErddapFormat] = useState(defaultErddapFormat);
-  const [obisFormat, setObisFormat] = useState(defaultObisFormat);
   const [pointsData, setPointsData] = useState(
     pointsToReview
       // Griddap is metadata-only and must never reach the estimate/queue flow.
@@ -248,9 +247,9 @@ export default function DownloadDetails({
   }
 
   const selectedCount = pointsData.filter((point) => point.selected).length;
-  // Includes datasets the 1 GB ceiling deselected: the queue refuses them, so
-  // that is where a direct link matters most. `!== false` because `selected`
-  // is unset until the estimates land, and a direct link needs none.
+  // Includes datasets the 1 GB ceiling deselected: the queue refuses them, and
+  // the script has no ceiling. `!== false` because `selected` is unset until
+  // the estimates land.
   const linkableDatasets = useMemo(
     () =>
       pointsData.filter(
@@ -258,38 +257,29 @@ export default function DownloadDetails({
       ),
     [pointsData],
   );
+  const scriptPks = linkableDatasets.map((point) => point.pk);
+  const obisCount = linkableDatasets.filter(
+    (point) => point.source_type === "obis",
+  ).length;
 
+  // A polygon can only reach ERDDAP as its bounding box, so direct links
+  // would hold data the package filters out; the script handles it.
+  const polygonFiltered = Boolean(polygon?.length && filterDownloadByPolygon);
   const constraints = useMemo(
     () =>
       downloadConstraints({
         query,
-        polygon,
         byTime: filterDownloadByTime,
         byDepth: filterDownloadByDepth,
-        byPolygon: filterDownloadByPolygon,
       }),
-    [
-      query,
-      polygon,
-      filterDownloadByTime,
-      filterDownloadByDepth,
-      filterDownloadByPolygon,
-    ],
+    [query, filterDownloadByTime, filterDownloadByDepth],
   );
-
   const links = useMemo(
     () =>
-      buildDownloadLinks(
-        linkableDatasets,
-        { erddapFormat, obisFormat },
-        constraints,
-      ),
-    [linkableDatasets, erddapFormat, obisFormat, constraints],
-  );
-
-  const linksByPk = useMemo(
-    () => new Map(links.map((link) => [link.pk, link])),
-    [links],
+      polygonFiltered
+        ? []
+        : buildDownloadLinks(linkableDatasets, packageFormat, constraints),
+    [polygonFiltered, linkableDatasets, packageFormat, constraints],
   );
 
   return (
@@ -321,81 +311,93 @@ export default function DownloadDetails({
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
-            downloadLinksByPk={linksByPk}
+            obisFallbackFormat={
+              OBIS_FORMATS.includes(packageFormat)
+                ? undefined
+                : t("downloadPackageFormat_csv")
+            }
+            pagerExtra={
+              <div className="downloadSummary">
+                {/* Both stats wait for the estimates, which decide how many
+                    stay selected. */}
+                <div className="downloadSummaryStat">
+                  {estimatesLoading ? (
+                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
+                  ) : (
+                    <span className="downloadSummaryValue">
+                      {selectedCount}
+                      <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
+                    </span>
+                  )}
+                  <span className="downloadSummaryLabel">
+                    {t("downloadDetailsDownloadInfoDatasets")}
+                  </span>
+                </div>
+                <div className="downloadSummaryDivider" aria-hidden="true" />
+                <div className="downloadSummaryStat">
+                  {estimatesLoading ? (
+                    <Spinner size="sm" className="datasetSizeTotalSpinner" />
+                  ) : downloadSizeEstimates ? (
+                    <span
+                      className="downloadSummaryValue"
+                      title={
+                        dataTotal.filteredPartial || dataTotal.unfilteredPartial
+                          ? t("downloadSizePartialTitle")
+                          : undefined
+                      }
+                    >
+                      {formatSizeEstimate(dataTotal.filteredSize)}
+                      {dataTotal.filteredPartial && "+"}
+                      <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
+                        dataTotal.unfilteredSize,
+                      )}${dataTotal.unfilteredPartial ? "+" : ""}`}</span>
+                    </span>
+                  ) : (
+                    <span
+                      className="downloadSummaryValue downloadSummaryValueMuted"
+                      title={t("downloadSizeUnavailableTitle")}
+                    >
+                      {t("downloadSizeUnavailable")}
+                    </span>
+                  )}
+                  <span className="downloadSummaryLabel">
+                    {t("downloadDetailsDownloadInfoDownloadSize")}
+                  </span>
+                </div>
+              </div>
+            }
           />
         </div>
       </div>
 
       <div className="downloadFooter">
-        <div className="downloadFooterSection">
-          <span className="downloadFooterTitle">
-            {t("downloadDetailsSelectionTitle")}
-          </span>
-          <div className="downloadSummary">
-            {/* Both stats wait for the estimates, which decide how many stay
-              selected. */}
-            <div className="downloadSummaryStat">
-              {estimatesLoading ? (
-                <Spinner size="sm" className="datasetSizeTotalSpinner" />
-              ) : (
-                <span className="downloadSummaryValue">
-                  {selectedCount}
-                  <span className="downloadSummaryValueMuted">{` / ${pointsData.length}`}</span>
-                </span>
-              )}
-              <span className="downloadSummaryLabel">
-                {t("downloadDetailsDownloadInfoDatasets")}
+        {/* Two ways to the same package, so they share one section. */}
+        <div className="downloadFooterSection downloadDelivery">
+          <div className="downloadDeliveryHeader">
+            <div className="downloadDeliveryHeading">
+              <span className="downloadFooterTitle">
+                {t("downloadDeliveryTitle")}
               </span>
+              <p className="downloadDeliveryIntro">
+                {t("downloadDeliveryIntro")}
+              </p>
             </div>
-            <div className="downloadSummaryDivider" aria-hidden="true" />
-            <div className="downloadSummaryStat">
-              {estimatesLoading ? (
-                <Spinner size="sm" className="datasetSizeTotalSpinner" />
-              ) : downloadSizeEstimates ? (
-                <span
-                  className="downloadSummaryValue"
-                  title={
-                    dataTotal.filteredPartial || dataTotal.unfilteredPartial
-                      ? t("downloadSizePartialTitle")
-                      : undefined
-                  }
-                >
-                  {formatSizeEstimate(dataTotal.filteredSize)}
-                  {dataTotal.filteredPartial && "+"}
-                  <span className="downloadSummaryValueMuted">{` / ${formatSizeEstimate(
-                    dataTotal.unfilteredSize,
-                  )}${dataTotal.unfilteredPartial ? "+" : ""}`}</span>
-                </span>
-              ) : (
-                <span
-                  className="downloadSummaryValue downloadSummaryValueMuted"
-                  title={t("downloadSizeUnavailableTitle")}
-                >
-                  {t("downloadSizeUnavailable")}
-                </span>
-              )}
-              <span className="downloadSummaryLabel">
-                {t("downloadDetailsDownloadInfoDownloadSize")}
-              </span>
-            </div>
+            <DownloadFormat obisCount={obisCount} />
+          </div>
+          <div className="downloadDeliveryOptions">
+            {children}
+            <span className="downloadDeliveryOr" aria-hidden="true">
+              {t("downloadDeliveryOr")}
+            </span>
+            <DownloadScript
+              url={scriptUrl(scriptPks)}
+              count={scriptPks.length}
+              links={links}
+              constraints={constraints}
+              polygonFiltered={polygonFiltered}
+            />
           </div>
         </div>
-
-        {children}
-
-        <DirectDownloadLinks
-          links={links}
-          constraints={constraints}
-          formatControls={
-            <DownloadFormats
-              links={links}
-              erddapFormat={erddapFormat}
-              setErddapFormat={setErddapFormat}
-              obisFormat={obisFormat}
-              setObisFormat={setObisFormat}
-            />
-          }
-        />
       </div>
     </div>
   );

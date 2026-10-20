@@ -6,8 +6,10 @@ import traceback
 
 import sentry_sdk
 from cde_harvester.core.issues import error_signature, report_issues
+from cioos_downloader import downloader_wrapper
+from cioos_downloader.download_erddap import FORMATS
+from cioos_downloader.package import REASONS
 from dotenv import load_dotenv
-from erddap_downloader import downloader_wrapper
 from jinja2 import Environment, FileSystemLoader
 from loguru import logger
 from sentry_sdk.integrations.loguru import LoguruIntegration
@@ -52,18 +54,11 @@ engine = create_engine(database_link)
 # string "NOW()" in a text column is unaffected.
 SQL_NOW = "NOW()"
 
-create_pdf = False
-
 # In production, this is mapped to a WAF via a host mounted volume
 output_folder = "./downloads"
 # Touched after every served poll. The container HEALTHCHECK reads its age, and
 # nginx serves it at /downloads/healthz, which proves the volume is shared.
 heartbeat_file = pathlib.Path(output_folder) / "healthz"
-
-
-if "CREATE_PDF" in envs:
-    create_pdf = envs["CREATE_PDF"] == "True"
-    logger.info("Create PDFs: {}", create_pdf)
 
 
 def get_a_download_job():
@@ -96,22 +91,12 @@ def email_user(email, status, zip_filename, downloader_output, language):
     Send the user a success/failed message
     """
 
-    # Reasons a dataset ends up in the zip vs. gets left out. Anything not
-    # COMPLETED/PARTIAL didn't make it in — surface it to the user.
+    # Anything not COMPLETED/PARTIAL didn't make it into the zip.
     _INCLUDED = ("COMPLETED", "PARTIAL")
-    _MISS_REASON = {
-        "FAILED": "could not be retrieved from its source",
-        "EMPTY": "had no data matching your selection",
-        "IGNORED": "was skipped because the download size limit was reached",
-    }
-    _MISS_REASON_FR = {
-        "FAILED": "n'a pas pu être récupéré depuis sa source",
-        "EMPTY": "ne contenait aucune donnée correspondant à votre sélection",
-        "IGNORED": "a été ignoré car la limite de taille de téléchargement a été atteinte",
-    }
 
     dataset_urls = []
     failed_datasets = []
+    fallback_datasets = []
     if downloader_output:
         for dataset in downloader_output["erddap_report"]:
             # OBIS datasets aren't on an ERDDAP server (erddap_url is the
@@ -127,18 +112,26 @@ def email_user(email, status, zip_filename, downloader_output, language):
                     dataset["erddap_url"] + "/info/" + dataset["dataset_id"] + "/index.html"
                 )
 
+            title = dataset.get("title")
+            label = f"{title} ({dataset['dataset_id']})" if title else dataset["dataset_id"]
             if dataset.get("status") not in _INCLUDED:
                 failed_datasets += [{
-                    "dataset_id": dataset["dataset_id"],
-                    "reason": _MISS_REASON.get(
-                        dataset.get("status"), "could not be included"
-                    ),
-                    "reason_fr": _MISS_REASON_FR.get(
-                        dataset.get("status"), "n'a pas pu être inclus"
-                    ),
+                    "dataset_id": label,
+                    "reason": REASONS["en"].get(dataset.get("status"), "could not be included"),
+                    "reason_fr": REASONS["fr"].get(dataset.get("status"), "n'a pas pu être inclus"),
+                    # The server's own words; the README has the full text and URLs.
+                    "error": (dataset.get("erddap_error") or "").replace("\n", "; ")[:300],
                 }]
                 # Don't cite a dataset that isn't in the zip.
                 continue
+
+            if dataset.get("format_fallback"):
+                requested = FORMATS[dataset["requested_format"]].label
+                fallback_datasets += [{
+                    "dataset_id": label,
+                    "reason": REASONS["en"]["fallback"].format(format=requested),
+                    "reason_fr": REASONS["fr"]["fallback"].format(format=requested),
+                }]
 
             out = {"source_label": source_label, "source_url": source_url}
             if dataset["ckan_id"]:
@@ -189,6 +182,7 @@ def email_user(email, status, zip_filename, downloader_output, language):
                 download_url=download_url,
                 status=status,
                 failed_datasets=failed_datasets,
+                fallback_datasets=fallback_datasets,
             )
         ]
         subject += [email_subject[status][language_option]]
@@ -220,7 +214,6 @@ def run_download(row):
         downloader_output = downloader_wrapper.run_download_query(
             download_query=downloader_input,
             output_folder=output_folder,
-            create_pdf=create_pdf,
         )
 
         status = "completed"

@@ -245,34 +245,6 @@ describe("DatasetCard", () => {
       ).toBeDisabled();
     });
 
-    it("shows the dataset's direct download link and copies its URL", async () => {
-      const user = userEvent.setup();
-      const downloadLink = {
-        url: "https://seagull-erddap.glos.org/erddap/tabledap/obs_270.csv",
-        filename: "obs_270.csv",
-        format: { label: "CSV" },
-      };
-      render(
-        <DatasetCard
-          row={ROW}
-          t={t}
-          i18n={i18n}
-          isDownloadModal
-          downloadLink={downloadLink}
-          downloadSizeEstimates={{ 1: { filteredSize: 500000 } }}
-        />,
-      );
-      const link = screen.getByRole("link", {
-        name: "datasetCardDirectDownloadText",
-      });
-      expect(link).toHaveAttribute("href", downloadLink.url);
-
-      await user.click(
-        screen.getByRole("button", { name: "datasetCardCopyLinkText" }),
-      );
-      expect(await navigator.clipboard.readText()).toBe(downloadLink.url);
-    });
-
     it("the remove button calls onRemove without also triggering onInspect", async () => {
       const user = userEvent.setup();
       const onRemove = vi.fn();

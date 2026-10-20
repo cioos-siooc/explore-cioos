@@ -135,6 +135,16 @@ describe("DownloadProvider", () => {
       expect(params.get("lang")).toBe("en");
     });
 
+    it("asks for CSV unless another package format is chosen", async () => {
+      await submit(false);
+      expect(new URL(requests[0].url).searchParams.get("format")).toBe("csv");
+
+      act(() => download.setPackageFormat("nccf"));
+      act(() => download.handleSubmission());
+      await waitFor(() => expect(requests).toHaveLength(2));
+      expect(new URL(requests[1].url).searchParams.get("format")).toBe("nccf");
+    });
+
     it("names the basket once when the Datasets filter is also narrowing", async () => {
       await renderReady("/?datasetPKs=2337");
       // query is debounced: submitting before it lands sends no Datasets

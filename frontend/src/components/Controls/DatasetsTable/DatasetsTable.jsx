@@ -61,7 +61,10 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  downloadLinksByPk,
+  // The format OBIS rows fall back to when the chosen one has no OBIS version.
+  obisFallbackFormat,
+  // Beside the pager's range: the download modal's selection totals.
+  pagerExtra,
   // Kept mounted under an open dataset page, so coming back finds the same
   // page and scroll position (see DatasetsPanel).
   hidden = false,
@@ -585,7 +588,7 @@ export default function DatasetsTable({
                   isDownloadModal={isDownloadModal}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
-                  downloadLink={downloadLinksByPk?.get(item.row.pk)}
+                  obisFallbackFormat={obisFallbackFormat}
                   onSelect={handleSelectDataset}
                   onRemove={isDownloadModal ? removeFromSelection : undefined}
                   onInspect={isDownloadModal ? undefined : setInspectDataset}
@@ -682,7 +685,9 @@ export default function DatasetsTable({
         onPageSizeChange={setPageSize}
         label={t("datasetsPagerLabel")}
         perPageLabel={t("datasetsPagerPerPageLabel")}
-      />
+      >
+        {pagerExtra}
+      </Pager>
     </div>
   );
 }
