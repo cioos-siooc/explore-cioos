@@ -1415,6 +1415,12 @@ export default function CreateMap({
     img.crossOrigin = "anonymous";
     img.onload = () => {
       if (token !== wmsRenderToken.current || !map.current) return;
+      // A share link's overlay can resolve before the style has loaded;
+      // registered after the handler that adds the data layers it sits under.
+      if (!map.current.getSource("cde-tiles")) {
+        map.current.once("style.load", img.onload);
+        return;
+      }
       let imageUrl;
       try {
         imageUrl = warpEquirectToMercator(
