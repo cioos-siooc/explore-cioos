@@ -10,6 +10,7 @@ erddap_urls:
   - https://dap.oceannetworks.ca/erddap
   - https://data.ceotr.ca/erddap
   - https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/
+  - https://salishsea.eos.ubc.ca/erddap
 
 # set to true to test with caching. Turn to False for production.
 # defaults to false
