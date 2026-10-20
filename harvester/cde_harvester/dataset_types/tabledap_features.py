@@ -401,6 +401,10 @@ def extract_features(dataset, handler):
 
             if "NaN" in max:
                 max = datetime.now(UTC).isoformat()
+                # The listing's maxTime is empty for an ongoing feed (ONC's
+                # open deployments), so it can't feed dataset_is_realtime().
+                if llat_variable == "time":
+                    dataset.coverage_time_max = max
 
             if llat_variable in vertical_variables:
                 min = float(min)
