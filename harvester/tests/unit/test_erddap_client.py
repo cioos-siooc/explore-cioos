@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 import requests
+from cde_harvester.sources.erddap import client
 from conftest import (
     ERDDAP_ALL_DATASETS_CSV,
     ERDDAP_INFO_CSV,
@@ -216,3 +217,10 @@ class TestCroissantVersionGate:
         erddap = self._erddap_with(version_text)
         digest, has_files, reason = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
         assert digest and has_files and reason is None
+
+    def test_harvest_version_bump_changes_the_hash(self, monkeypatch):
+        erddap = self._erddap_with("ERDDAP_version=2.28\n")
+        before, _, _ = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        monkeypatch.setattr(client, "HARVEST_VERSION", client.HARVEST_VERSION + 1)
+        after, _, _ = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
+        assert before != after

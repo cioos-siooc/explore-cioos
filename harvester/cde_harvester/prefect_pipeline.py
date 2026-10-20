@@ -240,6 +240,7 @@ class PrefectCDEPipeline:
         self.flush_redis = config.get("flush_redis", False)
         self.source = None
         self.triggered_by = None
+        self.force = False
         # No discovery here: init_config() also runs at deployment
         # registration, which must not depend on api.obis.org.
         obis = resolve_obis_config(config)
@@ -287,6 +288,8 @@ class PrefectCDEPipeline:
                 effective_incremental = self.incremental or bool(self.source)
                 if self.source and not self.incremental:
                     logger.warning("Single-source run (source=%s): forcing incremental db-load.", self.source)
+                if self.force:
+                    logger.info("force=True: re-harvesting every dataset, unchanged or not.")
 
                 logger.info("Running cde_harvester subflow")
                 try:
@@ -336,7 +339,7 @@ class PrefectCDEPipeline:
                 obis_discovery=self.obis_discovery,
                 source=self.source,
                 triggered_by=self.triggered_by,
-                skip_unchanged=effective_incremental,
+                skip_unchanged=effective_incremental and not self.force,
             )
             logger.info("cde_harvester completed successfully")
         except Exception as e:
@@ -516,14 +519,17 @@ def cde_pipeline_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
     source: str | None = None,
     triggered_by: str | None = None,
+    force: bool = False,
 ):
     """Deployable entry point. `source` (None = full) narrows to one ERDDAP url or 'obis';
-    `triggered_by` is recorded on the audit row. Single-source runs force incremental db-load."""
+    `triggered_by` is recorded on the audit row; `force` re-harvests datasets whose
+    Croissant hash is unchanged. Single-source runs force incremental db-load."""
     config_file = resolve_harvest_config_file(config_file)
     pipeline = PrefectCDEPipeline()
     pipeline.init_config(config_file=config_file)
     pipeline.source = source
     pipeline.triggered_by = triggered_by
+    pipeline.force = force
     pipeline.cde_pipeline()
 
 
@@ -532,7 +538,7 @@ _MAX_CONSECUTIVE_POLL_FAILURES = 60  # ~5 min of continuous API unavailability
 
 
 @task(name="trigger-source-harvest")
-def _trigger_source_harvest(source: str, triggered_by: str | None = None):
+def _trigger_source_harvest(source: str, triggered_by: str | None = None, force: bool = False):
     """Submit the per-source deployment for `source` and wait for it to finish; return a
     status dict (never raises).
 
@@ -544,6 +550,8 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
     params = {"source": source}
     if triggered_by:
         params["triggered_by"] = triggered_by
+    if force:
+        params["force"] = True
 
     try:
         flow_run = run_deployment(name=deployment_name, parameters=params, timeout=0)
@@ -590,6 +598,7 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None):
 def cde_harvest_all_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
     triggered_by: str | None = None,
+    force: bool = False,
 ):
     """Scheduled fan-out: trigger one independent per-source harvest job per configured source,
     wait for all, and fail red if any did not complete (a failure doesn't cancel the others)."""
@@ -609,7 +618,7 @@ def cde_harvest_all_run(
         )
 
     logger.info("Fanning out %d per-source harvest job(s): %s", len(sources), sources)
-    futures = [_trigger_source_harvest.submit(src, triggered_by) for src in sources]
+    futures = [_trigger_source_harvest.submit(src, triggered_by, force) for src in sources]
     results = [f.result() for f in futures]
 
     for r in results:
