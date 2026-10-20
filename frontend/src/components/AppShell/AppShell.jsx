@@ -6,6 +6,7 @@ import { useChanged } from "../../utilities.jsx";
 
 import MapContainer from "../Map/MapContainer.jsx";
 import FeatureCard from "../Map/FeatureCard/FeatureCard.jsx";
+import ClearMapSelection from "../Map/ClearMapSelection/ClearMapSelection.jsx";
 import ApiErrorBanner from "./ApiErrorBanner.jsx";
 import ActivityIndicator from "./ActivityIndicator.jsx";
 import Sidebar from "./Sidebar/Sidebar.jsx";
@@ -127,6 +128,7 @@ export default function AppShell() {
       {/* Directly after the map: it is anchored to the canvas, and the rest
           of the chrome outranks it. */}
       <FeatureCard />
+      <ClearMapSelection />
       <DatasetMapCorner />
       <ApiErrorBanner />
       <ActivityIndicator />

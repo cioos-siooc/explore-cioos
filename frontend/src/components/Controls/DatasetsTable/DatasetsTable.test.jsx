@@ -8,6 +8,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import translationFR from "../../../locales/fr/translation.json";
 
@@ -624,5 +625,36 @@ describe("DatasetsTable (download modal)", () => {
 
     await waitFor(() => expect(selection.selectedPks.has(1)).toBe(false));
     expect(handleSelectDataset).not.toHaveBeenCalled();
+  });
+
+  it("the map-click hint's Clear drops the highlighted click", async () => {
+    let map;
+    function MapProbe() {
+      map = useMapState();
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <MapProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    act(() =>
+      map.setFeatureQuery({ nonce: 1, lngLat: [0, 0], datasetPks: [2] }),
+    );
+
+    await userEvent.click(screen.getByTestId("datasets-map-click-clear"));
+
+    expect(map.featureQuery).toBeNull();
+    expect(
+      screen.queryByTestId("datasets-map-click-clear"),
+    ).not.toBeInTheDocument();
   });
 });
