@@ -143,17 +143,42 @@ describe("QuickFilters", () => {
     await waitFor(() => expect(seen.draw.at(-1)).toBe("clear"));
   });
 
-  it("closes the Area menu on Escape and on a click elsewhere", async () => {
+  it("arms the box tool on opening the Area menu and marks it", async () => {
+    const { user, seen } = renderRow();
+
+    await openArea(user);
+
+    await waitFor(() => expect(seen.draw.at(-1)).toBe("box"));
+    expect(screen.getByTestId("quick-filter-area-box")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("quick-filter-area-polygon")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("leaves a drawn shape alone on opening the Area menu", async () => {
+    const { user, seen } = renderRow(`/?${FREE_SHAPE}`);
+
+    await openArea(user);
+
+    expect(seen.draw.filter(Boolean)).toEqual([]);
+  });
+
+  it("disarms on Escape but keeps the box tool on a click elsewhere", async () => {
     const { user, seen } = renderRow();
     await openArea(user);
     await user.keyboard("{Escape}");
     expect(screen.queryByTestId("quick-filter-area-menu")).toBeNull();
     expect(screen.getByTestId("quick-filter-area")).toHaveFocus();
+    await waitFor(() => expect(seen.draw.at(-1)).toBe("clear"));
 
     await openArea(user);
     await user.click(document.body);
     expect(screen.queryByTestId("quick-filter-area-menu")).toBeNull();
-    expect(seen.draw.filter(Boolean)).toEqual([]);
+    expect(seen.draw.at(-1)).toBe("box");
   });
 
   it("toggles the in-view narrowing", async () => {

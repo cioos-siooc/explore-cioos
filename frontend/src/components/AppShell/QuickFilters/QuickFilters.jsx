@@ -25,9 +25,10 @@ import {
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
 
-// No armed-tool state: drawRequest is a *last* request, not a current one (see
-// MapStateProvider), so the Area button reads its lit state off the drawn
-// shape. Captions because a touch screen has no hover to show the title.
+// drawRequest is a *last* request, not a current one (see MapStateProvider),
+// so the lit menu item comes from the drawn shape, or failing one from the tool
+// this menu armed. Captions because a touch screen has no hover to show the
+// title.
 export default function QuickFilters() {
   const { t, i18n } = useTranslation();
   const { requestDraw, zoomToGeometry } = useMapState();
@@ -55,6 +56,7 @@ export default function QuickFilters() {
   const areaRef = useRef(null);
   const areaButtonRef = useRef(null);
   const [areaMenuOpen, setAreaMenuOpen] = useState(false);
+  const [armedMode, setArmedMode] = useState(null);
 
   // Pointer, not only blur: Safari never focuses a clicked button.
   useEffect(() => {
@@ -67,8 +69,10 @@ export default function QuickFilters() {
   }, [areaMenuOpen]);
 
   const hasShape = Boolean(polygon);
-  const boxActive = hasShape && polygonIsRectangle(polygon);
-  const polygonActive = hasShape && !boxActive;
+  const boxDrawn = hasShape && polygonIsRectangle(polygon);
+  const polygonDrawn = hasShape && !boxDrawn;
+  const boxActive = boxDrawn || (!hasShape && armedMode === "box");
+  const polygonActive = polygonDrawn || (!hasShape && armedMode === "polygon");
 
   // Not shown before the counts land, so it never flashes a zero.
   function countPreview(applied, count, id, testId) {
@@ -90,8 +94,28 @@ export default function QuickFilters() {
 
   function chooseArea(mode) {
     requestDraw(mode);
+    setArmedMode(mode === "clear" ? null : mode);
     setAreaMenuOpen(false);
     areaButtonRef.current?.focus();
+  }
+
+  // Opening arms the box tool so one click starts drawing; arming wipes the
+  // drawn shape, so not when there is one.
+  function openAreaMenu() {
+    setAreaMenuOpen(true);
+    if (hasShape) return;
+    requestDraw("box");
+    setArmedMode("box");
+  }
+
+  // A click elsewhere closes the menu without disarming: it is usually the
+  // first corner of the box.
+  function dismissAreaMenu() {
+    setAreaMenuOpen(false);
+    areaButtonRef.current?.focus();
+    if (hasShape || !armedMode) return;
+    requestDraw("clear");
+    setArmedMode(null);
   }
 
   return (
@@ -109,9 +133,7 @@ export default function QuickFilters() {
             setAreaMenuOpen(false);
         }}
         onKeyDown={(e) => {
-          if (e.key !== "Escape" || !areaMenuOpen) return;
-          setAreaMenuOpen(false);
-          areaButtonRef.current?.focus();
+          if (e.key === "Escape" && areaMenuOpen) dismissAreaMenu();
         }}
       >
         <button
@@ -119,7 +141,7 @@ export default function QuickFilters() {
           type="button"
           className={classNames("quickFilterButton", { applied: hasShape })}
           data-testid="quick-filter-area"
-          onClick={() => setAreaMenuOpen(!areaMenuOpen)}
+          onClick={areaMenuOpen ? dismissAreaMenu : openAreaMenu}
           aria-expanded={areaMenuOpen}
           aria-controls={areaMenuOpen ? areaMenuId : undefined}
           title={
@@ -133,7 +155,7 @@ export default function QuickFilters() {
               : t("spatialFilterFilterName")
           }
         >
-          {polygonActive ? (
+          {polygonDrawn ? (
             <Pentagon size={18} aria-hidden="true" />
           ) : (
             <BoundingBox size={18} aria-hidden="true" />
