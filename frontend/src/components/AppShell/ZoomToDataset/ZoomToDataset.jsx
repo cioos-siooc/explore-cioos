@@ -3,7 +3,10 @@ import { useCallback, useMemo } from "react";
 import { ZoomIn } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
-import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import {
+  useMapState,
+  useMapView,
+} from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import useWideView from "../../../state/selection/useWideView.js";
 import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
@@ -13,7 +16,8 @@ import { boundsAreFramed, boundsFromGeoJson } from "../../../utilities.jsx";
 // features, so theirs is the coverage bbox (see shapeQuery.js).
 export function useZoomToDataset() {
   const { inspectDataset } = useSelection();
-  const { zoomToGeometry, mapInstance, mapView } = useMapState();
+  const { zoomToGeometry, mapInstance } = useMapState();
+  const { mapView } = useMapView();
   const [, setWide] = useWideView();
 
   const footprint =

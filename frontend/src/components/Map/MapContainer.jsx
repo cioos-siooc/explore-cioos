@@ -6,7 +6,7 @@ import Spinner from "../ui/Spinner.jsx";
 import { server } from "../../config";
 import fetchJson from "../../state/fetchJson.js";
 import reportError from "../../state/reportError.js";
-import { useMapState } from "../../state/map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 
 // Map.jsx's WATCHED_MAP_LAYERS ids that draw data rather than basemap.
@@ -15,16 +15,8 @@ const DATA_LAYER_IDS = ["observations", "tracks", "griddap", "wmsOverlay"];
 export default function MapContainer() {
   const {
     mapQueryString,
-    setLoading,
-    reportFirstPaint,
-    setLoadingLayers,
-    mapView,
-    loadingLayers,
-    firstPaintPending,
-    setMapView,
     rangeLevels,
     coverageRangeLevels,
-    setViewportHexRange,
     griddapCoverageVisible,
     griddapCoverage,
     dataLayersVisible,
@@ -44,6 +36,16 @@ export default function MapContainer() {
     trailingDays,
     dataLayers,
   } = useMapState();
+  const {
+    setLoading,
+    reportFirstPaint,
+    setLoadingLayers,
+    mapView,
+    loadingLayers,
+    firstPaintPending,
+    setMapView,
+    setViewportHexRange,
+  } = useMapView();
   const {
     polygon,
     setPolygon,

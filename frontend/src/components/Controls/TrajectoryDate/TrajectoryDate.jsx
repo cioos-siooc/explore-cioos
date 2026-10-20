@@ -9,7 +9,10 @@ import {
   tracksMinDate,
   trailingWindowOptions,
 } from "../../config.js";
-import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import {
+  useMapState,
+  useMapView,
+} from "../../../state/map/MapStateProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, { DateField } from "../TimeRail/TimeRail.jsx";
 import {
@@ -26,8 +29,9 @@ import "./styles.css";
 // at 190px a century of empty axis would leave the Argo era a thumbnail.
 export default function TrajectoryDate() {
   const { t } = useTranslation();
-  const { zoom, scrubTime, setScrubTime, trailingDays, setTrailingDays } =
+  const { scrubTime, setScrubTime, trailingDays, setTrailingDays } =
     useMapState();
+  const { zoom } = useMapView();
   const { tipHighlight } = useTips();
 
   const maxIso = todayIso();

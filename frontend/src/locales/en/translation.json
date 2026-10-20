@@ -231,6 +231,8 @@
   "quickFilterCountDescription_one": "{{count, number}} dataset",
   "quickFilterCountDescription_other": "{{count, number}} datasets",
   "quickFilterCaptionReset": "Reset",
+  "quickFilterCaptionZoomArea": "Zoom",
+  "quickFilterZoomAreaTitle": "Zoom the map to the drawn area",
   "datasetsCardInViewCountText": "{{count}} datasets in the current map view",
   "datasetsCardGroupByLabel": "Group by",
   "datasetsCardGroupNoneText": "None",

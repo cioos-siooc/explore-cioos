@@ -27,7 +27,7 @@ import {
 } from "../../utilities.jsx";
 import erddapServersJSONfile from "../../erddapServers.json";
 import { useFilters } from "../filters/FilterProvider.jsx";
-import { useMapState } from "../map/MapStateProvider.jsx";
+import { useMapState, useViewportBounds } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
@@ -92,7 +92,6 @@ export default function SelectionProvider({ children }) {
     zoomToGeometry,
     pendingDatasetZoom,
     setPendingDatasetZoom,
-    mapView,
     setMapDatasetPKs,
     dataLayers,
   } = useMapState();
@@ -213,7 +212,7 @@ export default function SelectionProvider({ children }) {
     [pointsData],
   );
 
-  const viewportBounds = useDebounce(mapView?.bounds, 300);
+  const viewportBounds = useDebounce(useViewportBounds(), 300);
 
   // The instant answer, used until the server's exact one for this view lands
   // (or where it can't ask).
