@@ -64,7 +64,8 @@ export default function CardList({
   const [stuck, setStuck] = useState(false);
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    const root = sentinel?.closest(".datasetInspectorBody");
+    // A widened page scrolls each column on its own.
+    const root = sentinel?.closest(".datasetView, .datasetInspectorBody");
     if (!root) return undefined;
     const observer = new IntersectionObserver(
       ([entry]) =>

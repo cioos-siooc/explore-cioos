@@ -781,6 +781,8 @@
   "datasetMapCardDetailsText": "Details",
   "singleDatasetZoomText": "Zoom in",
   "closeDatasetText": "Close this dataset",
+  "sidebarWideViewTitle": "Widen this page over the map",
+  "sidebarNarrowViewTitle": "Return this page to the sidebar",
   "sidebarShowMapTitle": "Show the map — the dataset stays open in a card",
   "sidebarShowDatasetTitle": "Show the dataset page",
   "sidebarCollapseTitle": "Hide the dataset list",
@@ -952,6 +954,8 @@
   "filterSearchHelpTitle": "Type to find a filter, then select a result to apply it. Select it again to remove it.",
   "filterSearchOpenInPanel": "See every {{filter}} option",
   "filterSearchAllOptions": "All options",
+  "filterSearchShowMore": "Show {{count}} more",
+  "filterSearchShowMoreAction": "Show",
   "filterSearchHelpBrowse": "Or pick a filter from the list to see all of its options:",
   "filterSearchHelpFilters": "Variables, platforms, organizations…",
   "filterSearchHelpFiltersExamples": [
