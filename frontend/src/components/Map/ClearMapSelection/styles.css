@@ -1,0 +1,84 @@
+/* Outlined like the list's map-click cards (.datasetCard.fromMapClick), so
+   it reads as belonging to them and to the ring on the map. */
+.mapClickClear {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px 7px 7px;
+  border: 1px solid var(--cioos-map-click);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  box-shadow:
+    0 0 0 2px var(--cioos-map-click-glow),
+    0 0 10px 1px var(--cioos-map-click-glow);
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-base);
+  font-weight: 700;
+  color: var(--cioos-ink);
+  cursor: pointer;
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
+}
+
+@media (hover: hover) {
+  /* Red only once the pointer is on it: it's about to take the outline away. */
+  .mapClickClear:hover {
+    border-color: var(--cioos-error);
+    background-color: var(--cioos-error-bg);
+    color: var(--cioos-error-700);
+  }
+
+  .mapClickClear:hover .mapClickClearIcon {
+    background-color: var(--cioos-error-700);
+    color: var(--cioos-white);
+  }
+}
+
+.mapClickClearIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--cioos-map-click);
+  transition: background-color var(--cioos-transition-fast);
+}
+
+.mapClickClear:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.mapClickClearCompact {
+  flex: 0 0 auto;
+  margin-left: auto;
+  gap: 6px;
+  padding: 3px 12px 3px 3px;
+  font-size: var(--cioos-font-size-sm);
+}
+
+.mapClickClearCompact .mapClickClearIcon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Stacks above the error banner like the activity indicator. Under the
+   feature card, which carries its own close on phones where the two meet. */
+.clearMapSelection {
+  position: fixed;
+  left: 50%;
+  bottom: max(
+    calc(12px + var(--cioos-time-bar-space, 0px)),
+    var(--cioos-api-error-space, 0px)
+  );
+  transform: translateX(-50%);
+  z-index: calc(var(--cioos-z-shell, 30) - 3);
+  box-shadow:
+    0 0 0 2px var(--cioos-map-click-glow),
+    0 0 10px 1px var(--cioos-map-click-glow),
+    var(--cioos-shadow-float);
+}
