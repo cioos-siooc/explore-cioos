@@ -2,10 +2,11 @@ import { Marked } from "marked";
 import workflow from "@harvest-docs/workflow.md?raw";
 import erddap from "@harvest-docs/erddap.md?raw";
 import obis from "@harvest-docs/obis.md?raw";
+import downloads from "@harvest-docs/downloads.md?raw";
 
-export const HARVEST_DOCS = { workflow, erddap, obis };
+export const HARVEST_DOCS = { workflow, erddap, obis, downloads };
 
-const DOC_LINK = /^(workflow|erddap|obis)\.md(#[\w-]+)?$/;
+const DOC_LINK = /^(workflow|erddap|obis|downloads)\.md(#[\w-]+)?$/;
 const BASE = (process.env.BASE_URL || "/").replace(/\/$/, "");
 
 // GitHub's heading anchor rule, so `#loading`-style links work in both places.

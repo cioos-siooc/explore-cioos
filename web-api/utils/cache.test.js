@@ -321,3 +321,40 @@ test("the store is queued synchronously, so EXPIRE cannot beat the key", async (
     "hSet must be issued before hset() returns, not on a later tick",
   );
 });
+
+test("a cache hit answers the requesting origin, not the one that filled it", async () => {
+  clearAll();
+  const cors = require("cors");
+  const app = express();
+  app.use(cors({ origin: true, credentials: true }));
+  app.get("/t", apicache.middleware("24 hours"), (req, res) =>
+    res.json({ tile: "payload" }),
+  );
+  const server = app.listen(0);
+  const allowedOriginFor = (origin) =>
+    new Promise((resolve, reject) => {
+      http
+        .get(
+          { port: server.address().port, path: "/t", headers: { origin } },
+          (r) => {
+            r.resume();
+            r.on("end", () =>
+              resolve(r.headers["access-control-allow-origin"]),
+            );
+          },
+        )
+        .on("error", reject);
+    });
+  try {
+    assert.equal(await allowedOriginFor("http://a.test"), "http://a.test");
+    assert.equal(apicache.getIndex().all.length, 1, "the hit below is real");
+    assert.equal(
+      await allowedOriginFor("http://b.test"),
+      "http://b.test",
+      "a replayed origin makes the browser block the response",
+    );
+  } finally {
+    server.close();
+    clearAll();
+  }
+});

@@ -34,16 +34,17 @@ describe("renderHarvestDoc", () => {
 });
 
 describe("HARVEST_DOCS", () => {
-  it("bundles the three docs from docs/harvesting", () => {
+  it("bundles the four docs from docs/harvesting", () => {
     expect(HARVEST_DOCS.workflow).toMatch(/^# Harvest workflow/);
     expect(HARVEST_DOCS.erddap).toMatch(/^# ERDDAP harvest strategy/);
     expect(HARVEST_DOCS.obis).toMatch(/^# OBIS harvest strategy/);
+    expect(HARVEST_DOCS.downloads).toMatch(/^# Download packages/);
   });
 
   it("every cross-doc anchor points at a heading that exists", () => {
     for (const markdown of Object.values(HARVEST_DOCS)) {
       for (const [, doc, anchor] of markdown.matchAll(
-        /\]\((workflow|erddap|obis)\.md#([\w-]+)\)/g,
+        /\]\((workflow|erddap|obis|downloads)\.md#([\w-]+)\)/g,
       )) {
         expect(renderHarvestDoc(HARVEST_DOCS[doc])).toContain(`id="${anchor}"`);
       }

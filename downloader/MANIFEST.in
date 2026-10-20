@@ -1,1 +1,1 @@
-include erddap_downloader/eovs_to_standard_name.json
+include cioos_downloader/eovs_to_standard_name.json

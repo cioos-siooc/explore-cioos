@@ -66,6 +66,15 @@ describe("HarvestDownloads", () => {
     expect(screen.getAllByText(/KB/).length).toBeGreaterThan(0);
   });
 
+  it("links to the doc explaining how download packages are built", async () => {
+    renderWithProviders(<HarvestDownloads />);
+    expect(
+      await screen.findByRole("link", {
+        name: "How download packages are built",
+      }),
+    ).toHaveAttribute("href", "/harvest/docs/downloads");
+  });
+
   it("shows a dataset's reason text under its row when it has one", async () => {
     renderWithProviders(<HarvestDownloads />);
     await screen.findByText("obs_270");

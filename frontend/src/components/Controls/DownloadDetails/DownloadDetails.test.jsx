@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -236,21 +236,94 @@ describe("DownloadDetails", () => {
     );
   });
 
-  it("shows the direct links and each card's download link up front", () => {
-    renderDetails({
+  it("offers direct links without a polygon filter, and only the script with one", async () => {
+    const polygon = [
+      [-65, 44],
+      [-62, 44],
+      [-63, 45],
+      [-65, 44],
+    ];
+    const pointsToReview = [
+      makePoint({
+        pk: EST_SMALL.pk,
+        dataset_id: "small",
+        source_type: "erddap",
+        erddap_server_url: "https://data.example.ca/erddap",
+      }),
+    ];
+    const { user, rerender } = renderDetails({ pointsToReview });
+    const menu = () => screen.getByRole("button", { name: /script or links/i });
+    await user.click(menu());
+    expect(screen.getByRole("button", { name: /curl/i })).toBeVisible();
+    await user.click(menu());
+
+    rerender(
+      detailsElement({
+        pointsToReview,
+        polygon,
+        filterDownloadByPolygon: true,
+      }),
+    );
+    await user.click(menu());
+    expect(screen.queryByRole("button", { name: /curl/i })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /python script/i }),
+    ).toBeVisible();
+  });
+
+  it("links the download script to the package's selection and format", async () => {
+    const clicked = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      function () {
+        clicked.push(this.getAttribute("href"));
+      },
+    );
+    const { user } = renderDetails();
+    await user.click(screen.getByRole("button", { name: /script or links/i }));
+    await user.click(screen.getByRole("button", { name: /python script/i }));
+    const url = new URL(clicked[0], "http://localhost");
+    expect(url.pathname).toMatch(/\/download\/script$/);
+    expect(url.searchParams.get("datasetPKs")).toBe(
+      `${EST_SMALL.pk},${EST_LARGE.pk}`,
+    );
+    expect(url.searchParams.get("format")).toBe("csv");
+  });
+
+  it("names the OBIS datasets a format without an OBIS version turns into CSV", async () => {
+    const { user } = renderDetails({
       pointsToReview: [
+        makePoint({ pk: EST_SMALL.pk, title: "Small dataset" }),
         makePoint({
-          pk: EST_SMALL.pk,
-          dataset_id: "small",
-          erddap_url: "https://example.org/erddap/tabledap/small.html",
+          pk: EST_LARGE.pk,
+          title: "Fish survey",
+          source_type: "obis",
+          erddap_url: "https://obis.org",
         }),
       ],
     });
-    expect(screen.getByTestId("direct-links")).toBeInTheDocument();
-    expect(screen.getByTestId("download-formats")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^Download / })).toHaveAttribute(
-      "href",
-      expect.stringContaining("/tabledap/small."),
-    );
+    const format = screen.getByLabelText("All downloads");
+    expect(
+      within(screen.getByRole("group", { name: "ERDDAP and OBIS" }))
+        .getAllByRole("option")
+        .map((option) => option.value),
+    ).toEqual(["csv", "parquet"]);
+    expect(
+      within(screen.getByRole("group", { name: "ERDDAP only (OBIS as CSV)" }))
+        .getAllByRole("option")
+        .map((option) => option.value),
+    ).toEqual(["odv", "nccf"]);
+    expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
+    expect(screen.queryByText("As CSV")).not.toBeInTheDocument();
+
+    await user.selectOptions(format, "odv");
+    expect(
+      screen.getByText(
+        "1 OBIS dataset will be delivered as CSV: OBIS has no ODV spreadsheet version. Choose CSV or Parquet to get every dataset in one format.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("As CSV")).toHaveLength(1);
+
+    await user.selectOptions(format, "parquet");
+    expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
   });
 });
