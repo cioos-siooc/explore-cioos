@@ -381,8 +381,22 @@ describe("Citation", () => {
     expect(screen.queryByText(/A dataset\./)).not.toBeInTheDocument();
   });
 
-  it("renders nothing without a citation or DOI", () => {
-    const { container } = renderWithProviders(<Citation metadata={{}} />);
+  it("says the source gave no citation or DOI", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Citation metadata={{}} />);
+    await user.click(screen.getByRole("button", { name: "Citation" }));
+    expect(
+      screen.getByText(/has not supplied a citation or DOI/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Copy citation" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders nothing while the metadata loads", () => {
+    const { container } = renderWithProviders(
+      <Citation metadata={undefined} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 });
