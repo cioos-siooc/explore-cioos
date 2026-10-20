@@ -211,6 +211,16 @@ def _ckan_contact(party, cited, default_role=None):
     }
 
 
+def _ckan_lineage(steps):
+    """CKAN's lineage is a list of ISO lineage records (the schema's own
+    "statment" spelling); the page shows one text, as ERDDAP's history is."""
+    statements = [
+        _text(s.get("en") or s.get("fr"))
+        for s in (step.get("statment") or {} for step in steps or [])
+    ]
+    return "\n\n".join(filter(None, statements)) or None
+
+
 def from_ckan(package):
     citation = package.get("citation") or {}
     dates = {d.get("type"): d.get("value") for d in package.get("dataset-reference-date") or []}
@@ -242,7 +252,7 @@ def from_ckan(package):
         "progress": package.get("progress"),
         "update_frequency": package.get("frequency-of-update"),
         "projects": _unique(package.get("projects") or []),
-        "lineage": package.get("lineage"),
+        "lineage": _ckan_lineage(package.get("lineage")),
         "resources": _links([
             {
                 "name": _translated(r.get("name_translated"), r.get("name")),
