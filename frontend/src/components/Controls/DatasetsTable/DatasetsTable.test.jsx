@@ -8,6 +8,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import translationFR from "../../../locales/fr/translation.json";
 
@@ -624,5 +625,137 @@ describe("DatasetsTable (download modal)", () => {
 
     await waitFor(() => expect(selection.selectedPks.has(1)).toBe(false));
     expect(handleSelectDataset).not.toHaveBeenCalled();
+  });
+
+  describe("with the gridded coverage layer on", () => {
+    const titles = () =>
+      screen
+        .getAllByTestId("dataset-card")
+        .map((c) => c.querySelector(".datasetCardTitle").textContent);
+    let map;
+    function MapProbe() {
+      map = useMapState();
+      return null;
+    }
+    const ROWS_WITH_GRIDS = [
+      ...ROWS,
+      makeRow({
+        pk: 4,
+        title: "Delta grid",
+        cdm_data_type: "Grid",
+        grid_dimensions: [],
+      }),
+    ];
+    const renderTable = (props = {}) =>
+      renderWithProviders(
+        <>
+          <DatasetsTable
+            datasets={ROWS_WITH_GRIDS}
+            selectAll={false}
+            handleSelectAllDatasets={() => {}}
+            handleSelectDataset={() => {}}
+            {...props}
+          />
+          <MapProbe />
+        </>,
+        { providers: "app" },
+      );
+
+    it("lists grids first, each block in the chosen sort", async () => {
+      renderTable();
+      await screen.findAllByTestId("dataset-card");
+      expect(titles()).toEqual([
+        "Alpha station",
+        "Beta station",
+        "Delta grid",
+        "Gamma grid",
+      ]);
+
+      act(() => map.setGriddapCoverageVisible(true));
+
+      expect(titles()).toEqual([
+        "Delta grid",
+        "Gamma grid",
+        "Alpha station",
+        "Beta station",
+      ]);
+    });
+
+    it("still puts a map click's datasets above the grids", async () => {
+      renderTable();
+      await screen.findAllByTestId("dataset-card");
+      act(() => {
+        map.setGriddapCoverageVisible(true);
+        map.setFeatureQuery({ nonce: 1, lngLat: [0, 0], datasetPks: [1] });
+      });
+
+      expect(titles()).toEqual([
+        "Beta station",
+        "Delta grid",
+        "Gamma grid",
+        "Alpha station",
+      ]);
+    });
+
+    it("leads with the gridded group when grouped by type", async () => {
+      // A third station so the default largest-group-first order would put
+      // the time series ahead.
+      const { user } = renderTable({
+        datasets: [...ROWS_WITH_GRIDS, makeRow({ pk: 5, title: "Epsilon" })],
+      });
+      await screen.findAllByTestId("dataset-card");
+      act(() => map.setGriddapCoverageVisible(true));
+      await user.selectOptions(screen.getByLabelText("Group by"), "type");
+
+      await waitFor(() =>
+        expect(
+          document.querySelector(".datasetsCardGroupHeader"),
+        ).toHaveTextContent("Gridded"),
+      );
+    });
+
+    it("leaves the download modal's order alone", async () => {
+      renderTable({ isDownloadModal: true });
+      await screen.findAllByTestId("dataset-card");
+      act(() => map.setGriddapCoverageVisible(true));
+
+      expect(titles()).toEqual([
+        "Alpha station",
+        "Beta station",
+        "Delta grid",
+        "Gamma grid",
+      ]);
+    });
+  });
+
+  it("the map-click hint's Clear drops the highlighted click", async () => {
+    let map;
+    function MapProbe() {
+      map = useMapState();
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <MapProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    act(() =>
+      map.setFeatureQuery({ nonce: 1, lngLat: [0, 0], datasetPks: [2] }),
+    );
+
+    await userEvent.click(screen.getByTestId("datasets-map-click-clear"));
+
+    expect(map.featureQuery).toBeNull();
+    expect(
+      screen.queryByTestId("datasets-map-click-clear"),
+    ).not.toBeInTheDocument();
   });
 });

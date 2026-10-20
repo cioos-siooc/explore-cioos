@@ -1,5 +1,7 @@
 """Unit tests for dataset_types.tabledap_features on a fully-configured MagicMock dataset."""
 
+from datetime import UTC, datetime
+
 import pandas as pd
 import pytest
 from cde_harvester.dataset_types import extract_features as get_profiles
@@ -477,6 +479,15 @@ class TestSingleTimeseriesFromMetadata:
         assert result.loc[0, "time_min"] == pd.Timestamp("2021-02-01", tz="UTC")
         assert result.loc[0, "n_records"] == 25
         dataset.get_max_min.assert_not_called()
+
+    def test_open_ended_time_marks_the_dataset_ongoing(self, dataset):
+        """ONC publishes live deployments as actual_range [start, NaN]; the
+        listing's maxTime is then empty, so only this keeps them realtime."""
+        dataset.coverage_time_max = None
+        dataset.df_variables.loc["time", "actual_range"] = "1.788130289E9, NaN"
+        before = datetime.now(UTC)
+        get_profiles(dataset)
+        assert pd.Timestamp(dataset.coverage_time_max) >= before
 
 
 class TestIdentityCarriesBounds:

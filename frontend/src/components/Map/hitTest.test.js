@@ -14,7 +14,6 @@ import {
   loadTurfUnion,
   trackFeatureIn,
   trackItemsIn,
-  withoutGridHighlight,
 } from "./hitTest.js";
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
 
@@ -264,6 +263,7 @@ describe("buildFeatureQuery", () => {
     zoom: 6.7,
     queryRendered: () => [],
     language: "en",
+    gridGeometry: () => undefined,
     ...overrides,
   });
 
@@ -456,6 +456,19 @@ describe("buildFeatureQuery", () => {
     expect(query.observationCount).toBe(0);
   });
 
+  it("outlines a grid's whole box, not the tile-clipped piece clicked", () => {
+    const whole = square(0, 0, 4, 4);
+    const query = buildFeatureQuery(
+      lngLat,
+      [feature(GRID, { pk: 5 }, square(0, 0, 1, 1))],
+      context({ gridGeometry: (pk) => (pk === 5 ? whole : undefined) }),
+    );
+    expect(query.highlight.features.map((f) => f.geometry)).toEqual([
+      whole,
+      whole,
+    ]);
+  });
+
   it("puts tracks first, then observations, then grids", () => {
     const query = buildFeatureQuery(
       lngLat,
@@ -498,17 +511,5 @@ describe("featureHasDataset", () => {
       false,
     );
     expect(featureHasDataset(feature("hexes", {}), 3)).toBe(false);
-  });
-});
-
-describe("withoutGridHighlight", () => {
-  const tagged = (role) => ({ type: "Feature", properties: { role } });
-
-  it("drops the clicked grid boxes and their merged fill, keeping the rest", () => {
-    const highlight = {
-      type: "FeatureCollection",
-      features: [tagged("outline"), tagged("fill"), tagged("both")],
-    };
-    expect(withoutGridHighlight(highlight).features).toEqual([tagged("both")]);
   });
 });

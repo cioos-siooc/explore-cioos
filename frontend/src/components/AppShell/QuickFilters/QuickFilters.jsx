@@ -161,7 +161,7 @@ export default function QuickFilters() {
             <BoundingBox size={18} aria-hidden="true" />
           )}
           <span className="quickFilterCaption" aria-hidden="true">
-            {t("spatialFilterFilterName")}
+            {t("quickFilterCaptionArea")}
           </span>
         </button>
         {areaMenuOpen && (
@@ -285,7 +285,7 @@ export default function QuickFilters() {
       >
         <ArrowCounterclockwise size={18} aria-hidden="true" />
         <span className="quickFilterCaption" aria-hidden="true">
-          {t("quickFilterCaptionReset")}
+          {t("quickFilterCaptionClear")}
         </span>
       </button>
     </div>

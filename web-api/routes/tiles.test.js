@@ -173,6 +173,21 @@ test("GET /tiles/tracks/:z/:x/:y.mvt returns a binary MVT tile with both track l
   assert.match(db.queries[0], /track-heads/);
 });
 
+test("GET /tiles/tracks/:z/:x/:y.mvt keeps heads only for trajectories live on the selected date", async () => {
+  db.queueRaw([{ st_asmvt: FAKE_TILE }]);
+  await agent.get("/tiles/tracks/6/20/20.mvt").query({
+    timeMin: "2020-01-01T00:00:00Z",
+    timeMax: "2020-02-01T00:00:00Z",
+  });
+  const sql = db.queries[0];
+  const headMvt = sql.slice(
+    sql.indexOf("head_mvt AS"),
+    sql.indexOf("SELECT coalesce"),
+  );
+  assert.match(headMvt, /h\.trajectory_end >= .*- interval '1 day'/);
+  assert.match(headMvt, /make_interval\(secs => h\.gap_secs\)/);
+});
+
 test("GET /tiles/tracks/:z/:x/:y.mvt rejects an unrecognized trajectoryTypes entry", async () => {
   const res = await agent.get("/tiles/tracks/6/20/20.mvt").query({
     timeMin: "2020-01-01T00:00:00Z",

@@ -297,6 +297,7 @@ function CitationPopover({ citation, doi }) {
   }
 
   useEffect(() => () => clearTimeout(hoverTimer.current), []);
+  const missing = !citation && !doi;
   const doiInCitation =
     doi && citation?.includes(doi.replace(/^https?:\/\/doi\.org\//, ""));
 
@@ -331,7 +332,7 @@ function CitationPopover({ citation, doi }) {
     >
       <button
         type="button"
-        className="citationButton"
+        className={`citationButton${missing ? " missing" : ""}`}
         aria-expanded={open}
         onClick={() => setPinned((value) => !value)}
       >
@@ -342,6 +343,7 @@ function CitationPopover({ citation, doi }) {
         <div className="citationPopover">
           <div className="citationPopoverCard" role="region">
             <p className="metadataCitation">
+              {missing && t("metadataNoCitationText")}
               {citation}
               {/* Most citations end with their DOI already. */}
               {doi && !doiInCitation && (
@@ -483,7 +485,8 @@ export function Citation({ metadata }) {
   const { i18n } = useTranslation();
   const citation = localized(metadata?.citation, i18n.language);
   const doi = metadata?.doi;
-  if (!citation && !doi) return null;
+  // Waits for the metadata, so a page still loading doesn't claim there's none.
+  if (!metadata) return null;
   return <CitationPopover citation={citation} doi={doi} />;
 }
 
