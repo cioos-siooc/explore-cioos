@@ -2,7 +2,6 @@ import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
-  Dash,
   Download,
   FileEarmarkText,
   ListUl,
@@ -15,6 +14,11 @@ import isEmpty from "lodash-es/isEmpty";
 
 import { useChanged } from "../../../utilities.jsx";
 import CloseButton from "../../ui/CloseButton.jsx";
+import {
+  WindowMaximize,
+  WindowMinimize,
+  WindowSidebar,
+} from "../../ui/WindowControlIcons.jsx";
 import useSheetDrag from "../../ui/useSheetDrag.js";
 import DatasetsPanel from "../Panels/DatasetsPanel.jsx";
 import Spinner from "../../ui/Spinner.jsx";
@@ -23,6 +27,7 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import useBackDismiss from "../../../state/ui/useBackDismiss.js";
+import useWideView from "../../../state/selection/useWideView.js";
 import useMediaQuery, {
   MOBILE_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
@@ -65,6 +70,21 @@ export default function Sidebar() {
   if (useChanged(expanded) && expanded) setBackable(!inspectDataset);
   useBackDismiss(isMobile && expanded && backable, () => setSidebarOpen(false));
   const inspecting = Boolean(inspectDataset);
+  // Wide is the card's, not the page's: the list and a dataset page share it.
+  // Hiding the card keeps it, so it reopens the size it was left, as a
+  // minimized window does.
+  const [wideParam, setWide] = useWideView();
+  const wide = expanded && wideParam;
+  useEffect(() => {
+    if (!wide) return undefined;
+    // On window, so anything nearer that answers Escape (a dialog, the filter
+    // search, a pinned citation) stops or claims it first.
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && !event.defaultPrevented) setWide(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [wide, setWide]);
   const selectedCount = isEmpty(pointsToReview) ? 0 : pointsToReview.length;
   // Adding to the selection is when download tips start to matter.
   const lastSelectedCount = useRef(selectedCount);
@@ -75,153 +95,173 @@ export default function Sidebar() {
     lastSelectedCount.current = selectedCount;
   }, [selectedCount, offerTip]);
 
-  const collapseButton = (
+  // Minimize, maximize, close: the order window controls use. A phone's card
+  // is already a full-screen sheet.
+  const wideButton = !isMobile && (
     <CloseButton
-      label={t("sidebarCollapseTitle")}
-      onClick={() => setSidebarOpen(false)}
-      testId="sidebar-collapse"
+      label={t(wide ? "sidebarNarrowViewTitle" : "sidebarWideViewTitle")}
+      onClick={() => setWide(!wide)}
+      icon={wide ? WindowSidebar : WindowMaximize}
+      testId="sidebar-wide-toggle"
     />
   );
 
   return (
-    <aside
-      className="sidebar"
-      aria-label={t("datasetsFilterName")}
-      data-testid="sidebar"
-    >
-      <section
-        ref={cardRef}
-        className={classNames("sidebarDatasets", { expanded })}
-        data-testid="sidebar-datasets"
-        data-expanded={expanded}
-        data-map-cover={expanded || undefined}
-        onPointerDown={
-          isMobile
-            ? (event) => {
-                if (
-                  event.target.closest(
-                    ".sheetHandle, .datasetsHeader, .datasetsBanner",
-                  )
-                )
-                  startDrag(event);
-              }
-            : undefined
-        }
+    <>
+      {wide && (
+        <div
+          className="sidebarScrim"
+          data-testid="sidebar-scrim"
+          aria-hidden="true"
+          onClick={() => setWide(false)}
+        />
+      )}
+      <aside
+        className={classNames("sidebar", { wide })}
+        aria-label={t("datasetsFilterName")}
+        data-testid="sidebar"
       >
-        {isMobile && <div className="sheetHandle" aria-hidden="true" />}
-        {inspecting ? (
-          <div className="datasetsBanner">
-            {/* Names the destination, so it needs no tooltip. */}
-            <button
-              type="button"
-              className="datasetsBackButton"
-              data-testid="sidebar-back"
-              onClick={returnToDatasetList}
+        <section
+          ref={cardRef}
+          className={classNames("sidebarDatasets", { expanded })}
+          data-testid="sidebar-datasets"
+          data-expanded={expanded}
+          data-map-cover={expanded || undefined}
+          onPointerDown={
+            isMobile
+              ? (event) => {
+                  if (
+                    event.target.closest(
+                      ".sheetHandle, .datasetsHeader, .datasetsBanner",
+                    )
+                  )
+                    startDrag(event);
+                }
+              : undefined
+          }
+        >
+          {isMobile && <div className="sheetHandle" aria-hidden="true" />}
+          {inspecting ? (
+            <div className="datasetsBanner">
+              {/* Names the destination, so it needs no tooltip. */}
+              <button
+                type="button"
+                className="datasetsBackButton"
+                data-testid="sidebar-back"
+                onClick={returnToDatasetList}
+              >
+                <ChevronLeft
+                  className="datasetsBackButtonIcon"
+                  size={14}
+                  aria-hidden="true"
+                />
+                <span>{t("sidebarBackToDatasetsText")}</span>
+              </button>
+              <span className="datasetsBannerMode">
+                <FileEarmarkText size={13} aria-hidden="true" />
+                {t("sidebarDatasetDetailsLabel")}
+              </span>
+              <CloseButton
+                label={t("sidebarShowMapTitle")}
+                onClick={() => setSidebarOpen(false)}
+                icon={WindowMinimize}
+                testId="sidebar-collapse"
+              />
+              {wideButton}
+              <CloseButton
+                label={t("closeDatasetText")}
+                onClick={() => {
+                  returnToDatasetList();
+                  setSidebarOpen(false);
+                }}
+                testId="sidebar-close-dataset"
+              />
+            </div>
+          ) : (
+            <div className="datasetsHeader">
+              <span className="datasetsHeaderIcon" aria-hidden="true">
+                <ListUl size={20} />
+              </span>
+              <span className="datasetsHeaderText">
+                <span className="datasetsHeaderTitleRow">
+                  <span className="datasetsHeaderLabel">
+                    {t("datasetsFilterName")}
+                  </span>
+                  <span
+                    className={classNames("datasetsHeaderCount", {
+                      updating: countsUpdating,
+                    })}
+                    data-testid="sidebar-toggle-count"
+                    title={countsTitle}
+                  >
+                    {countsReady ? (
+                      countLabel
+                    ) : (
+                      <Spinner size="xs" className="countSpinner" />
+                    )}
+                  </span>
+                </span>
+                <span className="datasetsHeaderSubtitle">
+                  {t("datasetsToggleSubtitleText")}
+                </span>
+              </span>
+              {wideButton}
+              <CloseButton
+                label={t("sidebarCollapseTitle")}
+                onClick={() => setSidebarOpen(false)}
+                testId="sidebar-collapse"
+              />
+            </div>
+          )}
+          <div className="sidebarBody" data-testid="sidebar-body">
+            <DatasetsPanel />
+          </div>
+          <footer className="sidebarFooter" data-testid="sidebar-footer">
+            {/* The per-card control is a bare icon, so this line names it. */}
+            <p
+              className="sidebarFooterHint"
+              title={t("sidebarSelectionHintTitle")}
             >
-              <ChevronLeft
-                className="datasetsBackButtonIcon"
-                size={14}
+              <PlusCircle
+                className="sidebarFooterHintIcon"
+                size={13}
                 aria-hidden="true"
               />
-              <span>{t("sidebarBackToDatasetsText")}</span>
-            </button>
-            <span className="datasetsBannerMode">
-              <FileEarmarkText size={13} aria-hidden="true" />
-              {t("sidebarDatasetDetailsLabel")}
-            </span>
-            <CloseButton
-              label={t("sidebarShowMapTitle")}
-              onClick={() => setSidebarOpen(false)}
-              icon={Dash}
-              testId="sidebar-collapse"
-            />
-            <CloseButton
-              label={t("closeDatasetText")}
-              onClick={() => {
-                returnToDatasetList();
-                setSidebarOpen(false);
-              }}
-              testId="sidebar-close-dataset"
-            />
-          </div>
-        ) : (
-          <div className="datasetsHeader">
-            <span className="datasetsHeaderIcon" aria-hidden="true">
-              <ListUl size={20} />
-            </span>
-            <span className="datasetsHeaderText">
-              <span className="datasetsHeaderTitleRow">
-                <span className="datasetsHeaderLabel">
-                  {t("datasetsFilterName")}
-                </span>
-                <span
-                  className={classNames("datasetsHeaderCount", {
-                    updating: countsUpdating,
-                  })}
-                  data-testid="sidebar-toggle-count"
-                  title={countsTitle}
-                >
-                  {countsReady ? (
-                    countLabel
-                  ) : (
-                    <Spinner size="xs" className="countSpinner" />
-                  )}
-                </span>
-              </span>
-              <span className="datasetsHeaderSubtitle">
-                {t("datasetsToggleSubtitleText")}
-              </span>
-            </span>
-            {collapseButton}
-          </div>
-        )}
-        <div className="sidebarBody" data-testid="sidebar-body">
-          <DatasetsPanel />
-        </div>
-        <footer className="sidebarFooter" data-testid="sidebar-footer">
-          {/* The per-card control is a bare icon, so this line names it. */}
-          <p
-            className="sidebarFooterHint"
-            title={t("sidebarSelectionHintTitle")}
-          >
-            <PlusCircle
-              className="sidebarFooterHintIcon"
-              size={13}
-              aria-hidden="true"
-            />
-            <span>{t("sidebarSelectionHintText")}</span>
+              <span>{t("sidebarSelectionHintText")}</span>
+              <button
+                type="button"
+                className="sidebarFooterHintMore"
+                data-testid="sidebar-selection-help"
+                onClick={() => setShowSelectionHelpModal(true)}
+                aria-label={t("sidebarSelectionHintMoreText")}
+                title={t("sidebarSelectionHintMoreText")}
+              >
+                <QuestionCircle size={13} aria-hidden="true" />
+              </button>
+            </p>
             <button
               type="button"
-              className="sidebarFooterHintMore"
-              data-testid="sidebar-selection-help"
-              onClick={() => setShowSelectionHelpModal(true)}
-              aria-label={t("sidebarSelectionHintMoreText")}
-              title={t("sidebarSelectionHintMoreText")}
+              className="sidebarDownloadButton"
+              data-tip-highlight={
+                tipHighlight("filtersCutDownload") ||
+                tipHighlight("directLinks")
+              }
+              disabled={selectedCount === 0}
+              onClick={() => setShowDownloadModal(true)}
+              title={t("dockDownloadCountTitle", { count: selectedCount })}
             >
-              <QuestionCircle size={13} aria-hidden="true" />
-            </button>
-          </p>
-          <button
-            type="button"
-            className="sidebarDownloadButton"
-            data-tip-highlight={
-              tipHighlight("filtersCutDownload") || tipHighlight("directLinks")
-            }
-            disabled={selectedCount === 0}
-            onClick={() => setShowDownloadModal(true)}
-            title={t("dockDownloadCountTitle", { count: selectedCount })}
-          >
-            <Download size={16} aria-hidden="true" />
-            <span className="sidebarDownloadText">
-              {t("downloadModalButtonText")}
-              {/* Keyed on the count so each change replays the pulse. */}
-              <span className="sidebarDownloadCount" key={selectedCount}>
-                {t("sidebarCountsSelected", { count: selectedCount })}
+              <Download size={16} aria-hidden="true" />
+              <span className="sidebarDownloadText">
+                {t("downloadModalButtonText")}
+                {/* Keyed on the count so each change replays the pulse. */}
+                <span className="sidebarDownloadCount" key={selectedCount}>
+                  {t("sidebarCountsSelected", { count: selectedCount })}
+                </span>
               </span>
-            </span>
-          </button>
-        </footer>
-      </section>
-    </aside>
+            </button>
+          </footer>
+        </section>
+      </aside>
+    </>
   );
 }

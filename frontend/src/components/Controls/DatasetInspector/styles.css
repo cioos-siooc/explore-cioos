@@ -51,6 +51,8 @@
 /* Sections sit as white cards on the panel's wash (.datasetsPanelDetail). */
 .datasetInspectorBody {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow-y: auto;
 
@@ -60,6 +62,42 @@
 
   padding: var(--inspector-pad-top) var(--inspector-pad-x)
     var(--inspector-pad-bottom);
+}
+
+/* Widened over the map (useWideView): metadata and data side by side, each
+   its own scroller carrying the body's padding, so the sticky record toolbar
+   and pager still land on their edges. */
+.datasetInspector.wide .datasetInspectorBody {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  padding: 0;
+  overflow: hidden;
+}
+
+.datasetView {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--inspector-pad-top) var(--inspector-pad-x)
+    var(--inspector-pad-bottom);
+}
+
+.datasetView + .datasetView {
+  border-left: 1px solid var(--cioos-hairline);
+}
+
+.datasetViewHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+}
+
+.datasetView .recordSection .cardList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }
 
 .datasetTitleBlock {
@@ -351,7 +389,19 @@
   color: var(--cioos-ink-60);
 }
 
+/* The data panel fills its scroller, so the record pager sits at its base
+   even under a short list. */
+.datasetPanel-data:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+.datasetPanel-data {
+  flex: 1 0 auto;
+}
+
 .recordSection {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
 }
@@ -509,7 +559,7 @@
 }
 
 .recordSection .cardList {
-  margin-top: 4px;
+  margin: 4px 0 8px;
 }
 
 .recordSection .cardListToolbar {
@@ -538,7 +588,7 @@
   position: sticky;
   bottom: calc(-1 * var(--inspector-pad-bottom));
   z-index: 2;
-  margin: 8px calc(-1 * var(--inspector-pad-x))
+  margin: auto calc(-1 * var(--inspector-pad-x))
     calc(-1 * var(--inspector-pad-bottom));
   padding: 8px var(--inspector-pad-x);
   border-top: 1px solid var(--cioos-hairline);

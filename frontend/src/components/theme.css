@@ -38,6 +38,9 @@
      splash), where seeing the basemap come in is the point. */
   --cioos-scrim-soft: rgb(238 246 244 / 55%);
 
+  /* Under a dialog, or the dataset page widened over the map. */
+  --cioos-backdrop: rgb(21 47 55 / 45%);
+
   /* --- Status palette (CIOOS-aligned) --- */
   --cioos-success: #52a79b;
   --cioos-success-bg: #c6e3df;
