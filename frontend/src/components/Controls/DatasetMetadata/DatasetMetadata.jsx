@@ -308,6 +308,8 @@ function CitationPopover({ citation, doi }) {
           ? event.key === "Escape"
           : !ref.current?.contains(event.target);
       if (outside) {
+        // Claimed, so the widened sidebar doesn't also narrow on it.
+        if (event.type === "keydown") event.preventDefault();
         setPinned(false);
         setHovered(false);
       }

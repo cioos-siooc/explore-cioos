@@ -19,6 +19,7 @@ import {
   PLOT_PARAMS,
   RECORD_PARAM,
   TAB_PARAM,
+  WIDE_PARAM,
 } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
@@ -105,6 +106,8 @@ export default function UrlSync() {
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
+      // Owned by useWideView.
+      ...(searchParams.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
       ...(dataset ? { dataset } : {}),
       // Carried through only while a dataset is open, so they don't linger as
       // stale keys for a closed page.

@@ -780,6 +780,8 @@
   "datasetMapCardDetailsText": "Détails",
   "singleDatasetZoomText": "Zoomer",
   "closeDatasetText": "Fermer ce jeu de données",
+  "sidebarWideViewTitle": "Élargir cette page par-dessus la carte",
+  "sidebarNarrowViewTitle": "Ramener cette page dans le panneau latéral",
   "sidebarShowMapTitle": "Afficher la carte — le jeu de données reste ouvert dans une fiche",
   "sidebarShowDatasetTitle": "Afficher la page du jeu de données",
   "sidebarCollapseTitle": "Masquer la liste des jeux de données",
