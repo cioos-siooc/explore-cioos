@@ -16,7 +16,7 @@ import {
   defaultTrailingDays,
   HEX_METRIC,
   isMarkerTier,
-  TRAIL_ALL,
+  trailingWindowOptions,
 } from "../../components/config.js";
 import {
   applyDatasetPKs,
@@ -304,12 +304,11 @@ export default function MapStateProvider({ children }) {
     urlParams.get("scrubTime") || new Date().toISOString().split("T")[0],
   );
   const debouncedScrubTime = useDebounce(scrubTime, 250);
-  // parseInt('all') is NaN, so TRAIL_ALL must match before the numeric parse
-  // or the 'all' trail silently reverts on reload.
+  // Off-menu values (old links' 'all') fall back, or the select would show a
+  // window the map isn't drawing.
   const [trailingDays, setTrailingDays] = useState(() => {
-    const trail = urlParams.get("trail");
-    if (trail === TRAIL_ALL) return TRAIL_ALL;
-    return Number.parseInt(trail) || defaultTrailingDays;
+    const days = Number.parseInt(urlParams.get("trail"));
+    return trailingWindowOptions.includes(days) ? days : defaultTrailingDays;
   });
 
   // An empty ?layers= is how older links said "all off", i.e. exclude all.
