@@ -24,19 +24,52 @@ import TimeBar from "../Controls/TimeBar/TimeBar.jsx";
 import IntroModal from "../Controls/IntroModal/IntroModal.jsx";
 import TipCard from "../Controls/Tips/TipCard.jsx";
 import { useFilters } from "../../state/filters/FilterProvider.jsx";
-import { useMapState } from "../../state/map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
+// The splash and legend follow the camera, so they subscribe to it here rather
+// than re-rendering the whole shell on every move.
+function Splash() {
+  const { firstPaintPending } = useMapView();
+  const [splashMounted, setSplashMounted] = useState(firstPaintPending);
+
+  // Lowered by the splash itself once faded. Keyed on the condition rather
+  // than assuming it runs once, in case a later wait earns a splash too.
+  if (useChanged(firstPaintPending) && firstPaintPending)
+    setSplashMounted(true);
+
+  // Later redraws are reported by the brand logo's mark instead. The splash
+  // itself says when its fade is done, so the map and chrome arrive together
+  // (see Loading).
+  return (
+    splashMounted && (
+      <Loading
+        dismissed={!firstPaintPending}
+        onDismissed={() => setSplashMounted(false)}
+      />
+    )
+  );
+}
+
+function CameraLegend(props) {
+  const { zoom, currentRangeLevel, hexRangeLevel, hexRangeScaledToView } =
+    useMapView();
+  return (
+    <Legend
+      {...props}
+      zoom={zoom}
+      currentRangeLevel={currentRangeLevel}
+      hexRangeLevel={hexRangeLevel}
+      hexRangeScaledToView={hexRangeScaledToView}
+    />
+  );
+}
+
 export default function AppShell() {
   const { t } = useTranslation();
   const {
-    firstPaintPending,
-    zoom,
-    currentRangeLevel,
-    hexRangeLevel,
-    hexRangeScaledToView,
     legendLoading,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
@@ -51,13 +84,6 @@ export default function AppShell() {
   const { startDate, endDate, timeFilterActive } = useFilters();
   const { showIntroModal, setShowIntroModal } = useUI();
   const { platformsAvailable } = useSelection();
-
-  const [splashMounted, setSplashMounted] = useState(firstPaintPending);
-
-  // Lowered by the splash itself once faded. Keyed on the condition rather
-  // than assuming it runs once, in case a later wait earns a splash too.
-  if (useChanged(firstPaintPending) && firstPaintPending)
-    setSplashMounted(true);
 
   // Each turns off exactly what one legend entry describes, so it rides on
   // that entry. Display only: none of them touches the geometry filter.
@@ -94,15 +120,7 @@ export default function AppShell() {
 
   return (
     <>
-      {/* Later redraws are reported by the brand logo's mark instead. The
-          splash itself says when its fade is done, so the map and chrome
-          arrive together (see Loading). */}
-      {splashMounted && (
-        <Loading
-          dismissed={!firstPaintPending}
-          onDismissed={() => setSplashMounted(false)}
-        />
-      )}
+      <Splash />
       {/* Mounted immediately rather than waiting for /legend, the heaviest
           query; Map's setColorStops applies the ramp once ranges arrive. */}
       <MapContainer />
@@ -119,12 +137,8 @@ export default function AppShell() {
       <DownloadModal />
       <CoverageModal />
       <SelectionHelpModal />
-      <Legend
-        currentRangeLevel={currentRangeLevel}
-        hexRangeLevel={hexRangeLevel}
-        hexRangeScaledToView={hexRangeScaledToView}
+      <CameraLegend
         loading={legendLoading}
-        zoom={zoom}
         platformsAvailable={platformsAvailable}
         controls={legendControls}
         layerControls={layerControls}

@@ -10,7 +10,8 @@ vi.mock("../../../state/selection/SelectionProvider.jsx", () => ({
   useSelection: () => ({ inspectDataset }),
 }));
 vi.mock("../../../state/map/MapStateProvider.jsx", () => ({
-  useMapState: () => ({ zoomToGeometry, mapInstance: null, mapView: null }),
+  useMapState: () => ({ zoomToGeometry, mapInstance: null }),
+  useMapView: () => ({ mapView: null }),
 }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (k) => k }) }));
 

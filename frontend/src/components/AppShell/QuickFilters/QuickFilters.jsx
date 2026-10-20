@@ -18,7 +18,10 @@ import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
-import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import {
+  useMapState,
+  useMapView,
+} from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import "./styles.css";
 
@@ -27,7 +30,8 @@ import "./styles.css";
 // shape. Captions because a touch screen has no hover to show the title.
 export default function QuickFilters() {
   const { t, i18n } = useTranslation();
-  const { requestDraw, zoom, zoomToGeometry } = useMapState();
+  const { requestDraw, zoomToGeometry } = useMapState();
+  const { zoom } = useMapView();
   const {
     polygon,
     areaPlace,

@@ -4,7 +4,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
-import { useMapState } from "../../state/map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../state/selection/SelectionProvider.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
 
@@ -25,7 +25,7 @@ const ROW = pointQueryFixture[0];
 let latestMapState;
 let latestSelection;
 function Probe() {
-  latestMapState = useMapState();
+  latestMapState = { ...useMapState(), ...useMapView() };
   latestSelection = useSelection();
   const { initialPointsQueryComplete } = latestSelection;
   return (
