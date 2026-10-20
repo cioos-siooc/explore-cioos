@@ -53,8 +53,8 @@ button.griddapVariable:focus-visible {
 }
 
 button.griddapVariable[aria-pressed="true"] {
-  border-color: var(--cioos-primary);
-  background-color: var(--cioos-white);
+  border-color: var(--cioos-map-click);
+  background-color: var(--cioos-map-click-surface);
 }
 
 .griddapVariableHead {
