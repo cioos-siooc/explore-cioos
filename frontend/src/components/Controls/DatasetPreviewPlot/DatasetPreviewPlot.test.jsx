@@ -11,19 +11,32 @@ import DatasetPreview from "../DatasetPreview/DatasetPreview.jsx";
 // DRAWS is asserted in previewFacetFigure.test.mjs; what this covers is the
 // controls, and the settings reaching the figure at all.
 vi.mock("plotly.js-basic-dist-min", () => ({
-  default: { register: () => {} },
+  default: { register: () => {}, Icons: {} },
 }));
 vi.mock("plotly.js-locales/fr", () => ({ default: {} }));
 vi.mock("react-plotly.js/factory", () => ({
   default: () =>
-    function MockPlot({ data, layout }) {
+    function MockPlot({ data, layout, config }) {
       return (
         <div
           data-testid="plotly"
           data-traces={data.length}
           data-hovermode={layout.hovermode}
           data-y-autorange={layout.yaxis.autorange}
-        />
+          data-removed-buttons={config.modeBarButtonsToRemove?.join(" ")}
+          data-added-buttons={config.modeBarButtonsToAdd
+            ?.map((button) => button.name)
+            .join(" ")}
+        >
+          {config.modeBarButtonsToAdd?.map((button) => (
+            <button
+              key={button.name}
+              type="button"
+              aria-label={button.title}
+              onClick={() => button.click()}
+            />
+          ))}
+        </div>
       );
     },
 }));
@@ -86,6 +99,27 @@ describe("DatasetPreviewPlot", () => {
     // A profile's panels share the vertical axis, so its hover is the unified
     // one — the arrangement reaching the figure.
     expect(plot).toHaveAttribute("data-hovermode", "y unified");
+  });
+
+  it("swaps Plotly's camera for one that exports the legend, and adds a help button", async () => {
+    open();
+    const plot = await plotted();
+    expect(plot.getAttribute("data-removed-buttons")).toContain("toImage");
+    expect(plot).toHaveAttribute(
+      "data-added-buttons",
+      "downloadPlotPng plotInteractionHelp",
+    );
+  });
+
+  it("opens the interaction help in a dialog from the modebar's help button", async () => {
+    const user = open();
+    await plotted();
+    await user.click(
+      screen.getByRole("button", { name: "How to use the plot" }),
+    );
+    const help = screen.getByTestId("plot-interaction-help-modal");
+    expect(help).toHaveTextContent("Double-click to reset the view.");
+    expect(help.querySelectorAll("li")).toHaveLength(6);
   });
 
   it("offers every control the pane is responsible for", async () => {

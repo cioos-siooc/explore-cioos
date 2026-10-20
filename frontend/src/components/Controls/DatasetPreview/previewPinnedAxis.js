@@ -17,6 +17,8 @@ import { TICK_FONT_PX } from "./previewLabelText.js";
 // horizontal one.
 export const PINNED_AXIS_LETTER = { [COLUMNS]: "y" };
 const pinnedLetterFor = (orientation) => PINNED_AXIS_LETTER[orientation] || "x";
+export const pinnedAxisKeyFor = (orientation) =>
+  `${pinnedLetterFor(orientation)}axis`;
 
 // What the strip draws of the axis: its label and its scale. The rest — spikes,
 // hover, domain, anchor — belongs to the panels it runs along.
@@ -32,7 +34,7 @@ const TRANSPARENT = "rgba(0,0,0,0)";
  * unified hover — but unlabelled, and that axis's label and scale for the strip.
  */
 export function splitPinnedAxis(figure, orientation) {
-  const key = `${pinnedLetterFor(orientation)}axis`;
+  const key = pinnedAxisKeyFor(orientation);
   const axis = figure.layout[key];
   return {
     figure: {
@@ -49,7 +51,7 @@ export function splitPinnedAxis(figure, orientation) {
 // `_fullLayout` is Plotly's resolved layout, and the only place the range it
 // autoranged to and the margins automargin grew are kept.
 export function pinnedViewFor(fullLayout, orientation) {
-  const axis = fullLayout[`${pinnedLetterFor(orientation)}axis`];
+  const axis = fullLayout[pinnedAxisKeyFor(orientation)];
   const { l, r, t, b } = fullLayout._size;
   return {
     range: [...axis.range],

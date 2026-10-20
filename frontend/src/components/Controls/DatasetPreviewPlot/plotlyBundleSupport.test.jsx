@@ -4,11 +4,13 @@ import {
   variablesFrom,
   byColumnName,
 } from "../DatasetPreview/previewVariables.js";
-import { facetPlanFor } from "../DatasetPreview/previewFacetPlan.js";
+import { facetPlanFor, COLUMNS } from "../DatasetPreview/previewFacetPlan.js";
 import {
   buildColorFigure,
   buildFigure,
 } from "../DatasetPreview/previewFacetFigure.js";
+import { exportFigureFor } from "../DatasetPreview/previewExportFigure.js";
+import { splitPinnedAxis } from "../DatasetPreview/previewPinnedAxis.js";
 
 // Does the bundle we actually ship understand what the figure emits?
 //
@@ -110,6 +112,31 @@ describe("the shipped plotly bundle and the colour dimension", () => {
     data.forEach((trace) => {
       expect(trace.marker.coloraxis).toBe("coloraxis");
     });
+  });
+});
+
+describe("the shipped plotly bundle and the PNG download", () => {
+  it("understands every key the exported colourbar sets", async () => {
+    const schema = await plotlySchema();
+    const known = schema.layout.layoutAttributes.coloraxis;
+    const figure = coloredFigure();
+    const { figure: drawn, axis } = splitPinnedAxis(figure, COLUMNS);
+    const { layout } = exportFigureFor({
+      data: drawn.data,
+      layout: drawn.layout,
+      pinnedAxis: axis,
+      orientation: COLUMNS,
+      colorLegend: figure.colorLegend,
+    });
+
+    const { colorbar } = layout.coloraxis;
+    Object.keys(colorbar).forEach((key) => {
+      expect(known.colorbar, `coloraxis.colorbar.${key}`).toHaveProperty(key);
+    });
+    Object.keys(colorbar.title).forEach((key) => {
+      expect(known.colorbar.title, `colorbar.title.${key}`).toHaveProperty(key);
+    });
+    expect(known.colorbar.tickmode.values).toContain("array");
   });
 });
 

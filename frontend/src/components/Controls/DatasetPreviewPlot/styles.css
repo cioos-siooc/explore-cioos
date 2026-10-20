@@ -271,6 +271,13 @@
   display: none;
 }
 
+.plotInteractionHelpList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cioos-space-sm);
+  padding-left: var(--cioos-space-lg);
+}
+
 .datasetPreviewPlotEmpty {
   padding: 24px 8px;
   color: var(--cioos-ink-80);

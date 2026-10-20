@@ -71,6 +71,7 @@ i18n
     supportedLngs: ["en", "fr"],
     lng: urlLanguage || undefined,
     fallbackLng: ["en", "fr"],
+    interpolation: { escapeValue: false }, // React already escapes; i18next's escaping showed as "&#x2F;"
     detection: {
       order: ["querystring", "localStorage", "htmlTag"],
       lookupQuerystring: "lang",

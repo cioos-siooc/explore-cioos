@@ -1,8 +1,13 @@
 import * as React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronBarLeft, ChevronBarRight } from "react-bootstrap-icons";
+import {
+  ChevronBarLeft,
+  ChevronBarRight,
+  QuestionCircle,
+} from "react-bootstrap-icons";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
+import HelpModal from "../../ui/HelpModal.jsx";
 import PaneDivider from "../../ui/PaneDivider.jsx";
 import useElementSize from "../../ui/useElementSize.js";
 import ControlRow from "./ControlRow.jsx";
@@ -37,6 +42,7 @@ import {
   pinnedViewFor,
   splitPinnedAxis,
 } from "../DatasetPreview/previewPinnedAxis.js";
+import { exportFigureFor } from "../DatasetPreview/previewExportFigure.js";
 import {
   clampPaneWidth,
   PANE_DEFAULT_PX,
@@ -246,6 +252,7 @@ export default function DatasetPreviewPlot() {
     [figure, pinnedOrientation],
   );
   const [pinnedView, setPinnedView] = useState(null);
+  const [showInteractionHelp, setShowInteractionHelp] = useState(false);
   // Fired after every draw and every zoom; the main Plot redraws on each render
   // (its config is a fresh object), so an unchanged view must not re-render.
   const readPinnedView = useCallback(
@@ -262,6 +269,19 @@ export default function DatasetPreviewPlot() {
         : null,
     [split, pinnedView, pinnedOrientation],
   );
+  const downloadPng = (graphDiv) => {
+    const exported = exportFigureFor({
+      data: graphDiv.data,
+      layout: graphDiv.layout,
+      pinnedAxis: split.axis,
+      orientation: pinnedOrientation,
+      colorLegend: figure.colorLegend,
+    });
+    Plotly.downloadImage(
+      { data: exported.data, layout: exported.layout },
+      { format: "png", width: exported.width, height: exported.height },
+    );
+  };
   const pinnedThickness = pinnedAxisSizeFor(pinnedOrientation);
   const pinnedLeft = pinnedOrientation === COLUMNS;
 
@@ -611,6 +631,21 @@ export default function DatasetPreviewPlot() {
                     "lasso2d",
                     "resetScale2d",
                     "pan2d",
+                    "toImage", // replaced below: it would miss the pinned axis and the colour legend
+                  ],
+                  modeBarButtonsToAdd: [
+                    {
+                      name: "downloadPlotPng",
+                      title: t("datasetPreviewPlotDownloadPng"),
+                      icon: Plotly.Icons.camera,
+                      click: downloadPng,
+                    },
+                    {
+                      name: "plotInteractionHelp",
+                      title: t("datasetPreviewPlotInteractionHelpTitle"),
+                      icon: Plotly.Icons.question,
+                      click: () => setShowInteractionHelp(true),
+                    },
                   ],
                   // Off: `responsive` would fight the sizes above;
                   // useElementSize drives resizing instead.
@@ -653,6 +688,23 @@ export default function DatasetPreviewPlot() {
             is exactly the plot whose scale would otherwise be off-screen. */}
         <ColorScaleLegend legend={figure && figure.colorLegend} />
       </div>
+
+      <HelpModal
+        show={showInteractionHelp}
+        onHide={() => setShowInteractionHelp(false)}
+        id="plotInteractionHelpModal"
+        data-testid="plot-interaction-help-modal"
+        icon={<QuestionCircle size={20} />}
+        title={t("datasetPreviewPlotInteractionHelpTitle")}
+      >
+        <ul className="helpModalText plotInteractionHelpList">
+          {t("datasetPreviewPlotInteractionHelp")
+            .split("\n")
+            .map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+        </ul>
+      </HelpModal>
     </div>
   );
 }

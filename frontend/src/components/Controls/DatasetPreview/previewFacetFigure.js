@@ -514,8 +514,8 @@ export function buildFigure({
   return { data: [...lineTraces, ...traces], layout, colorLegend };
 }
 
-const COLORBAR_THICKNESS_PX = 12;
-const COLORBAR_PAD_PX = 10;
+export const COLORBAR_THICKNESS_PX = 12;
+export const COLORBAR_PAD_PX = 10;
 
 /**
  * The colour plot: every panel draws the same Y against the same X, one panel
