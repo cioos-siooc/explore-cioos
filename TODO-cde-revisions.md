@@ -1269,7 +1269,7 @@ below is a *production* number unless it says otherwise.
 - [ ] `cde_harvester/__main__.py:331 main` — 232 lines, with a 60-line `except Exception` that has to
       re-derive its own context.
 - [ ] `sources/erddap/harvester.py:145 harvest` — 220 lines.
-- [ ] `downloader/erddap_downloader/download_erddap.py:180 get_datasets` — 219 lines; builds URLs,
+- [ ] `downloader/cioos_downloader/download_erddap.py:180 get_datasets` — 219 lines; builds URLs,
       streams HTTP with a byte budget, parses CSV, filters by polygon, writes files, generates PDFs.
       Also mixes two definitions of a megabyte in one file (`ONE_MB = 10**6` vs `1024**2`) and
       accumulates via `sys.getsizeof(chunk)`, overcounting by the bytes-object header per chunk.

@@ -33,6 +33,16 @@ describe("HarvestDocs", () => {
     expect(screen.getByRole("link", { name: "OBIS" })).toHaveClass("active");
   });
 
+  it("has a Downloads tab explaining how a download package is built", () => {
+    renderDocs("/harvest/docs/downloads");
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Download packages" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Downloads" })).toHaveClass(
+      "active",
+    );
+  });
+
   it("hands the flowchart to mermaid", async () => {
     renderDocs("/harvest/docs/workflow");
     await vi.waitFor(() => expect(mermaidRun).toHaveBeenCalled());

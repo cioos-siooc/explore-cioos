@@ -25,6 +25,12 @@ import { usePersistentState } from "../usePersistentState.js";
 
 const DownloadContext = createContext();
 
+// The format the packaged download is written in; ODV and NetCDF have no
+// OBIS rendition, so OBIS datasets fall back to CSV (see downloader formats.py).
+export const PACKAGE_FORMATS = ["csv", "parquet", "odv", "nccf"];
+// The downloader's OBIS_FORMATS: other formats reach OBIS datasets as CSV.
+export const OBIS_FORMATS = ["csv", "parquet"];
+
 const FAILURE_TEXT_KEYS = {
   network: "submissionStateTextFailedNetwork",
   rejected: "submissionStateTextFailedRejected",
@@ -51,6 +57,7 @@ export default function DownloadProvider({ children }) {
   const [filterDownloadByTime, setFilterDownloadByTime] = useState(false);
   const [filterDownloadByDepth, setFilterDownloadByDepth] = useState(false);
   const [filterDownloadByPolygon, setFilterDownloadByPolygon] = useState(false);
+  const [packageFormat, setPackageFormat] = useState("csv");
 
   const emailValid = validateEmail(email);
   const polygonFilterActive = !isEmpty(polygon);
@@ -122,7 +129,8 @@ export default function DownloadProvider({ children }) {
     submitRequest();
   }
 
-  function submitRequest() {
+  // The selection as both the package queue and the download script read it.
+  function downloadQuery(pks) {
     const downloadQuery = { ...query };
     if (
       (startDate !== defaultStartDate || endDate !== defaultEndDate) &&
@@ -140,13 +148,24 @@ export default function DownloadProvider({ children }) {
     }
     // A Datasets filter already writes datasetPKs; applyDatasetPKs replaces it,
     // because a repeated key reaches the API as an array and 500s.
-    let url = `${server}/download?${applyDatasetPKs(
+    let queryString = `${applyDatasetPKs(
       createDataFilterQueryString(downloadQuery),
-      pointsToDownload.map((point) => point.pk),
-    )}&lang=${i18n.language}`;
+      pks,
+    )}&lang=${i18n.language}&format=${packageFormat}`;
     if (polygon && filterDownloadByPolygon) {
-      url += `&polygon=${JSON.stringify(polygon)}`;
+      queryString += `&polygon=${JSON.stringify(polygon)}`;
     }
+    return queryString;
+  }
+
+  function scriptUrl(pks) {
+    return `${server}/download/script?${downloadQuery(pks)}`;
+  }
+
+  function submitRequest() {
+    const url = `${server}/download?${downloadQuery(
+      pointsToDownload.map((point) => point.pk),
+    )}`;
     // The address goes in the body: a URL is written to access logs and
     // recorded by Sentry's request tracing, and a body is not.
     fetch(url, {
@@ -185,8 +204,11 @@ export default function DownloadProvider({ children }) {
     filterDownloadByPolygon,
     setFilterDownloadByPolygon,
     polygonFilterActive,
+    packageFormat,
+    setPackageFormat,
     handleEmailChange,
     handleSubmission,
+    scriptUrl,
   };
 
   return (

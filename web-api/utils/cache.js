@@ -71,6 +71,17 @@ function apicacheRedisAdapter(client) {
   };
 }
 
+// The cors middleware answers each request's own Origin. A stored copy would
+// replay the first caller's origin to every other one for the TTL, and the
+// browser blocks that tile with no request reaching the server. The list is
+// applied when serving too, so entries already stored are fixed as well.
+apicache.options({
+  headerBlacklist: [
+    "access-control-allow-origin",
+    "access-control-allow-credentials",
+  ],
+});
+
 // No `headers` option: it only takes literal strings; a function gets
 // stringified into an invalid Cache-Control. Unset, apicache emits a valid
 // max-age on its own.

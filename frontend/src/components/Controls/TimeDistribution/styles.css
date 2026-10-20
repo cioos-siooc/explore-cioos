@@ -1,0 +1,30 @@
+.timeDistribution {
+  margin-bottom: 12px;
+}
+
+.timeDistributionPlot,
+.timeDistributionStatus {
+  position: relative;
+  height: 200px;
+}
+
+.timeDistributionPlot > div:first-child {
+  height: 100%;
+}
+
+.timeDistributionStatus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cioos-primary-700);
+}
+
+.timeDistributionPlot > .timeDistributionStatus {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+
+.timeDistributionStale {
+  opacity: 0.4;
+}

@@ -14,7 +14,7 @@ const {
 const DEPTH_VARIABLE_PROBE = JSON.stringify([{ name: "depth" }]);
 // OBIS datasets carry no num_columns, so the estimate uses the width of the
 // CSV the downloader writes for them (download_obis_parquet in
-// downloader/erddap_downloader/download_erddap.py).
+// downloader/cioos_downloader/download_erddap.py).
 const OBIS_DOWNLOAD_COLUMNS = 8;
 
 // Split from getShapeQuery so the SQL can be asserted without Postgres.

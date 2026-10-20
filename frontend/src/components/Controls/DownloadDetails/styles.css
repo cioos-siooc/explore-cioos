@@ -102,6 +102,40 @@
   flex: 1 1 auto;
 }
 
+.downloadFormat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.downloadFormatLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.downloadFormatNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: var(--cioos-warn-bg);
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.3;
+}
+
+.downloadFormatNotice svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--cioos-warn);
+}
+
 .downloadBandRow .helpIcon {
   margin: 0;
 }
@@ -173,34 +207,11 @@
   min-height: 0;
 }
 
-.downloadFormats {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-}
-
-.downloadFormatsObis {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.downloadFormatsObisNote {
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
-  max-width: 22ch;
-  line-height: 1.15;
-}
-
-/* --- Order footer: summary | email | direct links. --- */
+/* --- Order footer: the package, by email or by script and links. --- */
 .downloadFooter {
   flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: auto minmax(240px, 1.5fr) minmax(260px, 1fr);
-  align-items: stretch;
   border-top: 1px solid var(--cioos-hairline);
-  background-color: var(--cioos-white);
+  background-color: var(--cioos-sand);
 }
 
 .downloadFooterSection {
@@ -209,11 +220,7 @@
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
-  padding: 12px 16px;
-}
-
-.downloadFooterSection + .downloadFooterSection {
-  border-left: 1px solid var(--cioos-hairline);
+  padding: 10px 16px;
 }
 
 /* Wraps, unlike the other captions here: the French for "Email download link
@@ -246,49 +253,41 @@
   margin: 0;
 }
 
-/* --- Column 1: order summary --- */
+/* --- Selection totals, in the list's pager row --- */
 .downloadSummary {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--cioos-hairline);
 }
 
 .downloadSummaryDivider {
-  align-self: stretch;
   width: 1px;
-  min-height: 30px;
+  height: 14px;
   background-color: var(--cioos-hairline);
 }
 
 .downloadSummaryStat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   white-space: nowrap;
 }
 
 .downloadSummaryValue {
   font-variant-numeric: tabular-nums;
-  font-family: var(--cioos-font-display);
-  font-weight: 600;
-  font-size: var(--cioos-font-size-lg);
-  line-height: 1.1;
+  font-weight: 700;
   color: var(--cioos-navy);
 }
 
 .downloadSummaryValueMuted {
-  font-size: var(--cioos-font-size-base);
   font-weight: 600;
-  color: var(--cioos-ink-40);
+  color: var(--cioos-ink-60);
 }
 
 .downloadSummaryLabel {
-  font-size: var(--cioos-font-size-2xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1;
   color: var(--cioos-ink-60);
 }
 
@@ -296,7 +295,71 @@
   opacity: 0.3;
 }
 
-/* --- Column 2: the queue (DownloadPanel's children) --- */
+/* --- The package: format, then email or script as two cards --- */
+.downloadDelivery {
+  gap: 8px;
+}
+
+.downloadDeliveryHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 24px;
+  width: 100%;
+}
+
+.downloadDeliveryHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.downloadDeliveryIntro {
+  margin: 0;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.3;
+  color: var(--cioos-ink-80);
+}
+
+.downloadDeliveryOptions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0 10px;
+  width: 100%;
+}
+
+.downloadDeliveryOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+}
+
+/* Sentence case under the section's caption: options, not sections. */
+.downloadDeliveryOption .downloadFooterTitle {
+  font-family: var(--cioos-font-body);
+  font-size: var(--cioos-font-size-sm);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cioos-ink);
+}
+
+.downloadDeliveryOr {
+  align-self: center;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
+}
+
 .downloadSubmitRow {
   display: flex;
   flex-wrap: wrap;
@@ -310,15 +373,15 @@
 .downloadSubmit .emailAddress {
   flex: 1 1 200px;
   min-width: 140px;
-  height: 40px;
+  height: 36px;
   margin: 0;
   background-color: var(--cioos-white);
 }
 
 .submitRequestButton {
   flex: 0 1 auto;
-  height: 40px;
-  padding: 0 20px;
+  height: 36px;
+  padding: 0 16px;
   border: none;
   border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-primary);
@@ -339,18 +402,21 @@
   cursor: not-allowed;
 }
 
-/* Reserves its line and padding so a result does not shove the column. */
+/* Always mounted, so screen readers hear the result; empty, it takes no room. */
 .downloadSubmit .submissionFeedback {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  min-height: 26px;
   padding: 4px 8px;
   margin: 0 -8px;
   border-radius: var(--cioos-radius-sm);
   font-size: var(--cioos-font-size-sm);
   line-height: 1.25;
   color: var(--cioos-ink-60);
+}
+
+.downloadSubmit .submissionFeedback:empty {
+  padding: 0;
 }
 
 .downloadSubmit .submissionFeedback svg {
@@ -360,12 +426,12 @@
 
 .downloadSubmit .form-switch {
   margin: 0;
-  font-size: var(--cioos-font-size-sm);
+  font-size: var(--cioos-font-size-xs);
 }
 
 .downloadEmailNotice {
   margin: 0;
-  font-size: var(--cioos-font-size-sm);
+  font-size: var(--cioos-font-size-xs);
   line-height: 1.25;
   color: var(--cioos-ink-80);
 }
@@ -401,7 +467,7 @@
   color: var(--cioos-error-700);
 }
 
-/* --- Column 3: direct links --- */
+/* --- The script and links menu --- */
 
 .directLinksCount {
   font-size: var(--cioos-font-size-sm);
@@ -409,14 +475,6 @@
   text-transform: none;
   letter-spacing: normal;
   color: var(--cioos-ink-60);
-}
-
-.directLinksActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
 }
 
 .directLinksButton {
@@ -482,51 +540,13 @@
   display: none;
 }
 
-.directLinksWarning {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 6px 9px;
-  border-radius: var(--cioos-radius-sm);
-  background-color: var(--cioos-warn-bg);
-
-  /* Ink rather than --cioos-warn: the amber is 3.4:1 against its own tint.
-     The glyph (3:1 to meet) carries the colour. */
-  color: var(--cioos-ink);
-  font-size: var(--cioos-font-size-sm);
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.directLinksWarning svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--cioos-warn);
-}
-
-/* --- Collapse: the links column leaves the row first. --- */
-@media (max-width: 1040px) {
-  .downloadFooter {
-    grid-template-columns: auto minmax(240px, 1fr);
-  }
-
-  .downloadFooter .directLinks {
-    grid-column: 1 / -1;
-    border-left: none;
-    border-top: 1px solid var(--cioos-hairline);
-  }
-
-  .directLinksNotes {
-    flex-flow: row wrap;
-    gap: 4px 14px;
-  }
-
-  .directLinksWarning {
-    flex: 1 1 100%;
-  }
-}
-
+/* The cards stack, "or" between them. */
 @media (max-width: 900px) {
+  .downloadDeliveryOptions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
   .downloadDetails.container {
     max-width: 100%;
   }
@@ -542,14 +562,5 @@
 
   .downloadDataRow.row {
     flex: 0 0 auto;
-  }
-
-  .downloadFooter {
-    grid-template-columns: 1fr;
-  }
-
-  .downloadFooterSection + .downloadFooterSection {
-    border-left: none;
-    border-top: 1px solid var(--cioos-hairline);
   }
 }

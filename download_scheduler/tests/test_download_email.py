@@ -139,6 +139,30 @@ def test_omitted_dataset_is_listed_with_reason_and_not_cited(sent, status, reaso
     assert "/info/Good/index.html" in body
 
 
+def test_omitted_dataset_shows_its_title_and_the_source_response(sent):
+    bad = {
+        **_erddap_dataset("Bad", status="FAILED"),
+        "title": "Bad CTD",
+        "erddap_error": "HTTP 500 Internal Server Error: disk on fire\nsecond region failed",
+    }
+    ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset("Good"), bad), "en")
+
+    body = sent[0][1]
+    assert "- Bad CTD (Bad) — could not be retrieved from its source." in body
+    assert "Source response: HTTP 500 Internal Server Error: disk on fire; second region failed" in body
+    assert "Réponse de la source : HTTP 500" in body
+
+
+def test_completed_email_points_to_the_package_citations(sent):
+    ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset()), "en")
+    assert "citations.txt" in sent[0][1]
+
+
+def test_no_data_email_links_the_package_readme(sent):
+    ds.email_user("a@b.ca", "no-data", "z.zip", _report(_erddap_dataset(status="EMPTY")), "en")
+    assert f"README.md at {WAF_URL}/z.zip" in sent[0][1]
+
+
 @pytest.mark.parametrize("status", ["COMPLETED", "PARTIAL"])
 def test_included_statuses_are_cited_not_listed_as_omitted(sent, status):
     ds.email_user(
@@ -148,6 +172,16 @@ def test_included_statuses_are_cited_not_listed_as_omitted(sent, status):
     body = sent[0][1]
     assert "/info/IOS_CTD_Profiles/index.html" in body
     assert "could not be included in this download" not in body
+
+
+def test_obis_dataset_delivered_as_csv_is_listed_in_both_languages(sent):
+    obis = _obis_dataset("a1b2c3") | {"format_fallback": True, "requested_format": "odv"}
+    ds.email_user("a@b.ca", "completed", "z.zip", _report(_erddap_dataset(), obis), "en")
+
+    body = sent[0][1]
+    assert "- a1b2c3 — was delivered as CSV: ODV spreadsheet is not available for this source." in body
+    assert "- a1b2c3 — a été livré en CSV : ODV spreadsheet n'est pas disponible pour cette source." in body
+    assert body.count("rather than the format you chose") == 1
 
 
 def test_unknown_status_falls_back_to_generic_reason(sent):

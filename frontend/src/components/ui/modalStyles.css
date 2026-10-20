@@ -6,7 +6,7 @@
   z-index: var(--cioos-z-modal, 1055);
   display: block;
   overflow: hidden auto;
-  background-color: rgb(21 47 55 / 45%); /* navy-tinted backdrop */
+  background-color: var(--cioos-backdrop);
 }
 
 body.cioos-modal-open {

@@ -3,6 +3,7 @@
 > **Harvest docs:** **Workflow**
 > · [ERDDAP](erddap.md)
 > · [OBIS](obis.md)
+> · [Downloads](downloads.md)
 
 This page describes how the CIOOS Data Explorer harvester turns three upstream
 systems into the `cde` database: how runs are scheduled, what each source

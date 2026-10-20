@@ -47,14 +47,27 @@ import {
 } from "../dataLayers.js";
 
 const MapStateContext = createContext();
+const MapViewContext = createContext();
+const ViewportBoundsContext = createContext();
 
 export function useMapState() {
   return useContext(MapStateContext);
 }
 
-export default function MapStateProvider({ children }) {
-  const { query } = useFilters();
+// The camera and load state change several times a second while the map
+// moves. Kept out of useMapState so that churn re-renders only the components
+// that read it, not every filter and list component.
+export function useMapView() {
+  return useContext(MapViewContext);
+}
 
+// Changes only when the camera settles (Map.jsx debounces setMapView), unlike
+// the rest of useMapView, which also flips with every tile-loading wave.
+export function useViewportBounds() {
+  return useContext(ViewportBoundsContext);
+}
+
+function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
   // mapLoaded: settled at least once. The first load earns the full splash;
   // later redraws only the brand logo's pulse.
   const [loading, setLoadingState] = useState(true);
@@ -92,12 +105,96 @@ export default function MapStateProvider({ children }) {
       zoom: asNumber("zoom", defaultMapZoom),
     };
   });
+  const { zoom } = mapView;
+
+  // Derived during render, not mirrored by an effect, which would paint one
+  // frame with the previous zoom's domain.
+  const currentRangeLevel = useMemo(
+    () => getCurrentRangeLevel(rangeLevels, zoom),
+    [rangeLevels, zoom],
+  );
+
+  // Below the marker tier coverage counts merge into the main hex ramp.
+  const currentCoverageRangeLevel = useMemo(
+    () =>
+      coverageRangeLevels && isMarkerTier(zoom)
+        ? coverageRangeLevels.zoom1
+        : undefined,
+    [coverageRangeLevels, zoom],
+  );
+
+  // Quantized and debounced at the source (Map.jsx refreshViewportHexRange);
+  // the setter drops equal values so a re-report can't re-render the legend.
+  const [viewportHexRange, setViewportHexRangeState] = useState();
+  const setViewportHexRange = useCallback((range) => {
+    setViewportHexRangeState((previous) =>
+      rangesEqual(previous, range) ? previous : range,
+    );
+  }, []);
+
+  // Below the marker tier every cell kind is summed into the hexes layer; at
+  // the marker tier only coverage cells remain, with their own tier.
+  const globalHexRangeLevel = isMarkerTier(zoom)
+    ? currentCoverageRangeLevel
+    : currentRangeLevel;
+
+  // The visible extent wins: a catalogue-wide domain paints a zoomed-in view
+  // in one flat shade. Global is the fallback before the first measurement or
+  // with too few hexes on screen.
+  const hexRangeLevel = viewportHexRange || globalHexRangeLevel;
+
+  const value = useMemo(
+    () => ({
+      loading,
+      setLoading,
+      reportFirstPaint,
+      firstPaintPending,
+      loadingLayers,
+      mapLoaded,
+      mapView,
+      setMapView,
+      zoom,
+      currentRangeLevel,
+      hexRangeLevel,
+      // Lets the legend explain why its numbers move with the camera.
+      hexRangeScaledToView: Boolean(viewportHexRange),
+      setViewportHexRange,
+      setLoadingLayers,
+    }),
+    [
+      loading,
+      setLoading,
+      reportFirstPaint,
+      firstPaintPending,
+      loadingLayers,
+      mapLoaded,
+      mapView,
+      zoom,
+      currentRangeLevel,
+      hexRangeLevel,
+      viewportHexRange,
+      setViewportHexRange,
+    ],
+  );
+
+  return (
+    <MapViewContext.Provider value={value}>
+      <ViewportBoundsContext.Provider value={mapView.bounds}>
+        {children}
+      </ViewportBoundsContext.Provider>
+    </MapViewContext.Provider>
+  );
+}
+
+export default function MapStateProvider({ children }) {
+  const { query } = useFilters();
+
   // Pushed from SelectionProvider (downstream of this provider). Map-only on
   // purpose: the list, its counts and the download selection keep hidden
   // datasets. undefined = nothing hidden.
   const [mapDatasetPKs, setMapDatasetPKs] = useState();
-  // Memoized: this provider re-renders on every moveend and the query string
-  // build does full passes over every filter array.
+  // Memoized: the query string build does full passes over every filter
+  // array.
   const mapQueryString = useMemo(
     () => applyDatasetPKs(createDataFilterQueryString(query), mapDatasetPKs),
     [query, mapDatasetPKs],
@@ -265,8 +362,6 @@ export default function MapStateProvider({ children }) {
     setDataLayerChoices({});
   }
 
-  const { zoom } = mapView;
-
   // A failed legend fetch leaves the current ramp in place; loadLegend() is
   // exposed for the retry banner. legendLoading exists because "no ranges yet"
   // and "no data matches" are otherwise indistinguishable.
@@ -326,61 +421,10 @@ export default function MapStateProvider({ children }) {
     return () => controller.abort();
   }, [mapQueryString, griddapCoverageVisible]);
 
-  // Derived during render, not mirrored by an effect, which would paint one
-  // frame with the previous zoom's domain.
-  const currentRangeLevel = useMemo(
-    () => getCurrentRangeLevel(rangeLevels, zoom),
-    [rangeLevels, zoom],
-  );
-
-  // Below the marker tier coverage counts merge into the main hex ramp.
-  const currentCoverageRangeLevel = useMemo(
-    () =>
-      coverageRangeLevels && isMarkerTier(zoom)
-        ? coverageRangeLevels.zoom1
-        : undefined,
-    [coverageRangeLevels, zoom],
-  );
-
-  // Quantized and debounced at the source (Map.jsx refreshViewportHexRange);
-  // the setter drops equal values so a re-report can't re-render the legend.
-  const [viewportHexRange, setViewportHexRangeState] = useState();
-  const setViewportHexRange = useCallback((range) => {
-    setViewportHexRangeState((previous) =>
-      rangesEqual(previous, range) ? previous : range,
-    );
-  }, []);
-
-  // Below the marker tier every cell kind is summed into the hexes layer; at
-  // the marker tier only coverage cells remain, with their own tier.
-  const globalHexRangeLevel = isMarkerTier(zoom)
-    ? currentCoverageRangeLevel
-    : currentRangeLevel;
-
-  // The visible extent wins: a catalogue-wide domain paints a zoomed-in view
-  // in one flat shade. Global is the fallback before the first measurement or
-  // with too few hexes on screen.
-  const hexRangeLevel = viewportHexRange || globalHexRangeLevel;
-
   const value = {
-    loading,
-    setLoading,
-    reportFirstPaint,
-    firstPaintPending,
-    loadingLayers,
-    setLoadingLayers,
-    mapLoaded,
-    mapView,
-    setMapView,
-    zoom,
     rangeLevels,
     legendLoading,
     coverageRangeLevels,
-    currentRangeLevel,
-    hexRangeLevel,
-    // Lets the legend explain why its numbers move with the camera.
-    hexRangeScaledToView: Boolean(viewportHexRange),
-    setViewportHexRange,
     griddapCoverageVisible,
     setGriddapCoverageVisible,
     dataLayersVisible,
@@ -428,7 +472,12 @@ export default function MapStateProvider({ children }) {
 
   return (
     <MapStateContext.Provider value={value}>
-      {children}
+      <MapViewProvider
+        rangeLevels={rangeLevels}
+        coverageRangeLevels={coverageRangeLevels}
+      >
+        {children}
+      </MapViewProvider>
     </MapStateContext.Provider>
   );
 }

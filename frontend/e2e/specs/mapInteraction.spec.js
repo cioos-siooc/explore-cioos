@@ -104,6 +104,38 @@ test.describe("pointing at the map", () => {
     }).toPass({ timeout: 20_000 });
   });
 
+  test("a hex tile that fails once is fetched again", async ({
+    page,
+    consoleGuard,
+  }) => {
+    // HEX's z2 tile.
+    const tile = /\/tiles\/2\/0\/1\.mvt/;
+    let requests = 0;
+    await page.route(tile, (route) => {
+      requests += 1;
+      if (requests === 1) return route.fulfill({ status: 500, body: "" });
+      return route.fallback();
+    });
+    await openAt(page, HEX);
+    const { x, y } = await canvasCentre(page);
+    await expect(async () => {
+      await page.mouse.move(x + 1, y);
+      await page.mouse.move(x, y);
+      await expect(page.locator(".mapChip")).toHaveText("18 day(s) of data", {
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 20_000 });
+    expect(requests).toBe(2);
+    // The failure this test injects, logged by the browser and by MapLibre.
+    const injected = /\b500\b/;
+    expect(consoleGuard.some((text) => injected.test(text))).toBe(true);
+    consoleGuard.splice(
+      0,
+      consoleGuard.length,
+      ...consoleGuard.filter((text) => !injected.test(text)),
+    );
+  });
+
   test("hovering empty water shows nothing", async ({ page }) => {
     await openAt(page, EMPTY);
     const { x, y } = await canvasCentre(page);

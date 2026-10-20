@@ -84,8 +84,8 @@ export default function TaxonomyChart({ datasetId }) {
   }
 
   return (
-    <div className="recordSection taxonomySection">
-      <div className="recordSectionHeader taxonomyHeader">
+    <div className="recordSection chartSection">
+      <div className="recordSectionHeader chartSectionHeader">
         <div>
           <strong>{t("taxonomyTitle")}</strong>
           <span className="recordHint">{t("taxonomyHint")}</span>
@@ -93,7 +93,7 @@ export default function TaxonomyChart({ datasetId }) {
         <div className="taxonomyControls">
           <div className="taxonomyActions" ref={setActionsEl} />
           <div
-            className="taxonomyViewToggle"
+            className="viewToggle"
             role="group"
             aria-label={t("taxonomyViewLabel")}
           >
