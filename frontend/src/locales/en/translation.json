@@ -307,6 +307,7 @@
   "metadataCopiedText": "Citation copied",
   "metadataLoadFailedText": "The dataset's metadata could not be loaded.",
   "metadataCitationTitle": "Citation",
+  "metadataNoCitationText": "The data provider has not supplied a citation or DOI for this dataset. Credit the provider named under Contacts and link to the source.",
   "metadataKeywordsTitle": "Keywords",
   "metadataDatesTitle": "Dates",
   "metadataCreatedText": "Created",

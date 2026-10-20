@@ -372,6 +372,12 @@
   background-color: var(--cioos-surface-2);
 }
 
+/* Still offered, so the absence is stated rather than left to be guessed. */
+.citationButton.missing {
+  border-color: var(--cioos-hairline);
+  color: var(--cioos-ink-60);
+}
+
 .citationButton:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);

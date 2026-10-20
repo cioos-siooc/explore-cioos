@@ -308,6 +308,7 @@
   "metadataCopiedText": "Citation copiée",
   "metadataLoadFailedText": "Les métadonnées du jeu de données n'ont pas pu être chargées.",
   "metadataCitationTitle": "Citation",
+  "metadataNoCitationText": "Le fournisseur de données n’a fourni ni citation ni DOI pour ce jeu de données. Citez le fournisseur nommé sous Contacts et ajoutez un lien vers la source.",
   "metadataKeywordsTitle": "Mots-clés",
   "metadataDatesTitle": "Dates",
   "metadataCreatedText": "Créé",
