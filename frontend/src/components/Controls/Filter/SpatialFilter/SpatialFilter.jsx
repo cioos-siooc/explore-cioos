@@ -11,6 +11,8 @@ import {
 import { useTranslation } from "react-i18next";
 
 import {
+  areaFromBounds,
+  parseArea,
   polygonBounds,
   polygonIsRectangle,
   polygonToWkt,
@@ -23,6 +25,7 @@ import {
 import { useSelection } from "../../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../../state/ui/UIProvider.jsx";
 import {
+  useApplyArea,
   useGoToRegion,
   useRegionMatches,
 } from "../../../../state/useRegionSearch.js";
@@ -132,13 +135,30 @@ function PlaceSearch() {
   );
 }
 
-// Unlike SpatialFilterButton this doesn't auto-arm the last tool on open:
-// opening this pane is browsing, not the start of drawing.
-export default function SpatialFilter() {
-  const { t, i18n } = useTranslation();
-  const { requestDraw } = useMapState();
-  const { polygon, areaPlace } = useSelection();
+const SIDES = ["north", "west", "east", "south"];
+const SIDE_LABELS = {
+  north: "spatialFilterNorth",
+  west: "spatialFilterWest",
+  east: "spatialFilterEast",
+  south: "spatialFilterSouth",
+};
+
+// The area as numbers to edit: its bounds, as a box, and its outline as WKT,
+// which also takes a pasted box. Keyed on the area by its caller, so a new
+// drawing replaces whatever was being typed. Applying closes the modal so the
+// map is in view.
+function AreaEditor({ polygon }) {
+  const { t } = useTranslation();
   const { setShowFiltersModal } = useUI();
+  const applyArea = useApplyArea();
+  const [bounds, setBounds] = useState(() => {
+    const current = polygon && polygonBounds(polygon);
+    return Object.fromEntries(
+      SIDES.map((side) => [side, current ? current[side].toFixed(4) : ""]),
+    );
+  });
+  const [wkt, setWkt] = useState(() => (polygon ? polygonToWkt(polygon) : ""));
+  const [invalid, setInvalid] = useState();
 
   const [wktCopied, setWktCopied] = useState(false);
   useEffect(() => {
@@ -147,14 +167,148 @@ export default function SpatialFilter() {
     return () => clearTimeout(timer);
   }, [wktCopied]);
 
-  const hasSelection = Boolean(polygon);
-  const activeMode = hasSelection
+  function apply(event, which, ring) {
+    event.preventDefault();
+    if (!ring) {
+      setInvalid(which);
+      return;
+    }
+    setShowFiltersModal(false);
+    applyArea(ring);
+  }
+
+  return (
+    <>
+      <form
+        className="spatialFilterBoundsForm"
+        noValidate
+        onSubmit={(e) =>
+          apply(
+            e,
+            "bounds",
+            areaFromBounds(
+              Object.fromEntries(
+                SIDES.map((side) => [side, Number.parseFloat(bounds[side])]),
+              ),
+            ),
+          )
+        }
+      >
+        <div className="spatialFilterBounds">
+          {SIDES.map((side) => (
+            <label
+              key={side}
+              className={`spatialFilterBounds${side[0].toUpperCase()}${side.slice(1)}`}
+            >
+              {t(SIDE_LABELS[side])}
+              <input
+                type="number"
+                step="any"
+                inputMode="decimal"
+                data-testid={`spatial-filter-${side}`}
+                value={bounds[side]}
+                aria-invalid={invalid === "bounds"}
+                aria-describedby={
+                  invalid === "bounds"
+                    ? "spatial-filter-bounds-error"
+                    : undefined
+                }
+                onChange={(e) => {
+                  setInvalid(undefined);
+                  setBounds((prev) => ({ ...prev, [side]: e.target.value }));
+                }}
+              />
+            </label>
+          ))}
+        </div>
+        {invalid === "bounds" && (
+          <p
+            id="spatial-filter-bounds-error"
+            className="spatialFilterError"
+            role="alert"
+          >
+            {t("spatialFilterBoundsInvalid")}
+          </p>
+        )}
+        <button type="submit" className="spatialFilterAction">
+          <BoundingBox size={14} aria-hidden="true" />
+          {t("spatialFilterApplyBox")}
+        </button>
+      </form>
+      <form
+        className="spatialFilterWktForm"
+        noValidate
+        onSubmit={(e) => apply(e, "wkt", parseArea(wkt))}
+      >
+        <label className="spatialFilterWktLabel">
+          {t("spatialFilterWktLabel")}
+          <textarea
+            className="spatialFilterWkt"
+            data-testid="spatial-filter-wkt"
+            value={wkt}
+            placeholder="POLYGON((-67 44, -64 44, -64 46, -67 44))"
+            aria-invalid={invalid === "wkt"}
+            aria-describedby={
+              invalid === "wkt" ? "spatial-filter-wkt-error" : undefined
+            }
+            onChange={(e) => {
+              setInvalid(undefined);
+              setWkt(e.target.value);
+            }}
+          />
+        </label>
+        {invalid === "wkt" && (
+          <p
+            id="spatial-filter-wkt-error"
+            className="spatialFilterError"
+            role="alert"
+          >
+            {t("spatialFilterWktInvalid")}
+          </p>
+        )}
+        <div className="spatialFilterActions">
+          <button type="submit" className="spatialFilterAction">
+            <Pentagon size={14} aria-hidden="true" />
+            {t("spatialFilterApplyWkt")}
+          </button>
+          {polygon && (
+            <button
+              type="button"
+              className="spatialFilterAction"
+              onClick={() => {
+                navigator.clipboard.writeText(polygonToWkt(polygon));
+                setWktCopied(true);
+              }}
+            >
+              {wktCopied ? (
+                <Check2 size={14} aria-hidden="true" />
+              ) : (
+                <Clipboard size={14} aria-hidden="true" />
+              )}
+              {t(
+                wktCopied ? "copiedSelectionWktTitle" : "copySelectionWktTitle",
+              )}
+            </button>
+          )}
+        </div>
+      </form>
+    </>
+  );
+}
+
+// Unlike SpatialFilterButton this doesn't auto-arm the last tool on open:
+// opening this pane is browsing, not the start of drawing.
+export default function SpatialFilter() {
+  const { t, i18n } = useTranslation();
+  const { requestDraw } = useMapState();
+  const { polygon, areaPlace } = useSelection();
+  const { setShowFiltersModal } = useUI();
+
+  const activeMode = polygon
     ? polygonIsRectangle(polygon)
       ? "box"
       : "polygon"
     : undefined;
-  const bounds = hasSelection ? polygonBounds(polygon) : undefined;
-  const wkt = hasSelection ? polygonToWkt(polygon) : "";
 
   function startDraw(mode) {
     setShowFiltersModal(false);
@@ -180,71 +334,31 @@ export default function SpatialFilter() {
         </div>
       </div>
       <PlaceSearch />
-      {hasSelection && (
-        <div className="spatialFilterDetails">
-          {areaPlace && (
-            <p className="spatialFilterPlaceApplied">
-              <span className="spatialFilterPlaceAppliedName">
-                {areaPlace.name}
-              </span>
-              <a
-                href={regionRecordUrl(
-                  areaPlace.cgndbid,
-                  i18n.language?.startsWith("fr") ? "fr" : "en",
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="spatial-filter-place-record"
-              >
-                {t("spatialFilterPlaceRecord")}
-                <BoxArrowUpRight size={12} aria-hidden="true" />
-              </a>
-            </p>
-          )}
-          <dl className="spatialFilterBounds">
-            <div className="spatialFilterBoundsNorth">
-              <dt>{t("spatialFilterNorth")}</dt>
-              <dd>{bounds.north.toFixed(4)}</dd>
-            </div>
-            <div className="spatialFilterBoundsWest">
-              <dt>{t("spatialFilterWest")}</dt>
-              <dd>{bounds.west.toFixed(4)}</dd>
-            </div>
-            <div className="spatialFilterBoundsEast">
-              <dt>{t("spatialFilterEast")}</dt>
-              <dd>{bounds.east.toFixed(4)}</dd>
-            </div>
-            <div className="spatialFilterBoundsSouth">
-              <dt>{t("spatialFilterSouth")}</dt>
-              <dd>{bounds.south.toFixed(4)}</dd>
-            </div>
-          </dl>
-          <label className="spatialFilterWktLabel">
-            WKT
-            <textarea
-              className="spatialFilterWkt"
-              readOnly
-              value={wkt}
-              onFocus={(e) => e.target.select()}
-            />
-          </label>
-          <button
-            type="button"
-            className="spatialFilterCopyWkt"
-            onClick={() => {
-              navigator.clipboard.writeText(wkt);
-              setWktCopied(true);
-            }}
-          >
-            {wktCopied ? (
-              <Check2 size={14} aria-hidden="true" />
-            ) : (
-              <Clipboard size={14} aria-hidden="true" />
-            )}
-            {t(wktCopied ? "copiedSelectionWktTitle" : "copySelectionWktTitle")}
-          </button>
-        </div>
-      )}
+      <div className="spatialFilterDetails">
+        {areaPlace && (
+          <p className="spatialFilterPlaceApplied">
+            <span className="spatialFilterPlaceAppliedName">
+              {areaPlace.name}
+            </span>
+            <a
+              href={regionRecordUrl(
+                areaPlace.cgndbid,
+                i18n.language?.startsWith("fr") ? "fr" : "en",
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="spatial-filter-place-record"
+            >
+              {t("spatialFilterPlaceRecord")}
+              <BoxArrowUpRight size={12} aria-hidden="true" />
+            </a>
+          </p>
+        )}
+        <AreaEditor
+          key={polygon ? polygonToWkt(polygon) : "none"}
+          polygon={polygon}
+        />
+      </div>
     </div>
   );
 }
