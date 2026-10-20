@@ -55,7 +55,6 @@ button.griddapVariable:focus-visible {
 button.griddapVariable[aria-pressed="true"] {
   border-color: var(--cioos-primary);
   background-color: var(--cioos-white);
-  box-shadow: inset 3px 0 0 var(--cioos-primary);
 }
 
 .griddapVariableHead {
