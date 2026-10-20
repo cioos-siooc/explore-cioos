@@ -105,6 +105,24 @@ def test_unparseable_ckan_citation_is_dropped():
     assert "citation" not in from_ckan({"citation": {"en": "not json"}})
 
 
+def test_ckan_lineage_records_become_text():
+    lineage = [
+        {
+            "statment": {"en": "Instrument specifications", "fr": "Spécifications"},
+            "scope": "collectionSession",
+            "source": [],
+            "processing-step": [],
+            "additional-documentation": ['{"title": "doc"}'],
+        },
+        {"statment": {"fr": "Contrôle qualité"}},
+        {"statment": {}},
+    ]
+    assert from_ckan({"lineage": lineage})["lineage"] == (
+        "Instrument specifications\n\nContrôle qualité"
+    )
+    assert "lineage" not in from_ckan({"lineage": [{"statment": {"en": ""}}]})
+
+
 def test_converted_obis_record_keeps_english_only():
     record = {
         "abstract": {"en": "An abstract", "fr": "Traduction française actuellement indisponible"},

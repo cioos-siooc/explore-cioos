@@ -7,7 +7,7 @@
   --legend-swatch: calc(12px + var(--legend-grow) / 200);
   --legend-row: calc(15px + var(--legend-grow) / 200);
   --legend-bar: calc(10px + var(--legend-grow) / 200);
-  --legend-switch: calc(16px + var(--legend-grow) / 200);
+  --legend-switch: calc(12px + var(--legend-grow) / 200);
 }
 
 .mapLegend {
@@ -101,6 +101,10 @@
 
   /* the row owns the gap to its contents, since its children are zeroed */
   margin-bottom: 3px;
+}
+
+.legendGroupIcon {
+  flex: 0 0 auto;
 }
 
 .legendGroupLabelRow .form-check.form-switch {
@@ -308,6 +312,12 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.legendLayerItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Card-wide: the observations switch sits in a group label row and has to
