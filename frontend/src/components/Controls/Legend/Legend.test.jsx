@@ -108,11 +108,11 @@ describe("Legend", () => {
     expect(help).toHaveTextContent("A day counts once");
   });
 
-  it("gives the hexes and the markers explainers of their own", async () => {
+  it("folds the hexes into the metric explainer and gives markers their own", async () => {
     const { user } = renderLegend({ zoom: 10 });
-    await user.click(screen.getByLabelText("About Hexagons"));
+    await user.click(screen.getByLabelText("About Days of data"));
     expect(await screen.findByTestId("legend-help-modal")).toHaveTextContent(
-      "summed into hexagonal cells",
+      "Hover for what is inside",
     );
     await user.click(screen.getByLabelText("Close"));
     await user.click(screen.getByLabelText("About Markers"));

@@ -40,7 +40,7 @@ describe("TrajectoryDate", () => {
 
   it("renders the track line and heading rows, and a rail with the scrub handle", async () => {
     await renderReady();
-    expect(screen.getByText("Track")).toBeInTheDocument();
+    expect(screen.getByLabelText("Track window")).toHaveValue("90");
     expect(screen.getAllByRole("slider")).toHaveLength(1);
   });
 
@@ -60,7 +60,7 @@ describe("TrajectoryDate", () => {
 
   it("changing the trail window updates trailingDays", async () => {
     const { user } = await renderReady();
-    await user.selectOptions(screen.getByLabelText("Trail"), "30");
+    await user.selectOptions(screen.getByLabelText("Track window"), "30");
     await waitFor(() => expect(latest.trailingDays).toBe(30));
   });
 });

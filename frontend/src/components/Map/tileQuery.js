@@ -1,9 +1,4 @@
-import {
-  HEX_METRIC,
-  TRAIL_ALL,
-  effectiveTrailingDays,
-  tracksMinDate,
-} from "../config";
+import { HEX_METRIC } from "../config";
 import {
   PROFILE_TYPE_KEYS,
   TRAJECTORY_TYPE_KEYS,
@@ -58,17 +53,12 @@ export function filterTimeWindow(queryString) {
   };
 }
 
-// [scrub - N days, scrub + 1 day), or from tracksMinDate for the 'all' trail.
-// Day snapping keeps tile URLs stable for the server's URL-keyed cache. The
-// trail is clamped by zoom first: a long window costs far more zoomed out.
-export function tracksTimeWindow(scrub, trailing, zoom) {
+// [scrub - N days, scrub + 1 day). Day snapping keeps tile URLs stable for the
+// server's URL-keyed cache.
+export function tracksTimeWindow(scrub, trailing) {
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const days = effectiveTrailingDays(trailing, zoom);
   const end = new Date(`${scrub}T00:00:00Z`).getTime();
   const timeMax = `${new Date(end + MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
-  const timeMin =
-    days === TRAIL_ALL
-      ? `${tracksMinDate}T00:00:00Z`
-      : `${new Date(end - days * MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
+  const timeMin = `${new Date(end - trailing * MS_PER_DAY).toISOString().split("T")[0]}T00:00:00Z`;
   return { timeMin, timeMax };
 }

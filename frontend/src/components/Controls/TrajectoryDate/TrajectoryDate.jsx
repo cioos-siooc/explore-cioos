@@ -3,16 +3,11 @@ import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight } from "react-bootstrap-icons";
 
 import {
-  TRAIL_ALL,
-  effectiveTrailingDays,
   trackLineColor,
   tracksMinDate,
   trailingWindowOptions,
 } from "../../config.js";
-import {
-  useMapState,
-  useMapView,
-} from "../../../state/map/MapStateProvider.jsx";
+import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, { DateField } from "../TimeRail/TimeRail.jsx";
 import {
@@ -31,16 +26,11 @@ export default function TrajectoryDate() {
   const { t } = useTranslation();
   const { scrubTime, setScrubTime, trailingDays, setTrailingDays } =
     useMapState();
-  const { zoom } = useMapView();
   const { tipHighlight } = useTips();
 
   const maxIso = todayIso();
   const axis = useMemo(() => createTimeAxis(tracksMinDate, maxIso), [maxIso]);
   const value = clampIso(scrubTime, tracksMinDate, maxIso);
-
-  // Zoomed out, long windows load clamped; report what's actually drawn.
-  const loadedTrail = effectiveTrailingDays(trailingDays, zoom);
-  const zoomClamped = loadedTrail !== trailingDays;
 
   function commit(iso) {
     setScrubTime(clampIso(iso, tracksMinDate, maxIso));
@@ -53,53 +43,23 @@ export default function TrajectoryDate() {
   return (
     <div className="trajectoryDate">
       <div className="legendItem trajectoryDateRow">
-        <svg className="legendSwatch" width="12" height="12">
-          <line
-            x1="1"
-            y1="10.5"
-            x2="11"
-            y2="1.5"
-            stroke={trackLineColor}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-        </svg>
-        <span className="legendItemLabel">{t("legendTrackLine")}</span>
+        <label className="legendItemLabel" htmlFor="trajectoryTrailSelect">
+          {t("trajectoryTrailLabel")}
+        </label>
         <select
+          id="trajectoryTrailSelect"
           className="trajectoryTrailSelect"
-          aria-label={t("trajectoryTrailLabel")}
-          title={
-            zoomClamped
-              ? t("legendTrackTrailZoomGated")
-              : t("trajectoryTrailLabel")
-          }
           value={trailingDays}
-          onChange={(event) =>
-            setTrailingDays(
-              event.target.value === TRAIL_ALL
-                ? TRAIL_ALL
-                : Number(event.target.value),
-            )
-          }
+          onChange={(event) => setTrailingDays(Number(event.target.value))}
         >
           {trailingWindowOptions.map((days) => (
             <option key={days} value={days}>
-              {days === TRAIL_ALL
-                ? t("trajectoryTrailAll")
-                : days === 365
-                  ? t("trajectoryTrailOneYear")
-                  : `${days} ${t("trajectoryTrailDays")}`}
+              {days === 365
+                ? t("trajectoryTrailOneYear")
+                : `${days} ${t("trajectoryTrailDays")}`}
             </option>
           ))}
         </select>
-        {zoomClamped && (
-          <span
-            className="trajectoryTrailClamped"
-            title={t("legendTrackTrailZoomGated")}
-          >
-            *
-          </span>
-        )}
       </div>
 
       <div
@@ -159,10 +119,10 @@ export default function TrajectoryDate() {
         axis={axis}
         scrub={{
           value,
-          trailStartMs:
-            loadedTrail === TRAIL_ALL
-              ? axis.minMs
-              : Math.max(isoToMs(value) - loadedTrail * MS_PER_DAY, axis.minMs),
+          trailStartMs: Math.max(
+            isoToMs(value) - trailingDays * MS_PER_DAY,
+            axis.minMs,
+          ),
         }}
         onCommit={(handle, iso) => commit(iso)}
       />

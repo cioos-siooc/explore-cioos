@@ -34,12 +34,6 @@ export const LEGEND_HELP_SECTIONS = {
       ["once", CalendarCheck],
       ["gaps", Calendar3],
       ["why", Rulers],
-    ],
-  },
-  hexes: {
-    Icon: HexagonFill,
-    lead: true,
-    items: [
       ["hover", CursorFill],
       ["scale", Palette],
     ],

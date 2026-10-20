@@ -48,7 +48,6 @@ import {
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
-  effectiveTrailingDays,
 } from "../config";
 import platformColors from "../../components/platformColors";
 import {
@@ -538,11 +537,11 @@ export default function CreateMap({
 
   // Drops the TimeSelector's timeMin/timeMax: the scrub window must not fight
   // the date-range filter.
-  function buildTracksTileUrl(queryString, scrub, trailing, zoom) {
+  function buildTracksTileUrl(queryString, scrub, trailing) {
     const params = new URLSearchParams(queryString);
     params.delete("timeMin");
     params.delete("timeMax");
-    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing, zoom);
+    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing);
     params.set("timeMin", timeMin);
     params.set("timeMax", timeMax);
     const layers = dataLayersRef.current;
@@ -557,18 +556,13 @@ export default function CreateMap({
     return `${server}/tiles/tracks/{z}/{x}/{y}.mvt?${params.toString()}`;
   }
 
-  // So zoomend can tell a trail-gate crossing (refetch) from any other zoom.
-  const appliedTrailRef = useRef(null);
-
   function refreshTracksSource(queryString, scrub, trailing) {
     if (!map.current || !map.current.getSource("tracks")) return;
-    const zoom = map.current.getZoom();
-    appliedTrailRef.current = effectiveTrailingDays(trailing, zoom);
     tileRetry.reset("tracks");
     // setTiles clears the source's tile cache and reloads the viewport tiles.
     map.current
       .getSource("tracks")
-      .setTiles([buildTracksTileUrl(queryString, scrub, trailing, zoom)]);
+      .setTiles([buildTracksTileUrl(queryString, scrub, trailing)]);
   }
 
   function refreshCombinedSources(queryString) {
@@ -2372,8 +2366,8 @@ export default function CreateMap({
     map.current.addSource("tracks", {
       type: "vector",
       // No minzoom on purpose. At low zoom one tile can carry every trajectory
-      // in the window (100k+ features); defaultTrailingDays and
-      // effectiveTrailingDays keep that in check. If it regresses, simplify
+      // in the window (100k+ features); trailingWindowOptions' one-year cap
+      // keeps that in check. If it regresses, simplify
       // server-side in web-api/routes/tiles.js rather than adding a minzoom.
       maxzoom: 8,
       tiles: [
@@ -2381,28 +2375,8 @@ export default function CreateMap({
           mapQueryRef.current,
           scrubTimeRef.current,
           trailingDaysRef.current,
-          map.current.getZoom(),
         ),
       ],
-    });
-    appliedTrailRef.current = effectiveTrailingDays(
-      trailingDaysRef.current,
-      map.current.getZoom(),
-    );
-
-    // Only on an actual gate crossing: setTiles drops the whole tile cache.
-    map.current.on("zoomend", () => {
-      if (!tracksModeRef.current || !map.current.getSource("tracks")) return;
-      const effective = effectiveTrailingDays(
-        trailingDaysRef.current,
-        map.current.getZoom(),
-      );
-      if (effective === appliedTrailRef.current) return;
-      refreshTracksSource(
-        mapQueryRef.current,
-        scrubTimeRef.current,
-        trailingDaysRef.current,
-      );
     });
 
     map.current.addLayer({

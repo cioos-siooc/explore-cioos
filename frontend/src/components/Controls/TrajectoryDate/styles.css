@@ -37,14 +37,6 @@
   border-color: var(--cioos-track);
 }
 
-.trajectoryTrailClamped {
-  flex: 0 0 auto;
-  margin-left: -3px;
-  color: var(--cioos-track-700);
-  font-weight: 700;
-  cursor: help;
-}
-
 .trajectoryDate .railStep {
   color: var(--cioos-track-700);
 }
