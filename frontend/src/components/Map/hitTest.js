@@ -336,15 +336,6 @@ export const buildFeatureQuery = (
   };
 };
 
-// griddap-highlight draws the open dataset's grid, so the click highlight
-// keeps only its cells and markers.
-export const withoutGridHighlight = (highlight) => ({
-  ...highlight,
-  features: highlight.features.filter(
-    (feature) => feature.properties.role === "both",
-  ),
-});
-
 // MapLibre hands nested properties back as JSON strings.
 export const featureHasDataset = (feature, pk) => {
   try {

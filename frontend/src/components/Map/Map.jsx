@@ -80,7 +80,6 @@ import {
   selectedTrackLayers,
   trackClickLayers,
   trackItemsIn,
-  withoutGridHighlight,
 } from "./hitTest.js";
 import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
@@ -1306,14 +1305,14 @@ export default function CreateMap({
   }
 
   // Guarded on the source: a share link can resolve a click payload before
-  // the style has added layers.
+  // the style has added layers. An open dataset draws its own footprint, so the
+  // click's hex, marker or grid box would read as part of it.
   const revealedQueryNonce = useRef();
   useEffect(() => {
     const source = map.current?.getSource("click-highlight");
     if (!source) return;
-    const highlight = featureQuery?.highlight || emptyFeatureCollection;
     source.setData(
-      inspectDataset ? withoutGridHighlight(highlight) : highlight,
+      (!inspectDataset && featureQuery?.highlight) || emptyFeatureCollection,
     );
     if (!featureQuery?.highlight?.features?.length) return;
     if (revealedQueryNonce.current === featureQuery.nonce) return;
@@ -2928,9 +2927,8 @@ export default function CreateMap({
         const markerDatasetPks = datasetPksOf(nearestMarker);
         if (markerDatasetPks.length === 1) {
           popup.remove();
-          // This path skips onFeatureQueryRef, so the ring is set here in the
-          // shape buildFeatureQuery would use, so it matches the marker
-          // exactly.
+          // The shape buildFeatureQuery would use, so the ring matches the
+          // marker exactly once the record is closed.
           const highlight = {
             type: "FeatureCollection",
             features: [
@@ -2943,7 +2941,6 @@ export default function CreateMap({
               },
             ],
           };
-          map.current.getSource("click-highlight")?.setData(highlight);
           // Not through handleFeatureQuery: navigating there in the same tick
           // as the record jump races two navigations over a stale search-params
           // snapshot (see setInspectRecordID in SelectionProvider), so
