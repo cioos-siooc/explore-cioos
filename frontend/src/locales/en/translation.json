@@ -733,6 +733,7 @@
   "zoomToDatasetTitle": "Zoom the map to this dataset's extent",
   "griddapMapPreviewTitle": "Map preview (WMS)",
   "griddapVariableSelect": "Variable",
+  "griddapVariableShowTitle": "Show this variable on the map",
   "griddapShowOnMapToggle": "Show on map",
   "griddapTimeShown": "Showing time:",
   "griddapLegendUnavailable": "Legend unavailable",

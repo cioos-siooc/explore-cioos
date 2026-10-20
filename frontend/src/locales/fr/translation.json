@@ -734,6 +734,7 @@
   "zoomToDatasetTitle": "Zoomer la carte sur l'étendue de ce jeu de données",
   "griddapMapPreviewTitle": "Aperçu cartographique (WMS)",
   "griddapVariableSelect": "Variable",
+  "griddapVariableShowTitle": "Afficher cette variable sur la carte",
   "griddapShowOnMapToggle": "Afficher sur la carte",
   "griddapTimeShown": "Temps affiché :",
   "griddapLegendUnavailable": "Légende non disponible",
