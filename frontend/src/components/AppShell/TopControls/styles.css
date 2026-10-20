@@ -387,29 +387,15 @@
     --top-bar-gap: 6px;
   }
 
+  /* minmax(0, …): an auto column grows to its content, which let the one-line
+     chip row widen past the screen instead of scrolling. */
   .topBarRow {
+    grid-template-columns: minmax(0, 1fr);
     justify-items: stretch;
   }
 
   .topBarRowInner {
     align-items: stretch;
-  }
-
-  /* One line that scrolls sideways: every wrapped line here is map lost. */
-  .activeFiltersPanel {
-    width: 100%;
-    padding: 2px 8px;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .activeFiltersPanel .activeFilterGroup {
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-    max-width: none;
   }
 
   /* Square corners, and no 1px side bleed, which would push the strip 2px
@@ -438,6 +424,21 @@
   .topBarButton svg {
     width: 15px;
     height: 15px;
+  }
+
+  /* The badge and the chevron share the narrowest of the three segments; at
+     desktop spacing the badge ran under the chevron. */
+  .topBarFiltersOpen {
+    gap: 4px;
+    padding: 2px 4px 2px 6px;
+  }
+
+  .topBarFiltersToggle {
+    padding: 2px 6px 2px 4px;
+  }
+
+  .topBarCount {
+    padding: 0 5px;
   }
 
   /* The tally tucks under the wordmark into space that was otherwise empty;
@@ -691,4 +692,55 @@
 .activeFilterMoreButton:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
+}
+
+/* Mobile chips, after the rules they override. They hang under the full-width
+   header, so they take its width too — on one line that scrolls sideways,
+   since every wrapped line here was a line of map lost — and a size down, as
+   the header's own tabs are. */
+@media (max-width: 700px), (max-height: 500px) {
+  .activeFiltersPanel {
+    width: 100%;
+    max-width: none;
+    padding: 2px 8px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .activeFilterGroup {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    max-width: none;
+    gap: 3px;
+  }
+
+  .activeFilterGroupLabel,
+  .activeFilterItem,
+  .activeFilterMoreButton {
+    font-size: var(--cioos-font-size-xs);
+  }
+
+  .activeFilterGroupLabel {
+    gap: 4px;
+    padding: 1px 8px 1px 2px;
+  }
+
+  .activeFilterItem {
+    max-width: 140px;
+    padding: 1px 1px 1px 7px;
+  }
+
+  .activeFilterGroupBubble {
+    padding: 1px;
+  }
+
+  .activeFilterGroupRemove,
+  .activeFilterItemRemove {
+    width: 16px;
+    height: 16px;
+  }
 }

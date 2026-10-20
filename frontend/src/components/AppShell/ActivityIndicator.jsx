@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import ActivityList from "../ui/ActivityList.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { useActivity } from "../../state/activity/ActivityProvider.jsx";
-import { useMapState } from "../../state/map/MapStateProvider.jsx";
+import { useMapView } from "../../state/map/MapStateProvider.jsx";
 import "./activityIndicatorStyles.css";
 
 // Comes and goes with the work; the brand logo's mark is the standing
@@ -14,7 +14,7 @@ export default function ActivityIndicator() {
   const { labelKeys, busy, announced } = useActivity();
   // The splash names the same waits, so the panel stands down until it has
   // gone. The spoken commentary carries on either way.
-  const { firstPaintPending } = useMapState();
+  const { firstPaintPending } = useMapView();
 
   return (
     <div className="activityIndicator">

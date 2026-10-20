@@ -3,6 +3,7 @@
 > **Harvest docs:** [Workflow](workflow.md)
 > · **ERDDAP**
 > · [OBIS](obis.md)
+> · [Downloads](downloads.md)
 
 How the CIOOS Data Explorer harvester reads each ERDDAP `cdm_data_type`. The
 [workflow](workflow.md) page shows where this fits: each ERDDAP server

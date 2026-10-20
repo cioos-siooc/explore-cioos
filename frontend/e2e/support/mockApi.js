@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { EXTERNAL_HOSTS, externalKey } from "./fixtureKey.js";
+import {
+  EXTERNAL_HOSTS,
+  externalKey,
+  isProxiedBasemapTile,
+} from "./fixtureKey.js";
 import { resolveFixture } from "./fixtureStore.js";
 import { FIXTURES_DIR } from "./fixturesDir.js";
 
@@ -60,6 +64,13 @@ export async function installMockApi(context, { appOrigin, apiOrigin }) {
   await context.route(
     (url) => url.origin === apiOrigin || url.host === GEONAMES_HOST,
     (route) => {
+      if (isProxiedBasemapTile(new URL(route.request().url()))) {
+        return route.fulfill({
+          status: 200,
+          contentType: "image/png",
+          body: BLANK_PNG,
+        });
+      }
       const fixture = resolveFixture(route.request().url());
       if (fixture.empty) return route.fulfill({ status: 204, body: "" });
       if (fixture.missingPath) {

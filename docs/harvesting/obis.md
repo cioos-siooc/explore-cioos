@@ -3,6 +3,7 @@
 > **Harvest docs:** [Workflow](workflow.md)
 > · [ERDDAP](erddap.md)
 > · **OBIS**
+> · [Downloads](downloads.md)
 
 This page describes how the CIOOS Data Explorer harvester reads datasets from
 the [Ocean Biodiversity Information System](https://obis.org). The

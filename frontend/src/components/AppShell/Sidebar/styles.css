@@ -33,6 +33,23 @@
   pointer-events: auto;
 }
 
+/* The card widened over the map (useWideView), above the rest of the
+   shell but under any dialog. Phones never get here: the card is already a
+   full-screen sheet. */
+.sidebar.wide {
+  left: 50%;
+  z-index: calc(var(--cioos-z-dock) + 1);
+  width: min(1280px, calc(100vw - 24px));
+  transform: translateX(-50%);
+}
+
+.sidebarScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cioos-z-dock);
+  background-color: var(--cioos-backdrop);
+}
+
 /* Datasets card */
 .sidebarDatasets {
   display: flex;
@@ -369,19 +386,33 @@
     border: none;
     border-radius: 0;
     box-shadow: none;
+
+    /* Down here the sheet is the screen, so it rises from the bottom edge, at
+       the other sheets' pace (modalStyles.css). */
     transform: translateY(100%);
+    transition-duration: 0.5s;
   }
 
   .sidebarDatasets.expanded {
     transform: translateY(0);
   }
 
-  .datasetsHeader {
-    padding: var(--cioos-space-md) var(--cioos-space-lg);
+  /* The grab area under the handle: the header or the dataset banner, with
+     room above it for the handle. Neither scrolls, so a vertical swipe on them
+     is left to the drag (useSheetDrag). The list under them scrolls to its end
+     and stops there rather than pulling the page to refresh. */
+  .datasetsHeader,
+  .datasetsBanner {
+    touch-action: none;
   }
 
+  .sidebarBody {
+    overscroll-behavior: contain;
+  }
+
+  .datasetsHeader,
   .datasetsBanner {
-    padding: var(--cioos-space-md) var(--cioos-space-lg);
+    padding: var(--cioos-space-lg) var(--cioos-space-lg) var(--cioos-space-md);
   }
 
   /* Dropped rather than clipped: the dataset title below says it in full. */

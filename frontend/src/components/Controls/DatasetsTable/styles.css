@@ -144,6 +144,25 @@
   padding: 10px;
 }
 
+/* Widened over the map (useWideView), the cards flow into a grid under
+   full-width group headers. Only the sidebar's list: the Download modal's is
+   the same table. */
+.sidebar.wide .datasetsCardList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-content: start;
+}
+
+.sidebar.wide .datasetsCardGroupHeader {
+  grid-column: 1 / -1;
+}
+
+/* A row's cards share its height; the meta line keeps to their base so the
+   row reads across whatever the titles' lengths. */
+.sidebar.wide .datasetCard .datasetCardMeta {
+  margin-top: auto;
+}
+
 .datasetsCardEmpty {
   grid-column: 1 / -1;
   padding: 24px 12px;
@@ -419,9 +438,11 @@ button.datasetCardTitle:focus-visible {
   white-space: nowrap;
 }
 
+/* Takes the toolbar's spare room in the sidebar, capped for the widened one. */
 .datasetsCardFilters {
   flex: 1 1 auto;
   min-width: 44px;
+  max-width: 180px;
   overflow: hidden;
   white-space: nowrap;
   display: inline-flex;
@@ -675,6 +696,18 @@ button.datasetCardTitle:focus-visible {
   font-size: var(--cioos-font-size-sm);
 }
 
+/* Ink carries the word, as on the download notice: --cioos-warn is the
+   glyph's hue, not a text colour on its own tint. */
+.datasetCardFormatTag {
+  padding: 0 8px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-warn-bg);
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .datasetCardSourceLink {
   display: inline-flex;
   align-items: center;
@@ -682,42 +715,6 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-primary-700);
   font-weight: 600;
   white-space: nowrap;
-}
-
-.datasetCardDownloadGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.datasetCardLinkWarning {
-  display: inline-flex;
-  align-items: center;
-  color: var(--cioos-warn);
-}
-
-.datasetCardIconLink {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  border: none;
-  border-radius: var(--cioos-radius-sm);
-  background: transparent;
-  color: var(--cioos-ink-40);
-  cursor: pointer;
-  transition: color var(--cioos-transition-fast);
-}
-
-@media (hover: hover) {
-  .datasetCardIconLink:hover {
-    color: var(--cioos-primary-700);
-    background-color: var(--cioos-surface-2);
-  }
-}
-
-.datasetCardIconLink:focus-visible {
-  outline: 2px solid var(--cioos-primary-700);
-  outline-offset: 1px;
 }
 
 .downloadableIcon.success {

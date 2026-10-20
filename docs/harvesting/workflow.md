@@ -3,6 +3,7 @@
 > **Harvest docs:** **Workflow**
 > · [ERDDAP](erddap.md)
 > · [OBIS](obis.md)
+> · [Downloads](downloads.md)
 
 This page describes how the CIOOS Data Explorer harvester turns three upstream
 systems into the `cde` database: how runs are scheduled, what each source
@@ -142,6 +143,13 @@ describes the data still stored.
 | Upstream data cache | None; every harvest queries the server | `obis_cache` volume, **no expiry**: new records for an already-cached dataset are not picked up until its cache is deleted |
 | New or removed datasets | From the server's `allDatasets` listing | From [discovery](obis.md#choosing-datasets) |
 | CKAN metadata refresh | Only for re-harvested datasets: an `UNCHANGED` dataset keeps its stored CKAN title, organizations and descriptive metadata | Cached per UUID with no expiry, "not found" included |
+
+To push a harvester or schema change to datasets that would otherwise be skipped
+as `UNCHANGED`, either bump `HARVEST_VERSION` in
+`cde_harvester/sources/erddap/client.py` (it is mixed into every stored hash, so
+the next run after deploy re-harvests every ERDDAP dataset once), or run
+*Harvest Source* / *Harvest All Sources* with `force=true` for a one-off. Both
+keep the load incremental and leave OBIS and its cache alone.
 
 ## CKAN
 

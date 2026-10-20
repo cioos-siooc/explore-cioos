@@ -12,10 +12,19 @@ Your download is available at {{download_url}}
 Please note: some datasets in your selection could not be included in this download:
 {% for d in failed_datasets %}
 - {{ d['dataset_id'] }} — {{ d['reason'] }}.
+{% if d['error'] %}
+  Source response: {{ d['error'] }}
+{% endif %}
 {% endfor %}
 {% endif %}
-Note: The data included in this zip file includes observations that have been downloaded from data hosted on open-access ERDDAP servers and CKAN catalogues. The links to the sources are included in this email. Please refer to metadata included in the ERDDAP servers and CKAN catalogues to identify the applicable licenses and correct way to cite these resources.
+{% if fallback_datasets %}
+These datasets are in CSV rather than the format you chose:
+{% for d in fallback_datasets %}
+- {{ d['dataset_id'] }} — {{ d['reason'] }}.
+{% endfor %}
+{% endif %}
+The README.md in the zip lists what was included and why anything was left out. The data folder holds one folder per dataset with its data, its citation and its source metadata; the citation folder has every citation in citations.txt (also .bib and .ris) and every licence in licences.txt. Please cite every dataset you use.
 
-Please visit the following websites to find the latest information on how to correctly cite these resources:
+The sources of this download:
 
 {{ datasets_list }}

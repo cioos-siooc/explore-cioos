@@ -58,7 +58,8 @@ def _prune(value):
 def _unique(values):
     seen, out = set(), []
     for value in values:
-        text = _text(value)
+        # OBIS keywords arrive entity-encoded ("EARTH SCIENCE &gt; ...").
+        text = _text(html.unescape(value) if isinstance(value, str) else value)
         if text and text.lower() not in seen:
             seen.add(text.lower())
             out.append(text)
@@ -89,10 +90,14 @@ def _plain(text):
     markdown and drop the rest of the markup."""
     if not isinstance(text, str):
         return text
+    is_html = bool(_TAG.search(text))
     text = _PARAGRAPH_END.sub("\n\n", text)
     text = _LINE_BREAK.sub("\n", text)
     text = _LIST_ITEM.sub("\n- ", text)
     text = html.unescape(_TAG.sub("", text))
+    if is_html:
+        # The markup's source indentation would read as markdown code blocks.
+        text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 

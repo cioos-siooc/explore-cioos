@@ -1,7 +1,7 @@
 /*
  * Ocean-first basemap: EMODnet bathymetry for the world view handing over to
  * Esri imagery at z10, under an OpenFreeMap vector overlay (rivers,
- * boundaries, FR/EN labels). No API keys; all endpoints are CORS-open.
+ * boundaries, FR/EN labels). No API keys.
  *
  * Map.jsx inserts data layers below FIRST_LABEL_LAYER_ID so labels stay on top.
  */
@@ -19,8 +19,9 @@ const OFM_TILEJSON = "https://tiles.openfreemap.org/planet";
 const OFM_GLYPHS =
   "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 
-const EMODNET_TILES =
-  "https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png";
+// Re-encoded as WebP and cached by web-api/routes/emodnet.js: upstream's PNGs
+// were the slowest tiles on the map.
+const EMODNET_TILES = `${server}/emodnet/{z}/{x}/{y}.webp`;
 
 // Esri tile REST convention is {z}/{y}/{x} (y before x), unlike XYZ schemes.
 const ESRI_IMAGERY_TILES =
@@ -503,8 +504,10 @@ export function buildBasemapStyle(lang = "en") {
         type: "raster",
         tiles: [EMODNET_TILES],
         tileSize: 256,
-        // pre-rendered up to z12; overzoom covers deeper levels
-        maxzoom: 12,
+        // z10 tiles would only draw while the raster fades out (z9.5-10), yet
+        // they are ~80% of the tiles over Canada that the proxy caches, so
+        // that half zoom overzooms z9.
+        maxzoom: 9,
         attribution:
           '© <a href="https://emodnet.ec.europa.eu/en/bathymetry">EMODnet Bathymetry Consortium</a>',
       },

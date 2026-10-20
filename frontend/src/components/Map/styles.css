@@ -1,7 +1,21 @@
 .map {
-  position: absolute;
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+
+  /* The large viewport reaches under mobile browser bars; Safari 26's
+     translucent toolbar then shows the map through it instead of a blur of the
+     page background. Fixed, so the extra height never makes the page scroll. */
+  height: 100lvh;
+}
+
+/* Lifts the attribution and controls back above the browser bar that the map
+   now runs under. Zero wherever the bars don't overlap the viewport. */
+.maplibregl-ctrl-bottom-left,
+.maplibregl-ctrl-bottom-right {
+  bottom: calc(100lvh - 100dvh);
 }
 
 /* MapLibre leaves the canvas transparent outside the globe, so this is the

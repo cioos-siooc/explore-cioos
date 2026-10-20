@@ -135,3 +135,32 @@ class TestFailedRunsReachTheDashboard:
                            lambda **kw: UNCHANGED)
         with pytest.raises(RuntimeError, match="nothing harvested"):
             p.cde_pipeline()
+
+
+class TestForce:
+    @pytest.fixture
+    def harvest_kwargs(self, config_file, tmp_path, monkeypatch):
+        def _run(force):
+            seen = {}
+            monkeypatch.setattr(prefect_pipeline, "harvester_main", lambda **kw: seen.update(kw))
+            monkeypatch.setattr(
+                prefect_pipeline, "db_loader_main",
+                lambda **kw: seen.update(load_incremental=kw["incremental"]) or UNCHANGED,
+            )
+            monkeypatch.setattr(prefect_pipeline, "_prune_server_run_folders", lambda *a, **kw: None)
+            p = PrefectCDEPipeline()
+            p.init_config(config_file(dict(
+                BASE_CONFIG, folder=str(tmp_path / "harvest"), incremental=True
+            )))
+            p.force = force
+            p.cde_pipeline()
+            return seen
+        return _run
+
+    def test_default_skips_unchanged(self, harvest_kwargs):
+        assert harvest_kwargs(False)["skip_unchanged"] is True
+
+    def test_force_reharvests_but_keeps_the_load_incremental(self, harvest_kwargs):
+        seen = harvest_kwargs(True)
+        assert seen["skip_unchanged"] is False
+        assert seen["load_incremental"] is True

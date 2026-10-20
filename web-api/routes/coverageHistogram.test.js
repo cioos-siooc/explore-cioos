@@ -83,19 +83,23 @@ test("the bins span the selection's data, not 1900 to now", async () => {
 });
 
 test("year-wide bins open on Jan 1, but never before the time filter", async () => {
-  db.queueRaw([{ min: "1905-07-01T00:00:00Z", max: "2020-01-01T00:00:00Z" }]);
+  db.queueRaw([{ min: "1805-07-01T00:00:00Z", max: "2020-01-01T00:00:00Z" }]);
   db.queueRaw([]);
-  let res = await agent.get("/coverageHistogram").query({ count: "days" });
-  assert.equal(res.body.timeBinEdges[0].slice(0, 10), "1905-01-01");
+  // Before the default 1900 window start, so the span is long enough for
+  // year-wide bins.
+  let res = await agent
+    .get("/coverageHistogram")
+    .query({ count: "days", timeMin: "1700-01-01" });
+  assert.equal(res.body.timeBinEdges[0].slice(0, 10), "1805-01-01");
 
   db.reset();
   resetCache();
-  db.queueRaw([{ min: "1905-07-01T00:00:00Z", max: "2020-01-01T00:00:00Z" }]);
+  db.queueRaw([{ min: "1805-07-01T00:00:00Z", max: "2020-01-01T00:00:00Z" }]);
   db.queueRaw([]);
   res = await agent
     .get("/coverageHistogram")
-    .query({ count: "days", timeMin: "1905-03-01" });
-  assert.equal(res.body.timeBinEdges[0].slice(0, 10), "1905-03-01");
+    .query({ count: "days", timeMin: "1805-03-01" });
+  assert.equal(res.body.timeBinEdges[0].slice(0, 10), "1805-03-01");
 });
 
 test("rejects an unknown count", async () => {
