@@ -59,9 +59,15 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: E2E and accessibility
+    name: E2E and accessibility (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Every test boots its own map on CPU WebGL, so wall time scales with test
+    # count; splitting across runners is what shortens it.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     container:
       # Must match @playwright/test in frontend/package.json exactly; bump the
       # two together. The same image as e2e/in-container.sh keeps a11y node
@@ -85,14 +91,14 @@ jobs:
       # restyling, so they gate every push and PR. The visual suite lives in
       # build_and_test.yml, gated on a published release.
       - name: Run the behavioural and accessibility suites
-        run: npx playwright test --project=desktop --project=tablet --project=mobile --project=a11y
+        run: npx playwright test --project=desktop --project=tablet --project=mobile --project=a11y --shard=${{ matrix.shard }}/4
         env:
           CI: "true"
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             frontend/playwright-report/
             frontend/test-results/
