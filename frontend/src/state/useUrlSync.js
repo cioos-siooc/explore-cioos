@@ -23,7 +23,7 @@ import {
 } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
-import { useMapState } from "./map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 
@@ -60,8 +60,8 @@ export default function UrlSync() {
   }
 
   const { query } = useFilters();
+  const { mapView } = useMapView();
   const {
-    mapView,
     tracksMode,
     scrubTime,
     debouncedScrubTime,

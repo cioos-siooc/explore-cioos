@@ -220,6 +220,8 @@
   "quickFilterCountDescription_one": "{{count, number}} jeu de données",
   "quickFilterCountDescription_other": "{{count, number}} jeux de données",
   "quickFilterCaptionReset": "Effacer",
+  "quickFilterCaptionZoomArea": "Zoom",
+  "quickFilterZoomAreaTitle": "Zoomer la carte sur la zone dessinée",
   "datasetsCardInViewCountText": "{{count}} jeux de données dans la vue actuelle de la carte",
   "datasetsCardGroupByLabel": "Regrouper par",
   "datasetsCardGroupNoneText": "Aucun",

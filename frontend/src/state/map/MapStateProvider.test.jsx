@@ -4,7 +4,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
-import { useMapState } from "./MapStateProvider.jsx";
+import { useMapState, useMapView } from "./MapStateProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 import legendFixture from "../../../e2e/fixtures/api/legend.json";
 import griddapCoverageFixture from "../../../e2e/fixtures/api/griddapCoverage.json";
@@ -12,7 +12,7 @@ import griddapCoverageFixture from "../../../e2e/fixtures/api/griddapCoverage.js
 let latest;
 
 function Probe() {
-  latest = useMapState();
+  latest = { ...useMapState(), ...useMapView() };
   // SelectionProvider's initial /pointQuery can settle after legendLoading
   // clears and reset mapDatasetPKs to undefined, clobbering what this suite
   // sets, so wait for both loads.

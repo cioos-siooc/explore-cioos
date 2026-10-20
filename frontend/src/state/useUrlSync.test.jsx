@@ -6,7 +6,7 @@ import { renderWithProviders } from "../test/renderWithProviders.jsx";
 import { installMockFetch } from "../test/mockFetch.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
-import { useMapState } from "./map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "./map/MapStateProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 import pointQueryFixture from "../../e2e/fixtures/api/pointQuery.json";
 
@@ -19,6 +19,7 @@ function Probe() {
     filters: useFilters(),
     selection: useSelection(),
     mapState: useMapState(),
+    mapView: useMapView(),
     ui: useUI(),
   };
   return (
@@ -41,13 +42,13 @@ describe("UrlSync", () => {
       url: `/?dataset=${pointQueryFixture[0].dataset_id}&wide=1`,
     });
     await waitFor(() => expect(hooks.selection.inspectDataset).toBeTruthy());
-    act(() => hooks.mapState.setMapView({ lat: 50, lon: -125, zoom: 6 }));
+    act(() => hooks.mapView.setMapView({ lat: 50, lon: -125, zoom: 6 }));
     await waitFor(() => expect(params().get("zoom")).toBe("6"));
     expect(params().get("wide")).toBe("1");
 
     act(() => hooks.selection.returnToDatasetList());
     await waitFor(() => expect(params().has("dataset")).toBe(false));
-    act(() => hooks.mapState.setMapView({ lat: 49, lon: -124, zoom: 5 }));
+    act(() => hooks.mapView.setMapView({ lat: 49, lon: -124, zoom: 5 }));
     await waitFor(() => expect(params().get("zoom")).toBe("5"));
     expect(params().get("wide")).toBe("1");
   });

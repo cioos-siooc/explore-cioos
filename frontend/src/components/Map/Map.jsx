@@ -84,6 +84,8 @@ import {
 import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
 import { focusedPointFeatures } from "./focusedPoints.js";
+import { selectionLayerFilter } from "./selectionFilter.js";
+import { createTileRetry } from "./tileRetry.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
 
 // Captured before the overrides below replace them.
@@ -284,6 +286,7 @@ const drawControlOptions = {
 // A debounce, not a throttle: one measurement at the end of a gesture, so a
 // hesitant pan doesn't renumber the legend halfway through.
 const VIEWPORT_RAMP_DEBOUNCE_MS = 400;
+const MAP_VIEW_DEBOUNCE_MS = 250;
 
 // Partial opacity so coincident tracks compound: 27 St. Lawrence voyages in
 // 90 days render as ONE line at full opacity.
@@ -379,6 +382,21 @@ const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
 
 const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
 
+const TRACK_HEAD_HAS_COURSE = ["has", "cog"];
+// Hidden outside a drawn shape, as the dataset list leaves them out: they can't
+// be hovered or clicked, and the map lays out less. Values are
+// each layer's own filter.
+const SELECTION_FILTERED_LAYERS = {
+  hexes: undefined,
+  points: undefined,
+  "points-halo": undefined,
+  "coverage-hexes": undefined,
+  "coverage-hex-outlines": undefined,
+  "track-lines": undefined,
+  "track-heads": TRACK_HEAD_HAS_COURSE,
+  "track-heads-fixed": ["!", TRACK_HEAD_HAS_COURSE],
+};
+
 // The eslint-disable react-hooks/exhaustive-deps comments below: effects call
 // helpers rebuilt on every render (the component re-renders on every map
 // move), so listing them would re-issue map commands continuously. The real
@@ -463,6 +481,16 @@ export default function CreateMap({
     [hexMaxZoom, COVERAGE_HEX_OPACITY_STOPS[0][1]],
   ];
   const [draw] = useState(() => new MapboxDraw(drawControlOptions));
+  // refreshTiles is the one public call that reloads an errored tile.
+  const [tileRetry] = useState(() =>
+    createTileRetry({
+      refresh: (sourceId, tile) => {
+        if (map.current?.getSource(sourceId)) {
+          map.current.refreshTiles(sourceId, [tile]);
+        }
+      },
+    }),
+  );
   const drawPolygon = useRef(draw);
   const doFinalCheck = useRef(false);
   const layersLoaded = useRef(false);
@@ -536,6 +564,7 @@ export default function CreateMap({
     if (!map.current || !map.current.getSource("tracks")) return;
     const zoom = map.current.getZoom();
     appliedTrailRef.current = effectiveTrailingDays(trailing, zoom);
+    tileRetry.reset("tracks");
     // setTiles clears the source's tile cache and reloads the viewport tiles.
     map.current
       .getSource("tracks")
@@ -553,6 +582,7 @@ export default function CreateMap({
     )
       return;
     const { tileQuery, cellTileQuery } = tileUrls(queryString);
+    HEX_SOURCE_IDS.forEach((id) => tileRetry.reset(id));
     map.current.getSource("cde-tiles").setTiles([tileQuery]);
     map.current.getSource("cde-cells").setTiles([cellTileQuery]);
   }
@@ -669,13 +699,11 @@ export default function CreateMap({
     onFirstPaint();
   }
 
-  // A measured range wins over the global tier, so nothing later can change
-  // the colours. Without one, reveal only once /legend has returned AND the
-  // tiles have arrived (an empty result or an off-screen focused dataset has
-  // nothing to measure); otherwise tiles landing later double-colour the map.
+  // Called with the tiles loaded, so a measured range is final. Without one (an
+  // empty result or an off-screen focused dataset) the /legend tier must be in
+  // too, or it lands later and double-colours the map.
   function revealDataIfRamped(measuredRange) {
-    if (measuredRange !== undefined) return revealData();
-    if (!rangeLevelsRef.current || !hexSourcesLoaded()) return;
+    if (measuredRange === undefined && !rangeLevelsRef.current) return;
     revealData();
   }
 
@@ -1064,15 +1092,14 @@ export default function CreateMap({
     if (!map.current || !map.current.isStyleLoaded()) return;
     const key = rampKey();
     if (rampMeasuredFor.current === key) return;
+    // Tiles still in flight: hold what's painted and measure at the next idle.
+    // Mid-load the rendered hexes include the previous zoom's stand-in tiles,
+    // and each re-colouring relayouts every loaded tile (see IS_DIMMED), which
+    // slowed the very tiles being waited on.
+    if (!hexSourcesLoaded()) return;
     const range = measureVisibleHexRange(rampFocusPk.current);
-    if (range !== undefined) {
-      // Only a real measurement pins the key, holding colours through a drag.
-      rampMeasuredFor.current = key;
-    } else if (!hexSourcesLoaded()) {
-      // Tiles still in flight: hold what's painted and retry at the next idle.
-      // Treating "can't tell" as "nothing here" re-coloured the map twice.
-      return;
-    }
+    // Pinned, holding colours through a drag.
+    if (range !== undefined) rampMeasuredFor.current = key;
     // Loaded and empty IS an answer, so the global tier takes over. Not pinned:
     // panning into data at this zoom should find it at the next idle.
 
@@ -1189,6 +1216,8 @@ export default function CreateMap({
   // Bumped on every overlay change so stale in-flight GetMap loads are dropped.
   const wmsRenderToken = useRef(0);
   const polygonRef = useRef(null);
+  // Read by map event handlers and the layer filters.
+  const selectionRing = useRef(polygon);
   // An overlay set before the style loaded hid layers that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
   const revealedWmsPk = useRef();
@@ -1565,6 +1594,11 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWmsOverlay, polygon]);
 
+  useEffect(() => {
+    selectionRing.current = polygon;
+    applySelectionFilter();
+  }, [polygon]);
+
   function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
       const features = map.current
@@ -1931,10 +1965,13 @@ export default function CreateMap({
       maxzoom: 14,
       promoteId: "pk",
     });
+    // The cells' geometry is the same at every zoom from 5 up, so past z10
+    // (~7 m per tile unit at 45°N on a 20 km cell) a deeper tile only refetched
+    // identical data on every zoom step.
     map.current.addSource("cde-cells", {
       type: "vector",
       tiles: [cellTileQuery],
-      maxzoom: 14,
+      maxzoom: 10,
       promoteId: "pk",
     });
 
@@ -2408,7 +2445,7 @@ export default function CreateMap({
       type: "symbol",
       source: "tracks",
       "source-layer": "track-heads",
-      filter: ["has", "cog"],
+      filter: SELECTION_FILTERED_LAYERS["track-heads"],
       layout: {
         visibility: tracksVisibility,
         "icon-image": "track-head-arrow",
@@ -2430,7 +2467,7 @@ export default function CreateMap({
       type: "circle",
       source: "tracks",
       "source-layer": "track-heads",
-      filter: ["!", ["has", "cog"]],
+      filter: SELECTION_FILTERED_LAYERS["track-heads-fixed"],
       layout: { visibility: tracksVisibility },
       paint: {
         "circle-color": trackLineColor,
@@ -2443,6 +2480,16 @@ export default function CreateMap({
     // Freshly created layers carry no focus paint.
     trackFocusApplied.current = undefined;
     applyTrackFocus();
+  }
+
+  function applySelectionFilter() {
+    Object.entries(SELECTION_FILTERED_LAYERS).forEach(([layerId, filter]) => {
+      if (!map.current?.getLayer(layerId)) return;
+      map.current.setFilter(
+        layerId,
+        selectionLayerFilter(filter, selectionRing.current),
+      );
+    });
   }
 
   function addSelectedTrackLayers() {
@@ -2815,6 +2862,18 @@ export default function CreateMap({
       }
       if (draw.getMode().includes("draw")) return;
 
+      // Outside the drawn shape is out of the selection.
+      const ring = selectionRing.current;
+      if (
+        ring &&
+        !turfPointsWithinPolygon(
+          helpers.point([e.lngLat.lng, e.lngLat.lat]),
+          helpers.polygon([ring]),
+        ).features.length
+      ) {
+        return;
+      }
+
       const hits = hitsAt(e.point);
       const markerHits = hits.filter(
         (feature) => feature.layer.id === "points",
@@ -3004,6 +3063,7 @@ export default function CreateMap({
       addClickHighlightLayers();
       addTrackLayers();
       addSelectedTrackLayers();
+      applySelectionFilter();
 
       applyLayerVisibility();
 
@@ -3089,6 +3149,16 @@ export default function CreateMap({
       hoverHighlightPoints(focusedDatasetPk.current);
     });
 
+    // Aborted requests (tiles left behind mid-zoom) don't fire 'error'. Any
+    // listener stops MapLibre's own console.error, hence the log; the message,
+    // since a minified error class logs as its two-letter name.
+    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks"];
+    map.current.on("error", (e) => {
+      console.error(e.error?.message ?? e.error);
+      if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
+      tileRetry.onError(e.sourceId, e.tile.tileID.canonical);
+    });
+
     map.current.on("idle", () => {
       layersLoaded.current = true;
       // 'sourcedata' can land before the new tiles render, and
@@ -3113,16 +3183,10 @@ export default function CreateMap({
     // The stops depend on the zoom band; stale point-level stops would clamp
     // every hex into a single green.
     map.current.on("zoomend", () => setColorStopsRef.current());
+    // Highlighted at 'idle' only: here the new zoom's tiles aren't in yet, so
+    // the pass was wasted work in the middle of a wheel zoom.
     map.current.on("zoomend", () => {
       doFinalCheck.current = true;
-      if (drawPolygon.current.getAll().features.length > 0) {
-        if (map.current.getZoom() >= 7) {
-          setLoading(true);
-          highlightPoints(
-            drawPolygon.current.getAll().features[0].geometry.coordinates[0],
-          );
-        }
-      }
     });
     // toArray() is [[west,south],[east,north]], the shape boundsIntersect
     // wants.
@@ -3135,7 +3199,9 @@ export default function CreateMap({
         bounds: map.current.getBounds().toArray(),
       });
     };
-    map.current.on("moveend", pushMapView);
+    // A wheel zoom ends in a moveend at every pause; re-rendering the app and
+    // rewriting the URL on each one stuttered the next notch.
+    map.current.on("moveend", debounce(pushMapView, MAP_VIEW_DEBOUNCE_MS));
     // moveend doesn't fire until the first interaction.
     map.current.once("idle", pushMapView);
     map.current.on("mousedown", (e) => {
