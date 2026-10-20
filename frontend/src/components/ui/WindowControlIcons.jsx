@@ -27,10 +27,12 @@ export function WindowMinimize(props) {
   );
 }
 
+// A window with its title bar, not a bare square, so it reads as "window".
 export function WindowMaximize(props) {
   return (
     <Glyph {...props}>
-      <rect x="4.5" y="4.5" width="7" height="7" rx="1" />
+      <rect x="3.5" y="4.5" width="9" height="7" rx="1" />
+      <path d="M3.5 6.5h9" />
     </Glyph>
   );
 }
@@ -39,8 +41,8 @@ export function WindowMaximize(props) {
 export function WindowSidebar(props) {
   return (
     <Glyph {...props}>
-      <rect x="4.5" y="4.5" width="7" height="7" rx="1" />
-      <path d="M7 4.5v7" />
+      <rect x="3.5" y="4.5" width="9" height="7" rx="1" />
+      <path d="M3.5 6.5h9M6.5 6.5v5" />
     </Glyph>
   );
 }
