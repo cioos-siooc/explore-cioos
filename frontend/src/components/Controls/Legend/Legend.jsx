@@ -82,17 +82,25 @@ const LEGEND_TIPS = ["trajectory"];
 // Mid-ramp: either end would make the icon claim a count.
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)];
 
+const GROUP_ICON_SIZE = 14;
+
 const HEX_ICON = (
   <HexagonFill
     className="legendGroupIcon"
-    size={11}
+    size={GROUP_ICON_SIZE}
     fill={HEX_ICON_COLOR}
     aria-hidden="true"
   />
 );
 
 const TRACK_ICON = (
-  <svg className="legendGroupIcon" width="11" height="11" aria-hidden="true">
+  <svg
+    className="legendGroupIcon"
+    width={GROUP_ICON_SIZE}
+    height={GROUP_ICON_SIZE}
+    viewBox="0 0 11 11"
+    aria-hidden="true"
+  >
     <line
       x1="1"
       y1="9.5"
@@ -104,6 +112,34 @@ const TRACK_ICON = (
     />
   </svg>
 );
+
+// The map's griddap footprint: a dashed outline over a faint fill.
+const GRIDDAP_ICON = (
+  <svg
+    className="legendGroupIcon"
+    width={GROUP_ICON_SIZE}
+    height={GROUP_ICON_SIZE}
+    viewBox="0 0 11 11"
+    aria-hidden="true"
+  >
+    <rect
+      x="1"
+      y="1.5"
+      width="9"
+      height="8"
+      style={{
+        fill: "var(--cioos-primary)",
+        fillOpacity: 0.15,
+        stroke: "var(--cioos-primary)",
+      }}
+      strokeWidth="1.5"
+      strokeDasharray="2 1.5"
+    />
+  </svg>
+);
+
+// Keyed by layerControls' key.
+const LAYER_ICONS = { griddap: GRIDDAP_ICON };
 
 // Evenly spaced subset, always keeping first and last, so labels don't overlap.
 function pickTickIndices(n, maxTicks = 5) {
@@ -463,14 +499,16 @@ export default function Legend({
     return (
       <div className="legendLayerItems">
         {layerControls.map((control) => (
-          <Switch
-            key={control.key}
-            id={`mapLayer-${control.key}`}
-            label={control.label}
-            checked={control.checked}
-            onChange={control.onChange}
-            tipTarget={control.tipTarget}
-          />
+          <div className="legendLayerItem" key={control.key}>
+            {LAYER_ICONS[control.key]}
+            <Switch
+              id={`mapLayer-${control.key}`}
+              label={control.label}
+              checked={control.checked}
+              onChange={control.onChange}
+              tipTarget={control.tipTarget}
+            />
+          </div>
         ))}
       </div>
     );

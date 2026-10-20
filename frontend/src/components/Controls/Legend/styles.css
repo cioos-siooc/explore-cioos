@@ -314,6 +314,12 @@
   gap: 4px;
 }
 
+.legendLayerItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Card-wide: the observations switch sits in a group label row and has to
    match these. */
 .mapLegend .form-check.form-switch {

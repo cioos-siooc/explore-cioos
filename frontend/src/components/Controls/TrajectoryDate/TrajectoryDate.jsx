@@ -2,14 +2,11 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight } from "react-bootstrap-icons";
 
-import {
-  trackLineColor,
-  tracksMinDate,
-  trailingWindowOptions,
-} from "../../config.js";
+import { tracksMinDate, trailingWindowOptions } from "../../config.js";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import TimeRail, { DateField } from "../TimeRail/TimeRail.jsx";
+import TrackHeadIcon from "./TrackHeadIcon.jsx";
 import {
   MS_PER_DAY,
   clampIso,
@@ -67,21 +64,7 @@ export default function TrajectoryDate() {
         title={t("legendTrackHead")}
         data-tip-highlight={tipHighlight("trajectory")}
       >
-        <svg
-          className="legendSwatch"
-          width="12"
-          height="12"
-          viewBox="0 0 16 16"
-        >
-          <path
-            d="M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z"
-            fill={trackLineColor}
-            stroke="#ffffff"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-            transform="rotate(45 8 8)"
-          />
-        </svg>
+        <TrackHeadIcon className="legendSwatch" />
         <DateField
           className="railValueInput timeRailDateInput trajectoryDateInput"
           label={t("trajectoryDateLabel")}

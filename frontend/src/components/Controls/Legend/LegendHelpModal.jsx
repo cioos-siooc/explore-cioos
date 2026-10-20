@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ArrowUpRight,
   BoundingBox,
   BoxArrowUpRight,
   Calendar3,
@@ -17,7 +16,8 @@ import {
 } from "react-bootstrap-icons";
 
 import HelpModal from "../../ui/HelpModal.jsx";
-import { bathymetrySourceUrl } from "../../config.js";
+import TrackHeadIcon from "../TrajectoryDate/TrackHeadIcon.jsx";
+import { bathymetrySourceUrl, trackLineColor } from "../../config.js";
 
 // Keyed "<section>_<item>"; each a language-keyed URL pair.
 const ITEM_LINKS = {
@@ -47,12 +47,14 @@ export const LEGEND_HELP_SECTIONS = {
       ["cells", HexagonFill],
     ],
   },
+  // In the map's own track colour, so each glyph reads as the line it explains.
   trajectories: {
     Icon: Share,
+    color: trackLineColor,
     items: [
       ["line", Share],
       ["trail", Calendar3],
-      ["head", ArrowUpRight],
+      ["head", TrackHeadIcon],
     ],
   },
   seafloor: {
@@ -75,7 +77,7 @@ export default function LegendHelpModal({ section, onHide }) {
   const { t, i18n } = useTranslation();
   const help = section && LEGEND_HELP_SECTIONS[section];
   if (!help) return null;
-  const { Icon } = help;
+  const { Icon, color } = help;
 
   // The source link runs on from the last sentence: it is provenance, not an action.
   function itemBody(key) {
@@ -104,11 +106,11 @@ export default function LegendHelpModal({ section, onHide }) {
       onHide={onHide}
       id="legendHelpModal"
       data-testid="legend-help-modal"
-      icon={<Icon size={20} />}
+      icon={<Icon size={20} color={color} />}
       title={t(`legendHelp_${section}_title`)}
       items={help.items?.map(([key, ItemIcon]) => ({
         key,
-        icon: <ItemIcon size={16} />,
+        icon: <ItemIcon size={16} color={color} />,
         title: t(`legendHelp_${section}_${key}_title`),
         body: itemBody(key),
       }))}

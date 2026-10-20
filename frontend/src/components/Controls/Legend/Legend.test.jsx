@@ -7,6 +7,7 @@ import { installMockFetch } from "../../../test/mockFetch.js";
 import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
 import Legend from "./Legend.jsx";
 import { DEFAULT_DATA_LAYERS } from "../../../state/dataLayers.js";
+import { trackLineColor } from "../../config.js";
 
 const BASE_PROPS = {
   currentRangeLevel: [1, 100],
@@ -119,6 +120,23 @@ describe("Legend", () => {
     const markers = await screen.findByTestId("legend-help-modal");
     expect(markers).toHaveTextContent("stop being cells");
     expect(markers).toHaveTextContent("Colour is the platform");
+  });
+
+  it("shows the map's own position marker beside its entry in the trajectories explainer", async () => {
+    const { user } = renderLegend({
+      dataLayers: { ...DEFAULT_DATA_LAYERS, trajectories: true },
+    });
+    await user.click(screen.getByLabelText("About Trajectories"));
+    const help = await screen.findByTestId("legend-help-modal");
+    expect(help).toHaveTextContent("Position on date");
+    expect(help.querySelector(`path[fill="${trackLineColor}"]`)).not.toBeNull();
+    const icons = help.querySelectorAll(
+      ".helpModalTitleIcon .bi, .helpModalItemIcon .bi",
+    );
+    expect(icons.length).toBeGreaterThan(0);
+    for (const icon of icons) {
+      expect(icon).toHaveAttribute("fill", trackLineColor);
+    }
   });
 
   it("gives the keyless layers group an info button of its own", async () => {
