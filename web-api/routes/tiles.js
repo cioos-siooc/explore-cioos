@@ -597,7 +597,9 @@ router.get(
  *       cde.trajectory_points: 'track-lines' (per-trajectory LineStrings over
  *       the requested time window, ordered by time, each carrying the segment's
  *       own 'time_min'/'time_max' as epoch ms) and 'track-heads' (each
- *       trajectory's latest fix within the window, with its 'head_time' and
+ *       trajectory's position on the selected date, the window's last day:
+ *       its latest fix, kept only when the trajectory runs to that day and
+ *       the fix is within its reporting gap of it; with its 'head_time' and
  *       'profile_id', and 'cog' — course over
  *       ground in degrees clockwise from north, absent when undefined).
  *       timeMin/timeMax are
@@ -698,7 +700,7 @@ router.get(
         ${trackTypeFilter}
     ),
     cand AS (
-      SELECT dataset_pk, trajectory_id, gap_secs
+      SELECT dataset_pk, trajectory_id, gap_secs, time_max
       FROM cand_rows d
       ${filters.hasShared ? "WHERE :filters" : ""}
       -- Tie-break on the pk for deterministic, cache-stable tiles.
@@ -707,7 +709,8 @@ router.get(
     ),
     pts AS (
       SELECT p.dataset_pk, p.trajectory_id, p.time, p.longitude, p.latitude,
-             p.geom, p.profile_id, d.pk_url, d.title AS dataset_title, c.gap_secs
+             p.geom, p.profile_id, d.pk_url, d.title AS dataset_title, c.gap_secs,
+             c.time_max AS trajectory_end
       FROM cde.trajectory_points p
       JOIN cand c ON c.dataset_pk = p.dataset_pk
                  AND c.trajectory_id = p.trajectory_id
@@ -756,7 +759,8 @@ router.get(
       -- cog is NULL for single-fix or stationary trajectories; the frontend
       -- renders those heads as circles instead of arrows.
       SELECT DISTINCT ON (dataset_pk, trajectory_id)
-             trajectory_id, pk_url, dataset_title, profile_id,
+             trajectory_id, pk_url, dataset_title, profile_id, time,
+             gap_secs, trajectory_end,
              (extract(epoch FROM time) * 1000)::bigint AS head_time,
              round(degrees(ST_Azimuth(
                ST_SetSRID(ST_MakePoint(lag(longitude) OVER w, lag(latitude) OVER w), 4326)::geography,
@@ -787,6 +791,12 @@ router.get(
              ST_AsMVTGeom(h.geom, te.tile_envelope) AS geom
       FROM heads h, te
       WHERE h.geom && te.tile_envelope
+        -- A head is the position on the selected date, the window's last day:
+        -- an ended trajectory, or one silent past its own gap threshold, has
+        -- none. Filtered after DISTINCT ON so cog still sees the prior fix.
+        AND h.trajectory_end >= :timeMax::timestamptz - interval '1 day'
+        AND h.time >= :timeMax::timestamptz - interval '1 day'
+                      - make_interval(secs => h.gap_secs)
     )
     -- A valid MVT is a concatenation of layer messages.
     SELECT coalesce((SELECT ST_AsMVT(l.*, 'track-lines', 4096, 'geom') FROM line_mvt l), ''::bytea)
