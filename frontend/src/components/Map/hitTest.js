@@ -150,7 +150,7 @@ export function trackItemsIn(hits) {
 export const buildFeatureQuery = (
   lngLat,
   hits,
-  { zoom, queryRendered, language },
+  { zoom, queryRendered, language, gridGeometry },
 ) => {
   if (hits.length === 0) return null;
 
@@ -258,10 +258,16 @@ export const buildFeatureQuery = (
     });
   }
 
-  // Deduped by dataset: stacked grids over the same water are the norm.
+  // Deduped by dataset: stacked grids over the same water are the norm. A
+  // rendered hit is clipped to its tile, so the box is outlined from the
+  // coverage source's whole geometry.
   const gridFeatures = dedupeGriddapByPk(
     hits.filter((feature) => feature.layer.id === "griddap-coverage-fill"),
-  );
+  ).map((feature) => ({
+    type: "Feature",
+    geometry: gridGeometry(Number(feature.properties.pk)) || feature.geometry,
+    properties: feature.properties,
+  }));
   const grids = gridFeatures.map((feature) => ({
     kind: "grid",
     pk: Number(feature.properties.pk),

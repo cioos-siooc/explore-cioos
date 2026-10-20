@@ -263,6 +263,7 @@ describe("buildFeatureQuery", () => {
     zoom: 6.7,
     queryRendered: () => [],
     language: "en",
+    gridGeometry: () => undefined,
     ...overrides,
   });
 
@@ -453,6 +454,19 @@ describe("buildFeatureQuery", () => {
       "fill",
     ]);
     expect(query.observationCount).toBe(0);
+  });
+
+  it("outlines a grid's whole box, not the tile-clipped piece clicked", () => {
+    const whole = square(0, 0, 4, 4);
+    const query = buildFeatureQuery(
+      lngLat,
+      [feature(GRID, { pk: 5 }, square(0, 0, 1, 1))],
+      context({ gridGeometry: (pk) => (pk === 5 ? whole : undefined) }),
+    );
+    expect(query.highlight.features.map((f) => f.geometry)).toEqual([
+      whole,
+      whole,
+    ]);
   });
 
   it("puts tracks first, then observations, then grids", () => {

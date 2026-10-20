@@ -2583,6 +2583,10 @@ export default function CreateMap({
     zoom: map.current.getZoom(),
     queryRendered: (options) => map.current.queryRenderedFeatures(options),
     language: i18n.language,
+    gridGeometry: (pk) =>
+      griddapCoverageRef.current?.features?.find(
+        (feature) => Number(feature.properties.pk) === pk,
+      )?.geometry,
   });
 
   // One handler, one hit-test: report what's under the click and let the card
