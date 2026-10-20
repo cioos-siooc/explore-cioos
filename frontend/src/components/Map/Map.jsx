@@ -50,7 +50,8 @@ import {
   trackLineColor,
   effectiveTrailingDays,
 } from "../config";
-import platformColors from "../../components/platformColors";
+import platforms from "../../platforms.json";
+import { platformColor } from "../../platformVocab.js";
 import {
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
@@ -774,15 +775,12 @@ export default function CreateMap({
       }),
   );
 
-  const colors = ["match", ["get", "platform"]];
-  platformColors.reduce((accumulatedPlatformColors, platformColor) => {
-    if (platformColor.color) {
-      accumulatedPlatformColors.push(platformColor.platform);
-      accumulatedPlatformColors.push(platformColor.color);
-    }
-    return accumulatedPlatformColors;
-  }, colors);
-  colors.push("#000000");
+  const colors = [
+    "match",
+    ["get", "platform"],
+    ...platforms.flatMap((p) => [p.label_en, platformColor(p.label_en)]),
+    platformColor("unknown"),
+  ];
 
   // Focus dimming is a feature-state flag the paint expressions carry from the
   // start. setFilter, or setPaintProperty on a data-driven property, forces a

@@ -24,6 +24,7 @@ import {
   bathymetryTicks,
 } from "../../config.js";
 import platformColors from "../../platformColors";
+import { platformCategory } from "../../../platformVocab.js";
 import {
   DEFAULT_DATA_LAYERS,
   anyTrajectoryLayerOn,
@@ -265,8 +266,9 @@ export default function Legend({
   }
 
   // The catalog's full palette would promise markers the map never draws.
+  const categoriesAvailable = new Set(platformsAvailable.map(platformCategory));
   const platformSwatches = platformColors.filter((pc) =>
-    platformsAvailable.includes(pc.platform),
+    categoriesAvailable.has(pc.platform),
   );
 
   function renderMetricTitle() {
