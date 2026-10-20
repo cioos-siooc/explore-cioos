@@ -36,6 +36,10 @@ MAX_RESPONSE_SIZE = 2e8
 SPOOL_MAX_IN_MEMORY = 8 * 1024 * 1024
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
+# Mixed into every Croissant hash: bump it when a harvester or schema change must
+# reach every dataset, so the next run re-harvests instead of skipping as unchanged.
+HARVEST_VERSION = 1
+
 
 class _SpooledBody(tempfile.SpooledTemporaryFile):
     """Python 3.10's SpooledTemporaryFile lacks the readable/writable/seekable
@@ -344,9 +348,8 @@ class ERDDAP:
             distribution = [distribution]
         if any(isinstance(d, dict) and d.get("@type") == "cr:FileObject"
                for d in distribution):
-            digest = hashlib.sha256(
-                json.dumps(doc, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest()
+            canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"))
+            digest = hashlib.sha256(f"{HARVEST_VERSION}:{canonical}".encode()).hexdigest()
             return digest, True, None
 
         if _hops < 3:
