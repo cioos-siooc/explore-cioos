@@ -286,6 +286,7 @@ const drawControlOptions = {
 // A debounce, not a throttle: one measurement at the end of a gesture, so a
 // hesitant pan doesn't renumber the legend halfway through.
 const VIEWPORT_RAMP_DEBOUNCE_MS = 400;
+const MAP_VIEW_DEBOUNCE_MS = 250;
 
 // Partial opacity so coincident tracks compound: 27 St. Lawrence voyages in
 // 90 days render as ONE line at full opacity.
@@ -1964,10 +1965,13 @@ export default function CreateMap({
       maxzoom: 14,
       promoteId: "pk",
     });
+    // The cells' geometry is the same at every zoom from 5 up, so past z10
+    // (~7 m per tile unit at 45°N on a 20 km cell) a deeper tile only refetched
+    // identical data on every zoom step.
     map.current.addSource("cde-cells", {
       type: "vector",
       tiles: [cellTileQuery],
-      maxzoom: 14,
+      maxzoom: 10,
       promoteId: "pk",
     });
 
@@ -3179,16 +3183,10 @@ export default function CreateMap({
     // The stops depend on the zoom band; stale point-level stops would clamp
     // every hex into a single green.
     map.current.on("zoomend", () => setColorStopsRef.current());
+    // Highlighted at 'idle' only: here the new zoom's tiles aren't in yet, so
+    // the pass was wasted work in the middle of a wheel zoom.
     map.current.on("zoomend", () => {
       doFinalCheck.current = true;
-      if (drawPolygon.current.getAll().features.length > 0) {
-        if (map.current.getZoom() >= 7) {
-          setLoading(true);
-          highlightPoints(
-            drawPolygon.current.getAll().features[0].geometry.coordinates[0],
-          );
-        }
-      }
     });
     // toArray() is [[west,south],[east,north]], the shape boundsIntersect
     // wants.
@@ -3201,7 +3199,9 @@ export default function CreateMap({
         bounds: map.current.getBounds().toArray(),
       });
     };
-    map.current.on("moveend", pushMapView);
+    // A wheel zoom ends in a moveend at every pause; re-rendering the app and
+    // rewriting the URL on each one stuttered the next notch.
+    map.current.on("moveend", debounce(pushMapView, MAP_VIEW_DEBOUNCE_MS));
     // moveend doesn't fire until the first interaction.
     map.current.once("idle", pushMapView);
     map.current.on("mousedown", (e) => {
