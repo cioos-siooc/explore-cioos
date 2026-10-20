@@ -727,4 +727,35 @@ describe("DatasetsTable (download modal)", () => {
       ]);
     });
   });
+
+  it("the map-click hint's Clear drops the highlighted click", async () => {
+    let map;
+    function MapProbe() {
+      map = useMapState();
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />
+        <MapProbe />
+      </>,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    act(() =>
+      map.setFeatureQuery({ nonce: 1, lngLat: [0, 0], datasetPks: [2] }),
+    );
+
+    await userEvent.click(screen.getByTestId("datasets-map-click-clear"));
+
+    expect(map.featureQuery).toBeNull();
+    expect(
+      screen.queryByTestId("datasets-map-click-clear"),
+    ).not.toBeInTheDocument();
+  });
 });

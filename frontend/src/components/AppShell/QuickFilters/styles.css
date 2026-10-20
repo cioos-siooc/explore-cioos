@@ -6,9 +6,10 @@
   align-items: center;
   justify-content: center;
 
-  /* Room for the captions under each button. */
-  gap: 24px 36px;
-  padding-bottom: 16px;
+  /* Room for the captions under each button (20px), plus a gap before the
+     filter chips below. */
+  gap: 28px 36px;
+  padding-bottom: 28px;
 }
 
 .quickFilterButton {
@@ -169,25 +170,6 @@
 .quickFilterAreaItem:focus-visible {
   outline: none;
   box-shadow: inset var(--cioos-focus);
-}
-
-/* Large screen with a mouse: titles and hover explain each button, so only
-   the pointed-at or focused one shows its caption. */
-@media (min-width: 701px) and (min-height: 501px) and (hover: hover) and (pointer: fine) {
-  .quickFilters {
-    gap: 8px 18px;
-    padding-bottom: 8px;
-  }
-
-  .quickFilterCaption {
-    opacity: 0;
-    transition: opacity var(--cioos-transition-fast);
-  }
-
-  .quickFilterButton:hover .quickFilterCaption,
-  .quickFilterButton:focus-visible .quickFilterCaption {
-    opacity: 1;
-  }
 }
 
 /* Mobile: one row of pills, caption beside the icon, to cost one button's

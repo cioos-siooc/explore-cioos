@@ -13,6 +13,7 @@ import {
   Filter,
   SlashCircle,
   Square,
+  X,
   XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -42,6 +43,7 @@ import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import "./styles.css";
+import "../../Map/ClearMapSelection/styles.css";
 
 // Offered only while the list is grouped, and its default then.
 const GROUP_SIZE = "groupSize";
@@ -86,7 +88,8 @@ export default function DatasetsTable({
   const activeFilterCount = useActiveFilters().length;
   // The "what's here" card's datasets sort to the top, tying the card to the
   // list; the download modal ignores them.
-  const { featureQuery, griddapCoverageVisible } = useMapState();
+  const { featureQuery, setFeatureQuery, griddapCoverageVisible } =
+    useMapState();
   const pinnedPks = useMemo(() => {
     if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET;
     return new Set(featureQuery.datasetPks.map(Number));
@@ -585,6 +588,18 @@ export default function DatasetsTable({
         <div className="datasetsCardMapClickHint">
           <span className="datasetsCardMapClickSwatch" aria-hidden="true" />
           {t("datasetsCardMapClickHint")}
+          <button
+            type="button"
+            className="mapClickClear mapClickClearCompact"
+            data-testid="datasets-map-click-clear"
+            onClick={() => setFeatureQuery(null)}
+            title={t("mapSelectionClearTitle")}
+          >
+            <span className="mapClickClearIcon" aria-hidden="true">
+              <X size={18} />
+            </span>
+            {t("mapSelectionClearText")}
+          </button>
         </div>
       )}
       <div

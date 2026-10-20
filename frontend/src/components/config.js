@@ -128,27 +128,10 @@ export const bathymetryScaleMin = 1;
 export const bathymetryScaleMax = 5000;
 export const bathymetryTicks = [1, 10, 100, 1000, 5000];
 
-// 'all' = no trailing cutoff. Not the default: at full-catalogue scale it puts
-// 100k+ line features (400k+ vertices) in each low-zoom tile and overwhelms
-// the renderer; the bounded default keeps tiles ~20x smaller.
-export const TRAIL_ALL = "all";
+// Capped at a year: measured per uncached tile at z2-z5, 90 days ~7 KB / 11 ms,
+// one year ~14 KB / 70 ms, all time ~380 KB / 1.8 s (100k+ line features).
 export const defaultTrailingDays = 90;
-export const trailingWindowOptions = [7, 14, 30, 90, 180, 365, TRAIL_ALL];
-
-// Measured per uncached tile at z2-z5: 90 days ~7 KB / 11 ms, one year
-// ~14 KB / 70 ms, 'all' ~380 KB / 1.8 s. Long windows are clamped to
-// longTrailMaxDays below this rather than dropped, since the trajectory hexes
-// draw all-time coverage and shorter tracks would read as broken.
-export const longTrailMinZoom = 5;
-export const longTrailMaxDays = 365;
-
-// Shared by the tracks tile URL and the legend/TimeBar, so the UI never claims
-// a window the map is not drawing. An unknown zoom clamps.
-export function effectiveTrailingDays(trailing, zoom) {
-  if (zoom != null && zoom >= longTrailMinZoom) return trailing;
-  if (trailing === TRAIL_ALL) return longTrailMaxDays;
-  return Math.min(trailing, longTrailMaxDays);
-}
+export const trailingWindowOptions = [7, 14, 30, 90, 180, 365];
 // Argo-era default; today is the end.
 export const tracksMinDate = "2000-01-01";
 export const trackLineColor = "#6749AC";
