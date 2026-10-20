@@ -14,6 +14,7 @@ import {
 import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import useEovCategories from "./useEovCategories.js";
+import useOptionCategories from "./useOptionCategories.js";
 import useSourceKinds from "./useSourceKinds.js";
 
 // The type group a geometry switch stands for.
@@ -52,6 +53,10 @@ export default function useGroupFilter(groupBy) {
   const filters = useFilters();
   const { dataLayerChoices, toggleDataLayer } = useMapState();
   const eovCategories = useEovCategories();
+  const platformCategories = useOptionCategories(
+    filters.platformsSelected,
+    filters.setPlatformsSelected,
+  );
   const sourceKinds = useSourceKinds();
 
   const filterFor = (key) => {
@@ -68,12 +73,16 @@ export default function useGroupFilter(groupBy) {
           }
         );
       }
-      case "platform":
+      case "platform": {
+        const parent = groupParent(key, groupBy);
+        if (!parent) return platformCategories.find((c) => c.category === key);
+        const value = key.slice(parent.length + 1);
         return listOption(
           filters.platformsSelected,
           filters.setPlatformsSelected,
-          (o) => o.title === key,
+          (o) => o.title === value,
         );
+      }
       case "organization":
         return listOption(
           filters.orgsSelected,
@@ -126,7 +135,10 @@ export default function useGroupFilter(groupBy) {
       break;
     }
     case "platform":
-      filteredKeys = stated(filters.platformsSelected, title);
+      filteredKeys = stated(
+        filters.platformsSelected,
+        (o) => `${o.category}:${o.title}`,
+      );
       break;
     case "organization":
       filteredKeys = stated(filters.orgsSelected, title);
