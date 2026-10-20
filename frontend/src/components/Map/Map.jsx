@@ -12,8 +12,10 @@ import turfBbox from "@turf/bbox";
 
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import "./styles.css";
+import Spinner from "../ui/Spinner.jsx";
 
 import { server } from "../../config";
 import reportError from "../../state/reportError.js";
@@ -79,7 +81,6 @@ import {
   selectedTrackLayers,
   trackClickLayers,
   trackItemsIn,
-  withoutGridHighlight,
 } from "./hitTest.js";
 import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
@@ -325,6 +326,9 @@ const WATCHED_MAP_LAYERS = [
   { id: "griddap", sources: ["griddap-coverage"] },
   { id: "wmsOverlay", sources: ["wms-overlay"] },
 ];
+// A browser-cached GetMap resolves in a frame or two; the spinner would flash.
+const WMS_SPINNER_DELAY_MS = 300;
+
 // The round trip is exact to float noise for a point really on the surface,
 // off by tens of pixels for one that isn't (see viewportQueryIsReliable).
 const SURFACE_ROUND_TRIP_TOLERANCE_PX = 1;
@@ -1213,6 +1217,37 @@ export default function CreateMap({
   // An overlay set before the style loaded hid layers that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
   const revealedWmsPk = useRef();
+  // A marker so it follows the region being fetched through a pan, not the
+  // map centre: a spatial filter can clip the overlay to part of the view.
+  const [wmsSpinnerElement] = useState(() => {
+    const element = document.createElement("div");
+    element.className = "wmsLoadingSpinner cioosSpinnerDisc";
+    element.dataset.testid = "wms-loading-spinner";
+    return element;
+  });
+  const wmsSpinnerMarker = useRef(null);
+  const wmsSpinnerTimer = useRef(null);
+
+  function showWmsSpinner(bounds) {
+    wmsSpinnerTimer.current = setTimeout(() => {
+      if (!map.current) return;
+      // Midpoint on screen, not in degrees: at Canadian latitudes the
+      // arithmetic midpoint sits well south of the image's visual centre.
+      const northWest = map.current.project([bounds.west, bounds.north]);
+      const southEast = map.current.project([bounds.east, bounds.south]);
+      wmsSpinnerMarker.current ??= new maplibreGl.Marker({
+        element: wmsSpinnerElement,
+      });
+      wmsSpinnerMarker.current
+        .setLngLat(map.current.unproject(northWest.add(southEast).div(2)))
+        .addTo(map.current);
+    }, WMS_SPINNER_DELAY_MS);
+  }
+
+  function hideWmsSpinner() {
+    clearTimeout(wmsSpinnerTimer.current);
+    wmsSpinnerMarker.current?.remove();
+  }
 
   function setGriddapHighlight(geometry) {
     const source = map.current?.getSource("griddap-highlight");
@@ -1268,14 +1303,14 @@ export default function CreateMap({
   }
 
   // Guarded on the source: a share link can resolve a click payload before
-  // the style has added layers.
+  // the style has added layers. An open dataset draws its own footprint, so the
+  // click's hex, marker or grid box would read as part of it.
   const revealedQueryNonce = useRef();
   useEffect(() => {
     const source = map.current?.getSource("click-highlight");
     if (!source) return;
-    const highlight = featureQuery?.highlight || emptyFeatureCollection;
     source.setData(
-      inspectDataset ? withoutGridHighlight(highlight) : highlight,
+      (!inspectDataset && featureQuery?.highlight) || emptyFeatureCollection,
     );
     if (!featureQuery?.highlight?.features?.length) return;
     if (revealedQueryNonce.current === featureQuery.nonce) return;
@@ -1346,6 +1381,7 @@ export default function CreateMap({
 
   function removeWmsOverlay() {
     wmsRenderToken.current += 1;
+    hideWmsSpinner();
     if (wmsMoveHandler.current) {
       map.current.off("moveend", wmsMoveHandler.current);
       wmsMoveHandler.current = null;
@@ -1368,6 +1404,7 @@ export default function CreateMap({
     // A GetMap for an earlier pan resolving after a newer one would paint stale
     // bounds.
     const token = ++wmsRenderToken.current;
+    hideWmsSpinner();
     const viewportBounds = clampBoundsForWms(map.current.getBounds());
     if (
       viewportBounds.south >= viewportBounds.north ||
@@ -1403,6 +1440,7 @@ export default function CreateMap({
       time: overlay.time,
       elevation: overlay.elevation,
     });
+    showWmsSpinner(bounds);
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -1413,6 +1451,7 @@ export default function CreateMap({
         map.current.once("style.load", img.onload);
         return;
       }
+      hideWmsSpinner();
       let imageUrl;
       try {
         imageUrl = warpEquirectToMercator(
@@ -1453,7 +1492,10 @@ export default function CreateMap({
         );
       }
     };
-    img.onerror = () => console.warn(`WMS GetMap failed: ${url}`);
+    img.onerror = () => {
+      if (token === wmsRenderToken.current) hideWmsSpinner();
+      console.warn(`WMS GetMap failed: ${url}`);
+    };
     img.src = url;
   }
 
@@ -2545,6 +2587,10 @@ export default function CreateMap({
     zoom: map.current.getZoom(),
     queryRendered: (options) => map.current.queryRenderedFeatures(options),
     language: i18n.language,
+    gridGeometry: (pk) =>
+      griddapCoverageRef.current?.features?.find(
+        (feature) => Number(feature.properties.pk) === pk,
+      )?.geometry,
   });
 
   // One handler, one hit-test: report what's under the click and let the card
@@ -2889,9 +2935,8 @@ export default function CreateMap({
         const markerDatasetPks = datasetPksOf(nearestMarker);
         if (markerDatasetPks.length === 1) {
           popup.remove();
-          // This path skips onFeatureQueryRef, so the ring is set here in the
-          // shape buildFeatureQuery would use, so it matches the marker
-          // exactly.
+          // The shape buildFeatureQuery would use, so the ring matches the
+          // marker exactly once the record is closed.
           const highlight = {
             type: "FeatureCollection",
             features: [
@@ -2904,7 +2949,6 @@ export default function CreateMap({
               },
             ],
           };
-          map.current.getSource("click-highlight")?.setData(highlight);
           // Not through handleFeatureQuery: navigating there in the same tick
           // as the record jump races two navigations over a stale search-params
           // snapshot (see setInspectRecordID in SelectionProvider), so
@@ -3387,12 +3431,18 @@ export default function CreateMap({
   }, [i18n.language, t]);
 
   return (
-    <div
-      ref={mapContainer}
-      className="map"
-      data-testid="map-container"
-      data-projection={projection}
-      data-map-ready={firstPainted || undefined}
-    />
+    <>
+      <div
+        ref={mapContainer}
+        className="map"
+        data-testid="map-container"
+        data-projection={projection}
+        data-map-ready={firstPainted || undefined}
+      />
+      {createPortal(
+        <Spinner size="lg" role="presentation" />,
+        wmsSpinnerElement,
+      )}
+    </>
   );
 }
