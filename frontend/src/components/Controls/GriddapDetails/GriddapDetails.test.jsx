@@ -104,4 +104,80 @@ describe("GriddapDetails", () => {
     await user.click(screen.getByLabelText("Show on map"));
     expect(setActiveWmsOverlay).toHaveBeenCalledWith();
   });
+
+  it("clicking a variable shows it on the map", async () => {
+    const setActiveWmsOverlay = vi.fn();
+    const dataset = {
+      ...GRID_DATASET_WMS,
+      grid_variables: [
+        ...GRID_DATASET_WMS.grid_variables,
+        { name: "sal", long_name: "Salinity" },
+      ],
+    };
+    const { user } = renderWithProviders(
+      <GriddapDetails
+        dataset={dataset}
+        activeWmsOverlay={undefined}
+        setActiveWmsOverlay={setActiveWmsOverlay}
+      />,
+      { providers: "app" },
+    );
+    await user.click(screen.getByRole("button", { name: /Salinity/ }));
+    expect(setActiveWmsOverlay).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        pk: dataset.pk,
+        variable: expect.objectContaining({ name: "sal" }),
+      }),
+    );
+  });
+
+  it("clicking a variable swaps it on the active overlay and marks it pressed", async () => {
+    const setActiveWmsOverlay = vi.fn();
+    const dataset = {
+      ...GRID_DATASET_WMS,
+      grid_variables: [
+        ...GRID_DATASET_WMS.grid_variables,
+        { name: "sal", long_name: "Salinity" },
+      ],
+    };
+    const overlay = {
+      pk: dataset.pk,
+      variables: dataset.grid_variables,
+      variable: dataset.grid_variables[0],
+      dimensions: dataset.grid_dimensions,
+      time: "2020-01-01T00:00:00Z",
+    };
+    const { user } = renderWithProviders(
+      <GriddapDetails
+        dataset={dataset}
+        activeWmsOverlay={overlay}
+        setActiveWmsOverlay={setActiveWmsOverlay}
+      />,
+      { providers: "app" },
+    );
+    expect(
+      screen.getByRole("button", { name: /Temperature/, pressed: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await user.click(
+      screen.getByRole("button", { name: /Salinity/, pressed: false }),
+    );
+    expect(setActiveWmsOverlay).toHaveBeenLastCalledWith({
+      ...overlay,
+      variable: dataset.grid_variables[1],
+    });
+  });
+
+  it("variables are not buttons without a WMS", () => {
+    renderWithProviders(
+      <GriddapDetails
+        dataset={GRID_DATASET_NO_WMS}
+        activeWmsOverlay={undefined}
+        setActiveWmsOverlay={() => {}}
+      />,
+      { providers: "app" },
+    );
+    expect(
+      screen.queryByRole("button", { name: /Temperature/ }),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -31,20 +31,6 @@
     100vh - max(12px, var(--cioos-top-bar-space, 0px)) - 12px -
       var(--cioos-time-bar-space, 0px)
   );
-  transition:
-    transform 0.32s cubic-bezier(0.22, 0.8, 0.3, 1),
-    visibility 0.32s;
-}
-
-.datasetMapCard.corner.parked {
-  transform: translateX(calc(-100% - 16px));
-  visibility: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .datasetMapCard.corner {
-    transition: none;
-  }
 }
 
 .datasetMapCardHead {
