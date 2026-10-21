@@ -89,6 +89,11 @@ def reloadTopRequests():
     apiRequests = []
     log_files = sorted(glob.glob("/app/nginx/logs/access.log*"))
     for log_file in log_files:
+        # The stock nginx image links access.log to /dev/stdout; opened here
+        # that is this process's own stdout pipe and the read never returns.
+        if not os.path.isfile(log_file):
+            logger.warning(f"Skipping non-regular log file: {log_file}")
+            continue
         logger.info(f"Reading: {log_file}")
         # Handle both normal and gzipped logs
         if log_file.endswith(".gz"):
