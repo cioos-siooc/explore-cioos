@@ -6,9 +6,14 @@
 export const RECORD_PARAM = "preview";
 
 // Which profile inside that record. Read by SelectionProvider as well as by
-// usePreviewPlotParams, because it is the one plot param that changes what is
-// FETCHED rather than how it is drawn — see the /preview `at` parameter.
+// usePreviewPlotParams, because it changes what is FETCHED rather than how it
+// is drawn — see the /preview `at` parameter.
 export const STEP_PARAM = "pstep";
+
+// Read by SelectionProvider too: the colour plot fetches every profile in the
+// window instead of the stepped one — see the /preview `allProfiles` parameter.
+export const LAYOUT_PARAM = "playout";
+export const COLOR_LAYOUT = "color";
 
 // `YYYY-MM-DD~YYYY-MM-DD` (inclusive UTC days), set when a trajectory pass is
 // plotted. Absent means the record's most recent data.
@@ -65,7 +70,7 @@ export const PLOT_PARAMS = [
   "pcolors",
   "pz",
   "pzscale",
-  "playout",
+  LAYOUT_PARAM,
   "pcx",
   "pcy",
   "pzscales",

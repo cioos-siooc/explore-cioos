@@ -1075,16 +1075,31 @@ function colorFigure(panels, extra = {}) {
     xAxis: "time",
     yAxis: "depth",
     data: DATA,
-    mode: "markers",
     uirevision: "test",
     ...extra,
   });
 }
 
-const panelTraces = (data) => data.filter((trace) => trace.hovertemplate);
+// Three casts, four depths each: a section, the colour plot's usual shape.
+const CAST_TIMES = [
+  "2025-09-16T00:00:00.000Z",
+  "2025-09-17T00:00:00.000Z",
+  "2025-09-18T00:00:00.000Z",
+];
+const SECTION = CAST_TIMES.flatMap((time, cast) =>
+  [1, 2, 3, 4].map((depth) => ({
+    station_id: "PMZA-RIKI",
+    time,
+    depth,
+    TE90_01: cast * 10 + depth,
+    PSAL_01: 30 + depth,
+  })),
+);
 
 test("a colour plot stacks one panel per colour variable, all drawing Y on X", () => {
-  const { data, layout } = colorFigure(["TE90_01", "PSAL_01"]);
+  const { data, layout } = colorFigure(["TE90_01", "PSAL_01"], {
+    data: SECTION,
+  });
   assert.equal(Object.keys(layout).filter((k) => /^xaxis/.test(k)).length, 1);
   assert.equal(Object.keys(layout).filter((k) => /^yaxis/.test(k)).length, 2);
   assert.deepEqual(
@@ -1093,15 +1108,34 @@ test("a colour plot stacks one panel per colour variable, all drawing Y on X", (
   );
   data.forEach((trace) => {
     assert.equal(trace.xaxis, "x");
-    assert.deepEqual(
-      trace.x,
-      DATA.map((row) => row.time),
-    );
-    assert.deepEqual(
-      trace.y,
-      DATA.map((row) => row.depth),
-    );
+    assert.deepEqual(trace.x, CAST_TIMES); // one column per cast
+    assert.deepEqual(trace.y, [1, 2, 3, 4]);
   });
+  assert.deepEqual(data[0].z, [
+    [1, 11, 21],
+    [2, 12, 22],
+    [3, 13, 23],
+    [4, 14, 24],
+  ]);
+});
+
+test("a colour panel is a smooth heatmap on its own colour axis", () => {
+  const { data } = colorFigure(["TE90_01", "PSAL_01"], { data: SECTION });
+  assert.equal(data.length, 2); // no line traces: there is no plot type
+  data.forEach((trace, index) => {
+    assert.equal(trace.type, "heatmap");
+    assert.equal(trace.zsmooth, "best");
+    assert.equal(trace.connectgaps, false);
+    assert.equal(trace.coloraxis, index === 0 ? "coloraxis" : "coloraxis2");
+  });
+});
+
+test("a single cast has nothing to blend: its panel falls back to markers", () => {
+  const oneCast = SECTION.filter((row) => row.time === CAST_TIMES[0]);
+  const [trace] = colorFigure(["TE90_01"], { data: oneCast }).data;
+  assert.equal(trace.type, "scatter");
+  assert.equal(trace.mode, "markers");
+  assert.equal(trace.marker.coloraxis, "coloraxis");
 });
 
 test("every colour panel titles its Y, reverses depth and zooms with the first", () => {
@@ -1133,7 +1167,7 @@ test("each panel's colourbar spans exactly its panel and names its variable", ()
     assert.equal(colorbar.lenmode, "fraction", name);
     assert.equal(colorbar.yanchor, "middle", name);
     assert.equal(colorbar.title.text, label, name);
-    assert.equal(data[index].marker.coloraxis, name);
+    assert.equal(data[index].coloraxis, name);
   });
 });
 
@@ -1170,20 +1204,6 @@ test("the colour plot's right margin holds the colourbars", () => {
   assert.equal(layout.hovermode, "closest");
 });
 
-test("a colour plot keeps the plot type: lines are binned in each panel's ramp", () => {
-  const { data } = colorFigure(["TE90_01", "PSAL_01"], { mode: "lines" });
-  const lines = data.filter((trace) => !trace.hovertemplate);
-  assert.ok(lines.length > 0);
-  assert.ok(lines.some((trace) => trace.yaxis === "y"));
-  assert.ok(lines.some((trace) => trace.yaxis === "y2"));
-  const panels = panelTraces(data);
-  assert.equal(panels.length, 2);
-  panels.forEach((trace) => {
-    assert.equal(trace.mode, "markers");
-    assert.equal(trace.marker.opacity, 0);
-  });
-});
-
 test("a time colour variable labels its bar with dates, not epoch milliseconds", () => {
   const { layout } = colorFigure(["time"], { xAxis: "TE90_01" });
   assert.equal(layout.coloraxis.colorbar.tickmode, "array");
@@ -1192,13 +1212,25 @@ test("a time colour variable labels its bar with dates, not epoch milliseconds",
   );
 });
 
-test("a row without a colour is a gap in its panel, not a grey point", () => {
-  const data = DATA.map((row, index) =>
-    index === 3 ? { ...row, TE90_01: null } : row,
+test("a time colour variable reads as a date in the hover", () => {
+  const [trace] = colorFigure(["time"], {
+    xAxis: "TE90_01",
+    data: SECTION,
+  }).data;
+  assert.equal(trace.type, "heatmap");
+  assert.match(trace.hovertemplate, /%\{text\}/);
+  assert.ok(trace.text.flat().some((text) => text.startsWith("2025-09-1")));
+});
+
+test("a cast's missing depth is filled between its neighbours, never below its last", () => {
+  const data = SECTION.map((row) =>
+    row.time === CAST_TIMES[1] && row.depth >= 2
+      ? { ...row, TE90_01: row.depth === 3 ? 13 : null }
+      : row,
   );
-  const [trace] = panelTraces(colorFigure(["TE90_01"], { data }).data);
-  assert.equal(trace.y[3], null);
-  assert.equal(trace.y[4], DATA[4].depth);
+  const [trace] = colorFigure(["TE90_01"], { data }).data;
+  assert.equal(trace.z[1][1], 12); // between 1 m and 3 m
+  assert.equal(trace.z[3][1], null); // below the cast's last sample
 });
 
 test("a colour variable with no value at all draws solid and gets no bar", () => {
@@ -1209,9 +1241,9 @@ test("a colour variable with no value at all draws solid and gets no bar", () =>
 });
 
 test("the colour plot's hover names X, Y and the colour value", () => {
-  const [trace] = colorFigure(["TE90_01"]).data;
+  const [trace] = colorFigure(["TE90_01"], { data: SECTION }).data;
   assert.match(trace.hovertemplate, /depth/i);
-  assert.match(trace.hovertemplate, /%\{customdata\} degree_C/);
+  assert.match(trace.hovertemplate, /%\{z\} degree_C/);
   assert.match(trace.hovertemplate, /%\{x\}/);
 });
 

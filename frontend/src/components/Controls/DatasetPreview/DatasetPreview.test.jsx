@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -59,11 +59,12 @@ function open({
   recordLoading = false,
   setInspectRecordID = vi.fn(),
   url = "/",
+  sample,
 } = {}) {
   const user = userEvent.setup({ delay: null });
   const result = renderWithProviders(
     <DatasetPreview
-      datasetPreview={table ? { table } : null}
+      datasetPreview={table ? { table, sample } : null}
       previewError={previewError}
       inspectDataset={dataset}
       inspectRecordID="record-1"
@@ -176,6 +177,84 @@ describe("DatasetPreview", () => {
       open();
       expect(screen.getByText("Test dataset:")).toBeInTheDocument();
       expect(screen.getByText("record-1")).toBeInTheDocument();
+    });
+  });
+
+  describe("saying when the rows are only part of the record", () => {
+    const STATION_TABLE = {
+      columnNames: ["profile", "time", "depth", "temperature"],
+      columnTypes: ["String", "String", "float", "float"],
+      columnUnits: [null, "UTC", "m", "degree_C"],
+      rows: [
+        ["cast-1", "2024-01-01T00:00:00Z", 0, 10],
+        ["cast-1", "2024-01-01T00:00:00Z", 5, 9],
+        ["cast-2", "2024-01-02T00:00:00Z", 0, 11],
+      ],
+    };
+    const STATION = { ...DATASET, cdm_data_type: "TimeSeriesProfile" };
+    const listsProfiles = () => {
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              column: "profile",
+              steps: [{ value: "cast-1" }, { value: "cast-2" }],
+              count: 335,
+              truncated: false,
+            }),
+        }),
+      );
+    };
+
+    it("counts the rows beside the title", () => {
+      open({ sample: { rowCount: 2, totalRowCount: 26131 } });
+      expect(screen.getByText("Sample: 2 of 26,131 rows")).toBeInTheDocument();
+    });
+
+    it("says nothing when the rows are the whole record", () => {
+      open({ sample: { rowCount: 2, totalRowCount: 2 } });
+      expect(screen.queryByText(/^Sample:/)).not.toBeInTheDocument();
+    });
+
+    it("counts the profiles too when the window holds several", async () => {
+      listsProfiles();
+      open({
+        table: STATION_TABLE,
+        dataset: STATION,
+        sample: { rowCount: 3, totalRowCount: 26131 },
+      });
+      expect(
+        await screen.findByText("Sample: 2 of 335 profiles · 3 of 26,131 rows"),
+      ).toBeInTheDocument();
+    });
+
+    it("says the colour plot draws every profile in the window", async () => {
+      listsProfiles();
+      open({
+        table: STATION_TABLE,
+        dataset: STATION,
+        url: "/?playout=color",
+        sample: { rowCount: 3, totalRowCount: 26131 },
+      });
+      expect(
+        await screen.findByText(
+          "Sample: every profile in the latest 3 of 26,131 rows (2 of 335 profiles)",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("counts rows only while one chosen profile is drawn", async () => {
+      listsProfiles();
+      open({
+        table: STATION_TABLE,
+        dataset: STATION,
+        url: "/?pstep=cast-1",
+        sample: { rowCount: 3, totalRowCount: 1500 },
+      });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+      await act(() => new Promise((resolve) => setTimeout(resolve, 0))); // the list lands
+      expect(screen.getByText("Sample: 3 of 1,500 rows")).toBeInTheDocument();
     });
   });
 });

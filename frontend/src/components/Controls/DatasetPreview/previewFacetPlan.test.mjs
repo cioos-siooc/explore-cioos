@@ -13,6 +13,7 @@ import {
   sharedCandidatesFor,
   resolvePanels,
   defaultVisFor,
+  hasColorPlotFor,
   COLUMNS,
   ROWS,
 } from "./previewFacetPlan.js";
@@ -318,6 +319,16 @@ test("vis default comes from the type alone, never the payload", () => {
   assert.equal(defaultVisFor({ cdm_data_type: "Grid" }), "table");
   assert.equal(defaultVisFor({ cdm_data_type: "Other" }), "table");
   assert.equal(defaultVisFor(undefined), "table");
+});
+
+test("only a record of many profiles offers the colour plot", () => {
+  for (const type of ["TimeSeriesProfile", "TrajectoryProfile"]) {
+    assert.equal(hasColorPlotFor({ cdm_data_type: type }), true, type);
+  }
+  for (const type of ["Profile", "TimeSeries", "Trajectory", "Point", "Grid"]) {
+    assert.equal(hasColorPlotFor({ cdm_data_type: type }), false, type);
+  }
+  assert.equal(hasColorPlotFor(undefined), false);
 });
 
 test("the plan names the cf_role columns, which is what titles the figure", () => {

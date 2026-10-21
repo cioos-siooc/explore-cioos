@@ -18,9 +18,13 @@ export default function VariablePicker({
   variablesByName,
   togglePanel,
   setPanels,
+  maxSelected = Infinity,
 }) {
   const { t } = useTranslation();
-  const allSelected = panels.length === choices.length;
+  const selectable = Math.min(choices.length, maxSelected);
+  const allSelected = panels.length === selectable;
+  const capped = choices.length > maxSelected;
+  const atCap = panels.length >= maxSelected;
   const title =
     panels.length === 1
       ? shortLabelFor(variablesByName.get(panels[0]))
@@ -36,19 +40,28 @@ export default function VariablePicker({
           {t("datasetPreviewPlotNoVariables")}
         </span>
       )}
-      {choices.map((variable) => (
-        <label
-          className="dropdown-item variablePickerRow"
-          key={variable.columnName}
-        >
-          <input
-            type="checkbox"
-            checked={panels.includes(variable.columnName)}
-            onChange={() => togglePanel(variable.columnName)}
-          />
-          <span className="variablePickerLabel">{labelFor(variable)}</span>
-        </label>
-      ))}
+      {capped && (
+        <span className="dropdownEmptyNote">
+          {t("datasetPreviewPlotMaxVariables", { count: maxSelected })}
+        </span>
+      )}
+      {choices.map((variable) => {
+        const checked = panels.includes(variable.columnName);
+        return (
+          <label
+            className="dropdown-item variablePickerRow"
+            key={variable.columnName}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={atCap && !checked}
+              onChange={() => togglePanel(variable.columnName)}
+            />
+            <span className="variablePickerLabel">{labelFor(variable)}</span>
+          </label>
+        );
+      })}
       {choices.length > 1 && (
         <>
           <hr />
@@ -59,7 +72,9 @@ export default function VariablePicker({
               setPanels(
                 allSelected
                   ? []
-                  : choices.map((variable) => variable.columnName),
+                  : choices
+                      .slice(0, selectable)
+                      .map((variable) => variable.columnName),
               )
             }
           >

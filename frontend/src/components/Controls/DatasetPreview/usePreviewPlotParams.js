@@ -16,9 +16,14 @@ import {
   facetPlanFor,
   resolvePanels,
   defaultVisFor,
+  hasColorPlotFor,
 } from "./previewFacetPlan.js";
 import { parseColorsParam, formatColorsParam } from "./previewColors.js";
-import { STEP_PARAM } from "../../../state/selection/previewParams.js";
+import {
+  COLOR_LAYOUT,
+  LAYOUT_PARAM,
+  STEP_PARAM,
+} from "../../../state/selection/previewParams.js";
 import {
   formatScalesParam,
   normalizeColorScale,
@@ -47,9 +52,12 @@ const DEFAULT_MODE = "markers+lines";
 // every panel and shades each by its own variable.
 export const PLOT_LAYOUTS = [
   { value: "panels", labelKey: "datasetPreviewPlotLayoutPanels" },
-  { value: "color", labelKey: "datasetPreviewPlotLayoutColor" },
+  { value: COLOR_LAYOUT, labelKey: "datasetPreviewPlotLayoutColor" },
 ];
 const DEFAULT_LAYOUT = "panels";
+// Each filled panel needs its height and its own colourbar; past this the
+// stack scrolls apart panels meant to be read against each other.
+export const MAX_COLOR_PANELS = 5;
 
 // Unticking every variable must not read as "use the defaults", so it writes a
 // sentinel; '-' cannot collide with a CF-legal ERDDAP variable name.
@@ -167,14 +175,18 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       ? axisParam
       : (plan && plan.sharedAxis) || null;
 
-  const layoutParam = searchParams.get("playout");
-  const plotLayout = PLOT_LAYOUTS.some((layout) => layout.value === layoutParam)
-    ? layoutParam
-    : DEFAULT_LAYOUT;
-  const isColorLayout = plotLayout === "color";
+  // A link may ask for the colour plot on a record that has one profile.
+  const colorPlotAvailable = hasColorPlotFor(inspectDataset);
+  const layoutParam = searchParams.get(LAYOUT_PARAM);
+  const plotLayout =
+    colorPlotAvailable &&
+    PLOT_LAYOUTS.some((layout) => layout.value === layoutParam)
+      ? layoutParam
+      : DEFAULT_LAYOUT;
+  const isColorLayout = plotLayout === COLOR_LAYOUT;
   const setPlotLayout = useCallback(
     (layout) =>
-      setParams({ playout: layout === DEFAULT_LAYOUT ? null : layout }),
+      setParams({ [LAYOUT_PARAM]: layout === DEFAULT_LAYOUT ? null : layout }),
     [setParams],
   );
 
@@ -203,9 +215,9 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   const resolveForLayout = useCallback(
     (requested) =>
       isColorLayout
-        ? resolvePanels(requested, colorCandidates, colorX).filter(
-            (columnName) => columnName !== colorY,
-          )
+        ? resolvePanels(requested, colorCandidates, colorX)
+            .filter((columnName) => columnName !== colorY)
+            .slice(0, MAX_COLOR_PANELS)
         : resolvePanels(requested, variables, sharedAxis),
     [isColorLayout, colorCandidates, colorX, colorY, variables, sharedAxis],
   );
@@ -433,6 +445,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     setColorScale,
     plotLayout,
     setPlotLayout,
+    colorPlotAvailable,
     colorX,
     setColorX,
     colorY,

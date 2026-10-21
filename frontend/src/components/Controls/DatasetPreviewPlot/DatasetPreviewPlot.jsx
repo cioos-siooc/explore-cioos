@@ -18,9 +18,8 @@ import ColorScaleLegend from "./ColorScaleLegend.jsx";
 import ProfileSlice from "./ProfileSlice.jsx";
 import "./styles.css";
 
-import Plotly from "plotly.js-basic-dist-min";
+import Plotly from "./previewPlotly.js";
 import createPlotlyComponent from "react-plotly.js/factory";
-import frLocale from "plotly.js-locales/fr";
 import isEqual from "lodash-es/isEqual";
 
 import { labelFor, shortLabelFor } from "../DatasetPreview/previewVariables.js";
@@ -53,6 +52,7 @@ import { defaultColorFor } from "../DatasetPreview/previewColors.js";
 import { autoScaleNameFor } from "../DatasetPreview/previewColorScales.js";
 import { POSITION_INDEX_COLUMN } from "../DatasetPreview/previewTrackIndex.js";
 import {
+  MAX_COLOR_PANELS,
   PLOT_LAYOUTS,
   PLOT_MODES,
 } from "../DatasetPreview/usePreviewPlotParams.js";
@@ -63,7 +63,6 @@ const PARAMS_PANE_ID = "datasetPreviewParamsPane";
 // instead of in the figure's own title.
 const PROFILE_RECORD_TYPES = ["TimeSeriesProfile", "TrajectoryProfile"];
 
-Plotly.register(frLocale);
 const Plot = createPlotlyComponent(Plotly);
 
 const PINNED_AXIS_CONFIG = { staticPlot: true, displayModeBar: false };
@@ -95,6 +94,7 @@ export default function DatasetPreviewPlot() {
     setColorScale,
     plotLayout,
     setPlotLayout,
+    colorPlotAvailable,
     colorX,
     setColorX,
     colorY,
@@ -192,7 +192,6 @@ export default function DatasetPreviewPlot() {
             labels: customLabels,
             scales: variableScales,
             title,
-            mode: plotType,
             sharedTicks: onPositionAxis ? trackIndex.ticks : null,
             sharedText: onPositionAxis ? trackIndex.labels : null,
             size: { width, height },
@@ -387,44 +386,48 @@ export default function DatasetPreviewPlot() {
         style={{ width: paneCollapsed ? 0 : paneWidth }}
       >
         {/* First in the pane deliberately: it is the one control that changes
-            every panel at once. */}
-        <ControlRow caption={t("plotType")}>
-          <DropdownButton
-            className="dropdownButtonLeft"
-            data-testid="preview-mode-dropdown"
-            title={toggleLabel(t(activeMode.labelKey))}
-          >
-            {PLOT_MODES.map(({ value, labelKey }) => (
-              <Dropdown.Item
-                key={value}
-                data-testid="preview-mode-option"
-                active={plotType === value}
-                onClick={() => setPlotType(value)}
-              >
-                {t(labelKey)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-        </ControlRow>
+            every panel at once. A filled colour plot has no plot type. */}
+        {!isColorLayout && (
+          <ControlRow caption={t("plotType")}>
+            <DropdownButton
+              className="dropdownButtonLeft"
+              data-testid="preview-mode-dropdown"
+              title={toggleLabel(t(activeMode.labelKey))}
+            >
+              {PLOT_MODES.map(({ value, labelKey }) => (
+                <Dropdown.Item
+                  key={value}
+                  data-testid="preview-mode-option"
+                  active={plotType === value}
+                  onClick={() => setPlotType(value)}
+                >
+                  {t(labelKey)}
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+          </ControlRow>
+        )}
 
-        <ControlRow caption={t("datasetPreviewPlotLayout")}>
-          <DropdownButton
-            className="dropdownButtonLeft"
-            data-testid="preview-layout-dropdown"
-            title={toggleLabel(t(activeLayout.labelKey))}
-          >
-            {PLOT_LAYOUTS.map(({ value, labelKey }) => (
-              <Dropdown.Item
-                key={value}
-                data-testid="preview-layout-option"
-                active={plotLayout === value}
-                onClick={() => setPlotLayout(value)}
-              >
-                {t(labelKey)}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-        </ControlRow>
+        {colorPlotAvailable && (
+          <ControlRow caption={t("datasetPreviewPlotLayout")}>
+            <DropdownButton
+              className="dropdownButtonLeft"
+              data-testid="preview-layout-dropdown"
+              title={toggleLabel(t(activeLayout.labelKey))}
+            >
+              {PLOT_LAYOUTS.map(({ value, labelKey }) => (
+                <Dropdown.Item
+                  key={value}
+                  data-testid="preview-layout-option"
+                  active={plotLayout === value}
+                  onClick={() => setPlotLayout(value)}
+                >
+                  {t(labelKey)}
+                </Dropdown.Item>
+              ))}
+            </DropdownButton>
+          </ControlRow>
+        )}
 
         {isColorLayout ? (
           <>
@@ -455,6 +458,7 @@ export default function DatasetPreviewPlot() {
                 variablesByName={variablesByName}
                 togglePanel={togglePanel}
                 setPanels={setPanels}
+                maxSelected={MAX_COLOR_PANELS}
               />
             </ControlRow>
           </>
@@ -606,7 +610,9 @@ export default function DatasetPreviewPlot() {
             <h5 className="previewProfileTitle" title={inspectRecordID}>
               {t("previewProfileTitle", { record: inspectRecordID })}
             </h5>
-            <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
+            {!isColorLayout && ( // the colour plot draws every profile at once
+              <ProfileSlice profiles={profiles} step={step} setStep={setStep} />
+            )}
           </div>
         )}
 

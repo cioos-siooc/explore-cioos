@@ -139,7 +139,8 @@
   padding: 12px;
 }
 
-.dataPreviewModal .datasetPreviewPeriod {
+.dataPreviewModal .datasetPreviewPeriod,
+.dataPreviewModal .datasetPreviewSample {
   display: block;
   margin-top: 4px;
   font-size: 0.8em;

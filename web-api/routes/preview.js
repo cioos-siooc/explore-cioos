@@ -32,6 +32,12 @@ const Sentry = require("@sentry/node");
  *       - in: query
  *         name: timeMax
  *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: allProfiles
+ *         schema: { type: boolean }
+ *         description: >
+ *           Every profile in the window rather than one: `at` is ignored, and a
+ *           TimeSeriesProfile record that is one cast stands for its station.
  *     responses:
  *       200:
  *         description: >
@@ -41,6 +47,8 @@ const Sentry = require("@sentry/node");
  *           column, positionally aligned to columnNames, null where the harvest
  *           knows no such column. The key is absent entirely for a dataset that
  *           has not been harvested since datasets.table_variables was added.
+ *           `sample` is { rowCount, totalRowCount }: the rows sent and the rows
+ *           the request covers, which differ when only part of it is sent.
  *       400:
  *         description: Missing or invalid parameters.
  *       404:
@@ -130,6 +138,32 @@ profile_feature AS (
   JOIN   ds ON ds.pk = p.dataset_pk
   WHERE  COALESCE(p.profile_id, p.timeseries_id) = :profile
 ),
+-- Under allProfiles a cast record stands for its station, so the window below
+-- is sized on the station: sized on the cast, it would fetch the whole station.
+-- (No bind names in SQL comments: knex binds them there too.)
+station_feature AS (
+  SELECT f.dataset_pk,
+         f.station_id AS feature_id,
+         MIN(p.time_min) AS time_min,
+         MAX(p.time_max) AS time_max,
+         SUM(p.n_records) AS n_records,
+         -- Over elapsed days, not days with data: casts are days apart, so a
+         -- rate over cast days sizes a window holding one or two of them.
+         SUM(p.n_records)::double precision
+           / GREATEST(EXTRACT(EPOCH FROM MAX(p.time_max) - MIN(p.time_min))
+                        / 86400, 1) AS records_per_day,
+         NULL::text AS cast_id,
+         f.station_id
+  FROM   profile_feature f
+  JOIN   ds ON ds.pk = f.dataset_pk
+  JOIN   cde.profiles p
+         ON  p.dataset_pk    = f.dataset_pk
+         AND p.timeseries_id = f.station_id
+  WHERE  CAST(:WHOLE_STATION AS boolean)
+         AND ds.cdm_data_type = 'TimeSeriesProfile'
+         AND f.cast_id IS NOT NULL
+  GROUP  BY f.dataset_pk, f.station_id
+),
 trajectory_feature AS (
   SELECT s.dataset_pk,
          s.trajectory_id AS feature_id,
@@ -149,7 +183,10 @@ trajectory_feature AS (
   GROUP  BY s.dataset_pk, s.trajectory_id, s.time_min, s.time_max
 ),
 feature AS (
+  SELECT * FROM station_feature
+  UNION ALL
   SELECT * FROM profile_feature
+  WHERE  NOT EXISTS (SELECT 1 FROM station_feature)
   UNION ALL
   SELECT * FROM trajectory_feature
 )
@@ -212,10 +249,12 @@ router.get(
     checks: [
       check(["dataset", "profile", "at"]).isLength({ max: 256 }),
       check(["timeMin", "timeMax"]).optional().isISO8601({ strict: true }),
+      check("allProfiles").optional().isIn(["true", "false"]),
     ],
   }),
   async (req, res, next) => {
     const { dataset, profile, at, timeMin, timeMax } = req.query;
+    const allProfiles = req.query.allProfiles === "true";
 
     // NOTE: filtered by dataset_id alone, so a dataset_id published on two
     // ERDDAP servers resolves to whichever row sorts first.
@@ -223,6 +262,7 @@ router.get(
       profile,
       dataset,
       NUM_RECORDS: PREVIEW_ROW_LIMIT,
+      WHOLE_STATION: allProfiles,
     });
 
     if (!rows.rows?.length) {
@@ -238,6 +278,7 @@ router.get(
       cdm_data_type,
       erddap_url,
       profile_id,
+      n_records,
       new_start_time,
       use_whole_profile,
       table_variables,
@@ -257,9 +298,11 @@ router.get(
     // `at` names one profile inside the record, to reach one OUTSIDE the tail
     // window below, so the two are exclusive. A cast record with no `at` draws
     // its own cast.
-    const step = steppedRecord(profile_variable, step_variable)
-      ? at || record_step
-      : null;
+    const step =
+      steppedRecord(profile_variable, step_variable) && !allProfiles
+        ? at || record_step
+        : null;
+    const windowed = !step && !timeMin && !timeMax && !use_whole_profile;
     if (step) {
       erddapQuery += `&${constraintFor(step_variable, step)}`;
     } else if (timeMin || timeMax) {
@@ -286,7 +329,16 @@ router.get(
           .status(404)
           .send({ error: "NO_DATA", dataset: dataset_id, profile: profile_id });
       }
+      const fetchedRowCount = data.table.rows.length;
       trimPreviewRows(data.table, PREVIEW_ROW_LIMIT);
+      // A window's rows are a part of the record whatever ERDDAP sent, so its
+      // whole is the harvested count.
+      data.sample = {
+        rowCount: data.table.rows.length,
+        totalRowCount: windowed
+          ? Math.max(Number(n_records) || 0, fetchedRowCount)
+          : fetchedRowCount,
+      };
       // Attached here rather than in shapeQuery.js, which would then carry
       // ~15 KB per dataset to /pointQuery. Kept positionally aligned with
       // ERDDAP's columnNames since the harvest may be older than the dataset;
@@ -386,6 +438,7 @@ router.get(
       profile,
       dataset,
       NUM_RECORDS: PREVIEW_ROW_LIMIT,
+      WHOLE_STATION: false,
     });
 
     if (!rows.rows?.length) {

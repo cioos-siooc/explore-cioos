@@ -102,6 +102,9 @@ const timeLeadingAxis = (variables) => [timeCoordinateOf(variables)];
 // Point needs nothing beyond its first measurement: the shared axis is always
 // excluded from the panel set, so "variable 1 on x, the rest as panels" falls
 // out of pointing the shared axis at a measurement.
+//
+// `colorPlot` marks the records holding many profiles: a filled section needs
+// several of them side by side.
 const CDM_LAYOUTS = {
   Profile: {
     orientation: COLUMNS,
@@ -113,12 +116,14 @@ const CDM_LAYOUTS = {
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
     leadingAxesFor: timeLeadingAxis,
+    colorPlot: true,
   },
   TrajectoryProfile: {
     orientation: COLUMNS,
     wanted: "vertical",
     sharedAxisFor: verticalCoordinate,
     leadingAxesFor: trackLeadingAxes,
+    colorPlot: true,
   },
   TimeSeries: {
     orientation: ROWS,
@@ -369,4 +374,8 @@ export function resolvePanels(panels, variables, sharedAxis) {
 // column is reported by plotBlockerFor instead.
 export function defaultVisFor(dataset) {
   return layoutFor(dataset) ? "plot" : "table";
+}
+
+export function hasColorPlotFor(dataset) {
+  return Boolean(layoutFor(dataset)?.colorPlot);
 }

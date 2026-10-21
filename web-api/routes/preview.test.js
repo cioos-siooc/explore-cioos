@@ -300,6 +300,138 @@ test("`at` wins over a cast record's own cast", async () => {
   assert.ok(!url.includes(encodeURIComponent("24/10/14-08:31:41")));
 });
 
+// --- every profile in the window (the colour plot) ---------------------------
+
+// What FEATURE_SQL answers for CAST_ROW's record under allProfiles: the station.
+const WHOLE_STATION_ROW = {
+  ...CAST_ROW,
+  record_step: null,
+  n_records: 146972,
+};
+
+test("allProfiles sizes the record on the cast's station, not the cast", async () => {
+  db.queueRaw([WHOLE_STATION_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1]] } },
+  });
+
+  await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "PMZA-VAS-24/10/14-08:31:41",
+    allProfiles: "true",
+  });
+
+  assert.match(
+    db.queries[0],
+    /WHERE\s+CAST\(true AS boolean\)\s+AND ds\.cdm_data_type/,
+  );
+});
+
+test("without allProfiles the station stand-in is switched off", async () => {
+  db.queueRaw([CAST_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1]] } },
+  });
+
+  await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "PMZA-VAS-24/10/14-08:31:41",
+  });
+
+  assert.match(
+    db.queries[0],
+    /WHERE\s+CAST\(false AS boolean\)\s+AND ds\.cdm_data_type/,
+  );
+});
+
+test("allProfiles ignores `at` and a cast's own cast, keeping the tail window", async () => {
+  db.queueRaw([CAST_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1]] } },
+  });
+
+  await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "PMZA-VAS-24/10/14-08:31:41",
+    at: "PMZA-VAS-24/10/10-14:01:41",
+    allProfiles: "true",
+  });
+
+  const { url } = axios.calls[0];
+  assert.ok(url.includes(`station_id=~${encodeURIComponent('"PMZA-VAS"')}`));
+  assert.ok(!url.includes("&profile=~"));
+  assert.ok(url.includes("time>2024-10-01T00:00:00Z"));
+});
+
+test("allProfiles keeps a requested period", async () => {
+  db.queueRaw([STEPPED_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1]] } },
+  });
+
+  await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "AZMP-ESG",
+    allProfiles: "true",
+    timeMin: "2020-01-03T00:00:00Z",
+    timeMax: "2020-01-05T23:59:59Z",
+  });
+
+  assert.match(axios.calls[0].url, /&time>=2020-01-03T00:00:00\.000Z/);
+});
+
+test("rejects an allProfiles that is not true or false", async () => {
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1", allProfiles: "yes" });
+  assert.equal(res.status, 400);
+  assert.equal(axios.calls.length, 0);
+});
+
+// --- how much of the request the rows are ------------------------------------
+
+test("a tail window is a sample of the whole record", async () => {
+  db.queueRaw([STEPPED_ROW]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: [[1], [2]] } },
+  });
+
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "mpoPmzaVikingCtdBinned", profile: "AZMP-ESG" });
+
+  assert.deepEqual(res.body.sample, { rowCount: 2, totalRowCount: 26000 });
+});
+
+test("a whole record is all of itself, even when the harvest counted fewer", async () => {
+  db.queueRaw([{ ...FEATURE_ROW, n_records: 1 }]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["i"], rows: [[1], [2]] } },
+  });
+
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1" });
+
+  assert.deepEqual(res.body.sample, { rowCount: 2, totalRowCount: 2 });
+});
+
+test("one cast cut at the row cap is counted from what ERDDAP sent", async () => {
+  db.queueRaw([STEPPED_ROW]);
+  const manyRows = Array.from({ length: 1500 }, (_, i) => [i]);
+  axios.queueResponse({
+    data: { table: { columnNames: ["depth"], rows: manyRows } },
+  });
+
+  const res = await agent.get("/preview").query({
+    dataset: "mpoPmzaVikingCtdBinned",
+    profile: "AZMP-ESG",
+    at: "AZMP-ESG-21/05/20-23:01:41",
+  });
+
+  assert.deepEqual(res.body.sample, { rowCount: 1000, totalRowCount: 1500 });
+});
+
 // --- /preview/profiles -------------------------------------------------------
 
 test("a cast record lists its station's casts and names its own as current", async () => {

@@ -31,6 +31,8 @@ import { useMapState } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
+  COLOR_LAYOUT,
+  LAYOUT_PARAM,
   PERIOD_PARAM,
   RECORD_PARAM,
   STEP_PARAM,
@@ -44,6 +46,7 @@ import {
   networkPreviewError,
   previewErrorFrom,
 } from "../../components/Controls/DatasetPreview/previewErrors.js";
+import { hasColorPlotFor } from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
 
 const SelectionContext = createContext();
 
@@ -709,11 +712,17 @@ export default function SelectionProvider({ children }) {
   // A record left with no dataset is cleaned up by setInspectDataset, not here,
   // or a cold shared link would lose its record before its dataset loads.
   const inspectDatasetId = inspectDataset?.dataset_id;
-  // Which profile INSIDE the record is drawn. The one plot param read here
-  // rather than in usePreviewPlotParams: it changes what is fetched, not how
-  // the rows are drawn, so it rides this fetch instead of a second one — one
-  // request, one previewError, one recordLoading.
-  const inspectRecordStep = searchParams.get(STEP_PARAM) || undefined;
+  // Which profile INSIDE the record is drawn, and whether the colour plot wants
+  // every profile in the window instead. Read here rather than in
+  // usePreviewPlotParams: they change what is fetched, not how the rows are
+  // drawn, so they ride this fetch instead of a second one — one request, one
+  // previewError, one recordLoading.
+  const inspectAllProfiles =
+    searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT &&
+    hasColorPlotFor(inspectDataset);
+  const inspectRecordStep = inspectAllProfiles
+    ? undefined
+    : searchParams.get(STEP_PARAM) || undefined;
 
   useEffect(() => {
     if (!inspectDatasetId || !inspectRecordID) return;
@@ -725,6 +734,7 @@ export default function SelectionProvider({ children }) {
       (inspectRecordStep
         ? `&at=${encodeURIComponent(inspectRecordStep)}`
         : "") +
+      (inspectAllProfiles ? "&allProfiles=true" : "") +
       (inspectRecordPeriod
         ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
         : "");
@@ -764,6 +774,7 @@ export default function SelectionProvider({ children }) {
     inspectRecordID,
     inspectDatasetId,
     inspectRecordStep,
+    inspectAllProfiles,
     inspectRecordPeriod,
   ]);
 

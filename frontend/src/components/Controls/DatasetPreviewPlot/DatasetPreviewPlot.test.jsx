@@ -10,10 +10,9 @@ import DatasetPreview from "../DatasetPreview/DatasetPreview.jsx";
 // the provider -> the lazy plot -> its controls — is what runs. What the figure
 // DRAWS is asserted in previewFacetFigure.test.mjs; what this covers is the
 // controls, and the settings reaching the figure at all.
-vi.mock("plotly.js-basic-dist-min", () => ({
-  default: { register: () => {}, Icons: {} },
+vi.mock("./previewPlotly.js", () => ({
+  default: { Icons: {} },
 }));
-vi.mock("plotly.js-locales/fr", () => ({ default: {} }));
 vi.mock("react-plotly.js/factory", () => ({
   default: () =>
     function MockPlot({ data, layout, config }) {
@@ -60,11 +59,14 @@ const DATASET = {
   first_eov_column: "temperature",
 };
 
-function open(url = "/", dataset = DATASET) {
+// The colour plot is offered only for a record holding many profiles.
+const STATION = { ...DATASET, cdm_data_type: "TimeSeriesProfile" };
+
+function open(url = "/", dataset = DATASET, table = TABLE) {
   const user = userEvent.setup({ delay: null });
   renderWithProviders(
     <DatasetPreview
-      datasetPreview={{ table: TABLE }}
+      datasetPreview={{ table }}
       previewError={null}
       inspectDataset={dataset}
       inspectRecordID="record-1"
@@ -147,7 +149,7 @@ describe("DatasetPreviewPlot", () => {
   });
 
   it("swaps to the colour plot's controls when its layout is picked", async () => {
-    const user = open();
+    const user = open("/", STATION);
     await plotted();
     await user.click(screen.getByRole("button", { name: "Panels" }));
     await user.click(screen.getByText("Color plot"));
@@ -165,10 +167,38 @@ describe("DatasetPreviewPlot", () => {
     expect(rowCaptioned("Color by")).toHaveTextContent("temperature");
     expect(rowCaptioned("Color by")).toHaveTextContent("(+/-)");
     expect(screen.queryByText("Color scale")).not.toBeInTheDocument();
+    // A filled colour plot has no markers or line to choose between.
+    expect(screen.queryByText("Plot type")).not.toBeInTheDocument();
+  });
+
+  it("caps the colour plot at five variables, a link's extras dropped", async () => {
+    const measurements = ["m1", "m2", "m3", "m4", "m5", "m6", "m7"];
+    const wideTable = {
+      columnNames: ["depth", "time", ...measurements],
+      columnTypes: ["float", "String", ...measurements.map(() => "float")],
+      columnUnits: ["m", "UTC", ...measurements.map(() => null)],
+      rows: [
+        [0, "2024-01-01T00:00:00Z", ...measurements.map(() => 1)],
+        [5, "2024-01-01T00:05:00Z", ...measurements.map(() => 2)],
+      ],
+    };
+    const user = open(
+      "/?playout=color&pvars=m1,m2,m3,m4,m5,m6",
+      { ...STATION, first_eov_column: "m1" },
+      wideTable,
+    );
+    await plotted();
+    expect(rowCaptioned("Color by")).toHaveTextContent("5 selected");
+
+    await user.click(screen.getByRole("button", { name: "5 selected" }));
+    expect(screen.getByText("Up to 5 variables")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "m5" })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: "m6" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "m7" })).toBeDisabled();
   });
 
   it("offers a scale per colour variable in Customize plot, not a colour", async () => {
-    const user = open("/?playout=color");
+    const user = open("/?playout=color", STATION);
     await plotted();
     await user.click(screen.getByText(/Customize plot/));
     const row = document
@@ -221,6 +251,45 @@ describe("DatasetPreviewPlot", () => {
   it("names a record of many casts in a header row above the figure", async () => {
     open("/", { ...DATASET, cdm_data_type: "TimeSeriesProfile" });
     await plotted();
+    expect(
+      screen.getByRole("heading", { name: "Profile: record-1" }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no layout for a record of one profile, its link's included", async () => {
+    open("/?playout=color");
+    const plot = await plotted();
+    expect(screen.queryByText("Layout")).not.toBeInTheDocument();
+    expect(plot).toHaveAttribute("data-hovermode", "y unified"); // still panels
+  });
+
+  it("draws every profile in the colour plot, so it has no cast slider", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            column: "profile",
+            steps: [{ value: "cast-1" }, { value: "cast-2" }],
+            count: 2,
+            truncated: false,
+          }),
+      }),
+    );
+    const user = open("/", STATION);
+    await plotted();
+    expect(
+      await screen.findByRole("button", { name: "Previous profile" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Panels" }));
+    await user.click(screen.getByText("Color plot"));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Previous profile" }),
+      ).not.toBeInTheDocument(),
+    );
     expect(
       screen.getByRole("heading", { name: "Profile: record-1" }),
     ).toBeInTheDocument();

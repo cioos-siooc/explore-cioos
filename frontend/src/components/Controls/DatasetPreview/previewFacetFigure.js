@@ -6,6 +6,7 @@
 import { COLUMNS, ROWS } from "./previewFacetPlan.js";
 import {
   isDownwardVertical,
+  isTimeLike,
   labelFor,
   shortLabelFor,
 } from "./previewVariables.js";
@@ -15,7 +16,12 @@ import {
   colorScaleForVariable,
   legendTicksFor,
 } from "./previewColorScales.js";
-import { coloredLineBinsFor, lineBinLimitFor } from "./previewColoredLine.js";
+import {
+  coloredLineBinsFor,
+  lineBinLimitFor,
+  MIN_STEP_PX,
+} from "./previewColoredLine.js";
+import { colorGridFor } from "./previewColorGrid.js";
 import {
   ellipsize,
   maxCharsFor,
@@ -516,16 +522,21 @@ export function buildFigure({
 
 export const COLORBAR_THICKNESS_PX = 12;
 export const COLORBAR_PAD_PX = 10;
+// The grid's cells along an axis not measured yet.
+const UNMEASURED_CELLS = 200;
+const cellsAlong = (pixels) =>
+  pixels > 0 ? Math.max(2, Math.floor(pixels / MIN_STEP_PX)) : UNMEASURED_CELLS;
 
 /**
  * The colour plot: every panel draws the same Y against the same X, one panel
- * per colour variable, each shaded by its own variable through its own
- * colourbar. The bar spans exactly its panel's domain, which is what ties a
- * scale to its graph.
+ * per colour variable, each filled by its own variable through its own
+ * colourbar — a heatmap, so the colour between samples is blended. The bar
+ * spans exactly its panel's domain, which is what ties a scale to its graph.
  *
- * Takes buildFigure's inputs, except that `panels` are the colour variables and
- * `xAxis`/`yAxis` replace `sharedAxis`. Always stacked: the bars sit inside the
- * figure, and only a stack is guaranteed never to scroll them out of view.
+ * Takes buildFigure's inputs, except that `panels` are the colour variables,
+ * `xAxis`/`yAxis` replace `sharedAxis`, and there is no plot type. Always
+ * stacked: the bars sit inside the figure, and only a stack is guaranteed never
+ * to scroll them out of view.
  *
  * @param scales { [columnName]: scaleName } — the user's overrides only
  * @param yReversed draw Y downwards; by default when Y is a depth or a pressure
@@ -539,7 +550,6 @@ export function buildColorFigure({
   labels = {},
   scales = {},
   title = "",
-  mode = "markers",
   sharedTicks = null,
   sharedText = null,
   size = {},
@@ -561,9 +571,8 @@ export function buildColorFigure({
     : 0;
   const wrapAlong = (text, pixels, maxLines) =>
     wrapLabel(text, maxCharsFor(pixels), maxLines);
-  const binLimit = mode.includes("lines")
-    ? lineBinLimitFor({ panelCount: panels.length, axisPixels: plottingWidth })
-    : 0;
+  const xIsTime = isTimeLike(variablesByName.get(xAxis));
+  const yIsTime = isTimeLike(variablesByName.get(yAxis));
 
   const layout = {
     uirevision,
@@ -601,7 +610,6 @@ export function buildColorFigure({
   const xValues = (data || []).map((row) => row[xAxis]);
   const yValues = (data || []).map((row) => row[yAxis]);
 
-  const lineTraces = [];
   const traces = panels.map((columnName, index) => {
     const domain = domains[index];
     const variable = variablesByName.get(columnName);
@@ -653,43 +661,57 @@ export function buildColorFigure({
       };
     }
 
-    // A row with no colour has nothing to say on this panel: a gap, not a grey
-    // point.
+    const grid =
+      dimension &&
+      colorGridFor({
+        xValues,
+        yValues,
+        zValues: dimension.values,
+        xIsTime,
+        yIsTime,
+        maxColumns: cellsAlong(plottingWidth),
+        maxRows: cellsAlong(plottingHeight * (domain[1] - domain[0])),
+      });
+    if (grid) {
+      // A time's cell holds epoch milliseconds; the hover reads its date.
+      const timeColor = isTimeLike(variable);
+      return {
+        type: "heatmap",
+        name: titleFor(columnName),
+        x: grid.x,
+        y: grid.y,
+        z: grid.z,
+        xaxis: "x",
+        yaxis: axisRef("y", index),
+        coloraxis: colorAxisName,
+        zsmooth: "best",
+        connectgaps: false, // where nothing was sampled stays blank
+        hovertemplate: `${hoverLine(xAxis, "%{x}")}<br>${hoverLine(yAxis, "%{y}")}<br>${hoverLine(columnName, timeColor ? "%{text}" : "%{z}")}<extra></extra>`,
+        ...(timeColor
+          ? {
+              text: grid.z.map((row) =>
+                row.map((value) =>
+                  value === null ? "" : new Date(value).toISOString(),
+                ),
+              ),
+            }
+          : {}),
+      };
+    }
+
+    // Nothing to blend across — a single cast, or no colour at all: one marker
+    // per row, and a row with no colour is a gap, not a grey point.
     const panelY = dimension
       ? yValues.map((value, row) =>
           dimension.values[row] === null ? null : value,
         )
       : yValues;
-
-    if (dimension && mode.includes("lines")) {
-      coloredLineBinsFor({
-        sharedValues: xValues,
-        panelValues: panelY,
-        colorValues: dimension.values,
-        range: dimension.range,
-        stops,
-        binLimit,
-        fallbackColor,
-      }).forEach((bin) =>
-        lineTraces.push({
-          type: "scatter",
-          mode: "lines",
-          hoverinfo: "skip",
-          x: bin.sharedValues,
-          y: bin.panelValues,
-          xaxis: "x",
-          yaxis: axisRef("y", index),
-          line: { color: bin.color },
-        }),
-      );
-    }
-
     const positionLine = sharedText
       ? `${hoverLine(xAxis, "%{x:d}")}<br>%{text}` // ":d" prints the rank
       : hoverLine(xAxis, "%{x}");
     return {
       type: "scatter",
-      mode: dimension && mode.includes("lines") ? "markers" : mode,
+      mode: "markers",
       name: titleFor(columnName),
       x: xValues,
       y: panelY,
@@ -697,13 +719,8 @@ export function buildColorFigure({
       yaxis: axisRef("y", index),
       hovertemplate: `${positionLine}<br>${hoverLine(yAxis, "%{y}")}<br>${hoverLine(columnName, "%{customdata}")}<extra></extra>`,
       marker: dimension
-        ? {
-            color: dimension.values,
-            coloraxis: colorAxisName,
-            ...(mode.includes("markers") ? {} : { opacity: 0 }), // kept for the hover
-          }
+        ? { color: dimension.values, coloraxis: colorAxisName }
         : { color: fallbackColor },
-      line: { color: fallbackColor },
       customdata: dimension
         ? dimension.hoverValues
         : (data || []).map((row) => row[columnName]),
@@ -711,5 +728,5 @@ export function buildColorFigure({
     };
   });
 
-  return { data: [...lineTraces, ...traces], layout, colorLegend: null };
+  return { data: traces, layout, colorLegend: null };
 }

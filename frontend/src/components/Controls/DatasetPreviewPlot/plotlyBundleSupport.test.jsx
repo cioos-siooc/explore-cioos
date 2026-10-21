@@ -17,7 +17,7 @@ import { splitPinnedAxis } from "../DatasetPreview/previewPinnedAxis.js";
 // The rest of the plot is asserted against buildFigure's return value under
 // `node --test`, which is right: a browser is not needed to check an object. But
 // that leaves the assumptions this file covers uncheckable there — that
-// plotly.js-basic-dist-min carries the colour axis and the across-subplot hover
+// the Plotly build previewPlotly.js assembles carries the colour axis, the heatmap and the across-subplot hover
 // at all. It is a PARTIAL bundle; if a version ever drops one, the figure would
 // keep passing every other test and quietly draw no colours, or answer for one
 // panel. So this one file loads the real Plotly and asks its own schema.
@@ -77,7 +77,7 @@ async function plotlySchema() {
     addListener() {},
     removeListener() {},
   });
-  const Plotly = (await import("plotly.js-basic-dist-min")).default;
+  const Plotly = (await import("./previewPlotly.js")).default;
   return Plotly.PlotSchema.get();
 }
 
@@ -217,11 +217,39 @@ describe("the shipped plotly bundle and the colour plot", () => {
       xAxis: "PSAL_01",
       yAxis: "depth",
       data: DATA,
-      mode: "markers",
       size: { width: 900, height: 600 },
       uirevision: "test",
     });
   }
+
+  it("understands every key a filled panel sets on its heatmap", async () => {
+    const schema = await plotlySchema();
+    const known = schema.traces.heatmap.attributes;
+    const section = DATA.flatMap((row) =>
+      [1, 2].map((depth) => ({ ...row, depth })),
+    );
+    const { data } = buildColorFigure({
+      variablesByName: byColumnName(
+        variablesFrom(TABLE, { cdm_data_type: "Profile" }),
+      ),
+      panels: ["TE90_01", "time"],
+      xAxis: "PSAL_01",
+      yAxis: "depth",
+      data: section,
+      size: { width: 900, height: 600 },
+      uirevision: "test",
+    });
+
+    data.forEach((trace) => {
+      expect(trace.type).toBe("heatmap");
+      Object.keys(trace)
+        .filter((key) => key !== "type")
+        .forEach((key) => {
+          expect(known, `heatmap.${key}`).toHaveProperty(key);
+        });
+    });
+    expect(known.zsmooth.values).toContain("best");
+  });
 
   it("understands every key a panel's own colourbar sets", async () => {
     const schema = await plotlySchema();
