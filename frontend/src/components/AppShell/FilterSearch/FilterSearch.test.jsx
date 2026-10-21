@@ -615,6 +615,25 @@ describe("FilterSearch", () => {
     expect(seen.depth).toEqual([200, 12000]);
   });
 
+  it("applies a typed bounding box or wkt polygon as the area filter", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "-130, 48, -120, 55");
+    expect(options()[0]).toHaveTextContent("Box: W -130, S 48, E -120, N 55");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(seen.draw).toBe("shape"));
+    expect(polygonIsRectangle(seen.ring)).toBe(true);
+    expect(seen.zoom.coordinates[0]).toEqual(seen.ring);
+
+    await user.keyboard("{Control>}k{/Control}");
+    const reopened = await screen.findByTestId("filter-search-input");
+    await user.click(reopened);
+    await user.paste("POLYGON((-130 48, -120 50, -125 55, -130 48))");
+    expect(options()[0]).toHaveTextContent("Polygon of 3 points");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(seen.ring).toHaveLength(4));
+  });
+
   it("suggests a time range while it is still being typed", async () => {
     const { user, box } = await renderPalette();
 

@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { server } from "../../../config.js";
-import { useDebounce } from "../../../utilities.jsx";
+import { parseArea, useDebounce } from "../../../utilities.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
@@ -265,6 +265,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
     ...useFilterModel(
       useScientificNameMatches(term, obisDataAvailable),
       exclude ? undefined : parsePartialRangeQuery(term),
+      exclude ? undefined : parseArea(term),
     ),
     regionGroup,
     canReset && {

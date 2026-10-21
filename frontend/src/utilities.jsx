@@ -691,6 +691,54 @@ export function polygonToWkt(polygon) {
   return `POLYGON((${ring}))`;
 }
 
+export function boundsToPolygon({ west, south, east, north }) {
+  return [
+    [west, south],
+    [east, south],
+    [east, north],
+    [west, north],
+    [west, south],
+  ];
+}
+
+const onGlobe = ([lon, lat]) => Math.abs(lon) <= 180 && Math.abs(lat) <= 90;
+
+// undefined for a box off the globe, with no area, or across the antimeridian
+// (west > east), which the area filter has no way to hold.
+export function areaFromBounds(bounds) {
+  const { west, south, east, north } = bounds;
+  const valid =
+    [west, south, east, north].every(Number.isFinite) &&
+    west < east &&
+    south < north &&
+    onGlobe([west, south]) &&
+    onGlobe([east, north]);
+  return valid ? boundsToPolygon(bounds) : undefined;
+}
+
+const NUMBER = /^[-+]?(?:\d+\.?\d*|\.\d+)$/;
+
+// Typed or pasted as "west, south, east, north" (the OGC and GeoJSON bbox
+// order, with commas or spaces), or as a WKT POLYGON, of which only the outer
+// ring is kept. undefined for anything else, or for a shape with no area.
+export function parseArea(text) {
+  const trimmed = text.trim();
+  const parts = trimmed.split(/[\s,;]+/);
+  if (parts.length === 4 && parts.every((part) => NUMBER.test(part))) {
+    const [west, south, east, north] = parts.map(Number);
+    return areaFromBounds({ west, south, east, north });
+  }
+  const wkt = trimmed.match(/^polygon\s*\(\s*\(([^()]*)\)/i);
+  if (!wkt) return undefined;
+  const points = wkt[1].split(",").map((point) => point.trim().split(/\s+/));
+  if (points.some((p) => p.length < 2 || !p.every((n) => NUMBER.test(n))))
+    return undefined;
+  const ring = points.map(([lon, lat]) => [Number(lon), Number(lat)]);
+  if (String(ring[0]) !== String(ring.at(-1))) ring.push([...ring[0]]);
+  const corners = new Set(ring.map(String)).size;
+  return corners >= 3 && ring.every(onGlobe) ? ring : undefined;
+}
+
 export function createSelectionQueryString(polygon) {
   if (polygonIsRectangle(polygon)) {
     const res = polygonToMaxMins(polygon);
@@ -717,13 +765,12 @@ export function selectionFromSearchParams(searchParams) {
   );
   if (bounds.some((value) => Number.isNaN(value))) return undefined;
   const [latMin, lonMin, latMax, lonMax] = bounds;
-  return [
-    [lonMin, latMin],
-    [lonMax, latMin],
-    [lonMax, latMax],
-    [lonMin, latMax],
-    [lonMin, latMin],
-  ];
+  return boundsToPolygon({
+    west: lonMin,
+    south: latMin,
+    east: lonMax,
+    north: latMax,
+  });
 }
 
 // No dataset has pk 0; an empty datasetPKs would mean "no filter" instead.
