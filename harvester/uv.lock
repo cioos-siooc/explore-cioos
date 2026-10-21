@@ -518,16 +518,16 @@ wheels = [
 
 [[package]]
 name = "erddapy"
-version = "2.2.4"
+version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx" },
     { name = "pandas" },
-    { name = "pytz" },
+    { name = "requests" },
+    { name = "xarray" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/0f/b031a4ea74156f118355455a4c40dde56788accb089e78cc633f0aeba726/erddapy-2.2.4.tar.gz", hash = "sha256:dbb9bcb7335a52d73e3a23e7cdd976e8ef84452f1d1ee3e9f99c974ff7dcd57b", size = 21936, upload-time = "2025-04-14T17:41:46.809Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/df/a077d8f8f4194c0a78b9abafda8618bb9d7404071f24aa0676707ca9adb5/erddapy-3.3.1.tar.gz", hash = "sha256:6de739c67cb969e0bbdc9d8410aaa37271eef3b9994bee7ae7342a4783f7f923", size = 22982, upload-time = "2026-09-14T11:22:23.141Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/ee/05fa45a5b8839702c7cd4199cb1bbcd3d31906eeafcf4b43a91ed8c362db/erddapy-2.2.4-py3-none-any.whl", hash = "sha256:277b512f1c907aaae5baf5d75105987fa02432b7e393f7ee5c9bb5e8cc35c229", size = 24843, upload-time = "2025-04-14T17:41:45.869Z" },
+    { url = "https://files.pythonhosted.org/packages/84/c2/6ca89ac727d1c1cf39475c9e4f888e0fc4e708279964ff2cb6043face6e9/erddapy-3.3.1-py3-none-any.whl", hash = "sha256:d515213f04d5c7e031aa83cbf128fedce9d689ea9870cd62329f9224b36db453", size = 26392, upload-time = "2026-09-14T11:22:21.61Z" },
 ]
 
 [[package]]
@@ -687,7 +687,7 @@ requires-dist = [
     { name = "cioos-metadata-conversion", git = "https://github.com/cioos-siooc/cioos-metadata-conversion?rev=1231913b103f5a6557f3c27b8ad967645f17d9c4" },
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "duckdb", specifier = ">=1.0.0" },
-    { name = "erddapy", specifier = ">=2.2.0" },
+    { name = "erddapy", specifier = ">=3.3.1" },
     { name = "lxml", specifier = ">=5.1.0" },
     { name = "numpy", specifier = ">=2.1.0" },
     { name = "pandas", specifier = ">=2.2.3" },
@@ -2134,6 +2134,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b3/8f/705086c9d734d3b663af0e9bb3d4de6578d08f46b1b101c2442fd9aecaa2/win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0", size = 4867, upload-time = "2024-12-07T15:28:28.314Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/07/c6fe3ad3e685340704d314d765b7912993bcb8dc198f0e7a89382d37974b/win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390", size = 4083, upload-time = "2024-12-07T15:28:26.465Z" },
+]
+
+[[package]]
+name = "xarray"
+version = "2026.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pandas" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/f5/781c70b234f54e0401f4f7c4427a7486da38d50dbb138c7d7c55144b3d86/xarray-2026.9.0.tar.gz", hash = "sha256:6abc69694c22fa1f0fb2f357ff4e41d88beb4477ed71091f944b7dbf67ed54fe", size = 3176922, upload-time = "2026-09-29T23:06:25.807Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/44/3159af4fb3c868970a412e294320ed6bb1a9fbdfa6431050eda8e0b34b6e/xarray-2026.9.0-py3-none-any.whl", hash = "sha256:fe349fa871628b1a0a5217af3fe1283a2862d5485156e6eda354fffb81c3bb7c", size = 1445445, upload-time = "2026-09-29T23:06:23.686Z" },
 ]
 
 [[package]]
