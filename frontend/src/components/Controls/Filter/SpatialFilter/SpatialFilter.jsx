@@ -230,10 +230,15 @@ function AreaEditor({ polygon }) {
             {t("spatialFilterBoundsInvalid")}
           </p>
         )}
-        <button type="submit" className="spatialFilterAction">
-          <BoundingBox size={14} aria-hidden="true" />
-          {t("spatialFilterApplyBox")}
-        </button>
+        <div className="spatialFilterActions">
+          <button
+            type="submit"
+            className="spatialFilterAction spatialFilterApply"
+          >
+            <BoundingBox size={14} aria-hidden="true" />
+            {t("spatialFilterApplyBox")}
+          </button>
+        </div>
       </form>
       <form
         className="spatialFilterWktForm"
@@ -267,10 +272,6 @@ function AreaEditor({ polygon }) {
           </p>
         )}
         <div className="spatialFilterActions">
-          <button type="submit" className="spatialFilterAction">
-            <Pentagon size={14} aria-hidden="true" />
-            {t("spatialFilterApplyWkt")}
-          </button>
           {polygon && (
             <button
               type="button"
@@ -290,6 +291,13 @@ function AreaEditor({ polygon }) {
               )}
             </button>
           )}
+          <button
+            type="submit"
+            className="spatialFilterAction spatialFilterApply"
+          >
+            <Pentagon size={14} aria-hidden="true" />
+            {t("spatialFilterApplyWkt")}
+          </button>
         </div>
       </form>
     </>

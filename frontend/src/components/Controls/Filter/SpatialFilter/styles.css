@@ -256,6 +256,10 @@
     color var(--cioos-transition-fast);
 }
 
+.spatialFilterApply {
+  margin-left: auto;
+}
+
 .spatialFilterAction:hover {
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);

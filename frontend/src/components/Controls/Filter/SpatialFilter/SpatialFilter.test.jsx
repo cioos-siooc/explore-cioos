@@ -219,7 +219,9 @@ describe("SpatialFilter coordinates", () => {
 
     await user.clear(north);
     await user.type(north, "47.5");
-    await user.click(screen.getByRole("button", { name: "Apply box" }));
+    await user.click(
+      screen.getByRole("button", { name: "Apply bounding box filter" }),
+    );
 
     await waitFor(() => expect(seen.ring).toBeDefined());
     expect(polygonIsRectangle(seen.ring)).toBe(true);
@@ -234,7 +236,9 @@ describe("SpatialFilter coordinates", () => {
     await user.type(screen.getByTestId("spatial-filter-east"), "-70");
     await user.type(screen.getByTestId("spatial-filter-south"), "40");
     await user.type(screen.getByTestId("spatial-filter-north"), "50");
-    await user.click(screen.getByRole("button", { name: "Apply box" }));
+    await user.click(
+      screen.getByRole("button", { name: "Apply bounding box filter" }),
+    );
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       "West must be less than east",
@@ -252,13 +256,17 @@ describe("SpatialFilter coordinates", () => {
 
     await user.click(wkt);
     await user.paste("POLYGON((-67 44, -64 44))");
-    await user.click(screen.getByRole("button", { name: "Apply" }));
+    await user.click(
+      screen.getByRole("button", { name: "Apply polygon filter" }),
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("POLYGON((lon lat");
 
     await user.clear(wkt);
     expect(screen.queryByRole("alert")).toBeNull();
     await user.paste("POLYGON((-67 44, -64 44, -65 46, -67 44))");
-    await user.click(screen.getByRole("button", { name: "Apply" }));
+    await user.click(
+      screen.getByRole("button", { name: "Apply polygon filter" }),
+    );
     await waitFor(() => expect(seen.ring).toHaveLength(4));
     expect(screen.getByTestId("spatial-filter-wkt")).toHaveValue(
       "POLYGON((-67 44, -64 44, -65 46, -67 44))",
