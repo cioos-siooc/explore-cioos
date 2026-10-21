@@ -57,10 +57,15 @@ def get_l06_codes_and_labels():
             platforms_parsed[id] = {"broader_L06_url": id, "l06_label": label}
         l06Lookup[id] = label
 
-    for l06_url_code, item in platforms_parsed.items():
-        broaderL06 = item["broader_L06_url"]
-        res = l06Lookup[broaderL06]
-        platforms_parsed[l06_url_code]["category"] = res
+    # L06 nests several levels deep (sub-surface gliders < autonomous underwater
+    # vehicle < submersible); the category is the top-level ancestor.
+    def top_level(url):
+        while platforms_parsed[url]["broader_L06_url"] != url:
+            url = platforms_parsed[url]["broader_L06_url"]
+        return url
+
+    for item in platforms_parsed.values():
+        item["category"] = l06Lookup[top_level(item["broader_L06_url"])]
     df = pd.DataFrame.from_dict(platforms_parsed, orient="index")
     del df["broader_L06_url"]
     df.index = df.index.str.split("/").str[-2]
@@ -112,6 +117,12 @@ ioos_to_l06_mapping = get_ioos_to_l06_mapping()
 platforms_nerc_ioos = (
     l06_codes_and_labels.join(ioos_to_l06_mapping).fillna("")
 )
+
+PLATFORM_CATEGORIES = l06_codes_and_labels.set_index("l06_label")["category"].to_dict()
+
+
+def platform_category(l06_label):
+    return PLATFORM_CATEGORIES.get(l06_label, "unknown")
 
 if __name__ == "__main__":
     logger.info("Save platforms mapping and labels to CSV")

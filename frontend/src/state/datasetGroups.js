@@ -4,6 +4,8 @@
 import eovCategories from "../eovCategories.json";
 import eovs from "../eovs.json";
 import erddapServers from "../erddapServers.json";
+import platforms from "../platforms.json";
+import { platformCategory, platformLabel } from "../platformVocab.js";
 import { formatErddapServerName } from "../utilities.jsx";
 import { cdmDataTypeLabel } from "./dataLayers.js";
 
@@ -20,6 +22,7 @@ export const OBIS_KEY = "obis";
 const PARENT_KEYS_BY_DIMENSION = {
   source: [ERDDAP_KEY, OBIS_KEY],
   eov: Object.keys(eovCategories),
+  platform: [...new Set(platforms.map((p) => p.category))],
 };
 
 export function eovCategory(eov) {
@@ -61,7 +64,10 @@ export function groupKeysFor(row, groupBy) {
     case "type":
       return [isGrid ? GRID_KEY : row.cdm_data_type || OTHER_KEY];
     case "platform":
-      return [isGrid ? GRID_KEY : row.platform || OTHER_KEY];
+      if (isGrid) return [GRID_KEY];
+      return row.platform
+        ? [`${platformCategory(row.platform)}:${row.platform}`]
+        : [OTHER_KEY];
     case "source":
       if (row.source_type !== "obis") {
         return [`${ERDDAP_KEY}:${row.erddap_server_url || OTHER_KEY}`];
@@ -100,6 +106,7 @@ export function groupLabel(key, groupBy, t, language = "en") {
       return formatErddapServerName(child, language, erddapServers);
     }
     if (groupBy === "eov") return t(child);
+    if (groupBy === "platform") return platformLabel(child, language);
     return parent === OBIS_KEY && child !== UNCATEGORIZED_KEY
       ? child
       : groupLabel(child, groupBy, t, language);
@@ -112,6 +119,8 @@ export function groupLabel(key, groupBy, t, language = "en") {
       return cdmDataTypeLabel(key, t);
     case "source":
       return key === OBIS_KEY ? "OBIS" : "ERDDAP";
+    case "platform":
+      return platformLabel(key, language);
     case "eov":
       return (
         eovCategories[key]?.[language.startsWith("fr") ? "fr" : "en"] ?? key

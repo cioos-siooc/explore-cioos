@@ -383,10 +383,24 @@ describe("contextual tips", () => {
         /leave things out/,
       );
       expect(screen.getAllByTestId("tip-card")).toHaveLength(1);
-      const [first, second] = await within(modal()).findAllByRole("button", {
-        name: /^Exclude: /,
-      });
+      // Category rows come first with their own Exclude; the tip is on the
+      // first option's.
+      const [first, second] = (
+        await within(modal()).findAllByTestId("filter-option")
+      ).map((option) =>
+        within(option.parentElement).getByRole("button", {
+          name: /^Exclude: /,
+        }),
+      );
       expect(first).toHaveAttribute("data-tip-highlight");
+      const [categoryRow] = within(modal()).getAllByTestId(
+        "filter-option-group",
+      );
+      expect(
+        within(categoryRow.parentElement).getByRole("button", {
+          name: /^Exclude: /,
+        }),
+      ).not.toHaveAttribute("data-tip-highlight");
       expect(second).not.toHaveAttribute("data-tip-highlight");
 
       await user.click(screen.getByRole("button", { name: "Next tip" }));
