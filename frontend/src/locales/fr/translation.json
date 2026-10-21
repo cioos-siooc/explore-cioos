@@ -602,7 +602,7 @@
   "harvest.col.recent": "Récent (nouveau→ancien)",
   "harvest.col.reason": "Raison",
   "harvest.warning.label": "Avertissement",
-  "harvest.warning.FEATURES_HIDDEN": "Entités masquées sur la carte",
+  "harvest.warning.FEATURES_HIDDEN": "Entités non affichées comme marqueurs",
   "harvest.warning.FEATURES_DROPPED": "Entités rejetées",
   "harvest.warning.OCCURRENCES_DROPPED": "Occurrences rejetées",
   "harvest.warning.NON_CF_STANDARD_NAMES": "Noms standard non conformes CF",

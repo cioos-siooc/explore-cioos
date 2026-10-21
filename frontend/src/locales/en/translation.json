@@ -601,7 +601,7 @@
   "harvest.col.recent": "Recent (newest→)",
   "harvest.col.reason": "Reason",
   "harvest.warning.label": "Warning",
-  "harvest.warning.FEATURES_HIDDEN": "Features hidden from the map",
+  "harvest.warning.FEATURES_HIDDEN": "Features not shown as map markers",
   "harvest.warning.FEATURES_DROPPED": "Features dropped",
   "harvest.warning.OCCURRENCES_DROPPED": "Occurrences dropped",
   "harvest.warning.NON_CF_STANDARD_NAMES": "Non-CF standard names",
