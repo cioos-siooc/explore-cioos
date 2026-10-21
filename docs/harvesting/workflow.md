@@ -126,7 +126,7 @@ describes the data still stored.
 
 | Code | Meaning |
 | --- | --- |
-| `FEATURES_HIDDEN` | Features spanning more than 1 km are hidden from the map (still searchable) |
+| `FEATURES_HIDDEN` | Features whose lat/lon box spans more than 1 km are not drawn as markers (still in coverage cells and search) |
 | `FEATURES_DROPPED` | Features removed: latitude/longitude out of range, depth outside -100..15 000 m, no record count, or an unparseable time |
 | `OCCURRENCES_DROPPED` | OBIS occurrences dropped for coordinates outside the Web Mercator range |
 | `NON_CF_STANDARD_NAMES` | `standard_name` values not in the CF table (ioos_qc `*_test` names excluded) |

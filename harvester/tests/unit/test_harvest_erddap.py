@@ -6,6 +6,7 @@ import pandas as pd
 from cde_harvester.core.errors import (
     CDM_DATA_TYPE_UNSUPPORTED,
     HTTP_ERROR,
+    NO_PROFILES_FOUND,
 )
 from cde_harvester.sources.erddap.harvester import harvest_erddap
 from conftest import (
@@ -103,6 +104,37 @@ class TestHarvestErddapSkipping:
         erddap_mock = _make_erddap_mock([("bad_ds", "Point")])
         result = _run_harvest(erddap_mock)
         assert (result.skipped["erddap_url"] == ERDDAP_URL.rstrip("/")).all()
+
+    def test_unsupported_cdm_type_message_lists_supported_types(self):
+        erddap_mock = _make_erddap_mock([("bad_ds", "Point")])
+        result = _run_harvest(erddap_mock)
+        message = result.attempts.query("dataset_id == 'bad_ds'")["error_message"].iloc[0]
+        assert "cdm_data_type='Point'" in message
+        assert "TimeSeries" in message
+
+    def test_no_features_attempt_carries_the_reason(self):
+        dataset = build_mock_dataset()
+        dataset.no_features_reason = "No variable has a cf_role attribute"
+        erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])
+        with (
+            patch("cde_harvester.sources.erddap.harvester.ERDDAP", return_value=erddap_mock),
+            patch(
+                "cde_harvester.sources.erddap.harvester.extract_features",
+                return_value=pd.DataFrame(),
+            ),
+        ):
+            erddap_mock.get_dataset.return_value = dataset
+            result = harvest_erddap.fn(ERDDAP_URL)
+        attempt = result.attempts.query("dataset_id == @DATASET_ID").iloc[0]
+        assert attempt["reason_code"] == NO_PROFILES_FOUND
+        assert attempt["error_message"] == "No variable has a cf_role attribute"
+
+    def test_compliance_skip_records_its_details(self):
+        non_compliant = build_mock_dataset(ERDDAP_INFO_NO_EOVS_CSV)
+        erddap_mock = _make_erddap_mock([(DATASET_ID, "TimeSeries")])
+        result = _run_harvest(erddap_mock, dataset_mock=non_compliant)
+        message = result.attempts.query("dataset_id == @DATASET_ID")["error_message"].iloc[0]
+        assert message == "No supported variables found"
 
     def test_non_compliant_dataset_added_to_skipped(self):
         """A dataset with no EOVs should fail compliance and appear in skipped."""
