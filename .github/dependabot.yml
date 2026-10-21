@@ -1,8 +1,8 @@
 version: 2
 updates:
-  # Grouped so a week's patches arrive as one PR per service rather than a
-  # dozen. Majors are separate: they need a human either way. Security updates
-  # ignore version-update groups, so each service has its own security group.
+  # Grouped so a week's updates arrive as at most three PRs per service rather
+  # than a dozen: minor/patch, majors (they need a human either way), and
+  # security, since security updates ignore version-update groups.
   # Root holds the shared lint/format toolchain (ESLint, Prettier, stylelint).
   - package-ecosystem: npm
     directory: /
@@ -11,6 +11,8 @@ updates:
     groups:
       tooling-minor-patch:
         update-types: [minor, patch]
+      tooling-major:
+        update-types: [major]
       tooling-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -22,6 +24,8 @@ updates:
     groups:
       frontend-minor-patch:
         update-types: [minor, patch]
+      frontend-major:
+        update-types: [major]
       frontend-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -33,6 +37,8 @@ updates:
     groups:
       web-api-minor-patch:
         update-types: [minor, patch]
+      web-api-major:
+        update-types: [major]
       web-api-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -44,6 +50,8 @@ updates:
     groups:
       test-minor-patch:
         update-types: [minor, patch]
+      test-major:
+        update-types: [major]
       test-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -56,6 +64,8 @@ updates:
     groups:
       python-minor-patch:
         update-types: [minor, patch]
+      python-major:
+        update-types: [major]
       python-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -65,6 +75,8 @@ updates:
     groups:
       harvester-minor-patch:
         update-types: [minor, patch]
+      harvester-major:
+        update-types: [major]
       harvester-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -74,6 +86,8 @@ updates:
     groups:
       downloader-minor-patch:
         update-types: [minor, patch]
+      downloader-major:
+        update-types: [major]
       downloader-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -83,6 +97,8 @@ updates:
     groups:
       scheduler-minor-patch:
         update-types: [minor, patch]
+      scheduler-major:
+        update-types: [major]
       scheduler-security:
         applies-to: security-updates
         patterns: ["*"]
@@ -106,4 +122,7 @@ updates:
     schedule: { interval: monthly }
     groups:
       actions:
+        patterns: ["*"]
+      actions-security:
+        applies-to: security-updates
         patterns: ["*"]
