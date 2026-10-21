@@ -94,6 +94,22 @@ describe("FilterSearch", () => {
     expect(screen.queryByTestId("filter-search-input")).toBeNull();
   });
 
+  it("leaves typing in a field inside a shadow root alone", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(<FiltersModal />, { providers: "app" });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const field = document.createElement("textarea");
+    host.attachShadow({ mode: "open" }).append(field);
+
+    field.focus();
+    await user.keyboard("abc");
+
+    expect(field).toHaveValue("abc");
+    expect(screen.queryByTestId("filter-search-input")).toBeNull();
+    host.remove();
+  });
+
   it("opens the Filters modal on its search page with Ctrl+K", async () => {
     const { seen } = await renderPalette();
     expect(seen.ui).toEqual({ showFiltersModal: true, openFilter: undefined });

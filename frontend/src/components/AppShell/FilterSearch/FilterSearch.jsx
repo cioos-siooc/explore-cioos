@@ -144,7 +144,9 @@ const isTypingTarget = (el) =>
     el.closest("input, textarea, select, [contenteditable]") !== null);
 
 // Also opens on typing a letter or digit while no field has focus and no
-// dialog is up. Not symbols, which the map takes for zoom (+, -, =).
+// dialog is up. Not symbols, which the map takes for zoom (+, -, =). The
+// composed path sees through shadow roots (Sentry's feedback form), which
+// retarget e.target to their host.
 export function useFilterSearchShortcut(open) {
   useEffect(() => {
     function onKeyDown(e) {
@@ -160,7 +162,7 @@ export function useFilterSearchShortcut(open) {
         e.ctrlKey ||
         e.altKey ||
         !/^[\p{L}\p{N}]$/u.test(e.key) ||
-        isTypingTarget(e.target) ||
+        isTypingTarget(e.composedPath()[0]) ||
         document.body.classList.contains("cioos-modal-open")
       )
         return;
