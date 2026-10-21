@@ -527,6 +527,9 @@ def extract_day_stats(dataset, count_profiles=False):
 
     if days.empty:
         log.warning("No trajectory days found for %s", dataset.id)
+        dataset.no_features_reason = (
+            "No trajectory days found: no record has a parseable time"
+        )
         return days
 
     # Read by get_df() (n_profiles = missions) and extract_track_points.

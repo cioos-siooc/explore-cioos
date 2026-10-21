@@ -69,6 +69,8 @@ class Dataset:
         # Recorded in harvest_attempts so an ERDDAP admin can reproduce a failure.
         self.queried_urls = []
         self.warnings = HarvestWarnings(self.logger)
+        # Why extract_features() came back empty, for the NO_PROFILES_FOUND attempt.
+        self.no_features_reason = None
         self.cdm_data_type = ""
         self.globals = {}
         self.platform = "unknown"
@@ -207,6 +209,11 @@ class Dataset:
         self.profile_variable_list = profile_variable_list
 
         if not profile_variables:
+            self.no_features_reason = (
+                "No variable has a cf_role attribute (profile_id, timeseries_id "
+                f"or trajectory_id), which a {self.cdm_data_type} dataset needs "
+                "to tell its features apart"
+            )
             return []
 
         # distinct() of the ids alone measured ~0.2s on every ONC and
@@ -235,6 +242,11 @@ class Dataset:
             ).reset_index()
 
         if profile_ids.empty:
+            self.no_features_reason = (
+                f"distinct() of the cf_role variable(s) {', '.join(profile_variable_list)} "
+                "returned no rows: the dataset has no data, or those variables are "
+                "never filled"
+            )
             return profile_ids
 
         self.profile_ids = profile_ids.drop_duplicates(profile_variable_list)
@@ -401,6 +413,8 @@ class Dataset:
 
         if "standard_name" not in df_variables:
             df_variables["standard_name"] = None
+        if "cf_role" not in df_variables:
+            df_variables["cf_role"] = ""
         df_variables.set_index("name", drop=False, inplace=True)
         self.df_variables = df_variables
         # Every column, coordinates and cf_role variables included: the preview
