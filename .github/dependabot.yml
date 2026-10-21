@@ -1,7 +1,8 @@
 version: 2
 updates:
-  # Grouped so a week's patches arrive as one PR per ecosystem rather than a
-  # dozen. Majors are separate: they need a human either way.
+  # Grouped so a week's patches arrive as one PR per service rather than a
+  # dozen. Majors are separate: they need a human either way. Security updates
+  # ignore version-update groups, so each service has its own security group.
   # Root holds the shared lint/format toolchain (ESLint, Prettier, stylelint).
   - package-ecosystem: npm
     directory: /
@@ -10,6 +11,9 @@ updates:
     groups:
       tooling-minor-patch:
         update-types: [minor, patch]
+      tooling-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   - package-ecosystem: npm
     directory: /frontend
@@ -18,6 +22,9 @@ updates:
     groups:
       frontend-minor-patch:
         update-types: [minor, patch]
+      frontend-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   - package-ecosystem: npm
     directory: /web-api
@@ -26,6 +33,9 @@ updates:
     groups:
       web-api-minor-patch:
         update-types: [minor, patch]
+      web-api-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   - package-ecosystem: npm
     directory: /test
@@ -34,6 +44,9 @@ updates:
     groups:
       test-minor-patch:
         update-types: [minor, patch]
+      test-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   # One entry per uv project — each has its own pyproject.toml and uv.lock.
   - package-ecosystem: uv
@@ -43,24 +56,36 @@ updates:
     groups:
       python-minor-patch:
         update-types: [minor, patch]
+      python-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: uv
     directory: /harvester
     schedule: { interval: weekly, day: monday }
     groups:
       harvester-minor-patch:
         update-types: [minor, patch]
+      harvester-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: uv
     directory: /downloader
     schedule: { interval: weekly, day: monday }
     groups:
       downloader-minor-patch:
         update-types: [minor, patch]
+      downloader-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: uv
     directory: /download_scheduler
     schedule: { interval: weekly, day: monday }
     groups:
       scheduler-minor-patch:
         update-types: [minor, patch]
+      scheduler-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   - package-ecosystem: docker
     directories: [/frontend, /web-api, /nginx, /database, /harvester, /download_scheduler]
