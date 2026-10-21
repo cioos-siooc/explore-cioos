@@ -271,7 +271,7 @@ services:
       # source. Budget against mem_limit below, not CPU: each run is its own
       # pandas working set, and 6 OOM'd the container. Raise it together with
       # HARVESTER_MEM_LIMIT.
-      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-2}
+      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-3}
     # memswap_limit == mem_limit gives this container ZERO swap, so a runaway
     # harvest is OOM-killed in its own cgroup instead of grinding through host
     # swap (which once livelocked the box until a hard reboot). Keep both

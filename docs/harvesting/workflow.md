@@ -70,11 +70,15 @@ All runs are Prefect flows executed by the `prefect_worker` process pool.
 - **All sources in one run** (`cde-harvester-deployment`, on demand) harvests
   every source in a single flow and loads them together. It is the only path
   where `incremental: false` performs a [full reload](#loading).
-- Sources are submitted together, but the worker runs at most
-  `HARVEST_WORKER_LIMIT` flows at once (default 2, and the waiting
-  orchestrator holds one slot), so with the defaults sources run one after
-  another. Inside a source, datasets are harvested one at a time, to stay
-  gentle on the upstream server and bound memory.
+- The worker runs at most `HARVEST_WORKER_LIMIT` flows at once (default 3;
+  the waiting orchestrator holds one slot). The orchestrator orders sources
+  by the median duration of their last 5 successful runs: the slowest one
+  runs alone in a side lane, and the rest run one after another, fastest
+  first, in the other lane, so a slow server never holds up the quick ones.
+  Sources with no history run last, in config order. With a limit of 2 there
+  is only one lane, ordered fastest first. Loads still go one at a time
+  (advisory lock). Inside a source, datasets are harvested one at a time, to
+  stay gentle on the upstream server and bound memory.
 - Each run writes its CSVs to `{folder}/{source-slug}/{timestamp}`. After a
   successful load the last 5 runs per source are kept (folders touched in the
   last 6 hours are never removed), so a failed load can be inspected.
