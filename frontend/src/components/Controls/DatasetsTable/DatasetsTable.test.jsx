@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -24,6 +24,13 @@ function makeRow(overrides) {
     ...overrides,
   };
 }
+
+// Platforms nest term under L06 category, and a term that is its own category
+// ("mooring") heads both levels: its own header is the nested one.
+const termHeader = (name) =>
+  [...document.querySelectorAll(".datasetsCardGroupHeader.nested")].find(
+    (h) => h.querySelector(".datasetsCardGroupTitle").textContent === name,
+  );
 
 let filters;
 function FiltersProbe() {
@@ -235,7 +242,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
 
   it("grouping sorts by group size, largest first, and ungrouping sorts by title again", async () => {
     const rows = [
-      makeRow({ pk: 1, title: "A", platform: "buoy" }),
+      makeRow({ pk: 1, title: "A", platform: "research vessel" }),
       makeRow({ pk: 2, title: "B", platform: "mooring" }),
       makeRow({ pk: 3, title: "C", platform: "mooring" }),
     ];
@@ -257,13 +264,19 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
         [...document.querySelectorAll(".datasetsCardGroupCount")].map(
           (el) => el.textContent,
         ),
-      ).toEqual(["2", "1"]),
+      ).toEqual(["2", "2", "1", "1"]),
     );
+    expect(
+      [...document.querySelectorAll(".datasetsCardGroupTitle")].map(
+        (el) => el.textContent,
+      ),
+    ).toEqual(["Mooring", "Mooring", "Surface vessel", "Research vessel"]);
+    // Shares are against the largest group at the same depth.
     expect(
       [...document.querySelectorAll(".datasetsCardGroupHeader")].map((h) =>
         h.style.getPropertyValue("--group-share"),
       ),
-    ).toEqual(["1", "0.5"]);
+    ).toEqual(["1", "1", "0.5", "0.5"]);
 
     await user.selectOptions(screen.getByLabelText("Group by"), "none");
     expect(screen.getByLabelText("Sort")).toHaveValue("title");
@@ -272,9 +285,9 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("starts every group closed past one page, and a header opens its group", async () => {
+  it("starts every term closed past one page, under its open category, and a header opens it", async () => {
     const rows = Array.from({ length: 30 }, (_, i) =>
-      makeRow({ pk: i + 1, platform: i % 2 ? "buoy" : "mooring" }),
+      makeRow({ pk: i + 1, platform: i % 2 ? "research vessel" : "mooring" }),
     );
     const { user } = renderWithProviders(
       <DatasetsTable
@@ -289,8 +302,9 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     await user.selectOptions(screen.getByLabelText("Group by"), "platform");
 
     const toggles = await screen.findAllByRole("button", { expanded: false });
+    expect(toggles).toHaveLength(2);
     expect(screen.queryAllByTestId("dataset-card")).toHaveLength(0);
-    expect(screen.queryAllByRole("button", { expanded: true })).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { expanded: true })).toHaveLength(2);
 
     await user.click(toggles[0]);
     expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
@@ -461,19 +475,20 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     await user.selectOptions(screen.getByLabelText("Group by"), "platform");
     const mooring = () =>
       filters.platformsSelected.find((p) => p.title === "mooring");
+    await waitFor(() => expect(termHeader("Mooring")).toBeDefined());
+    const button = (name) =>
+      within(termHeader("Mooring")).getByRole("button", { name });
 
-    const include = await screen.findByRole("button", {
-      name: "Add filter: mooring",
-    });
+    const include = button("Add filter: Mooring");
     await user.click(include);
     await waitFor(() => expect(mooring().isSelected).toBe(true));
     expect(include).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await user.click(button("Exclude: Mooring"));
     await waitFor(() => expect(mooring().isExcluded).toBe(true));
     expect(mooring().isSelected).toBe(false);
 
-    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await user.click(button("Exclude: Mooring"));
     await waitFor(() => expect(mooring().isExcluded).toBe(false));
   });
 
@@ -499,29 +514,25 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     });
     await screen.findAllByTestId("dataset-card");
     await user.selectOptions(screen.getByLabelText("Group by"), "platform");
-    const header = (name) =>
-      [...document.querySelectorAll(".datasetsCardGroupHeader")].find(
-        (h) => h.querySelector(".datasetsCardGroupTitle").textContent === name,
-      );
+    const header = termHeader;
+    const button = (group, name) =>
+      within(header(group)).getByRole("button", { name });
     const platform = (name) =>
       filters.platformsSelected.find((p) => p.title === name);
 
     // Including mooring narrows the results to it; surface vessel stays
     // listed, empty and last, so it can be added too.
-    await user.click(
-      await screen.findByRole("button", { name: "Add filter: mooring" }),
-    );
+    await waitFor(() => expect(header("Mooring")).toBeDefined());
+    await user.click(button("Mooring", "Add filter: Mooring"));
     rerender(table(ROWS));
-    expect(header("surface vessel")).toHaveClass("empty");
+    expect(header("Surface vessel")).toHaveClass("empty");
     expect(
-      header("surface vessel").querySelector(".datasetsCardGroupCount"),
+      header("Surface vessel").querySelector(".datasetsCardGroupCount"),
     ).toHaveTextContent("0");
     expect(
-      header("surface vessel").querySelector(".datasetsCardGroupToggle"),
+      header("Surface vessel").querySelector(".datasetsCardGroupToggle"),
     ).toBeDisabled();
-    await user.click(
-      screen.getByRole("button", { name: "Add filter: surface vessel" }),
-    );
+    await user.click(button("Surface vessel", "Add filter: Surface vessel"));
     await waitFor(() =>
       expect(platform("surface vessel").isSelected).toBe(true),
     );
@@ -529,22 +540,18 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
 
     // An excluded group stays listed with its undo, and clearing the filter
     // keeps it until the results bring it back.
-    await user.click(
-      screen.getByRole("button", { name: "Add filter: mooring" }),
-    );
-    await user.click(
-      screen.getByRole("button", { name: "Add filter: surface vessel" }),
-    );
-    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    await user.click(button("Mooring", "Add filter: Mooring"));
+    await user.click(button("Surface vessel", "Add filter: Surface vessel"));
+    await user.click(button("Mooring", "Exclude: Mooring"));
     rerender(table([vessel]));
-    expect(header("mooring")).toHaveClass("empty", "excluded");
-    expect(header("mooring").style.getPropertyValue("--group-share")).toBe("0");
-    await user.click(screen.getByRole("button", { name: "Exclude: mooring" }));
+    expect(header("Mooring")).toHaveClass("empty", "excluded");
+    expect(header("Mooring").style.getPropertyValue("--group-share")).toBe("0");
+    await user.click(button("Mooring", "Exclude: Mooring"));
     await waitFor(() => expect(platform("mooring").isExcluded).toBe(false));
-    expect(header("mooring")).toHaveClass("empty");
+    expect(header("Mooring")).toHaveClass("empty");
 
     rerender(table([...ROWS, vessel]));
-    expect(header("mooring")).not.toHaveClass("empty");
+    expect(header("Mooring")).not.toHaveClass("empty");
 
     await user.selectOptions(screen.getByLabelText("Group by"), "type");
     await user.selectOptions(screen.getByLabelText("Group by"), "platform");
@@ -625,6 +632,107 @@ describe("DatasetsTable (download modal)", () => {
 
     await waitFor(() => expect(selection.selectedPks.has(1)).toBe(false));
     expect(handleSelectDataset).not.toHaveBeenCalled();
+  });
+
+  describe("with the gridded coverage layer on", () => {
+    const titles = () =>
+      screen
+        .getAllByTestId("dataset-card")
+        .map((c) => c.querySelector(".datasetCardTitle").textContent);
+    let map;
+    function MapProbe() {
+      map = useMapState();
+      return null;
+    }
+    const ROWS_WITH_GRIDS = [
+      ...ROWS,
+      makeRow({
+        pk: 4,
+        title: "Delta grid",
+        cdm_data_type: "Grid",
+        grid_dimensions: [],
+      }),
+    ];
+    const renderTable = (props = {}) =>
+      renderWithProviders(
+        <>
+          <DatasetsTable
+            datasets={ROWS_WITH_GRIDS}
+            selectAll={false}
+            handleSelectAllDatasets={() => {}}
+            handleSelectDataset={() => {}}
+            {...props}
+          />
+          <MapProbe />
+        </>,
+        { providers: "app" },
+      );
+
+    it("lists grids first, each block in the chosen sort", async () => {
+      renderTable();
+      await screen.findAllByTestId("dataset-card");
+      expect(titles()).toEqual([
+        "Alpha station",
+        "Beta station",
+        "Delta grid",
+        "Gamma grid",
+      ]);
+
+      act(() => map.setGriddapCoverageVisible(true));
+
+      expect(titles()).toEqual([
+        "Delta grid",
+        "Gamma grid",
+        "Alpha station",
+        "Beta station",
+      ]);
+    });
+
+    it("still puts a map click's datasets above the grids", async () => {
+      renderTable();
+      await screen.findAllByTestId("dataset-card");
+      act(() => {
+        map.setGriddapCoverageVisible(true);
+        map.setFeatureQuery({ nonce: 1, lngLat: [0, 0], datasetPks: [1] });
+      });
+
+      expect(titles()).toEqual([
+        "Beta station",
+        "Delta grid",
+        "Gamma grid",
+        "Alpha station",
+      ]);
+    });
+
+    it("leads with the gridded group when grouped by type", async () => {
+      // A third station so the default largest-group-first order would put
+      // the time series ahead.
+      const { user } = renderTable({
+        datasets: [...ROWS_WITH_GRIDS, makeRow({ pk: 5, title: "Epsilon" })],
+      });
+      await screen.findAllByTestId("dataset-card");
+      act(() => map.setGriddapCoverageVisible(true));
+      await user.selectOptions(screen.getByLabelText("Group by"), "type");
+
+      await waitFor(() =>
+        expect(
+          document.querySelector(".datasetsCardGroupHeader"),
+        ).toHaveTextContent("Gridded"),
+      );
+    });
+
+    it("leaves the download modal's order alone", async () => {
+      renderTable({ isDownloadModal: true });
+      await screen.findAllByTestId("dataset-card");
+      act(() => map.setGriddapCoverageVisible(true));
+
+      expect(titles()).toEqual([
+        "Alpha station",
+        "Beta station",
+        "Delta grid",
+        "Gamma grid",
+      ]);
+    });
   });
 
   it("the map-click hint's Clear drops the highlighted click", async () => {

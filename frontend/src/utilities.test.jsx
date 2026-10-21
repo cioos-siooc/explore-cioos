@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   abbreviateString,
   applyDatasetPKs,
+  areaFromBounds,
   capitalizeFirstLetter,
   coverPadding,
   createDataFilterQueryString,
@@ -12,6 +13,7 @@ import {
   formatErddapServerName,
   formatSizeEstimate,
   getCurrentRangeLevel,
+  parseArea,
   toggleOptionExcluded,
   toggleOptionIncluded,
   polygonIsRectangle,
@@ -347,6 +349,50 @@ describe("the drawn selection round-trips through the url", () => {
     expect(polygonToWkt(rectangle)).toBe(
       "POLYGON((-130 48, -120 48, -120 55, -130 55, -130 48))",
     );
+  });
+
+  it("reads its own wkt back", () => {
+    expect(parseArea(polygonToWkt(freeform))).toEqual(freeform);
+  });
+});
+
+describe("parseArea", () => {
+  it("reads four numbers as west, south, east, north", () => {
+    const box = parseArea("-130, 48, -120, 55");
+    expect(polygonIsRectangle(box)).toBe(true);
+    expect(parseArea("-130 48 -120 55")).toEqual(box);
+    expect(box[0]).toEqual([-130, 48]);
+  });
+
+  it("closes an open wkt ring and keeps only the outer one", () => {
+    expect(
+      parseArea(
+        "polygon (( -130 48, -120 50, -125 55 ), (-128 50, -126 50, -127 51))",
+      ),
+    ).toEqual([
+      [-130, 48],
+      [-120, 50],
+      [-125, 55],
+      [-130, 48],
+    ]);
+  });
+
+  it.each([
+    ["a search", "oxygen"],
+    ["too few numbers", "-130, 48, -120"],
+    ["west past east", "-120, 48, -130, 55"],
+    ["off the globe", "-190, 48, -120, 55"],
+    ["a line", "POLYGON((-130 48, -120 50, -130 48))"],
+    ["a non-number", "POLYGON((-130 48, x 50, -125 55, -130 48))"],
+    ["a latitude past the pole", "POLYGON((-130 48, -120 95, -125 55))"],
+  ])("rejects %s", (_, text) => {
+    expect(parseArea(text)).toBeUndefined();
+  });
+
+  it("rejects bounds that are blank", () => {
+    expect(
+      areaFromBounds({ west: NaN, south: 48, east: -120, north: 55 }),
+    ).toBeUndefined();
   });
 });
 
