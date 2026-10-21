@@ -3,6 +3,7 @@ import gzip
 import os
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, date, datetime, timedelta
 
 import redis
 import requests
@@ -15,6 +16,27 @@ CACHE_WARM_TIMEOUT_SECONDS = 60
 # Serially, 5000 routes at ~100ms each takes 8+ minutes.
 CACHE_WARM_CONCURRENCY = int(os.environ.get("CACHE_WARM_CONCURRENCY", "8"))
 CACHE_WARM_MAX_ROUTES = 5000
+
+# What a first visitor's browser requests with default filters (frontend
+# FilterProvider, MapStateProvider, CoverageModal), byte-for-byte: apicache
+# keys on the exact URL. Warmed even when there are no access logs to replay.
+DEFAULT_VIEW_ROUTES = [
+    "/api/platforms",
+    "/api/oceanVariables",
+    "/api/organizations",
+    "/api/obisNodes",
+    "/api/datasets",
+    "/api/erddapServers",
+    "/api/timeExtent",
+    "/api/pointQuery",
+    "/api/legend?metric=days",
+    "/api/coverageHistogram?groupBy=source&count=days&view=timeline&",
+]
+# The default view (zoom 2.75) loads z2 tiles; z0-z3 is the whole world for
+# zooming out and one level in, 85 tiles per source.
+DEFAULT_VIEW_MAX_TILE_ZOOM = 3
+# frontend defaultTrailingDays; the track window ends on today's UTC date.
+DEFAULT_TRAILING_DAYS = 90
 
 # Same env contract as web-api/utils/redis.js.
 REDIS_URL = os.environ.get("REDIS_URL")
@@ -39,6 +61,26 @@ def clearRedisCache():
 
     _redis_client().flushall()
     logger.info("redis cache flushed")
+
+def _world_tiles(max_zoom):
+    for z in range(max_zoom + 1):
+        for x in range(2**z):
+            for y in range(2**z):
+                yield z, x, y
+
+
+def default_view_routes(today: date):
+    # Same window as the frontend's tracksTimeWindow(), URLSearchParams-encoded.
+    time_min = (today - timedelta(days=DEFAULT_TRAILING_DAYS)).isoformat()
+    time_max = (today + timedelta(days=1)).isoformat()
+    tracks_query = f"timeMin={time_min}T00%3A00%3A00Z&timeMax={time_max}T00%3A00%3A00Z"
+    tiles = list(_world_tiles(DEFAULT_VIEW_MAX_TILE_ZOOM))
+    return [
+        *DEFAULT_VIEW_ROUTES,
+        *(f"/api/tiles/{z}/{x}/{y}.mvt?metric=days" for z, x, y in tiles),
+        *(f"/api/tiles/tracks/{z}/{x}/{y}.mvt?{tracks_query}" for z, x, y in tiles),
+    ]
+
 
 @task(name="reload-top-requests")
 def reloadTopRequests():
@@ -67,9 +109,13 @@ def reloadTopRequests():
                 except IndexError:
                     continue
 
-    routes = [request for request, _count in Counter(apiRequests).most_common(
-        CACHE_WARM_MAX_ROUTES
-    )]
+    # Defaults first so a first visitor is covered soonest; dict dedupes in order.
+    routes = list(dict.fromkeys([
+        *default_view_routes(datetime.now(UTC).date()),
+        *(request for request, _count in Counter(apiRequests).most_common(
+            CACHE_WARM_MAX_ROUTES
+        )),
+    ]))
 
     def warm(request):
         # `logger` is closed over: get_run_logger() reads a thread-local

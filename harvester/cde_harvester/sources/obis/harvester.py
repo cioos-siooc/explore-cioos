@@ -534,6 +534,7 @@ class OBISHarvester(BaseHarvester):
             "dataset_id": dataset_id,
             "cdm_data_type": "Point",
             "platform": "unknown",
+            "platform_category": "unknown",
             "eovs": [],
             "organizations": organizations,
             "n_profiles": len(cells),

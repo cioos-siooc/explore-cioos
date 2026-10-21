@@ -2,6 +2,7 @@
 get_metadata() call in __init__ makes no HTTP request."""
 
 import pandas as pd
+import pytest
 from conftest import (
     DATASET_ID,
     ERDDAP_INFO_CSV,
@@ -75,6 +76,27 @@ class TestDatasetMetadataParsing:
         [warning] = ds.warnings
         assert warning["code"] == "UNKNOWN_PLATFORM_VOCABULARY"
         assert warning["items"] == ["45217"]
+
+    @pytest.mark.parametrize(
+        ("platform", "vocabulary", "label", "category"),
+        [
+            ("diver", "https://vocab.nerc.ac.uk/collection/L06/current/", "diver", "organism"),
+            # Two levels under its category: sub-surface gliders < AUV < submersible.
+            ("sub-surface gliders", "L06", "sub-surface gliders", "submersible"),
+            ("ice-tethered subsurface profiling float", "L06",
+             "Ice-tethered subsurface profiling float", "cryosphere"),
+            ("glider", "https://mmisw.org/ont/ioos/platform", "autonomous underwater vehicle", "submersible"),
+        ],
+    )
+    def test_platform_keeps_the_l06_term_and_its_top_level_category(
+        self, mock_erddap_server, platform, vocabulary, label, category
+    ):
+        ds = _make_dataset(mock_erddap_server)
+        ds.globals.update(platform=platform, platform_vocabulary=vocabulary)
+        ds.platform = ds.get_platform_code()
+        ds.profile_ids = pd.DataFrame({"station_id": ["S1"], "latitude": [48.5], "longitude": [-125.0]})
+        assert ds.platform == label
+        assert ds.get_df()["platform_category"].item() == category
 
 
 class TestPlottingAttributes:

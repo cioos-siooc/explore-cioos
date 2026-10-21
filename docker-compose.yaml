@@ -247,6 +247,9 @@ services:
       # Caches persisted across runs (cheap re-fetch if lost).
       - harvester_cache:/app/harvester/harvester_cache
       - obis_cache:/app/harvester/obis_cache
+      # Read by the post-harvest cache warm-up to replay the most common API
+      # requests (cde_harvester/redisFunctions.py).
+      - nginx_logs:/app/nginx/logs:ro
     env_file: *env-file
     environment:
       PREFECT_API_URL: http://prefect:4200/api

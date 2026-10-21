@@ -12,7 +12,11 @@ from cde_harvester.core.harvest_warnings import (
 from cde_harvester.core.observability import run_logger
 from cde_harvester.core.record_metadata import from_erddap_globals
 from cde_harvester.core.variables import extract_variables
-from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
+from cde_harvester.sources.erddap.platform_vocab import (
+    PLATFORM_CATEGORIES,
+    platform_category,
+    platforms_nerc_ioos,
+)
 from cde_harvester.utils import (
     eov_standard_name,
     eov_to_standard_name,
@@ -110,6 +114,7 @@ class Dataset:
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "platform": [self.platform],
+                "platform_category": [platform_category(self.platform)],
                 "eovs": [self.eovs],
                 "organizations": [self.organizations],
                 "n_profiles": [len(self.profile_ids)],
@@ -323,26 +328,18 @@ class Dataset:
 
         if "ioos" in platform_vocabulary:
             try:
-                l06_platform_label = platforms_nerc_ioos.query(
+                return platforms_nerc_ioos.query(
                     f"ioos_label=='{platform}'"
-                )["category"].item()
-
-                return l06_platform_label
+                )["l06_label"].item()
 
             except ValueError:
                 self.logger.error("Found unsupported IOOS platform: %s", platform)
 
         if "L06" in platform_vocabulary:
-            platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
-                subset=["l06_label"]
-            )
-
-            if platform.lower() in list(platforms_nerc_ioos["l06_label"]):
-                return platforms_nerc_ioos_no_duplicates.query(
-                    f"l06_label=='{platform.lower()}'"
-                )["category"].item()
-            else:
-                self.logger.error("Found unsupported L06 platform: %s", platform)
+            l06_labels = {label.lower(): label for label in PLATFORM_CATEGORIES}
+            if platform.lower() in l06_labels:
+                return l06_labels[platform.lower()]
+            self.logger.error("Found unsupported L06 platform: %s", platform)
 
         self.warnings.add(
             UNKNOWN_PLATFORM_VOCABULARY,

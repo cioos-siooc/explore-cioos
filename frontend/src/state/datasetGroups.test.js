@@ -117,6 +117,12 @@ describe("groupLabel", () => {
     expect(groupLabel("Biogeochemical:oxygen", "eov", t)).toBe("oxygen");
   });
 
+  it("labels a platform category and its terms from the L06 vocabulary", () => {
+    expect(groupLabel("organism", "platform", t, "fr-CA")).toBe("Organisme");
+    expect(groupLabel("organism:diver", "platform", t)).toBe("Diver");
+    expect(groupLabel("organism:diver", "platform", t, "fr")).toBe("Plongeur");
+  });
+
   it("returns the raw key for organization, which has no translation", () => {
     expect(groupLabel("Fisheries and Oceans Canada", "organization", t)).toBe(
       "Fisheries and Oceans Canada",
@@ -151,5 +157,17 @@ describe("nested groups", () => {
     expect(groupParent("Physical:seaIce", "eov")).toBe("Physical");
     expect(groupParent(UNCATEGORIZED_KEY, "eov")).toBe(null);
     expect(groupParent("a:b", "organization")).toBe(null);
+  });
+
+  it("nests a platform under its top-level L06 category", () => {
+    expect(parentGroupKeys("platform")).toContain("organism");
+    expect(groupKeysFor({ platform: "diver" }, "platform")).toEqual([
+      "organism:diver",
+    ]);
+    expect(
+      groupKeysFor({ platform: "sub-surface gliders" }, "platform"),
+    ).toEqual(["submersible:sub-surface gliders"]);
+    expect(groupParent("organism:diver", "platform")).toBe("organism");
+    expect(groupParent(OTHER_KEY, "platform")).toBe(null);
   });
 });
