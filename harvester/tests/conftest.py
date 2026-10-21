@@ -413,6 +413,7 @@ def build_mock_dataset(
     mock.variables_list = variables_list
     mock.logger = logging.getLogger("test.mock_dataset")
     mock.warnings = HarvestWarnings(mock.logger)
+    mock.no_features_reason = None
 
     info_df = build_info_df(info_csv)
     global_rows = info_df.query('`Variable Name`=="NC_GLOBAL"')[

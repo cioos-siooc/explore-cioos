@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+import math
 import os
 import shutil
 import sys
@@ -16,6 +17,8 @@ from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.deployments import run_deployment
 from prefect.exceptions import ObjectNotFound
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from cde_harvester.__main__ import main as harvester_main
 from cde_harvester.core import db as core_db
@@ -594,14 +597,64 @@ def _trigger_source_harvest(source: str, triggered_by: str | None = None, force:
                     "error": None if state.is_completed() else f"final state {state.name}"}
 
 
+_DURATION_HISTORY_RUNS = 5
+
+
+def _recent_durations():
+    """Median seconds of each source's last successful runs, keyed by deployment slug so a
+    re-spelled URL keeps its history. Empty if unreadable: scheduling falls back to config order."""
+    try:
+        engine = core_db.create_db_engine()
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(text("""
+                    SELECT triggered_source,
+                           percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds)
+                    FROM (
+                        SELECT triggered_source,
+                               extract(epoch FROM finished_at - started_at) AS seconds,
+                               row_number() OVER (PARTITION BY triggered_source
+                                                  ORDER BY started_at DESC) AS n
+                        FROM cde.harvest_runs
+                        WHERE status = 'ok' AND scope = 'single' AND finished_at IS NOT NULL
+                    ) runs
+                    WHERE n <= :runs
+                    GROUP BY triggered_source
+                """), {"runs": _DURATION_HISTORY_RUNS}).all()
+        finally:
+            engine.dispose()
+    except (SQLAlchemyError, ValueError) as e:
+        _run_logger().warning("No harvest history, keeping config order: %s", e)
+        return {}
+    return {deployment_slug(source): float(seconds) for source, seconds in rows}
+
+
+def _plan_lanes(sources, durations, slots):
+    """With two free slots the slowest known source gets a lane of its own so it can't hold
+    up the rest; the others run fastest first, sources without history last in config order."""
+    rest = sorted(sources, key=lambda s: durations.get(deployment_slug(s), math.inf))
+    known = [s for s in rest if deployment_slug(s) in durations]
+    if slots < 2 or len(sources) < 2 or not known:
+        return [rest]
+    slowest = known[-1]
+    rest.remove(slowest)
+    return [[slowest], rest]
+
+
+@task(name="harvest-lane")
+def _run_lane(sources: list[str], triggered_by: str | None = None, force: bool = False):
+    return [_trigger_source_harvest(src, triggered_by, force) for src in sources]
+
+
 @flow(name="Harvest All Sources", log_prints=True)
 def cde_harvest_all_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
     triggered_by: str | None = None,
     force: bool = False,
 ):
-    """Scheduled fan-out: trigger one independent per-source harvest job per configured source,
-    wait for all, and fail red if any did not complete (a failure doesn't cancel the others)."""
+    """Scheduled fan-out: trigger one independent per-source harvest job per configured source
+    (see _plan_lanes for the order), wait for all, and fail red if any did not complete
+    (a failure doesn't cancel the others)."""
     logger = _run_logger()
 
     config_file = resolve_harvest_config_file(config_file)
@@ -617,9 +670,12 @@ def cde_harvest_all_run(
             "obis_dataset_ids / obis_datasets_file)"
         )
 
-    logger.info("Fanning out %d per-source harvest job(s): %s", len(sources), sources)
-    futures = [_trigger_source_harvest.submit(src, triggered_by, force) for src in sources]
-    results = [f.result() for f in futures]
+    # The worker's own limit: the flow runs as its subprocess. This orchestrator holds one slot.
+    slots = int(os.getenv("HARVEST_WORKER_LIMIT", "3")) - 1
+    lanes = _plan_lanes(sources, _recent_durations(), slots)
+    logger.info("Harvesting %d source(s) in %d lane(s): %s", len(sources), len(lanes), lanes)
+    futures = [_run_lane.submit(lane, triggered_by, force) for lane in lanes]
+    results = [r for f in futures for r in f.result()]
 
     for r in results:
         logger.info("Source %s -> %s [%s] (flow_run=%s)",

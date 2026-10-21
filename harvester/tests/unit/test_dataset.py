@@ -329,6 +329,20 @@ class TestGetProfileIds:
         assert profile_ids.loc[0, "time_min"] == "2020-01-01T00:00:00Z"
         assert profile_ids.loc[0, "time_max"] == "2021-01-01T00:00:00Z"
 
+    def test_no_cf_role_explains_the_empty_result(self, mock_erddap_server):
+        from io import StringIO
+        info_csv = "\n".join(
+            line for line in ERDDAP_INFO_CSV.splitlines() if "cf_role" not in line
+        )
+        mock_erddap_server.erddap_csv_to_df.side_effect = (
+            lambda url, skiprows=None, dataset=None: pd.read_csv(StringIO(info_csv)).fillna("")
+        )
+        from cde_harvester.sources.erddap.dataset import Dataset
+        dataset = Dataset(mock_erddap_server, DATASET_ID)
+
+        assert len(dataset.get_profile_ids()) == 0
+        assert "No variable has a cf_role attribute" in dataset.no_features_reason
+
     def test_time_profile_id_is_dropped_before_enumerating(self, mock_erddap_server):
         """profile_id on time means one profile per record: only the
         timeseries are enumerated, never the timestamps."""

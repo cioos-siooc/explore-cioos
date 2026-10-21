@@ -62,6 +62,20 @@ class TestRequiredVariables:
         assert checker.check_required_variables() is False
         assert checker.failure_reason_code == MISSING_REQUIRED_VARS
 
+    def test_missing_variable_named_in_details(self):
+        checker = _checker()
+        checker.dataset.variables_list = [
+            v for v in checker.dataset.variables_list if v != "time"
+        ]
+        checker.check_required_variables()
+        assert "destinationName time:" in checker.failure_details
+
+    def test_empty_info_page_explained(self):
+        checker = _checker(variables_list=[])
+        assert checker.check_required_variables() is False
+        assert checker.failure_reason_code == MISSING_REQUIRED_VARS
+        assert "lists no variables" in checker.failure_details
+
     def test_all_required_present_passes(self):
         checker = _checker()
         assert checker.check_required_variables() is True
