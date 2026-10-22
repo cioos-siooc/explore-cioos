@@ -96,12 +96,18 @@ flowchart TD
    dataset's [descriptive metadata](#descriptive-metadata).
 5. **Compliance checks** (a failure is a skip, not an error):
    - `cde_ingest=false` global opts the dataset out (`INGEST_FLAG_FALSE`);
-   - `time`, `latitude`, `longitude` are required (`Grid`: lat/lon only)
-     (`MISSING_REQUIRED_VARS`; also the result of an empty or missing `info`
-     page);
+   - `time`, `latitude`, `longitude` are required (`MISSING_REQUIRED_VARS`;
+     also the result of an empty or missing `info` page). A `Grid` instead
+     needs a lat/lon extent: an axis `actual_range`, else numeric ACDD
+     `geospatial_lat_min/max` and `geospatial_lon_min/max` globals (see
+     [`Grid`](#grid-griddap));
    - at least one `standard_name` must map to a GOOS EOV
      (`NO_SUPPORTED_VARIABLES`);
    - not both `depth` and `altitude` (`DEPTH_AND_ALTITUDE`).
+
+   The failed check's message is stored as the attempt's error message and
+   shown on the harvest dataset page, so it says what the publisher should
+   change.
 6. **Feature extraction** by the type's handler (below). No rows means
    `NO_PROFILES_FOUND`.
 
@@ -274,7 +280,24 @@ page:
   variable (with its EOVs), stored on `cde.datasets` and used for the WMS
   overlay.
 
-A grid with no usable lat/lon extent is skipped as `NO_PROFILES_FOUND`.
+A grid with no usable lat/lon extent fails compliance as
+`MISSING_REQUIRED_VARS`.
+
+**Unusual layouts.**
+
+- *Single-point grids* (size-1 latitude and longitude axes, e.g. a tide-gauge
+  forecast) keep their zero-area extent. The database stores it as a point and
+  the map draws it as a dot in the grid layer. It stays a `Grid` dataset:
+  linked to griddap, not downloadable through CDE.
+- *Curvilinear grids* (model grids indexed by `gridY`/`gridX`, with 2-D
+  latitude/longitude published only in a separate dataset) have no lat/lon
+  axis to read. CF would attach those 2-D coordinates through `coordinates`,
+  but a griddap can't serve them next to data variables of another shape. So
+  the extent comes from the ACDD `geospatial_lat/lon_min/max` globals, which
+  the publisher must set. Without them the dataset is skipped as
+  `MISSING_REQUIRED_VARS`, and the skip message names the globals. The same
+  applies to a grid of 2-D latitude/longitude variables, which ERDDAP gives
+  no `actual_range`.
 
 ## In the database
 
@@ -297,10 +320,10 @@ are no longer listed upstream (see [Loading](workflow.md#loading)).
 | `CDM_DATA_TYPE_UNSUPPORTED` | skipped | `cdm_data_type` is not one of the supported types |
 | `ON_SKIP_LIST` | skipped | Listed in `skipped_datasets.json` |
 | `INGEST_FLAG_FALSE` | skipped | `cde_ingest=false` global attribute |
-| `MISSING_REQUIRED_VARS` | skipped | No `time` / `latitude` / `longitude` (or no readable `info` page) |
+| `MISSING_REQUIRED_VARS` | skipped | No `time` / `latitude` / `longitude` (or no readable `info` page); a grid without a lat/lon extent |
 | `NO_SUPPORTED_VARIABLES` | skipped | No `standard_name` maps to an EOV |
 | `DEPTH_AND_ALTITUDE` | skipped | Both `depth` and `altitude` present |
-| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (no `cf_role` variable, ids never filled, no lat/lon, a failed record count, or a grid without lat/lon extent); the message names which |
+| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (no `cf_role` variable, ids never filled, no lat/lon, or a failed record count); the message names which |
 | `HTTP_ERROR` | error | ERDDAP answered an error status after retries (other than those read as an empty result); the message holds ERDDAP's own error text |
 | `RESPONSE_TOO_LARGE` | error | A required response passed the 200 MB cap |
 | `UNKNOWN_ERROR` | error | Any other exception |
