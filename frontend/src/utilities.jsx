@@ -572,6 +572,10 @@ export function zoomToDatasetCamera(map) {
   };
 }
 
+// Region outlines can be a few hundred metres across, far past the
+// dataset framing's zoom cap.
+export const AREA_CAMERA = { maxZoom: 14 };
+
 export function boundsAreFramed(map, bounds) {
   if (!map || !bounds) return false;
   const camera = map.cameraForBounds(bounds, zoomToDatasetCamera(map));
