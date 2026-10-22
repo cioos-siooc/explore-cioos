@@ -44,7 +44,7 @@ test.describe("record preview", () => {
   test("a link opens the modal straight onto the plot", async ({ page }) => {
     await openPreview(page);
 
-    await expect(page.getByText(RECORD)).toBeVisible();
+    await expect(page.getByText(RECORD, { exact: true })).toBeVisible(); // not the plot's "Profile: <record>" heading
     await expect(plot(page).first()).toBeVisible();
     // A profile type opens on the plot, so nothing about the view is in the URL.
     expect(new URL(page.url()).searchParams.get("vis")).toBeNull();
@@ -155,14 +155,15 @@ const LONG_LABELS = {
 };
 
 // Only a Profile draws its record title inside the figure, above the panel
-// titles, and no recorded dataset is one.
-async function serveLongLabelProfile(page) {
+// titles, and no recorded dataset is one. Only a TimeSeriesProfile or a
+// TrajectoryProfile is offered the colour plot.
+async function serveLongLabelProfile(page, cdmDataType = "Profile") {
   await page.route("**/pointQuery*", (route) => {
     const datasets = JSON.parse(resolveFixture(route.request().url()).body);
     return route.fulfill({
       json: datasets.map((dataset) =>
         dataset.dataset_id === DATASET
-          ? { ...dataset, cdm_data_type: "Profile" }
+          ? { ...dataset, cdm_data_type: cdmDataType }
           : dataset,
       ),
     });
@@ -239,15 +240,17 @@ test.describe("record preview labels", () => {
   test("a colour plot's bar titles stay beside their own bars", async ({
     page,
   }) => {
+    await serveLongLabelProfile(page, "TimeSeriesProfile"); // routed after the beforeEach's Profile, so it wins
     await openApp(
       page,
       `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}&playout=color&pvars=CHLA,PSAL,SIGT`,
     );
     await expect(plot(page).first()).toBeVisible();
-    // The figure title, the time axis, three depth axes and three bars.
+    // The time axis, three depth axes and three bars; the record title sits
+    // above the figure.
     await expect
       .poll(() => labelOverlaps(page))
-      .toEqual({ count: 8, problems: [] });
+      .toEqual({ count: 7, problems: [] });
   });
 });
 
@@ -305,6 +308,7 @@ test.describe("record preview pinned axis", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 600 });
+    await serveLongLabelProfile(page, "TimeSeriesProfile"); // routed after the beforeEach's Profile, so it wins
     await openApp(
       page,
       `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}&playout=color&pvars=CHLA,PSAL,SIGT`,
@@ -334,14 +338,11 @@ test.describe("record preview pinned axis", () => {
     await scroller.evaluate((element) => {
       element.scrollTop = 0;
     });
-    const panel = await page
+    // hover() re-finds the panel: a late render (the profile list) redraws it.
+    await page
       .locator(".datasetPreviewPlotArea .nsewdrag")
       .last() // the top panel: the bottom one is scrolled out of view
-      .boundingBox();
-    await page.mouse.move(
-      panel.x + panel.width / 2,
-      panel.y + panel.height / 2,
-    );
+      .hover();
     await page.mouse.wheel(0, -400);
     await expect
       .poll(async () => {
