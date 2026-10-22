@@ -569,8 +569,8 @@ def extract_features(dataset, handler):
         profiles["depth_min"] = 0
         profiles["depth_max"] = 0
 
-    profiles["depth_min"].fillna(0, inplace=True)
-    profiles["depth_max"].fillna(0, inplace=True)
+    profiles["depth_min"] = profiles["depth_min"].fillna(0)
+    profiles["depth_max"] = profiles["depth_max"].fillna(0)
 
     if "profile_id" not in profiles:
         profiles["profile_id"] = ""

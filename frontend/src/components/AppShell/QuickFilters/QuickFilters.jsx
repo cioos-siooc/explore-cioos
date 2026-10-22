@@ -75,16 +75,30 @@ export default function QuickFilters() {
   const polygonActive = polygonDrawn || (!hasShape && armedMode === "polygon");
 
   // Not shown before the counts land, so it never flashes a zero.
-  function countPreview(applied, count, id, testId) {
+  function compactCount(applied, count) {
     if (applied || !countsReady) return null;
+    return count.toLocaleString(i18n.language, {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    });
+  }
+
+  // WCAG 2.5.3: the name has to contain the visible count too.
+  function countedLabel(applied, count, caption) {
+    const shown = compactCount(applied, count);
+    return shown ? `${shown} ${caption}` : caption;
+  }
+
+  // The space keeps the count and the caption separate words for axe; a flex
+  // container doesn't render it.
+  function countPreview(applied, count, id, testId) {
+    const shown = compactCount(applied, count);
+    if (!shown) return null;
     return (
       <>
         <span className="quickFilterCount" data-testid={testId}>
-          {count.toLocaleString(i18n.language, {
-            notation: "compact",
-            maximumFractionDigits: 1,
-          })}
-        </span>
+          {shown}
+        </span>{" "}
         <span id={id} className="sr-only">
           {t("quickFilterCountDescription", { count })}
         </span>
@@ -151,8 +165,8 @@ export default function QuickFilters() {
           }
           aria-label={
             areaPlace
-              ? `${t("spatialFilterFilterName")}: ${areaPlace.name}`
-              : t("spatialFilterFilterName")
+              ? `${t("quickFilterCaptionArea")}: ${areaPlace.name}`
+              : t("quickFilterCaptionArea")
           }
         >
           {polygonDrawn ? (
@@ -233,7 +247,11 @@ export default function QuickFilters() {
         onClick={() => setOnlyInView(!onlyInView)}
         aria-pressed={onlyInView}
         title={t("quickFilterInViewTitle")}
-        aria-label={t("datasetsCardOnlyInViewText")}
+        aria-label={countedLabel(
+          onlyInView,
+          inViewCount,
+          t("quickFilterCaptionInView"),
+        )}
         aria-describedby={
           countsReady && !onlyInView ? inViewCountId : undefined
         }
@@ -257,7 +275,11 @@ export default function QuickFilters() {
         onClick={() => setRealtimeOnly(!realtimeOnly)}
         aria-pressed={realtimeOnly}
         title={t("quickFilterRealtimeTitle")}
-        aria-label={t("realtimeFilterOptionText")}
+        aria-label={countedLabel(
+          realtimeOnly,
+          realtimeCount,
+          t("quickFilterCaptionRealtime"),
+        )}
         aria-describedby={
           countsReady && !realtimeOnly ? realtimeCountId : undefined
         }
