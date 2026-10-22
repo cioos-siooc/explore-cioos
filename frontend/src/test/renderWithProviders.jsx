@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter } from "react-router";
 import { createInstance } from "i18next";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 
@@ -44,7 +44,7 @@ export function renderWithProviders(
       providers === "app" ? <AppProviders>{children}</AppProviders> : children;
     return (
       <I18nextProvider i18n={i18n}>
-        <BrowserRouter>{content}</BrowserRouter>
+        <BrowserRouter useTransitions={false}>{content}</BrowserRouter>
       </I18nextProvider>
     );
   }

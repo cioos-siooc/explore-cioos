@@ -5,7 +5,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import {
