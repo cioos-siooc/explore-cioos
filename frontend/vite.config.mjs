@@ -108,11 +108,16 @@ export default defineConfig(({ mode }) => {
       // Only Sentry consumes (then deletes) maps; otherwise they'd ship publicly
       // and cost ~0.8 GB of build memory.
       sourcemap: !!env.SENTRY_AUTH_TOKEN,
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks: {
-            maplibre: ["maplibre-gl"],
-            plotly: ["plotly.js-basic-dist-min"],
+          codeSplitting: {
+            groups: [
+              { name: "maplibre", test: /\/node_modules\/maplibre-gl\// },
+              {
+                name: "plotly",
+                test: /\/node_modules\/plotly\.js-basic-dist-min\//,
+              },
+            ],
           },
         },
       },

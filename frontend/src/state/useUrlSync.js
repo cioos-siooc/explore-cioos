@@ -91,9 +91,10 @@ export default function UrlSync() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsPageLoad(false);
     if (isPageLoad) return;
-    // The live address, not this render's: a writer that ran after this render
-    // committed (a click while the page settles) would otherwise be undone.
-    const liveParams = new URLSearchParams(window.location.search);
+    // Read live: this effect can run from a render that predates a click, and
+    // render-time params would undo what that click just wrote.
+    const current = new URLSearchParams(window.location.search);
+    const dataset = current.get("dataset");
     const filterParams = new URLSearchParams(
       createDataFilterQueryString(query),
     );
@@ -110,16 +111,15 @@ export default function UrlSync() {
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       // Owned by useWideView.
-      ...(liveParams.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
+      ...(current.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
       ...(dataset ? { dataset } : {}),
       // Carried through only while a dataset is open, so they don't linger as
       // stale keys for a closed page.
       ...(dataset
         ? Object.fromEntries(
-            PRESERVED_PARAMS.map((param) => [
-              param,
-              liveParams.get(param),
-            ]).filter(([, value]) => value !== null),
+            PRESERVED_PARAMS.map((param) => [param, current.get(param)]).filter(
+              ([, value]) => value !== null,
+            ),
           )
         : {}),
       // Derived from state and likewise keyed to ?dataset=. These are the
