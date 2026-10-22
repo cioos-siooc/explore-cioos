@@ -180,28 +180,26 @@ describe("griddapTitle", () => {
   const titled = (properties) => feature(GRID, properties);
 
   it("picks the title in the current language", () => {
-    const title = JSON.stringify({ en: "Sea", fr: "Mer" });
+    const title = { en: "Sea", fr: "Mer" };
     expect(griddapTitle(titled({ title_translated: title }), "fr")).toBe("Mer");
   });
 
   it("falls back to English, then to the dataset id", () => {
-    const enOnly = JSON.stringify({ en: "Sea" });
+    const enOnly = { en: "Sea" };
     expect(griddapTitle(titled({ title_translated: enOnly }), "fr")).toBe(
       "Sea",
     );
     expect(
       griddapTitle(
-        titled({ title_translated: "{}", dataset_id: "grid_1" }),
+        titled({ title_translated: {}, dataset_id: "grid_1" }),
         "fr",
       ),
     ).toBe("grid_1");
   });
 
-  it("survives a title that is not JSON", () => {
-    expect(
-      griddapTitle(titled({ title_translated: "x", dataset_id: "g" }), "en"),
-    ).toBe("g");
-    expect(griddapTitle(titled({ title_translated: "x" }), "en")).toBe("");
+  it("survives a feature without titles", () => {
+    expect(griddapTitle(titled({ dataset_id: "g" }), "en")).toBe("g");
+    expect(griddapTitle(titled({ title_translated: null }), "en")).toBe("");
   });
 });
 
@@ -431,7 +429,7 @@ describe("buildFeatureQuery", () => {
   });
 
   it("lists stacked grids once each, outlined apart and filled as one", () => {
-    const title = (en) => JSON.stringify({ en });
+    const title = (en) => ({ en });
     const grids = [
       feature(
         GRID,

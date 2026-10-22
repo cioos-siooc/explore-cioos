@@ -43,7 +43,7 @@ sentry_sdk.init(
 
 
 database_link = (
-    f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
+    f"postgresql+psycopg2://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
     f"@{envs['DB_HOST']}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
 )
 logger.debug("Connecting to {}", envs["DB_HOST"])

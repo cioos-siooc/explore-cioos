@@ -5,13 +5,13 @@ description = "CIOOS Explorer ERDDAP/OBIS downloader."
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "duckdb>=1.1.0",
-    "erddapy>=2.2.4",
+    "duckdb>=2.0.0",
+    "erddapy>=3.3.1",
     "loguru>=0.7.3",
     "markdown-it-py>=4.0.0",
     "netcdf4>=1.7.5",
     "numpy>=2.1.0",
-    "pandas>=2.2.3",
+    "pandas>=3.0.6",
     "pyarrow>=26.0.0",
     "requests>=2.31.0",
     "rich>=14",

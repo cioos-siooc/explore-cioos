@@ -220,7 +220,7 @@ def _first_fix_per_interval(df, traj_var, interval_seconds):
         return df
     if traj_var:
         df[traj_var] = df[traj_var].astype(str)
-    epoch_seconds = df["time"].astype("int64") // 10**9
+    epoch_seconds = df["time"].dt.as_unit("s").astype("int64")
     bucket = (epoch_seconds // interval_seconds) * interval_seconds
     group_cols = ([traj_var] if traj_var else []) + [bucket]
     return (
@@ -332,14 +332,15 @@ def _decimate_tracks(points, max_points=None, always_simplify=False):
         # cap is soft against it (overshoot <= route length / max chord).
         return _densify_long_chords(group, simplified)
 
-    return (
-        # _densify_long_chords maps rows positionally and needs a unique index;
-        # the fallback path concatenates frames with repeating indices.
-        points.reset_index(drop=True)
-        .groupby("trajectory_id", dropna=False, group_keys=False)
-        .apply(_cap)
-        .reset_index(drop=True)
-    )
+    # _densify_long_chords maps rows positionally and needs a unique index;
+    # the fallback path concatenates frames with repeating indices.
+    points = points.reset_index(drop=True)
+    if points.empty:
+        return points
+    # Iterated rather than .apply(): pandas 3 drops the grouping column from
+    # apply's frames.
+    groups = points.groupby("trajectory_id", dropna=False)
+    return pd.concat([_cap(group) for _, group in groups], ignore_index=True)
 
 
 def extract_track_points(dataset, per_profile=False):

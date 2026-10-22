@@ -5,7 +5,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
-} from "react-router-dom";
+} from "react-router";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
 import { HARVEST_DOCS, renderHarvestDoc } from "./harvestDocs.js";

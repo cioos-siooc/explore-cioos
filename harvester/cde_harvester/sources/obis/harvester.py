@@ -664,10 +664,10 @@ class OBISHarvester(BaseHarvester):
             con.execute(
                 f"COPY ({query}) TO '{local_parquet}' (FORMAT PARQUET, COMPRESSION zstd)"
             )
-            relation = con.sql(f"SELECT * FROM read_parquet('{local_parquet}')")
+            con.execute(f"SELECT * FROM read_parquet('{local_parquet}')")
             with _OccurrenceCacheWriter(cache_file) as writer:
                 while True:
-                    chunk = relation.fetch_df_chunk(FETCH_VECTORS_PER_CHUNK)
+                    chunk = con.fetch_df_chunk(FETCH_VECTORS_PER_CHUNK)
                     if chunk.empty:
                         break
                     writer.write(chunk)

@@ -6,27 +6,27 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "cioos-metadata-conversion",
-    "duckdb>=1.0.0",
+    "duckdb>=2.0.0",
     "diskcache>=5.6.3",
-    "erddapy>=2.2.0",
+    "erddapy>=3.3.1",
     "lxml>=5.1.0",
-    "numpy>=2.1.0",
-    "pandera>=0.33.0,<0.34.0",
-    "pandas>=2.2.3",
-    "prefect>=3.8.6",
+    "numpy>=2.5.4",
+    "pandera>=0.34.1,<0.35.0",
+    "pandas>=3.0.6",
+    "prefect>=3.8.8",
     "prefect-docker>=0.7.4",
-    "psycopg2-binary>=2.9.10",
-    "python-dotenv>=1.1.1",
-    "pyyaml>=6.0.1",
-    "redis>=6.4.0",
-    "requests>=2.31.0",
-    "sentry-sdk>=2.38.0",
-    "shapely>=2.0.3",
-    "sqlalchemy>=2.0.0,<3.0.0",
+    "psycopg2-binary>=2.9.13",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+    "redis>=8.1.0",
+    "requests>=2.34.2",
+    "sentry-sdk>=2.72.0",
+    "shapely>=2.2.0",
+    "sqlalchemy>=2.1.5,<3.0.0",
 ]
 
 [build-system]
-requires = ["hatchling >= 1.26"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -37,8 +37,8 @@ cioos-metadata-conversion = { git = "https://github.com/cioos-siooc/cioos-metada
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.3",
-    "pytest-mock>=3.15.1",
+    "pytest>=9.1.1",
+    "pytest-mock>=3.17.0",
     "pytest-cov>=5.0",
 ]
 
