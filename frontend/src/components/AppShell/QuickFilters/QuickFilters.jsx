@@ -12,7 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
-import { polygonIsRectangle } from "../../../utilities.jsx";
+import { AREA_CAMERA, polygonIsRectangle } from "../../../utilities.jsx";
 import { isMarkerTier } from "../../config.js";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
@@ -214,7 +214,10 @@ export default function QuickFilters() {
           className="quickFilterButton"
           data-testid="quick-filter-zoom-area"
           onClick={() =>
-            zoomToGeometry({ type: "Polygon", coordinates: [polygon] })
+            zoomToGeometry(
+              { type: "Polygon", coordinates: [polygon] },
+              AREA_CAMERA,
+            )
           }
           title={t("quickFilterZoomAreaTitle")}
           aria-label={t("quickFilterZoomAreaTitle")}

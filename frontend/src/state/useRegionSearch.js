@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useDebounce } from "../utilities.jsx";
+import { AREA_CAMERA, useDebounce } from "../utilities.jsx";
 import fetchJson from "./fetchJson.js";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import {
@@ -63,7 +63,7 @@ export function useGoToRegion() {
   const { setAreaPlace } = useSelection();
   return useCallback(
     async (region, shape = "goto") => {
-      zoomToGeometry(region.geometry);
+      zoomToGeometry(region.geometry, region.area ? AREA_CAMERA : undefined);
       if (shape === "goto" || !region.area) return;
       try {
         const ring =
