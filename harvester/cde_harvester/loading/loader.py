@@ -478,8 +478,9 @@ def main(folder, incremental=False):
     ):
         if col not in datasets.columns:
             datasets[col] = None
-    if "wms_url" not in datasets.columns:
-        datasets["wms_url"] = None
+    for col in ("wms_url", "cdm_altitude_proxy"):
+        if col not in datasets.columns:
+            datasets[col] = None
 
     if datasets.empty:
         if not incremental:

@@ -67,6 +67,39 @@ test("attaches columnMeta positionally when the harvest recorded table_variables
   ]);
 });
 
+test("names the harvested cdm_altitude_proxy column on the table", async () => {
+  db.queueRaw([{ ...FEATURE_ROW, cdm_altitude_proxy: "PRES" }]);
+  axios.queueResponse({
+    data: {
+      table: { columnNames: ["time", "PRES"], rows: [["2024-03-01", 5.2]] },
+    },
+  });
+
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1" });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.table.altitudeProxyColumn, "PRES");
+  assert.match(db.queries[0], /ds\.cdm_altitude_proxy/);
+});
+
+test("omits altitudeProxyColumn when the dataset declares no proxy", async () => {
+  db.queueRaw([{ ...FEATURE_ROW, cdm_altitude_proxy: null }]);
+  axios.queueResponse({
+    data: {
+      table: { columnNames: ["time", "temp"], rows: [["2024-03-01", 5.2]] },
+    },
+  });
+
+  const res = await agent
+    .get("/preview")
+    .query({ dataset: "obs_270", profile: "1" });
+
+  assert.equal(res.status, 200);
+  assert.equal("altitudeProxyColumn" in res.body.table, false);
+});
+
 test("truncates rows to 1000 even when ERDDAP returns more", async () => {
   db.queueRaw([FEATURE_ROW]);
   const manyRows = Array.from({ length: 1500 }, (_, i) => [i]);

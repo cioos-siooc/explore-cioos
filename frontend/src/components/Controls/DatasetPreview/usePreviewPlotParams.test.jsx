@@ -179,6 +179,35 @@ describe("usePreviewPlotParams", () => {
       expect(api.reversedYAxes.has("temperature")).toBe(false);
     });
 
+    it("draws the dataset's altitude proxy downwards, and flips it back", async () => {
+      const table = {
+        columnNames: ["PRES", "temperature", "time"],
+        columnTypes: ["float", "float", "String"],
+        columnUnits: ["dbar", "degree_C", "UTC"],
+        altitudeProxyColumn: "PRES",
+      };
+      const data = [
+        { PRES: 1, temperature: 10, time: "2024-01-01T00:00:00Z" },
+        { PRES: 2, temperature: 9, time: "2024-01-01T00:05:00Z" },
+      ];
+      renderWithProviders(
+        <Probe
+          dataset={{ ...DATASET, cdm_data_type: "TimeSeries" }}
+          table={table}
+          data={data}
+        />,
+        { url: "/?pvars=PRES,temperature" },
+      );
+      expect(api.yAxisColumns).toEqual(["PRES", "temperature"]);
+      expect(api.reversedYAxes.has("PRES")).toBe(true);
+      expect(api.reversedYAxes.has("temperature")).toBe(false);
+      expect(param("pyflip")).toBeNull();
+
+      await run(() => api.setYAxisReversed("PRES", false));
+      expect(param("pyflip")).toBe("PRES");
+      expect(api.reversedYAxes.has("PRES")).toBe(false);
+    });
+
     it("keeps a variable's flip while it leaves Y and comes back", async () => {
       openStation("playout=color&pcy=salinity&pyflip=salinity");
       await run(() => api.setColorY("depth"));

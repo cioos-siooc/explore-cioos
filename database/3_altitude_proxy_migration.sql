@@ -1,0 +1,11 @@
+-- Add cde.datasets.cdm_altitude_proxy to databases created before it existed.
+--
+-- The canonical DDL is in 1_schema.sql, which only ever runs on a fresh volume;
+-- db_migrate applies [3-9]_*.sql on every deploy, so live databases get the
+-- column without a volume drop. Numbered 3 so it sorts ahead of
+-- 9_incremental_upsert.sql, whose upsert_datasets_from_temp() names it.
+--
+-- No-op on fresh volumes. NULL until each dataset is re-harvested, and a
+-- skip_unchanged harvest never reloads an unchanged dataset: run one full
+-- harvest after deploying. The preview falls back to its name heuristic.
+ALTER TABLE cde.datasets ADD COLUMN IF NOT EXISTS cdm_altitude_proxy text;

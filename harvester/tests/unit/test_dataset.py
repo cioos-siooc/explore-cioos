@@ -36,6 +36,26 @@ class TestDatasetMetadataParsing:
         ds = _make_dataset(mock_erddap_server)
         assert ds.cdm_data_type == "TimeSeries"
 
+    def test_cdm_altitude_proxy_parsed(self, mock_erddap_server):
+        info_csv = ERDDAP_INFO_CSV.replace(
+            "attribute,NC_GLOBAL,title,",
+            "attribute,NC_GLOBAL,cdm_altitude_proxy,,PRES\nattribute,NC_GLOBAL,title,",
+        )
+        ds = _make_dataset(mock_erddap_server, info_csv=info_csv)
+        assert ds.cdm_altitude_proxy == "PRES"
+
+    def test_cdm_altitude_proxy_absent_is_none(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        assert ds.cdm_altitude_proxy is None
+
+    def test_cdm_altitude_proxy_empty_is_none(self, mock_erddap_server):
+        info_csv = ERDDAP_INFO_CSV.replace(
+            "attribute,NC_GLOBAL,title,",
+            "attribute,NC_GLOBAL,cdm_altitude_proxy,,\nattribute,NC_GLOBAL,title,",
+        )
+        ds = _make_dataset(mock_erddap_server, info_csv=info_csv)
+        assert ds.cdm_altitude_proxy is None
+
     def test_globals_dict_populated(self, mock_erddap_server):
         ds = _make_dataset(mock_erddap_server)
         assert ds.globals["title"] == "Test Temperature Dataset"
@@ -279,6 +299,12 @@ class TestDatasetGetDf:
         required = ["title", "erddap_url", "dataset_id", "cdm_data_type", "platform", "eovs"]
         for col in required:
             assert col in df.columns
+
+    def test_get_df_carries_cdm_altitude_proxy(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        ds.profile_ids = pd.DataFrame({"station_id": ["S1"], "latitude": [48.5], "longitude": [-125.0]})
+        ds.cdm_altitude_proxy = "PRES"
+        assert ds.get_df()["cdm_altitude_proxy"].tolist() == ["PRES"]
 
 
 class TestGetProfileIds:

@@ -90,7 +90,10 @@ flowchart TD
 4. **Metadata.** The dataset `info` page: global attributes and per-variable
    attributes (`standard_name`, `cf_role`, `actual_range`, units). Besides
    driving the steps below, the global attributes are also kept as the
-   dataset's [descriptive metadata](#descriptive-metadata).
+   dataset's [descriptive metadata](#descriptive-metadata). `cdm_altitude_proxy`
+   (the column standing in for depth, e.g. `PRES`) is kept in
+   `cde.datasets.cdm_altitude_proxy`; the preview plot draws that column
+   downward.
 5. **Compliance checks** (a failure is a skip, not an error):
    - `cde_ingest=false` global opts the dataset out (`INGEST_FLAG_FALSE`);
    - `time`, `latitude`, `longitude` are required (`Grid`: lat/lon only)

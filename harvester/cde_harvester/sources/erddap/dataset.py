@@ -66,6 +66,7 @@ class Dataset:
         self.queried_urls = []
         self.warnings = HarvestWarnings(self.logger)
         self.cdm_data_type = ""
+        self.cdm_altitude_proxy = None
         self.globals = {}
         self.platform = "unknown"
         self.df_variables = None
@@ -109,6 +110,7 @@ class Dataset:
                 "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
+                "cdm_altitude_proxy": [self.cdm_altitude_proxy],
                 "platform": [self.platform],
                 "eovs": [self.eovs],
                 "organizations": [self.organizations],
@@ -400,6 +402,7 @@ class Dataset:
         self.cdm_data_type = globals_dict.get(
             "cdm_data_type", "Grid" if self.data_structure == "grid" else ""
         )
+        self.cdm_altitude_proxy = globals_dict.get("cdm_altitude_proxy") or None  # not fillna's ""
         self.globals = globals_dict
 
         if "standard_name" not in df_variables:

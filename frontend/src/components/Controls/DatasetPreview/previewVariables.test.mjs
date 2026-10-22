@@ -434,6 +434,39 @@ test("sea water pressure is downward, like depth", () => {
   );
 });
 
+test("the dataset's altitude proxy is downward unless it declares otherwise", () => {
+  const table = {
+    columnNames: ["time", "PRES", "TEMP"],
+    columnTypes: ["String", "float", "float"],
+    columnUnits: ["UTC", "dbar", "degree_C"],
+  };
+  const downward = (proxyTable, columnName) =>
+    isDownwardVertical(
+      byColumnName(variablesFrom(proxyTable, {})).get(columnName),
+    );
+
+  assert.equal(downward(table, "PRES"), false);
+  assert.equal(
+    downward({ ...table, altitudeProxyColumn: "PRES" }, "PRES"),
+    true,
+  );
+  assert.equal(
+    downward({ ...table, altitudeProxyColumn: "PRES" }, "TEMP"),
+    false,
+  );
+  assert.equal(
+    downward(
+      {
+        ...table,
+        altitudeProxyColumn: "PRES",
+        columnMeta: [null, { name: "PRES", positive: "up" }, null],
+      },
+      "PRES",
+    ),
+    false,
+  );
+});
+
 test("a cf_role is read from the harvest, or inferred from the dataset", () => {
   const index = byColumnName(variablesFrom(VIKING, VIKING_DATASET));
   assert.equal(index.get("station_id").cfRole, "timeseries_id");

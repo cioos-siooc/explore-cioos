@@ -131,7 +131,13 @@ function classify(variable, { flagColumns }) {
 // falls back to columnMeta's cfRole.
 export function variablesFrom(table, dataset) {
   if (!table || !table.columnNames) return [];
-  const { columnNames, columnTypes = [], columnUnits = [], columnMeta } = table;
+  const {
+    columnNames,
+    columnTypes = [],
+    columnUnits = [],
+    columnMeta,
+    altitudeProxyColumn,
+  } = table;
   const idRoles = recordIdRoles(dataset);
   const flagColumns = flaggedColumns(columnMeta);
 
@@ -152,7 +158,9 @@ export function variablesFrom(table, dataset) {
       cfRole:
         (meta && trimmed(meta.cf_role)) || idRoles.get(columnName) || null,
       axis: meta && trimmed(meta.axis),
-      positive: meta && trimmed(meta.positive),
+      positive:
+        (meta && trimmed(meta.positive)) ||
+        (columnName === altitudeProxyColumn ? "down" : null), // ERDDAP's cdm_altitude_proxy stands in for depth
       ioosCategory: meta && trimmed(meta.ioos_category),
       palette: meta && trimmed(meta.colorBarPalette),
       // Read by previewColorScales.js for the colour dimension's ramp.

@@ -47,6 +47,8 @@ const Sentry = require("@sentry/node");
  *           column, positionally aligned to columnNames, null where the harvest
  *           knows no such column. The key is absent entirely for a dataset that
  *           has not been harvested since datasets.table_variables was added.
+ *           table.altitudeProxyColumn names the column ERDDAP's
+ *           cdm_altitude_proxy says stands in for depth; absent when none.
  *           `sample` is { rowCount, totalRowCount }: the rows sent and the rows
  *           the request covers, which differ when only part of it is sent.
  *       400:
@@ -121,7 +123,8 @@ const TRAJECTORY_TYPES_SQL = ALL_TRAJECTORY_TYPES.map((t) => `'${t}'`).join(
 const FEATURE_SQL = `
 WITH ds AS (
   SELECT pk, dataset_id, erddap_url, cdm_data_type, table_variables,
-         timeseries_id_variable, profile_id_variable, trajectory_id_variable
+         timeseries_id_variable, profile_id_variable, trajectory_id_variable,
+         cdm_altitude_proxy
   FROM   cde.datasets
   WHERE  dataset_id = :dataset
 ),
@@ -194,6 +197,7 @@ SELECT ds.dataset_id,
        ds.erddap_url,
        ds.cdm_data_type,
        ds.table_variables,
+       ds.cdm_altitude_proxy,
        -- TimeSeriesProfile and TrajectoryProfile both also set
        -- profile_id_variable, but the record is the station / trajectory, so a
        -- flat COALESCE over all three would pick the wrong column.
@@ -282,6 +286,7 @@ router.get(
       new_start_time,
       use_whole_profile,
       table_variables,
+      cdm_altitude_proxy,
       record_step,
     } = rows.rows[0];
 
@@ -351,6 +356,9 @@ router.get(
         data.table.columnMeta = (data.table.columnNames || []).map(
           (name) => byName.get(name) ?? null,
         );
+      }
+      if (cdm_altitude_proxy) {
+        data.table.altitudeProxyColumn = cdm_altitude_proxy;
       }
       return res.send(data);
     } catch (error) {
