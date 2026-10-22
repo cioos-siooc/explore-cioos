@@ -12,7 +12,11 @@ from cde_harvester.core.harvest_warnings import (
 from cde_harvester.core.observability import run_logger
 from cde_harvester.core.record_metadata import from_erddap_globals
 from cde_harvester.core.variables import extract_variables
-from cde_harvester.sources.erddap.platform_vocab import platforms_nerc_ioos
+from cde_harvester.sources.erddap.platform_vocab import (
+    PLATFORM_CATEGORIES,
+    platform_category,
+    platforms_nerc_ioos,
+)
 from cde_harvester.utils import (
     eov_standard_name,
     eov_to_standard_name,
@@ -65,6 +69,8 @@ class Dataset:
         # Recorded in harvest_attempts so an ERDDAP admin can reproduce a failure.
         self.queried_urls = []
         self.warnings = HarvestWarnings(self.logger)
+        # Why extract_features() came back empty, for the NO_PROFILES_FOUND attempt.
+        self.no_features_reason = None
         self.cdm_data_type = ""
         self.globals = {}
         self.platform = "unknown"
@@ -110,6 +116,7 @@ class Dataset:
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
                 "platform": [self.platform],
+                "platform_category": [platform_category(self.platform)],
                 "eovs": [self.eovs],
                 "organizations": [self.organizations],
                 "n_profiles": [len(self.profile_ids)],
@@ -202,6 +209,11 @@ class Dataset:
         self.profile_variable_list = profile_variable_list
 
         if not profile_variables:
+            self.no_features_reason = (
+                "No variable has a cf_role attribute (profile_id, timeseries_id "
+                f"or trajectory_id), which a {self.cdm_data_type} dataset needs "
+                "to tell its features apart"
+            )
             return []
 
         # distinct() of the ids alone measured ~0.2s on every ONC and
@@ -230,6 +242,11 @@ class Dataset:
             ).reset_index()
 
         if profile_ids.empty:
+            self.no_features_reason = (
+                f"distinct() of the cf_role variable(s) {', '.join(profile_variable_list)} "
+                "returned no rows: the dataset has no data, or those variables are "
+                "never filled"
+            )
             return profile_ids
 
         self.profile_ids = profile_ids.drop_duplicates(profile_variable_list)
@@ -323,26 +340,18 @@ class Dataset:
 
         if "ioos" in platform_vocabulary:
             try:
-                l06_platform_label = platforms_nerc_ioos.query(
+                return platforms_nerc_ioos.query(
                     f"ioos_label=='{platform}'"
-                )["category"].item()
-
-                return l06_platform_label
+                )["l06_label"].item()
 
             except ValueError:
                 self.logger.error("Found unsupported IOOS platform: %s", platform)
 
         if "L06" in platform_vocabulary:
-            platforms_nerc_ioos_no_duplicates = platforms_nerc_ioos.drop_duplicates(
-                subset=["l06_label"]
-            )
-
-            if platform.lower() in list(platforms_nerc_ioos["l06_label"]):
-                return platforms_nerc_ioos_no_duplicates.query(
-                    f"l06_label=='{platform.lower()}'"
-                )["category"].item()
-            else:
-                self.logger.error("Found unsupported L06 platform: %s", platform)
+            l06_labels = {label.lower(): label for label in PLATFORM_CATEGORIES}
+            if platform.lower() in l06_labels:
+                return l06_labels[platform.lower()]
+            self.logger.error("Found unsupported L06 platform: %s", platform)
 
         self.warnings.add(
             UNKNOWN_PLATFORM_VOCABULARY,
@@ -404,6 +413,8 @@ class Dataset:
 
         if "standard_name" not in df_variables:
             df_variables["standard_name"] = None
+        if "cf_role" not in df_variables:
+            df_variables["cf_role"] = ""
         df_variables.set_index("name", drop=False, inplace=True)
         self.df_variables = df_variables
         # Every column, coordinates and cf_role variables included: the preview

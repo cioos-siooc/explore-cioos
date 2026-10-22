@@ -247,6 +247,9 @@ services:
       # Caches persisted across runs (cheap re-fetch if lost).
       - harvester_cache:/app/harvester/harvester_cache
       - obis_cache:/app/harvester/obis_cache
+      # Read by the post-harvest cache warm-up to replay the most common API
+      # requests (cde_harvester/redisFunctions.py).
+      - nginx_logs:/app/nginx/logs:ro
     env_file: *env-file
     environment:
       PREFECT_API_URL: http://prefect:4200/api
@@ -271,7 +274,7 @@ services:
       # source. Budget against mem_limit below, not CPU: each run is its own
       # pandas working set, and 6 OOM'd the container. Raise it together with
       # HARVESTER_MEM_LIMIT.
-      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-2}
+      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-3}
     # memswap_limit == mem_limit gives this container ZERO swap, so a runaway
     # harvest is OOM-killed in its own cgroup instead of grinding through host
     # swap (which once livelocked the box until a hard reboot). Keep both

@@ -70,11 +70,15 @@ All runs are Prefect flows executed by the `prefect_worker` process pool.
 - **All sources in one run** (`cde-harvester-deployment`, on demand) harvests
   every source in a single flow and loads them together. It is the only path
   where `incremental: false` performs a [full reload](#loading).
-- Sources are submitted together, but the worker runs at most
-  `HARVEST_WORKER_LIMIT` flows at once (default 2, and the waiting
-  orchestrator holds one slot), so with the defaults sources run one after
-  another. Inside a source, datasets are harvested one at a time, to stay
-  gentle on the upstream server and bound memory.
+- The worker runs at most `HARVEST_WORKER_LIMIT` flows at once (default 3;
+  the waiting orchestrator holds one slot). The orchestrator orders sources
+  by the median duration of their last 5 successful runs: the slowest one
+  runs alone in a side lane, and the rest run one after another, fastest
+  first, in the other lane, so a slow server never holds up the quick ones.
+  Sources with no history run last, in config order. With a limit of 2 there
+  is only one lane, ordered fastest first. Loads still go one at a time
+  (advisory lock). Inside a source, datasets are harvested one at a time, to
+  stay gentle on the upstream server and bound memory.
 - Each run writes its CSVs to `{folder}/{source-slug}/{timestamp}`. After a
   successful load the last 5 runs per source are kept (folders touched in the
   last 6 hours are never removed), so a failed load can be inspected.
@@ -122,7 +126,7 @@ describes the data still stored.
 
 | Code | Meaning |
 | --- | --- |
-| `FEATURES_HIDDEN` | Features spanning more than 1 km are hidden from the map (still searchable) |
+| `FEATURES_HIDDEN` | Features whose lat/lon box spans more than 1 km are not drawn as markers (still in coverage cells and search) |
 | `FEATURES_DROPPED` | Features removed: latitude/longitude out of range, depth outside -100..15 000 m, no record count, or an unparseable time |
 | `OCCURRENCES_DROPPED` | OBIS occurrences dropped for coordinates outside the Web Mercator range |
 | `NON_CF_STANDARD_NAMES` | `standard_name` values not in the CF table (ioos_qc `*_test` names excluded) |

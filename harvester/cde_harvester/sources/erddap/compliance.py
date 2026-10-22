@@ -18,10 +18,12 @@ class CDEComplianceChecker:
         self.dataset = dataset
         self.logger = dataset.logger
         self.failure_reason_code = ""
+        self.failure_details = None
 
     def failed_error(self, msg, failure_reason_code):
         self.logger.error("Skipping dataset:" + msg)
         self.failure_reason_code = failure_reason_code
+        self.failure_details = msg
 
     def check_required_variables(self):
         # Depth/altitude defaults to 0 when absent.
@@ -36,9 +38,20 @@ class CDEComplianceChecker:
             x for x in required_variables if x not in self.dataset.variables_list
         ]
 
+        if not self.dataset.variables_list:
+            self.failed_error(
+                "The dataset's ERDDAP info page lists no variables (empty or "
+                "unreadable), so its time/latitude/longitude can't be checked",
+                MISSING_REQUIRED_VARS,
+            )
+            return False
         if missing_required_vars:
             self.failed_error(
-                f"Can't find required variable: {missing_required_vars}",
+                f"No variable with destinationName {', '.join(missing_required_vars)}: "
+                f"CDE needs {', '.join(required_variables)} to place the dataset "
+                "on the map and in time. Rename the matching variable in "
+                "datasets.xml (ERDDAP's LLAT convention) if it exists under "
+                "another name",
                 MISSING_REQUIRED_VARS,
             )
             return False
