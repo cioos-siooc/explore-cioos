@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router";
 
 import { WIDE_PARAM } from "./previewParams.js";
 import useMediaQuery, { MOBILE_QUERY } from "../ui/useMediaQuery.js";

@@ -42,7 +42,7 @@ def database_url():
     envs = os.environ
     db_host = envs.get("DB_HOST_EXTERNAL", "localhost")
     return (
-        f"postgresql://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
+        f"postgresql+psycopg2://{envs['DB_USER']}:{envs['DB_PASSWORD']}"
         f"@{db_host}:{envs.get('DB_PORT', 5432)}/{envs['DB_NAME']}"
     )
 

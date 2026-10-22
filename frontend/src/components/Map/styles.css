@@ -112,6 +112,10 @@
   pointer-events: none;
 }
 
+.wmsLoadingSpinner {
+  pointer-events: none;
+}
+
 /* Phones: the activity panel in the bottom-right corner carries the spinner,
    so the centre of the map stays clear. */
 @media (max-width: 700px), (max-height: 500px) {

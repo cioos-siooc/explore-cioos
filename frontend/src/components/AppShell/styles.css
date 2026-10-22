@@ -31,6 +31,14 @@
   flex-shrink: 0;
 }
 
+.apiErrorDetail {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
+  overflow-wrap: anywhere;
+}
+
 .apiErrorBanner button {
   display: inline-flex;
   align-items: center;

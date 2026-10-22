@@ -286,7 +286,7 @@ class TestRequiredDbSettings:
         monkeypatch.setenv("DB_PASSWORD", "p")
         monkeypatch.setenv("DB_HOST_EXTERNAL", "db")
         monkeypatch.chdir(tmp_path)
-        assert core_db.database_url() == "postgresql://postgres:p@db:5432/cde"
+        assert core_db.database_url() == "postgresql+psycopg2://postgres:p@db:5432/cde"
 
 
 class TestRebuildFlowBody:

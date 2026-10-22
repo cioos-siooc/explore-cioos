@@ -50,6 +50,10 @@ describe("parseFilterQuery", () => {
       term: "nothing",
       exclude: false,
     });
+    expect(parseFilterQuery("-130, 48, -120, 55")).toEqual({
+      term: "-130, 48, -120, 55",
+      exclude: false,
+    });
   });
 });
 

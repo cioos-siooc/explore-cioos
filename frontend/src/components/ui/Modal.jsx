@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useInRouterContext } from "react-router-dom";
+import { useInRouterContext } from "react-router";
 
 import CloseButton from "./CloseButton.jsx";
 import useSheetDrag from "./useSheetDrag.js";

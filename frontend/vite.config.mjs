@@ -87,10 +87,15 @@ export default defineConfig(({ mode }) => {
         maxWorkers: Math.min(6, availableParallelism() - 1),
       }),
       // maplibre-gl needs WebGL, which jsdom lacks; map behaviour is e2e-tested.
-      alias: {
-        "maplibre-gl": new URL("./src/test/stubs/maplibre.js", import.meta.url)
-          .pathname,
-      },
+      // Anchored: a bare key also rewrites maplibre-gl/dist/*.css, and the
+      // failed transform silently drops Map.jsx from coverage.
+      alias: [
+        {
+          find: /^maplibre-gl$/,
+          replacement: new URL("./src/test/stubs/maplibre.js", import.meta.url)
+            .pathname,
+        },
+      ],
       coverage: {
         provider: "v8",
         reportsDirectory: "./coverage",

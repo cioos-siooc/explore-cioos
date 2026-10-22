@@ -50,7 +50,7 @@ def bucket_index_to_day(series, parse_dates):
     parsed = parse_dates(series)
     # NaT's int64 form defeats the magnitude test and overflows the conversion.
     usable = parsed.notna()
-    epoch = parsed.astype("int64") // 10**9
+    epoch = parsed.dt.as_unit("s").astype("int64")
     if usable.any() and epoch[usable].abs().max() < _BUCKET_INDEX_CEILING:
         epoch = epoch * DAY_SECONDS
     return pd.to_datetime(epoch.where(usable), unit="s", utc=True).dt.floor("D")

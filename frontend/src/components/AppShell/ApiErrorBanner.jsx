@@ -16,14 +16,21 @@ function measureBannerSpace({ top }) {
 
 // Otherwise the filters and dataset list would sit silently empty.
 export default function ApiErrorBanner() {
-  const { catalogError, loadCatalog } = useFilters();
+  const { catalogError, catalogErrorDetail, loadCatalog } = useFilters();
   const { loadLegend } = useMapState();
   const { pointsError, retryPointQuery } = useSelection();
 
   if (!catalogError && !pointsError) return null;
   return (
     <BannerSurface
-      text={catalogError ? "apiErrorBannerText" : "apiErrorPointsBannerText"}
+      text={
+        catalogError
+          ? catalogErrorDetail
+            ? "apiErrorRejectedText"
+            : "apiErrorBannerText"
+          : "apiErrorPointsBannerText"
+      }
+      detail={catalogError ? catalogErrorDetail : null}
       onRetry={() => {
         if (catalogError) {
           loadCatalog();
@@ -36,7 +43,7 @@ export default function ApiErrorBanner() {
 }
 
 // Split out so the footprint property is cleared when the banner unmounts.
-function BannerSurface({ text, onRetry }) {
+function BannerSurface({ text, detail, onRetry }) {
   const { t } = useTranslation();
   const bannerRef = useRef(null);
   usePublishedFootprint(
@@ -48,7 +55,10 @@ function BannerSurface({ text, onRetry }) {
   return (
     <div className="apiErrorBanner" role="alert" ref={bannerRef}>
       <ExclamationTriangle size={18} aria-hidden="true" />
-      <span>{t(text)}</span>
+      <span>
+        {t(text)}
+        {detail && <code className="apiErrorDetail">{detail}</code>}
+      </span>
       <button type="button" onClick={onRetry}>
         <ArrowClockwise size={14} aria-hidden="true" />
         {t("apiErrorRetryButton")}

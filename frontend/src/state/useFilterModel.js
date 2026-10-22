@@ -10,6 +10,7 @@ import eovsJSONfile from "../eovs.json";
 import eovCategoriesJSONfile from "../eovCategories.json";
 import {
   generateRangeSelectBadgeTitle,
+  polygonBounds,
   polygonIsRectangle,
   setAllOptionsIsSelectedTo,
 } from "../utilities.jsx";
@@ -22,6 +23,7 @@ import { useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import useEovCategories from "./useEovCategories.js";
+import { useApplyArea } from "./useRegionSearch.js";
 import useSourceKinds from "./useSourceKinds.js";
 
 const stateOf = (option) =>
@@ -33,9 +35,13 @@ const stateOf = (option) =>
 // toggledDataLayerChoice). Groups carry `panelName` and `clear`; options may
 // carry `closes` (palette closes on pick), `action`, `includeOnly`, and
 // `shortcut` with `covers` (listed as applied in place of the options it
-// covers when all are set, see appliedOptions). A typedRange group is
-// `pinned`: offered as typed rather than matched.
-export default function useFilterModel(scientificNameMatches = [], typedRange) {
+// covers when all are set, see appliedOptions). A typedRange or typedArea
+// group is `pinned`: offered as typed rather than matched.
+export default function useFilterModel(
+  scientificNameMatches = [],
+  typedRange,
+  typedArea,
+) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const filters = useFilters();
@@ -174,6 +180,18 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
     action: drawn ? undefined : t("filterSearchActionDraw"),
     toggle: () => requestDraw(drawn ? "clear" : mode),
   });
+  const applyArea = useApplyArea();
+  const typedAreaOption = typedArea && {
+    id: "typed",
+    label: polygonIsRectangle(typedArea)
+      ? t("spatialFilterTypedBox", polygonBounds(typedArea))
+      : t("spatialFilterTypedPolygon", { count: typedArea.length - 1 }),
+    description: t("quickFilterAreaTitle"),
+    includeOnly: true,
+    closes: true,
+    action: t("spatialFilterApply"),
+    toggle: () => applyArea(typedArea),
+  };
 
   const rangeGroup = (key, label, current, defaults, set, unit) => {
     const typed = typedRange?.key === key;
@@ -409,14 +427,17 @@ export default function useFilterModel(scientificNameMatches = [], typedRange) {
       key: "area",
       label: t("spatialFilterFilterName"),
       panelName: "spatialFilterFilterName",
-      options: [
-        areaOption("box", t("drawBoundingBoxOption"), boxDrawn),
-        areaOption(
-          "polygon",
-          t("drawPolygonOption"),
-          Boolean(polygon) && !boxDrawn,
-        ),
-      ],
+      pinned: Boolean(typedArea),
+      options: typedArea
+        ? [typedAreaOption]
+        : [
+            areaOption("box", t("drawBoundingBoxOption"), boxDrawn),
+            areaOption(
+              "polygon",
+              t("drawPolygonOption"),
+              Boolean(polygon) && !boxDrawn,
+            ),
+          ],
       clear: () => requestDraw("clear"),
     },
   ].filter(Boolean);

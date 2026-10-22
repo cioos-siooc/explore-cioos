@@ -98,7 +98,7 @@ fi
 # Cap concurrent flow runs: unbounded, ten parallel harvests (one OS process
 # each) exhausted RAM + swap on a 15.7 GB host and livelocked it.
 # --with-healthcheck serves /health on :8080 for the compose healthcheck.
-WORKER_LIMIT="${HARVEST_WORKER_LIMIT:-2}"
+WORKER_LIMIT="${HARVEST_WORKER_LIMIT:-3}"
 
 echo "[worker-entrypoint] Starting process worker on pool ${POOL_NAME} (concurrency limit ${WORKER_LIMIT})"
 exec uv run prefect worker start --pool "${POOL_NAME}" --type process \
