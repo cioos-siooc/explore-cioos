@@ -14,7 +14,6 @@ import {
   loadTurfUnion,
   trackFeatureIn,
   trackItemsIn,
-  withoutGridHighlight,
 } from "./hitTest.js";
 import { largeCircleSize, smallCircleSize } from "./pointRadius.js";
 
@@ -175,28 +174,26 @@ describe("griddapTitle", () => {
   const titled = (properties) => feature(GRID, properties);
 
   it("picks the title in the current language", () => {
-    const title = JSON.stringify({ en: "Sea", fr: "Mer" });
+    const title = { en: "Sea", fr: "Mer" };
     expect(griddapTitle(titled({ title_translated: title }), "fr")).toBe("Mer");
   });
 
   it("falls back to English, then to the dataset id", () => {
-    const enOnly = JSON.stringify({ en: "Sea" });
+    const enOnly = { en: "Sea" };
     expect(griddapTitle(titled({ title_translated: enOnly }), "fr")).toBe(
       "Sea",
     );
     expect(
       griddapTitle(
-        titled({ title_translated: "{}", dataset_id: "grid_1" }),
+        titled({ title_translated: {}, dataset_id: "grid_1" }),
         "fr",
       ),
     ).toBe("grid_1");
   });
 
-  it("survives a title that is not JSON", () => {
-    expect(
-      griddapTitle(titled({ title_translated: "x", dataset_id: "g" }), "en"),
-    ).toBe("g");
-    expect(griddapTitle(titled({ title_translated: "x" }), "en")).toBe("");
+  it("survives a feature without titles", () => {
+    expect(griddapTitle(titled({ dataset_id: "g" }), "en")).toBe("g");
+    expect(griddapTitle(titled({ title_translated: null }), "en")).toBe("");
   });
 });
 
@@ -264,6 +261,7 @@ describe("buildFeatureQuery", () => {
     zoom: 6.7,
     queryRendered: () => [],
     language: "en",
+    gridGeometry: () => undefined,
     ...overrides,
   });
 
@@ -425,7 +423,7 @@ describe("buildFeatureQuery", () => {
   });
 
   it("lists stacked grids once each, outlined apart and filled as one", () => {
-    const title = (en) => JSON.stringify({ en });
+    const title = (en) => ({ en });
     const grids = [
       feature(
         GRID,
@@ -454,6 +452,19 @@ describe("buildFeatureQuery", () => {
       "fill",
     ]);
     expect(query.observationCount).toBe(0);
+  });
+
+  it("outlines a grid's whole box, not the tile-clipped piece clicked", () => {
+    const whole = square(0, 0, 4, 4);
+    const query = buildFeatureQuery(
+      lngLat,
+      [feature(GRID, { pk: 5 }, square(0, 0, 1, 1))],
+      context({ gridGeometry: (pk) => (pk === 5 ? whole : undefined) }),
+    );
+    expect(query.highlight.features.map((f) => f.geometry)).toEqual([
+      whole,
+      whole,
+    ]);
   });
 
   it("puts tracks first, then observations, then grids", () => {
@@ -498,17 +509,5 @@ describe("featureHasDataset", () => {
       false,
     );
     expect(featureHasDataset(feature("hexes", {}), 3)).toBe(false);
-  });
-});
-
-describe("withoutGridHighlight", () => {
-  const tagged = (role) => ({ type: "Feature", properties: { role } });
-
-  it("drops the clicked grid boxes and their merged fill, keeping the rest", () => {
-    const highlight = {
-      type: "FeatureCollection",
-      features: [tagged("outline"), tagged("fill"), tagged("both")],
-    };
-    expect(withoutGridHighlight(highlight).features).toEqual([tagged("both")]);
   });
 });

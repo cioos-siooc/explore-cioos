@@ -77,5 +77,5 @@ test("/inView hands the viewport rectangle and filters to getDatasetPksInShape",
   assert.deepEqual(res.body, [3, 7]);
   assert.equal(shapeQuery.calls.length, 1);
   assert.equal(shapeQuery.calls[0].pksOnly, true);
-  assert.deepEqual(shapeQuery.calls[0].query, query);
+  assert.deepEqual({ ...shapeQuery.calls[0].query }, query);
 });

@@ -14,7 +14,7 @@ import {
 const drawnRadius = (range, count) => {
   const value = radiusExpression(range);
   if (typeof value === "number") return value;
-  const parsed = expression.createExpression(value);
+  const parsed = expression.createExpression(value, "paint.circle-radius");
   if (parsed.result !== "success") throw new Error(parsed.value[0].message);
   return parsed.value.evaluate({ zoom: 0 }, { properties: { count } });
 };
