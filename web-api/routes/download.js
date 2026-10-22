@@ -1,6 +1,6 @@
 require("dotenv").config({ quiet: true });
 
-const { v4: uuidv4 } = require("uuid");
+const { randomUUID } = require("node:crypto");
 const express = require("express");
 
 const router = express.Router();
@@ -281,7 +281,7 @@ async function downloadSelection(query) {
     explorer_url: `${EXPLORER_URL}/?${new URLSearchParams(
       Object.entries(query).filter(([key]) => key !== "format"),
     )}`,
-    job_id: uuidv4().substr(0, 6),
+    job_id: randomUUID().slice(0, 6),
     // Installed by the package's reproduce.py, like by the download script.
     downloader_url: DOWNLOADER_URL,
   };

@@ -3,7 +3,6 @@ const assert = require("node:assert");
 const express = require("express");
 const http = require("node:http");
 
-require("express-async-errors");
 const {
   pipeline,
   errorHandler,
@@ -15,7 +14,7 @@ const {
 // stage's position is asserted structurally at the bottom.
 function serve(stages, handler = (req, res) => res.json({ ok: true })) {
   const app = express();
-  app.get("/probe/:z?/:x?/:y?", ...stages, handler);
+  app.get("/probe{/:z}{/:x}{/:y}", ...stages, handler);
   app.use((err, req, res, _next) => {
     res
       .status(err.statusCode || err.status || 500)
