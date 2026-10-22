@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { fileURLToPath } from "node:url";
+import { availableParallelism } from "node:os";
 
 // The frontend image builds from the repo root to reach these.
 const harvestDocs = fileURLToPath(
@@ -79,6 +80,12 @@ export default defineConfig(({ mode }) => {
       include: ["src/**/*.test.{js,jsx}"],
       // Parsing CSS is the single biggest cost in a jsdom run.
       css: false,
+      // Coverage-instrumented workers starve each other past ~6 on a many-core
+      // machine: full-app tests overrun their 5 s, and a timed-out body keeps
+      // clicking into the next test's DOM. Plain runs are fine uncapped.
+      ...(process.argv.includes("--coverage") && {
+        maxWorkers: Math.min(6, availableParallelism() - 1),
+      }),
       // maplibre-gl needs WebGL, which jsdom lacks; map behaviour is e2e-tested.
       alias: {
         "maplibre-gl": new URL("./src/test/stubs/maplibre.js", import.meta.url)
