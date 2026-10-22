@@ -2,7 +2,8 @@
 erddap_urls:
   - https://data.cioospacific.ca/erddap
 
-# set to true to test with caching. Not available in production docker compose file
+# cache ERDDAP data responses for 12h on the harvester_cache volume, so a
+# re-run after an interrupted harvest is fast
 # defaults to false
 cache: true
 
