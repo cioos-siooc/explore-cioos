@@ -27,7 +27,7 @@ def test_a_database_error_is_reported_not_raised(monkeypatch):
 def connection():
     host = os.environ.get("DB_HOST_EXTERNAL") or os.environ.get("DB_HOST", "localhost")
     url = (
-        f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
+        f"postgresql+psycopg2://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
         f"@{host}:{os.environ.get('DB_PORT', 5432)}/{os.environ['DB_NAME']}"
     )
     try:

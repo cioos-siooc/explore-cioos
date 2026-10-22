@@ -210,7 +210,13 @@ class ERDDAPHarvester(BaseHarvester):
                     self.run_id, self.erddap_url, dataset_id,
                     status="skipped",
                     reason_code=CDM_DATA_TYPE_UNSUPPORTED,
-                    error_message=f"cdm_data_type={cdm_type!r} not in {cdm_data_types_supported}",
+                    error_message=(
+                        f"cdm_data_type={cdm_type!r}: CDE harvests only "
+                        f"{', '.join(cdm_data_types_supported)}, the types whose "
+                        "feature structure (cf_role ids, LLAT variables) it can "
+                        "map. Set cdm_data_type in datasets.xml if one of them "
+                        "describes this dataset"
+                    ),
                     query_urls=[f"{base}/info/{dataset_id}/index.html"],
                 ))
 
@@ -425,7 +431,11 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                         run_id, erddap_url, dataset_id,
                         status="skipped",
                         reason_code=NO_PROFILES_FOUND,
-                        error_message="Dataset passed compliance but feature extraction returned no rows",
+                        error_message=dataset.no_features_reason or (
+                            f"Dataset passed compliance but no {feature_kind} "
+                            "were left after extraction (see warnings for "
+                            "removed features)"
+                        ),
                         duration_ms=duration_ms,
                         query_urls=dataset.queried_urls,
                         warnings=dataset.warnings.to_json(),
@@ -449,9 +459,12 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                 if n_hidden:
                     dataset.warnings.add(
                         FEATURES_HIDDEN,
-                        f"{n_hidden} of {len(df_features)} features span more than "
-                        f"{POINT_THRESHOLD_M} m and are hidden from the map "
-                        "(still searchable via geospatial filters).",
+                        f"{n_hidden} of {len(df_features)} features are not drawn "
+                        "as map markers: their latitude/longitude bounding box "
+                        f"spans more than {POINT_THRESHOLD_M} m (a moving platform "
+                        "or a feature id shared across sites), so no single point "
+                        "represents them. They still count in the map's coverage "
+                        "cells and geospatial search.",
                         count=n_hidden,
                     )
             return DatasetHarvestResult(
@@ -479,7 +492,7 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
                 run_id, erddap_url, dataset_id,
                 status="skipped",
                 reason_code=compliance_checker.failure_reason_code,
-                error_message=getattr(compliance_checker, "failure_details", None),
+                error_message=compliance_checker.failure_details,
                 duration_ms=duration_ms,
                 query_urls=dataset.queried_urls,
                 warnings=dataset.warnings.to_json(),

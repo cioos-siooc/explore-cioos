@@ -1,4 +1,4 @@
-FROM nginx:1.30.5
+FROM nginx:1.31.6
 
 # --no-install-recommends keeps cron's default MTA (exim4 and its tree) out,
 # so cron must be named explicitly for start.sh. curl is only for

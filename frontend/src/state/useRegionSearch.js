@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useDebounce } from "../utilities.jsx";
+import { AREA_CAMERA, useDebounce } from "../utilities.jsx";
 import fetchJson from "./fetchJson.js";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import {
+  MAX_RING_VERTICES,
   parseRegions,
   prefixQuery,
   regionBox,
@@ -63,7 +64,7 @@ export function useGoToRegion() {
   const { setAreaPlace } = useSelection();
   return useCallback(
     async (region, shape = "goto") => {
-      zoomToGeometry(region.geometry);
+      zoomToGeometry(region.geometry, region.area ? AREA_CAMERA : undefined);
       if (shape === "goto" || !region.area) return;
       try {
         const ring =
@@ -77,5 +78,28 @@ export function useGoToRegion() {
       }
     },
     [requestDraw, setAreaPlace, zoomToGeometry],
+  );
+}
+
+// A typed or pasted area, framed and made the area filter as given, or as an
+// outline that keeps all of it when it is over the vertex budget.
+export function useApplyArea() {
+  const { requestDraw, zoomToGeometry } = useMapState();
+  return useCallback(
+    async (ring) => {
+      const geometry = { type: "Polygon", coordinates: [ring] };
+      zoomToGeometry(geometry);
+      try {
+        requestDraw(
+          "shape",
+          ring.length > MAX_RING_VERTICES
+            ? await regionOutline(geometry)
+            : ring,
+        );
+      } catch (error) {
+        reportError("area outline failed", error);
+      }
+    },
+    [requestDraw, zoomToGeometry],
   );
 }

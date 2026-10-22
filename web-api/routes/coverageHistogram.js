@@ -50,7 +50,7 @@ const GROUP_BY = {
     kindExpr: "CASE WHEN d.source_type = 'obis' THEN 'obis' ELSE 'erddap' END",
   },
   platform: {
-    keyExpr: "coalesce(nullif(d.platform, ''), 'unknown')",
+    keyExpr: "coalesce(nullif(d.platform_category, ''), 'unknown')",
     kindExpr: "'platform'",
   },
   dataType: {

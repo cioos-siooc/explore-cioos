@@ -149,6 +149,10 @@ def extract_grid_extent(dataset):
     lon_bounds = _axis_bounds_from_metadata(dataset, "longitude")
     if not (lat_bounds and lon_bounds):
         logger.warning("No lat/lon extent found in grid metadata")
+        dataset.no_features_reason = (
+            "No latitude/longitude axis with an actual_range in the grid "
+            "metadata, so its extent is unknown"
+        )
         return pd.DataFrame()
 
     # actual_range order isn't guaranteed on descending axes; antimeridian

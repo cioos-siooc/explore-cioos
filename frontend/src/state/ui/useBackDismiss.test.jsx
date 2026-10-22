@@ -2,7 +2,7 @@ import * as React from "react";
 import { useState } from "react";
 import { describe, it, expect } from "vitest";
 import { act, render, screen } from "@testing-library/react";
-import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 
 import useBackDismiss from "./useBackDismiss.js";
 

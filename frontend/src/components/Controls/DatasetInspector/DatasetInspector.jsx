@@ -5,7 +5,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import {
@@ -54,6 +54,7 @@ import {
 } from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
 import { DatasetPlatformIcon } from "../DatasetsTable/DatasetCard.jsx";
+import { platformLabel } from "../../../platformVocab.js";
 import ListCard, {
   CardField,
   CardTags,
@@ -636,7 +637,7 @@ export default function DatasetInspector({
                         decorative
                       />
                     </span>
-                    {t(dataset.platform)}
+                    {platformLabel(dataset.platform, i18n.language)}
                   </span>
                 ) : (
                   <span className="metadataEmpty">—</span>

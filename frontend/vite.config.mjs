@@ -80,10 +80,15 @@ export default defineConfig(({ mode }) => {
       // Parsing CSS is the single biggest cost in a jsdom run.
       css: false,
       // maplibre-gl needs WebGL, which jsdom lacks; map behaviour is e2e-tested.
-      alias: {
-        "maplibre-gl": new URL("./src/test/stubs/maplibre.js", import.meta.url)
-          .pathname,
-      },
+      // Anchored: a bare key also rewrites maplibre-gl/dist/*.css, and the
+      // failed transform silently drops Map.jsx from coverage.
+      alias: [
+        {
+          find: /^maplibre-gl$/,
+          replacement: new URL("./src/test/stubs/maplibre.js", import.meta.url)
+            .pathname,
+        },
+      ],
       coverage: {
         provider: "v8",
         reportsDirectory: "./coverage",
@@ -96,11 +101,16 @@ export default defineConfig(({ mode }) => {
       // Only Sentry consumes (then deletes) maps; otherwise they'd ship publicly
       // and cost ~0.8 GB of build memory.
       sourcemap: !!env.SENTRY_AUTH_TOKEN,
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks: {
-            maplibre: ["maplibre-gl"],
-            plotly: ["plotly.js-basic-dist-min"],
+          codeSplitting: {
+            groups: [
+              { name: "maplibre", test: /\/node_modules\/maplibre-gl\// },
+              {
+                name: "plotly",
+                test: /\/node_modules\/plotly\.js-basic-dist-min\//,
+              },
+            ],
           },
         },
       },

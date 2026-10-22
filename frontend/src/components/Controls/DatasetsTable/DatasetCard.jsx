@@ -15,9 +15,10 @@ import {
   X,
 } from "react-bootstrap-icons";
 import classNames from "classnames";
+import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
-import platformColors from "../../platformColors";
+import { platformColor, platformLabel } from "../../../platformVocab.js";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
@@ -293,6 +294,7 @@ export function DatasetPlatformIcon({
   t,
   decorative,
 }) {
+  const { i18n } = useTranslation();
   // Grid amber, the colour the map draws gridded coverage in.
   if (cdmDataType === "Grid") {
     return (
@@ -310,18 +312,11 @@ export function DatasetPlatformIcon({
   return (
     <Icon
       className="platformGlyph"
-      title={decorative ? undefined : t(platform)}
-      fill={platformColorOf(platform)}
+      title={decorative ? undefined : platformLabel(platform, i18n.language)}
+      fill={platformColor(platform)}
       size={13}
     />
   );
-}
-
-function platformColorOf(platform) {
-  return (
-    platformColors.find((pc) => pc.platform === platform) ??
-    platformColors.find((pc) => pc.platform === "unknown")
-  ).color;
 }
 
 // Shared with the map's "what's here" card so a dataset reads the same in both.
