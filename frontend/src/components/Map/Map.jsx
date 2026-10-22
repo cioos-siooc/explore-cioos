@@ -1,6 +1,7 @@
 import * as React from "react";
-import maplibreGl, { Popup } from "maplibre-gl";
+import { Map as MaplibreMap, Marker, Popup, setWorkerUrl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -51,7 +52,8 @@ import {
   MARKER_MIN_ZOOM,
   trackLineColor,
 } from "../config";
-import platformColors from "../../components/platformColors";
+import platforms from "../../platforms.json";
+import { platformColor } from "../../platformVocab.js";
 import {
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
@@ -87,6 +89,9 @@ import { focusedPointFeatures } from "./focusedPoints.js";
 import { selectionLayerFilter } from "./selectionFilter.js";
 import { createTileRetry } from "./tileRetry.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
+
+// maplibre 6 can't find its worker from inside a bundle.
+setWorkerUrl(maplibreWorkerUrl);
 
 // Captured before the overrides below replace them.
 const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex;
@@ -772,15 +777,12 @@ export default function CreateMap({
       }),
   );
 
-  const colors = ["match", ["get", "platform"]];
-  platformColors.reduce((accumulatedPlatformColors, platformColor) => {
-    if (platformColor.color) {
-      accumulatedPlatformColors.push(platformColor.platform);
-      accumulatedPlatformColors.push(platformColor.color);
-    }
-    return accumulatedPlatformColors;
-  }, colors);
-  colors.push("#000000");
+  const colors = [
+    "match",
+    ["get", "platform"],
+    ...platforms.flatMap((p) => [p.label_en, platformColor(p.label_en)]),
+    platformColor("unknown"),
+  ];
 
   // Focus dimming is a feature-state flag the paint expressions carry from the
   // start. setFilter, or setPaintProperty on a data-driven property, forces a
@@ -1237,7 +1239,7 @@ export default function CreateMap({
       // arithmetic midpoint sits well south of the image's visual centre.
       const northWest = map.current.project([bounds.west, bounds.north]);
       const southEast = map.current.project([bounds.east, bounds.south]);
-      wmsSpinnerMarker.current ??= new maplibreGl.Marker({
+      wmsSpinnerMarker.current ??= new Marker({
         element: wmsSpinnerElement,
       });
       wmsSpinnerMarker.current
@@ -3050,7 +3052,7 @@ export default function CreateMap({
 
   useEffect(() => {
     if (map.current) return;
-    map.current = new maplibreGl.Map({
+    map.current = new MaplibreMap({
       container: mapContainer.current,
       // The projection is part of the style in MapLibre 5 and must be set here:
       // the projection effect's first run happens while map.current is null.

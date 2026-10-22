@@ -232,7 +232,7 @@ def merge_and_write_csvs(folder, erddap_datasets, erddap_profiles, erddap_skippe
 
         erddap_datasets["title"] = erddap_datasets["title"].apply(lambda x: unescape_ascii(x))
 
-        erddap_datasets["ckan_title"].fillna(erddap_datasets["title"], inplace=True)
+        erddap_datasets["ckan_title"] = erddap_datasets["ckan_title"].fillna(erddap_datasets["title"])
 
         erddap_datasets["organizations"] = erddap_datasets.apply(
             lambda x: x["ckan_organizations"] or unescape_ascii_list(x["organizations"]),

@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { server } from "../../../config.js";
-import { useDebounce } from "../../../utilities.jsx";
+import { parseArea, useDebounce } from "../../../utilities.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
@@ -144,7 +144,9 @@ const isTypingTarget = (el) =>
     el.closest("input, textarea, select, [contenteditable]") !== null);
 
 // Also opens on typing a letter or digit while no field has focus and no
-// dialog is up. Not symbols, which the map takes for zoom (+, -, =).
+// dialog is up. Not symbols, which the map takes for zoom (+, -, =). The
+// composed path sees through shadow roots (Sentry's feedback form), which
+// retarget e.target to their host.
 export function useFilterSearchShortcut(open) {
   useEffect(() => {
     function onKeyDown(e) {
@@ -160,7 +162,7 @@ export function useFilterSearchShortcut(open) {
         e.ctrlKey ||
         e.altKey ||
         !/^[\p{L}\p{N}]$/u.test(e.key) ||
-        isTypingTarget(e.target) ||
+        isTypingTarget(e.composedPath()[0]) ||
         document.body.classList.contains("cioos-modal-open")
       )
         return;
@@ -263,6 +265,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
     ...useFilterModel(
       useScientificNameMatches(term, obisDataAvailable),
       exclude ? undefined : parsePartialRangeQuery(term),
+      exclude ? undefined : parseArea(term),
     ),
     regionGroup,
     canReset && {

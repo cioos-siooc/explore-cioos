@@ -31,7 +31,7 @@ def harvester(tmp_path):
 def captured_queries(monkeypatch):
     """Capture the SQL and hand back an immediately-exhausted chunk stream.
 
-    fetch_df_chunk signals end-of-stream with an empty frame that still
+    The connection's fetch_df_chunk signals end-of-stream with an empty frame that still
     carries the columns, which is what duckdb really returns.
     """
     class Captured(list):
@@ -44,12 +44,9 @@ def captured_queries(monkeypatch):
         def fetch_df_chunk(self, vectors_per_chunk=1):
             return pd.DataFrame(columns=RESULT_COLUMNS)
 
-    class FakeConnection:
+    class FakeConnection(FakeRelation):
         def execute(self, query):
             captured.append(query)   # the COPY, which wraps the SELECT verbatim
-
-        def sql(self, query):
-            return FakeRelation()
 
         def close(self):
             captured.closed += 1
@@ -167,12 +164,9 @@ class TestChunkedFetch:
             def fetch_df_chunk(self, vectors_per_chunk=1):
                 return pages.pop(0)
 
-        class FakeConnection:
+        class FakeConnection(FakeRelation):
             def execute(self, query):
                 pass
-
-            def sql(self, query):
-                return FakeRelation()
 
             def close(self):
                 pass
@@ -236,12 +230,9 @@ class TestChunkedFetch:
                     return pd.DataFrame({c: [1.0] * 3 for c in RESULT_COLUMNS})
                 raise RuntimeError("connection reset mid-stream")
 
-        class FakeConnection:
+        class FakeConnection(FakeRelation):
             def execute(self, query):
                 pass
-
-            def sql(self, query):
-                return FakeRelation()
 
             def close(self):
                 pass
@@ -267,12 +258,9 @@ class TestChunkedFetch:
                     return pd.DataFrame({c: [1.0] * 3 for c in RESULT_COLUMNS})
                 raise RuntimeError("boom")
 
-        class FakeConnection:
+        class FakeConnection(FakeRelation):
             def execute(self, query):
                 pass
-
-            def sql(self, query):
-                return FakeRelation()
 
             def close(self):
                 pass

@@ -7,7 +7,12 @@ import logging
 import pytest
 import yaml
 from cde_harvester import prefect_pipeline
-from cde_harvester.prefect_pipeline import PrefectCDEPipeline, _configured_sources
+from cde_harvester.prefect_pipeline import (
+    PrefectCDEPipeline,
+    _configured_sources,
+    _plan_lanes,
+    deployment_slug,
+)
 
 NODE_A = "7dfb2d90-9317-434d-8d4e-64adf324579a"
 NODE_B = "68f83ea7-69a7-44fd-be77-3c3afd6f3cf8"
@@ -189,20 +194,19 @@ class TestFanOut:
         triggered = []
 
         class FakeFuture:
-            def __init__(self, source):
-                self.source = source
+            def __init__(self, sources):
+                self.sources = sources
 
             def result(self):
-                return {"source": self.source, "deployment": "d", "state": "COMPLETED",
-                        "completed": True, "flow_run_id": "x"}
+                return [{"source": s, "deployment": "d", "state": "COMPLETED",
+                         "completed": True, "flow_run_id": "x"} for s in self.sources]
 
-        def fake_submit(src, triggered_by, force):
-            triggered.append((src, force))
-            return FakeFuture(src)
+        def fake_submit(lane, triggered_by, force):
+            triggered.extend((src, force) for src in lane)
+            return FakeFuture(lane)
 
-        monkeypatch.setattr(
-            prefect_pipeline._trigger_source_harvest, "submit", fake_submit, raising=False
-        )
+        monkeypatch.setattr(prefect_pipeline, "_recent_durations", dict)
+        monkeypatch.setattr(prefect_pipeline._run_lane, "submit", fake_submit, raising=False)
         prefect_pipeline.cde_harvest_all_run.fn(config_file(DISCOVERY_CONFIG))
         assert triggered == [("https://data.cioospacific.ca/erddap", False), ("obis", False)]
         triggered.clear()
@@ -225,3 +229,32 @@ class TestFanOut:
     def test_no_sources_raises(self, config_file):
         with pytest.raises(ValueError, match="No sources configured"):
             prefect_pipeline.cde_harvest_all_run.fn(config_file({"erddap_urls": []}))
+
+
+FAST, MID, SLOW, NEW = (f"https://{h}.example/erddap" for h in ("fast", "mid", "slow", "new"))
+DURATIONS = {deployment_slug(FAST): 60, deployment_slug(MID): 600, deployment_slug(SLOW): 6000}
+
+
+class TestPlanLanes:
+    def test_slowest_gets_a_side_lane_rest_fastest_first(self):
+        lanes = _plan_lanes([SLOW, NEW, MID, FAST], DURATIONS, slots=2)
+        assert lanes == [[SLOW], [FAST, MID, NEW]]
+
+    def test_one_slot_is_one_lane_fastest_first(self):
+        assert _plan_lanes([SLOW, NEW, MID, FAST], DURATIONS, slots=1) == [[FAST, MID, SLOW, NEW]]
+
+    def test_no_history_keeps_config_order(self):
+        assert _plan_lanes([SLOW, FAST], {}, slots=2) == [[SLOW, FAST]]
+
+    def test_single_source_is_one_lane(self):
+        assert _plan_lanes([SLOW], DURATIONS, slots=2) == [[SLOW]]
+
+    def test_history_matches_respelled_url(self):
+        assert _plan_lanes([FAST + "/", SLOW], DURATIONS, slots=1) == [[FAST + "/", SLOW]]
+
+    def test_unreadable_history_is_empty(self, monkeypatch):
+        def no_db(**kwargs):
+            raise ValueError("DB_NAME not set")
+
+        monkeypatch.setattr(prefect_pipeline.core_db, "create_db_engine", no_db)
+        assert prefect_pipeline._recent_durations() == {}

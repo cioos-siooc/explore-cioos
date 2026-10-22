@@ -15,6 +15,7 @@ import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
 
 import platformsJSONfile from "../../platforms.json";
+import { platformCategory, platformLabels } from "../../platformVocab.js";
 // Both copied verbatim from cioos-commons/eovs/ (eov.json, categories.json).
 import eovsJSONfile from "../../eovs.json";
 import eovCategoriesJSONfile from "../../eovCategories.json";
@@ -316,9 +317,13 @@ export default function FilterProvider({ children }) {
               (p) => p.label_en === platform,
             );
 
+            const category = platformCategory(platform);
             return {
               title: platform,
+              titleTranslated: platformLabels(platform),
               pk: platform,
+              category,
+              categoryTranslated: platformLabels(category),
               isSelected: platformsFromURL.includes(platform),
               isExcluded: platformsExcludedFromURL.includes(platform),
               hover_en: platformMetadata?.definition_en,

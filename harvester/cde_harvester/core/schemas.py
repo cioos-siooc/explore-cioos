@@ -135,6 +135,7 @@ class DatasetSchema(pa.DataFrameModel):
     dataset_id: Series[str]
     cdm_data_type: Series[str] = pa.Field(nullable=True)
     platform: Series[str] = pa.Field(nullable=True)
+    platform_category: Series[str] = pa.Field(nullable=True)
     eovs: Series[object]
     organizations: Series[object]
     n_profiles: Series[float] = pa.Field(nullable=True)

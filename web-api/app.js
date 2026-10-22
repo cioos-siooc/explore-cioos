@@ -1,14 +1,8 @@
-// Must be required before any router: it patches Layer.prototype's `handle`
-// setter, so routes registered earlier bypass it and a rejection there exits
-// the process.
-require("express-async-errors");
-
 const createError = require("http-errors");
 const express = require("express");
 const logger = require("morgan");
 const cors = require("cors");
 
-const Sentry = require("@sentry/node");
 const swaggerUi = require("swagger-ui-express");
 const downloadRouter = require("./routes/download");
 const indexRouter = require("./routes/index");
@@ -126,10 +120,6 @@ if (process.env.ENABLE_API_DOCS !== "false") {
 app.use((req, res, next) => {
   next(createError(404));
 });
-
-// After the routes and the 404, before the JSON handler: it only sees errors
-// from middleware registered above it.
-Sentry.setupExpressErrorHandler(app);
 
 // `statusCode` is what utils/dbFilter.js marks its client errors with,
 // `status` is http-errors' spelling; anything unlabelled is a 500.

@@ -58,8 +58,8 @@ import "./styles.css";
 
 const isSet = (option) => option.isSelected || option.isExcluded;
 
-// Also matches the translated label and, for EOVs, the category in either
-// language ("physique" finds them all).
+// Also matches the translated label and the category in either language
+// ("physique" finds every physical EOV).
 function createOptionSubset(searchTerms, allOptions, t) {
   if (!searchTerms) return allOptions;
   const search = searchTerms.toString().toLowerCase();
@@ -67,6 +67,8 @@ function createOptionSubset(searchTerms, allOptions, t) {
     [
       option.title,
       t(option.title),
+      option.titleTranslated?.en,
+      option.titleTranslated?.fr,
       option.categoryTranslated?.en,
       option.categoryTranslated?.fr,
     ].some((text) => text?.toLowerCase().includes(search)),
@@ -399,6 +401,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 searchable
                 colored
                 translatable
+                grouped
                 allOptions={platformsSelected}
               />
             </Filter>

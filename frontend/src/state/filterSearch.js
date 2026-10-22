@@ -37,8 +37,9 @@ function startsWords(option, words) {
 
 // A leading "-", "not" or "sauf" asks for the value to be excluded rather than
 // included, the same include / exclude pair every list filter offers. The
-// words need a space after them, so "nothing" or "saufen" stay searches.
-const EXCLUDE_PREFIX = /^(?:-|(?:not|sauf)\s+)\s*/i;
+// words need a space after them, so "nothing" or "saufen" stay searches, and
+// a "-" before a number is its sign ("-130, 48, -120, 55" is an area).
+const EXCLUDE_PREFIX = /^(?:-(?![\d.])|(?:not|sauf)\s+)\s*/i;
 
 export function parseFilterQuery(text) {
   const trimmed = text.trim();

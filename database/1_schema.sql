@@ -45,6 +45,8 @@ CREATE TABLE datasets (
     dataset_id TEXT,
     erddap_url TEXT,
     platform TEXT,
+    -- Top-level NERC L06 ancestor of platform (diver -> organism).
+    platform_category TEXT,
     title TEXT,
     title_fr TEXT,
     summary TEXT,

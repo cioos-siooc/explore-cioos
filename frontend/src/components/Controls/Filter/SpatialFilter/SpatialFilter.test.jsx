@@ -133,7 +133,7 @@ describe("SpatialFilter place search", () => {
     );
     expect(record.closest("p")).toHaveTextContent("Bay of Fundy");
     expect(screen.getByTestId("quick-filter-area")).toHaveAccessibleName(
-      "Area: Bay of Fundy",
+      "Draw area: Bay of Fundy",
     );
 
     act(() => seen.setPolygon([...seen.ring]));
@@ -178,5 +178,98 @@ describe("SpatialFilter place search", () => {
     expect(screen.getAllByTestId("spatial-filter-place-box")).toHaveLength(1);
     expect(screen.getAllByTestId("spatial-filter-place-area")).toHaveLength(1);
     expect(screen.getAllByTestId("spatial-filter-place-point")).toHaveLength(1);
+  });
+});
+
+describe("SpatialFilter coordinates", () => {
+  beforeEach(() => {
+    installMockFetch();
+  });
+
+  function renderPanel(url = "/") {
+    const seen = {};
+    function Probe() {
+      const map = useMapState();
+      seen.ring = map.drawRequest?.ring;
+      seen.showFiltersModal = useUI().showFiltersModal;
+      const { setPolygon } = useSelection();
+      const { drawRequest } = map;
+      React.useEffect(() => {
+        if (drawRequest?.mode === "shape") setPolygon(drawRequest.ring);
+      }, [drawRequest, setPolygon]);
+      return null;
+    }
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(
+      <>
+        <SpatialFilter />
+        <Probe />
+      </>,
+      { url, providers: "app" },
+    );
+    return { user, seen };
+  }
+
+  it("starts from the current box, and applies the edited one", async () => {
+    const { user, seen } = renderPanel(
+      "/?latMin=44&lonMin=-67&latMax=46&lonMax=-64",
+    );
+    const north = screen.getByTestId("spatial-filter-north");
+    expect(north).toHaveValue(46);
+
+    await user.clear(north);
+    await user.type(north, "47.5");
+    await user.click(
+      screen.getByRole("button", { name: "Apply bounding box filter" }),
+    );
+
+    await waitFor(() => expect(seen.ring).toBeDefined());
+    expect(polygonIsRectangle(seen.ring)).toBe(true);
+    expect(Math.max(...seen.ring.map(([, lat]) => lat))).toBe(47.5);
+    expect(seen.showFiltersModal).toBe(false);
+  });
+
+  it("explains an impossible box instead of applying it", async () => {
+    const { user, seen } = renderPanel();
+
+    await user.type(screen.getByTestId("spatial-filter-west"), "-60");
+    await user.type(screen.getByTestId("spatial-filter-east"), "-70");
+    await user.type(screen.getByTestId("spatial-filter-south"), "40");
+    await user.type(screen.getByTestId("spatial-filter-north"), "50");
+    await user.click(
+      screen.getByRole("button", { name: "Apply bounding box filter" }),
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "West must be less than east",
+    );
+    expect(screen.getByTestId("spatial-filter-west")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(seen.ring).toBeUndefined();
+  });
+
+  it("applies a pasted wkt polygon, and refuses one it cannot read", async () => {
+    const { user, seen } = renderPanel();
+    const wkt = screen.getByTestId("spatial-filter-wkt");
+
+    await user.click(wkt);
+    await user.paste("POLYGON((-67 44, -64 44))");
+    await user.click(
+      screen.getByRole("button", { name: "Apply polygon filter" }),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("POLYGON((lon lat");
+
+    await user.clear(wkt);
+    expect(screen.queryByRole("alert")).toBeNull();
+    await user.paste("POLYGON((-67 44, -64 44, -65 46, -67 44))");
+    await user.click(
+      screen.getByRole("button", { name: "Apply polygon filter" }),
+    );
+    await waitFor(() => expect(seen.ring).toHaveLength(4));
+    expect(screen.getByTestId("spatial-filter-wkt")).toHaveValue(
+      "POLYGON((-67 44, -64 44, -65 46, -67 44))",
+    );
   });
 });
