@@ -33,6 +33,35 @@ describe("fetchJson", () => {
     });
   });
 
+  it("uses the API's {error} message and keeps it as the detail", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "relation missing" }), {
+          status: 500,
+        }),
+      ),
+    );
+    await expect(fetchJson("/x")).rejects.toMatchObject({
+      status: 500,
+      message: "relation missing",
+      detail: "relation missing",
+    });
+  });
+
+  it("leaves the detail empty when the error body isn't API JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(new Response("<html>502</html>", { status: 502 })),
+    );
+    await expect(fetchJson("/x")).rejects.toMatchObject({
+      status: 502,
+      detail: undefined,
+    });
+  });
+
   it("never calls response.json() on a non-2xx body (avoids the HTML-error-page parse crash)", async () => {
     const json = vi.fn();
     vi.stubGlobal(

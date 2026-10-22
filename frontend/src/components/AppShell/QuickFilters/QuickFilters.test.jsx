@@ -7,6 +7,7 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
+import { AREA_CAMERA } from "../../../utilities.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import ActiveFilterChips from "../TopControls/ActiveFilterChips.jsx";
 import QuickFilters from "./QuickFilters.jsx";
@@ -34,6 +35,7 @@ describe("QuickFilters", () => {
       search: [],
       draw: [],
       zoom: [],
+      camera: [],
       onlyInView: [],
       realtimeOnly: [],
     };
@@ -44,6 +46,7 @@ describe("QuickFilters", () => {
       seen.search.push(datasetTitleSearchText);
       seen.draw.push(drawRequest?.mode);
       seen.zoom.push(zoomTarget?.geometry);
+      seen.camera.push(zoomTarget?.camera);
       seen.onlyInView.push(onlyInView);
       seen.realtimeOnly.push(realtimeOnly);
       return null;
@@ -132,6 +135,8 @@ describe("QuickFilters", () => {
         ],
       }),
     );
+    // A region-sized shape is lost at the dataset framing's zoom cap.
+    expect(seen.camera.at(-1)).toEqual(AREA_CAMERA);
   });
 
   it("clears the drawn shape from the Area menu", async () => {

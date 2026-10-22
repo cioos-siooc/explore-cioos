@@ -12,8 +12,8 @@
     "format:check": "prettier --check --ignore-path .prettierignore \"frontend/**/*.{js,jsx,mjs,css,json}\" \"web-api/**/*.js\" \"web-api/bin/www\" \"test/**/*.js\""
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
-    "eslint": "^9.39.5",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -21,5 +21,10 @@
     "prettier": "^3.9.10",
     "stylelint": "^17.16.0",
     "stylelint-config-standard": "^40.0.0"
+  },
+  "overrides": {
+    "eslint-plugin-react": {
+      "eslint": "$eslint"
+    }
   }
 }
