@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "cioos-metadata-conversion",
-    "duckdb>=1.5.6",
+    "duckdb>=2.0.0",
     "diskcache>=5.6.3",
     "erddapy>=3.3.1",
     "lxml>=5.1.0",
