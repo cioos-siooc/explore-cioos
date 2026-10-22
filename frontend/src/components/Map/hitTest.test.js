@@ -474,7 +474,7 @@ describe("buildFeatureQuery", () => {
   });
 
   it("lists a single-point grid and keeps its dot out of the area fill", () => {
-    const title = (en) => JSON.stringify({ en });
+    const title = (en) => ({ en });
     const query = buildFeatureQuery(
       lngLat,
       [
