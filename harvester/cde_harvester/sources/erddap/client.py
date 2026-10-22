@@ -41,6 +41,10 @@ DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 PLAUSIBLE_TIME_MIN = pd.Timestamp.min.tz_localize("UTC")
 PLAUSIBLE_TIME_MAX = pd.Timestamp.max.tz_localize("UTC")
 
+# Long enough for a re-run after an interrupted harvest, short enough that a
+# changed dataset isn't re-harvested from stale responses for long.
+CACHE_TTL_SECONDS = 12 * 3600
+
 # Mixed into every Croissant hash: bump it when a harvester or schema change must
 # reach every dataset, so the next run re-harvests instead of skipping as unchanged.
 HARVEST_VERSION = 2
@@ -112,12 +116,7 @@ class ERDDAP:
         self.cache_requests = cache_requests
 
         if cache_requests:
-            self.cache = dc.Cache(
-                "harvester_cache",
-                eviction_policy="none",
-                size_limit=10000000000,
-                cull_limit=0,
-            )
+            self.cache = dc.Cache("harvester_cache", size_limit=10000000000)
             print("Cache stats:")
             print("eviction_policy", self.cache.eviction_policy)
             print("count", self.cache.count)
@@ -158,6 +157,7 @@ class ERDDAP:
                 frame = self.erddap_csv_to_df(
                     f'/tabledap/allDatasets.csv?&accessible="public"&dataStructure="{structure}"',
                     skiprows=[1, 2],
+                    cache=False,
                 )
                 # Tag the requested structure ourselves — older ERDDAPs omit
                 # the dataStructure column from the listing.
@@ -195,7 +195,7 @@ class ERDDAP:
             parsed = pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
         return parsed.where(parsed.between(PLAUSIBLE_TIME_MIN, PLAUSIBLE_TIME_MAX))
 
-    def erddap_csv_to_df(self, url, skiprows=(1,), dataset=None):
+    def erddap_csv_to_df(self, url, skiprows=(1,), dataset=None, cache=True):
         """Errors raise up to the dataset loop, so the dataset gets skipped."""
         if dataset:
             logger = dataset.logger
@@ -217,7 +217,9 @@ class ERDDAP:
         if dataset is not None:
             dataset.queried_urls.append(decoded_url)
 
-        response, body = self._fetch(url_combined, decoded_url, logger)
+        response, body = self._fetch(
+            url_combined, decoded_url, logger, cache=cache and self.cache_requests
+        )
         if response.status_code == 504 and dataset is not None:
             self.gateway_timeouts.setdefault(dataset.id, time.monotonic())
 
@@ -270,22 +272,21 @@ class ERDDAP:
         finally:
             body.close()
 
-    def _fetch(self, url_combined, decoded_url, logger):
+    def _fetch(self, url_combined, decoded_url, logger, cache=False):
         """Return (response, body), body a seekable binary stream at 0.
 
         A 200 body is streamed and abandoned past MAX_RESPONSE_SIZE. Non-200
         bodies are read whole on purpose: they are small error pages the caller
-        matches on .text.
+        matches on .text. Only 200 bodies are cached, streamed to and from disk
+        files so a cached response never has to fit in memory.
         """
-        if self.cache_requests and url_combined in self.cache:
-            status_code, url, reason, encoding, content = self.cache[url_combined]
-            response = requests.Response()
-            response.status_code = status_code
-            response.url = url
-            response.reason = reason
-            response.encoding = encoding
-            response._content = content
-            return response, io.BytesIO(content)
+        if cache:
+            cached, meta = self.cache.get(url_combined, read=True, tag=True)
+            if cached is not None:
+                response = requests.Response()
+                response.status_code = 200
+                response.url, response.encoding = json.loads(meta)
+                return response, cached
 
         response = self.session.get(url_combined, timeout=3600, stream=True)
         try:
@@ -293,16 +294,12 @@ class ERDDAP:
         finally:
             response.close()
 
-        if self.cache_requests:
-            logger.debug("CACHE MISS")
-            # A streamed Response can't be pickled; this re-materializes the body
-            # in memory, so caching stays a local-development convenience.
-            content = body.read()
-            body.seek(0)
-            self.cache[url_combined] = (
-                response.status_code, response.url, response.reason,
-                response.encoding, content,
+        if cache and response.status_code == 200:
+            self.cache.set(
+                url_combined, body, read=True, expire=CACHE_TTL_SECONDS,
+                tag=json.dumps([response.url, response.encoding]),
             )
+            body.seek(0)
         return response, body
 
     @staticmethod
