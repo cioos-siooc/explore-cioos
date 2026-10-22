@@ -73,6 +73,55 @@ attribute,substrate,units,,m
 """
 
 
+# Modeled on salishsea.eos.ubc.ca ubcSSg3DPhysicsFields1hV21-11: a NEMO grid
+# indexed by gridY/gridX, plus the ACDD bounds its publisher is asked to add.
+CURVILINEAR_GRID_INFO_CSV = """\
+Row Type,Variable Name,Attribute Name,Data Type,Value
+attribute,NC_GLOBAL,cdm_data_type,,Grid
+attribute,NC_GLOBAL,geospatial_lat_min,double,46.86
+attribute,NC_GLOBAL,geospatial_lat_max,double,51.11
+attribute,NC_GLOBAL,geospatial_lon_min,double,-126.40
+attribute,NC_GLOBAL,geospatial_lon_max,double,-121.32
+dimension,time,,double,"nValues=173616, evenlySpaced=true, averageSpacing=1h 0m 0s"
+attribute,time,actual_range,,"1.1676114E9, 1.7926254E9"
+attribute,time,standard_name,,time
+attribute,time,units,,seconds since 1970-01-01T00:00:00Z
+dimension,depth,,float,"nValues=40, evenlySpaced=false, averageSpacing=11.3"
+attribute,depth,actual_range,,"0.5000003, 441.4661"
+attribute,depth,standard_name,,depth
+attribute,depth,units,,m
+dimension,gridY,,short,"nValues=898, evenlySpaced=true, averageSpacing=1.0"
+attribute,gridY,actual_range,,"0, 897"
+attribute,gridY,units,,count
+dimension,gridX,,short,"nValues=398, evenlySpaced=true, averageSpacing=1.0"
+attribute,gridX,actual_range,,"0, 397"
+attribute,gridX,units,,count
+variable,temperature,,float,"time, depth, gridY, gridX"
+attribute,temperature,standard_name,,sea_water_conservative_temperature
+attribute,temperature,units,,degC
+"""
+
+# Modeled on ubcSSfPointAtkinsonSSH10m: a tide-gauge forecast published as a
+# griddap with size-1 latitude/longitude axes.
+POINT_GRID_INFO_CSV = """\
+Row Type,Variable Name,Attribute Name,Data Type,Value
+attribute,NC_GLOBAL,cdm_data_type,,Grid
+dimension,time,,double,"nValues=1080, evenlySpaced=true, averageSpacing=10m 0s"
+attribute,time,actual_range,,"1.7921091E9, 1.7927565E9"
+attribute,time,standard_name,,time
+attribute,time,units,,seconds since 1970-01-01T00:00:00Z
+dimension,longitude,,float,"nValues=1, onlyValue=-123.2495"
+attribute,longitude,actual_range,,"-123.2495, -123.2495"
+attribute,longitude,units,,degrees_east
+dimension,latitude,,float,"nValues=1, onlyValue=49.33216"
+attribute,latitude,actual_range,,"49.33216, 49.33216"
+attribute,latitude,units,,degrees_north
+variable,ssh,,float,"time, longitude, latitude"
+attribute,ssh,standard_name,,sea_surface_height_above_geoid
+attribute,ssh,units,,m
+"""
+
+
 def build_grid_dataset(info_csv=GRID_INFO_CSV):
     """Fake Dataset carrying the attributes extract_grid_extent reads."""
     dataset = MagicMock()
@@ -178,6 +227,31 @@ class TestExtractGridExtent:
         dataset = build_grid_dataset(NO_EXTENT_GRID_INFO_CSV)
         df = extract_grid_extent(dataset)
         assert df.empty
+
+    def test_curvilinear_grid_extent_from_acdd_bounds(self):
+        dataset = build_grid_dataset(CURVILINEAR_GRID_INFO_CSV)
+        df = extract_grid_extent(dataset)
+
+        assert not df.empty
+        assert dataset.coverage_lat_min == pytest.approx(46.86)
+        assert dataset.coverage_lat_max == pytest.approx(51.11)
+        assert dataset.coverage_lon_min == pytest.approx(-126.40)
+        assert dataset.coverage_lon_max == pytest.approx(-121.32)
+        assert dataset.coverage_depth_min == pytest.approx(0.5000003)
+        assert dataset.coverage_depth_max == pytest.approx(441.4661)
+        assert [d["name"] for d in dataset.grid_dimensions] == [
+            "time", "depth", "gridY", "gridX",
+        ]
+
+    def test_single_point_grid_keeps_degenerate_extent(self):
+        dataset = build_grid_dataset(POINT_GRID_INFO_CSV)
+        df = extract_grid_extent(dataset)
+
+        assert not df.empty
+        assert dataset.coverage_lat_min == dataset.coverage_lat_max
+        assert dataset.coverage_lat_min == pytest.approx(49.33216)
+        assert dataset.coverage_lon_min == dataset.coverage_lon_max
+        assert dataset.coverage_lon_min == pytest.approx(-123.2495)
 
     def test_handler_registration_attributes(self):
         handler = GridHandler()

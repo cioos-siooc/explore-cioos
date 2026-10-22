@@ -53,6 +53,23 @@ describe("UrlSync", () => {
     expect(params().get("wide")).toBe("1");
   });
 
+  it("keeps a param written after its last render, as when widening while the page settles", async () => {
+    renderWithProviders(<Probe />, {
+      providers: "app",
+      url: `/?dataset=${pointQueryFixture[0].dataset_id}`,
+    });
+    await waitFor(() => expect(hooks.selection.inspectDataset).toBeTruthy());
+    // Straight to history, so UrlSync's render-time params still lack it.
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.search}&wide=1`,
+    );
+    act(() => hooks.mapView.setMapView({ lat: 50, lon: -125, zoom: 6 }));
+    await waitFor(() => expect(params().get("zoom")).toBe("6"));
+    expect(params().get("wide")).toBe("1");
+  });
+
   it("syncs i18n to a ?lang= the link was opened with", async () => {
     const { i18n } = renderWithProviders(<Probe />, {
       providers: "app",
