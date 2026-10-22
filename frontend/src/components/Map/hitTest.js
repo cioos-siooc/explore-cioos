@@ -21,9 +21,16 @@ export const GRIDDAP_PRIORITY_ZOOM = 5;
 
 // Past this zoom someone is working with a specific grid; below it a
 // rectangle over a continent's worth of hexes cannot swallow their hover.
+// A single-point grid's coverage is a Point, drawn by its own circle layer.
+export const griddapHitLayers = [
+  "griddap-coverage-fill",
+  "griddap-coverage-point",
+];
+export const isGriddapHit = (feature) =>
+  griddapHitLayers.includes(feature.layer.id);
+
 export const griddapOutranksHexesIn = (hits, zoom) =>
-  zoom >= GRIDDAP_PRIORITY_ZOOM &&
-  hits.some((feature) => feature.layer.id === "griddap-coverage-fill");
+  zoom >= GRIDDAP_PRIORITY_ZOOM && hits.some(isGriddapHit);
 
 // Clickable track layers, most-deliberate target first: an arrowhead is
 // aimed at (it is what the head tooltip describes), the line is the fallback.
@@ -261,13 +268,13 @@ export const buildFeatureQuery = (
   // Deduped by dataset: stacked grids over the same water are the norm. A
   // rendered hit is clipped to its tile, so the box is outlined from the
   // coverage source's whole geometry.
-  const gridFeatures = dedupeGriddapByPk(
-    hits.filter((feature) => feature.layer.id === "griddap-coverage-fill"),
-  ).map((feature) => ({
-    type: "Feature",
-    geometry: gridGeometry(Number(feature.properties.pk)) || feature.geometry,
-    properties: feature.properties,
-  }));
+  const gridFeatures = dedupeGriddapByPk(hits.filter(isGriddapHit)).map(
+    (feature) => ({
+      type: "Feature",
+      geometry: gridGeometry(Number(feature.properties.pk)) || feature.geometry,
+      properties: feature.properties,
+    }),
+  );
   const grids = gridFeatures.map((feature) => ({
     kind: "grid",
     pk: Number(feature.properties.pk),
@@ -282,12 +289,15 @@ export const buildFeatureQuery = (
   // union loses the nested boxes' borders. So the union feeds the fill only
   // ('fill'), the rectangles the outline/glow only ('outline'), the rest all
   // ('both').
-  let mergedGrid = gridFeatures[0] || null;
-  for (let i = 1; turfUnion && i < gridFeatures.length; i++) {
+  const gridAreas = gridFeatures.filter(
+    (feature) => feature.geometry.type !== "Point",
+  );
+  let mergedGrid = gridAreas[0] || null;
+  for (let i = 1; turfUnion && i < gridAreas.length; i++) {
     try {
       // One FeatureCollection per call — see the hex fragment union above.
       mergedGrid =
-        turfUnion(helpers.featureCollection([mergedGrid, gridFeatures[i]])) ||
+        turfUnion(helpers.featureCollection([mergedGrid, gridAreas[i]])) ||
         mergedGrid;
     } catch {
       // A degenerate polygon fails to union; keep what merged so far.

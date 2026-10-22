@@ -74,8 +74,10 @@ import {
   dedupeGriddapByPk,
   featureHasDataset,
   griddapCoveredIn,
+  griddapHitLayers,
   griddapOutranksHexesIn,
   griddapTitle,
+  isGriddapHit,
   isOnAPointIn,
   loadTurfUnion,
   selectedTrackLayers,
@@ -379,7 +381,11 @@ const trackLayerIds = [
   "selected-track-fixes",
   "selected-track-fixes-nocog",
 ];
-const griddapLayerIds = ["griddap-coverage-fill", "griddap-coverage-line"];
+const griddapLayerIds = [
+  "griddap-coverage-fill",
+  "griddap-coverage-line",
+  "griddap-coverage-point",
+];
 // Basemap, not data: owned by their own switch and left out of the WMS
 // overlay's hide.
 const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
@@ -2259,6 +2265,32 @@ export default function CreateMap({
     );
     map.current.addLayer(
       {
+        id: "griddap-coverage-point",
+        type: "circle",
+        source: "griddap-coverage",
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#52a79b",
+          "circle-opacity": 0.35,
+          "circle-stroke-color": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            "#fbb03b",
+            "#52a79b",
+          ],
+          "circle-stroke-width": [
+            "case",
+            ["boolean", ["feature-state", "hovered"], false],
+            2.5,
+            1.5,
+          ],
+        },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
         id: "griddap-highlight-fill",
         type: "fill",
         source: "griddap-highlight",
@@ -2272,6 +2304,22 @@ export default function CreateMap({
         type: "line",
         source: "griddap-highlight",
         paint: { "line-color": "#fbb03b", "line-width": 2.5 },
+      },
+      "points-highlighted",
+    );
+    map.current.addLayer(
+      {
+        id: "griddap-highlight-point",
+        type: "circle",
+        source: "griddap-highlight",
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-radius": 7,
+          "circle-color": "#fbb03b",
+          "circle-opacity": 0.1,
+          "circle-stroke-color": "#fbb03b",
+          "circle-stroke-width": 2.5,
+        },
       },
       "points-highlighted",
     );
@@ -2602,7 +2650,7 @@ export default function CreateMap({
     "points",
     "coverage-hexes",
     "hexes",
-    "griddap-coverage-fill",
+    ...griddapHitLayers,
   ];
 
   // Shared by a click and a share link's replay. Once a marker or track (a
@@ -2688,7 +2736,7 @@ export default function CreateMap({
     const hoverRules = [
       {
         id: "griddap",
-        layers: ["griddap-coverage-fill"],
+        layers: griddapHitLayers,
         when: (hits) => !griddapCoveredIn(hits, map.current.getZoom()),
         show: (e, features) =>
           showGriddapTooltip(e, dedupeGriddapByPk(features)),
@@ -2970,9 +3018,7 @@ export default function CreateMap({
 
       // Same shortcut for exactly one track (the hexes beneath it were dropped
       // above).
-      const gridHits = hits.filter(
-        (feature) => feature.layer.id === "griddap-coverage-fill",
-      );
+      const gridHits = hits.filter(isGriddapHit);
       if (
         tracks.length === 1 &&
         markerHits.length === 0 &&

@@ -59,6 +59,12 @@ describe("only a coverage rectangle can outrank them", () => {
     );
   });
 
+  it("counts a single-point grid's dot like a rectangle", () => {
+    expect(griddapOutranksHexesIn(hits("griddap-coverage-point"), 12)).toBe(
+      true,
+    );
+  });
+
   it("ignores the coverage outline, which is a different layer", () => {
     // The rectangles are drawn as a fill plus griddap-coverage-line on top of
     // it, and only the fill is hit-tested — matching the outline too would
@@ -466,6 +472,37 @@ describe("buildFeatureQuery", () => {
     expect(query.highlight.features.map((f) => f.geometry)).toEqual([
       whole,
       whole,
+    ]);
+  });
+
+  it("lists a single-point grid and keeps its dot out of the area fill", () => {
+    const title = (en) => JSON.stringify({ en });
+    const query = buildFeatureQuery(
+      lngLat,
+      [
+        feature(
+          "griddap-coverage-point",
+          { pk: 4, title_translated: title("Gauge") },
+          { type: "Point", coordinates: [1, 1] },
+        ),
+        feature(
+          GRID,
+          { pk: 5, title_translated: title("Model") },
+          square(0, 0, 2, 2),
+        ),
+      ],
+      context(),
+    );
+    expect(query.items).toEqual([
+      { kind: "grid", pk: 4, title: "Gauge" },
+      { kind: "grid", pk: 5, title: "Model" },
+    ]);
+    expect(
+      query.highlight.features.map((f) => [f.geometry.type, f.properties.role]),
+    ).toEqual([
+      ["Point", "outline"],
+      ["Polygon", "outline"],
+      ["Polygon", "fill"],
     ]);
   });
 
