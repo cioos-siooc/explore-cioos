@@ -275,6 +275,32 @@ describe("AppShell (composition)", () => {
     });
   });
 
+  it("names the API's error message when it rejects a catalog request", async () => {
+    installMockFetch();
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/datasets")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ error: 'column "title" does not exist' }),
+            { status: 500 },
+          ),
+        );
+      }
+      return realFetch(input, init);
+    };
+    renderWithProviders(<AppShell />, { providers: "app" });
+    expect(
+      await screen.findByText(
+        "The data service rejected the request, so filters and datasets could not be loaded.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('column "title" does not exist'),
+    ).toBeInTheDocument();
+  });
+
   it("shows the API error banner and a load-failed list when /pointQuery fails", async () => {
     installMockFetch();
     const realFetch = global.fetch;
