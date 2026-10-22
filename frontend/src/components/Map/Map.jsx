@@ -1924,12 +1924,12 @@ export default function CreateMap({
 
       const longitudes = coordinates.map((c) => c[0]);
       const latitudes = coordinates.map((c) => c[1]);
-      map.current.fitBounds(
+      revealBounds(
         [
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)],
         ],
-        zoomToDatasetCamera(map.current),
+        { frame: true },
       );
     }
     renderSelectedTrack();
@@ -1982,12 +1982,12 @@ export default function CreateMap({
       if (!frameView) return;
       const longitudes = coordinates.map((c) => c[0]);
       const latitudes = coordinates.map((c) => c[1]);
-      map.current.fitBounds(
+      revealBounds(
         [
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)],
         ],
-        zoomToDatasetCamera(map.current),
+        { frame: true },
       );
     }
     renderMappedRecord();
