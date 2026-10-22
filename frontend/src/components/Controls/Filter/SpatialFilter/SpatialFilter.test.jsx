@@ -133,7 +133,7 @@ describe("SpatialFilter place search", () => {
     );
     expect(record.closest("p")).toHaveTextContent("Bay of Fundy");
     expect(screen.getByTestId("quick-filter-area")).toHaveAccessibleName(
-      "Area: Bay of Fundy",
+      "Draw area: Bay of Fundy",
     );
 
     act(() => seen.setPolygon([...seen.ring]));

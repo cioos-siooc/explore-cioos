@@ -36,6 +36,11 @@ MAX_RESPONSE_SIZE = 2e8
 SPOOL_MAX_IN_MEMORY = 8 * 1024 * 1024
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
+# pandas 2's datetime64[ns] range. pandas 3 parses beyond it, which would let
+# typo years like 0019 through as real data; outside it counts as unparseable.
+PLAUSIBLE_TIME_MIN = pd.Timestamp.min.tz_localize("UTC")
+PLAUSIBLE_TIME_MAX = pd.Timestamp.max.tz_localize("UTC")
+
 # Mixed into every Croissant hash: bump it when a harvester or schema change must
 # reach every dataset, so the next run re-harvests instead of skipping as unchanged.
 HARVEST_VERSION = 2
@@ -174,9 +179,10 @@ class ERDDAP:
         is_timestamp = s.startswith("1.") or s.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(s, unit="s", utc=True)
-
-        return pd.to_datetime(s, errors="coerce", utc=True)
+            ts = pd.to_datetime(float(s), unit="s", utc=True)
+        else:
+            ts = pd.to_datetime(s, errors="coerce", utc=True)
+        return ts if PLAUSIBLE_TIME_MIN <= ts <= PLAUSIBLE_TIME_MAX else pd.NaT
 
     def parse_erddap_dates(series):
         """ERDDAP dates come either as timestamps or ISO 8601 datetimes"""
@@ -184,9 +190,10 @@ class ERDDAP:
         is_timestamp = time.startswith("1.") or time.startswith("-1.")
 
         if is_timestamp:
-            return pd.to_datetime(series, unit="s", utc=True)
-
-        return pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
+            parsed = pd.to_datetime(pd.to_numeric(series), unit="s", utc=True)
+        else:
+            parsed = pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
+        return parsed.where(parsed.between(PLAUSIBLE_TIME_MIN, PLAUSIBLE_TIME_MAX))
 
     def erddap_csv_to_df(self, url, skiprows=(1,), dataset=None):
         """Errors raise up to the dataset loop, so the dataset gets skipped."""

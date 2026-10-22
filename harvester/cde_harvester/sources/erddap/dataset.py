@@ -299,7 +299,8 @@ class Dataset:
 
         if skip_full_count and not df_count.empty:
             count = df_count[["time"]].time[0]
-            extrapolated_count = (int(count) / extraplolation_days) * days_in_dataset
+            # Rounded: pandas 3 refuses a float into the int count column.
+            extrapolated_count = round(int(count) / extraplolation_days * days_in_dataset)
 
             df_count.loc[0, "time"] = extrapolated_count
 
