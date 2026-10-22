@@ -224,3 +224,45 @@ class TestCroissantVersionGate:
         monkeypatch.setattr(client, "HARVEST_VERSION", client.HARVEST_VERSION + 1)
         after, _, _ = erddap.get_croissant_fingerprint(ERDDAP_URL, "ds1")
         assert before != after
+
+
+class TestRequestCache:
+    @pytest.fixture
+    def erddap(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("cde_harvester.sources.erddap.client.requests.Session") as session_cls:
+            session_cls.return_value = MagicMock()
+            erddap = client.ERDDAP(ERDDAP_URL, cache_requests=True)
+        erddap.session.get.side_effect = lambda url, **_: MockResponse(
+            text=ERDDAP_INFO_CSV, url=url
+        )
+        yield erddap
+        erddap.cache.close()
+
+    def test_repeated_query_is_served_from_disk(self, erddap):
+        first = erddap.erddap_csv_to_df("/info/ds/index.csv", skiprows=[])
+        second = erddap.erddap_csv_to_df("/info/ds/index.csv", skiprows=[])
+        assert erddap.session.get.call_count == 1
+        pd.testing.assert_frame_equal(first, second)
+
+    def test_all_datasets_listing_is_never_cached(self, erddap):
+        erddap.session.get.side_effect = lambda url, **_: MockResponse(
+            text=ERDDAP_ALL_DATASETS_CSV, url=url
+        )
+        erddap.get_all_datasets()
+        erddap.get_all_datasets()
+        assert erddap.session.get.call_count == 2
+
+    def test_error_responses_are_not_cached(self, erddap):
+        erddap.session.get.side_effect = lambda url, **_: MockResponse(
+            text="Your query produced no matching results", status_code=500, url=url
+        )
+        erddap.erddap_csv_to_df("/tabledap/ds.csv?time")
+        erddap.erddap_csv_to_df("/tabledap/ds.csv?time")
+        assert erddap.session.get.call_count == 2
+
+    def test_expired_entry_is_fetched_again(self, erddap, monkeypatch):
+        monkeypatch.setattr(client, "CACHE_TTL_SECONDS", -1)
+        erddap.erddap_csv_to_df("/info/ds/index.csv", skiprows=[])
+        erddap.erddap_csv_to_df("/info/ds/index.csv", skiprows=[])
+        assert erddap.session.get.call_count == 2
