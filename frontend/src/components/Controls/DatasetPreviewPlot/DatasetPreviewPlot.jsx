@@ -302,6 +302,8 @@ export default function DatasetPreviewPlot({
               useResizeHandler={false}
               config={{
                 displaylogo: false,
+                // Plotly 4 defaults this on; it posts the chart to cloud.plotly.com.
+                showSendToCloud: false,
                 modeBarButtonsToRemove: [
                   "select2d",
                   "lasso2d",
