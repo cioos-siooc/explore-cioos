@@ -91,6 +91,9 @@ export default function UrlSync() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsPageLoad(false);
     if (isPageLoad) return;
+    // The live address, not this render's: a writer that ran after this render
+    // committed (a click while the page settles) would otherwise be undone.
+    const liveParams = new URLSearchParams(window.location.search);
     const filterParams = new URLSearchParams(
       createDataFilterQueryString(query),
     );
@@ -107,7 +110,7 @@ export default function UrlSync() {
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
       // Owned by useWideView.
-      ...(searchParams.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
+      ...(liveParams.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
       ...(dataset ? { dataset } : {}),
       // Carried through only while a dataset is open, so they don't linger as
       // stale keys for a closed page.
@@ -115,7 +118,7 @@ export default function UrlSync() {
         ? Object.fromEntries(
             PRESERVED_PARAMS.map((param) => [
               param,
-              searchParams.get(param),
+              liveParams.get(param),
             ]).filter(([, value]) => value !== null),
           )
         : {}),
