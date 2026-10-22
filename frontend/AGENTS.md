@@ -1,6 +1,6 @@
 # frontend/
 
-(JS, ESM) — Vite + React 18 SPA with MapLibre GL 5; Context state composed in a load-bearing provider order in `src/state/AppProviders.jsx`; `API_URL`/`SENTRY_DSN` are build-time `define{}`s in `vite.config.mjs`, not runtime env.
+(JS, ESM) — Vite + React 18 SPA with MapLibre GL 6; Context state composed in a load-bearing provider order in `src/state/AppProviders.jsx`; `API_URL`/`SENTRY_DSN` are build-time `define{}`s in `vite.config.mjs`, not runtime env.
 
 ## Requirements
 
