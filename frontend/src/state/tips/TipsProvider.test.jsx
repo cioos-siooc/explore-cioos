@@ -286,8 +286,11 @@ describe("contextual tips", () => {
       returningVisitor();
       const { user } = renderProbe();
       // The fixtures hold OBIS data and feature datasets, but nothing gridded.
-      await waitFor(() => expect(tour()).toContain("speciesName"));
-      expect(tour()).toContain("showData");
+      await waitFor(() =>
+        expect(tour()).toEqual(
+          expect.arrayContaining(["speciesName", "showData"]),
+        ),
+      );
       expect(tour()).not.toContain("griddapWms");
       await user.click(screen.getByText("start tour"));
       for (let i = 0; i < tour().length; i += 1) {
