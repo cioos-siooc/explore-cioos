@@ -50,6 +50,10 @@ describe("parseFilterQuery", () => {
       term: "nothing",
       exclude: false,
     });
+    expect(parseFilterQuery("-130, 48, -120, 55")).toEqual({
+      term: "-130, 48, -120, 55",
+      exclude: false,
+    });
   });
 });
 
@@ -73,6 +77,40 @@ describe("matchFilterOptions", () => {
       groups[0].options[2],
     ]);
     expect(matchFilterOptions(groups, "chlorophyll")).toEqual([]);
+  });
+
+  it("matches each word on its own, in any order", () => {
+    expect(
+      matchFilterOptions(groups, "temperature sea")[0].options.map((o) => o.id),
+    ).toEqual([1]);
+    expect(matchFilterOptions(groups, "'oxygen!")[0].options).toEqual([
+      groups[0].options[2],
+    ]);
+  });
+
+  it("allows no typo in a short word and few in a long one", () => {
+    const titles = {
+      key: "datasets",
+      options: [
+        { id: "seal", label: "Ribbon seal (Histriophoca fasciata) location" },
+        { id: "bishop", label: "Bishop Museum" },
+      ],
+    };
+    expect(matchFilterOptions([titles], "oxygen")).toEqual([]);
+    expect(matchFilterOptions([titles], "ship")).toEqual([]);
+  });
+
+  it("ranks a word met at its start before one met inside another", () => {
+    const orgs = {
+      key: "orgs",
+      options: [
+        { id: "inside", label: "Kintama Research Services" },
+        { id: "start", label: "Dauphin Island Sea Lab" },
+      ],
+    };
+    expect(
+      matchFilterOptions([orgs], "sea")[0].options.map((o) => o.id),
+    ).toEqual(["start", "inside"]);
   });
 
   it("keeps a searched group as its service ranked it", () => {

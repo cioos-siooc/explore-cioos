@@ -5,10 +5,17 @@ import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
 import DatasetInspector from "./DatasetInspector.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+
+// Plotly needs a real canvas, and its chunk is slow enough to import under a
+// loaded test run to time out unrelated assertions.
+vi.mock("../CoverageHistogramPlot/CoverageHistogramPlot.jsx", () => ({
+  default: () => <div data-testid="time-distribution-plot" />,
+}));
 
 // pk 2337 / "Chicago Park District" / "mooring" match the catalog fixtures
 // FilterProvider loads (e2e/fixtures/api/*.json). `dataset` is passed directly
@@ -194,6 +201,57 @@ describe("DatasetInspector", () => {
     );
   });
 
+  describe("widened (?wide=1)", () => {
+    const stubRecords = () => {
+      const fixtureFetch = globalThis.fetch;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input) =>
+          String(input).includes("/datasetRecordsList?")
+            ? new Response(
+                JSON.stringify({ profiles: [{ profile_id: "station-7" }] }),
+                {
+                  status: 200,
+                  headers: { "content-type": "application/json" },
+                },
+              )
+            : fixtureFetch(input),
+        ),
+      );
+    };
+
+    it("shows metadata and data side by side, without tabs", async () => {
+      stubRecords();
+      await renderReady({ url: "/?wide=1" });
+      expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Metadata" })).toBeVisible();
+      expect(screen.getByRole("region", { name: "Data" })).toBeVisible();
+      expect(await screen.findByText("Oxygen")).toBeVisible();
+      expect(await screen.findByText("station-7")).toBeVisible();
+    });
+
+    it("keeps the tabs on a phone, where the page is already full-screen", async () => {
+      setViewportWidth(MOBILE_WIDTH);
+      await renderReady({ url: "/?wide=1" });
+      expect(screen.getByRole("tablist")).toBeInTheDocument();
+    });
+
+    it("returns to the sidebar when a record is shown on the map", async () => {
+      stubRecords();
+      const { user } = await renderReady({ url: "/?wide=1" });
+      const card = (await screen.findByText("station-7")).closest(".listCard");
+      await user.click(
+        within(card).getByRole("button", { name: /Show on map/ }),
+      );
+      await waitFor(() =>
+        expect(window.location.search).not.toContain("wide="),
+      );
+      expect(screen.getByTestId("mapped-record")).toHaveTextContent(
+        "station-7",
+      );
+    });
+  });
+
   it("links the source records under the title", async () => {
     await renderReady({
       dataset: { ...DATASET, ckan_url: "https://catalogue.cioos.ca/dataset/x" },
@@ -249,6 +307,23 @@ describe("DatasetInspector", () => {
     expect(await screen.findByText("station-7")).toBeInTheDocument();
   });
 
+  it("charts the dataset's time distribution under the active filters, on Data only", async () => {
+    await renderReady({ query: "depthMax=50" });
+    const histogramUrls = () =>
+      fetch.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes("/coverageHistogram?"));
+    expect(histogramUrls()).toEqual([]);
+
+    await openData();
+    expect(
+      await screen.findByTestId("time-distribution-plot"),
+    ).toBeInTheDocument();
+    const params = new URL(histogramUrls()[0]).searchParams;
+    expect(params.get("datasetPKs")).toBe(String(DATASET.pk));
+    expect(params.get("depthMax")).toBe("50");
+  });
+
   it("falls back to the generic Feature ID label when the dataset names no cf_role variable", async () => {
     await renderReady();
     await waitFor(() =>
@@ -265,6 +340,7 @@ describe("DatasetInspector", () => {
     expect(returnToList).toHaveBeenCalledTimes(1);
 
     returnToList.mockClear();
+    await openData();
     await user.click(screen.getByPlaceholderText("Search table"));
     await user.keyboard("{Backspace}");
     expect(returnToList).not.toHaveBeenCalled();

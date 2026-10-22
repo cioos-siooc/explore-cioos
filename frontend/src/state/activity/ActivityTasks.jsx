@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { useActivityTask, useActivityTasks } from "./ActivityProvider.jsx";
 import { useFilters } from "../filters/FilterProvider.jsx";
-import { useMapState } from "../map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "../map/MapStateProvider.jsx";
 import { useSelection } from "../selection/SelectionProvider.jsx";
 
 // Here so the map needn't know about i18n; phrased as the thing loaded, not
@@ -19,7 +19,8 @@ const MAP_LAYER_LABEL_KEYS = {
 // Keeps the providers unaware of the activity registry, as UrlSync does for
 // the URL. Component-owned work registers itself.
 export default function ActivityTasks() {
-  const { loading, loadingLayers, legendLoading } = useMapState();
+  const { legendLoading } = useMapState();
+  const { loading, loadingLayers } = useMapView();
   const { selectionLoading, recordLoading } = useSelection();
   const { catalogLoaded } = useFilters();
 

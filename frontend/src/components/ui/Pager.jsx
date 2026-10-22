@@ -45,6 +45,8 @@ export default function Pager({
   onPageSizeChange,
   label,
   perPageLabel,
+  // Shown after the range, e.g. the download modal's selection totals.
+  children,
   "data-testid": testId,
 }) {
   const { t } = useTranslation();
@@ -61,6 +63,7 @@ export default function Pager({
           total,
         })}
       </span>
+      {children}
       {pageCount > 1 && (
         <div className="pagerControls">
           <button

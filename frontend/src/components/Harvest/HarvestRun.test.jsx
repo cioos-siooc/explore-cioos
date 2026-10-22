@@ -1,7 +1,7 @@
 import * as React from "react";
 import { describe, it, expect } from "vitest";
 import { screen } from "@testing-library/react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockHarvestFetch } from "../../test/mockHarvestFetch.js";

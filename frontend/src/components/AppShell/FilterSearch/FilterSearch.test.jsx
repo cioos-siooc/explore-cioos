@@ -94,6 +94,22 @@ describe("FilterSearch", () => {
     expect(screen.queryByTestId("filter-search-input")).toBeNull();
   });
 
+  it("leaves typing in a field inside a shadow root alone", async () => {
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(<FiltersModal />, { providers: "app" });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const field = document.createElement("textarea");
+    host.attachShadow({ mode: "open" }).append(field);
+
+    field.focus();
+    await user.keyboard("abc");
+
+    expect(field).toHaveValue("abc");
+    expect(screen.queryByTestId("filter-search-input")).toBeNull();
+    host.remove();
+  });
+
   it("opens the Filters modal on its search page with Ctrl+K", async () => {
     const { seen } = await renderPalette();
     expect(seen.ui).toEqual({ showFiltersModal: true, openFilter: undefined });
@@ -294,7 +310,7 @@ describe("FilterSearch", () => {
 
   // GeoNames answers in place of the fixture set's empty reply, as the unit
   // network otherwise does for every term.
-  function answerRegions() {
+  function answerRegions(name = "Bay of Fundy", extra = 0) {
     const square = [
       [
         [-67, 44],
@@ -311,7 +327,7 @@ describe("FilterSearch", () => {
           type: "Feature",
           properties: {
             featureid: "fundy",
-            name: "Bay of Fundy",
+            name,
             concise: "BAY",
           },
           geometry: { type: "MultiPolygon", coordinates: [square] },
@@ -325,6 +341,15 @@ describe("FilterSearch", () => {
           },
           geometry: { type: "MultiPoint", coordinates: [[-65.5, 42.5]] },
         },
+        ...Array.from({ length: extra }, (_, n) => ({
+          type: "Feature",
+          properties: {
+            featureid: `cove-${n}`,
+            name: `Cove ${n}`,
+            concise: "BAY",
+          },
+          geometry: { type: "MultiPoint", coordinates: [[-64, 45]] },
+        })),
       ],
     };
     const fallback = globalThis.fetch;
@@ -351,17 +376,55 @@ describe("FilterSearch", () => {
     expect(seen.ui.showFiltersModal).toBe(false);
   });
 
-  it("shows a spinner in the bar while NRCan answers", async () => {
+  it("marks the bar busy and holds a places row while NRCan answers", async () => {
     answerRegions();
     const { user, box } = await renderPalette();
 
     await user.type(box, "fundy");
 
+    expect(box).toHaveAttribute("aria-busy", "true");
     expect(
       within(screen.getByTestId("filter-search")).getByRole("status"),
-    ).toHaveTextContent("Searching places…");
+    ).toHaveTextContent("Places (NRCan GeoNames)Searching places…");
     await screen.findByText("Bay of Fundy");
     expect(screen.queryByText("Searching places…")).toBeNull();
+    expect(box).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("lists places after the other suggestions", async () => {
+    answerRegions("Pacific");
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "pacific");
+    await screen.findByText("Fundian Channel");
+
+    const labels = screen
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    const firstPlace = labels.findIndex((l) => l.startsWith("Pacific"));
+    expect(labels.findIndex((l) => l.includes("CIOOS Pacific"))).toBeLessThan(
+      firstPlace,
+    );
+    expect(labels.at(-1)).toContain("Fundian Channel");
+  });
+
+  it("shows four of a group, and the rest when asked", async () => {
+    answerRegions("Bay of Fundy", 5);
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "fundy");
+    const more = await screen.findByText("Show 3 more");
+    const places = () =>
+      screen
+        .getAllByTestId("filter-search-option")
+        .filter((o) => /Bay of Fundy|Fundian|Cove/.test(o.textContent));
+    expect(places()).toHaveLength(4);
+
+    await user.click(more);
+
+    expect(places()).toHaveLength(7);
+    expect(screen.queryByText(/Show \d+ more/)).toBeNull();
+    expect(box).toHaveFocus();
   });
 
   it("goes to a region without filtering when asked", async () => {
@@ -550,6 +613,25 @@ describe("FilterSearch", () => {
     await user.clear(box);
     await user.type(box, "below 200m{Enter}");
     expect(seen.depth).toEqual([200, 12000]);
+  });
+
+  it("applies a typed bounding box or wkt polygon as the area filter", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "-130, 48, -120, 55");
+    expect(options()[0]).toHaveTextContent("Box: W -130, S 48, E -120, N 55");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(seen.draw).toBe("shape"));
+    expect(polygonIsRectangle(seen.ring)).toBe(true);
+    expect(seen.zoom.coordinates[0]).toEqual(seen.ring);
+
+    await user.keyboard("{Control>}k{/Control}");
+    const reopened = await screen.findByTestId("filter-search-input");
+    await user.click(reopened);
+    await user.paste("POLYGON((-130 48, -120 50, -125 55, -130 48))");
+    expect(options()[0]).toHaveTextContent("Polygon of 3 points");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(seen.ring).toHaveLength(4));
   });
 
   it("suggests a time range while it is still being typed", async () => {

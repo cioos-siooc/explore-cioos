@@ -3,6 +3,7 @@
 > **Harvest docs:** [Workflow](workflow.md)
 > · **ERDDAP**
 > · [OBIS](obis.md)
+> · [Downloads](downloads.md)
 
 How the CIOOS Data Explorer harvester reads each ERDDAP `cdm_data_type`. The
 [workflow](workflow.md) page shows where this fits: each ERDDAP server
@@ -70,7 +71,9 @@ flowchart TD
 1. **Listing.** One `allDatasets` request per data structure (`table`,
    `grid`) per server, restricted to public datasets. Its `minTime`/`maxTime`
    are the time coverage stored for tabledap datasets, and the last fallback
-   for grids. If the listing fails, the server yields no datasets and the run
+   for grids. A single-feature dataset whose time range is open-ended (no
+   `maxTime`, e.g. ONC's live deployments) is stored as ongoing up to the
+   harvest, so it can count as real-time. If the listing fails, the server yields no datasets and the run
    fails without loading (see [Orchestration](workflow.md#orchestration)).
 2. **Pre-filters, no request issued.** When the harvest config sets
    `dataset_ids`, every other dataset is dropped without an attempt record
@@ -300,7 +303,7 @@ are no longer listed upstream (see [Loading](workflow.md#loading)).
 | `MISSING_REQUIRED_VARS` | skipped | No `time` / `latitude` / `longitude` (or no readable `info` page) |
 | `NO_SUPPORTED_VARIABLES` | skipped | No `standard_name` maps to an EOV |
 | `DEPTH_AND_ALTITUDE` | skipped | Both `depth` and `altitude` present |
-| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing, including a failed record count (or a grid without lat/lon extent) |
+| `NO_PROFILES_FOUND` | skipped | Feature extraction returned nothing (no `cf_role` variable, ids never filled, no lat/lon, a failed record count, or a grid without lat/lon extent); the message names which |
 | `HTTP_ERROR` | error | ERDDAP answered an error status after retries (other than those read as an empty result); the message holds ERDDAP's own error text |
 | `RESPONSE_TOO_LARGE` | error | A required response passed the 200 MB cap |
 | `UNKNOWN_ERROR` | error | Any other exception |

@@ -4,7 +4,7 @@ import {
   useNavigate,
   useNavigationType,
   useSearchParams,
-} from "react-router-dom";
+} from "react-router";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -19,10 +19,11 @@ import {
   PLOT_PARAMS,
   RECORD_PARAM,
   TAB_PARAM,
+  WIDE_PARAM,
 } from "./selection/previewParams.js";
 import { defaultTrailingDays } from "../components/config.js";
 import { useFilters } from "./filters/FilterProvider.jsx";
-import { useMapState } from "./map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 
@@ -59,8 +60,8 @@ export default function UrlSync() {
   }
 
   const { query } = useFilters();
+  const { mapView } = useMapView();
   const {
-    mapView,
     tracksMode,
     scrubTime,
     debouncedScrubTime,
@@ -105,6 +106,8 @@ export default function UrlSync() {
       ...(datasetTitleSearchText ? { search: datasetTitleSearchText } : {}),
       ...(onlyInView ? { onlyInView: "true" } : {}),
       ...(groupBy && groupBy !== GROUP_NONE ? { groupBy } : {}),
+      // Owned by useWideView.
+      ...(searchParams.get(WIDE_PARAM) ? { [WIDE_PARAM]: "1" } : {}),
       ...(dataset ? { dataset } : {}),
       // Carried through only while a dataset is open, so they don't linger as
       // stale keys for a closed page.

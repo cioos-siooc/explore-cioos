@@ -32,9 +32,8 @@ const TIME_BIN_WIDTHS_MS = [
   10 * YEAR_MS,
   25 * YEAR_MS,
 ];
-// High enough that the default 1900-to-now window lands on the one-year rung
-// rather than the five-year one.
-const TARGET_TIME_BINS = 150;
+// The default 1900-to-now window lands on the half-year rung.
+const TARGET_TIME_BINS = 300;
 
 // Deliberately not the `metric` parameter: that one belongs to the hex ramp
 // (utils/hexMetric.js) and the shared filter validators check it strictly.
@@ -51,7 +50,7 @@ const GROUP_BY = {
     kindExpr: "CASE WHEN d.source_type = 'obis' THEN 'obis' ELSE 'erddap' END",
   },
   platform: {
-    keyExpr: "coalesce(nullif(d.platform, ''), 'unknown')",
+    keyExpr: "coalesce(nullif(d.platform_category, ''), 'unknown')",
     kindExpr: "'platform'",
   },
   dataType: {

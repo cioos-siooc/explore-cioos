@@ -2,6 +2,7 @@ import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter, useLocation } from "react-router";
 
 const zoomToGeometry = vi.fn();
 let inspectDataset;
@@ -10,7 +11,8 @@ vi.mock("../../../state/selection/SelectionProvider.jsx", () => ({
   useSelection: () => ({ inspectDataset }),
 }));
 vi.mock("../../../state/map/MapStateProvider.jsx", () => ({
-  useMapState: () => ({ zoomToGeometry, mapInstance: null, mapView: null }),
+  useMapState: () => ({ zoomToGeometry, mapInstance: null }),
+  useMapView: () => ({ mapView: null }),
 }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (k) => k }) }));
 
@@ -29,12 +31,26 @@ const footprint = {
   ],
 };
 
+let search;
+function LocationProbe() {
+  search = useLocation().search;
+  return null;
+}
+
+const renderAt = (url = "/") =>
+  render(
+    <MemoryRouter initialEntries={[url]}>
+      <ZoomToDataset />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+
 describe("ZoomToDataset", () => {
   beforeEach(() => zoomToGeometry.mockClear());
 
   it("frames the dataset's footprint when the map isn't already on it", async () => {
     inspectDataset = { coverage_bbox_geojson: footprint };
-    render(<ZoomToDataset />);
+    renderAt();
     const button = screen.getByRole("button");
     expect(button).toBeEnabled();
     await userEvent.click(button);
@@ -43,7 +59,15 @@ describe("ZoomToDataset", () => {
 
   it("is disabled for a dataset with no footprint", () => {
     inspectDataset = {};
-    render(<ZoomToDataset />);
+    renderAt();
     expect(screen.getByRole("button")).toBeDisabled();
+  });
+
+  it("returns a widened page to the sidebar so the map can be seen", async () => {
+    inspectDataset = { coverage_bbox_geojson: footprint };
+    renderAt("/?dataset=1&wide=1");
+    await userEvent.click(screen.getByRole("button"));
+    expect(search).not.toContain("wide=");
+    expect(search).toContain("dataset=1");
   });
 });

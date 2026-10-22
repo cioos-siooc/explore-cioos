@@ -11,16 +11,35 @@ import {
 // Typo-tolerant, and blind to case and accents, so "temprature" finds
 // "Température" and the French facet labels are as reachable as the English
 // ones. ignoreLocation, as a dataset title names its subject anywhere in it.
+// Extended search matches each word on its own and needs them all, so "sea
+// temperature" finds "Sea surface temperature" in either order.
+const optionText = (option) => option.matchText ?? option.label;
 const FUSE_OPTIONS = {
-  keys: [{ name: "text", getFn: (option) => option.matchText ?? option.label }],
+  keys: [{ name: "text", getFn: optionText }],
   ignoreDiacritics: true,
   ignoreLocation: true,
+  useExtendedSearch: true,
 };
+
+// Characters extended search reads as operators, taken as plain spaces.
+const OPERATORS = /['"!^=$|]/g;
+
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// A word met inside another ("sea" in "Research") reads less like what was
+// meant than one met at a word's start, so it ranks after.
+function startsWords(option, words) {
+  const text = deburr(optionText(option)).toLowerCase();
+  return words.every((word) =>
+    new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(word)}`).test(text),
+  );
+}
 
 // A leading "-", "not" or "sauf" asks for the value to be excluded rather than
 // included, the same include / exclude pair every list filter offers. The
-// words need a space after them, so "nothing" or "saufen" stay searches.
-const EXCLUDE_PREFIX = /^(?:-|(?:not|sauf)\s+)\s*/i;
+// words need a space after them, so "nothing" or "saufen" stay searches, and
+// a "-" before a number is its sign ("-130, 48, -120, 55" is an area).
+const EXCLUDE_PREFIX = /^(?:-(?![\d.])|(?:not|sauf)\s+)\s*/i;
 
 export function parseFilterQuery(text) {
   const trimmed = text.trim();
@@ -54,7 +73,7 @@ export function matchFilterOptions(
   limit = 5,
   keep = () => false,
 ) {
-  const needle = term.trim();
+  const needle = term.replace(OPERATORS, " ").trim();
   if (!needle) {
     return groups
       .map((group) => {
@@ -69,9 +88,12 @@ export function matchFilterOptions(
       .filter((group) => group.options.length > 0);
   }
   // A typo in a short word leaves too little of it to go on: "DFO" one letter
-  // off matches half the catalogue. Short terms match near exactly, and the
-  // tolerance grows with the term.
-  const looseness = needle.length <= 3 ? 0.1 : needle.length <= 5 ? 0.25 : 0.35;
+  // off matches half the catalogue, "oxygen" two off matches "Histriophoca".
+  // Each word is matched on its own, so the shortest sets the tolerance: none
+  // up to four letters, then about one typo in five.
+  const words = deburr(needle).toLowerCase().split(/\s+/);
+  const shortest = Math.min(...words.map((word) => word.length));
+  const looseness = shortest <= 4 ? 0.1 : shortest <= 7 ? 0.2 : 0.3;
   return groups
     .map((group) => {
       const fuse = new Fuse(group.options, {
@@ -79,7 +101,14 @@ export function matchFilterOptions(
         includeScore: true,
         threshold: group.searched ? 1 : looseness,
       });
-      const hits = fuse.search(needle, { limit });
+      const hits = fuse
+        .search(needle)
+        .map(({ item, score }) => ({
+          item,
+          score: startsWords(item, words) ? score : 0.5 + score / 2,
+        }))
+        .sort((a, b) => a.score - b.score)
+        .slice(0, limit);
       const score = hits[0]?.score ?? 1;
       const options = group.searched
         ? group.options.slice(0, limit)

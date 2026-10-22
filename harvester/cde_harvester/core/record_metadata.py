@@ -58,7 +58,8 @@ def _prune(value):
 def _unique(values):
     seen, out = set(), []
     for value in values:
-        text = _text(value)
+        # OBIS keywords arrive entity-encoded ("EARTH SCIENCE &gt; ...").
+        text = _text(html.unescape(value) if isinstance(value, str) else value)
         if text and text.lower() not in seen:
             seen.add(text.lower())
             out.append(text)
@@ -89,10 +90,14 @@ def _plain(text):
     markdown and drop the rest of the markup."""
     if not isinstance(text, str):
         return text
+    is_html = bool(_TAG.search(text))
     text = _PARAGRAPH_END.sub("\n\n", text)
     text = _LINE_BREAK.sub("\n", text)
     text = _LIST_ITEM.sub("\n- ", text)
     text = html.unescape(_TAG.sub("", text))
+    if is_html:
+        # The markup's source indentation would read as markdown code blocks.
+        text = re.sub(r"^[ \t]+", "", text, flags=re.MULTILINE)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
@@ -206,6 +211,16 @@ def _ckan_contact(party, cited, default_role=None):
     }
 
 
+def _ckan_lineage(steps):
+    """CKAN's lineage is a list of ISO lineage records (the schema's own
+    "statment" spelling); the page shows one text, as ERDDAP's history is."""
+    statements = [
+        _text(s.get("en") or s.get("fr"))
+        for s in (step.get("statment") or {} for step in steps or [])
+    ]
+    return "\n\n".join(filter(None, statements)) or None
+
+
 def from_ckan(package):
     citation = package.get("citation") or {}
     dates = {d.get("type"): d.get("value") for d in package.get("dataset-reference-date") or []}
@@ -237,7 +252,7 @@ def from_ckan(package):
         "progress": package.get("progress"),
         "update_frequency": package.get("frequency-of-update"),
         "projects": _unique(package.get("projects") or []),
-        "lineage": package.get("lineage"),
+        "lineage": _ckan_lineage(package.get("lineage")),
         "resources": _links([
             {
                 "name": _translated(r.get("name_translated"), r.get("name")),

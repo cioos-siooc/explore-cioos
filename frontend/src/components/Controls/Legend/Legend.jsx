@@ -22,8 +22,10 @@ import {
   bathymetryScaleMin,
   bathymetryScaleMax,
   bathymetryTicks,
+  trackLineColor,
 } from "../../config.js";
 import platformColors from "../../platformColors";
+import { platformCategory } from "../../../platformVocab.js";
 import {
   DEFAULT_DATA_LAYERS,
   anyTrajectoryLayerOn,
@@ -80,6 +82,65 @@ const LEGEND_TIPS = ["trajectory"];
 
 // Mid-ramp: either end would make the icon claim a count.
 const HEX_ICON_COLOR = colorScale[Math.floor(colorScale.length / 2)];
+
+const GROUP_ICON_SIZE = 14;
+
+const HEX_ICON = (
+  <HexagonFill
+    className="legendGroupIcon"
+    size={GROUP_ICON_SIZE}
+    fill={HEX_ICON_COLOR}
+    aria-hidden="true"
+  />
+);
+
+const TRACK_ICON = (
+  <svg
+    className="legendGroupIcon"
+    width={GROUP_ICON_SIZE}
+    height={GROUP_ICON_SIZE}
+    viewBox="0 0 11 11"
+    aria-hidden="true"
+  >
+    <line
+      x1="1"
+      y1="9.5"
+      x2="10"
+      y2="1.5"
+      stroke={trackLineColor}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+// The map's griddap footprint: a dashed outline over a faint fill.
+const GRIDDAP_ICON = (
+  <svg
+    className="legendGroupIcon"
+    width={GROUP_ICON_SIZE}
+    height={GROUP_ICON_SIZE}
+    viewBox="0 0 11 11"
+    aria-hidden="true"
+  >
+    <rect
+      x="1"
+      y="1.5"
+      width="9"
+      height="8"
+      style={{
+        fill: "var(--cioos-primary)",
+        fillOpacity: 0.15,
+        stroke: "var(--cioos-primary)",
+      }}
+      strokeWidth="1.5"
+      strokeDasharray="2 1.5"
+    />
+  </svg>
+);
+
+// Keyed by layerControls' key.
+const LAYER_ICONS = { griddap: GRIDDAP_ICON };
 
 // Evenly spaced subset, always keeping first and last, so labels don't overlap.
 function pickTickIndices(n, maxTicks = 5) {
@@ -168,7 +229,7 @@ export default function Legend({
   function renderGroup(
     key,
     label,
-    { control, tooltip, idSuffix = "" } = {},
+    { icon, control, tooltip, idSuffix = "" } = {},
     children,
   ) {
     const help = renderHelpButton(key);
@@ -176,6 +237,7 @@ export default function Legend({
       <div className="legendGroup" key={key}>
         {(label || control || help) && (
           <div className="legendGroupLabelRow">
+            {icon}
             {control && (
               <Switch
                 id={`mapLayer-${control.key}${idSuffix}`}
@@ -265,8 +327,9 @@ export default function Legend({
   }
 
   // The catalog's full palette would promise markers the map never draws.
+  const categoriesAvailable = new Set(platformsAvailable.map(platformCategory));
   const platformSwatches = platformColors.filter((pc) =>
-    platformsAvailable.includes(pc.platform),
+    categoriesAvailable.has(pc.platform),
   );
 
   function renderMetricTitle() {
@@ -300,24 +363,11 @@ export default function Legend({
   }
 
   // Deliberately one ramp for every kind of hexagon: what a hexagon holds is in
-  // its tooltip, not in a second colour domain. `labelled` is false only on the
-  // compact card (see compactRamp).
-  function renderHexEntry(labelled, maxTicks) {
+  // its tooltip, not in a second colour domain.
+  function renderHexEntry(maxTicks) {
     if (!hexesOnMap || isEmpty(hexRangeLevel)) return null;
     return (
       <div className="legendSubsection">
-        {labelled &&
-          renderSubCaption(t("legendHexes"), {
-            icon: (
-              <HexagonFill
-                className="legendSubIcon"
-                size={9}
-                fill={HEX_ICON_COLOR}
-                aria-hidden="true"
-              />
-            ),
-            help: "hexes",
-          })}
         {renderColorBar(
           colorScale,
           hexRangeLevel,
@@ -451,14 +501,16 @@ export default function Legend({
     return (
       <div className="legendLayerItems">
         {layerControls.map((control) => (
-          <Switch
-            key={control.key}
-            id={`mapLayer-${control.key}`}
-            label={control.label}
-            checked={control.checked}
-            onChange={control.onChange}
-            tipTarget={control.tipTarget}
-          />
+          <div className="legendLayerItem" key={control.key}>
+            {LAYER_ICONS[control.key]}
+            <Switch
+              id={`mapLayer-${control.key}`}
+              label={control.label}
+              checked={control.checked}
+              onChange={control.onChange}
+              tipTarget={control.tipTarget}
+            />
+          </div>
         ))}
       </div>
     );
@@ -466,16 +518,18 @@ export default function Legend({
 
   const countStatus = renderCountStatus();
   const markerKeys = renderMarkerKeys();
-  const hexEntry = renderHexEntry(true);
+  const hexEntry = renderHexEntry();
   // The compact card keeps only the hex ramp: its days-of-data reading is the one
   // key the map can't give. Four ticks fit a phone corner.
-  const compactHexEntry = compact ? renderHexEntry(false, 4) : null;
+  const compactHexEntry = compact ? renderHexEntry(4) : null;
+  const observationsIcon = hexesOnMap ? HEX_ICON : undefined;
   const compactRamp =
     compactHexEntry &&
     renderGroup(
       "observations",
       renderMetricTitle(),
       {
+        icon: observationsIcon,
         control: controls.observations,
         tooltip: t("legendMetricDaysTitle"),
         // The dialog's copy of this switch is on screen at the same time.
@@ -495,6 +549,7 @@ export default function Legend({
         "observations",
         renderMetricTitle(),
         {
+          icon: observationsIcon,
           control: controls.observations,
           tooltip: t("legendMetricDaysTitle"),
         },
@@ -508,7 +563,7 @@ export default function Legend({
       renderGroup(
         "trajectories",
         t("legendGroupTrajectories"),
-        { control: controls.tracks },
+        { icon: TRACK_ICON, control: controls.tracks },
         trackKeys,
       ),
     bathymetryBar &&

@@ -4,6 +4,7 @@ import {
   ArrowCounterclockwise,
   BoundingBox,
   BroadcastPin,
+  ChevronDown,
   ChevronRight,
   GeoAlt,
   Pentagon,
@@ -15,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 
 import { server } from "../../../config.js";
-import { useDebounce } from "../../../utilities.jsx";
+import { parseArea, useDebounce } from "../../../utilities.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
@@ -43,6 +44,7 @@ import "./styles.css";
 
 const SCIENTIFIC_NAME_MIN_LENGTH = 3;
 const MATCHES_PER_GROUP = 8;
+const SHOWN_PER_GROUP = 4;
 
 // Kept with the term they answer so a stale reply is simply not shown, rather
 // than cleared by an effect.
@@ -142,7 +144,9 @@ const isTypingTarget = (el) =>
     el.closest("input, textarea, select, [contenteditable]") !== null);
 
 // Also opens on typing a letter or digit while no field has focus and no
-// dialog is up. Not symbols, which the map takes for zoom (+, -, =).
+// dialog is up. Not symbols, which the map takes for zoom (+, -, =). The
+// composed path sees through shadow roots (Sentry's feedback form), which
+// retarget e.target to their host.
 export function useFilterSearchShortcut(open) {
   useEffect(() => {
     function onKeyDown(e) {
@@ -158,7 +162,7 @@ export function useFilterSearchShortcut(open) {
         e.ctrlKey ||
         e.altKey ||
         !/^[\p{L}\p{N}]$/u.test(e.key) ||
-        isTypingTarget(e.target) ||
+        isTypingTarget(e.composedPath()[0]) ||
         document.body.classList.contains("cioos-modal-open")
       )
         return;
@@ -252,6 +256,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
   // Picking leaves the list as it is, so several values can be picked in a
   // row; the empty box would otherwise drop a value the moment it was removed.
   const [touched, setTouched] = useState(() => new Set());
+  const [expanded, setExpanded] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
   const places = useRegionMatches(exclude ? "" : term);
@@ -260,6 +265,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
     ...useFilterModel(
       useScientificNameMatches(term, obisDataAvailable),
       exclude ? undefined : parsePartialRangeQuery(term),
+      exclude ? undefined : parseArea(term),
     ),
     regionGroup,
     canReset && {
@@ -309,7 +315,36 @@ export default function FilterSearch({ text, setText, inputRef }) {
       ...shown.filter((g) => g.key !== "text"),
     ];
   }
-  shown = [...pinned, ...shown];
+  // Places come last, where their slower answer lands without shifting the
+  // suggestions already being read.
+  shown = [
+    ...pinned,
+    ...shown.filter((g) => g.key !== "region"),
+    ...shown.filter((g) => g.key === "region"),
+  ];
+  // The rest of a group is an option too, so the arrow keys reach it; with an
+  // empty box a group lists what's applied, which is never cut.
+  if (term) {
+    shown = shown.map((group) => {
+      const hidden = group.options.length - SHOWN_PER_GROUP;
+      if (hidden <= 1 || expanded.has(group.key)) return group;
+      return {
+        ...group,
+        options: [
+          ...group.options.slice(0, SHOWN_PER_GROUP),
+          {
+            id: "more",
+            label: t("filterSearchShowMore", { count: hidden }),
+            icon: ChevronDown,
+            command: true,
+            includeOnly: true,
+            action: t("filterSearchShowMoreAction"),
+            toggle: () => setExpanded((prev) => new Set(prev).add(group.key)),
+          },
+        ],
+      };
+    });
+  }
   const flat = shown.flatMap((group) =>
     group.options.map((option) => ({ group, option })),
   );
@@ -352,6 +387,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
   function clearText() {
     setText("");
     setTouched(new Set());
+    setExpanded(new Set());
     setActiveIndex(0);
   }
 
@@ -378,7 +414,9 @@ export default function FilterSearch({ text, setText, inputRef }) {
       className={classNames("filterSearchPage", { excluding: exclude })}
       data-testid="filter-search"
     >
-      <div className="filterSearchField">
+      <div
+        className={classNames("filterSearchField", { busy: places.loading })}
+      >
         <Search size={20} aria-hidden="true" />
         <input
           ref={inputRef}
@@ -390,6 +428,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
           onChange={(e) => {
             setText(e.target.value);
             setTouched(new Set());
+            setExpanded(new Set());
             setActiveIndex(0);
           }}
           onKeyDown={onKeyDown}
@@ -399,13 +438,8 @@ export default function FilterSearch({ text, setText, inputRef }) {
           aria-expanded={flat.length > 0}
           aria-controls={flat.length > 0 ? listId : undefined}
           aria-activedescendant={current ? `${listId}-${active}` : undefined}
+          aria-busy={places.loading}
         />
-        {places.loading && (
-          <span role="status" className="filterSearchLoading">
-            <Spinner size="sm" role={null} />
-            <span className="sr-only">{t("regionSearchLoading")}</span>
-          </span>
-        )}
         {text && (
           <button
             type="button"
@@ -581,6 +615,18 @@ export default function FilterSearch({ text, setText, inputRef }) {
               inputRef.current?.focus();
             }}
           />
+        )}
+        {places.loading && (
+          <div role="status" className="filterSearchPending">
+            <span className="filterSearchGroupLabel">
+              <GroupIcon groupKey="region" />
+              {t("regionSearchGroup")}
+            </span>
+            <span className="filterSearchPendingText">
+              <Spinner size="sm" role={null} />
+              {t("regionSearchLoading")}
+            </span>
+          </div>
         )}
       </div>
       <footer className="filterSearchKeys" aria-hidden="true">

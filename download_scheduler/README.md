@@ -48,7 +48,6 @@ The scheduler uses these environment variables from `.env`:
   compose it is **derived**, not set by hand:
   `${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/downloads`.
   Set `APP_URL` instead.
-- `CREATE_PDF`: Enable/disable PDF generation (`True`/`False`)
 
 The output directory is not configurable — it is always `./downloads` relative
 to the working directory (`download_scheduler.py`), which compose backs with the

@@ -1,6 +1,7 @@
 import * as React from "react";
-import maplibreGl, { Popup } from "maplibre-gl";
+import { Map as MaplibreMap, Marker, Popup, setWorkerUrl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -12,8 +13,10 @@ import turfBbox from "@turf/bbox";
 
 import DrawRectangle from "mapbox-gl-draw-rectangle-mode";
 import debounce from "lodash-es/debounce";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import "./styles.css";
+import Spinner from "../ui/Spinner.jsx";
 
 import { server } from "../../config";
 import reportError from "../../state/reportError.js";
@@ -48,9 +51,9 @@ import {
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
-  effectiveTrailingDays,
 } from "../config";
-import platformColors from "../../components/platformColors";
+import platforms from "../../platforms.json";
+import { platformColor } from "../../platformVocab.js";
 import {
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
@@ -79,12 +82,16 @@ import {
   selectedTrackLayers,
   trackClickLayers,
   trackItemsIn,
-  withoutGridHighlight,
 } from "./hitTest.js";
 import { radiusExpression } from "./pointRadius.js";
 import { rampExpression, toRampStops } from "./hexRamp.js";
 import { focusedPointFeatures } from "./focusedPoints.js";
+import { selectionLayerFilter } from "./selectionFilter.js";
+import { createTileRetry } from "./tileRetry.js";
 import { withBoxHint, withPolygonHint } from "./DrawHint/drawHintModes.js";
+
+// maplibre 6 can't find its worker from inside a bundle.
+setWorkerUrl(maplibreWorkerUrl);
 
 // Captured before the overrides below replace them.
 const defaultDragVertex = MapboxDraw.modes.direct_select.dragVertex;
@@ -284,6 +291,7 @@ const drawControlOptions = {
 // A debounce, not a throttle: one measurement at the end of a gesture, so a
 // hesitant pan doesn't renumber the legend halfway through.
 const VIEWPORT_RAMP_DEBOUNCE_MS = 400;
+const MAP_VIEW_DEBOUNCE_MS = 250;
 
 // Partial opacity so coincident tracks compound: 27 St. Lawrence voyages in
 // 90 days render as ONE line at full opacity.
@@ -322,6 +330,9 @@ const WATCHED_MAP_LAYERS = [
   { id: "griddap", sources: ["griddap-coverage"] },
   { id: "wmsOverlay", sources: ["wms-overlay"] },
 ];
+// A browser-cached GetMap resolves in a frame or two; the spinner would flash.
+const WMS_SPINNER_DELAY_MS = 300;
+
 // The round trip is exact to float noise for a point really on the surface,
 // off by tens of pixels for one that isn't (see viewportQueryIsReliable).
 const SURFACE_ROUND_TRIP_TOLERANCE_PX = 1;
@@ -378,6 +389,21 @@ const griddapLayerIds = ["griddap-coverage-fill", "griddap-coverage-line"];
 const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
 
 const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
+
+const TRACK_HEAD_HAS_COURSE = ["has", "cog"];
+// Hidden outside a drawn shape, as the dataset list leaves them out: they can't
+// be hovered or clicked, and the map lays out less. Values are
+// each layer's own filter.
+const SELECTION_FILTERED_LAYERS = {
+  hexes: undefined,
+  points: undefined,
+  "points-halo": undefined,
+  "coverage-hexes": undefined,
+  "coverage-hex-outlines": undefined,
+  "track-lines": undefined,
+  "track-heads": TRACK_HEAD_HAS_COURSE,
+  "track-heads-fixed": ["!", TRACK_HEAD_HAS_COURSE],
+};
 
 // The eslint-disable react-hooks/exhaustive-deps comments below: effects call
 // helpers rebuilt on every render (the component re-renders on every map
@@ -463,6 +489,16 @@ export default function CreateMap({
     [hexMaxZoom, COVERAGE_HEX_OPACITY_STOPS[0][1]],
   ];
   const [draw] = useState(() => new MapboxDraw(drawControlOptions));
+  // refreshTiles is the one public call that reloads an errored tile.
+  const [tileRetry] = useState(() =>
+    createTileRetry({
+      refresh: (sourceId, tile) => {
+        if (map.current?.getSource(sourceId)) {
+          map.current.refreshTiles(sourceId, [tile]);
+        }
+      },
+    }),
+  );
   const drawPolygon = useRef(draw);
   const doFinalCheck = useRef(false);
   const layersLoaded = useRef(false);
@@ -510,11 +546,11 @@ export default function CreateMap({
 
   // Drops the TimeSelector's timeMin/timeMax: the scrub window must not fight
   // the date-range filter.
-  function buildTracksTileUrl(queryString, scrub, trailing, zoom) {
+  function buildTracksTileUrl(queryString, scrub, trailing) {
     const params = new URLSearchParams(queryString);
     params.delete("timeMin");
     params.delete("timeMax");
-    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing, zoom);
+    const { timeMin, timeMax } = tracksTimeWindow(scrub, trailing);
     params.set("timeMin", timeMin);
     params.set("timeMax", timeMax);
     const layers = dataLayersRef.current;
@@ -529,17 +565,13 @@ export default function CreateMap({
     return `${server}/tiles/tracks/{z}/{x}/{y}.mvt?${params.toString()}`;
   }
 
-  // So zoomend can tell a trail-gate crossing (refetch) from any other zoom.
-  const appliedTrailRef = useRef(null);
-
   function refreshTracksSource(queryString, scrub, trailing) {
     if (!map.current || !map.current.getSource("tracks")) return;
-    const zoom = map.current.getZoom();
-    appliedTrailRef.current = effectiveTrailingDays(trailing, zoom);
+    tileRetry.reset("tracks");
     // setTiles clears the source's tile cache and reloads the viewport tiles.
     map.current
       .getSource("tracks")
-      .setTiles([buildTracksTileUrl(queryString, scrub, trailing, zoom)]);
+      .setTiles([buildTracksTileUrl(queryString, scrub, trailing)]);
   }
 
   function refreshCombinedSources(queryString) {
@@ -553,6 +585,7 @@ export default function CreateMap({
     )
       return;
     const { tileQuery, cellTileQuery } = tileUrls(queryString);
+    HEX_SOURCE_IDS.forEach((id) => tileRetry.reset(id));
     map.current.getSource("cde-tiles").setTiles([tileQuery]);
     map.current.getSource("cde-cells").setTiles([cellTileQuery]);
   }
@@ -669,13 +702,11 @@ export default function CreateMap({
     onFirstPaint();
   }
 
-  // A measured range wins over the global tier, so nothing later can change
-  // the colours. Without one, reveal only once /legend has returned AND the
-  // tiles have arrived (an empty result or an off-screen focused dataset has
-  // nothing to measure); otherwise tiles landing later double-colour the map.
+  // Called with the tiles loaded, so a measured range is final. Without one (an
+  // empty result or an off-screen focused dataset) the /legend tier must be in
+  // too, or it lands later and double-colours the map.
   function revealDataIfRamped(measuredRange) {
-    if (measuredRange !== undefined) return revealData();
-    if (!rangeLevelsRef.current || !hexSourcesLoaded()) return;
+    if (measuredRange === undefined && !rangeLevelsRef.current) return;
     revealData();
   }
 
@@ -746,15 +777,12 @@ export default function CreateMap({
       }),
   );
 
-  const colors = ["match", ["get", "platform"]];
-  platformColors.reduce((accumulatedPlatformColors, platformColor) => {
-    if (platformColor.color) {
-      accumulatedPlatformColors.push(platformColor.platform);
-      accumulatedPlatformColors.push(platformColor.color);
-    }
-    return accumulatedPlatformColors;
-  }, colors);
-  colors.push("#000000");
+  const colors = [
+    "match",
+    ["get", "platform"],
+    ...platforms.flatMap((p) => [p.label_en, platformColor(p.label_en)]),
+    platformColor("unknown"),
+  ];
 
   // Focus dimming is a feature-state flag the paint expressions carry from the
   // start. setFilter, or setPaintProperty on a data-driven property, forces a
@@ -1064,15 +1092,14 @@ export default function CreateMap({
     if (!map.current || !map.current.isStyleLoaded()) return;
     const key = rampKey();
     if (rampMeasuredFor.current === key) return;
+    // Tiles still in flight: hold what's painted and measure at the next idle.
+    // Mid-load the rendered hexes include the previous zoom's stand-in tiles,
+    // and each re-colouring relayouts every loaded tile (see IS_DIMMED), which
+    // slowed the very tiles being waited on.
+    if (!hexSourcesLoaded()) return;
     const range = measureVisibleHexRange(rampFocusPk.current);
-    if (range !== undefined) {
-      // Only a real measurement pins the key, holding colours through a drag.
-      rampMeasuredFor.current = key;
-    } else if (!hexSourcesLoaded()) {
-      // Tiles still in flight: hold what's painted and retry at the next idle.
-      // Treating "can't tell" as "nothing here" re-coloured the map twice.
-      return;
-    }
+    // Pinned, holding colours through a drag.
+    if (range !== undefined) rampMeasuredFor.current = key;
     // Loaded and empty IS an answer, so the global tier takes over. Not pinned:
     // panning into data at this zoom should find it at the next idle.
 
@@ -1189,9 +1216,42 @@ export default function CreateMap({
   // Bumped on every overlay change so stale in-flight GetMap loads are dropped.
   const wmsRenderToken = useRef(0);
   const polygonRef = useRef(null);
+  // Read by map event handlers and the layer filters.
+  const selectionRing = useRef(polygon);
   // An overlay set before the style loaded hid layers that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
   const revealedWmsPk = useRef();
+  // A marker so it follows the region being fetched through a pan, not the
+  // map centre: a spatial filter can clip the overlay to part of the view.
+  const [wmsSpinnerElement] = useState(() => {
+    const element = document.createElement("div");
+    element.className = "wmsLoadingSpinner cioosSpinnerDisc";
+    element.dataset.testid = "wms-loading-spinner";
+    return element;
+  });
+  const wmsSpinnerMarker = useRef(null);
+  const wmsSpinnerTimer = useRef(null);
+
+  function showWmsSpinner(bounds) {
+    wmsSpinnerTimer.current = setTimeout(() => {
+      if (!map.current) return;
+      // Midpoint on screen, not in degrees: at Canadian latitudes the
+      // arithmetic midpoint sits well south of the image's visual centre.
+      const northWest = map.current.project([bounds.west, bounds.north]);
+      const southEast = map.current.project([bounds.east, bounds.south]);
+      wmsSpinnerMarker.current ??= new Marker({
+        element: wmsSpinnerElement,
+      });
+      wmsSpinnerMarker.current
+        .setLngLat(map.current.unproject(northWest.add(southEast).div(2)))
+        .addTo(map.current);
+    }, WMS_SPINNER_DELAY_MS);
+  }
+
+  function hideWmsSpinner() {
+    clearTimeout(wmsSpinnerTimer.current);
+    wmsSpinnerMarker.current?.remove();
+  }
 
   function setGriddapHighlight(geometry) {
     const source = map.current?.getSource("griddap-highlight");
@@ -1247,14 +1307,14 @@ export default function CreateMap({
   }
 
   // Guarded on the source: a share link can resolve a click payload before
-  // the style has added layers.
+  // the style has added layers. An open dataset draws its own footprint, so the
+  // click's hex, marker or grid box would read as part of it.
   const revealedQueryNonce = useRef();
   useEffect(() => {
     const source = map.current?.getSource("click-highlight");
     if (!source) return;
-    const highlight = featureQuery?.highlight || emptyFeatureCollection;
     source.setData(
-      inspectDataset ? withoutGridHighlight(highlight) : highlight,
+      (!inspectDataset && featureQuery?.highlight) || emptyFeatureCollection,
     );
     if (!featureQuery?.highlight?.features?.length) return;
     if (revealedQueryNonce.current === featureQuery.nonce) return;
@@ -1325,6 +1385,7 @@ export default function CreateMap({
 
   function removeWmsOverlay() {
     wmsRenderToken.current += 1;
+    hideWmsSpinner();
     if (wmsMoveHandler.current) {
       map.current.off("moveend", wmsMoveHandler.current);
       wmsMoveHandler.current = null;
@@ -1347,6 +1408,7 @@ export default function CreateMap({
     // A GetMap for an earlier pan resolving after a newer one would paint stale
     // bounds.
     const token = ++wmsRenderToken.current;
+    hideWmsSpinner();
     const viewportBounds = clampBoundsForWms(map.current.getBounds());
     if (
       viewportBounds.south >= viewportBounds.north ||
@@ -1382,10 +1444,18 @@ export default function CreateMap({
       time: overlay.time,
       elevation: overlay.elevation,
     });
+    showWmsSpinner(bounds);
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
       if (token !== wmsRenderToken.current || !map.current) return;
+      // A share link's overlay can resolve before the style has loaded;
+      // registered after the handler that adds the data layers it sits under.
+      if (!map.current.getSource("cde-tiles")) {
+        map.current.once("style.load", img.onload);
+        return;
+      }
+      hideWmsSpinner();
       let imageUrl;
       try {
         imageUrl = warpEquirectToMercator(
@@ -1426,7 +1496,10 @@ export default function CreateMap({
         );
       }
     };
-    img.onerror = () => console.warn(`WMS GetMap failed: ${url}`);
+    img.onerror = () => {
+      if (token === wmsRenderToken.current) hideWmsSpinner();
+      console.warn(`WMS GetMap failed: ${url}`);
+    };
     img.src = url;
   }
 
@@ -1564,6 +1637,11 @@ export default function CreateMap({
     return () => removeWmsOverlay();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWmsOverlay, polygon]);
+
+  useEffect(() => {
+    selectionRing.current = polygon;
+    applySelectionFilter();
+  }, [polygon]);
 
   function highlightPoints(polygon) {
     if (polygon && polygon.length >= 4) {
@@ -1840,12 +1918,12 @@ export default function CreateMap({
 
       const longitudes = coordinates.map((c) => c[0]);
       const latitudes = coordinates.map((c) => c[1]);
-      map.current.fitBounds(
+      revealBounds(
         [
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)],
         ],
-        zoomToDatasetCamera(map.current),
+        { frame: true },
       );
     }
     renderSelectedTrack();
@@ -1898,12 +1976,12 @@ export default function CreateMap({
       if (!frameView) return;
       const longitudes = coordinates.map((c) => c[0]);
       const latitudes = coordinates.map((c) => c[1]);
-      map.current.fitBounds(
+      revealBounds(
         [
           [Math.min(...longitudes), Math.min(...latitudes)],
           [Math.max(...longitudes), Math.max(...latitudes)],
         ],
-        zoomToDatasetCamera(map.current),
+        { frame: true },
       );
     }
     renderMappedRecord();
@@ -1931,10 +2009,13 @@ export default function CreateMap({
       maxzoom: 14,
       promoteId: "pk",
     });
+    // The cells' geometry is the same at every zoom from 5 up, so past z10
+    // (~7 m per tile unit at 45°N on a 20 km cell) a deeper tile only refetched
+    // identical data on every zoom step.
     map.current.addSource("cde-cells", {
       type: "vector",
       tiles: [cellTileQuery],
-      maxzoom: 14,
+      maxzoom: 10,
       promoteId: "pk",
     });
 
@@ -2335,8 +2416,8 @@ export default function CreateMap({
     map.current.addSource("tracks", {
       type: "vector",
       // No minzoom on purpose. At low zoom one tile can carry every trajectory
-      // in the window (100k+ features); defaultTrailingDays and
-      // effectiveTrailingDays keep that in check. If it regresses, simplify
+      // in the window (100k+ features); trailingWindowOptions' one-year cap
+      // keeps that in check. If it regresses, simplify
       // server-side in web-api/routes/tiles.js rather than adding a minzoom.
       maxzoom: 8,
       tiles: [
@@ -2344,28 +2425,8 @@ export default function CreateMap({
           mapQueryRef.current,
           scrubTimeRef.current,
           trailingDaysRef.current,
-          map.current.getZoom(),
         ),
       ],
-    });
-    appliedTrailRef.current = effectiveTrailingDays(
-      trailingDaysRef.current,
-      map.current.getZoom(),
-    );
-
-    // Only on an actual gate crossing: setTiles drops the whole tile cache.
-    map.current.on("zoomend", () => {
-      if (!tracksModeRef.current || !map.current.getSource("tracks")) return;
-      const effective = effectiveTrailingDays(
-        trailingDaysRef.current,
-        map.current.getZoom(),
-      );
-      if (effective === appliedTrailRef.current) return;
-      refreshTracksSource(
-        mapQueryRef.current,
-        scrubTimeRef.current,
-        trailingDaysRef.current,
-      );
     });
 
     map.current.addLayer({
@@ -2408,7 +2469,7 @@ export default function CreateMap({
       type: "symbol",
       source: "tracks",
       "source-layer": "track-heads",
-      filter: ["has", "cog"],
+      filter: SELECTION_FILTERED_LAYERS["track-heads"],
       layout: {
         visibility: tracksVisibility,
         "icon-image": "track-head-arrow",
@@ -2430,7 +2491,7 @@ export default function CreateMap({
       type: "circle",
       source: "tracks",
       "source-layer": "track-heads",
-      filter: ["!", ["has", "cog"]],
+      filter: SELECTION_FILTERED_LAYERS["track-heads-fixed"],
       layout: { visibility: tracksVisibility },
       paint: {
         "circle-color": trackLineColor,
@@ -2443,6 +2504,16 @@ export default function CreateMap({
     // Freshly created layers carry no focus paint.
     trackFocusApplied.current = undefined;
     applyTrackFocus();
+  }
+
+  function applySelectionFilter() {
+    Object.entries(SELECTION_FILTERED_LAYERS).forEach(([layerId, filter]) => {
+      if (!map.current?.getLayer(layerId)) return;
+      map.current.setFilter(
+        layerId,
+        selectionLayerFilter(filter, selectionRing.current),
+      );
+    });
   }
 
   function addSelectedTrackLayers() {
@@ -2520,6 +2591,10 @@ export default function CreateMap({
     zoom: map.current.getZoom(),
     queryRendered: (options) => map.current.queryRenderedFeatures(options),
     language: i18n.language,
+    gridGeometry: (pk) =>
+      griddapCoverageRef.current?.features?.find(
+        (feature) => Number(feature.properties.pk) === pk,
+      )?.geometry,
   });
 
   // One handler, one hit-test: report what's under the click and let the card
@@ -2815,6 +2890,18 @@ export default function CreateMap({
       }
       if (draw.getMode().includes("draw")) return;
 
+      // Outside the drawn shape is out of the selection.
+      const ring = selectionRing.current;
+      if (
+        ring &&
+        !turfPointsWithinPolygon(
+          helpers.point([e.lngLat.lng, e.lngLat.lat]),
+          helpers.polygon([ring]),
+        ).features.length
+      ) {
+        return;
+      }
+
       const hits = hitsAt(e.point);
       const markerHits = hits.filter(
         (feature) => feature.layer.id === "points",
@@ -2852,9 +2939,8 @@ export default function CreateMap({
         const markerDatasetPks = datasetPksOf(nearestMarker);
         if (markerDatasetPks.length === 1) {
           popup.remove();
-          // This path skips onFeatureQueryRef, so the ring is set here in the
-          // shape buildFeatureQuery would use, so it matches the marker
-          // exactly.
+          // The shape buildFeatureQuery would use, so the ring matches the
+          // marker exactly once the record is closed.
           const highlight = {
             type: "FeatureCollection",
             features: [
@@ -2867,7 +2953,6 @@ export default function CreateMap({
               },
             ],
           };
-          map.current.getSource("click-highlight")?.setData(highlight);
           // Not through handleFeatureQuery: navigating there in the same tick
           // as the record jump races two navigations over a stale search-params
           // snapshot (see setInspectRecordID in SelectionProvider), so
@@ -2967,7 +3052,7 @@ export default function CreateMap({
 
   useEffect(() => {
     if (map.current) return;
-    map.current = new maplibreGl.Map({
+    map.current = new MaplibreMap({
       container: mapContainer.current,
       // The projection is part of the style in MapLibre 5 and must be set here:
       // the projection effect's first run happens while map.current is null.
@@ -3004,6 +3089,7 @@ export default function CreateMap({
       addClickHighlightLayers();
       addTrackLayers();
       addSelectedTrackLayers();
+      applySelectionFilter();
 
       applyLayerVisibility();
 
@@ -3089,6 +3175,16 @@ export default function CreateMap({
       hoverHighlightPoints(focusedDatasetPk.current);
     });
 
+    // Aborted requests (tiles left behind mid-zoom) don't fire 'error'. Any
+    // listener stops MapLibre's own console.error, hence the log; the message,
+    // since a minified error class logs as its two-letter name.
+    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks"];
+    map.current.on("error", (e) => {
+      console.error(e.error?.message ?? e.error);
+      if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
+      tileRetry.onError(e.sourceId, e.tile.tileID.canonical);
+    });
+
     map.current.on("idle", () => {
       layersLoaded.current = true;
       // 'sourcedata' can land before the new tiles render, and
@@ -3113,16 +3209,10 @@ export default function CreateMap({
     // The stops depend on the zoom band; stale point-level stops would clamp
     // every hex into a single green.
     map.current.on("zoomend", () => setColorStopsRef.current());
+    // Highlighted at 'idle' only: here the new zoom's tiles aren't in yet, so
+    // the pass was wasted work in the middle of a wheel zoom.
     map.current.on("zoomend", () => {
       doFinalCheck.current = true;
-      if (drawPolygon.current.getAll().features.length > 0) {
-        if (map.current.getZoom() >= 7) {
-          setLoading(true);
-          highlightPoints(
-            drawPolygon.current.getAll().features[0].geometry.coordinates[0],
-          );
-        }
-      }
     });
     // toArray() is [[west,south],[east,north]], the shape boundsIntersect
     // wants.
@@ -3135,7 +3225,9 @@ export default function CreateMap({
         bounds: map.current.getBounds().toArray(),
       });
     };
-    map.current.on("moveend", pushMapView);
+    // A wheel zoom ends in a moveend at every pause; re-rendering the app and
+    // rewriting the URL on each one stuttered the next notch.
+    map.current.on("moveend", debounce(pushMapView, MAP_VIEW_DEBOUNCE_MS));
     // moveend doesn't fire until the first interaction.
     map.current.once("idle", pushMapView);
     map.current.on("mousedown", (e) => {
@@ -3343,12 +3435,18 @@ export default function CreateMap({
   }, [i18n.language, t]);
 
   return (
-    <div
-      ref={mapContainer}
-      className="map"
-      data-testid="map-container"
-      data-projection={projection}
-      data-map-ready={firstPainted || undefined}
-    />
+    <>
+      <div
+        ref={mapContainer}
+        className="map"
+        data-testid="map-container"
+        data-projection={projection}
+        data-map-ready={firstPainted || undefined}
+      />
+      {createPortal(
+        <Spinner size="lg" role="presentation" />,
+        wmsSpinnerElement,
+      )}
+    </>
   );
 }

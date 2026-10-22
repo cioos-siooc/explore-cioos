@@ -13,6 +13,7 @@ import {
   Filter,
   SlashCircle,
   Square,
+  X,
   XCircle,
 } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
@@ -26,6 +27,7 @@ import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
+  GRID_KEY,
   GROUP_NONE,
   groupKeysFor,
   groupLabel,
@@ -41,6 +43,7 @@ import Pager, { PAGE_SIZES } from "../../ui/Pager.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
 import SortSelect from "../../ui/SortSelect.jsx";
 import "./styles.css";
+import "../../Map/ClearMapSelection/styles.css";
 
 // Offered only while the list is grouped, and its default then.
 const GROUP_SIZE = "groupSize";
@@ -61,7 +64,10 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  downloadLinksByPk,
+  // The format OBIS rows fall back to when the chosen one has no OBIS version.
+  obisFallbackFormat,
+  // Beside the pager's range: the download modal's selection totals.
+  pagerExtra,
   // Kept mounted under an open dataset page, so coming back finds the same
   // page and scroll position (see DatasetsPanel).
   hidden = false,
@@ -82,11 +88,14 @@ export default function DatasetsTable({
   const activeFilterCount = useActiveFilters().length;
   // The "what's here" card's datasets sort to the top, tying the card to the
   // list; the download modal ignores them.
-  const { featureQuery } = useMapState();
+  const { featureQuery, setFeatureQuery, griddapCoverageVisible } =
+    useMapState();
   const pinnedPks = useMemo(() => {
     if (isDownloadModal || !featureQuery?.datasetPks?.length) return EMPTY_SET;
     return new Set(featureQuery.datasetPks.map(Number));
   }, [featureQuery, isDownloadModal]);
+  // With the gridded coverage layer on, the reader is looking for grids.
+  const gridFirst = griddapCoverageVisible && !isDownloadModal;
   const { tipHighlight } = useTips();
 
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
@@ -205,13 +214,26 @@ export default function DatasetsTable({
       const pa = pinnedPks.has(Number(a.pk)) ? 0 : 1;
       const pb = pinnedPks.has(Number(b.pk)) ? 0 : 1;
       if (pa !== pb) return pa - pb;
+      if (gridFirst) {
+        const ga = a.cdm_data_type === "Grid" ? 0 : 1;
+        const gb = b.cdm_data_type === "Grid" ? 0 : 1;
+        if (ga !== gb) return ga - gb;
+      }
       const va = sortValue(a, rowSort.field);
       const vb = sortValue(b, rowSort.field);
       if (field?.type === "number") return (va - vb) * factor;
       return String(va).localeCompare(String(vb), i18n.language) * factor;
     });
     return sorted;
-  }, [datasets, rowSort, i18n.language, pinnedPks, sortFields, sortValue]);
+  }, [
+    datasets,
+    rowSort,
+    i18n.language,
+    pinnedPks,
+    gridFirst,
+    sortFields,
+    sortValue,
+  ]);
 
   const byGroup = useMemo(() => {
     const groups = new Map();
@@ -276,6 +298,10 @@ export default function DatasetsTable({
       if (sort.field === GROUP_SIZE) {
         const factor = sort.dir === "asc" ? 1 : -1;
         sorted.sort((a, b) => (sizeOf(a) - sizeOf(b)) * factor);
+      }
+      if (gridFirst && sorted.includes(GRID_KEY)) {
+        sorted.splice(sorted.indexOf(GRID_KEY), 1);
+        sorted.unshift(GRID_KEY);
       }
       // The groups the results no longer hold go under the ones they do.
       return [
@@ -358,6 +384,7 @@ export default function DatasetsTable({
     emptyKeys,
     isExpanded,
     sort,
+    gridFirst,
     i18n.language,
     t,
   ]);
@@ -452,7 +479,15 @@ export default function DatasetsTable({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
     scrollListToTop();
-  }, [datasetsKey, sort, isDownloadModal, groupBy, pageSize, pinnedPks]);
+  }, [
+    datasetsKey,
+    sort,
+    isDownloadModal,
+    groupBy,
+    pageSize,
+    pinnedPks,
+    gridFirst,
+  ]);
 
   const goToPage = (next) => {
     setPage(Math.min(Math.max(next, 1), pageCount));
@@ -553,6 +588,18 @@ export default function DatasetsTable({
         <div className="datasetsCardMapClickHint">
           <span className="datasetsCardMapClickSwatch" aria-hidden="true" />
           {t("datasetsCardMapClickHint")}
+          <button
+            type="button"
+            className="mapClickClear mapClickClearCompact"
+            data-testid="datasets-map-click-clear"
+            onClick={() => setFeatureQuery(null)}
+            title={t("mapSelectionClearTitle")}
+          >
+            <span className="mapClickClearIcon" aria-hidden="true">
+              <X size={18} />
+            </span>
+            {t("mapSelectionClearText")}
+          </button>
         </div>
       )}
       <div
@@ -585,7 +632,7 @@ export default function DatasetsTable({
                   isDownloadModal={isDownloadModal}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
-                  downloadLink={downloadLinksByPk?.get(item.row.pk)}
+                  obisFallbackFormat={obisFallbackFormat}
                   onSelect={handleSelectDataset}
                   onRemove={isDownloadModal ? removeFromSelection : undefined}
                   onInspect={isDownloadModal ? undefined : setInspectDataset}
@@ -682,7 +729,9 @@ export default function DatasetsTable({
         onPageSizeChange={setPageSize}
         label={t("datasetsPagerLabel")}
         perPageLabel={t("datasetsPagerPerPageLabel")}
-      />
+      >
+        {pagerExtra}
+      </Pager>
     </div>
   );
 }

@@ -401,6 +401,10 @@ def extract_features(dataset, handler):
 
             if "NaN" in max:
                 max = datetime.now(UTC).isoformat()
+                # The listing's maxTime is empty for an ongoing feed (ONC's
+                # open deployments), so it can't feed dataset_is_realtime().
+                if llat_variable == "time":
+                    dataset.coverage_time_max = max
 
             if llat_variable in vertical_variables:
                 min = float(min)
@@ -415,6 +419,10 @@ def extract_features(dataset, handler):
 
             if profile_min_max.empty:
                 logger.error(f"No data found for  {dataset.id}")
+                dataset.no_features_reason = (
+                    f"orderByMinMax of {llat_variable} per feature returned no "
+                    f"rows: {llat_variable} is never filled"
+                )
                 return profile_min_max
 
         profiles_with_lat_lon = profiles_with_lat_lon.join(profile_min_max)
@@ -422,6 +430,10 @@ def extract_features(dataset, handler):
     box = _lat_lon_box(dataset, profiles, profile_variable_list, logger, identity)
     if box.empty:
         logger.error(f"No lat/lon data found for {dataset.id}")
+        dataset.no_features_reason = (
+            "No latitude/longitude values per feature: the per-feature min/max "
+            "query returned no rows"
+        )
         return box
 
     profiles_with_lat_lon = profiles_with_lat_lon.join(box)
@@ -438,6 +450,8 @@ def extract_features(dataset, handler):
     profiles_with_lat_lon = profiles_with_lat_lon.dropna(
         subset=["latitude", "longitude"]
     )
+    if profiles_with_lat_lon.empty:
+        dataset.no_features_reason = "Every feature has a missing latitude or longitude"
     # result_type="expand" leaves this object-typed and nothing coerces it later.
     profiles_with_lat_lon["show_as_point"] = profiles_with_lat_lon[
         "show_as_point"
@@ -493,6 +507,9 @@ def extract_features(dataset, handler):
         if dataset.id in dataset.erddap_server.gateway_timeouts:
             # The harvester retries the whole dataset once ERDDAP has cached it.
             logger.warning("Gateway timeout while counting; deferring the dataset")
+            dataset.no_features_reason = (
+                "ERDDAP timed out (504) while counting records, again after a retry"
+            )
             return pd.DataFrame()
         profiles = _count_records(
             dataset, profiles, profile_variable_list, count_variables,
@@ -508,6 +525,9 @@ def extract_features(dataset, handler):
 
     if profiles.empty:
         logger.error("Error counting records")
+        dataset.no_features_reason = (
+            "The record-count query returned no counts for any feature"
+        )
         return profiles
 
     profiles = profiles.reset_index(drop=False).copy()
@@ -549,8 +569,8 @@ def extract_features(dataset, handler):
         profiles["depth_min"] = 0
         profiles["depth_max"] = 0
 
-    profiles["depth_min"].fillna(0, inplace=True)
-    profiles["depth_max"].fillna(0, inplace=True)
+    profiles["depth_min"] = profiles["depth_min"].fillna(0)
+    profiles["depth_max"] = profiles["depth_max"].fillna(0)
 
     if "profile_id" not in profiles:
         profiles["profile_id"] = ""

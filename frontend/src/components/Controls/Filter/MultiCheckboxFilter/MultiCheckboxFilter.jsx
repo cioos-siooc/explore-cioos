@@ -14,7 +14,7 @@ import {
   toggleOptionIncluded,
   withCategoryState,
 } from "../../../../utilities";
-import platformColors from "../../../platformColors";
+import { platformColor } from "../../../../platformVocab.js";
 import { FilterOption } from "./OptionState.jsx";
 import { useTips } from "../../../../state/tips/TipsProvider.jsx";
 import "./styles.css";
@@ -137,17 +137,7 @@ export default function MultiCheckboxFilter({
       title = option.title;
     }
 
-    let platformColor;
-    if (colored) {
-      platformColor = platformColors.filter(
-        (pc) => pc.platform === option.title,
-      );
-      if (colored && !platformColor.length) {
-        platformColor = "#000000";
-      } else {
-        platformColor = platformColor[0].color;
-      }
-    }
+    const swatchColor = colored && platformColor(option.title);
     const hoverText = option[`hover_${i18n.language}`] || title;
 
     return (
@@ -174,7 +164,7 @@ export default function MultiCheckboxFilter({
           {colored && (
             <CircleFill
               className="optionColorCircle"
-              fill={platformColor}
+              fill={swatchColor}
               size="15"
             />
           )}

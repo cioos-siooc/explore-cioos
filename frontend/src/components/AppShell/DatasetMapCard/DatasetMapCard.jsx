@@ -15,21 +15,15 @@ import useMediaQuery, {
 import "./styles.css";
 
 // Closing the sidebar keeps the map keyed to the open dataset, so this card
-// names it, reopens its page and is the one way out. Wider than a phone it
-// takes turns with the "what's here" card in the sidebar's corner.
+// names it, reopens its page and is the one way out. Never gives way to a map
+// click: the "what's here" card stays shut while a dataset is open.
 export function DatasetMapCorner() {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const { inspectDataset } = useSelection();
   const { sidebarOpen } = useUI();
-  const { featureQuery } = useMapState();
 
   if (isMobile || !inspectDataset || sidebarOpen) return null;
-  return (
-    <DatasetMapCard
-      dataset={inspectDataset}
-      className={classNames("corner", { parked: Boolean(featureQuery) })}
-    />
-  );
+  return <DatasetMapCard dataset={inspectDataset} className="corner" />;
 }
 
 export default function DatasetMapCard({ dataset, className }) {

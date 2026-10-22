@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
@@ -15,6 +15,13 @@ vi.mock("../Map/Map.jsx", () => ({
 }));
 
 import AppShell from "./AppShell.jsx";
+import { useMapState } from "../../state/map/MapStateProvider.jsx";
+
+let latestMap;
+function MapStateProbe() {
+  latestMap = useMapState();
+  return null;
+}
 
 describe("AppShell (composition)", () => {
   beforeEach(() => {
@@ -149,10 +156,13 @@ describe("AppShell (composition)", () => {
       const user = userEvent.setup();
       window.localStorage.setItem("cde.introSeen", "true");
       const row = pointQueryFixture[0];
-      renderWithProviders(<AppShell />, {
-        providers: "app",
-        url: `/?dataset=${row.dataset_id}`,
-      });
+      renderWithProviders(
+        <>
+          <AppShell />
+          <MapStateProbe />
+        </>,
+        { providers: "app", url: `/?dataset=${row.dataset_id}` },
+      );
       await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
       await user.click(screen.getByTestId("sidebar-collapse"));
       const card = await screen.findByTestId("dataset-map-card");
@@ -180,6 +190,15 @@ describe("AppShell (composition)", () => {
       );
       expect(screen.getByTestId("sidebar-back")).toBeInTheDocument();
       expect(screen.queryByTestId("dataset-map-card")).toBeNull();
+    });
+
+    // Regression: a map click parked the card off screen for the "what's
+    // here" card, which never opens while a dataset is, leaving neither.
+    it("stays on screen after a map click", async () => {
+      const { card } = await minimize();
+      act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
+      expect(card).toBeVisible();
+      expect(card).not.toHaveClass("parked");
     });
 
     it("sits in the corner, clear of the top bar, in place of the quick filters", async () => {
@@ -254,6 +273,32 @@ describe("AppShell (composition)", () => {
         document.querySelector(".apiErrorBanner, [class*=ErrorBanner]"),
       ).toBeTruthy();
     });
+  });
+
+  it("names the API's error message when it rejects a catalog request", async () => {
+    installMockFetch();
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.includes("/datasets")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ error: 'column "title" does not exist' }),
+            { status: 500 },
+          ),
+        );
+      }
+      return realFetch(input, init);
+    };
+    renderWithProviders(<AppShell />, { providers: "app" });
+    expect(
+      await screen.findByText(
+        "The data service rejected the request, so filters and datasets could not be loaded.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('column "title" does not exist'),
+    ).toBeInTheDocument();
   });
 
   it("shows the API error banner and a load-failed list when /pointQuery fails", async () => {

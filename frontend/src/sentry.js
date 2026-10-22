@@ -9,7 +9,7 @@ import {
   useNavigationType,
   createRoutesFromChildren,
   matchRoutes,
-} from "react-router-dom";
+} from "react-router";
 
 // A build arg baked in by vite's `define`, so it is public in the bundle.
 const dsn = process.env.SENTRY_DSN;

@@ -4,10 +4,6 @@ import {
   CalendarCheck,
   CheckCircleFill,
   CircleFill,
-  Clipboard,
-  ClipboardCheck,
-  Download,
-  ExclamationTriangleFill,
   PlusCircle,
   Grid3x3Gap,
   HexagonFill,
@@ -19,9 +15,10 @@ import {
   X,
 } from "react-bootstrap-icons";
 import classNames from "classnames";
+import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
-import platformColors from "../../platformColors";
+import { platformColor, platformLabel } from "../../../platformVocab.js";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
 import erddapServersJSONfile from "../../../erddapServers.json";
@@ -29,7 +26,6 @@ import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import Skeleton from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
-import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
 
 export default function DatasetCard({
   row,
@@ -37,7 +33,7 @@ export default function DatasetCard({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
-  downloadLink,
+  obisFallbackFormat,
   onSelect,
   onInspect,
   // Unlike onSelect (in or out of this batch), takes the row off the order.
@@ -49,7 +45,6 @@ export default function DatasetCard({
   t,
   i18n,
 }) {
-  const [copyState, copy] = useCopyToClipboard("a dataset download link");
   const isGrid = row.cdm_data_type === "Grid";
   const isObis = row.source_type === "obis";
   // griddap is metadata-only, and in the modal a dataset is only selectable
@@ -224,6 +219,16 @@ export default function DatasetCard({
             one these links are wanted for. */}
         {isDownloadModal && (
           <div className="datasetCardSources">
+            {isObis && obisFallbackFormat && (
+              <span
+                className="datasetCardFormatTag"
+                title={t("datasetCardObisFallbackTitle", {
+                  format: obisFallbackFormat,
+                })}
+              >
+                {t("datasetCardObisFallbackText")}
+              </span>
+            )}
             {row.erddap_url && (
               <a
                 className="datasetCardSourceLink"
@@ -249,73 +254,6 @@ export default function DatasetCard({
                 <BoxArrowUpRight size={12} aria-hidden="true" />
                 {t("datasetCardCatalogueLinkText")}
               </a>
-            )}
-            {downloadLink && (
-              <span className="datasetCardDownloadGroup">
-                {/* ERDDAP gets the polygon's bounding box, so the file holds
-                    points outside the selection; the queued zip doesn't. */}
-                {downloadLink.polygonSquared && (
-                  <Tooltip
-                    placement="top"
-                    content={t("directLinksNotePolygon")}
-                  >
-                    <span
-                      className="datasetCardLinkWarning"
-                      role="img"
-                      aria-label={t("directLinksNotePolygon")}
-                    >
-                      <ExclamationTriangleFill size={13} aria-hidden="true" />
-                    </span>
-                  </Tooltip>
-                )}
-                <Tooltip
-                  placement="top"
-                  content={t("datasetCardDirectDownloadText", {
-                    format: downloadLink.format.label,
-                  })}
-                >
-                  <a
-                    className="datasetCardIconLink"
-                    href={downloadLink.url}
-                    download={downloadLink.filename}
-                    aria-label={t("datasetCardDirectDownloadText", {
-                      format: downloadLink.format.label,
-                    })}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Download size={13} aria-hidden="true" />
-                  </a>
-                </Tooltip>
-                <Tooltip
-                  placement="top"
-                  content={
-                    copyState === "copied"
-                      ? t("directLinksCopied")
-                      : copyState === "failed"
-                        ? t("directLinksCopyFailed")
-                        : t("datasetCardCopyLinkText")
-                  }
-                >
-                  <button
-                    type="button"
-                    className="datasetCardIconLink"
-                    aria-label={t("datasetCardCopyLinkText")}
-                    onClick={(e) => {
-                      // The card's own click opens the dataset page.
-                      e.stopPropagation();
-                      copy(downloadLink.url);
-                    }}
-                  >
-                    {copyState === "copied" ? (
-                      <ClipboardCheck size={13} aria-hidden="true" />
-                    ) : (
-                      <Clipboard size={13} aria-hidden="true" />
-                    )}
-                  </button>
-                </Tooltip>
-              </span>
             )}
           </div>
         )}
@@ -356,6 +294,7 @@ export function DatasetPlatformIcon({
   t,
   decorative,
 }) {
+  const { i18n } = useTranslation();
   // Grid amber, the colour the map draws gridded coverage in.
   if (cdmDataType === "Grid") {
     return (
@@ -373,18 +312,11 @@ export function DatasetPlatformIcon({
   return (
     <Icon
       className="platformGlyph"
-      title={decorative ? undefined : t(platform)}
-      fill={platformColorOf(platform)}
+      title={decorative ? undefined : platformLabel(platform, i18n.language)}
+      fill={platformColor(platform)}
       size={13}
     />
   );
-}
-
-function platformColorOf(platform) {
-  return (
-    platformColors.find((pc) => pc.platform === platform) ??
-    platformColors.find((pc) => pc.platform === "unknown")
-  ).color;
 }
 
 // Shared with the map's "what's here" card so a dataset reads the same in both.

@@ -5,7 +5,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
 import {
@@ -31,6 +31,7 @@ import DatasetMetadata, {
 } from "../DatasetMetadata/DatasetMetadata.jsx";
 import useDatasetMetadata from "../DatasetMetadata/useDatasetMetadata.js";
 import TaxonomyChart from "../TaxonomyChart/TaxonomyChart.jsx";
+import TimeDistribution from "../TimeDistribution/TimeDistribution.jsx";
 import { server } from "../../../config";
 import reportError from "../../../state/reportError.js";
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
@@ -38,6 +39,7 @@ import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { TAB_PARAM } from "../../../state/selection/previewParams.js";
+import useWideView from "../../../state/selection/useWideView.js";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
   dataLayerKeyForDataset,
@@ -52,6 +54,7 @@ import {
 } from "../../../utilities.jsx";
 import CardList from "./CardList.jsx";
 import { DatasetPlatformIcon } from "../DatasetsTable/DatasetCard.jsx";
+import { platformLabel } from "../../../platformVocab.js";
 import ListCard, {
   CardField,
   CardTags,
@@ -456,8 +459,11 @@ export default function DatasetInspector({
     : mappedRecord?.datasetPk === dataset.pk
       ? mappedRecord.recordId
       : undefined;
+  const [wide, setWide] = useWideView();
   const toggleOnMap = (recordId) => {
     const shown = onMapId === recordId;
+    // Widened, the page covers the map it is about to draw on.
+    if (!shown) setWide(false);
     if (isTrajectoryDataset) {
       setSelectedTrajectory(
         shown
@@ -531,9 +537,32 @@ export default function DatasetInspector({
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [tab]);
 
+  // A tab panel normally; widened, a labelled column with its own scroll.
+  const viewProps = (key) => ({
+    className: classNames(`datasetPanel-${key}`, { datasetView: wide }),
+    ...(wide
+      ? {
+          role: "region",
+          "aria-labelledby": `datasetViewHeading-${key}`,
+        }
+      : {
+          role: "tabpanel",
+          id: `datasetPanel-${key}`,
+          "aria-labelledby": `datasetTab-${key}`,
+          hidden: tab !== key,
+        }),
+  });
+  const viewHeading = (key, label, Icon) =>
+    wide && (
+      <h3 className="datasetViewHeading" id={`datasetViewHeading-${key}`}>
+        <Icon size={14} aria-hidden="true" />
+        {t(label)}
+      </h3>
+    );
+
   return (
     <div
-      className="datasetInspector"
+      className={classNames("datasetInspector", { wide })}
       ref={inspectorRef}
       onMouseEnter={() => setHoveredDataset(dataset)}
       onMouseLeave={() => setHoveredDataset()}
@@ -598,36 +627,35 @@ export default function DatasetInspector({
           </div>
         )}
       </div>
-      <div className="datasetTabs" role="tablist">
-        {[
-          ["metadata", "datasetInspectorMetadataTab", InfoCircle],
-          ["data", "datasetInspectorDataTab", Table],
-        ].map(([key, label, Icon]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            id={`datasetTab-${key}`}
-            aria-selected={tab === key}
-            aria-controls={`datasetPanel-${key}`}
-            className="datasetTab"
-            data-tip-highlight={
-              key === "data" ? tipHighlight("showData") : undefined
-            }
-            onClick={() => setTab(key)}
-          >
-            <Icon size={14} aria-hidden="true" />
-            {t(label)}
-          </button>
-        ))}
-      </div>
+      {/* Widened, both views sit side by side and need no tabs. */}
+      {!wide && (
+        <div className="datasetTabs" role="tablist">
+          {[
+            ["metadata", "datasetInspectorMetadataTab", InfoCircle],
+            ["data", "datasetInspectorDataTab", Table],
+          ].map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              id={`datasetTab-${key}`}
+              aria-selected={tab === key}
+              aria-controls={`datasetPanel-${key}`}
+              className="datasetTab"
+              data-tip-highlight={
+                key === "data" ? tipHighlight("showData") : undefined
+              }
+              onClick={() => setTab(key)}
+            >
+              <Icon size={14} aria-hidden="true" />
+              {t(label)}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="datasetInspectorBody" ref={bodyRef}>
-        <div
-          role="tabpanel"
-          id="datasetPanel-metadata"
-          aria-labelledby="datasetTab-metadata"
-          hidden={tab !== "metadata"}
-        >
+        <div {...viewProps("metadata")}>
+          {viewHeading("metadata", "datasetInspectorMetadataTab", InfoCircle)}
           <DatasetAbstract {...metadata} />
           <dl className="datasetMetaSheet">
             <div className="metaCell">
@@ -654,7 +682,7 @@ export default function DatasetInspector({
                         decorative
                       />
                     </span>
-                    {t(dataset.platform)}
+                    {platformLabel(dataset.platform, i18n.language)}
                   </span>
                 ) : (
                   <span className="metadataEmpty">—</span>
@@ -747,12 +775,13 @@ export default function DatasetInspector({
           </dl>
           <DatasetMetadata dataset={dataset} {...metadata} />
         </div>
-        <div
-          role="tabpanel"
-          id="datasetPanel-data"
-          aria-labelledby="datasetTab-data"
-          hidden={tab !== "data"}
-        >
+        <div {...viewProps("data")}>
+          {viewHeading("data", "datasetInspectorDataTab", Table)}
+          {/* Mounted only while shown, so a page left on Metadata never loads
+              the Plotly chunk. */}
+          {(wide || tab === "data") && (
+            <TimeDistribution datasetPk={dataset.pk} query={query} />
+          )}
           {isGrid && (
             <GriddapDetails
               dataset={dataset}

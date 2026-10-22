@@ -1,7 +1,7 @@
 import * as React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import HarvestDocs from "./HarvestDocs.jsx";
@@ -31,6 +31,16 @@ describe("HarvestDocs", () => {
       "/harvest/docs/workflow",
     );
     expect(screen.getByRole("link", { name: "OBIS" })).toHaveClass("active");
+  });
+
+  it("has a Downloads tab explaining how a download package is built", () => {
+    renderDocs("/harvest/docs/downloads");
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Download packages" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Downloads" })).toHaveClass(
+      "active",
+    );
   });
 
   it("hands the flowchart to mermaid", async () => {

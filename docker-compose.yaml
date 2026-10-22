@@ -125,6 +125,9 @@ services:
       REDIS_HOST: redis
       # Server URL shown in the Swagger UI and openapi.json.
       PUBLIC_BASE_URL: ${SERVICE_URL_NGINX:-${APP_URL:-http://localhost:${NGINX_PORT:-8098}}}/api
+      # The commit the download script pins the downloader to (deploy.yml and
+      # Coolify set it); unset, scripts track development-v2.
+      SOURCE_COMMIT: ${SOURCE_COMMIT:-}
     expose:
       - "5000"
     depends_on:
@@ -244,6 +247,9 @@ services:
       # Caches persisted across runs (cheap re-fetch if lost).
       - harvester_cache:/app/harvester/harvester_cache
       - obis_cache:/app/harvester/obis_cache
+      # Read by the post-harvest cache warm-up to replay the most common API
+      # requests (cde_harvester/redisFunctions.py).
+      - nginx_logs:/app/nginx/logs:ro
     env_file: *env-file
     environment:
       PREFECT_API_URL: http://prefect:4200/api
@@ -268,7 +274,7 @@ services:
       # source. Budget against mem_limit below, not CPU: each run is its own
       # pandas working set, and 6 OOM'd the container. Raise it together with
       # HARVESTER_MEM_LIMIT.
-      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-2}
+      HARVEST_WORKER_LIMIT: ${HARVEST_WORKER_LIMIT:-3}
     # memswap_limit == mem_limit gives this container ZERO swap, so a runaway
     # harvest is OOM-killed in its own cgroup instead of grinding through host
     # swap (which once livelocked the box until a hard reboot). Keep both
@@ -281,7 +287,7 @@ services:
     # Non-conda image: ships asyncpg, so Prefect can use Postgres as its
     # metadata DB. SQLite (the default) throws "database is locked" under the
     # concurrent access from scaled / remote workers — Postgres handles it.
-    image: prefecthq/prefect:3.8-python3.14
+    image: prefecthq/prefect:3.9-python3.14
     # On startup, create the dedicated `prefect` database in the shared `db`
     # Postgres if it doesn't exist (idempotent; works on fresh AND existing
     # volumes, including Coolify where initdb scripts won't re-run), then start

@@ -5,7 +5,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../test/mockFetch.js";
 import { useSelection } from "./SelectionProvider.jsx";
-import { useMapState } from "../map/MapStateProvider.jsx";
+import { useMapState, useMapView } from "../map/MapStateProvider.jsx";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { erddapServerSlug } from "../../utilities.jsx";
 import pointQueryFixture from "../../../e2e/fixtures/api/pointQuery.json";
@@ -17,7 +17,7 @@ let latestFilters;
 
 function Probe() {
   latest = useSelection();
-  latestMapState = useMapState();
+  latestMapState = { ...useMapState(), ...useMapView() };
   latestFilters = useFilters();
   return (
     <span data-testid="state">

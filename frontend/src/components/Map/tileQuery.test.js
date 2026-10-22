@@ -11,13 +11,7 @@ import {
   PROFILE_TYPE_KEYS,
   TRAJECTORY_TYPE_KEYS,
 } from "../../state/dataLayers.js";
-import {
-  HEX_METRIC,
-  TRAIL_ALL,
-  longTrailMaxDays,
-  longTrailMinZoom,
-  tracksMinDate,
-} from "../config";
+import { HEX_METRIC } from "../config";
 
 const params = (suffix) => new URLSearchParams(suffix);
 const onlyDataLayer = (key) => dataLayersFromChoices({ [key]: "include" });
@@ -161,25 +155,9 @@ describe("filterTimeWindow", () => {
 
 describe("tracksTimeWindow", () => {
   it("ends the day after the scrub date and starts the trail before it", () => {
-    expect(tracksTimeWindow("2024-03-10", 7, longTrailMinZoom)).toEqual({
+    expect(tracksTimeWindow("2024-03-10", 7)).toEqual({
       timeMin: "2024-03-03T00:00:00Z",
       timeMax: "2024-03-11T00:00:00Z",
     });
-  });
-
-  it("starts the 'all' trail at the scrub bar's own start", () => {
-    expect(
-      tracksTimeWindow("2024-03-10", TRAIL_ALL, longTrailMinZoom).timeMin,
-    ).toBe(`${tracksMinDate}T00:00:00Z`);
-  });
-
-  it("clamps a long trail when zoomed out", () => {
-    const { timeMin } = tracksTimeWindow(
-      "2024-03-10",
-      TRAIL_ALL,
-      longTrailMinZoom - 1,
-    );
-    const days = (Date.parse("2024-03-10") - Date.parse(timeMin)) / 86_400_000;
-    expect(days).toBe(longTrailMaxDays);
   });
 });

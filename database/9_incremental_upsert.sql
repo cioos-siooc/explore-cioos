@@ -56,7 +56,7 @@ BEGIN
   -- coverage_bbox column that temp_datasets omits; pk is left out so the
   -- target assigns its own serial.
   INSERT INTO cde.datasets (
-    pk_url, dataset_id, erddap_url, platform, title, title_fr,
+    pk_url, dataset_id, erddap_url, platform, platform_category, title, title_fr,
     summary, summary_fr, cdm_data_type, organizations, eovs, ckan_id,
     timeseries_id_variable, profile_id_variable, trajectory_id_variable,
     organization_pks, n_profiles, profile_variables, num_columns,
@@ -68,7 +68,7 @@ BEGIN
     cdm_altitude_proxy
   )
   SELECT
-    pk_url, dataset_id, erddap_url, platform, title, title_fr,
+    pk_url, dataset_id, erddap_url, platform, platform_category, title, title_fr,
     summary, summary_fr, cdm_data_type, organizations, eovs, ckan_id,
     timeseries_id_variable, profile_id_variable, trajectory_id_variable,
     organization_pks, n_profiles, profile_variables, num_columns,
@@ -82,6 +82,7 @@ BEGIN
   ON CONFLICT (dataset_id, erddap_url)
   DO UPDATE SET
     platform = EXCLUDED.platform,
+    platform_category = EXCLUDED.platform_category,
     title = EXCLUDED.title,
     title_fr = EXCLUDED.title_fr,
     summary = EXCLUDED.summary,

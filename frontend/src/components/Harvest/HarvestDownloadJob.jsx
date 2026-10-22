@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import HarvestLayout from "./HarvestLayout.jsx";
 import { HarvestTableSkeleton } from "./HarvestSkeleton.jsx";

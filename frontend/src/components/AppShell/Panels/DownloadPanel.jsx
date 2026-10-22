@@ -12,11 +12,10 @@ import { useUI } from "../../../state/ui/UIProvider.jsx";
 import "./styles.css";
 
 /*
- * Prepared (CDE packages and mails a link, with a per-dataset size ceiling)
- * and Direct (the publisher's URL, no ceiling) are aspects of each dataset
- * card rather than two tabs, so a dataset the packager refuses shows how to
- * fetch it anyway. This panel only owns the email/submit column; the rest is
- * DownloadDetails.
+ * The package (CDE builds and mails it, with a size ceiling) and the download
+ * script (the same package built on the user's computer, no ceiling) share
+ * one selection and format. This panel only owns the email option; the rest
+ * is DownloadDetails.
  */
 export default function DownloadPanel() {
   const { t } = useTranslation();
@@ -79,8 +78,8 @@ export default function DownloadPanel() {
         setSubmissionState={setSubmissionState}
       >
         {/* Passed as children because the submission state lives in this
-            panel's providers; the class places it in the footer's grid. */}
-        <div className="downloadFooterSection downloadSubmit">
+            panel's providers; DownloadDetails sets it beside the script. */}
+        <div className="downloadDeliveryOption downloadSubmit">
           <label className="downloadFooterTitle" htmlFor="downloadEmailInput">
             {t("downloadEmailLabelText")}
           </label>

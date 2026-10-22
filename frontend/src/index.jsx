@@ -9,7 +9,7 @@ import Loading from "./components/Controls/Loading/Loading.jsx";
 import translationEN from "./locales/en/translation.json";
 import translationFR from "./locales/fr/translation.json";
 import App from "./components/App.jsx";
-import { BrowserRouter, Navigate, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Route } from "react-router";
 import { clearLegacyCookies } from "./state/usePersistentState.js";
 
 // Self-hosted, not Google Fonts, which would hand visitors' IPs to Google
@@ -82,7 +82,9 @@ i18n
 const domContainer = document.querySelector("#app");
 createRoot(domContainer).render(
   <Suspense fallback={<Loading />}>
-    <BrowserRouter basename={process.env.BASE_URL}>
+    {/* Synchronous URL updates, as in v6: SelectionProvider and UrlSync rely on
+        a URL write batching with the state set beside it. */}
+    <BrowserRouter basename={process.env.BASE_URL} useTransitions={false}>
       <SentryRoutes>
         <Route path="/" element={<App />} />
         <Route path="/harvest" element={<HarvestOverview />} />
