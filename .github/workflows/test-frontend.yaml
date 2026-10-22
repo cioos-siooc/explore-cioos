@@ -66,7 +66,7 @@ jobs:
       # Must match @playwright/test in frontend/package.json exactly; bump the
       # two together. The same image as e2e/in-container.sh keeps a11y node
       # counts reproducible.
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       # Chromium dies on the default 64MB /dev/shm.
       options: --ipc=host
     steps:

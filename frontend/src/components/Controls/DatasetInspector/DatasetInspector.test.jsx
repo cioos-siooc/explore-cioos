@@ -340,6 +340,7 @@ describe("DatasetInspector", () => {
     expect(returnToList).toHaveBeenCalledTimes(1);
 
     returnToList.mockClear();
+    await openData();
     await user.click(screen.getByPlaceholderText("Search table"));
     await user.keyboard("{Backspace}");
     expect(returnToList).not.toHaveBeenCalled();
