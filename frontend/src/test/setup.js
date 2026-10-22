@@ -21,30 +21,6 @@ class NoopObserver {
 globalThis.ResizeObserver ??= NoopObserver;
 globalThis.IntersectionObserver ??= NoopObserver;
 
-// Node 26's experimental `localStorage` global shadows jsdom's and is
-// `undefined` unless node is started with --localstorage-file.
-if (!window.localStorage) {
-  const store = new Map();
-  const storage = {
-    getItem: (key) => (store.has(key) ? store.get(key) : null),
-    setItem: (key, value) => store.set(key, String(value)),
-    removeItem: (key) => store.delete(key),
-    clear: () => store.clear(),
-    key: (index) => [...store.keys()][index] ?? null,
-    get length() {
-      return store.size;
-    },
-  };
-  Object.defineProperty(window, "localStorage", {
-    value: storage,
-    configurable: true,
-  });
-  Object.defineProperty(window, "sessionStorage", {
-    value: storage,
-    configurable: true,
-  });
-}
-
 globalThis.URL.createObjectURL ??= () => "blob:test";
 globalThis.URL.revokeObjectURL ??= () => {};
 
