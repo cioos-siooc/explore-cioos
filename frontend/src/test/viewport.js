@@ -4,6 +4,8 @@ export const MOBILE_WIDTH = 390;
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const TOUCH_QUERY = "(hover: none)";
+// react-data-table-component reads it on mount to pick its default theme.
+const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
 let currentWidth = DESKTOP_WIDTH;
 let touchScreen = false;
@@ -16,11 +18,12 @@ function evaluate(query) {
   if (/^\(\s*max-height:\s*\d+px\s*\)$/.test(query.trim())) return false;
   if (query.trim() === REDUCED_MOTION_QUERY) return false;
   if (query.trim() === TOUCH_QUERY) return touchScreen;
+  if (query.trim() === DARK_SCHEME_QUERY) return false;
   const match = /^\(\s*(min|max)-width:\s*(\d+)px\s*\)$/.exec(query.trim());
   if (!match) {
     throw new Error(
       `Unsupported media query in test: "${query}". ` +
-        "Only (min-width: Npx), (max-width: Npx), (max-height: Npx), comma lists of those, (hover: none) and reduced motion are handled — see src/test/viewport.js.",
+        "Only (min-width: Npx), (max-width: Npx), (max-height: Npx), comma lists of those, (hover: none), reduced motion and dark scheme are handled — see src/test/viewport.js.",
     );
   }
   const [, bound, px] = match;
