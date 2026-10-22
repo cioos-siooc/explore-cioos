@@ -434,3 +434,25 @@ class TestGetProfileIds:
         profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
 
         assert len(profile_ids) == 1
+
+
+class TestGetCount:
+    def test_single_profile_count_is_extrapolated_from_30_days(self, mock_erddap_server):
+        from io import StringIO
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(ERDDAP_INFO_CSV)).fillna("")
+            return pd.DataFrame({"time": [3000]})
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+        ds = Dataset(mock_erddap_server, DATASET_ID)
+        ds.profile_ids = pd.DataFrame({"station_id": ["A"]})
+
+        count = ds.get_count(
+            ["time"], ["station_id"],
+            pd.Timestamp("2020-01-01", tz="UTC"), pd.Timestamp("2020-07-19", tz="UTC"),
+        )
+
+        assert count.loc[0, "time"] == 20000
