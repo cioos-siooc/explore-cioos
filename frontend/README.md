@@ -115,7 +115,7 @@ True polar stereographic projections (e.g. EPSG:3413) are not supported by MapLi
 
 ## Technology Stack
 
-- **React 18**: UI framework
+- **React 19**: UI framework
 - **MapLibre GL 5**: WebGL map rendering (globe + mercator projections)
 - **Plotly.js**: Dataset preview charts (lazy-loaded)
 - **Vite**: Build tool and dev server
