@@ -90,18 +90,10 @@ export function dedupeGriddapByPk(features) {
   return [...byPk.values()];
 }
 
-// nested feature properties arrive JSON-stringified from MapLibre
+// A GeoJSON source keeps nested properties as objects (vector tiles don't).
 export function griddapTitle(feature, language) {
-  try {
-    const titleTranslated = JSON.parse(feature.properties.title_translated);
-    return (
-      titleTranslated[language] ||
-      titleTranslated.en ||
-      feature.properties.dataset_id
-    );
-  } catch {
-    return feature.properties.dataset_id || "";
-  }
+  const titles = feature.properties.title_translated ?? {};
+  return titles[language] || titles.en || feature.properties.dataset_id || "";
 }
 
 export const datasetPksOf = (feature) => {

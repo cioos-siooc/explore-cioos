@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
+import { useLocation, useNavigate, useNavigationType } from "react-router";
 
 // Gives an open surface a history entry of its own, so the browser's Back —
 // Android's back button and gesture — closes it instead of leaving the app.
