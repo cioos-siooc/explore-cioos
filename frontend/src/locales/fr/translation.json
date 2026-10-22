@@ -820,6 +820,7 @@
   "quickFiltersShow": "Afficher les filtres",
   "quickFiltersHide": "Masquer les filtres",
   "apiErrorBannerText": "Le service de données ne répond pas : les filtres et les jeux de données n'ont pas pu être chargés.",
+  "apiErrorRejectedText": "Le service de données a rejeté la requête : les filtres et les jeux de données n'ont pas pu être chargés.",
   "apiErrorPointsBannerText": "Le service de données ne répond pas : la liste des jeux de données n'a pas pu être chargée.",
   "apiErrorRetryButton": "Réessayer",
   "harvest.downloads.title": "Téléchargements",

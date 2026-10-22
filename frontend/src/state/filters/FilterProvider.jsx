@@ -249,12 +249,14 @@ export default function FilterProvider({ children }) {
 
   // So the UI can offer a retry instead of silently empty filters.
   const [catalogError, setCatalogError] = useState(false);
+  const [catalogErrorDetail, setCatalogErrorDetail] = useState(null);
   // Distinguishes "still loading" from "loaded but empty".
   const [catalogLoaded, setCatalogLoaded] = useState(false);
 
   // Seeded with any selections carried in the URL. Retryable via loadCatalog().
   const loadCatalog = useCallback(() => {
     setCatalogError(false);
+    setCatalogErrorDetail(null);
     const filtersFromURL = Object.fromEntries(
       new URL(window.location.href).searchParams,
     );
@@ -461,7 +463,12 @@ export default function FilterProvider({ children }) {
       const serviceDown = failed.some(
         (r) => !r.reason?.status || r.reason.status >= 500,
       );
-      if (serviceDown) setCatalogError(true);
+      if (serviceDown) {
+        setCatalogError(true);
+        setCatalogErrorDetail(
+          failed.find((r) => r.reason?.detail)?.reason.detail ?? null,
+        );
+      }
       setCatalogLoaded(true);
     });
   }, []);
@@ -590,6 +597,7 @@ export default function FilterProvider({ children }) {
     resetFilters,
     optionLabel,
     catalogError,
+    catalogErrorDetail,
     catalogLoaded,
     loadCatalog,
   };
