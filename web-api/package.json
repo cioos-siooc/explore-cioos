@@ -12,7 +12,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@sentry/node": "^10.73.0",
+    "@sentry/node": "^11.8.0",
     "apicache": "1.6.3",
     "axios": "1.20.0",
     "cors": "^2.8.6",
