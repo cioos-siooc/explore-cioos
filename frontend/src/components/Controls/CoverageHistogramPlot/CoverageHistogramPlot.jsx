@@ -258,6 +258,8 @@ export default function CoverageHistogramPlot({ histogram }) {
         }}
         config={{
           displaylogo: false,
+          // Plotly 4 defaults this on; it posts the chart to cloud.plotly.com.
+          showSendToCloud: false,
           // Not `editable: true`, which would make titles click-to-edit too.
           edits: { legendPosition: true },
           modeBarButtonsToRemove: [
