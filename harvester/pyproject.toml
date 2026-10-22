@@ -33,7 +33,7 @@ build-backend = "hatchling.build"
 packages = ["cde_harvester"]
 
 [tool.uv.sources]
-cioos-metadata-conversion = { git = "https://github.com/cioos-siooc/cioos-metadata-conversion", rev = "b16d8c93fb0ab0398aa95393632d512130e3083d" }
+cioos-metadata-conversion = { git = "https://github.com/cioos-siooc/cioos-metadata-conversion", branch = "main" }
 
 [dependency-groups]
 dev = [
