@@ -349,8 +349,7 @@ class OBISHarvester(BaseHarvester):
             )
 
             if not df_datasets.empty:
-                df_datasets = self._enrich_with_ckan(df_datasets)
-                df_datasets = self._enrich_with_conversion(df_datasets)
+                df_datasets = self._enrich_metadata(df_datasets)
 
             return HarvestResult(
                 profiles=df_profiles,
@@ -360,6 +359,14 @@ class OBISHarvester(BaseHarvester):
                 obis_cells=df_obis_cells,
                 attempts=df_attempts,
             )
+
+    def _enrich_metadata(self, df_datasets):
+        """Enrich datasets with CKAN metadata (EOVs, French titles, CKAN IDs), or
+        with their converted OBIS metadata when CKAN has no record."""
+        df_datasets = self._enrich_with_conversion(self._enrich_with_ckan(df_datasets))
+        # obis_derive_eovs() rebuilds `eovs` as these plus the taxon-derived EOVs.
+        df_datasets["declared_eovs"] = df_datasets["eovs"]
+        return df_datasets
 
     def _enrich_with_ckan(self, df_datasets):
         self.logger.info("Fetching CKAN metadata for %d OBIS datasets", len(df_datasets))
@@ -586,6 +593,7 @@ class OBISHarvester(BaseHarvester):
             "platform": "unknown",
             "platform_category": "unknown",
             "eovs": [],
+            "declared_eovs": [],
             "organizations": organizations,
             "n_profiles": len(cells),
             "profile_variables": [],
