@@ -13,7 +13,7 @@ export function fixtureKey(rawUrl) {
 
   // By z/x/y only, or every filter combination would need its own tiles.
   const tile =
-    /^(tiles(?:\/cells|\/tracks)?|nonna\/\d+)\/(\d+)\/(\d+)\/(\d+)\.(mvt|png)$/.exec(
+    /^(tiles(?:\/cells|\/tracks)?|nonna(?:\/10)?)\/(\d+)\/(\d+)\/(\d+)\.(mvt|png)$/.exec(
       pathname,
     );
   if (tile) {

@@ -11,6 +11,7 @@ import {
   basemapHandoffEndZoom,
   basemapHandoffStartZoom,
   basemapPrewarmZoom,
+  bathymetryColorScale,
   bathymetryFadeInZoom,
   bathymetryFullZoom,
 } from "../config.js";
@@ -27,10 +28,57 @@ const EMODNET_TILES = `${server}/emodnet/{z}/{x}/{y}.webp`;
 const ESRI_IMAGERY_TILES =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
-// CHS allowlists request origins exactly (403ing the CORS preflight too), and
-// MapLibre always sends an Origin, so these go through web-api/routes/nonna.js.
-const NONNA_100_TILES = `${server}/nonna/100/{z}/{x}/{y}.png`;
-const NONNA_10_TILES = `${server}/nonna/10/{z}/{x}/{y}.png`;
+// Terrarium DEM tiles re-encoded from CHS's WCS by web-api/routes/nonna.js
+// (NONNA 10 over NONNA 100), so the ramp below is ours, not baked in.
+const NONNA_DEM_TILES = `${server}/nonna/{z}/{x}/{y}.png`;
+// What a transparent Terrarium pixel decodes to: no sounding.
+const NONNA_NODATA_ELEVATION = -32768;
+
+// Elevations are negative below chart datum; the ramp is listed by depth.
+const nonnaRampStops = [...bathymetryColorScale]
+  .reverse()
+  .flatMap(({ depth, color }) => [-depth, color]);
+const NONNA_COLOR_RAMP = [
+  "interpolate",
+  ["linear"],
+  ["elevation"],
+  NONNA_NODATA_ELEVATION,
+  "rgba(0, 0, 0, 0)",
+  // Nothing real lies between the sentinel and the deepest stop.
+  NONNA_NODATA_ELEVATION + 1,
+  nonnaRampStops[1],
+  ...nonnaRampStops,
+];
+
+const NONNA_10_DEM_TILES = `${server}/nonna/10/{z}/{x}/{y}.png`;
+// Where the proxy starts drawing NONNA 10 into the merged tiles
+// (web-api/routes/nonna.js COVERAGES).
+const NONNA_FINE_ZOOM = 11;
+
+const NONNA_HILLSHADE_PAINT = {
+  // Hillshade has no opacity; fading its colours does the same job.
+  "hillshade-shadow-color": [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    bathymetryFadeInZoom,
+    "rgba(0, 0, 0, 0)",
+    bathymetryFullZoom,
+    "rgba(0, 20, 40, 0.6)",
+  ],
+  "hillshade-highlight-color": [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    bathymetryFadeInZoom,
+    "rgba(255, 255, 255, 0)",
+    bathymetryFullZoom,
+    "rgba(255, 255, 255, 0.35)",
+  ],
+  "hillshade-accent-color": "rgba(0, 0, 0, 0)",
+  // Seabed slopes are gentle; the 0.5 default barely shows.
+  "hillshade-exaggeration": 1,
+};
 
 const CHS_ATTRIBUTION =
   'Bathymetry © <a href="https://www.charts.gc.ca/data-gestion/index-eng.html">Canadian Hydrographic Service</a> (NONNA)';
@@ -170,21 +218,19 @@ export function buildBasemapStyle(lang = "en") {
         "raster-saturation": -0.15,
       },
     },
-    // NONNA is transparent over land and where CHS has no soundings, so it can
-    // lie straight over the imagery (MapLibre can't clip a raster to water).
-    // NONNA 10 draws over NONNA 100; they share one colour ramp, so the stack
-    // only smooths the 100 m blockiness. The ramp is baked into CHS's tiles,
-    // which is why the legend's depth axis is calibrated from them
-    // (bathymetryColorScale in config.js).
+    // NONNA has no soundings over land or past CHS's surveys; those pixels sit
+    // below the ramp and draw transparent, so the depth colours can lie
+    // straight over the imagery (MapLibre can't clip a raster to water).
     {
-      id: "bathymetry-nonna-100",
-      type: "raster",
-      source: "nonna100",
+      id: "bathymetry-nonna",
+      type: "color-relief",
+      source: "nonna",
       // Mounted early like the imagery: these come through our proxy and are
       // the slowest tiles on the map on a cold cache.
       minzoom: basemapPrewarmZoom,
       paint: {
-        "raster-opacity": [
+        "color-relief-color": NONNA_COLOR_RAMP,
+        "color-relief-opacity": [
           "interpolate",
           ["linear"],
           ["zoom"],
@@ -193,29 +239,28 @@ export function buildBasemapStyle(lang = "en") {
           bathymetryFullZoom,
           0.7,
         ],
-        // The default 300 ms cross-fade draws both tiles, and these translucent
-        // layers over the satellite are the most overdrawn part of the map;
-        // fading instantly also releases the parent tiles sooner.
-        "raster-fade-duration": 0,
+        // Linear filtering blends the packed RGB bytes, not the elevations,
+        // and smears off-ramp colours along every survey edge.
+        resampling: "nearest",
       },
     },
+    // Past NONNA_FINE_ZOOM the 100 m grid is upscaled and shades as
+    // stair-steps, so the hillshade moves to NONNA 10 alone and leaves
+    // 100 m-only water flat.
     {
-      id: "bathymetry-nonna-10",
-      type: "raster",
-      source: "nonna10",
+      id: "bathymetry-nonna-hillshade",
+      type: "hillshade",
+      source: "nonna",
       minzoom: basemapPrewarmZoom,
-      paint: {
-        "raster-opacity": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          bathymetryFadeInZoom,
-          0,
-          bathymetryFullZoom,
-          0.7,
-        ],
-        "raster-fade-duration": 0,
-      },
+      maxzoom: NONNA_FINE_ZOOM,
+      paint: NONNA_HILLSHADE_PAINT,
+    },
+    {
+      id: "bathymetry-nonna-10-hillshade",
+      type: "hillshade",
+      source: "nonna10",
+      minzoom: NONNA_FINE_ZOOM,
+      paint: NONNA_HILLSHADE_PAINT,
     },
     // Pulls the sea toward CIOOS teal while EMODnet is the base; lifts off as
     // the imagery arrives.
@@ -522,21 +567,22 @@ export function buildBasemapStyle(lang = "en") {
         attribution:
           'Imagery © <a href="https://www.esri.com">Esri</a>, Vantor, Earthstar Geographics',
       },
-      // The proxy answers a transparent tile wherever CHS has nothing. maxzoom
-      // is where each grid runs out of soundings (100 m past ~z10, 10 m past
-      // ~z13) plus 2x headroom: deeper levels were only upsampled server-side,
-      // and capping cut z16 requests from ~60 per viewport to ~6.
-      nonna100: {
-        type: "raster",
-        tiles: [NONNA_100_TILES],
+      // maxzoom is where NONNA 10 runs out of soundings (~z13) plus 2x
+      // headroom; MapLibre overzooms DEM tiles past it.
+      nonna: {
+        type: "raster-dem",
+        encoding: "terrarium",
+        tiles: [NONNA_DEM_TILES],
         tileSize: 256,
-        maxzoom: 11,
+        maxzoom: 14,
         attribution: CHS_ATTRIBUTION,
       },
       nonna10: {
-        type: "raster",
-        tiles: [NONNA_10_TILES],
+        type: "raster-dem",
+        encoding: "terrarium",
+        tiles: [NONNA_10_DEM_TILES],
         tileSize: 256,
+        minzoom: NONNA_FINE_ZOOM,
         maxzoom: 14,
       },
       ofm: {
