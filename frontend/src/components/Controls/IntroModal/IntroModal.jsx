@@ -4,11 +4,10 @@ import {
   ArrowRight,
   BarChartLine,
   Bezier2,
-  ChatDots,
   Download,
+  InfoCircle,
   GeoAlt,
   GlobeAmericas,
-  InfoCircle,
   Lightbulb,
   Search,
   Water,
@@ -17,7 +16,6 @@ import { Trans, useTranslation } from "react-i18next";
 
 import CioosLogo from "../../ui/CioosLogo.jsx";
 import Modal from "../../ui/Modal.jsx";
-import Switch from "../../ui/Switch.jsx";
 import FeedbackButton from "../FeedbackButton/FeedbackButton.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
@@ -33,6 +31,7 @@ import {
   showNonna,
   showTrajectory,
 } from "../../../state/tips/scenes.js";
+import "../../ui/switchStyles.css";
 import "./styles.css";
 
 const FEATURES = [
@@ -166,6 +165,21 @@ export default function IntroModal({ showModal, setShowModal }) {
           <span className="introTitleName">{t("dataExplorer")}</span>
           <span className="tagLine">{t("CIOOSQuote")}</span>
         </Modal.Title>
+        <p className="introReopen">
+          <Trans
+            i18nKey="introReopenText"
+            components={{
+              icon: (
+                <InfoCircle
+                  className="introGlyph"
+                  size={14}
+                  role="img"
+                  aria-label={t("dockIntroButtonTitle")}
+                />
+              ),
+            }}
+          />
+        </p>
       </Modal.Header>
       <Modal.Body>
         <section className="introHero">
@@ -184,6 +198,16 @@ export default function IntroModal({ showModal, setShowModal }) {
             <div className="introHeroActions">
               <button type="button" className="introCta" onClick={close}>
                 {t("introHeroCta")}
+              </button>
+              <button
+                type="button"
+                className="introCta introCtaSecondary"
+                onClick={() => {
+                  close();
+                  startTour(TIPS[0]);
+                }}
+              >
+                {t("introTourCta")}
               </button>
             </div>
           </div>
@@ -254,80 +278,64 @@ export default function IntroModal({ showModal, setShowModal }) {
 
         <footer className="introFooter">
           <div className="introFooterCards">
-            <section
-              className="introFooterCard introTipsCard"
+            <label
+              className="introFooterCard"
+              htmlFor="introTipsToggle"
               data-testid="intro-tips"
             >
-              <h2 className="introFooterHeading">
-                <Lightbulb size={18} aria-hidden="true" />
-                {t("introTipsHeading")}
-              </h2>
-              <p>
-                <Trans
-                  i18nKey="introTipsText"
-                  components={{
-                    icon: (
-                      <Lightbulb
-                        className="introGlyph"
-                        size={14}
-                        role="img"
-                        aria-label={t("tipCardOpen")}
-                      />
-                    ),
-                  }}
+              <Lightbulb size={20} aria-hidden="true" />
+              <span className="introFooterText">
+                <span id="introTipsHeading" className="introFooterHeading">
+                  {t("introTipsHeading")}
+                </span>
+                <span id="introTipsText">
+                  <Trans
+                    i18nKey="introTipsText"
+                    components={{
+                      icon: (
+                        <Lightbulb
+                          className="introGlyph"
+                          size={14}
+                          role="img"
+                          aria-label={t("tipCardOpen")}
+                        />
+                      ),
+                    }}
+                  />
+                </span>
+              </span>
+              <span className="form-switch">
+                <input
+                  id="introTipsToggle"
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  aria-labelledby="introTipsHeading"
+                  aria-describedby="introTipsText"
+                  checked={tipsEnabled}
+                  onChange={() => setTipsEnabled(!tipsEnabled)}
                 />
-              </p>
-              <Switch
-                id="introTipsToggle"
-                label={t("tipsToggleLabel")}
-                checked={tipsEnabled}
-                onChange={() => setTipsEnabled(!tipsEnabled)}
-              />
-              <button
-                type="button"
-                className="introFooterAction"
-                onClick={() => {
-                  close();
-                  startTour(TIPS[0]);
-                }}
-              >
-                {t("introTourCta")}
-                <ArrowRight size={14} aria-hidden="true" />
-              </button>
-            </section>
-            <section className="introFooterCard">
-              <h2 className="introFooterHeading">
-                <ChatDots size={18} aria-hidden="true" />
-                {t("introFeedbackHeading")}
-              </h2>
-              <p>{t("tipInfoFeedback")}</p>
-              <FeedbackButton
-                className="introFooterAction"
-                size={14}
-                label={t("introFeedbackCta")}
-              />
-            </section>
-            <section className="introFooterCard">
-              <h2 className="introFooterHeading">
-                <InfoCircle size={18} aria-hidden="true" />
-                {t("introReopenHeading")}
-              </h2>
-              <p>
-                <Trans
-                  i18nKey="introReopenText"
-                  components={{
-                    icon: (
-                      <InfoCircle
-                        className="introGlyph"
-                        size={14}
-                        role="img"
-                        aria-label={t("dockIntroButtonTitle")}
-                      />
-                    ),
-                  }}
-                />
-              </p>
-            </section>
+              </span>
+            </label>
+            <FeedbackButton
+              className="introFooterCard"
+              size={20}
+              label={
+                <>
+                  <span className="introFooterText">
+                    <span className="introFooterHeading">
+                      {t("introFeedbackHeading")}
+                    </span>
+                    <span>{t("tipInfoFeedback")}</span>
+                  </span>
+                  <ArrowRight
+                    className="introShowcaseArrow"
+                    size={18}
+                    aria-hidden="true"
+                  />
+                </>
+              }
+            />
           </div>
           <p className="introSources">
             {t("introSources")}{" "}
