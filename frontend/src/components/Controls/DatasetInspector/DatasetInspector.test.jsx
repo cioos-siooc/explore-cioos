@@ -110,7 +110,10 @@ describe("DatasetInspector", () => {
     const erddapLink = await screen.findByRole("link", {
       name: /Data access form/,
     });
-    expect(erddapLink).toHaveAttribute("href", DATASET.erddap_url);
+    expect(erddapLink).toHaveAttribute(
+      "href",
+      "https://erddap.example/en/tabledap/foo.html",
+    );
   });
 
   it("links an OBIS dataset to OBIS and to the CKAN record the harvest matched", async () => {
@@ -128,7 +131,10 @@ describe("DatasetInspector", () => {
     ).toHaveAttribute("href", "https://obis.org/dataset/obis-uuid");
     expect(
       screen.getByRole("link", { name: /CIOOS catalogue record/ }),
-    ).toHaveAttribute("href", ckanUrl);
+    ).toHaveAttribute(
+      "href",
+      "https://catalogue.cioos.ca/en/dataset/ckan-obis-1",
+    );
   });
 
   it("shows no CKAN link for an OBIS dataset the harvest matched to none", async () => {
@@ -258,11 +264,11 @@ describe("DatasetInspector", () => {
     });
     expect(screen.getByRole("link", { name: /ERDDAP/ })).toHaveAttribute(
       "href",
-      DATASET.erddap_url,
+      "https://erddap.example/en/tabledap/foo.html",
     );
     expect(screen.getByRole("link", { name: /Catalog/ })).toHaveAttribute(
       "href",
-      "https://catalogue.cioos.ca/dataset/x",
+      "https://catalogue.cioos.ca/en/dataset/x",
     );
   });
 
