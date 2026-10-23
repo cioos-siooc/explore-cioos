@@ -141,7 +141,7 @@
    reachable and nothing pushes the modal sideways. */
 .filtersPanel .filterOptions {
   position: absolute;
-  inset: 12px 12px 12px 296px;
+  inset: 12px 12px 0 296px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -151,15 +151,31 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
-  padding: 4px 8px 12px;
+  padding: 4px 8px 0;
+}
+
+/* On a phone the modal's own title names the page (see FiltersModal). */
+.filtersPanel .filterOptionsTitle {
+  flex: 0 0 auto;
+  margin: 0 0 6px;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-md);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cioos-navy);
 }
 
 .filtersPanel .filterOptionsCaption {
   flex: 0 0 auto;
+  margin: 0 0 12px;
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.45;
+}
+
+.filtersPanel .filterOptionsControls {
+  flex: 0 0 auto;
   margin: 0 0 8px;
-  color: var(--cioos-ink-80);
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.35;
 }
 
 .filtersPanel .filterOptionsBody {
@@ -170,6 +186,14 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden auto;
+}
+
+/* Every page reads header (description, search, switches), options, actions;
+   hairlines between the bands, as between the list's groups on the left. */
+.filtersPanel .filterOptionsBody:not(:first-child) {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cioos-hairline);
 }
 
 .filtersPanel .filterOptionsActions {
@@ -351,6 +375,10 @@
 
 /* Mobile: filters master and detail become two screens. */
 @media (max-width: 700px), (max-height: 500px) {
+  .filtersPanel .filterOptionsTitle {
+    display: none;
+  }
+
   /* The download panel scrolls as one column here — see the note in
      DownloadDetails/styles.css. */
   .downloadPanel {
@@ -373,7 +401,7 @@
      options break by growing after the scroll is computed. */
   .filtersPanel .filterOptions {
     inset: 0;
-    padding: 6px 10px 8px;
+    padding: 6px 10px 0;
   }
 
   /* The search page sits above the list (see FilterSearch/styles.css). */

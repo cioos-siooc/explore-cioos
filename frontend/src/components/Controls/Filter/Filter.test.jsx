@@ -51,6 +51,23 @@ describe("Filter (uncontrolled)", () => {
     expect(screen.queryByTestId("filter-options")).not.toBeInTheDocument();
   });
 
+  it("keeps its controls outside the scrolling options body", async () => {
+    const user = userEvent.setup();
+    render(
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        controls={<button>match all</button>}
+      >
+        <div>options here</div>
+      </Filter>,
+    );
+    await user.click(screen.getByTestId("filter-header"));
+    const controls = screen.getByRole("button", { name: "match all" });
+    expect(controls.closest(".filterOptionsBody")).toBeNull();
+    expect(screen.getByTestId("filter-options")).toContainElement(controls);
+  });
+
   it("truncates a long badge title, keeping the full text in the title attribute", async () => {
     const long = "A".repeat(50);
     render(

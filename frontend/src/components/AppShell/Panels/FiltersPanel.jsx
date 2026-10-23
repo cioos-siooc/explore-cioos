@@ -138,6 +138,9 @@ export default function FiltersPanel({ searchInputRef }) {
   const { openFilter, setOpenFilter, filterSearchText } = useUI();
   // Kept here so a visit to a filter's own page and back finds it as left.
   const [searchText, setSearchText] = useState(filterSearchText ?? "");
+  // Rows picked from the empty search stay listed, so several values can be
+  // picked in a row and a removed one picked again; Clear all drops them.
+  const [searchTouched, setSearchTouched] = useState(() => new Set());
   const [, resetAll] = useResetAllFilters();
   const {
     ready: countsReady,
@@ -184,7 +187,7 @@ export default function FiltersPanel({ searchInputRef }) {
     orgsFilterTranslationKey,
     orgsSelected,
   );
-  const datasetsFilterTranslationKey = "datasetsFilterName";
+  const datasetsFilterTranslationKey = "datasetTitleFilterName";
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(
     t,
     datasetsFilterTranslationKey,
@@ -296,6 +299,8 @@ export default function FiltersPanel({ searchInputRef }) {
           <FilterSearch
             text={searchText}
             setText={setSearchText}
+            touched={searchTouched}
+            setTouched={setSearchTouched}
             inputRef={searchInputRef}
           />
         )}
@@ -327,6 +332,7 @@ export default function FiltersPanel({ searchInputRef }) {
               openFilter={openFilter === dataLayersFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={resetDataLayers}
+              infoButton="https://cfconventions.org/Data/cf-conventions/cf-conventions-1.11/cf-conventions.html#discrete-sampling-geometries"
             >
               <DataLayersFilter />
             </Filter>
@@ -348,13 +354,14 @@ export default function FiltersPanel({ searchInputRef }) {
               resetButton={() =>
                 setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
               }
-            >
-              {matchAllSwitch(
+              controls={matchAllSwitch(
                 "eovs-match-all",
                 eovsMatchAll,
                 setEovsMatchAll,
                 "matchAll",
               )}
+              infoButton="https://goosocean.org/what-we-do/framework/essential-ocean-variables/"
+            >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   eovsSearchTerms,
@@ -425,8 +432,12 @@ export default function FiltersPanel({ searchInputRef }) {
               resetButton={() =>
                 setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
               }
+              controls={matchAllSwitch(
+                "orgs-match-all",
+                orgsMatchAll,
+                setOrgsMatchAll,
+              )}
             >
-              {matchAllSwitch("orgs-match-all", orgsMatchAll, setOrgsMatchAll)}
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   orgsSearchTerms,
@@ -600,14 +611,11 @@ export default function FiltersPanel({ searchInputRef }) {
                 />
                 <span>{t("realtimeFilterOptionText")}</span>
               </label>
-              <div className="inViewFilterCount">
-                {t("realtimeFilterHelpText")}
-              </div>
             </Filter>
             <Filter
               active={onlyInView}
               badgeTitle={t("datasetsCardOnlyInViewText")}
-              tooltip={t("datasetsCardOnlyInViewTitle")}
+              tooltip={t("inViewFilterTooltip")}
               icon={<Eye />}
               controlled
               filterName={inViewFilterName}
@@ -645,6 +653,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 filterName={scientificNamesFilterTranslationKey}
                 openFilter={openFilter === scientificNamesFilterTranslationKey}
                 tipTarget="speciesName"
+                infoButton="https://www.marinespecies.org/"
                 setOpenFilter={setOpenFilter}
                 resetButton={
                   scientificNamesPicked.length > 0
@@ -654,12 +663,12 @@ export default function FiltersPanel({ searchInputRef }) {
                       }
                     : undefined
                 }
-              >
-                {matchAllSwitch(
+                controls={matchAllSwitch(
                   "scientific-names-match-all",
                   scientificNamesMatchAll,
                   setScientificNamesMatchAll,
                 )}
+              >
                 <ScientificNameFilter
                   scientificNamesSelected={scientificNamesSelected}
                   setScientificNamesSelected={setScientificNamesSelected}
@@ -698,7 +707,10 @@ export default function FiltersPanel({ searchInputRef }) {
         <button
           type="button"
           className="filtersPanelReset"
-          onClick={resetAll}
+          onClick={() => {
+            resetAll();
+            setSearchTouched(new Set());
+          }}
           title={t("resetFiltersButtonTooltipText")}
         >
           {t("filtersPanelResetAll")}

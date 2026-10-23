@@ -35,7 +35,7 @@ import "./styles.css";
 
 // An area becomes the area filter as its outline or its box, and any place can
 // just be gone to. Picking closes the modal so the map is in view.
-function PlaceSearch() {
+function PlaceSearch({ children }) {
   const { t } = useTranslation();
   const { setShowFiltersModal } = useUI();
   const goTo = useGoToRegion();
@@ -52,9 +52,11 @@ function PlaceSearch() {
   ];
 
   return (
-    <div className="spatialFilterPlaces">
+    <section>
       <label className="spatialFilterPlacesLabel">
-        {t("spatialFilterPlaceLabel")}
+        <span className="spatialFilterSectionTitle">
+          {t("spatialFilterPlaceLabel")}
+        </span>
         <input
           className="filterSearch"
           type="text"
@@ -131,7 +133,8 @@ function PlaceSearch() {
       <p className="spatialFilterPlacesSource">
         {t("spatialFilterPlaceSource")}
       </p>
-    </div>
+      {children}
+    </section>
   );
 }
 
@@ -325,24 +328,28 @@ export default function SpatialFilter() {
 
   return (
     <div className="spatialFilterOptions">
-      <div className="multiCheckboxFilter">
-        <div
-          className={`optionButton ${activeMode === "box" ? "selected" : ""}`}
-          onClick={() => startDraw("box")}
-        >
-          <BoundingBox />
-          <span className="optionName">{t("drawBoundingBoxOption")}</span>
+      <section>
+        <h3 className="spatialFilterSectionTitle">
+          {t("spatialFilterDrawTitle")}
+        </h3>
+        <div className="multiCheckboxFilter">
+          <div
+            className={`optionButton ${activeMode === "box" ? "selected" : ""}`}
+            onClick={() => startDraw("box")}
+          >
+            <BoundingBox />
+            <span className="optionName">{t("drawBoundingBoxOption")}</span>
+          </div>
+          <div
+            className={`optionButton ${activeMode === "polygon" ? "selected" : ""}`}
+            onClick={() => startDraw("polygon")}
+          >
+            <Pentagon />
+            <span className="optionName">{t("drawPolygonOption")}</span>
+          </div>
         </div>
-        <div
-          className={`optionButton ${activeMode === "polygon" ? "selected" : ""}`}
-          onClick={() => startDraw("polygon")}
-        >
-          <Pentagon />
-          <span className="optionName">{t("drawPolygonOption")}</span>
-        </div>
-      </div>
-      <PlaceSearch />
-      <div className="spatialFilterDetails">
+      </section>
+      <PlaceSearch>
         {areaPlace && (
           <p className="spatialFilterPlaceApplied">
             <span className="spatialFilterPlaceAppliedName">
@@ -362,11 +369,16 @@ export default function SpatialFilter() {
             </a>
           </p>
         )}
+      </PlaceSearch>
+      <section>
+        <h3 className="spatialFilterSectionTitle">
+          {t("spatialFilterCoordinatesTitle")}
+        </h3>
         <AreaEditor
           key={polygon ? polygonToWkt(polygon) : "none"}
           polygon={polygon}
         />
-      </div>
+      </section>
     </div>
   );
 }

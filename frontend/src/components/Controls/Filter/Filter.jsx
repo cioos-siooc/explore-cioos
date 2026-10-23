@@ -37,6 +37,8 @@ export default function Filter({
   resetButton,
   infoButton,
   tipTarget,
+  // Above the scrolling options, so a long list can't scroll it away.
+  controls,
   children,
 }) {
   const { t } = useTranslation();
@@ -95,6 +97,7 @@ export default function Filter({
       )}
       {paneShown && (
         <div className="filterOptions" data-testid="filter-options">
+          <h3 className="filterOptionsTitle">{t(filterName)}</h3>
           {tooltip && <div className="filterOptionsCaption">{tooltip}</div>}
           {/* Wrapped so the clear button positions against the field, not the
               pane (whose caption has unpredictable height). */}
@@ -129,6 +132,7 @@ export default function Filter({
               )}
             </form>
           )}
+          {controls && <div className="filterOptionsControls">{controls}</div>}
           <div className="filterOptionsBody">{children}</div>
           {/* No Select all: an explicit all-list would exclude records with
               no value and options harvested later; empty already means all. */}
