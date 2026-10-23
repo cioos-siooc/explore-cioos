@@ -277,6 +277,52 @@ class TestDayStatsExtraction:
         assert not any("latitude/" in u or "longitude/" in u for u in urls)
 
 
+def _dataset_with_day_counts(pairs):
+    """`pairs` of (trajectory id, day offset from Jan 1 2021) for the
+    orderByCount response; depth is left out so it is the only query."""
+    dataset = build_trajectory_dataset(with_depth=False)
+    counts = pd.DataFrame({
+        "traj_id": [t for t, _ in pairs],
+        "time": [
+            pd.Timestamp(18628 + d, unit="s").strftime("%Y-%m-%dT%H:%M:%SZ")
+            for _, d in pairs
+        ],
+        "latitude": [10] * len(pairs),
+    })
+    dataset.dataset_tabledap_query = MagicMock(return_value=counts)
+    return dataset
+
+
+class TestPerSegmentTrajectoryIdWarning:
+    def test_many_single_day_ids_warn(self):
+        # A glider whose cf_role=trajectory_id is the dive number: 10 dives a day.
+        dataset = _dataset_with_day_counts([(f"{i}", i // 10) for i in range(30)])
+        extract_day_stats(dataset)
+        (warning,) = list(dataset.warnings)
+        assert warning["code"] == "TRAJECTORY_ID_PER_SEGMENT"
+        assert warning["count"] == 30
+        assert warning["items"][:3] == ["0", "1", "2"]
+        assert len(warning["items"]) == 20
+
+    def test_single_mission_does_not_warn(self):
+        dataset = build_trajectory_dataset()
+        extract_day_stats(dataset)
+        assert "TRAJECTORY_ID_PER_SEGMENT" not in dataset.warnings.codes()
+
+    def test_concurrent_multi_day_ids_do_not_warn(self):
+        # Drifters released together: more ids than days, each lasting 3 days.
+        dataset = _dataset_with_day_counts(
+            [(f"d{i}", d) for i in range(5) for d in range(3)]
+        )
+        extract_day_stats(dataset)
+        assert not dataset.warnings
+
+    def test_one_id_per_day_does_not_warn(self):
+        dataset = _dataset_with_day_counts([(f"day{d}", d) for d in range(5)])
+        extract_day_stats(dataset)
+        assert not dataset.warnings
+
+
 class TestTrajectoryProfile:
     def test_profiles_per_day(self):
         dataset = build_trajectory_dataset(cdm_data_type="TrajectoryProfile")

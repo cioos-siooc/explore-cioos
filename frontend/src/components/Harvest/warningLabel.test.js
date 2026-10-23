@@ -38,6 +38,7 @@ describe("harvest.warning.<CODE> translations", () => {
     "PROFILE_COUNT_UNAVAILABLE",
     "TRACKS_UNAVAILABLE",
     "TRAJECTORY_DATA_INCOMPLETE",
+    "TRAJECTORY_ID_PER_SEGMENT",
   ];
 
   it.each([
