@@ -213,6 +213,28 @@ class TestFanOut:
         prefect_pipeline.cde_harvest_all_run.fn(config_file(DISCOVERY_CONFIG), force=True)
         assert [f for _, f in triggered] == [True, True]
 
+    @pytest.mark.parametrize("sources, expected", [
+        (None, ["https://data.cioospacific.ca/erddap", "obis"]),
+        (["obis"], ["obis"]),
+        (["https://data.cioospacific.ca/erddap/", "https://gone.example/erddap"],
+         ["https://data.cioospacific.ca/erddap"]),
+    ])
+    def test_sources_narrow_the_fanout(self, config_file, monkeypatch, sources, expected):
+        lanes = []
+        monkeypatch.setattr(prefect_pipeline, "_recent_durations", dict)
+        monkeypatch.setattr(prefect_pipeline, "_plan_lanes", lambda s, d, slots: [s])
+
+        class FakeFuture:
+            def result(self):
+                return []
+
+        monkeypatch.setattr(
+            prefect_pipeline._run_lane, "submit",
+            lambda lane, triggered_by, force: lanes.append(lane) or FakeFuture(), raising=False,
+        )
+        prefect_pipeline.cde_harvest_all_run.fn(config_file(DISCOVERY_CONFIG), sources=sources)
+        assert lanes == [expected]
+
     @pytest.mark.parametrize("force, expected", [(False, {}), (True, {"force": True})])
     def test_force_is_passed_to_the_child_run(self, monkeypatch, force, expected):
         params = {}

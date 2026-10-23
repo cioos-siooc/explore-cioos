@@ -9,6 +9,10 @@
 #                           false        never
 #                           true/once    only when the database is empty (new install)
 #                           always       every deploy, regardless of DB contents
+#   RESUME_ORPHANED_RUNS  (default true)  mark runs killed by the last restart
+#                         Crashed and rerun them (cde_harvester.prefect_recovery).
+#                         Set false when other workers share the pool: their
+#                         live runs would be marked Crashed too.
 #   HARVESTER_CRON / VERNACULARS_CRON     (optional) recurring schedules
 #
 # Remote workers set REGISTER_DEPLOYMENTS=false so they ONLY poll the central
@@ -87,6 +91,13 @@ if [ "${REGISTER_DEPLOYMENTS:-true}" = "true" ]; then
       echo "[worker-entrypoint] RUN_ON_DEPLOY=${RUN_ON_DEPLOY_MODE} -> not triggering a deploy harvest"
       ;;
   esac
+
+  # After registration (Harvest All must accept `sources`), before this worker
+  # starts taking runs of its own.
+  if [ "${RESUME_ORPHANED_RUNS:-true}" = "true" ]; then
+    uv run python -m cde_harvester.prefect_recovery -f "${CONFIG_FILE}" \
+      || echo "[worker-entrypoint] orphaned-run recovery failed; worker will still start"
+  fi
 
   if [ "${SHOULD_HARVEST}" = "true" ]; then
     # Non-fatal so a transient API hiccup can't block the worker.

@@ -122,6 +122,53 @@ class _OccurrenceCacheWriter:
             self.rows_written += 1
 
 
+_OCCURRENCE_CACHE_PREFIX = '{"results": ['
+_OCCURRENCE_CACHE_READ_CHARS = 1 << 20
+
+
+def _iter_occurrence_cache(path, slice_rows=OCCURRENCE_CACHE_SLICE_ROWS):
+    """Reads what _OccurrenceCacheWriter wrote, one slice at a time: json.load of
+    the largest cache (472 MB gzip) OOM-killed a 6GB worker.
+
+    Raises ValueError (JSONDecodeError included), EOFError or OSError on a
+    malformed or truncated file.
+    """
+    decoder = json.JSONDecoder()
+    opener = gzip.open if path.endswith(".gz") else open
+    rows = []
+    with opener(path, "rt") as f:
+        if f.read(len(_OCCURRENCE_CACHE_PREFIX)) != _OCCURRENCE_CACHE_PREFIX:
+            raise ValueError(f"{path} does not start with {_OCCURRENCE_CACHE_PREFIX!r}")
+        buf, pos, eof = "", 0, False
+        while True:
+            while True:
+                while pos < len(buf) and buf[pos] in ", \t\r\n":
+                    pos += 1
+                if pos < len(buf) or eof:
+                    break
+                buf, pos = f.read(_OCCURRENCE_CACHE_READ_CHARS), 0
+                eof = not buf
+            if pos >= len(buf):
+                raise ValueError(f"{path} ends before its results list closes")
+            if buf[pos] == "]":
+                break
+            try:
+                row, pos = decoder.raw_decode(buf, pos)
+            except json.JSONDecodeError:
+                if eof:
+                    raise
+                # The row straddles the buffer's end.
+                more = f.read(_OCCURRENCE_CACHE_READ_CHARS)
+                buf, pos, eof = buf[pos:] + more, 0, not more
+                continue
+            rows.append(row)
+            if len(rows) == slice_rows:
+                yield pd.DataFrame(rows)
+                rows = []
+    if rows:
+        yield pd.DataFrame(rows)
+
+
 class OBISHarvester(BaseHarvester):
     MAX_RETRIES = 5
 
@@ -616,15 +663,22 @@ class OBISHarvester(BaseHarvester):
         os.makedirs(self.folder, exist_ok=True)
         cache_file = os.path.join(self.folder, f"{dataset_id}.json")
 
-        cached = self._read_cache(cache_file)
-        if cached is not None:
+        for path in (cache_file + ".gz", cache_file):
+            if not os.path.isfile(path):
+                continue
             self.logger.info("Loaded %s occurrences from cache", dataset_id)
-            # pop, not get: lets each slice be freed as the caller consumes it.
-            results = cached.pop("results", [])
-            del cached
-            for start in range(0, len(results), OCCURRENCE_CACHE_SLICE_ROWS):
-                yield pd.DataFrame(results[start:start + OCCURRENCE_CACHE_SLICE_ROWS])
-            return
+            yielded_any = False
+            try:
+                for chunk in _iter_occurrence_cache(path, OCCURRENCE_CACHE_SLICE_ROWS):
+                    yielded_any = True
+                    yield chunk
+                return
+            except (ValueError, EOFError, OSError) as e:
+                self.logger.warning("Corrupt cache file %s, will re-fetch: %s", path, e)
+                os.remove(path)
+                if yielded_any:
+                    # Same rule as the parquet stream below: the retry loop redoes the dataset.
+                    raise
 
         import duckdb
         url = f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
