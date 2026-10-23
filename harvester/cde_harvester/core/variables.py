@@ -7,6 +7,8 @@ A plain list of dicts, so it round-trips through the CSV contract (repr out,
 # Not all of CONSIDERED_VARIABLE_ATTRIBUTES: flag_* and colorBar* have no
 # consumer. actual_range can contain fill sentinels (mpoPmzaVikingCtdInsitu
 # TE90_01 declares -1.4899, 191277.0); don't trust it as an axis range.
+# ERDDAP's own "name" is excluded: the "name" key holds the destination name
+# /preview matches columns by, and the loop would overwrite it.
 PERSISTED_VARIABLE_ATTRIBUTES = [
     "long_name",
     "standard_name",

@@ -53,7 +53,13 @@ const ID_NAME = /(_id|[a-z0-9]ID)$/;
 
 // ioos_category is authoritative where it is declared (~48% of variables).
 const ID_CATEGORIES = new Set(["Identifier"]);
-const COORDINATE_CATEGORIES = new Set(["Time", "Location"]);
+// "Location" is deliberately NOT here: it says what a column is ABOUT, not that
+// it is an axis. Every column in the catalogue that really is a horizontal
+// coordinate also declares axis, a CF standard_name, or degrees units, so the
+// category added nothing there — while it classified ismerOsl002's `distance`
+// (the along-transect abscissa, units m, no axis, no standard_name) as a
+// coordinate, which left that record with no measurement to draw at all.
+const COORDINATE_CATEGORIES = new Set(["Time"]);
 
 const trimmed = (value) =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -92,6 +98,7 @@ function flaggedColumns(columnMeta) {
 }
 
 function classify(variable, { flagColumns }) {
+  if (isTimeLike(variable)) return "coordinate"; // rqmMoh*Ctd publish cf_role=profile_id ON time
   if (
     variable.cfRole ||
     ID_CATEGORIES.has(variable.ioosCategory) ||
@@ -124,14 +131,20 @@ function classify(variable, { flagColumns }) {
 // falls back to columnMeta's cfRole.
 export function variablesFrom(table, dataset) {
   if (!table || !table.columnNames) return [];
-  const { columnNames, columnTypes = [], columnUnits = [], columnMeta } = table;
+  const {
+    columnNames,
+    columnTypes = [],
+    columnUnits = [],
+    columnMeta,
+    altitudeProxyColumn,
+  } = table;
   const idRoles = recordIdRoles(dataset);
   const flagColumns = flaggedColumns(columnMeta);
 
   const variables = columnNames.map((columnName, index) => {
     const meta = (columnMeta && columnMeta[index]) || null;
     const type = trimmed(columnTypes[index]) || (meta && trimmed(meta.type));
-    const variable = {
+    return {
       columnName,
       // ERDDAP's answer for THIS query wins over a harvest that may predate a
       // units change.
@@ -145,14 +158,22 @@ export function variablesFrom(table, dataset) {
       cfRole:
         (meta && trimmed(meta.cf_role)) || idRoles.get(columnName) || null,
       axis: meta && trimmed(meta.axis),
-      positive: meta && trimmed(meta.positive),
+      positive:
+        (meta && trimmed(meta.positive)) ||
+        (columnName === altitudeProxyColumn ? "down" : null), // ERDDAP's cdm_altitude_proxy stands in for depth
       ioosCategory: meta && trimmed(meta.ioos_category),
       palette: meta && trimmed(meta.colorBarPalette),
+      // Read by previewColorScales.js for the colour dimension's ramp.
       colorBarScale: meta && trimmed(meta.colorBarScale),
+      // Deliberately unread, now that the colour dimension could read them:
+      // ERDDAP's colorBar bounds are per standard_name across a whole catalogue
+      // (0-8000 for depth, 0-32 for temperature), and one record spans a sliver
+      // of that — honouring them would flatten every profile to two adjacent
+      // shades of its ramp. Kept because they describe the column, and the next
+      // reader should see the decision rather than assume an oversight.
       cmin: meta ? numberOr(meta.colorBarMinimum, undefined) : undefined,
       cmax: meta ? numberOr(meta.colorBarMaximum, undefined) : undefined,
     };
-    return variable;
   });
 
   return variables.map((variable) => ({
@@ -161,12 +182,9 @@ export function variablesFrom(table, dataset) {
   }));
 }
 
-// standard_name before column name: it is at least words, where a column name
-// is often a BODC P01 code.
 export function labelFor(variable) {
   if (!variable) return "";
-  const name =
-    variable.longName || variable.standardName || variable.columnName;
+  const name = shortLabelFor(variable);
   return variable.unit ? `${name} ( ${variable.unit} )` : name;
 }
 
@@ -194,6 +212,18 @@ export function idVariablesFor(variables) {
   return (variables || []).filter((variable) => variable.cfRole);
 }
 
+// Separate from `kind === 'coordinate'` because time arrives as ISO text, so
+// the colour dimension has to know to parse it before ordering it.
+export function isTimeLike(variable) {
+  if (!variable) return false;
+  return Boolean(
+    variable.axis === "T" ||
+    variable.standardName === "time" ||
+    TIME_UNITS.has(variable.unit) ||
+    (variable.unit && TIME_FORMAT_UNIT.test(variable.unit)),
+  );
+}
+
 // `positive` is the only attribute that says so; failing it, CF's convention
 // that depth increases downward and altitude upward.
 export function isDownwardVertical(variable) {
@@ -204,5 +234,10 @@ export function isDownwardVertical(variable) {
     variable.columnName ||
     ""
   ).toLowerCase();
-  return name === "depth" || name === "pressure" || name.startsWith("depth");
+  return (
+    name === "depth" ||
+    name === "pressure" ||
+    name === "sea_water_pressure" ||
+    name.startsWith("depth")
+  );
 }

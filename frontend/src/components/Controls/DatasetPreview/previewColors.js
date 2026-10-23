@@ -1,3 +1,5 @@
+// Names the panel: a solid colour per variable for its line;
+// previewColorScales.js takes the markers.
 // Pure on purpose: the param codec has to be assertable under `node --test`, and
 // usePreviewPlotParams (which owns the param) imports react-router.
 

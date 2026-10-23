@@ -138,6 +138,61 @@ describe("Rail", () => {
     expect(onCommit).toHaveBeenCalledWith("end", 85);
   });
 
+  it("with onDrag, a handle drag reports as it goes and commits once on release", () => {
+    stubTrackRect(200, 40);
+    const onCommit = vi.fn();
+    const onDrag = vi.fn();
+    render(
+      <Rail
+        axis={axis}
+        handles={[{ key: "a", value: 0, label: "A" }]}
+        onDrag={onDrag}
+        onCommit={onCommit}
+      />,
+    );
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 0, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 60, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 120, pointerId: 1 });
+    expect(onDrag).toHaveBeenLastCalledWith("a", 60);
+    expect(onCommit).not.toHaveBeenCalled();
+    fireEvent.pointerUp(handle, { clientX: 120, pointerId: 1 });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith("a", 60);
+  });
+
+  it("with onDrag, a press released without moving commits nothing", () => {
+    const onCommit = vi.fn();
+    render(
+      <Rail
+        axis={axis}
+        handles={[{ key: "a", value: 0, label: "A" }]}
+        onDrag={() => {}}
+        onCommit={onCommit}
+      />,
+    );
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { pointerId: 1 });
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("without onDrag, a handle drag commits on every move", () => {
+    stubTrackRect(200, 40);
+    const onCommit = vi.fn();
+    render(
+      <Rail
+        axis={axis}
+        handles={[{ key: "a", value: 0, label: "A" }]}
+        onCommit={onCommit}
+      />,
+    );
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 60, pointerId: 1 });
+    expect(onCommit).toHaveBeenCalledWith("a", 30);
+  });
+
   it("renders vertical orientation with railVertical class and top-based positioning", () => {
     render(
       <Rail

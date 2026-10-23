@@ -393,6 +393,79 @@ describe("SelectionProvider", () => {
     expect(latest.datasetPreview).toBeDefined();
   });
 
+  const previewUrls = () =>
+    fetch.mock.calls
+      .map(([input]) => (typeof input === "string" ? input : input.url))
+      .filter((url) => url.includes("/preview?"));
+
+  it("a chosen profile rides the preview fetch as `at`", async () => {
+    // A plot param that changes what is FETCHED rather than how it is drawn,
+    // which is why the provider reads it at all.
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+    expect(previewUrls().at(-1)).toContain("at=cast-1");
+  });
+
+  it("no chosen profile asks for the record exactly as it always did", async () => {
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+    expect(previewUrls().at(-1)).not.toContain("at=");
+  });
+
+  it("the colour plot asks for every profile in the window, not the chosen one", async () => {
+    const fixtureRow = pointQueryFixture[0]; // a TimeSeriesProfile
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1&playout=color`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+    expect(previewUrls().at(-1)).toContain("allProfiles=true");
+    expect(previewUrls().at(-1)).not.toContain("at=");
+  });
+
+  it("a colour plot link on a record of one profile fetches as panels", async () => {
+    const fixtureRow = pointQueryFixture[1]; // a TimeSeries
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&playout=color`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+    expect(previewUrls().at(-1)).not.toContain("allProfiles");
+  });
+
+  it("opening another record drops the profile chosen for the previous one", async () => {
+    // A cast id belongs to the station it came from; carried across, it names a
+    // profile the new station never took and /preview answers NO_DATA.
+    const fixtureRow = pointQueryFixture[0];
+    await renderLoaded({
+      url: `/?dataset=${fixtureRow.dataset_id}&preview=STATION_001&pstep=cast-1`,
+    });
+    await waitFor(() => expect(latest.recordLoading).toBe(false));
+
+    act(() => latest.setInspectRecordID("STATION_002"));
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("preview")).toBe(
+        "STATION_002",
+      ),
+    );
+    expect(new URLSearchParams(window.location.search).get("pstep")).toBeNull();
+    await waitFor(() =>
+      expect(previewUrls().at(-1)).toContain("profile=STATION_002"),
+    );
+    expect(previewUrls().at(-1)).not.toContain("at=");
+  });
+
+  it("a ?preview= naming no dataset keeps the modal closed", async () => {
+    // The modal opens on inspectDataset AND inspectRecordID; a link carrying
+    // only half of that must not open an empty dialog.
+    await renderLoaded({ url: "/?preview=record-1" });
+    expect(latest.showPreviewModal).toBe(false);
+  });
+
   it("previews one period of a record, and drops it when the record reopens without one", async () => {
     const fixtureRow = pointQueryFixture[0];
     await renderLoaded({ url: `/?dataset=${fixtureRow.dataset_id}` });

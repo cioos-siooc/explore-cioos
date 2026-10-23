@@ -1,204 +1,110 @@
 // Explicit axis domains rather than layout.grid: Plotly resolves a grid only
-// against a real DOM, and computing them here keeps the layout assertable under
-// `node --test`. Labels beside a vertical axis are annotations, not axis
-// titles, because Plotly always rotates a y-axis title; horizontal labels stay
-// axis titles to keep automargin. The figure carries its own title because a
-// downloaded PNG has nothing else naming the record.
+// against a real DOM, and computing them here (see previewFacetSizing) keeps the
+// layout assertable under `node --test`. Every label is an axis title, so it
+// runs along its axis (a y axis title sideways) and gets `automargin`.
 
-import { COLUMNS } from "./previewFacetPlan.js";
-import { labelFor, shortLabelFor } from "./previewVariables.js";
+import { COLUMNS, ROWS } from "./previewFacetPlan.js";
+import {
+  isDownwardVertical,
+  isTimeLike,
+  labelFor,
+  shortLabelFor,
+} from "./previewVariables.js";
 import { defaultColorFor } from "./previewColors.js";
+import {
+  colorDimensionFor,
+  colorScaleForVariable,
+  legendTicksFor,
+} from "./previewColorScales.js";
+import {
+  coloredLineBinsFor,
+  lineBinLimitFor,
+  MIN_STEP_PX,
+} from "./previewColoredLine.js";
+import { colorGridFor } from "./previewColorGrid.js";
+import {
+  ellipsize,
+  maxCharsFor,
+  titleLinesFor,
+  wrapLabel,
+  wrapTitleFor,
+  HOVER_FONT_PX,
+  LABEL_FONT_PX,
+  TICK_FONT_PX,
+  TITLE_FONT_PX,
+} from "./previewLabelText.js";
+import {
+  boxBudgetFor,
+  domainsFor,
+  heightBudgetFor,
+  marginFor,
+  plotHeightFor,
+  plotWidthFor,
+  COLORBAR_ROOM_PX,
+  COLUMN_GAP,
+  PINNED_AXIS_LINES,
+  ROW_GAP,
+  TITLE_PAD_PX,
+} from "./previewFacetSizing.js";
 
-// Left gutter, in both orientations: tick labels, then the horizontally written
-// axis label.
-const TICK_ROOM_PX = 52;
-export const LABEL_GUTTER_PX = 104;
-
-// Excludes the figure title, which marginFor() adds on top.
-const COLUMNS_MARGIN = {
-  l: TICK_ROOM_PX + LABEL_GUTTER_PX,
-  r: 26,
-  t: 54,
-  b: 22,
-};
-const ROWS_MARGIN = { l: TICK_ROOM_PX + LABEL_GUTTER_PX, r: 26, t: 30, b: 62 };
-
-export const TITLE_FONT_PX = 14;
-// 14px at Plotly's LINE_SPACING of 1.3 is 18.2; 19 buys a pixel of clearance.
-const TITLE_LINE_PX = 19;
-const TITLE_PAD_PX = 10;
-export const MAX_TITLE_LINES = 2;
-
-export function titleRoomFor(lineCount) {
-  return lineCount > 0 ? TITLE_PAD_PX + lineCount * TITLE_LINE_PX : 0;
-}
-
-// `titleLines` defaults to the worst case for callers that cannot measure it.
-export function marginFor(orientation, titleLines = MAX_TITLE_LINES) {
-  const base = orientation === COLUMNS ? COLUMNS_MARGIN : ROWS_MARGIN;
-  return { ...base, t: base.t + titleRoomFor(titleLines) };
-}
-
-// Gap as a fraction of one panel, not of the plotting area: area-relative gaps
-// left nineteen panels about a pixel wide. 0.22 fits six 150 px profile panels
-// in a ~1140 px modal; stacked panels need less, as vertical space is scarce.
-const COLUMN_GAP = 0.22;
-const ROW_GAP = 0.12;
-// Below this a panel is not worth drawing; the container scrolls instead.
-export const MIN_PANEL_PX = 150;
-export const MIN_PLOT_PX = 320;
-
-// Explicit rather than Plotly's axis-title default (14) so maxCharsFor() can
-// predict rendered width.
-export const LABEL_FONT_PX = 12;
-// Average advance per character for Plotly's default font stack, as a fraction
-// of font size. Deliberately generous: overestimating wraps a word early,
-// underestimating overlaps neighbouring panel titles.
-const CHAR_PX_PER_FONT_PX = 0.58;
-const MAX_LABEL_LINES = 3;
-
-// 0 means unmeasured; callers treat it as "do not wrap".
-export function maxCharsFor(widthPx, fontPx = LABEL_FONT_PX) {
-  if (!widthPx || widthPx <= 0) return 0;
-  return Math.max(8, Math.floor(widthPx / (fontPx * CHAR_PX_PER_FONT_PX)));
-}
-
-// labelFor() writes "long_name ( unit )", and the unit group is both the tail of
-// every label and the part that collides first, so it gets its own line.
-const UNIT_SUFFIX = /\s\(\s[^()]*\s\)$/;
-
-function greedyLines(text, maxChars) {
-  const lines = [];
-  let current = "";
-  text
-    .split(/\s+/)
-    .filter(Boolean)
-    .forEach((word) => {
-      if (!current) {
-        current = word;
-      } else if (`${current} ${word}`.length <= maxChars) {
-        current = `${current} ${word}`;
-      } else {
-        lines.push(current);
-        current = word;
-      }
-    });
-  if (current) lines.push(current);
-  return lines;
-}
-
-function ellipsize(text, maxChars) {
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
-}
-
-// <br> is what Plotly reads and counts when growing a margin. Words are never
-// split; past `maxLines` the name is truncated but the unit line is kept, since
-// a label without its unit reads as a different quantity.
-export function wrapLabel(text, maxChars, maxLines = MAX_LABEL_LINES) {
-  const label = (text || "").trim();
-  if (!maxChars || label.length <= maxChars) return label;
-
-  const match = label.match(UNIT_SUFFIX);
-  const unit = match ? match[0].trim() : "";
-  const name = match ? label.slice(0, match.index).trim() : label;
-
-  const allowed = Math.max(1, maxLines - (unit ? 1 : 0));
-  let lines = greedyLines(name, maxChars);
-  if (!lines.length) lines = [""];
-  if (lines.length > allowed) {
-    const kept = lines.slice(0, allowed - 1);
-    kept.push(ellipsize(lines.slice(allowed - 1).join(" "), maxChars));
-    lines = kept;
-  }
-  return [...lines, ...(unit ? [unit] : [])].join("<br>");
-}
-
-// Against the whole figure width: the title is centred on the figure.
-export function wrapTitleFor(title, widthPx) {
-  return wrapLabel(title, maxCharsFor(widthPx, TITLE_FONT_PX), MAX_TITLE_LINES);
-}
-
-export function titleLinesFor(title, widthPx) {
-  const wrapped = wrapTitleFor(title, widthPx);
-  return wrapped ? wrapped.split("<br>").length : 0;
-}
-
-// Both the domains and the size floors derive from this, so they cannot drift
-// apart.
-export function panelPitch(n, gapRatio) {
-  return n <= 0 ? 0 : n + (n - 1) * gapRatio;
-}
-
-export function domainsFor(n, gapRatio) {
-  if (n <= 0) return [];
-  if (n === 1) return [[0, 1]];
-  const span = 1 / panelPitch(n, gapRatio);
-  const pitch = span * (1 + gapRatio);
-  const domains = Array.from({ length: n }, (_, index) => {
-    const start = index * pitch;
-    // Round to kill float drift, which Plotly reports as an invalid domain when
-    // the last end lands at 1.0000000000000002.
-    return [Number(start.toFixed(6)), Number((start + span).toFixed(6))];
-  });
-  // Plotly wants the full 0..1 covered exactly.
-  domains[0][0] = 0;
-  domains[n - 1][1] = 1;
-  return domains;
-}
-
-// Constant for profiles (one shared depth axis); grows for stacked panels.
-export function plotHeightFor(
-  orientation,
-  panelCount,
-  availableHeight,
-  titleLines = MAX_TITLE_LINES,
-) {
-  const available = Math.max(availableHeight || 0, MIN_PLOT_PX);
-  if (orientation === COLUMNS) return available;
-  const margin = marginFor(orientation, titleLines);
-  const needed =
-    MIN_PANEL_PX * panelPitch(panelCount, ROW_GAP) + margin.t + margin.b;
-  // Whole pixels: a fractional height is a fractional scroll position.
-  return Math.ceil(Math.max(available, needed));
-}
-
-// The floor keeps a 14-column selection legible at the cost of a horizontal
-// scroll.
-export function plotWidthFor(orientation, panelCount, availableWidth) {
-  const available = Math.max(availableWidth || 0, MIN_PLOT_PX);
-  if (orientation !== COLUMNS) return available;
-  const margin = marginFor(orientation);
-  const needed =
-    MIN_PANEL_PX * panelPitch(panelCount, COLUMN_GAP) + margin.l + margin.r;
-  return Math.ceil(Math.max(available, needed));
-}
+// How much of a name a hover row may spend. Long enough for "Practical
+// Salinity", short enough that six rows stay a box rather than a paragraph.
+const HOVER_NAME_CHARS = 22;
 
 const axisKey = (letter, index) =>
   index === 0 ? `${letter}axis` : `${letter}axis${index + 1}`;
 const axisRef = (letter, index) =>
   index === 0 ? letter : `${letter}${index + 1}`;
 
-// Where Plotly would put the axis title, but horizontal; `y` is the centre of
-// the labelled span in paper coordinates.
-const axisLabel = (text, y) => ({
+// The hover's line, on the SHARED axis alone — a second one per panel would be
+// noise. `across` is what makes it span every panel: Plotly draws it between the
+// lowest and highest domain of that axis's counter axes.
+//
+// A fixed grey because the default is the hovered POINT's colour, and with a
+// colour dimension set that tints the line by the ramp value it is pointing at —
+// the line is a guide, not data.
+const SPIKE_COLOR = "#6c757d";
+const sharedAxisSpike = {
+  showspikes: true,
+  spikemode: "across",
+  spikesnap: "hovered data",
+  spikethickness: 1, // Plotly's own default is 3, which reads as a rule
+  spikedash: "dot",
+  spikecolor: SPIKE_COLOR,
+};
+
+const axisTitle = (text) => ({
   text,
-  xref: "paper",
-  x: 0,
-  xanchor: "right",
-  xshift: -TICK_ROOM_PX,
-  yref: "paper",
-  y,
-  yanchor: "middle",
-  showarrow: false,
-  align: "right",
   font: { size: LABEL_FONT_PX },
+  standoff: 6,
 });
 
-// Wraps into the fixed gutter, so it works on first render; four 12px lines fit
-// a MIN_PANEL_PX panel.
-const wrapAxisLabel = (text) =>
-  wrapLabel(text, maxCharsFor(LABEL_GUTTER_PX), 4);
+// The two arrangements, as closed alternatives rather than one boolean asked a
+// dozen times. Each owns the letters its axes take — which is what wires the
+// traces — the gap between panels, and how the hover is gathered.
+const COLUMNS_LAYOUT = {
+  gap: COLUMN_GAP,
+  shared: "y",
+  panel: "x",
+  hovermode: "y unified",
+  // Plotly rotates every hover box by a fixed 60° when hovermode is "y" and
+  // more than one is drawn — YANGLE, and no attribute turns it off. Unified
+  // gathers them into one horizontal box instead.
+  unifiedHover: true,
+  panelTitleSide: "top",
+};
+
+const ROWS_LAYOUT = {
+  gap: ROW_GAP,
+  shared: "x",
+  panel: "y",
+  // Not rotated, so a stack keeps one box per panel.
+  hovermode: "x",
+  unifiedHover: false,
+  panelTitleSide: null,
+};
+
+const ARRANGEMENTS = { [COLUMNS]: COLUMNS_LAYOUT, [ROWS]: ROWS_LAYOUT };
 
 const TITLE_JOIN = " — ";
 const VALUE_JOIN = ", ";
@@ -239,7 +145,108 @@ export function recordTitleFor({ plan, variablesByName, data }) {
     .join(TITLE_JOIN);
 }
 
-// `colors` holds the user's overrides only; `title` is plain text, wrapped here.
+/**
+ * The box the figure is drawn in, and the title that shapes it.
+ *
+ * The order is the whole point of gathering these into one function: the width
+ * does not depend on the title, so it is chosen first; the title's line count
+ * follows from that width; and only then is the height known. Any other order
+ * needs a measurement that does not exist yet.
+ */
+export function plotBoxFor({
+  plan,
+  variablesByName,
+  data,
+  panelCount,
+  availableHeight,
+  measured = {},
+  withTitle = true,
+  orientation = plan.orientation, // the colour plot always stacks
+}) {
+  const title = withTitle
+    ? recordTitleFor({ plan, variablesByName, data })
+    : "";
+  const width = plotWidthFor(
+    orientation,
+    panelCount,
+    boxBudgetFor(measured.width),
+  );
+  const titleLines = titleLinesFor(title, width);
+  const height = plotHeightFor(
+    orientation,
+    panelCount,
+    heightBudgetFor(availableHeight, measured.height),
+    titleLines,
+  );
+  return { title, width, height, titleLines };
+}
+
+// What the figure calls a column, on an axis and in a hover. Shared by both
+// layouts so a rename reads the same in each.
+function labellerFor(variablesByName, labels) {
+  const titleFor = (columnName) => {
+    const custom = labels[columnName] && labels[columnName].trim();
+    const variable = variablesByName.get(columnName);
+    if (!custom) return labelFor(variable);
+    return variable && variable.unit
+      ? `${custom} ( ${variable.unit} )`
+      : custom;
+  };
+
+  // What the hover calls a column: the user's rename, else its long_name. Capped
+  // because a box is open on every panel at once and one 125-character long_name
+  // would stretch it across the figure.
+  const hoverNameFor = (columnName) => {
+    const custom = labels[columnName] && labels[columnName].trim();
+    const name =
+      custom || shortLabelFor(variablesByName.get(columnName)) || columnName;
+    return ellipsize(name, HOVER_NAME_CHARS);
+  };
+  // After the value rather than after the name: "3.21 degree_C" reads as a
+  // measurement, where "TE90_01 ( degree_C ): 3.21" reads as a column heading.
+  const hoverUnitFor = (columnName) => {
+    const variable = variablesByName.get(columnName);
+    return variable && variable.unit ? ` ${variable.unit}` : "";
+  };
+  const hoverLine = (columnName, token) =>
+    `${hoverNameFor(columnName)}: ${token}${hoverUnitFor(columnName)}`;
+
+  return { titleFor, hoverLine };
+}
+
+// title.automargin deliberately unset: it would grow the margin inside a fixed
+// height and silently shrink panels below MIN_PANEL_PX.
+const layoutTitleFor = (wrappedTitle) => ({
+  text: wrappedTitle,
+  font: { size: TITLE_FONT_PX },
+  xref: "container",
+  x: 0.5,
+  xanchor: "center",
+  yref: "container",
+  y: 1,
+  yanchor: "top",
+  pad: { t: TITLE_PAD_PX },
+});
+
+/**
+ * @param plan          from facetPlanFor()
+ * @param variablesByName Map columnName -> variable (previewVariables)
+ * @param panels        resolved column names, one panel each
+ * @param sharedAxis    column name shared by every panel
+ * @param data          array of row objects
+ * @param colors        { [columnName]: '#rrggbb' } — the user's overrides only
+ * @param labels        { [columnName]: customLabel }
+ * @param title         plain text, from recordTitleFor(); wrapped here
+ * @param mode          'markers' | 'lines' | 'markers+lines'
+ * @param colorAxis     column whose values shade EVERY panel, or null
+ * @param colorScale    the user's scale for it, or null for the automatic one
+ * @param sharedTicks   { tickvals, ticktext } for a shared axis whose values are
+ *                      ranks rather than a quantity, or null
+ * @param sharedText    one string per row naming where that row is, or null
+ * @param size          { width, height }
+ * @param uirevision    changes whenever the axis set changes
+ * @param reversedYAxes the columns whose Y axis is drawn downwards
+ */
 export function buildFigure({
   plan,
   variablesByName,
@@ -250,139 +257,476 @@ export function buildFigure({
   labels = {},
   title = "",
   mode = "markers",
+  colorAxis = null,
+  colorScale = null,
+  sharedTicks = null,
+  sharedText = null,
   size = {},
   uirevision,
+  reversedYAxes = new Set(plan.sharedReversed ? [sharedAxis] : []),
 }) {
-  const titleFor = (columnName) => {
-    const custom = labels[columnName] && labels[columnName].trim();
-    const variable = variablesByName.get(columnName);
-    if (!custom) return labelFor(variable);
-    return variable && variable.unit
-      ? `${custom} ( ${variable.unit} )`
-      : custom;
-  };
+  const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
 
-  const isColumns = plan.orientation === COLUMNS;
-  const gap = isColumns ? COLUMN_GAP : ROW_GAP;
-  const domains = domainsFor(panels.length, gap);
+  const arrangement = ARRANGEMENTS[plan.orientation] || ROWS_LAYOUT;
+  const { shared: sharedLetter, panel: panelLetter } = arrangement;
+  const domains = domainsFor(panels.length, arrangement.gap);
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
-  const margin = marginFor(plan.orientation, titleLines);
-  const plottingWidth = size.width
-    ? Math.max(size.width - margin.l - margin.r, 0)
-    : 0;
-  const wrapAt = (text, widthPx) => wrapLabel(text, maxCharsFor(widthPx));
 
-  const annotations = [];
+  // Decided here rather than taken on trust: a column with no numeric value in
+  // it carries no ramp, and Plotly would ignore it in silence.
+  const colorVariable = colorAxis ? variablesByName.get(colorAxis) : undefined;
+  const colorDimension = colorDimensionFor(colorVariable, data);
+  const hasColorBar = Boolean(colorDimension);
+  const colorStops = hasColorBar
+    ? colorScaleForVariable(colorVariable, colorScale)
+    : null;
+  // The ramp's line is drawn by traces of its own — see previewColoredLine.js —
+  // leaving the panel's trace the markers and the hover.
+  const coloredLine = hasColorBar && mode.includes("lines");
+
+  // 0 until the plot area has been measured, and maxCharsFor turns that into
+  // "leave the label alone". The width needs only the side margins, so it is
+  // known before the top margin is.
+  const sideMargin = marginFor(plan.orientation, titleLines);
+  const plottingWidth = size.width
+    ? Math.max(size.width - sideMargin.l - sideMargin.r, 0)
+    : 0;
+  // A panel title wraps across its own panel; on top, its lines are what the
+  // top margin reserves, so they never climb into the figure title.
+  const panelTitles = panels.map((columnName, index) =>
+    panelLetter === "x"
+      ? wrapLabel(
+          titleFor(columnName),
+          maxCharsFor(plottingWidth * (domains[index][1] - domains[index][0])),
+        )
+      : null,
+  );
+  const panelTitleLines = Math.max(
+    1,
+    ...panelTitles.map((text) => (text ? text.split("<br>").length : 1)),
+  );
+  const margin = marginFor(plan.orientation, titleLines, panelTitleLines);
+  const plottingHeight = size.height
+    ? Math.max(size.height - margin.t - margin.b, 0)
+    : 0;
+  // A title wraps against the length of its own axis: across for x, along for y.
+  const wrapAlong = (text, letter, domain, maxLines) =>
+    wrapLabel(
+      text,
+      maxCharsFor(
+        (letter === "y" ? plottingHeight : plottingWidth) *
+          (domain[1] - domain[0]),
+      ),
+      maxLines,
+    );
+  const binLimit = coloredLine
+    ? lineBinLimitFor({
+        panelCount: panels.length,
+        axisPixels: sharedLetter === "y" ? plottingHeight : plottingWidth,
+      })
+    : 0;
+
   const layout = {
     uirevision,
     margin,
-    // Stated rather than inherited, because maxCharsFor's estimate assumes it.
-    font: { size: LABEL_FONT_PX },
+    // Ticks; every label states its own LABEL_FONT_PX.
+    font: { size: TICK_FONT_PX },
+    hoverlabel: { font: { size: HOVER_FONT_PX } },
     showlegend: false, // each panel is titled; a legend would repeat it
-    hovermode: "closest",
+    // One hover for every panel at once, along the axis they share.
+    // `hoversubplots` is what widens it past the panel under the pointer.
+    hovermode: arrangement.hovermode,
+    hoversubplots: "axis",
     dragmode: "zoom",
     modebar: { orientation: "v" },
     ...(size.width ? { width: size.width } : {}),
     ...(size.height ? { height: size.height } : {}),
   };
 
-  if (titleLines) {
-    // title.automargin deliberately unset: it would grow the margin inside a
-    // fixed height and silently shrink panels below MIN_PANEL_PX.
-    layout.title = {
-      text: wrappedTitle,
-      font: { size: TITLE_FONT_PX },
-      xref: "container",
-      x: 0.5,
-      xanchor: "center",
-      yref: "container",
-      y: 1,
-      yanchor: "top",
-      pad: { t: TITLE_PAD_PX },
+  if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
+
+  if (hasColorBar) {
+    // ONE colour axis in the layout, not one mapping per trace: Plotly ranges it
+    // across every trace that references it, so all the panels read against the
+    // one scale by construction.
+    //
+    // The range is stated rather than left to Plotly, because the legend beside
+    // the plot has to paint the same one.
+    layout.coloraxis = {
+      colorscale: colorStops,
+      ...(colorDimension.range
+        ? { cmin: colorDimension.range[0], cmax: colorDimension.range[1] }
+        : {}),
+      showscale: false, // drawn outside the figure — see ColorScaleLegend.jsx
     };
   }
 
   const sharedTitle = titleFor(sharedAxis);
+  // A rank has no quantity to tick at: every label is named by the caller, and
+  // Plotly's own round numbers would be positions nobody sampled.
+  const tickOverride = sharedTicks
+    ? {
+        tickmode: "array",
+        tickvals: sharedTicks.tickvals,
+        ticktext: sharedTicks.ticktext,
+      }
+    : {};
 
-  if (isColumns) {
-    layout.yaxis = {
-      automargin: true,
-      domain: [0, 1],
-      anchor: "x",
-      ...(plan.sharedReversed ? { autorange: "reversed" } : {}),
-    };
-    annotations.push(axisLabel(wrapAxisLabel(sharedTitle), 0.5));
-  } else {
-    layout.xaxis = {
-      automargin: true,
-      domain: [0, 1],
-      anchor: "y",
-      title: {
-        text: wrapAt(sharedTitle, plottingWidth),
-        font: { size: LABEL_FONT_PX },
-        standoff: 6,
-      },
-    };
-  }
+  layout[`${sharedLetter}axis`] = {
+    automargin: true,
+    domain: [0, 1],
+    anchor: panelLetter,
+    ...sharedAxisSpike,
+    ...tickOverride,
+    ...(arrangement.unifiedHover
+      ? {
+          // The unified box's own title. Left alone it is the bare axis value;
+          // this makes it read like the rows underneath it.
+          unifiedhovertitle: {
+            text: hoverLine(sharedAxis, `%{${sharedLetter}}`),
+          },
+        }
+      : {}),
+    ...(sharedLetter === "y" && reversedYAxes.has(sharedAxis)
+      ? { autorange: "reversed" }
+      : {}),
+    title: axisTitle(
+      wrapAlong(sharedTitle, sharedLetter, [0, 1], PINNED_AXIS_LINES), // the pinned strip's fixed room
+    ),
+  };
 
+  const lineTraces = [];
   const traces = panels.map((columnName, index) => {
     const domain = domains[index];
     const panelTitle = titleFor(columnName);
 
-    if (isColumns) {
-      layout[axisKey("x", index)] = {
-        domain,
-        anchor: "y",
-        automargin: true,
-        side: "top",
-        title: {
-          // Wrapped to its own panel's width, not the plot's.
-          text: wrapAt(panelTitle, plottingWidth * (domain[1] - domain[0])),
-          font: { size: LABEL_FONT_PX },
-          standoff: 6,
-        },
-        zeroline: false,
-      };
-    } else {
-      // y domains count up from the bottom, so the first variable is lowest.
-      layout[axisKey("y", index)] = {
-        domain,
-        anchor: "x",
-        automargin: true,
-        zeroline: false,
-      };
-      annotations.push(
-        axisLabel(wrapAxisLabel(panelTitle), (domain[0] + domain[1]) / 2),
-      );
-    }
+    // In a stack, y domains count up from the bottom, so the first variable is
+    // lowest.
+    layout[axisKey(panelLetter, index)] = {
+      domain,
+      anchor: sharedLetter,
+      automargin: true,
+      ...(arrangement.panelTitleSide
+        ? { side: arrangement.panelTitleSide }
+        : {}),
+      // Wrapped to its own panel's width, not the plot's.
+      title: axisTitle(
+        panelTitles[index] ?? wrapAlong(panelTitle, panelLetter, domain),
+      ),
+      zeroline: false,
+      ...(panelLetter === "y" && reversedYAxes.has(columnName)
+        ? { autorange: "reversed" }
+        : {}),
+    };
 
     const sharedValues = (data || []).map((row) => row[sharedAxis]);
     const panelValues = (data || []).map((row) => row[columnName]);
+    // This colour says WHICH variable the panel draws — the colour DIMENSION,
+    // when one is set, takes the markers and the line instead.
     const color =
       colors[columnName] ||
       defaultColorFor(variablesByName.get(columnName), index);
 
+    // The colour column is worth a hover line unless the box already prints it.
+    // A unified box gathers every panel from the SAME data row, so it gets the
+    // line once, on the first panel, and none when any panel draws that column.
+    const colorAlreadyPrinted = arrangement.unifiedHover
+      ? panels.includes(colorAxis)
+      : colorAxis === columnName;
+    const colorInHover =
+      hasColorBar &&
+      colorAxis !== sharedAxis &&
+      !colorAlreadyPrinted &&
+      (!arrangement.unifiedHover || index === 0);
+
+    // Where the row IS, when the shared axis only says which row it is. Carried
+    // as `text` because customdata is spoken for by the colour dimension, and
+    // kept out of a unified box for the same reason as the colour line.
+    const positionInHover =
+      !arrangement.unifiedHover && sharedText && sharedText.length;
+
+    if (coloredLine) {
+      coloredLineBinsFor({
+        sharedValues,
+        panelValues,
+        colorValues: colorDimension.values,
+        range: colorDimension.range,
+        stops: colorStops,
+        binLimit,
+        fallbackColor: color,
+      }).forEach((bin) =>
+        lineTraces.push({
+          type: "scatter",
+          mode: "lines",
+          hoverinfo: "skip", // the panel's own trace answers the hover
+          [panelLetter]: bin.panelValues,
+          [sharedLetter]: bin.sharedValues,
+          [`${panelLetter}axis`]: axisRef(panelLetter, index),
+          [`${sharedLetter}axis`]: sharedLetter,
+          line: { color: bin.color },
+        }),
+      );
+    }
+
     return {
       type: "scatter",
-      mode,
-      // Plain, never the wrapped text: a <br> in a hover box breaks the line
-      // where the panel needed it, not where the sentence does.
+      mode: coloredLine ? "markers" : mode,
+      // Never drawn — <extra></extra> drops the box Plotly keeps it in — but
+      // plain rather than wrapped: a <br> belongs to the panel that needed it.
       name: panelTitle,
-      x: isColumns ? panelValues : sharedValues,
-      y: isColumns ? sharedValues : panelValues,
-      xaxis: isColumns ? axisRef("x", index) : "x",
-      yaxis: isColumns ? "y" : axisRef("y", index),
+      // The letters are the arrangement's: the panel's own axis carries its
+      // values, the shared one carries the axis every panel is drawn against.
+      [panelLetter]: panelValues,
+      [sharedLetter]: sharedValues,
+      [`${panelLetter}axis`]: axisRef(panelLetter, index),
+      [`${sharedLetter}axis`]: sharedLetter,
       hovertemplate:
-        (isColumns
-          ? `${panelTitle}: %{x}<br>${sharedTitle}: %{y}`
-          : `${sharedTitle}: %{x}<br>${panelTitle}: %{y}`) + "<extra></extra>",
-      marker: { color },
+        // One line in a unified box, where the shared axis is in the title
+        // already; two in a box of its own, which has no title.
+        (arrangement.unifiedHover
+          ? hoverLine(columnName, `%{${panelLetter}}`)
+          : positionInHover
+            ? `${hoverLine(sharedAxis, `%{${sharedLetter}:d}`)}<br>%{text}<br>${hoverLine(columnName, `%{${panelLetter}}`)}` // ":d" prints the rank, not the lat/lon tick text %{text} already shows
+            : `${hoverLine(sharedAxis, `%{${sharedLetter}}`)}<br>${hoverLine(columnName, `%{${panelLetter}}`)}`) +
+        (colorInHover ? `<br>${hoverLine(colorAxis, "%{customdata}")}` : "") +
+        "<extra></extra>",
+      marker: hasColorBar
+        ? {
+            color: colorDimension.values,
+            coloraxis: "coloraxis",
+            ...(mode.includes("markers") ? {} : { opacity: 0 }), // kept for the hover
+          }
+        : { color },
       line: { color },
+      ...(positionInHover ? { text: sharedText } : {}),
+      ...(hasColorBar ? { customdata: colorDimension.hoverValues } : {}),
     };
   });
 
-  layout.annotations = annotations;
-  return { data: traces, layout };
+  // The same stops the markers were given and the same range they were mapped
+  // over, so the strip above the plot and the markers cannot disagree about what
+  // a colour means. Null when there is no colour column, which is what decides
+  // whether the strip is rendered at all.
+  const colorLegend = hasColorBar
+    ? {
+        label: titleFor(colorAxis),
+        stops: colorStops,
+        ticks: legendTicksFor(colorDimension),
+      }
+    : null;
+  // First, so every panel's markers draw over its line.
+  return { data: [...lineTraces, ...traces], layout, colorLegend };
+}
+
+export const COLORBAR_THICKNESS_PX = 12;
+export const COLORBAR_PAD_PX = 10;
+// The grid's cells along an axis not measured yet.
+const UNMEASURED_CELLS = 200;
+const cellsAlong = (pixels) =>
+  pixels > 0 ? Math.max(2, Math.floor(pixels / MIN_STEP_PX)) : UNMEASURED_CELLS;
+
+/**
+ * The colour plot: every panel draws the same Y against the same X, one panel
+ * per colour variable, each filled by its own variable through its own
+ * colourbar — a heatmap, so the colour between samples is blended. The bar
+ * spans exactly its panel's domain, which is what ties a scale to its graph.
+ *
+ * Takes buildFigure's inputs, except that `panels` are the colour variables,
+ * `xAxis`/`yAxis` replace `sharedAxis`, and there is no plot type. Always
+ * stacked: the bars sit inside the figure, and only a stack is guaranteed never
+ * to scroll them out of view.
+ *
+ * @param scales { [columnName]: scaleName } — the user's overrides only
+ * @param yReversed draw Y downwards; by default when Y is a depth or a pressure
+ */
+export function buildColorFigure({
+  variablesByName,
+  panels,
+  xAxis,
+  yAxis,
+  data,
+  labels = {},
+  scales = {},
+  title = "",
+  sharedTicks = null,
+  sharedText = null,
+  size = {},
+  uirevision,
+  yReversed = isDownwardVertical(variablesByName.get(yAxis)),
+}) {
+  const { titleFor, hoverLine } = labellerFor(variablesByName, labels);
+  const domains = domainsFor(panels.length, ROW_GAP);
+
+  const wrappedTitle = wrapTitleFor(title, size.width);
+  const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
+  const baseMargin = marginFor(ROWS, titleLines);
+  const margin = { ...baseMargin, r: baseMargin.r + COLORBAR_ROOM_PX };
+  const plottingWidth = size.width
+    ? Math.max(size.width - margin.l - margin.r, 0)
+    : 0;
+  const plottingHeight = size.height
+    ? Math.max(size.height - margin.t - margin.b, 0)
+    : 0;
+  const wrapAlong = (text, pixels, maxLines) =>
+    wrapLabel(text, maxCharsFor(pixels), maxLines);
+  const xIsTime = isTimeLike(variablesByName.get(xAxis));
+  const yIsTime = isTimeLike(variablesByName.get(yAxis));
+
+  const layout = {
+    uirevision,
+    margin,
+    font: { size: TICK_FONT_PX },
+    hoverlabel: { font: { size: HOVER_FONT_PX } },
+    showlegend: false,
+    // Panels share X and Y but not their rows' colours: the point under the
+    // pointer is the only one worth a box.
+    hovermode: "closest",
+    dragmode: "zoom",
+    modebar: { orientation: "v" },
+    ...(size.width ? { width: size.width } : {}),
+    ...(size.height ? { height: size.height } : {}),
+  };
+  if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
+
+  layout.xaxis = {
+    automargin: true,
+    domain: [0, 1],
+    anchor: "y",
+    ...(sharedTicks
+      ? {
+          tickmode: "array",
+          tickvals: sharedTicks.tickvals,
+          ticktext: sharedTicks.ticktext,
+        }
+      : {}),
+    title: axisTitle(
+      wrapAlong(titleFor(xAxis), plottingWidth, PINNED_AXIS_LINES), // the pinned strip's fixed room
+    ),
+  };
+
+  const yTitle = titleFor(yAxis);
+  const xValues = (data || []).map((row) => row[xAxis]);
+  const yValues = (data || []).map((row) => row[yAxis]);
+
+  const traces = panels.map((columnName, index) => {
+    const domain = domains[index];
+    const variable = variablesByName.get(columnName);
+    const dimension = colorDimensionFor(variable, data);
+    const stops = colorScaleForVariable(variable, scales[columnName]);
+    const colorAxisName = index === 0 ? "coloraxis" : `coloraxis${index + 1}`;
+    const fallbackColor = defaultColorFor(variable, index);
+
+    layout[axisKey("y", index)] = {
+      domain,
+      anchor: "x",
+      automargin: true,
+      zeroline: false,
+      ...(index > 0 ? { matches: "y" } : {}), // one zoom for every panel
+      ...(yReversed ? { autorange: "reversed" } : {}),
+      title: axisTitle(
+        wrapAlong(yTitle, plottingHeight * (domain[1] - domain[0])),
+      ),
+    };
+
+    if (dimension) {
+      layout[colorAxisName] = {
+        colorscale: stops,
+        ...(dimension.range
+          ? { cmin: dimension.range[0], cmax: dimension.range[1] }
+          : {}),
+        colorbar: {
+          x: 1,
+          xanchor: "left",
+          xpad: COLORBAR_PAD_PX,
+          y: (domain[0] + domain[1]) / 2,
+          yanchor: "middle",
+          len: domain[1] - domain[0],
+          lenmode: "fraction",
+          thickness: COLORBAR_THICKNESS_PX,
+          tickfont: { size: TICK_FONT_PX },
+          ...(dimension.ticks || {}),
+          title: {
+            // Along its own bar, like the panel's Y title: unwrapped, a long
+            // name runs past the bar into its neighbours'.
+            text: wrapAlong(
+              titleFor(columnName),
+              plottingHeight * (domain[1] - domain[0]),
+            ),
+            side: "right",
+            font: { size: LABEL_FONT_PX },
+          },
+        },
+      };
+    }
+
+    const grid =
+      dimension &&
+      colorGridFor({
+        xValues,
+        yValues,
+        zValues: dimension.values,
+        xIsTime,
+        yIsTime,
+        maxColumns: cellsAlong(plottingWidth),
+        maxRows: cellsAlong(plottingHeight * (domain[1] - domain[0])),
+      });
+    if (grid) {
+      // A time's cell holds epoch milliseconds; the hover reads its date.
+      const timeColor = isTimeLike(variable);
+      return {
+        type: "heatmap",
+        name: titleFor(columnName),
+        x: grid.x,
+        y: grid.y,
+        z: grid.z,
+        xaxis: "x",
+        yaxis: axisRef("y", index),
+        coloraxis: colorAxisName,
+        zsmooth: "best",
+        connectgaps: false, // where nothing was sampled stays blank
+        hovertemplate: `${hoverLine(xAxis, "%{x}")}<br>${hoverLine(yAxis, "%{y}")}<br>${hoverLine(columnName, timeColor ? "%{text}" : "%{z}")}<extra></extra>`,
+        ...(timeColor
+          ? {
+              text: grid.z.map((row) =>
+                row.map((value) =>
+                  value === null ? "" : new Date(value).toISOString(),
+                ),
+              ),
+            }
+          : {}),
+      };
+    }
+
+    // Nothing to blend across — a single cast, or no colour at all: one marker
+    // per row, and a row with no colour is a gap, not a grey point.
+    const panelY = dimension
+      ? yValues.map((value, row) =>
+          dimension.values[row] === null ? null : value,
+        )
+      : yValues;
+    const positionLine = sharedText
+      ? `${hoverLine(xAxis, "%{x:d}")}<br>%{text}` // ":d" prints the rank
+      : hoverLine(xAxis, "%{x}");
+    return {
+      type: "scatter",
+      mode: "markers",
+      name: titleFor(columnName),
+      x: xValues,
+      y: panelY,
+      xaxis: "x",
+      yaxis: axisRef("y", index),
+      hovertemplate: `${positionLine}<br>${hoverLine(yAxis, "%{y}")}<br>${hoverLine(columnName, "%{customdata}")}<extra></extra>`,
+      marker: dimension
+        ? { color: dimension.values, coloraxis: colorAxisName }
+        : { color: fallbackColor },
+      customdata: dimension
+        ? dimension.hoverValues
+        : (data || []).map((row) => row[columnName]),
+      ...(sharedText ? { text: sharedText } : {}),
+    };
+  });
+
+  return { data: traces, layout, colorLegend: null };
 }

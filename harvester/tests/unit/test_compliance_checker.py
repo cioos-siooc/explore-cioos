@@ -1,5 +1,7 @@
 """Unit tests for cde_harvester.sources.erddap.compliance."""
 
+import logging
+from unittest.mock import MagicMock
 
 from cde_harvester.core.errors import (
     DEPTH_AND_ALTITUDE,
@@ -14,7 +16,9 @@ from conftest import (
     ERDDAP_INFO_DEPTH_AND_ALTITUDE_CSV,
     ERDDAP_INFO_INGEST_FALSE_CSV,
     ERDDAP_INFO_NO_EOVS_CSV,
+    build_info_df,
     build_mock_dataset,
+    build_variables_df,
 )
 
 
@@ -79,6 +83,106 @@ class TestRequiredVariables:
     def test_all_required_present_passes(self):
         checker = _checker()
         assert checker.check_required_variables() is True
+
+
+# Modeled on salishsea.eos.ubc.ca ubcSSg3DPhysicsFields1hV21-11: indexed by
+# gridY/gridX, its 2-D latitude/longitude live in a separate dataset.
+CURVILINEAR_GRID_CSV = """\
+Row Type,Variable Name,Attribute Name,Data Type,Value
+attribute,NC_GLOBAL,cdm_data_type,,Grid
+{globals}dimension,time,,double,"nValues=10, evenlySpaced=true, averageSpacing=1h 0m 0s"
+attribute,time,actual_range,,"1.1676114E9, 1.7926254E9"
+attribute,time,standard_name,,time
+dimension,gridY,,short,"nValues=898, evenlySpaced=true, averageSpacing=1.0"
+attribute,gridY,actual_range,,"0, 897"
+dimension,gridX,,short,"nValues=398, evenlySpaced=true, averageSpacing=1.0"
+attribute,gridX,actual_range,,"0, 397"
+variable,temperature,,float,"time, gridY, gridX"
+attribute,temperature,standard_name,,sea_water_temperature
+"""
+
+ACDD_BOUNDS = """\
+attribute,NC_GLOBAL,geospatial_lat_min,double,46.86
+attribute,NC_GLOBAL,geospatial_lat_max,double,51.11
+attribute,NC_GLOBAL,geospatial_lon_min,double,-126.40
+attribute,NC_GLOBAL,geospatial_lon_max,double,-121.32
+"""
+
+# Modeled on ubcSSnBathymetryV21-08: 2-D latitude/longitude data variables,
+# which ERDDAP gives no actual_range.
+COORDINATE_GRID_CSV = """\
+Row Type,Variable Name,Attribute Name,Data Type,Value
+attribute,NC_GLOBAL,cdm_data_type,,Grid
+dimension,gridY,,int,"nValues=898, evenlySpaced=true, averageSpacing=1.0"
+dimension,gridX,,short,"nValues=398, evenlySpaced=true, averageSpacing=1.0"
+variable,bathymetry,,double,"gridY, gridX"
+attribute,bathymetry,standard_name,,sea_floor_depth
+variable,latitude,,double,"gridY, gridX"
+attribute,latitude,standard_name,,latitude
+variable,longitude,,double,"gridY, gridX"
+attribute,longitude,standard_name,,longitude
+"""
+
+
+def _grid_checker(info_csv):
+    # build_mock_dataset assumes a tabledap with cf_role variables.
+    dataset = MagicMock()
+    dataset.cdm_data_type = "Grid"
+    dataset.logger = logging.getLogger("test.grid_compliance")
+    dataset.df_variables = build_variables_df(info_csv)
+    dataset.variables_list = dataset.df_variables["name"].tolist()
+    info = build_info_df(info_csv)
+    dataset.globals = (
+        info.query('`Variable Name`=="NC_GLOBAL"')
+        .set_index("Attribute Name")["Value"]
+        .to_dict()
+    )
+    return CDEComplianceChecker(dataset)
+
+
+class TestGridExtent:
+    def test_regular_grid_axes_pass(self):
+        checker = _grid_checker(
+            CURVILINEAR_GRID_CSV.format(globals="")
+            .replace("gridY", "latitude")
+            .replace("gridX", "longitude")
+        )
+        assert checker.check_required_variables() is True
+
+    def test_curvilinear_grid_with_acdd_bounds_passes(self):
+        checker = _grid_checker(CURVILINEAR_GRID_CSV.format(globals=ACDD_BOUNDS))
+        assert checker.check_required_variables() is True
+
+    def test_curvilinear_grid_without_bounds_fails_with_guidance(self):
+        checker = _grid_checker(CURVILINEAR_GRID_CSV.format(globals=""))
+        assert checker.check_required_variables() is False
+        assert checker.failure_reason_code == MISSING_REQUIRED_VARS
+        assert "geospatial_lat_min" in checker.failure_details
+        assert "geospatial_lon_max" in checker.failure_details
+
+    def test_2d_coordinate_variables_without_range_fail(self):
+        checker = _grid_checker(COORDINATE_GRID_CSV)
+        assert checker.check_required_variables() is False
+        assert checker.failure_reason_code == MISSING_REQUIRED_VARS
+
+    def test_non_numeric_bound_fails(self):
+        checker = _grid_checker(
+            CURVILINEAR_GRID_CSV.format(
+                globals=ACDD_BOUNDS.replace("-121.32", "east")
+            )
+        )
+        assert checker.check_required_variables() is False
+        assert checker.failure_details.startswith("No longitude extent")
+
+    def test_tabledap_type_ignores_acdd_bounds(self):
+        checker = _checker()
+        checker.dataset.variables_list = ["time", "temperature"]
+        checker.dataset.globals = {
+            "geospatial_lat_min": "48", "geospatial_lat_max": "51",
+            "geospatial_lon_min": "-126", "geospatial_lon_max": "-121",
+        }
+        assert checker.check_required_variables() is False
+        assert checker.failure_reason_code == MISSING_REQUIRED_VARS
 
 
 class TestSupportedCFName:
