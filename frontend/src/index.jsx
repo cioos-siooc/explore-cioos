@@ -67,7 +67,6 @@ i18n
   .use(LanguageDetector)
   .init({
     resources,
-    showSupportNotice: false,
     supportedLngs: ["en", "fr"],
     lng: urlLanguage || undefined,
     fallbackLng: ["en", "fr"],

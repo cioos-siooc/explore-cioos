@@ -97,14 +97,16 @@ CREATE TABLE datasets (
     wms_url text,
     -- lat clamped to +-85.06 (3857 pole blowup); lon_min > lon_max means
     -- antimeridian-crossing -> split into a two-envelope MultiPolygon.
+    -- ST_Envelope turns a single-point grid's zero-area box into a Point
+    -- (a Line when only one axis is degenerate) so the map can draw it.
     coverage_bbox geometry(Geometry,3857) GENERATED ALWAYS AS (
       CASE
         WHEN coverage_lon_min IS NULL OR coverage_lon_max IS NULL
           OR coverage_lat_min IS NULL OR coverage_lat_max IS NULL THEN NULL
         WHEN coverage_lon_min <= coverage_lon_max THEN
-          ST_Transform(ST_SetSRID(ST_MakeEnvelope(
+          ST_Transform(ST_SetSRID(ST_Envelope(ST_MakeEnvelope(
             coverage_lon_min, LEAST(GREATEST(coverage_lat_min, -85.06), 85.06),
-            coverage_lon_max, LEAST(GREATEST(coverage_lat_max, -85.06), 85.06)),
+            coverage_lon_max, LEAST(GREATEST(coverage_lat_max, -85.06), 85.06))),
             4326), 3857)
         ELSE
           ST_Transform(ST_SetSRID(ST_Collect(

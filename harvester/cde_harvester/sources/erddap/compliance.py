@@ -5,6 +5,7 @@ from cde_harvester.core.errors import (
     NO_SUPPORTED_VARIABLES,
 )
 from cde_harvester.core.harvest_warnings import NON_CF_STANDARD_NAMES
+from cde_harvester.dataset_types.tabledap_features import _axis_bounds_from_metadata
 from cde_harvester.utils import (
     eov_standard_name,
     intersection,
@@ -28,16 +29,6 @@ class CDEComplianceChecker:
     def check_required_variables(self):
         # Depth/altitude defaults to 0 when absent.
         # https://coastwatch.pfeg.noaa.gov/erddap/download/setupDatasetsXml.html#LLAT
-        # Static grids (no time axis) are valid metadata-only datasets.
-        if self.dataset.cdm_data_type == "Grid":
-            required_variables = ["latitude", "longitude"]
-        else:
-            required_variables = ["time", "latitude", "longitude"]
-
-        missing_required_vars = [
-            x for x in required_variables if x not in self.dataset.variables_list
-        ]
-
         if not self.dataset.variables_list:
             self.failed_error(
                 "The dataset's ERDDAP info page lists no variables (empty or "
@@ -45,6 +36,13 @@ class CDEComplianceChecker:
                 MISSING_REQUIRED_VARS,
             )
             return False
+        if self.dataset.cdm_data_type == "Grid":
+            return self._check_grid_extent()
+
+        required_variables = ["time", "latitude", "longitude"]
+        missing_required_vars = [
+            x for x in required_variables if x not in self.dataset.variables_list
+        ]
         if missing_required_vars:
             self.failed_error(
                 f"No variable with destinationName {', '.join(missing_required_vars)}: "
@@ -52,6 +50,28 @@ class CDEComplianceChecker:
                 "on the map and in time. Rename the matching variable in "
                 "datasets.xml (ERDDAP's LLAT convention) if it exists under "
                 "another name",
+                MISSING_REQUIRED_VARS,
+            )
+            return False
+        return True
+
+    def _check_grid_extent(self):
+        # Static grids (no time axis) are valid metadata-only datasets.
+        # Curvilinear grids index by gridY/gridX and can't serve their 2-D
+        # lat/lon beside the data, so ACDD bounds stand in for an axis range.
+        missing = [
+            axis
+            for axis in ("latitude", "longitude")
+            if _axis_bounds_from_metadata(self.dataset, axis) is None
+        ]
+        if missing:
+            self.failed_error(
+                f"No {' or '.join(missing)} extent: the grid has no "
+                f"{'/'.join(missing)} axis with an actual_range. Add the ACDD "
+                "global attributes geospatial_lat_min, geospatial_lat_max, "
+                "geospatial_lon_min and geospatial_lon_max (e.g. for a "
+                "curvilinear grid whose 2-D latitude/longitude are published "
+                "in a separate dataset)",
                 MISSING_REQUIRED_VARS,
             )
             return False

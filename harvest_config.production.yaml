@@ -12,7 +12,8 @@ erddap_urls:
   - https://cnodc-cndoc.azure.cloud-nuage.dfo-mpo.gc.ca/erddap/
   - https://salishsea.eos.ubc.ca/erddap
 
-# set to true to test with caching. Turn to False for production.
+# cache ERDDAP data responses for 12h on the harvester_cache volume (useful on
+# dev, where redeploys interrupt harvests)
 # defaults to false
 cache: False
 
