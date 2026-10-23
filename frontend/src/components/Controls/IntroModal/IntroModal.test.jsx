@@ -75,10 +75,10 @@ describe("IntroModal", () => {
     );
   });
 
-  it("Start exploring closes the dialog", async () => {
+  it("Go to the map closes the dialog", async () => {
     const setShowModal = vi.fn();
     const { user } = renderIntro({ setShowModal });
-    await user.click(screen.getByRole("button", { name: "Start exploring" }));
+    await user.click(screen.getByRole("button", { name: "Go to the map" }));
     expect(setShowModal).toHaveBeenCalledWith(false);
   });
 
@@ -128,10 +128,12 @@ describe("IntroModal", () => {
     expect(screen.getByTestId("selection-help")).toHaveTextContent("open");
   });
 
-  it("Take a quick tour closes the dialog and starts the tour at the first tip", async () => {
+  it("Start the walkthrough closes the dialog and starts the tour at the first tip", async () => {
     const setShowModal = vi.fn();
     const { user } = renderIntro({ setShowModal });
-    await user.click(screen.getByRole("button", { name: "Take a quick tour" }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the walkthrough" }),
+    );
     expect(setShowModal).toHaveBeenCalledWith(false);
     expect(screen.getByTestId("tip-card")).toHaveTextContent(/Tip 1 of \d+/);
   });
@@ -146,11 +148,11 @@ describe("IntroModal", () => {
     ).toBeInTheDocument();
   });
 
-  it("the feedback card has a labelled Send feedback button", () => {
+  it("the whole feedback card is the feedback button", () => {
     renderIntro();
-    expect(
-      screen.getByRole("button", { name: "Send feedback" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Feedback/ })).toHaveClass(
+      "introFooterCard",
+    );
   });
 
   it("names both data sources, ERDDAP™ and OBIS", () => {
@@ -160,11 +162,11 @@ describe("IntroModal", () => {
     );
   });
 
-  it("the tips switch persists the choice", async () => {
+  it("clicking anywhere on the tips card toggles tips and persists the choice", async () => {
     const { user } = renderIntro();
-    const toggle = screen.getByRole("switch", { name: /Show tips/ });
+    const toggle = screen.getByRole("switch", { name: "Tips as you go" });
     expect(toggle).toBeChecked();
-    await user.click(toggle);
+    await user.click(screen.getByText(/Short tips pop up/));
     expect(toggle).not.toBeChecked();
     expect(window.localStorage.getItem("cde.tipsEnabled")).toBe("false");
   });
