@@ -1,11 +1,14 @@
 /* One scroll container: .modal-content (capped) -> .modal-body (flex, clips) ->
  * .tableAndPlot (scrolls). Done locally, not via Modal `scrollable`, because
- * ui/modalStyles.css is shared; min-height: 0 lets the flex children shrink. */
+ * ui/modalStyles.css is shared; min-height: 0 lets the flex children shrink.
+ * Only the table view scrolls here: the plot view fills it exactly, leaving its
+ * parameters and plot panes as the scrollers (DatasetPreviewPlot/styles.css). */
 .dataPreviewModal .modal-content {
   overflow: hidden;
 
   /* A definite height, not max-height: the plot sizes from this container, so a
-   * content-sized modal would grow in visible steps (plot -> modal -> budget). */
+   * content-sized modal would grow in visible steps (plot -> modal -> budget).
+   * Definite all the way down, so the plot's pane row can use it as a % basis. */
   height: calc(100vh - 2 * var(--cioos-space-lg, 16px));
 }
 
@@ -74,25 +77,23 @@
   margin: 10px auto;
 }
 
-.tableAndPlotGridItem .dropdown {
-  display: inline;
-  margin-right: 10px;
-}
-
-.tableAndPlotGridItem .dropdown button {
+.tableAndPlotGridItem .dropdown .btn:hover {
   background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
 }
 
 .tableAndPlotGridItem hr {
   margin-top: 0;
 }
 
+/* Copy-link button: an icon-only square at the toggle buttons' height. */
 .tableAndPlotGridContainer .copyLinkButton {
+  width: 42px;
   height: 42px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
+  justify-content: center;
+  padding: 0;
   background-color: white;
   border-radius: 5px;
   border: 2px solid var(--cioos-hairline);
@@ -105,10 +106,26 @@
   background-color: var(--cioos-teal-light);
 }
 
-/* Without a floor the container is at its minimum when Plotly measures it. */
+/* Without a floor the container is at its minimum when Plotly measures it.
+   Reserves the panes' box so the modal does not jump when the chunk lands. */
 .datasetPreviewPlotLoading {
   display: grid;
-  min-height: 420px;
+  height: 100%;
+  min-height: 320px;
+}
+
+/* Why a record refused to plot, in the plot's place. The columns it did find are
+   half the message — that is what says whether the fix is in the link or in the
+   dataset's own metadata — so they get their own muted line. */
+.datasetPreviewPlotBlocked {
+  max-width: 70ch;
+  padding: 24px 8px;
+}
+
+.datasetPreviewPlotBlockedColumns {
+  color: var(--cioos-text-muted, #666);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
 }
 
 .datasetPreviewPlotLoading .cioosSkeleton {
@@ -122,7 +139,8 @@
   padding: 12px;
 }
 
-.dataPreviewModal .datasetPreviewPeriod {
+.dataPreviewModal .datasetPreviewPeriod,
+.dataPreviewModal .datasetPreviewSample {
   display: block;
   margin-top: 4px;
   font-size: 0.8em;

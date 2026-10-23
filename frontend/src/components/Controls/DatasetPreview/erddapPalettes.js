@@ -2,7 +2,8 @@
 // (/erddap/download/*.cpt, /erddap/images/*.cpt), so the mapping lives here.
 // These ten cover ~95% of declared usage in the OGSL catalogue; the rest fall
 // through to the index palette in previewColors.js. KT_* are cmocean.
-// Whole ramps are kept though only one stop is used: they cannot be re-derived.
+// Whole ramps, read two ways: previewColorScales.js draws them for the colour
+// dimension, and paletteColorFor() projects one to a single stop per variable.
 
 // Five-stop approximations in Plotly's [position, css-colour] form.
 const PALETTES = {

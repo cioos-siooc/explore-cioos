@@ -31,13 +31,22 @@ import { useMapState, useViewportBounds } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
+  COLOR_LAYOUT,
+  LAYOUT_PARAM,
   PERIOD_PARAM,
   RECORD_PARAM,
+  STEP_PARAM,
   TAB_PARAM,
   parsePeriod,
   withoutPreviewParams,
 } from "./previewParams.js";
 import { useViewportDatasetPks } from "./viewportDatasetPks.js";
+import {
+  PREVIEW_ERROR,
+  networkPreviewError,
+  previewErrorFrom,
+} from "../../components/Controls/DatasetPreview/previewErrors.js";
+import { hasColorPlotFor } from "../../components/Controls/DatasetPreview/previewFacetPlan.js";
 
 const SelectionContext = createContext();
 
@@ -169,6 +178,10 @@ export default function SelectionProvider({ children }) {
     Boolean(initialParams.get(RECORD_PARAM)),
   );
   const [datasetPreview, setDatasetPreview] = useState();
+  // Why the last /preview came back with nothing, or undefined when it did not.
+  // Set and cleared in the same tick as datasetPreview, so the modal can never
+  // hold one record's rows beside another's excuse.
+  const [previewError, setPreviewError] = useState();
   const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
     () => initialParams.get("search") || "",
   );
@@ -415,6 +428,10 @@ export default function SelectionProvider({ children }) {
           if (!recordId) return withoutPreviewParams(previous);
           const next = new URLSearchParams(previous);
           next.set(RECORD_PARAM, recordId);
+          // A profile id belongs to the record it came from: carrying one to
+          // the next station names a cast that station never took, and
+          // /preview answers NO_DATA for it.
+          next.delete(STEP_PARAM);
           if (period) next.set(PERIOD_PARAM, `${period.start}~${period.end}`);
           else next.delete(PERIOD_PARAM);
           return next;
@@ -694,40 +711,71 @@ export default function SelectionProvider({ children }) {
   // A record left with no dataset is cleaned up by setInspectDataset, not here,
   // or a cold shared link would lose its record before its dataset loads.
   const inspectDatasetId = inspectDataset?.dataset_id;
+  // Which profile INSIDE the record is drawn, and whether the colour plot wants
+  // every profile in the window instead. Read here rather than in
+  // usePreviewPlotParams: they change what is fetched, not how the rows are
+  // drawn, so they ride this fetch instead of a second one — one request, one
+  // previewError, one recordLoading.
+  const inspectAllProfiles =
+    searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT &&
+    hasColorPlotFor(inspectDataset);
+  const inspectRecordStep = inspectAllProfiles
+    ? undefined
+    : searchParams.get(STEP_PARAM) || undefined;
 
   useEffect(() => {
     if (!inspectDatasetId || !inspectRecordID) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
     setRecordLoading(true);
-    const previewUrl = `${server}/preview?dataset=${encodeURIComponent(
-      inspectDatasetId,
-    )}&profile=${encodeURIComponent(inspectRecordID)}${
-      inspectRecordPeriod
+    const previewUrl =
+      `${server}/preview?dataset=${encodeURIComponent(inspectDatasetId)}` +
+      `&profile=${encodeURIComponent(inspectRecordID)}` +
+      (inspectRecordStep
+        ? `&at=${encodeURIComponent(inspectRecordStep)}`
+        : "") +
+      (inspectAllProfiles ? "&allProfiles=true" : "") +
+      (inspectRecordPeriod
         ? `&timeMin=${inspectRecordPeriod.start}T00:00:00Z&timeMax=${inspectRecordPeriod.end}T23:59:59Z`
-        : ""
-    }`;
+        : "");
     fetch(previewUrl)
       .then((response) => {
-        if (response.ok) return response.json();
-        // 404 RECORD_NOT_FOUND/NO_DATA is an expected empty record; 5xx is an
-        // outage worth reporting.
-        if (response.status >= 500) {
-          reportError(
-            `preview upstream failure (${response.status})`,
-            new Error(previewUrl),
-          );
+        if (response.ok) {
+          return response.json().then((preview) => ({ preview }));
         }
-        return undefined;
-      })
-      .then((preview) => {
-        setDatasetPreview(preview);
-        setRecordLoading(false);
+        // /preview says WHY it refused — four codes — and the modal has a
+        // sentence for each. The body is read here rather than discarded: a
+        // failure with no reason is the one thing the modal cannot explain.
+        // Anything that is not JSON (a proxy's HTML 502) reads as no body,
+        // which previewErrorFrom answers from the status alone.
+        return response
+          .json()
+          .catch(() => null)
+          .then((body) => ({
+            previewError: previewErrorFrom(response.status, body),
+          }));
       })
       .catch((error) => {
         reportError("preview fetch failed", error);
+        return { previewError: networkPreviewError() };
+      })
+      .then(({ preview, previewError: failure }) => {
+        // Cleared together, always: a failure that left the previous record's
+        // rows in state showed them under the new record's title.
+        setDatasetPreview(preview);
+        setPreviewError(failure);
         setRecordLoading(false);
+        if (failure && failure.code === PREVIEW_ERROR.ERDDAP_UNAVAILABLE) {
+          // An outage is worth reporting; an empty or unknown record is not.
+          reportError("preview upstream failure", new Error(previewUrl));
+        }
       });
-  }, [inspectRecordID, inspectDatasetId, inspectRecordPeriod]);
+  }, [
+    inspectRecordID,
+    inspectDatasetId,
+    inspectRecordStep,
+    inspectAllProfiles,
+    inspectRecordPeriod,
+  ]);
 
   const value = {
     polygon,
@@ -764,6 +812,7 @@ export default function SelectionProvider({ children }) {
     // so ORing it would leave an empty modal open forever if the link's
     // dataset never resolves.
     showPreviewModal: Boolean(inspectDataset && inspectRecordID),
+    previewError,
     recordLoading,
     setRecordLoading,
     datasetPreview,

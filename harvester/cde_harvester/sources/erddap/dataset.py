@@ -72,6 +72,7 @@ class Dataset:
         # Why extract_features() came back empty, for the NO_PROFILES_FOUND attempt.
         self.no_features_reason = None
         self.cdm_data_type = ""
+        self.cdm_altitude_proxy = None
         self.globals = {}
         self.platform = "unknown"
         self.df_variables = None
@@ -115,6 +116,7 @@ class Dataset:
                 "erddap_url": [self.erddap_url],
                 "dataset_id": [self.id],
                 "cdm_data_type": [self.cdm_data_type],
+                "cdm_altitude_proxy": [self.cdm_altitude_proxy],
                 "platform": [self.platform],
                 "platform_category": [platform_category(self.platform)],
                 "eovs": [self.eovs],
@@ -410,6 +412,7 @@ class Dataset:
         self.cdm_data_type = globals_dict.get(
             "cdm_data_type", "Grid" if self.data_structure == "grid" else ""
         )
+        self.cdm_altitude_proxy = globals_dict.get("cdm_altitude_proxy") or None  # not fillna's ""
         self.globals = globals_dict
 
         if "standard_name" not in df_variables:

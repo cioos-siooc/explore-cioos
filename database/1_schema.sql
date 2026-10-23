@@ -127,6 +127,7 @@ CREATE TABLE datasets (
     -- license, ...), normalized and merged CKAN > OBIS > ERDDAP by
     -- harvester/cde_harvester/core/record_metadata.py. NULL until re-harvested.
     metadata jsonb,
+    cdm_altitude_proxy text, -- ERDDAP NC_GLOBAL: the column standing in for depth (e.g. PRES)
     UNIQUE(dataset_id, erddap_url)
 );
 
