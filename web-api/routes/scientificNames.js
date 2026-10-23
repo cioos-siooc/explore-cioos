@@ -54,8 +54,8 @@ const RANK_ORDER_SQL = `ARRAY[${RANK_ORDER.map((r) => `'${r}'`).join(", ")}]`;
  *     summary: Typeahead lookup of OBIS scientific names with vernacular subtitles
  *     tags: [ScientificNames]
  *     description: |
- *       Returns OBIS scientific names matched by either a scientific-name prefix or a
- *       vernacular (common) name substring. Vernacular matches come first, nested
+ *       Returns OBIS scientific names matched by a scientific-name word prefix
+ *       (genus or epithet) or a vernacular (common) name substring. Vernacular matches come first, nested
  *       under their highest vernacular-matched ancestor. Each result includes the locale-appropriate
  *       vernacular when WoRMS has one cached locally. Pass `names=A,B,C` (without `q`) to
  *       hydrate vernaculars for an exact list of scientific names — used by the frontend
@@ -64,7 +64,7 @@ const RANK_ORDER_SQL = `ARRAY[${RANK_ORDER.map((r) => `'${r}'`).join(", ")}]`;
  *       - in: query
  *         name: q
  *         schema: { type: string }
- *         description: Match against scientific name (prefix) or vernacular name (substring), case-insensitive.
+ *         description: Match against the start of any scientific-name word or a vernacular-name substring, case-insensitive.
  *       - in: query
  *         name: lang
  *         schema: { type: string, enum: [en, fr] }
@@ -159,6 +159,7 @@ router.get(
             ON v.scientific_name = n.scientific_name
          WHERE :q = ''
             OR n.scientific_name ILIKE :prefix
+            OR n.scientific_name ILIKE :wordPrefix
             OR EXISTS (
                  SELECT 1 FROM unnest(v.${vernCol}) AS vn
                   WHERE vn ILIKE :sub
@@ -207,6 +208,8 @@ router.get(
     const { rows } = await db.raw(sql, {
       q,
       prefix: `${q}%`,
+      // "scombrus" finds Scomber scombrus without the genus.
+      wordPrefix: `% ${q}%`,
       sub: `%${q}%`,
       limit,
       cap: MAX_EXPANDED_APHIA_IDS,

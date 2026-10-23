@@ -40,6 +40,15 @@ test("q searches by scientific-name prefix or vernacular substring", async () =>
   assert.equal(res.body[0].scientificName, "Orcinus orca");
 });
 
+test("q matches the start of any scientific-name word, not just the genus", async () => {
+  db.queueRaw([]);
+
+  await agent.get("/scientificNames").query({ q: "scombrus" });
+
+  assert.match(db.queries[0], /scientific_name ILIKE 'scombrus%'/);
+  assert.match(db.queries[0], /scientific_name ILIKE '% scombrus%'/);
+});
+
 test("q flags each result tooBroad against the rolldown cap", async () => {
   db.queueRaw([]);
 
