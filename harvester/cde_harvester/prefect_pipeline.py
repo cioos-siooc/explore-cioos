@@ -651,19 +651,28 @@ def cde_harvest_all_run(
     config_file: str = "/app/harvester/harvest_config.yaml",
     triggered_by: str | None = None,
     force: bool = False,
+    sources: list[str] | None = None,
 ):
     """Scheduled fan-out: trigger one independent per-source harvest job per configured source
     (see _plan_lanes for the order), wait for all, and fail red if any did not complete
-    (a failure doesn't cancel the others)."""
+    (a failure doesn't cancel the others). `sources` narrows it to those configured sources."""
     logger = _run_logger()
 
     config_file = resolve_harvest_config_file(config_file)
     config = load_config(config_file)
 
     obis = resolve_obis_config(config)
-    sources = _configured_sources(
+    configured = _configured_sources(
         config.get("erddap_urls") or [], obis.dataset_ids, obis.discovery
     )
+    if sources is None:
+        sources = configured
+    else:
+        wanted = {deployment_slug(s) for s in sources}
+        unknown = wanted - {deployment_slug(s) for s in configured}
+        if unknown:
+            logger.warning("Ignoring source(s) no longer configured: %s", sorted(unknown))
+        sources = [s for s in configured if deployment_slug(s) in wanted]
     if not sources:
         raise ValueError(
             "No sources configured to harvest (erddap_urls / obis_discovery / "
