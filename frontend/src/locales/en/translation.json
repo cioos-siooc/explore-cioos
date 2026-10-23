@@ -655,6 +655,7 @@
   "harvest.warning.PROFILE_COUNT_UNAVAILABLE": "Profile count unavailable",
   "harvest.warning.TRACKS_UNAVAILABLE": "Tracks unavailable",
   "harvest.warning.TRAJECTORY_DATA_INCOMPLETE": "Trajectory data incomplete",
+  "harvest.warning.TRAJECTORY_ID_PER_SEGMENT": "Trajectory ID changes per segment",
   "harvest.warnings.title": "Warnings",
   "harvest.warnings.items": "Affected items ({{count}})",
   "harvest.warnings.more": "+{{count}} more",

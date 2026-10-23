@@ -23,8 +23,10 @@ from cde_harvester.core.day_sets import bucket_index_to_day, day_bucket_group
 from cde_harvester.core.errors import ResponseTooLargeError
 from cde_harvester.core.harvest_warnings import (
     DEPTH_RANGE_UNAVAILABLE,
+    MAX_ITEMS,
     PROFILE_COUNT_UNAVAILABLE,
     TRAJECTORY_DATA_INCOMPLETE,
+    TRAJECTORY_ID_PER_SEGMENT,
 )
 from cde_harvester.sources.erddap.client import ERDDAP
 
@@ -452,6 +454,25 @@ def extract_track_points(dataset, per_profile=False):
     return points
 
 
+def _warn_if_per_segment_ids(dataset, days, traj_var):
+    """More ids than days, most within a single day: the cf_role points at a
+    per-dive/profile counter (C-PROOF gliders on cioosatlantic use
+    profile_id), so one deployment is split into hundreds of trajectories."""
+    n_traj = days["trajectory_id"].nunique()
+    n_days = days["day"].nunique()
+    median_days = days.groupby("trajectory_id").size().median()
+    if n_traj > n_days and median_days <= 1:
+        first_ids = days.sort_values("day", kind="stable")["trajectory_id"].unique()
+        dataset.warnings.add(
+            TRAJECTORY_ID_PER_SEGMENT,
+            f"cf_role=trajectory_id variable '{traj_var}' gives {n_traj} "
+            f"trajectories over {n_days} days (median {median_days:g} day "
+            "each); likely a per-dive/profile id, not a deployment id",
+            items=list(first_ids[:MAX_ITEMS]),
+            count=n_traj,
+        )
+
+
 def extract_day_stats(dataset, count_profiles=False):
     """Deliberately position-free: the database joins track points by day."""
     log = dataset.logger
@@ -576,6 +597,8 @@ def extract_day_stats(dataset, count_profiles=False):
     days["dataset_id"] = dataset.id
     days["erddap_url"] = dataset.erddap_url
     days = days.dropna(subset=["day"])
+    if traj_var:
+        _warn_if_per_segment_ids(dataset, days, traj_var)
 
     log.info(
         "Extracted %d trajectory days across %d trajectories for %s",

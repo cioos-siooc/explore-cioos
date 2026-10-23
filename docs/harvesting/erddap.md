@@ -230,7 +230,9 @@ dropped from both the drawn line and the sweep, when it crosses more than
 180° of longitude, when its time gap exceeds both 48 h and 4× the
 trajectory's median fix interval, or when it is longer than 50 km with less
 than 96 h between fixes. A dataset without a `cf_role=trajectory_id` is
-treated as one trajectory.
+treated as one trajectory. One whose `cf_role=trajectory_id` has more values than days
+covered, most within a single day (a per-dive counter, as on the C-PROOF
+gliders), is kept as published but flagged `TRAJECTORY_ID_PER_SEGMENT`.
 
 **Fallback** for servers without `orderBy` interval grouping, or when the
 server-side query returns nothing: only the id/lat/lon/time(/depth) columns

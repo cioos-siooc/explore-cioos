@@ -137,6 +137,7 @@ describes the data still stored.
 | `PROFILE_COUNT_UNAVAILABLE` | Trajectory per-day profile count failed; days kept without it |
 | `TRACKS_UNAVAILABLE` | Track-point extraction failed; coverage kept, no track drawn |
 | `TRAJECTORY_DATA_INCOMPLETE` | Chunked trajectory download skipped a time window after an HTTP error |
+| `TRAJECTORY_ID_PER_SEGMENT` | More `cf_role=trajectory_id` values than days covered, most within one day: likely a per-dive/profile id splitting one deployment; first 20 ids listed |
 
 ## Change detection and freshness
 
