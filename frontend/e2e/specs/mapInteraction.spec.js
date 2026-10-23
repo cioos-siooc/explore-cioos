@@ -171,6 +171,25 @@ test.describe("pointing at the map", () => {
     await page.mouse.click(x, y);
     await expect(openCard(page)).toHaveCount(0);
   });
+
+  test("clicking the sea labels its depth on the map, close in or zoomed out", async ({
+    page,
+  }) => {
+    // Halifax approaches; the depth is e2e/fixtures/api/depth.json's.
+    await openAt(page, { lon: -63.55, lat: 44.62 }, "", 12);
+    const { x, y } = await canvasCentre(page);
+    await page.mouse.click(x, y);
+    const probe = page.getByTestId("depth-probe");
+    await expect(probe).toContainText("26.4 m");
+    await expect(probe).toContainText("CHS NONNA · 10 m grid");
+    await expect(page.locator(".depthProbeDot")).toBeVisible();
+
+    // Past NONNA's reach the API answers from ETOPO; the label still comes.
+    await openAt(page, EMPTY);
+    const centre = await canvasCentre(page);
+    await page.mouse.click(centre.x, centre.y);
+    await expect(probe).toBeVisible();
+  });
 });
 
 test.describe("pointing at markers and tracks", () => {

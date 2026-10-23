@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   CircleFill,
   CursorFill,
+  ExclamationTriangle,
   Grid3x3Gap,
   HexagonFill,
   Palette,
@@ -61,7 +62,8 @@ export const LEGEND_HELP_SECTIONS = {
     Icon: Water,
     items: [
       ["source", Water],
-      ["reading", Rulers],
+      ["reading", CursorFill],
+      ["navigation", ExclamationTriangle],
     ],
   },
   layers: {

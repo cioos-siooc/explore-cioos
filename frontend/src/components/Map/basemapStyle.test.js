@@ -6,6 +6,7 @@ import {
   LABEL_LAYER_IDS,
   FIRST_LABEL_LAYER_ID,
 } from "./basemapStyle.js";
+import { bathymetryColorScale } from "../config.js";
 
 describe("getLabelTextField", () => {
   it("prefers the localized name, falling back to the tile's default", () => {
@@ -24,8 +25,8 @@ describe("buildBasemapStyle", () => {
     expect(Object.keys(style.sources).sort()).toEqual([
       "bathymetry",
       "imagery",
+      "nonna",
       "nonna10",
-      "nonna100",
       "ofm",
     ]);
     const layerIds = style.layers.map((layer) => layer.id);
@@ -69,5 +70,51 @@ describe("buildBasemapStyle", () => {
     expect(bEndVal).toBe(0);
     expect(iStartVal).toBe(0);
     expect(iEndVal).toBe(1);
+  });
+
+  it("colours NONNA from the merged DEM and shades only NONNA 10 once the 100 m grid is upscaled", () => {
+    const style = buildBasemapStyle("en");
+    ["nonna", "nonna10"].forEach((id) =>
+      expect(style.sources[id]).toMatchObject({
+        type: "raster-dem",
+        encoding: "terrarium",
+      }),
+    );
+    const layer = (id) => style.layers.find((l) => l.id === id);
+    expect(layer("bathymetry-nonna")).toMatchObject({
+      type: "color-relief",
+      source: "nonna",
+    });
+    const coarse = layer("bathymetry-nonna-hillshade");
+    const fine = layer("bathymetry-nonna-10-hillshade");
+    expect(coarse).toMatchObject({ type: "hillshade", source: "nonna" });
+    expect(fine).toMatchObject({ type: "hillshade", source: "nonna10" });
+    // One hands straight to the other.
+    expect(fine.minzoom).toBe(coarse.maxzoom);
+    expect(style.sources.nonna10.minzoom).toBe(fine.minzoom);
+  });
+
+  it("draws pixels without a sounding transparent and the rest on the legend's ramp", () => {
+    const relief = buildBasemapStyle("en").layers.find(
+      (layer) => layer.id === "bathymetry-nonna",
+    );
+    // ["interpolate", ["linear"], ["elevation"], e0, c0, e1, c1, ...]
+    const stops = relief.paint["color-relief-color"].slice(3);
+    const elevations = stops.filter((_, i) => i % 2 === 0);
+    const colors = stops.filter((_, i) => i % 2 === 1);
+
+    // A transparent Terrarium pixel decodes to -32768.
+    expect([elevations[0], colors[0]]).toEqual([-32768, "rgba(0, 0, 0, 0)"]);
+    expect(elevations).toEqual([...elevations].sort((a, b) => a - b));
+    const deepest = bathymetryColorScale.at(-1);
+    const shallowest = bathymetryColorScale[0];
+    expect(colors[1]).toBe(deepest.color);
+    expect(elevations.slice(2)).toEqual(
+      [...bathymetryColorScale].reverse().map(({ depth }) => -depth),
+    );
+    expect([elevations.at(-1), colors.at(-1)]).toEqual([
+      -shallowest.depth,
+      shallowest.color,
+    ]);
   });
 });

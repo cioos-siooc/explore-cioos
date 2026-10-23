@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Map as MaplibreMap, Marker, Popup, setWorkerUrl } from "maplibre-gl";
+import { createRoot } from "react-dom/client";
 import "maplibre-gl/dist/maplibre-gl.css";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
@@ -54,6 +55,7 @@ import {
 } from "../config";
 import platforms from "../../platforms.json";
 import { platformColor } from "../../platformVocab.js";
+import DepthProbe from "./DepthProbe.jsx";
 import {
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
@@ -327,7 +329,7 @@ const BASEMAP_SOURCE_IDS = ["bathymetry", "imagery", "ofm"];
 const WATCHED_MAP_LAYERS = [
   { id: "observations", sources: HEX_SOURCE_IDS },
   { id: "tracks", sources: ["tracks", "selected-track"] },
-  { id: "bathymetry", sources: ["bathymetry", "nonna100", "nonna10"] },
+  { id: "bathymetry", sources: ["bathymetry", "nonna", "nonna10"] },
   { id: "imagery", sources: ["imagery"] },
   { id: "griddap", sources: ["griddap-coverage"] },
   { id: "wmsOverlay", sources: ["wms-overlay"] },
@@ -392,7 +394,11 @@ const griddapLayerIds = [
 ];
 // Basemap, not data: owned by their own switch and left out of the WMS
 // overlay's hide.
-const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
+const bathymetryLayerIds = [
+  "bathymetry-nonna",
+  "bathymetry-nonna-hillshade",
+  "bathymetry-nonna-10-hillshade",
+];
 
 const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -437,6 +443,10 @@ export default function CreateMap({
   onMarkerClick = () => {},
   // One track and nothing else under the cursor. See handleMapClick.
   onTrackClick = () => {},
+  // Every click while the depth layer is on, whatever else it hits.
+  onDepthQuery = () => {},
+  // Its answer, labelled at the clicked point.
+  depthReading,
   rangeLevels,
   coverageRangeLevels,
   // undefined when there is nothing to measure and the global tier takes over.
@@ -781,6 +791,43 @@ export default function CreateMap({
         offset: 10,
         maxWidth: "260px",
       }),
+  );
+
+  // A dot under the label, so the depth reads as that exact spot's. The label
+  // is its own React root: MapLibre owns the popup's DOM.
+  const [depthProbe] = useState(() => {
+    const dot = document.createElement("span");
+    dot.className = "depthProbeDot";
+    const content = document.createElement("div");
+    return {
+      marker: new Marker({ element: dot }),
+      label: new Popup({
+        closeButton: false,
+        closeOnClick: false,
+        className: "depthProbePopup",
+        anchor: "bottom",
+        offset: 12,
+        maxWidth: "260px",
+      }).setDOMContent(content),
+      root: createRoot(content),
+    };
+  });
+
+  useEffect(() => {
+    if (!map.current || !depthReading || !bathymetryVisible) {
+      depthProbe.marker.remove();
+      depthProbe.label.remove();
+      return;
+    }
+    depthProbe.root.render(<DepthProbe reading={depthReading} />);
+    depthProbe.marker.setLngLat(depthReading.lngLat).addTo(map.current);
+    depthProbe.label.setLngLat(depthReading.lngLat).addTo(map.current);
+  }, [depthProbe, depthReading, bathymetryVisible]);
+
+  // Deferred: unmounting a root while React is committing this one warns.
+  useEffect(
+    () => () => setTimeout(() => depthProbe.root.unmount()),
+    [depthProbe],
   );
 
   const colors = [
@@ -1691,6 +1738,7 @@ export default function CreateMap({
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
   const onMarkerClickRef = useRef(onMarkerClick);
   const onTrackClickRef = useRef(onTrackClick);
+  const onDepthQueryRef = useRef(onDepthQuery);
 
   // Written after commit so a render React throws away never leaks into them;
   // layout effects run before every effect and map event that reads them.
@@ -1703,6 +1751,7 @@ export default function CreateMap({
     onFeatureQueryRef.current = onFeatureQuery;
     onMarkerClickRef.current = onMarkerClick;
     onTrackClickRef.current = onTrackClick;
+    onDepthQueryRef.current = onDepthQuery;
   });
 
   // /tiles and /tiles/cells split the zoom range for the same selection and
@@ -2937,6 +2986,10 @@ export default function CreateMap({
         return;
       }
       if (draw.getMode().includes("draw")) return;
+
+      // At every zoom: past NONNA's reach the API answers from ETOPO.
+      if (bathymetryVisibleRef.current)
+        onDepthQueryRef.current(e.lngLat.wrap());
 
       // Outside the drawn shape is out of the selection.
       const ring = selectionRing.current;

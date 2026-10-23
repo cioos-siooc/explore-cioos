@@ -28,6 +28,8 @@ export default function MapContainer() {
     featureQueryRequest,
     mapInstance,
     setMapInstance,
+    readDepthAt,
+    depthReading,
     featureQuery,
     setFeatureQuery,
     sharedFeatureQueryAt,
@@ -126,6 +128,8 @@ export default function MapContainer() {
         sharedFeatureQueryAt={sharedFeatureQueryAt}
         onMarkerClick={onMarkerClick}
         onTrackClick={selectTrajectoryFromMap}
+        onDepthQuery={readDepthAt}
+        depthReading={depthReading}
         setHoveredDataset={setHoveredDataset}
         hoveredDataset={hoveredDataset}
         inspectDataset={inspectDataset}

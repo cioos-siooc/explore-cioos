@@ -169,6 +169,8 @@ export default function Legend({
   controls = {},
   layerControls = [],
   dataLayers,
+  // The NONNA sounding under the latest click, marked on the depth bar.
+  depthReading,
 }) {
   const { t } = useTranslation();
   const [legendOpen, setLegendOpen] = useState(true);
@@ -390,13 +392,23 @@ export default function Legend({
           `${color} ${(depthPosition(depth) * 100).toFixed(1)}%`,
       )
       .join(", ")})`;
+    const depth = hidden ? undefined : depthReading?.depth;
     return (
       <div className={classNames({ legendDimmed: hidden })}>
         <div
           className="legendColorBar"
           style={{ background: gradient }}
           aria-hidden="true"
-        />
+        >
+          {depth > 0 && (
+            <span
+              className="legendDepthMarker"
+              style={{
+                left: `${depthPosition(Math.min(Math.max(depth, bathymetryScaleMin), bathymetryScaleMax)) * 100}%`,
+              }}
+            />
+          )}
+        </div>
         <div className="legendColorBarTicks">
           {bathymetryTicks.map((metres, i) => {
             const align =
