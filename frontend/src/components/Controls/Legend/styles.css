@@ -274,9 +274,23 @@
 }
 
 .legendColorBar {
+  position: relative;
   height: var(--legend-bar);
   border-radius: 3px;
   border: 1px solid var(--cioos-hairline);
+}
+
+/* Spans the bar's full height, with a dark core and light edges so it reads
+   over both the near-black deep end and the red shallows. */
+.legendDepthMarker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--cioos-ink);
+  box-shadow: 0 0 0 1px var(--cioos-white);
+  border-radius: 1px;
 }
 
 .legendColorBarTicks {

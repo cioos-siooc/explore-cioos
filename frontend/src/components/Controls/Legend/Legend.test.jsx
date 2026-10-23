@@ -91,6 +91,43 @@ describe("Legend", () => {
     expect(screen.getByText("Depth (m)")).toBeInTheDocument();
   });
 
+  it("marks the clicked depth on the depth ramp", () => {
+    renderLegend({ zoom: 12, depthReading: { depth: 26.4, resolution: 10 } });
+    expect(document.querySelector(".legendDepthMarker")).toBeInTheDocument();
+  });
+
+  it("marks nothing where CHS has no sounding, or the bottom dries", () => {
+    const { rerender } = renderLegend({
+      zoom: 12,
+      depthReading: { depth: null, resolution: null },
+    });
+    expect(document.querySelector(".legendDepthMarker")).toBeNull();
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        depthReading={{ depth: -1.5, resolution: 100 }}
+      />,
+    );
+    expect(document.querySelector(".legendDepthMarker")).toBeNull();
+  });
+
+  it("drops the depth mark while the depth layer is switched off", () => {
+    renderLegend({
+      zoom: 12,
+      depthReading: { depth: 26.4, resolution: 10 },
+      controls: {
+        bathymetry: {
+          key: "bathymetry",
+          label: "Seafloor depth",
+          checked: false,
+          onChange: () => {},
+        },
+      },
+    });
+    expect(document.querySelector(".legendDepthMarker")).toBeNull();
+  });
+
   it("renders layer switches with no key on the map under their own group", () => {
     const onChange = vi.fn();
     renderLegend({
@@ -99,6 +136,15 @@ describe("Legend", () => {
       ],
     });
     expect(screen.getByLabelText("Gridded coverage")).toBeInTheDocument();
+  });
+
+  it("says in the seafloor info that NONNA is not for navigation", async () => {
+    const { user } = renderLegend({ zoom: 12 });
+    await user.click(screen.getByLabelText("About Seafloor depth"));
+    const help = await screen.findByTestId("legend-help-modal");
+    expect(help).toHaveTextContent("Not for navigation");
+    expect(help).toHaveTextContent("official CHS nautical charts");
+    expect(help).toHaveTextContent("below chart datum");
   });
 
   it("explains the metric from the info button on the group label", async () => {

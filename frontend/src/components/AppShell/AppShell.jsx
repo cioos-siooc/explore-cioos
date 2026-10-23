@@ -78,6 +78,7 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
+    depthReading,
     tracksMode,
     toggleTrackLines,
     dataLayers,
@@ -145,6 +146,7 @@ export default function AppShell() {
         controls={legendControls}
         layerControls={layerControls}
         dataLayers={dataLayers}
+        depthReading={depthReading}
         startDate={startDate}
         endDate={endDate}
         timeFilterActive={timeFilterActive}
