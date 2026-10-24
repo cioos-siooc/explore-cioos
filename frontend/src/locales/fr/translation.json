@@ -961,6 +961,8 @@
   "filterOptionExcludeAction": "Exclure",
   "filterOptionExcludeTitle": "Exclure : retirer les jeux de données qui y correspondent",
   "filterOptionUnexcludeTitle": "Ne plus exclure",
+  "filterLegendSelect": "Sélectionner",
+  "filterLegendExclude": "Exclure",
   "filterMatchAll": "toutes",
   "filterMatchAllLabel": "Contient toutes les sélections",
   "oceanVariableFilterTooltip": "Variables océaniques essentielles du GOOS, déterminées à partir du nom standard CF de chaque variable.",

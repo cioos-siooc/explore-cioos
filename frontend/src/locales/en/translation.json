@@ -960,6 +960,8 @@
   "filterOptionExcludeAction": "Exclude",
   "filterOptionExcludeTitle": "Exclude: leave out datasets that match this",
   "filterOptionUnexcludeTitle": "Stop excluding this",
+  "filterLegendSelect": "Select",
+  "filterLegendExclude": "Exclude",
   "filterMatchAll": "all",
   "filterMatchAllLabel": "Includes all selected",
   "oceanVariableFilterTooltip": "GOOS Essential Ocean Variables, matched from each variable's CF standard name.",

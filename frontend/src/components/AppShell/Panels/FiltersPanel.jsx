@@ -54,6 +54,7 @@ import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { OptionStateLegend } from "../../Controls/Filter/MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
 const isSet = (option) => option.isSelected || option.isExcluded;
@@ -141,7 +142,7 @@ export default function FiltersPanel({ searchInputRef }) {
   // Rows picked from the empty search stay listed, so several values can be
   // picked in a row and a removed one picked again; Clear all drops them.
   const [searchTouched, setSearchTouched] = useState(() => new Set());
-  const [, resetAll] = useResetAllFilters();
+  const [canReset, resetAll] = useResetAllFilters();
   const {
     ready: countsReady,
     updating: countsUpdating,
@@ -329,6 +330,7 @@ export default function FiltersPanel({ searchInputRef }) {
               icon={<Stack />}
               controlled
               filterName={dataLayersFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === dataLayersFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={resetDataLayers}
@@ -349,6 +351,7 @@ export default function FiltersPanel({ searchInputRef }) {
               setSearchTerms={setEovsSearchTerms}
               searchPlaceholder={t("oceanVariableFilterSeachPlaceholder")}
               filterName={eovsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === eovsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
@@ -387,6 +390,7 @@ export default function FiltersPanel({ searchInputRef }) {
               setSearchTerms={setPlatformsSearchTerms}
               searchPlaceholder={t("platformsFilterSeachPlaceholder")}
               filterName={platformsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === platformsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
@@ -427,6 +431,7 @@ export default function FiltersPanel({ searchInputRef }) {
               setSearchTerms={setOrgsSearchTerms}
               searchPlaceholder={t("organizationFilterSearchPlaceholder")}
               filterName={orgsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === orgsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
@@ -462,6 +467,7 @@ export default function FiltersPanel({ searchInputRef }) {
               setSearchTerms={setDatasetSearchTerms}
               searchPlaceholder={t("datasetSearchPlaceholder")}
               filterName={datasetsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === datasetsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
@@ -498,6 +504,7 @@ export default function FiltersPanel({ searchInputRef }) {
               setSearchTerms={setSourcesSearchTerms}
               searchPlaceholder={t("sourceFilterSearchPlaceholder")}
               filterName={sourcesFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === sourcesFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() => {
@@ -651,6 +658,7 @@ export default function FiltersPanel({ searchInputRef }) {
                 setSearchTerms={setScientificNameSearchTerms}
                 searchPlaceholder={t("scientificNameFilterSearchPlaceholder")}
                 filterName={scientificNamesFilterTranslationKey}
+                legend={<OptionStateLegend />}
                 openFilter={openFilter === scientificNamesFilterTranslationKey}
                 tipTarget="speciesName"
                 infoButton="https://www.marinespecies.org/"
@@ -704,9 +712,11 @@ export default function FiltersPanel({ searchInputRef }) {
             <Spinner size="xs" className="countSpinner" />
           )}
         </span>
+        {/* Hidden rather than removed, so the footer keeps its height. */}
         <button
           type="button"
           className="filtersPanelReset"
+          style={canReset ? undefined : { visibility: "hidden" }}
           onClick={() => {
             resetAll();
             setSearchTouched(new Set());

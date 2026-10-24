@@ -530,10 +530,13 @@ describe("FilterSearch", () => {
   });
 
   it("shows the examples again once Clear all empties the list", async () => {
-    const { user, seen } = await renderPalette("/?eovs=oxygen");
+    const { user, seen } = await renderPalette(
+      "/?eovs=oxygen&realtimeOnly=true",
+    );
     await waitFor(() => expect(seen.oxygen?.isSelected).toBe(true));
-    await user.click(options()[0]);
-    expect(options()).toHaveLength(1);
+    await user.click(option("Oxygen"));
+    expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
+    expect(options()).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "Clear all" }));
 

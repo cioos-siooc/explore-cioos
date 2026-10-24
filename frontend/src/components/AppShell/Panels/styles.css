@@ -63,11 +63,10 @@
   font-weight: 700;
   color: var(--cioos-primary-700);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast);
-}
-
-.filtersPanelReset:hover {
-  background-color: var(--cioos-teal-light);
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
 }
 
 .filtersPanelReset:focus-visible {
@@ -154,10 +153,56 @@
   padding: 4px 8px 0;
 }
 
+/* Held at the button's height, so Clear coming and going moves nothing. */
+.filtersPanel .filterOptionsHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  margin: 0 0 6px;
+}
+
+/* The footer's Clear all, smaller: a secondary action for this page only. */
+.filtersPanel .filterOptionsReset {
+  flex: 0 0 auto;
+  height: 28px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+/* Coral only as it is about to clear, as the quick filters' Reset does. */
+.filtersPanel .filterOptionsReset:hover,
+.filtersPanelReset:hover {
+  border-color: var(--cioos-error);
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-error-700);
+}
+
+.filtersPanel .filterOptionsReset:active,
+.filtersPanelReset:active {
+  border-color: var(--cioos-error);
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+.filtersPanel .filterOptionsReset:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
 /* On a phone the modal's own title names the page (see FiltersModal). */
 .filtersPanel .filterOptionsTitle {
-  flex: 0 0 auto;
-  margin: 0 0 6px;
+  margin: 0;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-md);
   font-weight: 600;
@@ -194,6 +239,39 @@
   margin-top: 4px;
   padding-top: 12px;
   border-top: 1px solid var(--cioos-hairline);
+}
+
+.filtersPanel .filterOptionsLegend {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  padding: 8px 8px 0;
+  border-top: 1px solid var(--cioos-hairline);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-80);
+}
+
+.filtersPanel .optionLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The rows' resting colours, so each reads as the control it names. */
+.filtersPanel .optionLegendItem svg {
+  color: var(--cioos-ink-60);
+}
+
+.filtersPanel .optionLegendItem + .optionLegendItem svg {
+  color: var(--cioos-ink-40);
+}
+
+/* One band: the legend's rule already separates it from the options. */
+.filtersPanel .filterOptionsLegend + .filterOptionsActions {
+  margin-top: 0;
+  border-top: 0;
 }
 
 .filtersPanel .filterOptionsActions {
