@@ -1,13 +1,25 @@
 .spatialFilterOptions {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
-.spatialFilterPlaces {
-  margin-top: 10px;
-  padding-top: 10px;
+.spatialFilterOptions > section + section {
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--cioos-hairline);
+}
+
+/* The Filters list's group heading (WHAT, FROM…), so the two columns speak
+   the same structure. */
+.spatialFilterSectionTitle {
+  margin: 0 0 8px;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: var(--cioos-ink-60);
 }
 
 .spatialFilterPlacesLabel {
@@ -16,6 +28,10 @@
   gap: 6px;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-80);
+}
+
+.spatialFilterPlacesLabel .spatialFilterSectionTitle {
+  margin: 0;
 }
 
 .spatialFilterPlacesLabel .filterSearch {
@@ -111,7 +127,7 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 10px;
-  margin: 0 0 10px;
+  margin: 8px 0 0;
 }
 
 .spatialFilterPlaceAppliedName {
@@ -131,12 +147,6 @@
   margin: 6px 0 0;
   font-size: var(--cioos-font-size-xs);
   color: var(--cioos-ink-80);
-}
-
-.spatialFilterDetails {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--cioos-hairline);
 }
 
 .spatialFilterBounds {

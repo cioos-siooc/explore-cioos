@@ -63,11 +63,10 @@
   font-weight: 700;
   color: var(--cioos-primary-700);
   cursor: pointer;
-  transition: background-color var(--cioos-transition-fast);
-}
-
-.filtersPanelReset:hover {
-  background-color: var(--cioos-teal-light);
+  transition:
+    background-color var(--cioos-transition-fast),
+    border-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast);
 }
 
 .filtersPanelReset:focus-visible {
@@ -141,7 +140,7 @@
    reachable and nothing pushes the modal sideways. */
 .filtersPanel .filterOptions {
   position: absolute;
-  inset: 12px 12px 12px 296px;
+  inset: 12px 12px 0 296px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -151,15 +150,77 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
-  padding: 4px 8px 12px;
+  padding: 4px 8px 0;
+}
+
+/* Held at the button's height, so Clear coming and going moves nothing. */
+.filtersPanel .filterOptionsHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  margin: 0 0 6px;
+}
+
+/* The footer's Clear all, smaller: a secondary action for this page only. */
+.filtersPanel .filterOptionsReset {
+  flex: 0 0 auto;
+  height: 28px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+  background: var(--cioos-white);
+  font: inherit;
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+/* Coral only as it is about to clear, as the quick filters' Reset does. */
+.filtersPanel .filterOptionsReset:hover,
+.filtersPanelReset:hover {
+  border-color: var(--cioos-error);
+  background-color: var(--cioos-error-bg);
+  color: var(--cioos-error-700);
+}
+
+.filtersPanel .filterOptionsReset:active,
+.filtersPanelReset:active {
+  border-color: var(--cioos-error);
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+.filtersPanel .filterOptionsReset:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+/* On a phone the modal's own title names the page (see FiltersModal). */
+.filtersPanel .filterOptionsTitle {
+  margin: 0;
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-md);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cioos-navy);
 }
 
 .filtersPanel .filterOptionsCaption {
   flex: 0 0 auto;
+  margin: 0 0 12px;
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.45;
+}
+
+.filtersPanel .filterOptionsControls {
+  flex: 0 0 auto;
   margin: 0 0 8px;
-  color: var(--cioos-ink-80);
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.35;
 }
 
 .filtersPanel .filterOptionsBody {
@@ -170,6 +231,47 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden auto;
+}
+
+/* Every page reads header (description, search, switches), options, actions;
+   hairlines between the bands, as between the list's groups on the left. */
+.filtersPanel .filterOptionsBody:not(:first-child) {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+.filtersPanel .filterOptionsLegend {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  padding: 8px 8px 0;
+  border-top: 1px solid var(--cioos-hairline);
+  font-size: var(--cioos-font-size-sm);
+  color: var(--cioos-ink-80);
+}
+
+.filtersPanel .optionLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The rows' resting colours, so each reads as the control it names. */
+.filtersPanel .optionLegendItem svg {
+  color: var(--cioos-ink-60);
+}
+
+.filtersPanel .optionLegendItem + .optionLegendItem svg {
+  color: var(--cioos-ink-40);
+}
+
+/* One band: the legend's rule already separates it from the options. */
+.filtersPanel .filterOptionsLegend + .filterOptionsActions {
+  margin-top: 0;
+  border-top: 0;
 }
 
 .filtersPanel .filterOptionsActions {
@@ -351,6 +453,10 @@
 
 /* Mobile: filters master and detail become two screens. */
 @media (max-width: 700px), (max-height: 500px) {
+  .filtersPanel .filterOptionsTitle {
+    display: none;
+  }
+
   /* The download panel scrolls as one column here — see the note in
      DownloadDetails/styles.css. */
   .downloadPanel {
@@ -373,7 +479,7 @@
      options break by growing after the scroll is computed. */
   .filtersPanel .filterOptions {
     inset: 0;
-    padding: 6px 10px 8px;
+    padding: 6px 10px 0;
   }
 
   /* The search page sits above the list (see FilterSearch/styles.css). */
