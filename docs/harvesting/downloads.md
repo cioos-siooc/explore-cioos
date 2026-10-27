@@ -38,7 +38,8 @@ map uses, plus:
 | `datasetPKs` | The datasets ticked in the panel |
 | `polygon` | The drawn polygon as GeoJSON, only when **Filter by polygon** is on |
 | time / depth | Reset to the full range when their download switch is off |
-| `format` | `csv` (default), `parquet`, `odv` or `nccf` |
+| `format` | `csv` (default), `parquet`, `odv`, `nccf` or `dwca` (Darwin Core Archive, OBIS only) |
+| `obisValues` | `curated` (default): OBIS's curated Darwin Core values; `submitted`: the provider's, as sent to OBIS |
 | `lang` | `en` or `fr`: the language of the README and the email order |
 
 The email travels in the JSON body, never the URL, so it stays out of access
@@ -107,8 +108,27 @@ harvested before that column existed fall back to the dataset's ERDDAP info page
 ### OBIS
 
 OBIS datasets are read from the OBIS open-data parquet export with DuckDB,
-bounded by the box, then filtered on depth, time and the polygon. OBIS has no
-ODV or CF rendition, so those formats fall back to CSV and the README says so.
+bounded by the box, then filtered on depth, time and the polygon. Each
+occurrence keeps its Darwin Core fields under their Darwin Core names, from the
+export's `interpreted` struct (curated by OBIS, plus OBIS's own fields such as
+`aphiaid` and its quality `flags`) or its `source` struct (as the provider
+submitted them), per `obisValues`. Fields empty across the whole dataset are
+left out. Its ExtendedMeasurementOrFact and DNADerivedData records go in their
+own tables, keyed by the occurrence `id`:
+
+| Format | OBIS files |
+| --- | --- |
+| CSV, Parquet | `<folder>.csv`, plus `<folder>_extendedmeasurementorfact.csv` and `<folder>_dnaderiveddata.csv` when the dataset has any |
+| Darwin Core Archive | `<folder>.dwca.zip`: `occurrence.txt` (core), the extension `.txt` files, `meta.xml` and the dataset's `eml.xml`; only columns with a Darwin Core or extension term |
+
+OBIS has no ODV or CF rendition and ERDDAP no Darwin Core one, so those fall
+back to CSV and the README says so. The README also links the provider's whole
+source archive (the `archive` of the OBIS dataset record).
+
+Occurrences without coordinates are left out; the README says so. It also
+dates the version OBIS harvested (the record's `published`), and flags it when
+the provider's `eml.xml`, fetched live from their IPT, is a newer version: the
+EML and the source archive then describe that newer version, not the data.
 
 ### Limits and outcomes
 
@@ -155,7 +175,7 @@ cde_download_<job_id>/
   README.html             the same, as a standalone page (no external requests) with a copy button per citation
   data/
     <dataset_id>_<host>/  one folder per dataset
-      <dataset_id>_<host>.csv|parquet|txt|nc
+      <dataset_id>_<host>.csv|parquet|txt|nc|dwca.zip
       citation.txt
       metadata/           metadata.json, erddap.nccsvMetadata, ckan_iso19115.xml, obis_dataset.json, eml.xml
   citation/

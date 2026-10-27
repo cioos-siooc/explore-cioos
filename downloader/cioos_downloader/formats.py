@@ -6,6 +6,7 @@ Text values are read and written back as strings, so numbers keep ERDDAP's
 exact formatting; only latitude/longitude are parsed, for the polygon test.
 """
 
+import functools
 import hashlib
 import json
 import shutil
@@ -18,11 +19,14 @@ import duckdb
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import shapely
 import shapely.affinity
 import shapely.wkt
 import xarray as xr
+
+from cioos_downloader import darwin_core
 
 # Some ERDDAP servers (e.g. data.cioospacific.ca) sit behind a WAF that 403s
 # urllib's default User-Agent.
@@ -258,9 +262,85 @@ def _epoch_ms(value):
     return int(pd.to_datetime(value, utc=True).timestamp() * 1000) if value else None
 
 
-def write_obis(format_key, url, user_query, regions, out_base: Path):
+_OBIS_BATCH_ROWS = 100_000
+_OBIS_THREADS = 2
+# The OBIS-curated values, or the provider's as submitted to OBIS.
+OBIS_VALUES = {"curated": "interpreted", "submitted": "source"}
+
+
+def _populated(con, url):
+    """Column paths ("interpreted, eventDate") holding any value in the export,
+    from the footer's statistics; a column without them counts as populated."""
+    rows = con.execute(
+        "SELECT path_in_schema, sum(stats_null_count), sum(num_values) FROM parquet_metadata($url) GROUP BY 1",
+        {"url": url},
+    ).fetchall()
+    return {path for path, nulls, n in rows if nulls is None or nulls < n}
+
+
+def _leaves(struct_type, prefix, populated):
+    """The struct's scalar or list fields with a value somewhere in the export."""
+    names = []
+    for field in struct_type:
+        path = f"{prefix}, {field.name}"
+        if pa.types.is_struct(field.type):
+            continue
+        if pa.types.is_list(field.type):
+            path += ", list, element"
+        if path in populated:
+            names.append(field)
+    return names
+
+
+def _sql_name(name):
+    return '"' + name.replace('"', '""') + '"'
+
+
+class _Table:
+    """A CSV, tab-separated or Parquet file written batch by batch, created
+    with the first batch. Text is staged as Parquet in ``tmp`` and written by
+    DuckDB, which quotes only the values that need it."""
+
+    def __init__(self, path: Path, kind, tmp: Path):
+        self.path, self.kind, self.columns, self.n_rows, self.writer = path, kind, [], 0, None
+        self.staged = path if kind == "parquet" else tmp / f"{path.name}.parquet"
+
+    def write(self, batch):
+        if not batch.num_rows:
+            return
+        if self.writer is None:
+            self.writer = pq.ParquetWriter(self.staged, batch.schema)
+            self.columns = batch.schema.names
+        self.writer.write_batch(batch)
+        self.n_rows += batch.num_rows
+
+    def close(self):
+        if self.writer is not None:
+            self.writer.close()
+
+    def finish(self, con):
+        if self.writer is not None and self.kind != "parquet":
+            delimiter = "\t" if self.kind == "tsv" else ","
+            con.execute(
+                f"COPY (SELECT * FROM read_parquet({_sql_string(self.staged)})) "
+                f"TO {_sql_string(self.path)} (FORMAT csv, HEADER, DELIMITER '{delimiter}')"
+            )
+
+    def entry(self):
+        return {"path": self.path, "n_rows": self.n_rows, "columns": [{"name": n, "unit": ""} for n in self.columns]}
+
+
+def _sql_string(value):
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def write_obis(format_key, url, user_query, regions, out_base: Path, values="curated", eml: Path | None = None):
     """The OBIS occurrences of the parquet export at ``url`` matching the query,
-    as CSV or Parquet; [] when none match."""
+    with their Darwin Core fields (``values`` picks OBIS's curated ones or the
+    provider's), and their measurement and DNA records: as CSV or Parquet
+    tables, or one Darwin Core Archive (``dwca``) with ``eml`` as its
+    metadata. Only fields holding a value in the dataset are written. Returns
+    the occurrence file first; [] when no occurrence matches."""
     if regions:
         lon_min, lat_min, lon_max, lat_max = shapely.total_bounds(regions)
     else:
@@ -276,42 +356,107 @@ def write_obis(format_key, url, user_query, regions, out_base: Path):
         "time_min": _epoch_ms(user_query.get("time_min")),
         "time_max": _epoch_ms(user_query.get("time_max")),
     }
-    # The same columns the harvester reads; reliably present across OBIS
-    # exports. date_start/date_end are epoch milliseconds.
-    query = """
-        SELECT
-            _id                              AS id,
-            interpreted.scientificName       AS scientificName,
-            interpreted.decimalLatitude      AS latitude,
-            interpreted.decimalLongitude     AS longitude,
-            interpreted.date_start           AS date_start,
-            interpreted.date_end             AS date_end,
-            interpreted.minimumDepthInMeters AS minimumDepthInMeters,
-            interpreted.maximumDepthInMeters AS maximumDepthInMeters
-        FROM read_parquet($url)
-        WHERE interpreted.decimalLatitude  BETWEEN $lat_min AND $lat_max
-          AND interpreted.decimalLongitude BETWEEN $lon_min AND $lon_max
-          AND ($depth_max IS NULL OR coalesce(interpreted.minimumDepthInMeters, 0) <= $depth_max)
-          AND ($depth_min IS NULL OR coalesce(interpreted.maximumDepthInMeters, 0) >= $depth_min)
-          AND ($time_min IS NULL OR interpreted.date_end >= $time_min)
-          AND ($time_max IS NULL OR interpreted.date_start <= $time_max)
-    """
-    # Own connection: the shared default one breaks under concurrent subsets.
-    with duckdb.connect() as con:
-        df = con.execute(query, params).df()
-    if regions:
-        df = df[inside(df["longitude"], df["latitude"], regions)]
-    if df.empty:
-        return []
+    struct = OBIS_VALUES[values]
+    archive = format_key == "dwca"
+    eml = eml if eml and eml.exists() else None
 
-    if format_key == "parquet":
-        path = out_base.with_suffix(".parquet")
-        df.to_parquet(path, index=False)
-    else:
-        path = out_base.with_suffix(".csv")
-        df.to_csv(path, index=False, lineterminator="\n")
-    columns = [{"name": c, "unit": ""} for c in df.columns]
-    return [{"path": path, "n_rows": len(df), "columns": columns}]
+    # Own connection: the shared default one breaks under concurrent subsets.
+    # Few threads: each buffers whole row groups of the ~250-field structs,
+    # and a 1M-occurrence dataset otherwise peaks near 3 GB.
+    with duckdb.connect(config={"threads": _OBIS_THREADS}) as con:
+        schema = con.sql("SELECT * FROM read_parquet($url) LIMIT 0", params={"url": url}).to_arrow_table().schema
+        populated = _populated(con, url)
+        fields = _leaves(schema.field(struct).type, struct, populated)
+        if archive:
+            fields = [f for f in fields if f.name in darwin_core.OCCURRENCE_TERMS]
+        select = ["_id AS id"]
+        for field in fields:
+            column = f"{struct}.{_sql_name(field.name)}"
+            if pa.types.is_list(field.type):
+                column = f"array_to_string({column}, '|')"
+            select.append(f"{column} AS {_sql_name(field.name)}")
+        core_columns = ["id", *(f.name for f in fields)]
+        # OBIS's quality flags go with its curated values; they aren't Darwin Core.
+        if struct == "interpreted" and not archive and "flags, list, element" in populated:
+            select.append("array_to_string(flags, '|') AS flags")
+            core_columns.append("flags")
+
+        # Each extension's source fields with a value somewhere in the export.
+        extension_type = schema.field("extensions").type if "extensions" in schema.names else pa.struct([])
+        extensions = []
+        for i, row_type in enumerate(darwin_core.EXTENSIONS):
+            if extension_type.get_field_index(row_type) < 0:
+                continue
+            prefix = f"extensions, {row_type}, list, element, source"
+            source = extension_type.field(row_type).type.value_type.field("source").type
+            names = [f.name for f in _leaves(source, prefix, populated)]
+            if archive:
+                names = [n for n in names if n in darwin_core.EXTENSIONS[row_type][1]]
+            if names:
+                select.append(f"extensions.{_sql_name(row_type)} AS __extension{i}")
+                extensions.append((row_type, f"__extension{i}", names))
+
+        query = f"""
+            SELECT {", ".join(select)},
+                   interpreted.decimalLongitude AS __lon,
+                   interpreted.decimalLatitude  AS __lat
+            FROM read_parquet($url)
+            WHERE interpreted.decimalLatitude  BETWEEN $lat_min AND $lat_max
+              AND interpreted.decimalLongitude BETWEEN $lon_min AND $lon_max
+              AND ($depth_max IS NULL OR coalesce(interpreted.minimumDepthInMeters, 0) <= $depth_max)
+              AND ($depth_min IS NULL OR coalesce(interpreted.maximumDepthInMeters, 0) >= $depth_min)
+              AND ($time_min IS NULL OR interpreted.date_end >= $time_min)
+              AND ($time_max IS NULL OR interpreted.date_start <= $time_max)
+        """
+
+        with tempfile.TemporaryDirectory(dir=out_base.parent) as tmp:
+            if archive:
+                kind, core_path = "tsv", Path(tmp) / "occurrence.txt"
+            else:
+                kind = "parquet" if format_key == "parquet" else "csv"
+                core_path = out_base.with_suffix(f".{kind}")
+            core = _Table(core_path, kind, Path(tmp))
+            tables = {
+                row_type: _Table(
+                    Path(tmp) / f"{stem}.txt" if archive else out_base.with_name(f"{out_base.name}_{stem}.{kind}"),
+                    kind,
+                    Path(tmp),
+                )
+                for row_type, (stem, _) in darwin_core.EXTENSIONS.items()
+            }
+            try:
+                for batch in con.sql(query, params=params).to_arrow_reader(_OBIS_BATCH_ROWS):
+                    if regions:
+                        batch = batch.filter(pa.array(inside(batch["__lon"], batch["__lat"], regions)))
+                    core.write(batch.select(core_columns))
+                    for row_type, column, names in extensions:
+                        lists = batch[column]
+                        source = pc.list_flatten(lists).field("source")
+                        ids = batch["id"].take(pc.list_parent_indices(lists))
+                        records = pa.record_batch([ids, *(source.field(n) for n in names)], names=["id", *names])
+                        # OBIS exports records holding nothing but their occurrence's ID.
+                        content = [pc.is_valid(records[n]) for n in names if n != "occurrenceID"]
+                        if content:
+                            records = records.filter(functools.reduce(pc.or_, content))
+                        tables[row_type].write(records)
+            finally:
+                for table in (core, *tables.values()):
+                    table.close()
+
+            if not core.n_rows:
+                return []
+            written = [t for t in (core, *tables.values()) if t.n_rows]
+            for table in written:
+                table.finish(con)
+            if not archive:
+                return [t.entry() for t in written]
+
+            path = out_base.with_name(out_base.name + ".dwca.zip")
+            extension_columns = [(rt, t.columns) for rt, t in tables.items() if t.n_rows]
+            meta = darwin_core.meta_xml(core.columns, extension_columns, eml)
+            files = {t.path.name: t.path for t in written}
+            darwin_core.write_archive(path, files, meta, eml)
+            return [{**core.entry(), "path": path}]
 
 
 def sha256(path):
@@ -332,10 +477,12 @@ def _fetch(url, path):
     return True
 
 
-def _rebuild(subset, query, regions, out_base: Path, tmp: Path):
+def _rebuild(subset, query, regions, out_base: Path, tmp: Path, metadata: Path):
     out_base.parent.mkdir(parents=True, exist_ok=True)
     if subset["source_type"] == "obis":
-        return write_obis(subset["format"], subset["request_urls"][0], query, regions, out_base)
+        values = query.get("obis_values") or "curated"
+        url = subset["request_urls"][0]
+        return write_obis(subset["format"], url, query, regions, out_base, values, metadata / "eml.xml")
     parts = []
     for i, url in enumerate(subset["request_urls"]):
         part = tmp / f"{subset['folder']}.part{i}"
@@ -360,7 +507,9 @@ def reproduce(root: Path):
             print(f"{subset['dataset_id']}:")
             folder = f"data/{subset['folder']}"
             try:
-                files = _rebuild(subset, query, regions, out / folder / subset["folder"], Path(tmp))
+                files = _rebuild(
+                    subset, query, regions, out / folder / subset["folder"], Path(tmp), root / folder / "metadata"
+                )
             except Exception as e:
                 print(f"  failed: {type(e).__name__}: {e}")
                 differs += 1

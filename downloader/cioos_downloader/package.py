@@ -22,6 +22,7 @@ import base64
 import html
 import json
 import re
+import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from importlib.metadata import version
 from itertools import pairwise
@@ -92,6 +93,25 @@ _TEXT = {
         "box": "latitude {lat_min} to {lat_max}, longitude {lon_min} to {lon_max}",
         "anywhere": "anywhere",
         "format": "Format",
+        "obis_values": "OBIS values",
+        "obis_values_curated": "curated by OBIS, with its quality flags",
+        "obis_values_submitted": "as the provider submitted them to OBIS",
+        "obis_tables": (
+            "OBIS datasets in CSV or Parquet hold each occurrence's Darwin Core fields, named as in Darwin Core; "
+            "their measurements and DNA records, when the dataset has any, are in "
+            "`<dataset folder>_extendedmeasurementorfact` and `<dataset folder>_dnaderiveddata`, whose `id` is "
+            "the occurrence's `id`."
+        ),
+        "obis_coordinates": (
+            "OBIS occurrences without coordinates are not included; each OBIS dataset's source Darwin Core "
+            "Archive, linked under Documentation, holds the whole dataset."
+        ),
+        "obis_harvested": "OBIS's copy, used for these data, is the version published {date}",
+        "obis_newer": (
+            "; the provider has since published a newer one ({newer}), which `eml.xml` and the source "
+            "Darwin Core Archive are"
+        ),
+        "source_archive": "Source Darwin Core Archive (whole dataset)",
         "filters": "Other filters (as sent by the Data Explorer)",
         "data": "Data",
         "dataset": "Dataset",
@@ -133,6 +153,13 @@ _TEXT = {
                 "`<dataset folder>.csv`: comma-separated text. It opens in any spreadsheet, or in Python with "
                 "`pandas.read_csv`. Files from ERDDAP have the column names on the first row and their units on "
                 "the second (skip it with `skiprows=[1]`); files from OBIS have no units row."
+            ),
+            "dwca": (
+                "`<dataset folder>.dwca.zip`: a Darwin Core Archive of the OBIS occurrences: `occurrence.txt` "
+                "(the occurrence core), `extendedmeasurementorfact.txt` and `dnaderiveddata.txt` (their "
+                "measurements and DNA records, when the dataset has any), `meta.xml` mapping each column to its "
+                "Darwin Core term, and `eml.xml`. Keep it zipped for GBIF's data validator, an IPT or R's "
+                "`finch`; in Python, open it with `python-dwca-reader`."
             ),
             "parquet": (
                 "`<dataset folder>.parquet`: a compressed column table, much smaller and faster to read than "
@@ -226,6 +253,25 @@ _TEXT = {
         "box": "latitude {lat_min} à {lat_max}, longitude {lon_min} à {lon_max}",
         "anywhere": "partout",
         "format": "Format",
+        "obis_values": "Valeurs OBIS",
+        "obis_values_curated": "vérifiées par OBIS, avec ses indicateurs de qualité",
+        "obis_values_submitted": "telles que le fournisseur les a transmises à OBIS",
+        "obis_tables": (
+            "Les jeux de données OBIS en CSV ou en Parquet contiennent les champs Darwin Core de chaque "
+            "occurrence, nommés comme dans Darwin Core; leurs mesures et données ADN, si le jeu de données en "
+            "a, sont dans `<dossier>_extendedmeasurementorfact` et `<dossier>_dnaderiveddata`, dont l'`id` est "
+            "celui de l'occurrence."
+        ),
+        "obis_coordinates": (
+            "Les occurrences OBIS sans coordonnées ne sont pas incluses; l'archive Darwin Core source de chaque "
+            "jeu de données OBIS, liée sous Documentation, contient le jeu de données complet."
+        ),
+        "obis_harvested": "La copie d'OBIS, utilisée pour ces données, est la version publiée le {date}",
+        "obis_newer": (
+            "; le fournisseur en a depuis publié une plus récente ({newer}), qui est celle de `eml.xml` et de "
+            "l'archive Darwin Core source"
+        ),
+        "source_archive": "Archive Darwin Core source (jeu de données complet)",
         "filters": "Autres filtres (tels qu'envoyés par l'Explorateur)",
         "data": "Données",
         "dataset": "Jeu de données",
@@ -268,6 +314,13 @@ _TEXT = {
                 "`<dossier>.csv` : texte séparé par des virgules. Il s'ouvre dans tout tableur, ou en Python avec "
                 "`pandas.read_csv`. Les fichiers d'ERDDAP ont les noms de colonnes sur la première ligne et leurs "
                 "unités sur la deuxième (à ignorer avec `skiprows=[1]`); ceux d'OBIS n'ont pas de ligne d'unités."
+            ),
+            "dwca": (
+                "`<dossier>.dwca.zip` : une archive Darwin Core (DwC-A) des occurrences OBIS : `occurrence.txt` "
+                "(le noyau des occurrences), `extendedmeasurementorfact.txt` et `dnaderiveddata.txt` (leurs "
+                "mesures et données ADN, si le jeu de données en a), `meta.xml`, qui associe chaque colonne à "
+                "son terme Darwin Core, et `eml.xml`. Gardez-la compressée pour le validateur de données du GBIF, "
+                "un IPT ou `finch` en R; en Python, ouvrez-la avec `python-dwca-reader`."
             ),
             "parquet": (
                 "`<dossier>.parquet` : une table compressée par colonnes, bien plus petite et rapide à lire qu'un "
@@ -487,7 +540,7 @@ def _resource(root, row, file, licence):
     }
     if licence and _frictionless_licence(licence):
         resource["licenses"] = [_frictionless_licence(licence)]
-    if row["format"] != "nccf":
+    if row["format"] not in ("nccf", "dwca"):
         resource["type"] = "table"
         resource["schema"] = {
             "fields": [
@@ -518,7 +571,25 @@ def _source_links(row, metadata, t):
         links.append((t["catalogue"], row["ckan_url"]))
     if metadata.get("doi"):
         links.append(("DOI", metadata["doi"]))
+    if row.get("source_archive"):
+        links.append((t["source_archive"], row["source_archive"]))
     return links
+
+
+def _newer_version(eml: Path, harvested):
+    """The version and date ("v1.173, 2026-10-05") of the provider's EML, fetched
+    live from their IPT, when it was published after the version OBIS harvested."""
+    if not harvested or not eml.exists():
+        return None
+    try:
+        root = ET.fromstring(eml.read_bytes())
+    except ET.ParseError:
+        return None
+    published = (root.findtext("dataset/pubDate") or "").strip()[:10]
+    if published <= harvested:
+        return None
+    _, sep, number = (root.get("packageId") or "").rpartition("/v")
+    return f"v{number}, {published}" if sep else published
 
 
 def _md_url(url):
@@ -549,6 +620,10 @@ def _readme_contents(included, readme_html, t):
     formats = {row["format"] for row, _, _ in included}
     lines = [t["contents_data"], ""]
     lines += [f"- {t['open'][key]}" for key in FORMATS if key in formats]
+    if any(row["source_type"] == "obis" and row["format"] != "dwca" for row, _, _ in included):
+        lines += ["", t["obis_tables"]]
+    if any(row["source_type"] == "obis" for row, _, _ in included):
+        lines += ["", t["obis_coordinates"]]
     lines += [t["contents_dataset"], "", t["contents_citation"], "", t["contents_package"], ""]
     if readme_html:
         lines.append(t["contents_html"])
@@ -610,6 +685,8 @@ def _readme(user_query, entries, created, lang, readme_html):
         area = t["anywhere"]
     lines.append(f"- {t['area']}: {area}")
     lines.append(f"- {t['format']}: {FORMATS[user_query.get('format') or 'csv'].label}")
+    if any(row["source_type"] == "obis" for row, _, _ in entries):
+        lines.append(f"- {t['obis_values']}: {t['obis_values_' + (user_query.get('obis_values') or 'curated')]}")
     filters = user_query.get("filters") or {}
     if filters:
         lines.append(f"- {t['filters']}:")
@@ -624,6 +701,11 @@ def _readme(user_query, entries, created, lang, readme_html):
             records = f"[`metadata/`](data/{row['folder']}/metadata/)"
             sources = " · ".join(f"[{label}](<{_md_url(url)}>)" for label, url in _source_links(row, metadata, t))
             lines.append(f"- **{_title(row, lng)}**: {records} · {sources}")
+            if row.get("obis_harvested"):
+                note = t["obis_harvested"].format(date=row["obis_harvested"])
+                if row.get("obis_newer"):
+                    note += t["obis_newer"].format(newer=row["obis_newer"])
+                lines.append(f"  - {note}.")
     lines += ["", f"## {t['reproduce']}", "", t["reproduce_text"]]
     lines += ["", f"## {t['about']}", "", t["about_text"], ""]
 
@@ -868,6 +950,12 @@ def write_package(root: Path, json_query, report, readme_html=True):
         row["ckan_url"] = dataset.get("ckan_url")
         row["requested_format"] = requested
         folder = root / "data" / row["folder"]
+        obis_record = folder / "metadata" / "obis_dataset.json"
+        if obis_record.exists():
+            record = json.loads(obis_record.read_text())
+            row["source_archive"] = record.get("archive")
+            row["obis_harvested"] = (record.get("published") or "")[:10]
+            row["obis_newer"] = _newer_version(folder / "metadata" / "eml.xml", row["obis_harvested"])
         if metadata:
             (folder / "metadata" / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False))
         for file in row["files"]:

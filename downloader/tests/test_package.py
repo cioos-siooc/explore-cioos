@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import re
 import subprocess
@@ -5,6 +7,7 @@ import sys
 import threading
 import time
 import tomllib
+import xml.etree.ElementTree as ET
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
@@ -377,10 +380,10 @@ def test_progress_hears_each_dataset_stage_bytes_and_outcome_in_order(tmp_path):
         (dataset_id, *event)
         for dataset_id in ("A0", "A1")
         for event in [
+            ("stage", "fetching the source metadata records"),
             ("stage", "request 1/1"),
             ("bytes", len(_CSV)),
             ("stage", "writing CSV"),
-            ("stage", "fetching the source metadata records"),
             ("finished", "COMPLETED"),
         ]
     ]
@@ -425,22 +428,61 @@ def _raw_nccf(path):
     ).to_netcdf(path)
 
 
+_EMOF = "http://rs.iobis.org/obis/terms/ExtendedMeasurementOrFact"
+
+
+def _struct(**columns):
+    return pa.StructArray.from_arrays([pa.array(v) for v in columns.values()], names=list(columns))
+
+
 def _raw_obis(path):
+    """An OBIS export as published: OBIS's curated values, the provider's as
+    submitted, quality flags and measurement records."""
     lats, lons = zip(*_POINTS, strict=True)
-    interpreted = pa.StructArray.from_arrays(
-        [
-            pa.array(["Gadus morhua"] * 2),
-            pa.array(lats),
-            pa.array(lons),
-            pa.array([1577836800000] * 2),
-            pa.array([1577836800000] * 2),
-            pa.array([5.0] * 2),
-            pa.array([5.0] * 2),
-        ],
-        names=["scientificName", "decimalLatitude", "decimalLongitude", "date_start", "date_end",
-               "minimumDepthInMeters", "maximumDepthInMeters"],
+    interpreted = _struct(
+        scientificName=["Gadus morhua"] * 2,
+        decimalLatitude=list(lats),
+        decimalLongitude=list(lons),
+        date_start=[1577836800000] * 2,
+        date_end=[1577836800000] * 2,
+        minimumDepthInMeters=[5.0] * 2,
+        maximumDepthInMeters=[5.0] * 2,
+        eventDate=["2020-01-01"] * 2,
+        occurrenceID=["occ-a", "occ-b"],
+        aphiaid=[126436, 126436],
+        cultivarEpithet=pa.array([None, None], pa.string()),
+        areas=[[34, 35], [34]],
     )
-    pq.write_table(pa.table({"_id": ["a", "b"], "interpreted": interpreted}), path)
+    source = _struct(
+        scientificName=["Gadus morhua Linnaeus, 1758"] * 2,
+        decimalLatitude=[str(v) for v in lats],
+        decimalLongitude=[str(v) for v in lons],
+        eventDate=["2020-01-01T00:00Z"] * 2,
+        occurrenceID=["occ-a", "occ-b"],
+        cultivarEpithet=pa.array([None, None], pa.string()),
+    )
+    terms = ("measurementType", "measurementValue", "measurementUnit")
+    measurement = pa.struct([("level", pa.int32()), ("source", pa.struct([(n, pa.string()) for n in terms]))])
+
+    def fact(*values):
+        return {"level": None, "source": dict(zip(terms, values, strict=True))}
+
+    emof = pa.array(
+        [[fact("length", "30", "cm"), fact("tow", "15", None), fact(None, None, None)], [fact("length", "41", "cm")]],
+        pa.list_(measurement),
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "_id": ["a", "b"],
+                "interpreted": interpreted,
+                "source": source,
+                "extensions": pa.StructArray.from_arrays([emof], names=[_EMOF]),
+                "flags": [["NO_DEPTH"], []],
+            }
+        ),
+        path,
+    )
 
 
 def _reproduce(tmp_path, archive, edit=None):
@@ -483,8 +525,8 @@ def test_reproduce_rebuilds_every_erddap_format_identically(tmp_path, fmt, write
     assert (root / "reproduced" / data["path"]).read_bytes() == (root / data["path"]).read_bytes()
 
 
-@pytest.mark.parametrize("fmt", ["csv", "parquet"])
-def test_reproduce_rebuilds_obis_subsets_identically(tmp_path, monkeypatch, fmt):
+@pytest.mark.parametrize(("fmt", "data"), [("csv", "csv"), ("parquet", "parquet"), ("dwca", "dwca.zip")])
+def test_reproduce_rebuilds_obis_subsets_identically(tmp_path, monkeypatch, fmt, data):
     export = tmp_path / "export.parquet"
     _raw_obis(export)
     monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
@@ -495,7 +537,8 @@ def test_reproduce_rebuilds_obis_subsets_identically(tmp_path, monkeypatch, fmt)
     _, result = _reproduce(tmp_path, archive)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert f"match: data/abc_obis_org/abc_obis_org.{fmt}" in result.stdout
+    assert f"match: data/abc_obis_org/abc_obis_org.{data}" in result.stdout
+    assert "differs" not in result.stdout
 
 
 def test_reproduce_reports_a_source_that_changed(tmp_path):
@@ -550,7 +593,7 @@ def test_obis_subsets_can_be_filtered_concurrently(tmp_path):
             pool.map(lambda i: formats.write_obis("csv", str(export), {}, regions, tmp_path / str(i)), range(32))
         )
 
-    assert [f["n_rows"] for [f] in written] == [1] * 32
+    assert [files[0]["n_rows"] for files in written] == [1] * 32
 
 
 @pytest.mark.parametrize(
@@ -571,7 +614,148 @@ def test_obis_occurrences_are_filtered_by_depth_and_time(tmp_path, query, n_rows
 
     written = formats.write_obis("csv", str(export), query, [], tmp_path / "out")
 
-    assert sum(f["n_rows"] for f in written) == n_rows
+    assert (written[0]["n_rows"] if written else 0) == n_rows
+
+
+def _obis_run(tmp_path, monkeypatch, **user_query):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    return _run(tmp_path, _query(obis, polygon_region=_TRIANGLE, **user_query))
+
+
+def _csv_rows(text, delimiter=","):
+    return list(csv.DictReader(io.StringIO(text), delimiter=delimiter))
+
+
+def test_obis_csv_holds_the_curated_darwin_core_fields_and_their_measurements(tmp_path, monkeypatch):
+    report, archive, read = _obis_run(tmp_path, monkeypatch)
+
+    [occurrence] = _csv_rows(read("data/abc_obis_org/abc_obis_org.csv"))
+    # Named as in Darwin Core, with OBIS's own fields and flags; a field empty
+    # across the whole dataset is left out.
+    assert occurrence["decimalLatitude"] == "50.0" and occurrence["eventDate"] == "2020-01-01"
+    assert occurrence["scientificName"] == "Gadus morhua"
+    assert occurrence["aphiaid"] == "126436" and occurrence["areas"] == "34|35"
+    assert occurrence["flags"] == "NO_DEPTH"
+    assert "cultivarEpithet" not in occurrence
+    measurements = _csv_rows(read("data/abc_obis_org/abc_obis_org_extendedmeasurementorfact.csv"))
+    assert [(m["id"], m["measurementType"], m["measurementValue"]) for m in measurements] == [
+        ("a", "length", "30"),
+        ("a", "tow", "15"),
+    ]
+    assert report["erddap_report"][0]["n_records"] == 1
+    assert "abc_obis_org_dnaderiveddata.csv" not in " ".join(archive.namelist())
+    readme = read("README.md")
+    assert "OBIS values: curated by OBIS" in readme
+    assert "_extendedmeasurementorfact" in readme
+
+
+def test_obis_values_can_be_as_the_provider_submitted_them(tmp_path, monkeypatch):
+    _, _, read = _obis_run(tmp_path, monkeypatch, obis_values="submitted")
+
+    [occurrence] = _csv_rows(read("data/abc_obis_org/abc_obis_org.csv"))
+    assert occurrence["scientificName"] == "Gadus morhua Linnaeus, 1758"
+    assert occurrence["eventDate"] == "2020-01-01T00:00Z"
+    assert "aphiaid" not in occurrence and "flags" not in occurrence
+    assert "as the provider submitted them" in read("README.md")
+
+
+def test_obis_darwin_core_archive_maps_every_column_to_its_term(tmp_path, monkeypatch):
+    _, archive, read = _obis_run(tmp_path, monkeypatch, format="dwca")
+
+    path = "cde_download_pkg001/data/abc_obis_org/abc_obis_org.dwca.zip"
+    dwca = zipfile.ZipFile(io.BytesIO(archive.read(path)))
+    assert set(dwca.namelist()) == {"meta.xml", "occurrence.txt", "extendedmeasurementorfact.txt"}
+    ns = {"dwc": "http://rs.tdwg.org/dwc/text/"}
+    meta = ET.fromstring(dwca.read("meta.xml"))
+    for table in [meta.find("dwc:core", ns), *meta.findall("dwc:extension", ns)]:
+        location = table.find("dwc:files/dwc:location", ns).text
+        header = dwca.read(location).decode().splitlines()[0].split("\t")
+        terms = {int(f.get("index")): f.get("term") for f in table.findall("dwc:field", ns)}
+        # Column 0 is the occurrence id; every other column is a mapped term.
+        assert sorted(terms) == list(range(1, len(header)))
+        assert all(terms[i].rsplit("/", 1)[1] == name for i, name in enumerate(header) if i)
+    core = meta.find("dwc:core", ns)
+    assert core.get("rowType") == "http://rs.tdwg.org/dwc/terms/Occurrence"
+    [occurrence] = _csv_rows(dwca.read("occurrence.txt").decode(), "\t")
+    # Only Darwin Core terms: OBIS's own fields stay in the CSV and Parquet tables.
+    assert {"id", "scientificName", "eventDate", "occurrenceID"} <= set(occurrence)
+    assert not {"aphiaid", "flags", "areas", "date_start"} & set(occurrence)
+    resources = {r["path"]: r for r in json.loads(read("datapackage.json"))["resources"]}
+    assert resources["data/abc_obis_org/abc_obis_org.dwca.zip"]["mediatype"] == "application/zip"
+    assert "Darwin Core Archive" in read("README.md")
+
+
+def test_the_darwin_core_archive_carries_the_eml_and_links_the_source_archive(tmp_path, monkeypatch):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    source_archive = "https://ipt.iobis.org/obiscanada/archive.do?r=abc"
+
+    def save_source_metadata(dataset, folder):
+        (folder / "eml.xml").write_text("<eml/>")
+        (folder / "obis_dataset.json").write_text(json.dumps({"archive": source_archive}))
+        return []
+
+    monkeypatch.setattr(download_erddap, "save_source_metadata", save_source_metadata)
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    with patch("cioos_downloader.download_erddap.requests.get"):
+        report = downloader_wrapper.run_download_query(
+            download_query=_query(obis, format="dwca"), output_folder=tmp_path / "out"
+        )
+    archive = zipfile.ZipFile(report["path"])
+
+    dwca = zipfile.ZipFile(io.BytesIO(archive.read("cde_download_pkg001/data/abc_obis_org/abc_obis_org.dwca.zip")))
+    assert dwca.read("eml.xml") == b"<eml/>"
+    assert b'metadata="eml.xml"' in dwca.read("meta.xml")
+    readme = archive.read("cde_download_pkg001/README.md").decode()
+    assert f"(<{source_archive}>)" in readme
+    assert "OBIS occurrences without coordinates are not included" in readme
+
+
+def _obis_readme(tmp_path, monkeypatch, eml_published):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+
+    def save_source_metadata(dataset, folder):
+        (folder / "eml.xml").write_text(
+            '<eml:eml xmlns:eml="https://eml.ecoinformatics.org/eml-2.2.0" packageId="abc/v1.173">'
+            f"<dataset><pubDate>{eml_published}</pubDate></dataset></eml:eml>"
+        )
+        (folder / "obis_dataset.json").write_text(json.dumps({"published": "2026-05-05T12:00:00.000Z"}))
+        return []
+
+    monkeypatch.setattr(download_erddap, "save_source_metadata", save_source_metadata)
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    with patch("cioos_downloader.download_erddap.requests.get"):
+        report = downloader_wrapper.run_download_query(download_query=_query(obis), output_folder=tmp_path / "out")
+    return zipfile.ZipFile(report["path"]).read("cde_download_pkg001/README.md").decode()
+
+
+def test_the_readme_dates_the_obis_version_and_flags_a_newer_one_from_the_provider(tmp_path, monkeypatch):
+    readme = _obis_readme(tmp_path, monkeypatch, "2026-10-05")
+
+    assert "OBIS's copy, used for these data, is the version published 2026-05-05" in readme
+    assert "the provider has since published a newer one (v1.173, 2026-10-05)" in readme
+
+
+def test_the_readme_flags_no_newer_version_when_obis_has_the_latest(tmp_path, monkeypatch):
+    readme = _obis_readme(tmp_path, monkeypatch, "2026-05-05")
+
+    assert "the version published 2026-05-05." in readme
+    assert "has since published" not in readme
+
+
+def test_erddap_datasets_fall_back_to_csv_from_a_darwin_core_archive(tmp_path):
+    report, archive, read = _run(tmp_path, _query(_dataset("Ctd"), format="dwca"))
+
+    row = report["erddap_report"][0]
+    assert row["format"] == "csv" and row["format_fallback"]
+    assert "cde_download_pkg001/data/Ctd_data_example_ca/Ctd_data_example_ca.csv" in archive.namelist()
+    assert "was delivered as CSV: Darwin Core Archive is not available" in read("README.md")
 
 
 def test_the_readme_also_ships_as_a_standalone_web_page(tmp_path):

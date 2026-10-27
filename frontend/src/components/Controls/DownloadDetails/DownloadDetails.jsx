@@ -10,6 +10,7 @@ import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
 import {
+  ERDDAP_FORMATS,
   OBIS_FORMATS,
   useDownload,
 } from "../../../state/download/DownloadProvider.jsx";
@@ -261,6 +262,7 @@ export default function DownloadDetails({
   const obisCount = linkableDatasets.filter(
     (point) => point.source_type === "obis",
   ).length;
+  const erddapCount = linkableDatasets.length - obisCount;
 
   // A polygon can only reach ERDDAP as its bounding box, so direct links
   // would hold data the package filters out; the script handles it.
@@ -313,6 +315,11 @@ export default function DownloadDetails({
             estimatesLoading={estimatesLoading}
             obisFallbackFormat={
               OBIS_FORMATS.includes(packageFormat)
+                ? undefined
+                : t("downloadPackageFormat_csv")
+            }
+            erddapFallbackFormat={
+              ERDDAP_FORMATS.includes(packageFormat)
                 ? undefined
                 : t("downloadPackageFormat_csv")
             }
@@ -382,7 +389,7 @@ export default function DownloadDetails({
                 {t("downloadDeliveryIntro")}
               </p>
             </div>
-            <DownloadFormat obisCount={obisCount} />
+            <DownloadFormat obisCount={obisCount} erddapCount={erddapCount} />
           </div>
           <div className="downloadDeliveryOptions">
             {children}

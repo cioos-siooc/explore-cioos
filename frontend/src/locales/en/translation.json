@@ -69,12 +69,19 @@
   "downloadPackageFormat_parquet": "Parquet",
   "downloadPackageFormat_odv": "ODV spreadsheet",
   "downloadPackageFormat_nccf": "NetCDF (CF)",
+  "downloadPackageFormat_dwca": "Darwin Core Archive",
   "downloadPackageFormatPillLabel": "All downloads",
   "downloadPackageFormatGroupAll": "ERDDAP and OBIS",
   "downloadPackageFormatGroupErddap": "ERDDAP only (OBIS as CSV)",
-  "downloadPackageFormatTooltipText": "One format for everything below: the emailed package, the Python script and the ERDDAP direct links. OBIS publishes occurrences only as a table, so OBIS datasets come as CSV unless you choose CSV or Parquet (and OBIS direct links are always JSON).",
+  "downloadPackageFormatGroupObis": "OBIS only (ERDDAP as CSV)",
+  "downloadPackageFormatTooltipText": "One format for everything below: the emailed package, the Python script and the ERDDAP direct links. OBIS datasets always carry their Darwin Core fields, with their measurements and DNA records: as tables in CSV or Parquet, or as a Darwin Core Archive. They come as CSV in ODV or NetCDF, and ERDDAP datasets come as CSV in a Darwin Core Archive (OBIS direct links are always JSON).",
   "downloadPackageFormatObisNote_one": "{{count}} OBIS dataset will be delivered as CSV: OBIS has no {{format}} version. Choose CSV or Parquet to get every dataset in one format.",
   "downloadPackageFormatObisNote_other": "{{count}} OBIS datasets will be delivered as CSV: OBIS has no {{format}} version. Choose CSV or Parquet to get every dataset in one format.",
+  "downloadPackageFormatErddapNote_one": "{{count}} ERDDAP dataset will be delivered as CSV: a Darwin Core Archive holds OBIS biodiversity records only.",
+  "downloadPackageFormatErddapNote_other": "{{count}} ERDDAP datasets will be delivered as CSV: a Darwin Core Archive holds OBIS biodiversity records only.",
+  "downloadObisValuesPillLabel": "OBIS values",
+  "downloadObisValues_curated": "Curated by OBIS",
+  "downloadObisValues_submitted": "As submitted",
   "downloadEmailLabelText": "Email me a download link",
   "downloadEmailPlaceholder": "you@institution.ca",
   "downloadRememberEmailLabel": "Remember my email on this device",
@@ -1075,5 +1082,6 @@
   "downloadDeliveryIntro": "The same files either way: your data in the chosen format, with each source's metadata, citations and licences.",
   "downloadDeliveryOr": "or",
   "datasetCardObisFallbackText": "As CSV",
-  "datasetCardObisFallbackTitle": "Delivered as CSV: OBIS has no version in the chosen format"
+  "datasetCardObisFallbackTitle": "Delivered as CSV: OBIS has no version in the chosen format",
+  "datasetCardErddapFallbackTitle": "Delivered as CSV: a Darwin Core Archive holds OBIS records only"
 }

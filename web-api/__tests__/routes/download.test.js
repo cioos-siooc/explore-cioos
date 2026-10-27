@@ -109,6 +109,38 @@ describe("POST /download — happy path", () => {
   });
 });
 
+describe("POST /download — format and OBIS values", () => {
+  function queuedQuery() {
+    const qb = db.mock.results.find((r) => r.value?.insert);
+    return qb.value.insert.mock.calls[0][0].downloader_input.user_query;
+  }
+
+  it("queues a Darwin Core Archive with the provider's OBIS values", async () => {
+    const res = await request(app)
+      .post("/download")
+      .query({ ...BASE_QUERY, format: "dwca", obisValues: "submitted" })
+      .send(EMAIL);
+    expect(res.status).toBe(200);
+    const query = queuedQuery();
+    expect(query).toMatchObject({ format: "dwca", obis_values: "submitted" });
+    expect(query.filters).not.toHaveProperty("obisValues");
+    expect(query.explorer_url).not.toContain("obisValues");
+  });
+
+  it("defaults to OBIS's curated values", async () => {
+    await request(app).post("/download").query(BASE_QUERY).send(EMAIL);
+    expect(queuedQuery().obis_values).toBe("curated");
+  });
+
+  it("returns 400 for an unknown OBIS values choice", async () => {
+    const res = await request(app)
+      .post("/download")
+      .query({ ...BASE_QUERY, obisValues: "raw" })
+      .send(EMAIL);
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("POST /download — shape validation", () => {
   it("returns 400 when only latMin is provided (partial bounding box)", async () => {
     const res = await request(app)

@@ -72,11 +72,14 @@ FORMATS = {
         Format("parquet", "parquetWMeta", "application/vnd.apache.parquet", True, "Parquet"),
         Format("odv", "odvTxt", "text/tab-separated-values", False, "ODV spreadsheet"),
         Format("nccf", "ncCF", "application/x-netcdf", True, "NetCDF CF (DSG)"),
+        Format("dwca", None, "application/zip", True, "Darwin Core Archive"),
     )
 }
 DEFAULT_FORMAT = "csv"
 # OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition of it.
-OBIS_FORMATS = ("csv", "parquet")
+OBIS_FORMATS = ("csv", "parquet", "dwca")
+# Darwin Core describes biodiversity records, which only OBIS serves.
+ERDDAP_FORMATS = ("csv", "parquet", "odv", "nccf")
 
 
 # ERDDAP error envelope: Error { code=500; message="Query error: ..."; }
@@ -351,15 +354,19 @@ def _download_obis(dataset, user_query, regions, fmt, row, folder: Path, progres
     row["download_url_list"] = [url]
     _stage(progress, dataset, f"querying the OBIS export {url}")
 
-    files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset))
+    values = user_query.get("obis_values") or "curated"
+    eml = folder / "metadata" / "eml.xml"
+    files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset), values, eml)
     row["files"] = files
+    # The first file holds the occurrences; the others are their measurements and DNA.
+    row["n_records"] = files[0]["n_rows"] if files else 0
     row["status"] = COMPLETED if files else EMPTY
 
 
 def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget, progress):
     source_type = dataset.get("source_type") or "erddap"
     fmt = requested_format
-    if source_type == "obis" and fmt not in OBIS_FORMATS:
+    if fmt not in (OBIS_FORMATS if source_type == "obis" else ERDDAP_FORMATS):
         fmt = DEFAULT_FORMAT
 
     folder_name = dataset_folder_name(dataset)
@@ -367,6 +374,9 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
     (folder / "metadata").mkdir(parents=True, exist_ok=True)
     row = _row(dataset, fmt, folder_name)
     row["format_fallback"] = fmt != requested_format
+    # Before the data: an OBIS Darwin Core Archive carries the EML record.
+    _stage(progress, dataset, "fetching the source metadata records")
+    row["warnings"] += save_source_metadata(dataset, folder / "metadata")
 
     try:
         if source_type == "obis":
@@ -384,8 +394,6 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
             "Downloader failed for dataset {}", dataset["dataset_id"]
         )
 
-    _stage(progress, dataset, "fetching the source metadata records")
-    row["warnings"] += save_source_metadata(dataset, folder / "metadata")
     row["file_size"] = sum(f["bytes"] for f in row["files"])
     row["n_records"] = row["n_records"] or sum(f["n_rows"] for f in row["files"])
     row["total_size_so_far"] = budget.add(row["file_size"])
