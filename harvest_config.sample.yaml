@@ -13,7 +13,7 @@ folder:
 # Keep the default sample harvest small and deterministic. Add additional IDs
 # locally when testing a particular dataset.
 dataset_ids:
-  - DFO_MEDS_BUOYS
+  - PRIMED_wavebuoy
 
 # defaults to false
 log_time:
