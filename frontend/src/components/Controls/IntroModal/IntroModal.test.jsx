@@ -75,10 +75,10 @@ describe("IntroModal", () => {
     );
   });
 
-  it("Start exploring closes the dialog", async () => {
+  it("Go to the map closes the dialog", async () => {
     const setShowModal = vi.fn();
     const { user } = renderIntro({ setShowModal });
-    await user.click(screen.getByRole("button", { name: "Start exploring" }));
+    await user.click(screen.getByRole("button", { name: "Go to the map" }));
     expect(setShowModal).toHaveBeenCalledWith(false);
   });
 
@@ -128,10 +128,10 @@ describe("IntroModal", () => {
     expect(screen.getByTestId("selection-help")).toHaveTextContent("open");
   });
 
-  it("Take a quick tour closes the dialog and starts the tour at the first tip", async () => {
+  it("Take the guided tour closes the dialog and starts the tour at the first tip", async () => {
     const setShowModal = vi.fn();
     const { user } = renderIntro({ setShowModal });
-    await user.click(screen.getByRole("button", { name: "Take a quick tour" }));
+    await user.click(screen.getByRole("button", { name: "Take the guided tour" }));
     expect(setShowModal).toHaveBeenCalledWith(false);
     expect(screen.getByTestId("tip-card")).toHaveTextContent(/Tip 1 of \d+/);
   });

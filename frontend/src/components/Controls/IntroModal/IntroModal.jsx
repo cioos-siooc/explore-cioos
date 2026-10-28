@@ -4,7 +4,7 @@ import {
   ArrowRight,
   BarChartLine,
   Bezier2,
-  ChatDots,
+  Megaphone,
   Download,
   GeoAlt,
   GlobeAmericas,
@@ -297,7 +297,7 @@ export default function IntroModal({ showModal, setShowModal }) {
             </section>
             <section className="introFooterCard">
               <h2 className="introFooterHeading">
-                <ChatDots size={18} aria-hidden="true" />
+                <Megaphone size={18} aria-hidden="true" />
                 {t("introFeedbackHeading")}
               </h2>
               <p>{t("tipInfoFeedback")}</p>
