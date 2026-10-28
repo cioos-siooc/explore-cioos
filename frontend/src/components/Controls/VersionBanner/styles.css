@@ -5,7 +5,7 @@
   transform: translateX(-50%);
   z-index: 5;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   width: max-content;
   max-width: calc(100% - 20px);
@@ -18,25 +18,31 @@
 
 .versionBannerIcon {
   flex-shrink: 0;
-  margin-top: 5px;
   color: #52a79b;
 }
 
+/* text on the left, form on the right; stacks when there's no room */
 .versionBannerBody {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
   min-width: 0;
+}
+
+.versionBannerBody > span {
+  flex: 1 1 260px;
+  max-width: 420px;
 }
 
 .versionBannerForm {
   display: flex;
-  flex-wrap: wrap;
+  flex: 0 1 auto;
   gap: 6px;
 }
 
 .versionBannerForm input[type='email'] {
-  flex: 1 1 200px;
+  width: 220px;
   min-width: 0;
   height: 34px;
   padding: 0 10px;
