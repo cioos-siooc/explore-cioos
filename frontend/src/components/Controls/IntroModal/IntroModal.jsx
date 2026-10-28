@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BarChartLine,
-  Bezier2,
   Download,
   InfoCircle,
   GlobeAmericas,
@@ -17,6 +16,7 @@ import { Trans, useTranslation } from "react-i18next";
 import CioosLogo from "../../ui/CioosLogo.jsx";
 import Modal from "../../ui/Modal.jsx";
 import FeedbackButton from "../FeedbackButton/FeedbackButton.jsx";
+import TrackHeadIcon from "../TrajectoryDate/TrackHeadIcon.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
@@ -54,7 +54,7 @@ function useShowcases(close) {
   return [
     trajectory && {
       key: "trajectory",
-      Icon: Bezier2,
+      Icon: TrackHeadIcon,
       run: () =>
         showTrajectory(trajectory, {
           selectTrajectoryFromMap,

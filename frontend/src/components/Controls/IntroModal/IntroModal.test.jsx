@@ -115,7 +115,7 @@ describe("IntroModal", () => {
       renderIntro();
       await screen.findByText("datasets");
       expect(
-        screen.queryByRole("button", { name: /Draw gridded data on the map/ }),
+        screen.queryByRole("button", { name: /Overlay gridded data/ }),
       ).not.toBeInTheDocument();
     });
   });
@@ -164,7 +164,7 @@ describe("IntroModal", () => {
     const { user } = renderIntro();
     const toggle = screen.getByRole("switch", { name: "Tips as you go" });
     expect(toggle).toBeChecked();
-    await user.click(screen.getByText(/Short tips pop up/));
+    await user.click(screen.getByText(/Tips appear as you explore/));
     expect(toggle).not.toBeChecked();
     expect(window.localStorage.getItem("cde.tipsEnabled")).toBe("false");
   });
