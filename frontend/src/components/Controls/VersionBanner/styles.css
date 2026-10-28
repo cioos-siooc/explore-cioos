@@ -1,0 +1,37 @@
+.versionBanner {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 20px);
+  padding: 8px 8px 8px 14px;
+  background-color: #fff;
+  border-left: 4px solid #52a79b;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  pointer-events: all;
+}
+
+.versionBannerIcon {
+  flex-shrink: 0;
+  color: #52a79b;
+}
+
+.versionBannerClose {
+  flex-shrink: 0;
+  display: flex;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.versionBannerClose:hover {
+  background-color: #f3f3f3;
+}
