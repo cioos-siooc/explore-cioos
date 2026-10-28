@@ -8,7 +8,7 @@ const {
 } = require("../utils/tileCache");
 const { pipeline } = require("../utils/routePipeline");
 const {
-  COVERAGES,
+  NONNA_10,
   WEB_MERCATOR_HALF,
   fetchElevations,
   isSounding,
@@ -72,17 +72,9 @@ function encodeTerrarium(elevations) {
     .toBuffer();
 }
 
-const mergeLayers = (layers) =>
-  layers[0].map(
-    (_, i) => layers.map((layer) => layer[i]).find(isSounding) ?? NaN,
-  );
-
-const tileKey = (product, z, x, y) =>
-  `${product === "fine" ? "10/" : ""}${z}/${x}/${y}`;
-
 // NONNA 10 has one-pixel no-data rows and columns inside its own coverage,
-// which the hillshade would draw as trenches and a NONNA 100 fill as steps;
-// a gap pixel this close to soundings takes their mean instead.
+// which the hillshade would draw as trenches; a gap pixel this close to
+// soundings takes their mean instead.
 const SEAM_FILL_PX = 3;
 
 function fillSeams(layer) {
@@ -113,63 +105,16 @@ function fillSeams(layer) {
   });
 }
 
-// Both products from one fetch: the colour and hillshade layers ask for the
-// same tile, and this spares the second pair of WCS calls. The hillshade's
-// leaves 100 m-only water unshaded.
-async function renderTiles(z, x, y) {
-  const subsets = tileSubsets(z, x, y);
-  const coverages = COVERAGES.filter(({ minZoom }) => z >= minZoom);
-  const [first, ...rest] = await Promise.all(
-    coverages.map(({ id }) =>
-      fetchElevations(
-        wcsUrl(id, subsets, { scalesize: `i(${TILE_SIZE}),j(${TILE_SIZE})` }),
-      ),
-    ),
+// NONNA 10 alone, one WCS call a tile: NONNA 100 would only add sparsely
+// surveyed water, whose 10 m cells the downsampling skips at these zooms.
+async function renderTile(z, x, y) {
+  const elevations = await fetchElevations(
+    wcsUrl(NONNA_10.id, tileSubsets(z, x, y), {
+      scalesize: `i(${TILE_SIZE}),j(${TILE_SIZE})`,
+    }),
   );
-  if (!rest.length) return { merged: await encodeTerrarium(first) };
-  const fine = fillSeams(first);
-  return {
-    merged: await encodeTerrarium(mergeLayers([fine, ...rest])),
-    fine: await encodeTerrarium(fine),
-  };
+  return encodeTerrarium(fillSeams(elevations));
 }
-
-function serveTile(product) {
-  return async (req, res) => {
-    const z = Number(req.params.z);
-    const x = Number(req.params.x);
-    const y = Number(req.params.y);
-
-    const key = tileKey(product, z, x, y);
-    const cached = await tileCache.get(key);
-    if (cached) {
-      return sendTile(res, cached, "image/png", BROWSER_MAX_AGE_S);
-    }
-
-    try {
-      const tiles = await renderTiles(z, x, y);
-      Object.entries(tiles).forEach(([name, body]) =>
-        tileCache.set(tileKey(name, z, x, y), body),
-      );
-      // Below NONNA 10's zoom there is no fine tile; nothing shades there.
-      if (!tiles[product]) return sendFallbackTile(res);
-      return sendTile(res, tiles[product], "image/png", BROWSER_MAX_AGE_S);
-    } catch (e) {
-      // A 403 here means CHS changed the allowlist or the gateway rules.
-      console.error(
-        `NONNA tile ${key} failed:`,
-        e.response ? `upstream ${e.response.status}` : e.message,
-      );
-      return sendFallbackTile(res);
-    }
-  };
-}
-
-const tilePipeline = pipeline({
-  filters: false,
-  cacheFor: null,
-  tileParams: { maxZoom: MAX_ZOOM },
-});
 
 /**
  * @swagger
@@ -178,9 +123,9 @@ const tilePipeline = pipeline({
  *     summary: CHS NONNA bathymetry as a Terrarium-encoded DEM tile
  *     tags: [Nonna]
  *     description: >
- *       Fetches Canadian Hydrographic Service NONNA elevations from the CHS
- *       GeoServer WCS (NONNA 10 where it has soundings from zoom 11, NONNA 100
- *       elsewhere) and re-encodes them as a 256 px Terrarium PNG
+ *       Fetches Canadian Hydrographic Service NONNA 10 elevations from the CHS
+ *       GeoServer WCS, fills its one-pixel no-data seams from the soundings
+ *       around them, and re-encodes them as a 256 px Terrarium PNG
  *       (elevation = R*256 + G + B/256 - 32768, metres, negative below chart
  *       datum). Pixels without soundings are fully transparent and decode to
  *       -32768.
@@ -208,43 +153,38 @@ const tilePipeline = pipeline({
  *       400:
  *         description: Tile coordinates outside the zoom's grid.
  */
-// No apicache: these routes run their own two-tier tile cache.
-router.get("/:z/:x/:y.png", ...tilePipeline, serveTile("merged"));
+// No apicache: this route runs its own two-tier tile cache.
+router.get(
+  "/:z/:x/:y.png",
+  ...pipeline({
+    filters: false,
+    cacheFor: null,
+    tileParams: { maxZoom: MAX_ZOOM },
+  }),
+  async (req, res) => {
+    const z = Number(req.params.z);
+    const x = Number(req.params.x);
+    const y = Number(req.params.y);
 
-/**
- * @swagger
- * /nonna/10/{z}/{x}/{y}.png:
- *   get:
- *     summary: CHS NONNA 10 alone as a Terrarium-encoded DEM tile
- *     tags: [Nonna]
- *     description: >
- *       As /nonna/{z}/{x}/{y}.png, but NONNA 10 only (its one-pixel no-data
- *       seams filled from the soundings around them). The source the map's hillshade reads from zoom 11;
- *       below it, a transparent tile.
- *     parameters:
- *       - in: path
- *         name: z
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: x
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: y
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Terrarium PNG tile.
- *         content:
- *           image/png:
- *             schema:
- *               type: string
- *               format: binary
- *       400:
- *         description: Tile coordinates outside the zoom's grid.
- */
-router.get("/10/:z/:x/:y.png", ...tilePipeline, serveTile("fine"));
+    const key = `${z}/${x}/${y}`;
+    const cached = await tileCache.get(key);
+    if (cached) {
+      return sendTile(res, cached, "image/png", BROWSER_MAX_AGE_S);
+    }
+
+    try {
+      const body = await renderTile(z, x, y);
+      tileCache.set(key, body);
+      return sendTile(res, body, "image/png", BROWSER_MAX_AGE_S);
+    } catch (e) {
+      // A 403 here means CHS changed the allowlist or the gateway rules.
+      console.error(
+        `NONNA tile ${key} failed:`,
+        e.response ? `upstream ${e.response.status}` : e.message,
+      );
+      return sendFallbackTile(res);
+    }
+  },
+);
 
 module.exports = router;

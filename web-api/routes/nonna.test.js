@@ -48,7 +48,7 @@ async function decodeTerrarium(png) {
 
 const getTile = (path) => agent.get(path).buffer(true).parse(binary);
 
-test("encodes NONNA 100 elevations as a Terrarium PNG, nodata transparent", async () => {
+test("encodes NONNA 10 elevations as a Terrarium PNG, nodata transparent", async () => {
   axios.queueResponse(tileTiff({ 0: -12.5, 2: -4000.25, 3: 2 }));
 
   const res = await getTile("/nonna/6/10/10.png");
@@ -58,72 +58,27 @@ test("encodes NONNA 100 elevations as a Terrarium PNG, nodata transparent", asyn
   assert.ok(res.headers["cache-control"].includes("max-age=604800"));
   const elevationAt = await decodeTerrarium(res.body);
   assert.equal(elevationAt(0), -12.5);
-  assert.equal(elevationAt(1), null);
   assert.equal(elevationAt(2), -4000.25);
   assert.equal(elevationAt(3), 2);
+  assert.equal(elevationAt(100), null);
 
   assert.equal(axios.calls.length, 1);
   const url = new URL(axios.calls[0].url);
-  assert.equal(url.searchParams.get("coverageId"), "nonna__NONNA 100 Coverage");
+  assert.equal(url.searchParams.get("coverageId"), "nonna__NONNA 10 Coverage");
   assert.equal(url.searchParams.getAll("subset").length, 2);
   assert.equal(url.searchParams.get("scalesize"), "i(256),j(256)");
 });
 
-test("from zoom 11, NONNA 10 wins where it has soundings and NONNA 100 fills the rest", async () => {
-  axios.queueResponse(tileTiff({ 0: -7 }));
-  axios.queueResponse(tileTiff({ 0: -9, 200: -30 }));
-
-  const res = await getTile("/nonna/11/600/700.png");
-
-  const elevationAt = await decodeTerrarium(res.body);
-  assert.equal(elevationAt(0), -7);
-  assert.equal(elevationAt(200), -30);
-  assert.equal(elevationAt(201), null);
-  assert.deepEqual(
-    axios.calls.map((c) => new URL(c.url).searchParams.get("coverageId")),
-    ["nonna__NONNA 10 Coverage", "nonna__NONNA 100 Coverage"],
-  );
-});
-
-test("NONNA 10's one-pixel seams fill from the soundings around them, in both tiles", async () => {
-  // Pixel 1 is a seam between two 10 m soundings; pixel 200 is well clear of
-  // any, so the hillshade leaves it and the colour takes NONNA 100's.
+test("NONNA 10's one-pixel seams fill from the soundings around them", async () => {
+  // Pixel 1 is a seam between two soundings; pixel 300 is well clear of any.
   axios.queueResponse(tileTiff({ 0: -6, 2: -8 }));
-  axios.queueResponse(tileTiff({ 1: -30, 200: -40 }));
 
-  const merged = await decodeTerrarium(
+  const elevationAt = await decodeTerrarium(
     (await getTile("/nonna/12/600/700.png")).body,
   );
-  const fine = await decodeTerrarium(
-    (await getTile("/nonna/10/12/600/700.png")).body,
-  );
 
-  assert.equal(merged(1), -7);
-  assert.equal(fine(1), -7);
-  assert.equal(merged(200), -40);
-  assert.equal(fine(200), null);
-  assert.equal(axios.calls.length, 2);
-});
-
-test("a merged tile from zoom 11 also caches the hillshade's, sparing its WCS calls", async () => {
-  axios.queueResponse(tileTiff({ 0: -7 }));
-  axios.queueResponse(tileTiff({ 0: -9, 1: -30 }));
-  await getTile("/nonna/12/601/700.png");
-  assert.equal(axios.calls.length, 2);
-
-  const fine = await getTile("/nonna/10/12/601/700.png");
-
-  assert.equal(axios.calls.length, 2);
-  const elevationAt = await decodeTerrarium(fine.body);
-  assert.equal(elevationAt(0), -7);
-});
-
-test("the hillshade's tile is transparent below NONNA 10's zoom", async () => {
-  axios.queueResponse(tileTiff({ 0: -9 }));
-
-  const res = await getTile("/nonna/10/8/70/90.png");
-
-  assert.equal(res.headers["cache-control"], "public, max-age=60");
+  assert.equal(elevationAt(1), -7);
+  assert.equal(elevationAt(300), null);
 });
 
 test("requests the tile's Web Mercator bounds", async () => {

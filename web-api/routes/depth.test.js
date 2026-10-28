@@ -22,9 +22,8 @@ const etopo = (z) => ({
   },
 });
 
-test("reads NONNA 10 first, as positive metres", async () => {
+test("reads NONNA 10, as positive metres", async () => {
   axios.queueResponse(nonna(-26.43));
-  axios.queueResponse(nonna(-30));
 
   const res = await agent.get("/depth?lon=-63.55&lat=44.62");
 
@@ -32,21 +31,15 @@ test("reads NONNA 10 first, as positive metres", async () => {
   assert.deepEqual(res.body, { depth: 26.4, resolution: 10, source: "nonna" });
   const subsets = new URL(axios.calls[0].url).searchParams.getAll("subset");
   assert.match(subsets[0], /^X\(-7074\d{3}\.\d+\)$/);
+  assert.equal(
+    new URL(axios.calls[0].url).searchParams.get("coverageId"),
+    "nonna__NONNA 10 Coverage",
+  );
   // NOAA is only asked where CHS has nothing.
-  assert.equal(axios.calls.length, 2);
-});
-
-test("falls back to NONNA 100 where NONNA 10 has no sounding", async () => {
-  axios.queueResponse(nonna(NODATA));
-  axios.queueResponse(nonna(-5.21));
-
-  const res = await agent.get("/depth?lon=-63.53&lat=44.6");
-
-  assert.deepEqual(res.body, { depth: 5.2, resolution: 100, source: "nonna" });
+  assert.equal(axios.calls.length, 1);
 });
 
 test("answers from ETOPO where CHS has no sounding, land included", async () => {
-  axios.queueResponse(nonna(NODATA));
   axios.queueResponse(nonna(NODATA));
   axios.queueResponse(etopo(9.71));
 
@@ -54,13 +47,12 @@ test("answers from ETOPO where CHS has no sounding, land included", async () => 
 
   assert.deepEqual(res.body, { depth: -9.7, resolution: 450, source: "etopo" });
   assert.equal(
-    decodeURIComponent(new URL(axios.calls[2].url).search),
+    decodeURIComponent(new URL(axios.calls[1].url).search),
     "?z[(75)][(-80)]",
   );
 });
 
 test("still answers from ETOPO when CHS fails", async () => {
-  axios.queueError(new Error("timeout"));
   axios.queueError(new Error("timeout"));
   axios.queueResponse(etopo(-94));
 
@@ -70,7 +62,6 @@ test("still answers from ETOPO when CHS fails", async () => {
 });
 
 test("answers 502 when neither source does", async () => {
-  axios.queueResponse(nonna(NODATA));
   axios.queueResponse(nonna(NODATA));
   axios.queueError(new Error("timeout"));
 

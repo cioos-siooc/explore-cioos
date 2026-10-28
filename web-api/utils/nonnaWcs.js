@@ -7,11 +7,7 @@ const sharp = require("sharp");
 
 const NONNA_WCS = "https://nonna-geoserver.data.chs-shc.ca/geoserver/wcs";
 
-// Finest first: a pixel takes the first product that has a sounding there.
-const COVERAGES = [
-  { resolution: 10, id: "nonna__NONNA 10 Coverage", minZoom: 11 },
-  { resolution: 100, id: "nonna__NONNA 100 Coverage", minZoom: 0 },
-];
+const NONNA_10 = { resolution: 10, id: "nonna__NONNA 10 Coverage" };
 
 // Float32 max; CHS's nodata.
 const NODATA_ABOVE = 1e30;
@@ -48,26 +44,23 @@ async function fetchElevations(url) {
 
 const isSounding = (v) => Number.isFinite(v) && v < NODATA_ABOVE;
 
-// The finest sounding under a point, as { elevation, resolution }, or null
+// The NONNA 10 sounding under a point, as { elevation, resolution }, or null
 // where CHS has none.
 async function nonnaElevationAt(lon, lat) {
   const mx = (lon * WEB_MERCATOR_HALF) / 180;
   const my =
     (Math.log(Math.tan(((90 + lat) * Math.PI) / 360)) * WEB_MERCATOR_HALF) /
     Math.PI;
-  const values = await Promise.all(
-    COVERAGES.map(({ id }) =>
-      fetchElevations(wcsUrl(id, [`X(${mx})`, `Y(${my})`])),
-    ),
+  const [elevation] = await fetchElevations(
+    wcsUrl(NONNA_10.id, [`X(${mx})`, `Y(${my})`]),
   );
-  const i = values.findIndex((value) => isSounding(value[0]));
-  return i === -1
-    ? null
-    : { elevation: values[i][0], resolution: COVERAGES[i].resolution };
+  return isSounding(elevation)
+    ? { elevation, resolution: NONNA_10.resolution }
+    : null;
 }
 
 module.exports = {
-  COVERAGES,
+  NONNA_10,
   WEB_MERCATOR_HALF,
   fetchElevations,
   isSounding,

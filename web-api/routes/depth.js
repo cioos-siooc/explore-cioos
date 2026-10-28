@@ -34,7 +34,7 @@ const toDepth = (elevation) => Math.round(-elevation * 10) / 10;
  *     summary: Seafloor depth, or land elevation, at a point
  *     tags: [Basemap]
  *     description: >
- *       CHS NONNA where it has a sounding (NONNA 10, else NONNA 100; metres
+ *       CHS NONNA 10 where it has a sounding (metres
  *       below chart datum), otherwise NOAA ETOPO 2022 at 15 arc-seconds
  *       (metres below mean sea level). depth is negative above the datum:
  *       ground that dries, or land. Fields are null when neither source has a
