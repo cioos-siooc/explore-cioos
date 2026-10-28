@@ -189,10 +189,10 @@ describe("DatasetMetadata", () => {
       .getAllByRole("link")
       .filter((link) => link.classList.contains("metadataResource"));
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      DATASET.erddap_url,
-      "https://erddap.example.org/erddap/info/example_ctd/index.html",
+      "https://erddap.example.org/erddap/en/tabledap/example_ctd.html",
+      "https://erddap.example.org/erddap/en/info/example_ctd/index.html",
       "https://erddap.example.org/erddap/metadata/iso19115/xml/example_ctd_iso19115.xml",
-      DATASET.ckan_url,
+      "https://catalogue.cioos.ca/en/dataset/abc",
       "https://example.org",
     ]);
     expect(links[0]).toHaveTextContent("Data access form");

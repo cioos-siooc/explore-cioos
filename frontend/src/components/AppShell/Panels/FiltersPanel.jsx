@@ -54,6 +54,7 @@ import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import { OptionStateLegend } from "../../Controls/Filter/MultiCheckboxFilter/OptionState.jsx";
 import "./styles.css";
 
 const isSet = (option) => option.isSelected || option.isExcluded;
@@ -138,7 +139,10 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
   const { openFilter, setOpenFilter, filterSearchText } = useUI();
   // Kept here so a visit to a filter's own page and back finds it as left.
   const [searchText, setSearchText] = useState(filterSearchText ?? "");
-  const [, resetAll] = useResetAllFilters();
+  // Rows picked from the empty search stay listed, so several values can be
+  // picked in a row and a removed one picked again; Clear all drops them.
+  const [searchTouched, setSearchTouched] = useState(() => new Set());
+  const [canReset, resetAll] = useResetAllFilters();
   const {
     ready: countsReady,
     updating: countsUpdating,
@@ -184,7 +188,7 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
     orgsFilterTranslationKey,
     orgsSelected,
   );
-  const datasetsFilterTranslationKey = "datasetsFilterName";
+  const datasetsFilterTranslationKey = "datasetTitleFilterName";
   const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(
     t,
     datasetsFilterTranslationKey,
@@ -296,6 +300,8 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
           <FilterSearch
             text={searchText}
             setText={setSearchText}
+            touched={searchTouched}
+            setTouched={setSearchTouched}
             inputRef={searchInputRef}
           />
         )}
@@ -324,9 +330,11 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               icon={<Stack />}
               controlled
               filterName={dataLayersFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === dataLayersFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={resetDataLayers}
+              infoButton="https://cfconventions.org/Data/cf-conventions/cf-conventions-1.11/cf-conventions.html#discrete-sampling-geometries"
             >
               <DataLayersFilter />
             </Filter>
@@ -343,18 +351,20 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setSearchTerms={setEovsSearchTerms}
               searchPlaceholder={t("oceanVariableFilterSeachPlaceholder")}
               filterName={eovsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === eovsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
                 setAllOptionsIsSelectedTo(false, eovsSelected, setEovsSelected)
               }
-            >
-              {matchAllSwitch(
+              controls={matchAllSwitch(
                 "eovs-match-all",
                 eovsMatchAll,
                 setEovsMatchAll,
                 "matchAll",
               )}
+              infoButton="https://goosocean.org/what-we-do/framework/essential-ocean-variables/"
+            >
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   eovsSearchTerms,
@@ -380,6 +390,7 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setSearchTerms={setPlatformsSearchTerms}
               searchPlaceholder={t("platformsFilterSeachPlaceholder")}
               filterName={platformsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === platformsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
@@ -420,13 +431,18 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setSearchTerms={setOrgsSearchTerms}
               searchPlaceholder={t("organizationFilterSearchPlaceholder")}
               filterName={orgsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === orgsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
                 setAllOptionsIsSelectedTo(false, orgsSelected, setOrgsSelected)
               }
+              controls={matchAllSwitch(
+                "orgs-match-all",
+                orgsMatchAll,
+                setOrgsMatchAll,
+              )}
             >
-              {matchAllSwitch("orgs-match-all", orgsMatchAll, setOrgsMatchAll)}
               <MultiCheckboxFilter
                 optionsSelected={createOptionSubset(
                   orgsSearchTerms,
@@ -451,6 +467,7 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setSearchTerms={setDatasetSearchTerms}
               searchPlaceholder={t("datasetSearchPlaceholder")}
               filterName={datasetsFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === datasetsFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() =>
@@ -487,6 +504,7 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               setSearchTerms={setSourcesSearchTerms}
               searchPlaceholder={t("sourceFilterSearchPlaceholder")}
               filterName={sourcesFilterTranslationKey}
+              legend={<OptionStateLegend />}
               openFilter={openFilter === sourcesFilterTranslationKey}
               setOpenFilter={setOpenFilter}
               resetButton={() => {
@@ -600,14 +618,11 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
                 />
                 <span>{t("realtimeFilterOptionText")}</span>
               </label>
-              <div className="inViewFilterCount">
-                {t("realtimeFilterHelpText")}
-              </div>
             </Filter>
             <Filter
               active={onlyInView}
               badgeTitle={t("datasetsCardOnlyInViewText")}
-              tooltip={t("datasetsCardOnlyInViewTitle")}
+              tooltip={t("inViewFilterTooltip")}
               icon={<Eye />}
               controlled
               filterName={inViewFilterName}
@@ -643,8 +658,10 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
                 setSearchTerms={setScientificNameSearchTerms}
                 searchPlaceholder={t("scientificNameFilterSearchPlaceholder")}
                 filterName={scientificNamesFilterTranslationKey}
+                legend={<OptionStateLegend />}
                 openFilter={openFilter === scientificNamesFilterTranslationKey}
                 tipTarget="speciesName"
+                infoButton="https://www.marinespecies.org/"
                 setOpenFilter={setOpenFilter}
                 resetButton={
                   scientificNamesPicked.length > 0
@@ -654,12 +671,12 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
                       }
                     : undefined
                 }
-              >
-                {matchAllSwitch(
+                controls={matchAllSwitch(
                   "scientific-names-match-all",
                   scientificNamesMatchAll,
                   setScientificNamesMatchAll,
                 )}
+              >
                 <ScientificNameFilter
                   scientificNamesSelected={scientificNamesSelected}
                   setScientificNamesSelected={setScientificNamesSelected}
@@ -696,10 +713,15 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
           )}
         </span>
         <span className="filtersPanelActions">
+          {/* Hidden rather than removed, so the footer keeps its height. */}
           <button
             type="button"
             className="filtersPanelReset"
-            onClick={resetAll}
+            style={canReset ? undefined : { visibility: "hidden" }}
+            onClick={() => {
+              resetAll();
+              setSearchTouched(new Set());
+            }}
             title={t("resetFiltersButtonTooltipText")}
           >
             {t("filtersPanelResetAll")}
