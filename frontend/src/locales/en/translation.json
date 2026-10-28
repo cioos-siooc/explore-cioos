@@ -79,6 +79,8 @@
   "downloadEmailPlaceholder": "you@institution.ca",
   "downloadRememberEmailLabel": "Remember my email on this device",
   "downloadEmailNotice": "We use your email only to send you this download, and delete it 7 days after the download is processed, keeping just its domain (such as uvic.ca) for usage statistics.",
+  "downloadLinkLifetime_one": "The emailed link works for {{count}} day, then the file is deleted.",
+  "downloadLinkLifetime_other": "The emailed link works for {{count}} days, then the file is deleted.",
   "privacyLinkText": "Privacy",
   "privacyModalTitle": "Privacy",
   "privacyModalSubtitle": "What this site keeps, what leaves your browser, and why.",

@@ -79,6 +79,8 @@
   "downloadEmailPlaceholder": "vous@institution.ca",
   "downloadRememberEmailLabel": "Mémoriser mon courriel sur cet appareil",
   "downloadEmailNotice": "Votre courriel sert uniquement à vous envoyer ce téléchargement; nous le supprimons 7 jours après son traitement, en ne gardant que son domaine (par exemple uvic.ca) à des fins statistiques.",
+  "downloadLinkLifetime_one": "Le lien envoyé par courriel reste valide {{count}} jour, puis le fichier est supprimé.",
+  "downloadLinkLifetime_other": "Le lien envoyé par courriel reste valide {{count}} jours, puis le fichier est supprimé.",
   "privacyLinkText": "Confidentialité",
   "privacyModalTitle": "Confidentialité",
   "privacyModalSubtitle": "Ce que ce site conserve, ce qui quitte votre navigateur, et pourquoi.",
