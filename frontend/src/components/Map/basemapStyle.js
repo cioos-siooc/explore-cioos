@@ -28,8 +28,8 @@ const EMODNET_TILES = `${server}/emodnet/{z}/{x}/{y}.webp`;
 const ESRI_IMAGERY_TILES =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
-// Terrarium DEM tiles re-encoded from CHS's WCS by web-api/routes/nonna.js
-// (NONNA 10 over NONNA 100), so the ramp below is ours, not baked in.
+// NONNA 10 as Terrarium DEM tiles re-encoded from CHS's WCS by
+// web-api/routes/nonna.js, so the ramp below is ours, not baked in.
 const NONNA_DEM_TILES = `${server}/nonna/{z}/{x}/{y}.png`;
 // What a transparent Terrarium pixel decodes to: no sounding.
 const NONNA_NODATA_ELEVATION = -32768;
@@ -49,11 +49,6 @@ const NONNA_COLOR_RAMP = [
   nonnaRampStops[1],
   ...nonnaRampStops,
 ];
-
-const NONNA_10_DEM_TILES = `${server}/nonna/10/{z}/{x}/{y}.png`;
-// Where the proxy starts drawing NONNA 10 into the merged tiles
-// (web-api/routes/nonna.js COVERAGES).
-const NONNA_FINE_ZOOM = 11;
 
 const NONNA_HILLSHADE_PAINT = {
   // Hillshade has no opacity; fading its colours does the same job.
@@ -244,22 +239,11 @@ export function buildBasemapStyle(lang = "en") {
         resampling: "nearest",
       },
     },
-    // Past NONNA_FINE_ZOOM the 100 m grid is upscaled and shades as
-    // stair-steps, so the hillshade moves to NONNA 10 alone and leaves
-    // 100 m-only water flat.
     {
       id: "bathymetry-nonna-hillshade",
       type: "hillshade",
       source: "nonna",
       minzoom: basemapPrewarmZoom,
-      maxzoom: NONNA_FINE_ZOOM,
-      paint: NONNA_HILLSHADE_PAINT,
-    },
-    {
-      id: "bathymetry-nonna-10-hillshade",
-      type: "hillshade",
-      source: "nonna10",
-      minzoom: NONNA_FINE_ZOOM,
       paint: NONNA_HILLSHADE_PAINT,
     },
     // Pulls the sea toward CIOOS teal while EMODnet is the base; lifts off as
@@ -576,14 +560,6 @@ export function buildBasemapStyle(lang = "en") {
         tileSize: 256,
         maxzoom: 14,
         attribution: CHS_ATTRIBUTION,
-      },
-      nonna10: {
-        type: "raster-dem",
-        encoding: "terrarium",
-        tiles: [NONNA_10_DEM_TILES],
-        tileSize: 256,
-        minzoom: NONNA_FINE_ZOOM,
-        maxzoom: 14,
       },
       ofm: {
         type: "vector",

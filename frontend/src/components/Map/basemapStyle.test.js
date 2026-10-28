@@ -26,7 +26,6 @@ describe("buildBasemapStyle", () => {
       "bathymetry",
       "imagery",
       "nonna",
-      "nonna10",
       "ofm",
     ]);
     const layerIds = style.layers.map((layer) => layer.id);
@@ -72,26 +71,21 @@ describe("buildBasemapStyle", () => {
     expect(iEndVal).toBe(1);
   });
 
-  it("colours NONNA from the merged DEM and shades only NONNA 10 once the 100 m grid is upscaled", () => {
+  it("colours and shades NONNA from one DEM source", () => {
     const style = buildBasemapStyle("en");
-    ["nonna", "nonna10"].forEach((id) =>
-      expect(style.sources[id]).toMatchObject({
-        type: "raster-dem",
-        encoding: "terrarium",
-      }),
-    );
+    expect(style.sources.nonna).toMatchObject({
+      type: "raster-dem",
+      encoding: "terrarium",
+    });
     const layer = (id) => style.layers.find((l) => l.id === id);
     expect(layer("bathymetry-nonna")).toMatchObject({
       type: "color-relief",
       source: "nonna",
     });
-    const coarse = layer("bathymetry-nonna-hillshade");
-    const fine = layer("bathymetry-nonna-10-hillshade");
-    expect(coarse).toMatchObject({ type: "hillshade", source: "nonna" });
-    expect(fine).toMatchObject({ type: "hillshade", source: "nonna10" });
-    // One hands straight to the other.
-    expect(fine.minzoom).toBe(coarse.maxzoom);
-    expect(style.sources.nonna10.minzoom).toBe(fine.minzoom);
+    expect(layer("bathymetry-nonna-hillshade")).toMatchObject({
+      type: "hillshade",
+      source: "nonna",
+    });
   });
 
   it("draws pixels without a sounding transparent and the rest on the legend's ramp", () => {

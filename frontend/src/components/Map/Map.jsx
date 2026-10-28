@@ -329,7 +329,7 @@ const BASEMAP_SOURCE_IDS = ["bathymetry", "imagery", "ofm"];
 const WATCHED_MAP_LAYERS = [
   { id: "observations", sources: HEX_SOURCE_IDS },
   { id: "tracks", sources: ["tracks", "selected-track"] },
-  { id: "bathymetry", sources: ["bathymetry", "nonna", "nonna10"] },
+  { id: "bathymetry", sources: ["bathymetry", "nonna"] },
   { id: "imagery", sources: ["imagery"] },
   { id: "griddap", sources: ["griddap-coverage"] },
   { id: "wmsOverlay", sources: ["wms-overlay"] },
@@ -394,11 +394,7 @@ const griddapLayerIds = [
 ];
 // Basemap, not data: owned by their own switch and left out of the WMS
 // overlay's hide.
-const bathymetryLayerIds = [
-  "bathymetry-nonna",
-  "bathymetry-nonna-hillshade",
-  "bathymetry-nonna-10-hillshade",
-];
+const bathymetryLayerIds = ["bathymetry-nonna", "bathymetry-nonna-hillshade"];
 
 const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
 

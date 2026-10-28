@@ -19,12 +19,10 @@ describe("DepthProbe", () => {
 
   it("reads a negative depth as a drying height", () => {
     renderWithProviders(
-      <DepthProbe
-        reading={{ depth: -1.5, resolution: 100, source: "nonna" }}
-      />,
+      <DepthProbe reading={{ depth: -1.5, resolution: 10, source: "nonna" }} />,
     );
     expect(probe()).toHaveTextContent("Dries 1.5 m");
-    expect(probe()).toHaveTextContent("CHS NONNA · 100 m grid");
+    expect(probe()).toHaveTextContent("CHS NONNA · 10 m grid");
   });
 
   it("names ETOPO where it answered, and reads its negative depth as land elevation", () => {
