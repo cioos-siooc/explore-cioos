@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const { v4: uuidv4 } = require("uuid");
+const { randomUUID } = require("crypto");
 const express = require("express");
 
 const router = express.Router();
@@ -121,7 +121,7 @@ router.get(
       const tileRaw = await db.raw(SQL);
       const tile = tileRaw.rows[0];
       if (tile.json_agg && tile.json_agg.length) {
-        const jobID = uuidv4().substr(0, 6);
+        const jobID = randomUUID().substr(0, 6);
         const downloaderInput = {
           user_query: {
             language: lang,
