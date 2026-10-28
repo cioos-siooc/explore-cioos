@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Megaphone } from "react-bootstrap-icons";
+import { ChatDots } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 // Sentry's dialog renders in its own shadow DOM, so labels are handed to it from
@@ -44,7 +44,7 @@ export default function FeedbackButton({ className, size = 16, label }) {
       title={t("feedbackButtonTitle")}
       aria-label={label ? undefined : t("feedbackButtonTitle")}
     >
-      <Megaphone size={size} aria-hidden="true" />
+      <ChatDots size={size} aria-hidden="true" />
       {label}
     </button>
   );
