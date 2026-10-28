@@ -13,6 +13,8 @@ import {
   Filter,
   SlashCircle,
   Square,
+  ViewList,
+  ViewStacked,
   X,
   XCircle,
 } from "react-bootstrap-icons";
@@ -25,6 +27,7 @@ import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
+import { usePersistentState } from "../../../state/usePersistentState.js";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
   GRID_KEY,
@@ -99,6 +102,11 @@ export default function DatasetsTable({
   const { tipHighlight } = useTips();
 
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
+  const [compactPreference, setCompact] = usePersistentState(
+    "compactList",
+    false,
+  );
+  const compact = compactPreference && !isDownloadModal;
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
   const listRef = useRef(null);
@@ -543,6 +551,25 @@ export default function DatasetsTable({
             options={groupByOptions}
             onChange={setGroupBy}
           />
+          <button
+            type="button"
+            className="datasetsCardDensity"
+            data-testid="datasets-density-toggle"
+            onClick={() => setCompact(!compact)}
+            aria-pressed={compact}
+            aria-label={t("datasetsCardDensityCompactTitle")}
+            title={t(
+              compact
+                ? "datasetsCardDensityComfortableTitle"
+                : "datasetsCardDensityCompactTitle",
+            )}
+          >
+            {compact ? (
+              <ViewList size={14} aria-hidden="true" />
+            ) : (
+              <ViewStacked size={14} aria-hidden="true" />
+            )}
+          </button>
         </div>
       )}
 
@@ -603,7 +630,7 @@ export default function DatasetsTable({
         </div>
       )}
       <div
-        className="datasetsCardList"
+        className={classNames("datasetsCardList", { compact })}
         ref={listRef}
         onScroll={(event) => {
           if (!hidden) scrollTopRef.current = event.currentTarget.scrollTop;

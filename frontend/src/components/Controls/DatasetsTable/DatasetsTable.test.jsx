@@ -164,6 +164,36 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     expect(ui.openFilter).toBeUndefined();
   });
 
+  it("the density toggle switches to compact rows and remembers it", async () => {
+    const renderSidebarTable = () =>
+      renderWithProviders(
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />,
+        { providers: "app" },
+      );
+    const { user, unmount } = renderSidebarTable();
+    await screen.findAllByTestId("dataset-card");
+    const toggle = screen.getByRole("button", { name: "Compact rows" });
+    const list = document.querySelector(".datasetsCardList");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(list).not.toHaveClass("compact");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(list).toHaveClass("compact");
+    expect(window.localStorage.getItem("cde.compactList")).toBe("true");
+
+    unmount();
+    renderSidebarTable();
+    await screen.findAllByTestId("dataset-card");
+    expect(document.querySelector(".datasetsCardList")).toHaveClass("compact");
+  });
+
   it("shows the no-results message when the datasets prop is empty", async () => {
     renderWithProviders(
       <DatasetsTable
@@ -632,6 +662,28 @@ describe("DatasetsTable (download modal)", () => {
 
     await waitFor(() => expect(selection.selectedPks.has(1)).toBe(false));
     expect(handleSelectDataset).not.toHaveBeenCalled();
+  });
+
+  it("offers no density toggle and ignores a stored compact preference", async () => {
+    window.localStorage.setItem("cde.compactList", "true");
+    renderWithProviders(
+      <DatasetsTable
+        isDownloadModal
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+
+    expect(
+      screen.queryByTestId("datasets-density-toggle"),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector(".datasetsCardList")).not.toHaveClass(
+      "compact",
+    );
   });
 
   describe("with the gridded coverage layer on", () => {
