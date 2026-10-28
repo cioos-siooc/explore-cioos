@@ -6,8 +6,8 @@ import {
   Bezier2,
   Download,
   InfoCircle,
-  GeoAlt,
   GlobeAmericas,
+  Grid3x3Gap,
   Lightbulb,
   Search,
   Water,
@@ -20,14 +20,15 @@ import FeedbackButton from "../FeedbackButton/FeedbackButton.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
-import { MARKER_MIN_ZOOM } from "../../config.js";
 import useMediaQuery, {
   REDUCED_MOTION_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { TIPS, useTips } from "../../../state/tips/TipsProvider.jsx";
 import {
+  findGridded,
   findTrajectory,
+  showGridded,
   showNonna,
   showTrajectory,
 } from "../../../state/tips/scenes.js";
@@ -40,22 +41,15 @@ const FEATURES = [
   { key: "download", Icon: Download },
 ];
 
-// The Gulf of St. Lawrence, thick with profile and time-series stations, framed
-// just past the zoom where hexes give way to markers.
-const STATIONS_SHOWCASE_CENTRE = {
-  type: "Point",
-  coordinates: [-63.914, 49.038],
-};
-const STATIONS_SHOWCASE_ZOOM = MARKER_MIN_ZOOM + 0.8;
-
 // Each uses the same actions the controls do, as a user would have.
 function useShowcases(close) {
   const { pointsData, setInspectDataset, selectTrajectoryFromMap } =
     useSelection();
   const { zoomToGeometry, setBathymetryVisible } = useMapState();
-  const { setShowCoverageModal } = useUI();
+  const { setShowCoverageModal, setSidebarOpen } = useUI();
 
   const trajectory = findTrajectory(pointsData);
+  const gridded = findGridded(pointsData);
 
   return [
     trajectory && {
@@ -68,13 +62,14 @@ function useShowcases(close) {
           zoomToGeometry,
         }),
     },
-    {
-      key: "stations",
-      Icon: GeoAlt,
-      run: () =>
-        zoomToGeometry(STATIONS_SHOWCASE_CENTRE, {
-          maxZoom: STATIONS_SHOWCASE_ZOOM,
-        }),
+    gridded && {
+      key: "gridded",
+      Icon: Grid3x3Gap,
+      // The overlay is drawn by the dataset page, which lives in the sidebar.
+      run: () => {
+        setSidebarOpen(true);
+        showGridded(gridded, { setInspectDataset, zoomToGeometry });
+      },
     },
     {
       key: "nonna",

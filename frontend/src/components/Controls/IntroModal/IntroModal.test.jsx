@@ -82,8 +82,8 @@ describe("IntroModal", () => {
     expect(setShowModal).toHaveBeenCalledWith(false);
   });
 
-  describe("See it in action", () => {
-    it("See the seafloor in Halifax Harbour turns the NONNA layer on", async () => {
+  describe("New feature highlights", () => {
+    it("High-resolution bathymetry turns the NONNA layer on", async () => {
       window.localStorage.setItem(
         "cde.bathymetryVisible",
         JSON.stringify(false),
@@ -93,32 +93,30 @@ describe("IntroModal", () => {
       expect(screen.getByTestId("bathymetry")).toHaveTextContent("off");
       await user.click(
         screen.getByRole("button", {
-          name: /See the seafloor in Halifax Harbour/,
+          name: /High-resolution bathymetry/,
         }),
       );
       expect(setShowModal).toHaveBeenCalledWith(false);
       expect(screen.getByTestId("bathymetry")).toHaveTextContent("on");
     });
 
-    it("When was the data collected? opens the time coverage chart", async () => {
+    it("See when data was collected opens the time coverage chart", async () => {
       const setShowModal = vi.fn();
       const { user } = renderIntro({ setShowModal });
       await user.click(
-        screen.getByRole("button", { name: /When was the data collected/ }),
+        screen.getByRole("button", { name: /See when data was collected/ }),
       );
       expect(setShowModal).toHaveBeenCalledWith(false);
       expect(screen.getByTestId("coverage-modal")).toHaveTextContent("open");
     });
 
-    it("Zoom into the Gulf of St. Lawrence closes the dialog to show the map", async () => {
-      const setShowModal = vi.fn();
-      const { user } = renderIntro({ setShowModal });
-      await user.click(
-        screen.getByRole("button", {
-          name: /Zoom into the Gulf of St. Lawrence/,
-        }),
-      );
-      expect(setShowModal).toHaveBeenCalledWith(false);
+    // The fixture catalogue has no dataset with a WMS server.
+    it("hides the gridded showcase when no dataset has a WMS server", async () => {
+      renderIntro();
+      await screen.findByText("datasets");
+      expect(
+        screen.queryByRole("button", { name: /Draw gridded data on the map/ }),
+      ).not.toBeInTheDocument();
     });
   });
 

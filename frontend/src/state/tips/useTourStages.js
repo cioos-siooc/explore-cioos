@@ -4,6 +4,7 @@ import { useSelection } from "../selection/SelectionProvider.jsx";
 import { useUI } from "../ui/UIProvider.jsx";
 import {
   findTrajectory,
+  findGridded,
   showGridded,
   showTrajectory,
   showWhatsHere,
@@ -40,7 +41,6 @@ export default function useTourStages() {
   };
   const hasFeatureList = (dataset) =>
     dataset.source_type !== "obis" && dataset.cdm_data_type !== "Grid";
-  const findGridded = () => pointsData.find((row) => row.wms_url);
   const showQuickFilters = () => setQuickFiltersCollapsed(false);
   const openFilter = (filterName) => () => {
     setOpenFilter(filterName);
@@ -63,7 +63,7 @@ export default function useTourStages() {
       !(inspectDataset && hasFeatureList(inspectDataset)) &&
         !pointsData.some(hasFeatureList) &&
         "showData",
-      !findGridded() && "griddapWms",
+      !findGridded(pointsData) && "griddapWms",
     ].filter(Boolean),
   );
 
@@ -90,7 +90,7 @@ export default function useTourStages() {
       });
     },
     griddapWms: () => {
-      const dataset = findGridded();
+      const dataset = findGridded(pointsData);
       if (!dataset) return;
       setSidebarOpen(true);
       showGridded(dataset, { setInspectDataset, zoomToGeometry });
