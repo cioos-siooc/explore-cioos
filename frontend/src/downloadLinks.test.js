@@ -11,6 +11,8 @@ import {
   linksToCsv,
   linksToCurlScript,
   linksToText,
+  localizedCkanUrl,
+  localizedErddapUrl,
   obisDownloadUrl,
 } from "./downloadLinks.js";
 
@@ -204,6 +206,51 @@ describe("ckanRecordUrl", () => {
     // ckan_id NULL makes the whole concatenation NULL upstream.
     expect(ckanRecordUrl(null)).toBeNull();
     expect(ckanRecordUrl("https://catalogue.cioos.ca/")).toBeNull();
+  });
+});
+
+describe("localizedCkanUrl", () => {
+  it("prefixes the catalogue page with the French locale", () => {
+    expect(localizedCkanUrl(erddapRow.ckan_url, "fr")).toBe(
+      "https://catalogue.cioos.ca/fr/dataset/ff21-4d1e",
+    );
+  });
+
+  it("names English too, since the catalogue's default is configurable", () => {
+    expect(localizedCkanUrl(erddapRow.ckan_url, "en")).toBe(
+      "https://catalogue.cioos.ca/en/dataset/ff21-4d1e",
+    );
+  });
+
+  it("has nothing to localize for a dataset with no catalogue entry", () => {
+    expect(localizedCkanUrl(null, "fr")).toBeNull();
+  });
+});
+
+describe("localizedErddapUrl", () => {
+  const landing = "https://data.cioospacific.ca/erddap/tabledap/ios.html";
+
+  it("puts the language right after the server base", () => {
+    expect(localizedErddapUrl(erddapRow, landing, "fr")).toBe(
+      "https://data.cioospacific.ca/erddap/fr/tabledap/ios.html",
+    );
+  });
+
+  it("works from the landing page alone", () => {
+    expect(localizedErddapUrl({ erddap_url: landing }, landing, "fr")).toBe(
+      "https://data.cioospacific.ca/erddap/fr/tabledap/ios.html",
+    );
+  });
+
+  it("names English too, since the server's default is configurable", () => {
+    expect(localizedErddapUrl(erddapRow, landing, "en")).toBe(
+      "https://data.cioospacific.ca/erddap/en/tabledap/ios.html",
+    );
+  });
+
+  it("leaves OBIS pages as they are", () => {
+    const obisPage = `https://obis.org/dataset/${obisRow.dataset_id}`;
+    expect(localizedErddapUrl(obisRow, obisPage, "fr")).toBe(obisPage);
   });
 });
 

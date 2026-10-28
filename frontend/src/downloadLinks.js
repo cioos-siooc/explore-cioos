@@ -91,6 +91,28 @@ export function ckanRecordUrl(ckanUrl) {
   return `${origin}/api/3/action/package_show?id=${encodeURIComponent(id)}`;
 }
 
+// Both CKAN and ERDDAP (2.12+) default to whatever language their manager
+// set, so the page's language is always named in the URL.
+const urlLanguage = (language) => (language?.startsWith("fr") ? "fr" : "en");
+
+export function localizedCkanUrl(ckanUrl, language) {
+  if (!ckanUrl) return ckanUrl;
+  const [origin, id] = ckanUrl.split(CKAN_DATASET_PATH);
+  if (!id) return ckanUrl;
+  return `${origin}/${urlLanguage(language)}${CKAN_DATASET_PATH}${id}`;
+}
+
+const isObis = (row) => row?.source_type === "obis";
+
+// ERDDAP takes the language as the first segment after the server base.
+// obis.org has no French UI.
+export function localizedErddapUrl(row, url, language) {
+  if (!url || isObis(row)) return url;
+  const base = erddapServerBase(row);
+  if (!base || !url.startsWith(`${base}/`)) return url;
+  return `${base}/${urlLanguage(language)}${url.slice(base.length)}`;
+}
+
 // Some rows (and the download panel's reshaping) only carry the landing page.
 export function erddapServerBase(row) {
   const base = row?.erddap_server_url;
@@ -99,8 +121,6 @@ export function erddapServerBase(row) {
   if (!landing) return null;
   return landing.replace(/\/(tabledap|griddap)\/.*$/, "");
 }
-
-const isObis = (row) => row?.source_type === "obis";
 
 // dataset_folder_name in downloader/cioos_downloader/download_erddap.py.
 function datasetFolder(row) {
