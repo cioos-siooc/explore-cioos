@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { setViewportHeight } from "../../../test/viewport.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -164,6 +165,27 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     expect(ui.openFilter).toBeUndefined();
   });
 
+  it("starts compact on a short window until the viewer picks full cards", async () => {
+    setViewportHeight(700);
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    const list = document.querySelector(".datasetsCardList");
+    expect(list).toHaveClass("compact");
+
+    await user.click(screen.getByTestId("datasets-density-toggle"));
+
+    expect(list).not.toHaveClass("compact");
+    expect(window.localStorage.getItem("cde.listDensity")).toBe('"full"');
+  });
+
   it("the density toggle switches to compact rows and remembers it", async () => {
     const renderSidebarTable = () =>
       renderWithProviders(
@@ -186,7 +208,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(list).toHaveClass("compact");
-    expect(window.localStorage.getItem("cde.compactList")).toBe("true");
+    expect(window.localStorage.getItem("cde.listDensity")).toBe('"compact"');
 
     unmount();
     renderSidebarTable();
@@ -665,7 +687,7 @@ describe("DatasetsTable (download modal)", () => {
   });
 
   it("offers no density toggle and ignores a stored compact preference", async () => {
-    window.localStorage.setItem("cde.compactList", "true");
+    window.localStorage.setItem("cde.listDensity", '"compact"');
     renderWithProviders(
       <DatasetsTable
         isDownloadModal

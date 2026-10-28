@@ -25,6 +25,7 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import useMediaQuery, { SHORT_QUERY } from "../../../state/ui/useMediaQuery.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
 import { usePersistentState } from "../../../state/usePersistentState.js";
@@ -102,11 +103,11 @@ export default function DatasetsTable({
   const { tipHighlight } = useTips();
 
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
-  const [compactPreference, setCompact] = usePersistentState(
-    "compactList",
-    false,
-  );
-  const compact = compactPreference && !isDownloadModal;
+  const shortScreen = useMediaQuery(SHORT_QUERY);
+  // Unset until the viewer picks one, so the list follows the window height.
+  const [density, setDensity] = usePersistentState("listDensity", null);
+  const compact =
+    !isDownloadModal && (density ? density === "compact" : shortScreen);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
   const listRef = useRef(null);
@@ -555,7 +556,7 @@ export default function DatasetsTable({
             type="button"
             className="datasetsCardDensity"
             data-testid="datasets-density-toggle"
-            onClick={() => setCompact(!compact)}
+            onClick={() => setDensity(compact ? "full" : "compact")}
             aria-pressed={compact}
             aria-label={t("datasetsCardDensityCompactTitle")}
             title={t(

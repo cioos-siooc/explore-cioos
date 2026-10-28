@@ -851,14 +851,15 @@ button.datasetCardTitle:focus-visible {
 
 /* The sidebar list keeps titles to two lines, the full title left to its
    tooltip. */
-.sidebar .datasetsCardList .datasetCardTitle {
+.sidebar .datasetsCardList:not(.compact) .datasetCardTitle {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-/* Compact rows (the toolbar's density toggle): a single meta line. */
+/* Compact rows (the toolbar's density toggle): a line each for the title and
+   the meta. */
 .datasetsCardList.compact {
   gap: 4px;
 }
@@ -869,6 +870,12 @@ button.datasetCardTitle:focus-visible {
 
 .datasetsCardList.compact .datasetCardBody {
   gap: 2px;
+}
+
+.datasetsCardList.compact .datasetCardTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .datasetsCardList.compact .datasetCardMeta {
