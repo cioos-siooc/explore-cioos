@@ -214,5 +214,8 @@
   "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Requests for more than 1GB of data from a dataset can be downloaded through the provided ERDDAP™ link",
   "datasetTableDownloadModalExternalDownloadColumnName": "External download",
   "versionBannerMessage": "A new version of the CIOOS Data Explorer is coming soon.",
-  "versionBannerSubscribe": "Subscribe to our newsletter to be notified."
+  "versionBannerSubscribe": "Subscribe to our newsletter to be notified.",
+  "versionBannerSubscribeButton": "Subscribe",
+  "versionBannerEmailLabel": "Email address",
+  "versionBannerSubscribed": "Thanks! Check your inbox to confirm your subscription."
 }
