@@ -21,6 +21,16 @@
   color: #52a79b;
 }
 
+.versionBannerLink {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.versionBannerLink:hover {
+  color: #52a79b;
+}
+
 .versionBannerClose {
   flex-shrink: 0;
   display: flex;

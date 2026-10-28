@@ -4,6 +4,10 @@ import { InfoCircle, X } from 'react-bootstrap-icons'
 
 import './styles.css'
 
+// CIOOS newsletter, same Mailchimp list as the catalogue footer signup
+const newsletterUrl =
+  'https://cioos.us4.list-manage.com/subscribe?u=878a48e5216df1dd94addb795&id=a3c7b19b1e'
+
 export default function VersionBanner() {
   const { t } = useTranslation()
   const [open, setOpen] = useState(true)
@@ -13,7 +17,17 @@ export default function VersionBanner() {
   return (
     <div className='versionBanner' role='status'>
       <InfoCircle className='versionBannerIcon' aria-hidden='true' />
-      <span>{t('versionBannerMessage')}</span>
+      <span>
+        {t('versionBannerMessage')}{' '}
+        <a
+          className='versionBannerLink'
+          href={newsletterUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+        >
+          {t('versionBannerSubscribe')}
+        </a>
+      </span>
       <button
         type='button'
         className='versionBannerClose'
