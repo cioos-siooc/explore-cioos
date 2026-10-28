@@ -391,6 +391,35 @@ async function warningBreakdown(erddapUrl) {
   return result.rows;
 }
 
+// The catalogue is only as fresh as its stalest source, so the oldest of each
+// source's last successful run. Sources no longer in the catalogue are left
+// out: their history would pin the date forever. OBIS datasets don't carry
+// the attempts' erddap_url, hence the source test.
+async function oldestLastHarvest() {
+  const sql = `
+    SELECT MIN(last_ok) AS oldest_last_harvest
+    FROM (
+        SELECT MAX(r.finished_at) AS last_ok
+        FROM cde.harvest_attempts a
+        JOIN cde.harvest_runs r ON r.run_id = a.run_id
+        WHERE r.status = 'ok'
+          AND (a.source = 'obis'
+               OR a.erddap_url IN (SELECT erddap_url FROM cde.datasets))
+        GROUP BY a.erddap_url
+    ) per_source
+  `;
+  const result = await db.raw(sql);
+  return result.rows[0]?.oldest_last_harvest ?? null;
+}
+
+router.get(
+  "/freshness",
+  ...pipeline({ filters: false, cacheFor: "10 minutes" }),
+  async (req, res) => {
+    res.json({ oldestLastHarvest: await oldestLastHarvest() });
+  },
+);
+
 router.get(
   "/servers",
   ...pipeline({ filters: false, cacheFor: "2 minutes" }),

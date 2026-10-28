@@ -128,6 +128,7 @@
   "topBarCountsTotal_one": "{{count, number}} jeu de données",
   "topBarCountsTotal_other": "{{count, number}} jeux de données",
   "topBarCountsUnit": "jeux de données",
+  "datasetsCountLastHarvest": "Données à jour au {{date}} (source mise à jour le moins récemment)",
   "datasetsMulti": " jeux de données",
   "sourceFilterName": "Portail de données",
   "sourcesMulti": " portails de données",
