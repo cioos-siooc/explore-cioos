@@ -51,6 +51,40 @@ describe("Filter (uncontrolled)", () => {
     expect(screen.queryByTestId("filter-options")).not.toBeInTheDocument();
   });
 
+  it("keeps its controls outside the scrolling options body", async () => {
+    const user = userEvent.setup();
+    render(
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        controls={<button>match all</button>}
+      >
+        <div>options here</div>
+      </Filter>,
+    );
+    await user.click(screen.getByTestId("filter-header"));
+    const controls = screen.getByRole("button", { name: "match all" });
+    expect(controls.closest(".filterOptionsBody")).toBeNull();
+    expect(screen.getByTestId("filter-options")).toContainElement(controls);
+  });
+
+  it("keeps its legend outside the scrolling options body", async () => {
+    const user = userEvent.setup();
+    render(
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        legend={<p>what the rows mean</p>}
+      >
+        <div>options here</div>
+      </Filter>,
+    );
+    await user.click(screen.getByTestId("filter-header"));
+    const legend = screen.getByText("what the rows mean");
+    expect(legend.closest(".filterOptionsBody")).toBeNull();
+    expect(screen.getByTestId("filter-options")).toContainElement(legend);
+  });
+
   it("truncates a long badge title, keeping the full text in the title attribute", async () => {
     const long = "A".repeat(50);
     render(
@@ -189,11 +223,27 @@ describe("Filter search / reset / info", () => {
     expect(setSearchTerms).toHaveBeenCalledWith("");
   });
 
+  it("offers Clear only once something is set", async () => {
+    const user = userEvent.setup();
+    render(
+      <Filter
+        badgeTitle="Ocean variables"
+        filterName="eovs"
+        resetButton={vi.fn()}
+      >
+        <div>options</div>
+      </Filter>,
+    );
+    await user.click(screen.getByTestId("filter-header"));
+    expect(screen.queryByText("Clear")).not.toBeInTheDocument();
+  });
+
   it("the reset button calls resetButton", async () => {
     const user = userEvent.setup();
     const resetButton = vi.fn();
     render(
       <Filter
+        active
         badgeTitle="Ocean variables"
         filterName="eovs"
         resetButton={resetButton}

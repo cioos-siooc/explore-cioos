@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useRef } from "react";
-import { ChevronLeft, Filter } from "react-bootstrap-icons";
+import { ChevronLeft, ChevronRight, Filter } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 
 import Modal from "../../ui/Modal.jsx";
@@ -35,7 +35,8 @@ export default function FiltersModal() {
 
   // A translation key for most filters, an already-translated label for the
   // range ones; i18next returns unknown keys unchanged, so t() suits both.
-  const openFilterName = openFilter ? t(openFilter) : "";
+  // Wider screens title the page itself instead (see Filter).
+  const openFilterName = isMobile && openFilter ? t(openFilter) : "";
 
   return (
     <Modal
@@ -57,7 +58,7 @@ export default function FiltersModal() {
             <span className="filtersModalTitleRow">
               {/* On a phone the open filter covers the list, so this is the
                   way back. */}
-              {isMobile && openFilterName ? (
+              {openFilterName ? (
                 <button
                   type="button"
                   className="filtersModalBack"
@@ -82,10 +83,24 @@ export default function FiltersModal() {
                   {activeFilterCount}
                 </span>
               )}
+              {openFilterName && (
+                <>
+                  <ChevronRight
+                    className="filtersModalTitleSeparator"
+                    size={14}
+                    aria-hidden="true"
+                  />
+                  <span className="filtersModalTitleHeading filtersModalTitleCrumb">
+                    {openFilterName}
+                  </span>
+                </>
+              )}
             </span>
-            <span className="filtersModalTitleSubtitle">
-              {openFilterName || t("filtersModalSubtitleText")}
-            </span>
+            {!openFilterName && (
+              <span className="filtersModalTitleSubtitle">
+                {t("filtersModalSubtitleText")}
+              </span>
+            )}
           </span>
         </Modal.Title>
       </Modal.Header>
