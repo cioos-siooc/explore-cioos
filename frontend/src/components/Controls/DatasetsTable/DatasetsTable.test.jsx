@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
+import { setViewportHeight } from "../../../test/viewport.js";
 import DatasetsTable from "./DatasetsTable.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -162,6 +163,57 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
 
     expect(ui.showFiltersModal).toBe(true);
     expect(ui.openFilter).toBeUndefined();
+  });
+
+  it("starts compact on a short window until the viewer picks full cards", async () => {
+    setViewportHeight(700);
+    const { user } = renderWithProviders(
+      <DatasetsTable
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+    const list = document.querySelector(".datasetsCardList");
+    expect(list).toHaveClass("compact");
+
+    await user.click(screen.getByTestId("datasets-density-toggle"));
+
+    expect(list).not.toHaveClass("compact");
+    expect(window.localStorage.getItem("cde.listDensity")).toBe('"full"');
+  });
+
+  it("the density toggle switches to compact rows and remembers it", async () => {
+    const renderSidebarTable = () =>
+      renderWithProviders(
+        <DatasetsTable
+          datasets={ROWS}
+          selectAll={false}
+          handleSelectAllDatasets={() => {}}
+          handleSelectDataset={() => {}}
+        />,
+        { providers: "app" },
+      );
+    const { user, unmount } = renderSidebarTable();
+    await screen.findAllByTestId("dataset-card");
+    const toggle = screen.getByRole("button", { name: "Compact rows" });
+    const list = document.querySelector(".datasetsCardList");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(list).not.toHaveClass("compact");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(list).toHaveClass("compact");
+    expect(window.localStorage.getItem("cde.listDensity")).toBe('"compact"');
+
+    unmount();
+    renderSidebarTable();
+    await screen.findAllByTestId("dataset-card");
+    expect(document.querySelector(".datasetsCardList")).toHaveClass("compact");
   });
 
   it("shows the no-results message when the datasets prop is empty", async () => {
@@ -632,6 +684,28 @@ describe("DatasetsTable (download modal)", () => {
 
     await waitFor(() => expect(selection.selectedPks.has(1)).toBe(false));
     expect(handleSelectDataset).not.toHaveBeenCalled();
+  });
+
+  it("offers no density toggle and ignores a stored compact preference", async () => {
+    window.localStorage.setItem("cde.listDensity", '"compact"');
+    renderWithProviders(
+      <DatasetsTable
+        isDownloadModal
+        datasets={ROWS}
+        selectAll={false}
+        handleSelectAllDatasets={() => {}}
+        handleSelectDataset={() => {}}
+      />,
+      { providers: "app" },
+    );
+    await screen.findAllByTestId("dataset-card");
+
+    expect(
+      screen.queryByTestId("datasets-density-toggle"),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector(".datasetsCardList")).not.toHaveClass(
+      "compact",
+    );
   });
 
   describe("with the gridded coverage layer on", () => {

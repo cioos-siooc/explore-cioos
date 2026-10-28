@@ -11,8 +11,27 @@
   gap: var(--top-bar-gap);
   max-width: calc(100vw - 24px);
   pointer-events: none;
+  transition: transform 0.32s cubic-bezier(0.22, 0.8, 0.3, 1);
 
   --top-bar-gap: 10px;
+}
+
+/* Beside the open datasets column, moved right only as far as clears it:
+   overhanging, it would push the whole column down under it (see
+   measureTopBarSpace). 24px is the column's inset plus a gap. Below 1000px
+   the bar no longer fits beside it. */
+@media (min-width: 1000px) {
+  .topBar.besideSidebar {
+    transform: translateX(
+      max(-50%, calc(var(--cioos-sidebar-width) + 24px - 50vw))
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topBar {
+    transition: none;
+  }
 }
 
 /* The brand card is what the rows below slide out from under. */
