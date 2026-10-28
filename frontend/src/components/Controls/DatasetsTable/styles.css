@@ -895,8 +895,29 @@ button.datasetCardTitle:focus-visible {
     padding: 8px;
   }
 
-  .sidebar .pager {
+  .sidebar .datasetsCardControls {
     padding: 4px 8px;
+  }
+
+  .sidebar .datasetsCardFilters {
+    padding: 2px 10px;
+  }
+
+  .sidebar .datasetsCardToolbar .selectPillSizer {
+    padding-block: 2px;
+  }
+
+  .sidebar .datasetsCardDensity {
+    width: 24px;
+    height: 24px;
+  }
+
+  .sidebar .pager {
+    padding: 3px 8px;
+  }
+
+  .sidebar .pagerSize select {
+    padding: 3px 10px;
   }
 
   .sidebar .datasetsCardList:not(.compact) {
