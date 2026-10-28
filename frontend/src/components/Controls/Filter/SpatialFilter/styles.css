@@ -3,23 +3,33 @@
   flex-direction: column;
 }
 
+/* Each section's body sits indented under its title, so the four ways read
+   as separate blocks. */
+.spatialFilterOptions > section {
+  padding-left: 16px;
+}
+
 .spatialFilterOptions > section + section {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 20px;
+  padding-top: 20px;
   border-top: 1px solid var(--cioos-hairline);
 }
 
-/* The Filters list's group heading (WHAT, FROM…), so the two columns speak
-   the same structure. */
+/* One step below the page title, so each way to set the area reads as its
+   own part of the page rather than as a list group heading. */
 .spatialFilterSectionTitle {
-  margin: 0 0 8px;
+  margin: 0 0 4px -16px;
   font-family: var(--cioos-font-display);
-  font-size: var(--cioos-font-size-xs);
+  font-size: var(--cioos-font-size-base);
   font-weight: 600;
-  letter-spacing: 0.06em;
   line-height: 1.3;
-  text-transform: uppercase;
-  color: var(--cioos-ink-60);
+  color: var(--cioos-navy);
+}
+
+.spatialFilterSectionHint {
+  margin: 0 0 10px;
+  font-size: var(--cioos-font-size-xs);
+  color: var(--cioos-ink-80);
 }
 
 .spatialFilterPlacesLabel {
@@ -31,7 +41,7 @@
 }
 
 .spatialFilterPlacesLabel .spatialFilterSectionTitle {
-  margin: 0;
+  margin-bottom: 0;
 }
 
 .spatialFilterPlacesLabel .filterSearch {
@@ -215,10 +225,6 @@
   color: var(--cioos-error-700);
 }
 
-.spatialFilterWktForm {
-  margin-top: 16px;
-}
-
 .spatialFilterWktLabel {
   display: block;
   font-size: var(--cioos-font-size-xs);
@@ -245,37 +251,39 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 10px;
 }
 
-.spatialFilterAction {
+/* The Download and Submit buttons' primary style. */
+.spatialFilterApply {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  align-self: flex-start;
-  margin-top: 8px;
-  padding: 0 14px;
   height: 30px;
-  background-color: var(--cioos-teal-light);
-  border: 1px solid var(--cioos-primary);
-  border-radius: var(--cioos-radius-pill);
-  color: var(--cioos-ink);
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast);
-}
-
-.spatialFilterApply {
   margin-left: auto;
-}
-
-.spatialFilterAction:hover {
+  padding: 0 14px;
+  border: 1px solid var(--cioos-primary-700);
+  border-radius: var(--cioos-radius-sm);
   background-color: var(--cioos-primary);
   color: var(--cioos-on-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--cioos-transition-fast);
 }
 
-.spatialFilterAction:focus-visible {
+.spatialFilterApply:hover:not(:disabled) {
+  background-color: var(--cioos-primary-700);
+}
+
+.spatialFilterApply:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
+}
+
+.spatialFilterApply:disabled {
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink-60);
+  cursor: default;
 }
