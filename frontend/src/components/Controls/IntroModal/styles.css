@@ -220,8 +220,6 @@
     var(--cioos-white)
   );
 
-  display: flex;
-  align-items: center;
   width: 100%;
   border: 1px solid var(--cioos-teal-light);
   border-radius: var(--cioos-radius-lg);
@@ -261,8 +259,51 @@
   transform: translateY(3px);
 }
 
+.introShowcase,
+.introFooterCard {
+  display: grid;
+  position: relative;
+  grid-template-areas:
+    "icon title title"
+    "body body body";
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-content: start;
+  align-items: center;
+}
+
+.introShowcaseText,
+.introFooterText {
+  display: contents;
+}
+
+.introShowcaseIcon,
+.introFooterCard > svg:first-child {
+  grid-area: icon;
+}
+
+.introShowcaseTitle,
+.introFooterHeading {
+  grid-area: title;
+}
+
+.introShowcaseBody,
+.introFooterText > :not(.introFooterHeading) {
+  grid-area: body;
+  align-self: start;
+}
+
+.introFooterCard > .form-switch {
+  grid-area: end;
+}
+
+.introFooterCard:has(> .form-switch) {
+  grid-template-areas:
+    "icon title end"
+    "body body end";
+}
+
 .introShowcase {
-  gap: var(--cioos-space-sm);
+  gap: var(--cioos-space-xs) var(--cioos-space-sm);
   height: 100%;
   padding: var(--cioos-space-sm) var(--cioos-space-md);
 }
@@ -279,13 +320,6 @@
   color: var(--cioos-teal-light);
 }
 
-.introShowcaseText {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .introShowcaseTitle {
   font-weight: 600;
   color: var(--cioos-navy);
@@ -298,11 +332,38 @@
 
 .introShowcaseArrow {
   flex: none;
+  position: absolute;
+  right: var(--cioos-space-sm);
+  bottom: var(--cioos-space-sm);
+  box-sizing: content-box;
+  padding: 4px;
+  border-radius: 50%;
+  background: color-mix(
+    in srgb,
+    var(--cioos-teal-light) 60%,
+    var(--cioos-white)
+  );
   color: var(--cioos-primary-700);
-  transition: transform var(--cioos-transition-fast);
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast),
+    transform var(--cioos-transition-fast);
 }
 
-.introShowcase:hover .introShowcaseArrow {
+/* Keeps the last line of text clear of the corner arrow. */
+.introShowcaseBody,
+.introFooterCard:has(> .introShowcaseArrow)
+  .introFooterText
+  > :not(.introFooterHeading) {
+  padding-right: calc(22px + var(--cioos-space-xs));
+}
+
+.introShowcase:hover .introShowcaseArrow,
+.introShowcase:focus-visible .introShowcaseArrow,
+.introFooterCard:hover .introShowcaseArrow,
+.introFooterCard:focus-visible .introShowcaseArrow {
+  background: var(--cioos-primary-700);
+  color: var(--cioos-white);
   transform: translateX(3px);
 }
 
@@ -317,6 +378,12 @@
 }
 
 .introFeature {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cioos-space-sm) var(--cioos-space-md);
   padding: var(--cioos-space-lg);
   border-radius: var(--cioos-radius-lg);
   background: var(--cioos-white);
@@ -331,7 +398,7 @@
 }
 
 .introFeature h3 {
-  margin: var(--cioos-space-sm) 0 var(--cioos-space-xs);
+  margin: 0;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-lg);
   font-weight: 600;
@@ -339,13 +406,17 @@
 }
 
 .introFeature p {
+  flex-basis: 100%;
   margin: 0;
   line-height: 1.6;
 }
 
+.introFeature .introLink {
+  margin-top: 0;
+}
+
 .introFeatureIcon {
   display: flex;
-  margin-inline: auto;
   align-items: center;
   justify-content: center;
   width: 44px;
@@ -376,7 +447,7 @@
 }
 
 .introFooterCard {
-  gap: var(--cioos-space-md);
+  gap: var(--cioos-space-xs) var(--cioos-space-md);
   margin: 0;
   padding: var(--cioos-space-md) var(--cioos-space-lg);
   line-height: 1.55;
@@ -385,18 +456,6 @@
 .introFooterCard > svg:first-child {
   flex: none;
   color: var(--cioos-primary);
-}
-
-.introFooterCard:hover .introShowcaseArrow {
-  transform: translateX(3px);
-}
-
-.introFooterText {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
 }
 
 .introFooterHeading {
@@ -548,12 +607,15 @@
     content: none;
   }
 
+  .introFeature p {
+    flex-basis: auto;
+  }
+
   .introFeature .introLink {
-    margin-top: 0;
     font-size: var(--cioos-font-size-sm);
   }
 
-  .introFeature p,
+  .introFeatureBody,
   .introShowcaseBody,
   .introShowcaseArrow {
     display: none;

@@ -236,16 +236,23 @@ export default function IntroModal({ showModal, setShowModal }) {
                 <Icon size={22} />
               </span>
               <h3>{t(`introFeature_${key}_title`)}</h3>
-              <p>{t(`introFeature_${key}_body`)}</p>
-              {key === "download" && (
-                <button
-                  type="button"
-                  className="introLink"
-                  onClick={() => setShowSelectionHelpModal(true)}
-                >
-                  {t("introFeature_download_help")}
-                </button>
-              )}
+              <p>
+                <span className="introFeatureBody">
+                  {t(`introFeature_${key}_body`)}
+                </span>
+                {key === "download" && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="introLink"
+                      onClick={() => setShowSelectionHelpModal(true)}
+                    >
+                      {t("introFeature_download_help")}
+                    </button>
+                  </>
+                )}
+              </p>
             </li>
           ))}
         </ol>
@@ -268,7 +275,7 @@ export default function IntroModal({ showModal, setShowModal }) {
                 </span>
                 <ArrowRight
                   className="introShowcaseArrow"
-                  size={18}
+                  size={14}
                   aria-hidden="true"
                 />
               </button>
@@ -330,7 +337,7 @@ export default function IntroModal({ showModal, setShowModal }) {
                   </span>
                   <ArrowRight
                     className="introShowcaseArrow"
-                    size={18}
+                    size={14}
                     aria-hidden="true"
                   />
                 </>
