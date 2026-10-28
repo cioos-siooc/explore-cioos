@@ -4,14 +4,19 @@ import { InfoCircle, X } from 'react-bootstrap-icons'
 
 import './styles.css'
 
-// CIOOS newsletter, same Mailchimp list as the catalogue footer signup
-const newsletterAction =
-  'https://cioos.us4.list-manage.com/subscribe/post?u=878a48e5216df1dd94addb795&id=a3c7b19b1e'
-// Mailchimp's bot trap: must be submitted empty
-const honeypotName = 'b_878a48e5216df1dd94addb795_a3c7b19b1e'
+// Newsletter Mailchimp list per language, as on cioos.ca (CIOOS / SIOOC National)
+const mailchimpUser = '878a48e5216df1dd94addb795'
+const newsletterLists = {
+  en: { host: 'cioos.us4.list-manage.com', id: 'a3c7b19b1e' },
+  fr: { host: 'siooc.us4.list-manage.com', id: '08bb9ce192' }
+}
 
 export default function VersionBanner() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const list = i18n.language === 'fr' ? newsletterLists.fr : newsletterLists.en
+  const newsletterAction = `https://${list.host}/subscribe/post?u=${mailchimpUser}&id=${list.id}`
+  // Mailchimp's bot trap: must be submitted empty
+  const honeypotName = `b_${mailchimpUser}_${list.id}`
   const [open, setOpen] = useState(true)
   const [submitted, setSubmitted] = useState(false)
 
