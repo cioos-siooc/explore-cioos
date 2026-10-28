@@ -320,6 +320,11 @@
   color: var(--cioos-teal-light);
 }
 
+/* The viewBox fits the arrow's bounds; its visual mass sits up-right of them. */
+.introTrackHead {
+  transform: translate(-2px, 2px);
+}
+
 .introShowcaseTitle {
   font-weight: 600;
   color: var(--cioos-navy);

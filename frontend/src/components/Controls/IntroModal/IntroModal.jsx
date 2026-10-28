@@ -35,6 +35,16 @@ import {
 import "../../ui/switchStyles.css";
 import "./styles.css";
 
+function TrajectoryIcon({ size }) {
+  return (
+    <TrackHeadIcon
+      size={size}
+      color="currentColor"
+      className="introTrackHead"
+    />
+  );
+}
+
 const FEATURES = [
   { key: "explore", Icon: GlobeAmericas },
   { key: "search", Icon: Search },
@@ -54,7 +64,7 @@ function useShowcases(close) {
   return [
     trajectory && {
       key: "trajectory",
-      Icon: TrackHeadIcon,
+      Icon: TrajectoryIcon,
       run: () =>
         showTrajectory(trajectory, {
           selectTrajectoryFromMap,
