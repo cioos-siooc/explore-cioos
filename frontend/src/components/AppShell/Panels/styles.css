@@ -51,7 +51,14 @@
   opacity: 0.55;
 }
 
-.filtersPanelReset {
+.filtersPanelActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.filtersPanelReset,
+.filtersPanelDone {
   flex: 0 0 auto;
   padding: 0 14px;
   height: 34px;
@@ -70,7 +77,18 @@
   background-color: var(--cioos-teal-light);
 }
 
-.filtersPanelReset:focus-visible {
+.filtersPanelDone {
+  border-color: var(--cioos-primary-700);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.filtersPanelDone:hover {
+  background-color: var(--cioos-primary-700);
+}
+
+.filtersPanelReset:focus-visible,
+.filtersPanelDone:focus-visible {
   outline: none;
   box-shadow: var(--cioos-focus);
 }
@@ -407,7 +425,8 @@
     padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
   }
 
-  .filtersPanelReset {
+  .filtersPanelReset,
+  .filtersPanelDone {
     min-height: 44px;
     padding: 0 14px;
   }
