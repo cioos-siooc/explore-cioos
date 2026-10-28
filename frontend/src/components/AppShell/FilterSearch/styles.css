@@ -127,6 +127,29 @@
   padding: 4px 0 8px;
 }
 
+/* As the filter pages: results scroll across the whole column. */
+@media (min-width: 701px) and (min-height: 501px) {
+  .filterSearchPage {
+    right: 0;
+    left: 280px;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .filterSearchPage > :not(.filterSearchResults) {
+    margin-right: 20px;
+    margin-left: 20px;
+  }
+
+  .filterSearchPage > .filterSearchResults,
+  .filterSearchPage > .filterSearchKeys {
+    margin-right: 0;
+    margin-left: 0;
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+
 .filterSearchGroupLabel {
   display: flex;
   align-items: center;

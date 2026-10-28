@@ -285,6 +285,32 @@
   border-top: 1px solid var(--cioos-hairline);
 }
 
+/* The options scroll across the whole column, divider to dialog edge; the
+   content keeps an even gutter inside. */
+@media (min-width: 701px) and (min-height: 501px) {
+  .filtersPanel .filterOptions {
+    right: 0;
+    left: 280px;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .filtersPanel .filterOptions > :not(.filterOptionsBody) {
+    margin-right: 20px;
+    margin-left: 20px;
+  }
+
+  /* Padded rather than inset, so every band's hairline spans the column. */
+  .filtersPanel .filterOptions > .filterOptionsBody,
+  .filtersPanel .filterOptions > .filterOptionsLegend,
+  .filtersPanel .filterOptions > .filterOptionsActions {
+    margin-right: 0;
+    margin-left: 0;
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+
 /* The bodies' own scroll box and min-width were sized for a free-floating
    dropdown; inside the pane they caused double and horizontal scrollbars. */
 .filtersPanel .filterOptionsBody > *,
