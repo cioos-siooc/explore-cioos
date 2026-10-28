@@ -380,9 +380,8 @@
 .introFeature {
   display: flex;
   flex-wrap: wrap;
-  align-content: flex-start;
+  place-content: flex-start center;
   align-items: center;
-  justify-content: center;
   gap: var(--cioos-space-sm) var(--cioos-space-md);
   padding: var(--cioos-space-lg);
   border-radius: var(--cioos-radius-lg);
