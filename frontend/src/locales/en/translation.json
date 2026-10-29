@@ -906,7 +906,7 @@
   "datasetRealtimeBadgeTitle": "This dataset was still producing data when it was last harvested. Coverage is across all of its records, as reported by the server.",
   "directLinksEmpty": "No datasets selected",
   "directLinksTitle": "Query the sources myself",
-  "directLinksTooltipText": "A CSV with one row per dataset: the query URL that fetches its data from the source server with your time and depth filters, its CIOOS catalogue record, its licence and how to cite it. No email, queue or 1 GB ceiling.",
+  "directLinksDescription": "A CSV with each dataset's source query (your time and depth filters applied), catalogue record, licence and citation. No email, queue or 1 GB limit.",
   "directLinksCsv": "Dataset list (CSV)",
   "directLinksFailed": "Couldn't build the dataset list. Try again.",
   "directLinksPolygonNote": "Not offered with a polygon filter: the source queries could carry only its bounding box.",

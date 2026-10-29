@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FiletypeCsv } from "react-bootstrap-icons";
 
-import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import reportError from "../../../state/reportError.js";
 import { server } from "../../../config.js";
@@ -44,21 +43,17 @@ export default function DownloadLinks({ count, links, polygonFiltered }) {
 
   return (
     <div
-      className="downloadDeliveryOption"
+      className="downloadDeliveryOption directLinks"
       data-testid="download-links"
       data-tip-highlight={tipHighlight("directLinks")}
     >
       <span className="downloadFooterTitle">
         {t("directLinksTitle")}
-        <QuestionIconTooltip
-          tooltipText={t("directLinksTooltipText")}
-          tooltipPlacement="top"
-          size={16}
-        />
         {!count && (
           <span className="directLinksCount">{t("directLinksEmpty")}</span>
         )}
       </span>
+      <p className="directLinksDescription">{t("directLinksDescription")}</p>
 
       <button
         type="button"

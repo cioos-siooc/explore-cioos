@@ -323,9 +323,10 @@
   color: var(--cioos-ink-80);
 }
 
+/* The package takes the room; the dataset list is one button, so a side column. */
 .downloadDeliveryOptions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(220px, 280px);
   align-items: stretch;
   gap: 0 10px;
   width: 100%;
@@ -353,11 +354,22 @@
 }
 
 .downloadDeliveryOr {
-  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--cioos-ink-60);
+}
+
+.downloadDeliveryOr::before,
+.downloadDeliveryOr::after {
+  content: "";
+  flex: 1 1 auto;
+  width: 1px;
+  background-color: var(--cioos-hairline);
 }
 
 .downloadSubmitRow {
@@ -468,6 +480,12 @@
 }
 
 /* --- The dataset list export --- */
+.directLinksDescription {
+  margin: 0;
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.25;
+  color: var(--cioos-ink-80);
+}
 
 .directLinksCount {
   font-size: var(--cioos-font-size-sm);
@@ -480,7 +498,9 @@
 .directLinksButton {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
   height: 36px;
   padding: 0 14px;
   border-radius: var(--cioos-radius-sm);
@@ -533,6 +553,16 @@
   .downloadDeliveryOptions {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
+  }
+
+  .downloadDeliveryOr {
+    flex-direction: row;
+  }
+
+  .downloadDeliveryOr::before,
+  .downloadDeliveryOr::after {
+    width: auto;
+    height: 1px;
   }
 
   .downloadDetails.container {
