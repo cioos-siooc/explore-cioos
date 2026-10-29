@@ -545,18 +545,17 @@ def _readme_citation(row, metadata, lang, t):
     return lines
 
 
-def _readme_contents(included, readme_html, t):
+def _readme_contents(included, t):
     formats = {row["format"] for row, _, _ in included}
     lines = [t["contents_data"], ""]
     lines += [f"- {t['open'][key]}" for key in FORMATS if key in formats]
     lines += [t["contents_dataset"], "", t["contents_citation"], "", t["contents_package"], ""]
-    if readme_html:
-        lines.append(t["contents_html"])
+    lines.append(t["contents_html"])
     lines.append(t["contents_text"].format(reproduce=t["reproduce"], reproduce_anchor=_slug(t["reproduce"])))
     return lines
 
 
-def _readme(user_query, entries, created, lang, readme_html):
+def _readme(user_query, entries, created, lang):
     t = _TEXT[lang]
     included = [e for e in entries if e[0]["status"] in INCLUDED]
     contents = {"section": t["contents"], "anchor": _slug(t["contents"])}
@@ -596,7 +595,7 @@ def _readme(user_query, entries, created, lang, readme_html):
                 lines += [f"  - {t['retry']}: <{_md_url(url)}>" for url in row["download_url_list"]]
             lines += [f"  - {t['warnings']}: {w}" for w in row["warnings"]]
 
-    lines += ["", f"## {t['contents']}", "", *_readme_contents(included, readme_html, t)]
+    lines += ["", f"## {t['contents']}", "", *_readme_contents(included, t)]
     lines += ["", f"## {t['selection']}", ""]
     if user_query.get("time_min") or user_query.get("time_max"):
         lines.append(f"- {t['time']}: {user_query.get('time_min') or '…'} – {user_query.get('time_max') or '…'}")
@@ -853,9 +852,8 @@ def _reproduce_script(user_query, created):
     )
 
 
-def write_package(root: Path, json_query, report, readme_html=True):
-    """Write the package files into ``root`` (the folder that gets zipped).
-    The download script skips README.html: its CIOOS page is for the emailed zip."""
+def write_package(root: Path, json_query, report):
+    """Write the package files into ``root`` (the folder that gets zipped)."""
     user_query = json_query["user_query"]
     lang = _lang(user_query)
     created = datetime.now(UTC).isoformat(timespec="seconds")
@@ -877,11 +875,10 @@ def write_package(root: Path, json_query, report, readme_html=True):
         entries.append((row, metadata, lang))
     included = [e for e in entries if e[0]["status"] in INCLUDED]
 
-    readme = _readme(user_query, entries, created, lang, readme_html)
+    readme = _readme(user_query, entries, created, lang)
     (root / "README.md").write_text(readme)
-    if readme_html:
-        citations = {f"data/{row['folder']}": citation(row, metadata, user_query, lg) for row, metadata, lg in included}
-        (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
+    citations = {f"data/{row['folder']}": citation(row, metadata, user_query, lg) for row, metadata, lg in included}
+    (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
     cite = root / "citation"
     cite.mkdir(exist_ok=True)
     (cite / "citations.txt").write_text("\n\n".join(citation(r, m, user_query, lg) for r, m, lg in included) + "\n")
@@ -896,9 +893,10 @@ def write_package(root: Path, json_query, report, readme_html=True):
         )
     (cite / "licences.txt").write_text("\n".join(licences) + "\n")
 
-    resources = [{"name": "readme", "path": "README.md", "mediatype": "text/markdown"}]
-    if readme_html:
-        resources.append({"name": "readme-html", "path": "README.html", "mediatype": "text/html"})
+    resources = [
+        {"name": "readme", "path": "README.md", "mediatype": "text/markdown"},
+        {"name": "readme-html", "path": "README.html", "mediatype": "text/html"},
+    ]
     for row, metadata, _ in included:
         resources += [_resource(root, row, file, _licence(metadata)) for file in row["files"]]
     failed = [
@@ -938,7 +936,7 @@ def write_package(root: Path, json_query, report, readme_html=True):
 
     root_files = [
         "README.md",
-        *(["README.html"] if readme_html else []),
+        "README.html",
         "datapackage.json",
         "citation/citations.txt",
         "citation/citations.bib",

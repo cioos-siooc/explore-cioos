@@ -20,11 +20,10 @@ must update each one it affects, in the same change:
   `frontend/src/state/download/DownloadProvider.jsx` (plus its
   `downloadPackageFormat_*` translations).
 
-## The download script installs `downloader` from GitHub
+## `reproduce.py` installs `downloader` from GitHub
 
-The Data Explorer's download script (`GET /download/script`) installs this
-package from the public repo at the deployed commit and calls
-`cioos_downloader.script.run()`. Keep `cioos-data-explorer-downloader` installable on its own:
+Each package's `reproduce.py` installs this package from the public repo at
+the deployed commit and calls `cioos_downloader.formats.reproduce()`. Keep `cioos-data-explorer-downloader` installable on its own:
 never depend on `harvester` or other server-only code (a git/archive install
 ignores `tool.uv.sources`, so such a dependency would resolve to an unrelated
 PyPI package of the same name).

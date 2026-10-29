@@ -4,7 +4,6 @@ download_erddap regroup a set of tool used by CDE to download ERDDAP datasets.
 
 import io
 import re
-import sys
 import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -88,23 +87,8 @@ def server(dataset):
     return urlparse(dataset["erddap_url"]).netloc
 
 
-class Progress:
-    """Hooks for a caller showing a download as it runs; the server ignores them.
-    Calls for one server come from one thread, in order."""
-
-    def stage(self, dataset, text):
-        pass
-
-    def received(self, dataset, n_bytes):
-        pass
-
-    def finished(self, dataset, row):
-        pass
-
-
-def _stage(progress, dataset, text):
+def _stage(dataset, text):
     logger.info("{}: {}", dataset["dataset_id"], text)
-    progress.stage(dataset, text)
 
 
 def erddap_server_to_name(server):
@@ -186,10 +170,10 @@ def get_erddap_download_url(dataset, user_query, variables, region=None, respons
     return e.get_download_url()
 
 
-def _variables(dataset, progress):
+def _variables(dataset):
     if dataset.get("table_variables"):
         return [v["name"] for v in dataset["table_variables"]]
-    _stage(progress, dataset, "reading the variable list")
+    _stage(dataset, "reading the variable list")
     info_url = ERDDAP(dataset["erddap_url"]).get_info_url(dataset["dataset_id"], response="csv")
     with requests.get(info_url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT) as response:
         response.raise_for_status()
@@ -228,7 +212,7 @@ class _QueryBudget:
             return self.total > self.query_limit
 
 
-def _stream_to_file(url, path: Path, already_downloaded, limit, on_chunk):
+def _stream_to_file(url, path: Path, already_downloaded, limit):
     """Returns (bytes_written, error, empty, truncated)."""
     written = 0
     with requests.get(url, headers=REQUEST_HEADERS, stream=True, timeout=REQUEST_TIMEOUT) as response:
@@ -244,7 +228,6 @@ def _stream_to_file(url, path: Path, already_downloaded, limit, on_chunk):
                 allowed = limit - already_downloaded - written
                 f.write(chunk[:allowed])
                 written += min(len(chunk), allowed)
-                on_chunk(min(len(chunk), allowed))
                 if len(chunk) > allowed:
                     return written, None, False, True
     return written, None, False, False
@@ -286,9 +269,9 @@ def _row(dataset, fmt, folder_name):
     }
 
 
-def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budget, progress):
+def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budget):
     form = FORMATS[fmt]
-    variables = _variables(dataset, progress)
+    variables = _variables(dataset)
     constraints = feature_constraints(dataset)
     row["feature_constrained"] = constraints is not None
     requests_to_make = (
@@ -305,11 +288,9 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
         if row["dataset_limit_hit"]:
             continue
 
-        _stage(progress, dataset, f"request {i + 1}/{len(requests_to_make)}: {url}")
+        _stage(dataset, f"request {i + 1}/{len(requests_to_make)}: {url}")
         part = folder / f".part{i}"
-        written, error, empty, truncated = _stream_to_file(
-            url, part, row["bytes_downloaded"], budget.dataset_limit, lambda n: progress.received(dataset, n)
-        )
+        written, error, empty, truncated = _stream_to_file(url, part, row["bytes_downloaded"], budget.dataset_limit)
         row["bytes_downloaded"] += written
         if error:
             errors.append(error)
@@ -334,7 +315,7 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
         parts.append(part)
 
     if parts and row["status"] != FAILED:
-        _stage(progress, dataset, f"writing {form.label}" + (" inside the polygon" if regions else ""))
+        _stage(dataset, f"writing {form.label}" + (" inside the polygon" if regions else ""))
         files = write_subset(fmt, parts, regions, folder / dataset_folder_name(dataset))
         row["files"] = files
     for part in parts:
@@ -345,18 +326,18 @@ def _download_erddap(dataset, user_query, regions, fmt, row, folder: Path, budge
         row["status"] = COMPLETED if row["files"] else EMPTY
 
 
-def _download_obis(dataset, user_query, regions, fmt, row, folder: Path, progress):
+def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
     dataset_id = dataset["dataset_id"]
     url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
     row["download_url_list"] = [url]
-    _stage(progress, dataset, f"querying the OBIS export {url}")
+    _stage(dataset, f"querying the OBIS export {url}")
 
     files = write_obis(fmt, url, user_query, regions, folder / dataset_folder_name(dataset))
     row["files"] = files
     row["status"] = COMPLETED if files else EMPTY
 
 
-def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget, progress):
+def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget):
     source_type = dataset.get("source_type") or "erddap"
     fmt = requested_format
     if source_type == "obis" and fmt not in OBIS_FORMATS:
@@ -370,9 +351,9 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
 
     try:
         if source_type == "obis":
-            _download_obis(dataset, user_query, regions, fmt, row, folder, progress)
+            _download_obis(dataset, user_query, regions, fmt, row, folder)
         else:
-            _download_erddap(dataset, user_query, regions, fmt, row, folder, budget, progress)
+            _download_erddap(dataset, user_query, regions, fmt, row, folder, budget)
         row["files"] = _relative(row["files"], root)
     except Exception as e:
         # One dataset failing must not lose the rest of the user's download.
@@ -384,7 +365,7 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
             "Downloader failed for dataset {}", dataset["dataset_id"]
         )
 
-    _stage(progress, dataset, "fetching the source metadata records")
+    _stage(dataset, "fetching the source metadata records")
     row["warnings"] += save_source_metadata(dataset, folder / "metadata")
     row["file_size"] = sum(f["bytes"] for f in row["files"])
     row["n_records"] = row["n_records"] or sum(f["n_rows"] for f in row["files"])
@@ -399,20 +380,14 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
         row["file_size"] / ONE_MB,
         row["n_records"],
     )
-    progress.finished(dataset, row)
     return row
 
 
-def get_datasets(json_query, output_path, size_limits=True, progress=None):
+def get_datasets(json_query, output_path):
     user_query = json_query["user_query"]
     regions = polygon_regions(user_query.get("polygon_region"))
     requested_format = user_query.get("format") or DEFAULT_FORMAT
-    # The limits protect the server; a user's own run has none.
-    if size_limits:
-        budget = _QueryBudget(DATASET_SIZE_LIMIT, QUERY_SIZE_LIMIT)
-    else:
-        budget = _QueryBudget(sys.maxsize, sys.maxsize)
-    progress = progress or Progress()
+    budget = _QueryBudget(DATASET_SIZE_LIMIT, QUERY_SIZE_LIMIT)
     root = Path(output_path)
     datasets = json_query["cache_filtered"]
 
@@ -424,7 +399,7 @@ def get_datasets(json_query, output_path, size_limits=True, progress=None):
 
     def download_server(indexes):
         for i in indexes:
-            rows[i] = download_dataset(datasets[i], user_query, regions, requested_format, root, budget, progress)
+            rows[i] = download_dataset(datasets[i], user_query, regions, requested_format, root, budget)
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         list(pool.map(download_server, by_server.values()))
