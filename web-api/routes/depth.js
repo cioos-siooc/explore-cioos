@@ -7,22 +7,33 @@ const { nonnaElevationAt } = require("../utils/nonnaWcs");
 
 const router = express.Router();
 
-// Global, land included: answers wherever CHS has no sounding, e.g. offshore
+// Global: answers wherever CHS has no sounding, e.g. offshore
 // or zoomed out over EMODnet's basemap, whose own depth service stops at
 // 70.5 W.
-const ETOPO_GRIDDAP =
-  "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.json";
+const GEBCO_OPENDAP =
+  "https://dap.ceda.ac.uk/thredds/dodsC/bodc/gebco/global/gebco_2026/ice_surface_elevation/netcdf/GEBCO_2026.nc";
+const GEBCO_CELLS_PER_DEGREE = 240;
+const GEBCO_ROWS = 180 * GEBCO_CELLS_PER_DEGREE;
+const GEBCO_COLUMNS = 360 * GEBCO_CELLS_PER_DEGREE;
 // 15 arc-seconds of latitude.
-const ETOPO_RESOLUTION_M = 450;
+const GEBCO_RESOLUTION_M = 463;
 const UPSTREAM_TIMEOUT_MS = 15000;
 
-async function etopoElevationAt(lon, lat) {
-  const query = encodeURIComponent(`z[(${lat})][(${lon})]`);
-  const { data } = await axios.get(`${ETOPO_GRIDDAP}?${query}`, {
-    timeout: UPSTREAM_TIMEOUT_MS,
-  });
-  const [row] = data.table.rows;
-  return Number.isFinite(row?.[2]) ? row[2] : null;
+const gebcoIndex = (degrees, offset, cells) =>
+  Math.min(cells - 1, Math.floor((degrees + offset) * GEBCO_CELLS_PER_DEGREE));
+
+async function gebcoElevationAt(lon, lat) {
+  const row = gebcoIndex(lat, 90, GEBCO_ROWS);
+  const column = gebcoIndex(lon, 180, GEBCO_COLUMNS);
+  const { data } = await axios.get(
+    `${GEBCO_OPENDAP}.ascii?elevation[${row}][${column}]`,
+    { responseType: "text", timeout: UPSTREAM_TIMEOUT_MS },
+  );
+  // OPeNDAP's ASCII grid: the value follows its "[0], " row index.
+  const match = /\[0\],\s*(-?\d+)/.exec(data);
+  const elevation = match ? Number(match[1]) : null;
+  // Land, or a lake's surface: no seafloor to report.
+  return elevation < 0 ? elevation : null;
 }
 
 const toDepth = (elevation) => Math.round(-elevation * 10) / 10;
@@ -31,14 +42,14 @@ const toDepth = (elevation) => Math.round(-elevation * 10) / 10;
  * @swagger
  * /depth:
  *   get:
- *     summary: Seafloor depth, or land elevation, at a point
+ *     summary: Seafloor depth at a point
  *     tags: [Basemap]
  *     description: >
  *       CHS NONNA 10 where it has a sounding (metres
- *       below chart datum), otherwise NOAA ETOPO 2022 at 15 arc-seconds
- *       (metres below mean sea level). depth is negative above the datum:
- *       ground that dries, or land. Fields are null when neither source has a
- *       value.
+ *       below chart datum), otherwise GEBCO 2026 at 15 arc-seconds
+ *       (metres below mean sea level). A negative depth is NONNA ground
+ *       that dries above the datum. Fields are null on land and where neither
+ *       source has a value.
  *     parameters:
  *       - in: query
  *         name: lon
@@ -50,7 +61,7 @@ const toDepth = (elevation) => Math.round(-elevation * 10) / 10;
  *         schema: { type: number, minimum: -85, maximum: 85 }
  *     responses:
  *       200:
- *         description: '{ depth, resolution, source: "nonna" | "etopo" }'
+ *         description: '{ depth, resolution, source: "nonna" | "gebco" }'
  *       400:
  *         description: Missing or out-of-range coordinates.
  *       502:
@@ -70,7 +81,7 @@ router.get(
     const lon = Number(req.query.lon);
     const lat = Number(req.query.lat);
 
-    // CHS failing still leaves ETOPO's answer, which is better than none.
+    // CHS failing still leaves GEBCO's answer, which is better than none.
     let nonna = null;
     try {
       nonna = await nonnaElevationAt(lon, lat);
@@ -89,19 +100,19 @@ router.get(
     }
 
     try {
-      const elevation = await etopoElevationAt(lon, lat);
+      const elevation = await gebcoElevationAt(lon, lat);
       return res.json(
         elevation === null
           ? { depth: null, resolution: null, source: null }
           : {
               depth: toDepth(elevation),
-              resolution: ETOPO_RESOLUTION_M,
-              source: "etopo",
+              resolution: GEBCO_RESOLUTION_M,
+              source: "gebco",
             },
       );
     } catch (e) {
       console.error(
-        `ETOPO depth at ${lon},${lat} failed:`,
+        `GEBCO depth at ${lon},${lat} failed:`,
         e.response ? `upstream ${e.response.status}` : e.message,
       );
       return res.status(502).json({ errors: ["depth lookup failed"] });
