@@ -1,7 +1,7 @@
 const axios = require("axios");
 const sharp = require("sharp");
 const { VectorTile } = require("@mapbox/vector-tile");
-const { PbfReader } = require("pbf");
+const Pbf = require("pbf");
 
 const { WEB_MERCATOR_HALF, toWebMercator } = require("./nonnaWcs");
 
@@ -58,7 +58,7 @@ async function waterMask(z, x, y) {
     responseType: "arraybuffer",
     timeout: UPSTREAM_TIMEOUT_MS,
   });
-  const layer = new VectorTile(new PbfReader(Buffer.from(data))).layers.water;
+  const layer = new VectorTile(new Pbf(Buffer.from(data))).layers.water;
   if (!layer) return new Uint8Array(TILE_SIZE * TILE_SIZE);
   const alpha = await sharp(Buffer.from(waterSvg(layer)))
     .ensureAlpha()
