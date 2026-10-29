@@ -324,8 +324,8 @@ describe("DownloadDetails", () => {
     );
   });
 
-  it("names the OBIS datasets a format without an OBIS version turns into CSV", async () => {
-    const { user } = renderDetails({
+  it("offers each source its own formats, only for the sources selected", async () => {
+    renderDetails({
       pointsToReview: [
         makePoint({ pk: EST_SMALL.pk, title: "Small dataset" }),
         makePoint({
@@ -336,29 +336,17 @@ describe("DownloadDetails", () => {
         }),
       ],
     });
-    const format = screen.getByLabelText("All downloads");
-    expect(
-      within(screen.getByRole("group", { name: "ERDDAP and OBIS" }))
+    const values = (label) =>
+      within(screen.getByLabelText(label))
         .getAllByRole("option")
-        .map((option) => option.value),
-    ).toEqual(["csv", "parquet"]);
-    expect(
-      within(screen.getByRole("group", { name: "ERDDAP only (OBIS as CSV)" }))
-        .getAllByRole("option")
-        .map((option) => option.value),
-    ).toEqual(["odv", "nccf"]);
-    expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
-    expect(screen.queryByText("As CSV")).not.toBeInTheDocument();
+        .map((option) => option.value);
+    expect(values("ERDDAP™")).toEqual(["csv", "parquet", "odv", "nccf"]);
+    expect(values("OBIS")).toEqual(["csv", "parquet"]);
+  });
 
-    await user.selectOptions(format, "odv");
-    expect(
-      screen.getByText(
-        "1 OBIS dataset will be delivered as CSV: OBIS has no ODV spreadsheet version. Choose CSV or Parquet to get every dataset in one format.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText("As CSV")).toHaveLength(1);
-
-    await user.selectOptions(format, "parquet");
-    expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
+  it("hides the OBIS format when no OBIS dataset is selected", () => {
+    renderDetails();
+    expect(screen.getByLabelText("ERDDAP™")).toBeInTheDocument();
+    expect(screen.queryByLabelText("OBIS")).not.toBeInTheDocument();
   });
 });

@@ -66,12 +66,7 @@
   "downloadPackageFormat_parquet": "Parquet",
   "downloadPackageFormat_odv": "Tableur ODV",
   "downloadPackageFormat_nccf": "NetCDF (CF)",
-  "downloadPackageFormatPillLabel": "Tous les téléchargements",
-  "downloadPackageFormatGroupAll": "ERDDAP et OBIS",
-  "downloadPackageFormatGroupErddap": "ERDDAP seulement (OBIS en CSV)",
-  "downloadPackageFormatTooltipText": "Un seul format pour tout ce qui suit : le paquet envoyé par courriel, le script Python et les liens directs ERDDAP. OBIS ne publie ses occurrences que sous forme de tableau : les jeux de données OBIS sont donc livrés en CSV, sauf si vous choisissez CSV ou Parquet (et les liens directs OBIS sont toujours en JSON).",
-  "downloadPackageFormatObisNote_one": "{{count}} jeu de données OBIS sera livré en CSV : OBIS n'existe pas en {{format}}. Choisissez CSV ou Parquet pour obtenir tous les jeux de données dans un seul format.",
-  "downloadPackageFormatObisNote_other": "{{count}} jeux de données OBIS seront livrés en CSV : OBIS n'existe pas en {{format}}. Choisissez CSV ou Parquet pour obtenir tous les jeux de données dans un seul format.",
+  "downloadPackageFormatTooltipText": "Le paquet envoyé par courriel, le script Python et les liens directs ERDDAP prennent ces formats. OBIS ne publie ses occurrences que sous forme de tableau : les jeux de données OBIS sont donc livrés en CSV ou Parquet; les liens directs OBIS sont toujours l'archive Darwin Core du jeu de données.",
   "downloadEmailLabelText": "M'envoyer un lien par courriel",
   "downloadEmailPlaceholder": "vous@institution.ca",
   "downloadRememberEmailLabel": "Mémoriser mon courriel sur cet appareil",
@@ -1079,7 +1074,5 @@
   "taxonomyShowAllText": "Tout afficher",
   "downloadDeliveryTitle": "Obtenir votre paquet",
   "downloadDeliveryIntro": "Vos données dans le format choisi, avec les métadonnées, citations et licences de chaque source, ou une liste des requêtes aux sources à lancer vous-même.",
-  "downloadDeliveryOr": "ou",
-  "datasetCardObisFallbackText": "En CSV",
-  "datasetCardObisFallbackTitle": "Livré en CSV : OBIS n'existe pas dans le format choisi"
+  "downloadDeliveryOr": "ou"
 }

@@ -9,10 +9,7 @@ import DownloadLinks from "./DownloadLinks.jsx";
 import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
-import {
-  OBIS_FORMATS,
-  useDownload,
-} from "../../../state/download/DownloadProvider.jsx";
+import { useDownload } from "../../../state/download/DownloadProvider.jsx";
 
 import {
   applyDatasetPKs,
@@ -257,7 +254,7 @@ export default function DownloadDetails({
       ),
     [pointsData],
   );
-  const obisCount = linkableDatasets.filter(
+  const obisCount = pointsData.filter(
     (point) => point.source_type === "obis",
   ).length;
 
@@ -304,6 +301,12 @@ export default function DownloadDetails({
           setFilterDownloadByPolygon={setFilterDownloadByPolygon}
         />
       </div>
+      <div className="downloadBandRow">
+        <DownloadFormat
+          erddapCount={pointsData.length - obisCount}
+          obisCount={obisCount}
+        />
+      </div>
 
       <div className="row downloadDataRow">
         <div className="col">
@@ -317,11 +320,6 @@ export default function DownloadDetails({
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
             downloadLinkByPk={linkByPk}
-            obisFallbackFormat={
-              OBIS_FORMATS.includes(packageFormat)
-                ? undefined
-                : t("downloadPackageFormat_csv")
-            }
             pagerExtra={
               <div className="downloadSummary">
                 {/* Both stats wait for the estimates, which decide how many
@@ -379,16 +377,13 @@ export default function DownloadDetails({
       <div className="downloadFooter">
         {/* Two ways to the data, so they share one section. */}
         <div className="downloadFooterSection downloadDelivery">
-          <div className="downloadDeliveryHeader">
-            <div className="downloadDeliveryHeading">
-              <span className="downloadFooterTitle">
-                {t("downloadDeliveryTitle")}
-              </span>
-              <p className="downloadDeliveryIntro">
-                {t("downloadDeliveryIntro")}
-              </p>
-            </div>
-            <DownloadFormat obisCount={obisCount} />
+          <div className="downloadDeliveryHeading">
+            <span className="downloadFooterTitle">
+              {t("downloadDeliveryTitle")}
+            </span>
+            <p className="downloadDeliveryIntro">
+              {t("downloadDeliveryIntro")}
+            </p>
           </div>
           <div className="downloadDeliveryOptions">
             {children}

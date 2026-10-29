@@ -1,6 +1,5 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { ExclamationTriangleFill } from "react-bootstrap-icons";
 
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import SelectPill from "../../ui/SelectPill.jsx";
@@ -12,48 +11,43 @@ import {
 import "./styles.css";
 
 // Above both delivery options, not inside either: the emailed package, the
-// script and the direct links all take this format.
-export default function DownloadFormat({ obisCount }) {
+// script and the ERDDAP direct links all take these formats. A source's
+// picker shows only when the selection holds one of its datasets.
+export default function DownloadFormat({ erddapCount, obisCount }) {
   const { t } = useTranslation();
-  const { packageFormat, setPackageFormat } = useDownload();
-  const obisFallback = obisCount > 0 && !OBIS_FORMATS.includes(packageFormat);
+  const { packageFormat, setPackageFormat, obisFormat, setObisFormat } =
+    useDownload();
+  const options = (formats) =>
+    formats.map((id) => ({ id, label: t(`downloadPackageFormat_${id}`) }));
 
   return (
-    <>
-      <div className="downloadFormat">
-        <span className="downloadFormatLabel">
-          {t("downloadPackageFormatLabel")}
-          <QuestionIconTooltip
-            tooltipText={t("downloadPackageFormatTooltipText")}
-            tooltipPlacement="top"
-            size={16}
-          />
-        </span>
+    <div className="downloadFormat">
+      <span className="downloadFormatLabel">
+        {t("downloadPackageFormatLabel")}
+        <QuestionIconTooltip
+          tooltipText={t("downloadPackageFormatTooltipText")}
+          tooltipPlacement="top"
+          size={16}
+        />
+      </span>
+      {erddapCount > 0 && (
         <SelectPill
-          label={t("downloadPackageFormatPillLabel")}
+          label="ERDDAP™"
           value={packageFormat}
-          options={PACKAGE_FORMATS.map((id) => ({
-            id,
-            label: t(`downloadPackageFormat_${id}`),
-            group: t(
-              OBIS_FORMATS.includes(id)
-                ? "downloadPackageFormatGroupAll"
-                : "downloadPackageFormatGroupErddap",
-            ),
-          }))}
+          options={options(PACKAGE_FORMATS)}
           onChange={setPackageFormat}
           data-testid="download-package-format"
         />
-      </div>
-      {obisFallback && (
-        <p className="downloadFormatNotice">
-          <ExclamationTriangleFill size={14} aria-hidden="true" />
-          {t("downloadPackageFormatObisNote", {
-            count: obisCount,
-            format: t(`downloadPackageFormat_${packageFormat}`),
-          })}
-        </p>
       )}
-    </>
+      {obisCount > 0 && (
+        <SelectPill
+          label="OBIS"
+          value={obisFormat}
+          options={options(OBIS_FORMATS)}
+          onChange={setObisFormat}
+          data-testid="download-obis-format"
+        />
+      )}
+    </div>
   );
 }

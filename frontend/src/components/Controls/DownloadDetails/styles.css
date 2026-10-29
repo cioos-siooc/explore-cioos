@@ -117,25 +117,6 @@
   color: var(--cioos-ink);
 }
 
-.downloadFormatNotice {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: var(--cioos-radius-sm);
-  background-color: var(--cioos-warn-bg);
-  color: var(--cioos-ink);
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.3;
-}
-
-.downloadFormatNotice svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--cioos-warn);
-}
-
 .downloadBandRow .helpIcon {
   margin: 0;
 }
@@ -298,15 +279,6 @@
 /* --- The package: format, then email or script as two cards --- */
 .downloadDelivery {
   gap: 8px;
-}
-
-.downloadDeliveryHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px 24px;
-  width: 100%;
 }
 
 .downloadDeliveryHeading {

@@ -145,6 +145,20 @@ describe("DownloadProvider", () => {
       expect(new URL(requests[1].url).searchParams.get("format")).toBe("nccf");
     });
 
+    it("asks for the OBIS format separately", async () => {
+      await submit(false);
+      expect(new URL(requests[0].url).searchParams.get("obisFormat")).toBe(
+        "csv",
+      );
+
+      act(() => download.setObisFormat("parquet"));
+      act(() => download.handleSubmission());
+      await waitFor(() => expect(requests).toHaveLength(2));
+      const params = new URL(requests[1].url).searchParams;
+      expect(params.get("obisFormat")).toBe("parquet");
+      expect(params.get("format")).toBe("csv");
+    });
+
     it("names the basket once when the Datasets filter is also narrowing", async () => {
       await renderReady("/?datasetPKs=2337");
       // query is debounced: submitting before it lands sends no Datasets

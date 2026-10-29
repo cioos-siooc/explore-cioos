@@ -66,12 +66,7 @@
   "downloadPackageFormat_parquet": "Parquet",
   "downloadPackageFormat_odv": "ODV spreadsheet",
   "downloadPackageFormat_nccf": "NetCDF (CF)",
-  "downloadPackageFormatPillLabel": "All downloads",
-  "downloadPackageFormatGroupAll": "ERDDAP and OBIS",
-  "downloadPackageFormatGroupErddap": "ERDDAP only (OBIS as CSV)",
-  "downloadPackageFormatTooltipText": "One format for everything below: the emailed package, the Python script and the ERDDAP direct links. OBIS publishes occurrences only as a table, so OBIS datasets come as CSV unless you choose CSV or Parquet (and OBIS direct links are always JSON).",
-  "downloadPackageFormatObisNote_one": "{{count}} OBIS dataset will be delivered as CSV: OBIS has no {{format}} version. Choose CSV or Parquet to get every dataset in one format.",
-  "downloadPackageFormatObisNote_other": "{{count}} OBIS datasets will be delivered as CSV: OBIS has no {{format}} version. Choose CSV or Parquet to get every dataset in one format.",
+  "downloadPackageFormatTooltipText": "The emailed package, the Python script and the ERDDAP direct links take these formats. OBIS publishes occurrences only as a table, so OBIS datasets come as CSV or Parquet; OBIS direct links are always the dataset's Darwin Core Archive.",
   "downloadEmailLabelText": "Email me a download link",
   "downloadEmailPlaceholder": "you@institution.ca",
   "downloadRememberEmailLabel": "Remember my email on this device",
@@ -1078,7 +1073,5 @@
   "taxonomyShowAllText": "Show all",
   "downloadDeliveryTitle": "Get your package",
   "downloadDeliveryIntro": "Your data in the chosen format, with each source's metadata, citations and licences, or a list of the source queries to run yourself.",
-  "downloadDeliveryOr": "or",
-  "datasetCardObisFallbackText": "As CSV",
-  "datasetCardObisFallbackTitle": "Delivered as CSV: OBIS has no version in the chosen format"
+  "downloadDeliveryOr": "or"
 }
