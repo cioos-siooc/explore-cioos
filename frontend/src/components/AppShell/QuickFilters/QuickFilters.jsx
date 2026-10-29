@@ -4,9 +4,9 @@ import {
   ArrowCounterclockwise,
   BoundingBox,
   BroadcastPin,
+  Database,
   Eye,
   Pentagon,
-  Server,
   Trash,
   ZoomIn,
 } from "react-bootstrap-icons";
@@ -336,7 +336,7 @@ export default function QuickFilters() {
             source: t(SOURCE_LABEL[sourceMode]),
           })}
         >
-          <Server size={18} aria-hidden="true" />
+          <Database size={18} aria-hidden="true" />
           <span className="quickFilterCaption" aria-hidden="true">
             {t(SOURCE_CAPTION[sourceMode])}
           </span>
