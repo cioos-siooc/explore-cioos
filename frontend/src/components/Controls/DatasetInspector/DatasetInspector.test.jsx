@@ -103,7 +103,7 @@ describe("DatasetInspector", () => {
   it("shows ocean variables, geometry, platform and where to get the data", async () => {
     await renderReady();
     expect(await screen.findByText("Oxygen")).toBeInTheDocument();
-    expect(screen.getByText("subSurfaceTemperature")).toBeInTheDocument();
+    expect(screen.getByText("Subsurface temperature")).toBeInTheDocument();
     // TimeSeries maps to the "Time series" data-layer label.
     expect(screen.getByText("Time series")).toBeInTheDocument();
     expect(screen.getByText("Mooring")).toBeInTheDocument();

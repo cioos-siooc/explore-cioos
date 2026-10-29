@@ -6,7 +6,7 @@ import { createInstance } from "i18next";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 
 import AppProviders from "../state/AppProviders.jsx";
-import translationEN from "../locales/en/translation.json";
+import { resources } from "../locales/resources.js";
 
 // The real English bundle, not a stub, so a missing key shows up as the raw
 // key in a failing assertion.
@@ -16,7 +16,7 @@ function createI18n() {
     lng: "en",
     fallbackLng: "en",
     supportedLngs: ["en", "fr"],
-    resources: { en: { translation: translationEN } },
+    resources: { en: resources.en },
     interpolation: { escapeValue: false },
     react: { useSuspense: false },
   });

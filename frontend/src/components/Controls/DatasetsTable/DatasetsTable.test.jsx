@@ -11,7 +11,7 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
-import translationFR from "../../../locales/fr/translation.json";
+import { resources } from "../../../locales/resources.js";
 
 function makeRow(overrides) {
   return {
@@ -121,7 +121,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
     await screen.findAllByTestId("dataset-card");
     // The test i18n instance only carries the English bundle.
     await act(async () => {
-      i18n.addResourceBundle("fr", "translation", translationFR);
+      i18n.addResourceBundle("fr", "translation", resources.fr.translation);
       await i18n.changeLanguage("fr");
     });
     expect(screen.getAllByTitle("Type").map((el) => el.textContent)).toEqual([
@@ -488,7 +488,7 @@ describe("DatasetsTable (standalone rows, sidebar context)", () => {
         ["Nutrients", "1", true],
         ["Oxygen", "1", true],
         ["Physical", "1", false],
-        ["Sea State", "1", true],
+        ["Sea state", "1", true],
         ["Uncategorized", "1", false],
       ]),
     );
