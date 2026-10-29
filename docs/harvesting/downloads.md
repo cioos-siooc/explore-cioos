@@ -203,15 +203,18 @@ anything server-only).
 
 ### Dataset list
 
-Without a polygon filter, the panel also saves a CSV with one row per dataset:
-its raw source query, its CIOOS catalogue page, its licence and a one-line
-citation. The queries are built in the browser (`frontend/src/downloadLinks.js`):
-ERDDAP links request the package format's file type with the same time and
-depth bounds; OBIS links use the v3 API (JSON, at most 10,000 records). The
-licence and citation come from `GET /datasets/citations`, which cites as the
-package's `source_citation` does (the source's own citation, else one built
-from its metadata), without the subset note. With a polygon the list is not
-offered: ERDDAP could only take its bounding box.
+The panel also saves a CSV with one row per dataset: its source download link,
+the download filters that link leaves out, its source record, its CIOOS
+catalogue page, its licence and a one-line citation. Each card in the panel
+carries the same download link and flags the filters it leaves out. The links
+are built in the browser (`frontend/src/downloadLinks.js`): ERDDAP links
+request the package format's file type with the same time and depth bounds;
+OBIS links are the dataset's whole Darwin Core Archive (`archive_url`, from the
+OBIS dataset API's `archive` at harvest), so no filter applies to them. A
+polygon reaches neither source and is always flagged. The licence and citation
+come from `GET /datasets/citations`, which cites as the package's
+`source_citation` does (the source's own citation, else one built from its
+metadata), without the subset note.
 
 ### Citations
 

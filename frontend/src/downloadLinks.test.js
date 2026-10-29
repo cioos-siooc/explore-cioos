@@ -2,14 +2,12 @@ import { describe, it, expect } from "vitest";
 
 import {
   ERDDAP_FORMATS,
-  OBIS_RECORD_CAP,
   buildDownloadLinks,
   downloadConstraints,
   erddapDownloadUrl,
   linksToCsv,
   localizedCkanUrl,
   localizedErddapUrl,
-  obisDownloadUrl,
 } from "./downloadLinks.js";
 
 const erddapRow = {
@@ -30,6 +28,8 @@ const obisRow = {
   source_type: "obis",
   erddap_server_url: "https://obis.org",
   cdm_data_type: "Point",
+  erddap_url: "https://obis.org/dataset/5422689c-d83d-44e8-87f4-a4b0a5117181",
+  archive_url: "https://ipt.example.org/archive.do?r=occurrences",
 };
 
 const allFilters = downloadConstraints({
@@ -50,7 +50,13 @@ describe("downloadConstraints", () => {
       byTime: false,
       byDepth: false,
     });
-    expect(Object.values(none).every((v) => v === undefined)).toBe(true);
+    expect(none).toEqual({
+      startDate: undefined,
+      endDate: undefined,
+      startDepth: undefined,
+      endDepth: undefined,
+      polygon: false,
+    });
   });
 });
 
@@ -109,36 +115,51 @@ describe("erddapDownloadUrl", () => {
   });
 });
 
-describe("obisDownloadUrl", () => {
-  it("carries time and depth, and pins the page size to the API maximum", () => {
-    const url = new URL(obisDownloadUrl(obisRow, allFilters));
-    const params = url.searchParams;
-    expect(params.get("datasetid")).toBe(obisRow.dataset_id);
-    expect(params.get("startdate")).toBe("2020-01-01");
-    expect(params.get("enddate")).toBe("2020-12-31");
-    expect(params.get("startdepth")).toBe("0");
-    expect(params.get("enddepth")).toBe("100");
-    expect(params.has("geometry")).toBe(false);
-    expect(params.get("size")).toBe(String(OBIS_RECORD_CAP));
-  });
-});
-
 describe("buildDownloadLinks", () => {
   it("routes each row to its own source", () => {
     const links = buildDownloadLinks([erddapRow, obisRow], "csv", allFilters);
     expect(links.map((link) => link.source)).toEqual(["erddap", "obis"]);
     expect(links[0].url).toContain("/tabledap/");
-    expect(links[1].url).toContain("api.obis.org");
+    expect(links[1].url).toBe(obisRow.archive_url);
   });
 
-  it("asks ERDDAP for the package format's file type, OBIS for API JSON", () => {
+  it("asks ERDDAP for the package format's file type, OBIS for its DwC-A", () => {
     const [erddap, obis] = buildDownloadLinks(
       [erddapRow, obisRow],
       "parquet",
       allFilters,
     );
     expect(erddap.url).toContain("/tabledap/ios_ctd_profiles.parquetWMeta?");
-    expect(obis.format).toBe("obisJson");
+    expect(obis.format).toBe("dwca");
+    expect(obis.recordUrl).toBe(obisRow.erddap_url);
+  });
+
+  it("keeps an OBIS row with no harvested archive, linking only its record", () => {
+    const [obis] = buildDownloadLinks(
+      [{ ...obisRow, archive_url: null }],
+      "csv",
+      {},
+    );
+    expect(obis.url).toBeNull();
+    expect(obis.recordUrl).toBe(obisRow.erddap_url);
+  });
+
+  it("flags every filter on an OBIS archive, which is the whole dataset", () => {
+    const [obis] = buildDownloadLinks([obisRow], "csv", {
+      ...allFilters,
+      polygon: true,
+    });
+    expect(obis.unapplied).toEqual(["time", "depth", "polygon"]);
+    const [whole] = buildDownloadLinks([obisRow], "csv", {});
+    expect(whole.unapplied).toEqual([]);
+  });
+
+  it("flags a polygon on ERDDAP links, which carry time and depth only", () => {
+    const [erddap] = buildDownloadLinks([erddapRow], "csv", {
+      ...allFilters,
+      polygon: true,
+    });
+    expect(erddap.unapplied).toEqual(["polygon"]);
   });
 
   it("skips grids, which have no constraint-based subsetting", () => {
@@ -156,7 +177,7 @@ describe("buildDownloadLinks", () => {
       "csv",
       allFilters,
     );
-    expect(depthless.depthDropped).toBe(true);
+    expect(depthless.unapplied).toEqual(["depth"]);
   });
 });
 
@@ -219,10 +240,10 @@ describe("linksToCsv", () => {
     ]);
     const [header, erddap, obis] = csv.trim().split("\n");
     expect(header).toBe(
-      '"dataset_id","title","source","format","query_url","catalogue_url","license","license_url","citation"',
+      '"dataset_id","title","source","format","download_url","filters_not_applied","record_url","catalogue_url","license","license_url","citation"',
     );
     expect(erddap).toBe(
-      `"ios_ctd_profiles","IOS CTD Profiles","erddap","csv","${links[0].url}","https://catalogue.cioos.ca/dataset/ff21-4d1e","CC-BY 4.0","https://cc.org/by/4.0","IOS (2020). CTD."`,
+      `"ios_ctd_profiles","IOS CTD Profiles","erddap","csv","${links[0].url}","","","https://catalogue.cioos.ca/dataset/ff21-4d1e","CC-BY 4.0","https://cc.org/by/4.0","IOS (2020). CTD."`,
     );
     // No catalogue entry and no citation answer: empty cells, not a dropped row.
     expect(obis.endsWith(',"","","",""')).toBe(true);

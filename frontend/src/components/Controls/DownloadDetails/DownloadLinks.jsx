@@ -9,16 +9,21 @@ import { server } from "../../../config.js";
 import { downloadTextFile, linksToCsv } from "../../../downloadLinks.js";
 import "./styles.css";
 
-// The raw source queries, offered only without a polygon filter: ERDDAP can
-// only take its bounding box, so those files would hold data the package
-// filters out.
+// The raw source links, each flagged with the download filters it leaves out.
 export default function DownloadLinks({ count, links, polygonFiltered }) {
   const { t, i18n } = useTranslation();
   const { tipHighlight } = useTips();
   const [state, setState] = useState();
 
-  const depthDropped = links.filter((link) => link.depthDropped).length;
-  const obis = links.filter((link) => link.source === "obis").length;
+  const leavesOut = (link, filter) => link.unapplied.includes(filter);
+  const depthDropped = links.filter(
+    (link) => link.source === "erddap" && leavesOut(link, "depth"),
+  ).length;
+  const obisSubset = links.filter(
+    (link) =>
+      link.source === "obis" &&
+      (leavesOut(link, "time") || leavesOut(link, "depth")),
+  ).length;
 
   async function saveCsv() {
     setState("loading");
@@ -67,11 +72,15 @@ export default function DownloadLinks({ count, links, polygonFiltered }) {
 
       <div className="directLinksNotes" aria-live="polite">
         {state === "failed" && <span>{t("directLinksFailed")}</span>}
-        {polygonFiltered && <span>{t("directLinksPolygonNote")}</span>}
+        {polygonFiltered && links.length > 0 && (
+          <span>{t("directLinksPolygonNote")}</span>
+        )}
         {depthDropped > 0 && (
           <span>{t("directLinksNoteDepth", { count: depthDropped })}</span>
         )}
-        {obis > 0 && <span>{t("directLinksNoteObis", { count: obis })}</span>}
+        {obisSubset > 0 && (
+          <span>{t("directLinksNoteObis", { count: obisSubset })}</span>
+        )}
       </div>
     </div>
   );

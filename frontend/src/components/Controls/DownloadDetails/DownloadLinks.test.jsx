@@ -27,6 +27,8 @@ const obisRow = {
   source_type: "obis",
   erddap_server_url: "https://obis.org",
   cdm_data_type: "Point",
+  erddap_url: "https://obis.org/dataset/5422689c",
+  archive_url: "https://ipt.example.org/archive.do?r=occurrences",
 };
 
 const query = {
@@ -50,16 +52,19 @@ const citations = [
 let saved;
 
 // Stands in for DownloadDetails, which builds the links from the package
-// format and the time/depth switches, and drops them under a polygon.
-function Harness({ rows = [erddapRow, obisRow], polygonFiltered = false }) {
+// format and the time/depth/polygon switches.
+function Harness({
+  rows = [erddapRow, obisRow],
+  polygonFiltered = false,
+  filtered = true,
+}) {
   const constraints = downloadConstraints({
     query,
-    byTime: true,
-    byDepth: true,
+    byTime: filtered,
+    byDepth: filtered,
+    byPolygon: polygonFiltered,
   });
-  const links = polygonFiltered
-    ? []
-    : buildDownloadLinks(rows, "csv", constraints);
+  const links = buildDownloadLinks(rows, "csv", constraints);
   return (
     <DownloadLinks
       count={rows.length}
@@ -94,7 +99,7 @@ describe("DownloadLinks", () => {
     vi.unstubAllGlobals();
   });
 
-  it("saves a CSV of each dataset's query, catalogue page, licence and citation", async () => {
+  it("saves a CSV of each dataset's download, record, catalogue page, licence and citation", async () => {
     const { user } = open();
     await user.click(csvButton());
 
@@ -103,11 +108,16 @@ describe("DownloadLinks", () => {
       /\/datasets\/citations\?datasetPKs=1,2&lang=\w+$/,
     );
     const [header, erddap, obis] = (await saved[0].text()).trim().split("\n");
-    expect(header).toContain('"query_url","catalogue_url","license"');
+    expect(header).toContain(
+      '"download_url","filters_not_applied","record_url","catalogue_url","license"',
+    );
     expect(erddap).toContain("/tabledap/ios_ctd_profiles.csv?&time%3E=");
     expect(erddap).toContain('"CC-BY 4.0","https://cc.org/by/4.0"');
     expect(erddap).toContain('"IOS (2020). CTD."');
-    expect(obis).toContain("api.obis.org");
+    expect(obis).toContain(
+      '"https://ipt.example.org/archive.do?r=occurrences","time depth","https://obis.org/dataset/5422689c"',
+    );
+    expect(obis).not.toContain("api.obis.org");
   });
 
   it("saves nothing and says so when the citations can't be fetched", async () => {
@@ -120,22 +130,27 @@ describe("DownloadLinks", () => {
     expect(csvButton()).toBeEnabled();
   });
 
-  it("is not offered under a polygon filter, and says why", () => {
+  it("is still offered under a polygon filter, flagged as not applying it", () => {
     open({ polygonFiltered: true });
-    expect(panel()).toHaveTextContent(/polygon filter/i);
-    expect(csvButton()).toBeDisabled();
+    expect(panel()).toHaveTextContent(/polygon isn't applied/i);
+    expect(csvButton()).toBeEnabled();
   });
 
   it("says what the links could not carry", () => {
     open({ rows: [{ ...erddapRow, has_depth: false }, obisRow] });
     expect(panel()).toHaveTextContent(/no depth variable/i);
-    expect(panel()).toHaveTextContent(/OBIS API/i);
+    expect(panel()).toHaveTextContent(/whole Darwin Core Archive/i);
+  });
+
+  it("says nothing of OBIS archives when no filter subsets the request", () => {
+    open({ rows: [obisRow], filtered: false });
+    expect(panel()).not.toHaveTextContent(/filters aren.t applied/i);
   });
 
   it("stays quiet about filters that were carried in full", () => {
     open({ rows: [erddapRow] });
     expect(panel()).not.toHaveTextContent(/depth variable/i);
-    expect(panel()).not.toHaveTextContent(/OBIS/i);
+    expect(panel()).not.toHaveTextContent(/filters aren.t applied/i);
   });
 
   it("has nothing to offer for an empty selection", () => {

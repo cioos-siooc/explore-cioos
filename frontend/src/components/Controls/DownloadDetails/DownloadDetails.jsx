@@ -261,8 +261,6 @@ export default function DownloadDetails({
     (point) => point.source_type === "obis",
   ).length;
 
-  // A polygon can only reach ERDDAP as its bounding box, so direct links
-  // would hold data the package filters out.
   const polygonFiltered = Boolean(polygon?.length && filterDownloadByPolygon);
   const constraints = useMemo(
     () =>
@@ -270,15 +268,23 @@ export default function DownloadDetails({
         query,
         byTime: filterDownloadByTime,
         byDepth: filterDownloadByDepth,
+        byPolygon: polygonFiltered,
       }),
-    [query, filterDownloadByTime, filterDownloadByDepth],
+    [query, filterDownloadByTime, filterDownloadByDepth, polygonFiltered],
+  );
+  const linkByPk = useMemo(
+    () =>
+      new Map(
+        buildDownloadLinks(pointsData, packageFormat, constraints).map(
+          (link) => [link.pk, link],
+        ),
+      ),
+    [pointsData, packageFormat, constraints],
   );
   const links = useMemo(
     () =>
-      polygonFiltered
-        ? []
-        : buildDownloadLinks(linkableDatasets, packageFormat, constraints),
-    [polygonFiltered, linkableDatasets, packageFormat, constraints],
+      linkableDatasets.map((point) => linkByPk.get(point.pk)).filter(Boolean),
+    [linkableDatasets, linkByPk],
   );
 
   return (
@@ -310,6 +316,7 @@ export default function DownloadDetails({
             setHoveredDataset={setHoveredDataset}
             downloadSizeEstimates={downloadSizeEstimates}
             estimatesLoading={estimatesLoading}
+            downloadLinkByPk={linkByPk}
             obisFallbackFormat={
               OBIS_FORMATS.includes(packageFormat)
                 ? undefined

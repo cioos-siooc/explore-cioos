@@ -4,6 +4,8 @@ import {
   CalendarCheck,
   CheckCircleFill,
   CircleFill,
+  Download,
+  ExclamationTriangle,
   PlusCircle,
   Grid3x3Gap,
   HexagonFill,
@@ -37,6 +39,8 @@ export default function DatasetCard({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
+  // The source link the download modal built for this row.
+  downloadLink,
   obisFallbackFormat,
   onSelect,
   onInspect,
@@ -247,6 +251,34 @@ export default function DatasetCard({
                 <BoxArrowUpRight size={12} aria-hidden="true" />
                 {isObis ? "OBIS" : "ERDDAP™"}
               </a>
+            )}
+            {downloadLink?.url && (
+              <a
+                className="datasetCardSourceLink"
+                href={downloadLink.url}
+                title={downloadLink.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download size={12} aria-hidden="true" />
+                {isObis ? "DwC-A" : t("datasetCardDataLinkText")}
+              </a>
+            )}
+            {downloadLink?.unapplied.length > 0 && (
+              <span
+                className="datasetCardFormatTag datasetCardUnapplied"
+                title={t("datasetCardUnappliedTitle", {
+                  filters: new Intl.ListFormat(i18n.language).format(
+                    downloadLink.unapplied.map((filter) =>
+                      t(`downloadFilterName_${filter}`),
+                    ),
+                  ),
+                })}
+              >
+                <ExclamationTriangle size={11} aria-hidden="true" />
+                {t("datasetCardUnappliedText")}
+              </span>
             )}
             {row.ckan_url && (
               <a

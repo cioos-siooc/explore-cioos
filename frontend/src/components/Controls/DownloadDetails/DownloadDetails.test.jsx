@@ -236,7 +236,7 @@ describe("DownloadDetails", () => {
     );
   });
 
-  it("offers the dataset list without a polygon filter, and not with one", async () => {
+  it("keeps the links under a polygon filter, flagged as not applying it", async () => {
     const polygon = [
       [-65, 44],
       [-62, 44],
@@ -254,6 +254,7 @@ describe("DownloadDetails", () => {
     const { rerender } = renderDetails({ pointsToReview });
     const csv = () => screen.getByRole("button", { name: /dataset list/i });
     expect(csv()).toBeEnabled();
+    expect(screen.queryByText("Unfiltered")).not.toBeInTheDocument();
 
     rerender(
       detailsElement({
@@ -262,7 +263,48 @@ describe("DownloadDetails", () => {
         filterDownloadByPolygon: true,
       }),
     );
-    expect(csv()).toBeDisabled();
+    expect(csv()).toBeEnabled();
+    expect(screen.getByText("Unfiltered").closest("span")).toHaveAttribute(
+      "title",
+      "This link doesn't apply your polygon filter.",
+    );
+    expect(screen.getByTestId("download-links")).toHaveTextContent(
+      /polygon isn't applied/i,
+    );
+  });
+
+  it("links each card to its source download", async () => {
+    renderDetails({
+      pointsToReview: [
+        makePoint({
+          pk: EST_SMALL.pk,
+          dataset_id: "small",
+          source_type: "erddap",
+          erddap_server_url: "https://data.example.ca/erddap",
+        }),
+        makePoint({
+          pk: EST_LARGE.pk,
+          dataset_id: "fish",
+          source_type: "obis",
+          cdm_data_type: "Point",
+          erddap_server_url: "https://obis.org",
+          erddap_url: "https://obis.org/dataset/fish",
+          archive_url: "https://ipt.example.org/archive.do?r=fish",
+        }),
+      ],
+    });
+    expect(screen.getByRole("link", { name: "Data" })).toHaveAttribute(
+      "href",
+      "https://data.example.ca/erddap/tabledap/small.csv?",
+    );
+    expect(screen.getByRole("link", { name: "DwC-A" })).toHaveAttribute(
+      "href",
+      "https://ipt.example.org/archive.do?r=fish",
+    );
+    expect(screen.getByRole("link", { name: "OBIS" })).toHaveAttribute(
+      "href",
+      "https://obis.org/dataset/fish",
+    );
   });
 
   it("asks for the citations of every dataset in the selection", async () => {

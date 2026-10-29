@@ -68,6 +68,7 @@ export default function DatasetsTable({
   isDownloadModal,
   downloadSizeEstimates,
   estimatesLoading,
+  downloadLinkByPk,
   // The format OBIS rows fall back to when the chosen one has no OBIS version.
   obisFallbackFormat,
   // Beside the pager's range: the download modal's selection totals.
@@ -660,6 +661,7 @@ export default function DatasetsTable({
                   isDownloadModal={isDownloadModal}
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
+                  downloadLink={downloadLinkByPk?.get(item.row.pk)}
                   obisFallbackFormat={obisFallbackFormat}
                   onSelect={handleSelectDataset}
                   onRemove={isDownloadModal ? removeFromSelection : undefined}

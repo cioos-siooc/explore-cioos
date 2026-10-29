@@ -1,7 +1,6 @@
-// Direct links to each dataset's source server, offered only when no polygon
-// filters the download: without one, what the source returns is what the
-// package holds. The ERDDAP query is deliberately variable-less, returning
-// every variable: a user following a link to the source wants the source.
+// Direct links to each dataset's source server. The ERDDAP query is
+// deliberately variable-less, returning every variable: a user following a
+// link to the source wants the source.
 
 // The ERDDAP file type behind each package format (FORMATS in
 // downloader/cioos_downloader/download_erddap.py).
@@ -12,19 +11,15 @@ export const ERDDAP_FORMATS = {
   nccf: "ncCF",
 };
 
-// OBIS has no raw rendition of the package's filtered table: its v3 API
-// applies every filter but caps records per request.
-export const OBIS_RECORD_CAP = 10000;
-const OBIS_FORMAT = "obisJson";
-
 // The `by*` flags are the same checkboxes that filter the queued zip, so the
 // two delivery routes can never disagree.
-export function downloadConstraints({ query, byTime, byDepth }) {
+export function downloadConstraints({ query, byTime, byDepth, byPolygon }) {
   return {
     startDate: byTime ? query?.startDate : undefined,
     endDate: byTime ? query?.endDate : undefined,
     startDepth: byDepth ? query?.startDepth : undefined,
     endDepth: byDepth ? query?.endDepth : undefined,
+    polygon: Boolean(byPolygon),
   };
 }
 
@@ -62,24 +57,6 @@ export function erddapDownloadUrl(row, fileType, constraints = {}) {
     .join("")}`;
 }
 
-// `size` is pinned to the API maximum: the default of 10 would look like a
-// ten-record dataset.
-export function obisDownloadUrl(row, constraints = {}) {
-  if (!row?.dataset_id) return null;
-  const params = new URLSearchParams({ datasetid: row.dataset_id });
-  if (constraints.startDate) params.set("startdate", constraints.startDate);
-  if (constraints.endDate) params.set("enddate", constraints.endDate);
-  if (constraints.startDepth != null) {
-    params.set("startdepth", constraints.startDepth);
-  }
-  if (constraints.endDepth != null) {
-    params.set("enddepth", constraints.endDepth);
-  }
-  params.set("size", String(OBIS_RECORD_CAP));
-
-  return `https://api.obis.org/v3/occurrence?${params}`;
-}
-
 const CKAN_DATASET_PATH = "/dataset/";
 
 // Both CKAN and ERDDAP (2.12+) default to whatever language their manager
@@ -114,31 +91,49 @@ export function erddapServerBase(row) {
 }
 
 // Grids are skipped: griddap subsets by index ranges, so the map's filters
-// can't be carried into one.
-export function buildDownloadLinks(rows, packageFormat, constraints) {
+// can't be carried into one. `unapplied` names each download filter the link
+// leaves out, for the card and the list to flag.
+export function buildDownloadLinks(rows, packageFormat, constraints = {}) {
+  const byTime = Boolean(constraints.startDate || constraints.endDate);
+  const byDepth =
+    constraints.startDepth != null || constraints.endDepth != null;
   return (rows || [])
     .filter((row) => row?.cdm_data_type !== "Grid")
     .map((row) => {
-      const obis = isObis(row);
-      const format = obis ? OBIS_FORMAT : ERDDAP_FORMATS[packageFormat];
-      if (!format || !erddapServerBase(row)) return null;
-
-      const url = obis
-        ? obisDownloadUrl(row, constraints)
-        : erddapDownloadUrl(row, format, constraints);
-      if (!url) return null;
-
-      return {
+      const link = {
         pk: row.pk,
         datasetId: row.dataset_id,
         title: row.title,
-        source: obis ? "obis" : "erddap",
+        recordUrl: row.erddap_url || null,
+        ckanUrl: row.ckan_url || null,
+      };
+      // A Darwin Core Archive is the whole dataset: no filter reaches it.
+      if (isObis(row)) {
+        return {
+          ...link,
+          source: "obis",
+          format: "dwca",
+          url: row.archive_url || null,
+          unapplied: [
+            byTime && "time",
+            byDepth && "depth",
+            constraints.polygon && "polygon",
+          ].filter(Boolean),
+        };
+      }
+      const format = ERDDAP_FORMATS[packageFormat];
+      const url = format && erddapDownloadUrl(row, format, constraints);
+      if (!url) return null;
+      // A polygon can only reach ERDDAP as its bounding box.
+      return {
+        ...link,
+        source: "erddap",
         format,
         url,
-        ckanUrl: row.ckan_url || null,
-        // What this link could not carry, for the row to say so.
-        depthDropped:
-          !obis && !row.has_depth && constraints?.startDepth != null,
+        unapplied: [
+          byDepth && !row.has_depth && "depth",
+          constraints.polygon && "polygon",
+        ].filter(Boolean),
       };
     })
     .filter(Boolean);
@@ -156,7 +151,9 @@ export function linksToCsv(links, citations = []) {
       "title",
       "source",
       "format",
-      "query_url",
+      "download_url",
+      "filters_not_applied",
+      "record_url",
       // The human page, not the API record: CSVs are read in spreadsheets.
       "catalogue_url",
       "license",
@@ -170,7 +167,9 @@ export function linksToCsv(links, citations = []) {
         link.title || "",
         link.source,
         link.format,
-        link.url,
+        link.url || "",
+        link.unapplied.join(" "),
+        link.recordUrl || "",
         link.ckanUrl || "",
         cited.license || "",
         cited.license_url || "",
