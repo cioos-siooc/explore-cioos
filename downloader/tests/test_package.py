@@ -215,6 +215,19 @@ def test_obis_falls_back_to_csv_for_a_format_it_has_no_rendition_of(tmp_path, mo
     assert "was delivered as CSV" in read("README.md")
 
 
+def test_obis_takes_its_own_format_beside_the_erddap_one(tmp_path, monkeypatch):
+    export = tmp_path / "export.parquet"
+    _raw_obis(export)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    obis = _dataset("abc", source_type="obis", erddap_url="https://obis.org", cdm_data_type="Point")
+    report, archive, read = _run(tmp_path, _query(obis, format="nccf", obis_format="parquet"))
+
+    row = report["erddap_report"][0]
+    assert row["format"] == "parquet" and not row["format_fallback"]
+    assert "cde_download_pkg001/data/abc_obis_org/abc_obis_org.parquet" in archive.namelist()
+    assert "- OBIS format: Parquet" in read("README.md")
+
+
 def test_feature_ids_replace_the_bounding_box(tmp_path):
     urls = []
 

@@ -78,6 +78,13 @@ DEFAULT_FORMAT = "csv"
 OBIS_FORMATS = ("csv", "parquet")
 
 
+# Jobs queued before obis_format existed carry one format for every source.
+def requested_format(user_query, source_type):
+    if source_type == "obis" and user_query.get("obis_format"):
+        return user_query["obis_format"]
+    return user_query.get("format") or DEFAULT_FORMAT
+
+
 # ERDDAP error envelope: Error { code=500; message="Query error: ..."; }
 _ERDDAP_MESSAGE_RE = re.compile(r'message\s*=\s*"(.*?)"\s*;?\s*\}?\s*$', re.DOTALL | re.IGNORECASE)
 MAX_ERROR_CHARS = 500
@@ -337,9 +344,10 @@ def _download_obis(dataset, user_query, regions, fmt, row, folder: Path):
     row["status"] = COMPLETED if files else EMPTY
 
 
-def download_dataset(dataset, user_query, regions, requested_format, root: Path, budget):
+def download_dataset(dataset, user_query, regions, root: Path, budget):
     source_type = dataset.get("source_type") or "erddap"
-    fmt = requested_format
+    requested = requested_format(user_query, source_type)
+    fmt = requested
     if source_type == "obis" and fmt not in OBIS_FORMATS:
         fmt = DEFAULT_FORMAT
 
@@ -347,7 +355,8 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
     folder = root / "data" / folder_name
     (folder / "metadata").mkdir(parents=True, exist_ok=True)
     row = _row(dataset, fmt, folder_name)
-    row["format_fallback"] = fmt != requested_format
+    row["requested_format"] = requested
+    row["format_fallback"] = fmt != requested
 
     try:
         if source_type == "obis":
@@ -386,7 +395,6 @@ def download_dataset(dataset, user_query, regions, requested_format, root: Path,
 def get_datasets(json_query, output_path):
     user_query = json_query["user_query"]
     regions = polygon_regions(user_query.get("polygon_region"))
-    requested_format = user_query.get("format") or DEFAULT_FORMAT
     budget = _QueryBudget(DATASET_SIZE_LIMIT, QUERY_SIZE_LIMIT)
     root = Path(output_path)
     datasets = json_query["cache_filtered"]
@@ -399,7 +407,7 @@ def get_datasets(json_query, output_path):
 
     def download_server(indexes):
         for i in indexes:
-            rows[i] = download_dataset(datasets[i], user_query, regions, requested_format, root, budget)
+            rows[i] = download_dataset(datasets[i], user_query, regions, root, budget)
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         list(pool.map(download_server, by_server.values()))

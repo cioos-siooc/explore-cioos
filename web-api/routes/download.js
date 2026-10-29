@@ -19,6 +19,8 @@ const {
 // The email rides in the JSON body so it never reaches access logs or traces.
 
 const FORMATS = ["csv", "parquet", "odv", "nccf"];
+// OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition.
+const OBIS_FORMATS = ["csv", "parquet"];
 // Past this many matched features, a bounding-box request beats a regex over
 // their IDs (the downloader also caps the number of requests it splits into).
 const MAX_FEATURE_IDS = 5000;
@@ -59,6 +61,10 @@ const DOWNLOADER_URL = `https://github.com/cioos-siooc/explore-cioos/archive/${D
  *       - in: query
  *         name: format
  *         schema: { type: string, enum: [csv, parquet, odv, nccf], default: csv }
+ *       - in: query
+ *         name: obisFormat
+ *         schema: { type: string, enum: [csv, parquet] }
+ *         description: Format for OBIS datasets; defaults to format, as CSV when OBIS has no such rendition.
  *       - in: query
  *         name: timeMin
  *         schema: { type: string, format: date-time }
@@ -111,6 +117,7 @@ async function downloadSelection(query) {
     polygon,
     lang = "en",
     format = "csv",
+    obisFormat,
   } = query;
 
   const filters = await createDBFilter(query);
@@ -188,16 +195,19 @@ async function downloadSelection(query) {
     depth_max: Number.parseFloat(depthMax),
     polygon_region: polygon ? polygonJSONToWKT(polygon) : null,
     format,
+    obis_format: obisFormat || null,
     // Every filter as the Data Explorer sent it, for the package README.
     filters: Object.fromEntries(
       Object.entries(query).filter(
-        ([key]) => !["polygon", "lang", "format"].includes(key),
+        ([key]) => !["polygon", "lang", "format", "obisFormat"].includes(key),
       ),
     ),
     // The explorer reads these same parameters back from its URL, so the
     // package can link to the selection it was made from.
     explorer_url: `${EXPLORER_URL}/?${new URLSearchParams(
-      Object.entries(query).filter(([key]) => key !== "format"),
+      Object.entries(query).filter(
+        ([key]) => !["format", "obisFormat"].includes(key),
+      ),
     )}`,
     job_id: randomUUID().slice(0, 6),
     // Installed by the package's reproduce.py.
@@ -216,6 +226,7 @@ router.post(
       body("email").isEmail(),
       check("lang").isIn(["en", "fr"]).optional(),
       check("format").isIn(FORMATS).optional(),
+      check("obisFormat").isIn(OBIS_FORMATS).optional(),
     ],
     cacheFor: null,
   }),

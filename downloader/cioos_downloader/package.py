@@ -92,6 +92,7 @@ _TEXT = {
         "box": "latitude {lat_min} to {lat_max}, longitude {lon_min} to {lon_max}",
         "anywhere": "anywhere",
         "format": "Format",
+        "obis_format": "OBIS format",
         "filters": "Other filters (as sent by the Data Explorer)",
         "data": "Data",
         "dataset": "Dataset",
@@ -226,6 +227,7 @@ _TEXT = {
         "box": "latitude {lat_min} à {lat_max}, longitude {lon_min} à {lon_max}",
         "anywhere": "partout",
         "format": "Format",
+        "obis_format": "Format OBIS",
         "filters": "Autres filtres (tels qu'envoyés par l'Explorateur)",
         "data": "Données",
         "dataset": "Jeu de données",
@@ -609,6 +611,8 @@ def _readme(user_query, entries, created, lang):
         area = t["anywhere"]
     lines.append(f"- {t['area']}: {area}")
     lines.append(f"- {t['format']}: {FORMATS[user_query.get('format') or 'csv'].label}")
+    if user_query.get("obis_format"):
+        lines.append(f"- {t['obis_format']}: {FORMATS[user_query['obis_format']].label}")
     filters = user_query.get("filters") or {}
     if filters:
         lines.append(f"- {t['filters']}:")
@@ -857,14 +861,12 @@ def write_package(root: Path, json_query, report):
     user_query = json_query["user_query"]
     lang = _lang(user_query)
     created = datetime.now(UTC).isoformat(timespec="seconds")
-    requested = user_query.get("format") or "csv"
 
     entries = []
     for dataset, row in zip(json_query["cache_filtered"], report["erddap_report"], strict=True):
         metadata = dataset.get("metadata") or {}
         row["title_fr"] = dataset.get("title_fr")
         row["ckan_url"] = dataset.get("ckan_url")
-        row["requested_format"] = requested
         folder = root / "data" / row["folder"]
         if metadata:
             (folder / "metadata" / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False))

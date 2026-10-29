@@ -137,6 +137,30 @@ test("rejects an unknown output format", async () => {
   assert.equal(res.status, 400);
 });
 
+test("rejects an OBIS format OBIS has no rendition of", async () => {
+  const res = await agent
+    .post("/download")
+    .query({ ...VALID_QUERY, obisFormat: "nccf" })
+    .send(EMAIL);
+  assert.equal(res.status, 400);
+});
+
+test("queues the OBIS format beside the ERDDAP one, not as a filter", async () => {
+  shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
+  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
+  db.queueRows({});
+
+  await agent
+    .post("/download")
+    .query({ ...VALID_QUERY, format: "nccf", obisFormat: "parquet" })
+    .send(EMAIL);
+
+  const insert = db.queries[1];
+  assert.match(insert, /"format":"nccf","obis_format":"parquet"/);
+  assert.doesNotMatch(insert, /"filters":\{[^}]*obisFormat/);
+  assert.doesNotMatch(insert, /"explorer_url":"[^"]*obisFormat/);
+});
+
 test("queues the chosen format and the filters as sent, without the email", async () => {
   shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
   db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);

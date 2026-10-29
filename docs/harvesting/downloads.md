@@ -39,6 +39,7 @@ map uses, plus:
 | `polygon` | The drawn polygon as GeoJSON, only when **Filter by polygon** is on |
 | time / depth | Reset to the full range when their download switch is off |
 | `format` | `csv` (default), `parquet`, `odv` or `nccf` |
+| `obisFormat` | `csv` or `parquet` for OBIS datasets; `format` when absent |
 | `lang` | `en` or `fr`: the language of the README and the email order |
 
 The email travels in the JSON body, never the URL, so it stays out of access
@@ -107,8 +108,9 @@ harvested before that column existed fall back to the dataset's ERDDAP info page
 ### OBIS
 
 OBIS datasets are read from the OBIS open-data parquet export with DuckDB,
-bounded by the box, then filtered on depth, time and the polygon. OBIS has no
-ODV or CF rendition, so those formats fall back to CSV and the README says so.
+bounded by the box, then filtered on depth, time and the polygon, and written in
+`obisFormat`. A job without one takes `format`; OBIS has no ODV or CF
+rendition, so those fall back to CSV and the README says so.
 
 ### Limits and outcomes
 
