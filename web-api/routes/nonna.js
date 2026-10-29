@@ -1,12 +1,20 @@
 require("dotenv").config({ quiet: true });
 const express = require("express");
-const axios = require("axios");
+const sharp = require("sharp");
 const {
   createTileCache,
   sendTile,
   sendFallbackTile,
 } = require("../utils/tileCache");
 const { pipeline } = require("../utils/routePipeline");
+const {
+  NONNA_10,
+  WEB_MERCATOR_HALF,
+  fetchElevations,
+  isSounding,
+  wcsUrl,
+} = require("../utils/nonnaWcs");
+const { waterMask } = require("../utils/waterMask");
 
 const router = express.Router();
 
@@ -14,31 +22,28 @@ const router = express.Router();
  * NONNA's gateway allowlists request origins exactly and 403s every other
  * Origin, including the CORS preflight. MapLibre always sends an Origin
  * (crossOrigin = 'anonymous', required for WebGL textures), while a
- * server-side request sends none and succeeds. If CHS ever allowlists
- * explore.cioos.ca, this route can be deleted.
+ * server-side request sends none and succeeds.
+ *
+ * Its WMTS tiles have CHS's colour ramp baked in and WMS refuses SLD_BODY, so
+ * the raw float depths come from WCS instead (utils/nonnaWcs.js) and are
+ * re-encoded as Terrarium DEM tiles: the browser colours (color-relief) and
+ * shades (hillshade) them.
+ *
+ * NONNA carries soundings on land too (drying heights, stray cells); those
+ * pixels are cleared against OSM's water polygons (utils/waterMask.js) so the
+ * imagery shows through instead of the ramp's palest colour.
  */
 
-const NONNA_WMTS =
-  "https://nonna-geoserver.data.chs-shc.ca/geoserver/gwc/service/wmts";
-
-// Allowlisted so this cannot be used to bounce arbitrary requests off the API.
-const LAYERS = {
-  10: "nonna:NONNA 10",
-  100: "nonna:NONNA 100",
-};
-
-// Its tile indices are ordinary XYZ (top-left origin), so {z}/{x}/{y} maps
-// straight onto tilematrix/tilecol/tilerow.
-const TILE_MATRIX_SET = "EPSG:900913";
+const TILE_SIZE = 256;
 
 const MAX_ZOOM = 21;
-const UPSTREAM_TIMEOUT_MS = 15000;
 
 const BROWSER_MAX_AGE_S = 604800;
 
-// Tiles run ~5-40 KB, so the 3000 default is ~120 MB at worst. CHS
-// republishes NONNA on a slow cycle, so a month in redis is safe.
-const tileCache = createTileCache("nonna", {
+// Tiles run ~5-60 KB, so the 3000 default is ~180 MB at worst. CHS
+// republishes NONNA on a slow cycle, so a month in redis is safe. Its own
+// namespace so older tiles in redis (colour, then unmasked DEM) are never served.
+const tileCache = createTileCache("nonna-dem-water", {
   l1Max:
     Number(process.env.NONNA_TILE_CACHE_MAX) > 0
       ? Number(process.env.NONNA_TILE_CACHE_MAX)
@@ -46,26 +51,99 @@ const tileCache = createTileCache("nonna", {
   redisTtlS: 30 * 24 * 60 * 60,
 });
 
+function tileSubsets(z, x, y) {
+  const size = (2 * WEB_MERCATOR_HALF) / 2 ** z;
+  const minX = x * size - WEB_MERCATOR_HALF;
+  const maxY = WEB_MERCATOR_HALF - y * size;
+  return [`X(${minX},${minX + size})`, `Y(${maxY - size},${maxY})`];
+}
+
+// Terrarium: elevation = R*256 + G + B/256 - 32768. Nodata goes out as
+// (0,0,0,0), which decodes to -32768, the bottom of color-relief's ramp.
+function encodeTerrarium(elevations) {
+  const rgba = Buffer.alloc(elevations.length * 4);
+  elevations.forEach((v, i) => {
+    if (!isSounding(v)) return;
+    const shifted = v + 32768;
+    rgba[i * 4] = Math.floor(shifted / 256);
+    rgba[i * 4 + 1] = Math.floor(shifted) % 256;
+    rgba[i * 4 + 2] = Math.floor((shifted % 1) * 256);
+    rgba[i * 4 + 3] = 255;
+  });
+  return sharp(rgba, {
+    raw: { width: TILE_SIZE, height: TILE_SIZE, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+}
+
+// NONNA 10 has one-pixel no-data rows and columns inside its own coverage,
+// which the hillshade would draw as trenches; a gap pixel this close to
+// soundings takes their mean instead.
+const SEAM_FILL_PX = 3;
+
+function fillSeams(layer) {
+  return layer.map((v, i) => {
+    if (isSounding(v)) return v;
+    const row = Math.floor(i / TILE_SIZE);
+    const col = i % TILE_SIZE;
+    let sum = 0;
+    let n = 0;
+    for (
+      let r = Math.max(0, row - SEAM_FILL_PX);
+      r <= Math.min(TILE_SIZE - 1, row + SEAM_FILL_PX);
+      r++
+    ) {
+      for (
+        let c = Math.max(0, col - SEAM_FILL_PX);
+        c <= Math.min(TILE_SIZE - 1, col + SEAM_FILL_PX);
+        c++
+      ) {
+        const neighbour = layer[r * TILE_SIZE + c];
+        if (isSounding(neighbour)) {
+          sum += neighbour;
+          n++;
+        }
+      }
+    }
+    return n ? sum / n : NaN;
+  });
+}
+
+// Masked after the seam fill, which would otherwise spread soundings back
+// over the cleared land.
+async function waterOnly(elevations, z, x, y) {
+  if (!elevations.some(isSounding)) return elevations;
+  const water = await waterMask(z, x, y);
+  return elevations.map((v, i) => (water[i] ? v : NaN));
+}
+
+// NONNA 10 alone, one WCS call a tile: NONNA 100 would only add sparsely
+// surveyed water, whose 10 m cells the downsampling skips at these zooms.
+async function renderTile(z, x, y) {
+  const elevations = await fetchElevations(
+    wcsUrl(NONNA_10.id, tileSubsets(z, x, y), {
+      scalesize: `i(${TILE_SIZE}),j(${TILE_SIZE})`,
+    }),
+  );
+  return encodeTerrarium(await waterOnly(fillSeams(elevations), z, x, y));
+}
+
 /**
  * @swagger
- * /nonna/{layer}/{z}/{x}/{y}.png:
+ * /nonna/{z}/{x}/{y}.png:
  *   get:
- *     summary: Proxy a CHS NONNA bathymetry raster tile
+ *     summary: CHS NONNA bathymetry as a Terrarium-encoded DEM tile
  *     tags: [Nonna]
  *     description: >
- *       Fetches a Canadian Hydrographic Service NONNA bathymetry tile from the
- *       CHS GeoServer and re-serves it same-origin. CHS allowlists request
- *       origins exactly and 403s everything else, including the CORS preflight,
- *       so the browser cannot load these tiles directly; a server-side request
- *       sends no Origin header and succeeds. Tiles are transparent over land and
- *       wherever CHS holds no data, so the result composites directly over
- *       satellite imagery.
+ *       Fetches Canadian Hydrographic Service NONNA 10 elevations from the CHS
+ *       GeoServer WCS, fills its one-pixel no-data seams from the soundings
+ *       around them, clears those outside OpenStreetMap water (via
+ *       OpenFreeMap), and re-encodes them as a 256 px Terrarium PNG
+ *       (elevation = R*256 + G + B/256 - 32768, metres, negative below chart
+ *       datum). Pixels without soundings, or on land, are fully transparent and decode to
+ *       -32768.
  *     parameters:
- *       - in: path
- *         name: layer
- *         required: true
- *         description: NONNA product resolution in metres.
- *         schema: { type: string, enum: ["10", "100"] }
  *       - in: path
  *         name: z
  *         required: true
@@ -80,62 +158,36 @@ const tileCache = createTileCache("nonna", {
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: PNG tile, transparent where CHS holds no data.
+ *         description: Terrarium PNG tile.
  *         content:
  *           image/png:
  *             schema:
  *               type: string
  *               format: binary
  *       400:
- *         description: Unknown layer, or tile coordinates outside the zoom's grid.
+ *         description: Tile coordinates outside the zoom's grid.
  */
 // No apicache: this route runs its own two-tier tile cache.
 router.get(
-  "/:layer/:z/:x/:y.png",
+  "/:z/:x/:y.png",
   ...pipeline({
     filters: false,
     cacheFor: null,
     tileParams: { maxZoom: MAX_ZOOM },
   }),
   async (req, res) => {
-    const { layer, z, x, y } = req.params;
+    const z = Number(req.params.z);
+    const x = Number(req.params.x);
+    const y = Number(req.params.y);
 
-    const wmtsLayer = LAYERS[layer];
-    if (!wmtsLayer) {
-      return res.status(400).json({
-        errors: [`unknown NONNA layer '${layer}'; expected 10 or 100`],
-      });
-    }
-
-    const zoom = Number(z);
-    const col = Number(x);
-    const row = Number(y);
-
-    const key = `${layer}/${zoom}/${col}/${row}`;
+    const key = `${z}/${x}/${y}`;
     const cached = await tileCache.get(key);
     if (cached) {
       return sendTile(res, cached, "image/png", BROWSER_MAX_AGE_S);
     }
 
     try {
-      const upstream = await axios.get(NONNA_WMTS, {
-        params: {
-          service: "WMTS",
-          version: "1.0.0",
-          request: "GetTile",
-          layer: wmtsLayer,
-          style: "",
-          tilematrixset: TILE_MATRIX_SET,
-          format: "image/png",
-          tilematrix: `${TILE_MATRIX_SET}:${zoom}`,
-          tilerow: row,
-          tilecol: col,
-        },
-        responseType: "arraybuffer",
-        timeout: UPSTREAM_TIMEOUT_MS,
-      });
-
-      const body = Buffer.from(upstream.data);
+      const body = await renderTile(z, x, y);
       tileCache.set(key, body);
       return sendTile(res, body, "image/png", BROWSER_MAX_AGE_S);
     } catch (e) {

@@ -17,6 +17,7 @@ import classNames from "classnames";
 
 import { server } from "../../../config.js";
 import { parseArea, useDebounce } from "../../../utilities.jsx";
+import MatchHighlight from "../../ui/MatchHighlight.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
@@ -175,16 +176,15 @@ export function useFilterSearchShortcut(open) {
 }
 
 const HELP_ROWS = [
-  { group: "text", help: "Filters", note: true },
-  { group: "text", help: "Titles", note: true },
+  { group: "text", help: "Filters" },
+  { group: "text", help: "Titles" },
   { group: "time", help: "Time" },
   { group: "depth", help: "Depth" },
   { group: "quick", help: "Toggles" },
   { group: "area", help: "Area" },
+  { group: "region", help: "Places" },
   { group: "exclude", help: "Exclude" },
 ];
-
-const BROWSE_SECTIONS = ["What", "From", "WhenWhere", "Biodiversity"];
 
 function FilterSearchHelp({ showSpecies, onExample }) {
   const { t } = useTranslation();
@@ -196,7 +196,7 @@ function FilterSearchHelp({ showSpecies, onExample }) {
   };
   return (
     <div className="filterSearchHelp" data-testid="filter-search-help">
-      <p className="filterSearchHelpTitle">{t("filterSearchHelpTitle")}</p>
+      <p className="filterSearchHelpCaption">{t("filterSearchCaption")}</p>
       <dl className="filterSearchHelpRows">
         {HELP_ROWS.map((row) => (
           <div key={row.help} className="filterSearchHelpRow">
@@ -205,11 +205,6 @@ function FilterSearchHelp({ showSpecies, onExample }) {
                 <GroupIcon groupKey={row.group} />
                 {t(`filterSearchHelp${row.help}`)}
               </span>
-              {row.note && (
-                <span className="filterSearchHelpNote">
-                  {t(`filterSearchHelp${row.help}Note`)}
-                </span>
-              )}
             </dt>
             <dd>
               {examples(row.help).map((example) => (
@@ -227,25 +222,19 @@ function FilterSearchHelp({ showSpecies, onExample }) {
           </div>
         ))}
       </dl>
-      <div className="filterSearchHelpBrowse">
-        <p>{t("filterSearchHelpBrowse")}</p>
-        <dl className="filterSearchHelpSections">
-          {BROWSE_SECTIONS.filter(
-            (section) => showSpecies || section !== "Biodiversity",
-          ).map((section) => (
-            <div key={section} className="filterSearchHelpSection">
-              <dt>{t(`filterGroup${section}`)}</dt>
-              <dd>{t(`filterSearchHelpSection${section}`)}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
     </div>
   );
 }
 
-// The text is the panel's, so it survives a visit to a filter's own page.
-export default function FilterSearch({ text, setText, inputRef }) {
+// The text and the picked rows are the panel's, so they survive a visit to a
+// filter's own page and its Clear all can drop the rows.
+export default function FilterSearch({
+  text,
+  setText,
+  touched,
+  setTouched,
+  inputRef,
+}) {
   const { t } = useTranslation();
   const { obisDataAvailable } = useFilters();
   const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection();
@@ -253,9 +242,6 @@ export default function FilterSearch({ text, setText, inputRef }) {
   const [canReset, resetAll] = useResetAllFilters();
   const listId = useId();
   const [activeIndex, setActiveIndex] = useState(0);
-  // Picking leaves the list as it is, so several values can be picked in a
-  // row; the empty box would otherwise drop a value the moment it was removed.
-  const [touched, setTouched] = useState(() => new Set());
   const [expanded, setExpanded] = useState(() => new Set());
 
   const { term, exclude } = parseFilterQuery(text);
@@ -279,7 +265,10 @@ export default function FilterSearch({ text, setText, inputRef }) {
           includeOnly: true,
           command: true,
           action: t("quickFilterCaptionReset"),
-          toggle: resetAll,
+          toggle: () => {
+            resetAll();
+            setTouched(new Set());
+          },
         },
       ],
     },
@@ -414,6 +403,7 @@ export default function FilterSearch({ text, setText, inputRef }) {
       className={classNames("filterSearchPage", { excluding: exclude })}
       data-testid="filter-search"
     >
+      <h3 className="filterOptionsTitle">{t("filterSearchLabel")}</h3>
       <div
         className={classNames("filterSearchField", { busy: places.loading })}
       >
@@ -561,10 +551,21 @@ export default function FilterSearch({ text, setText, inputRef }) {
                               {t("filterSearchCategoryTag")}
                             </span>
                           )}
-                          {option.label}
+                          {group.key === "scientificName" ? (
+                            <MatchHighlight text={option.label} query={term} />
+                          ) : (
+                            option.label
+                          )}
                           {option.hint && (
                             <span className="filterSearchOptionHint">
-                              {option.hint}
+                              {group.key === "scientificName" ? (
+                                <MatchHighlight
+                                  text={option.hint}
+                                  query={term}
+                                />
+                              ) : (
+                                option.hint
+                              )}
                             </span>
                           )}
                           <ExcludedLabel

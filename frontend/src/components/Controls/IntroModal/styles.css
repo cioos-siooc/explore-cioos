@@ -15,6 +15,19 @@
   margin-left: auto;
 }
 
+.introReopen {
+  max-width: 22rem;
+  margin: 0 0 0 auto;
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.4;
+  text-align: right;
+  color: var(--cioos-ink-80);
+}
+
+.introModal .modal-header > .introReopen + .closeButton {
+  margin-left: 0;
+}
+
 .introBrand {
   /* Not inline: the line box would hang descender space under the lockup and
      ride it above the title's centre. */
@@ -184,38 +197,115 @@
   transform: translateY(-1px);
 }
 
+.introCtaSecondary {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 70%);
+  background: transparent;
+  color: var(--cioos-white);
+}
+
 .introShowcases {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--cioos-space-sm);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.introShowcase {
-  display: flex;
-  align-items: center;
-  gap: var(--cioos-space-sm);
+.introShowcase,
+.introFooterCard {
+  --intro-key-edge: color-mix(
+    in srgb,
+    var(--cioos-primary) 55%,
+    var(--cioos-white)
+  );
+
   width: 100%;
-  height: 100%;
-  padding: var(--cioos-space-sm) var(--cioos-space-md);
-  border: 1px solid color-mix(in srgb, var(--cioos-sand), var(--cioos-ink) 15%);
+  border: 1px solid var(--cioos-teal-light);
   border-radius: var(--cioos-radius-lg);
-  background: var(--cioos-sand);
+  background: var(--cioos-white);
+
+  /* A raised key: the solid edge reads as pressable without hover (touch). */
+  box-shadow:
+    0 4px 0 var(--intro-key-edge),
+    0 6px 10px rgb(21 47 55 / 12%);
   font: inherit;
   text-align: left;
   color: var(--cioos-ink);
   cursor: pointer;
   transition:
     border-color var(--cioos-transition-fast),
-    background-color var(--cioos-transition-fast);
+    box-shadow var(--cioos-transition-fast),
+    transform var(--cioos-transition-fast);
 }
 
 .introShowcase:hover,
-.introShowcase:focus-visible {
-  border-color: var(--cioos-ink-40);
-  background: var(--cioos-white);
+.introShowcase:focus-visible,
+.introFooterCard:hover,
+.introFooterCard:has(:focus-visible),
+.introFooterCard:focus-visible {
+  border-color: var(--cioos-primary);
+  box-shadow:
+    0 6px 0 var(--intro-key-edge),
+    0 10px 16px rgb(21 47 55 / 14%);
+  transform: translateY(-2px);
+}
+
+.introShowcase:active,
+.introFooterCard:active {
+  box-shadow:
+    0 1px 0 var(--intro-key-edge),
+    0 2px 4px rgb(21 47 55 / 12%);
+  transform: translateY(3px);
+}
+
+.introShowcase,
+.introFooterCard {
+  display: grid;
+  position: relative;
+  grid-template-areas:
+    "icon title title"
+    "body body body";
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-content: start;
+  align-items: center;
+}
+
+.introShowcaseText,
+.introFooterText {
+  display: contents;
+}
+
+.introShowcaseIcon,
+.introFooterCard > svg:first-child {
+  grid-area: icon;
+}
+
+.introShowcaseTitle,
+.introFooterHeading {
+  grid-area: title;
+}
+
+.introShowcaseBody,
+.introFooterText > :not(.introFooterHeading) {
+  grid-area: body;
+  align-self: start;
+}
+
+.introFooterCard > .form-switch {
+  grid-area: end;
+}
+
+.introFooterCard:has(> .form-switch) {
+  grid-template-areas:
+    "icon title end"
+    "body body end";
+}
+
+.introShowcase {
+  gap: var(--cioos-space-xs) var(--cioos-space-sm);
+  height: 100%;
+  padding: var(--cioos-space-sm) var(--cioos-space-md);
 }
 
 .introShowcaseIcon {
@@ -230,11 +320,9 @@
   color: var(--cioos-teal-light);
 }
 
-.introShowcaseText {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
+/* The viewBox fits the arrow's bounds; its visual mass sits up-right of them. */
+.introTrackHead {
+  transform: translate(-2px, 2px);
 }
 
 .introShowcaseTitle {
@@ -249,11 +337,38 @@
 
 .introShowcaseArrow {
   flex: none;
+  position: absolute;
+  right: var(--cioos-space-sm);
+  bottom: var(--cioos-space-sm);
+  box-sizing: content-box;
+  padding: 4px;
+  border-radius: 50%;
+  background: color-mix(
+    in srgb,
+    var(--cioos-teal-light) 60%,
+    var(--cioos-white)
+  );
   color: var(--cioos-primary-700);
-  transition: transform var(--cioos-transition-fast);
+  transition:
+    background-color var(--cioos-transition-fast),
+    color var(--cioos-transition-fast),
+    transform var(--cioos-transition-fast);
 }
 
-.introShowcase:hover .introShowcaseArrow {
+/* Keeps the last line of text clear of the corner arrow. */
+.introShowcaseBody,
+.introFooterCard:has(> .introShowcaseArrow)
+  .introFooterText
+  > :not(.introFooterHeading) {
+  padding-right: calc(22px + var(--cioos-space-xs));
+}
+
+.introShowcase:hover .introShowcaseArrow,
+.introShowcase:focus-visible .introShowcaseArrow,
+.introFooterCard:hover .introShowcaseArrow,
+.introFooterCard:focus-visible .introShowcaseArrow {
+  background: var(--cioos-primary-700);
+  color: var(--cioos-white);
   transform: translateX(3px);
 }
 
@@ -268,21 +383,17 @@
 }
 
 .introFeature {
+  display: flex;
+  flex-wrap: wrap;
+  place-content: flex-start center;
+  align-items: center;
+  gap: var(--cioos-space-sm) var(--cioos-space-md);
   padding: var(--cioos-space-lg);
-  border: 1px solid var(--cioos-teal-light);
   border-radius: var(--cioos-radius-lg);
   background: var(--cioos-white);
-  box-shadow: 0 2px 8px rgb(21 47 55 / 8%);
+  text-align: center;
   animation: intro-rise 0.5s ease-out both;
   animation-delay: calc(var(--intro-feature-index, 0) * 90ms + 150ms);
-  transition:
-    transform var(--cioos-transition-fast),
-    box-shadow var(--cioos-transition-fast);
-}
-
-.introFeature:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--cioos-shadow-lift);
 }
 
 .introFeature h3::before {
@@ -291,7 +402,7 @@
 }
 
 .introFeature h3 {
-  margin: var(--cioos-space-sm) 0 var(--cioos-space-xs);
+  margin: 0;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-lg);
   font-weight: 600;
@@ -299,12 +410,17 @@
 }
 
 .introFeature p {
+  flex-basis: 100%;
   margin: 0;
   line-height: 1.6;
 }
 
+.introFeature .introLink {
+  margin-top: 0;
+}
+
 .introFeatureIcon {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
@@ -329,62 +445,28 @@
 
 .introFooterCards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 26rem));
+  justify-content: center;
   gap: var(--cioos-space-md);
 }
 
 .introFooterCard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--cioos-space-sm);
-  padding: var(--cioos-space-md) var(--cioos-space-lg);
-  border-radius: var(--cioos-radius-lg);
-  background-color: var(--cioos-surface-2);
-}
-
-.introFooterCard p {
+  gap: var(--cioos-space-xs) var(--cioos-space-md);
   margin: 0;
+  padding: var(--cioos-space-md) var(--cioos-space-lg);
   line-height: 1.55;
 }
 
+.introFooterCard > svg:first-child {
+  flex: none;
+  color: var(--cioos-primary);
+}
+
 .introFooterHeading {
-  display: flex;
-  align-items: center;
-  gap: var(--cioos-space-xs);
-  margin: 0;
   font-family: var(--cioos-font-display);
   font-size: var(--cioos-font-size-md);
   font-weight: 600;
   color: var(--cioos-navy);
-}
-
-.introFooterHeading svg {
-  color: var(--cioos-primary);
-}
-
-.introFooterAction {
-  display: inline-flex;
-  align-self: flex-end;
-  margin-top: auto;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border: 1px solid var(--cioos-primary);
-  border-radius: var(--cioos-radius-pill);
-  background: var(--cioos-white);
-  font-weight: 600;
-  color: var(--cioos-primary-700);
-  cursor: pointer;
-  transition:
-    background-color var(--cioos-transition-fast),
-    color var(--cioos-transition-fast);
-}
-
-.introFooterAction:hover,
-.introFooterAction:focus-visible {
-  background: var(--cioos-primary);
-  color: var(--cioos-on-primary);
 }
 
 .introGlyph {
@@ -410,9 +492,7 @@
 }
 
 @media (max-width: 992px) {
-  .introFeatures,
-  .introShowcases,
-  .introFooterCards {
+  .introFeatures {
     grid-template-columns: 1fr;
   }
 }
@@ -430,7 +510,8 @@
     --cioos-font-size-xl: 18px;
   }
 
-  .introModal .tagLine {
+  .introModal .tagLine,
+  .introReopen {
     display: none;
   }
 
@@ -516,9 +597,6 @@
     align-items: center;
     gap: var(--cioos-space-xs);
     padding: var(--cioos-space-sm) var(--cioos-space-xs);
-    border: 0;
-    background: color-mix(in srgb, var(--cioos-teal-light) 35%, transparent);
-    box-shadow: none;
     text-align: center;
   }
 
@@ -533,12 +611,15 @@
     content: none;
   }
 
+  .introFeature p {
+    flex-basis: auto;
+  }
+
   .introFeature .introLink {
-    margin-top: 0;
     font-size: var(--cioos-font-size-sm);
   }
 
-  .introFeature p,
+  .introFeatureBody,
   .introShowcaseBody,
   .introShowcaseArrow {
     display: none;
@@ -547,7 +628,6 @@
   .introFeatureIcon {
     width: 32px;
     height: 32px;
-    background: var(--cioos-white);
   }
 
   .introFeatureIcon svg {
@@ -561,7 +641,7 @@
 
   .introShowcases {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--cioos-space-xs);
+    gap: var(--cioos-space-sm);
   }
 
   .introShowcases > li:last-child:nth-child(odd) {
@@ -596,44 +676,16 @@
   .introFooterCard {
     gap: var(--cioos-space-xs);
     padding: var(--cioos-space-sm);
-  }
-
-  .introTipsCard {
-    flex-flow: row wrap;
-    align-items: center;
-    grid-column: 1 / -1;
-  }
-
-  .introTipsCard > .introFooterHeading {
-    flex-basis: 100%;
-  }
-
-  .introTipsCard > .form-switch {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .introTipsCard > .introFooterAction {
-    flex: none;
+    line-height: 1.4;
   }
 
   .introFooterHeading {
     font-size: var(--cioos-font-size-base);
   }
 
-  .introFooterCard:not(:last-child) p {
+  .introFooterText > :not(.introFooterHeading),
+  .introFooterCard .introShowcaseArrow {
     display: none;
-  }
-
-  .introFooterAction {
-    align-self: flex-start;
-    padding: 4px 12px;
-    font-size: var(--cioos-font-size-sm);
-  }
-
-  .introFooterCard p {
-    font-size: var(--cioos-font-size-sm);
-    line-height: 1.4;
   }
 }
 
@@ -666,7 +718,7 @@
 
   .introHeroActions {
     position: relative;
-    grid-area: 3 / 2;
+    grid-column: 1 / -1;
   }
 }
 
@@ -689,9 +741,11 @@
     animation: none;
   }
 
-  .introFeature:hover,
   .introCta:hover,
-  .introShowcase:hover .introShowcaseArrow {
+  .introShowcase:hover,
+  .introFooterCard:hover,
+  .introShowcase:hover .introShowcaseArrow,
+  .introFooterCard:hover .introShowcaseArrow {
     transform: none;
   }
 }

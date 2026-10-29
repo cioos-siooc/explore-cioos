@@ -1,5 +1,5 @@
 # Stage 1 - the build process
-FROM node:25-alpine AS build-deps
+FROM node:26-alpine AS build-deps
 WORKDIR /usr/src/app
 
 ARG API_URL
@@ -43,7 +43,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
 
 # Stage 2 - the production environment
 # Pinned to match nginx/Dockerfile.
-FROM nginx:1.31.7-alpine
+FROM nginx:1.31.8-alpine
 COPY --from=build-deps /usr/src/app/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --chmod=755 frontend/api-proxy.sh /docker-entrypoint.d/40-api-proxy.sh

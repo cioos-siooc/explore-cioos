@@ -153,7 +153,7 @@ describe("FilterSearch", () => {
     await user.type(box, "carbone organique");
 
     // Named as the Filters list names it, found by its French name.
-    expect(option("Dissolved Organic Carbon")).toBeInTheDocument();
+    expect(option("Dissolved organic carbon")).toBeInTheDocument();
   });
 
   it("finds an ocean variable by its category", async () => {
@@ -529,6 +529,21 @@ describe("FilterSearch", () => {
     expect(box).toBeInTheDocument();
   });
 
+  it("shows the examples again once Clear all empties the list", async () => {
+    const { user, seen } = await renderPalette(
+      "/?eovs=oxygen&realtimeOnly=true",
+    );
+    await waitFor(() => expect(seen.oxygen?.isSelected).toBe(true));
+    await user.click(option("Oxygen"));
+    expect(seen.oxygen).toEqual({ isSelected: false, isExcluded: false });
+    expect(options()).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+
+    expect(screen.queryAllByTestId("filter-search-option")).toHaveLength(0);
+    expect(screen.getByTestId("filter-search-help")).toBeInTheDocument();
+  });
+
   it("clears every filter when asked for by name", async () => {
     const { user, seen, box } = await renderPalette("/?eovs=oxygen");
     await waitFor(() => expect(seen.oxygen?.isSelected).toBe(true));
@@ -567,9 +582,7 @@ describe("FilterSearch", () => {
       "Depths",
       "Quick filters",
       "Exclude",
-      "What",
-      "From",
-      "When & Where",
+      "Places (NRCan GeoNames)",
     ])
       expect(within(help).getByText(name)).toBeInTheDocument();
 

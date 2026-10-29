@@ -5,6 +5,7 @@ import isEmpty from "lodash-es/isEmpty";
 
 import DownloadDetails from "../../Controls/DownloadDetails/DownloadDetails.jsx";
 import Switch from "../../ui/Switch.jsx";
+import { downloadRetentionDays } from "../../config.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useDownload } from "../../../state/download/DownloadProvider.jsx";
@@ -124,6 +125,7 @@ export default function DownloadPanel() {
             onChange={() => setRememberEmail(!rememberEmail)}
           />
           <p className="downloadEmailNotice">
+            {t("downloadLinkLifetime", { count: downloadRetentionDays })}{" "}
             {t("downloadEmailNotice")}{" "}
             <button
               type="button"

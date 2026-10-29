@@ -224,7 +224,10 @@ describe("DatasetCard", () => {
         />,
       );
       const link = screen.getByRole("link", { name: /ERDDAP™/ });
-      expect(link).toHaveAttribute("href", ROW.erddap_url);
+      expect(link).toHaveAttribute(
+        "href",
+        "https://seagull-erddap.glos.org/erddap/en/tabledap/obs_270.html",
+      );
     });
 
     it("disables selection when the CDE can't deliver the dataset", () => {
