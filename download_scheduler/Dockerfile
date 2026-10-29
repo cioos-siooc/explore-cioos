@@ -1,4 +1,6 @@
-FROM ghcr.io/astral-sh/uv:python3.14-trixie
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
+
+RUN useradd --create-home app
 
 # No gcc/libc-dev/libgeos-dev/python3-dev on purpose: every dependency installs
 # from a binary wheel, and those packages drag in ~18 minutes of libc6/python3
@@ -14,6 +16,17 @@ WORKDIR /usr/src/app/download_scheduler
 # --locked: without it uv may re-resolve to versions CI never tested.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
+
+# Same split as harvester/Dockerfile: root-owned code, `app` writes only the
+# workdir (each job's cde_download_* temp folder) and the downloads volume.
+# Without it, every `uv run` rebuilds the editable install into the read-only
+# venv and fails; the build already synced it --locked.
+ENV UV_NO_SYNC=1
+ENV WRITABLE_DIRS="downloads"
+RUN mkdir $WRITABLE_DIRS && chown app:app . $WRITABLE_DIRS
+
+COPY --chmod=755 scripts/drop-privileges.sh /usr/local/bin/drop-privileges
+ENTRYPOINT ["drop-privileges"]
 
 # poll_once() touches downloads/healthz after every served poll. Missing or
 # stale means the loop is dead, hung, or cannot reach the database. The hour of
