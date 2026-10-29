@@ -105,13 +105,21 @@ describe("erddapDownloadUrl", () => {
     expect(url).toBe("https://catalogue.hakai.org/erddap/tabledap/abc.csv?");
   });
 
-  it("maps every package format to an ERDDAP file type", () => {
-    expect(Object.keys(ERDDAP_FORMATS)).toEqual([
-      "csv",
-      "parquet",
-      "odv",
-      "nccf",
-    ]);
+  it("maps the clippable formats to their ERDDAP file type and passes the rest through", () => {
+    expect(ERDDAP_FORMATS).toMatchObject({
+      csv: "csv",
+      parquet: "parquetWMeta",
+      odv: "odvTxt",
+      nccf: "ncCF",
+      json: "json",
+      mat: "mat",
+    });
+  });
+
+  it("links a raw ERDDAP file type as itself", () => {
+    expect(erddapDownloadUrl(erddapRow, ERDDAP_FORMATS.geoJson)).toContain(
+      ".geoJson?",
+    );
   });
 });
 

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import isEmpty from "lodash-es/isEmpty";
 
 import { server } from "../../config.js";
+import { ERDDAP_FORMATS } from "../../downloadLinks.js";
 import reportError from "../reportError.js";
 import {
   defaultStartDate,
@@ -27,7 +28,7 @@ const DownloadContext = createContext();
 
 // The formats the packaged download is written in, per source: OBIS
 // occurrences are a flat table, with no ODV or CF-DSG rendition.
-export const PACKAGE_FORMATS = ["csv", "parquet", "odv", "nccf"];
+export const PACKAGE_FORMATS = Object.keys(ERDDAP_FORMATS);
 export const OBIS_FORMATS = ["csv", "parquet"];
 
 const FAILURE_TEXT_KEYS = {

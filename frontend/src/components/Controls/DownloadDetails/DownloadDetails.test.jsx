@@ -340,8 +340,52 @@ describe("DownloadDetails", () => {
       within(screen.getByLabelText(label))
         .getAllByRole("option")
         .map((option) => option.value);
-    expect(values("ERDDAP™")).toEqual(["csv", "parquet", "odv", "nccf"]);
+    expect(values("ERDDAP™").slice(0, 4)).toEqual([
+      "csv",
+      "parquet",
+      "odv",
+      "nccf",
+    ]);
+    expect(values("ERDDAP™")).toEqual(
+      expect.arrayContaining(["csvp", "json", "nc", "mat", "kml"]),
+    );
     expect(values("OBIS")).toEqual(["csv", "parquet"]);
+  });
+
+  it("splits the ERDDAP formats by whether a polygon can clip them", () => {
+    const groups = () =>
+      within(screen.getByLabelText("ERDDAP™"))
+        .queryAllByRole("group")
+        .map((group) => [
+          group.getAttribute("label"),
+          within(group)
+            .getAllByRole("option")
+            .map((option) => option.value),
+        ]);
+    const pointsToReview = [makePoint({ pk: EST_SMALL.pk })];
+    const { rerender } = renderDetails({ pointsToReview });
+    expect(groups()).toEqual([]);
+
+    rerender(
+      detailsElement({
+        pointsToReview,
+        polygon: [
+          [-65, 44],
+          [-62, 44],
+          [-63, 45],
+          [-65, 44],
+        ],
+        filterDownloadByPolygon: true,
+      }),
+    );
+    const [clipped, box] = groups();
+    expect(clipped).toEqual([
+      "Clipped to the polygon",
+      ["csv", "parquet", "odv", "nccf"],
+    ]);
+    expect(box[0]).toBe("Polygon's bounding box only");
+    expect(box[1]).toEqual(expect.arrayContaining(["json", "mat"]));
+    expect(box[1]).not.toContain("csv");
   });
 
   it("hides the OBIS format when no OBIS dataset is selected", () => {

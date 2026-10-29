@@ -3,12 +3,44 @@
 // link to the source wants the source.
 
 // The ERDDAP file type behind each package format (FORMATS in
-// downloader/cioos_downloader/download_erddap.py).
-export const ERDDAP_FORMATS = {
+// downloader/cioos_downloader/download_erddap.py). The downloader parses only
+// the clippable ones, so only they can be cut to a polygon; the rest are
+// packaged as ERDDAP writes them, over the polygon's bounding box.
+const CLIPPABLE_ERDDAP_FORMATS = {
   csv: "csv",
   parquet: "parquetWMeta",
   odv: "odvTxt",
   nccf: "ncCF",
+};
+export const CLIPPABLE_FORMATS = Object.keys(CLIPPABLE_ERDDAP_FORMATS);
+export const RAW_FORMATS = [
+  "csvp",
+  "csv0",
+  "tsv",
+  "tsvp",
+  "tsv0",
+  "nccsv",
+  "esriCsv",
+  "json",
+  "jsonlCSV1",
+  "jsonlCSV",
+  "jsonlKVP",
+  "geoJson",
+  "ncoJson",
+  "dataTable",
+  "nc",
+  "ncCFMA",
+  "mat",
+  "itx",
+  "asc",
+  "dods",
+  "htmlTable",
+  "xhtml",
+  "kml",
+];
+export const ERDDAP_FORMATS = {
+  ...CLIPPABLE_ERDDAP_FORMATS,
+  ...Object.fromEntries(RAW_FORMATS.map((format) => [format, format])),
 };
 
 // The `by*` flags are the same checkboxes that filter the queued zip, so the

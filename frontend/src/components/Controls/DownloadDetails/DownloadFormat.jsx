@@ -8,17 +8,34 @@ import {
   PACKAGE_FORMATS,
   useDownload,
 } from "../../../state/download/DownloadProvider.jsx";
+import { CLIPPABLE_FORMATS } from "../../../downloadLinks.js";
 import "./styles.css";
 
 // Above both delivery options, not inside either: the emailed package, the
 // script and the ERDDAP direct links all take these formats. A source's
-// picker shows only when the selection holds one of its datasets.
-export default function DownloadFormat({ erddapCount, obisCount }) {
+// picker shows only when the selection holds one of its datasets. Under a
+// polygon, the ERDDAP formats split by whether the package can clip them to it.
+export default function DownloadFormat({
+  erddapCount,
+  obisCount,
+  polygonFiltered,
+}) {
   const { t } = useTranslation();
   const { packageFormat, setPackageFormat, obisFormat, setObisFormat } =
     useDownload();
   const options = (formats) =>
     formats.map((id) => ({ id, label: t(`downloadPackageFormat_${id}`) }));
+  // OBIS is always clipped, so only the ERDDAP picker needs the split.
+  const erddapOptions = options(PACKAGE_FORMATS).map((option) => ({
+    ...option,
+    group: polygonFiltered
+      ? t(
+          CLIPPABLE_FORMATS.includes(option.id)
+            ? "downloadPackageFormatGroupClipped"
+            : "downloadPackageFormatGroupBox",
+        )
+      : undefined,
+  }));
 
   return (
     <div className="downloadBandGroup">
@@ -35,7 +52,7 @@ export default function DownloadFormat({ erddapCount, obisCount }) {
           <SelectPill
             label="ERDDAP™"
             value={packageFormat}
-            options={options(PACKAGE_FORMATS)}
+            options={erddapOptions}
             onChange={setPackageFormat}
             data-testid="download-package-format"
           />

@@ -305,6 +305,7 @@ export default function DownloadDetails({
         <DownloadFormat
           erddapCount={pointsData.length - obisCount}
           obisCount={obisCount}
+          polygonFiltered={polygonFiltered}
         />
       </div>
 
