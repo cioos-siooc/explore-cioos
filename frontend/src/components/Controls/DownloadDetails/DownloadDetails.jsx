@@ -5,7 +5,7 @@ import isEmpty from "lodash-es/isEmpty";
 
 import DatasetsTable from "../DatasetsTable/DatasetsTable.jsx";
 import DownloadFormat from "./DownloadFormat.jsx";
-import DownloadScript from "./DownloadScript.jsx";
+import DownloadLinks from "./DownloadLinks.jsx";
 import FilterDownloadToggles from "./FilterDownloadToggles.jsx";
 
 import { useActivityTask } from "../../../state/activity/ActivityProvider.jsx";
@@ -56,7 +56,7 @@ export default function DownloadDetails({
   children,
 }) {
   const { t } = useTranslation();
-  const { scriptUrl, packageFormat } = useDownload();
+  const { packageFormat } = useDownload();
   const [selectAll, setSelectAll] = useState(true);
   const [pointsData, setPointsData] = useState(
     pointsToReview
@@ -248,7 +248,7 @@ export default function DownloadDetails({
 
   const selectedCount = pointsData.filter((point) => point.selected).length;
   // Includes datasets the 1 GB ceiling deselected: the queue refuses them, and
-  // the script has no ceiling. `!== false` because `selected` is unset until
+  // the source queries have no ceiling. `!== false` because `selected` is unset until
   // the estimates land.
   const linkableDatasets = useMemo(
     () =>
@@ -257,13 +257,12 @@ export default function DownloadDetails({
       ),
     [pointsData],
   );
-  const scriptPks = linkableDatasets.map((point) => point.pk);
   const obisCount = linkableDatasets.filter(
     (point) => point.source_type === "obis",
   ).length;
 
   // A polygon can only reach ERDDAP as its bounding box, so direct links
-  // would hold data the package filters out; the script handles it.
+  // would hold data the package filters out.
   const polygonFiltered = Boolean(polygon?.length && filterDownloadByPolygon);
   const constraints = useMemo(
     () =>
@@ -371,7 +370,7 @@ export default function DownloadDetails({
       </div>
 
       <div className="downloadFooter">
-        {/* Two ways to the same package, so they share one section. */}
+        {/* Two ways to the data, so they share one section. */}
         <div className="downloadFooterSection downloadDelivery">
           <div className="downloadDeliveryHeader">
             <div className="downloadDeliveryHeading">
@@ -389,11 +388,9 @@ export default function DownloadDetails({
             <span className="downloadDeliveryOr" aria-hidden="true">
               {t("downloadDeliveryOr")}
             </span>
-            <DownloadScript
-              url={scriptUrl(scriptPks)}
-              count={scriptPks.length}
+            <DownloadLinks
+              count={linkableDatasets.length}
               links={links}
-              constraints={constraints}
               polygonFiltered={polygonFiltered}
             />
           </div>

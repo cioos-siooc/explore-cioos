@@ -29,93 +29,11 @@ const EXPLORER_URL = (
 // The ID variable whose values select a feature in ERDDAP, per cdm_data_type.
 const FEATURE_ID_SQL = `CASE WHEN d.cdm_data_type IN ('TimeSeries', 'TimeSeriesProfile') THEN p.timeseries_id
                WHEN d.cdm_data_type = 'Profile' THEN p.profile_id END`;
-// The download script installs the downloader from the public repo at the
-// commit this API was deployed from; local stacks have none and track the
+// The package's reproduce.py installs the downloader from the public repo at
+// the commit this API was deployed from; local stacks have none and track the
 // development branch.
 const DOWNLOADER_REF = process.env.SOURCE_COMMIT || "development-v2";
 const DOWNLOADER_URL = `https://github.com/cioos-siooc/explore-cioos/archive/${DOWNLOADER_REF}.tar.gz#subdirectory=downloader`;
-
-// A Python string as ruff format writes it: double quotes unless single
-// quotes need fewer escapes.
-function pythonString(text) {
-  const doubles = (text.match(/"/g) || []).length;
-  const singles = (text.match(/'/g) || []).length;
-  const quote = doubles > singles ? "'" : '"';
-  let body = "";
-  for (const char of text) {
-    const code = char.codePointAt(0);
-    if (char === "\\" || char === quote) body += `\\${char}`;
-    else if (char === "\n") body += "\\n";
-    else if (char === "\r") body += "\\r";
-    else if (char === "\t") body += "\\t";
-    // Control characters, and lone surrogates that UTF-8 can't encode.
-    else if (code < 0x20 || code === 0x7f) {
-      body += `\\x${code.toString(16).padStart(2, "0")}`;
-    } else if (code >= 0xd800 && code <= 0xdfff) {
-      body += `\\u${code.toString(16)}`;
-    } else body += char;
-  }
-  return quote + body + quote;
-}
-
-// One item per line with a trailing comma, which ruff format keeps as is.
-function pythonLiteral(value, indent = "") {
-  if (value === null || value === undefined) return "None";
-  if (typeof value === "boolean") return value ? "True" : "False";
-  // NaN (an unparsed bound) is None, as it was through JSON.
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? String(value).replace("e+", "e") : "None";
-  }
-  if (typeof value === "string") return pythonString(value);
-  const inner = `${indent}    `;
-  if (Array.isArray(value)) {
-    if (!value.length) return "[]";
-    const items = value.map((v) => `${inner}${pythonLiteral(v, inner)},`);
-    return `[\n${items.join("\n")}\n${indent}]`;
-  }
-  const entries = Object.entries(value);
-  if (!entries.length) return "{}";
-  const items = entries.map(
-    ([k, v]) => `${inner}${pythonString(k)}: ${pythonLiteral(v, inner)},`,
-  );
-  return `{\n${items.join("\n")}\n${indent}}`;
-}
-
-function downloadScript(manifest, now) {
-  const { user_query: query, cache_filtered: datasets } = manifest;
-  const oneLine = (text) => String(text ?? "").replace(/\s+/g, " ");
-  return [
-    "# /// script",
-    '# requires-python = "==3.13.*"',
-    `# dependencies = ["cioos-data-explorer-downloader @ ${DOWNLOADER_URL}"]`,
-    "# [tool.uv]",
-    // Resolves the same library versions on every run of this script.
-    `# exclude-newer = "${now.toISOString()}"`,
-    "# ///",
-    "#",
-    "# CIOOS Data Explorer download script.",
-    "# Run it with uv (https://docs.astral.sh/uv/): uv run <this file>",
-    `# It writes cde_download_${query.job_id}/ in the current folder: the data (${query.format}),`,
-    "# each source's metadata, citations and licences, as in the emailed package.",
-    `# Selection: ${oneLine(query.explorer_url)}`,
-    `# Downloader: ${DOWNLOADER_URL}`,
-    "#",
-    "# Datasets:",
-    ...datasets.map((d) => `#   ${oneLine(d.dataset_id)}: ${oneLine(d.title)}`),
-    "",
-    "import sys",
-    "",
-    "from cioos_downloader.script import run",
-    "",
-    `QUERY = ${pythonLiteral(JSON.parse(JSON.stringify(manifest)))}`,
-    "",
-    'if __name__ == "__main__":',
-    "    sys.exit(run(QUERY))",
-    "",
-  ]
-    .map((line) => line.trimEnd())
-    .join("\n");
-}
 
 /**
  * @swagger
@@ -179,7 +97,7 @@ function downloadScript(manifest, now) {
  *         description: Validation error
  */
 // The datasets matching the selection (null when none) and the query the
-// downloader reads, shared by the queued package and the download script.
+// downloader reads.
 async function downloadSelection(query) {
   const {
     timeMin,
@@ -282,7 +200,7 @@ async function downloadSelection(query) {
       Object.entries(query).filter(([key]) => key !== "format"),
     )}`,
     job_id: randomUUID().slice(0, 6),
-    // Installed by the package's reproduce.py, like by the download script.
+    // Installed by the package's reproduce.py.
     downloader_url: DOWNLOADER_URL,
   };
   return { datasets, userQuery };
@@ -333,53 +251,4 @@ router.post(
   },
 );
 
-/**
- * @swagger
- * /download/script:
- *   get:
- *     summary: Download script
- *     tags: [Download]
- *     description: >
- *       A uv script that builds the download package for this selection on
- *       the caller's computer, with the downloader pinned to this deployment's
- *       commit. Takes the same filter, shape, format and lang parameters as
- *       POST /download.
- *     responses:
- *       200:
- *         description: The Python script
- *         content:
- *           text/x-python: {}
- *       204:
- *         description: Nothing matches the selection
- *       400:
- *         description: Validation error
- */
-router.get(
-  "/script",
-  ...pipeline({
-    shape: true,
-    checks: [
-      check("lang").isIn(["en", "fr"]).optional(),
-      check("format").isIn(FORMATS).optional(),
-    ],
-  }),
-  async (req, res) => {
-    const { datasets, userQuery } = await downloadSelection(req.query);
-    if (!datasets) return res.status(204).end();
-
-    res.setHeader("Content-Type", "text/x-python; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="cioos_download_${userQuery.job_id}.py"`,
-    );
-    res.send(
-      downloadScript(
-        { user_query: userQuery, cache_filtered: datasets },
-        new Date(),
-      ),
-    );
-  },
-);
-
 module.exports = router;
-module.exports.downloadScript = downloadScript;

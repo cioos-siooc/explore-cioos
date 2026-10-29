@@ -467,7 +467,7 @@
   color: var(--cioos-error-700);
 }
 
-/* --- The script and links menu --- */
+/* --- The dataset list export --- */
 
 .directLinksCount {
   font-size: var(--cioos-font-size-sm);
@@ -512,18 +512,6 @@
 
 .directLinksButton:disabled svg {
   color: var(--cioos-ink-40);
-}
-
-/* The "Save as" toggle wears .directLinksButton, but ui/Dropdown's
-   `.dropdown .btn` outranks it. */
-.directLinksSave .btn.directLinksButton {
-  padding: 0 14px;
-  font-size: var(--cioos-font-size-sm);
-}
-
-.directLinksSave .btn.directLinksButton:disabled {
-  background-color: var(--cioos-white);
-  cursor: not-allowed;
 }
 
 .directLinksNotes {

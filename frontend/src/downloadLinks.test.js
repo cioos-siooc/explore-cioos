@@ -4,13 +4,9 @@ import {
   ERDDAP_FORMATS,
   OBIS_RECORD_CAP,
   buildDownloadLinks,
-  ckanRecordUrl,
   downloadConstraints,
   erddapDownloadUrl,
-  filterSummaryText,
   linksToCsv,
-  linksToCurlScript,
-  linksToText,
   localizedCkanUrl,
   localizedErddapUrl,
   obisDownloadUrl,
@@ -110,9 +106,6 @@ describe("erddapDownloadUrl", () => {
       "odv",
       "nccf",
     ]);
-    for (const format of Object.values(ERDDAP_FORMATS)) {
-      expect(format.ext).toMatch(/^\w+$/);
-    }
   });
 });
 
@@ -145,8 +138,7 @@ describe("buildDownloadLinks", () => {
       allFilters,
     );
     expect(erddap.url).toContain("/tabledap/ios_ctd_profiles.parquetWMeta?");
-    expect(erddap.path).toMatch(/\.parquet$/);
-    expect(obis.path).toMatch(/\.json$/);
+    expect(obis.format).toBe("obisJson");
   });
 
   it("skips grids, which have no constraint-based subsetting", () => {
@@ -158,33 +150,6 @@ describe("buildDownloadLinks", () => {
     expect(links).toEqual([]);
   });
 
-  it("lays files out as the package does: one folder per dataset", () => {
-    const [erddap, obis] = buildDownloadLinks(
-      [erddapRow, obisRow],
-      "csv",
-      allFilters,
-    );
-    const name = "ios_ctd_profiles_data_cioospacific_ca";
-    const folder = `data/${name}`;
-    expect(erddap.path).toBe(`${folder}/${name}.csv`);
-    expect(erddap.records).toEqual([
-      {
-        path: `${folder}/metadata/erddap.nccsvMetadata`,
-        url: "https://data.cioospacific.ca/erddap/tabledap/ios_ctd_profiles.nccsvMetadata",
-      },
-      {
-        path: `${folder}/metadata/ckan_package.json`,
-        url: "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
-      },
-    ]);
-    expect(obis.records).toEqual([
-      {
-        path: `data/${obisRow.dataset_id}_obis_org/metadata/obis_dataset.json`,
-        url: `https://api.obis.org/v3/dataset/${obisRow.dataset_id}`,
-      },
-    ]);
-  });
-
   it("flags a depth filter the link could not carry", () => {
     const [depthless] = buildDownloadLinks(
       [{ ...erddapRow, has_depth: false }],
@@ -192,20 +157,6 @@ describe("buildDownloadLinks", () => {
       allFilters,
     );
     expect(depthless.depthDropped).toBe(true);
-  });
-});
-
-describe("ckanRecordUrl", () => {
-  it("reads the catalogue page as the record behind it", () => {
-    expect(ckanRecordUrl("https://catalogue.cioos.ca/dataset/ff21-4d1e")).toBe(
-      "https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e",
-    );
-  });
-
-  it("has nothing to offer for a dataset with no catalogue entry", () => {
-    // ckan_id NULL makes the whole concatenation NULL upstream.
-    expect(ckanRecordUrl(null)).toBeNull();
-    expect(ckanRecordUrl("https://catalogue.cioos.ca/")).toBeNull();
   });
 });
 
@@ -254,90 +205,30 @@ describe("localizedErddapUrl", () => {
   });
 });
 
-describe("filterSummaryText", () => {
-  it("says what the URLs were filtered by, in the URLs' own terms", () => {
-    expect(filterSummaryText(allFilters)).toBe(
-      "time 2020-01-01 to 2020-12-31; depth 0 to 100 m",
-    );
-  });
-
-  it("is empty when nothing was applied, which the header reads as 'none'", () => {
-    expect(filterSummaryText({})).toBe("");
-    // Depth 0 is a depth, not an absent filter.
-    expect(filterSummaryText({ startDepth: 0 })).toBe("depth 0 to … m");
-  });
-});
-
-describe("the exported list", () => {
+describe("linksToCsv", () => {
   const links = buildDownloadLinks([erddapRow, obisRow], "csv", allFilters);
-  const meta = { generatedAt: "2026-09-10T00:00:00Z", filterSummary: "time" };
 
-  it("is one URL per line under a commented header", () => {
-    const lines = linksToText(links, meta).trim().split("\n");
-    expect(lines.filter((line) => line.startsWith("#"))).toHaveLength(3);
-    // Two data URLs, two source records and one catalogue record.
-    expect(lines.filter((line) => line.startsWith("http"))).toHaveLength(5);
-  });
-
-  it("is a curl script that skips a failed file instead of stopping", () => {
-    const script = linksToCurlScript(links, meta);
-    expect(script.split("\n")[0]).toBe("#!/usr/bin/env bash");
-    expect(script).toContain("set -uo pipefail");
-    expect(script).not.toContain("set -e");
-    expect(script).toContain("--fail");
-    expect(script).toContain('--user-agent "$UA"');
-    expect(script).toContain("mkdir -p cde_download && cd cde_download");
-    // Every URL is quoted: '&' unquoted would background the command.
-    for (const link of links) {
-      expect(script).toContain(`fetch '${link.path}' '${link.url}'`);
-    }
-  });
-
-  it("points to the Python script for what it can't build", () => {
-    expect(linksToCurlScript(links, meta)).toMatch(/Citations.*Python script/s);
-  });
-
-  it("warns about the OBIS page cap only when an OBIS API link is in it", () => {
-    expect(linksToCurlScript(links, meta)).toContain(
-      `at most ${OBIS_RECORD_CAP} records`,
-    );
-    const erddapOnly = buildDownloadLinks([erddapRow], "csv", allFilters);
-    expect(linksToCurlScript(erddapOnly, meta)).not.toContain(
-      "records per request",
-    );
-  });
-
-  it("escapes quotes rather than breaking the shell word", () => {
-    const quoted = buildDownloadLinks(
-      [{ ...erddapRow, title: "it's here" }],
-      "csv",
-      allFilters,
-    );
-    expect(linksToCurlScript(quoted, meta)).toContain("# it's here");
-  });
-
-  it("fetches each source record into its dataset's folder", () => {
-    const script = linksToCurlScript(links, meta);
-    const folder = "data/ios_ctd_profiles_data_cioospacific_ca/metadata";
-    expect(script).toContain(
-      `fetch '${folder}/ckan_package.json' 'https://catalogue.cioos.ca/api/3/action/package_show?id=ff21-4d1e'`,
-    );
-    expect(script).toContain(`fetch '${folder}/erddap.nccsvMetadata'`);
-    // The OBIS row has no catalogue entry, so it contributes no CKAN line.
-    expect(script.match(/package_show/g)).toHaveLength(1);
-  });
-
-  it("gives the CSV the page a person clicks, not the API record", () => {
-    const csv = linksToCsv(links);
+  it("lists each dataset's query, catalogue page, licence and citation", () => {
+    const csv = linksToCsv(links, [
+      {
+        pk: 1,
+        license: "CC-BY 4.0",
+        license_url: "https://cc.org/by/4.0",
+        citation: "IOS (2020). CTD.",
+      },
+    ]);
     const [header, erddap, obis] = csv.trim().split("\n");
-    expect(header).toContain('"catalogue_url"');
-    expect(erddap).toContain('"https://catalogue.cioos.ca/dataset/ff21-4d1e"');
-    // A dataset the harvest never matched to a catalogue entry gets an empty
-    // cell rather than a broken URL.
-    expect(obis.endsWith('""')).toBe(true);
+    expect(header).toBe(
+      '"dataset_id","title","source","format","query_url","catalogue_url","license","license_url","citation"',
+    );
+    expect(erddap).toBe(
+      `"ios_ctd_profiles","IOS CTD Profiles","erddap","csv","${links[0].url}","https://catalogue.cioos.ca/dataset/ff21-4d1e","CC-BY 4.0","https://cc.org/by/4.0","IOS (2020). CTD."`,
+    );
+    // No catalogue entry and no citation answer: empty cells, not a dropped row.
+    expect(obis.endsWith(',"","","",""')).toBe(true);
   });
 
-  it("is a CSV whose cells survive a comma in the title", () => {
+  it("keeps a cell whole across commas and quotes", () => {
     const csv = linksToCsv(
       buildDownloadLinks(
         [{ ...erddapRow, title: 'Profiles, "inshore"' }],
@@ -345,10 +236,6 @@ describe("the exported list", () => {
         allFilters,
       ),
     );
-    const [header, row] = csv.trim().split("\n");
-    expect(header).toBe(
-      '"dataset_id","title","source","format","path","url","catalogue_url"',
-    );
-    expect(row).toContain('"Profiles, ""inshore"""');
+    expect(csv.trim().split("\n")[1]).toContain('"Profiles, ""inshore"""');
   });
 });

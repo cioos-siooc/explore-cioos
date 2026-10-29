@@ -186,9 +186,8 @@ the README what each dataset returned.
 
 ### Reproducing a package
 
-`reproduce.py` is a [uv](https://docs.astral.sh/uv/) script that, like the
-download script below, installs `downloader` from the public repository's
-archive: at the `downloader_url` the web API records in `user_query` (the
+`reproduce.py` is a [uv](https://docs.astral.sh/uv/) script that installs
+`downloader` from the public repository's archive: at the `downloader_url` the web API records in `user_query` (the
 commit it was deployed from; the `development-v2` archive for jobs queued
 without one), with `exclude-newer` set to when the package was built. It calls
 `cioos_downloader.formats.reproduce()` on its own folder. uv is the only thing
@@ -198,43 +197,21 @@ files to `reproduced/` and prints `match`, `differs` or `missing` for each
 against its sha256 in `datapackage.json`. A `PARTIAL` subset differs by design
 (no size limit applies locally), as does one whose source data changed.
 
-### The download script
+`reproduce.py` runs the code at that commit, so `cioos-data-explorer-downloader`
+must stay installable on its own: it must never depend on the harvester (or
+anything server-only).
 
-The Download panel's **Python script** builds the same package on the user's
-computer, with no email, queue or size limit. `GET /download/script` takes the
-panel's query (the ticked datasets plus any the 1 GB ceiling deselected, and
-the package format) and returns a [uv](https://docs.astral.sh/uv/) script that
-holds the same `user_query` and `cache_filtered` a queued job gets, minus the
-email. Its PEP 723 header installs `downloader` from the public repository's
-archive at the commit the API was deployed from (`SOURCE_COMMIT`, set by
-`deploy.yml`; `development-v2` when unset), with `exclude-newer` set to when it
-was generated, so every run resolves the same libraries. Running it calls
-`cioos_downloader.script.run()`: `get_datasets` without the size limits, then
-`write_package` without README.html, into `cde_download_<job>/`. While it
-runs, it logs each step (every request URL, the writing and metadata steps,
-each dataset's outcome) above a progress bar of datasets done and one live bar
-per server being downloaded from, showing the current dataset, bytes received
-and speed; `get_datasets` reports those through its `progress` hooks.
+### Dataset list
 
-The selection is written into the script as a Python literal (`QUERY = {…}`)
-laid out as `ruff format` would, so the user can read and edit it.
-
-The script runs the code at that commit, so `cioos-data-explorer-downloader` must stay
-installable on its own: it must never depend on the harvester (or anything
-server-only).
-
-### Direct links
-
-Without a polygon filter, the panel also lists each dataset's raw source URL
-(copy, curl script, URL list or CSV), built in the browser
-(`frontend/src/downloadLinks.js`). ERDDAP links request the package format's
-file type with the same time and depth bounds; OBIS links use the v3 API (JSON,
-at most 10,000 records). The curl script writes `cde_download/` with the
-package's folder and file names: each dataset's data plus its source records
-(`erddap.nccsvMetadata` or `obis_dataset.json`, and CKAN's `ckan_package.json`).
-Citations and licences need the package code, so its header points to the
-Python script. With a polygon the links are hidden: ERDDAP could only take its
-bounding box, so only the script matches the package.
+Without a polygon filter, the panel also saves a CSV with one row per dataset:
+its raw source query, its CIOOS catalogue page, its licence and a one-line
+citation. The queries are built in the browser (`frontend/src/downloadLinks.js`):
+ERDDAP links request the package format's file type with the same time and
+depth bounds; OBIS links use the v3 API (JSON, at most 10,000 records). The
+licence and citation come from `GET /datasets/citations`, which cites as the
+package's `source_citation` does (the source's own citation, else one built
+from its metadata), without the subset note. With a polygon the list is not
+offered: ERDDAP could only take its bounding box.
 
 ### Citations
 

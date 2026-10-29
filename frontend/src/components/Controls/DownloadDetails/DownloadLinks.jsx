@@ -1,63 +1,57 @@
 import * as React from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Clipboard,
-  Download,
-  FiletypeCsv,
-  FiletypePy,
-  FiletypeSh,
-  FiletypeTxt,
-} from "react-bootstrap-icons";
+import { FiletypeCsv } from "react-bootstrap-icons";
 
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
-import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
-import useCopyToClipboard from "../../../state/useCopyToClipboard.js";
-import {
-  downloadTextFile,
-  filterSummaryText,
-  linksToCsv,
-  linksToCurlScript,
-  linksToText,
-  saveUrl,
-} from "../../../downloadLinks.js";
+import reportError from "../../../state/reportError.js";
+import { server } from "../../../config.js";
+import { downloadTextFile, linksToCsv } from "../../../downloadLinks.js";
 import "./styles.css";
 
-// Everything the user runs themselves, in one menu. The Python script is the
-// queued package run on their computer (web-api GET /download/script); the
-// rest are the raw source URLs, offered only without a polygon filter: ERDDAP
-// can only take its bounding box, so those files would hold data the package
+// The raw source queries, offered only without a polygon filter: ERDDAP can
+// only take its bounding box, so those files would hold data the package
 // filters out.
-export default function DownloadScript({
-  url,
-  count,
-  links,
-  constraints,
-  polygonFiltered,
-}) {
-  const { t } = useTranslation();
+export default function DownloadLinks({ count, links, polygonFiltered }) {
+  const { t, i18n } = useTranslation();
   const { tipHighlight } = useTips();
-  const [copyState, copy] = useCopyToClipboard("direct download links");
+  const [state, setState] = useState();
 
   const depthDropped = links.filter((link) => link.depthDropped).length;
   const obis = links.filter((link) => link.source === "obis").length;
 
-  const exportMeta = {
-    generatedAt: new Date().toISOString(),
-    filterSummary: filterSummaryText(constraints),
-  };
-  const stem = `cioos-direct-links-${exportMeta.generatedAt.slice(0, 10)}`;
+  async function saveCsv() {
+    setState("loading");
+    try {
+      const pks = links.map((link) => link.pk).join(",");
+      const response = await fetch(
+        `${server}/datasets/citations?datasetPKs=${pks}&lang=${i18n.language}`,
+      );
+      if (!response.ok) throw new Error(`citations failed: ${response.status}`);
+      const day = new Date().toISOString().slice(0, 10);
+      downloadTextFile(
+        `cioos-datasets-${day}.csv`,
+        linksToCsv(links, await response.json()),
+        "text/csv",
+      );
+      setState();
+    } catch (error) {
+      reportError("dataset list export failed", error);
+      setState("failed");
+    }
+  }
 
   return (
     <div
       className="downloadDeliveryOption"
-      data-testid="download-script"
+      data-testid="download-links"
       data-tip-highlight={tipHighlight("directLinks")}
     >
       <span className="downloadFooterTitle">
-        {t("downloadScriptTitle")}
+        {t("directLinksTitle")}
         <QuestionIconTooltip
-          tooltipText={t("downloadScriptTooltipText")}
+          tooltipText={t("directLinksTooltipText")}
           tooltipPlacement="top"
           size={16}
         />
@@ -66,75 +60,19 @@ export default function DownloadScript({
         )}
       </span>
 
-      <DropdownButton
-        title={
-          <>
-            <Download size={16} aria-hidden="true" />
-            {t("downloadScriptSave")}
-          </>
-        }
-        className="directLinksSave"
-        toggleClassName="directLinksButton"
-        disabled={!count}
-        data-testid="download-script-menu"
+      <button
+        type="button"
+        className="directLinksButton"
+        disabled={!links.length || state === "loading"}
+        onClick={saveCsv}
       >
-        <Dropdown.Item onClick={() => saveUrl(url)}>
-          <FiletypePy size={16} aria-hidden="true" />
-          {t("downloadScriptPython")}
-        </Dropdown.Item>
-        {links.length > 0 && (
-          <>
-            <Dropdown.Item
-              onClick={() =>
-                downloadTextFile(
-                  `${stem}.sh`,
-                  linksToCurlScript(links, exportMeta),
-                  "text/x-shellscript",
-                )
-              }
-            >
-              <FiletypeSh size={16} aria-hidden="true" />
-              {t("directLinksScript")}
-            </Dropdown.Item>
-            <Dropdown.Item
-              onClick={() =>
-                downloadTextFile(`${stem}.txt`, linksToText(links, exportMeta))
-              }
-            >
-              <FiletypeTxt size={16} aria-hidden="true" />
-              {t("directLinksText")}
-            </Dropdown.Item>
-            <Dropdown.Item
-              onClick={() =>
-                downloadTextFile(`${stem}.csv`, linksToCsv(links), "text/csv")
-              }
-            >
-              <FiletypeCsv size={16} aria-hidden="true" />
-              {t("directLinksCsv")}
-            </Dropdown.Item>
-            <Dropdown.Item onClick={() => copy(linksToText(links))}>
-              <Clipboard size={16} aria-hidden="true" />
-              {t("directLinksCopy")}
-            </Dropdown.Item>
-          </>
-        )}
-      </DropdownButton>
+        <FiletypeCsv size={16} aria-hidden="true" />
+        {t("directLinksCsv")}
+      </button>
 
-      {/* The menu closes on click, so a copy's result is told here. */}
       <div className="directLinksNotes" aria-live="polite">
-        <span>
-          {t("downloadScriptUsage")}{" "}
-          <a
-            href="https://docs.astral.sh/uv/getting-started/installation/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t("downloadScriptUvLink")}
-          </a>
-        </span>
-        {copyState === "copied" && <span>{t("directLinksCopied")}</span>}
-        {copyState === "failed" && <span>{t("directLinksCopyFailed")}</span>}
-        {polygonFiltered && <span>{t("downloadScriptPolygonNote")}</span>}
+        {state === "failed" && <span>{t("directLinksFailed")}</span>}
+        {polygonFiltered && <span>{t("directLinksPolygonNote")}</span>}
         {depthDropped > 0 && (
           <span>{t("directLinksNoteDepth", { count: depthDropped })}</span>
         )}

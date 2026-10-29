@@ -236,7 +236,7 @@ describe("DownloadDetails", () => {
     );
   });
 
-  it("offers direct links without a polygon filter, and only the script with one", async () => {
+  it("offers the dataset list without a polygon filter, and not with one", async () => {
     const polygon = [
       [-65, 44],
       [-62, 44],
@@ -251,11 +251,9 @@ describe("DownloadDetails", () => {
         erddap_server_url: "https://data.example.ca/erddap",
       }),
     ];
-    const { user, rerender } = renderDetails({ pointsToReview });
-    const menu = () => screen.getByRole("button", { name: /script or links/i });
-    await user.click(menu());
-    expect(screen.getByRole("button", { name: /curl/i })).toBeVisible();
-    await user.click(menu());
+    const { rerender } = renderDetails({ pointsToReview });
+    const csv = () => screen.getByRole("button", { name: /dataset list/i });
+    expect(csv()).toBeEnabled();
 
     rerender(
       detailsElement({
@@ -264,29 +262,24 @@ describe("DownloadDetails", () => {
         filterDownloadByPolygon: true,
       }),
     );
-    await user.click(menu());
-    expect(screen.queryByRole("button", { name: /curl/i })).toBeNull();
-    expect(
-      screen.getByRole("button", { name: /python script/i }),
-    ).toBeVisible();
+    expect(csv()).toBeDisabled();
   });
 
-  it("links the download script to the package's selection and format", async () => {
-    const clicked = [];
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
-      function () {
-        clicked.push(this.getAttribute("href"));
-      },
-    );
-    const { user } = renderDetails();
-    await user.click(screen.getByRole("button", { name: /script or links/i }));
-    await user.click(screen.getByRole("button", { name: /python script/i }));
-    const url = new URL(clicked[0], "http://localhost");
-    expect(url.pathname).toMatch(/\/download\/script$/);
-    expect(url.searchParams.get("datasetPKs")).toBe(
+  it("asks for the citations of every dataset in the selection", async () => {
+    const source = { erddap_server_url: "https://data.example.ca/erddap" };
+    const { user } = renderDetails({
+      pointsToReview: [
+        makePoint({ pk: EST_SMALL.pk, dataset_id: "small", ...source }),
+        makePoint({ pk: EST_LARGE.pk, dataset_id: "large", ...source }),
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: /dataset list/i }));
+    const asked = fetch.mock.calls
+      .map(([url]) => new URL(url, "http://localhost"))
+      .find((url) => url.pathname.endsWith("/datasets/citations"));
+    expect(asked.searchParams.get("datasetPKs")).toBe(
       `${EST_SMALL.pk},${EST_LARGE.pk}`,
     );
-    expect(url.searchParams.get("format")).toBe("csv");
   });
 
   it("names the OBIS datasets a format without an OBIS version turns into CSV", async () => {

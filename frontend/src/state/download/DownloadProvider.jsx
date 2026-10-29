@@ -129,7 +129,7 @@ export default function DownloadProvider({ children }) {
     submitRequest();
   }
 
-  // The selection as both the package queue and the download script read it.
+  // The selection as the package queue reads it.
   function downloadQuery(pks) {
     const downloadQuery = { ...query };
     if (
@@ -156,10 +156,6 @@ export default function DownloadProvider({ children }) {
       queryString += `&polygon=${JSON.stringify(polygon)}`;
     }
     return queryString;
-  }
-
-  function scriptUrl(pks) {
-    return `${server}/download/script?${downloadQuery(pks)}`;
   }
 
   function submitRequest() {
@@ -208,7 +204,6 @@ export default function DownloadProvider({ children }) {
     setPackageFormat,
     handleEmailChange,
     handleSubmission,
-    scriptUrl,
   };
 
   return (
