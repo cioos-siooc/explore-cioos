@@ -6,6 +6,7 @@ import {
   Calendar3,
   CalendarCheck,
   CircleFill,
+  Crosshair,
   CursorFill,
   ExclamationTriangle,
   Grid3x3Gap,
@@ -62,6 +63,8 @@ export const LEGEND_HELP_SECTIONS = {
     Icon: Water,
     items: [
       ["source", Water],
+      // The legend button's own glyph, so the entry reads as that button.
+      ["tool", Crosshair],
       ["reading", CursorFill],
       ["navigation", ExclamationTriangle],
     ],

@@ -188,6 +188,8 @@ describe("Legend", () => {
     expect(help).toHaveTextContent("Not for navigation");
     expect(help).toHaveTextContent("official CHS nautical charts");
     expect(help).toHaveTextContent("below chart datum");
+    expect(help).toHaveTextContent("The crosshair button");
+    expect(help).toHaveTextContent("Press Esc or the crosshair again");
   });
 
   it("explains the metric from the info button on the group label", async () => {
