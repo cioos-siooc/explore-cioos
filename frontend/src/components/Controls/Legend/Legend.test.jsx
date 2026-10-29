@@ -91,6 +91,86 @@ describe("Legend", () => {
     expect(screen.getByText("Depth (m)")).toBeInTheDocument();
   });
 
+  it("marks the clicked depth on the depth ramp", () => {
+    renderLegend({ zoom: 12, depthReading: { depth: 26.4, resolution: 10 } });
+    expect(document.querySelector(".legendDepthMarker")).toBeInTheDocument();
+  });
+
+  it("marks nothing where CHS has no sounding, or the bottom dries", () => {
+    const { rerender } = renderLegend({
+      zoom: 12,
+      depthReading: { depth: null, resolution: null },
+    });
+    expect(document.querySelector(".legendDepthMarker")).toBeNull();
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        depthReading={{ depth: -1.5, resolution: 100 }}
+      />,
+    );
+    expect(document.querySelector(".legendDepthMarker")).toBeNull();
+  });
+
+  it("drops the depth mark while the depth layer is switched off", () => {
+    renderLegend({
+      zoom: 12,
+      depthReading: { depth: 26.4, resolution: 10 },
+      controls: {
+        bathymetry: {
+          key: "bathymetry",
+          label: "Seafloor depth",
+          checked: false,
+          onChange: () => {},
+        },
+      },
+    });
+    expect(document.querySelector(".legendDepthMarker")).toBeNull();
+  });
+
+  it("toggles the depth tool from the depth group, and disables it with the layer", () => {
+    const onChange = vi.fn();
+    const bathymetry = (checked) => ({
+      key: "bathymetry",
+      label: "Seafloor depth",
+      checked,
+      onChange: () => {},
+    });
+    const { rerender } = renderLegend({
+      zoom: 12,
+      controls: { bathymetry: bathymetry(true) },
+      depthTool: { active: false, onChange },
+    });
+    const tool = screen.getByRole("button", {
+      name: "Read the depth at a point",
+    });
+    expect(tool).toHaveAttribute("aria-pressed", "false");
+    tool.click();
+    expect(onChange).toHaveBeenCalledWith(true);
+
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        controls={{ bathymetry: bathymetry(true) }}
+        depthTool={{ active: true, onChange }}
+      />,
+    );
+    expect(tool).toHaveAttribute("aria-pressed", "true");
+    tool.click();
+    expect(onChange).toHaveBeenLastCalledWith(false);
+
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        controls={{ bathymetry: bathymetry(false) }}
+        depthTool={{ active: false, onChange }}
+      />,
+    );
+    expect(tool).toBeDisabled();
+  });
+
   it("renders layer switches with no key on the map under their own group", () => {
     const onChange = vi.fn();
     renderLegend({
@@ -99,6 +179,17 @@ describe("Legend", () => {
       ],
     });
     expect(screen.getByLabelText("Gridded coverage")).toBeInTheDocument();
+  });
+
+  it("says in the seafloor info that NONNA is not for navigation", async () => {
+    const { user } = renderLegend({ zoom: 12 });
+    await user.click(screen.getByLabelText("About Seafloor depth"));
+    const help = await screen.findByTestId("legend-help-modal");
+    expect(help).toHaveTextContent("Not for navigation");
+    expect(help).toHaveTextContent("official CHS nautical charts");
+    expect(help).toHaveTextContent("below chart datum");
+    expect(help).toHaveTextContent("The crosshair button");
+    expect(help).toHaveTextContent("Press Esc or the crosshair again");
   });
 
   it("explains the metric from the info button on the group label", async () => {

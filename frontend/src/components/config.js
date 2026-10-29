@@ -95,34 +95,19 @@ export const bathymetrySourceUrl = {
   fr: "https://charts.gc.ca/data-gestion/nonna/index-fra.html",
 };
 
-// The NONNA depth ramp, as (metres, colour) anchors. CHS serves NONNA as
-// pre-rendered RGB with no colour map or useful GetLegendGraphic, so these
-// were recovered from ~730 tile pixels across both coasts paired with GMRT
-// depths (median colour per log-spaced band): exact colours, but depths good
-// to the band, not the metre (legendBathymetryTitle says so).
+// The NONNA depth ramp, as (metres, colour) anchors, drawn by the
+// color-relief layer in basemapStyle.js and the legend alike. The sea stops of
+// EMODnet's own "atlas_land" style (WMS GetStyles on emodnet:mean_2020), which
+// its basemap tiles are rendered with, so NONNA picks up where EMODnet hands
+// off. 1 m stands in for its 0 m white, which a log axis can't place.
 export const bathymetryColorScale = [
-  { depth: 2, color: "#c31800" },
-  { depth: 4, color: "#c36200" },
-  { depth: 8, color: "#c39200" },
-  { depth: 12, color: "#0cba00" },
-  { depth: 17, color: "#03ae1e" },
-  { depth: 22, color: "#068a60" },
-  { depth: 28, color: "#0966b9" },
-  { depth: 35, color: "#0961bd" },
-  { depth: 45, color: "#075bb8" },
-  { depth: 60, color: "#0551ae" },
-  { depth: 85, color: "#0346a1" },
-  { depth: 120, color: "#003794" },
-  { depth: 175, color: "#003491" },
-  { depth: 250, color: "#00308e" },
-  { depth: 390, color: "#002786" },
-  { depth: 610, color: "#001a7d" },
-  { depth: 870, color: "#000a72" },
-  { depth: 1200, color: "#00006a" },
-  { depth: 1750, color: "#000062" },
-  { depth: 2450, color: "#00005b" },
-  { depth: 3450, color: "#000052" },
-  { depth: 4500, color: "#000045" },
+  { depth: 1, color: "#fefeff" },
+  { depth: 120, color: "#badeff" },
+  { depth: 1300, color: "#94c2f7" },
+  { depth: 4000, color: "#85b3eb" },
+  { depth: 5000, color: "#73a6e0" },
+  { depth: 6000, color: "#5994cc" },
+  { depth: 10000, color: "#000000" },
 ];
 
 // Log-depth axis: the ramp spends its bright half on the first 25 m, which a
