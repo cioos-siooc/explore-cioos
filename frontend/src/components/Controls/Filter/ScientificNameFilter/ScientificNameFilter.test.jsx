@@ -23,6 +23,11 @@ function mockScientificNamesSearch(results) {
   };
 }
 
+// The typed match is marked, so the name spans several text nodes.
+const nameMatcher = (name) => (_, element) =>
+  element?.classList.contains("scientificNameOptionName") &&
+  element.textContent === name;
+
 describe("ScientificNameFilter", () => {
   beforeEach(() => {
     installMockFetch();
@@ -75,12 +80,12 @@ describe("ScientificNameFilter", () => {
         searchTerms="orca"
       />,
     );
-    await waitFor(
-      () => expect(screen.getByText("Orcinus orca")).toBeInTheDocument(),
-      {
-        timeout: 2000,
-      },
+    const name = await screen.findByText(
+      nameMatcher("Orcinus orca"),
+      {},
+      { timeout: 2000 },
     );
+    expect(name.querySelector("mark")).toHaveTextContent(/^orca$/);
     // "Species · Killer whale" is one text node split across the rank/
     // separator/vernacular — no single element's own text is exactly
     // "Killer whale", so match on the detail row's combined content instead.
@@ -134,7 +139,7 @@ describe("ScientificNameFilter", () => {
       />,
     );
     const option = await screen.findByText(
-      "Orcinus orca",
+      nameMatcher("Orcinus orca"),
       {},
       { timeout: 2000 },
     );

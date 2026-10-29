@@ -432,6 +432,7 @@ export default function Legend({
             );
           })}
         </div>
+        <p className="legendWarning">{t("legendBathymetryNotForNavigation")}</p>
       </div>
     );
   }

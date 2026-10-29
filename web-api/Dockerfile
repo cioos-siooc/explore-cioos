@@ -1,5 +1,5 @@
-# 24 matches frontend/Dockerfile and the CI node-version.
-FROM node:25-alpine
+# 26 matches frontend/Dockerfile and the CI node-version.
+FROM node:26-alpine
 
 WORKDIR /usr/src/app
 

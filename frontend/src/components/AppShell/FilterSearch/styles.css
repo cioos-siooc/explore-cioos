@@ -1,11 +1,14 @@
 /* The box stays put while the results under it scroll. */
 .filterSearchPage {
   position: absolute;
-  inset: 12px 12px 12px 296px;
+  inset: 12px 12px 0 296px;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+
+  /* The filter pages' padding (.filterOptions), so every page lines up. */
+  padding: 4px 8px 0;
 }
 
 .filterSearchField {
@@ -122,6 +125,29 @@
 
 .filterSearchList {
   padding: 4px 0 8px;
+}
+
+/* As the filter pages: results scroll across the whole column. */
+@media (min-width: 701px) and (min-height: 501px) {
+  .filterSearchPage {
+    right: 0;
+    left: 280px;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .filterSearchPage > :not(.filterSearchResults) {
+    margin-right: 20px;
+    margin-left: 20px;
+  }
+
+  .filterSearchPage > .filterSearchResults,
+  .filterSearchPage > .filterSearchKeys {
+    margin-right: 0;
+    margin-left: 0;
+    padding-right: 20px;
+    padding-left: 20px;
+  }
 }
 
 .filterSearchGroupLabel {
@@ -332,25 +358,22 @@
   color: var(--cioos-ink-80);
 }
 
-.filterSearchHelp p {
-  margin: 0;
+.filterSearchHelpCaption {
+  margin: 0 0 12px;
+  color: var(--cioos-ink);
+  font-size: var(--cioos-font-size-base);
+  line-height: 1.45;
 }
 
 .filterSearchHelpRows {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   gap: 8px 16px;
-  margin: 12px 0;
+  margin: 0;
 }
 
 .filterSearchHelpRow {
   display: contents;
-}
-
-.filterSearchHelpRow dt {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .filterSearchHelpName {
@@ -359,15 +382,6 @@
   gap: 6px;
   font-weight: 600;
   color: var(--cioos-ink);
-}
-
-/* Held to the label's width so it wraps rather than widening the shared column. */
-.filterSearchHelpNote {
-  width: 0;
-  min-width: 100%;
-  padding-left: 20px;
-  font-size: var(--cioos-font-size-xs);
-  color: var(--cioos-ink-60);
 }
 
 .filterSearchHelpName svg {
@@ -398,32 +412,6 @@
 .filterSearchHelpExample:focus-visible {
   border-color: var(--cioos-primary-700);
   background-color: var(--cioos-teal-light);
-}
-
-.filterSearchHelpBrowse {
-  padding-top: 12px;
-  border-top: 1px solid var(--cioos-hairline);
-  color: var(--cioos-ink-60);
-}
-
-.filterSearchHelpSections {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 4px 16px;
-  margin: 8px 0 0;
-}
-
-.filterSearchHelpSection {
-  display: contents;
-}
-
-.filterSearchHelpSection dt {
-  font-weight: 600;
-  color: var(--cioos-ink);
-}
-
-.filterSearchHelpSection dd {
-  margin: 0;
 }
 
 .filterSearchKeys {

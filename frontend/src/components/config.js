@@ -9,6 +9,9 @@ export const defaultStartDepth = 0;
 export const defaultEndDepth = 12000;
 
 export const defaultScientificNamesSelected = [];
+
+// download_scheduler deletes download zips after DOWNLOAD_RETENTION_DAYS.
+export const downloadRetentionDays = 7;
 export const defaultObisNodesSelected = [];
 // Listed before "show more": the two Canadian nodes the harvest is built
 // around; the others only contribute datasets inside Canadian waters.
