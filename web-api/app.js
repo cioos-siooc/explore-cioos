@@ -26,6 +26,7 @@ const harvestRouter = require("./routes/harvest");
 const harvestDownloadsRouter = require("./routes/harvestDownloads");
 const trajectoriesRouter = require("./routes/trajectories");
 const nonnaRouter = require("./routes/nonna");
+const depthRouter = require("./routes/depth");
 const emodnetRouter = require("./routes/emodnet");
 const coverageHistogramRouter = require("./routes/coverageHistogram");
 const swaggerSpec = require("./swagger");
@@ -97,6 +98,7 @@ app.use("/harvest/downloads", harvestDownloadsRouter);
 app.use("/harvest", harvestRouter);
 app.use("/trajectories", trajectoriesRouter);
 app.use("/nonna", nonnaRouter);
+app.use("/depth", depthRouter);
 app.use("/emodnet", emodnetRouter);
 app.use("/coverageHistogram", coverageHistogramRouter);
 
