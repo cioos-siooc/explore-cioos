@@ -45,8 +45,21 @@ test("q matches the start of any scientific-name word, not just the genus", asyn
 
   await agent.get("/scientificNames").query({ q: "scombrus" });
 
-  assert.match(db.queries[0], /scientific_name ILIKE 'scombrus%'/);
-  assert.match(db.queries[0], /scientific_name ILIKE '% scombrus%'/);
+  assert.match(
+    db.queries[0],
+    /\(n\.scientific_name ILIKE 'scombrus%' OR n\.scientific_name ILIKE '% scombrus%'\)/,
+  );
+});
+
+test("q requires every word to start a scientific-name word, in any order", async () => {
+  db.queueRaw([]);
+
+  await agent.get("/scientificNames").query({ q: "morhua G." });
+
+  assert.match(
+    db.queries[0],
+    /\(n\.scientific_name ILIKE 'morhua%' OR n\.scientific_name ILIKE '% morhua%'\) AND \(n\.scientific_name ILIKE 'G%' OR n\.scientific_name ILIKE '% G%'\)/,
+  );
 });
 
 test("q flags each result tooBroad against the rolldown cap", async () => {
