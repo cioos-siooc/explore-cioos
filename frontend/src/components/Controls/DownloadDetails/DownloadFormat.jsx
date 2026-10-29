@@ -21,8 +21,8 @@ export default function DownloadFormat({ erddapCount, obisCount }) {
     formats.map((id) => ({ id, label: t(`downloadPackageFormat_${id}`) }));
 
   return (
-    <div className="downloadFormat">
-      <span className="downloadFormatLabel">
+    <div className="downloadBandGroup">
+      <span className="downloadBandLabel">
         {t("downloadPackageFormatLabel")}
         <QuestionIconTooltip
           tooltipText={t("downloadPackageFormatTooltipText")}
@@ -30,24 +30,26 @@ export default function DownloadFormat({ erddapCount, obisCount }) {
           size={16}
         />
       </span>
-      {erddapCount > 0 && (
-        <SelectPill
-          label="ERDDAP™"
-          value={packageFormat}
-          options={options(PACKAGE_FORMATS)}
-          onChange={setPackageFormat}
-          data-testid="download-package-format"
-        />
-      )}
-      {obisCount > 0 && (
-        <SelectPill
-          label="OBIS"
-          value={obisFormat}
-          options={options(OBIS_FORMATS)}
-          onChange={setObisFormat}
-          data-testid="download-obis-format"
-        />
-      )}
+      <div className="downloadBandContent">
+        {erddapCount > 0 && (
+          <SelectPill
+            label="ERDDAP™"
+            value={packageFormat}
+            options={options(PACKAGE_FORMATS)}
+            onChange={setPackageFormat}
+            data-testid="download-package-format"
+          />
+        )}
+        {obisCount > 0 && (
+          <SelectPill
+            label="OBIS"
+            value={obisFormat}
+            options={options(OBIS_FORMATS)}
+            onChange={setObisFormat}
+            data-testid="download-obis-format"
+          />
+        )}
+      </div>
     </div>
   );
 }

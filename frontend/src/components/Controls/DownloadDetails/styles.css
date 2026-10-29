@@ -102,21 +102,6 @@
   flex: 1 1 auto;
 }
 
-.downloadFormat {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.downloadFormatLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  color: var(--cioos-ink);
-}
-
 .downloadBandRow .helpIcon {
   margin: 0;
 }
@@ -129,6 +114,7 @@
   display: inline-flex;
 }
 
+/* Sized like the format band's SelectPills. */
 .filterDownloadToggle button {
   display: inline-flex;
   align-items: center;
@@ -136,10 +122,11 @@
   background-color: var(--cioos-white);
   border-radius: var(--cioos-radius-pill);
   border: 1px solid var(--cioos-hairline);
-  height: 36px;
-  padding: 0 14px 0 10px;
+  padding: 4px 12px 4px 8px;
   color: var(--cioos-ink);
-  font-weight: 500;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.5;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease;
