@@ -4,6 +4,9 @@ import { useCallback, useSyncExternalStore } from "react";
 // spelled here so JS and CSS branches cannot drift apart.
 export const MOBILE_QUERY = "(max-width: 700px), (max-height: 500px)";
 
+// Short desktop windows (Sidebar/styles.css tightens at the same height).
+export const SHORT_QUERY = "(max-height: 860px)";
+
 export const TOUCH_QUERY = "(hover: none)";
 
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
