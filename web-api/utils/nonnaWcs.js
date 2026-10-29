@@ -44,13 +44,16 @@ async function fetchElevations(url) {
 
 const isSounding = (v) => Number.isFinite(v) && v < NODATA_ABOVE;
 
+const toWebMercator = (lon, lat) => [
+  (lon * WEB_MERCATOR_HALF) / 180,
+  (Math.log(Math.tan(((90 + lat) * Math.PI) / 360)) * WEB_MERCATOR_HALF) /
+    Math.PI,
+];
+
 // The NONNA 10 sounding under a point, as { elevation, resolution }, or null
 // where CHS has none.
 async function nonnaElevationAt(lon, lat) {
-  const mx = (lon * WEB_MERCATOR_HALF) / 180;
-  const my =
-    (Math.log(Math.tan(((90 + lat) * Math.PI) / 360)) * WEB_MERCATOR_HALF) /
-    Math.PI;
+  const [mx, my] = toWebMercator(lon, lat);
   const [elevation] = await fetchElevations(
     wcsUrl(NONNA_10.id, [`X(${mx})`, `Y(${my})`]),
   );
@@ -65,5 +68,6 @@ module.exports = {
   fetchElevations,
   isSounding,
   nonnaElevationAt,
+  toWebMercator,
   wcsUrl,
 };

@@ -213,9 +213,9 @@ export function buildBasemapStyle(lang = "en") {
         "raster-saturation": -0.15,
       },
     },
-    // NONNA has no soundings over land or past CHS's surveys; those pixels sit
-    // below the ramp and draw transparent, so the depth colours can lie
-    // straight over the imagery (MapLibre can't clip a raster to water).
+    // Pixels past CHS's surveys, and any on land (web-api clears those against
+    // OSM water, since MapLibre can't clip a raster), sit below the ramp and
+    // draw transparent, so the depth colours lie straight over the imagery.
     {
       id: "bathymetry-nonna",
       type: "color-relief",

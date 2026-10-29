@@ -14,6 +14,7 @@ const {
   isSounding,
   wcsUrl,
 } = require("../utils/nonnaWcs");
+const { waterMask } = require("../utils/waterMask");
 
 const router = express.Router();
 
@@ -27,6 +28,10 @@ const router = express.Router();
  * the raw float depths come from WCS instead (utils/nonnaWcs.js) and are
  * re-encoded as Terrarium DEM tiles: the browser colours (color-relief) and
  * shades (hillshade) them.
+ *
+ * NONNA carries soundings on land too (drying heights, stray cells); those
+ * pixels are cleared against OSM's water polygons (utils/waterMask.js) so the
+ * imagery shows through instead of the ramp's palest colour.
  */
 
 const TILE_SIZE = 256;
@@ -37,8 +42,8 @@ const BROWSER_MAX_AGE_S = 604800;
 
 // Tiles run ~5-60 KB, so the 3000 default is ~180 MB at worst. CHS
 // republishes NONNA on a slow cycle, so a month in redis is safe. Its own
-// namespace so the old colour tiles in redis are never served as DEM.
-const tileCache = createTileCache("nonna-dem", {
+// namespace so older tiles in redis (colour, then unmasked DEM) are never served.
+const tileCache = createTileCache("nonna-dem-water", {
   l1Max:
     Number(process.env.NONNA_TILE_CACHE_MAX) > 0
       ? Number(process.env.NONNA_TILE_CACHE_MAX)
@@ -105,6 +110,14 @@ function fillSeams(layer) {
   });
 }
 
+// Masked after the seam fill, which would otherwise spread soundings back
+// over the cleared land.
+async function waterOnly(elevations, z, x, y) {
+  if (!elevations.some(isSounding)) return elevations;
+  const water = await waterMask(z, x, y);
+  return elevations.map((v, i) => (water[i] ? v : NaN));
+}
+
 // NONNA 10 alone, one WCS call a tile: NONNA 100 would only add sparsely
 // surveyed water, whose 10 m cells the downsampling skips at these zooms.
 async function renderTile(z, x, y) {
@@ -113,7 +126,7 @@ async function renderTile(z, x, y) {
       scalesize: `i(${TILE_SIZE}),j(${TILE_SIZE})`,
     }),
   );
-  return encodeTerrarium(fillSeams(elevations));
+  return encodeTerrarium(await waterOnly(fillSeams(elevations), z, x, y));
 }
 
 /**
@@ -125,9 +138,10 @@ async function renderTile(z, x, y) {
  *     description: >
  *       Fetches Canadian Hydrographic Service NONNA 10 elevations from the CHS
  *       GeoServer WCS, fills its one-pixel no-data seams from the soundings
- *       around them, and re-encodes them as a 256 px Terrarium PNG
+ *       around them, clears those outside OpenStreetMap water (via
+ *       OpenFreeMap), and re-encodes them as a 256 px Terrarium PNG
  *       (elevation = R*256 + G + B/256 - 32768, metres, negative below chart
- *       datum). Pixels without soundings are fully transparent and decode to
+ *       datum). Pixels without soundings, or on land, are fully transparent and decode to
  *       -32768.
  *     parameters:
  *       - in: path

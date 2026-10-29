@@ -4,6 +4,7 @@ const { check } = require("express-validator");
 
 const { pipeline } = require("../utils/routePipeline");
 const { nonnaElevationAt } = require("../utils/nonnaWcs");
+const { isWaterAt } = require("../utils/waterMask");
 
 const router = express.Router();
 
@@ -48,8 +49,8 @@ const toDepth = (elevation) => Math.round(-elevation * 10) / 10;
  *       CHS NONNA 10 where it has a sounding (metres
  *       below chart datum), otherwise GEBCO 2026 at 15 arc-seconds
  *       (metres below mean sea level). A negative depth is NONNA ground
- *       that dries above the datum. Fields are null on land and where neither
- *       source has a value.
+ *       that dries above the datum, inside OpenStreetMap's high-water line.
+ *       Fields are null on land and where neither source has a value.
  *     parameters:
  *       - in: query
  *         name: lon
@@ -90,6 +91,17 @@ router.get(
         `NONNA depth at ${lon},${lat} failed:`,
         e.response ? `upstream ${e.response.status}` : e.message,
       );
+    }
+    // NONNA has cells on land too; the map hides them, so the probe does.
+    if (nonna) {
+      try {
+        if (!(await isWaterAt(lon, lat))) nonna = null;
+      } catch (e) {
+        console.error(
+          `Water mask at ${lon},${lat} failed:`,
+          e.response ? `upstream ${e.response.status}` : e.message,
+        );
+      }
     }
     if (nonna) {
       return res.json({

@@ -3,15 +3,18 @@ const assert = require("node:assert/strict");
 const sharp = require("sharp");
 
 const axiosStub = require("../test/axiosStub");
+const waterMaskStub = require("../test/waterMaskStub");
 const { floatTiff } = require("../test/floatTiff");
 
 const axios = axiosStub.install();
+const water = waterMaskStub.install();
 
 const { createTestApp } = require("../test/testApp");
 const { agent, resetCache } = createTestApp();
 
 test.beforeEach(() => {
   axios.reset();
+  water.reset();
   resetCache();
 });
 
@@ -79,6 +82,44 @@ test("NONNA 10's one-pixel seams fill from the soundings around them", async () 
 
   assert.equal(elevationAt(1), -7);
   assert.equal(elevationAt(300), null);
+});
+
+test("clears soundings outside OSM water, after the seam fill", async () => {
+  // Pixel 1 would be seam-filled from 0 and 2; 0 and 1 are land.
+  const mask = new Uint8Array(TILE_PIXELS).fill(1);
+  mask[0] = 0;
+  mask[1] = 0;
+  water.setMask(mask);
+  axios.queueResponse(tileTiff({ 0: 3, 2: -8 }));
+
+  const elevationAt = await decodeTerrarium(
+    (await getTile("/nonna/12/601/700.png")).body,
+  );
+
+  assert.equal(elevationAt(0), null);
+  assert.equal(elevationAt(1), null);
+  assert.equal(elevationAt(2), -8);
+  assert.deepEqual(water.calls, [{ z: 12, x: 601, y: 700 }]);
+});
+
+test("skips the water mask for a tile without soundings", async () => {
+  axios.queueResponse(tileTiff({}));
+  await getTile("/nonna/12/602/700.png");
+  assert.equal(water.calls.length, 0);
+});
+
+test("serves the placeholder, uncached, when the water mask fails", async () => {
+  water.fail(new Error("OFM down"));
+  axios.queueResponse(tileTiff({ 0: -5 }));
+
+  const res = await getTile("/nonna/12/603/700.png");
+
+  assert.ok(res.headers["cache-control"].includes("max-age=60"));
+
+  water.reset();
+  axios.queueResponse(tileTiff({ 0: -5 }));
+  const retry = await getTile("/nonna/12/603/700.png");
+  assert.equal((await decodeTerrarium(retry.body))(0), -5);
 });
 
 test("requests the tile's Web Mercator bounds", async () => {

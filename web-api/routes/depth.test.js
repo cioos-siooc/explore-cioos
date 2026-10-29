@@ -2,15 +2,18 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const axiosStub = require("../test/axiosStub");
+const waterMaskStub = require("../test/waterMaskStub");
 const { floatTiff } = require("../test/floatTiff");
 
 const axios = axiosStub.install();
+const water = waterMaskStub.install();
 
 const { createTestApp } = require("../test/testApp");
 const { agent, resetCache } = createTestApp();
 
 test.beforeEach(() => {
   axios.reset();
+  water.reset();
   resetCache();
 });
 
@@ -46,6 +49,35 @@ test("reads NONNA 10, as positive metres", async () => {
   );
   // GEBCO is only asked where CHS has nothing.
   assert.equal(axios.calls.length, 1);
+});
+
+test("ignores a NONNA sounding on land and asks GEBCO", async () => {
+  water.setWater(false);
+  axios.queueResponse(nonna(3.2));
+  axios.queueResponse(gebco(12));
+
+  const res = await agent.get("/depth?lon=-63.58&lat=44.65");
+
+  assert.deepEqual(res.body, { depth: null, resolution: null, source: null });
+  assert.deepEqual(water.calls, [{ lon: -63.58, lat: 44.65 }]);
+});
+
+test("keeps the NONNA sounding when the water mask fails", async () => {
+  water.fail(new Error("timeout"));
+  axios.queueResponse(nonna(-8));
+
+  const res = await agent.get("/depth?lon=-63.5&lat=44.6");
+
+  assert.deepEqual(res.body, { depth: 8, resolution: 10, source: "nonna" });
+});
+
+test("skips the water mask where CHS has no sounding", async () => {
+  axios.queueResponse(nonna(NODATA));
+  axios.queueResponse(gebco(-50));
+
+  await agent.get("/depth?lon=-61&lat=43");
+
+  assert.equal(water.calls.length, 0);
 });
 
 test("answers from GEBCO where CHS has no sounding", async () => {
