@@ -17,34 +17,19 @@ describe("DepthProbe", () => {
     expect(probe()).toHaveTextContent(/^26.4 mCHS NONNA · 10 m grid$/);
   });
 
-  it("reads a negative depth as a drying height", () => {
+  it("reads a negative depth as an elevation above the datum", () => {
     renderWithProviders(
       <DepthProbe reading={{ depth: -1.5, resolution: 10, source: "nonna" }} />,
     );
-    expect(probe()).toHaveTextContent("Dries 1.5 m");
+    expect(probe()).toHaveTextContent("Elevation 1.5 m");
     expect(probe()).toHaveTextContent("CHS NONNA · 10 m grid");
   });
 
-  it("names ETOPO where it answered, and reads its negative depth as land elevation", () => {
-    const { rerender } = renderWithProviders(
-      <DepthProbe reading={{ depth: 58, resolution: 450, source: "etopo" }} />,
+  it("names GEBCO where it answered", () => {
+    renderWithProviders(
+      <DepthProbe reading={{ depth: 58, resolution: 463, source: "gebco" }} />,
     );
-    expect(probe()).toHaveTextContent(/^58 mNOAA ETOPO 2022 · ~450 m grid$/);
-    rerender(
-      <DepthProbe
-        reading={{ depth: -9.7, resolution: 450, source: "etopo" }}
-      />,
-    );
-    expect(probe()).toHaveTextContent("Elevation 9.7 m");
-  });
-
-  it("says so while reading and where CHS has no sounding", () => {
-    const { rerender } = renderWithProviders(
-      <DepthProbe reading={{ pending: true }} />,
-    );
-    expect(probe()).toHaveTextContent("Reading depth…");
-    rerender(<DepthProbe reading={{ depth: null, resolution: null }} />);
-    expect(probe()).toHaveTextContent("No depth here");
+    expect(probe()).toHaveTextContent(/^58 mGEBCO 2026 · ~463 m grid$/);
   });
 
   it("writes the depth with the page language's decimal mark", async () => {

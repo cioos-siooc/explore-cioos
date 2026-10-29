@@ -73,16 +73,24 @@
 }
 
 /* Rests on the map like the legend, so it takes the small 3D lift. A label,
-   not a target: clicks fall through to the map. */
-.depthProbePopup {
+   not a target: clicks fall through to the map, so the content needs it too
+   (MapLibre sets pointer-events: auto there). Translucent so the seafloor it
+   names stays visible; the blur keeps the text legible over busy imagery. */
+.depthProbePopup,
+.depthProbePopup .maplibregl-popup-content {
   pointer-events: none;
 }
 
 .depthProbePopup .maplibregl-popup-content {
   padding: 0;
   border-radius: var(--cioos-radius);
-  background: var(--cioos-white);
+  background: rgb(255 255 255 / 35%);
   box-shadow: var(--cioos-shadow-3d-sm);
+  backdrop-filter: blur(6px);
+}
+
+.depthProbePopup .maplibregl-popup-tip {
+  border-top-color: rgb(255 255 255 / 35%);
 }
 
 .depthProbe {
@@ -90,11 +98,6 @@
   color: var(--cioos-navy);
   font-family: var(--cioos-font-body);
   text-align: center;
-}
-
-.depthProbeQuiet {
-  color: var(--cioos-ink-80);
-  font-size: var(--cioos-font-size-sm);
 }
 
 .depthProbeValue {

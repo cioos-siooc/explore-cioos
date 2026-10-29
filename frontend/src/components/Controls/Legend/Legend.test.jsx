@@ -128,6 +128,49 @@ describe("Legend", () => {
     expect(document.querySelector(".legendDepthMarker")).toBeNull();
   });
 
+  it("toggles the depth tool from the depth group, and disables it with the layer", () => {
+    const onChange = vi.fn();
+    const bathymetry = (checked) => ({
+      key: "bathymetry",
+      label: "Seafloor depth",
+      checked,
+      onChange: () => {},
+    });
+    const { rerender } = renderLegend({
+      zoom: 12,
+      controls: { bathymetry: bathymetry(true) },
+      depthTool: { active: false, onChange },
+    });
+    const tool = screen.getByRole("button", {
+      name: "Read the depth at a point",
+    });
+    expect(tool).toHaveAttribute("aria-pressed", "false");
+    tool.click();
+    expect(onChange).toHaveBeenCalledWith(true);
+
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        controls={{ bathymetry: bathymetry(true) }}
+        depthTool={{ active: true, onChange }}
+      />,
+    );
+    expect(tool).toHaveAttribute("aria-pressed", "true");
+    tool.click();
+    expect(onChange).toHaveBeenLastCalledWith(false);
+
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        controls={{ bathymetry: bathymetry(false) }}
+        depthTool={{ active: false, onChange }}
+      />,
+    );
+    expect(tool).toBeDisabled();
+  });
+
   it("renders layer switches with no key on the map under their own group", () => {
     const onChange = vi.fn();
     renderLegend({

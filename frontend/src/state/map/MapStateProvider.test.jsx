@@ -62,6 +62,22 @@ describe("MapStateProvider", () => {
     expect(latest.depthReading).toBeUndefined();
   });
 
+  it("turns the depth tool off with its reading, and with the depth layer", async () => {
+    await renderReady();
+    expect(latest.depthToolActive).toBe(false);
+    act(() => latest.setDepthToolActive(true));
+    expect(latest.depthToolActive).toBe(true);
+    act(() => latest.readDepthAt({ lng: -63.55, lat: 44.62 }));
+
+    act(() => latest.setDepthToolActive(false));
+    expect(latest.depthToolActive).toBe(false);
+    expect(latest.depthReading).toBeUndefined();
+
+    act(() => latest.setDepthToolActive(true));
+    act(() => latest.setBathymetryVisible(false));
+    expect(latest.depthToolActive).toBe(false);
+  });
+
   it("picks the zoom0/zoom1/zoom2 tier by the current zoom", async () => {
     await renderReady({ url: "/?zoom=3" });
     expect(latest.currentRangeLevel).toEqual(legendFixture.recordsCount.zoom0);

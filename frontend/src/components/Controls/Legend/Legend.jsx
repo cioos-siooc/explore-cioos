@@ -6,6 +6,7 @@ import {
   ChevronCompactUp,
   Circle,
   CircleFill,
+  Crosshair,
   HexagonFill,
   InfoCircle,
 } from "react-bootstrap-icons";
@@ -171,6 +172,8 @@ export default function Legend({
   dataLayers,
   // The NONNA sounding under the latest click, marked on the depth bar.
   depthReading,
+  // { active, onChange }: the tool that turns map clicks into depth readings.
+  depthTool,
 }) {
   const { t } = useTranslation();
   const [legendOpen, setLegendOpen] = useState(true);
@@ -231,13 +234,13 @@ export default function Legend({
   function renderGroup(
     key,
     label,
-    { icon, control, tooltip, idSuffix = "" } = {},
+    { icon, control, tooltip, action, idSuffix = "" } = {},
     children,
   ) {
     const help = renderHelpButton(key);
     return (
       <div className="legendGroup" key={key}>
-        {(label || control || help) && (
+        {(label || control || help || action) && (
           <div className="legendGroupLabelRow">
             {icon}
             {control && (
@@ -257,6 +260,7 @@ export default function Legend({
               label
             )}
             {help}
+            {action}
           </div>
         )}
         {children}
@@ -551,6 +555,23 @@ export default function Legend({
     );
   const trackKeys = renderTrackKeys();
   const bathymetryBar = renderBathymetryBar();
+  const depthToolButton = depthTool && (
+    <button
+      type="button"
+      className={classNames("legendToolButton", { active: depthTool.active })}
+      onClick={() => {
+        depthTool.onChange(!depthTool.active);
+        // The dialog covers the map the tool is about to be used on.
+        if (!depthTool.active) setDetailOpen(false);
+      }}
+      disabled={controls.bathymetry ? !controls.bathymetry.checked : false}
+      aria-pressed={depthTool.active}
+      title={t(depthTool.active ? "legendDepthToolExit" : "legendDepthTool")}
+      aria-label={t("legendDepthTool")}
+    >
+      <Crosshair size={11} aria-hidden="true" />
+    </button>
+  );
   const layerSwitches = renderLayerSwitches();
 
   // The last group's switches are labelled already, so they stand in its label
@@ -582,7 +603,11 @@ export default function Legend({
       renderGroup(
         "seafloor",
         t("legendBathymetry"),
-        { control: controls.bathymetry, tooltip: t("legendBathymetryTitle") },
+        {
+          control: controls.bathymetry,
+          tooltip: t("legendBathymetryTitle"),
+          action: depthToolButton,
+        },
         bathymetryBar,
       ),
     layerSwitches && renderGroup("layers", layerSwitches),

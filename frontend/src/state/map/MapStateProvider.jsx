@@ -267,6 +267,17 @@ export default function MapStateProvider({ children }) {
         reportError("NONNA depth fetch failed", error);
       });
   }, []);
+  // The legend's depth tool: while on, a map click reads the depth there and
+  // nothing else. Off with the depth layer, which owns the reading.
+  const [depthToolOn, setDepthToolOn] = useState(false);
+  const depthToolActive = depthToolOn && bathymetryVisible;
+  const setDepthToolActive = useCallback(
+    (on) => {
+      setDepthToolOn(on);
+      if (!on) readDepthAt(null);
+    },
+    [readDepthAt],
+  );
   // The param is the switch the user sees ('globe=true'), not the internal value.
   const [projection, setProjection] = useUrlSeededPersistentState(
     "projection",
@@ -462,6 +473,8 @@ export default function MapStateProvider({ children }) {
     setBathymetryVisible,
     depthReading,
     readDepthAt,
+    depthToolActive,
+    setDepthToolActive,
     projection,
     setProjection,
     // Read-only outside: flipped through toggleTrackLines, not the raw setter.

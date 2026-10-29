@@ -30,6 +30,8 @@ export default function MapContainer() {
     setMapInstance,
     readDepthAt,
     depthReading,
+    depthToolActive,
+    setDepthToolActive,
     featureQuery,
     setFeatureQuery,
     sharedFeatureQueryAt,
@@ -130,6 +132,8 @@ export default function MapContainer() {
         onTrackClick={selectTrajectoryFromMap}
         onDepthQuery={readDepthAt}
         depthReading={depthReading}
+        depthToolActive={depthToolActive}
+        onDepthToolExit={() => setDepthToolActive(false)}
         setHoveredDataset={setHoveredDataset}
         hoveredDataset={hoveredDataset}
         inspectDataset={inspectDataset}

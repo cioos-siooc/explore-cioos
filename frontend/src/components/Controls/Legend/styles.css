@@ -534,3 +534,39 @@
   margin-top: var(--cioos-space-md);
   padding-top: var(--cioos-space-md);
 }
+
+/* A map tool, so it reads as a button rather than an ⓘ; filled while on. */
+.legendToolButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 3px;
+  border: 1px solid var(--cioos-ink-40);
+  border-radius: var(--cioos-radius);
+  background: transparent;
+  color: var(--cioos-ink-80);
+  cursor: pointer;
+}
+
+.legendToolButton:hover:not(:disabled) {
+  color: var(--cioos-ink);
+  background-color: var(--cioos-surface-2);
+}
+
+.legendToolButton.active {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.legendToolButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.legendToolButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
