@@ -2,6 +2,7 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
+import MatchHighlight from "../../../ui/MatchHighlight.jsx";
 import Spinner from "../../../ui/Spinner.jsx";
 import { server } from "../../../../config.js";
 import reportError from "../../../../state/reportError.js";
@@ -146,14 +147,16 @@ export default function ScientificNameFilter({
             title={vernacular || scientificName}
           >
             <span className="optionName">
-              <span className="scientificNameOptionName">{scientificName}</span>
+              <span className="scientificNameOptionName">
+                <MatchHighlight text={scientificName} query={searchQuery} />
+              </span>
               {(rank || vernacular) && (
                 <span className="scientificNameOptionDetail">
                   {rank && (
                     <span className="scientificNameOptionRank">{rank}</span>
                   )}
                   {rank && vernacular && " · "}
-                  {vernacular}
+                  <MatchHighlight text={vernacular} query={searchQuery} />
                 </span>
               )}
             </span>
