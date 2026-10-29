@@ -1,5 +1,6 @@
 import glob
 import gzip
+import math
 import os
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -35,6 +36,9 @@ DEFAULT_VIEW_ROUTES = [
 # The default view (zoom 2.75) loads z2 tiles; z0-z3 is the whole world for
 # zooming out and one level in, 85 tiles per source.
 DEFAULT_VIEW_MAX_TILE_ZOOM = 3
+# Zooming in on North America (~1k tiles per source through z6) stays warm.
+NORTH_AMERICA_BBOX = (-170.0, 15.0, -50.0, 84.0)  # west, south, east, north
+NORTH_AMERICA_MAX_TILE_ZOOM = 6
 # frontend defaultTrailingDays; the track window ends on today's UTC date.
 DEFAULT_TRAILING_DAYS = 90
 
@@ -69,12 +73,33 @@ def _world_tiles(max_zoom):
                 yield z, x, y
 
 
+def _bbox_tiles(min_zoom, max_zoom, bbox):
+    west, south, east, north = bbox
+
+    def tile_y(lat, n):
+        lat = math.radians(lat)
+        return int((1 - math.asinh(math.tan(lat)) / math.pi) / 2 * n)
+
+    for z in range(min_zoom, max_zoom + 1):
+        n = 2**z
+        for x in range(int((west + 180) / 360 * n), int((east + 180) / 360 * n) + 1):
+            for y in range(tile_y(north, n), tile_y(south, n) + 1):
+                yield z, x, y
+
+
 def default_view_routes(today: date):
     # Same window as the frontend's tracksTimeWindow(), URLSearchParams-encoded.
     time_min = (today - timedelta(days=DEFAULT_TRAILING_DAYS)).isoformat()
     time_max = (today + timedelta(days=1)).isoformat()
     tracks_query = f"timeMin={time_min}T00%3A00%3A00Z&timeMax={time_max}T00%3A00%3A00Z"
-    tiles = list(_world_tiles(DEFAULT_VIEW_MAX_TILE_ZOOM))
+    tiles = [
+        *_world_tiles(DEFAULT_VIEW_MAX_TILE_ZOOM),
+        *_bbox_tiles(
+            DEFAULT_VIEW_MAX_TILE_ZOOM + 1,
+            NORTH_AMERICA_MAX_TILE_ZOOM,
+            NORTH_AMERICA_BBOX,
+        ),
+    ]
     return [
         *DEFAULT_VIEW_ROUTES,
         *(f"/api/tiles/{z}/{x}/{y}.mvt?metric=days" for z, x, y in tiles),
