@@ -17,6 +17,7 @@ import classNames from "classnames";
 
 import { server } from "../../../config.js";
 import { parseArea, useDebounce } from "../../../utilities.jsx";
+import MatchHighlight from "../../ui/MatchHighlight.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import fetchJson from "../../../state/fetchJson.js";
 import reportError from "../../../state/reportError.js";
@@ -550,10 +551,21 @@ export default function FilterSearch({
                               {t("filterSearchCategoryTag")}
                             </span>
                           )}
-                          {option.label}
+                          {group.key === "scientificName" ? (
+                            <MatchHighlight text={option.label} query={term} />
+                          ) : (
+                            option.label
+                          )}
                           {option.hint && (
                             <span className="filterSearchOptionHint">
-                              {option.hint}
+                              {group.key === "scientificName" ? (
+                                <MatchHighlight
+                                  text={option.hint}
+                                  query={term}
+                                />
+                              ) : (
+                                option.hint
+                              )}
                             </span>
                           )}
                           <ExcludedLabel

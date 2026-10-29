@@ -1,0 +1,6 @@
+/* Weight, not a fill: a fill would fight the active and excluded row colours. */
+.matchHighlight {
+  background: none;
+  color: inherit;
+  font-weight: 700;
+}

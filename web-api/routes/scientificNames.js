@@ -54,7 +54,8 @@ const RANK_ORDER_SQL = `ARRAY[${RANK_ORDER.map((r) => `'${r}'`).join(", ")}]`;
  *     summary: Typeahead lookup of OBIS scientific names with vernacular subtitles
  *     tags: [ScientificNames]
  *     description: |
- *       Returns OBIS scientific names matched by either a scientific-name prefix or a
+ *       Returns OBIS scientific names matched when every typed word starts a
+ *       scientific-name word, in any order (genus, epithet or "G. morhua"), or by a
  *       vernacular (common) name substring. Vernacular matches come first, nested
  *       under their highest vernacular-matched ancestor. Each result includes the locale-appropriate
  *       vernacular when WoRMS has one cached locally. Pass `names=A,B,C` (without `q`) to
@@ -64,7 +65,7 @@ const RANK_ORDER_SQL = `ARRAY[${RANK_ORDER.map((r) => `'${r}'`).join(", ")}]`;
  *       - in: query
  *         name: q
  *         schema: { type: string }
- *         description: Match against scientific name (prefix) or vernacular name (substring), case-insensitive.
+ *         description: Every word must start a scientific-name word (any order), or the whole query is a vernacular-name substring, case-insensitive.
  *       - in: query
  *         name: lang
  *         schema: { type: string, enum: [en, fr] }
@@ -136,6 +137,20 @@ router.get(
       return res.json(lookupRows);
     }
 
+    // Each typed word must start some word of the name, in any order, so
+    // "scombrus", "G. morhua" and "morhua gadus" all find their species.
+    const words = q.split(/[\s.]+/).filter(Boolean);
+    const wordBindings = {};
+    const wordMatchSql = words.length
+      ? words
+          .map((word, i) => {
+            wordBindings[`word${i}`] = `${word}%`;
+            wordBindings[`laterWord${i}`] = `% ${word}%`;
+            return `(n.scientific_name ILIKE :word${i} OR n.scientific_name ILIKE :laterWord${i})`;
+          })
+          .join(" AND ")
+      : "FALSE";
+
     // The subtitle is the matched vernacular when there is one ("killer" shows
     // Orcinus orca as "killer whale", not the first WoRMS entry "grampus").
     //
@@ -158,7 +173,7 @@ router.get(
      LEFT JOIN cde.scientific_name_vernaculars v
             ON v.scientific_name = n.scientific_name
          WHERE :q = ''
-            OR n.scientific_name ILIKE :prefix
+            OR (${wordMatchSql})
             OR EXISTS (
                  SELECT 1 FROM unnest(v.${vernCol}) AS vn
                   WHERE vn ILIKE :sub
@@ -207,6 +222,7 @@ router.get(
     const { rows } = await db.raw(sql, {
       q,
       prefix: `${q}%`,
+      ...wordBindings,
       sub: `%${q}%`,
       limit,
       cap: MAX_EXPANDED_APHIA_IDS,
