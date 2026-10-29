@@ -46,7 +46,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -123,9 +123,9 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
-          # Match the app runtime: frontend/package.json requires >=24 and
-          # frontend/Dockerfile builds on node:24-alpine.
-          node-version: 24
+          # Match the app runtime: frontend/package.json requires >=26 and
+          # frontend/Dockerfile builds on node:26-alpine.
+          node-version: 26
           cache: npm
           cache-dependency-path: |
             test/package-lock.json

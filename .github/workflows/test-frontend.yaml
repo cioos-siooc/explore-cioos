@@ -39,9 +39,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          # frontend/package.json declares engines.node >= 24, and the frontend
-          # image builds on node:24-alpine.
-          node-version: 24
+          # frontend/package.json declares engines.node >= 26, and the frontend
+          # image builds on node:26-alpine.
+          node-version: 26
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -74,7 +74,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

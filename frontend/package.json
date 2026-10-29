@@ -5,7 +5,7 @@
   "private": true,
   "homepage": "https://explore.cioos.ca/",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.3.0",
