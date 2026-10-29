@@ -4,7 +4,11 @@ import { trackLineColor } from "../../config.js";
 
 // No white halo, unlike the map's arrow: on the white legend and dialog it was
 // invisible and only shrank the glyph.
-export default function TrackHeadIcon({ size = 12, className }) {
+export default function TrackHeadIcon({
+  size = 12,
+  className,
+  color = trackLineColor,
+}) {
   return (
     <svg
       className={className}
@@ -17,7 +21,7 @@ export default function TrackHeadIcon({ size = 12, className }) {
     >
       <path
         d="M8 1.5 L13.5 13.5 L8 10.5 L2.5 13.5 Z"
-        fill={trackLineColor}
+        fill={color}
         transform="rotate(45 8 8)"
       />
     </svg>

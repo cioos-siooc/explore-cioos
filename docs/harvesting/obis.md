@@ -162,19 +162,23 @@ Each OBIS dataset that yields cells becomes one `cde.datasets` row with
 
 ## Freshness and caching
 
-OBIS has no change signal like ERDDAP's Croissant hash. Every OBIS run
+OBIS datasets are never skipped like unchanged ERDDAP ones. Every OBIS run
 re-harvests and reloads the whole dataset list, which is also how added and
 withdrawn datasets are picked up.
 
 Metadata, occurrences and converted metadata are cached as gzip JSON in the
-`obis_cache` volume, shared across runs. **The cache has no expiry.** A
-dataset's occurrences are downloaded once, and later runs rebuild its cells
-from the cached copy. New records published upstream for an
-already-harvested dataset are therefore not picked up until its cache files
-are deleted. The cache is cleared automatically only between failed
-attempts.
+`obis_cache` volume, shared across runs. A dataset's occurrences are
+downloaded once, and later runs rebuild its cells from the cached copy.
 
-Two cached results stick until deleted by hand:
+Before each dataset, a `HEAD` request reads its parquet's `Last-Modified`.
+If OBIS rewrote the parquet after the oldest of the dataset's cache files was
+written (OBIS re-ingested the dataset), the whole cache for that dataset is
+deleted and fetched again. If the `HEAD` fails, the cache is kept. This
+includes datasets with no parquet, whose cache came from the REST API: those
+are never refreshed. The cache is also cleared between failed attempts.
+
+Two cached results stick until OBIS republishes the dataset or someone deletes
+them by hand:
 
 - a failed metadata fetch is cached as empty metadata. The dataset is then
   treated as non-exempt with an unknown extent, and gets no OBIS title,

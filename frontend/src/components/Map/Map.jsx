@@ -524,6 +524,9 @@ export default function CreateMap({
   // Mirrors firstPaintReported purely to reach the DOM; the ref stays the guard
   // because reportFirstPaint reads it synchronously.
   const [firstPainted, setFirstPainted] = useState(false);
+  // The mount effect's pushMapView, so reportFirstPaint can seed the in-view
+  // bounds the moment the map is handed over.
+  const pushMapViewRef = useRef(null);
   // For the once-registered measurement handler, which runs on the mount
   // closure.
   const rangeLevelsRef = useRef(rangeLevels);
@@ -706,6 +709,7 @@ export default function CreateMap({
     // CSS fade, which screenshot capture disables.
     setFirstPainted(true);
     onFirstPaint();
+    pushMapViewRef.current?.();
   }
 
   // Called with the tiles loaded, so a measured range is final. Without one (an
@@ -1095,7 +1099,7 @@ export default function CreateMap({
   // Cheap to call spuriously: the key test stops the loop, since repainting a
   // data-driven property re-renders the map, which calls this.
   function refreshViewportHexRange() {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current) return;
     const key = rampKey();
     if (rampMeasuredFor.current === key) return;
     // Tiles still in flight: hold what's painted and measure at the next idle.
@@ -3274,8 +3278,10 @@ export default function CreateMap({
     // A wheel zoom ends in a moveend at every pause; re-rendering the app and
     // rewriting the URL on each one stuttered the next notch.
     map.current.on("moveend", debounce(pushMapView, MAP_VIEW_DEBOUNCE_MS));
-    // moveend doesn't fire until the first interaction.
-    map.current.once("idle", pushMapView);
+    // moveend doesn't fire until the first interaction, so seed at the reveal:
+    // 'idle' waits on every tile, leaving the in-view count empty for as long
+    // as the slowest source took.
+    pushMapViewRef.current = pushMapView;
     map.current.on("mousedown", (e) => {
       if (e.originalEvent.shiftKey) {
         shiftBoxCreate.current = true;

@@ -1,6 +1,7 @@
 import * as React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -29,5 +30,22 @@ describe("FiltersPanel", () => {
       "title",
       expect.stringMatching(/^\d+ of 40 datasets shown$/),
     );
+  });
+
+  it("Show results is offered only where there is something to close", async () => {
+    const onDone = vi.fn();
+    const { unmount } = renderWithProviders(<FiltersPanel onDone={onDone} />, {
+      providers: "app",
+    });
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Show results" }));
+    expect(onDone).toHaveBeenCalledOnce();
+    unmount();
+
+    renderWithProviders(<FiltersPanel />, { providers: "app" });
+    expect(
+      screen.queryByRole("button", { name: "Show results" }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -59,6 +59,9 @@ export function showNonna({ setBathymetryVisible, zoomToGeometry }) {
   zoomToGeometry(NONNA_AREA, { maxZoom: 12 });
 }
 
+export const findGridded = (pointsData) =>
+  pointsData.find((dataset) => dataset.wms_url);
+
 // The page draws its WMS overlay by itself (see GriddapDetails).
 export function showGridded(dataset, { setInspectDataset, zoomToGeometry }) {
   setInspectDataset(dataset);

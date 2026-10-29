@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import time
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 
 import pandas as pd
 import requests
@@ -35,6 +36,7 @@ from prefect import task
 logger = logging.getLogger(__name__)
 
 OBIS_SOURCE_URL = "https://obis.org"
+OBIS_PARQUET_URL = "https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
 
 # Bounds the per-occurrence dicts `to_dict` builds (540 bytes/row, ~1.1 GiB on
 # the largest OBIS dataset if all live at once).
@@ -201,7 +203,7 @@ class OBISHarvester(BaseHarvester):
                            error_message=None, duration_ms=None, warnings=None):
             query_urls = [
                 f"https://api.obis.org/v3/dataset/{dataset_id}",
-                f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet",
+                OBIS_PARQUET_URL.format(dataset_id=dataset_id),
             ]
             all_attempts.append({
                 "run_id": self.run_id,
@@ -224,6 +226,7 @@ class OBISHarvester(BaseHarvester):
                 self.logger.info("Processing OBIS dataset %d/%d: %s", i, total, dataset_id)
                 last_error = None
                 t0 = time.monotonic()
+                self._expire_stale_cache(dataset_id)
                 for attempt in range(1, self.MAX_RETRIES + 1):
                     try:
                         metadata = self.fetch_dataset_metadata(dataset_id)
@@ -596,15 +599,38 @@ class OBISHarvester(BaseHarvester):
         }])
         return dataset_row
 
+    def _cache_files(self, dataset_id):
+        return [
+            path
+            for name in [f"{dataset_id}.json", f"{dataset_id}_metadata.json", f"{dataset_id}_cioos.json"]
+            for path in [os.path.join(self.folder, name), os.path.join(self.folder, name + ".gz")]
+            if os.path.isfile(path)
+        ]
+
     def _clear_cache(self, dataset_id):
-        for name in [f"{dataset_id}.json", f"{dataset_id}_metadata.json", f"{dataset_id}_cioos.json"]:
-            for path in [
-                os.path.join(self.folder, name),
-                os.path.join(self.folder, name + ".gz"),
-            ]:
-                if os.path.isfile(path):
-                    os.remove(path)
-                    self.logger.info("Cleared cache file: %s", path)
+        for path in self._cache_files(dataset_id):
+            os.remove(path)
+            self.logger.info("Cleared cache file: %s", path)
+
+    def _expire_stale_cache(self, dataset_id):
+        """Clears the dataset's cache when OBIS rewrote its parquet export after
+        the oldest cache file was written, i.e. the dataset was re-ingested.
+
+        Datasets without a parquet export (REST-only) keep their cache.
+        """
+        cache_files = self._cache_files(dataset_id)
+        if not cache_files:
+            return
+        try:
+            response = requests.head(OBIS_PARQUET_URL.format(dataset_id=dataset_id), timeout=30)
+            response.raise_for_status()
+            published = parsedate_to_datetime(response.headers["Last-Modified"]).timestamp()
+        except (requests.RequestException, KeyError, TypeError, ValueError) as e:
+            self.logger.info("Keeping %s cache, parquet freshness unknown: %s", dataset_id, e)
+            return
+        if published > min(os.path.getmtime(path) for path in cache_files):
+            self.logger.info("OBIS republished %s since it was cached, re-fetching", dataset_id)
+            self._clear_cache(dataset_id)
 
     def _read_cache(self, path):
         gz_path = path + ".gz"
@@ -681,7 +707,7 @@ class OBISHarvester(BaseHarvester):
                     raise
 
         import duckdb
-        url = f"https://obis-open-data.s3.amazonaws.com/occurrence/{dataset_id}.parquet"
+        url = OBIS_PARQUET_URL.format(dataset_id=dataset_id)
 
         lat_min, lat_max = -85.06, 85.06
         lon_min, lon_max = -180, 180

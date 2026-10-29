@@ -29,6 +29,27 @@ test("GET /harvest/servers returns the per-server summary rows", async () => {
   assert.equal(res.body[0].erddap_url, "https://erddap.example.com/erddap");
 });
 
+test("GET /harvest/freshness returns the stalest catalogue source's last good run", async () => {
+  db.queueRaw([{ oldest_last_harvest: "2026-10-20T04:00:00Z" }]);
+
+  const res = await agent.get("/harvest/freshness");
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { oldestLastHarvest: "2026-10-20T04:00:00Z" });
+  assert.match(db.queries[0], /MIN\(last_ok\)/);
+  assert.match(db.queries[0], /r\.status = 'ok'/);
+  assert.match(db.queries[0], /IN \(SELECT erddap_url FROM cde\.datasets\)/);
+});
+
+test("GET /harvest/freshness answers null before any harvest", async () => {
+  db.queueRaw([]);
+
+  const res = await agent.get("/harvest/freshness");
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { oldestLastHarvest: null });
+});
+
 test("GET /harvest/servers/:slug resolves the slug and returns its datasets", async () => {
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl lookup
   db.queueRaw([{ dataset_id: "obs_270", status: "success" }]);
