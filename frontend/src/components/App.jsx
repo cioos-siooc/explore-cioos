@@ -27,6 +27,7 @@ import DataDownloadModal from './Controls/DataDownloadModal/DataDownloadModal.js
 import Loading from './Controls/Loading/Loading.jsx'
 import Legend from './Controls/Legend/Legend.jsx'
 import IntroModal from './Controls/IntroModal/IntroModal.jsx'
+import VersionBanner from './Controls/VersionBanner/VersionBanner.jsx'
 import Filter from './Controls/Filter/Filter.jsx'
 import MultiCheckboxFilter from './Controls/Filter/MultiCheckboxFilter/MultiCheckboxFilter.jsx'
 import TimeSelector from './Controls/Filter/TimeSelector/TimeSelector.jsx'
@@ -904,6 +905,7 @@ export default function App() {
       >
         <div className='rectangleIcon' />
       </button>
+      <VersionBanner />
       <IntroModal showModal={showIntroModal} setShowModal={setShowIntroModal} />
     </ErrorBoundary>
   )

@@ -213,5 +213,10 @@
   "datasetsTableDownloadModalDatasetCheckboxTooltip": "Télécharger à partir de l'explorateur de données CIOOS",
   "datasetTableDownloadModalCDEDownloadableColumnNameTooltip": "Les demandes de moins de 1 Go de données à partir d'un ensemble de données peuvent être téléchargées via CDE",
   "datasetTableDownloadModalNotCDEDownloadableColumnNameTooltip": "Les demandes de plus de 1 Go de données à partir d'un ensemble de données peuvent être téléchargées via le lien ERDDAP™ fourni",
-  "datasetTableDownloadModalExternalDownloadColumnName": "Téléchargement externe"
+  "datasetTableDownloadModalExternalDownloadColumnName": "Téléchargement externe",
+  "versionBannerMessage": "Une nouvelle version de l'Explorateur de données du SIOOC sera bientôt disponible.",
+  "versionBannerSubscribe": "Abonnez-vous à notre infolettre pour recevoir l'annonce.",
+  "versionBannerSubscribeButton": "S'abonner",
+  "versionBannerEmailLabel": "Adresse courriel",
+  "versionBannerSubscribed": "Merci! Vérifiez votre boîte de réception pour confirmer votre abonnement."
 }

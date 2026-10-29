@@ -1,0 +1,86 @@
+.versionBanner {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 20px);
+  padding: 8px 8px 8px 14px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 10%);
+  pointer-events: all;
+}
+
+.versionBannerIcon {
+  flex-shrink: 0;
+  color: #52a79b;
+}
+
+/* text on the left, form on the right; stacks when there's no room */
+.versionBannerBody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  min-width: 0;
+}
+
+.versionBannerBody > span {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.versionBannerForm {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 6px;
+}
+
+.versionBannerForm input[type='email'] {
+  width: 220px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: solid 2px lightgrey;
+  border-radius: 10px;
+}
+
+.versionBannerForm button {
+  height: 34px;
+  padding: 0 14px;
+  background-color: white;
+  border: solid 2px lightgrey;
+  border-radius: 10px;
+}
+
+.versionBannerForm button:hover {
+  background-color: #f3f3f3;
+}
+
+.versionBannerHoneypot {
+  position: absolute;
+  left: -5000px;
+}
+
+.versionBannerThanks {
+  font-weight: 600;
+}
+
+.versionBannerClose {
+  flex-shrink: 0;
+  display: flex;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.versionBannerClose:hover {
+  background-color: #f3f3f3;
+}
