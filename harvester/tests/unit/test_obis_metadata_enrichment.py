@@ -153,3 +153,14 @@ def test_conversion_connection_closed_when_conversion_fails(harvester, mocker, d
     assert harvester.convert_metadata(UNMATCHED) is None
     seen[0].close.assert_called_once()
     assert obis_conversion._DUCKDB_CON is None
+
+
+def test_dataset_row_carries_the_dwca_archive(harvester):
+    archive = "https://ipt.example.org/ipt/archive.do?r=qu39"
+    row = harvester.build_dataset_row(MATCHED, {"archive": archive}, cells=[])
+    assert row.loc[0, "archive_url"] == archive
+
+
+def test_dataset_row_without_an_archive_stores_null(harvester):
+    row = harvester.build_dataset_row(MATCHED, {}, cells=[])
+    assert row.loc[0, "archive_url"] is None
