@@ -38,17 +38,23 @@ describe("QuickFilters", () => {
       camera: [],
       onlyInView: [],
       realtimeOnly: [],
+      sources: [],
     };
     function Probe() {
       const { datasetTitleSearchText, onlyInView } = useSelection();
       const { drawRequest, zoomTarget } = useMapState();
-      const { realtimeOnly } = useFilters();
+      const { realtimeOnly, erddapServersSelected, obisNodesSelected } =
+        useFilters();
       seen.search.push(datasetTitleSearchText);
       seen.draw.push(drawRequest?.mode);
       seen.zoom.push(zoomTarget?.geometry);
       seen.camera.push(zoomTarget?.camera);
       seen.onlyInView.push(onlyInView);
       seen.realtimeOnly.push(realtimeOnly);
+      seen.sources.push({
+        servers: erddapServersSelected.map((o) => [o.isSelected, o.isExcluded]),
+        nodes: obisNodesSelected.map((o) => [o.isSelected, o.isExcluded]),
+      });
       return null;
     }
     const user = userEvent.setup({ delay: null });
@@ -339,5 +345,75 @@ describe("QuickFilters", () => {
       "aria-pressed",
       "false",
     );
+  });
+
+  describe("source toggle", () => {
+    const all = (n, state) => Array.from({ length: n }, () => state);
+    const NONE = [false, false];
+    const ON = [true, false];
+    // erddapServers.json fixture minus the https://obis.org sentinel.
+    const SERVERS = 3;
+    const NODES = 3;
+
+    it("cycles ERDDAP + OBIS, ERDDAP only, OBIS only and back", async () => {
+      const { user, seen } = renderRow();
+      const button = await screen.findByTestId("quick-filter-source");
+      await waitFor(() =>
+        expect(seen.sources.at(-1).nodes).toHaveLength(NODES),
+      );
+      expect(button).toHaveAccessibleName("Sources: ERDDAP + OBIS");
+      expect(button).not.toHaveClass("applied");
+
+      await user.click(button);
+      expect(seen.sources.at(-1)).toEqual({
+        servers: all(SERVERS, ON),
+        nodes: all(NODES, NONE),
+      });
+      expect(button).toHaveAccessibleName("Sources: ERDDAP");
+      expect(button).toHaveClass("applied");
+
+      await user.click(button);
+      expect(seen.sources.at(-1)).toEqual({
+        servers: all(SERVERS, NONE),
+        nodes: all(NODES, ON),
+      });
+      expect(button).toHaveAccessibleName("Sources: OBIS");
+
+      await user.click(button);
+      expect(seen.sources.at(-1)).toEqual({
+        servers: all(SERVERS, NONE),
+        nodes: all(NODES, NONE),
+      });
+      expect(button).not.toHaveClass("applied");
+    });
+
+    it("lights up for a hand-picked mix and clears it in one click", async () => {
+      const { user, seen } = renderRow(
+        "/?erddapServers=https://catalogue.hakai.org/erddap&excludeObisNodes=OBIS%20USA",
+      );
+      const button = await screen.findByTestId("quick-filter-source");
+      await waitFor(() => expect(button).toHaveClass("applied"));
+      expect(button).toHaveAccessibleName("Sources: custom selection");
+
+      await user.click(button);
+      expect(seen.sources.at(-1)).toEqual({
+        servers: all(SERVERS, NONE),
+        nodes: all(NODES, NONE),
+      });
+    });
+
+    it("is hidden when there is no OBIS data to switch to", async () => {
+      const mockedFetch = globalThis.fetch;
+      vi.stubGlobal("fetch", async (input) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/obisNodes")) return new Response("[]");
+        return mockedFetch(input);
+      });
+      const { seen } = renderRow();
+      await waitFor(() =>
+        expect(seen.sources.at(-1).servers).toHaveLength(SERVERS),
+      );
+      expect(screen.queryByTestId("quick-filter-source")).toBeNull();
+    });
   });
 });

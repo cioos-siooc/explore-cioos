@@ -115,6 +115,9 @@ test("names every quick filter on its button, and still fits the width", async (
   await expect(row.getByTestId("quick-filter-reset")).toHaveAccessibleName(
     /clear all filters/i,
   );
+  await expect(row.getByTestId("quick-filter-source")).toHaveAccessibleName(
+    "Sources: ERDDAP + OBIS",
+  );
   const tops = await row
     .locator(".quickFilterButton")
     .evaluateAll((buttons) =>
