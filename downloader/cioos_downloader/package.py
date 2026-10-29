@@ -53,6 +53,7 @@ REASONS = {
         IGNORED: "was skipped because the download size limit was reached",
         PARTIAL: "was cut off at the per-dataset size limit",
         "fallback": "was delivered as CSV: {format} is not available for this source",
+        "polygon_box": "covers your polygon's bounding box: {format} can't be clipped to the polygon",
     },
     "fr": {
         FAILED: "n'a pas pu être récupéré depuis sa source",
@@ -60,6 +61,9 @@ REASONS = {
         IGNORED: "a été ignoré car la limite de taille de téléchargement a été atteinte",
         PARTIAL: "a été tronqué à la limite de taille par jeu de données",
         "fallback": "a été livré en CSV : {format} n'est pas disponible pour cette source",
+        "polygon_box": (
+            "couvre le rectangle englobant de votre polygone : {format} ne peut pas être découpé selon le polygone"
+        ),
     },
 }
 
@@ -150,6 +154,11 @@ _TEXT = {
                 "subset fetched in several requests comes as `_part1.nc`, `_part2.nc`…"
             ),
         },
+        "open_raw": (
+            "Other formats are ERDDAP's own files, as the server wrote them; see "
+            "<https://coastwatch.pfeg.noaa.gov/erddap/tabledap/documentation.html#fileType> for each one. A "
+            "subset fetched in several requests comes as `_part1`, `_part2`…"
+        ),
         "contents_dataset": (
             "- `citation.txt`: the citation of this subset, ready to paste into a reference list.\n"
             "- `metadata/`: the source's own description of the dataset, as published:\n"
@@ -287,6 +296,11 @@ _TEXT = {
                 "View. Un sous-ensemble récupéré en plusieurs requêtes est livré en `_part1.nc`, `_part2.nc`…"
             ),
         },
+        "open_raw": (
+            "Les autres formats sont les fichiers d'ERDDAP, tels que le serveur les a écrits; voir "
+            "<https://coastwatch.pfeg.noaa.gov/erddap/tabledap/documentation.html#fileType> pour chacun. Un "
+            "sous-ensemble obtenu en plusieurs requêtes est livré en `_part1`, `_part2`…"
+        ),
         "contents_dataset": (
             "- `citation.txt` : la citation de ce sous-ensemble, prête à coller dans une liste de références.\n"
             "- `metadata/` : la description du jeu de données publiée par sa source :\n"
@@ -489,7 +503,7 @@ def _resource(root, row, file, licence):
     }
     if licence and _frictionless_licence(licence):
         resource["licenses"] = [_frictionless_licence(licence)]
-    if row["format"] != "nccf":
+    if file["columns"] and row["format"] != "nccf":
         resource["type"] = "table"
         resource["schema"] = {
             "fields": [
@@ -511,6 +525,8 @@ def _outcome(row, lang):
         notes.append(reasons[row["status"]])
     if row.get("format_fallback") and row["files"]:
         notes.append(reasons["fallback"].format(format=FORMATS[row["requested_format"]].label))
+    if row.get("polygon_box_only") and row["files"]:
+        notes.append(reasons["polygon_box"].format(format=FORMATS[row["format"]].label))
     return notes
 
 
@@ -550,7 +566,9 @@ def _readme_citation(row, metadata, lang, t):
 def _readme_contents(included, t):
     formats = {row["format"] for row, _, _ in included}
     lines = [t["contents_data"], ""]
-    lines += [f"- {t['open'][key]}" for key in FORMATS if key in formats]
+    lines += [f"- {t['open'][key]}" for key in FORMATS if key in formats and key in t["open"]]
+    if formats - t["open"].keys():
+        lines.append(f"- {t['open_raw']}")
     lines += [t["contents_dataset"], "", t["contents_citation"], "", t["contents_package"], ""]
     lines.append(t["contents_html"])
     lines.append(t["contents_text"].format(reproduce=t["reproduce"], reproduce_anchor=_slug(t["reproduce"])))
@@ -582,7 +600,8 @@ def _readme(user_query, entries, created, lang):
         for row, metadata, lng in included:
             folder = f"[`data/{row['folder']}/`](data/{row['folder']}/)"
             licence = _readme_licence(_licence(metadata), t)
-            lines.append(f"| {_cell(_title(row, lng))} | {row['n_records']} | {folder} | {licence} |")
+            rows = "—" if row["n_records"] is None else row["n_records"]
+            lines.append(f"| {_cell(_title(row, lng))} | {rows} | {folder} | {licence} |")
         lines += ["", t["licences_text"], "", t["contents_link"].format(**contents)]
 
     issues = [(row, _outcome(row, lang)) for row, _, _ in entries if _outcome(row, lang) or row["warnings"]]

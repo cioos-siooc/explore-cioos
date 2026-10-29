@@ -18,7 +18,38 @@ const {
 
 // The email rides in the JSON body so it never reaches access logs or traces.
 
-const FORMATS = ["csv", "parquet", "odv", "nccf"];
+// The downloader clips the first four to a polygon; ERDDAP's other file types
+// pass through over the polygon's bounding box (RAW_FORMATS in
+// downloader/cioos_downloader/formats.py).
+const FORMATS = [
+  "csv",
+  "parquet",
+  "odv",
+  "nccf",
+  "csvp",
+  "csv0",
+  "tsv",
+  "tsvp",
+  "tsv0",
+  "nccsv",
+  "esriCsv",
+  "json",
+  "jsonlCSV1",
+  "jsonlCSV",
+  "jsonlKVP",
+  "geoJson",
+  "ncoJson",
+  "dataTable",
+  "nc",
+  "ncCFMA",
+  "mat",
+  "itx",
+  "asc",
+  "dods",
+  "htmlTable",
+  "xhtml",
+  "kml",
+];
 // OBIS occurrences are a flat table: there is no ODV or CF-DSG rendition.
 const OBIS_FORMATS = ["csv", "parquet"];
 // Past this many matched features, a bounding-box request beats a regex over
@@ -60,7 +91,8 @@ const DOWNLOADER_URL = `https://github.com/cioos-siooc/explore-cioos/archive/${D
  *         description: GeoJSON polygon string.
  *       - in: query
  *         name: format
- *         schema: { type: string, enum: [csv, parquet, odv, nccf], default: csv }
+ *         schema: { type: string, enum: [csv, parquet, odv, nccf, csvp, csv0, tsv, tsvp, tsv0, nccsv, esriCsv, json, jsonlCSV1, jsonlCSV, jsonlKVP, geoJson, ncoJson, dataTable, nc, ncCFMA, mat, itx, asc, dods, htmlTable, xhtml, kml], default: csv }
+ *         description: Only csv, parquet, odv and nccf are clipped to a polygon; the other ERDDAP file types cover its bounding box.
  *       - in: query
  *         name: obisFormat
  *         schema: { type: string, enum: [csv, parquet] }

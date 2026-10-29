@@ -427,6 +427,34 @@ def test_reproduce_rebuilds_every_erddap_format_identically(tmp_path, fmt, write
     assert (root / "reproduced" / data["path"]).read_bytes() == (root / data["path"]).read_bytes()
 
 
+def test_a_raw_erddap_format_ships_as_erddap_wrote_it_over_the_polygons_box(tmp_path):
+    raw = tmp_path / "raw"
+    raw.write_bytes(b'{"table": {"rows": [[1, 2]]}}')
+    report, archive, read = _run(
+        tmp_path, _query(_dataset("Ctd"), format="json", polygon_region=_TRIANGLE),
+        lambda url, **_: _response(body=raw.read_bytes()),
+    )
+    row = report["erddap_report"][0]
+    assert row["status"] == "COMPLETED" and row["n_records"] is None
+    assert ".json?" in row["download_url_list"][0]
+    assert read("data/Ctd_data_example_ca/Ctd_data_example_ca.json") == raw.read_text()
+    readme = read("README.md")
+    assert "covers your polygon's bounding box: JSON table can't be clipped" in readme
+    assert "| Title Ctd | — |" in readme
+    assert "ERDDAP's own files" in readme
+    [resource] = [r for r in json.loads(read("datapackage.json"))["resources"] if r["path"].endswith(".json")]
+    assert resource["mediatype"] == "application/json" and "schema" not in resource
+
+    root, result = _reproduce(tmp_path, archive, _point_requests_at(raw))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "match: data/Ctd_data_example_ca/Ctd_data_example_ca.json" in result.stdout
+
+
+def test_a_clippable_format_under_a_polygon_carries_no_bounding_box_note(tmp_path):
+    _, _, read = _run(tmp_path, _query(_dataset("Ctd"), polygon_region=_TRIANGLE))
+    assert "bounding box" not in read("README.md")
+
+
 @pytest.mark.parametrize("fmt", ["csv", "parquet"])
 def test_reproduce_rebuilds_obis_subsets_identically(tmp_path, monkeypatch, fmt):
     export = tmp_path / "export.parquet"

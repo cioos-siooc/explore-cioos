@@ -18,6 +18,8 @@ from erddapy import ERDDAP
 from loguru import logger
 
 from cioos_downloader.formats import (
+    CLIPPABLE_FORMATS,
+    RAW_FORMATS,
     REQUEST_HEADERS,
     polygon_regions,
     query_box,
@@ -71,6 +73,8 @@ FORMATS = {
         Format("parquet", "parquetWMeta", "application/vnd.apache.parquet", True, "Parquet"),
         Format("odv", "odvTxt", "text/tab-separated-values", False, "ODV spreadsheet"),
         Format("nccf", "ncCF", "application/x-netcdf", True, "NetCDF CF (DSG)"),
+        # Not parsed, so a cut-off response can't be trimmed to its last whole record.
+        *(Format(key, key, mediatype, True, label) for key, (_, mediatype, label) in RAW_FORMATS.items()),
     )
 }
 DEFAULT_FORMAT = "csv"
@@ -357,6 +361,7 @@ def download_dataset(dataset, user_query, regions, root: Path, budget):
     row = _row(dataset, fmt, folder_name)
     row["requested_format"] = requested
     row["format_fallback"] = fmt != requested
+    row["polygon_box_only"] = bool(regions) and fmt not in CLIPPABLE_FORMATS
 
     try:
         if source_type == "obis":
@@ -377,7 +382,8 @@ def download_dataset(dataset, user_query, regions, root: Path, budget):
     _stage(dataset, "fetching the source metadata records")
     row["warnings"] += save_source_metadata(dataset, folder / "metadata")
     row["file_size"] = sum(f["bytes"] for f in row["files"])
-    row["n_records"] = row["n_records"] or sum(f["n_rows"] for f in row["files"])
+    counts = [f["n_rows"] for f in row["files"]]
+    row["n_records"] = row["n_records"] or (None if None in counts else sum(counts))
     row["total_size_so_far"] = budget.add(row["file_size"])
     row["no_data"] = not row["files"]
     row["finished_at"] = _now()

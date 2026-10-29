@@ -38,7 +38,7 @@ map uses, plus:
 | `datasetPKs` | The datasets ticked in the panel |
 | `polygon` | The drawn polygon as GeoJSON, only when **Filter by polygon** is on |
 | time / depth | Reset to the full range when their download switch is off |
-| `format` | `csv` (default), `parquet`, `odv` or `nccf` |
+| `format` | `csv` (default), `parquet`, `odv`, `nccf`, or another tabledap type passed through as is |
 | `obisFormat` | `csv` or `parquet` for OBIS datasets; `format` when absent |
 | `lang` | `en` or `fr`: the language of the README and the email order |
 
@@ -85,6 +85,7 @@ One tabledap request per subset, in the chosen format's ERDDAP response type:
 | Parquet | `.parquetWMeta` (ERDDAP attributes kept in the file) | Rows outside are dropped |
 | ODV spreadsheet | `.odvTxt` (its `//` header kept) | Rows outside are dropped |
 | NetCDF (CF) | `.ncCF` (a CF discrete-sampling-geometry file) | Observations outside are dropped and the ragged array (`rowSize`, parent index) is rebuilt |
+| Other tabledap types (`csvp`, `json`, `nc`, `mat`, `kml`, …; `RAW_FORMATS` in `formats.py`) | The same type, shipped as ERDDAP wrote it | Not applied: the file covers the polygon's bounding box, and the README says so |
 
 How the request is constrained:
 
@@ -97,8 +98,8 @@ How the request is constrained:
 3. **Long ID lists** are split so each URL stays under 6000 characters. Past 8
    requests, or when an ID contains a character the regex can't escape, the
    bounding box is used instead.
-4. The **polygon** is then applied exactly to the downloaded rows, whatever the
-   format. Values other than latitude/longitude are written back as received, so
+4. The **polygon** is then applied exactly to the downloaded rows, in the four
+   formats above that the downloader parses. Values other than latitude/longitude are written back as received, so
    numbers keep ERDDAP's formatting.
 
 The variable list comes from the harvested `table_variables`; only datasets
