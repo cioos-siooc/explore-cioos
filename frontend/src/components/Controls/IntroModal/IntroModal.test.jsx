@@ -131,7 +131,9 @@ describe("IntroModal", () => {
   it("Take the guided tour closes the dialog and starts the tour at the first tip", async () => {
     const setShowModal = vi.fn();
     const { user } = renderIntro({ setShowModal });
-    await user.click(screen.getByRole("button", { name: "Take the guided tour" }));
+    await user.click(
+      screen.getByRole("button", { name: "Take the guided tour" }),
+    );
     expect(setShowModal).toHaveBeenCalledWith(false);
     expect(screen.getByTestId("tip-card")).toHaveTextContent(/Tip 1 of \d+/);
   });
