@@ -3,7 +3,7 @@ name = "harvester"
 version = "0.2.0"
 description = "CIOOS Explorer Harvester"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.14,<3.15"
 dependencies = [
     "cioos-metadata-conversion",
     "duckdb>=2.0.0",
