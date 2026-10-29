@@ -1,5 +1,5 @@
 # Stage 1 - the build process
-FROM node:25-alpine AS build-deps
+FROM node:26-alpine AS build-deps
 WORKDIR /usr/src/app
 
 ARG API_URL

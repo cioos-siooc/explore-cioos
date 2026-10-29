@@ -410,6 +410,14 @@
   overflow: hidden;
 }
 
+.datasetsPanelLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--cioos-primary);
+}
+
 /* The page enters from the right (drill-in), the list from the left. */
 .datasetsPanelView {
   height: 100%;
