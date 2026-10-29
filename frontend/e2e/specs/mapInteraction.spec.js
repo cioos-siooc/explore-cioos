@@ -190,7 +190,9 @@ test.describe("pointing at the map", () => {
     // closes on its way on.
     const inDialog = testInfo.project.name === "mobile";
     if (inDialog) await page.getByRole("button", { name: "Legend" }).click();
-    const tool = page.getByRole("button", { name: "Read the depth at a point" });
+    const tool = page.getByRole("button", {
+      name: "Read the depth at a point",
+    });
     await tool.click();
     if (inDialog) await expect(page.getByRole("dialog")).toHaveCount(0);
     else await expect(tool).toHaveAttribute("aria-pressed", "true");
