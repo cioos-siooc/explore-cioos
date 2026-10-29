@@ -827,7 +827,7 @@ def _reproduce_script(user_query, created):
     return "\n".join(
         [
             "# /// script",
-            '# requires-python = "==3.13.*"',
+            '# requires-python = "==3.14.*"',
             f'# dependencies = ["cioos-data-explorer-downloader @ {url}"]',
             "# [tool.uv]",
             # Resolves the libraries as they were when the package was built.

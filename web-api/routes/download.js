@@ -86,7 +86,7 @@ function downloadScript(manifest, now) {
   const oneLine = (text) => String(text ?? "").replace(/\s+/g, " ");
   return [
     "# /// script",
-    '# requires-python = "==3.13.*"',
+    '# requires-python = "==3.14.*"',
     `# dependencies = ["cioos-data-explorer-downloader @ ${DOWNLOADER_URL}"]`,
     "# [tool.uv]",
     // Resolves the same library versions on every run of this script.

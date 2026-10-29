@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm
+FROM ghcr.io/astral-sh/uv:python3.14-trixie
 
 # No gcc/libc-dev/libgeos-dev/python3-dev on purpose: every dependency installs
 # from a binary wheel, and those packages drag in ~18 minutes of libc6/python3
