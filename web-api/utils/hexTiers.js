@@ -23,7 +23,7 @@ const FINE = TIERS[1];
 
 // The coverage layer never becomes points, so the fine grid is reused
 // uncapped past the zoom where the main layer switches to dots.
-const FINE_TIER_MIN_ZOOM = 5;
+const FINE_TIER_MIN_ZOOM = 4;
 
 function tierForZoom(z) {
   return Number(z) < FINE_TIER_MIN_ZOOM ? TIERS[0] : TIERS[1];

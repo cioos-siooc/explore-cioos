@@ -516,6 +516,8 @@ describe("legend range helpers", () => {
 
   it("picks the tier covering the current zoom", () => {
     expect(getCurrentRangeLevel(rangeLevels, 3)).toBe(rangeLevels.zoom0);
+    expect(getCurrentRangeLevel(rangeLevels, 3.9)).toBe(rangeLevels.zoom0);
+    expect(getCurrentRangeLevel(rangeLevels, 4)).toBe(rangeLevels.zoom1);
     expect(getCurrentRangeLevel(rangeLevels, 6)).toBe(rangeLevels.zoom1);
     expect(getCurrentRangeLevel(rangeLevels, 9)).toBe(rangeLevels.zoom2);
   });
