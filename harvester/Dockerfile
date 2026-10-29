@@ -1,6 +1,11 @@
 FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
 
-RUN useradd --create-home app
+# git: uv fetches the git-sourced dependencies (metadata-xml,
+# cioos-metadata-conversion), and the slim base doesn't ship it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home app
 
 WORKDIR /app
 
