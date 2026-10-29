@@ -82,8 +82,8 @@ describe("IntroModal", () => {
     expect(setShowModal).toHaveBeenCalledWith(false);
   });
 
-  describe("See it in action", () => {
-    it("See the seafloor in Halifax Harbour turns the NONNA layer on", async () => {
+  describe("New feature highlights", () => {
+    it("High-resolution bathymetry turns the NONNA layer on", async () => {
       window.localStorage.setItem(
         "cde.bathymetryVisible",
         JSON.stringify(false),
@@ -93,32 +93,30 @@ describe("IntroModal", () => {
       expect(screen.getByTestId("bathymetry")).toHaveTextContent("off");
       await user.click(
         screen.getByRole("button", {
-          name: /See the seafloor in Halifax Harbour/,
+          name: /High-resolution bathymetry/,
         }),
       );
       expect(setShowModal).toHaveBeenCalledWith(false);
       expect(screen.getByTestId("bathymetry")).toHaveTextContent("on");
     });
 
-    it("When was the data collected? opens the time coverage chart", async () => {
+    it("See when data was collected opens the time coverage chart", async () => {
       const setShowModal = vi.fn();
       const { user } = renderIntro({ setShowModal });
       await user.click(
-        screen.getByRole("button", { name: /When was the data collected/ }),
+        screen.getByRole("button", { name: /See when data was collected/ }),
       );
       expect(setShowModal).toHaveBeenCalledWith(false);
       expect(screen.getByTestId("coverage-modal")).toHaveTextContent("open");
     });
 
-    it("Zoom into the Gulf of St. Lawrence closes the dialog to show the map", async () => {
-      const setShowModal = vi.fn();
-      const { user } = renderIntro({ setShowModal });
-      await user.click(
-        screen.getByRole("button", {
-          name: /Zoom into the Gulf of St. Lawrence/,
-        }),
-      );
-      expect(setShowModal).toHaveBeenCalledWith(false);
+    // The fixture catalogue has no dataset with a WMS server.
+    it("hides the gridded showcase when no dataset has a WMS server", async () => {
+      renderIntro();
+      await screen.findByText("datasets");
+      expect(
+        screen.queryByRole("button", { name: /Overlay gridded data/ }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -128,11 +126,11 @@ describe("IntroModal", () => {
     expect(screen.getByTestId("selection-help")).toHaveTextContent("open");
   });
 
-  it("Take the guided tour closes the dialog and starts the tour at the first tip", async () => {
+  it("Start the walkthrough closes the dialog and starts the tour at the first tip", async () => {
     const setShowModal = vi.fn();
     const { user } = renderIntro({ setShowModal });
     await user.click(
-      screen.getByRole("button", { name: "Take the guided tour" }),
+      screen.getByRole("button", { name: "Start the walkthrough" }),
     );
     expect(setShowModal).toHaveBeenCalledWith(false);
     expect(screen.getByTestId("tip-card")).toHaveTextContent(/Tip 1 of \d+/);
@@ -148,11 +146,11 @@ describe("IntroModal", () => {
     ).toBeInTheDocument();
   });
 
-  it("the feedback card has a labelled Send feedback button", () => {
+  it("the whole feedback card is the feedback button", () => {
     renderIntro();
-    expect(
-      screen.getByRole("button", { name: "Send feedback" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Feedback/ })).toHaveClass(
+      "introFooterCard",
+    );
   });
 
   it("names both data sources, ERDDAP™ and OBIS", () => {
@@ -162,11 +160,11 @@ describe("IntroModal", () => {
     );
   });
 
-  it("the tips switch persists the choice", async () => {
+  it("clicking anywhere on the tips card toggles tips and persists the choice", async () => {
     const { user } = renderIntro();
-    const toggle = screen.getByRole("switch", { name: /Show tips/ });
+    const toggle = screen.getByRole("switch", { name: "Tips as you go" });
     expect(toggle).toBeChecked();
-    await user.click(toggle);
+    await user.click(screen.getByText(/Tips appear as you explore/));
     expect(toggle).not.toBeChecked();
     expect(window.localStorage.getItem("cde.tipsEnabled")).toBe("false");
   });
