@@ -62,6 +62,18 @@
   color: var(--cioos-navy);
 }
 
+.filtersModal .filtersModalTitleSeparator {
+  flex: 0 0 auto;
+  color: var(--cioos-ink-60);
+}
+
+.filtersModal .filtersModalTitleCrumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .filtersModal .filtersModalTitleCounter {
   display: inline-flex;
   align-items: center;

@@ -156,7 +156,7 @@ describe("contextual tips", () => {
     await user.click(screen.getByText("offer exclude"));
     expect(card()).toBeNull();
     await user.click(screen.getByText("offer match all"));
-    expect(card()).toHaveTextContent(/Match all/);
+    expect(card()).toHaveTextContent(/Includes all selected/);
   });
 
   it("offers the first unseen tip of a priority list", async () => {
@@ -164,7 +164,7 @@ describe("contextual tips", () => {
     window.localStorage.setItem("cde.seenTips", JSON.stringify(["exclude"]));
     const { user } = renderProbe();
     await user.click(screen.getByText("offer either"));
-    expect(card()).toHaveTextContent(/Match all/);
+    expect(card()).toHaveTextContent(/Includes all selected/);
   });
 
   it("stays quiet on a first visit, where the intro covers the basics", async () => {
@@ -187,7 +187,7 @@ describe("contextual tips", () => {
     renderProbe();
     fireEvent.click(screen.getByText("offer match all"));
     act(() => vi.advanceTimersByTime(60000));
-    expect(card()).toHaveTextContent(/Match all/);
+    expect(card()).toHaveTextContent(/Includes all selected/);
     vi.useRealTimers();
   });
 
@@ -198,7 +198,7 @@ describe("contextual tips", () => {
     await user.click(screen.getByText("offer match all"));
     expect(card()).toBeNull();
     await user.click(screen.getByText("close filters"));
-    expect(card()).toHaveTextContent(/Match all/);
+    expect(card()).toHaveTextContent(/Includes all selected/);
   });
 
   it("“Don't show tips” turns them off for good", async () => {
@@ -221,7 +221,7 @@ describe("contextual tips", () => {
       await user.click(
         screen.getByRole("button", { name: "A tip is available" }),
       );
-      expect(card()).toHaveTextContent(/Match all/);
+      expect(card()).toHaveTextContent(/Includes all selected/);
     });
 
     it("opens a tour straight away", async () => {
@@ -278,7 +278,7 @@ describe("contextual tips", () => {
       await user.click(screen.getByText("offer exclude"));
       expect(card()).toHaveTextContent(counter("exclude"));
       await user.click(screen.getByRole("button", { name: "Next tip" }));
-      expect(card()).toHaveTextContent(/Match all/);
+      expect(card()).toHaveTextContent(/Includes all selected/);
       expect(card()).not.toHaveTextContent("Don't show tips");
     });
 
@@ -408,7 +408,7 @@ describe("contextual tips", () => {
 
       await user.click(screen.getByRole("button", { name: "Next tip" }));
       expect(within(modal()).getByTestId("tip-card")).toHaveTextContent(
-        /Match all/,
+        /Includes all selected/,
       );
       expect(
         within(modal())

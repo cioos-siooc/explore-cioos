@@ -415,8 +415,8 @@ export default function useFilterModel(
     },
     listGroup(
       "datasets",
-      t("datasetsFilterName"),
-      "datasetsFilterName",
+      t("datasetTitleFilterName"),
+      "datasetTitleFilterName",
       filters.datasetsSelected,
       filters.setDatasetsSelected,
       true,

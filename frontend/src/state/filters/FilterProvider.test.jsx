@@ -74,11 +74,22 @@ describe("FilterProvider", () => {
     await renderLoaded({ url: "/?excludePlatforms=mooring&eovsMatch=all" });
     expect(latest.platformsSelected.some((p) => p.isExcluded)).toBe(true);
 
+    act(() => latest.setEovsMatchAll(false));
     act(() => latest.resetFilters());
     await waitFor(() => {
       expect(latest.platformsSelected.some((p) => p.isExcluded)).toBe(false);
-      expect(latest.eovsMatchAll).toBe(false);
+      expect(latest.eovsMatchAll).toBe(true);
     });
+  });
+
+  it("matches every included EOV by default", async () => {
+    await renderLoaded({ url: "/?eovs=oxygen" });
+    expect(latest.eovsMatchAll).toBe(true);
+  });
+
+  it("keeps a link with several EOVs and no match param on any-match", async () => {
+    await renderLoaded({ url: "/?eovs=oxygen,salinity" });
+    expect(latest.eovsMatchAll).toBe(false);
   });
 
   it("seeds every list's exclusions and match mode from the URL, and reset clears them", async () => {
