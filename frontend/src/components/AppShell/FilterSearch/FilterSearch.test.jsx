@@ -153,7 +153,7 @@ describe("FilterSearch", () => {
     await user.type(box, "carbone organique");
 
     // Named as the Filters list names it, found by its French name.
-    expect(option("Dissolved Organic Carbon")).toBeInTheDocument();
+    expect(option("Dissolved organic carbon")).toBeInTheDocument();
   });
 
   it("finds an ocean variable by its category", async () => {

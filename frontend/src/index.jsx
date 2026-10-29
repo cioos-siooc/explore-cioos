@@ -6,8 +6,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import Loading from "./components/Controls/Loading/Loading.jsx";
-import translationEN from "./locales/en/translation.json";
-import translationFR from "./locales/fr/translation.json";
+import { resources } from "./locales/resources.js";
 import App from "./components/App.jsx";
 import { BrowserRouter, Navigate, Route } from "react-router";
 import { clearLegacyCookies } from "./state/usePersistentState.js";
@@ -43,15 +42,6 @@ const HarvestDocs = lazy(() => import("./components/Harvest/HarvestDocs.jsx"));
 const HarvestDownloadJob = lazy(
   () => import("./components/Harvest/HarvestDownloadJob.jsx"),
 );
-
-const resources = {
-  en: {
-    translation: translationEN,
-  },
-  fr: {
-    translation: translationFR,
-  },
-};
 
 clearLegacyCookies();
 
