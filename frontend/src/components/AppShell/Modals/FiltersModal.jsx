@@ -106,7 +106,10 @@ export default function FiltersModal() {
       </Modal.Header>
       <TipCard inModal="filters" />
       <Modal.Body>
-        <FiltersPanel searchInputRef={searchInputRef} />
+        <FiltersPanel
+          searchInputRef={searchInputRef}
+          onDone={() => setShowFiltersModal(false)}
+        />
       </Modal.Body>
     </Modal>
   );

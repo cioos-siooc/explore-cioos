@@ -76,7 +76,7 @@ function createOptionSubset(searchTerms, allOptions, t) {
   );
 }
 
-export default function FiltersPanel({ searchInputRef }) {
+export default function FiltersPanel({ searchInputRef, onDone }) {
   const { t } = useTranslation();
   const {
     eovsSelected,
@@ -712,19 +712,26 @@ export default function FiltersPanel({ searchInputRef }) {
             <Spinner size="xs" className="countSpinner" />
           )}
         </span>
-        {/* Hidden rather than removed, so the footer keeps its height. */}
-        <button
-          type="button"
-          className="filtersPanelReset"
-          style={canReset ? undefined : { visibility: "hidden" }}
-          onClick={() => {
-            resetAll();
-            setSearchTouched(new Set());
-          }}
-          title={t("resetFiltersButtonTooltipText")}
-        >
-          {t("filtersPanelResetAll")}
-        </button>
+        <span className="filtersPanelActions">
+          {/* Hidden rather than removed, so the footer keeps its height. */}
+          <button
+            type="button"
+            className="filtersPanelReset"
+            style={canReset ? undefined : { visibility: "hidden" }}
+            onClick={() => {
+              resetAll();
+              setSearchTouched(new Set());
+            }}
+            title={t("resetFiltersButtonTooltipText")}
+          >
+            {t("filtersPanelResetAll")}
+          </button>
+          {onDone && (
+            <button type="button" className="filtersPanelDone" onClick={onDone}>
+              {t("filtersPanelShowResults")}
+            </button>
+          )}
+        </span>
       </div>
     </div>
   );
