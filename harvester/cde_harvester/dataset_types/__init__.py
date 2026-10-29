@@ -3,7 +3,7 @@ DatasetTypeHandler below to support another cdm_data_type."""
 
 from cde_harvester.dataset_types.base import DatasetTypeHandler
 
-_REGISTRY: "dict[str, DatasetTypeHandler]" = {}
+_REGISTRY: dict[str, DatasetTypeHandler] = {}
 
 
 def register(handler: DatasetTypeHandler) -> None:

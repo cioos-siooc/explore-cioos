@@ -2019,7 +2019,7 @@ export default function CreateMap({
       maxzoom: 14,
       promoteId: "pk",
     });
-    // The cells' geometry is the same at every zoom from 5 up, so past z10
+    // The cells' geometry is the same at every zoom from 4 up, so past z10
     // (~7 m per tile unit at 45°N on a 20 km cell) a deeper tile only refetched
     // identical data on every zoom step.
     map.current.addSource("cde-cells", {

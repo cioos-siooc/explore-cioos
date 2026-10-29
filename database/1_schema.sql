@@ -368,7 +368,7 @@ CREATE TABLE trajectory_hexes (
     pk serial PRIMARY KEY,
     dataset_pk integer,
     trajectory_id text DEFAULT '',
-    -- 0 = cde.hexes_zoom_0 (100 km, z<5), 1 = cde.hexes_zoom_1 (10 km, z>=5).
+    -- 0 = cde.hexes_zoom_0 (100 km, z<4), 1 = cde.hexes_zoom_1 (10 km, z>=4).
     -- Each tier is aggregated independently so `days` is exact at both: summing
     -- the 10 km rows into a 100 km hex would count a day once per 10 km hex the
     -- platform crossed that day.
@@ -424,7 +424,7 @@ CREATE INDEX trajectory_hexes_depth_max_idx ON trajectory_hexes (depth_max);
 
 
 -- One row per (coarse hex, dataset, source): the three feature tables rolled
--- up to the grain the z<5 tiles and the legend's zoom0 ramp aggregate at. A
+-- up to the grain the z<4 tiles and the legend's zoom0 ramp aggregate at. A
 -- request whose filters are all dataset-level (dbFilter's datasetLevelOnly)
 -- reads this instead of re-unnesting every feature's day set: 685 k feature
 -- rows become ~35 k, a z2 tile 2.5 s -> 0.2 s. Rebuilt per load by

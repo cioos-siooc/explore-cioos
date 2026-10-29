@@ -165,6 +165,22 @@ export default function FilterProvider({ children }) {
   // An empty /obisNodes means no OBIS data, so OBIS-only UI is hidden.
   const obisDataAvailable = obisNodesSelected.length > 0;
 
+  // Between an edit and its debounce firing, results still answer the old
+  // selection.
+  const filtersPending =
+    eovsSelected !== debouncedEovsSelected ||
+    orgsSelected !== debouncedOrgsSelected ||
+    datasetsSelected !== debouncedDatasetsSelected ||
+    platformsSelected !== debouncedPlatformsSelected ||
+    erddapServersSelected !== debouncedErddapServersSelected ||
+    obisNodesSelected !== debouncedObisNodesSelected ||
+    startDate !== debouncedStartDate ||
+    endDate !== debouncedEndDate ||
+    startDepth !== debouncedStartDepth ||
+    endDepth !== debouncedEndDepth ||
+    scientificNamesSelected !== debouncedScientificNamesSelected ||
+    scientificNamesExcluded !== debouncedScientificNamesExcluded;
+
   // A memo, not effect-mirrored state: at the moment the trailing debounce
   // fires the debounced value equals the live one, so this lands one render
   // earlier with no extra pass.
@@ -545,6 +561,7 @@ export default function FilterProvider({ children }) {
 
   const value = {
     query,
+    filtersPending,
     eovsSelected,
     setEovsSelected,
     eovsSearchTerms,
