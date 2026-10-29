@@ -505,6 +505,38 @@ button.datasetCardTitle:focus-visible {
   color: var(--cioos-primary);
 }
 
+.datasetsCardDensity {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-700);
+  cursor: pointer;
+}
+
+.datasetsCardDensity:hover {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-surface-2);
+}
+
+.datasetsCardDensity:focus-visible {
+  outline: none;
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.datasetsCardDensity[aria-pressed="true"] {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-teal-light);
+  color: var(--cioos-primary-800);
+}
+
 .datasetsCardGroupCount {
   flex: 0 0 auto;
   min-width: 22px;
@@ -815,6 +847,95 @@ button.datasetCardTitle:focus-visible {
 .datasetCardLinkNote svg {
   flex: 0 0 auto;
   margin-top: 2px;
+}
+
+/* The sidebar list keeps titles to two lines, the full title left to its
+   tooltip. */
+.sidebar .datasetsCardList:not(.compact) .datasetCardTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Compact rows (the toolbar's density toggle): a line each for the title and
+   the meta. */
+.datasetsCardList.compact {
+  gap: 4px;
+}
+
+.datasetsCardList.compact .datasetCard {
+  padding: 5px 10px;
+}
+
+.datasetsCardList.compact .datasetCardBody {
+  gap: 2px;
+}
+
+.datasetsCardList.compact .datasetCardTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datasetsCardList.compact .datasetCardMeta {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  font-size: var(--cioos-font-size-xs);
+}
+
+.datasetsCardList.compact .datasetCardMetaItem {
+  white-space: nowrap;
+}
+
+/* Short screens: see Sidebar/styles.css. The Download modal keeps its own
+   layout. */
+@media (min-width: 701px) and (max-height: 860px) {
+  .sidebar .datasetsCardList {
+    padding: 8px;
+  }
+
+  .sidebar .datasetsCardControls {
+    padding: 4px 8px;
+  }
+
+  .sidebar .datasetsCardFilters {
+    padding: 2px 10px;
+  }
+
+  .sidebar .datasetsCardToolbar .selectPillSizer {
+    padding-block: 2px;
+  }
+
+  .sidebar .datasetsCardDensity {
+    width: 24px;
+    height: 24px;
+  }
+
+  .sidebar .pager {
+    padding: 3px 8px;
+  }
+
+  .sidebar .pagerSize select {
+    padding: 3px 10px;
+  }
+
+  .sidebar .datasetsCardList:not(.compact) {
+    gap: 6px;
+  }
+
+  .sidebar .datasetsCardList:not(.compact) .datasetCard {
+    padding: 8px 10px;
+  }
+
+  .sidebar .datasetCardMeta {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .sidebar .datasetCardMetaItem {
+    white-space: nowrap;
+  }
 }
 
 /* The panel around this list scrolls as one column on phones

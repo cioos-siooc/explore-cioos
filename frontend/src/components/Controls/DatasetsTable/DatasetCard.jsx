@@ -21,9 +21,12 @@ import isEmpty from "lodash-es/isEmpty";
 import { platformColor, platformLabel } from "../../../platformVocab.js";
 import { formatErddapServerName, formatSizeEstimate } from "../../../utilities";
 import { formatGridSize } from "../../../wmsUtilities";
+import {
+  localizedCkanUrl,
+  localizedErddapUrl,
+} from "../../../downloadLinks.js";
 import erddapServersJSONfile from "../../../erddapServers.json";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
-import Skeleton from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 
@@ -47,6 +50,8 @@ export default function DatasetCard({
 }) {
   const isGrid = row.cdm_data_type === "Grid";
   const isObis = row.source_type === "obis";
+  const erddapUrl = localizedErddapUrl(row, row.erddap_url, i18n.language);
+  const ckanUrl = localizedCkanUrl(row.ckan_url, i18n.language);
   // griddap is metadata-only, and in the modal a dataset is only selectable
   // when the CDE can deliver it (internalDownload).
   const selectDisabled = isGrid || (isDownloadModal && !row.internalDownload);
@@ -232,8 +237,8 @@ export default function DatasetCard({
             {row.erddap_url && (
               <a
                 className="datasetCardSourceLink"
-                href={row.erddap_url}
-                title={row.erddap_url}
+                href={erddapUrl}
+                title={erddapUrl}
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -245,8 +250,8 @@ export default function DatasetCard({
             {row.ckan_url && (
               <a
                 className="datasetCardSourceLink"
-                href={row.ckan_url}
-                title={row.ckan_url}
+                href={ckanUrl}
+                title={ckanUrl}
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -265,27 +270,6 @@ export default function DatasetCard({
 // The dataset's glyph, shaped like what the map draws for it: a grid for a
 // gridded footprint, a hexagon for trajectories and OBIS (shown as hex cells),
 // a dot for everything drawn as markers. Coloured by platform.
-export function DatasetCardSkeleton() {
-  return (
-    <div className="datasetCard" aria-hidden="true">
-      <div className="datasetCardBody">
-        <div className="datasetCardHeadline">
-          <span className="datasetCardSelect">
-            <Skeleton width="16px" height="16px" radius="50%" />
-          </span>
-          <span className="datasetCardTitle">
-            <Skeleton text />
-            <Skeleton text width="60%" />
-          </span>
-        </div>
-        <div className="datasetCardMeta">
-          <Skeleton text width="45%" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // `decorative` drops the tooltip for a spot whose own text already names it.
 export function DatasetPlatformIcon({
   platform,

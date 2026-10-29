@@ -56,7 +56,8 @@
     "northward_derivative_of_eastward_sea_ice_velocity",
     "sea_ice_x_velocity",
     "sea_ice_y_velocity",
-    "sea_ice_speed"
+    "sea_ice_speed",
+    "sea_ice_area_fraction"
   ],
   "seaState": [
     "sea_surface_swell_wave_period",
@@ -105,7 +106,8 @@
     "sea_water_density",
     "sea_water_sigma_t",
     "sea_water_sigma_theta",
-    "sea_water_conservative_temperature"
+    "sea_water_conservative_temperature",
+    "ocean_mixed_layer_thickness_defined_by_sigma_theta"
   ],
   "surfaceCurrents": [
     "surface_eastward_sea_water_velocity",
@@ -206,7 +208,8 @@
     "mass_concentration_of_nanophytoplankton_expressed_as_chlorophyll_in_sea_water",
     "mass_concentration_of_phytoplankton_expressed_as_chlorophyll_in_sea_water",
     "mass_concentration_of_picophytoplankton_expressed_as_chlorophyll_in_sea_water",
-    "mass_fraction_of_chlorophyll_a_in_sea_water"
+    "mass_fraction_of_chlorophyll_a_in_sea_water",
+    "surface_upwelling_radiance_per_unit_wavelength_in_sea_water"
   ],
   "oceanSound": [
     "sound_frequency",

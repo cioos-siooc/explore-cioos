@@ -93,3 +93,21 @@ export function FilterOption({
     </div>
   );
 }
+
+// What a row's box and its trailing button do; shown under every list that
+// can exclude.
+export function OptionStateLegend() {
+  const { t } = useTranslation();
+  return (
+    <p className="filterOptionsLegend" data-testid="filter-legend">
+      <span className="optionLegendItem">
+        <Square aria-hidden="true" />
+        {t("filterLegendSelect")}
+      </span>
+      <span className="optionLegendItem">
+        <SlashCircle aria-hidden="true" />
+        {t("filterLegendExclude")}
+      </span>
+    </p>
+  );
+}

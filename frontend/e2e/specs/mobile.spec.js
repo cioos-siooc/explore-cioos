@@ -153,10 +153,9 @@ test.describe("a phone held landscape", () => {
     await openApp(page);
     await page.getByTestId("topbar-filters-button").click();
 
+    // Clear all hides until a filter is set; the count is always there.
     await expect(
-      page.getByTestId("filters-modal").getByRole("button", {
-        name: "Clear all",
-      }),
+      page.getByTestId("filters-modal").getByTestId("filters-panel-count"),
     ).toBeInViewport();
   });
 });
