@@ -4,6 +4,9 @@ import { useCallback, useSyncExternalStore } from "react";
 // spelled here so JS and CSS branches cannot drift apart.
 export const MOBILE_QUERY = "(max-width: 700px), (max-height: 500px)";
 
+// Room for the list to stay beside an open dataset page.
+export const RAIL_QUERY = "(min-width: 1280px) and (min-height: 501px)";
+
 export const TOUCH_QUERY = "(hover: none)";
 
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";

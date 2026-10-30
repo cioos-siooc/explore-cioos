@@ -11,10 +11,13 @@ let touchScreen = false;
 const liveQueries = new Set();
 
 // Only the forms this codebase writes; anything else is a typo, and answering
-// `false` would hide it. Height never moves, so (max-height) reads as tall.
+// `false` would hide it. Height never moves, so (max-height) and (min-height)
+// read as tall.
 function evaluate(query) {
   if (query.includes(",")) return query.split(",").some(evaluate);
+  if (query.includes(" and ")) return query.split(" and ").every(evaluate);
   if (/^\(\s*max-height:\s*\d+px\s*\)$/.test(query.trim())) return false;
+  if (/^\(\s*min-height:\s*\d+px\s*\)$/.test(query.trim())) return true;
   if (query.trim() === REDUCED_MOTION_QUERY) return false;
   if (query.trim() === TOUCH_QUERY) return touchScreen;
   if (query.trim() === DARK_SCHEME_QUERY) return false;
@@ -22,7 +25,7 @@ function evaluate(query) {
   if (!match) {
     throw new Error(
       `Unsupported media query in test: "${query}". ` +
-        "Only (min-width: Npx), (max-width: Npx), (max-height: Npx), comma lists of those, (hover: none), reduced motion and a dark colour scheme are handled — see src/test/viewport.js.",
+        "Only (min-width: Npx), (max-width: Npx), (min-height: Npx), (max-height: Npx), comma and `and` lists of those, (hover: none), reduced motion and a dark colour scheme are handled — see src/test/viewport.js.",
     );
   }
   const [, bound, px] = match;

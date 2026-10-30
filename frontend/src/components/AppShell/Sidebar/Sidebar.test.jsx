@@ -4,7 +4,11 @@ import { act, screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
-import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
+import {
+  MOBILE_WIDTH,
+  TABLET_WIDTH,
+  setViewportWidth,
+} from "../../../test/viewport.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import pointQueryFixture from "../../../../e2e/fixtures/api/pointQuery.json";
 import Sidebar from "./Sidebar.jsx";
@@ -87,7 +91,7 @@ describe("Sidebar wide view", () => {
         url: `/?dataset=${pointQueryFixture[0].dataset_id}${query}`,
       },
     );
-    await screen.findByTestId("sidebar-back");
+    await screen.findByTestId("sidebar-close-dataset");
     return result;
   }
 
@@ -151,7 +155,7 @@ describe("Sidebar wide view", () => {
     expect(screen.getByTestId("sidebar")).toHaveClass("wide");
 
     act(() => latestSelection.setInspectDataset(pointQueryFixture[0]));
-    await screen.findByTestId("sidebar-back");
+    await screen.findByTestId("sidebar-close-dataset");
     expect(screen.getByTestId("sidebar")).toHaveClass("wide");
   });
 
@@ -180,5 +184,75 @@ describe("Sidebar wide view", () => {
     await screen.findByTestId("sidebar-back");
     expect(screen.queryByTestId("sidebar-wide-toggle")).not.toBeInTheDocument();
     expect(screen.getByTestId("sidebar")).not.toHaveClass("wide");
+  });
+});
+
+describe("Sidebar list beside a dataset page", () => {
+  beforeEach(() => {
+    installMockFetch();
+    window.localStorage.setItem("cde.introSeen", "true");
+  });
+
+  const cardOf = (row) =>
+    document.querySelector(`.datasetCard[data-dataset-pk="${row.pk}"]`);
+
+  async function openFromList() {
+    const result = renderWithProviders(
+      <>
+        <Sidebar />
+        <Probe />
+      </>,
+      { providers: "app" },
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("state")).toHaveTextContent("ready"),
+    );
+    act(() => latestSelection.setInspectDataset(pointQueryFixture[0]));
+    await screen.findByTestId("sidebar-close-dataset");
+    return result;
+  }
+
+  it("keeps the list as it was in sight, marking the open dataset", async () => {
+    await openFromList();
+    expect(screen.getByTestId("sidebar")).toHaveClass("railed");
+    expect(screen.getByTestId("sidebar-toggle-count")).toBeVisible();
+    expect(screen.getByTestId("datasets-controls")).toBeVisible();
+    expect(screen.queryByTestId("sidebar-back")).not.toBeInTheDocument();
+    // One set of window controls, on the page's banner.
+    expect(screen.getAllByTestId("sidebar-collapse")).toHaveLength(1);
+    expect(cardOf(pointQueryFixture[0])).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("switches datasets in place, and one close goes back to the list entry", async () => {
+    const { user } = await openFromList();
+    const next = document.querySelector(".datasetCard:not([aria-current])");
+    await user.click(next.querySelector(".datasetCardTitle"));
+    await waitFor(() => expect(next).toHaveAttribute("aria-current", "true"));
+    // The list's own entry, not a fresh one stacked after two datasets.
+    await user.click(screen.getByTestId("sidebar-close-dataset"));
+    await waitFor(() => expect(window.history.state?.idx).toBe(0));
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("dataset")).toBe(
+        null,
+      ),
+    );
+    expect(screen.getByTestId("sidebar")).not.toHaveClass("railed");
+    expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
+      "data-expanded",
+      "true",
+    );
+  });
+
+  it("gives way to the back button where there is no room for it", async () => {
+    setViewportWidth(TABLET_WIDTH);
+    renderWithProviders(<Sidebar />, {
+      providers: "app",
+      url: `/?dataset=${pointQueryFixture[0].dataset_id}`,
+    });
+    await screen.findByTestId("sidebar-back");
+    expect(screen.getByTestId("sidebar")).not.toHaveClass("railed");
   });
 });

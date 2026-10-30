@@ -41,6 +41,8 @@ export default function DatasetCard({
   onHover = () => {},
   onHoverEnd = () => {},
   fromMapClick,
+  // Its dataset page is the one open beside the list.
+  active = false,
   tipHighlight,
   t,
   i18n,
@@ -77,7 +79,9 @@ export default function DatasetCard({
         clickable,
         downloadModal: isDownloadModal,
         fromMapClick,
+        active,
       })}
+      aria-current={active || undefined}
       title={fromMapClick ? t("datasetCardFromMapTitle") : undefined}
       onClick={handleCardClick}
       onMouseEnter={() => onHover(row)}

@@ -114,7 +114,10 @@ test.describe("the datasets sidebar", () => {
     if ((await panel.getAttribute("data-expanded")) !== "true") {
       await page.getByTestId("topbar-datasets-button").click();
     }
-    const narrowWidth = (await panel.boundingBox()).width;
+    // The column, not the list card: where there's room the page is a window
+    // of its own beside the list, and that window is what widens.
+    const column = page.getByTestId("sidebar");
+    const narrowWidth = (await column.boundingBox()).width;
 
     await page.getByTestId("sidebar-wide-toggle").click();
     await expect(page).toHaveURL(/[?&]wide=1/);
@@ -125,7 +128,7 @@ test.describe("the datasets sidebar", () => {
       page.getByRole("region", { name: "Data", exact: true }),
     ).toBeVisible();
     await expect
-      .poll(async () => (await panel.boundingBox()).width)
+      .poll(async () => (await column.boundingBox()).width)
       .toBeGreaterThan(narrowWidth * 1.5);
 
     await page.keyboard.press("Escape");

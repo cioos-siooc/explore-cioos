@@ -33,6 +33,43 @@
   pointer-events: auto;
 }
 
+/* Where there's room (RAIL_QUERY) an open dataset page is a window of its
+   own, laid over the list card's last two thirds so the list keeps its width. */
+.sidebar.railed {
+  --rail-overlap: calc(var(--cioos-sidebar-width) * 2 / 3);
+
+  display: grid;
+  grid-template-columns:
+    calc(var(--cioos-sidebar-width) - var(--rail-overlap))
+    var(--rail-overlap) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  width: min(
+    calc(var(--cioos-sidebar-width) * 2 - var(--rail-overlap)),
+    calc(100vw - 24px)
+  );
+}
+
+.sidebar.railed > .sidebarDatasets {
+  grid-area: 1 / 1 / 2 / 3;
+}
+
+.sidebar.railed > .sidebarWindow {
+  z-index: 1;
+  grid-area: 1 / 2 / 2 / 4;
+}
+
+/* Download and the pager's steps sit at the right of the list card, under
+   the window: brought to its left, which stays in sight. */
+.sidebar.railed .sidebarFooter {
+  flex-direction: row-reverse;
+}
+
+.sidebar.railed .pagerControls {
+  order: -1;
+  margin-left: 0;
+}
+
 /* The card widened over the map (useWideView), above the rest of the
    shell but under any dialog. Phones never get here: the card is already a
    full-screen sheet. */
@@ -50,8 +87,9 @@
   background-color: var(--cioos-backdrop);
 }
 
-/* Datasets card */
-.sidebarDatasets {
+/* Datasets card, and the dataset page's own window beside it */
+.sidebarDatasets,
+.sidebarWindow {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -75,13 +113,15 @@
     visibility 0.32s;
 }
 
-.sidebarDatasets.expanded {
+.sidebarDatasets.expanded,
+.sidebarWindow.expanded {
   transform: translateX(0) var(--cioos-perspective);
   visibility: visible;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebarDatasets {
+  .sidebarDatasets,
+  .sidebarWindow {
     transition: none;
   }
 }
@@ -230,7 +270,15 @@
   color: var(--cioos-primary-700);
 }
 
-.sidebarBody {
+/* With no back button before it (the list beside the page is the way back),
+   the label leads. */
+.sidebar.railed .datasetsBannerMode {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.sidebarBody,
+.sidebarWindowBody {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;

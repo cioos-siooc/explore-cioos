@@ -62,7 +62,13 @@ export default function TopControls() {
   const datasetMinimized = Boolean(inspectDataset) && !sidebarOpen;
 
   const barRef = useRef(null);
-  usePublishedFootprint(barRef, "--cioos-top-bar-space", measureTopBarSpace);
+  // The column widens beside an open dataset page.
+  usePublishedFootprint(
+    barRef,
+    "--cioos-top-bar-space",
+    measureTopBarSpace,
+    ".sidebar",
+  );
 
   return (
     <div className="topBar" ref={barRef} data-testid="top-bar">

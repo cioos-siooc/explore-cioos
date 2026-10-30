@@ -359,9 +359,11 @@ export default function SelectionProvider({ children }) {
 
   // Read by setInspectDataset at call time, so it can stay stable across pans.
   const onListRef = useRef(!searchParams.get("dataset"));
+  const fromListRef = useRef(Boolean(location.state?.fromList));
   useEffect(() => {
     onListRef.current = !searchParams.get("dataset");
-  }, [searchParams]);
+    fromListRef.current = Boolean(location.state?.fromList);
+  }, [searchParams, location.state]);
 
   // A share link that named a dataset but no camera frames its footprint once
   // it resolves. Consumed once.
@@ -382,8 +384,11 @@ export default function SelectionProvider({ children }) {
   // User opens push a history entry; automatic opens/closes pass replace: true
   // so Back skips steps the user never took. fromList lets
   // returnToDatasetList go back to that list entry instead of stacking a new one.
+  // Going from one dataset to another (the list beside the page) takes over
+  // the open one's entry and its fromList, so one Back still reaches the list.
   const setInspectDataset = useCallback(
     (dataset, { replace = false } = {}) => {
+      const switching = Boolean(dataset) && !onListRef.current;
       setSearchParams(
         (previous) => {
           // The open record and its plot params belong to the previous
@@ -402,7 +407,9 @@ export default function SelectionProvider({ children }) {
           }
           return next;
         },
-        { replace, state: { fromList: !replace && onListRef.current } },
+        switching
+          ? { replace: true, state: { fromList: fromListRef.current } }
+          : { replace, state: { fromList: !replace && onListRef.current } },
       );
     },
     [setSearchParams],
