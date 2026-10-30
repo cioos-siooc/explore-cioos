@@ -3325,7 +3325,9 @@ export default function CreateMap({
     // Aborted requests (tiles left behind mid-zoom) don't fire 'error'. Any
     // listener stops MapLibre's own console.error, hence the log; the message,
     // since a minified error class logs as its two-letter name.
-    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks"];
+    // Esri imagery throws the odd transient 502 (logged as a CORS block, since
+    // its error responses carry no Access-Control-Allow-Origin).
+    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks", "imagery"];
     map.current.on("error", (e) => {
       console.error(e.error?.message ?? e.error);
       if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
