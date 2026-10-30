@@ -1,10 +1,13 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
-import { ArrowsExpand, CalendarWeek } from "react-bootstrap-icons";
+import {
+  ArrowsExpand,
+  BoundingBoxCircles,
+  CalendarWeek,
+  Pentagon,
+} from "react-bootstrap-icons";
 
-import polygonImage from "../../Images/polygonIcon.png";
-import rectangleImage from "../../Images/rectangleIcon.png";
 import { polygonIsRectangle } from "../../../utilities.jsx";
 import QuestionIconTooltip from "../QuestionIconTooltip/QuestionIconTooltip.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
@@ -57,7 +60,7 @@ export default function FilterDownloadToggles({
             >
               <CalendarWeek
                 className="filterToggleIcon"
-                size={16}
+                size={14}
                 aria-hidden="true"
               />
               <span>{`${query.startDate} – ${query.endDate}`}</span>
@@ -77,7 +80,7 @@ export default function FilterDownloadToggles({
             >
               <ArrowsExpand
                 className="filterToggleIcon"
-                size={16}
+                size={14}
                 aria-hidden="true"
               />
               <span>{`${query.startDepth} – ${query.endDepth} m`}</span>
@@ -97,24 +100,20 @@ export default function FilterDownloadToggles({
               }
               disabled={!polygonFilterActive}
             >
-              <div
-                className="mapbox-gl-draw-polygon filterToggleIcon"
-                style={{
-                  display: "inline",
-                  backgroundImage: `url(${
-                    polygonIsRectangle(polygon) ? rectangleImage : polygonImage
-                  })`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "24px 24px",
-                  backgroundPositionX: "8px",
-                  backgroundPositionY: "-3px",
-                  borderRadius: "0px",
-                  height: "34px",
-                  paddingLeft: "38px",
-                }}
-              >
-                {polygonSummary(polygon)}
-              </div>
+              {polygonIsRectangle(polygon) ? (
+                <BoundingBoxCircles
+                  className="filterToggleIcon"
+                  size={14}
+                  aria-hidden="true"
+                />
+              ) : (
+                <Pentagon
+                  className="filterToggleIcon"
+                  size={14}
+                  aria-hidden="true"
+                />
+              )}
+              <span>{polygonSummary(polygon)}</span>
             </button>
           </div>
         )}

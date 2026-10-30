@@ -596,6 +596,7 @@ class OBISHarvester(BaseHarvester):
             "first_eov_column": None,
             "source_type": "obis",
             "obis_nodes": obis_nodes,
+            "archive_url": metadata.get("archive") or None,
         }])
         return dataset_row
 

@@ -244,13 +244,58 @@ def _write_nccf(parts, regions, out_base):
     return written
 
 
-_WRITERS = {"csv": _write_csv, "odv": _write_odv, "parquet": _write_parquet, "nccf": _write_nccf}
+# ERDDAP's other tabledap file types (key: suffix, mediatype, label). The
+# downloader can't parse them, so they ship as ERDDAP wrote them: a polygon only
+# reaches them as its bounding box, in the request.
+RAW_FORMATS = {
+    "csvp": (".csv", "text/csv", "CSV, units in header"),
+    "csv0": (".csv", "text/csv", "CSV, no header"),
+    "tsv": (".tsv", "text/tab-separated-values", "TSV"),
+    "tsvp": (".tsv", "text/tab-separated-values", "TSV, units in header"),
+    "tsv0": (".tsv", "text/tab-separated-values", "TSV, no header"),
+    "nccsv": (".csv", "text/csv", "NCCSV"),
+    "esriCsv": (".csv", "text/csv", "Esri CSV"),
+    "json": (".json", "application/json", "JSON table"),
+    "jsonlCSV1": (".jsonl", "application/jsonl", "JSON Lines, header row"),
+    "jsonlCSV": (".jsonl", "application/jsonl", "JSON Lines, arrays"),
+    "jsonlKVP": (".jsonl", "application/jsonl", "JSON Lines, objects"),
+    "geoJson": (".geojson", "application/geo+json", "GeoJSON"),
+    "ncoJson": (".json", "application/json", "NCO JSON"),
+    "dataTable": (".json", "application/json", "Google Visualization table"),
+    "nc": (".nc", "application/x-netcdf", "NetCDF-3, flat table"),
+    "ncCFMA": (".nc", "application/x-netcdf", "NetCDF CF (DSG), multidimensional"),
+    "mat": (".mat", "application/x-matlab-data", "MATLAB"),
+    "itx": (".itx", "text/plain", "Igor Text"),
+    "asc": (".asc", "text/plain", "OPeNDAP ASCII"),
+    "dods": (".dods", "application/octet-stream", "OPeNDAP binary"),
+    "htmlTable": (".html", "text/html", "HTML table"),
+    "xhtml": (".xhtml", "application/xhtml+xml", "XHTML table"),
+    "kml": (".kml", "application/vnd.google-earth.kml+xml", "KML"),
+}
+
+
+def _raw_writer(suffix):
+    def write(parts, regions, out_base):
+        written = []
+        for i, part in enumerate(parts):
+            path = out_base.with_name(out_base.name + (f"_part{i + 1}" if len(parts) > 1 else "") + suffix)
+            shutil.copyfile(part, path)
+            written.append({"path": path, "n_rows": None, "columns": []})
+        return written
+
+    return write
+
+
+_CLIPPING_WRITERS = {"csv": _write_csv, "odv": _write_odv, "parquet": _write_parquet, "nccf": _write_nccf}
+CLIPPABLE_FORMATS = tuple(_CLIPPING_WRITERS)
+_WRITERS = {**_CLIPPING_WRITERS, **{key: _raw_writer(suffix) for key, (suffix, _, _) in RAW_FORMATS.items()}}
 
 
 def write_subset(format_key, parts, regions, out_base: Path):
     """Filter raw response files ``parts`` to ``regions`` (empty = no polygon)
     and write them next to ``out_base`` (no extension). Returns
-    ``[{path, n_rows, columns: [{name, unit}]}]``; [] when nothing is left."""
+    ``[{path, n_rows, columns: [{name, unit}]}]``, n_rows None for a raw
+    format; [] when nothing is left."""
     return _WRITERS[format_key](parts, regions, out_base)
 
 

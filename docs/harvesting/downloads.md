@@ -38,7 +38,8 @@ map uses, plus:
 | `datasetPKs` | The datasets ticked in the panel |
 | `polygon` | The drawn polygon as GeoJSON, only when **Filter by polygon** is on |
 | time / depth | Reset to the full range when their download switch is off |
-| `format` | `csv` (default), `parquet`, `odv` or `nccf` |
+| `format` | `csv` (default), `parquet`, `odv`, `nccf`, or another tabledap type passed through as is |
+| `obisFormat` | `csv` or `parquet` for OBIS datasets; `format` when absent |
 | `lang` | `en` or `fr`: the language of the README and the email order |
 
 The email travels in the JSON body, never the URL, so it stays out of access
@@ -84,6 +85,7 @@ One tabledap request per subset, in the chosen format's ERDDAP response type:
 | Parquet | `.parquetWMeta` (ERDDAP attributes kept in the file) | Rows outside are dropped |
 | ODV spreadsheet | `.odvTxt` (its `//` header kept) | Rows outside are dropped |
 | NetCDF (CF) | `.ncCF` (a CF discrete-sampling-geometry file) | Observations outside are dropped and the ragged array (`rowSize`, parent index) is rebuilt |
+| Other tabledap types (`csvp`, `json`, `nc`, `mat`, `kml`, …; `RAW_FORMATS` in `formats.py`) | The same type, shipped as ERDDAP wrote it | Not applied: the file covers the polygon's bounding box, and the README says so |
 
 How the request is constrained:
 
@@ -96,8 +98,8 @@ How the request is constrained:
 3. **Long ID lists** are split so each URL stays under 6000 characters. Past 8
    requests, or when an ID contains a character the regex can't escape, the
    bounding box is used instead.
-4. The **polygon** is then applied exactly to the downloaded rows, whatever the
-   format. Values other than latitude/longitude are written back as received, so
+4. The **polygon** is then applied exactly to the downloaded rows, in the four
+   formats above that the downloader parses. Values other than latitude/longitude are written back as received, so
    numbers keep ERDDAP's formatting.
 
 The variable list comes from the harvested `table_variables`; only datasets
@@ -107,8 +109,9 @@ harvested before that column existed fall back to the dataset's ERDDAP info page
 ### OBIS
 
 OBIS datasets are read from the OBIS open-data parquet export with DuckDB,
-bounded by the box, then filtered on depth, time and the polygon. OBIS has no
-ODV or CF rendition, so those formats fall back to CSV and the README says so.
+bounded by the box, then filtered on depth, time and the polygon, and written in
+`obisFormat`. A job without one takes `format`; OBIS has no ODV or CF
+rendition, so those fall back to CSV and the README says so.
 
 ### Limits and outcomes
 
@@ -186,9 +189,8 @@ the README what each dataset returned.
 
 ### Reproducing a package
 
-`reproduce.py` is a [uv](https://docs.astral.sh/uv/) script that, like the
-download script below, installs `downloader` from the public repository's
-archive: at the `downloader_url` the web API records in `user_query` (the
+`reproduce.py` is a [uv](https://docs.astral.sh/uv/) script that installs
+`downloader` from the public repository's archive: at the `downloader_url` the web API records in `user_query` (the
 commit it was deployed from; the `development-v2` archive for jobs queued
 without one), with `exclude-newer` set to when the package was built. It calls
 `cioos_downloader.formats.reproduce()` on its own folder. uv is the only thing
@@ -198,43 +200,24 @@ files to `reproduced/` and prints `match`, `differs` or `missing` for each
 against its sha256 in `datapackage.json`. A `PARTIAL` subset differs by design
 (no size limit applies locally), as does one whose source data changed.
 
-### The download script
+`reproduce.py` runs the code at that commit, so `cioos-data-explorer-downloader`
+must stay installable on its own: it must never depend on the harvester (or
+anything server-only).
 
-The Download panel's **Python script** builds the same package on the user's
-computer, with no email, queue or size limit. `GET /download/script` takes the
-panel's query (the ticked datasets plus any the 1 GB ceiling deselected, and
-the package format) and returns a [uv](https://docs.astral.sh/uv/) script that
-holds the same `user_query` and `cache_filtered` a queued job gets, minus the
-email. Its PEP 723 header installs `downloader` from the public repository's
-archive at the commit the API was deployed from (`SOURCE_COMMIT`, set by
-`deploy.yml`; `development-v2` when unset), with `exclude-newer` set to when it
-was generated, so every run resolves the same libraries. Running it calls
-`cioos_downloader.script.run()`: `get_datasets` without the size limits, then
-`write_package` without README.html, into `cde_download_<job>/`. While it
-runs, it logs each step (every request URL, the writing and metadata steps,
-each dataset's outcome) above a progress bar of datasets done and one live bar
-per server being downloaded from, showing the current dataset, bytes received
-and speed; `get_datasets` reports those through its `progress` hooks.
+### Dataset list
 
-The selection is written into the script as a Python literal (`QUERY = {…}`)
-laid out as `ruff format` would, so the user can read and edit it.
-
-The script runs the code at that commit, so `cioos-data-explorer-downloader` must stay
-installable on its own: it must never depend on the harvester (or anything
-server-only).
-
-### Direct links
-
-Without a polygon filter, the panel also lists each dataset's raw source URL
-(copy, curl script, URL list or CSV), built in the browser
-(`frontend/src/downloadLinks.js`). ERDDAP links request the package format's
-file type with the same time and depth bounds; OBIS links use the v3 API (JSON,
-at most 10,000 records). The curl script writes `cde_download/` with the
-package's folder and file names: each dataset's data plus its source records
-(`erddap.nccsvMetadata` or `obis_dataset.json`, and CKAN's `ckan_package.json`).
-Citations and licences need the package code, so its header points to the
-Python script. With a polygon the links are hidden: ERDDAP could only take its
-bounding box, so only the script matches the package.
+The panel also saves a CSV with one row per dataset: its source download link,
+the download filters that link leaves out, its source record, its CIOOS
+catalogue page, its licence and a one-line citation. Each card in the panel
+carries the same download link and flags the filters it leaves out. The links
+are built in the browser (`frontend/src/downloadLinks.js`): ERDDAP links
+request the package format's file type with the same time and depth bounds;
+OBIS links are the dataset's whole Darwin Core Archive (`archive_url`, from the
+OBIS dataset API's `archive` at harvest), so no filter applies to them. A
+polygon reaches neither source and is always flagged. The licence and citation
+come from `GET /datasets/citations`, which cites as the package's
+`source_citation` does (the source's own citation, else one built from its
+metadata), without the subset note.
 
 ### Citations
 

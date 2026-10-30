@@ -53,6 +53,7 @@ REASONS = {
         IGNORED: "was skipped because the download size limit was reached",
         PARTIAL: "was cut off at the per-dataset size limit",
         "fallback": "was delivered as CSV: {format} is not available for this source",
+        "polygon_box": "covers your polygon's bounding box: {format} can't be clipped to the polygon",
     },
     "fr": {
         FAILED: "n'a pas pu être récupéré depuis sa source",
@@ -60,6 +61,9 @@ REASONS = {
         IGNORED: "a été ignoré car la limite de taille de téléchargement a été atteinte",
         PARTIAL: "a été tronqué à la limite de taille par jeu de données",
         "fallback": "a été livré en CSV : {format} n'est pas disponible pour cette source",
+        "polygon_box": (
+            "couvre le rectangle englobant de votre polygone : {format} ne peut pas être découpé selon le polygone"
+        ),
     },
 }
 
@@ -92,6 +96,7 @@ _TEXT = {
         "box": "latitude {lat_min} to {lat_max}, longitude {lon_min} to {lon_max}",
         "anywhere": "anywhere",
         "format": "Format",
+        "obis_format": "OBIS format",
         "filters": "Other filters (as sent by the Data Explorer)",
         "data": "Data",
         "dataset": "Dataset",
@@ -149,6 +154,11 @@ _TEXT = {
                 "subset fetched in several requests comes as `_part1.nc`, `_part2.nc`…"
             ),
         },
+        "open_raw": (
+            "Other formats are ERDDAP's own files, as the server wrote them; see "
+            "<https://coastwatch.pfeg.noaa.gov/erddap/tabledap/documentation.html#fileType> for each one. A "
+            "subset fetched in several requests comes as `_part1`, `_part2`…"
+        ),
         "contents_dataset": (
             "- `citation.txt`: the citation of this subset, ready to paste into a reference list.\n"
             "- `metadata/`: the source's own description of the dataset, as published:\n"
@@ -226,6 +236,7 @@ _TEXT = {
         "box": "latitude {lat_min} à {lat_max}, longitude {lon_min} à {lon_max}",
         "anywhere": "partout",
         "format": "Format",
+        "obis_format": "Format OBIS",
         "filters": "Autres filtres (tels qu'envoyés par l'Explorateur)",
         "data": "Données",
         "dataset": "Jeu de données",
@@ -285,6 +296,11 @@ _TEXT = {
                 "View. Un sous-ensemble récupéré en plusieurs requêtes est livré en `_part1.nc`, `_part2.nc`…"
             ),
         },
+        "open_raw": (
+            "Les autres formats sont les fichiers d'ERDDAP, tels que le serveur les a écrits; voir "
+            "<https://coastwatch.pfeg.noaa.gov/erddap/tabledap/documentation.html#fileType> pour chacun. Un "
+            "sous-ensemble obtenu en plusieurs requêtes est livré en `_part1`, `_part2`…"
+        ),
         "contents_dataset": (
             "- `citation.txt` : la citation de ce sous-ensemble, prête à coller dans une liste de références.\n"
             "- `metadata/` : la description du jeu de données publiée par sa source :\n"
@@ -487,7 +503,7 @@ def _resource(root, row, file, licence):
     }
     if licence and _frictionless_licence(licence):
         resource["licenses"] = [_frictionless_licence(licence)]
-    if row["format"] != "nccf":
+    if file["columns"] and row["format"] != "nccf":
         resource["type"] = "table"
         resource["schema"] = {
             "fields": [
@@ -509,6 +525,8 @@ def _outcome(row, lang):
         notes.append(reasons[row["status"]])
     if row.get("format_fallback") and row["files"]:
         notes.append(reasons["fallback"].format(format=FORMATS[row["requested_format"]].label))
+    if row.get("polygon_box_only") and row["files"]:
+        notes.append(reasons["polygon_box"].format(format=FORMATS[row["format"]].label))
     return notes
 
 
@@ -545,18 +563,19 @@ def _readme_citation(row, metadata, lang, t):
     return lines
 
 
-def _readme_contents(included, readme_html, t):
+def _readme_contents(included, t):
     formats = {row["format"] for row, _, _ in included}
     lines = [t["contents_data"], ""]
-    lines += [f"- {t['open'][key]}" for key in FORMATS if key in formats]
+    lines += [f"- {t['open'][key]}" for key in FORMATS if key in formats and key in t["open"]]
+    if formats - t["open"].keys():
+        lines.append(f"- {t['open_raw']}")
     lines += [t["contents_dataset"], "", t["contents_citation"], "", t["contents_package"], ""]
-    if readme_html:
-        lines.append(t["contents_html"])
+    lines.append(t["contents_html"])
     lines.append(t["contents_text"].format(reproduce=t["reproduce"], reproduce_anchor=_slug(t["reproduce"])))
     return lines
 
 
-def _readme(user_query, entries, created, lang, readme_html):
+def _readme(user_query, entries, created, lang):
     t = _TEXT[lang]
     included = [e for e in entries if e[0]["status"] in INCLUDED]
     contents = {"section": t["contents"], "anchor": _slug(t["contents"])}
@@ -581,7 +600,8 @@ def _readme(user_query, entries, created, lang, readme_html):
         for row, metadata, lng in included:
             folder = f"[`data/{row['folder']}/`](data/{row['folder']}/)"
             licence = _readme_licence(_licence(metadata), t)
-            lines.append(f"| {_cell(_title(row, lng))} | {row['n_records']} | {folder} | {licence} |")
+            rows = "—" if row["n_records"] is None else row["n_records"]
+            lines.append(f"| {_cell(_title(row, lng))} | {rows} | {folder} | {licence} |")
         lines += ["", t["licences_text"], "", t["contents_link"].format(**contents)]
 
     issues = [(row, _outcome(row, lang)) for row, _, _ in entries if _outcome(row, lang) or row["warnings"]]
@@ -596,7 +616,7 @@ def _readme(user_query, entries, created, lang, readme_html):
                 lines += [f"  - {t['retry']}: <{_md_url(url)}>" for url in row["download_url_list"]]
             lines += [f"  - {t['warnings']}: {w}" for w in row["warnings"]]
 
-    lines += ["", f"## {t['contents']}", "", *_readme_contents(included, readme_html, t)]
+    lines += ["", f"## {t['contents']}", "", *_readme_contents(included, t)]
     lines += ["", f"## {t['selection']}", ""]
     if user_query.get("time_min") or user_query.get("time_max"):
         lines.append(f"- {t['time']}: {user_query.get('time_min') or '…'} – {user_query.get('time_max') or '…'}")
@@ -610,6 +630,8 @@ def _readme(user_query, entries, created, lang, readme_html):
         area = t["anywhere"]
     lines.append(f"- {t['area']}: {area}")
     lines.append(f"- {t['format']}: {FORMATS[user_query.get('format') or 'csv'].label}")
+    if user_query.get("obis_format"):
+        lines.append(f"- {t['obis_format']}: {FORMATS[user_query['obis_format']].label}")
     filters = user_query.get("filters") or {}
     if filters:
         lines.append(f"- {t['filters']}:")
@@ -853,20 +875,17 @@ def _reproduce_script(user_query, created):
     )
 
 
-def write_package(root: Path, json_query, report, readme_html=True):
-    """Write the package files into ``root`` (the folder that gets zipped).
-    The download script skips README.html: its CIOOS page is for the emailed zip."""
+def write_package(root: Path, json_query, report):
+    """Write the package files into ``root`` (the folder that gets zipped)."""
     user_query = json_query["user_query"]
     lang = _lang(user_query)
     created = datetime.now(UTC).isoformat(timespec="seconds")
-    requested = user_query.get("format") or "csv"
 
     entries = []
     for dataset, row in zip(json_query["cache_filtered"], report["erddap_report"], strict=True):
         metadata = dataset.get("metadata") or {}
         row["title_fr"] = dataset.get("title_fr")
         row["ckan_url"] = dataset.get("ckan_url")
-        row["requested_format"] = requested
         folder = root / "data" / row["folder"]
         if metadata:
             (folder / "metadata" / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False))
@@ -877,11 +896,10 @@ def write_package(root: Path, json_query, report, readme_html=True):
         entries.append((row, metadata, lang))
     included = [e for e in entries if e[0]["status"] in INCLUDED]
 
-    readme = _readme(user_query, entries, created, lang, readme_html)
+    readme = _readme(user_query, entries, created, lang)
     (root / "README.md").write_text(readme)
-    if readme_html:
-        citations = {f"data/{row['folder']}": citation(row, metadata, user_query, lg) for row, metadata, lg in included}
-        (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
+    citations = {f"data/{row['folder']}": citation(row, metadata, user_query, lg) for row, metadata, lg in included}
+    (root / "README.html").write_text(_readme_html(readme, user_query, lang, citations))
     cite = root / "citation"
     cite.mkdir(exist_ok=True)
     (cite / "citations.txt").write_text("\n\n".join(citation(r, m, user_query, lg) for r, m, lg in included) + "\n")
@@ -896,9 +914,10 @@ def write_package(root: Path, json_query, report, readme_html=True):
         )
     (cite / "licences.txt").write_text("\n".join(licences) + "\n")
 
-    resources = [{"name": "readme", "path": "README.md", "mediatype": "text/markdown"}]
-    if readme_html:
-        resources.append({"name": "readme-html", "path": "README.html", "mediatype": "text/html"})
+    resources = [
+        {"name": "readme", "path": "README.md", "mediatype": "text/markdown"},
+        {"name": "readme-html", "path": "README.html", "mediatype": "text/html"},
+    ]
     for row, metadata, _ in included:
         resources += [_resource(root, row, file, _licence(metadata)) for file in row["files"]]
     failed = [
@@ -938,7 +957,7 @@ def write_package(root: Path, json_query, report, readme_html=True):
 
     root_files = [
         "README.md",
-        *(["README.html"] if readme_html else []),
+        "README.html",
         "datapackage.json",
         "citation/citations.txt",
         "citation/citations.bib",

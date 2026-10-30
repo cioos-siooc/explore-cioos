@@ -102,40 +102,6 @@
   flex: 1 1 auto;
 }
 
-.downloadFormat {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.downloadFormatLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  color: var(--cioos-ink);
-}
-
-.downloadFormatNotice {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: var(--cioos-radius-sm);
-  background-color: var(--cioos-warn-bg);
-  color: var(--cioos-ink);
-  font-size: var(--cioos-font-size-sm);
-  line-height: 1.3;
-}
-
-.downloadFormatNotice svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--cioos-warn);
-}
-
 .downloadBandRow .helpIcon {
   margin: 0;
 }
@@ -148,6 +114,7 @@
   display: inline-flex;
 }
 
+/* Sized like the format band's SelectPills. */
 .filterDownloadToggle button {
   display: inline-flex;
   align-items: center;
@@ -155,10 +122,11 @@
   background-color: var(--cioos-white);
   border-radius: var(--cioos-radius-pill);
   border: 1px solid var(--cioos-hairline);
-  height: 36px;
-  padding: 0 14px 0 10px;
+  padding: 4px 12px 4px 8px;
   color: var(--cioos-ink);
-  font-weight: 500;
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 700;
+  line-height: 1.5;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease;
@@ -300,15 +268,6 @@
   gap: 8px;
 }
 
-.downloadDeliveryHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px 24px;
-  width: 100%;
-}
-
 .downloadDeliveryHeading {
   display: flex;
   flex-direction: column;
@@ -323,9 +282,10 @@
   color: var(--cioos-ink-80);
 }
 
+/* The package takes the room; the dataset list is one button, so a side column. */
 .downloadDeliveryOptions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(220px, 280px);
   align-items: stretch;
   gap: 0 10px;
   width: 100%;
@@ -353,11 +313,22 @@
 }
 
 .downloadDeliveryOr {
-  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--cioos-ink-60);
+}
+
+.downloadDeliveryOr::before,
+.downloadDeliveryOr::after {
+  content: "";
+  flex: 1 1 auto;
+  width: 1px;
+  background-color: var(--cioos-hairline);
 }
 
 .downloadSubmitRow {
@@ -467,7 +438,13 @@
   color: var(--cioos-error-700);
 }
 
-/* --- The script and links menu --- */
+/* --- The dataset list export --- */
+.directLinksDescription {
+  margin: 0;
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.25;
+  color: var(--cioos-ink-80);
+}
 
 .directLinksCount {
   font-size: var(--cioos-font-size-sm);
@@ -480,7 +457,9 @@
 .directLinksButton {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
   height: 36px;
   padding: 0 14px;
   border-radius: var(--cioos-radius-sm);
@@ -514,18 +493,6 @@
   color: var(--cioos-ink-40);
 }
 
-/* The "Save as" toggle wears .directLinksButton, but ui/Dropdown's
-   `.dropdown .btn` outranks it. */
-.directLinksSave .btn.directLinksButton {
-  padding: 0 14px;
-  font-size: var(--cioos-font-size-sm);
-}
-
-.directLinksSave .btn.directLinksButton:disabled {
-  background-color: var(--cioos-white);
-  cursor: not-allowed;
-}
-
 .directLinksNotes {
   display: flex;
   flex-direction: column;
@@ -545,6 +512,16 @@
   .downloadDeliveryOptions {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
+  }
+
+  .downloadDeliveryOr {
+    flex-direction: row;
+  }
+
+  .downloadDeliveryOr::before,
+  .downloadDeliveryOr::after {
+    width: auto;
+    height: 1px;
   }
 
   .downloadDetails.container {

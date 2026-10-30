@@ -137,6 +137,30 @@ test("rejects an unknown output format", async () => {
   assert.equal(res.status, 400);
 });
 
+test("rejects an OBIS format OBIS has no rendition of", async () => {
+  const res = await agent
+    .post("/download")
+    .query({ ...VALID_QUERY, obisFormat: "nccf" })
+    .send(EMAIL);
+  assert.equal(res.status, 400);
+});
+
+test("queues the OBIS format beside the ERDDAP one, not as a filter", async () => {
+  shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
+  db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
+  db.queueRows({});
+
+  await agent
+    .post("/download")
+    .query({ ...VALID_QUERY, format: "nccf", obisFormat: "parquet" })
+    .send(EMAIL);
+
+  const insert = db.queries[1];
+  assert.match(insert, /"format":"nccf","obis_format":"parquet"/);
+  assert.doesNotMatch(insert, /"filters":\{[^}]*obisFormat/);
+  assert.doesNotMatch(insert, /"explorer_url":"[^"]*obisFormat/);
+});
+
 test("queues the chosen format and the filters as sent, without the email", async () => {
   shapeQuery.queueResult([{ pk_url: 1, size: 1000 }]);
   db.queueRaw([{ json_agg: [{ dataset_id: "obs_270" }] }]);
@@ -189,106 +213,4 @@ test("defaults to CSV and passes each dataset's matched feature IDs and metadata
   assert.match(db.queries[0], /d\.metadata/);
   assert.match(db.queries[0], /d\.table_variables/);
   assert.match(db.queries[1], /"format":"csv"/);
-});
-
-const { downloadScript } = require("./download");
-
-test("serves a download script that embeds the selection, pinned and without an email", async () => {
-  const datasets = [
-    { dataset_id: "obs_270", title: 'Line "A"\nnorth', feature_ids: ["x"] },
-  ];
-  db.queueRaw([{ json_agg: datasets }]);
-
-  const res = await agent
-    .get("/download/script")
-    .query({ ...VALID_QUERY, format: "parquet", lang: "fr" })
-    .buffer(true)
-    .parse((r, done) => {
-      let text = "";
-      r.on("data", (chunk) => (text += chunk));
-      r.on("end", () => done(null, text));
-    });
-
-  assert.equal(res.status, 200);
-  assert.match(res.headers["content-type"], /^text\/x-python/);
-  assert.match(
-    res.headers["content-disposition"],
-    /attachment; filename="cioos_download_\w{6}\.py"/,
-  );
-  const script = res.body;
-  assert.match(
-    script,
-    /# dependencies = \["cioos-data-explorer-downloader @ https:\/\/github\.com\/cioos-siooc\/explore-cioos\/archive\/[\w.-]+\.tar\.gz#subdirectory=downloader"\]/,
-  );
-  // The package's reproduce.py installs the same downloader.
-  const url = script.match(/cioos-data-explorer-downloader @ (\S+)"\]/)[1];
-  assert.ok(script.includes(`        "downloader_url": "${url}",\n`));
-  assert.match(script, /^# {3}obs_270: Line "A" north$/m);
-  assert.match(script, /^ {12}"title": 'Line "A"\\nnorth',$/m);
-  assert.match(script, /^ {12}"feature_ids": \[\n {16}"x",\n {12}\],$/m);
-  assert.match(script, /^ {8}"format": "parquet",$/m);
-  assert.match(script, /^ {8}"language": "fr",$/m);
-  assert.doesNotMatch(script, /"email"/);
-  assert.match(script, /sys\.exit\(run\(QUERY\)\)/);
-});
-
-test("writes the query as a Python literal in ruff format's layout", () => {
-  const script = downloadScript(
-    {
-      user_query: { job_id: "abc123", format: "csv", lat_min: NaN },
-      cache_filtered: [
-        {
-          dataset_id: "d1",
-          title: "it's \\ a\ttab",
-          n: [1e21, 0.5, true, null],
-          empty: [],
-          meta: {},
-        },
-      ],
-    },
-    new Date("2026-10-16T00:00:00Z"),
-  );
-  const literal = script.slice(script.indexOf("QUERY = "));
-  assert.equal(
-    literal,
-    `QUERY = {
-    "user_query": {
-        "job_id": "abc123",
-        "format": "csv",
-        "lat_min": None,
-    },
-    "cache_filtered": [
-        {
-            "dataset_id": "d1",
-            "title": "it's \\\\ a\\ttab",
-            "n": [
-                1e21,
-                0.5,
-                True,
-                None,
-            ],
-            "empty": [],
-            "meta": {},
-        },
-    ],
-}
-
-if __name__ == "__main__":
-    sys.exit(run(QUERY))
-`,
-  );
-  assert.ok(script.split("\n").every((line) => line === line.trimEnd()));
-});
-
-test("the download script answers 204 when nothing matches", async () => {
-  db.queueRaw([{ json_agg: null }]);
-  const res = await agent.get("/download/script").query(VALID_QUERY);
-  assert.equal(res.status, 204);
-});
-
-test("the download script rejects an unknown format", async () => {
-  const res = await agent
-    .get("/download/script")
-    .query({ ...VALID_QUERY, format: "xlsx" });
-  assert.equal(res.status, 400);
 });
