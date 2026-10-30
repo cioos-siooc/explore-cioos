@@ -577,19 +577,26 @@ export default function SelectionProvider({ children }) {
     });
   }, [pointsData]);
 
+  // Keyed on the string: the catalog load renews `query` once its debounced
+  // copies settle, with nothing changed, and the whole result list (1.8 MB)
+  // was fetched twice on every cold load.
+  const pointQueryString = useMemo(
+    () =>
+      [
+        createDataFilterQueryString(query),
+        polygon && createSelectionQueryString(polygon),
+      ]
+        .filter((e) => e)
+        .join("&"),
+    [query, polygon],
+  );
+
   // Waits for the catalog so filters are hydrated from the URL first, but not
   // for a non-empty EOV list: OBIS datasets carry no EOVs, so an OBIS-only
   // database would never query. catalogLoaded resolves even when fetches fail.
   useEffect(() => {
     if (catalogLoaded) {
-      const filtersQuery = createDataFilterQueryString(query);
-      let shapeQuery = [];
-      if (polygon) {
-        shapeQuery = createSelectionQueryString(polygon);
-      }
-      const combinedQueries = [filtersQuery, shapeQuery]
-        .filter((e) => e)
-        .join("&");
+      const combinedQueries = pointQueryString;
       // An open dataset page survives a filter change; it closes only if the
       // new results exclude it (see the pointsData effect).
       // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing effect; converting to render-phase adjustment is a behaviour change, tracked separately
@@ -632,7 +639,7 @@ export default function SelectionProvider({ children }) {
         controller.abort();
       };
     }
-  }, [query, polygon, catalogLoaded, pointsAttempt]);
+  }, [pointQueryString, catalogLoaded, pointsAttempt]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

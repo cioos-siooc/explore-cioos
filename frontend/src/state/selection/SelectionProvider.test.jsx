@@ -47,6 +47,16 @@ describe("SelectionProvider", () => {
     expect(row.title).toBe(pointQueryFixture[0].title_translated.en);
   });
 
+  it("fetches /pointQuery once on a cold load, though the debounced filters renew the query", async () => {
+    await renderLoaded();
+    // Past the filters' 500 ms debounce, which hands back an equal query.
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    const pointQueryCalls = globalThis.fetch.mock.calls.filter(([input]) =>
+      (typeof input === "string" ? input : input.url).includes("/pointQuery"),
+    );
+    expect(pointQueryCalls).toHaveLength(1);
+  });
+
   it("flags a failed /pointQuery instead of reporting no matches, and retries it", async () => {
     const realFetch = globalThis.fetch;
     let failing = true;
