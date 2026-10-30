@@ -58,11 +58,7 @@ export default function HarvestOverview() {
   const { data: runs, loading: loadingRuns } = useHarvestFetch("/runs/recent");
   const { data: reasons, loading: loadingReasons } =
     useHarvestFetch("/reasons");
-  const { data: downloads } = useHarvestFetch("/downloads/summary");
 
-  const stuckDownloads = downloads
-    ? Number(downloads.n_stuck || 0) + Number(downloads.n_stalled || 0)
-    : 0;
   const shades = reasonShades((servers || []).map(serverFailures));
 
   return (
@@ -81,42 +77,6 @@ export default function HarvestOverview() {
           {(servers || []).map((s) => (
             <ServerCard key={s.erddap_url} server={s} shades={shades} t={t} />
           ))}
-        </div>
-      )}
-
-      {stuckDownloads > 0 && (
-        <div className="harvest-queue-warning">
-          <Link to="/harvest/downloads" className="harvest-link">
-            {t("harvest.downloads.queueStalled", { count: stuckDownloads })}
-          </Link>
-        </div>
-      )}
-
-      <h2 className="harvest-section-title">
-        {t("harvest.downloads.title")}
-        <Link
-          to="/harvest/downloads"
-          className="harvest-link harvest-section-link"
-        >
-          {t("harvest.downloads.viewAll")}
-        </Link>
-      </h2>
-      {downloads && (
-        <div className="harvest-card-counts">
-          <span className="harvest-count-pill harvest-count-success">
-            ✓ {downloads.n_completed} {t("harvest.downloads.completed")}
-          </span>
-          <span className="harvest-count-pill harvest-count-error">
-            ✗ {downloads.n_failed} {t("harvest.downloads.failed")}
-          </span>
-          <span className="harvest-count-pill harvest-count-unchanged">
-            {downloads.n_open} {t("harvest.downloads.queued")}
-          </span>
-          <span className="harvest-muted harvest-text-sm harvest-self-center">
-            {t("harvest.downloads.lastRequest", {
-              date: fmtDt(downloads.last_request_at),
-            })}
-          </span>
         </div>
       )}
 

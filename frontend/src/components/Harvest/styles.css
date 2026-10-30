@@ -2,7 +2,6 @@
 .harvest-root {
   --harvest-success-ink: #0e3d35;
   --harvest-error-ink: #7a1520;
-  --harvest-error-border: #e8b9bf;
   --harvest-warn-bg: #f3ecd6;
   --harvest-warn-ink: #7a5c00;
   --harvest-warn-border: #ddd0b0;
@@ -263,13 +262,6 @@
   white-space: nowrap;
 }
 
-.harvest-card-counts {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-}
-
 .harvest-count-pill {
   display: inline-flex;
   align-items: center;
@@ -313,41 +305,6 @@
   margin: 1.75rem 0 0.75rem;
   padding-bottom: 0.35rem;
   border-bottom: 2px solid var(--cioos-teal-light);
-}
-
-.harvest-section-link {
-  float: right;
-  font-size: 0.82rem;
-  font-weight: 400;
-}
-
-/* The scheduler being down. Loud on purpose: nothing else reveals it. */
-.harvest-queue-warning {
-  background: var(--cioos-error-bg);
-  color: var(--harvest-error-ink);
-  border: 1px solid var(--harvest-error-border);
-  border-radius: 4px;
-  padding: 0.6rem 0.9rem;
-  margin: 1rem 0;
-  font-size: 0.9rem;
-}
-
-.harvest-queue-warning a {
-  color: var(--harvest-error-ink);
-}
-
-.harvest-error-block {
-  background: var(--cioos-error-bg);
-  color: var(--harvest-error-ink);
-  border: 1px solid var(--harvest-error-border);
-  border-radius: 4px;
-  padding: 0.75rem;
-  font-size: 0.75rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  max-height: 320px;
-  overflow: auto;
 }
 
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
@@ -651,6 +608,42 @@ a.harvest-link:hover {
   border-radius: var(--cioos-radius-sm);
 }
 
+.harvest-doc blockquote {
+  margin: 0 0 1rem;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--cioos-teal-light);
+  background: var(--cioos-surface-2);
+}
+
+.harvest-doc blockquote p {
+  margin: 0;
+}
+
+.harvest-doc table {
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.harvest-doc :is(th, td) {
+  border: 1px solid var(--harvest-hairline);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.harvest-doc th {
+  background: var(--cioos-surface-2);
+}
+
+.harvest-doc .mermaid {
+  margin: 1rem 0 1.5rem;
+  overflow-x: auto;
+  text-align: center;
+}
+
 /* ── Server card pie (harvested vs failure reasons) ──────────────────────── */
 .harvest-pie {
   display: flex;
@@ -737,40 +730,4 @@ a.harvest-link:hover {
   color: var(--harvest-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-}
-
-.harvest-doc blockquote {
-  margin: 0 0 1rem;
-  padding: 0.5rem 1rem;
-  border-left: 3px solid var(--cioos-teal-light);
-  background: var(--cioos-surface-2);
-}
-
-.harvest-doc blockquote p {
-  margin: 0;
-}
-
-.harvest-doc table {
-  border-collapse: collapse;
-  margin: 0 0 1rem;
-  font-size: 0.9rem;
-  display: block;
-  overflow-x: auto;
-}
-
-.harvest-doc :is(th, td) {
-  border: 1px solid var(--harvest-hairline);
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-  vertical-align: top;
-}
-
-.harvest-doc th {
-  background: var(--cioos-surface-2);
-}
-
-.harvest-doc .mermaid {
-  margin: 1rem 0 1.5rem;
-  overflow-x: auto;
-  text-align: center;
 }
