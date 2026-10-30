@@ -18,11 +18,12 @@ import {
 import {
   colorScale,
   isMarkerTier,
-  bathymetryColorScale,
+  bathymetryPalettes,
   bathymetryLegendMinZoom,
   bathymetryScaleMin,
   bathymetryScaleMax,
   bathymetryTicks,
+  defaultBathymetryPalette,
   trackLineColor,
 } from "../../config.js";
 import platformColors from "../../platformColors";
@@ -72,7 +73,7 @@ function formatDepth(metres) {
   return metres >= 1000 ? `${metres / 1000}k` : `${metres}`;
 }
 
-// 0..1 along the bar; the bar is logarithmic (see bathymetryColorScale).
+// 0..1 along the bar; the bar is logarithmic (see bathymetryScaleMin).
 const LOG_MIN = Math.log10(bathymetryScaleMin);
 const LOG_SPAN = Math.log10(bathymetryScaleMax) - LOG_MIN;
 function depthPosition(metres) {
@@ -166,7 +167,8 @@ export default function Legend({
   zoom,
   platformsAvailable = [],
   // { observations, bathymetry, tracks }, each { key, label, checked, onChange };
-  // absent members render their entry without a switch.
+  // absent members render their entry without a switch. bathymetry also
+  // carries { palette, onPaletteChange }.
   controls = {},
   layerControls = [],
   dataLayers,
@@ -389,8 +391,9 @@ export default function Legend({
     // is false, so the bar would flash on before its raster exists.
     if (!Number.isFinite(zoom) || zoom < bathymetryLegendMinZoom) return null;
     const hidden = controls.bathymetry ? !controls.bathymetry.checked : false;
+    const palette = controls.bathymetry?.palette ?? defaultBathymetryPalette;
     // Anchors sit at their own depths, so the gradient is uneven by design.
-    const gradient = `linear-gradient(to right, ${bathymetryColorScale
+    const gradient = `linear-gradient(to right, ${bathymetryPalettes[palette]
       .map(
         ({ depth, color }) =>
           `${color} ${(depthPosition(depth) * 100).toFixed(1)}%`,
@@ -432,7 +435,31 @@ export default function Legend({
             );
           })}
         </div>
-        <p className="legendWarning">{t("legendBathymetryNotForNavigation")}</p>
+        <div className="legendBathymetryFooter">
+          <p className="legendWarning">
+            {t("legendBathymetryNotForNavigation")}
+          </p>
+          {controls.bathymetry?.onPaletteChange && (
+            <div
+              className="legendPaletteToggle"
+              role="group"
+              aria-label={t("legendBathymetryPalette")}
+            >
+              {Object.keys(bathymetryPalettes).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={palette === option}
+                  disabled={hidden}
+                  title={t(`legendBathymetryPaletteTitle_${option}`)}
+                  onClick={() => controls.bathymetry.onPaletteChange(option)}
+                >
+                  {t(`legendBathymetryPalette_${option}`)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }

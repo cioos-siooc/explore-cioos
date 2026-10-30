@@ -49,6 +49,7 @@ import {
   basemapHandoffStartZoom,
   clickHighlightColor,
   colorScale,
+  defaultBathymetryPalette,
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
@@ -65,6 +66,7 @@ import {
   getLabelTextField,
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS,
+  nonnaColorRamp,
 } from "./basemapStyle.js";
 import {
   buildTileSuffix,
@@ -462,6 +464,7 @@ export default function CreateMap({
   griddapCoverage,
   dataLayersVisible = true,
   bathymetryVisible = true,
+  bathymetryPalette = defaultBathymetryPalette,
   activeWmsOverlay,
   projection = "mercator",
   zoomTarget,
@@ -1618,6 +1621,15 @@ export default function CreateMap({
     if (!map.current) return;
     setLayersVisibility(bathymetryLayerIds, bathymetryVisible);
   }, [bathymetryVisible]);
+
+  useEffect(() => {
+    if (!map.current) return;
+    map.current.setPaintProperty(
+      "bathymetry-nonna",
+      "color-relief-color",
+      nonnaColorRamp(bathymetryPalette),
+    );
+  }, [bathymetryPalette]);
 
   // No setStyle() calls exist (language uses setLayoutProperty), so the
   // projection persists until toggled here.
@@ -3188,7 +3200,7 @@ export default function CreateMap({
       // The projection is part of the style in MapLibre 5 and must be set here:
       // the projection effect's first run happens while map.current is null.
       style: {
-        ...buildBasemapStyle(i18n.language),
+        ...buildBasemapStyle(i18n.language, bathymetryPalette),
         projection: { type: projection === "globe" ? "globe" : "mercator" },
       },
       // The default 'high-performance' wakes the discrete GPU on dual-GPU

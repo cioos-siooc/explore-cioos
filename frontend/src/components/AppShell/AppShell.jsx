@@ -78,6 +78,8 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
+    bathymetryPalette,
+    setBathymetryPalette,
     depthReading,
     depthToolActive,
     setDepthToolActive,
@@ -103,6 +105,8 @@ export default function AppShell() {
       label: t("layersBathymetry"),
       checked: bathymetryVisible,
       onChange: () => setBathymetryVisible(!bathymetryVisible),
+      palette: bathymetryPalette,
+      onPaletteChange: setBathymetryPalette,
     },
     tracks: {
       key: "tracks",

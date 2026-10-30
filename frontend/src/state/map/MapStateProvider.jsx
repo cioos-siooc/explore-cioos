@@ -11,6 +11,8 @@ import {
 
 import { server } from "../../config.js";
 import {
+  bathymetryPalettes,
+  defaultBathymetryPalette,
   defaultMapCenter,
   defaultMapZoom,
   defaultTrailingDays,
@@ -28,7 +30,10 @@ import {
 import { wmsSliceFromParams } from "../../wmsUtilities.js";
 import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
-import { useUrlSeededPersistentState } from "../usePersistentState.js";
+import {
+  usePersistentState,
+  useUrlSeededPersistentState,
+} from "../usePersistentState.js";
 
 // Always written out, never omitted: the API counts something else when the
 // param is absent (see HEX_METRIC), and the tile URLs spell it out the same way.
@@ -237,6 +242,17 @@ export default function MapStateProvider({ children }) {
     true,
     (raw) => raw !== "false",
   );
+  // Colour vision is the viewer's, not the map's, so a share link doesn't carry it.
+  const [storedBathymetryPalette, setBathymetryPalette] = usePersistentState(
+    "bathymetryPalette",
+    defaultBathymetryPalette,
+  );
+  const bathymetryPalette = Object.hasOwn(
+    bathymetryPalettes,
+    storedBathymetryPalette,
+  )
+    ? storedBathymetryPalette
+    : defaultBathymetryPalette;
   // The NONNA sounding under the latest click: depth null where CHS has none.
   const [depthReading, setDepthReading] = useState();
   const depthRequest = useRef();
@@ -471,6 +487,8 @@ export default function MapStateProvider({ children }) {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
+    bathymetryPalette,
+    setBathymetryPalette,
     depthReading,
     readDepthAt,
     depthToolActive,

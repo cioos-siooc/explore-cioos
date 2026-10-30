@@ -301,6 +301,56 @@
 
 /* CHS charts, not this layer, are for navigation: said outright, not left to
    the ⓘ tooltip. */
+.legendBathymetryFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+
+.legendBathymetryFooter .legendWarning {
+  margin: 0;
+}
+
+.legendPaletteToggle {
+  display: inline-flex;
+  padding: 1px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-pill);
+  background-color: var(--cioos-white);
+}
+
+.legendPaletteToggle button {
+  padding: 1px 8px;
+  border: 0;
+  border-radius: var(--cioos-radius-pill);
+  background: none;
+  color: var(--cioos-ink-80);
+  font-size: var(--cioos-font-size-2xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.legendPaletteToggle button:hover:not(:disabled) {
+  background-color: var(--cioos-surface-2);
+}
+
+.legendPaletteToggle button[aria-pressed="true"] {
+  background-color: var(--cioos-primary-700);
+  color: var(--cioos-on-primary);
+}
+
+.legendPaletteToggle button:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.legendPaletteToggle button:disabled {
+  cursor: default;
+}
+
 .legendWarning {
   margin: 4px 0 0;
   font-size: var(--cioos-font-size-2xs);
