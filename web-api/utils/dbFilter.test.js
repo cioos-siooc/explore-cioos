@@ -344,6 +344,26 @@ test("realtimeOnly off or absent constrains nothing", async () => {
   }
 });
 
+test("search matches the stored vector, scoped to titles by default", async () => {
+  const f = await createDBFilter({ search: "sea temp" });
+  const sql = f.shared.toString();
+  assert.match(sql, /d\.search_tsv @@ dataset_search_query\('sea temp'\)/);
+  assert.match(sql, /ts_filter\(d\.search_tsv, \('\{a\}'\)::"char"\[\]\)/);
+  assert.equal(f.profileOnly.toString(), "TRUE");
+});
+
+test("searchIn=all widens the scope to every weight", async () => {
+  const f = await createDBFilter({ search: "sea", searchIn: "all" });
+  assert.match(f.shared.toString(), /'\{a,b,c,d\}'/);
+});
+
+test("a blank search constrains nothing", async () => {
+  for (const search of ["", "   "]) {
+    const f = await createDBFilter({ search, searchIn: "all" });
+    assert.equal(f.shared.toString(), "TRUE");
+  }
+});
+
 test("datasetLevelOnly holds only while every predicate reads cde.datasets", async () => {
   const datasetLevel = {
     platforms: "p",
@@ -357,6 +377,8 @@ test("datasetLevelOnly holds only while every predicate reads cde.datasets", asy
     erddapServers: "https://e",
     excludeErddapServers: "https://f",
     excludeObisNodes: "n2",
+    search: "salinity",
+    searchIn: "all",
   };
   assert.equal((await createDBFilter({})).datasetLevelOnly, true);
   assert.equal((await createDBFilter(datasetLevel)).datasetLevelOnly, true);

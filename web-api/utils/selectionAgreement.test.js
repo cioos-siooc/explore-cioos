@@ -267,9 +267,9 @@ test("a selection containing no source still yields runnable SQL", async () => {
   assert.match(await shapeSql(nothing), /empty_combined WHERE FALSE/);
 });
 
-test("every selection route inherits the realtimeOnly dataset filter", async () => {
+test("every selection route inherits the realtimeOnly and search dataset filters", async () => {
   // Catches a site that builds its own WHERE and forgets the shared fragment.
-  const query = { realtimeOnly: "true" };
+  const query = { realtimeOnly: "true", search: "salinity" };
   const statements = [
     ...(await sqlFrom("tiles", query)),
     ...(await sqlFrom("tiles/cells", query)),
@@ -290,6 +290,11 @@ test("every selection route inherits the realtimeOnly dataset filter", async () 
       sql,
       /dataset_is_realtime\(/,
       `a selection statement omits the realtime filter: ${sql.slice(0, 160)}`,
+    );
+    assert.match(
+      sql,
+      /d\.search_tsv @@ dataset_search_query\('salinity'\)/,
+      `a selection statement omits the search filter: ${sql.slice(0, 160)}`,
     );
   }
 });
