@@ -471,7 +471,6 @@
   "legendBathymetryPaletteChs": "Couleurs des profondeurs du SHC",
   "legendBathymetryPaletteToChs": "Utiliser les couleurs NONNA du Service hydrographique du Canada",
   "legendBathymetryPaletteToDeep": "Revenir aux couleurs des profondeurs accessibles",
-  "legendBathymetryNotForNavigation": "Ne pas utiliser pour la navigation",
   "layersGriddedCoverage": "Couverture maillée",
   "layersObservations": "Hexagones et points",
   "layersBathymetry": "Profondeur du fond marin",

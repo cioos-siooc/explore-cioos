@@ -221,8 +221,9 @@ describe("Legend", () => {
     expect(screen.getByLabelText("Gridded coverage")).toBeInTheDocument();
   });
 
-  it("says in the seafloor info that NONNA is not for navigation", async () => {
+  it("says in the seafloor info, not on the card, that NONNA is not for navigation", async () => {
     const { user } = renderLegend({ zoom: 12 });
+    expect(screen.queryByText("Not for navigation")).not.toBeInTheDocument();
     await user.click(screen.getByLabelText("About Seafloor depth"));
     const help = await screen.findByTestId("legend-help-modal");
     expect(help).toHaveTextContent("Not for navigation");

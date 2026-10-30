@@ -299,16 +299,6 @@
   margin-top: 3px;
 }
 
-/* CHS charts, not this layer, are for navigation: said outright, not left to
-   the ⓘ tooltip. */
-.legendWarning {
-  margin: 4px 0 0;
-  font-size: var(--cioos-font-size-2xs);
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--cioos-ink-80);
-}
-
 .legendColorBarTicks .legendTick {
   font-variant-numeric: tabular-nums;
   position: absolute;

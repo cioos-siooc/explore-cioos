@@ -470,7 +470,6 @@
   "legendBathymetryPaletteChs": "CHS depth colours",
   "legendBathymetryPaletteToChs": "Use the Canadian Hydrographic Service's own NONNA colours",
   "legendBathymetryPaletteToDeep": "Back to colour-safe depth colours",
-  "legendBathymetryNotForNavigation": "Not for navigation",
   "layersGriddedCoverage": "Gridded coverage",
   "layersObservations": "Hexagons & points",
   "layersBathymetry": "Seafloor depth",
