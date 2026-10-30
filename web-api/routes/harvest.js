@@ -360,29 +360,6 @@ async function runAttempts(runId) {
   return result.rows;
 }
 
-async function reasonBreakdown(erddapUrl = null) {
-  const sql = `
-    WITH latest_attempt AS (
-        SELECT DISTINCT ON (erddap_url, dataset_id)
-               erddap_url, dataset_id,
-               ${NORM_STATUS("ha")} AS status,
-               ${NORM_REASON("ha")} AS reason_code
-        FROM cde.harvest_attempts ha
-        WHERE (CAST(? AS text) IS NULL OR erddap_url = ?)
-        ORDER BY erddap_url, dataset_id, attempted_at DESC
-    )
-    SELECT reason_code,
-           COUNT(*) AS n
-    FROM latest_attempt
-    WHERE status <> 'success'
-      AND reason_code IS NOT NULL
-    GROUP BY reason_code
-    ORDER BY n DESC
-  `;
-  const result = await db.raw(sql, [erddapUrl, erddapUrl]);
-  return result.rows;
-}
-
 async function warningBreakdown(erddapUrl) {
   const sql = `
     WITH latest_success AS (
@@ -499,23 +476,6 @@ router.get(
     if (!run) return res.status(404).json({ error: "Run not found" });
     const attempts = await runAttempts(req.params.runId);
     res.json({ run, attempts });
-  },
-);
-
-router.get(
-  "/reasons",
-  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
-  async (req, res) => {
-    res.json(await reasonBreakdown());
-  },
-);
-
-router.get(
-  "/reasons/:slug",
-  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
-  async (req, res) => {
-    const erddapUrl = await resolveErddapUrl(req.params.slug);
-    res.json(await reasonBreakdown(erddapUrl));
   },
 );
 

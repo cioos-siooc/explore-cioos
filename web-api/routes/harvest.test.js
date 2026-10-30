@@ -219,23 +219,6 @@ test("GET /harvest/runs/recent is not captured by /runs/:runId", async () => {
   assert.deepEqual(res.body, []);
 });
 
-test("GET /harvest/reasons returns the catalogue-wide failure breakdown", async () => {
-  db.queueRaw([{ reason_code: "HTTP_ERROR", n: 4 }]);
-  const res = await agent.get("/harvest/reasons");
-  assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ reason_code: "HTTP_ERROR", n: 4 }]);
-});
-
-test("GET /harvest/reasons/:slug scopes the breakdown to one server", async () => {
-  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
-  db.queueRaw([{ reason_code: "HTTP_ERROR", n: 2 }]);
-
-  const res = await agent.get("/harvest/reasons/erddap-example-com-erddap");
-
-  assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ reason_code: "HTTP_ERROR", n: 2 }]);
-});
-
 test("GET /harvest/warnings/:slug returns the per-code breakdown for one server", async () => {
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
   const row = {
