@@ -11,9 +11,10 @@ import {
   basemapHandoffEndZoom,
   basemapHandoffStartZoom,
   basemapPrewarmZoom,
-  bathymetryColorScale,
+  bathymetryPalettes,
   bathymetryFadeInZoom,
   bathymetryFullZoom,
+  defaultBathymetryPalette,
 } from "../config.js";
 
 const OFM_TILEJSON = "https://tiles.openfreemap.org/planet";
@@ -34,21 +35,23 @@ const NONNA_DEM_TILES = `${server}/nonna/{z}/{x}/{y}.png`;
 // What a transparent Terrarium pixel decodes to: no sounding.
 const NONNA_NODATA_ELEVATION = -32768;
 
-// Elevations are negative below chart datum; the ramp is listed by depth.
-const nonnaRampStops = [...bathymetryColorScale]
-  .reverse()
-  .flatMap(({ depth, color }) => [-depth, color]);
-const NONNA_COLOR_RAMP = [
-  "interpolate",
-  ["linear"],
-  ["elevation"],
-  NONNA_NODATA_ELEVATION,
-  "rgba(0, 0, 0, 0)",
-  // Nothing real lies between the sentinel and the deepest stop.
-  NONNA_NODATA_ELEVATION + 1,
-  nonnaRampStops[1],
-  ...nonnaRampStops,
-];
+// Elevations are negative below chart datum; the palettes are listed by depth.
+export function nonnaColorRamp(palette) {
+  const stops = [...bathymetryPalettes[palette]]
+    .reverse()
+    .flatMap(({ depth, color }) => [-depth, color]);
+  return [
+    "interpolate",
+    ["linear"],
+    ["elevation"],
+    NONNA_NODATA_ELEVATION,
+    "rgba(0, 0, 0, 0)",
+    // Nothing real lies between the sentinel and the deepest stop.
+    NONNA_NODATA_ELEVATION + 1,
+    stops[1],
+    ...stops,
+  ];
+}
 
 const NONNA_HILLSHADE_PAINT = {
   // Hillshade has no opacity; fading its colours does the same job.
@@ -132,7 +135,10 @@ const WATER_LABEL_PAINT = {
   "text-halo-width": 1.5,
 };
 
-export function buildBasemapStyle(lang = "en") {
+export function buildBasemapStyle(
+  lang = "en",
+  bathymetryPalette = defaultBathymetryPalette,
+) {
   const layers = [
     {
       id: "background",
@@ -224,7 +230,7 @@ export function buildBasemapStyle(lang = "en") {
       // the slowest tiles on the map on a cold cache.
       minzoom: basemapPrewarmZoom,
       paint: {
-        "color-relief-color": NONNA_COLOR_RAMP,
+        "color-relief-color": nonnaColorRamp(bathymetryPalette),
         "color-relief-opacity": [
           "interpolate",
           ["linear"],

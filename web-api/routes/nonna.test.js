@@ -140,6 +140,11 @@ test("serves a transparent placeholder, on a short TTL, when upstream fails", as
   assert.equal(res.status, 200);
   assert.equal(res.headers["content-type"], "image/png");
   assert.ok(res.headers["cache-control"].includes("max-age=60"));
+  const { data, info } = await sharp(res.body)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  assert.deepEqual([info.width, info.height, info.channels], [256, 256, 4]);
+  assert.ok(data.every((byte) => byte === 0));
 });
 
 test("rejects tile coordinates outside the grid at that zoom", async () => {

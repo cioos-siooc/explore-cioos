@@ -6,6 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>CIOOS Data Explorer</title>
   <link rel="icon" href="/ICON_color_dark_bkg.svg">
+  <!-- OFM_TILEJSON in src/components/Map/basemapStyle.js. Fetched while the
+       bundle loads: the coastline tiles otherwise wait on this cross-origin
+       lookup, which only starts once the map is built. -->
+  <link rel="preload" href="https://tiles.openfreemap.org/planet" as="fetch" crossorigin>
 
   <script defer data-domain="explore.cioos.ca,all.cioos.ca"
     src="https://plausible.cioos.ca/js/script.hash.outbound-links.local.js"></script>

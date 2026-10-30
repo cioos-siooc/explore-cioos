@@ -265,11 +265,11 @@ describe("DatasetInspector", () => {
     await renderReady({
       dataset: { ...DATASET, ckan_url: "https://catalogue.cioos.ca/dataset/x" },
     });
-    expect(screen.getByRole("link", { name: /ERDDAP/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "ERDDAP™" })).toHaveAttribute(
       "href",
       "https://erddap.example/en/tabledap/foo.html",
     );
-    expect(screen.getByRole("link", { name: /Catalog/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Catalog" })).toHaveAttribute(
       "href",
       "https://catalogue.cioos.ca/en/dataset/x",
     );

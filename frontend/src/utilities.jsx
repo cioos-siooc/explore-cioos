@@ -56,6 +56,19 @@ export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+// Catalogue titles (datasets, platforms) are never i18n keys, and a missed t()
+// still pays for nesting and interpolation: run over thousands of dataset
+// titles it cost over a second per filter-model build.
+export function filterOptionLabel(option, translatable, t, language) {
+  let title = option.title;
+  if (translatable) {
+    title = option.titleTranslated
+      ? option.titleTranslated[language] || option.title
+      : t(option.title);
+  }
+  return capitalizeFirstLetter(title);
+}
+
 // Takes the caller's `t`: it looks up several keys and can't call
 // useTranslation outside a component.
 export function generateMultipleSelectBadgeTitle(

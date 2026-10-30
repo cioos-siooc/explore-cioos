@@ -116,6 +116,20 @@ describe("MapStateProvider", () => {
     expect(latest.projection).toBe("globe");
   });
 
+  it("defaults the depth colours to the colour-safe palette, and keeps the choice", async () => {
+    await renderReady();
+    expect(latest.bathymetryPalette).toBe("deep");
+    act(() => latest.setBathymetryPalette("chs"));
+    expect(latest.bathymetryPalette).toBe("chs");
+    expect(window.localStorage.getItem("cde.bathymetryPalette")).toBe('"chs"');
+  });
+
+  it("falls back to the default depth colours for a palette that no longer exists", async () => {
+    window.localStorage.setItem("cde.bathymetryPalette", '"emodnet"');
+    await renderReady();
+    expect(latest.bathymetryPalette).toBe("deep");
+  });
+
   it("defaults tracksMode on", async () => {
     await renderReady();
     expect(latest.tracksMode).toBe(true);
