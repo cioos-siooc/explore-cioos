@@ -70,6 +70,8 @@ export default function DatasetsTable({
   estimatesLoading,
   // The format OBIS rows fall back to when the chosen one has no OBIS version.
   obisFallbackFormat,
+  // Likewise for ERDDAP rows (a Darwin Core Archive is OBIS-only).
+  erddapFallbackFormat,
   // Beside the pager's range: the download modal's selection totals.
   pagerExtra,
   // Kept mounted under an open dataset page, so coming back finds the same
@@ -661,6 +663,7 @@ export default function DatasetsTable({
                   downloadSizeEstimates={downloadSizeEstimates}
                   estimatesLoading={estimatesLoading}
                   obisFallbackFormat={obisFallbackFormat}
+                  erddapFallbackFormat={erddapFallbackFormat}
                   onSelect={handleSelectDataset}
                   onRemove={isDownloadModal ? removeFromSelection : undefined}
                   onInspect={isDownloadModal ? undefined : setInspectDataset}

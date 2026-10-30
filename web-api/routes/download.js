@@ -18,7 +18,9 @@ const {
 
 // The email rides in the JSON body so it never reaches access logs or traces.
 
-const FORMATS = ["csv", "parquet", "odv", "nccf"];
+const FORMATS = ["csv", "parquet", "odv", "nccf", "dwca"];
+// OBIS's curated values, or the provider's as submitted to OBIS.
+const OBIS_VALUES = ["curated", "submitted"];
 // Past this many matched features, a bounding-box request beats a regex over
 // their IDs (the downloader also caps the number of requests it splits into).
 const MAX_FEATURE_IDS = 5000;
@@ -140,7 +142,12 @@ function downloadScript(manifest, now) {
  *         description: GeoJSON polygon string.
  *       - in: query
  *         name: format
- *         schema: { type: string, enum: [csv, parquet, odv, nccf], default: csv }
+ *         schema: { type: string, enum: [csv, parquet, odv, nccf, dwca], default: csv }
+ *         description: dwca (Darwin Core Archive) applies to OBIS datasets; ERDDAP ones come as CSV.
+ *       - in: query
+ *         name: obisValues
+ *         schema: { type: string, enum: [curated, submitted], default: curated }
+ *         description: OBIS's curated Darwin Core values, or the provider's as submitted.
  *       - in: query
  *         name: timeMin
  *         schema: { type: string, format: date-time }
@@ -193,6 +200,7 @@ async function downloadSelection(query) {
     polygon,
     lang = "en",
     format = "csv",
+    obisValues = "curated",
   } = query;
 
   const filters = await createDBFilter(query);
@@ -270,16 +278,19 @@ async function downloadSelection(query) {
     depth_max: Number.parseFloat(depthMax),
     polygon_region: polygon ? polygonJSONToWKT(polygon) : null,
     format,
+    obis_values: obisValues,
     // Every filter as the Data Explorer sent it, for the package README.
     filters: Object.fromEntries(
       Object.entries(query).filter(
-        ([key]) => !["polygon", "lang", "format"].includes(key),
+        ([key]) => !["polygon", "lang", "format", "obisValues"].includes(key),
       ),
     ),
     // The explorer reads these same parameters back from its URL, so the
     // package can link to the selection it was made from.
     explorer_url: `${EXPLORER_URL}/?${new URLSearchParams(
-      Object.entries(query).filter(([key]) => key !== "format"),
+      Object.entries(query).filter(
+        ([key]) => !["format", "obisValues"].includes(key),
+      ),
     )}`,
     job_id: randomUUID().slice(0, 6),
     // Installed by the package's reproduce.py, like by the download script.
@@ -298,6 +309,7 @@ router.post(
       body("email").isEmail(),
       check("lang").isIn(["en", "fr"]).optional(),
       check("format").isIn(FORMATS).optional(),
+      check("obisValues").isIn(OBIS_VALUES).optional(),
     ],
     cacheFor: null,
   }),
@@ -342,8 +354,8 @@ router.post(
  *     description: >
  *       A uv script that builds the download package for this selection on
  *       the caller's computer, with the downloader pinned to this deployment's
- *       commit. Takes the same filter, shape, format and lang parameters as
- *       POST /download.
+ *       commit. Takes the same filter, shape, format, obisValues and lang
+ *       parameters as POST /download.
  *     responses:
  *       200:
  *         description: The Python script
@@ -361,6 +373,7 @@ router.get(
     checks: [
       check("lang").isIn(["en", "fr"]).optional(),
       check("format").isIn(FORMATS).optional(),
+      check("obisValues").isIn(OBIS_VALUES).optional(),
     ],
   }),
   async (req, res) => {

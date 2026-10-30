@@ -312,6 +312,11 @@ describe("DownloadDetails", () => {
         .getAllByRole("option")
         .map((option) => option.value),
     ).toEqual(["odv", "nccf"]);
+    expect(
+      within(screen.getByRole("group", { name: "OBIS only (ERDDAP as CSV)" }))
+        .getAllByRole("option")
+        .map((option) => option.value),
+    ).toEqual(["dwca"]);
     expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
     expect(screen.queryByText("As CSV")).not.toBeInTheDocument();
 
@@ -325,5 +330,58 @@ describe("DownloadDetails", () => {
 
     await user.selectOptions(format, "parquet");
     expect(screen.queryByText(/delivered as CSV/)).not.toBeInTheDocument();
+  });
+
+  it("names the ERDDAP datasets a Darwin Core Archive turns into CSV", async () => {
+    const { user } = renderDetails({
+      pointsToReview: [
+        makePoint({ pk: EST_SMALL.pk, title: "Small dataset" }),
+        makePoint({
+          pk: EST_LARGE.pk,
+          title: "Fish survey",
+          source_type: "obis",
+          erddap_url: "https://obis.org",
+        }),
+      ],
+    });
+
+    await user.selectOptions(screen.getByLabelText("All downloads"), "dwca");
+    expect(
+      screen.getByText(
+        "1 ERDDAP dataset will be delivered as CSV: a Darwin Core Archive holds OBIS biodiversity records only.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("As CSV")).toHaveLength(1);
+    expect(screen.queryByText(/OBIS dataset will be/)).not.toBeInTheDocument();
+  });
+
+  it("sends the chosen OBIS values with the script, offered only for OBIS datasets", async () => {
+    const clicked = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      function () {
+        clicked.push(this.getAttribute("href"));
+      },
+    );
+    const { user } = renderDetails({
+      pointsToReview: [
+        makePoint({
+          pk: EST_LARGE.pk,
+          title: "Fish survey",
+          source_type: "obis",
+          erddap_url: "https://obis.org",
+        }),
+      ],
+    });
+
+    await user.selectOptions(screen.getByLabelText("OBIS values"), "submitted");
+    await user.click(screen.getByRole("button", { name: /script or links/i }));
+    await user.click(screen.getByRole("button", { name: /python script/i }));
+    const url = new URL(clicked[0], "http://localhost");
+    expect(url.searchParams.get("obisValues")).toBe("submitted");
+  });
+
+  it("offers no OBIS values choice without an OBIS dataset", () => {
+    renderDetails();
+    expect(screen.queryByLabelText("OBIS values")).not.toBeInTheDocument();
   });
 });

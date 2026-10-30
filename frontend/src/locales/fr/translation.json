@@ -66,12 +66,19 @@
   "downloadPackageFormat_parquet": "Parquet",
   "downloadPackageFormat_odv": "Tableur ODV",
   "downloadPackageFormat_nccf": "NetCDF (CF)",
+  "downloadPackageFormat_dwca": "Archive Darwin Core",
   "downloadPackageFormatPillLabel": "Tous les téléchargements",
   "downloadPackageFormatGroupAll": "ERDDAP et OBIS",
   "downloadPackageFormatGroupErddap": "ERDDAP seulement (OBIS en CSV)",
-  "downloadPackageFormatTooltipText": "Un seul format pour tout ce qui suit : le paquet envoyé par courriel, le script Python et les liens directs ERDDAP. OBIS ne publie ses occurrences que sous forme de tableau : les jeux de données OBIS sont donc livrés en CSV, sauf si vous choisissez CSV ou Parquet (et les liens directs OBIS sont toujours en JSON).",
+  "downloadPackageFormatGroupObis": "OBIS seulement (ERDDAP en CSV)",
+  "downloadPackageFormatTooltipText": "Un seul format pour tout ce qui suit : le paquet envoyé par courriel, le script Python et les liens directs ERDDAP. Les jeux de données OBIS contiennent toujours leurs champs Darwin Core, avec leurs mesures et données ADN : en tableaux CSV ou Parquet, ou en archive Darwin Core. Ils sont livrés en CSV si vous choisissez ODV ou NetCDF, et les jeux de données ERDDAP sont livrés en CSV dans une archive Darwin Core (les liens directs OBIS sont toujours en JSON).",
   "downloadPackageFormatObisNote_one": "{{count}} jeu de données OBIS sera livré en CSV : OBIS n'existe pas en {{format}}. Choisissez CSV ou Parquet pour obtenir tous les jeux de données dans un seul format.",
   "downloadPackageFormatObisNote_other": "{{count}} jeux de données OBIS seront livrés en CSV : OBIS n'existe pas en {{format}}. Choisissez CSV ou Parquet pour obtenir tous les jeux de données dans un seul format.",
+  "downloadPackageFormatErddapNote_one": "{{count}} jeu de données ERDDAP sera livré en CSV : une archive Darwin Core ne contient que des observations de biodiversité OBIS.",
+  "downloadPackageFormatErddapNote_other": "{{count}} jeux de données ERDDAP seront livrés en CSV : une archive Darwin Core ne contient que des observations de biodiversité OBIS.",
+  "downloadObisValuesPillLabel": "Valeurs OBIS",
+  "downloadObisValues_curated": "Vérifiées par OBIS",
+  "downloadObisValues_submitted": "Telles que transmises",
   "downloadEmailLabelText": "M'envoyer un lien par courriel",
   "downloadEmailPlaceholder": "vous@institution.ca",
   "downloadRememberEmailLabel": "Mémoriser mon courriel sur cet appareil",
@@ -1068,5 +1075,6 @@
   "downloadDeliveryIntro": "Les mêmes fichiers dans les deux cas : vos données dans le format choisi, avec les métadonnées, citations et licences de chaque source.",
   "downloadDeliveryOr": "ou",
   "datasetCardObisFallbackText": "En CSV",
-  "datasetCardObisFallbackTitle": "Livré en CSV : OBIS n'existe pas dans le format choisi"
+  "datasetCardObisFallbackTitle": "Livré en CSV : OBIS n'existe pas dans le format choisi",
+  "datasetCardErddapFallbackTitle": "Livré en CSV : une archive Darwin Core ne contient que des observations OBIS"
 }

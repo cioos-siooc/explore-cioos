@@ -2,9 +2,10 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
-from cioos_downloader import downloader_wrapper
+from cioos_downloader import download_erddap, downloader_wrapper
 
 QUERIES = list((Path(__file__).parent / "queries").glob("*.json"))
 
@@ -66,50 +67,46 @@ def test_downloader_query(query, tmp_path):
     assert len(result["erddap_report"]) == len(query_data["cache_filtered"])
 
 
-# One point inside the query polygon (deep + shallow) and one clearly outside it.
+# Two points inside the query polygon (deep + shallow) and one clearly outside it.
 # date_start/date_end are epoch-ms (2015-06-01), inside the query time window.
-_OBIS_DF = pd.DataFrame(
-    {
-        "id": ["a", "b", "c"],
-        "scientificName": ["Gadus morhua", "Gadus morhua", "Pandalus borealis"],
-        "latitude": [52.0, 53.0, 10.0],
-        "longitude": [-130.0, -128.0, 100.0],
-        "date_start": [1433116800000, 1433116800000, 1433116800000],
-        "date_end": [1433116800000, 1433116800000, 1433116800000],
-        "minimumDepthInMeters": [5.0, 10.0, 5.0],
-        "maximumDepthInMeters": [20.0, 50.0, 20.0],
-    }
-)
+def _obis_export(path, rows=slice(None)):
+    interpreted = pa.table(
+        {
+            "scientificName": ["Gadus morhua", "Gadus morhua", "Pandalus borealis"],
+            "decimalLatitude": [52.0, 53.0, 10.0],
+            "decimalLongitude": [-130.0, -128.0, 100.0],
+            "date_start": [1433116800000] * 3,
+            "date_end": [1433116800000] * 3,
+            "minimumDepthInMeters": [5.0, 10.0, 5.0],
+            "maximumDepthInMeters": [20.0, 50.0, 20.0],
+        }
+    )[rows]
+    struct = pa.StructArray.from_arrays(
+        [c.combine_chunks() for c in interpreted.columns], names=interpreted.column_names
+    )
+    pq.write_table(pa.table({"_id": ["a", "b", "c"][rows], "interpreted": struct}), path)
 
 
-def test_obis_download_parquet(tmp_path):
-    """The OBIS source_type path reads occurrences via DuckDB and writes a
-    polygon-filtered CSV (no ERDDAP/tabledap involvement)."""
+def _run_obis(tmp_path, monkeypatch, rows=slice(None)):
     query_data = json.loads((Path(__file__).parent / "obis_query.json").read_text())
+    export = tmp_path / "export.parquet"
+    _obis_export(export, rows)
+    monkeypatch.setattr(download_erddap, "OBIS_PARQUET_URL", str(export))
+    with patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]) as save_meta:
+        result = downloader_wrapper.run_download_query(download_query=query_data, output_folder=tmp_path / "out")
+    return result, save_meta
 
-    duck_result = MagicMock()
-    duck_result.df.return_value = _OBIS_DF.copy()
 
-    with (
-        patch("duckdb.connect") as connect,
-        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]) as save_meta,
-    ):
-        duck_execute = connect.return_value.__enter__.return_value.execute
-        duck_execute.return_value = duck_result
-        result = downloader_wrapper.run_download_query(
-            download_query=query_data,
-            output_folder=tmp_path,
-        )
+def test_obis_download_parquet(tmp_path, monkeypatch):
+    """The OBIS source_type path reads occurrences from the parquet export and
+    writes a polygon-filtered CSV (no ERDDAP/tabledap involvement)."""
+    result, save_meta = _run_obis(tmp_path, monkeypatch)
 
-    # DuckDB was used to read the parquet (not the tabledap path).
-    assert duck_execute.called
     # OBIS dataset metadata is fetched and saved for a successful download.
     assert save_meta.called
-    parquet_url = duck_execute.call_args[0][1]["url"]
-    assert ".parquet" in parquet_url and "obis-open-data" in parquet_url
-
     assert len(result["erddap_report"]) == 1
     entry = result["erddap_report"][0]
+    assert entry["download_url_list"] == [str(tmp_path / "export.parquet")]
     assert entry["status"] == "COMPLETED"
     assert entry["no_data"] is False
     # Row "c" (lon 100, lat 10) is outside the polygon → dropped; 2 rows written.
@@ -118,22 +115,9 @@ def test_obis_download_parquet(tmp_path):
     assert result["path"].endswith(".zip")
 
 
-def test_obis_download_empty(tmp_path):
+def test_obis_download_empty(tmp_path, monkeypatch):
     """An OBIS dataset with no rows inside the selection reports EMPTY, not a crash."""
-    query_data = json.loads((Path(__file__).parent / "obis_query.json").read_text())
-
-    duck_result = MagicMock()
-    duck_result.df.return_value = _OBIS_DF.iloc[2:].copy()  # only the out-of-polygon row
-
-    with (
-        patch("duckdb.connect") as connect,
-        patch("cioos_downloader.download_erddap.save_source_metadata", return_value=[]),
-    ):
-        connect.return_value.__enter__.return_value.execute.return_value = duck_result
-        result = downloader_wrapper.run_download_query(
-            download_query=query_data,
-            output_folder=tmp_path,
-        )
+    result, _ = _run_obis(tmp_path, monkeypatch, rows=slice(2, None))  # only the out-of-polygon row
 
     entry = result["erddap_report"][0]
     assert entry["status"] == "EMPTY"

@@ -155,7 +155,10 @@ export function buildDownloadLinks(rows, packageFormat, constraints) {
     .filter((row) => row?.cdm_data_type !== "Grid")
     .map((row) => {
       const obis = isObis(row);
-      const format = obis ? OBIS_FORMAT : ERDDAP_FORMATS[packageFormat];
+      // The package's CSV fallback, for a format ERDDAP has no rendition of.
+      const format = obis
+        ? OBIS_FORMAT
+        : (ERDDAP_FORMATS[packageFormat] ?? ERDDAP_FORMATS.csv);
       if (!format || !erddapServerBase(row)) return null;
 
       const url = obis
