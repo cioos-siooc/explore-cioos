@@ -13,6 +13,10 @@ const SHADES = {
 };
 const STATUS_ORDER = ["error", "skipped"];
 const OTHER_COLOR = "#8a8984";
+// Skips a source asked for: greyed out so they don't read as problems.
+const DISABLED_COLOR = "#cfcdc6";
+const DISABLED_REASONS = new Set(["INGEST_FLAG_FALSE"]);
+export const isDisabled = (f) => DISABLED_REASONS.has(f.reason_code);
 const OTHER_KEY = "__other__";
 
 const failureKey = (f) => `${f.status}|${f.reason_code || ""}`;
@@ -32,39 +36,49 @@ export function serverFailures(server) {
   );
 }
 
-// The same breakdown tallied from one server's dataset rows.
-export function datasetFailures(datasets) {
+// Sums failure lists by status and reason, largest first.
+export function mergeFailures(failureLists) {
   const byKey = new Map();
-  for (const d of datasets || []) {
-    if (d.status === "success") continue;
-    const f = byKey.get(failureKey(d)) || {
-      status: d.status,
-      reason_code: d.reason_code || null,
+  for (const f of failureLists.flat()) {
+    const sum = byKey.get(failureKey(f)) || {
+      status: f.status,
+      reason_code: f.reason_code || null,
       n: 0,
     };
-    f.n++;
-    byKey.set(failureKey(f), f);
+    sum.n += f.n;
+    byKey.set(failureKey(f), sum);
   }
-  return [...byKey.values()];
+  return [...byKey.values()].sort(
+    (a, b) => b.n - a.n || failureKey(a).localeCompare(failureKey(b)),
+  );
+}
+
+// The same breakdown tallied from one server's dataset rows.
+export function datasetFailures(datasets) {
+  return mergeFailures([
+    (datasets || [])
+      .filter((d) => d.status !== "success")
+      .map((d) => ({ status: d.status, reason_code: d.reason_code, n: 1 })),
+  ]);
 }
 
 // Colours follow the reason, not its rank on a card: rank reasons across every
 // server's failures so a reason wears the same shade wherever it appears.
 export function reasonShades(failureLists) {
-  const totals = new Map();
-  for (const f of failureLists.flat()) {
-    totals.set(failureKey(f), (totals.get(failureKey(f)) || 0) + f.n);
-  }
+  const ranked = mergeFailures(failureLists);
   const shades = new Map();
   for (const status of STATUS_ORDER) {
-    [...totals.keys()]
-      .filter((k) => k.startsWith(`${status}|`))
-      .sort((a, b) => totals.get(b) - totals.get(a) || a.localeCompare(b))
+    ranked
+      .filter((f) => f.status === status && !isDisabled(f))
       .slice(0, SHADES[status].length)
-      .forEach((k, i) => shades.set(k, i));
+      .forEach((f, i) => shades.set(failureKey(f), i));
   }
   return shades;
 }
+
+// One colour per failure for marks that don't distinguish reasons by shade.
+export const failureColor = (f) =>
+  isDisabled(f) ? DISABLED_COLOR : (SHADES[f.status]?.[0] ?? OTHER_COLOR);
 
 function slicesFor(harvested, failures, shades, t) {
   const slices = [
@@ -81,7 +95,8 @@ function slicesFor(harvested, failures, shades, t) {
   let other = 0;
   for (const f of failures) {
     const shade = shades.get(failureKey(f));
-    if (shade === undefined || !SHADES[f.status]) {
+    const disabled = isDisabled(f);
+    if (!disabled && (shade === undefined || !SHADES[f.status])) {
       other += f.n;
       continue;
     }
@@ -91,10 +106,12 @@ function slicesFor(harvested, failures, shades, t) {
         ? reasonLabel(t, f.reason_code)
         : t(`harvest.filter.${f.status}`),
       n: f.n,
-      color: SHADES[f.status][shade],
+      color: disabled ? DISABLED_COLOR : SHADES[f.status][shade],
       status: f.status,
       reason: f.reason_code,
-      order: STATUS_ORDER.indexOf(f.status) * 10 + shade,
+      // Disabled skips sit last, out of the way of the real problems.
+      order: disabled ? 100 : STATUS_ORDER.indexOf(f.status) * 10 + shade,
+      disabled,
     });
   }
   ranked.sort((a, b) => a.order - b.order);
@@ -203,7 +220,15 @@ export default function HarvestPie({
             </>
           );
           return (
-            <li key={s.key} className={dimmed(s) ? "harvest-pie-dimmed" : ""}>
+            <li
+              key={s.key}
+              className={[
+                dimmed(s) && "harvest-pie-dimmed",
+                s.disabled && "harvest-pie-disabled",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
               {selectable(s) ? (
                 <button
                   type="button"

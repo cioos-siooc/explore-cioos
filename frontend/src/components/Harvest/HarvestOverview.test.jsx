@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 
 import { renderWithProviders } from "../../test/renderWithProviders.jsx";
 import { installMockHarvestFetch } from "../../test/mockHarvestFetch.js";
@@ -34,12 +34,10 @@ const RUNS = [
     n_total: 46,
   },
 ];
-const REASONS = [{ reason_code: "HTTP_ERROR", n: 4 }];
 function stubRoutes(overrides = {}) {
   installMockHarvestFetch({
     "/servers": SERVERS,
     "/runs/recent": RUNS,
-    "/reasons": REASONS,
     ...overrides,
   });
 }
@@ -51,9 +49,9 @@ describe("HarvestOverview", () => {
 
   it("renders a server card per source, charting its harvested and failed datasets", async () => {
     renderWithProviders(<HarvestOverview />);
-    expect(await screen.findByText("erddap.example.com")).toBeInTheDocument();
+    const host = await screen.findByText("erddap.example.com");
     expect(
-      screen.getByRole("img", {
+      within(host.closest("a")).getByRole("img", {
         name: "40 of 43 datasets harvested in the last run",
       }),
     ).toBeInTheDocument();
@@ -69,8 +67,10 @@ describe("HarvestOverview", () => {
       ],
     });
     renderWithProviders(<HarvestOverview />);
-    const legend = await screen.findByRole("list");
-    expect(legend).toHaveTextContent("HTTP error3");
+    const host = await screen.findByText("erddap.example.com");
+    expect(within(host.closest("a")).getByRole("list")).toHaveTextContent(
+      "HTTP error3",
+    );
   });
 
   it("shows when each server last harvested successfully", async () => {
@@ -95,10 +95,38 @@ describe("HarvestOverview", () => {
     expect(screen.getByText("46")).toBeInTheDocument();
   });
 
-  it("shows the top-failure-reasons table", async () => {
+  it("charts the whole catalogue and ranks its failure reasons", async () => {
+    stubRoutes({
+      "/servers": [
+        {
+          ...SERVERS[0],
+          reasons: [{ status: "error", reason_code: "HTTP_ERROR", n: 3 }],
+        },
+        {
+          ...SERVERS[0],
+          erddap_url: "https://other.example.com/erddap",
+          n_success: 10,
+          reasons: [
+            { status: "error", reason_code: "HTTP_ERROR", n: 2 },
+            { status: "skipped", reason_code: "ON_SKIP_LIST", n: 4 },
+          ],
+        },
+      ],
+    });
     renderWithProviders(<HarvestOverview />);
-    expect(await screen.findByText("HTTP error")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
+    const title = await screen.findByText("Last run, all sources");
+    expect(
+      within(title.closest("div")).getByRole("img", {
+        name: "50 of 59 datasets harvested in the last run",
+      }),
+    ).toBeInTheDocument();
+    const bars = screen
+      .getByText("Failure reasons")
+      .parentElement.querySelectorAll(".harvest-bars li");
+    expect([...bars].map((b) => b.textContent)).toEqual([
+      "HTTP errorerror5",
+      "On skip listskipped4",
+    ]);
   });
 
   it("links each server card to its /harvest/server/<slug> page", async () => {

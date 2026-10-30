@@ -731,3 +731,53 @@ a.harvest-link:hover {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+.harvest-pie-disabled,
+.harvest-bars-disabled {
+  color: var(--harvest-muted);
+}
+
+/* ── Catalogue section (overview) ────────────────────────────────────────── */
+.harvest-catalogue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 2rem;
+  margin-bottom: 1rem;
+}
+
+.harvest-bars {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.harvest-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) auto minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2px 0;
+}
+
+.harvest-bars-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harvest-bars-track {
+  height: 10px;
+}
+
+.harvest-bars-bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+}
+
+.harvest-bars-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

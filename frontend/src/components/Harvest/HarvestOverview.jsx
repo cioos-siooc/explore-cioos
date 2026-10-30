@@ -7,9 +7,13 @@ import {
   HarvestTableSkeleton,
 } from "./HarvestSkeleton.jsx";
 import StatusBadge from "./StatusBadge.jsx";
-import HarvestPie, { reasonShades, serverFailures } from "./HarvestPie.jsx";
+import HarvestPie, {
+  mergeFailures,
+  reasonShades,
+  serverFailures,
+} from "./HarvestPie.jsx";
+import HarvestReasonBars from "./HarvestReasonBars.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
-import reasonLabel from "./reasonLabel.js";
 import { slugify } from "./slug.js";
 import { hostname, fmtDt, fmtDurationS } from "./format.js";
 
@@ -56,10 +60,14 @@ export default function HarvestOverview() {
   const { data: servers, loading: loadingServers } =
     useHarvestFetch("/servers");
   const { data: runs, loading: loadingRuns } = useHarvestFetch("/runs/recent");
-  const { data: reasons, loading: loadingReasons } =
-    useHarvestFetch("/reasons");
 
-  const shades = reasonShades((servers || []).map(serverFailures));
+  const failureLists = (servers || []).map(serverFailures);
+  const shades = reasonShades(failureLists);
+  const allFailures = mergeFailures(failureLists);
+  const allHarvested = (servers || []).reduce(
+    (sum, s) => sum + (Number(s.n_success) || 0),
+    0,
+  );
 
   return (
     <HarvestLayout>
@@ -70,6 +78,33 @@ export default function HarvestOverview() {
           : ""}
       </p>
 
+      {servers && servers.length > 0 && (
+        <section className="harvest-catalogue">
+          <div>
+            <h2 className="harvest-section-title">
+              {t("harvest.catalogue.title")}
+            </h2>
+            <div className="harvest-pie-detail">
+              <HarvestPie
+                harvested={allHarvested}
+                failures={allFailures}
+                shades={shades}
+                size={160}
+              />
+            </div>
+          </div>
+          {allFailures.length > 0 && (
+            <div>
+              <h2 className="harvest-section-title">
+                {t("harvest.catalogue.issues")}
+              </h2>
+              <HarvestReasonBars failures={allFailures} />
+            </div>
+          )}
+        </section>
+      )}
+
+      <h2 className="harvest-section-title">{t("harvest.sources")}</h2>
       {loadingServers ? (
         <HarvestCardsSkeleton label={t("harvest.loading.sources")} />
       ) : (
@@ -151,30 +186,6 @@ export default function HarvestOverview() {
             ))}
           </tbody>
         </table>
-      )}
-
-      {!loadingReasons && reasons && reasons.length > 0 && (
-        <>
-          <h2 className="harvest-section-title">
-            {t("harvest.topFailureReasons")}
-          </h2>
-          <table className="harvest-table" style={{ maxWidth: 500 }}>
-            <thead>
-              <tr>
-                <th>{t("harvest.col.reasonCode")}</th>
-                <th className="harvest-num">{t("harvest.col.datasets")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reasons.map((r) => (
-                <tr key={r.reason_code}>
-                  <td title={r.reason_code}>{reasonLabel(t, r.reason_code)}</td>
-                  <td className="harvest-num-total">{r.n}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
       )}
     </HarvestLayout>
   );
