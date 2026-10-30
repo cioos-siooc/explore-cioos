@@ -129,7 +129,12 @@ describe("AppShell (composition)", () => {
     await user.keyboard("{Control>}k{/Control}");
     await user.type(
       await screen.findByTestId("filter-search-input"),
-      "temperature{Enter}",
+      "temperature",
+    );
+    await user.click(
+      await screen.findByRole("option", {
+        name: /Titles matching “temperature”/,
+      }),
     );
     await screen.findByText(
       "This dataset doesn't match your current filters.",
