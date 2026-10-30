@@ -18,15 +18,15 @@ third-party service or data flow belongs in both.
 
 ## What is handled, and how
 
-| What                | How it is handled                                                                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Cookies             | None. Preferences (language, map layers, projection, tips seen, About seen) live in the browser's localStorage and never reach the server.                   |
-| Download email      | Sent in the request body, never a URL. Remembered on the device only if the user asks. Deleted 7 days after the job finishes.                                |
-| Download statistics | Job rows are kept, with the email's domain (e.g. `uvic.ca`) but not the address.                                                                             |
-| Visit counts        | Plausible, run by CIOOS: no cookies, no personal data. A `Download submitted` event records the dataset count and language.                                  |
-| Errors and feedback | Sentry (hosted in the US). No IP addresses, no request bodies; feedback email is optional.                                                                   |
-| Fonts               | Served from our own site (no Google Fonts).                                                                                                                  |
-| Map tiles           | Loaded directly from EMODnet, OpenFreeMap and Esri, which see the viewer's IP like any website.                                                              |
+| What                | How it is handled                                                                                                                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cookies             | None. Preferences (language, map layers, depth colours, projection, tips seen, About seen) live in the browser's localStorage and never reach the server.                                 |
+| Download email      | Sent in the request body, never a URL. Remembered on the device only if the user asks. Deleted 7 days after the job finishes.                                                             |
+| Download statistics | Job rows are kept, with the email's domain (e.g. `uvic.ca`) but not the address.                                                                                                          |
+| Visit counts        | Plausible, run by CIOOS: no cookies, no personal data. A `Download submitted` event records the dataset count and language.                                                               |
+| Errors and feedback | Sentry (hosted in the US). No IP addresses, no request bodies; feedback email is optional.                                                                                                |
+| Fonts               | Served from our own site (no Google Fonts).                                                                                                                                               |
+| Map tiles           | Loaded directly from EMODnet, OpenFreeMap and Esri, which see the viewer's IP like any website.                                                                                           |
 | Seafloor depth      | Fetched by our server (`web-api/routes/nonna.js`, `routes/depth.js`) from CHS NONNA and GEBCO (served by the UK's CEDA archive); they see the area or clicked point, not the viewer's IP. |
 
 ## Where it lives in the code

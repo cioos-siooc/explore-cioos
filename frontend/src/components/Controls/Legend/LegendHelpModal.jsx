@@ -63,6 +63,7 @@ export const LEGEND_HELP_SECTIONS = {
     Icon: Water,
     items: [
       ["source", Water],
+      ["colours", Palette],
       // The legend button's own glyph, so the entry reads as that button.
       ["tool", Crosshair],
       ["reading", CursorFill],

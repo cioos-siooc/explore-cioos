@@ -5,8 +5,9 @@ import {
   getLabelTextField,
   LABEL_LAYER_IDS,
   FIRST_LABEL_LAYER_ID,
+  nonnaColorRamp,
 } from "./basemapStyle.js";
-import { bathymetryColorScale } from "../config.js";
+import { bathymetryPalettes } from "../config.js";
 
 describe("getLabelTextField", () => {
   it("prefers the localized name, falling back to the tile's default", () => {
@@ -100,15 +101,26 @@ describe("buildBasemapStyle", () => {
     // A transparent Terrarium pixel decodes to -32768.
     expect([elevations[0], colors[0]]).toEqual([-32768, "rgba(0, 0, 0, 0)"]);
     expect(elevations).toEqual([...elevations].sort((a, b) => a - b));
-    const deepest = bathymetryColorScale.at(-1);
-    const shallowest = bathymetryColorScale[0];
+    const scale = bathymetryPalettes.deep;
+    const deepest = scale.at(-1);
+    const shallowest = scale[0];
     expect(colors[1]).toBe(deepest.color);
     expect(elevations.slice(2)).toEqual(
-      [...bathymetryColorScale].reverse().map(({ depth }) => -depth),
+      [...scale].reverse().map(({ depth }) => -depth),
     );
     expect([elevations.at(-1), colors.at(-1)]).toEqual([
       -shallowest.depth,
       shallowest.color,
     ]);
+  });
+
+  it("draws the palette it is built with", () => {
+    const relief = buildBasemapStyle("en", "chs").layers.find(
+      (layer) => layer.id === "bathymetry-nonna",
+    );
+    expect(relief.paint["color-relief-color"]).toEqual(nonnaColorRamp("chs"));
+    expect(relief.paint["color-relief-color"].at(-1)).toBe(
+      bathymetryPalettes.chs[0].color,
+    );
   });
 });

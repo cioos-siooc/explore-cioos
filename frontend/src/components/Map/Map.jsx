@@ -49,6 +49,7 @@ import {
   basemapHandoffStartZoom,
   clickHighlightColor,
   colorScale,
+  defaultBathymetryPalette,
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
@@ -65,6 +66,7 @@ import {
   getLabelTextField,
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS,
+  nonnaColorRamp,
 } from "./basemapStyle.js";
 import {
   buildTileSuffix,
@@ -462,6 +464,7 @@ export default function CreateMap({
   griddapCoverage,
   dataLayersVisible = true,
   bathymetryVisible = true,
+  bathymetryPalette = defaultBathymetryPalette,
   activeWmsOverlay,
   projection = "mercator",
   zoomTarget,
@@ -1433,16 +1436,19 @@ export default function CreateMap({
     if (visible) rampMeasuredFor.current = undefined;
   }
 
-  // Restoring hands each group back to its owner: the picker for hex/point
-  // layers, applyLayerVisibility for the tracks.
+  // Restoring hands each group back to its owner: the switches for hex/point
+  // layers and the depth wash, applyLayerVisibility for the tracks. The depth
+  // wash goes too: its colours would read as the overlay's own.
   function setDataLayersVisibility(visible) {
     setLayersVisibility(griddapLayerIds, visible);
     if (!visible) {
       setLayersVisibility(observationLayerIds, false);
       setLayersVisibility(trackLayerIds, false);
+      setLayersVisibility(bathymetryLayerIds, false);
       return;
     }
     setLayersVisibility(observationLayerIds, dataLayersVisibleRef.current);
+    setLayersVisibility(bathymetryLayerIds, bathymetryVisibleRef.current);
     setLayersVisibility(trackLayerIds, true);
     applyLayerVisibility();
   }
@@ -1612,12 +1618,22 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLayersVisible]);
 
-  // Left alone by the WMS overlay: the depth wash reads as basemap.
+  // The ref keeps the choice through a WMS overlay, which hides the depth wash.
   useEffect(() => {
     bathymetryVisibleRef.current = bathymetryVisible;
-    if (!map.current) return;
+    if (!map.current || activeWmsOverlay) return;
     setLayersVisibility(bathymetryLayerIds, bathymetryVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bathymetryVisible]);
+
+  useEffect(() => {
+    if (!map.current) return;
+    map.current.setPaintProperty(
+      "bathymetry-nonna",
+      "color-relief-color",
+      nonnaColorRamp(bathymetryPalette),
+    );
+  }, [bathymetryPalette]);
 
   // No setStyle() calls exist (language uses setLayoutProperty), so the
   // projection persists until toggled here.
@@ -3188,7 +3204,7 @@ export default function CreateMap({
       // The projection is part of the style in MapLibre 5 and must be set here:
       // the projection effect's first run happens while map.current is null.
       style: {
-        ...buildBasemapStyle(i18n.language),
+        ...buildBasemapStyle(i18n.language, bathymetryPalette),
         projection: { type: projection === "globe" ? "globe" : "mercator" },
       },
       // The default 'high-performance' wakes the discrete GPU on dual-GPU
@@ -3309,7 +3325,9 @@ export default function CreateMap({
     // Aborted requests (tiles left behind mid-zoom) don't fire 'error'. Any
     // listener stops MapLibre's own console.error, hence the log; the message,
     // since a minified error class logs as its two-letter name.
-    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks"];
+    // Esri imagery throws the odd transient 502 (logged as a CORS block, since
+    // its error responses carry no Access-Control-Allow-Origin).
+    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks", "imagery"];
     map.current.on("error", (e) => {
       console.error(e.error?.message ?? e.error);
       if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;

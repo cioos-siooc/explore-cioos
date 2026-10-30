@@ -21,6 +21,7 @@ export default function MapContainer() {
     griddapCoverage,
     dataLayersVisible,
     bathymetryVisible,
+    bathymetryPalette,
     activeWmsOverlay,
     projection,
     zoomTarget,
@@ -146,6 +147,7 @@ export default function MapContainer() {
         griddapCoverage={griddapCoverageVisible ? griddapCoverage : null}
         dataLayersVisible={dataLayersVisible}
         bathymetryVisible={bathymetryVisible}
+        bathymetryPalette={bathymetryPalette}
         activeWmsOverlay={activeWmsOverlay}
         projection={projection}
         zoomTarget={zoomTarget}
