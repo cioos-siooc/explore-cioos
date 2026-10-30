@@ -37,6 +37,19 @@ describe("reasonShades", () => {
   });
 });
 
+describe("reasonShades and disabled skips", () => {
+  it("keeps ingest-disabled skips off the skip shades", () => {
+    const shades = reasonShades([
+      [
+        { status: "skipped", reason_code: "INGEST_FLAG_FALSE", n: 9 },
+        { status: "skipped", reason_code: "ON_SKIP_LIST", n: 1 },
+      ],
+    ]);
+    expect(shades.has("skipped|INGEST_FLAG_FALSE")).toBe(false);
+    expect(shades.get("skipped|ON_SKIP_LIST")).toBe(0);
+  });
+});
+
 describe("serverFailures", () => {
   it("falls back to skipped/error counts for a row without reasons", () => {
     expect(serverFailures({ n_skipped: "4", n_error: "2" })).toEqual([
@@ -122,6 +135,17 @@ describe("HarvestPie", () => {
       "aria-pressed",
       "false",
     );
+  });
+
+  it("greys out ingest-disabled skips and lists them last", () => {
+    renderPie(1, [
+      { status: "skipped", reason_code: "INGEST_FLAG_FALSE", n: 5 },
+      { status: "error", reason_code: "HTTP_ERROR", n: 1 },
+    ]);
+    const rows = screen.getAllByRole("listitem");
+    expect(rows[2]).toHaveTextContent("Ingest disabled");
+    expect(rows[2]).toHaveClass("harvest-pie-disabled");
+    expect(rows[1]).not.toHaveClass("harvest-pie-disabled");
   });
 
   it("draws nothing for a server with no attempts", () => {

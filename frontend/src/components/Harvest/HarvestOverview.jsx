@@ -7,9 +7,13 @@ import {
   HarvestTableSkeleton,
 } from "./HarvestSkeleton.jsx";
 import StatusBadge from "./StatusBadge.jsx";
-import HarvestPie, { reasonShades, serverFailures } from "./HarvestPie.jsx";
+import HarvestPie, {
+  mergeFailures,
+  reasonShades,
+  serverFailures,
+} from "./HarvestPie.jsx";
+import HarvestReasonBars from "./HarvestReasonBars.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
-import reasonLabel from "./reasonLabel.js";
 import { slugify } from "./slug.js";
 import { hostname, fmtDt, fmtDurationS } from "./format.js";
 
@@ -51,15 +55,106 @@ function ServerCard({ server, shades, t }) {
   );
 }
 
+function CkanCoverage({ coverage, t }) {
+  const total = coverage.n_ckan_records;
+  const pct = total ? Math.round((100 * coverage.n_linked) / total) : null;
+  return (
+    <div>
+      <h2 className="harvest-section-title">
+        {t("harvest.ckanCoverage.title")}
+      </h2>
+      {pct !== null && (
+        <>
+          <div className="harvest-ckan-pct">{pct}%</div>
+          <div
+            className="harvest-ckan-meter"
+            role="img"
+            aria-label={t("harvest.ckanCoverage.ratio", {
+              linked: coverage.n_linked,
+              total,
+            })}
+          >
+            <span style={{ width: `${pct}%` }} />
+          </div>
+        </>
+      )}
+      <p className="harvest-card-meta">
+        {pct !== null
+          ? t("harvest.ckanCoverage.ratio", {
+              linked: coverage.n_linked,
+              total,
+            })
+          : t("harvest.ckanCoverage.unavailable", {
+              linked: coverage.n_linked,
+            })}
+      </p>
+      {coverage.sources ? (
+        <ul className="harvest-ckan-sources">
+          {coverage.sources.map((s) => {
+            const sourcePct = s.n_records
+              ? Math.round((100 * s.n_linked) / s.n_records)
+              : 0;
+            return (
+              <li
+                key={s.source ?? ""}
+                title={t("harvest.ckanCoverage.split", {
+                  erddap: s.n_erddap,
+                  obis: s.n_obis,
+                })}
+              >
+                <span className="harvest-pie-name">
+                  {s.source ?? t("harvest.ckanCoverage.unknownSource")}
+                </span>
+                <span className="harvest-pie-value">
+                  {t("harvest.ckanCoverage.sourceRatio", {
+                    linked: s.n_linked,
+                    total: s.n_records,
+                    pct: sourcePct,
+                  })}
+                </span>
+                <div className="harvest-ckan-meter" aria-hidden="true">
+                  <span style={{ width: `${sourcePct}%` }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <ul className="harvest-pie-legend">
+          <li>
+            <span className="harvest-pie-name">ERDDAP</span>
+            <span className="harvest-pie-value">{coverage.n_erddap}</span>
+          </li>
+          <li>
+            <span className="harvest-pie-name">OBIS</span>
+            <span className="harvest-pie-value">{coverage.n_obis}</span>
+          </li>
+        </ul>
+      )}
+      {coverage.n_linked_stale > 0 && (
+        <p className="harvest-card-meta">
+          {t("harvest.ckanCoverage.stale", { count: coverage.n_linked_stale })}
+        </p>
+      )}
+      <p className="harvest-card-meta">{t("harvest.ckanCoverage.caption")}</p>
+    </div>
+  );
+}
+
 export default function HarvestOverview() {
   const { t } = useTranslation();
   const { data: servers, loading: loadingServers } =
     useHarvestFetch("/servers");
   const { data: runs, loading: loadingRuns } = useHarvestFetch("/runs/recent");
-  const { data: reasons, loading: loadingReasons } =
-    useHarvestFetch("/reasons");
+  const { data: ckanCoverage } = useHarvestFetch("/ckan-coverage");
 
-  const shades = reasonShades((servers || []).map(serverFailures));
+  const failureLists = (servers || []).map(serverFailures);
+  const shades = reasonShades(failureLists);
+  const allFailures = mergeFailures(failureLists);
+  const allHarvested = (servers || []).reduce(
+    (sum, s) => sum + (Number(s.n_success) || 0),
+    0,
+  );
 
   return (
     <HarvestLayout>
@@ -70,6 +165,34 @@ export default function HarvestOverview() {
           : ""}
       </p>
 
+      {servers && servers.length > 0 && (
+        <section className="harvest-catalogue">
+          <div>
+            <h2 className="harvest-section-title">
+              {t("harvest.catalogue.title")}
+            </h2>
+            <div className="harvest-pie-detail">
+              <HarvestPie
+                harvested={allHarvested}
+                failures={allFailures}
+                shades={shades}
+                size={160}
+              />
+            </div>
+          </div>
+          {allFailures.length > 0 && (
+            <div>
+              <h2 className="harvest-section-title">
+                {t("harvest.catalogue.issues")}
+              </h2>
+              <HarvestReasonBars failures={allFailures} />
+            </div>
+          )}
+          {ckanCoverage && <CkanCoverage coverage={ckanCoverage} t={t} />}
+        </section>
+      )}
+
+      <h2 className="harvest-section-title">{t("harvest.sources")}</h2>
       {loadingServers ? (
         <HarvestCardsSkeleton label={t("harvest.loading.sources")} />
       ) : (
@@ -151,30 +274,6 @@ export default function HarvestOverview() {
             ))}
           </tbody>
         </table>
-      )}
-
-      {!loadingReasons && reasons && reasons.length > 0 && (
-        <>
-          <h2 className="harvest-section-title">
-            {t("harvest.topFailureReasons")}
-          </h2>
-          <table className="harvest-table" style={{ maxWidth: 500 }}>
-            <thead>
-              <tr>
-                <th>{t("harvest.col.reasonCode")}</th>
-                <th className="harvest-num">{t("harvest.col.datasets")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reasons.map((r) => (
-                <tr key={r.reason_code}>
-                  <td title={r.reason_code}>{reasonLabel(t, r.reason_code)}</td>
-                  <td className="harvest-num-total">{r.n}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
       )}
     </HarvestLayout>
   );

@@ -1,4 +1,5 @@
 const express = require("express");
+const axios = require("axios");
 
 const router = express.Router();
 const db = require("../db");
@@ -11,6 +12,11 @@ const SPARKLINE_DEPTH = 10;
 const HISTORY_MAX_ROWS = 200;
 
 const WARNING_DATASET_SAMPLE = 20;
+
+const CKAN_PACKAGE_SEARCH =
+  "https://catalogue.cioos.ca/api/3/action/package_search";
+const CKAN_TIMEOUT_MS = 10000;
+const CKAN_PAGE_ROWS = 1000;
 
 // A hash-unchanged skip means the dataset was verified up to date, so the
 // dataset-centric views count it as a healthy success. Per-run audit views
@@ -360,29 +366,6 @@ async function runAttempts(runId) {
   return result.rows;
 }
 
-async function reasonBreakdown(erddapUrl = null) {
-  const sql = `
-    WITH latest_attempt AS (
-        SELECT DISTINCT ON (erddap_url, dataset_id)
-               erddap_url, dataset_id,
-               ${NORM_STATUS("ha")} AS status,
-               ${NORM_REASON("ha")} AS reason_code
-        FROM cde.harvest_attempts ha
-        WHERE (CAST(? AS text) IS NULL OR erddap_url = ?)
-        ORDER BY erddap_url, dataset_id, attempted_at DESC
-    )
-    SELECT reason_code,
-           COUNT(*) AS n
-    FROM latest_attempt
-    WHERE status <> 'success'
-      AND reason_code IS NOT NULL
-    GROUP BY reason_code
-    ORDER BY n DESC
-  `;
-  const result = await db.raw(sql, [erddapUrl, erddapUrl]);
-  return result.rows;
-}
-
 async function warningBreakdown(erddapUrl) {
   const sql = `
     WITH latest_success AS (
@@ -426,6 +409,98 @@ async function oldestLastHarvest() {
   const result = await db.raw(sql);
   return result.rows[0]?.oldest_last_harvest ?? null;
 }
+
+// One row per CKAN record, however many datasets share it. source_type is
+// NULL on some ERDDAP rows, so ERDDAP is "not OBIS" rather than = 'erddap'.
+async function ckanLinkedRecords() {
+  const sql = `
+    SELECT ckan_id,
+           bool_or(source_type IS DISTINCT FROM 'obis') AS erddap,
+           bool_or(source_type = 'obis') AS obis
+    FROM cde.datasets
+    WHERE ckan_id IS NOT NULL
+    GROUP BY ckan_id
+  `;
+  const result = await db.raw(sql);
+  return result.rows;
+}
+
+// Every catalogue record's id and the regional catalogue it was harvested
+// from. Sorted by id so the pages don't shift under concurrent edits. A CKAN
+// outage must not hide the linked counts, so it degrades to null.
+async function ckanRecordSources() {
+  const sources = new Map();
+  try {
+    for (let start = 0, count = 1; start < count; start += CKAN_PAGE_ROWS) {
+      const { data } = await axios.get(CKAN_PACKAGE_SEARCH, {
+        params: {
+          rows: CKAN_PAGE_ROWS,
+          start,
+          fl: "id,harvest_source_title",
+          sort: "id asc",
+        },
+        timeout: CKAN_TIMEOUT_MS,
+      });
+      const { count: total, results } = data.result;
+      if (!Number.isInteger(total) || !results.length) break;
+      count = total;
+      for (const r of results)
+        sources.set(r.id, r.harvest_source_title || null);
+    }
+  } catch {
+    return null;
+  }
+  return sources;
+}
+
+function tallyCkanCoverage(linkedRows, recordSources) {
+  const tally = (rows) => ({
+    n_linked: rows.length,
+    n_erddap: rows.filter((r) => r.erddap).length,
+    n_obis: rows.filter((r) => r.obis).length,
+  });
+  if (!recordSources) {
+    return {
+      n_ckan_records: null,
+      ...tally(linkedRows),
+      n_linked_stale: null,
+      sources: null,
+    };
+  }
+  const bySource = new Map();
+  for (const source of recordSources.values()) {
+    const row = bySource.get(source) || { source, n_records: 0, linked: [] };
+    row.n_records += 1;
+    bySource.set(source, row);
+  }
+  const current = linkedRows.filter((r) => recordSources.has(r.ckan_id));
+  for (const r of current)
+    bySource.get(recordSources.get(r.ckan_id)).linked.push(r);
+  return {
+    n_ckan_records: recordSources.size,
+    ...tally(current),
+    n_linked_stale: linkedRows.length - current.length,
+    sources: [...bySource.values()]
+      .sort((a, b) => b.n_records - a.n_records)
+      .map(({ source, n_records, linked }) => ({
+        source,
+        n_records,
+        ...tally(linked),
+      })),
+  };
+}
+
+router.get(
+  "/ckan-coverage",
+  ...pipeline({ filters: false, cacheFor: "10 minutes" }),
+  async (req, res) => {
+    const [linkedRows, recordSources] = await Promise.all([
+      ckanLinkedRecords(),
+      ckanRecordSources(),
+    ]);
+    res.json(tallyCkanCoverage(linkedRows, recordSources));
+  },
+);
 
 router.get(
   "/freshness",
@@ -499,23 +574,6 @@ router.get(
     if (!run) return res.status(404).json({ error: "Run not found" });
     const attempts = await runAttempts(req.params.runId);
     res.json({ run, attempts });
-  },
-);
-
-router.get(
-  "/reasons",
-  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
-  async (req, res) => {
-    res.json(await reasonBreakdown());
-  },
-);
-
-router.get(
-  "/reasons/:slug",
-  ...pipeline({ filters: false, cacheFor: "2 minutes" }),
-  async (req, res) => {
-    const erddapUrl = await resolveErddapUrl(req.params.slug);
-    res.json(await reasonBreakdown(erddapUrl));
   },
 );
 

@@ -42,7 +42,6 @@ const DATASETS = [
     last_updated_at: null,
   },
 ];
-const REASONS = [{ reason_code: "HTTP_ERROR", n: 1 }];
 const WARNINGS = [
   {
     code: "NON_CF_STANDARD_NAMES",
@@ -72,7 +71,6 @@ describe("HarvestServer", () => {
   beforeEach(() => {
     installMockHarvestFetch({
       [`/servers/${SLUG}`]: DATASETS,
-      [`/reasons/${SLUG}`]: REASONS,
       [`/warnings/${SLUG}`]: WARNINGS,
     });
   });
@@ -140,7 +138,6 @@ describe("HarvestServer", () => {
     await screen.findByText("obs_270");
     installMockHarvestFetch({
       [`/servers/${SLUG}?status=error`]: [DATASETS[1]],
-      [`/reasons/${SLUG}`]: REASONS,
     });
     await user.selectOptions(screen.getByDisplayValue("All statuses"), "error");
     await waitFor(() => {
@@ -154,7 +151,6 @@ describe("HarvestServer", () => {
     await screen.findByText("obs_270");
     installMockHarvestFetch({
       [`/servers/${SLUG}?q=obs_512`]: [DATASETS[1]],
-      [`/reasons/${SLUG}`]: REASONS,
     });
     await user.type(
       screen.getByPlaceholderText("Search dataset / reason / error…"),
@@ -168,7 +164,6 @@ describe("HarvestServer", () => {
   it("shows the no-datasets message when the server has none", async () => {
     installMockHarvestFetch({
       [`/servers/${SLUG}`]: [],
-      [`/reasons/${SLUG}`]: [],
     });
     renderServer();
     expect(await screen.findByText("No datasets found.")).toBeInTheDocument();
@@ -190,7 +185,6 @@ describe("HarvestServer", () => {
     installMockHarvestFetch({
       [`/servers/${SLUG}`]: DATASETS,
       [`/servers/${SLUG}?warning=NON_CF_STANDARD_NAMES`]: [WARNED],
-      [`/reasons/${SLUG}`]: REASONS,
       [`/warnings/${SLUG}`]: WARNINGS,
     });
     await user.click(screen.getByText("Warnings (1)"));
@@ -214,7 +208,6 @@ describe("HarvestServer", () => {
   it("seeds the warning filter from the URL", async () => {
     installMockHarvestFetch({
       [`/servers/${SLUG}?warning=NON_CF_STANDARD_NAMES`]: [WARNED],
-      [`/reasons/${SLUG}`]: REASONS,
       [`/warnings/${SLUG}`]: WARNINGS,
     });
     renderServer(`/harvest/server/${SLUG}?warning=NON_CF_STANDARD_NAMES`);
@@ -227,7 +220,6 @@ describe("HarvestServer", () => {
   it("shows the first warning's label plus how many more in the reason column", async () => {
     installMockHarvestFetch({
       [`/servers/${SLUG}`]: [WARNED],
-      [`/reasons/${SLUG}`]: [],
       [`/warnings/${SLUG}`]: [],
     });
     renderServer();

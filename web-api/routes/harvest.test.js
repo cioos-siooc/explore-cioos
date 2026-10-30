@@ -1,12 +1,17 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const axiosStub = require("../test/axiosStub");
+
+const axios = axiosStub.install();
+
 const { createTestApp } = require("../test/testApp");
 
 const { agent, db, resetCache } = createTestApp();
 
 test.beforeEach(() => {
   db.reset();
+  axios.reset();
   resetCache();
 });
 
@@ -219,23 +224,6 @@ test("GET /harvest/runs/recent is not captured by /runs/:runId", async () => {
   assert.deepEqual(res.body, []);
 });
 
-test("GET /harvest/reasons returns the catalogue-wide failure breakdown", async () => {
-  db.queueRaw([{ reason_code: "HTTP_ERROR", n: 4 }]);
-  const res = await agent.get("/harvest/reasons");
-  assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ reason_code: "HTTP_ERROR", n: 4 }]);
-});
-
-test("GET /harvest/reasons/:slug scopes the breakdown to one server", async () => {
-  db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
-  db.queueRaw([{ reason_code: "HTTP_ERROR", n: 2 }]);
-
-  const res = await agent.get("/harvest/reasons/erddap-example-com-erddap");
-
-  assert.equal(res.status, 200);
-  assert.deepEqual(res.body, [{ reason_code: "HTTP_ERROR", n: 2 }]);
-});
-
 test("GET /harvest/warnings/:slug returns the per-code breakdown for one server", async () => {
   db.queueRaw([{ erddap_url: "https://erddap.example.com/erddap" }]); // resolveErddapUrl
   const row = {
@@ -256,4 +244,134 @@ test("GET /harvest/warnings/:slug returns the per-code breakdown for one server"
   );
   assert.match(db.queries[1], /status = 'success'/);
   assert.match(db.queries[1], /jsonb_array_elements\(ls\.warnings\)/);
+});
+
+const ckanPage = (count, results) => ({ data: { result: { count, results } } });
+
+test("GET /harvest/ckan-coverage splits linked records by the catalogue's harvest source", async () => {
+  db.queueRaw([
+    { ckan_id: "a1", erddap: true, obis: false },
+    { ckan_id: "a2", erddap: true, obis: true },
+    { ckan_id: "p1", erddap: false, obis: true },
+  ]);
+  axios.queueResponse(
+    ckanPage(5, [
+      { id: "a1", harvest_source_title: "CIOOS Atlantic" },
+      { id: "a2", harvest_source_title: "CIOOS Atlantic" },
+      { id: "a3", harvest_source_title: "CIOOS Atlantic" },
+      { id: "p1", harvest_source_title: "CIOOS Pacific" },
+      { id: "x1", harvest_source_title: "DataStream" },
+    ]),
+  );
+
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, {
+    n_ckan_records: 5,
+    n_linked: 3,
+    n_erddap: 2,
+    n_obis: 2,
+    n_linked_stale: 0,
+    sources: [
+      {
+        source: "CIOOS Atlantic",
+        n_records: 3,
+        n_linked: 2,
+        n_erddap: 2,
+        n_obis: 1,
+      },
+      {
+        source: "CIOOS Pacific",
+        n_records: 1,
+        n_linked: 1,
+        n_erddap: 0,
+        n_obis: 1,
+      },
+      {
+        source: "DataStream",
+        n_records: 1,
+        n_linked: 0,
+        n_erddap: 0,
+        n_obis: 0,
+      },
+    ],
+  });
+  assert.match(
+    axios.calls[0].url,
+    /catalogue\.cioos\.ca\/api\/3\/action\/package_search$/,
+  );
+  assert.equal(axios.calls[0].config.params.fl, "id,harvest_source_title");
+});
+
+test("GET /harvest/ckan-coverage pages through the whole catalogue", async () => {
+  db.queueRaw([]);
+  const page = (from, n) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `r${from + i}`,
+      harvest_source_title: "CIOOS Pacific",
+    }));
+  axios.queueResponse(ckanPage(1500, page(0, 1000)));
+  axios.queueResponse(ckanPage(1500, page(1000, 500)));
+
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(res.body.n_ckan_records, 1500);
+  assert.deepEqual(
+    axios.calls.map((c) => c.config.params.start),
+    [0, 1000],
+  );
+});
+
+test("GET /harvest/ckan-coverage keeps links to records the catalogue dropped out of the ratio", async () => {
+  db.queueRaw([
+    { ckan_id: "a1", erddap: true, obis: false },
+    { ckan_id: "gone", erddap: true, obis: false },
+  ]);
+  axios.queueResponse(ckanPage(1, [{ id: "a1" }]));
+
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(res.body.n_linked, 1);
+  assert.equal(res.body.n_linked_stale, 1);
+  assert.deepEqual(res.body.sources, [
+    { source: null, n_records: 1, n_linked: 1, n_erddap: 1, n_obis: 0 },
+  ]);
+});
+
+test("GET /harvest/ckan-coverage counts each CKAN record once, ERDDAP rows by not-OBIS", async () => {
+  db.queueRaw([]);
+  axios.queueResponse(ckanPage(0, []));
+
+  await agent.get("/harvest/ckan-coverage");
+
+  assert.match(db.queries[0], /GROUP BY ckan_id/);
+  assert.match(db.queries[0], /source_type IS DISTINCT FROM 'obis'/);
+  assert.match(db.queries[0], /WHERE ckan_id IS NOT NULL/);
+});
+
+test("GET /harvest/ckan-coverage keeps the linked counts when CKAN fails mid-listing", async () => {
+  db.queueRaw([
+    { ckan_id: "a1", erddap: true, obis: false },
+    { ckan_id: "p1", erddap: false, obis: true },
+  ]);
+  axios.queueResponse(
+    ckanPage(
+      2000,
+      Array.from({ length: 1000 }, (_, i) => ({ id: `r${i}` })),
+    ),
+  );
+  axios.queueError(new Error("connect ECONNREFUSED"));
+
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, {
+    n_ckan_records: null,
+    n_linked: 2,
+    n_erddap: 1,
+    n_obis: 1,
+    n_linked_stale: null,
+    sources: null,
+  });
 });

@@ -731,3 +731,96 @@ a.harvest-link:hover {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+.harvest-pie-disabled,
+.harvest-bars-disabled {
+  color: var(--harvest-muted);
+}
+
+/* ── Catalogue section (overview) ────────────────────────────────────────── */
+.harvest-catalogue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 2rem;
+  margin-bottom: 1rem;
+}
+
+.harvest-ckan-pct {
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.harvest-ckan-meter {
+  height: 8px;
+  margin: 0.25rem 0 0.5rem;
+  border-radius: 4px;
+  background: var(--harvest-input-border);
+  overflow: hidden;
+}
+
+.harvest-ckan-meter span {
+  display: block;
+  height: 100%;
+  background: var(--cioos-success);
+}
+
+.harvest-ckan-sources {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.harvest-ckan-sources li {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.harvest-ckan-sources .harvest-ckan-meter {
+  flex-basis: 100%;
+  height: 4px;
+  margin: 0.15rem 0 0;
+}
+
+.harvest-bars {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) auto minmax(0, 1fr) 3.5rem;
+  column-gap: 0.5rem;
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.harvest-bars li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.harvest-bars-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harvest-bars-track {
+  height: 10px;
+}
+
+.harvest-bars-bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+}
+
+.harvest-bars-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
