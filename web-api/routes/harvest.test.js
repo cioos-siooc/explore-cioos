@@ -29,6 +29,16 @@ test("GET /harvest/servers returns the per-server summary rows", async () => {
   assert.equal(res.body[0].erddap_url, "https://erddap.example.com/erddap");
 });
 
+test("GET /harvest/servers breaks each server's last-run failures down by reason", async () => {
+  db.queueRaw([]);
+
+  await agent.get("/harvest/servers");
+
+  assert.match(db.queries[0], /AS reasons/);
+  assert.match(db.queries[0], /x\.run_id = s\.last_run_id/);
+  assert.match(db.queries[0], /g\.status <> 'success'/);
+});
+
 test("GET /harvest/freshness returns the stalest catalogue source's last good run", async () => {
   db.queueRaw([{ oldest_last_harvest: "2026-10-20T04:00:00Z" }]);
 

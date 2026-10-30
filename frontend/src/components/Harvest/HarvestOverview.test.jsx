@@ -35,21 +35,11 @@ const RUNS = [
   },
 ];
 const REASONS = [{ reason_code: "HTTP_ERROR", n: 4 }];
-const DOWNLOADS_SUMMARY = {
-  n_completed: 10,
-  n_failed: 1,
-  n_open: 2,
-  n_stuck: 0,
-  n_stalled: 0,
-  last_request_at: "2024-03-02T00:00:00Z",
-};
-
 function stubRoutes(overrides = {}) {
   installMockHarvestFetch({
     "/servers": SERVERS,
     "/runs/recent": RUNS,
     "/reasons": REASONS,
-    "/downloads/summary": DOWNLOADS_SUMMARY,
     ...overrides,
   });
 }
@@ -59,11 +49,28 @@ describe("HarvestOverview", () => {
     stubRoutes();
   });
 
-  it("renders a server card per source, with its success/skip/error counts", async () => {
+  it("renders a server card per source, charting its harvested and failed datasets", async () => {
     renderWithProviders(<HarvestOverview />);
     expect(await screen.findByText("erddap.example.com")).toBeInTheDocument();
-    expect(screen.getByText("✓ 40")).toBeInTheDocument();
-    expect(screen.getByText("✗ 1")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "40 of 43 datasets harvested in the last run",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("splits a server's failures by reason when the API reports them", async () => {
+    stubRoutes({
+      "/servers": [
+        {
+          ...SERVERS[0],
+          reasons: [{ status: "error", reason_code: "HTTP_ERROR", n: 3 }],
+        },
+      ],
+    });
+    renderWithProviders(<HarvestOverview />);
+    const legend = await screen.findByRole("list");
+    expect(legend).toHaveTextContent("HTTP error3");
   });
 
   it("shows when each server last harvested successfully", async () => {
@@ -92,34 +99,6 @@ describe("HarvestOverview", () => {
     renderWithProviders(<HarvestOverview />);
     expect(await screen.findByText("HTTP error")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
-  });
-
-  it("shows the downloads summary counts and a link to the full page", async () => {
-    renderWithProviders(<HarvestOverview />);
-    expect(await screen.findByText(/10.*completed/)).toBeInTheDocument();
-    expect(screen.getByText(/1.*failed/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /View all/ })).toHaveAttribute(
-      "href",
-      "/harvest/downloads",
-    );
-  });
-
-  it("shows a stalled-queue warning when the queue is stuck", async () => {
-    stubRoutes({
-      "/downloads/summary": { ...DOWNLOADS_SUMMARY, n_stuck: 3 },
-    });
-    renderWithProviders(<HarvestOverview />);
-    expect(
-      await screen.findByText(/3 download requests are queued/),
-    ).toBeInTheDocument();
-  });
-
-  it("omits the stalled-queue warning when nothing is stuck", async () => {
-    renderWithProviders(<HarvestOverview />);
-    await screen.findByText("erddap.example.com");
-    expect(
-      screen.queryByText(/download request.*queued/),
-    ).not.toBeInTheDocument();
   });
 
   it("links each server card to its /harvest/server/<slug> page", async () => {

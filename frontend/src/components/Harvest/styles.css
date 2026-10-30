@@ -2,7 +2,6 @@
 .harvest-root {
   --harvest-success-ink: #0e3d35;
   --harvest-error-ink: #7a1520;
-  --harvest-error-border: #e8b9bf;
   --harvest-warn-bg: #f3ecd6;
   --harvest-warn-ink: #7a5c00;
   --harvest-warn-border: #ddd0b0;
@@ -263,13 +262,6 @@
   white-space: nowrap;
 }
 
-.harvest-card-counts {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-}
-
 .harvest-count-pill {
   display: inline-flex;
   align-items: center;
@@ -313,41 +305,6 @@
   margin: 1.75rem 0 0.75rem;
   padding-bottom: 0.35rem;
   border-bottom: 2px solid var(--cioos-teal-light);
-}
-
-.harvest-section-link {
-  float: right;
-  font-size: 0.82rem;
-  font-weight: 400;
-}
-
-/* The scheduler being down. Loud on purpose: nothing else reveals it. */
-.harvest-queue-warning {
-  background: var(--cioos-error-bg);
-  color: var(--harvest-error-ink);
-  border: 1px solid var(--harvest-error-border);
-  border-radius: 4px;
-  padding: 0.6rem 0.9rem;
-  margin: 1rem 0;
-  font-size: 0.9rem;
-}
-
-.harvest-queue-warning a {
-  color: var(--harvest-error-ink);
-}
-
-.harvest-error-block {
-  background: var(--cioos-error-bg);
-  color: var(--harvest-error-ink);
-  border: 1px solid var(--harvest-error-border);
-  border-radius: 4px;
-  padding: 0.75rem;
-  font-size: 0.75rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  max-height: 320px;
-  overflow: auto;
 }
 
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
@@ -685,4 +642,92 @@ a.harvest-link:hover {
   margin: 1rem 0 1.5rem;
   overflow-x: auto;
   text-align: center;
+}
+
+/* ── Server card pie (harvested vs failure reasons) ──────────────────────── */
+.harvest-pie {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.harvest-pie svg {
+  flex: none;
+}
+
+.harvest-pie-slice {
+  stroke: var(--cioos-white);
+  stroke-width: 1px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.harvest-pie-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.harvest-pie-item:hover,
+.harvest-pie-item[aria-pressed="true"] {
+  background: var(--harvest-row-hover);
+}
+
+.harvest-pie-dimmed {
+  opacity: 0.5;
+}
+
+.harvest-pie-detail .harvest-pie {
+  max-width: 560px;
+  margin-bottom: 1rem;
+}
+
+.harvest-pie-detail .harvest-pie-legend {
+  font-size: 0.85rem;
+}
+
+.harvest-pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  flex: 1;
+  font-size: 0.75rem;
+}
+
+.harvest-pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.harvest-pie-swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.harvest-pie-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harvest-pie-value {
+  margin-left: auto;
+  color: var(--harvest-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
