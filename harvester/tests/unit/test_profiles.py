@@ -129,6 +129,22 @@ class TestGetProfilesEmptyAndEdgeCases:
         dropped = {w["code"]: w for w in bad_geometry_dataset.warnings}["FEATURES_DROPPED"]
         assert dropped["count"] == 1
         assert dropped["items"] == ["STATION_001"]
+        assert bad_geometry_dataset.no_features_reason == dropped["message"]
+
+    def test_bad_depth_range_kept_without_depth(self, single_station_dataset):
+        """QC-flagged recovery spikes (amundsen13107_ips5: -24413 m) land in
+        actual_range; the feature stays, only its depth range is dropped."""
+        single_station_dataset.df_variables.loc["depth", "actual_range"] = (
+            "-24413.14,77.05393"
+        )
+        result = get_profiles(single_station_dataset)
+        assert len(result) == 1
+        assert result["depth_min"].isna().all()
+        assert result["depth_max"].isna().all()
+        warning = {w["code"]: w for w in single_station_dataset.warnings}[
+            "DEPTH_RANGE_UNAVAILABLE"
+        ]
+        assert warning["items"] == ["STATION_001"]
 
     def test_unparseable_time_feature_filtered_out(self, single_station_dataset):
         """A time pandas can't represent (year 0019, a typo for 2019) coerces
