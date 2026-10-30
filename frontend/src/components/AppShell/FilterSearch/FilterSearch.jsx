@@ -34,8 +34,11 @@ import {
 } from "../../../state/useRegionSearch.js";
 import useFilterModel from "../../../state/useFilterModel.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
-import { useFilters } from "../../../state/filters/FilterProvider.jsx";
-import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import {
+  SEARCH_ALL,
+  SEARCH_TITLES,
+  useFilters,
+} from "../../../state/filters/FilterProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import {
   ExcludedLabel,
@@ -236,8 +239,7 @@ export default function FilterSearch({
   inputRef,
 }) {
   const { t } = useTranslation();
-  const { obisDataAvailable } = useFilters();
-  const { datasetTitleSearchText, setDatasetTitleSearchText } = useSelection();
+  const { obisDataAvailable, searchText, searchIn, setSearch } = useFilters();
   const { setOpenFilter, setShowFiltersModal } = useUI();
   const [canReset, resetAll] = useResetAllFilters();
   const listId = useId();
@@ -286,19 +288,23 @@ export default function FilterSearch({
       .map((g) => ({ ...g, options: g.options.filter((o) => !o.includeOnly) }))
       .filter((g) => g.options.length > 0);
   } else if (term) {
-    const searching = datasetTitleSearchText === term;
+    const scopeOption = (id, scope, labelKey) => {
+      const searching = searchText === term && searchIn === scope;
+      return {
+        id,
+        label: t(labelKey, { term }),
+        state: searching ? "include" : undefined,
+        includeOnly: true,
+        toggle: () => setSearch(searching ? "" : term, scope),
+      };
+    };
     shown = [
       {
         key: "text",
         label: t("textSearchFilterName"),
         options: [
-          {
-            id: "text-new",
-            label: t("filterSearchTitleOption", { term }),
-            state: searching ? "include" : undefined,
-            includeOnly: true,
-            toggle: () => setDatasetTitleSearchText(searching ? "" : term),
-          },
+          scopeOption("text-new", SEARCH_TITLES, "filterSearchTitleOption"),
+          scopeOption("text-all", SEARCH_ALL, "filterSearchAllOption"),
         ],
       },
       ...shown.filter((g) => g.key !== "text"),

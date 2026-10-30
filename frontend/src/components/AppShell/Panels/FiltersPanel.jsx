@@ -127,15 +127,10 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
     allObisNodesExcluded,
     showObis,
     obisDataAvailable,
+    searchText: appliedSearchText,
   } = useFilters();
-  const {
-    datasetTitleSearchText,
-    onlyInView,
-    setOnlyInView,
-    inViewCount,
-    polygon,
-    areaPlace,
-  } = useSelection();
+  const { onlyInView, setOnlyInView, inViewCount, polygon, areaPlace } =
+    useSelection();
   const { openFilter, setOpenFilter, filterSearchText } = useUI();
   // Kept here so a visit to a filter's own page and back finds it as left.
   const [searchText, setSearchText] = useState(filterSearchText ?? "");
@@ -313,7 +308,7 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
               data-testid="filters-panel-search"
               className={classNames("filterHeader", {
                 open: !openFilter,
-                active: Boolean(datasetTitleSearchText),
+                active: Boolean(appliedSearchText),
               })}
               aria-current={!openFilter ? "true" : undefined}
               onClick={() => setOpenFilter(undefined)}

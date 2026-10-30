@@ -44,6 +44,10 @@ import {
 
 const FilterContext = createContext();
 
+// The API's searchIn scopes (web-api/utils/dbFilter.js).
+export const SEARCH_TITLES = "titles";
+export const SEARCH_ALL = "all";
+
 export function useFilters() {
   return useContext(FilterContext);
 }
@@ -61,6 +65,8 @@ export const defaultQuery = {
   obisNodesSelected: defaultObisNodesSelected,
   erddapServersSelected: defaultErddapServersSelected,
   realtimeOnly: defaultRealtimeOnly,
+  searchText: "",
+  searchIn: SEARCH_TITLES,
   eovsMatchAll: true,
   orgsMatchAll: false,
   scientificNamesExcluded: defaultScientificNamesSelected,
@@ -123,6 +129,19 @@ export default function FilterProvider({ children }) {
 
   // Not debounced: a single toggle, unlike the list filters.
   const [realtimeOnly, setRealtimeOnly] = useState(defaultRealtimeOnly);
+
+  // Not debounced either: the search box submits on Enter.
+  const [search, setSearchState] = useState(() => {
+    const params = new URL(window.location.href).searchParams;
+    return {
+      text: params.get("search") || "",
+      in: params.get("searchIn") === SEARCH_ALL ? SEARCH_ALL : SEARCH_TITLES,
+    };
+  });
+  const setSearch = useCallback(
+    (text, scope = SEARCH_TITLES) => setSearchState({ text, in: scope }),
+    [],
+  );
 
   const [startDate, setStartDate] = useState(defaultStartDate);
   const debouncedStartDate = useDebounce(startDate, 500);
@@ -200,6 +219,8 @@ export default function FilterProvider({ children }) {
       obisNodesSelected: debouncedObisNodesSelected,
       erddapServersSelected: debouncedErddapServersSelected,
       realtimeOnly,
+      searchText: search.text,
+      searchIn: search.in,
       eovsMatchAll,
       orgsMatchAll,
       scientificNamesMatchAll,
@@ -218,6 +239,7 @@ export default function FilterProvider({ children }) {
       debouncedObisNodesSelected,
       debouncedErddapServersSelected,
       realtimeOnly,
+      search,
       eovsMatchAll,
       orgsMatchAll,
       scientificNamesMatchAll,
@@ -501,6 +523,7 @@ export default function FilterProvider({ children }) {
 
   function resetFilters() {
     setRealtimeOnly(defaultRealtimeOnly);
+    setSearch("");
     setEovsMatchAll(true);
     setOrgsMatchAll(false);
     setScientificNamesMatchAll(false);
@@ -586,6 +609,9 @@ export default function FilterProvider({ children }) {
     setSourcesSearchTerms,
     realtimeOnly,
     setRealtimeOnly,
+    searchText: search.text,
+    searchIn: search.in,
+    setSearch,
     eovsMatchAll,
     setEovsMatchAll,
     orgsMatchAll,

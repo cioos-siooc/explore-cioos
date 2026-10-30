@@ -164,17 +164,6 @@ describe("SelectionProvider", () => {
     );
   });
 
-  it("flags the open dataset out of the results when the title search excludes it", async () => {
-    await renderLoaded();
-    const target = latest.pointsData[0];
-    act(() => latest.setInspectDataset(target));
-    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(false));
-
-    act(() => latest.setDatasetTitleSearchText("no-title-matches-this"));
-    await waitFor(() => expect(latest.inspectDatasetExcluded).toBe(true));
-    expect(latest.inspectDataset?.pk).toBe(target.pk);
-  });
-
   it("goes back to the list entry a dataset page was opened from", async () => {
     await renderLoaded();
     const target = latest.pointsData[0];
@@ -225,59 +214,45 @@ describe("SelectionProvider", () => {
     expect(latest.pointsToReview.some((p) => p.pk === 999999)).toBe(false);
   });
 
-  it("datasetTitleSearchText narrows filteredDatasets by title", async () => {
+  it("sends the search to /pointQuery and the map as a filter, not a pk list", async () => {
     await renderLoaded();
-    const target = latest.pointsData[0];
-    const needle = target.title.slice(0, 6);
-    act(() => latest.setDatasetTitleSearchText(needle));
-    await waitFor(() => {
-      expect(latest.filteredDatasets.length).toBeGreaterThan(0);
-      expect(
-        latest.filteredDatasets.every((row) =>
-          row.title.toLowerCase().includes(needle.toLowerCase()),
-        ),
-      ).toBe(true);
-    });
-  });
-
-  it("datasetTitleSearchText narrows the map's queries too, not just the list", async () => {
-    await renderLoaded();
-    const target = latest.pointsData[0];
-    const needle = target.title.slice(0, 6);
-    const excluded = latest.pointsData.find(
-      (row) => !row.title.toLowerCase().includes(needle.toLowerCase()),
+    const realFetch = globalThis.fetch;
+    const requested = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/pointQuery?")) {
+          requested.push(new URL(url).searchParams);
+        }
+        return realFetch(input, init);
+      }),
     );
-    expect(
-      new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
-    ).toBeNull();
 
-    act(() => latest.setDatasetTitleSearchText(needle));
-    await waitFor(() => {
-      const drawn = new URLSearchParams(latestMapState.mapQueryString)
-        .get("datasetPKs")
-        ?.split(",");
-      expect(drawn).toContain(String(target.pk));
-      expect(drawn).toEqual(
-        latest.filteredDatasets.map((row) => String(row.pk)),
-      );
-    });
-    if (excluded) {
-      expect(
-        new URLSearchParams(latestMapState.mapQueryString)
-          .get("datasetPKs")
-          .split(","),
-      ).not.toContain(String(excluded.pk));
-    }
-
-    act(() => latest.setDatasetTitleSearchText(""));
+    act(() => latestFilters.setSearch("sea ice", "all"));
     await waitFor(() =>
       expect(
-        new URLSearchParams(latestMapState.mapQueryString).get("datasetPKs"),
+        requested.some(
+          (params) =>
+            params.get("search") === "sea ice" &&
+            params.get("searchIn") === "all",
+        ),
+      ).toBe(true),
+    );
+    const drawn = new URLSearchParams(latestMapState.mapQueryString);
+    expect(drawn.get("search")).toBe("sea ice");
+    expect(drawn.get("searchIn")).toBe("all");
+    expect(drawn.get("datasetPKs")).toBeNull();
+
+    act(() => latestFilters.setSearch(""));
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(latestMapState.mapQueryString).get("search"),
       ).toBeNull(),
     );
   });
 
-  it("inViewCount counts the filtered datasets in view — the title search moves it", async () => {
+  it("inViewCount counts the filtered datasets in view", async () => {
     // The fixture rows carry no bbox; give every one the same point so a
     // world-sized viewport has them all in view.
     const mockedFetch = globalThis.fetch;
@@ -308,16 +283,6 @@ describe("SelectionProvider", () => {
     await waitFor(() =>
       expect(latest.inViewCount).toBe(latest.pointsData.length),
     );
-
-    const needle = latest.pointsData[0].title.slice(0, 6);
-    act(() => latest.setDatasetTitleSearchText(needle));
-    await waitFor(() =>
-      expect(latest.inViewCount).toBe(latest.filteredDatasets.length),
-    );
-    expect(latest.inViewCount).toBeLessThan(latest.pointsData.length);
-
-    act(() => latest.setDatasetTitleSearchText("zzzzqqq"));
-    await waitFor(() => expect(latest.inViewCount).toBe(0));
   });
 
   it("the server's in-view answer overrides a bbox that merely overlaps the view", async () => {

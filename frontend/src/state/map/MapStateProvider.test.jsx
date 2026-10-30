@@ -14,8 +14,7 @@ let latest;
 function Probe() {
   latest = { ...useMapState(), ...useMapView() };
   // SelectionProvider's initial /pointQuery can settle after legendLoading
-  // clears and reset mapDatasetPKs to undefined, clobbering what this suite
-  // sets, so wait for both loads.
+  // clears, so wait for both loads.
   const { initialPointsQueryComplete } = useSelection();
   const ready = !latest.legendLoading && initialPointsQueryComplete;
   return <span data-testid="state">{ready ? "ready" : "loading"}</span>;
@@ -205,17 +204,5 @@ describe("MapStateProvider", () => {
     await renderReady();
     act(() => latest.requestDraw("box"));
     expect(latest.drawRequest.mode).toBe("box");
-  });
-
-  it("narrows mapQueryString's datasetPKs to mapDatasetPKs, when set", async () => {
-    await renderReady();
-    const withoutHidden = latest.mapQueryString;
-    act(() => latest.setMapDatasetPKs([1, 2]));
-    await waitFor(() => {
-      expect(new URLSearchParams(latest.mapQueryString).get("datasetPKs")).toBe(
-        "1,2",
-      );
-    });
-    expect(latest.mapQueryString).not.toBe(withoutHidden);
   });
 });

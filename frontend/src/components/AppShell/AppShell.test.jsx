@@ -122,8 +122,15 @@ describe("AppShell (composition)", () => {
     window.localStorage.setItem("cde.introSeen", "true");
     renderWithProviders(<AppShell />, {
       providers: "app",
-      url: `/?dataset=${pointQueryFixture[0].dataset_id}&search=no-title-matches-this`,
+      url: `/?dataset=${pointQueryFixture[0].dataset_id}`,
     });
+    await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
+    // The keyed /pointQuery fixture for this search leaves the dataset out.
+    await user.keyboard("{Control>}k{/Control}");
+    await user.type(
+      await screen.findByTestId("filter-search-input"),
+      "temperature{Enter}",
+    );
     await screen.findByText(
       "This dataset doesn't match your current filters.",
       {},

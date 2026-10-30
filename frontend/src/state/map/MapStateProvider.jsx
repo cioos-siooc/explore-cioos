@@ -19,7 +19,6 @@ import {
   trailingWindowOptions,
 } from "../../components/config.js";
 import {
-  applyDatasetPKs,
   createDataFilterQueryString,
   getCurrentRangeLevel,
   rangesEqual,
@@ -189,15 +188,11 @@ function MapViewProvider({ rangeLevels, coverageRangeLevels, children }) {
 export default function MapStateProvider({ children }) {
   const { query } = useFilters();
 
-  // Pushed from SelectionProvider (downstream of this provider). Map-only on
-  // purpose: the list, its counts and the download selection keep hidden
-  // datasets. undefined = nothing hidden.
-  const [mapDatasetPKs, setMapDatasetPKs] = useState();
   // Memoized: the query string build does full passes over every filter
   // array.
   const mapQueryString = useMemo(
-    () => applyDatasetPKs(createDataFilterQueryString(query), mapDatasetPKs),
-    [query, mapDatasetPKs],
+    () => createDataFilterQueryString(query),
+    [query],
   );
   const [rangeLevels, setRangeLevels] = useState();
   // The whole dedupe test for the refetch effect below.
@@ -508,8 +503,6 @@ export default function MapStateProvider({ children }) {
     featureQuery,
     sharedFeatureQueryAt,
     setFeatureQuery,
-    mapDatasetPKs,
-    setMapDatasetPKs,
     mapQueryString,
     loadLegend: () => loadLegend(mapQueryString),
   };

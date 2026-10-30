@@ -17,7 +17,7 @@ import {
 
 import { appliedOptions } from "./filterSearch.js";
 import useFilterModel from "./useFilterModel.js";
-import { useSelection } from "./selection/SelectionProvider.jsx";
+import { useFilters } from "./filters/FilterProvider.jsx";
 import { useUI } from "./ui/UIProvider.jsx";
 
 // Same icon as the filter's FiltersPanel row.
@@ -51,7 +51,7 @@ export const QUICK_FILTER_KEYS = new Set(["area", "inView", "realtime"]);
 // useFilterModel so chips, the Filters badge and the palette cannot disagree.
 export default function useActiveFilters() {
   const model = useFilterModel();
-  const { datasetTitleSearchText } = useSelection();
+  const { searchText } = useFilters();
   const { setShowFiltersModal, setOpenFilter, openFilterSearch } = useUI();
 
   return model.flatMap((group) => {
@@ -68,7 +68,7 @@ export default function useActiveFilters() {
             setOpenFilter(group.panelName);
             setShowFiltersModal(true);
           }
-        : () => openFilterSearch(datasetTitleSearchText),
+        : () => openFilterSearch(searchText),
       items: applied.map((option) => ({
         id: option.id,
         label: option.label,
