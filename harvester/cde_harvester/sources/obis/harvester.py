@@ -26,6 +26,7 @@ from cde_harvester.core.schemas import (
     VariableSchema,
 )
 from cde_harvester.sources.base import BaseHarvester, HarvestResult
+from cde_harvester.sources.ckan.create_ckan_erddap_link import with_owner
 from cde_harvester.sources.ckan.create_ckan_obis_link import get_ckan_obis_records
 from cde_harvester.sources.obis.discovery import ObisDatasetDiscovery
 from cde_harvester.sources.obis.geo_filter import ObisGeoFilter
@@ -381,9 +382,18 @@ class OBISHarvester(BaseHarvester):
             lambda r: r["ckan_eovs"] if isinstance(r.get("ckan_eovs"), list) and r["ckan_eovs"] else r["eovs"],
             axis=1,
         )
+        df_datasets["organizations"] = df_datasets.apply(
+            lambda r: with_owner(
+                r["ckan_organizations"]
+                if isinstance(r.get("ckan_organizations"), list) and r["ckan_organizations"]
+                else r["organizations"],
+                r.get("ckan_owner"),
+            ),
+            axis=1,
+        )
         df_datasets["title"] = df_datasets["ckan_title"].fillna(df_datasets["title"])
 
-        df_datasets.drop(columns=["ckan_eovs", "ckan_title"], inplace=True)
+        df_datasets.drop(columns=["ckan_eovs", "ckan_organizations", "ckan_owner", "ckan_title"], inplace=True)
         df_datasets.rename(columns={"ckan_metadata": "metadata"}, inplace=True)
 
         return df_datasets
