@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
@@ -171,36 +171,44 @@ describe("Legend", () => {
     expect(tool).toBeDisabled();
   });
 
-  it("switches the depth colours from the depth group, and disables the switch with the layer", () => {
+  it("switches to CHS's depth colours and back from the depth group, and disables the switch with the layer", () => {
     const onPaletteChange = vi.fn();
-    const bathymetry = (checked) => ({
+    const bathymetry = (checked, palette) => ({
       key: "bathymetry",
       label: "Seafloor depth",
       checked,
       onChange: () => {},
-      palette: "deep",
+      palette,
       onPaletteChange,
     });
     const { rerender } = renderLegend({
       zoom: 12,
-      controls: { bathymetry: bathymetry(true) },
+      controls: { bathymetry: bathymetry(true, "deep") },
     });
-    const group = screen.getByRole("group", { name: "Depth colours" });
-    const safe = within(group).getByRole("button", { name: "Colour-safe" });
-    const chs = within(group).getByRole("button", { name: "CHS" });
-    expect(safe).toHaveAttribute("aria-pressed", "true");
-    expect(chs).toHaveAttribute("aria-pressed", "false");
-    chs.click();
+    const button = screen.getByRole("button", { name: "CHS depth colours" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    button.click();
     expect(onPaletteChange).toHaveBeenCalledWith("chs");
 
     rerender(
       <Legend
         {...BASE_PROPS}
         zoom={12}
-        controls={{ bathymetry: bathymetry(false) }}
+        controls={{ bathymetry: bathymetry(true, "chs") }}
       />,
     );
-    expect(chs).toBeDisabled();
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    button.click();
+    expect(onPaletteChange).toHaveBeenLastCalledWith("deep");
+
+    rerender(
+      <Legend
+        {...BASE_PROPS}
+        zoom={12}
+        controls={{ bathymetry: bathymetry(false, "chs") }}
+      />,
+    );
+    expect(button).toBeDisabled();
   });
 
   it("renders layer switches with no key on the map under their own group", () => {

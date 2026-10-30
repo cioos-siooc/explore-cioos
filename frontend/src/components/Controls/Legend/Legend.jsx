@@ -9,6 +9,7 @@ import {
   Crosshair,
   HexagonFill,
   InfoCircle,
+  Palette,
 } from "react-bootstrap-icons";
 
 import {
@@ -435,31 +436,7 @@ export default function Legend({
             );
           })}
         </div>
-        <div className="legendBathymetryFooter">
-          <p className="legendWarning">
-            {t("legendBathymetryNotForNavigation")}
-          </p>
-          {controls.bathymetry?.onPaletteChange && (
-            <div
-              className="legendPaletteToggle"
-              role="group"
-              aria-label={t("legendBathymetryPalette")}
-            >
-              {Object.keys(bathymetryPalettes).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={palette === option}
-                  disabled={hidden}
-                  title={t(`legendBathymetryPaletteTitle_${option}`)}
-                  onClick={() => controls.bathymetry.onPaletteChange(option)}
-                >
-                  {t(`legendBathymetryPalette_${option}`)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <p className="legendWarning">{t("legendBathymetryNotForNavigation")}</p>
       </div>
     );
   }
@@ -600,6 +577,29 @@ export default function Legend({
       <Crosshair size={11} aria-hidden="true" />
     </button>
   );
+  // Two palettes, so one button: pressed is CHS's, and the bar shows which.
+  const chsColours = controls.bathymetry?.palette === "chs";
+  const paletteButton = controls.bathymetry?.onPaletteChange && (
+    <button
+      type="button"
+      className={classNames("legendToolButton", { active: chsColours })}
+      onClick={() =>
+        controls.bathymetry.onPaletteChange(
+          chsColours ? defaultBathymetryPalette : "chs",
+        )
+      }
+      disabled={!controls.bathymetry.checked}
+      aria-pressed={chsColours}
+      title={t(
+        chsColours
+          ? "legendBathymetryPaletteToDeep"
+          : "legendBathymetryPaletteToChs",
+      )}
+      aria-label={t("legendBathymetryPaletteChs")}
+    >
+      <Palette size={11} aria-hidden="true" />
+    </button>
+  );
   const layerSwitches = renderLayerSwitches();
 
   // The last group's switches are labelled already, so they stand in its label
@@ -634,7 +634,12 @@ export default function Legend({
         {
           control: controls.bathymetry,
           tooltip: t("legendBathymetryTitle"),
-          action: depthToolButton,
+          action: (
+            <>
+              {paletteButton}
+              {depthToolButton}
+            </>
+          ),
         },
         bathymetryBar,
       ),
