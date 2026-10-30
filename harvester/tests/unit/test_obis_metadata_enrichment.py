@@ -31,11 +31,12 @@ def _metadata(dataset_id):
     }
 
 
-def _ckan(*dataset_ids, organizations=("CKAN org",)):
+def _ckan(*dataset_ids, organizations=("CKAN org",), owner=None):
     return pd.DataFrame(
         [
             {"dataset_id": d, "ckan_id": f"ckan-{d}", "ckan_eovs": ["fishAbundanceAndDistribution"],
-             "ckan_organizations": list(organizations), "ckan_title": "CKAN title", "title_fr": "Titre CKAN",
+             "ckan_organizations": list(organizations), "ckan_owner": owner,
+             "ckan_title": "CKAN title", "title_fr": "Titre CKAN",
              "ckan_metadata": {"abstract": {"en": "CKAN abstract"}}}
             for d in dataset_ids
         ],
@@ -99,6 +100,17 @@ def test_ckan_record_without_organizations_keeps_obis_institutes(harvester, mock
     )
     mocker.patch.object(obis_harvester, "map_obis_to_cioos", return_value=CONVERTED)
     assert _enrich(harvester).loc[MATCHED, "organizations"] == ["OBIS institute"]
+
+
+def test_ckan_owner_added_after_the_institutes_fallback(harvester, mocker):
+    mocker.patch.object(
+        obis_harvester, "get_ckan_obis_records",
+        return_value=_ckan(MATCHED, organizations=(), owner="St. Lawrence Global Observatory (SLGO)"),
+    )
+    mocker.patch.object(obis_harvester, "map_obis_to_cioos", return_value=CONVERTED)
+    df = _enrich(harvester)
+    assert df.loc[MATCHED, "organizations"] == ["OBIS institute", "St. Lawrence Global Observatory (SLGO)"]
+    assert df.loc[UNMATCHED, "organizations"] == ["OBIS institute"]
 
 
 def test_unmatched_dataset_takes_converted_eovs_and_abstract(harvester, mocker):

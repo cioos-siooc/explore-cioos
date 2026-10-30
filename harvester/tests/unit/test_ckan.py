@@ -263,7 +263,7 @@ class TestCkanUnavailable:
         load.assert_called_once_with(["https://obis.org"])
         assert df.to_dict("records") == [{
             "dataset_id": "uuid-1", "ckan_id": "ckan-uuid-1", "ckan_eovs": ["fish"],
-            "ckan_organizations": [], "ckan_title": "Stored", "title_fr": "Stocké",
+            "ckan_organizations": [], "ckan_owner": None, "ckan_title": "Stored", "title_fr": "Stocké",
             "ckan_metadata": {"abstract": {"en": "Stored abstract"}},
         }]
 
@@ -310,7 +310,7 @@ class TestGetCkanObisRecords:
         df = get_ckan_obis_records({OBIS_UUID: None, "11111111-1111-4111-8111-111111111111": None})
         assert df.to_dict("records") == [{
             "dataset_id": OBIS_UUID, "ckan_id": "by-uuid", "ckan_eovs": ["fishAbundanceAndDistribution"],
-            "ckan_organizations": [], "ckan_title": "by-uuid en", "title_fr": "by-uuid fr",
+            "ckan_organizations": [], "ckan_owner": None, "ckan_title": "by-uuid en", "title_fr": "by-uuid fr",
             "ckan_metadata": {"resources": [
                 {"url": "https://catalogue.example/notes.pdf"},
                 {"url": f"https://obis.org/dataset/{OBIS_UUID}"},
@@ -341,6 +341,17 @@ class TestGetCkanObisRecords:
         df = get_ckan_obis_records({OBIS_UUID: None})
         assert df["ckan_organizations"].tolist() == [["Comité ZIP Côte-Nord du Golfe"]]
 
+    @pytest.mark.parametrize(("owner", "expected"), [
+        ("slgo", "St. Lawrence Global Observatory (SLGO)"),
+        ("cioos-pacific", "CIOOS Pacific"),
+        ("unknown-owner", None),
+    ])
+    def test_owner_named_from_the_owner_map(self, mocker, owner, expected):
+        record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
+        record["organization"] = {"name": owner, "title": "Titre en français"}
+        _make_ckan_get(mocker, _search_pages(record))
+        assert get_ckan_obis_records({OBIS_UUID: None})["ckan_owner"].tolist() == [expected]
+
     def test_titles_cleaned_like_erddap(self, mocker):
         record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
         record["title_translated"] = {"en": "Line\\none"}
@@ -357,7 +368,7 @@ class TestGetCkanObisRecords:
 
 
 class TestMergeCkanJoin:
-    def _merge(self, mocker, tmp_path, ckan_erddap_url, ckan_available=True):
+    def _merge(self, mocker, tmp_path, ckan_erddap_url, ckan_available=True, **ckan_columns):
         from cde_harvester.__main__ import merge_and_write_csvs
 
         logger = mocker.MagicMock()
@@ -379,6 +390,7 @@ class TestMergeCkanJoin:
             "ckan_title": ["CKAN title"],
             "title_fr": ["Titre"],
             "ckan_metadata": [{"abstract": {"en": "CKAN"}}],
+            **ckan_columns,
         })
         merge_and_write_csvs.fn(
             str(tmp_path), erddap_datasets,
@@ -447,3 +459,17 @@ class TestMergeCkanJoin:
     def test_hash_kept_when_ckan_available(self, mocker, tmp_path):
         datasets, _ = self._merge(mocker, tmp_path, "https://erddap.amundsenscience.com/erddap")
         assert datasets.loc["matched", "content_hash"] == "h1"
+
+    def test_owner_added_to_ckan_organizations(self, mocker, tmp_path):
+        datasets, _ = self._merge(
+            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap", ckan_owner=["Amundsen Science"],
+        )
+        assert ast.literal_eval(datasets.loc["matched", "organizations"]) == ["CKAN org", "Amundsen Science"]
+        assert ast.literal_eval(datasets.loc["orphan", "organizations"]) == ["org"]
+
+    def test_owner_does_not_suppress_the_erddap_fallback(self, mocker, tmp_path):
+        datasets, _ = self._merge(
+            mocker, tmp_path, "https://erddap.amundsenscience.com/erddap",
+            ckan_organizations=[[]], ckan_owner=["Amundsen Science"],
+        )
+        assert ast.literal_eval(datasets.loc["matched", "organizations"]) == ["org", "Amundsen Science"]

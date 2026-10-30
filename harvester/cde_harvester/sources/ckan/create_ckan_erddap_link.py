@@ -94,12 +94,34 @@ def remove_newlines(s):
     return s
 
 
+# Owners' CKAN titles are French; these names match the cited organizations.
+CKAN_OWNER_ORGANIZATIONS = {
+    "slgo": "St. Lawrence Global Observatory (SLGO)",
+    "cioos-pacific": "CIOOS Pacific",
+    "cioos-atlantic": "CIOOS Atlantic",
+    "amundsen-science": "Amundsen Science",
+    "datastream": "DataStream",
+    "fisheries-and-oceans-canada": "Fisheries and Oceans Canada",
+}
+
+
 def ckan_organizations(record):
     organizations = [
         unescape_ascii(contact.get("organisation-name"))
         for contact in record.get("cited-responsible-party", [])
     ]
     return list(filter(None, set(organizations)))
+
+
+def ckan_owner(record):
+    return CKAN_OWNER_ORGANIZATIONS.get((record.get("organization") or {}).get("name"))
+
+
+def with_owner(organizations, owner):
+    """Owner added after the source fallback: it alone must not suppress it."""
+    if isinstance(owner, str) and owner not in organizations:
+        return [*organizations, owner]
+    return organizations
 
 
 @task(task_run_name="fetch-ckan-metadata")
@@ -158,6 +180,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
                     ckan_record_text,
                     is_subset,
                     metadata,
+                    ckan_owner(record_full),
                 ],
             )
 
@@ -170,6 +193,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
         "title_fr": [x[4]["title_fr"] for x in out],
         "is_subset": [x[5] for x in out],
         "ckan_metadata": [x[6] for x in out],
+        "ckan_owner": [x[7] for x in out],
     }
 
     df = pd.DataFrame(line)
