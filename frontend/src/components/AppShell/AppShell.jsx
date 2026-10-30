@@ -78,6 +78,9 @@ export default function AppShell() {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
+    depthReading,
+    depthToolActive,
+    setDepthToolActive,
     tracksMode,
     toggleTrackLines,
     dataLayers,
@@ -145,6 +148,8 @@ export default function AppShell() {
         controls={legendControls}
         layerControls={layerControls}
         dataLayers={dataLayers}
+        depthReading={depthReading}
+        depthTool={{ active: depthToolActive, onChange: setDepthToolActive }}
         startDate={startDate}
         endDate={endDate}
         timeFilterActive={timeFilterActive}

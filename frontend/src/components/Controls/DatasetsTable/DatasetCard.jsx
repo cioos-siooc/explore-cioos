@@ -27,7 +27,6 @@ import {
 } from "../../../downloadLinks.js";
 import erddapServersJSONfile from "../../../erddapServers.json";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
-import Skeleton from "../../ui/Skeleton.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import Tooltip from "../../ui/Tooltip.jsx";
 
@@ -280,27 +279,6 @@ export default function DatasetCard({
 // The dataset's glyph, shaped like what the map draws for it: a grid for a
 // gridded footprint, a hexagon for trajectories and OBIS (shown as hex cells),
 // a dot for everything drawn as markers. Coloured by platform.
-export function DatasetCardSkeleton() {
-  return (
-    <div className="datasetCard" aria-hidden="true">
-      <div className="datasetCardBody">
-        <div className="datasetCardHeadline">
-          <span className="datasetCardSelect">
-            <Skeleton width="16px" height="16px" radius="50%" />
-          </span>
-          <span className="datasetCardTitle">
-            <Skeleton text />
-            <Skeleton text width="60%" />
-          </span>
-        </div>
-        <div className="datasetCardMeta">
-          <Skeleton text width="45%" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // `decorative` drops the tooltip for a spot whose own text already names it.
 export function DatasetPlatformIcon({
   platform,

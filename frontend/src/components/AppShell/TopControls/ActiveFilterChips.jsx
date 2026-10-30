@@ -27,7 +27,7 @@ export default function ActiveFilterChips() {
   const eovsIncluded = (
     activeFilters.find((f) => f.key === "eovs")?.items ?? []
   ).filter((item) => !item.excluded).length;
-  const offerMatchAll = eovsIncluded > 1 && !eovsMatchAll;
+  const offerMatchAll = eovsIncluded > 1 && eovsMatchAll;
   useEffect(() => {
     if (!filtering) return;
     offerTip([

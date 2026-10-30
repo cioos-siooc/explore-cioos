@@ -209,7 +209,7 @@ an image to pick up code changes. Install locally
 (`uv sync && npm ci && npm --prefix frontend ci && npm --prefix web-api ci`) only
 for lint/format hooks and local frontend dev.
 
-Python uses uv, pinned to 3.10 (`.python-version`). `uv lock --check` must pass in
+Python uses uv, pinned to 3.14 (`.python-version`). `uv lock --check` must pass in
 `.`, `harvester`, `downloader` and `download_scheduler` — the Dockerfiles build
 with `uv sync --locked`, so a stale lock is a broken image.
 

@@ -171,6 +171,40 @@ test.describe("pointing at the map", () => {
     await page.mouse.click(x, y);
     await expect(openCard(page)).toHaveCount(0);
   });
+
+  test("the legend's depth tool labels the clicked depth, until Esc", async ({
+    page,
+  }, testInfo) => {
+    // Halifax approaches; the depth is e2e/fixtures/api/depth.json's.
+    await openAt(page, { lon: -63.55, lat: 44.62 }, "", 12);
+    const { x, y } = await canvasCentre(page);
+    const probe = page.getByTestId("depth-probe");
+
+    // Off by default: a plain click reads nothing. The wait outlasts Map.jsx's
+    // TAP_ECHO_MS, which would drop the next click as this one's echo.
+    await page.mouse.click(x, y);
+    await page.waitForTimeout(500);
+    await expect(probe).toHaveCount(0);
+
+    // On a phone the depth group sits in the legend's dialog, which the tool
+    // closes on its way on.
+    const inDialog = testInfo.project.name === "mobile";
+    if (inDialog) await page.getByRole("button", { name: "Legend" }).click();
+    const tool = page.getByRole("button", {
+      name: "Read the depth at a point",
+    });
+    await tool.click();
+    if (inDialog) await expect(page.getByRole("dialog")).toHaveCount(0);
+    else await expect(tool).toHaveAttribute("aria-pressed", "true");
+    await page.mouse.click(x, y);
+    await expect(probe).toContainText("26.4 m");
+    await expect(probe).toContainText("CHS NONNA · 10 m grid");
+    await expect(page.locator(".depthProbeDot")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(probe).toHaveCount(0);
+    if (!inDialog) await expect(tool).toHaveAttribute("aria-pressed", "false");
+  });
 });
 
 test.describe("pointing at markers and tracks", () => {

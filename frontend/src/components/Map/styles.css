@@ -59,6 +59,63 @@
   pointer-events: none;
 }
 
+/* Where the depth label (Map.jsx depthProbe) was read: the navy core and
+   white ring hold up over both pale shallows and dark imagery. */
+.depthProbeDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--cioos-navy);
+  box-shadow:
+    0 0 0 2px var(--cioos-white),
+    0 1px 4px rgb(21 47 55 / 35%);
+  pointer-events: none;
+}
+
+/* Rests on the map like the legend, so it takes the small 3D lift. A label,
+   not a target: clicks fall through to the map, so the content needs it too
+   (MapLibre sets pointer-events: auto there). Translucent so the seafloor it
+   names stays visible; the blur keeps the text legible over busy imagery. */
+.depthProbePopup,
+.depthProbePopup .maplibregl-popup-content {
+  pointer-events: none;
+}
+
+.depthProbePopup .maplibregl-popup-content {
+  padding: 0;
+  border-radius: var(--cioos-radius);
+  background: rgb(255 255 255 / 35%);
+  box-shadow: var(--cioos-shadow-3d-sm);
+  backdrop-filter: blur(6px);
+}
+
+.depthProbePopup .maplibregl-popup-tip {
+  border-top-color: rgb(255 255 255 / 35%);
+}
+
+.depthProbe {
+  padding: 6px 10px 7px;
+  color: var(--cioos-navy);
+  font-family: var(--cioos-font-body);
+  text-align: center;
+}
+
+.depthProbeValue {
+  font-family: var(--cioos-font-display);
+  font-size: var(--cioos-font-size-lg);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.depthProbeSource {
+  color: var(--cioos-ink-80);
+  font-size: var(--cioos-font-size-xs);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
 .mapChip {
   display: inline-block;
 

@@ -78,7 +78,7 @@ export function generateMultipleSelectBadgeTitle(
         oceanVariablesFiltername: "oceanVariablesMulti",
         platformsFilterName: "platformsMulti",
         organizationFilterName: "organizationMulti",
-        datasetsFilterName: "datasetsMulti",
+        datasetTitleFilterName: "datasetsMulti",
       };
       return optionsSelectedFiltered.length + t(mapping[badgeTitle]);
     }
@@ -471,11 +471,12 @@ export function useSearchInput(
 }
 
 // An unknown zoom (camera not reported yet) takes the widest tier: undefined
-// would read as "no data".
+// would read as "no data". The 4 must match FINE_TIER_MIN_ZOOM in
+// web-api/utils/hexTiers.js.
 export function getCurrentRangeLevel(rangeLevels, zoom) {
   if (!rangeLevels) return undefined;
   const level = Number(zoom);
-  if (!Number.isFinite(level) || level < 5) return rangeLevels.zoom0;
+  if (!Number.isFinite(level) || level < 4) return rangeLevels.zoom0;
   if (level < 7) return rangeLevels.zoom1;
   return rangeLevels.zoom2;
 }

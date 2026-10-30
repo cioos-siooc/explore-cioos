@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import pathlib
+import time
 import traceback
 
 import sentry_sdk
@@ -183,6 +184,7 @@ def email_user(email, status, zip_filename, downloader_output, language):
                 status=status,
                 failed_datasets=failed_datasets,
                 fallback_datasets=fallback_datasets,
+                retention_days=DOWNLOAD_RETENTION_DAYS,
             )
         ]
         subject += [email_subject[status][language_option]]
@@ -458,6 +460,26 @@ def forget_expired_emails():
         return
     if forgotten:
         logger.info("Cleared the email from {} expired download jobs", forgotten)
+
+
+# The email and the Download modal (downloadEmailNotice) state this lifetime.
+DOWNLOAD_RETENTION_DAYS = 7
+
+
+def delete_expired_downloads():
+    """Delete download zips past retention; never raises."""
+    cutoff = time.time() - DOWNLOAD_RETENTION_DAYS * 24 * 60 * 60
+    deleted = 0
+    try:
+        for path in pathlib.Path(output_folder).glob("cde_download_*.zip"):
+            if path.stat().st_mtime < cutoff:
+                path.unlink(missing_ok=True)
+                deleted += 1
+    except OSError:
+        logger.exception("Could not delete expired downloads")
+        sentry_sdk.capture_exception()
+    if deleted:
+        logger.info("Deleted {} expired downloads", deleted)
 
 
 def update_download_jobs(pk, row, session=None):

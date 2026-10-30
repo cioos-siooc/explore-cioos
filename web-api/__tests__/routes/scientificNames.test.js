@@ -23,14 +23,18 @@ describe("GET /scientificNames", () => {
       expect(res.status).toBe(200);
     });
 
-    it("binds q as both a scientific-name prefix and vernacular substring", async () => {
+    it("binds each q word as a scientific-name word start, and q as a vernacular substring", async () => {
       await request(app).get("/scientificNames?q=Orcinus&limit=10");
       const [sql, bindings] = db.raw.mock.calls[0];
-      expect(sql).toContain("n.scientific_name ILIKE :prefix");
+      expect(sql).toContain(
+        "(n.scientific_name ILIKE :word0 OR n.scientific_name ILIKE :laterWord0)",
+      );
       expect(sql).toContain("WHERE vn ILIKE :sub");
       expect(bindings).toEqual({
         q: "Orcinus",
         prefix: "Orcinus%",
+        word0: "Orcinus%",
+        laterWord0: "% Orcinus%",
         sub: "%Orcinus%",
         limit: 10,
         cap: 5000,
@@ -68,7 +72,7 @@ describe("GET /scientificNames", () => {
     it("treats names= as a search request", async () => {
       await request(app).get("/scientificNames?names=");
       const [sql, bindings] = db.raw.mock.calls[0];
-      expect(sql).toContain("n.scientific_name ILIKE :prefix");
+      expect(sql).toContain("WHERE :q = ''");
       expect(bindings.q).toBe("");
     });
   });
