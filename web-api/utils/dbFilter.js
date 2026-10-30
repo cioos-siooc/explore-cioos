@@ -165,8 +165,11 @@ async function createDBFilter(
     // profiles branch where bare `eovs` is profiles.eovs. Every branch reading
     // cde.profiles must apply it or silently stays dataset-level —
     // utils/selectionAgreement.test.js guards this. Branches that cannot
-    // answer it (OBIS/trajectory cells, griddap) rely on the clause above.
+    // answer it (trajectory cells, griddap) rely on the clause above.
     profileFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
+    // OBIS cells carry the EOVs their taxa map to (obis_derive_eovs()), so a
+    // fish selection keeps only the cells that recorded fish.
+    obisFilters.push(`eovs ${eovsOp} :eovsCommaSeparatedString`);
   }
 
   // Both levels, so a dataset that measured an excluded EOV is dropped whole

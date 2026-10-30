@@ -9,6 +9,7 @@ from cde_harvester.utils import (
     eov_standard_name,
     eov_to_standard_name,
     erddap_time_to_iso,
+    get_eov_taxa,
     get_eov_to_standard_name,
     intersection,
     is_cf_standard_name,
@@ -35,6 +36,19 @@ class TestIntersection:
 
     def test_empty_lists_return_empty(self):
         assert intersection([], []) == []
+
+
+class TestEovTaxa:
+    def test_keys_are_known_eovs(self):
+        assert set(get_eov_taxa()) <= set(eov_to_standard_name)
+
+    def test_every_rule_constrains_something(self):
+        fields = {"aphia_ids", "exclude_aphia_ids", "functional_groups"}
+        for eov, rule in get_eov_taxa().items():
+            assert set(rule) <= fields, eov
+            assert rule.get("aphia_ids") or rule.get("functional_groups"), eov
+            for field in ("aphia_ids", "exclude_aphia_ids"):
+                assert all(isinstance(a, int) for a in rule.get(field, [])), eov
 
 
 class TestCdeEovMappings:
