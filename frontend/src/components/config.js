@@ -95,38 +95,57 @@ export const bathymetrySourceUrl = {
   fr: "https://charts.gc.ca/data-gestion/nonna/index-fra.html",
 };
 
-// The NONNA depth ramp, as (metres, colour) anchors. CHS serves NONNA as
-// pre-rendered RGB with no colour map or useful GetLegendGraphic, so these
-// were recovered from ~730 tile pixels across both coasts paired with GMRT
-// depths (median colour per log-spaced band): exact colours, but depths good
-// to the band, not the metre (legendBathymetryTitle says so).
-export const bathymetryColorScale = [
-  { depth: 2, color: "#c31800" },
-  { depth: 4, color: "#c36200" },
-  { depth: 8, color: "#c39200" },
-  { depth: 12, color: "#0cba00" },
-  { depth: 17, color: "#03ae1e" },
-  { depth: 22, color: "#068a60" },
-  { depth: 28, color: "#0966b9" },
-  { depth: 35, color: "#0961bd" },
-  { depth: 45, color: "#075bb8" },
-  { depth: 60, color: "#0551ae" },
-  { depth: 85, color: "#0346a1" },
-  { depth: 120, color: "#003794" },
-  { depth: 175, color: "#003491" },
-  { depth: 250, color: "#00308e" },
-  { depth: 390, color: "#002786" },
-  { depth: 610, color: "#001a7d" },
-  { depth: 870, color: "#000a72" },
-  { depth: 1200, color: "#00006a" },
-  { depth: 1750, color: "#000062" },
-  { depth: 2450, color: "#00005b" },
-  { depth: 3450, color: "#000052" },
-  { depth: 4500, color: "#000045" },
-];
+// The NONNA depth ramps the viewer picks between, as (metres, colour) anchors,
+// drawn by the color-relief layer in basemapStyle.js and the legend alike.
+// 1 m stands in for 0 m, which a log axis can't place.
+export const bathymetryPalettes = {
+  // cmocean "deep", sampled evenly along the log-depth axis so the shallows
+  // get as much of the ramp as the abyss; readable with any colour vision.
+  deep: [
+    { depth: 1, color: "#fdfecc" },
+    { depth: 2, color: "#d2eeb5" },
+    { depth: 4, color: "#a5dfa7" },
+    { depth: 8, color: "#78cea3" },
+    { depth: 17, color: "#5dbaa4" },
+    { depth: 35, color: "#50a4a2" },
+    { depth: 70, color: "#488e9e" },
+    { depth: 145, color: "#427999" },
+    { depth: 290, color: "#3e6495" },
+    { depth: 590, color: "#404c8b" },
+    { depth: 1200, color: "#3f396c" },
+    { depth: 2450, color: "#352a4a" },
+    { depth: 5000, color: "#281a2c" },
+  ],
+  // CHS's own NONNA colours, which its WMS serves baked into the tiles with no
+  // style to read: recovered by pairing WMS pixels with the WCS sounding under
+  // each, to within 6/255 per channel. Past 400 m, where NONNA 10 ran out of
+  // samples, NONNA 100 pixels paired with GMRT depths.
+  chs: [
+    { depth: 1, color: "#c31300" },
+    { depth: 10, color: "#c3c100" },
+    { depth: 12, color: "#6bc300" },
+    { depth: 15, color: "#00c200" },
+    { depth: 22, color: "#04955f" },
+    { depth: 26, color: "#068189" },
+    { depth: 30, color: "#0965c2" },
+    { depth: 40, color: "#0960bd" },
+    { depth: 60, color: "#0551ad" },
+    { depth: 100, color: "#003894" },
+    { depth: 200, color: "#003290" },
+    { depth: 400, color: "#002586" },
+    { depth: 610, color: "#001a7d" },
+    { depth: 870, color: "#000a72" },
+    { depth: 1200, color: "#00006a" },
+    { depth: 1750, color: "#000062" },
+    { depth: 2450, color: "#00005b" },
+    { depth: 3450, color: "#000052" },
+    { depth: 4500, color: "#000045" },
+  ],
+};
+export const defaultBathymetryPalette = "deep";
 
-// Log-depth axis: the ramp spends its bright half on the first 25 m, which a
-// linear axis would crush.
+// Log-depth axis: both ramps change most over the first 30 m, which a linear
+// axis would crush.
 export const bathymetryScaleMin = 1;
 export const bathymetryScaleMax = 5000;
 export const bathymetryTicks = [1, 10, 100, 1000, 5000];

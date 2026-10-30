@@ -11,6 +11,8 @@ import {
 
 import { server } from "../../config.js";
 import {
+  bathymetryPalettes,
+  defaultBathymetryPalette,
   defaultMapCenter,
   defaultMapZoom,
   defaultTrailingDays,
@@ -28,7 +30,10 @@ import {
 import { wmsSliceFromParams } from "../../wmsUtilities.js";
 import fetchJson from "../fetchJson.js";
 import reportError from "../reportError.js";
-import { useUrlSeededPersistentState } from "../usePersistentState.js";
+import {
+  usePersistentState,
+  useUrlSeededPersistentState,
+} from "../usePersistentState.js";
 
 // Always written out, never omitted: the API counts something else when the
 // param is absent (see HEX_METRIC), and the tile URLs spell it out the same way.
@@ -237,6 +242,58 @@ export default function MapStateProvider({ children }) {
     true,
     (raw) => raw !== "false",
   );
+  // Colour vision is the viewer's, not the map's, so a share link doesn't carry it.
+  const [storedBathymetryPalette, setBathymetryPalette] = usePersistentState(
+    "bathymetryPalette",
+    defaultBathymetryPalette,
+  );
+  const bathymetryPalette = Object.hasOwn(
+    bathymetryPalettes,
+    storedBathymetryPalette,
+  )
+    ? storedBathymetryPalette
+    : defaultBathymetryPalette;
+  // The NONNA sounding under the latest click: depth null where CHS has none.
+  const [depthReading, setDepthReading] = useState();
+  const depthRequest = useRef();
+  // null clears it.
+  const readDepthAt = useCallback((lngLat) => {
+    depthRequest.current?.abort();
+    if (!lngLat) {
+      setDepthReading(undefined);
+      return;
+    }
+    const { lng, lat } = lngLat;
+    const at = [lng, lat];
+    const controller = new AbortController();
+    depthRequest.current = controller;
+    setDepthReading({ lngLat: at, pending: true });
+    // ~1 m: finer only splits the API cache.
+    const params = new URLSearchParams({
+      lon: lng.toFixed(5),
+      lat: lat.toFixed(5),
+    });
+    fetchJson(`${server}/depth?${params}`, { signal: controller.signal })
+      .then(({ depth, resolution, source }) =>
+        setDepthReading({ lngLat: at, depth, resolution, source }),
+      )
+      .catch((error) => {
+        if (error.name === "AbortError") return;
+        setDepthReading(undefined);
+        reportError("NONNA depth fetch failed", error);
+      });
+  }, []);
+  // The legend's depth tool: while on, a map click reads the depth there and
+  // nothing else. Off with the depth layer, which owns the reading.
+  const [depthToolOn, setDepthToolOn] = useState(false);
+  const depthToolActive = depthToolOn && bathymetryVisible;
+  const setDepthToolActive = useCallback(
+    (on) => {
+      setDepthToolOn(on);
+      if (!on) readDepthAt(null);
+    },
+    [readDepthAt],
+  );
   // The param is the switch the user sees ('globe=true'), not the internal value.
   const [projection, setProjection] = useUrlSeededPersistentState(
     "projection",
@@ -430,6 +487,12 @@ export default function MapStateProvider({ children }) {
     setDataLayersVisible,
     bathymetryVisible,
     setBathymetryVisible,
+    bathymetryPalette,
+    setBathymetryPalette,
+    depthReading,
+    readDepthAt,
+    depthToolActive,
+    setDepthToolActive,
     projection,
     setProjection,
     // Read-only outside: flipped through toggleTrackLines, not the raw setter.

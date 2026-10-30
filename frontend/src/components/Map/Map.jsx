@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Map as MaplibreMap, Marker, Popup, setWorkerUrl } from "maplibre-gl";
+import { createRoot } from "react-dom/client";
 import "maplibre-gl/dist/maplibre-gl.css";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
@@ -48,12 +49,14 @@ import {
   basemapHandoffStartZoom,
   clickHighlightColor,
   colorScale,
+  defaultBathymetryPalette,
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
 } from "../config";
 import platforms from "../../platforms.json";
 import { platformColor } from "../../platformVocab.js";
+import DepthProbe from "./DepthProbe.jsx";
 import {
   TRAJECTORY_TYPE_KEYS,
   anyTrajectoryLayerOn,
@@ -63,6 +66,7 @@ import {
   getLabelTextField,
   FIRST_LABEL_LAYER_ID,
   LABEL_LAYER_IDS,
+  nonnaColorRamp,
 } from "./basemapStyle.js";
 import {
   buildTileSuffix,
@@ -78,6 +82,7 @@ import {
   griddapHitLayers,
   griddapOutranksHexesIn,
   griddapTitle,
+  idsOutsideDataset,
   isGriddapHit,
   isOnAPointIn,
   loadTurfUnion,
@@ -327,7 +332,7 @@ const BASEMAP_SOURCE_IDS = ["bathymetry", "imagery", "ofm"];
 const WATCHED_MAP_LAYERS = [
   { id: "observations", sources: HEX_SOURCE_IDS },
   { id: "tracks", sources: ["tracks", "selected-track"] },
-  { id: "bathymetry", sources: ["bathymetry", "nonna100", "nonna10"] },
+  { id: "bathymetry", sources: ["bathymetry", "nonna"] },
   { id: "imagery", sources: ["imagery"] },
   { id: "griddap", sources: ["griddap-coverage"] },
   { id: "wmsOverlay", sources: ["wms-overlay"] },
@@ -392,7 +397,7 @@ const griddapLayerIds = [
 ];
 // Basemap, not data: owned by their own switch and left out of the WMS
 // overlay's hide.
-const bathymetryLayerIds = ["bathymetry-nonna-100", "bathymetry-nonna-10"];
+const bathymetryLayerIds = ["bathymetry-nonna", "bathymetry-nonna-hillshade"];
 
 const emptyFeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -437,6 +442,13 @@ export default function CreateMap({
   onMarkerClick = () => {},
   // One track and nothing else under the cursor. See handleMapClick.
   onTrackClick = () => {},
+  // Every click while the depth tool is on, instead of anything else it hits.
+  onDepthQuery = () => {},
+  // Its answer, labelled at the clicked point.
+  depthReading,
+  depthToolActive = false,
+  // Escape, the usual way out of a map tool.
+  onDepthToolExit = () => {},
   rangeLevels,
   coverageRangeLevels,
   // undefined when there is nothing to measure and the global tier takes over.
@@ -453,6 +465,7 @@ export default function CreateMap({
   griddapCoverage,
   dataLayersVisible = true,
   bathymetryVisible = true,
+  bathymetryPalette = defaultBathymetryPalette,
   activeWmsOverlay,
   projection = "mercator",
   zoomTarget,
@@ -785,6 +798,51 @@ export default function CreateMap({
         offset: 10,
         maxWidth: "260px",
       }),
+  );
+
+  // A dot under the label, so the depth reads as that exact spot's. The label
+  // is its own React root: MapLibre owns the popup's DOM.
+  const [depthProbe] = useState(() => {
+    const dot = document.createElement("span");
+    dot.className = "depthProbeDot";
+    const content = document.createElement("div");
+    return {
+      marker: new Marker({ element: dot }),
+      label: new Popup({
+        closeButton: false,
+        closeOnClick: false,
+        className: "depthProbePopup",
+        anchor: "bottom",
+        offset: 12,
+        maxWidth: "260px",
+      }).setDOMContent(content),
+      root: createRoot(content),
+    };
+  });
+
+  useEffect(() => {
+    // Pinned only once a depth is in: not while reading, on land, or where
+    // there is no sounding.
+    if (
+      !map.current ||
+      !depthReading ||
+      depthReading.pending ||
+      depthReading.depth === null ||
+      !bathymetryVisible
+    ) {
+      depthProbe.marker.remove();
+      depthProbe.label.remove();
+      return;
+    }
+    depthProbe.root.render(<DepthProbe reading={depthReading} />);
+    depthProbe.marker.setLngLat(depthReading.lngLat).addTo(map.current);
+    depthProbe.label.setLngLat(depthReading.lngLat).addTo(map.current);
+  }, [depthProbe, depthReading, bathymetryVisible]);
+
+  // Deferred: unmounting a root while React is committing this one warns.
+  useEffect(
+    () => () => setTimeout(() => depthProbe.root.unmount()),
+    [depthProbe],
   );
 
   const colors = [
@@ -1169,27 +1227,37 @@ export default function CreateMap({
     if (!map.current || !layersLoaded.current) return;
     applyTrackFocus();
 
-    // queryRenderedFeatures only sees what's on screen now, hence re-running on
-    // sourcedata. Below z7 profiles are merged into 'hexes'.
+    // Every loaded tile, not just drawn ones: re-run as each tile loads, this
+    // greys it before its first frame. Below z7 profiles are merged into
+    // 'hexes'; the geometry type keeps hex and marker pks, which share the
+    // source layer, from dimming each other across the z7 hand-off.
     const pointLevel = map.current.getZoom() >= 7;
     const dimmedLayers = [pointLevel ? "points" : "hexes", "coverage-hexes"];
+    const sourceFilters = {
+      points: ["==", ["geometry-type"], "Point"],
+      hexes: ["==", ["geometry-type"], "Polygon"],
+    };
 
     const dimmed = {};
     let focusedPoints = emptyFeatureCollection;
     dimmedLayers.forEach((layerId) => {
-      if (!pk || !map.current.getLayer(layerId)) {
+      const { source, sourceLayer } = focusTargets[layerId];
+      if (!pk || !map.current.getSource(source)) {
         dimmed[layerId] = [];
         return;
       }
-      const hits = map.current.queryRenderedFeatures({ layers: [layerId] });
-      dimmed[layerId] = hits
-        .filter((feature) => !featureHasDataset(feature, pk))
-        // promoteId puts pk on the id, which setFeatureState addresses.
-        .map((feature) => feature.id);
+      const features = map.current.querySourceFeatures(source, {
+        sourceLayer,
+        filter: sourceFilters[layerId],
+      });
+      // promoteId puts pk on the id, which setFeatureState addresses.
+      dimmed[layerId] = idsOutsideDataset(features, pk);
       // 'points' sort-key can't depend on feature-state, so focused markers
       // were buried under grey ones; they're redrawn on top from a copy, since
       // a filtered tile layer would relayout the whole source per focus change.
-      if (layerId === "points") focusedPoints = focusedPointFeatures(hits, pk);
+      if (layerId === "points") {
+        focusedPoints = focusedPointFeatures(features, pk);
+      }
     });
 
     // Writing state fires sourcedata/idle, which re-run this, so a no-op must
@@ -1379,16 +1447,19 @@ export default function CreateMap({
     if (visible) rampMeasuredFor.current = undefined;
   }
 
-  // Restoring hands each group back to its owner: the picker for hex/point
-  // layers, applyLayerVisibility for the tracks.
+  // Restoring hands each group back to its owner: the switches for hex/point
+  // layers and the depth wash, applyLayerVisibility for the tracks. The depth
+  // wash goes too: its colours would read as the overlay's own.
   function setDataLayersVisibility(visible) {
     setLayersVisibility(griddapLayerIds, visible);
     if (!visible) {
       setLayersVisibility(observationLayerIds, false);
       setLayersVisibility(trackLayerIds, false);
+      setLayersVisibility(bathymetryLayerIds, false);
       return;
     }
     setLayersVisibility(observationLayerIds, dataLayersVisibleRef.current);
+    setLayersVisibility(bathymetryLayerIds, bathymetryVisibleRef.current);
     setLayersVisibility(trackLayerIds, true);
     applyLayerVisibility();
   }
@@ -1558,12 +1629,22 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLayersVisible]);
 
-  // Left alone by the WMS overlay: the depth wash reads as basemap.
+  // The ref keeps the choice through a WMS overlay, which hides the depth wash.
   useEffect(() => {
     bathymetryVisibleRef.current = bathymetryVisible;
-    if (!map.current) return;
+    if (!map.current || activeWmsOverlay) return;
     setLayersVisibility(bathymetryLayerIds, bathymetryVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bathymetryVisible]);
+
+  useEffect(() => {
+    if (!map.current) return;
+    map.current.setPaintProperty(
+      "bathymetry-nonna",
+      "color-relief-color",
+      nonnaColorRamp(bathymetryPalette),
+    );
+  }, [bathymetryPalette]);
 
   // No setStyle() calls exist (language uses setLayoutProperty), so the
   // projection persists until toggled here.
@@ -1695,6 +1776,8 @@ export default function CreateMap({
   const sharedFeatureQueryAtRef = useRef(sharedFeatureQueryAt);
   const onMarkerClickRef = useRef(onMarkerClick);
   const onTrackClickRef = useRef(onTrackClick);
+  const onDepthQueryRef = useRef(onDepthQuery);
+  const depthToolActiveRef = useRef(depthToolActive);
 
   // Written after commit so a render React throws away never leaks into them;
   // layout effects run before every effect and map event that reads them.
@@ -1707,7 +1790,25 @@ export default function CreateMap({
     onFeatureQueryRef.current = onFeatureQuery;
     onMarkerClickRef.current = onMarkerClick;
     onTrackClickRef.current = onTrackClick;
+    onDepthQueryRef.current = onDepthQuery;
+    depthToolActiveRef.current = depthToolActive;
   });
+
+  useEffect(() => {
+    if (!depthToolActive) return undefined;
+    popup.remove();
+    const canvas = map.current?.getCanvas();
+    if (canvas) canvas.style.cursor = "crosshair";
+    const exitOnEscape = (e) => {
+      if (e.key === "Escape") onDepthToolExit();
+    };
+    window.addEventListener("keydown", exitOnEscape);
+    return () => {
+      window.removeEventListener("keydown", exitOnEscape);
+      if (canvas) canvas.style.cursor = "grab";
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depthToolActive]);
 
   // /tiles and /tiles/cells split the zoom range for the same selection and
   // take the same params, so the hex switch can't leave trajectory counts in
@@ -2853,8 +2954,9 @@ export default function CreateMap({
     ];
 
     const handleHover = (e) => {
-      // Drawing owns the cursor; leave the popup as the last hover left it.
-      if (draw.getMode().includes("draw")) {
+      // Drawing and the depth tool own the cursor; leave the popup as the last
+      // hover left it.
+      if (draw.getMode().includes("draw") || depthToolActiveRef.current) {
         showGriddapTooltip.cancel();
         setGriddapHovered([]);
         return;
@@ -2916,7 +3018,7 @@ export default function CreateMap({
       pendingHover = null;
       showGriddapTooltip.cancel();
       setGriddapHovered([]);
-      if (!draw.getMode().includes("draw")) {
+      if (!draw.getMode().includes("draw") && !depthToolActiveRef.current) {
         map.current.getCanvas().style.cursor = "grab";
         popup.remove();
       }
@@ -2941,6 +3043,12 @@ export default function CreateMap({
         return;
       }
       if (draw.getMode().includes("draw")) return;
+
+      // At every zoom: past NONNA's reach the API answers from GEBCO.
+      if (depthToolActiveRef.current) {
+        onDepthQueryRef.current(e.lngLat.wrap());
+        return;
+      }
 
       // Outside the drawn shape is out of the selection.
       const ring = selectionRing.current;
@@ -3107,7 +3215,7 @@ export default function CreateMap({
       // The projection is part of the style in MapLibre 5 and must be set here:
       // the projection effect's first run happens while map.current is null.
       style: {
-        ...buildBasemapStyle(i18n.language),
+        ...buildBasemapStyle(i18n.language, bathymetryPalette),
         projection: { type: projection === "globe" ? "globe" : "mercator" },
       },
       // The default 'high-performance' wakes the discrete GPU on dual-GPU
@@ -3216,19 +3324,21 @@ export default function CreateMap({
     }, DRAW_UPDATE_DEBOUNCE_MS);
     map.current.on("draw.update", commitDrawUpdate);
 
-    // New tiles were never part of the queryRenderedFeatures snapshot the focus
-    // was computed from, so re-apply it as each data source loads.
+    // A tile's 'data' event fires before its first frame, so dimming it here
+    // keeps out-of-focus cells from flashing their colour while panning.
     const dataSourceIds = ["cde-tiles", "cde-cells"];
     map.current.on("sourcedata", (e) => {
       if (!focusedDatasetPk.current) return;
-      if (!e.isSourceLoaded || !dataSourceIds.includes(e.sourceId)) return;
+      if (!e.tile || !dataSourceIds.includes(e.sourceId)) return;
       hoverHighlightPoints(focusedDatasetPk.current);
     });
 
     // Aborted requests (tiles left behind mid-zoom) don't fire 'error'. Any
     // listener stops MapLibre's own console.error, hence the log; the message,
     // since a minified error class logs as its two-letter name.
-    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks"];
+    // Esri imagery throws the odd transient 502 (logged as a CORS block, since
+    // its error responses carry no Access-Control-Allow-Origin).
+    const retriedSourceIds = [...HEX_SOURCE_IDS, "tracks", "imagery"];
     map.current.on("error", (e) => {
       console.error(e.error?.message ?? e.error);
       if (!e.tile || !retriedSourceIds.includes(e.sourceId)) return;
@@ -3237,8 +3347,8 @@ export default function CreateMap({
 
     map.current.on("idle", () => {
       layersLoaded.current = true;
-      // 'sourcedata' can land before the new tiles render, and
-      // queryRenderedFeatures only sees rendered ones.
+      // A focus set before the layers settled was skipped, and a zoom across
+      // z7 switches the dimmed band without loading a tile.
       if (focusedDatasetPk.current) {
         hoverHighlightPoints(focusedDatasetPk.current);
       }

@@ -38,6 +38,46 @@ describe("MapStateProvider", () => {
     expect(latest.rangeLevels).toEqual(legendFixture.recordsCount);
   });
 
+  it("reads the NONNA depth at a clicked point", async () => {
+    await renderReady();
+    act(() => latest.readDepthAt({ lng: -63.55, lat: 44.62 }));
+    expect(latest.depthReading).toEqual({
+      lngLat: [-63.55, 44.62],
+      pending: true,
+    });
+    await waitFor(() =>
+      expect(latest.depthReading).toEqual({
+        lngLat: [-63.55, 44.62],
+        depth: 26.4,
+        resolution: 10,
+        source: "nonna",
+      }),
+    );
+    const depthCall = fetch.mock.calls
+      .map(([url]) => String(url))
+      .find((url) => url.includes("/depth?"));
+    expect(depthCall).toMatch(/lon=-63\.55000&lat=44\.62000$/);
+
+    act(() => latest.readDepthAt(null));
+    expect(latest.depthReading).toBeUndefined();
+  });
+
+  it("turns the depth tool off with its reading, and with the depth layer", async () => {
+    await renderReady();
+    expect(latest.depthToolActive).toBe(false);
+    act(() => latest.setDepthToolActive(true));
+    expect(latest.depthToolActive).toBe(true);
+    act(() => latest.readDepthAt({ lng: -63.55, lat: 44.62 }));
+
+    act(() => latest.setDepthToolActive(false));
+    expect(latest.depthToolActive).toBe(false);
+    expect(latest.depthReading).toBeUndefined();
+
+    act(() => latest.setDepthToolActive(true));
+    act(() => latest.setBathymetryVisible(false));
+    expect(latest.depthToolActive).toBe(false);
+  });
+
   it("picks the zoom0/zoom1/zoom2 tier by the current zoom", async () => {
     await renderReady({ url: "/?zoom=3" });
     expect(latest.currentRangeLevel).toEqual(legendFixture.recordsCount.zoom0);
@@ -74,6 +114,20 @@ describe("MapStateProvider", () => {
     expect(latest.bathymetryVisible).toBe(false);
     expect(latest.dataLayersVisible).toBe(false);
     expect(latest.projection).toBe("globe");
+  });
+
+  it("defaults the depth colours to the colour-safe palette, and keeps the choice", async () => {
+    await renderReady();
+    expect(latest.bathymetryPalette).toBe("deep");
+    act(() => latest.setBathymetryPalette("chs"));
+    expect(latest.bathymetryPalette).toBe("chs");
+    expect(window.localStorage.getItem("cde.bathymetryPalette")).toBe('"chs"');
+  });
+
+  it("falls back to the default depth colours for a palette that no longer exists", async () => {
+    window.localStorage.setItem("cde.bathymetryPalette", '"emodnet"');
+    await renderReady();
+    expect(latest.bathymetryPalette).toBe("deep");
   });
 
   it("defaults tracksMode on", async () => {

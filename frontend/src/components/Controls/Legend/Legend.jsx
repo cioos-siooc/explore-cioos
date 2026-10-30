@@ -6,8 +6,10 @@ import {
   ChevronCompactUp,
   Circle,
   CircleFill,
+  Crosshair,
   HexagonFill,
   InfoCircle,
+  Palette,
 } from "react-bootstrap-icons";
 
 import {
@@ -17,11 +19,12 @@ import {
 import {
   colorScale,
   isMarkerTier,
-  bathymetryColorScale,
+  bathymetryPalettes,
   bathymetryLegendMinZoom,
   bathymetryScaleMin,
   bathymetryScaleMax,
   bathymetryTicks,
+  defaultBathymetryPalette,
   trackLineColor,
 } from "../../config.js";
 import platformColors from "../../platformColors";
@@ -71,7 +74,7 @@ function formatDepth(metres) {
   return metres >= 1000 ? `${metres / 1000}k` : `${metres}`;
 }
 
-// 0..1 along the bar; the bar is logarithmic (see bathymetryColorScale).
+// 0..1 along the bar; the bar is logarithmic (see bathymetryScaleMin).
 const LOG_MIN = Math.log10(bathymetryScaleMin);
 const LOG_SPAN = Math.log10(bathymetryScaleMax) - LOG_MIN;
 function depthPosition(metres) {
@@ -165,10 +168,15 @@ export default function Legend({
   zoom,
   platformsAvailable = [],
   // { observations, bathymetry, tracks }, each { key, label, checked, onChange };
-  // absent members render their entry without a switch.
+  // absent members render their entry without a switch. bathymetry also
+  // carries { palette, onPaletteChange }.
   controls = {},
   layerControls = [],
   dataLayers,
+  // The NONNA sounding under the latest click, marked on the depth bar.
+  depthReading,
+  // { active, onChange }: the tool that turns map clicks into depth readings.
+  depthTool,
 }) {
   const { t } = useTranslation();
   const [legendOpen, setLegendOpen] = useState(true);
@@ -229,13 +237,13 @@ export default function Legend({
   function renderGroup(
     key,
     label,
-    { icon, control, tooltip, idSuffix = "" } = {},
+    { icon, control, tooltip, action, idSuffix = "" } = {},
     children,
   ) {
     const help = renderHelpButton(key);
     return (
       <div className="legendGroup" key={key}>
-        {(label || control || help) && (
+        {(label || control || help || action) && (
           <div className="legendGroupLabelRow">
             {icon}
             {control && (
@@ -255,6 +263,7 @@ export default function Legend({
               label
             )}
             {help}
+            {action}
           </div>
         )}
         {children}
@@ -383,20 +392,31 @@ export default function Legend({
     // is false, so the bar would flash on before its raster exists.
     if (!Number.isFinite(zoom) || zoom < bathymetryLegendMinZoom) return null;
     const hidden = controls.bathymetry ? !controls.bathymetry.checked : false;
+    const palette = controls.bathymetry?.palette ?? defaultBathymetryPalette;
     // Anchors sit at their own depths, so the gradient is uneven by design.
-    const gradient = `linear-gradient(to right, ${bathymetryColorScale
+    const gradient = `linear-gradient(to right, ${bathymetryPalettes[palette]
       .map(
         ({ depth, color }) =>
           `${color} ${(depthPosition(depth) * 100).toFixed(1)}%`,
       )
       .join(", ")})`;
+    const depth = hidden ? undefined : depthReading?.depth;
     return (
       <div className={classNames({ legendDimmed: hidden })}>
         <div
           className="legendColorBar"
           style={{ background: gradient }}
           aria-hidden="true"
-        />
+        >
+          {depth > 0 && (
+            <span
+              className="legendDepthMarker"
+              style={{
+                left: `${depthPosition(Math.min(Math.max(depth, bathymetryScaleMin), bathymetryScaleMax)) * 100}%`,
+              }}
+            />
+          )}
+        </div>
         <div className="legendColorBarTicks">
           {bathymetryTicks.map((metres, i) => {
             const align =
@@ -416,7 +436,6 @@ export default function Legend({
             );
           })}
         </div>
-        <p className="legendWarning">{t("legendBathymetryNotForNavigation")}</p>
       </div>
     );
   }
@@ -540,6 +559,46 @@ export default function Legend({
     );
   const trackKeys = renderTrackKeys();
   const bathymetryBar = renderBathymetryBar();
+  const depthToolButton = depthTool && (
+    <button
+      type="button"
+      className={classNames("legendToolButton", { active: depthTool.active })}
+      onClick={() => {
+        depthTool.onChange(!depthTool.active);
+        // The dialog covers the map the tool is about to be used on.
+        if (!depthTool.active) setDetailOpen(false);
+      }}
+      disabled={controls.bathymetry ? !controls.bathymetry.checked : false}
+      aria-pressed={depthTool.active}
+      title={t(depthTool.active ? "legendDepthToolExit" : "legendDepthTool")}
+      aria-label={t("legendDepthTool")}
+    >
+      <Crosshair size={11} aria-hidden="true" />
+    </button>
+  );
+  // Two palettes, so one button: pressed is CHS's, and the bar shows which.
+  const chsColours = controls.bathymetry?.palette === "chs";
+  const paletteButton = controls.bathymetry?.onPaletteChange && (
+    <button
+      type="button"
+      className={classNames("legendToolButton", { active: chsColours })}
+      onClick={() =>
+        controls.bathymetry.onPaletteChange(
+          chsColours ? defaultBathymetryPalette : "chs",
+        )
+      }
+      disabled={!controls.bathymetry.checked}
+      aria-pressed={chsColours}
+      title={t(
+        chsColours
+          ? "legendBathymetryPaletteToDeep"
+          : "legendBathymetryPaletteToChs",
+      )}
+      aria-label={t("legendBathymetryPaletteChs")}
+    >
+      <Palette size={11} aria-hidden="true" />
+    </button>
+  );
   const layerSwitches = renderLayerSwitches();
 
   // The last group's switches are labelled already, so they stand in its label
@@ -571,7 +630,16 @@ export default function Legend({
       renderGroup(
         "seafloor",
         t("legendBathymetry"),
-        { control: controls.bathymetry, tooltip: t("legendBathymetryTitle") },
+        {
+          control: controls.bathymetry,
+          tooltip: t("legendBathymetryTitle"),
+          action: (
+            <>
+              {paletteButton}
+              {depthToolButton}
+            </>
+          ),
+        },
         bathymetryBar,
       ),
     layerSwitches && renderGroup("layers", layerSwitches),

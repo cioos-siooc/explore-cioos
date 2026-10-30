@@ -274,25 +274,29 @@
 }
 
 .legendColorBar {
+  position: relative;
   height: var(--legend-bar);
   border-radius: 3px;
   border: 1px solid var(--cioos-hairline);
+}
+
+/* Spans the bar's full height, with a dark core and light edges so it reads
+   over both the near-black deep end and the red shallows. */
+.legendDepthMarker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--cioos-ink);
+  box-shadow: 0 0 0 1px var(--cioos-white);
+  border-radius: 1px;
 }
 
 .legendColorBarTicks {
   position: relative;
   height: calc(12px + var(--legend-grow) / 400);
   margin-top: 3px;
-}
-
-/* CHS charts, not this layer, are for navigation: said outright, not left to
-   the ⓘ tooltip. */
-.legendWarning {
-  margin: 4px 0 0;
-  font-size: var(--cioos-font-size-2xs);
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--cioos-ink-80);
 }
 
 .legendColorBarTicks .legendTick {
@@ -529,4 +533,44 @@
 .legendModal .legendGroup + .legendGroup {
   margin-top: var(--cioos-space-md);
   padding-top: var(--cioos-space-md);
+}
+
+/* A map tool, so it reads as a button rather than an ⓘ; filled while on. */
+.legendToolButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 3px;
+  border: 1px solid var(--cioos-ink-40);
+  border-radius: var(--cioos-radius);
+  background: transparent;
+  color: var(--cioos-ink-80);
+  cursor: pointer;
+}
+
+.legendToolButton + .legendToolButton {
+  margin-left: 4px;
+}
+
+.legendToolButton:hover:not(:disabled) {
+  color: var(--cioos-ink);
+  background-color: var(--cioos-surface-2);
+}
+
+.legendToolButton.active {
+  border-color: var(--cioos-primary);
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+}
+
+.legendToolButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+.legendToolButton:disabled {
+  cursor: default;
+  opacity: 0.5;
 }

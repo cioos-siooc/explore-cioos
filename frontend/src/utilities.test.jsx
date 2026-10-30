@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import {
   abbreviateString,
@@ -9,6 +9,7 @@ import {
   createDataFilterQueryString,
   createSelectionQueryString,
   escapeHtml,
+  filterOptionLabel,
   formatDatasetCount,
   formatErddapServerName,
   formatSizeEstimate,
@@ -461,6 +462,33 @@ describe("string and count helpers", () => {
     expect(capitalizeFirstLetter("oxygen concentration")).toBe(
       "Oxygen concentration",
     );
+  });
+
+  it("labels catalogue options from their translations, without t()", () => {
+    const t = vi.fn((key) => `t:${key}`);
+    const dataset = {
+      title: "ctd casts",
+      titleTranslated: { en: "ctd casts", fr: null },
+    };
+    expect(filterOptionLabel(dataset, true, t, "fr")).toBe("Ctd casts");
+    expect(
+      filterOptionLabel(
+        { ...dataset, titleTranslated: { en: "ctd casts", fr: "profils" } },
+        true,
+        t,
+        "fr",
+      ),
+    ).toBe("Profils");
+    expect(t).not.toHaveBeenCalled();
+  });
+
+  it("labels vocabulary options through t(), and untranslatable ones as-is", () => {
+    const t = vi.fn(() => "oxygen");
+    expect(filterOptionLabel({ title: "oxygenKey" }, true, t, "en")).toBe(
+      "Oxygen",
+    );
+    expect(filterOptionLabel({ title: "dfo" }, false, t, "en")).toBe("Dfo");
+    expect(t).toHaveBeenCalledTimes(1);
   });
 
   it("neutralises markup in harvested text", () => {

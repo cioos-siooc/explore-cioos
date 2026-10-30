@@ -5,7 +5,9 @@ import {
   getLabelTextField,
   LABEL_LAYER_IDS,
   FIRST_LABEL_LAYER_ID,
+  nonnaColorRamp,
 } from "./basemapStyle.js";
+import { bathymetryPalettes } from "../config.js";
 
 describe("getLabelTextField", () => {
   it("prefers the localized name, falling back to the tile's default", () => {
@@ -24,8 +26,7 @@ describe("buildBasemapStyle", () => {
     expect(Object.keys(style.sources).sort()).toEqual([
       "bathymetry",
       "imagery",
-      "nonna10",
-      "nonna100",
+      "nonna",
       "ofm",
     ]);
     const layerIds = style.layers.map((layer) => layer.id);
@@ -69,5 +70,57 @@ describe("buildBasemapStyle", () => {
     expect(bEndVal).toBe(0);
     expect(iStartVal).toBe(0);
     expect(iEndVal).toBe(1);
+  });
+
+  it("colours and shades NONNA from one DEM source", () => {
+    const style = buildBasemapStyle("en");
+    expect(style.sources.nonna).toMatchObject({
+      type: "raster-dem",
+      encoding: "terrarium",
+    });
+    const layer = (id) => style.layers.find((l) => l.id === id);
+    expect(layer("bathymetry-nonna")).toMatchObject({
+      type: "color-relief",
+      source: "nonna",
+    });
+    expect(layer("bathymetry-nonna-hillshade")).toMatchObject({
+      type: "hillshade",
+      source: "nonna",
+    });
+  });
+
+  it("draws pixels without a sounding transparent and the rest on the legend's ramp", () => {
+    const relief = buildBasemapStyle("en").layers.find(
+      (layer) => layer.id === "bathymetry-nonna",
+    );
+    // ["interpolate", ["linear"], ["elevation"], e0, c0, e1, c1, ...]
+    const stops = relief.paint["color-relief-color"].slice(3);
+    const elevations = stops.filter((_, i) => i % 2 === 0);
+    const colors = stops.filter((_, i) => i % 2 === 1);
+
+    // A transparent Terrarium pixel decodes to -32768.
+    expect([elevations[0], colors[0]]).toEqual([-32768, "rgba(0, 0, 0, 0)"]);
+    expect(elevations).toEqual([...elevations].sort((a, b) => a - b));
+    const scale = bathymetryPalettes.deep;
+    const deepest = scale.at(-1);
+    const shallowest = scale[0];
+    expect(colors[1]).toBe(deepest.color);
+    expect(elevations.slice(2)).toEqual(
+      [...scale].reverse().map(({ depth }) => -depth),
+    );
+    expect([elevations.at(-1), colors.at(-1)]).toEqual([
+      -shallowest.depth,
+      shallowest.color,
+    ]);
+  });
+
+  it("draws the palette it is built with", () => {
+    const relief = buildBasemapStyle("en", "chs").layers.find(
+      (layer) => layer.id === "bathymetry-nonna",
+    );
+    expect(relief.paint["color-relief-color"]).toEqual(nonnaColorRamp("chs"));
+    expect(relief.paint["color-relief-color"].at(-1)).toBe(
+      bathymetryPalettes.chs[0].color,
+    );
   });
 });
