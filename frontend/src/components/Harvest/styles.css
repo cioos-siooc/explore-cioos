@@ -651,6 +651,94 @@ a.harvest-link:hover {
   border-radius: var(--cioos-radius-sm);
 }
 
+/* ── Server card pie (harvested vs failure reasons) ──────────────────────── */
+.harvest-pie {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.harvest-pie svg {
+  flex: none;
+}
+
+.harvest-pie-slice {
+  stroke: var(--cioos-white);
+  stroke-width: 1px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.harvest-pie-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.harvest-pie-item:hover,
+.harvest-pie-item[aria-pressed="true"] {
+  background: var(--harvest-row-hover);
+}
+
+.harvest-pie-dimmed {
+  opacity: 0.5;
+}
+
+.harvest-pie-detail .harvest-pie {
+  max-width: 560px;
+  margin-bottom: 1rem;
+}
+
+.harvest-pie-detail .harvest-pie-legend {
+  font-size: 0.85rem;
+}
+
+.harvest-pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  flex: 1;
+  font-size: 0.75rem;
+}
+
+.harvest-pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.harvest-pie-swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.harvest-pie-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harvest-pie-value {
+  margin-left: auto;
+  color: var(--harvest-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .harvest-doc blockquote {
   margin: 0 0 1rem;
   padding: 0.5rem 1rem;

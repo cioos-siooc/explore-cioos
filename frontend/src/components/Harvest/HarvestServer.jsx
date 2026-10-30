@@ -7,6 +7,11 @@ import StatusBadge from "./StatusBadge.jsx";
 import HarvestModeBadge from "./HarvestModeBadge.jsx";
 import HarvestRealtimeBadge from "./HarvestRealtimeBadge.jsx";
 import Sparkline from "./Sparkline.jsx";
+import HarvestPie, {
+  datasetFailures,
+  reasonShades,
+  sliceKey,
+} from "./HarvestPie.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
 import warningLabel from "./warningLabel.js";
@@ -23,6 +28,7 @@ export default function HarvestServer() {
   );
   const [q, setQ] = useState(searchParams.get("q") || "");
   const warning = searchParams.get("warning") || "";
+  const reason = searchParams.get("reason") || "";
 
   const qs = new URLSearchParams();
   if (statusFilter) qs.set("status", statusFilter);
@@ -33,29 +39,49 @@ export default function HarvestServer() {
   const { data: datasets, loading } = useHarvestFetch(
     `/servers/${slug}${queryStr ? "?" + queryStr : ""}`,
   );
+  // The pie always charts the whole server, so a filtered table needs the
+  // unfiltered rows fetched alongside it.
+  const { data: allDatasets } = useHarvestFetch(
+    queryStr ? `/servers/${slug}` : null,
+  );
+  const pieRows = queryStr ? allDatasets : datasets;
+  const rows = reason
+    ? (datasets || []).filter((d) => d.reason_code === reason)
+    : datasets;
   // The slug is a transformed source URL; the full erddap_url (and a clean
   // hostname for display) come from the dataset rows once loaded.
   const erddapUrl = (datasets && datasets[0] && datasets[0].erddap_url) || "";
   const host = hostname(erddapUrl) || slug;
-  const { data: reasons } = useHarvestFetch(`/reasons/${slug}`);
   const { data: warningSummary } = useHarvestFetch(`/warnings/${slug}`);
 
-  function applyFilters(newStatus, newQ, newWarning = warning) {
+  function applyFilters(
+    newStatus,
+    newQ,
+    newWarning = warning,
+    newReason = reason,
+  ) {
     const p = {};
     if (newStatus) p.status = newStatus;
     if (newQ) p.q = newQ;
     if (newWarning) p.warning = newWarning;
+    if (newReason) p.reason = newReason;
     setSearchParams(p);
   }
 
-  const summary = (datasets || []).reduce(
-    (acc, d) => {
-      acc[d.status] = (acc[d.status] || 0) + 1;
-      acc.total++;
-      return acc;
-    },
-    { success: 0, skipped: 0, error: 0, total: 0 },
-  );
+  const selectedSlice =
+    reason || statusFilter === "success"
+      ? sliceKey(statusFilter, reason)
+      : null;
+  function selectSlice(slice) {
+    const off = slice.key === selectedSlice;
+    setStatusFilter(off ? "" : slice.status);
+    applyFilters(off ? "" : slice.status, q, warning, off ? "" : slice.reason);
+  }
+
+  const failures = datasetFailures(pieRows);
+  const nHarvested = (pieRows || []).filter(
+    (d) => d.status === "success",
+  ).length;
   const nIncremental = (datasets || []).filter(
     (d) => harvestMode(d) === "incremental",
   ).length;
@@ -82,19 +108,19 @@ export default function HarvestServer() {
         )}
       </p>
 
-      <div className="harvest-summary">
-        <span className="harvest-count-pill harvest-count-success">
-          ✓ {summary.success} {t("harvest.filter.success").toLowerCase()}
-        </span>
-        <span className="harvest-count-pill harvest-count-skipped">
-          · {summary.skipped} {t("harvest.filter.skipped").toLowerCase()}
-        </span>
-        <span className="harvest-count-pill harvest-count-error">
-          ✗ {summary.error} {t("harvest.filter.error").toLowerCase()}
-        </span>
-        <span className="harvest-muted harvest-text-md harvest-self-center">
-          {t("harvest.datasetsCount", { count: summary.total })}
-        </span>
+      <p className="harvest-muted harvest-text-md">
+        {t("harvest.datasetsCount", { count: (rows || []).length })}
+      </p>
+
+      <div className="harvest-pie-detail">
+        <HarvestPie
+          harvested={nHarvested}
+          failures={failures}
+          shades={reasonShades([failures])}
+          size={160}
+          onSelect={selectSlice}
+          selected={selectedSlice}
+        />
       </div>
 
       {nIncremental > 0 && (
@@ -106,27 +132,6 @@ export default function HarvestServer() {
             📁 {t("harvest.server.incrementalCount", { count: nIncremental })}
           </span>
         </div>
-      )}
-
-      {reasons && reasons.length > 0 && (
-        <details style={{ marginBottom: "1rem" }}>
-          <summary className="harvest-clickable harvest-text-md harvest-muted-strong">
-            {t("harvest.topFailureReasons")} ({reasons.length})
-          </summary>
-          <table
-            className="harvest-table"
-            style={{ maxWidth: 400, marginTop: "0.5rem" }}
-          >
-            <tbody>
-              {reasons.map((r) => (
-                <tr key={r.reason_code}>
-                  <td title={r.reason_code}>{reasonLabel(t, r.reason_code)}</td>
-                  <td className="harvest-num-total">{r.n}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
       )}
 
       {warningSummary && warningSummary.length > 0 && (
@@ -180,7 +185,7 @@ export default function HarvestServer() {
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
-            applyFilters(e.target.value, q);
+            applyFilters(e.target.value, q, warning, "");
           }}
         >
           <option value="">{t("harvest.filter.allStatuses")}</option>
@@ -223,7 +228,7 @@ export default function HarvestServer() {
             </button>
           </span>
         )}
-        {(statusFilter || q || warning) && (
+        {(statusFilter || q || warning || reason) && (
           <button
             className="harvest-text-md harvest-clickable harvest-btn-sm harvest-muted-soft"
             onClick={() => {
@@ -255,7 +260,7 @@ export default function HarvestServer() {
             </tr>
           </thead>
           <tbody>
-            {(datasets || []).map((d) => {
+            {(rows || []).map((d) => {
               const datasetSlug = slugify(d.erddap_url);
               return (
                 <tr key={d.dataset_id}>
@@ -319,7 +324,7 @@ export default function HarvestServer() {
                 </tr>
               );
             })}
-            {!loading && (!datasets || datasets.length === 0) && (
+            {!loading && (!rows || rows.length === 0) && (
               <tr>
                 <td colSpan="9" className="harvest-empty-row">
                   {t("harvest.server.noDatasets")}

@@ -59,11 +59,28 @@ describe("HarvestOverview", () => {
     stubRoutes();
   });
 
-  it("renders a server card per source, with its success/skip/error counts", async () => {
+  it("renders a server card per source, charting its harvested and failed datasets", async () => {
     renderWithProviders(<HarvestOverview />);
     expect(await screen.findByText("erddap.example.com")).toBeInTheDocument();
-    expect(screen.getByText("✓ 40")).toBeInTheDocument();
-    expect(screen.getByText("✗ 1")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "40 of 43 datasets harvested in the last run",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("splits a server's failures by reason when the API reports them", async () => {
+    stubRoutes({
+      "/servers": [
+        {
+          ...SERVERS[0],
+          reasons: [{ status: "error", reason_code: "HTTP_ERROR", n: 3 }],
+        },
+      ],
+    });
+    renderWithProviders(<HarvestOverview />);
+    const legend = await screen.findByRole("list");
+    expect(legend).toHaveTextContent("HTTP error3");
   });
 
   it("shows when each server last harvested successfully", async () => {

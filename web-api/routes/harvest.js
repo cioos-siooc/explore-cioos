@@ -85,7 +85,8 @@ async function listServers() {
            COUNT(*) FILTER (WHERE a.status = 'error')   AS n_error,
            COUNT(*) AS n_total,
            last_success.finished_at AS last_success_at,
-           last_success.run_id      AS last_success_run_id
+           last_success.run_id      AS last_success_run_id,
+           COALESCE(failures.reasons, '[]'::jsonb) AS reasons
     FROM latest_run_per_server s
     LEFT JOIN cde.harvest_attempts a
         ON a.erddap_url = s.erddap_url
@@ -101,8 +102,22 @@ async function listServers() {
         ORDER BY r.started_at DESC
         LIMIT 1
     ) last_success ON true
+    LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+                   'status', g.status, 'reason_code', g.reason_code, 'n', g.n)
+                 ORDER BY g.n DESC, g.reason_code) AS reasons
+        FROM (
+            SELECT ${NORM_STATUS("x")} AS status,
+                   ${NORM_REASON("x")} AS reason_code,
+                   COUNT(*)::int AS n
+            FROM cde.harvest_attempts x
+            WHERE x.run_id = s.last_run_id AND x.erddap_url = s.erddap_url
+            GROUP BY 1, 2
+        ) g
+        WHERE g.status <> 'success'
+    ) failures ON true
     GROUP BY s.erddap_url, s.source, s.last_attempted_at, s.last_run_id,
-             last_success.finished_at, last_success.run_id
+             last_success.finished_at, last_success.run_id, failures.reasons
     ORDER BY s.erddap_url
   `;
   const result = await db.raw(sql);

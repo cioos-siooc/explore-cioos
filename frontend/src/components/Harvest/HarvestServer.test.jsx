@@ -91,22 +91,48 @@ describe("HarvestServer", () => {
     expect(screen.getByText("source")).toBeInTheDocument();
   });
 
-  it("shows the summary counts and the hashable count", async () => {
+  it("shows the hashable count", async () => {
     renderServer();
     await screen.findByText("obs_270");
-    expect(screen.getByText(/✓ 1/)).toBeInTheDocument();
-    expect(screen.getByText(/✗ 1/)).toBeInTheDocument();
     expect(screen.getByText(/1 hashable/)).toBeInTheDocument();
   });
 
-  it("shows the top failure reasons behind a details disclosure", async () => {
+  it("charts harvested datasets against failures split by reason", async () => {
     renderServer();
     await screen.findByText("obs_270");
-    expect(screen.getByText(/Top failure reasons/)).toBeInTheDocument();
-    // "HTTP error" also appears as obs_512's own reason in the main table —
-    // the disclosure's own copy is the one inside its <details>.
-    const details = document.querySelector("details");
-    expect(details).toHaveTextContent("HTTP error");
+    expect(
+      screen.getByRole("img", {
+        name: "1 of 2 datasets harvested in the last run",
+      }),
+    ).toBeInTheDocument();
+    const legend = document.querySelector(".harvest-pie-legend");
+    expect(legend).toHaveTextContent("Harvested1 · 50%");
+    expect(legend).toHaveTextContent("HTTP error1 · 50%");
+  });
+
+  it("clicking a pie reason filters the table to it and keeps the whole-server pie", async () => {
+    const { user } = renderServer();
+    await screen.findByText("obs_270");
+    installMockHarvestFetch({
+      [`/servers/${SLUG}?status=error`]: [DATASETS[1]],
+      [`/servers/${SLUG}`]: DATASETS,
+      [`/warnings/${SLUG}`]: WARNINGS,
+    });
+    const reasonItem = screen.getByRole("button", { name: /HTTP error/ });
+    await user.click(reasonItem);
+    await waitFor(() => {
+      expect(screen.queryByText("obs_270")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("obs_512")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /HTTP error/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.getByRole("img", {
+        name: "1 of 2 datasets harvested in the last run",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("filtering by status re-fetches with the status query param", async () => {

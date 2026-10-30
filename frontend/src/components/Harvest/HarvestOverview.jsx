@@ -7,6 +7,7 @@ import {
   HarvestTableSkeleton,
 } from "./HarvestSkeleton.jsx";
 import StatusBadge from "./StatusBadge.jsx";
+import HarvestPie, { reasonShades, serverFailures } from "./HarvestPie.jsx";
 import useHarvestFetch from "./useHarvestFetch.js";
 import reasonLabel from "./reasonLabel.js";
 import { slugify } from "./slug.js";
@@ -23,23 +24,17 @@ function runLabel(r) {
   return r.scope || "—";
 }
 
-function ServerCard({ server, t }) {
+function ServerCard({ server, shades, t }) {
   const slug = slugify(server.erddap_url);
   return (
     <Link to={`/harvest/server/${slug}`} className="harvest-card">
       <div className="harvest-card-hostname">{hostname(server.erddap_url)}</div>
       <div className="harvest-card-url">{server.erddap_url}</div>
-      <div className="harvest-card-counts">
-        <span className="harvest-count-pill harvest-count-success">
-          ✓ {server.n_success}
-        </span>
-        <span className="harvest-count-pill harvest-count-skipped">
-          · {server.n_skipped}
-        </span>
-        <span className="harvest-count-pill harvest-count-error">
-          ✗ {server.n_error}
-        </span>
-      </div>
+      <HarvestPie
+        harvested={Number(server.n_success) || 0}
+        failures={serverFailures(server)}
+        shades={shades}
+      />
       <div className="harvest-card-meta">
         {t("harvest.card.lastAttempt", {
           date: fmtDt(server.last_attempted_at),
@@ -68,6 +63,7 @@ export default function HarvestOverview() {
   const stuckDownloads = downloads
     ? Number(downloads.n_stuck || 0) + Number(downloads.n_stalled || 0)
     : 0;
+  const shades = reasonShades((servers || []).map(serverFailures));
 
   return (
     <HarvestLayout>
@@ -83,7 +79,7 @@ export default function HarvestOverview() {
       ) : (
         <div className="harvest-card-grid">
           {(servers || []).map((s) => (
-            <ServerCard key={s.erddap_url} server={s} t={t} />
+            <ServerCard key={s.erddap_url} server={s} shades={shades} t={t} />
           ))}
         </div>
       )}
