@@ -1436,16 +1436,19 @@ export default function CreateMap({
     if (visible) rampMeasuredFor.current = undefined;
   }
 
-  // Restoring hands each group back to its owner: the picker for hex/point
-  // layers, applyLayerVisibility for the tracks.
+  // Restoring hands each group back to its owner: the switches for hex/point
+  // layers and the depth wash, applyLayerVisibility for the tracks. The depth
+  // wash goes too: its colours would read as the overlay's own.
   function setDataLayersVisibility(visible) {
     setLayersVisibility(griddapLayerIds, visible);
     if (!visible) {
       setLayersVisibility(observationLayerIds, false);
       setLayersVisibility(trackLayerIds, false);
+      setLayersVisibility(bathymetryLayerIds, false);
       return;
     }
     setLayersVisibility(observationLayerIds, dataLayersVisibleRef.current);
+    setLayersVisibility(bathymetryLayerIds, bathymetryVisibleRef.current);
     setLayersVisibility(trackLayerIds, true);
     applyLayerVisibility();
   }
@@ -1615,11 +1618,12 @@ export default function CreateMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLayersVisible]);
 
-  // Left alone by the WMS overlay: the depth wash reads as basemap.
+  // The ref keeps the choice through a WMS overlay, which hides the depth wash.
   useEffect(() => {
     bathymetryVisibleRef.current = bathymetryVisible;
-    if (!map.current) return;
+    if (!map.current || activeWmsOverlay) return;
     setLayersVisibility(bathymetryLayerIds, bathymetryVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bathymetryVisible]);
 
   useEffect(() => {
