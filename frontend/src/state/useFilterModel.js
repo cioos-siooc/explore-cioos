@@ -221,6 +221,7 @@ export default function useFilterModel(
     {
       key: "text",
       label: t("textSearchFilterName"),
+      panelName: "textSearchFilterName",
       options: filters.searchText
         ? [
             {
@@ -409,14 +410,23 @@ export default function useFilterModel(
         setScientificNamesExcluded([]);
       },
     },
-    listGroup(
-      "datasets",
-      t("datasetTitleFilterName"),
-      "datasetTitleFilterName",
-      filters.datasetsSelected,
-      filters.setDatasetsSelected,
-      true,
-    ),
+    // Only datasets a link applied, never every title: the text search finds
+    // datasets by name.
+    {
+      ...listGroup(
+        "datasets",
+        t("datasetTitleFilterName"),
+        undefined,
+        filters.datasetsSelected,
+        filters.setDatasetsSelected,
+        true,
+      ),
+      options: listOptions(
+        filters.datasetsSelected.filter(stateOf),
+        filters.setDatasetsSelected,
+        true,
+      ),
+    },
     // After the catalogue's values, which a few loosely matched letters
     // ("oxyg" for "Polygon") should not push down.
     {

@@ -119,9 +119,7 @@ describe("FilterSearch", () => {
   it("toggles a value without disturbing the list, so more can be picked", async () => {
     const { user, seen, box } = await renderPalette();
 
-    await user.type(box, "oxyg");
-    // Past the two text-search scopes.
-    await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+    await user.type(box, "oxyg{Enter}");
     expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
     expect(box).toHaveValue("oxyg");
     expect(option("Oxygen")).toHaveAttribute("data-state", "include");
@@ -257,13 +255,14 @@ describe("FilterSearch", () => {
     expect(option("CIOOS Pacific")).toBeInTheDocument();
   });
 
-  it("offers the typed text as a title search first", async () => {
+  it("offers the typed text as a title search", async () => {
     const { user, seen, box } = await renderPalette();
 
-    await user.type(box, "argo{Enter}");
+    await user.type(box, "argo");
+    await user.click(option("Titles matching “argo”"));
     expect(seen.search).toBe("argo");
     expect(seen.searchIn).toBe("titles");
-    await user.keyboard("{Enter}");
+    await user.click(option("Titles matching “argo”"));
     expect(seen.search).toBe("");
   });
 
@@ -274,6 +273,18 @@ describe("FilterSearch", () => {
     await user.click(option("Titles, descriptions & keywords matching “argo”"));
     expect(seen.search).toBe("argo");
     expect(seen.searchIn).toBe("all");
+  });
+
+  it("offers where to search a dataset's name, not its title", async () => {
+    const { user, box } = await renderPalette();
+
+    await user.type(box, "Alpena");
+    await waitFor(() =>
+      expect(option("Titles matching “Alpena”")).toBeInTheDocument(),
+    );
+    expect(
+      options().filter((o) => o.textContent.includes("ReCON")),
+    ).toHaveLength(0);
   });
 
   it("toggles the switches and geometry layers by name", async () => {
@@ -402,7 +413,7 @@ describe("FilterSearch", () => {
     expect(box).toHaveAttribute("aria-busy", "false");
   });
 
-  it("lists places after the other suggestions", async () => {
+  it("lists places after the other suggestions, and the text search last", async () => {
     answerRegions("Pacific");
     const { user, box } = await renderPalette();
 
@@ -416,7 +427,11 @@ describe("FilterSearch", () => {
     expect(labels.findIndex((l) => l.includes("CIOOS Pacific"))).toBeLessThan(
       firstPlace,
     );
-    expect(labels.at(-1)).toContain("Fundian Channel");
+    const firstText = labels.findIndex((l) => l.startsWith("Titles matching"));
+    expect(labels.findIndex((l) => l.includes("Fundian Channel"))).toBeLessThan(
+      firstText,
+    );
+    expect(labels.at(-1)).toContain("Titles, descriptions & keywords");
   });
 
   it("shows four of a group, and the rest when asked", async () => {

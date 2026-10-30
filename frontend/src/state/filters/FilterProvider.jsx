@@ -91,7 +91,6 @@ export default function FilterProvider({ children }) {
     defaultDatatsetsSelected,
   );
   const debouncedDatasetsSelected = useDebounce(datasetsSelected, 500);
-  const [datasetSearchTerms, setDatasetSearchTerms] = useState("");
 
   const [platformsSelected, setPlatformsSelected] = useState(
     defaultPlatformsSelected,
@@ -581,8 +580,6 @@ export default function FilterProvider({ children }) {
     setOrgsSearchTerms,
     datasetsSelected,
     setDatasetsSelected,
-    datasetSearchTerms,
-    setDatasetSearchTerms,
     platformsSelected,
     setPlatformsSelected,
     platformsSearchTerms,
