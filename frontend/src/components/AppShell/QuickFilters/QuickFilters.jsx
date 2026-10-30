@@ -4,6 +4,7 @@ import {
   ArrowCounterclockwise,
   BoundingBox,
   BroadcastPin,
+  Database,
   Eye,
   Pentagon,
   Trash,
@@ -23,7 +24,26 @@ import {
   useMapView,
 } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useSourceMode } from "../../../state/useSourceKinds.js";
 import "./styles.css";
+
+const SOURCE_CAPTION = {
+  all: "quickFilterCaptionSource",
+  erddap: "quickFilterSourceErddap",
+  obis: "quickFilterSourceObis",
+  custom: "quickFilterCaptionSource",
+};
+const SOURCE_LABEL = {
+  ...SOURCE_CAPTION,
+  all: "quickFilterSourceAll",
+  custom: "quickFilterSourceCustom",
+};
+const SOURCE_NEXT_TITLE = {
+  all: "quickFilterSourceNextErddap",
+  erddap: "quickFilterSourceNextObis",
+  obis: "quickFilterSourceNextAll",
+  custom: "quickFilterSourceNextAll",
+};
 
 // drawRequest is a *last* request, not a current one (see MapStateProvider),
 // so the lit menu item comes from the drawn shape, or failing one from the tool
@@ -45,6 +65,11 @@ export default function QuickFilters() {
   const { realtimeOnly, setRealtimeOnly } = useFilters();
   const { offerTip, tipHighlight } = useTips();
   const [canReset, resetAll] = useResetAllFilters();
+  const {
+    available: sourceAvailable,
+    mode: sourceMode,
+    cycle: cycleSource,
+  } = useSourceMode();
   const zoomedIn = isMarkerTier(zoom) && !onlyInView;
   useEffect(() => {
     if (zoomedIn) offerTip("inView");
@@ -298,6 +323,25 @@ export default function QuickFilters() {
           {t("quickFilterCaptionRealtime")}
         </span>
       </button>
+      {sourceAvailable && (
+        <button
+          type="button"
+          className={classNames("quickFilterButton quickFilterSource", {
+            applied: sourceMode !== "all",
+          })}
+          data-testid="quick-filter-source"
+          onClick={cycleSource}
+          title={t(SOURCE_NEXT_TITLE[sourceMode])}
+          aria-label={t("quickFilterSourceLabel", {
+            source: t(SOURCE_LABEL[sourceMode]),
+          })}
+        >
+          <Database size={18} aria-hidden="true" />
+          <span className="quickFilterCaption" aria-hidden="true">
+            {t(SOURCE_CAPTION[sourceMode])}
+          </span>
+        </button>
+      )}
       <button
         type="button"
         className="quickFilterButton quickFilterReset"

@@ -178,7 +178,7 @@
   .quickFilters {
     align-self: center;
     max-width: calc(100vw - 16px);
-    gap: 4px;
+    gap: 3px;
     padding-bottom: 6px;
   }
 
@@ -197,7 +197,7 @@
     border-radius: var(--cioos-radius-pill);
   }
 
-  /* Icon only: four captions don't fit a 360px row. The label stays for
+  /* Icon only: five captions don't fit a 360px row. The label stays for
      assistive tech. */
   .quickFilterButton.quickFilterReset {
     width: 30px;
@@ -207,6 +207,17 @@
   }
 
   .quickFilterReset .quickFilterCaption {
+    display: none;
+  }
+
+  /* Source too: its chip below names the source picked. */
+  .quickFilterButton.quickFilterSource {
+    width: 30px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .quickFilterSource .quickFilterCaption {
     display: none;
   }
 
