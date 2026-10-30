@@ -36,7 +36,7 @@ import {
   defaultRealtimeOnly,
 } from "../../components/config.js";
 import {
-  capitalizeFirstLetter,
+  filterOptionLabel,
   useDebounce,
   createDataFilterQueryString,
   formatErddapServerName,
@@ -542,22 +542,8 @@ export default function FilterProvider({ children }) {
     setScientificNamesExcluded([]);
   }
 
-  // Matches how MultiCheckboxFilter renders it.
-  const optionLabel = (option, translatable) => {
-    let title = option.title;
-    if (translatable) {
-      if (
-        option.titleTranslated &&
-        option.titleTranslated[i18n.languages[0]] &&
-        option.titleTranslated[i18n.languages[1]]
-      ) {
-        title = option.titleTranslated[i18n.language];
-      } else if (t(option.title)) {
-        title = t(option.title);
-      }
-    }
-    return capitalizeFirstLetter(title);
-  };
+  const optionLabel = (option, translatable) =>
+    filterOptionLabel(option, translatable, t, i18n.language);
 
   const value = {
     query,
