@@ -96,18 +96,18 @@ describe("AppShell (composition)", () => {
     });
   });
 
-  it("closes a dataset page and the sidebar from the banner's close button", async () => {
+  it("closes a dataset page onto the list from the banner's close button", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem("cde.introSeen", "true");
     renderWithProviders(<AppShell />, {
       providers: "app",
       url: `/?dataset=${pointQueryFixture[0].dataset_id}`,
     });
-    await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
+    await screen.findByTestId("sidebar-close-dataset", {}, { timeout: 3000 });
     await user.click(screen.getByTestId("sidebar-close-dataset"));
     expect(screen.getByTestId("sidebar-datasets")).toHaveAttribute(
       "data-expanded",
-      "false",
+      "true",
     );
     await waitFor(() =>
       expect(
@@ -131,7 +131,7 @@ describe("AppShell (composition)", () => {
     );
     await user.click(screen.getByRole("button", { name: "Back to results" }));
     await waitFor(() =>
-      expect(screen.queryByTestId("sidebar-back")).toBeNull(),
+      expect(screen.queryByTestId("sidebar-close-dataset")).toBeNull(),
     );
   });
 
@@ -155,9 +155,9 @@ describe("AppShell (composition)", () => {
     const pageTwoTitle = firstTitle();
 
     await user.click(screen.getAllByTestId("dataset-card")[0]);
-    await user.click(await screen.findByTestId("sidebar-back"));
+    await user.click(await screen.findByTestId("sidebar-close-dataset"));
     await waitFor(() =>
-      expect(screen.queryByTestId("sidebar-back")).toBeNull(),
+      expect(screen.queryByTestId("sidebar-close-dataset")).toBeNull(),
     );
     expect(firstTitle()).toBe(pageTwoTitle);
   });
@@ -202,7 +202,7 @@ describe("AppShell (composition)", () => {
         </>,
         { providers: "app", url: `/?dataset=${row.dataset_id}` },
       );
-      await screen.findByTestId("sidebar-back", {}, { timeout: 3000 });
+      await screen.findByTestId("sidebar-close-dataset", {}, { timeout: 3000 });
       await user.click(screen.getByTestId("sidebar-collapse"));
       const card = await screen.findByTestId("dataset-map-card");
       return { user, row, card };
@@ -227,7 +227,7 @@ describe("AppShell (composition)", () => {
         "data-expanded",
         "true",
       );
-      expect(screen.getByTestId("sidebar-back")).toBeInTheDocument();
+      expect(screen.getByTestId("sidebar-close-dataset")).toBeInTheDocument();
       expect(screen.queryByTestId("dataset-map-card")).toBeNull();
     });
 

@@ -75,6 +75,8 @@ export default function DatasetsTable({
   // Kept mounted under an open dataset page, so coming back finds the same
   // page and scroll position (see DatasetsPanel).
   hidden = false,
+  // The dataset whose page is open beside the list.
+  activePk,
 }) {
   const { t, i18n } = useTranslation();
   // The grouping lives in SelectionProvider: it outlives this list while a
@@ -457,6 +459,16 @@ export default function DatasetsTable({
     return out;
   }, [renderItems, firstRow, pageSize, currentPage, pageCount, isExpanded]);
 
+  // The page of the list holding the open dataset's card; 0 when it isn't
+  // listed (or sits in a closed group).
+  const activePage = useMemo(() => {
+    if (activePk === undefined) return 0;
+    const index = renderItems
+      .filter((item) => !item.header)
+      .findIndex((item) => item.row.pk === activePk);
+    return index < 0 ? 0 : Math.floor(index / pageSize) + 1;
+  }, [activePk, renderItems, pageSize]);
+
   // The what's here tip points at one of the click's datasets that can be
   // ticked in, while this list rather than the card holds them (see Sidebar).
   const whatsHereTarget = pageItems.find(
@@ -497,6 +509,21 @@ export default function DatasetsTable({
     pinnedPks,
     gridFirst,
   ]);
+
+  // After the reset above, so a dataset opened onto a fresh list (a share
+  // link) still finds its card's page.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (activePage) setPage(activePage);
+    // Not on activePage itself: paging away from the card must stick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePk, datasetsKey, sort, groupBy, pageSize, pinnedPks]);
+  useEffect(() => {
+    if (hidden || activePk === undefined) return;
+    listRef.current
+      ?.querySelector(`[data-dataset-pk="${activePk}"]`)
+      ?.scrollIntoView?.({ block: "nearest" });
+  }, [hidden, activePk, currentPage]);
 
   const goToPage = (next) => {
     setPage(Math.min(Math.max(next, 1), pageCount));
@@ -667,6 +694,7 @@ export default function DatasetsTable({
                   onHover={setHoveredDataset}
                   onHoverEnd={() => setHoveredDataset()}
                   fromMapClick={pinnedPks.has(Number(item.row.pk))}
+                  active={item.row.pk === activePk}
                   tipHighlight={tipHighlight(
                     item === whatsHereTarget && "whatsHere",
                   )}

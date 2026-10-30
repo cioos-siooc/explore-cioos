@@ -3,7 +3,14 @@ import { useEffect } from "react";
 // Publishes a floating surface's footprint as a :root custom property so other
 // surfaces can hold clearance without hard-coding its size; removed on unmount.
 // Pass a stable `measure` (module scope or useCallback): it is an effect dep.
-export default function usePublishedFootprint(ref, property, measure) {
+// `alsoObserve` names another element `measure` reads, to re-measure when it
+// resizes too.
+export default function usePublishedFootprint(
+  ref,
+  property,
+  measure,
+  alsoObserve,
+) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
@@ -17,6 +24,8 @@ export default function usePublishedFootprint(ref, property, measure) {
     // The viewport matters too, since every measurement is relative to it.
     const observer = new ResizeObserver(publish);
     observer.observe(el);
+    const other = alsoObserve && document.querySelector(alsoObserve);
+    if (other) observer.observe(other);
     window.addEventListener("resize", publish);
     // A class change can move the surface without resizing it, and a
     // transition only lands where it was going at its end.
@@ -33,5 +42,5 @@ export default function usePublishedFootprint(ref, property, measure) {
       window.removeEventListener("resize", publish);
       document.documentElement.style.removeProperty(property);
     };
-  }, [ref, property, measure]);
+  }, [ref, property, measure, alsoObserve]);
 }
