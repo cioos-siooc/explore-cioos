@@ -413,7 +413,7 @@ export default function FilterSearch({
       <div
         className={classNames("filterSearchField", { busy: places.loading })}
       >
-        <Search size={20} aria-hidden="true" />
+        <Search size={16} aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
