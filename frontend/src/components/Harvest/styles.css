@@ -746,6 +746,9 @@ a.harvest-link:hover {
 }
 
 .harvest-bars {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) auto minmax(0, 1fr) 3.5rem;
+  column-gap: 0.5rem;
   list-style: none;
   margin: 0 0 1rem;
   padding: 0;
@@ -754,9 +757,9 @@ a.harvest-link:hover {
 
 .harvest-bars li {
   display: grid;
-  grid-template-columns: minmax(0, 12rem) auto minmax(0, 1fr) 3.5rem;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 0.5rem;
   padding: 2px 0;
 }
 
