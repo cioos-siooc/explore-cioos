@@ -34,10 +34,28 @@ const RUNS = [
     n_total: 46,
   },
 ];
+const CKAN_COVERAGE = {
+  n_ckan_records: 400,
+  n_linked: 100,
+  n_erddap: 70,
+  n_obis: 35,
+  n_linked_stale: 0,
+  sources: [
+    {
+      source: "CIOOS Pacific",
+      n_records: 300,
+      n_linked: 90,
+      n_erddap: 60,
+      n_obis: 35,
+    },
+    { source: null, n_records: 100, n_linked: 10, n_erddap: 10, n_obis: 0 },
+  ],
+};
 function stubRoutes(overrides = {}) {
   installMockHarvestFetch({
     "/servers": SERVERS,
     "/runs/recent": RUNS,
+    "/ckan-coverage": CKAN_COVERAGE,
     ...overrides,
   });
 }
@@ -136,5 +154,58 @@ describe("HarvestOverview", () => {
       "href",
       "/harvest/server/erddap-example-com-erddap",
     );
+  });
+
+  it("shows the share of CKAN catalogue records linked to a harvested dataset", async () => {
+    renderWithProviders(<HarvestOverview />);
+    expect(await screen.findByText("25%")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "100 of 400 catalogue records linked to a harvested dataset",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the linked count but drops the share when the catalogue total is unavailable", async () => {
+    stubRoutes({
+      "/ckan-coverage": {
+        ...CKAN_COVERAGE,
+        n_ckan_records: null,
+        n_linked_stale: null,
+        sources: null,
+      },
+    });
+    renderWithProviders(<HarvestOverview />);
+    expect(
+      await screen.findByText(
+        "100 catalogue records linked to a harvested dataset (catalogue total unavailable)",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("25%")).not.toBeInTheDocument();
+  });
+
+  it("splits the linked records by the catalogue each was harvested from", async () => {
+    renderWithProviders(<HarvestOverview />);
+    const pacific = (await screen.findByText("CIOOS Pacific")).closest("li");
+    expect(within(pacific).getByText("90 / 300 (30%)")).toBeInTheDocument();
+    expect(pacific).toHaveAttribute(
+      "title",
+      "60 linked through ERDDAP, 35 through OBIS",
+    );
+    const unknown = screen.getByText("Unknown source").closest("li");
+    expect(within(unknown).getByText("10 / 100 (10%)")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/no longer in the catalogue/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says how many linked records the catalogue has since dropped", async () => {
+    stubRoutes({ "/ckan-coverage": { ...CKAN_COVERAGE, n_linked_stale: 3 } });
+    renderWithProviders(<HarvestOverview />);
+    expect(
+      await screen.findByText(
+        "3 linked records are no longer in the catalogue and are left out.",
+      ),
+    ).toBeInTheDocument();
   });
 });

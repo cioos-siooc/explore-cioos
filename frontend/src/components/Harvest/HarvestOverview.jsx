@@ -55,11 +55,98 @@ function ServerCard({ server, shades, t }) {
   );
 }
 
+function CkanCoverage({ coverage, t }) {
+  const total = coverage.n_ckan_records;
+  const pct = total ? Math.round((100 * coverage.n_linked) / total) : null;
+  return (
+    <div>
+      <h2 className="harvest-section-title">
+        {t("harvest.ckanCoverage.title")}
+      </h2>
+      {pct !== null && (
+        <>
+          <div className="harvest-ckan-pct">{pct}%</div>
+          <div
+            className="harvest-ckan-meter"
+            role="img"
+            aria-label={t("harvest.ckanCoverage.ratio", {
+              linked: coverage.n_linked,
+              total,
+            })}
+          >
+            <span style={{ width: `${pct}%` }} />
+          </div>
+        </>
+      )}
+      <p className="harvest-card-meta">
+        {pct !== null
+          ? t("harvest.ckanCoverage.ratio", {
+              linked: coverage.n_linked,
+              total,
+            })
+          : t("harvest.ckanCoverage.unavailable", {
+              linked: coverage.n_linked,
+            })}
+      </p>
+      {coverage.sources ? (
+        <ul className="harvest-ckan-sources">
+          {coverage.sources.map((s) => {
+            const sourcePct = s.n_records
+              ? Math.round((100 * s.n_linked) / s.n_records)
+              : 0;
+            return (
+              <li
+                key={s.source ?? ""}
+                title={t("harvest.ckanCoverage.split", {
+                  erddap: s.n_erddap,
+                  obis: s.n_obis,
+                })}
+              >
+                <span className="harvest-pie-name">
+                  {s.source ?? t("harvest.ckanCoverage.unknownSource")}
+                </span>
+                <span className="harvest-pie-value">
+                  {t("harvest.ckanCoverage.sourceRatio", {
+                    linked: s.n_linked,
+                    total: s.n_records,
+                    pct: sourcePct,
+                  })}
+                </span>
+                <div className="harvest-ckan-meter" aria-hidden="true">
+                  <span style={{ width: `${sourcePct}%` }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <ul className="harvest-pie-legend">
+          <li>
+            <span className="harvest-pie-name">ERDDAP</span>
+            <span className="harvest-pie-value">{coverage.n_erddap}</span>
+          </li>
+          <li>
+            <span className="harvest-pie-name">OBIS</span>
+            <span className="harvest-pie-value">{coverage.n_obis}</span>
+          </li>
+        </ul>
+      )}
+      {coverage.n_linked_stale > 0 && (
+        <p className="harvest-card-meta">
+          {t("harvest.ckanCoverage.stale", { count: coverage.n_linked_stale })}
+        </p>
+      )}
+      <p className="harvest-card-meta">{t("harvest.ckanCoverage.caption")}</p>
+    </div>
+  );
+}
+
 export default function HarvestOverview() {
   const { t } = useTranslation();
   const { data: servers, loading: loadingServers } =
     useHarvestFetch("/servers");
   const { data: runs, loading: loadingRuns } = useHarvestFetch("/runs/recent");
+  const { data: ckanCoverage } = useHarvestFetch("/ckan-coverage");
 
   const failureLists = (servers || []).map(serverFailures);
   const shades = reasonShades(failureLists);
@@ -101,6 +188,7 @@ export default function HarvestOverview() {
               <HarvestReasonBars failures={allFailures} />
             </div>
           )}
+          {ckanCoverage && <CkanCoverage coverage={ckanCoverage} t={t} />}
         </section>
       )}
 
