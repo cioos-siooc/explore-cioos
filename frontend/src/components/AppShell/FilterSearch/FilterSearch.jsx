@@ -310,12 +310,14 @@ export default function FilterSearch({
       ...shown.filter((g) => g.key !== "text"),
     ];
   }
-  // Places come last, where their slower answer lands without shifting the
-  // suggestions already being read.
+  // Places come after the filter values, where their slower answer lands
+  // without shifting the suggestions already being read; the text search
+  // closes the list.
+  const tail = ["region", "text"];
   shown = [
     ...pinned,
-    ...shown.filter((g) => g.key !== "region"),
-    ...shown.filter((g) => g.key === "region"),
+    ...shown.filter((g) => !tail.includes(g.key)),
+    ...tail.flatMap((key) => shown.filter((g) => g.key === key)),
   ];
   // The rest of a group is an option too, so the arrow keys reach it; with an
   // empty box a group lists what's applied, which is never cut.
@@ -413,7 +415,7 @@ export default function FilterSearch({
       <div
         className={classNames("filterSearchField", { busy: places.loading })}
       >
-        <Search size={20} aria-hidden="true" />
+        <Search size={16} aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"

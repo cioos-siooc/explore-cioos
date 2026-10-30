@@ -187,11 +187,11 @@ describe("ActiveFilterChips", () => {
 
   // The title search has no row of its own in the Filters modal: its chip
   // opens the search palette on the term instead.
-  it("opens the search palette from the title search's chip", async () => {
+  it("opens the text search's own page from its chip", async () => {
     const seen = {};
     function UIProbe() {
-      const { showFiltersModal, filterSearchText } = useUI();
-      Object.assign(seen, { showFiltersModal, filterSearchText });
+      const { showFiltersModal, openFilter } = useUI();
+      Object.assign(seen, { showFiltersModal, openFilter });
       return null;
     }
     const user = userEvent.setup({ delay: null });
@@ -208,7 +208,7 @@ describe("ActiveFilterChips", () => {
 
     expect(seen).toEqual({
       showFiltersModal: true,
-      filterSearchText: "temperature",
+      openFilter: "textSearchFilterName",
     });
   });
 

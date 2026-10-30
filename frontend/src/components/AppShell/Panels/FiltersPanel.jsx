@@ -7,7 +7,7 @@ import {
   CalendarWeek,
   Cursor,
   Eye,
-  FileEarmarkSpreadsheet,
+  CardText,
   Pentagon,
   Search,
   Stack,
@@ -50,7 +50,11 @@ import {
 } from "../../../state/dataLayers.js";
 import useDatasetCounts from "../../../state/useDatasetCounts.js";
 import useResetAllFilters from "../../../state/useResetAllFilters.js";
-import { useFilters } from "../../../state/filters/FilterProvider.jsx";
+import {
+  SEARCH_ALL,
+  SEARCH_TITLES,
+  useFilters,
+} from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
@@ -91,10 +95,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
     setOrgsSearchTerms,
     orgsMatchAll,
     setOrgsMatchAll,
-    datasetsSelected,
-    setDatasetsSelected,
-    datasetSearchTerms,
-    setDatasetSearchTerms,
     platformsSelected,
     setPlatformsSelected,
     platformsSearchTerms,
@@ -128,6 +128,8 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
     showObis,
     obisDataAvailable,
     searchText: appliedSearchText,
+    searchIn,
+    setSearch,
   } = useFilters();
   const { onlyInView, setOnlyInView, inViewCount, polygon, areaPlace } =
     useSelection();
@@ -183,12 +185,10 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
     orgsFilterTranslationKey,
     orgsSelected,
   );
-  const datasetsFilterTranslationKey = "datasetTitleFilterName";
-  const datasetsBadgeTitle = generateMultipleSelectBadgeTitle(
-    t,
-    datasetsFilterTranslationKey,
-    datasetsSelected,
-  );
+  const textSearchFilterTranslationKey = "textSearchFilterName";
+  const textSearchBadgeTitle = appliedSearchText
+    ? `${t(textSearchFilterTranslationKey)}: “${appliedSearchText}”`
+    : t(textSearchFilterTranslationKey);
   const platformsFilterTranslationKey = "platformsFilterName";
   const platformsBadgeTitle = generateMultipleSelectBadgeTitle(
     t,
@@ -306,10 +306,7 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
             <button
               type="button"
               data-testid="filters-panel-search"
-              className={classNames("filterHeader", {
-                open: !openFilter,
-                active: Boolean(appliedSearchText),
-              })}
+              className={classNames("filterHeader", { open: !openFilter })}
               aria-current={!openFilter ? "true" : undefined}
               onClick={() => setOpenFilter(undefined)}
             >
@@ -318,6 +315,35 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
             </button>
           </div>
           <FilterSection title={t("filterGroupWhat")}>
+            <Filter
+              active={Boolean(appliedSearchText)}
+              badgeTitle={textSearchBadgeTitle}
+              tooltip={t("textSearchFilterTooltip")}
+              icon={<CardText />}
+              controlled
+              searchable
+              searchTerms={appliedSearchText}
+              setSearchTerms={(text) => setSearch(text, searchIn)}
+              searchPlaceholder={t("textSearchPlaceholder")}
+              filterName={textSearchFilterTranslationKey}
+              openFilter={openFilter === textSearchFilterTranslationKey}
+              setOpenFilter={setOpenFilter}
+              resetButton={() => setSearch("")}
+              controls={
+                <Switch
+                  id="text-search-all"
+                  data-testid="text-search-all"
+                  label={t("textSearchAllSwitch")}
+                  checked={searchIn === SEARCH_ALL}
+                  onChange={(e) =>
+                    setSearch(
+                      appliedSearchText,
+                      e.target.checked ? SEARCH_ALL : SEARCH_TITLES,
+                    )
+                  }
+                />
+              }
+            />
             <Filter
               active={dataLayersChosen.length > 0}
               badgeTitle={dataLayersBadgeTitle}
@@ -447,42 +473,6 @@ export default function FiltersPanel({ searchInputRef, onDone }) {
                 setOptionsSelected={setOrgsSelected}
                 searchable
                 allOptions={orgsSelected}
-              />
-            </Filter>
-            <Filter
-              active={datasetsSelected.some(isSet)}
-              badgeTitle={datasetsBadgeTitle}
-              optionsSelected={datasetsSelected}
-              setOptionsSelected={setDatasetsSelected}
-              tooltip={t("datasetFilterTooltip")}
-              icon={<FileEarmarkSpreadsheet />}
-              controlled
-              searchable
-              searchTerms={datasetSearchTerms}
-              setSearchTerms={setDatasetSearchTerms}
-              searchPlaceholder={t("datasetSearchPlaceholder")}
-              filterName={datasetsFilterTranslationKey}
-              legend={<OptionStateLegend />}
-              openFilter={openFilter === datasetsFilterTranslationKey}
-              setOpenFilter={setOpenFilter}
-              resetButton={() =>
-                setAllOptionsIsSelectedTo(
-                  false,
-                  datasetsSelected,
-                  setDatasetsSelected,
-                )
-              }
-            >
-              <MultiCheckboxFilter
-                optionsSelected={createOptionSubset(
-                  datasetSearchTerms,
-                  datasetsSelected,
-                  t,
-                )}
-                setOptionsSelected={setDatasetsSelected}
-                searchable
-                allOptions={datasetsSelected}
-                translatable
               />
             </Filter>
             <Filter
