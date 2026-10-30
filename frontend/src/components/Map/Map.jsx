@@ -80,6 +80,7 @@ import {
   griddapHitLayers,
   griddapOutranksHexesIn,
   griddapTitle,
+  idsOutsideDataset,
   isGriddapHit,
   isOnAPointIn,
   loadTurfUnion,
@@ -1223,27 +1224,37 @@ export default function CreateMap({
     if (!map.current || !layersLoaded.current) return;
     applyTrackFocus();
 
-    // queryRenderedFeatures only sees what's on screen now, hence re-running on
-    // sourcedata. Below z7 profiles are merged into 'hexes'.
+    // Every loaded tile, not just drawn ones: re-run as each tile loads, this
+    // greys it before its first frame. Below z7 profiles are merged into
+    // 'hexes'; the geometry type keeps hex and marker pks, which share the
+    // source layer, from dimming each other across the z7 hand-off.
     const pointLevel = map.current.getZoom() >= 7;
     const dimmedLayers = [pointLevel ? "points" : "hexes", "coverage-hexes"];
+    const sourceFilters = {
+      points: ["==", ["geometry-type"], "Point"],
+      hexes: ["==", ["geometry-type"], "Polygon"],
+    };
 
     const dimmed = {};
     let focusedPoints = emptyFeatureCollection;
     dimmedLayers.forEach((layerId) => {
-      if (!pk || !map.current.getLayer(layerId)) {
+      const { source, sourceLayer } = focusTargets[layerId];
+      if (!pk || !map.current.getSource(source)) {
         dimmed[layerId] = [];
         return;
       }
-      const hits = map.current.queryRenderedFeatures({ layers: [layerId] });
-      dimmed[layerId] = hits
-        .filter((feature) => !featureHasDataset(feature, pk))
-        // promoteId puts pk on the id, which setFeatureState addresses.
-        .map((feature) => feature.id);
+      const features = map.current.querySourceFeatures(source, {
+        sourceLayer,
+        filter: sourceFilters[layerId],
+      });
+      // promoteId puts pk on the id, which setFeatureState addresses.
+      dimmed[layerId] = idsOutsideDataset(features, pk);
       // 'points' sort-key can't depend on feature-state, so focused markers
       // were buried under grey ones; they're redrawn on top from a copy, since
       // a filtered tile layer would relayout the whole source per focus change.
-      if (layerId === "points") focusedPoints = focusedPointFeatures(hits, pk);
+      if (layerId === "points") {
+        focusedPoints = focusedPointFeatures(features, pk);
+      }
     });
 
     // Writing state fires sourcedata/idle, which re-run this, so a no-op must
@@ -3297,12 +3308,12 @@ export default function CreateMap({
     }, DRAW_UPDATE_DEBOUNCE_MS);
     map.current.on("draw.update", commitDrawUpdate);
 
-    // New tiles were never part of the queryRenderedFeatures snapshot the focus
-    // was computed from, so re-apply it as each data source loads.
+    // A tile's 'data' event fires before its first frame, so dimming it here
+    // keeps out-of-focus cells from flashing their colour while panning.
     const dataSourceIds = ["cde-tiles", "cde-cells"];
     map.current.on("sourcedata", (e) => {
       if (!focusedDatasetPk.current) return;
-      if (!e.isSourceLoaded || !dataSourceIds.includes(e.sourceId)) return;
+      if (!e.tile || !dataSourceIds.includes(e.sourceId)) return;
       hoverHighlightPoints(focusedDatasetPk.current);
     });
 
@@ -3318,8 +3329,8 @@ export default function CreateMap({
 
     map.current.on("idle", () => {
       layersLoaded.current = true;
-      // 'sourcedata' can land before the new tiles render, and
-      // queryRenderedFeatures only sees rendered ones.
+      // A focus set before the layers settled was skipped, and a zoom across
+      // z7 switches the dimmed band without loading a tile.
       if (focusedDatasetPk.current) {
         hoverHighlightPoints(focusedDatasetPk.current);
       }
