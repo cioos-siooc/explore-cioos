@@ -1,4 +1,11 @@
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
+
+# git: uv fetches the git-sourced dependencies (metadata-xml,
+# cioos-metadata-conversion), and the slim base doesn't ship it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home app
 
 WORKDIR /app
 
@@ -27,5 +34,17 @@ COPY ./database /app/database
 # 4. Install project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked || (echo "Lock mismatch final stage, aborting" && exit 1)
+
+# The source and venv stay root-owned, so `app` cannot modify them; it only
+# writes new entries in the workdir and the volume mount points below. Mount
+# points that exist in the image hand their owner to a new named volume.
+# Without it, every `uv run` rebuilds the editable install into the read-only
+# venv and fails; the build already synced it --locked.
+ENV UV_NO_SYNC=1
+ENV WRITABLE_DIRS="harvest logs harvester_cache obis_cache"
+RUN mkdir $WRITABLE_DIRS && chown app:app . $WRITABLE_DIRS
+
+COPY --chmod=755 ./scripts/drop-privileges.sh /usr/local/bin/drop-privileges
+ENTRYPOINT ["drop-privileges"]
 
 CMD ["uv", "run", "python", "-m", "cde_harvester.prefect_pipeline", "-f", "harvest_config.yaml"]

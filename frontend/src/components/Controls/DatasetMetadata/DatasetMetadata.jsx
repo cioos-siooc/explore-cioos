@@ -9,7 +9,11 @@ import {
 
 import Skeleton, { SkeletonGroup } from "../../ui/Skeleton.jsx";
 import { useExpandableList } from "../DatasetInspector/ListCard.jsx";
-import { erddapServerBase } from "../../../downloadLinks.js";
+import {
+  erddapServerBase,
+  localizedCkanUrl,
+  localizedErddapUrl,
+} from "../../../downloadLinks.js";
 import { formatRange } from "../../../utilities.jsx";
 import { licenseLabel, licenseText } from "./license.js";
 import { renderMarkdown } from "./markdown.js";
@@ -452,12 +456,15 @@ export function Organizations({ metadata }) {
 // link each to ERDDAP, OBIS and CKAN, whichever the dataset has, as a cell of
 // the facts sheet.
 export function SourceLinksCell({ dataset }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const links = [
     dataset.source_type === "obis"
       ? ["OBIS", `https://obis.org/dataset/${dataset.dataset_id}`]
-      : ["ERDDAP™", dataset.erddap_url],
-    ["Catalog", dataset.ckan_url],
+      : [
+          "ERDDAP™",
+          localizedErddapUrl(dataset, dataset.erddap_url, i18n.language),
+        ],
+    ["Catalog", localizedCkanUrl(dataset.ckan_url, i18n.language)],
   ].filter(([, url]) => url);
   if (!links.length) return null;
   return (
@@ -492,7 +499,7 @@ export function Citation({ metadata }) {
 
 // Links that exist for every dataset of its kind, whatever its catalogue
 // record lists: where to get the data, its full metadata, its record.
-function datasetResources(dataset, t) {
+function datasetResources(dataset, t, language) {
   const resources = [];
   const base = erddapServerBase(dataset);
   if (dataset.source_type === "obis") {
@@ -506,7 +513,7 @@ function datasetResources(dataset, t) {
     resources.push({
       name: t("metadataResourceErddapName"),
       description: t("metadataResourceErddapDescription"),
-      url: dataset.erddap_url,
+      url: localizedErddapUrl(dataset, dataset.erddap_url, language),
       format: "ERDDAP",
     });
     if (base && dataset.dataset_id) {
@@ -514,7 +521,11 @@ function datasetResources(dataset, t) {
         {
           name: t("metadataResourceAttributesName"),
           description: t("metadataResourceAttributesDescription"),
-          url: `${base}/info/${dataset.dataset_id}/index.html`,
+          url: localizedErddapUrl(
+            dataset,
+            `${base}/info/${dataset.dataset_id}/index.html`,
+            language,
+          ),
           format: "ERDDAP",
         },
         {
@@ -537,7 +548,7 @@ function datasetResources(dataset, t) {
     resources.push({
       name: t("metadataResourceCatalogueName"),
       description: t("metadataResourceCatalogueDescription"),
-      url: dataset.ckan_url,
+      url: localizedCkanUrl(dataset.ckan_url, language),
       format: "CIOOS",
     });
   }
@@ -588,7 +599,7 @@ function Resources({ dataset, metadata }) {
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const seen = new Set();
   const resources = [
-    ...datasetResources(dataset, t),
+    ...datasetResources(dataset, t, lang),
     ...(metadata.resources ?? []).filter(
       (r) =>
         !r.language ||

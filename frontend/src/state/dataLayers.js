@@ -1,28 +1,28 @@
 // Shared by MapStateProvider (?layers= round-trip), Map.jsx (tile-query
 // params) and SelectionProvider (list narrowing) so all three agree.
 
-// Key order is the ?layers= order and the render order (fixed-place, path,
-// occurrence, gridded); the two trajectory rows stay adjacent because their
+// Key order is the ?layers= order and the render order (occurrence,
+// fixed-place, path, gridded); the two trajectory rows stay adjacent because their
 // display options render once under the pair. 'trajectories' keeps its old
 // name so links in the wild resolve; LEGACY_DATA_LAYER_KEYS maps 'obis' to
 // 'point'.
 export const DATA_LAYER_LABEL_KEYS = {
+  point: "layerPoint",
   profile: "layerProfile",
   timeseries: "layerTimeseries",
   timeseriesProfile: "layerTimeseriesProfile",
   trajectories: "layerTrajectories",
   trajectoryProfile: "layerTrajectoryProfile",
-  point: "layerPoint",
   grid: "layerGrid",
 };
 
 export const DATA_LAYER_HINT_KEYS = {
+  point: "layerPointHint",
   profile: "layerProfileHint",
   timeseries: "layerTimeseriesHint",
   timeseriesProfile: "layerTimeseriesProfileHint",
   trajectories: "layerTrajectoriesHint",
   trajectoryProfile: "layerTrajectoryProfileHint",
-  point: "layerPointHint",
   grid: "layerGridHint",
 };
 

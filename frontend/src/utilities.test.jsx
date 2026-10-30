@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import {
   abbreviateString,
@@ -9,6 +9,7 @@ import {
   createDataFilterQueryString,
   createSelectionQueryString,
   escapeHtml,
+  filterOptionLabel,
   formatDatasetCount,
   formatErddapServerName,
   formatSizeEstimate,
@@ -463,6 +464,33 @@ describe("string and count helpers", () => {
     );
   });
 
+  it("labels catalogue options from their translations, without t()", () => {
+    const t = vi.fn((key) => `t:${key}`);
+    const dataset = {
+      title: "ctd casts",
+      titleTranslated: { en: "ctd casts", fr: null },
+    };
+    expect(filterOptionLabel(dataset, true, t, "fr")).toBe("Ctd casts");
+    expect(
+      filterOptionLabel(
+        { ...dataset, titleTranslated: { en: "ctd casts", fr: "profils" } },
+        true,
+        t,
+        "fr",
+      ),
+    ).toBe("Profils");
+    expect(t).not.toHaveBeenCalled();
+  });
+
+  it("labels vocabulary options through t(), and untranslatable ones as-is", () => {
+    const t = vi.fn(() => "oxygen");
+    expect(filterOptionLabel({ title: "oxygenKey" }, true, t, "en")).toBe(
+      "Oxygen",
+    );
+    expect(filterOptionLabel({ title: "dfo" }, false, t, "en")).toBe("Dfo");
+    expect(t).toHaveBeenCalledTimes(1);
+  });
+
   it("neutralises markup in harvested text", () => {
     expect(escapeHtml('<img src=x onerror="alert(1)">')).toBe(
       "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;",
@@ -516,6 +544,8 @@ describe("legend range helpers", () => {
 
   it("picks the tier covering the current zoom", () => {
     expect(getCurrentRangeLevel(rangeLevels, 3)).toBe(rangeLevels.zoom0);
+    expect(getCurrentRangeLevel(rangeLevels, 3.9)).toBe(rangeLevels.zoom0);
+    expect(getCurrentRangeLevel(rangeLevels, 4)).toBe(rangeLevels.zoom1);
     expect(getCurrentRangeLevel(rangeLevels, 6)).toBe(rangeLevels.zoom1);
     expect(getCurrentRangeLevel(rangeLevels, 9)).toBe(rangeLevels.zoom2);
   });

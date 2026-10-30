@@ -216,7 +216,10 @@ describe("Sidebar list beside a dataset page", () => {
     await openFromList();
     expect(screen.getByTestId("sidebar")).toHaveClass("railed");
     expect(screen.getByTestId("sidebar-toggle-count")).toBeVisible();
-    expect(screen.getByTestId("datasets-controls")).toBeVisible();
+    // The list stays hidden until the results settle.
+    await waitFor(() =>
+      expect(screen.getByTestId("datasets-controls")).toBeVisible(),
+    );
     expect(screen.queryByTestId("sidebar-back")).not.toBeInTheDocument();
     // One set of window controls, on the page's banner.
     expect(screen.getAllByTestId("sidebar-collapse")).toHaveLength(1);

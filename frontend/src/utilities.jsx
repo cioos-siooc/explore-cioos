@@ -56,6 +56,19 @@ export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+// Catalogue titles (datasets, platforms) are never i18n keys, and a missed t()
+// still pays for nesting and interpolation: run over thousands of dataset
+// titles it cost over a second per filter-model build.
+export function filterOptionLabel(option, translatable, t, language) {
+  let title = option.title;
+  if (translatable) {
+    title = option.titleTranslated
+      ? option.titleTranslated[language] || option.title
+      : t(option.title);
+  }
+  return capitalizeFirstLetter(title);
+}
+
 // Takes the caller's `t`: it looks up several keys and can't call
 // useTranslation outside a component.
 export function generateMultipleSelectBadgeTitle(
@@ -78,7 +91,7 @@ export function generateMultipleSelectBadgeTitle(
         oceanVariablesFiltername: "oceanVariablesMulti",
         platformsFilterName: "platformsMulti",
         organizationFilterName: "organizationMulti",
-        datasetsFilterName: "datasetsMulti",
+        datasetTitleFilterName: "datasetsMulti",
       };
       return optionsSelectedFiltered.length + t(mapping[badgeTitle]);
     }
@@ -471,11 +484,12 @@ export function useSearchInput(
 }
 
 // An unknown zoom (camera not reported yet) takes the widest tier: undefined
-// would read as "no data".
+// would read as "no data". The 4 must match FINE_TIER_MIN_ZOOM in
+// web-api/utils/hexTiers.js.
 export function getCurrentRangeLevel(rangeLevels, zoom) {
   if (!rangeLevels) return undefined;
   const level = Number(zoom);
-  if (!Number.isFinite(level) || level < 5) return rangeLevels.zoom0;
+  if (!Number.isFinite(level) || level < 4) return rangeLevels.zoom0;
   if (level < 7) return rangeLevels.zoom1;
   return rangeLevels.zoom2;
 }

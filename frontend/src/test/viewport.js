@@ -7,17 +7,21 @@ const TOUCH_QUERY = "(hover: none)";
 const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)"; // asked by react-data-table-component 8
 
 let currentWidth = DESKTOP_WIDTH;
+let currentHeight = Infinity;
 let touchScreen = false;
 const liveQueries = new Set();
 
 // Only the forms this codebase writes; anything else is a typo, and answering
-// `false` would hide it. Height never moves, so (max-height) and (min-height)
-// read as tall.
+// `false` would hide it. Height stays tall unless a test sets it.
 function evaluate(query) {
   if (query.includes(",")) return query.split(",").some(evaluate);
   if (query.includes(" and ")) return query.split(" and ").every(evaluate);
-  if (/^\(\s*max-height:\s*\d+px\s*\)$/.test(query.trim())) return false;
-  if (/^\(\s*min-height:\s*\d+px\s*\)$/.test(query.trim())) return true;
+  const height = /^\(\s*(min|max)-height:\s*(\d+)px\s*\)$/.exec(query.trim());
+  if (height) {
+    return height[1] === "min"
+      ? currentHeight >= Number(height[2])
+      : currentHeight <= Number(height[2]);
+  }
   if (query.trim() === REDUCED_MOTION_QUERY) return false;
   if (query.trim() === TOUCH_QUERY) return touchScreen;
   if (query.trim() === DARK_SCHEME_QUERY) return false;
@@ -68,6 +72,13 @@ export function setViewportWidth(width) {
   liveQueries.forEach((mql) => mql.dispatch());
 }
 
+// Call before render, or inside act() when the change should flush updates.
+export function setViewportHeight(height) {
+  currentHeight = height;
+  window.innerHeight = height;
+  liveQueries.forEach((mql) => mql.dispatch());
+}
+
 export function setTouchScreen(touch) {
   touchScreen = touch;
   liveQueries.forEach((mql) => mql.dispatch());
@@ -75,6 +86,7 @@ export function setTouchScreen(touch) {
 
 export function resetViewport() {
   currentWidth = DESKTOP_WIDTH;
+  currentHeight = Infinity;
   touchScreen = false;
   liveQueries.clear();
 }

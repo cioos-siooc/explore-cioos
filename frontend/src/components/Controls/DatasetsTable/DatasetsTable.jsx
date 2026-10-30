@@ -13,6 +13,8 @@ import {
   Filter,
   SlashCircle,
   Square,
+  ViewList,
+  ViewStacked,
   X,
   XCircle,
 } from "react-bootstrap-icons";
@@ -23,8 +25,10 @@ import { useMapState } from "../../../state/map/MapStateProvider.jsx";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
+import useMediaQuery, { SHORT_QUERY } from "../../../state/ui/useMediaQuery.js";
 import useActiveFilters from "../../../state/useActiveFilters.js";
 import useGroupFilter from "../../../state/useGroupFilter.js";
+import { usePersistentState } from "../../../state/usePersistentState.js";
 import { cdmDataTypeLabel } from "../../../state/dataLayers.js";
 import {
   GRID_KEY,
@@ -101,6 +105,11 @@ export default function DatasetsTable({
   const { tipHighlight } = useTips();
 
   const groupBy = isDownloadModal ? GROUP_NONE : selectedGroupBy;
+  const shortScreen = useMediaQuery(SHORT_QUERY);
+  // Unset until the viewer picks one, so the list follows the window height.
+  const [density, setDensity] = usePersistentState("listDensity", null);
+  const compact =
+    !isDownloadModal && (density ? density === "compact" : shortScreen);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
   const listRef = useRef(null);
@@ -570,6 +579,25 @@ export default function DatasetsTable({
             options={groupByOptions}
             onChange={setGroupBy}
           />
+          <button
+            type="button"
+            className="datasetsCardDensity"
+            data-testid="datasets-density-toggle"
+            onClick={() => setDensity(compact ? "full" : "compact")}
+            aria-pressed={compact}
+            aria-label={t("datasetsCardDensityCompactTitle")}
+            title={t(
+              compact
+                ? "datasetsCardDensityComfortableTitle"
+                : "datasetsCardDensityCompactTitle",
+            )}
+          >
+            {compact ? (
+              <ViewList size={14} aria-hidden="true" />
+            ) : (
+              <ViewStacked size={14} aria-hidden="true" />
+            )}
+          </button>
         </div>
       )}
 
@@ -630,7 +658,7 @@ export default function DatasetsTable({
         </div>
       )}
       <div
-        className="datasetsCardList"
+        className={classNames("datasetsCardList", { compact })}
         ref={listRef}
         onScroll={(event) => {
           if (!hidden) scrollTopRef.current = event.currentTarget.scrollTop;

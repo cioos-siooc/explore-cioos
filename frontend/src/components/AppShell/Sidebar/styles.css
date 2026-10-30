@@ -3,16 +3,18 @@
 
 /* Transparent shell: empty space stays click-through to the map. */
 .sidebar {
+  --sidebar-inset: 12px;
+
   position: fixed;
 
   /* --cioos-top-bar-space is published by TopControls (0 once the bar sits
      clear of this column). */
-  top: max(12px, var(--cioos-top-bar-space, 0px));
-  left: 12px;
+  top: max(var(--sidebar-inset), var(--cioos-top-bar-space, 0px));
+  left: var(--sidebar-inset);
 
   /* --cioos-time-bar-space is 0 unless TimeBar is mounted; undone past 1944px
      (see below). */
-  bottom: calc(12px + var(--cioos-time-bar-space, 0px));
+  bottom: calc(var(--sidebar-inset) + var(--cioos-time-bar-space, 0px));
   z-index: var(--cioos-z-shell, 30);
   display: flex;
   flex-direction: column;
@@ -25,7 +27,7 @@
    reaches this column. Update if --cioos-sidebar-width or that cap changes. */
 @media (min-width: 1944px) {
   .sidebar {
-    bottom: 12px;
+    bottom: var(--sidebar-inset);
   }
 }
 
@@ -400,6 +402,38 @@
 @keyframes sidebarCountFlash {
   from {
     opacity: 0.2;
+  }
+}
+
+/* Short screens (a laptop, or a 1080p monitor at 125-150% scaling): the fixed
+   chrome gives up height to the list. The phone rules below still win. */
+@media (min-width: 701px) and (max-height: 860px) {
+  .sidebar {
+    --sidebar-inset: 8px;
+  }
+
+  .datasetsHeader {
+    padding: 8px 12px;
+  }
+
+  .datasetsHeaderSubtitle {
+    display: none;
+  }
+
+  .sidebarFooter {
+    padding: 6px 10px;
+  }
+
+  /* The (?) still opens the explanation the sentence summarizes. */
+  .sidebarFooterHintIcon,
+  .sidebarFooterHint > span {
+    display: none;
+  }
+
+  .sidebarDownloadText {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
   }
 }
 

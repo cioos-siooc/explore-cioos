@@ -16,10 +16,17 @@ vi.mock("../Map/Map.jsx", () => ({
 
 import AppShell from "./AppShell.jsx";
 import { useMapState } from "../../state/map/MapStateProvider.jsx";
+import { useFilters } from "../../state/filters/FilterProvider.jsx";
 
 let latestMap;
 function MapStateProbe() {
   latestMap = useMapState();
+  return null;
+}
+
+let latestFilters;
+function FiltersProbe() {
+  latestFilters = useFilters();
   return null;
 }
 
@@ -134,7 +141,13 @@ describe("AppShell (composition)", () => {
     renderWithProviders(<AppShell />, { providers: "app" });
     await user.click(await screen.findByTestId("topbar-datasets-button"));
     await screen.findAllByTestId("dataset-card", {}, { timeout: 3000 });
-    await user.click(screen.getByRole("button", { name: "Next page" }));
+    await user.click(
+      await screen.findByRole(
+        "button",
+        { name: "Next page" },
+        { timeout: 3000 },
+      ),
+    );
     const firstTitle = () =>
       screen
         .getAllByTestId("dataset-card")[0]
@@ -147,6 +160,32 @@ describe("AppShell (composition)", () => {
       expect(screen.queryByTestId("sidebar-close-dataset")).toBeNull(),
     );
     expect(firstTitle()).toBe(pageTwoTitle);
+  });
+
+  it("swaps the list for placeholders until results answer an edited filter", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("cde.introSeen", "true");
+    renderWithProviders(
+      <>
+        <AppShell />
+        <FiltersProbe />
+      </>,
+      { providers: "app" },
+    );
+    await user.click(await screen.findByTestId("topbar-datasets-button"));
+    const list = (await screen.findAllByTestId("dataset-card"))[0].closest(
+      ".datasetsPanelList",
+    );
+    await waitFor(() => expect(list).toBeVisible());
+
+    act(() => latestFilters.setStartDepth(10));
+    expect(list).not.toBeVisible();
+    expect(
+      screen.getByTestId("datasets-panel").querySelector(".cioosSpinner"),
+    ).toBeInTheDocument();
+
+    await waitFor(() => expect(list).toBeVisible(), { timeout: 3000 });
+    expect(screen.queryByTestId("skeleton")).toBeNull();
   });
 
   describe("a minimized dataset page", () => {

@@ -36,7 +36,7 @@ import {
   defaultRealtimeOnly,
 } from "../../components/config.js";
 import {
-  capitalizeFirstLetter,
+  filterOptionLabel,
   useDebounce,
   createDataFilterQueryString,
   formatErddapServerName,
@@ -61,7 +61,7 @@ export const defaultQuery = {
   obisNodesSelected: defaultObisNodesSelected,
   erddapServersSelected: defaultErddapServersSelected,
   realtimeOnly: defaultRealtimeOnly,
-  eovsMatchAll: false,
+  eovsMatchAll: true,
   orgsMatchAll: false,
   scientificNamesExcluded: defaultScientificNamesSelected,
   scientificNamesMatchAll: false,
@@ -74,7 +74,7 @@ export default function FilterProvider({ children }) {
   const debouncedEovsSelected = useDebounce(eovsSelected, 500);
   const [eovsSearchTerms, setEovsSearchTerms] = useState("");
   // Not debounced, like realtimeOnly.
-  const [eovsMatchAll, setEovsMatchAll] = useState(false);
+  const [eovsMatchAll, setEovsMatchAll] = useState(true);
 
   const [orgsSelected, setOrgsSelected] = useState(defaultOrgsSelected);
   const debouncedOrgsSelected = useDebounce(orgsSelected, 500);
@@ -164,6 +164,22 @@ export default function FilterProvider({ children }) {
     (!anyServersSelected || anyObisNodesSelected) && !allObisNodesExcluded;
   // An empty /obisNodes means no OBIS data, so OBIS-only UI is hidden.
   const obisDataAvailable = obisNodesSelected.length > 0;
+
+  // Between an edit and its debounce firing, results still answer the old
+  // selection.
+  const filtersPending =
+    eovsSelected !== debouncedEovsSelected ||
+    orgsSelected !== debouncedOrgsSelected ||
+    datasetsSelected !== debouncedDatasetsSelected ||
+    platformsSelected !== debouncedPlatformsSelected ||
+    erddapServersSelected !== debouncedErddapServersSelected ||
+    obisNodesSelected !== debouncedObisNodesSelected ||
+    startDate !== debouncedStartDate ||
+    endDate !== debouncedEndDate ||
+    startDepth !== debouncedStartDepth ||
+    endDepth !== debouncedEndDepth ||
+    scientificNamesSelected !== debouncedScientificNamesSelected ||
+    scientificNamesExcluded !== debouncedScientificNamesExcluded;
 
   // A memo, not effect-mirrored state: at the moment the trailing debounce
   // fires the debounced value equals the live one, so this lands one render
@@ -297,7 +313,10 @@ export default function FilterProvider({ children }) {
       setScientificNamesExcluded(namesFromURL(excludeScientificNames));
     }
     if (realtimeOnlyFromURL === "true") setRealtimeOnly(true);
-    if (eovsMatch === "all") setEovsMatchAll(true);
+    // Links from before AND became the default leave the param off for OR.
+    if (eovs?.split(",").filter(Boolean).length > 1) {
+      setEovsMatchAll(eovsMatch === "all");
+    }
     if (organizationsMatch === "all") setOrgsMatchAll(true);
     if (scientificNamesMatch === "all") setScientificNamesMatchAll(true);
     if (timeMin) setStartDate(timeMin);
@@ -482,7 +501,7 @@ export default function FilterProvider({ children }) {
 
   function resetFilters() {
     setRealtimeOnly(defaultRealtimeOnly);
-    setEovsMatchAll(false);
+    setEovsMatchAll(true);
     setOrgsMatchAll(false);
     setScientificNamesMatchAll(false);
     setStartDate(defaultStartDate);
@@ -523,25 +542,12 @@ export default function FilterProvider({ children }) {
     setScientificNamesExcluded([]);
   }
 
-  // Matches how MultiCheckboxFilter renders it.
-  const optionLabel = (option, translatable) => {
-    let title = option.title;
-    if (translatable) {
-      if (
-        option.titleTranslated &&
-        option.titleTranslated[i18n.languages[0]] &&
-        option.titleTranslated[i18n.languages[1]]
-      ) {
-        title = option.titleTranslated[i18n.language];
-      } else if (t(option.title)) {
-        title = t(option.title);
-      }
-    }
-    return capitalizeFirstLetter(title);
-  };
+  const optionLabel = (option, translatable) =>
+    filterOptionLabel(option, translatable, t, i18n.language);
 
   const value = {
     query,
+    filtersPending,
     eovsSelected,
     setEovsSelected,
     eovsSearchTerms,

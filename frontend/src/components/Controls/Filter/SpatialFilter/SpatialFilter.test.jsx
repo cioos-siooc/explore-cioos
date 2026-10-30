@@ -229,6 +229,31 @@ describe("SpatialFilter coordinates", () => {
     expect(seen.showFiltersModal).toBe(false);
   });
 
+  it("enables each Apply only once its own inputs differ from the area", async () => {
+    const { user } = renderPanel("/?latMin=44&lonMin=-67&latMax=46&lonMax=-64");
+    const applyBox = screen.getByRole("button", {
+      name: "Apply bounding box filter",
+    });
+    const applyWkt = screen.getByRole("button", {
+      name: "Apply polygon filter",
+    });
+    expect(applyBox).toBeDisabled();
+    expect(applyWkt).toBeDisabled();
+
+    const north = screen.getByTestId("spatial-filter-north");
+    await user.clear(north);
+    await user.type(north, "47");
+    expect(applyBox).toBeEnabled();
+    expect(applyWkt).toBeDisabled();
+
+    await user.clear(north);
+    await user.type(north, "46");
+    expect(applyBox).toBeDisabled();
+
+    await user.type(screen.getByTestId("spatial-filter-wkt"), " ");
+    expect(applyWkt).toBeEnabled();
+  });
+
   it("explains an impossible box instead of applying it", async () => {
     const { user, seen } = renderPanel();
 

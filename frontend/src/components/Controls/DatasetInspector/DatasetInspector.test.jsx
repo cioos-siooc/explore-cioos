@@ -103,14 +103,17 @@ describe("DatasetInspector", () => {
   it("shows ocean variables, geometry, platform and where to get the data", async () => {
     await renderReady();
     expect(await screen.findByText("Oxygen")).toBeInTheDocument();
-    expect(screen.getByText("subSurfaceTemperature")).toBeInTheDocument();
+    expect(screen.getByText("Subsurface temperature")).toBeInTheDocument();
     // TimeSeries maps to the "Time series" data-layer label.
     expect(screen.getByText("Time series")).toBeInTheDocument();
     expect(screen.getByText("Mooring")).toBeInTheDocument();
     const erddapLink = await screen.findByRole("link", {
       name: /Data access form/,
     });
-    expect(erddapLink).toHaveAttribute("href", DATASET.erddap_url);
+    expect(erddapLink).toHaveAttribute(
+      "href",
+      "https://erddap.example/en/tabledap/foo.html",
+    );
   });
 
   it("links an OBIS dataset to OBIS and to the CKAN record the harvest matched", async () => {
@@ -128,7 +131,10 @@ describe("DatasetInspector", () => {
     ).toHaveAttribute("href", "https://obis.org/dataset/obis-uuid");
     expect(
       screen.getByRole("link", { name: /CIOOS catalogue record/ }),
-    ).toHaveAttribute("href", ckanUrl);
+    ).toHaveAttribute(
+      "href",
+      "https://catalogue.cioos.ca/en/dataset/ckan-obis-1",
+    );
   });
 
   it("shows no CKAN link for an OBIS dataset the harvest matched to none", async () => {
@@ -224,10 +230,13 @@ describe("DatasetInspector", () => {
       stubRecords();
       await renderReady({ url: "/?wide=1" });
       expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-      expect(screen.getByRole("region", { name: "Metadata" })).toBeVisible();
-      expect(screen.getByRole("region", { name: "Data" })).toBeVisible();
-      expect(await screen.findByText("Oxygen")).toBeVisible();
-      expect(await screen.findByText("station-7")).toBeVisible();
+      const metadata = screen.getByRole("region", { name: "Metadata" });
+      const data = screen.getByRole("region", { name: "Data" });
+      expect(metadata).toBeVisible();
+      expect(data).toBeVisible();
+      // Scoped: the record card in Data also tags its EOVs ("Oxygen").
+      expect(await within(metadata).findByText("Oxygen")).toBeVisible();
+      expect(await within(data).findByText("station-7")).toBeVisible();
     });
 
     it("keeps the tabs on a phone, where the page is already full-screen", async () => {
@@ -258,11 +267,11 @@ describe("DatasetInspector", () => {
     });
     expect(screen.getByRole("link", { name: /ERDDAP/ })).toHaveAttribute(
       "href",
-      DATASET.erddap_url,
+      "https://erddap.example/en/tabledap/foo.html",
     );
     expect(screen.getByRole("link", { name: /Catalog/ })).toHaveAttribute(
       "href",
-      "https://catalogue.cioos.ca/dataset/x",
+      "https://catalogue.cioos.ca/en/dataset/x",
     );
   });
 

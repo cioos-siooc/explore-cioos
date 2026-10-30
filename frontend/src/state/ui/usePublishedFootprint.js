@@ -27,8 +27,18 @@ export default function usePublishedFootprint(
     const other = alsoObserve && document.querySelector(alsoObserve);
     if (other) observer.observe(other);
     window.addEventListener("resize", publish);
+    // A class change can move the surface without resizing it, and a
+    // transition only lands where it was going at its end.
+    const classObserver = new MutationObserver(publish);
+    classObserver.observe(el, { attributes: true, attributeFilter: ["class"] });
+    const onTransitionEnd = (event) => {
+      if (event.target === el) publish();
+    };
+    el.addEventListener("transitionend", onTransitionEnd);
     return () => {
       observer.disconnect();
+      classObserver.disconnect();
+      el.removeEventListener("transitionend", onTransitionEnd);
       window.removeEventListener("resize", publish);
       document.documentElement.style.removeProperty(property);
     };

@@ -71,7 +71,11 @@ export default function TopControls() {
   );
 
   return (
-    <div className="topBar" ref={barRef} data-testid="top-bar">
+    <div
+      className={classNames("topBar", { besideSidebar: sidebarOpen })}
+      ref={barRef}
+      data-testid="top-bar"
+    >
       <BrandSearch>
         <div className="topBarStatusRow">
           <DatasetCounts />
