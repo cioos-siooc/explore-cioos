@@ -1,6 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
@@ -333,16 +333,14 @@ describe("DatasetInspector", () => {
     );
   });
 
-  it("Backspace calls returnToList, except while typing in a field", async () => {
+  // Both left the page by accident, the wheel while panning the records table.
+  it("stays open on Backspace and on a sideways trackpad scroll", async () => {
     const returnToList = vi.fn();
     const { user } = await renderReady({ returnToList });
     await user.keyboard("{Backspace}");
-    expect(returnToList).toHaveBeenCalledTimes(1);
-
-    returnToList.mockClear();
-    await openData();
-    await user.click(screen.getByPlaceholderText("Search table"));
-    await user.keyboard("{Backspace}");
+    fireEvent.wheel(document.querySelector(".datasetInspector"), {
+      deltaX: -200,
+    });
     expect(returnToList).not.toHaveBeenCalled();
   });
 
