@@ -94,6 +94,14 @@ def remove_newlines(s):
     return s
 
 
+def ckan_organizations(record):
+    organizations = [
+        unescape_ascii(contact.get("organisation-name"))
+        for contact in record.get("cited-responsible-party", [])
+    ]
+    return list(filter(None, set(organizations)))
+
+
 @task(task_run_name="fetch-ckan-metadata")
 def get_ckan_records(dataset_ids, limit=None, cache=False):
     """Fetch the full CKAN record for each harvested dataset ID.
@@ -137,12 +145,7 @@ def get_ckan_records(dataset_ids, limit=None, cache=False):
             if v:
                 ckan_record_text[k] = remove_newlines(unescape_ascii(v))
 
-        organizations = []
-
-        for contact in record_full.get("cited-responsible-party", []):
-            organizations += [unescape_ascii(contact.get("organisation-name"))]
-
-        organizations = list(filter(None, set(organizations)))
+        organizations = ckan_organizations(record_full)
         metadata = from_ckan(record_full)
 
         for erddap_host, dataset_id, is_subset in links:

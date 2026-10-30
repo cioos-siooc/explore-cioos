@@ -381,9 +381,15 @@ class OBISHarvester(BaseHarvester):
             lambda r: r["ckan_eovs"] if isinstance(r.get("ckan_eovs"), list) and r["ckan_eovs"] else r["eovs"],
             axis=1,
         )
+        df_datasets["organizations"] = df_datasets.apply(
+            lambda r: r["ckan_organizations"]
+            if isinstance(r.get("ckan_organizations"), list) and r["ckan_organizations"]
+            else r["organizations"],
+            axis=1,
+        )
         df_datasets["title"] = df_datasets["ckan_title"].fillna(df_datasets["title"])
 
-        df_datasets.drop(columns=["ckan_eovs", "ckan_title"], inplace=True)
+        df_datasets.drop(columns=["ckan_eovs", "ckan_organizations", "ckan_title"], inplace=True)
         df_datasets.rename(columns={"ckan_metadata": "metadata"}, inplace=True)
 
         return df_datasets

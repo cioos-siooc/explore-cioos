@@ -263,7 +263,7 @@ class TestCkanUnavailable:
         load.assert_called_once_with(["https://obis.org"])
         assert df.to_dict("records") == [{
             "dataset_id": "uuid-1", "ckan_id": "ckan-uuid-1", "ckan_eovs": ["fish"],
-            "ckan_title": "Stored", "title_fr": "Stocké",
+            "ckan_organizations": [], "ckan_title": "Stored", "title_fr": "Stocké",
             "ckan_metadata": {"abstract": {"en": "Stored abstract"}},
         }]
 
@@ -310,7 +310,7 @@ class TestGetCkanObisRecords:
         df = get_ckan_obis_records({OBIS_UUID: None, "11111111-1111-4111-8111-111111111111": None})
         assert df.to_dict("records") == [{
             "dataset_id": OBIS_UUID, "ckan_id": "by-uuid", "ckan_eovs": ["fishAbundanceAndDistribution"],
-            "ckan_title": "by-uuid en", "title_fr": "by-uuid fr",
+            "ckan_organizations": [], "ckan_title": "by-uuid en", "title_fr": "by-uuid fr",
             "ckan_metadata": {"resources": [
                 {"url": "https://catalogue.example/notes.pdf"},
                 {"url": f"https://obis.org/dataset/{OBIS_UUID}"},
@@ -329,6 +329,17 @@ class TestGetCkanObisRecords:
             _record("other-ipt", "https://ipt.iobis.org/caribbean/resource?r=hakai_qu39"),
         ))
         assert get_ckan_obis_records({OBIS_UUID: QU39_IPT}).empty
+
+    def test_organizations_from_cited_responsible_parties(self, mocker):
+        record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")
+        record["cited-responsible-party"] = [
+            {"organisation-name": "Comit\\u00e9 ZIP C\\u00f4te-Nord du Golfe"},
+            {"organisation-name": "Comit\\u00e9 ZIP C\\u00f4te-Nord du Golfe"},
+            {"individual-name": "Someone"},
+        ]
+        _make_ckan_get(mocker, _search_pages(record))
+        df = get_ckan_obis_records({OBIS_UUID: None})
+        assert df["ckan_organizations"].tolist() == [["Comité ZIP Côte-Nord du Golfe"]]
 
     def test_titles_cleaned_like_erddap(self, mocker):
         record = _record("r", f"https://obis.org/dataset/{OBIS_UUID}")

@@ -31,11 +31,11 @@ def _metadata(dataset_id):
     }
 
 
-def _ckan(*dataset_ids):
+def _ckan(*dataset_ids, organizations=("CKAN org",)):
     return pd.DataFrame(
         [
             {"dataset_id": d, "ckan_id": f"ckan-{d}", "ckan_eovs": ["fishAbundanceAndDistribution"],
-             "ckan_title": "CKAN title", "title_fr": "Titre CKAN",
+             "ckan_organizations": list(organizations), "ckan_title": "CKAN title", "title_fr": "Titre CKAN",
              "ckan_metadata": {"abstract": {"en": "CKAN abstract"}}}
             for d in dataset_ids
         ],
@@ -57,7 +57,8 @@ def harvester(tmp_path, mocker):
 
 def _enrich(h):
     datasets = pd.DataFrame(
-        [{"dataset_id": d, "title": f"OBIS {d}", "eovs": []} for d in (MATCHED, UNMATCHED)]
+        [{"dataset_id": d, "title": f"OBIS {d}", "eovs": [], "organizations": ["OBIS institute"]}
+         for d in (MATCHED, UNMATCHED)]
     )
     return h._enrich_with_conversion(h._enrich_with_ckan(datasets)).set_index("dataset_id")
 
@@ -82,6 +83,22 @@ def test_matched_dataset_takes_ckan_metadata_and_is_not_converted(harvester, moc
     assert row["summary"] is None
     assert row["metadata"] == {"abstract": {"en": "CKAN abstract"}}
     convert.assert_called_once_with(_metadata(UNMATCHED))
+
+
+def test_matched_dataset_takes_ckan_organizations(harvester, mocker):
+    mocker.patch.object(obis_harvester, "get_ckan_obis_records", return_value=_ckan(MATCHED))
+    mocker.patch.object(obis_harvester, "map_obis_to_cioos", return_value=CONVERTED)
+    df = _enrich(harvester)
+    assert df.loc[MATCHED, "organizations"] == ["CKAN org"]
+    assert df.loc[UNMATCHED, "organizations"] == ["OBIS institute"]
+
+
+def test_ckan_record_without_organizations_keeps_obis_institutes(harvester, mocker):
+    mocker.patch.object(
+        obis_harvester, "get_ckan_obis_records", return_value=_ckan(MATCHED, organizations=()),
+    )
+    mocker.patch.object(obis_harvester, "map_obis_to_cioos", return_value=CONVERTED)
+    assert _enrich(harvester).loc[MATCHED, "organizations"] == ["OBIS institute"]
 
 
 def test_unmatched_dataset_takes_converted_eovs_and_abstract(harvester, mocker):
