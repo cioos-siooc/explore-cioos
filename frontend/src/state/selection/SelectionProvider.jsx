@@ -21,11 +21,9 @@ import {
   createSelectionQueryString,
   datasetMatchesUrlKey,
   datasetUrlKey,
-  formatErddapServerName,
   selectionFromSearchParams,
   useDebounce,
 } from "../../utilities.jsx";
-import erddapServersJSONfile from "../../erddapServers.json";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState, useViewportBounds } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
@@ -64,23 +62,6 @@ const isPlatformlessDataset = (row) =>
   PLATFORMLESS_DATASET_TYPES.has(row.cdm_data_type) ||
   row.source_type === "obis";
 
-// `query` is already lowercased. Shared by the list and the map narrowing so
-// both agree on what a search term keeps.
-function datasetMatchesSearch(row, query, language) {
-  return [
-    row.title,
-    row.cdm_data_type,
-    formatErddapServerName(
-      row.erddap_server_url || row.erddap_url,
-      language,
-      erddapServersJSONfile,
-    ),
-  ]
-    .join(" ")
-    .toLowerCase()
-    .includes(query);
-}
-
 function datasetInLanguage(point, language) {
   return {
     ...point,
@@ -101,7 +82,6 @@ export default function SelectionProvider({ children }) {
     zoomToGeometry,
     pendingDatasetZoom,
     setPendingDatasetZoom,
-    setMapDatasetPKs,
     dataLayers,
   } = useMapState();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -182,9 +162,6 @@ export default function SelectionProvider({ children }) {
   // Set and cleared in the same tick as datasetPreview, so the modal can never
   // hold one record's rows beside another's excuse.
   const [previewError, setPreviewError] = useState();
-  const [datasetTitleSearchText, setDatasetTitleSearchText] = useState(
-    () => initialParams.get("search") || "",
-  );
   const [combinedQueries, setCombinedQueries] = useState([]);
   const [onlyInView, setOnlyInView] = useState(
     () => initialParams.get("onlyInView") === "true",
@@ -249,27 +226,16 @@ export default function SelectionProvider({ children }) {
   // The data-layer switches narrow it as well, so the list never offers
   // datasets absent from the map (Grid datasets belong to no switch).
   const filteredDatasets = useMemo(() => {
-    const query = datasetTitleSearchText.toLowerCase();
-    const hasSearch = !isEmpty(datasetTitleSearchText);
     const layersNarrowed = !allDataLayersOn(dataLayers);
-    if (!hasSearch && !onlyInView && !layersNarrowed) return pointsData;
+    if (!onlyInView && !layersNarrowed) return pointsData;
     return pointsData.filter((row) => {
       if (layersNarrowed && !datasetInDataLayers(row, dataLayers)) return false;
-      if (onlyInView && !datasetsInViewPks.has(row.pk)) return false;
-      if (!hasSearch) return true;
-      return datasetMatchesSearch(row, query, i18n.language);
+      return !onlyInView || datasetsInViewPks.has(row.pk);
     });
-  }, [
-    pointsData,
-    datasetTitleSearchText,
-    onlyInView,
-    datasetsInViewPks,
-    dataLayers,
-    i18n.language,
-  ]);
+  }, [pointsData, onlyInView, datasetsInViewPks, dataLayers]);
 
-  // Over filteredDatasets rather than pointsData: the title search and the
-  // data-layer switches narrow only client-side.
+  // Over filteredDatasets rather than pointsData: the data-layer switches
+  // narrow only client-side.
   const inViewCount = useMemo(
     () =>
       filteredDatasets.filter((row) => datasetsInViewPks.has(row.pk)).length,
@@ -281,11 +247,10 @@ export default function SelectionProvider({ children }) {
     [filteredDatasets],
   );
 
-  // For routes that answer about the filtered data rather than draw it: the
-  // search, "only in view" and data-layer switches are client-side, so this
-  // list is how they reach the API. Undefined when filteredDatasets is
-  // pointsData itself (nothing narrows). Not mapDatasetPks: that one drops
-  // "only in view", which would rewrite every tile URL on every pan.
+  // For routes that answer about the filtered data rather than draw it:
+  // "only in view" and the data-layer switches are client-side, so this list
+  // is how they reach the API. Undefined when filteredDatasets is pointsData
+  // itself (nothing narrows).
   const filteredDatasetPks = useMemo(
     () =>
       filteredDatasets === pointsData
@@ -308,25 +273,6 @@ export default function SelectionProvider({ children }) {
         .map((entry) => ({ ...entry.row, selected: true })),
     [shortlist],
   );
-
-  // Undefined while nothing narrows leaves the tile/legend/coverage queries as
-  // the filters wrote them. Only the search narrows it: the data-layer switches
-  // already reach the map via the tile query, and "only in view" would rewrite
-  // every map query on every pan. Each distinct search text is a fresh round of
-  // map requests, which is why every search box submits on Enter rather than
-  // publishing as typed.
-  const mapDatasetPks = useMemo(() => {
-    const query = datasetTitleSearchText.toLowerCase();
-    const hasSearch = !isEmpty(datasetTitleSearchText);
-    if (!hasSearch) return undefined;
-    return pointsData
-      .filter((row) => datasetMatchesSearch(row, query, i18n.language))
-      .map((row) => row.pk);
-  }, [pointsData, datasetTitleSearchText, i18n.language]);
-
-  useEffect(() => {
-    setMapDatasetPKs(mapDatasetPks);
-  }, [mapDatasetPks, setMapDatasetPKs]);
 
   // The open dataset page lives in the URL so Back/Forward move through it
   // natively. A filter that excludes the open dataset doesn't close its page:
@@ -824,8 +770,6 @@ export default function SelectionProvider({ children }) {
     setRecordLoading,
     datasetPreview,
     setDatasetPreview,
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
     filteredDatasets,
     filteredDatasetPks,
     platformsAvailable,

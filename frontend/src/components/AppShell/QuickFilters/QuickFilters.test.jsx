@@ -40,10 +40,10 @@ describe("QuickFilters", () => {
       realtimeOnly: [],
     };
     function Probe() {
-      const { datasetTitleSearchText, onlyInView } = useSelection();
+      const { onlyInView } = useSelection();
       const { drawRequest, zoomTarget } = useMapState();
-      const { realtimeOnly } = useFilters();
-      seen.search.push(datasetTitleSearchText);
+      const { realtimeOnly, searchText } = useFilters();
+      seen.search.push(searchText);
       seen.draw.push(drawRequest?.mode);
       seen.zoom.push(zoomTarget?.geometry);
       seen.camera.push(zoomTarget?.camera);

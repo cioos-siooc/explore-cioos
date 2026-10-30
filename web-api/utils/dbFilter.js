@@ -84,6 +84,11 @@ function memoizeAphiaFetch(fetcher) {
 
 const fetchAphiaIdsCached = memoizeAphiaFetch(fetchAphiaIdsFromDb);
 
+// searchIn → the dataset_search_tsv() weights it reads
+// (database/3_dataset_search.sql); "titles" is the default.
+const SEARCH_WEIGHTS = { titles: "{a}", all: "{a,b,c,d}" };
+const SEARCH_SCOPES = Object.keys(SEARCH_WEIGHTS);
+
 class InvalidPolygonError extends Error {
   constructor() {
     super(
@@ -126,6 +131,8 @@ async function createDBFilter(
     eovsMatch,
     organizationsMatch,
     scientificNamesMatch,
+    search,
+    searchIn,
 
     // comma-separated lists
     eovs,
@@ -232,6 +239,17 @@ async function createDBFilter(
     parameters.excludeDatasetPKs = excludeDatasetPKs.split(",");
     // pk_url is NULL until 5_profile_process.sql back-fills it.
     filters.push("(d.pk_url IS NULL OR d.pk_url <> ALL (:excludeDatasetPKs))");
+  }
+
+  // The bare @@ lets the GIN index prune before ts_filter narrows the scope.
+  if (search?.trim()) {
+    parameters.search = search;
+    parameters.searchWeights =
+      SEARCH_WEIGHTS[searchIn] ?? SEARCH_WEIGHTS.titles;
+    filters.push(
+      "(d.search_tsv @@ dataset_search_query(:search) AND " +
+        'ts_filter(d.search_tsv, (:searchWeights)::"char"[]) @@ dataset_search_query(:search))',
+    );
   }
 
   if (pointPKs) {
@@ -379,6 +397,7 @@ module.exports = createDBFilter;
 module.exports.ScientificNameSelectionTooBroadError =
   ScientificNameSelectionTooBroadError;
 module.exports.InvalidPolygonError = InvalidPolygonError;
+module.exports.SEARCH_SCOPES = SEARCH_SCOPES;
 module.exports.MAX_EXPANDED_APHIA_IDS = MAX_EXPANDED_APHIA_IDS;
 module.exports.memoizeAphiaFetch = memoizeAphiaFetch;
 module.exports.APHIA_CACHE_TTL_MS = APHIA_CACHE_TTL_MS;

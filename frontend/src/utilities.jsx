@@ -157,6 +157,8 @@ export function createDataFilterQueryString(query) {
     obisNodesSelected,
     erddapServersSelected,
     realtimeOnly,
+    searchText,
+    searchIn,
     eovsMatchAll,
     orgsMatchAll,
     scientificNamesMatchAll,
@@ -295,6 +297,9 @@ export function createDataFilterQueryString(query) {
     obisNodes,
     // objectToURL drops "", so the default leaves the URL and cache key untouched.
     realtimeOnly: realtimeOnly ? "true" : "",
+    search: searchText ? encodeURIComponent(searchText) : "",
+    // "titles" is the API's default, so only the wider scope is written.
+    searchIn: searchText && searchIn === "all" ? "all" : "",
   };
 
   return objectToURL(apiMappedQuery);

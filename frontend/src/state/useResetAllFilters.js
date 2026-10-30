@@ -7,7 +7,7 @@ import { useSelection } from "./selection/SelectionProvider.jsx";
 // by every reset button so they all clear exactly the same state.
 export default function useResetAllFilters() {
   const { requestDraw, resetDataLayers } = useMapState();
-  const { setDatasetTitleSearchText, setOnlyInView } = useSelection();
+  const { setOnlyInView } = useSelection();
   const { resetFilters } = useFilters();
   const canReset = useActiveFilters().length > 0;
 
@@ -15,7 +15,6 @@ export default function useResetAllFilters() {
     resetFilters();
     resetDataLayers();
     requestDraw("clear");
-    setDatasetTitleSearchText("");
     setOnlyInView(false);
   }
 

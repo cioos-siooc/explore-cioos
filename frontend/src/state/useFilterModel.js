@@ -19,7 +19,7 @@ import {
   DATA_LAYER_KEYS,
   DATA_LAYER_LABEL_KEYS,
 } from "./dataLayers.js";
-import { useFilters } from "./filters/FilterProvider.jsx";
+import { SEARCH_ALL, useFilters } from "./filters/FilterProvider.jsx";
 import { useMapState } from "./map/MapStateProvider.jsx";
 import { useSelection } from "./selection/SelectionProvider.jsx";
 import useEovCategories from "./useEovCategories.js";
@@ -49,14 +49,7 @@ export default function useFilterModel(
   const sourceKinds = useSourceKinds();
   const { dataLayerChoices, toggleDataLayer, resetDataLayers, requestDraw } =
     useMapState();
-  const {
-    polygon,
-    areaPlace,
-    datasetTitleSearchText,
-    setDatasetTitleSearchText,
-    onlyInView,
-    setOnlyInView,
-  } = useSelection();
+  const { polygon, areaPlace, onlyInView, setOnlyInView } = useSelection();
 
   // "(all)" once a dataset has to carry every included value, not just one.
   const matchAllLabel = (label, matchAll, includedCount) =>
@@ -228,18 +221,21 @@ export default function useFilterModel(
     {
       key: "text",
       label: t("textSearchFilterName"),
-      options: datasetTitleSearchText
+      options: filters.searchText
         ? [
             {
               id: "text",
-              label: `“${datasetTitleSearchText}”`,
+              label:
+                filters.searchIn === SEARCH_ALL
+                  ? t("textSearchAllLabel", { term: filters.searchText })
+                  : `“${filters.searchText}”`,
               state: "include",
               includeOnly: true,
-              toggle: () => setDatasetTitleSearchText(""),
+              toggle: () => filters.setSearch(""),
             },
           ]
         : [],
-      clear: () => setDatasetTitleSearchText(""),
+      clear: () => filters.setSearch(""),
     },
     toggleGroup(
       "realtime",

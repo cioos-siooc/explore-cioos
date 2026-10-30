@@ -68,6 +68,8 @@ test("the shared filter params are accepted when valid", async () => {
     "organizationsMatch=all",
     "scientificNamesMatch=any",
     "excludeScientificNames=Gadus morhua",
+    'search=température "sea ice" -model',
+    "searchIn=all",
   ].join("&");
   assert.strictEqual(
     await statusOf(pipeline({ cacheFor: null }), `/probe?${query}`),
@@ -95,6 +97,8 @@ test("params that used to reach the query unvalidated are now rejected", async (
     "organizationsMatch=most",
     "scientificNamesMatch=1",
     "excludeScientificNames=Gadus;morhua",
+    "searchIn=summary",
+    `search=${"x".repeat(201)}`,
   ]) {
     assert.strictEqual(
       await statusOf(stages, `/probe?${query}`),

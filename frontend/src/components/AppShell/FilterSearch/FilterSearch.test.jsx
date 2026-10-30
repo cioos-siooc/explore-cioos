@@ -7,7 +7,6 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import { useFilters } from "../../../state/filters/FilterProvider.jsx";
 import { useMapState } from "../../../state/map/MapStateProvider.jsx";
-import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { defaultStartDate, defaultEndDate } from "../../config.js";
 import { polygonIsRectangle } from "../../../utilities.jsx";
@@ -33,7 +32,8 @@ describe("FilterSearch", () => {
       };
       seen.realtimeOnly = realtimeOnly;
       seen.dataLayerChoices = useMapState().dataLayerChoices;
-      seen.search = useSelection().datasetTitleSearchText;
+      seen.search = filters.searchText;
+      seen.searchIn = filters.searchIn;
       seen.draw = useMapState().drawRequest?.mode;
       seen.ring = useMapState().drawRequest?.ring;
       seen.zoom = useMapState().zoomTarget?.geometry;
@@ -120,7 +120,8 @@ describe("FilterSearch", () => {
     const { user, seen, box } = await renderPalette();
 
     await user.type(box, "oxyg");
-    await user.keyboard("{ArrowDown}{Enter}");
+    // Past the two text-search scopes.
+    await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
     expect(seen.oxygen).toEqual({ isSelected: true, isExcluded: false });
     expect(box).toHaveValue("oxyg");
     expect(option("Oxygen")).toHaveAttribute("data-state", "include");
@@ -261,8 +262,18 @@ describe("FilterSearch", () => {
 
     await user.type(box, "argo{Enter}");
     expect(seen.search).toBe("argo");
+    expect(seen.searchIn).toBe("titles");
     await user.keyboard("{Enter}");
     expect(seen.search).toBe("");
+  });
+
+  it("offers the wider search over descriptions and keywords second", async () => {
+    const { user, seen, box } = await renderPalette();
+
+    await user.type(box, "argo");
+    await user.click(option("Titles, descriptions & keywords matching “argo”"));
+    expect(seen.search).toBe("argo");
+    expect(seen.searchIn).toBe("all");
   });
 
   it("toggles the switches and geometry layers by name", async () => {
@@ -577,7 +588,7 @@ describe("FilterSearch", () => {
     const { user, box } = await renderPalette();
     const help = screen.getByTestId("filter-search-help");
     for (const name of [
-      "Dataset titles",
+      "Dataset titles, descriptions & keywords",
       "Dates",
       "Depths",
       "Quick filters",

@@ -4,6 +4,7 @@ const cache = require("./cache");
 const { polygonJSONToWKT } = require("./polygon");
 const { METRICS } = require("./hexMetric");
 const { ALL_PROFILE_TYPES, ALL_TRAJECTORY_TYPES } = require("./dataTypes");
+const { SEARCH_SCOPES } = require("./dbFilter");
 
 // Free text (platform names, node titles, URLs) is always bound, never
 // interpolated, so only size is bounded.
@@ -35,6 +36,8 @@ function filterValidators() {
     check(["eovs", "excludeEovs"])
       .matches(/^[a-zA-Z,]*$/)
       .optional(),
+    check("search").isLength({ max: 200 }).optional(),
+    check("searchIn").isIn(SEARCH_SCOPES).optional(),
     check(["eovsMatch", "organizationsMatch", "scientificNamesMatch"])
       .isIn(["any", "all"])
       .optional(),
