@@ -1,10 +1,16 @@
 import * as React from "react";
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Check2, Link45deg } from "react-bootstrap-icons";
+import {
+  Check2,
+  GraphUp,
+  Link45deg,
+  Table as TableIcon,
+} from "react-bootstrap-icons";
 
 import Modal from "../../ui/Modal.jsx";
 import useElementSize from "../../ui/useElementSize.js";
+import { NARROW_QUERY } from "../../../state/ui/useMediaQuery.js";
 
 import PreviewBody from "./PreviewBody.jsx";
 import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
@@ -92,7 +98,11 @@ export default function DatasetPreview({
   // A viewing preference like the disclosure triangle in the plot, not a view of
   // the data — so not in the URL, and not reset per record.
   const [paneWidth, setPaneWidth] = useState(PANE_DEFAULT_PX);
-  const [paneCollapsed, setPaneCollapsed] = useState(false);
+  // Folded on a phone, where the settings stack above the plot and would push
+  // it below the fold.
+  const [paneCollapsed, setPaneCollapsed] = useState(
+    () => window.matchMedia(NARROW_QUERY).matches,
+  );
 
   // The Table view's scroll container and the ceiling on the plot's height:
   // sized by the modal, not the plot, so it is safe to feed into the plot's
@@ -142,28 +152,37 @@ export default function DatasetPreview({
         <PreviewPlotProvider value={plotValue}>
           <Modal.Header closeButton className="tableAndPlotGridContainer">
             {dataIsReady && (
-              <>
-                <button
-                  className={`toggleButton ${
-                    selectedVis === "plot" && "selected"
-                  }`}
-                  onClick={() => setSelectedVis("plot")}
-                >
-                  {t("datasetPreviewPlotText")}
-                </button>
-                <button
-                  className={`toggleButton ${
-                    selectedVis === "table" && "selected"
-                  }`}
-                  onClick={() => setSelectedVis("table")}
-                >
-                  {t("datasetPreviewTableText")}
-                </button>
-              </>
+              <div className="previewViewToggle" role="group">
+                {[
+                  ["plot", GraphUp, "datasetPreviewPlotText"],
+                  ["table", TableIcon, "datasetPreviewTableText"],
+                ].map(([vis, Icon, labelKey]) => (
+                  <button
+                    key={vis}
+                    type="button"
+                    className={
+                      selectedVis === vis
+                        ? "toggleButton selected"
+                        : "toggleButton"
+                    }
+                    aria-pressed={selectedVis === vis}
+                    onClick={() => setSelectedVis(vis)}
+                  >
+                    <Icon size={15} aria-hidden="true" />
+                    {t(labelKey)}
+                  </button>
+                ))}
+              </div>
             )}
 
             <h4 className="datasetTitle">
-              {inspectDataset.title}: <i>{inspectRecordID}</i>
+              <span
+                className="datasetPreviewDatasetTitle"
+                title={inspectDataset.title}
+              >
+                {inspectDataset.title}:
+              </span>{" "}
+              <i className="datasetPreviewRecord">{inspectRecordID}</i>
               {inspectRecordPeriod && (
                 <span className="datasetPreviewPeriod">
                   {t("datasetPreviewPeriodText", inspectRecordPeriod)}

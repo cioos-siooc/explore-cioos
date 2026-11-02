@@ -4,12 +4,17 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronBarLeft,
   ChevronBarRight,
+  ChevronDown,
+  ChevronUp,
   QuestionCircle,
 } from "react-bootstrap-icons";
 import { Dropdown, DropdownButton } from "../../ui/Dropdown.jsx";
 import HelpModal from "../../ui/HelpModal.jsx";
 import PaneDivider from "../../ui/PaneDivider.jsx";
 import useElementSize from "../../ui/useElementSize.js";
+import useMediaQuery, {
+  NARROW_QUERY,
+} from "../../../state/ui/useMediaQuery.js";
 import ControlRow from "./ControlRow.jsx";
 import VariablePicker from "./VariablePicker.jsx";
 import VariableColorPicker from "./VariableColorPicker.jsx";
@@ -123,6 +128,8 @@ export default function DatasetPreviewPlot() {
   const [showLabels, setShowLabels] = useState(false);
   // Only for the cursor and the text-selection lock while a drag is live.
   const [resizing, setResizing] = useState(false);
+  // Too narrow for two panes side by side: the settings fold above the plot.
+  const stacked = useMediaQuery(NARROW_QUERY);
 
   // The plot pane's own box. Its width is what the figure is drawn to; its
   // height enters only through plotBoxFor, which can lower the ceiling that
@@ -367,6 +374,11 @@ export default function DatasetPreviewPlot() {
   );
 
   const bounds = { paneWidth, plotWidth: plotAreaSize.width };
+  const paneToggleText = t(
+    paneCollapsed
+      ? "datasetPreviewPlotShowParams"
+      : "datasetPreviewPlotHideParams",
+  );
 
   return (
     <div
@@ -383,7 +395,7 @@ export default function DatasetPreviewPlot() {
             : "datasetPreviewParamsPane"
         }
         id={PARAMS_PANE_ID}
-        style={{ width: paneCollapsed ? 0 : paneWidth }}
+        style={stacked ? undefined : { width: paneCollapsed ? 0 : paneWidth }}
       >
         {/* First in the pane deliberately: it is the one control that changes
             every panel at once. A filled colour plot has no plot type. */}
@@ -567,28 +579,30 @@ export default function DatasetPreviewPlot() {
 
       <button
         type="button"
-        className="paneCollapseToggle"
+        className={
+          stacked ? "paneCollapseToggle isStacked" : "paneCollapseToggle"
+        }
         aria-expanded={!paneCollapsed}
         aria-controls={PARAMS_PANE_ID}
-        aria-label={t(
-          paneCollapsed
-            ? "datasetPreviewPlotShowParams"
-            : "datasetPreviewPlotHideParams",
-        )}
-        title={t(
-          paneCollapsed
-            ? "datasetPreviewPlotShowParams"
-            : "datasetPreviewPlotHideParams",
-        )}
+        aria-label={stacked ? undefined : paneToggleText}
+        title={stacked ? undefined : paneToggleText}
         onClick={() => setPaneCollapsed(!paneCollapsed)}
       >
-        {paneCollapsed ? (
+        {stacked && t("datasetPreviewPlotSettings")}
+        {stacked && paneCollapsed && (
+          <ChevronDown size={14} aria-hidden="true" />
+        )}
+        {stacked && !paneCollapsed && (
+          <ChevronUp size={14} aria-hidden="true" />
+        )}
+        {!stacked && paneCollapsed && (
           <ChevronBarRight size={16} aria-hidden="true" />
-        ) : (
+        )}
+        {!stacked && !paneCollapsed && (
           <ChevronBarLeft size={16} aria-hidden="true" />
         )}
       </button>
-      {!paneCollapsed && (
+      {!paneCollapsed && !stacked && (
         <PaneDivider
           label={t("datasetPreviewPlotResizeParams")}
           controls={PARAMS_PANE_ID}

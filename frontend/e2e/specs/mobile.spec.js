@@ -130,6 +130,57 @@ test("names every quick filter on its button, and still fits the width", async (
   expect(overflow, "the page scrolls horizontally").toBeLessThanOrEqual(0);
 });
 
+test.describe("the record preview on a phone", () => {
+  const DATASET = "HakaiADCPTimeSeriesProfileProvisional";
+  const RECORD = "STATION_001-21/05/20-23:01:41";
+  const PREVIEW = {
+    table: {
+      columnNames: ["depth", "SVELCV01", "profile"],
+      columnTypes: ["float", "float", "String"],
+      columnUnits: ["m", "m s-1", null],
+      rows: Array.from({ length: 12 }, (_, i) => [i + 1, 1478 + i, RECORD]),
+    },
+  };
+
+  test("fills the screen and leads with the plot, settings folded above it", async ({
+    page,
+  }) => {
+    await page.route("**/preview?*", (route) =>
+      route.fulfill({ json: PREVIEW }),
+    );
+    await openApp(
+      page,
+      `dataset=${DATASET}&preview=${encodeURIComponent(RECORD)}`,
+    );
+
+    const dialog = page.locator(".dataPreviewModal .modal-content");
+    const plot = page.locator(".datasetPreviewPlotColumn");
+    await expect(plot.locator(".main-svg").first()).toBeVisible();
+
+    const viewport = page.viewportSize();
+    expect((await dialog.boundingBox()).width).toBe(viewport.width);
+    expect((await plot.boundingBox()).width).toBeGreaterThan(
+      viewport.width * 0.85,
+    );
+
+    const settings = page.getByRole("button", {
+      name: "Plot settings",
+      exact: true,
+    });
+    await expect(settings).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("preview-mode-dropdown-toggle")).toBeHidden();
+    await settings.click();
+    await expect(
+      page.getByTestId("preview-mode-dropdown-toggle"),
+    ).toBeInViewport();
+
+    const overflow = await dialog.evaluate(
+      (el) => el.scrollWidth - el.clientWidth,
+    );
+    expect(overflow, "the preview scrolls sideways").toBeLessThanOrEqual(0);
+  });
+});
+
 // Landscape phones miss the width rung but are too short for floating chrome.
 test.describe("a phone held landscape", () => {
   test.use({ viewport: { width: 844, height: 390 } });

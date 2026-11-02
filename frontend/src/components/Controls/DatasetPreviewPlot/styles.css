@@ -547,3 +547,47 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* Portrait phones: the settings fold above the plot, which keeps the full
+   width. Collapsed is display: none here, as there is no width to slide. */
+@media (max-width: 700px) {
+  .datasetPreviewPlotPanes {
+    flex-direction: column;
+    gap: var(--cioos-space-sm);
+  }
+
+  .datasetPreviewParamsPane {
+    order: 1;
+    width: auto;
+    max-width: none;
+    max-height: 45%;
+    padding-bottom: var(--cioos-space-sm);
+    border-bottom: 1px solid var(--cioos-hairline);
+    transition: none;
+  }
+
+  .datasetPreviewParamsPane.isCollapsed {
+    display: none;
+  }
+
+  .paneCollapseToggle.isStacked {
+    order: 0;
+    align-self: stretch;
+    justify-content: space-between;
+    width: auto;
+    height: 36px;
+    padding: 0 var(--cioos-space-md);
+    border-radius: var(--cioos-radius-sm, 6px);
+    color: var(--cioos-ink);
+    font-size: var(--cioos-font-size-sm);
+    font-weight: 600;
+  }
+
+  .datasetPreviewPlotColumn {
+    order: 2;
+  }
+
+  .controlRow .dropdown-toggle {
+    min-height: 36px;
+  }
+}
