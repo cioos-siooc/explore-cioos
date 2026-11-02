@@ -12,7 +12,7 @@ import isEmpty from "lodash-es/isEmpty";
 import { useChanged } from "../../utilities.jsx";
 import { usePersistentState } from "../usePersistentState.js";
 import { useSelection } from "../selection/SelectionProvider.jsx";
-import useMediaQuery from "./useMediaQuery.js";
+import useMediaQuery, { SHORT_QUERY } from "./useMediaQuery.js";
 
 const UIContext = createContext();
 
@@ -73,6 +73,11 @@ export default function UIProvider({ children }) {
     if (!showIntroModal) setIntroSeen(true);
   }, [showIntroModal, setIntroSeen]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  // The datasets list's density, which the "what's here" card follows. Unset
+  // until the viewer picks one, so it follows the window height.
+  const shortScreen = useMediaQuery(SHORT_QUERY);
+  const [listDensity, setListDensity] = usePersistentState("listDensity", null);
+  const compactList = listDensity ? listDensity === "compact" : shortScreen;
   // Opens on the search page rather than whichever filter was open last.
   const openFilters = useCallback(() => {
     setOpenFilter(undefined);
@@ -113,6 +118,8 @@ export default function UIProvider({ children }) {
   }, [pointsToReview]);
 
   const value = {
+    compactList,
+    setListDensity,
     sidebarOpen,
     setSidebarOpen,
     showFiltersModal,
