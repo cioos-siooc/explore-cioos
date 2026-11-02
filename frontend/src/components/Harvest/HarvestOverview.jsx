@@ -158,6 +158,83 @@ function CkanCoverage({ coverage, t }) {
   );
 }
 
+// Categorical slots 1–7 of the dataviz reference palette, in order, with
+// "Other" in the pie's neutral grey; validated as adjacent stack pairs.
+const SOURCE_COLORS = [
+  "#2a78d6",
+  "#eb6834",
+  "#1baf7a",
+  "#eda100",
+  "#e87ba4",
+  "#008300",
+  "#6250d6",
+];
+const OTHER_SOURCE_COLOR = "#8a8984";
+
+// Largest first, so a source keeps its colour while the counts hold their
+// order; past the palette the remainder folds into "Other".
+function unmatchedBySource(harvested, otherLabel) {
+  const ranked = harvested
+    .map((s) => ({
+      key: s.erddap_url,
+      label: hostname(s.erddap_url),
+      n: s.n_datasets - s.n_matched,
+    }))
+    .filter((s) => s.n > 0)
+    .sort((a, b) => b.n - a.n || a.key.localeCompare(b.key));
+  const shown = ranked
+    .slice(0, SOURCE_COLORS.length)
+    .map((s, i) => ({ ...s, color: SOURCE_COLORS[i] }));
+  const otherN = ranked
+    .slice(SOURCE_COLORS.length)
+    .reduce((sum, s) => sum + s.n, 0);
+  return otherN
+    ? [
+        ...shown,
+        { key: "", label: otherLabel, n: otherN, color: OTHER_SOURCE_COLOR },
+      ]
+    : shown;
+}
+
+function UnmatchedBar({ harvested, t }) {
+  const segments = unmatchedBySource(
+    harvested,
+    t("harvest.ckanCoverage.otherSources"),
+  );
+  const total = segments.reduce((sum, s) => sum + s.n, 0);
+  if (!total) return null;
+  const label = t("harvest.ckanCoverage.notInCkan", { count: total });
+  return (
+    <div className="harvest-unmatched">
+      <div className="harvest-unmatched-title">{label}</div>
+      <div className="harvest-unmatched-bar" role="img" aria-label={label}>
+        {segments.map((s) => (
+          <span
+            key={s.key}
+            style={{ flexGrow: s.n, background: s.color }}
+            title={`${s.label}: ${s.n}`}
+          />
+        ))}
+      </div>
+      <ul className="harvest-pie-legend">
+        {segments.map((s) => (
+          <li key={s.key}>
+            <span
+              className="harvest-pie-swatch"
+              style={{ background: s.color }}
+              aria-hidden="true"
+            />
+            <span className="harvest-pie-name">{s.label}</span>
+            <span className="harvest-pie-value">
+              {s.n} · {Math.round((100 * s.n) / total)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function HarvestedInCkan({ harvested, t }) {
   const total = harvested.reduce((sum, s) => sum + s.n_datasets, 0);
   const matched = harvested.reduce((sum, s) => sum + s.n_matched, 0);
@@ -176,6 +253,7 @@ function HarvestedInCkan({ harvested, t }) {
         <span style={{ width: `${pct}%` }} />
       </div>
       <p className="harvest-card-meta">{ratio}</p>
+      <UnmatchedBar harvested={harvested} t={t} />
       <ul className="harvest-ckan-sources">
         {harvested.map((s) => {
           const matchedPct = s.n_datasets

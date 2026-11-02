@@ -218,12 +218,44 @@ describe("HarvestOverview", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("62%")).toBeInTheDocument();
-    const erddap = screen.getByText("data.cioospacific.ca").closest("li");
-    expect(within(erddap).getByText("30 / 40 (75%)")).toBeInTheDocument();
+    const erddap = screen.getByText("30 / 40 (75%)").closest("li");
+    expect(
+      within(erddap).getByText("data.cioospacific.ca"),
+    ).toBeInTheDocument();
     expect(erddap).toHaveAttribute("title", "10 datasets not in the catalogue");
-    const obis = screen.getByText("obis.org").closest("li");
-    expect(within(obis).getByText("1 / 10 (10%)")).toBeInTheDocument();
+    const obis = screen.getByText("1 / 10 (10%)").closest("li");
+    expect(within(obis).getByText("obis.org")).toBeInTheDocument();
     expect(obis).toHaveAttribute("title", "9 datasets not in the catalogue");
+  });
+
+  it("splits the harvested datasets missing from CKAN by source", async () => {
+    renderWithProviders(<HarvestOverview />);
+    const bar = await screen.findByRole("img", {
+      name: "19 harvested datasets are not in any CKAN catalogue",
+    });
+    const legend = bar.parentElement.querySelector("ul");
+    const rows = within(legend)
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+    expect(rows).toEqual(["data.cioospacific.ca10 · 53%", "obis.org9 · 47%"]);
+  });
+
+  it("folds the sources past the seventh into Other", async () => {
+    const harvested = Array.from({ length: 9 }, (_, i) => ({
+      erddap_url: `https://s${i}.example.org/erddap`,
+      n_datasets: 20 - i,
+      n_matched: 0,
+    }));
+    stubRoutes({ "/ckan-coverage": { ...CKAN_COVERAGE, harvested } });
+    renderWithProviders(<HarvestOverview />);
+    const bar = await screen.findByRole("img", {
+      name: "144 harvested datasets are not in any CKAN catalogue",
+    });
+    const rows = within(bar.parentElement.querySelector("ul")).getAllByRole(
+      "listitem",
+    );
+    expect(rows).toHaveLength(8);
+    expect(rows[7]).toHaveTextContent("Other sources25 · 17%");
   });
 
   it("holds both CKAN sections with a spinner while the coverage loads", async () => {

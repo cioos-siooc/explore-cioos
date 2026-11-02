@@ -784,6 +784,44 @@ a.harvest-link:hover {
   background: var(--cioos-success);
 }
 
+.harvest-unmatched {
+  margin: 0.75rem 0;
+}
+
+.harvest-unmatched-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.harvest-unmatched-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.harvest-unmatched-bar span {
+  flex-basis: 0;
+  min-width: 2px;
+}
+
+.harvest-unmatched-bar span:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.harvest-unmatched-bar span:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.harvest-unmatched-bar span:only-child {
+  border-radius: 4px;
+}
+
+.harvest-unmatched .harvest-pie-legend {
+  font-size: 0.8rem;
+}
+
 .harvest-ckan-sources {
   list-style: none;
   margin: 0.75rem 0;
