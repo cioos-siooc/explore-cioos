@@ -192,7 +192,7 @@ SENTRY_DSN=your_sentry_dsn_here
 ENVIRONMENT=development  # or production
 
 # Optional: Harvester schedule (defaults to None unset)
-HARVESTER_CRON=10 0 */3 * *
+HARVESTER_CRON=10 0 * * 3,6
 # Optional: WoRMS vernaculars backfill schedule (unset = none)
 VERNACULARS_CRON=
 # Optional: fire one harvest immediately on (re)deploy (default false)
