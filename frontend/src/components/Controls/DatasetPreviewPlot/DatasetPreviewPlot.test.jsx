@@ -80,8 +80,13 @@ function open(url = "/", dataset = DATASET, table = TABLE) {
   return user;
 }
 
+// The first test pays for the lazy plot chunk's cold import, which can pass
+// waitFor's 1 s default when the whole suite runs in parallel.
 const plotted = async () => {
-  await waitFor(() => expect(screen.getByTestId("plotly")).toBeInTheDocument());
+  await waitFor(
+    () => expect(screen.getByTestId("plotly")).toBeInTheDocument(),
+    { timeout: 5000 },
+  );
   return screen.getByTestId("plotly");
 };
 const rowCaptioned = (caption) =>
@@ -363,6 +368,40 @@ describe("DatasetPreviewPlot", () => {
     await user.click(screen.getByRole("button", { name: "Remove salinity" }));
     await waitFor(() => expect(traceCount()).toBe(1));
     expect(rowCaptioned("X axis")).not.toHaveTextContent("salinity");
+  });
+
+  it("reorders the picked variables from the keyboard", async () => {
+    const user = open("/?pvars=temperature,salinity");
+    await waitFor(() => expect(traceCount()).toBe(2));
+    const pills = () =>
+      [
+        ...rowCaptioned("X axis").querySelectorAll(
+          ".variableSelect__multi-value__label",
+        ),
+      ].map((pill) => pill.textContent);
+    expect(pills()).toEqual(["temperature", "salinity"]);
+
+    screen.getByRole("button", { name: "Reorder salinity" }).focus();
+    await user.keyboard(" ");
+    await user.keyboard("{ArrowLeft}");
+    await user.keyboard(" ");
+    await waitFor(() => expect(pills()).toEqual(["salinity", "temperature"]));
+  });
+
+  it("puts a drag grip in each pill only once there are two to order", async () => {
+    open("/?pvars=temperature,salinity");
+    await waitFor(() => expect(traceCount()).toBe(2));
+    expect(screen.getAllByRole("button", { name: /^Reorder / })).toHaveLength(
+      2,
+    );
+  });
+
+  it("gives a lone pick no drag grip", async () => {
+    open("/?pvars=temperature");
+    await plotted();
+    expect(
+      screen.queryByRole("button", { name: /^Reorder / }),
+    ).not.toBeInTheDocument();
   });
 
   it("filters the variable list by what is typed", async () => {

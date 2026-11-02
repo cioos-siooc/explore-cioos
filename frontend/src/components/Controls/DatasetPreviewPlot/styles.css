@@ -123,6 +123,43 @@
   border-radius: var(--cioos-radius-pill);
 }
 
+.variableSelect .variableSelect__multi-value[data-dragging] {
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--cioos-shadow-md);
+}
+
+.variableSelect .variableSelect__multi-value__label {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* touch-action: the grip, not the page, takes a finger's drag. */
+.variableSelectDragHandle {
+  display: inline-flex;
+  align-items: center;
+  margin: -2px 2px -2px -3px;
+  padding: 2px 1px;
+  border-radius: var(--cioos-radius-sm);
+  color: var(--cioos-ink-60);
+  cursor: grab;
+  touch-action: none;
+}
+
+.variableSelectDragHandle:hover {
+  background-color: var(--cioos-surface-2);
+  color: var(--cioos-ink);
+}
+
+.variableSelect__multi-value[data-dragging] .variableSelectDragHandle {
+  cursor: grabbing;
+}
+
+.variableSelectDragHandle:focus-visible {
+  outline: 2px solid var(--cioos-focus);
+  outline-offset: 1px;
+}
+
 .variableSelect .variableSelect__multi-value__label {
   font-size: var(--cioos-font-size-xs);
   font-weight: 600;
