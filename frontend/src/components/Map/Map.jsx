@@ -304,6 +304,15 @@ const MAP_VIEW_DEBOUNCE_MS = 250;
 // Partial opacity so coincident tracks compound: 27 St. Lawrence voyages in
 // 90 days render as ONE line at full opacity.
 const TRACK_LINE_OPACITY = 0.55;
+// A head the trajectory has since left behind (ended, or silent past its
+// reporting gap): where it was last seen in the window, not where it is.
+const TRACK_HEAD_INACTIVE_OPACITY = 0.35;
+const trackHeadOpacity = (scale) => [
+  "case",
+  ["to-boolean", ["get", "active"]],
+  scale,
+  TRACK_HEAD_INACTIVE_OPACITY * scale,
+];
 const DATA_STALE_OPACITY = 0.25;
 // direct_select fires draw.update on every drag tick, and setPolygon feeds
 // the /pointQuery fetch.
@@ -757,12 +766,17 @@ export default function CreateMap({
       "line-opacity",
       TRACK_LINE_OPACITY * scale,
     );
-    map.current.setPaintProperty("track-heads", "icon-opacity", scale);
-    map.current.setPaintProperty("track-heads-fixed", "circle-opacity", scale);
+    const headOpacity = trackHeadOpacity(scale);
+    map.current.setPaintProperty("track-heads", "icon-opacity", headOpacity);
+    map.current.setPaintProperty(
+      "track-heads-fixed",
+      "circle-opacity",
+      headOpacity,
+    );
     map.current.setPaintProperty(
       "track-heads-fixed",
       "circle-stroke-opacity",
-      scale,
+      headOpacity,
     );
   }
 
@@ -2638,6 +2652,7 @@ export default function CreateMap({
         // When culling, keep the most recent heads deterministically.
         "symbol-sort-key": ["-", 0, ["coalesce", ["get", "head_time"], 0]],
       },
+      paint: { "icon-opacity": trackHeadOpacity(1) },
     });
 
     map.current.addLayer({
@@ -2650,7 +2665,9 @@ export default function CreateMap({
       paint: {
         "circle-color": trackLineColor,
         "circle-radius": 4.5,
+        "circle-opacity": trackHeadOpacity(1),
         "circle-stroke-color": "#ffffff",
+        "circle-stroke-opacity": trackHeadOpacity(1),
         "circle-stroke-width": 1.5,
       },
     });

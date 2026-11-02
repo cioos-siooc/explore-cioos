@@ -597,9 +597,9 @@ router.get(
  *       cde.trajectory_points: 'track-lines' (per-trajectory LineStrings over
  *       the requested time window, ordered by time, each carrying the segment's
  *       own 'time_min'/'time_max' as epoch ms) and 'track-heads' (each
- *       trajectory's position on the selected date, the window's last day:
- *       its latest fix, kept only when the trajectory runs to that day and
- *       the fix is within its reporting gap of it; with its 'head_time' and
+ *       trajectory's latest fix in the window, with 'active' true when the
+ *       trajectory runs to the window's last day and the fix is within its
+ *       reporting gap of it; with its 'head_time' and
  *       'profile_id', and 'cog' — course over
  *       ground in degrees clockwise from north, absent when undefined).
  *       timeMin/timeMax are
@@ -786,17 +786,18 @@ router.get(
       WHERE l.geom && te.tile_envelope
     ),
     head_mvt AS (
+      -- Active: still there on the selected date, the window's last day. An
+      -- ended trajectory, or one silent past its own gap threshold (>= 2
+      -- days), keeps its last position in the window, drawn faded.
       SELECT h.trajectory_id, h.pk_url, h.dataset_title, h.profile_id,
              h.head_time, h.cog,
+             h.trajectory_end >= :timeMax::timestamptz - interval '1 day'
+               AND h.time >= :timeMax::timestamptz - interval '1 day'
+                             - make_interval(secs => h.gap_secs)
+               AS active,
              ST_AsMVTGeom(h.geom, te.tile_envelope) AS geom
       FROM heads h, te
       WHERE h.geom && te.tile_envelope
-        -- A head is the position on the selected date, the window's last day:
-        -- an ended trajectory, or one silent past its own gap threshold, has
-        -- none. Filtered after DISTINCT ON so cog still sees the prior fix.
-        AND h.trajectory_end >= :timeMax::timestamptz - interval '1 day'
-        AND h.time >= :timeMax::timestamptz - interval '1 day'
-                      - make_interval(secs => h.gap_secs)
     )
     -- A valid MVT is a concatenation of layer messages.
     SELECT coalesce((SELECT ST_AsMVT(l.*, 'track-lines', 4096, 'geom') FROM line_mvt l), ''::bytea)
