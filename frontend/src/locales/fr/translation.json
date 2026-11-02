@@ -623,6 +623,7 @@
   "harvest.loading": "Chargement…",
   "harvest.loading.sources": "Chargement des sources…",
   "harvest.loading.runs": "Chargement des exécutions…",
+  "harvest.loading.ckanCoverage": "Chargement de la couverture du catalogue…",
   "harvest.loading.datasets": "Chargement des jeux de données…",
   "harvest.docs.link": "Fonctionnement de la moisson",
   "harvest.docs.title": "Documentation de la moisson",

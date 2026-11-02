@@ -226,6 +226,26 @@ describe("HarvestOverview", () => {
     expect(obis).toHaveAttribute("title", "9 datasets not in the catalogue");
   });
 
+  it("holds both CKAN sections with a spinner while the coverage loads", async () => {
+    const mockFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", (input) =>
+      String(input).endsWith("/ckan-coverage")
+        ? new Promise(() => {})
+        : mockFetch(input),
+    );
+    renderWithProviders(<HarvestOverview />);
+    expect(
+      await screen.findByText("Harvested datasets with a CKAN record"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("CKAN records with harvested data"),
+    ).toBeInTheDocument();
+    const loading = screen.getAllByText("Loading catalogue coverage…");
+    expect(loading).toHaveLength(2);
+    for (const el of loading)
+      expect(el.closest('[role="status"]')).toBeInTheDocument();
+  });
+
   it("says how many linked records the catalogue has since dropped", async () => {
     stubRoutes({ "/ckan-coverage": { ...CKAN_COVERAGE, n_linked_stale: 3 } });
     renderWithProviders(<HarvestOverview />);

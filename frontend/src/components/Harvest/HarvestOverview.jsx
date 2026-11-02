@@ -7,6 +7,7 @@ import {
   HarvestTableSkeleton,
 } from "./HarvestSkeleton.jsx";
 import StatusBadge from "./StatusBadge.jsx";
+import Spinner from "../ui/Spinner.jsx";
 import HarvestPie, {
   mergeFailures,
   reasonShades,
@@ -52,6 +53,20 @@ function ServerCard({ server, shades, t }) {
           : t("harvest.card.noSuccess")}
       </div>
     </Link>
+  );
+}
+
+// Holds the section's place while CKAN is paged through on a cold cache.
+function SectionLoading({ titleKey, descKey, t }) {
+  return (
+    <div>
+      <h2 className="harvest-section-title">{t(titleKey)}</h2>
+      <p className="harvest-section-desc">{t(descKey)}</p>
+      <div className="harvest-section-loading" role="status">
+        <Spinner size="md" role="presentation" />
+        <span>{t("harvest.loading.ckanCoverage")}</span>
+      </div>
+    </div>
   );
 }
 
@@ -197,7 +212,8 @@ export default function HarvestOverview() {
   const { data: servers, loading: loadingServers } =
     useHarvestFetch("/servers");
   const { data: runs, loading: loadingRuns } = useHarvestFetch("/runs/recent");
-  const { data: ckanCoverage } = useHarvestFetch("/ckan-coverage");
+  const { data: ckanCoverage, loading: loadingCkan } =
+    useHarvestFetch("/ckan-coverage");
 
   const failureLists = (servers || []).map(serverFailures);
   const shades = reasonShades(failureLists);
@@ -244,6 +260,20 @@ export default function HarvestOverview() {
               </p>
               <HarvestReasonBars failures={allFailures} />
             </div>
+          )}
+          {loadingCkan && (
+            <>
+              <SectionLoading
+                titleKey="harvest.ckanCoverage.title"
+                descKey="harvest.ckanCoverage.caption"
+                t={t}
+              />
+              <SectionLoading
+                titleKey="harvest.ckanCoverage.harvestedTitle"
+                descKey="harvest.ckanCoverage.harvestedDesc"
+                t={t}
+              />
+            </>
           )}
           {ckanCoverage && <CkanCoverage coverage={ckanCoverage} t={t} />}
           {ckanCoverage?.harvested?.length > 0 && (

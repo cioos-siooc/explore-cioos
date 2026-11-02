@@ -622,6 +622,7 @@
   "harvest.loading": "Loading…",
   "harvest.loading.sources": "Loading sources…",
   "harvest.loading.runs": "Loading runs…",
+  "harvest.loading.ckanCoverage": "Loading catalogue coverage…",
   "harvest.loading.datasets": "Loading datasets…",
   "harvest.docs.link": "How harvesting works",
   "harvest.docs.title": "Harvest documentation",
