@@ -63,6 +63,9 @@ function CkanCoverage({ coverage, t }) {
       <h2 className="harvest-section-title">
         {t("harvest.ckanCoverage.title")}
       </h2>
+      <p className="harvest-section-desc">
+        {t("harvest.ckanCoverage.caption")}
+      </p>
       {pct !== null && (
         <>
           <div className="harvest-ckan-pct">{pct}%</div>
@@ -136,7 +139,55 @@ function CkanCoverage({ coverage, t }) {
           {t("harvest.ckanCoverage.stale", { count: coverage.n_linked_stale })}
         </p>
       )}
-      <p className="harvest-card-meta">{t("harvest.ckanCoverage.caption")}</p>
+    </div>
+  );
+}
+
+function HarvestedInCkan({ harvested, t }) {
+  const total = harvested.reduce((sum, s) => sum + s.n_datasets, 0);
+  const matched = harvested.reduce((sum, s) => sum + s.n_matched, 0);
+  const pct = total ? Math.round((100 * matched) / total) : 0;
+  const ratio = t("harvest.ckanCoverage.harvestedRatio", { matched, total });
+  return (
+    <div>
+      <h2 className="harvest-section-title">
+        {t("harvest.ckanCoverage.harvestedTitle")}
+      </h2>
+      <p className="harvest-section-desc">
+        {t("harvest.ckanCoverage.harvestedDesc")}
+      </p>
+      <div className="harvest-ckan-pct">{pct}%</div>
+      <div className="harvest-ckan-meter" role="img" aria-label={ratio}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <p className="harvest-card-meta">{ratio}</p>
+      <ul className="harvest-ckan-sources">
+        {harvested.map((s) => {
+          const matchedPct = s.n_datasets
+            ? Math.round((100 * s.n_matched) / s.n_datasets)
+            : 0;
+          return (
+            <li
+              key={s.erddap_url}
+              title={t("harvest.ckanCoverage.unmatched", {
+                count: s.n_datasets - s.n_matched,
+              })}
+            >
+              <span className="harvest-pie-name">{hostname(s.erddap_url)}</span>
+              <span className="harvest-pie-value">
+                {t("harvest.ckanCoverage.sourceRatio", {
+                  linked: s.n_matched,
+                  total: s.n_datasets,
+                  pct: matchedPct,
+                })}
+              </span>
+              <div className="harvest-ckan-meter" aria-hidden="true">
+                <span style={{ width: `${matchedPct}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -171,6 +222,9 @@ export default function HarvestOverview() {
             <h2 className="harvest-section-title">
               {t("harvest.catalogue.title")}
             </h2>
+            <p className="harvest-section-desc">
+              {t("harvest.catalogue.desc")}
+            </p>
             <div className="harvest-pie-detail">
               <HarvestPie
                 harvested={allHarvested}
@@ -185,10 +239,16 @@ export default function HarvestOverview() {
               <h2 className="harvest-section-title">
                 {t("harvest.catalogue.issues")}
               </h2>
+              <p className="harvest-section-desc">
+                {t("harvest.catalogue.issuesDesc")}
+              </p>
               <HarvestReasonBars failures={allFailures} />
             </div>
           )}
           {ckanCoverage && <CkanCoverage coverage={ckanCoverage} t={t} />}
+          {ckanCoverage?.harvested?.length > 0 && (
+            <HarvestedInCkan harvested={ckanCoverage.harvested} t={t} />
+          )}
         </section>
       )}
 

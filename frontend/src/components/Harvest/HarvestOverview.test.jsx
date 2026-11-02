@@ -50,6 +50,14 @@ const CKAN_COVERAGE = {
     },
     { source: null, n_records: 100, n_linked: 10, n_erddap: 10, n_obis: 0 },
   ],
+  harvested: [
+    {
+      erddap_url: "https://data.cioospacific.ca/erddap",
+      n_datasets: 40,
+      n_matched: 30,
+    },
+    { erddap_url: "https://obis.org", n_datasets: 10, n_matched: 1 },
+  ],
 };
 function stubRoutes(overrides = {}) {
   installMockHarvestFetch({
@@ -132,14 +140,14 @@ describe("HarvestOverview", () => {
       ],
     });
     renderWithProviders(<HarvestOverview />);
-    const title = await screen.findByText("Last run, all sources");
+    const title = await screen.findByText("Latest harvest outcome");
     expect(
       within(title.closest("div")).getByRole("img", {
         name: "50 of 59 datasets harvested in the last run",
       }),
     ).toBeInTheDocument();
     const bars = screen
-      .getByText("Failure reasons")
+      .getByText("Why datasets were not harvested")
       .parentElement.querySelectorAll(".harvest-bars li");
     expect([...bars].map((b) => b.textContent)).toEqual([
       "HTTP errorerror5",
@@ -197,6 +205,25 @@ describe("HarvestOverview", () => {
     expect(
       screen.queryByText(/no longer in the catalogue/),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows how many of each source's harvested datasets are in the catalogue", async () => {
+    renderWithProviders(<HarvestOverview />);
+    expect(
+      await screen.findByText("Harvested datasets with a CKAN record"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "31 of 50 harvested datasets linked to a CKAN record",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("62%")).toBeInTheDocument();
+    const erddap = screen.getByText("data.cioospacific.ca").closest("li");
+    expect(within(erddap).getByText("30 / 40 (75%)")).toBeInTheDocument();
+    expect(erddap).toHaveAttribute("title", "10 datasets not in the catalogue");
+    const obis = screen.getByText("obis.org").closest("li");
+    expect(within(obis).getByText("1 / 10 (10%)")).toBeInTheDocument();
+    expect(obis).toHaveAttribute("title", "9 datasets not in the catalogue");
   });
 
   it("says how many linked records the catalogue has since dropped", async () => {
