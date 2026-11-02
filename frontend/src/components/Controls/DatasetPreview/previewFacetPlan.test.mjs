@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { variablesFrom } from "./previewVariables.js";
+import { variablesFrom, withDataPresence } from "./previewVariables.js";
 import {
   axisDirectionsFor,
   colorCandidatesFor,
@@ -659,4 +659,35 @@ test("no plan means no colour plot axes", () => {
     x: null,
     y: null,
   });
+});
+
+// VIKING's rows with every value but the named columns' blanked out.
+const vikingWithDataIn = (dataset, columnNames) =>
+  withDataPresence(variablesFrom(VIKING, dataset), [
+    Object.fromEntries(
+      VIKING.columnNames.map((columnName) => [
+        columnName,
+        columnNames.includes(columnName) ? 1 : null,
+      ]),
+    ),
+  ]);
+
+test("an empty first_eov_column gives way to a measurement that has data", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const variables = vikingWithDataIn(dataset, ["depth", "PSAL_01"]);
+  assert.deepEqual(facetPlanFor(dataset, variables).panelDefaults, ["PSAL_01"]);
+});
+
+test("a record with no data anywhere opens on the usual default", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
+  const variables = vikingWithDataIn(dataset, []);
+  assert.deepEqual(facetPlanFor(dataset, variables).panelDefaults, ["TE90_01"]);
+});
+
+test("Point shares its first measurement that has data", () => {
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Point" };
+  const variables = vikingWithDataIn(dataset, ["CNDC_01", "PSAL_01"]);
+  const plan = facetPlanFor(dataset, variables);
+  assert.equal(plan.sharedAxis, "CNDC_01");
+  assert.deepEqual(plan.panelDefaults, ["PSAL_01"]);
 });

@@ -339,6 +339,21 @@ describe("DatasetPreviewPlot", () => {
     await waitFor(() => expect(traceCount()).toBe(2));
   });
 
+  it("tags the variables the record leaves empty, in their usual place", async () => {
+    const user = open("/", DATASET, {
+      ...TABLE,
+      columnNames: [...TABLE.columnNames, "oxygen"],
+      columnTypes: [...TABLE.columnTypes, "float"],
+      columnUnits: [...TABLE.columnUnits, "ml/l"],
+      rows: TABLE.rows.map((row) => [...row, null]),
+    });
+    await plotted();
+    await user.click(variableSearch());
+    expect(
+      screen.getAllByRole("option").map((option) => option.textContent),
+    ).toEqual(["salinity ( PSU )", "oxygen ( ml/l )no data", "time ( UTC )"]);
+  });
+
   it("shows a removable pill per picked variable", async () => {
     const user = open("/?pvars=temperature,salinity");
     await waitFor(() => expect(traceCount()).toBe(2));

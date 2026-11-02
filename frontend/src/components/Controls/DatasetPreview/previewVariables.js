@@ -241,3 +241,28 @@ export function isDownwardVertical(variable) {
     name.startsWith("depth")
   );
 }
+
+const isPresent = (value) =>
+  value !== null &&
+  value !== undefined &&
+  value !== "" &&
+  (typeof value !== "number" || Number.isFinite(value));
+
+// Judged on the rows the preview holds, which is what the plot draws: a column
+// empty there draws an empty panel however full the rest of the record is.
+export function withDataPresence(variables, rows) {
+  if (!rows || !rows.length) return variables;
+  return (variables || []).map((variable) => ({
+    ...variable,
+    hasData: rows.some((row) => isPresent(row[variable.columnName])),
+  }));
+}
+
+// Unannotated counts as having data: before /preview lands nothing is known.
+export const hasData = (variable) => variable.hasData !== false;
+
+// The ones with data, or all of them when none has any.
+export function preferWithData(variables) {
+  const withData = (variables || []).filter(hasData);
+  return withData.length ? withData : variables || [];
+}

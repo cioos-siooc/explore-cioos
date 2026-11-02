@@ -1,10 +1,14 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import Select, { components } from "react-select";
-import { CaretDownFill } from "react-bootstrap-icons";
+import { CaretDownFill, SlashCircle } from "react-bootstrap-icons";
 
 import MatchHighlight from "../../ui/MatchHighlight.jsx";
-import { labelFor, shortLabelFor } from "../DatasetPreview/previewVariables.js";
+import {
+  hasData,
+  labelFor,
+  shortLabelFor,
+} from "../DatasetPreview/previewVariables.js";
 
 const columnNameOf = (variable) => variable.columnName;
 
@@ -34,6 +38,17 @@ function MenuList(props) {
         </button>
       )}
     </components.MenuList>
+  );
+}
+
+// Tags a column the preview's rows leave empty, in every list that offers it.
+export function NoDataMarker() {
+  const { t } = useTranslation();
+  return (
+    <span className="noDataMarker">
+      <SlashCircle size={10} aria-hidden="true" />
+      {t("datasetPreviewPlotNoDataMarker")}
+    </span>
   );
 }
 
@@ -92,7 +107,10 @@ export default function VariablePicker({
       getOptionLabel={labelFor}
       formatOptionLabel={(variable, { context, inputValue }) =>
         context === "menu" ? (
-          <MatchHighlight text={labelFor(variable)} query={inputValue} />
+          <>
+            <MatchHighlight text={labelFor(variable)} query={inputValue} />
+            {!hasData(variable) && <NoDataMarker />}
+          </>
         ) : (
           shortLabelFor(variable)
         )

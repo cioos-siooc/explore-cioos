@@ -10,6 +10,7 @@ import {
   isDownwardVertical,
   isTimeLike,
   measurementsOf,
+  preferWithData,
 } from "./previewVariables.js";
 import {
   POSITION_INDEX_COLUMN,
@@ -140,7 +141,7 @@ const CDM_LAYOUTS = {
   Point: {
     orientation: ROWS,
     wanted: "measurement",
-    sharedAxisFor: (variables) => measurementsOf(variables)[0],
+    sharedAxisFor: (variables) => preferWithData(measurementsOf(variables))[0],
   },
 };
 
@@ -215,7 +216,8 @@ export function colorPlotAxesFor(dataset, variables, plan) {
     variable.columnName !== plan.sharedAxis &&
     !panelDefaults.includes(variable.columnName);
   const down =
-    verticalCoordinate(variables) || measurementsOf(variables).find(notTaken);
+    verticalCoordinate(variables) ||
+    preferWithData(measurementsOf(variables).filter(notTaken))[0];
   return {
     x: plan.sharedAxis,
     y: down && down.columnName !== plan.sharedAxis ? down.columnName : null,
@@ -253,13 +255,15 @@ function defaultPanelCandidatesFor(variables, sharedAxis) {
   const notShared = (variable) =>
     !sharedAxis || variable.columnName !== sharedAxis;
   const measurements = measurementsOf(variables).filter(notShared);
-  if (measurements.length) return measurements;
-  return (variables || []).filter(
-    (variable) =>
-      variable.kind === "coordinate" &&
-      variable.isNumeric &&
-      notShared(variable) &&
-      !isHorizontalPosition(variable),
+  if (measurements.length) return preferWithData(measurements);
+  return preferWithData(
+    (variables || []).filter(
+      (variable) =>
+        variable.kind === "coordinate" &&
+        variable.isNumeric &&
+        notShared(variable) &&
+        !isHorizontalPosition(variable),
+    ),
   );
 }
 

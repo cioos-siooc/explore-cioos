@@ -6,6 +6,7 @@ import {
   variablesFrom,
   byColumnName,
   isDownwardVertical,
+  withDataPresence,
 } from "./previewVariables.js";
 import { positionRowsFor, trackIndexFor } from "./previewTrackIndex.js";
 import { distanceRowsFor, trackDistancesFor } from "./previewTrackDistance.js";
@@ -138,22 +139,28 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
 
   // The index and distances are offered like any other column, so the axis
   // picker, the label editor and the colour candidates need no special case.
-  const variables = useMemo(
-    () => [
-      ...columns,
-      ...(trackIndex ? [trackIndex.variable] : []),
-      ...(trackDistances ? trackDistances.variables : []),
-    ],
-    [columns, trackIndex, trackDistances],
-  );
-  const variablesByName = useMemo(() => byColumnName(variables), [variables]);
-
   // The rows the FIGURE draws: in track order, each carrying its index and
   // distances. The table keeps `data` as it arrived.
   const plotData = useMemo(
     () => positionRowsFor(distanceRowsFor(data, trackDistances), trackIndex),
     [data, trackDistances, trackIndex],
   );
+
+  // Each marked with whether the rows hold any of it, so the defaults and the
+  // pickers can put the columns that would draw something first.
+  const variables = useMemo(
+    () =>
+      withDataPresence(
+        [
+          ...columns,
+          ...(trackIndex ? [trackIndex.variable] : []),
+          ...(trackDistances ? trackDistances.variables : []),
+        ],
+        plotData,
+      ),
+    [columns, trackIndex, trackDistances, plotData],
+  );
+  const variablesByName = useMemo(() => byColumnName(variables), [variables]);
 
   // The type's own plan, then the plan as drawn: `porient` moves the panels to
   // the other axis, so either X or Y can hold several variables, one at a time.

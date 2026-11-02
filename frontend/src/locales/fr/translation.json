@@ -526,6 +526,7 @@
   "datasetPreviewPlotNoMatchingVariables": "Aucune variable correspondante",
   "datasetPreviewPlotAllVariablesSelected": "Toutes les variables sont tracées",
   "datasetPreviewPlotNoVariables": "Aucune variable traçable",
+  "datasetPreviewPlotNoDataMarker": "aucune donnée",
   "datasetPreviewPlotMaxVariables": "Jusqu’à {{count}} variables",
   "datasetPreviewPlotNoVariablesSelected": "Choisissez au moins une variable à tracer.",
   "datasetPreviewPlotBlockedNoColumns": "Cet enregistrement ne contient aucune colonne : il n'y a rien à tracer.",

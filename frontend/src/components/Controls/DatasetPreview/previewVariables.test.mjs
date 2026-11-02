@@ -10,6 +10,8 @@ import {
   byColumnName,
   isDownwardVertical,
   isTimeLike,
+  withDataPresence,
+  preferWithData,
 } from "./previewVariables.js";
 
 // The real /api/preview?dataset=mpoPmzaVikingCtdInsitu payload: a
@@ -530,3 +532,30 @@ test("a time column is recognised however ERDDAP spelled its units", () => {
 });
 
 export { VIKING, VIKING_NO_META, VIKING_DATASET };
+
+test("a column has data when any row holds a value, zero and text included", () => {
+  const variables = ["a", "b", "c", "d", "e"].map((columnName) => ({
+    columnName,
+  }));
+  const rows = [
+    { a: null, b: "", c: NaN, d: 0, e: null },
+    { a: undefined, b: null, c: null, d: null, e: "x" },
+  ];
+  assert.deepEqual(
+    withDataPresence(variables, rows).map((variable) => variable.hasData),
+    [false, false, false, true, true],
+  );
+});
+
+test("before any rows land nothing is marked empty", () => {
+  const variables = [{ columnName: "a" }];
+  assert.equal(withDataPresence(variables, []), variables);
+});
+
+test("preferWithData keeps every column when none has data", () => {
+  const empty = [
+    { columnName: "a", hasData: false },
+    { columnName: "b", hasData: false },
+  ];
+  assert.equal(preferWithData(empty), empty);
+});

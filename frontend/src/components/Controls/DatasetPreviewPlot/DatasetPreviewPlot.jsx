@@ -16,7 +16,7 @@ import useMediaQuery, {
   NARROW_QUERY,
 } from "../../../state/ui/useMediaQuery.js";
 import ControlRow from "./ControlRow.jsx";
-import VariablePicker from "./VariablePicker.jsx";
+import VariablePicker, { NoDataMarker } from "./VariablePicker.jsx";
 import VariableColorPicker from "./VariableColorPicker.jsx";
 import ColorScalePicker from "./ColorScalePicker.jsx";
 import ColorScaleLegend from "./ColorScaleLegend.jsx";
@@ -27,7 +27,11 @@ import Plotly from "./previewPlotly.js";
 import createPlotlyComponent from "react-plotly.js/factory";
 import isEqual from "lodash-es/isEqual";
 
-import { labelFor, shortLabelFor } from "../DatasetPreview/previewVariables.js";
+import {
+  hasData,
+  labelFor,
+  shortLabelFor,
+} from "../DatasetPreview/previewVariables.js";
 import {
   axisDirectionsFor,
   panelCandidatesFor,
@@ -317,6 +321,7 @@ export default function DatasetPreviewPlot() {
             onClick={() => onSelect(variable.columnName)}
           >
             {labelFor(variable)}
+            {!hasData(variable) && <NoDataMarker />}
           </Dropdown.Item>
         ))}
     </DropdownButton>
