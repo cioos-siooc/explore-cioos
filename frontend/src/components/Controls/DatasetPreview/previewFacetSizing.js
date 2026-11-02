@@ -12,12 +12,12 @@ import { MAX_LABEL_LINES, MAX_TITLE_LINES } from "./previewLabelText.js";
 // axis's own label, which runs along the axis and so needs only its line
 // height — two 18px lines here, automargin covers a third. Reserved by a
 // stack's margin and by a profile's pinned strip, both left of a vertical axis.
-export const TICK_ROOM_PX = 40;
+export const TICK_ROOM_PX = 48;
 export const LABEL_GUTTER_PX = 48;
 
 // Above a profile's panels: their tick labels and the title standoff. The panel
 // titles' own lines are added per line, so they never reach the figure title.
-export const TOP_TICK_ROOM_PX = 28;
+export const TOP_TICK_ROOM_PX = 32;
 // 18px at Plotly's LINE_SPACING of 1.3 is 23.4.
 export const LABEL_LINE_PX = 24;
 
@@ -27,7 +27,7 @@ export const LABEL_LINE_PX = 24;
 // of that edge not to clip the axis line. The title is capped at two lines,
 // because a strip sized from its title would feed back into the figure's size.
 export const PINNED_AXIS_LINES = 2;
-const BOTTOM_TICK_ROOM_PX = 24;
+const BOTTOM_TICK_ROOM_PX = 28;
 export const PINNED_EDGE_PX = 4;
 
 export function pinnedAxisSizeFor(orientation) {

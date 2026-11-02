@@ -214,6 +214,30 @@ function labellerFor(variablesByName, labels) {
   return { titleFor, hoverLine };
 }
 
+// Drawn on every panel's axes and the shared one, so each panel reads as its
+// own framed chart rather than as a patch of gridlines.
+const AXIS_LINE_COLOR = "rgba(21,47,55,0.62)"; // --cioos-ink-60
+const AXIS_LINE = {
+  showline: true,
+  linecolor: AXIS_LINE_COLOR,
+  linewidth: 1,
+};
+
+// Plotly draws the shared axis's line once, beside the panel it is anchored
+// to; every other panel gets the same edge as a shape.
+const sharedAxisEdgesFor = (panelLetter, panelCount) =>
+  Array.from({ length: panelCount - 1 }, (_, i) => {
+    const panel = `${axisRef(panelLetter, i + 1)} domain`;
+    return {
+      type: "line",
+      layer: "below",
+      line: { color: AXIS_LINE_COLOR, width: 1 },
+      ...(panelLetter === "x"
+        ? { xref: panel, x0: 0, x1: 0, yref: "y domain", y0: 0, y1: 1 }
+        : { yref: panel, y0: 0, y1: 0, xref: "x domain", x0: 0, x1: 1 }),
+    };
+  });
+
 // title.automargin deliberately unset: it would grow the margin inside a fixed
 // height and silently shrink panels below MIN_PANEL_PX.
 const layoutTitleFor = (wrappedTitle) => ({
@@ -375,6 +399,7 @@ export function buildFigure({
     : {};
 
   layout[`${sharedLetter}axis`] = {
+    ...AXIS_LINE,
     automargin: true,
     domain: [0, 1],
     anchor: panelLetter,
@@ -405,6 +430,7 @@ export function buildFigure({
     // In a stack, y domains count up from the bottom, so the first variable is
     // lowest.
     layout[axisKey(panelLetter, index)] = {
+      ...AXIS_LINE,
       domain,
       anchor: sharedLetter,
       automargin: true,
@@ -516,6 +542,7 @@ export function buildFigure({
         ticks: legendTicksFor(colorDimension),
       }
     : null;
+  layout.shapes = sharedAxisEdgesFor(panelLetter, panels.length);
   // First, so every panel's markers draw over its line.
   return { data: [...lineTraces, ...traces], layout, colorLegend };
 }
@@ -591,6 +618,7 @@ export function buildColorFigure({
   if (titleLines) layout.title = layoutTitleFor(wrappedTitle);
 
   layout.xaxis = {
+    ...AXIS_LINE,
     automargin: true,
     domain: [0, 1],
     anchor: "y",
@@ -619,6 +647,7 @@ export function buildColorFigure({
     const fallbackColor = defaultColorFor(variable, index);
 
     layout[axisKey("y", index)] = {
+      ...AXIS_LINE,
       domain,
       anchor: "x",
       automargin: true,
@@ -728,5 +757,6 @@ export function buildColorFigure({
     };
   });
 
+  layout.shapes = sharedAxisEdgesFor("y", panels.length);
   return { data: traces, layout, colorLegend: null };
 }
