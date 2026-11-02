@@ -254,12 +254,12 @@ describe("usePreviewPlotParams", () => {
   });
 
   describe("panels", () => {
-    it("toggles a variable on and back off", async () => {
+    it("adds a variable and takes it back off", async () => {
       open();
-      await run(() => api.togglePanel("salinity"));
+      await run(() => api.setPanels(["temperature", "salinity"]));
       expect(api.panels).toEqual(["temperature", "salinity"]);
 
-      await run(() => api.togglePanel("salinity"));
+      await run(() => api.setPanels(["temperature"]));
       expect(api.panels).toEqual(["temperature"]);
     });
 
@@ -273,7 +273,7 @@ describe("usePreviewPlotParams", () => {
   it("changes uirevision when the axis set changes, so no zoom is restored onto a dead axis", async () => {
     open();
     const before = api.uirevision;
-    await run(() => api.togglePanel("salinity"));
+    await run(() => api.setPanels(["temperature", "salinity"]));
     expect(api.uirevision).not.toBe(before);
   });
 

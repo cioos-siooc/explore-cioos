@@ -86,6 +86,8 @@ const plotted = async () => {
 };
 const rowCaptioned = (caption) =>
   screen.getByText(caption).closest(".controlRow");
+const variableSearch = (axis = "X axis") =>
+  screen.getByRole("combobox", { name: axis });
 const traceCount = () =>
   Number(screen.getByTestId("plotly").getAttribute("data-traces"));
 
@@ -188,13 +190,15 @@ describe("DatasetPreviewPlot", () => {
       wideTable,
     );
     await plotted();
-    expect(rowCaptioned("Color by")).toHaveTextContent("5 selected");
+    expect(rowCaptioned("Color by")).toHaveTextContent("m5");
+    expect(rowCaptioned("Color by")).not.toHaveTextContent("m6");
 
-    await user.click(screen.getByRole("button", { name: "5 selected" }));
+    await user.click(variableSearch("Color by"));
     expect(screen.getByText("Up to 5 variables")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "m5" })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: "m6" })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "m7" })).toBeDisabled();
+    expect(screen.getByRole("option", { name: "m6" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("offers a scale per colour variable in Customize plot, not a colour", async () => {
@@ -301,19 +305,65 @@ describe("DatasetPreviewPlot", () => {
     expect(screen.queryByText("Profile: record-1")).not.toBeInTheDocument();
   });
 
-  it("hints that the panels axis takes more than one variable", async () => {
+  it("offers several variables on either axis, but on one at a time", async () => {
     open();
     await plotted();
     expect(rowCaptioned("X axis")).toHaveTextContent("(+/-)");
+    expect(rowCaptioned("Y axis")).toHaveTextContent("(+/-)");
+  });
+
+  it("keeps the shared axis to one variable once the panels hold several", async () => {
+    open("/?pvars=temperature,salinity");
+    await waitFor(() => expect(traceCount()).toBe(2));
     expect(rowCaptioned("Y axis")).not.toHaveTextContent("(+/-)");
+  });
+
+  it("moves the panels to the other axis when it takes a second variable", async () => {
+    const user = open();
+    await plotted();
+    await user.click(variableSearch("Y axis"));
+    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
+
+    await waitFor(() => expect(traceCount()).toBe(2));
+    expect(rowCaptioned("Y axis")).toHaveTextContent("depth");
+    expect(rowCaptioned("Y axis")).toHaveTextContent("salinity");
+    expect(rowCaptioned("X axis")).toHaveTextContent("temperature");
+    expect(rowCaptioned("X axis")).not.toHaveTextContent("(+/-)");
   });
 
   it("adds a panel when a second variable is ticked", async () => {
     const user = open();
     await plotted();
-    await user.click(screen.getByRole("button", { name: "temperature" }));
-    await user.click(screen.getByLabelText("salinity ( PSU )"));
+    await user.click(variableSearch());
+    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
     await waitFor(() => expect(traceCount()).toBe(2));
+  });
+
+  it("shows a removable pill per picked variable", async () => {
+    const user = open("/?pvars=temperature,salinity");
+    await waitFor(() => expect(traceCount()).toBe(2));
+    expect(rowCaptioned("X axis")).toHaveTextContent("temperature");
+    expect(rowCaptioned("X axis")).toHaveTextContent("salinity");
+
+    await user.click(screen.getByRole("button", { name: "Remove salinity" }));
+    await waitFor(() => expect(traceCount()).toBe(1));
+    expect(rowCaptioned("X axis")).not.toHaveTextContent("salinity");
+  });
+
+  it("filters the variable list by what is typed", async () => {
+    const user = open("/?pvars=temperature");
+    await plotted();
+    await user.type(variableSearch(), "sal");
+    expect(
+      screen.getByRole("option", { name: "salinity ( PSU )" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /^time/ }),
+    ).not.toBeInTheDocument();
+
+    await user.clear(variableSearch());
+    await user.type(variableSearch(), "oxygen");
+    expect(screen.getByText("No matching variables")).toBeInTheDocument();
   });
 
   it("says so rather than drawing nothing when every variable is unticked", async () => {
@@ -341,18 +391,36 @@ describe("DatasetPreviewPlot", () => {
   it("reveals the colour scale once a colour column is picked", async () => {
     const user = open();
     await plotted();
-    await user.click(screen.getByRole("button", { name: "None" }));
-    await user.click(screen.getByText("salinity ( PSU )"));
+    await user.click(variableSearch("Color by"));
+    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
     await waitFor(() =>
       expect(screen.getByText("Color scale")).toBeInTheDocument(),
     );
   });
 
+  it("turns the colour column back off from its clear button", async () => {
+    const user = open("/?pz=salinity");
+    await waitFor(() =>
+      expect(screen.getByText("Color scale")).toBeInTheDocument(),
+    );
+    expect(rowCaptioned("Color by")).toHaveTextContent("salinity");
+
+    await user.click(
+      rowCaptioned("Color by").querySelector(
+        ".variableSelect__clear-indicator",
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("Color scale")).not.toBeInTheDocument(),
+    );
+    expect(rowCaptioned("Color by")).toHaveTextContent("None");
+  });
+
   it("draws the colour scale below the plot, outside its scroller", async () => {
     const user = open();
     await plotted();
-    await user.click(screen.getByRole("button", { name: "None" }));
-    await user.click(screen.getByText("salinity ( PSU )"));
+    await user.click(variableSearch("Color by"));
+    await user.click(screen.getByRole("option", { name: "salinity ( PSU )" }));
 
     const legend = await waitFor(() => {
       const found = document.querySelector(".colorScaleLegend");

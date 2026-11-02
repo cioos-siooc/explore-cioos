@@ -13,6 +13,7 @@ import {
   colorCandidatesFor,
   colorPlotAxesFor,
   COLUMNS,
+  ROWS,
   facetPlanFor,
   resolvePanels,
   defaultVisFor,
@@ -154,10 +155,29 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [data, trackDistances, trackIndex],
   );
 
-  const plan = useMemo(
+  // The type's own plan, then the plan as drawn: `porient` moves the panels to
+  // the other axis, so either X or Y can hold several variables, one at a time.
+  const typePlan = useMemo(
     () => facetPlanFor(inspectDataset, variables, plotData),
     [inspectDataset, variables, plotData],
   );
+  const orientParam = searchParams.get("porient");
+  const plan = useMemo(() => {
+    if (
+      !typePlan ||
+      (orientParam !== ROWS && orientParam !== COLUMNS) ||
+      orientParam === typePlan.orientation
+    ) {
+      return typePlan;
+    }
+    return {
+      ...typePlan,
+      orientation: orientParam,
+      sharedReversed:
+        orientParam === COLUMNS &&
+        isDownwardVertical(variablesByName.get(typePlan.sharedAxis)),
+    };
+  }, [typePlan, orientParam, variablesByName]);
 
   const defaultVis = defaultVisFor(inspectDataset);
   const visParam = searchParams.get("vis");
@@ -199,8 +219,8 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
   // axis is its depth, which the colour plot draws DOWN rather than across.
   // A link naming a column this dataset does not have falls back, like paxis.
   const colorAxesDefault = useMemo(
-    () => colorPlotAxesFor(inspectDataset, variables, plan),
-    [inspectDataset, variables, plan],
+    () => colorPlotAxesFor(inspectDataset, variables, typePlan),
+    [inspectDataset, variables, typePlan],
   );
   const knownOr = (param, fallback) => {
     const value = searchParams.get(param);
@@ -244,6 +264,24 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     [setParams, plan, panels],
   );
 
+  // A second variable on the single axis: it becomes the panels' axis, and the
+  // one panel left on the other side becomes the shared axis. One write.
+  const flipPanelAxis = useCallback(
+    (nextShared, nextPanels) => {
+      if (!typePlan) return;
+      const orientation = plan.orientation === COLUMNS ? ROWS : COLUMNS;
+      const cleaned = resolvePanels(nextPanels, variables, nextShared);
+      setParams({
+        porient: orientation === typePlan.orientation ? null : orientation,
+        paxis: nextShared === typePlan.sharedAxis ? null : nextShared,
+        pvars: sameList(cleaned, typePlan.panelDefaults)
+          ? null
+          : listToParam(cleaned),
+      });
+    },
+    [setParams, typePlan, plan, variables],
+  );
+
   const setPanels = useCallback(
     (nextPanels) => {
       const cleaned = resolveForLayout(nextPanels);
@@ -251,17 +289,6 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
       setParams({ pvars: isDefault ? null : listToParam(cleaned) });
     },
     [setParams, plan, resolveForLayout],
-  );
-
-  const togglePanel = useCallback(
-    (columnName) => {
-      setPanels(
-        panels.includes(columnName)
-          ? panels.filter((name) => name !== columnName)
-          : [...panels, columnName],
-      );
-    },
-    [setPanels, panels],
   );
 
   // Keyed by column name, not panel index, so a colour survives untick/retick and
@@ -435,7 +462,7 @@ export default function usePreviewPlotParams(inspectDataset, table, data) {
     setSharedAxis,
     panels,
     setPanels,
-    togglePanel,
+    flipPanelAxis,
     variableColors,
     setVariableColor,
     colorCandidates,

@@ -40,6 +40,10 @@ export function parsePeriod(value) {
 //                                  (default: the dataset's first EOV column)
 //   paxis    the axis every panel shares
 //                                  (default: depth / time / track, per type)
+//   porient  columns | rows        which way the panels run: across with a
+//                                  shared Y, or stacked with a shared X
+//                                  (default: columns for profiles, rows
+//                                  otherwise)
 //   pmode    markers | lines | markers+lines
 //   pcolors  per-variable colours, `column~rrggbb` comma-separated
 //                                  (default: the variable's own ERDDAP palette)
@@ -70,6 +74,7 @@ export const PLOT_PARAMS = [
   "vis",
   "pvars",
   "paxis",
+  "porient",
   "pmode",
   "pcolors",
   "pz",

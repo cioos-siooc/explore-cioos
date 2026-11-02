@@ -89,26 +89,104 @@
   outline-offset: 1px;
 }
 
-/* Checkbox rows in the variable picker. The menu is portaled to document.body
-   with its own max-height and overflow (ui/dropdownStyles.css), so a dataset
-   with any number of variables scrolls THERE and never adds a scroller inside
-   the modal. */
-.variablePickerRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  margin: 0;
-}
-
-.variablePickerRow input {
-  flex: 0 0 auto;
-  margin: 0;
-}
-
-.variablePickerLabel {
+/* react-select's multi-picker (VariablePicker), dressed like the pane's
+   dropdowns and the active-filter chips. Two classes deep to beat the
+   emotion styles it injects after this sheet; the menu portals to
+   document.body, so it is reached through its portal wrapper. */
+.variableSelect {
   flex: 1 1 auto;
-  white-space: nowrap;
+  min-width: 0;
+  font-size: var(--cioos-font-size-sm);
+}
+
+.variableSelect .variableSelect__control {
+  min-height: 38px;
+  border-color: var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: none;
+}
+
+.variableSelect .variableSelect__control:hover {
+  border-color: var(--cioos-hairline);
+  background-color: var(--cioos-surface-2);
+}
+
+.variableSelect .variableSelect__control--is-focused,
+.variableSelect .variableSelect__control--is-focused:hover {
+  border-color: var(--cioos-primary);
+  box-shadow: var(--cioos-focus);
+}
+
+.variableSelect .variableSelect__multi-value {
+  background-color: var(--cioos-teal-light);
+  border: 1px solid var(--cioos-primary);
+  border-radius: var(--cioos-radius-pill);
+}
+
+.variableSelect .variableSelect__multi-value__label {
+  font-size: var(--cioos-font-size-xs);
+  font-weight: 600;
+  color: var(--cioos-ink);
+}
+
+.variableSelect .variableSelect__multi-value__remove {
+  border-radius: var(--cioos-radius-pill);
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.variableSelect .variableSelect__multi-value__remove:hover {
+  background-color: var(--cioos-error);
+  color: var(--cioos-white);
+}
+
+.variableSelect .variableSelect__dropdown-indicator {
+  padding: 0 12px 0 6px;
+  color: var(--cioos-ink);
+}
+
+.variableSelect .variableSelect__clear-indicator {
+  padding: 0 2px;
+  color: var(--cioos-ink-60);
+  cursor: pointer;
+}
+
+.variableSelect .variableSelect__clear-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+
+.variableSelect .variableSelect__placeholder {
+  color: var(--cioos-ink-80);
+}
+
+.variableSelect__menu-portal .variableSelect__menu {
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius-sm);
+  box-shadow: var(--cioos-shadow-md);
+}
+
+.variableSelect__menu-portal .variableSelect__option {
+  color: var(--cioos-ink);
+  cursor: pointer;
+}
+
+.variableSelect__menu-portal .variableSelect__option--is-focused {
+  background-color: var(--cioos-surface-2);
+}
+
+.variableSelect__menu-portal .variableSelect__option--is-disabled {
+  color: var(--cioos-ink-40);
+  cursor: default;
+}
+
+.variableSelectBulk {
+  border-top: 1px solid var(--cioos-hairline);
+}
+
+/* The caption stays level with the first row of pills as they wrap. */
+.controlRow:has(.variableSelect) {
+  align-items: baseline;
 }
 
 /* Sits in the menu where the options would be, so it takes their inset

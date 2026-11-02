@@ -88,8 +88,8 @@ export default function DatasetPreviewPlot() {
     sharedAxis,
     setSharedAxis,
     panels,
-    togglePanel,
     setPanels,
+    flipPanelAxis,
     variableColors,
     setVariableColor,
     colorCandidates,
@@ -142,6 +142,7 @@ export default function DatasetPreviewPlot() {
   );
   const sharedCandidates = sharedCandidatesFor(variables, inspectDataset);
   const directions = axisDirectionsFor(plan.orientation);
+  const sharedIsX = directions.x === "horizontal";
   const hasProfileHeader = PROFILE_RECORD_TYPES.includes(
     inspectDataset?.cdm_data_type,
   );
@@ -373,6 +374,49 @@ export default function DatasetPreviewPlot() {
     </div>
   );
 
+  // Either axis can hold several variables, one at a time: while the panels'
+  // axis holds exactly one, a second one on the shared axis flips the plot.
+  const canFlip = panels.length === 1;
+  const sharedAxisRow = (
+    <ControlRow
+      caption={axisCaptionFor(directions.x)}
+      hint={canFlip && t("datasetPreviewPlotAddRemovePlots")}
+    >
+      <VariablePicker
+        label={axisCaptionFor(directions.x)}
+        choices={
+          canFlip
+            ? sharedCandidates.filter(
+                (variable) => variable.columnName !== panels[0],
+              )
+            : sharedCandidates
+        }
+        value={[sharedAxis]}
+        variablesByName={variablesByName}
+        isMulti={canFlip}
+        required
+        onChange={(picked) => {
+          if (picked.length === 1) setSharedAxis(picked[0]);
+          else if (picked.length > 1) flipPanelAxis(panels[0], picked);
+        }}
+      />
+    </ControlRow>
+  );
+  const panelsRow = (
+    <ControlRow
+      caption={axisCaptionFor(directions.y)}
+      hint={t("datasetPreviewPlotAddRemovePlots")}
+    >
+      <VariablePicker
+        label={axisCaptionFor(directions.y)}
+        choices={panelChoices}
+        value={panels}
+        variablesByName={variablesByName}
+        onChange={setPanels}
+      />
+    </ControlRow>
+  );
+
   const bounds = { paneWidth, plotWidth: plotAreaSize.width };
   const paneToggleText = t(
     paneCollapsed
@@ -458,92 +502,45 @@ export default function DatasetPreviewPlot() {
             <ControlRow
               caption={t("datasetPreviewPlotColorBy")}
               hint={t("datasetPreviewPlotAddRemovePlots")}
-              tooltip={panels.map(labelOf).join(", ")}
             >
               <VariablePicker
+                label={t("datasetPreviewPlotColorBy")}
                 choices={colorCandidates.filter(
                   (variable) =>
                     variable.columnName !== colorX &&
                     variable.columnName !== colorY,
                 )}
-                panels={panels}
+                value={panels}
                 variablesByName={variablesByName}
-                togglePanel={togglePanel}
-                setPanels={setPanels}
+                onChange={setPanels}
                 maxSelected={MAX_COLOR_PANELS}
               />
             </ControlRow>
           </>
         ) : (
           <>
-            <ControlRow
-              caption={axisCaptionFor(directions.x)}
-              tooltip={labelOf(sharedAxis)}
-            >
-              <DropdownButton
-                className="dropdownButtonLeft"
-                title={toggleLabel(
-                  shortLabelFor(variablesByName.get(sharedAxis)),
-                )}
-              >
-                {sharedCandidates.map((variable) => (
-                  <Dropdown.Item
-                    key={variable.columnName}
-                    active={variable.columnName === sharedAxis}
-                    onClick={() => setSharedAxis(variable.columnName)}
-                  >
-                    {labelFor(variable)}
-                  </Dropdown.Item>
-                ))}
-              </DropdownButton>
-            </ControlRow>
+            {sharedIsX ? (
+              <>
+                {sharedAxisRow}
+                {panelsRow}
+              </>
+            ) : (
+              <>
+                {panelsRow}
+                {sharedAxisRow}
+              </>
+            )}
 
-            <ControlRow
-              caption={axisCaptionFor(directions.y)}
-              hint={t("datasetPreviewPlotAddRemovePlots")}
-              tooltip={panels.map(labelOf).join(", ")}
-            >
+            <ControlRow caption={t("datasetPreviewPlotColorBy")}>
               <VariablePicker
-                choices={panelChoices}
-                panels={panels}
+                label={t("datasetPreviewPlotColorBy")}
+                choices={colorCandidates}
+                value={colorAxis ? [colorAxis] : []}
                 variablesByName={variablesByName}
-                togglePanel={togglePanel}
-                setPanels={setPanels}
+                isMulti={false}
+                placeholder={t("datasetPreviewPlotColorNone")}
+                onChange={(picked) => setColorAxis(picked[0] ?? null)}
               />
-            </ControlRow>
-
-            <ControlRow
-              caption={t("datasetPreviewPlotColorBy")}
-              tooltip={
-                colorAxis
-                  ? labelOf(colorAxis)
-                  : t("datasetPreviewPlotColorNone")
-              }
-            >
-              <DropdownButton
-                className="dropdownButtonLeft"
-                title={toggleLabel(
-                  colorAxis
-                    ? shortLabelFor(variablesByName.get(colorAxis))
-                    : t("datasetPreviewPlotColorNone"),
-                )}
-              >
-                <Dropdown.Item
-                  active={!colorAxis}
-                  onClick={() => setColorAxis(null)}
-                >
-                  {t("datasetPreviewPlotColorNone")}
-                </Dropdown.Item>
-                {colorCandidates.map((variable) => (
-                  <Dropdown.Item
-                    key={variable.columnName}
-                    active={variable.columnName === colorAxis}
-                    onClick={() => setColorAxis(variable.columnName)}
-                  >
-                    {labelFor(variable)}
-                  </Dropdown.Item>
-                ))}
-              </DropdownButton>
             </ControlRow>
 
             {colorAxis && (
