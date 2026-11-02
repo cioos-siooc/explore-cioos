@@ -1,56 +1,38 @@
 version: 2
 updates:
-  # Grouped so a week's updates arrive as at most three PRs per block rather
-  # than a dozen: minor/patch, majors (they need a human either way), and
-  # security, since security updates ignore version-update groups.
-  # Root holds the shared lint/format toolchain (ESLint, Prettier, stylelint).
+  # Grouped so updates arrive as at most three PRs per block rather than a
+  # dozen: minor/patch, majors (they need a human either way), and security,
+  # since security updates ignore version-update groups. Cooldown only delays
+  # version updates; security updates still open immediately.
+  # One block for every npm project (root lint/format toolchain, frontend,
+  # web-api, e2e tests) so a shared dependency lands as a single PR.
   - package-ecosystem: npm
-    directory: /
+    directories: [/, /frontend, /web-api, /test]
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
     groups:
-      tooling-minor-patch:
+      npm-minor-patch:
         update-types: [minor, patch]
-      tooling-major:
+      npm-major:
         update-types: [major]
-      tooling-security:
-        applies-to: security-updates
-        patterns: ["*"]
-
-  # One block for both apps so a dependency shared by them (and the week's
-  # bumps in general) lands as a single PR instead of one per directory.
-  - package-ecosystem: npm
-    directories: [/frontend, /web-api]
-    schedule: { interval: weekly, day: monday }
-    open-pull-requests-limit: 5
-    groups:
-      apps-minor-patch:
-        update-types: [minor, patch]
-      apps-major:
-        update-types: [major]
-      apps-security:
-        applies-to: security-updates
-        patterns: ["*"]
-
-  - package-ecosystem: npm
-    directory: /test
-    schedule: { interval: monthly }
-    open-pull-requests-limit: 2
-    groups:
-      test-minor-patch:
-        update-types: [minor, patch]
-      test-major:
-        update-types: [major]
-      test-security:
+      npm-security:
         applies-to: security-updates
         patterns: ["*"]
 
   # All uv projects (each with its own pyproject.toml and uv.lock) share one
-  # block so e.g. a pytest bump arrives as one PR rather than four.
+  # block. lockfile-only keeps pyproject ranges as written, so majors outside
+  # them are bumped by hand.
   - package-ecosystem: uv
     directories: [/, /harvester, /downloader, /download_scheduler]
-    schedule: { interval: weekly, day: monday }
+    schedule: { interval: monthly }
     open-pull-requests-limit: 5
+    versioning-strategy: lockfile-only
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
     groups:
       python-minor-patch:
         update-types: [minor, patch]
@@ -63,6 +45,7 @@ updates:
   - package-ecosystem: docker
     directories: [/frontend, /web-api, /nginx, /database, /harvester, /download_scheduler]
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     groups:
       base-images:
         patterns: ["*"]
@@ -70,6 +53,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     groups:
       compose-images:
         patterns: ["*"]
@@ -77,6 +61,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+    cooldown: { default-days: 7 }
     groups:
       actions:
         patterns: ["*"]
