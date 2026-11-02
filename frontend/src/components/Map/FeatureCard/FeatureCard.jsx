@@ -1,8 +1,9 @@
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircleFill, GeoAlt, PlusCircle } from "react-bootstrap-icons";
+import { GeoAlt } from "react-bootstrap-icons";
 import { useTranslation } from "react-i18next";
 import classNames from "classnames";
+import groupBy from "lodash-es/groupBy";
 
 import CloseButton from "../../ui/CloseButton.jsx";
 import { useChanged } from "../../../utilities.jsx";
@@ -11,10 +12,8 @@ import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
 import { useUI } from "../../../state/ui/UIProvider.jsx";
 import { useTips } from "../../../state/tips/TipsProvider.jsx";
 import useCellDatasetDays from "./useCellDatasetDays.js";
-import {
-  DatasetCardMeta,
-  DatasetPlatformIcon,
-} from "../../Controls/DatasetsTable/DatasetCard.jsx";
+import { pinnedPksOf, sortDatasets } from "../../../state/datasetSort.js";
+import DatasetCard from "../../Controls/DatasetsTable/DatasetCard.jsx";
 import "../../Controls/DatasetsTable/styles.css";
 import "./styles.css";
 
@@ -24,21 +23,21 @@ import "./styles.css";
 
 const VISIBLE_ROWS = 5;
 
-const KIND_ORDER = ["track", "observation", "grid"];
-
 export default function FeatureCard() {
   const { t, i18n } = useTranslation();
-  const { featureQuery, setFeatureQuery, dataLayers } = useMapState();
+  const { featureQuery, setFeatureQuery, dataLayers, griddapCoverageVisible } =
+    useMapState();
   const {
-    pointsData,
+    filteredDatasets,
+    listSort,
     inspectDataset,
     setInspectDataset,
     selectTrajectoryFromMap,
-    addDatasetsToSelection,
+    handleSelectDataset,
     selectedPks,
     combinedQueries,
   } = useSelection();
-  const { sidebarOpen } = useUI();
+  const { sidebarOpen, compactList } = useUI();
   const { offerTip, tipHighlight } = useTips();
 
   const [expanded, setExpanded] = useState(false);
@@ -74,10 +73,10 @@ export default function FeatureCard() {
   // searched for by name.
   const hasObis =
     open &&
-    (query?.items || []).some(
-      (item) =>
-        pointsData.find((row) => Number(row.pk) === item.pk)?.source_type ===
-        "obis",
+    (query?.datasetPks || []).some(
+      (pk) =>
+        filteredDatasets.find((row) => Number(row.pk) === Number(pk))
+          ?.source_type === "obis",
     );
   useEffect(() => {
     if (open) offerTip([...(hasObis ? ["speciesName"] : []), "whatsHere"]);
@@ -85,78 +84,54 @@ export default function FeatureCard() {
   // Nothing has been clicked yet in this session: there is no card to park.
   if (!query) return null;
 
-  // Observation rows resolve against the current results (the tiles carry no
-  // titles), and one that doesn't is not in the list the buttons act on, so it
-  // is dropped. Tracks and grids carry their own titles and only dataset-level
-  // filters, so they can be drawn for a dataset pointQuery dropped; they stay,
-  // with the result-row actions withheld.
-  const byPk = new Map(pointsData.map((row) => [Number(row.pk), row]));
-
-  // A marker click's featureQuery is deliberately item-less (Map.jsx's
-  // handleMapClick): it only pins the dataset in the list.
-  const rows = (query.items || [])
-    .map((item) => {
-      const row = byPk.get(item.pk);
-      if (!row && item.kind === "observation") return null;
-      return {
-        ...item,
-        title: row?.title || item.title,
-        platform: row?.platform || item.platform,
-        // undefined until the breakdown lands, and for a track or grid.
-        count: datasetDays.get(item.pk),
-        row,
-        // A track without a result row still opens: selectTrajectoryFromMap
-        // draws the platform's history and leaves the page alone.
-        openable: item.kind === "track" || Boolean(row),
-        // Griddap is metadata-only and never enters the selection.
-        selectable: item.kind !== "grid" && row?.cdm_data_type !== "Grid",
-        inSelection: selectedPks.has(row?.pk),
-      };
-    })
-    .filter(Boolean)
-    .sort(
-      (a, b) =>
-        KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) ||
-        (b.count || 0) - (a.count || 0),
-    );
+  // Exactly the datasets list's pinned rows, in its order: the card stands in
+  // for that list while it is closed.
+  const pinnedPks = pinnedPksOf(query);
+  const rows = sortDatasets(
+    filteredDatasets.filter((row) => pinnedPks.has(Number(row.pk))),
+    listSort,
+    { gridFirst: griddapCoverageVisible, t, language: i18n.language },
+  );
+  const itemsByPk = groupBy(query.items || [], "pk");
+  const tracksOf = (row) =>
+    (itemsByPk[row.pk] || []).filter((item) => item.kind === "track");
 
   const empty = rows.length === 0;
   const shown = expanded ? rows : rows.slice(0, VISIBLE_ROWS);
   const hidden = rows.length - shown.length;
+  const tipTarget = shown.find((row) => row.cdm_data_type !== "Grid");
 
-  const openDataset = (entry) => {
-    if (entry.kind === "track") {
-      selectTrajectoryFromMap(entry.pk, entry.trajectoryId, entry.title);
-      close();
-      return;
+  // A single track under the click opens on that track; otherwise the
+  // dataset's page.
+  const openDataset = (row) => {
+    const tracks = tracksOf(row);
+    if (tracks.length === 1) {
+      selectTrajectoryFromMap(row.pk, tracks[0].trajectoryId, row.title);
+    } else {
+      setInspectDataset(row);
     }
-    if (entry.row) {
-      setInspectDataset(entry.row);
-      close();
-    }
+    close();
   };
-
-  // Adding keeps the card open: picking several datasets under one click
-  // is the normal case.
-  const addOne = (pk) => addDatasetsToSelection([pk]);
-
-  // A track or grid row without a result row still gets its kind's glyph.
-  const kindIcon = (entry) => (
-    <DatasetPlatformIcon
-      platform={entry.platform}
-      cdmDataType={
-        entry.row?.cdm_data_type ??
-        { track: "Trajectory", grid: "Grid" }[entry.kind]
-      }
-      sourceType={entry.row?.source_type}
-      t={t}
-    />
-  );
 
   const countLabel = (value) =>
     t("mapHexCountDays", {
       total: Number(value || 0).toLocaleString(i18n.language),
     });
+
+  // What the click found of this dataset, beside its catalogue-wide meta.
+  const hereLine = (row) => {
+    const items = itemsByPk[row.pk] || [];
+    const count = datasetDays.get(Number(row.pk));
+    return [
+      ...tracksOf(row).map((item) => item.trajectoryId),
+      // No figure yet (or the request failed): show none rather than a number
+      // that isn't this dataset's.
+      count === undefined ? null : countLabel(count),
+      items.some((item) => item.aggregate) ? t("featureCardNearby") : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
 
   return (
     <div
@@ -204,91 +179,28 @@ export default function FeatureCard() {
         <p className="featureCardEmptyText">{t("featureCardEmpty")}</p>
       ) : (
         <>
-          <div className="featureCardList">
-            {shown.map((entry, index) => {
-              const here =
-                entry.kind === "track"
-                  ? entry.trajectoryId || t("featureCardTrack")
-                  : entry.kind === "grid"
-                    ? t("featureCardGrid")
-                    : [
-                        // No figure yet (or the request failed): show none
-                        // rather than a number that isn't this dataset's.
-                        entry.count === undefined
-                          ? null
-                          : countLabel(entry.count),
-                        entry.aggregate ? t("featureCardNearby") : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ");
-              // A grid the current results don't contain has no page to open:
-              // the rectangles come from their own source and outlive the
-              // filter.
+          <div
+            className={classNames("datasetsCardList featureCardList", {
+              compact: compactList,
+            })}
+          >
+            {shown.map((row) => {
+              const here = hereLine(row);
               return (
-                <div
-                  className={classNames("featureCardRow", {
-                    clickable: entry.openable,
-                  })}
-                  key={`${entry.kind}:${entry.pk}:${entry.trajectoryId ?? ""}`}
-                  title={entry.title}
-                  onClick={
-                    entry.openable ? () => openDataset(entry) : undefined
-                  }
-                >
-                  <span className="featureCardRowHeadline">
-                    <button
-                      type="button"
-                      className={classNames("featureCardRowAdd", {
-                        isSelected: entry.inSelection,
-                      })}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addOne(entry.pk);
-                      }}
-                      // One is enough to point at; the sidebar list's own
-                      // toggle stands in for it while the card is held back
-                      // (see DatasetsTable).
-                      data-tip-highlight={tipHighlight(
-                        open && index === 0 && "whatsHere",
-                      )}
-                      disabled={!entry.selectable || entry.inSelection}
-                      title={
-                        !entry.selectable
-                          ? t("griddapNotDownloadableTooltip")
-                          : entry.inSelection
-                            ? t("featureCardAlreadyAdded")
-                            : t("featureCardAddOne")
-                      }
-                      aria-label={`${
-                        entry.inSelection
-                          ? t("featureCardAlreadyAdded")
-                          : t("featureCardAddOne")
-                      }: ${entry.title}`}
-                    >
-                      {entry.inSelection ? (
-                        <CheckCircleFill size={16} aria-hidden="true" />
-                      ) : (
-                        <PlusCircle size={16} aria-hidden="true" />
-                      )}
-                    </button>
-                    <span className="featureCardRowIcon">
-                      {kindIcon(entry)}
-                    </span>
-                    {/* The row holds the add button, so it can't be a button
-                        itself. */}
-                    {entry.openable ? (
-                      <button type="button" className="featureCardRowTitle">
-                        {entry.title}
-                      </button>
-                    ) : (
-                      <span className="featureCardRowTitle">{entry.title}</span>
-                    )}
-                  </span>
-                  {entry.row && (
-                    <DatasetCardMeta row={entry.row} t={t} i18n={i18n} />
+                <DatasetCard
+                  key={row.pk}
+                  row={row}
+                  selected={selectedPks.has(row.pk)}
+                  onSelect={handleSelectDataset}
+                  onInspect={openDataset}
+                  tipHighlight={tipHighlight(
+                    open && row === tipTarget && "whatsHere",
                   )}
-                  {here && <span className="featureCardRowMeta">{here}</span>}
-                </div>
+                  t={t}
+                  i18n={i18n}
+                >
+                  {here && <span className="featureCardHere">{here}</span>}
+                </DatasetCard>
               );
             })}
           </div>
