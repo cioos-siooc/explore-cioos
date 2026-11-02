@@ -3,6 +3,7 @@ const axios = require("axios");
 
 const router = express.Router();
 const db = require("../db");
+const cache = require("../utils/cache");
 const { pipeline } = require("../utils/routePipeline");
 
 const SPARKLINE_DEPTH = 10;
@@ -505,15 +506,23 @@ function tallyCkanCoverage(linkedRows, recordSources) {
   };
 }
 
+// Kept until the harvest flushes redis, except a reply built during a CKAN
+// outage: cached, it would hide the catalogue totals for a whole day. The
+// toggle also gates serving a hit, before the handler runs, hence !== false.
 router.get(
   "/ckan-coverage",
-  ...pipeline({ filters: false, cacheFor: "10 minutes" }),
+  ...pipeline({
+    filters: false,
+    cacheToggle: (req, res) =>
+      cache.onlyOk(req, res) && res.locals.ckanReachable !== false,
+  }),
   async (req, res) => {
     const [linkedRows, harvested, recordSources] = await Promise.all([
       ckanLinkedRecords(),
       ckanMatchedBySource(),
       ckanRecordSources(),
     ]);
+    res.locals.ckanReachable = recordSources !== null;
     res.json({ ...tallyCkanCoverage(linkedRows, recordSources), harvested });
   },
 );

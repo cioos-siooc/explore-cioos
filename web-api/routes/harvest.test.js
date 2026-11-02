@@ -409,3 +409,31 @@ test("GET /harvest/ckan-coverage counts harvested datasets matched to CKAN per s
   assert.match(db.queries[1], /COUNT\(ckan_id\)/);
   assert.match(db.queries[1], /GROUP BY erddap_url/);
 });
+
+test("GET /harvest/ckan-coverage serves a complete reply from the cache", async () => {
+  db.queueRaw([]);
+  db.queueRaw([]);
+  axios.queueResponse(ckanPage(1, [{ id: "a1" }]));
+
+  await agent.get("/harvest/ckan-coverage");
+  const res = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(res.body.n_ckan_records, 1);
+  assert.equal(db.queries.length, 2);
+  assert.equal(axios.calls.length, 1);
+});
+
+test("GET /harvest/ckan-coverage does not cache a reply built during a CKAN outage", async () => {
+  db.queueRaw([]);
+  db.queueRaw([]);
+  axios.queueError(new Error("connect ECONNREFUSED"));
+  db.queueRaw([]);
+  db.queueRaw([]);
+  axios.queueResponse(ckanPage(1, [{ id: "a1" }]));
+
+  const outage = await agent.get("/harvest/ckan-coverage");
+  const recovered = await agent.get("/harvest/ckan-coverage");
+
+  assert.equal(outage.body.n_ckan_records, null);
+  assert.equal(recovered.body.n_ckan_records, 1);
+});
