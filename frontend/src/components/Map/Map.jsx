@@ -50,6 +50,7 @@ import {
   clickHighlightColor,
   colorScale,
   defaultBathymetryPalette,
+  defaultMapBounds,
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
@@ -3226,12 +3227,24 @@ export default function CreateMap({
       locale: { "Map.Title": t("mapCanvasLabel") },
       // The legend card builds the attribution control (see LegendFooter.jsx).
       attributionControl: false,
-      center: [initialView.lon, initialView.lat],
-      zoom: initialView.zoom,
+      ...(initialView.lat === undefined
+        ? {}
+        : {
+            center: [initialView.lon, initialView.lat],
+            zoom: initialView.zoom,
+          }),
       // Esri serves a grey "not yet available" tile past its coverage, which is
       // z17 on remote Arctic coasts.
       maxZoom: 17,
     });
+    // Not the constructor's `bounds`: the padding that keeps the box clear of
+    // the sidebar needs the canvas.
+    if (initialView.lat === undefined) {
+      map.current.fitBounds(defaultMapBounds, {
+        padding: mapCoverPadding(map.current),
+        animate: false,
+      });
+    }
     onMapReady(map.current);
 
     map.current.dragRotate.disable();

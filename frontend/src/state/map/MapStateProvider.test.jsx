@@ -96,9 +96,14 @@ describe("MapStateProvider", () => {
     );
   });
 
-  it("seeds the camera from ?lat&lon&zoom, defaulting anything absent", async () => {
+  it("seeds the camera from ?lat&lon&zoom", async () => {
     await renderReady({ url: "/?lat=48.5&lon=-125&zoom=8" });
     expect(latest.mapView).toEqual({ lat: 48.5, lon: -125, zoom: 8 });
+  });
+
+  it("leaves the centre to the map's default-bounds fit without a full camera", async () => {
+    await renderReady({ url: "/?zoom=8" });
+    expect(latest.mapView).toEqual({ zoom: 0 });
   });
 
   it("defaults bathymetry/observations/projection switches to on/on/mercator", async () => {
