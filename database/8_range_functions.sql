@@ -152,7 +152,7 @@ IMMUTABLE on purpose: measured against the harvest, not now(), so a badge does
 not flip between page loads; it ages until the next harvest re-measures it.
 
 7 days, not 1: near-real-time feeds lag for QC and the default harvest cadence
-is 3 days (HARVESTER_CRON), so this allows that lag plus a missed run.
+is twice a week (HARVESTER_CRON), so this allows that lag plus a missed run.
 
 Callers pass verified_at, not last_updated_at: a dead feed skipped as unchanged
 keeps its old last_updated_at, which would read realtime forever.

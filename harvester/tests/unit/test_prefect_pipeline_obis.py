@@ -280,3 +280,22 @@ class TestPlanLanes:
 
         monkeypatch.setattr(prefect_pipeline.core_db, "create_db_engine", no_db)
         assert prefect_pipeline._recent_durations() == {}
+
+
+def test_harvest_all_cannot_overlap(config_file, monkeypatch):
+    """A waiting orchestrator holds a worker slot: overlapping ones starve their own children."""
+    deployed = {}
+
+    class FakeSource:
+        def deploy(self, name, **kwargs):
+            deployed[name] = kwargs
+
+    monkeypatch.setattr(prefect_pipeline.flow, "from_source", lambda **kw: FakeSource())
+    monkeypatch.setattr(PrefectCDEPipeline, "create_process_work_pool", lambda self, name: None)
+    p = PrefectCDEPipeline()
+    p.init_config(config_file(DISCOVERY_CONFIG))
+    p.create_deployment()
+
+    limit = deployed["cde-harvest-all"]["concurrency_limit"]
+    assert (limit.limit, limit.collision_strategy) == (1, "CANCEL_NEW")
+    assert all("concurrency_limit" not in kw for n, kw in deployed.items() if n != "cde-harvest-all")
