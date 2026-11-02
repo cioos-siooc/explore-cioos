@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Grouped so a week's updates arrive as at most three PRs per service rather
+  # Grouped so a week's updates arrive as at most three PRs per block rather
   # than a dozen: minor/patch, majors (they need a human either way), and
   # security, since security updates ignore version-update groups.
   # Root holds the shared lint/format toolchain (ESLint, Prettier, stylelint).
@@ -17,29 +17,18 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
+  # One block for both apps so a dependency shared by them (and the week's
+  # bumps in general) lands as a single PR instead of one per directory.
   - package-ecosystem: npm
-    directory: /frontend
+    directories: [/frontend, /web-api]
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
     groups:
-      frontend-minor-patch:
+      apps-minor-patch:
         update-types: [minor, patch]
-      frontend-major:
+      apps-major:
         update-types: [major]
-      frontend-security:
-        applies-to: security-updates
-        patterns: ["*"]
-
-  - package-ecosystem: npm
-    directory: /web-api
-    schedule: { interval: weekly, day: monday }
-    open-pull-requests-limit: 5
-    groups:
-      web-api-minor-patch:
-        update-types: [minor, patch]
-      web-api-major:
-        update-types: [major]
-      web-api-security:
+      apps-security:
         applies-to: security-updates
         patterns: ["*"]
 
@@ -56,9 +45,10 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
-  # One entry per uv project — each has its own pyproject.toml and uv.lock.
+  # All uv projects (each with its own pyproject.toml and uv.lock) share one
+  # block so e.g. a pytest bump arrives as one PR rather than four.
   - package-ecosystem: uv
-    directory: /
+    directories: [/, /harvester, /downloader, /download_scheduler]
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
     groups:
@@ -67,39 +57,6 @@ updates:
       python-major:
         update-types: [major]
       python-security:
-        applies-to: security-updates
-        patterns: ["*"]
-  - package-ecosystem: uv
-    directory: /harvester
-    schedule: { interval: weekly, day: monday }
-    groups:
-      harvester-minor-patch:
-        update-types: [minor, patch]
-      harvester-major:
-        update-types: [major]
-      harvester-security:
-        applies-to: security-updates
-        patterns: ["*"]
-  - package-ecosystem: uv
-    directory: /downloader
-    schedule: { interval: weekly, day: monday }
-    groups:
-      downloader-minor-patch:
-        update-types: [minor, patch]
-      downloader-major:
-        update-types: [major]
-      downloader-security:
-        applies-to: security-updates
-        patterns: ["*"]
-  - package-ecosystem: uv
-    directory: /download_scheduler
-    schedule: { interval: weekly, day: monday }
-    groups:
-      scheduler-minor-patch:
-        update-types: [minor, patch]
-      scheduler-major:
-        update-types: [major]
-      scheduler-security:
         applies-to: security-updates
         patterns: ["*"]
 
