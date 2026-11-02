@@ -519,6 +519,7 @@
   "datasetPreviewPlotAddRemovePlots": "(+/-)",
   "datasetPreviewPlotResizeParams": "Redimensionner le panneau de réglages du graphique",
   "datasetPreviewPlotHideParams": "Masquer le panneau de réglages du graphique",
+  "datasetPreviewPlotSettings": "Réglages du graphique",
   "datasetPreviewPlotShowParams": "Afficher le panneau de réglages du graphique",
   "datasetPreviewPlotSelectAll": "Tout sélectionner",
   "datasetPreviewPlotSelectNone": "Tout désélectionner",

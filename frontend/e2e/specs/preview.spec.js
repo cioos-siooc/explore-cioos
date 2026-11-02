@@ -40,6 +40,16 @@ async function openPreview(page, extra = "") {
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
+// Phones fold the plot settings above the plot; the folding stays open across
+// the Table/Plot flip, so this is needed once per test.
+async function showSettings(page) {
+  const settings = page.getByRole("button", {
+    name: "Plot settings",
+    exact: true,
+  });
+  if (await settings.isVisible()) await settings.click();
+}
+
 test.describe("record preview", () => {
   test("a link opens the modal straight onto the plot", async ({ page }) => {
     await openPreview(page);
@@ -55,6 +65,7 @@ test.describe("record preview", () => {
   }) => {
     await openPreview(page);
     await expect(plot(page).first()).toBeVisible();
+    await showSettings(page);
 
     const modeToggle = page.getByTestId("preview-mode-dropdown-toggle");
     const mode = (name) =>
@@ -84,6 +95,7 @@ test.describe("record preview", () => {
   }) => {
     await openPreview(page, "&pmode=lines");
     await expect(plot(page).first()).toBeVisible();
+    await showSettings(page);
     await expect(page.getByRole("button", { name: "Line" })).toBeVisible();
 
     await page.getByRole("button", { name: "Table" }).click();

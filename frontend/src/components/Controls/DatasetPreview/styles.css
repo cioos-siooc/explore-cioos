@@ -52,27 +52,6 @@
   gap: 10px;
 }
 
-.tableAndPlotGridContainer .toggleButton {
-  height: 42px;
-  margin: 0 16.5px;
-  background-color: white;
-  border-radius: 5px;
-  border: 2px solid var(--cioos-hairline);
-  color: var(--cioos-ink);
-  line-height: 15px;
-  min-width: 100px;
-  max-width: 100px;
-}
-
-.toggleButton:hover {
-  background-color: var(--cioos-teal-light);
-}
-
-.toggleButton.selected {
-  background-color: var(--cioos-primary);
-  color: white;
-}
-
 .dataPreviewModal .datasetTitle {
   margin: 10px auto;
 }
@@ -86,24 +65,29 @@
   margin-top: 0;
 }
 
-/* Copy-link button: an icon-only square at the toggle buttons' height. */
+/* Copy-link button: an icon-only square at the view switch's height. */
 .tableAndPlotGridContainer .copyLinkButton {
-  width: 42px;
-  height: 42px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  background-color: white;
-  border-radius: 5px;
-  border: 2px solid var(--cioos-hairline);
-  color: var(--cioos-ink);
-  line-height: 15px;
-  white-space: nowrap;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: var(--cioos-white);
+  color: var(--cioos-primary-800);
+  transition: background-color 0.15s ease-out;
 }
 
 .tableAndPlotGridContainer .copyLinkButton:hover {
-  background-color: var(--cioos-teal-light);
+  background-color: var(--cioos-surface-2);
+}
+
+.tableAndPlotGridContainer .copyLinkButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
 }
 
 /* Without a floor the container is at its minimum when Plotly measures it.
@@ -146,4 +130,138 @@
   font-size: 0.8em;
   font-weight: normal;
   color: var(--cioos-ink-80);
+}
+
+/* Plot / Table: one segmented control in the tab strip's language (DESIGN.md)
+   — a teal-washed track, the open view a solid raised segment. */
+.previewViewToggle {
+  display: inline-grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+  background-color: rgb(82 167 155 / 14%);
+}
+
+.previewViewToggle .toggleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  min-width: 88px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--cioos-radius-sm);
+  background: transparent;
+  color: var(--cioos-primary-800);
+  font-size: var(--cioos-font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    color 0.15s ease-out;
+}
+
+.previewViewToggle .toggleButton:hover:not(.selected) {
+  background-color: rgb(82 167 155 / 18%);
+}
+
+.previewViewToggle .toggleButton.selected {
+  background-color: var(--cioos-primary);
+  color: var(--cioos-on-primary);
+  box-shadow: var(--cioos-shadow-3d-sm);
+  cursor: default;
+}
+
+.previewViewToggle .toggleButton:focus-visible {
+  outline: none;
+  box-shadow: var(--cioos-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .previewViewToggle .toggleButton {
+    transition: none;
+  }
+}
+
+/* Phones take the whole screen: the plot needs every pixel, and a framed
+   dialog over the map leaves nothing to tap behind it anyway. */
+@media (max-width: 700px), (max-height: 500px) {
+  .dataPreviewModal .modal-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100dvh;
+    margin: 0;
+  }
+
+  .dataPreviewModal .modal-content {
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .dataPreviewModal .modal-body {
+    padding: var(--cioos-space-sm) var(--cioos-space-md)
+      max(var(--cioos-space-sm), env(safe-area-inset-bottom));
+  }
+
+  .dataPreviewModal .datasetTitle {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--cioos-font-size-md);
+    line-height: 1.3;
+  }
+
+  .dataPreviewModal .datasetPreviewDatasetTitle {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .dataPreviewModal .datasetPreviewRecord {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Portrait: who and what on the first row beside the actions, then the
+   Plot/Table switch as one full-width segmented control under it. */
+@media (max-width: 700px) {
+  .tableAndPlotGridContainer {
+    display: grid;
+    grid-template:
+      "title link close" auto
+      "view view view" auto / minmax(0, 1fr) auto auto;
+    align-items: start;
+    gap: var(--cioos-space-sm);
+  }
+
+  .tableAndPlotGridContainer .datasetTitle {
+    grid-area: title;
+  }
+
+  .tableAndPlotGridContainer .copyLinkButton {
+    grid-area: link;
+  }
+
+  .tableAndPlotGridContainer > :last-child {
+    grid-area: close;
+  }
+
+  .previewViewToggle {
+    grid-area: view;
+    display: grid;
+  }
+
+  .previewViewToggle .toggleButton {
+    height: 34px;
+  }
 }
