@@ -484,20 +484,19 @@ export default function CreateMap({
 
   const circleOpacity = 0.7;
   // Count is carried by colour alone; opacity varies with zoom alone.
-  const hexOpacity = 0.8;
+  const hexOpacity = 0.6;
   const hexMinZoom = 0;
   // Shared with the Legend: the hex band and the marker tier must not drift.
   const hexMaxZoom = MARKER_MIN_ZOOM;
   // Nearly solid: a hairline stands in for a whole hexagon of fill.
   const COVERAGE_HEX_OUTLINE_OPACITY = 0.9;
 
-  // Doesn't bottom out at a wash: at 0.15 the cells stopped reading as a shade
-  // of anything. Across the basemap hand-over the fill goes to nothing and the
-  // border carries the ramp (HEX_FILL_FADE_*_ZOOM).
+  // Held at hexOpacity so a cell shows as much basemap at every zoom. Across
+  // the basemap hand-over the fill goes to nothing and the border carries the
+  // ramp (HEX_FILL_FADE_*_ZOOM).
   const COVERAGE_HEX_OPACITY_STOPS = [
-    [hexMaxZoom, 0.6],
-    [hexMaxZoom + 1.5, 0.5],
-    [HEX_FILL_FADE_START_ZOOM, 0.43],
+    [hexMaxZoom, hexOpacity],
+    [HEX_FILL_FADE_START_ZOOM, hexOpacity],
     [HEX_FILL_FADE_END_ZOOM, 0],
   ];
 
@@ -957,9 +956,8 @@ export default function CreateMap({
   // draws this colour once the fill has gone.
   const coverageHexOutlineColor = () => hexOutlineColor;
 
-  // Zoom only: the count reaches transparency through the ramp's alpha
-  // (toRampStops), and MapLibre multiplies the two. `scale` multiplies the
-  // stops because MapLibre rejects wrapping a top-level zoom interpolate.
+  // Zoom only. `scale` multiplies the stops because MapLibre rejects wrapping
+  // a top-level zoom interpolate.
   const scaleStops = (stops, scale) =>
     stops.flatMap(([zoom, opacity]) => [zoom, opacity * scale]);
   function hexOpacityExpression(scale = 1) {
@@ -2244,6 +2242,7 @@ export default function CreateMap({
           // the 'case' dimmable wraps it in.
           "fill-color": dimmable(hexFillColor()),
           "fill-color-transition": NO_TRANSITION,
+          "fill-outline-color": hexOutlineColor,
         },
       },
       FIRST_LABEL_LAYER_ID,

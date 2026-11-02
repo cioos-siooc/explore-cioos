@@ -51,8 +51,8 @@ export const colorScale = [
   "#152F37", // navy
 ];
 
-// White separates cells against every part of the ramp; a mid-ramp teal vanished.
-export const hexOutlineColor = "#FFFFFF";
+// Semi-transparent navy: white vanished against the pale low-count cells.
+export const hexOutlineColor = "rgba(21, 47, 55, 0.25)";
 
 // Click answers (click-highlight-* and selected-track-* layers, highlighted
 // rows). Goldenrod because greens, purple and amber already mean data layers.

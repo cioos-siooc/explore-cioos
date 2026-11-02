@@ -1,21 +1,18 @@
 import { describe, it, expect } from "vitest";
 
-import { HEX_RAMP_MIN_ALPHA, rampExpression, toRampStops } from "./hexRamp.js";
-
-const stops = (...colors) =>
-  colors.map((color, index) => ({ stop: index * 10, color }));
+import { rampExpression, toRampStops } from "./hexRamp.js";
 
 describe("toRampStops", () => {
-  it("rises from the minimum alpha to opaque along the ramp", () => {
-    expect(toRampStops(stops("#000000", "#000000", "#000000"))).toEqual([
-      [0, `rgba(0, 0, 0, ${HEX_RAMP_MIN_ALPHA})`],
-      [10, `rgba(0, 0, 0, ${(HEX_RAMP_MIN_ALPHA + 1) / 2})`],
-      [20, "rgba(0, 0, 0, 1)"],
+  it("keeps every colour as given, so the layer opacity alone sets transparency", () => {
+    expect(
+      toRampStops([
+        { stop: 0, color: "#C6E3DF" },
+        { stop: 10, color: "#152F37" },
+      ]),
+    ).toEqual([
+      [0, "#C6E3DF"],
+      [10, "#152F37"],
     ]);
-  });
-
-  it("makes a one-stop ramp opaque", () => {
-    expect(toRampStops(stops("#ff0000"))).toEqual([[0, "rgba(255, 0, 0, 1)"]]);
   });
 });
 

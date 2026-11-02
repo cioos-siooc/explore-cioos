@@ -1009,13 +1009,3 @@ export function initialBearing(a, b) {
     Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
   return (Math.atan2(y, x) / rad + 360) % 360;
 }
-
-// Non-hex colours pass through untouched: an unparseable colour throws out of
-// setPaintProperty and aborts the rest of the paint pass.
-export function withAlpha(color, alpha) {
-  const match = /^#([0-9a-f]{6})$/i.exec(color);
-  if (!match) return color;
-  const int = parseInt(match[1], 16);
-  const a = Math.round(alpha * 1000) / 1000;
-  return `rgba(${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}, ${a})`;
-}
