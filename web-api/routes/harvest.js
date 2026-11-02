@@ -425,6 +425,21 @@ async function ckanLinkedRecords() {
   return result.rows;
 }
 
+// OBIS rows carry the https://obis.org sentinel erddap_url, so they group as
+// their own source.
+async function ckanMatchedBySource() {
+  const sql = `
+    SELECT erddap_url,
+           COUNT(*)::int       AS n_datasets,
+           COUNT(ckan_id)::int AS n_matched
+    FROM cde.datasets
+    GROUP BY erddap_url
+    ORDER BY n_datasets DESC, erddap_url
+  `;
+  const result = await db.raw(sql);
+  return result.rows;
+}
+
 // Every catalogue record's id and the regional catalogue it was harvested
 // from. Sorted by id so the pages don't shift under concurrent edits. A CKAN
 // outage must not hide the linked counts, so it degrades to null.
@@ -494,11 +509,12 @@ router.get(
   "/ckan-coverage",
   ...pipeline({ filters: false, cacheFor: "10 minutes" }),
   async (req, res) => {
-    const [linkedRows, recordSources] = await Promise.all([
+    const [linkedRows, harvested, recordSources] = await Promise.all([
       ckanLinkedRecords(),
+      ckanMatchedBySource(),
       ckanRecordSources(),
     ]);
-    res.json(tallyCkanCoverage(linkedRows, recordSources));
+    res.json({ ...tallyCkanCoverage(linkedRows, recordSources), harvested });
   },
 );
 
