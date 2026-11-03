@@ -201,6 +201,9 @@ services:
       # `environment:` secret source below; unset => upload is skipped.
       secrets:
         - sentry_auth_token
+    environment:
+      # Runtime, unlike the args above: a change needs a restart, not a rebuild.
+      NOTICES: ${NOTICES:-}
     expose:
       - "80"
   # Prefect PROCESS worker: runs harvest flows in-process (no spawned flow-run
