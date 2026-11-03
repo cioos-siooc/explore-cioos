@@ -8,6 +8,7 @@ UNKNOWN_ERROR = "UNKNOWN_ERROR"
 NO_PROFILES_FOUND = "NO_PROFILES_FOUND"
 ON_SKIP_LIST = "ON_SKIP_LIST"
 RESPONSE_TOO_LARGE = "RESPONSE_TOO_LARGE"
+EMPTY_VARIABLE = "EMPTY_VARIABLE"
 UNCHANGED = "UNCHANGED"
 # Harvested, but the run's database load failed: nothing was stored.
 LOAD_FAILED = "LOAD_FAILED"
@@ -23,7 +24,22 @@ HASH_FEDERATED_UNRESOLVED = "HASH_FEDERATED_UNRESOLVED"  # federated source not 
 HASH_CKAN_UNAVAILABLE = "HASH_CKAN_UNAVAILABLE"  # CKAN was down; unhashed so the next run re-enriches it
 
 
-class ResponseTooLargeError(Exception):
-    """An ERDDAP response exceeded MAX_RESPONSE_SIZE. Distinct from a generic
-    error so the audit log can show RESPONSE_TOO_LARGE instead of UNKNOWN_ERROR
-    (typically high-frequency datasets whose distinct()/enumeration is too big)."""
+class DatasetDataError(Exception):
+    """A dataset-level failure with its own audit-log reason code instead of
+    UNKNOWN_ERROR."""
+
+    reason_code = UNKNOWN_ERROR
+
+
+class ResponseTooLargeError(DatasetDataError):
+    """An ERDDAP response exceeded MAX_RESPONSE_SIZE (typically high-frequency
+    datasets whose distinct()/enumeration is too big)."""
+
+    reason_code = RESPONSE_TOO_LARGE
+
+
+class EmptyVariableError(DatasetDataError):
+    """A variable the dataset declares came back with no values: a provider
+    data problem, so an error rather than a NO_PROFILES_FOUND skip."""
+
+    reason_code = EMPTY_VARIABLE

@@ -3,6 +3,7 @@ get_metadata() call in __init__ makes no HTTP request."""
 
 import pandas as pd
 import pytest
+from cde_harvester.core.errors import EmptyVariableError
 from conftest import (
     DATASET_ID,
     ERDDAP_INFO_CSV,
@@ -460,6 +461,20 @@ class TestGetProfileIds:
         profile_ids = Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
 
         assert len(profile_ids) == 1
+
+    def test_never_filled_ids_are_an_error(self, mock_erddap_server):
+        from io import StringIO
+
+        def _erddap_csv_to_df(url, skiprows=None, dataset=None):
+            if "/info/" in url:
+                return pd.read_csv(StringIO(ERDDAP_INFO_CSV)).fillna("")
+            return pd.DataFrame()
+
+        mock_erddap_server.erddap_csv_to_df.side_effect = _erddap_csv_to_df
+        from cde_harvester.sources.erddap.dataset import Dataset
+
+        with pytest.raises(EmptyVariableError, match="distinct\\(\\) of the cf_role"):
+            Dataset(mock_erddap_server, DATASET_ID).get_profile_ids()
 
 
 class TestGetCount:
