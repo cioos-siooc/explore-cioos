@@ -4,9 +4,6 @@ import { useCallback, useSyncExternalStore } from "react";
 // spelled here so JS and CSS branches cannot drift apart.
 export const MOBILE_QUERY = "(max-width: 700px), (max-height: 500px)";
 
-// Portrait phones only: side-by-side panes still fit a landscape phone.
-export const NARROW_QUERY = "(max-width: 700px)";
-
 // Too narrow for the record preview's settings beside its plot: they open in
 // a dialog instead (DatasetPreviewPlot/styles.css breaks at the same width).
 export const PREVIEW_COMPACT_QUERY = "(max-width: 1100px)";
