@@ -11,6 +11,8 @@ import requests
 from prefect import task
 from prefect.logging import get_run_logger
 
+from cde_harvester.user_agent import HEADERS
+
 # Compose network, not the public domain: avoids going out through the WAF.
 CACHE_WARM_BASE_URL = os.environ.get("CACHE_WARM_BASE_URL", "http://nginx:4000")
 CACHE_WARM_TIMEOUT_SECONDS = 60
@@ -152,7 +154,7 @@ def reloadTopRequests():
         # Prefect run context that worker threads do not have.
         try:
             response = requests.get(
-                CACHE_WARM_BASE_URL + request, timeout=CACHE_WARM_TIMEOUT_SECONDS
+                CACHE_WARM_BASE_URL + request, headers=HEADERS, timeout=CACHE_WARM_TIMEOUT_SECONDS
             )
             response.raise_for_status()
             return True

@@ -18,6 +18,7 @@ from cde_harvester.sources.obis.geo_filter import (
     DEFAULT_EXEMPT_NODE_IDS,
     load_boundary_polygon,
 )
+from cde_harvester.user_agent import USER_AGENT
 from requests.adapters import HTTPAdapter
 from shapely import wkt as shp_wkt
 from urllib3.util.retry import Retry
@@ -135,6 +136,7 @@ class DiscoveryResult:
 
 def _build_session() -> requests.Session:
     session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
     retry = Retry(
         total=4,
         backoff_factor=1.0,         # 0s, 2s, 4s, 8s between attempts
