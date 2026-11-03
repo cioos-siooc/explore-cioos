@@ -93,7 +93,7 @@ describe("FeatureCard", () => {
 
   it("is never open at the same time as the datasets sidebar", async () => {
     await renderReady(DESKTOP_WIDTH);
-    expect(latestUI.sidebarOpen).toBe(true);
+    act(() => latestUI.setSidebarOpen(true));
     act(() => latestMap.setFeatureQuery({ nonce: 1, lngLat: [0, 0] }));
     expect(screen.getByTestId("feature-card")).not.toHaveClass("open");
     act(() => latestUI.setSidebarOpen(false));
