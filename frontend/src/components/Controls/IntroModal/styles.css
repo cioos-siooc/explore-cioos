@@ -749,3 +749,21 @@
     transform: none;
   }
 }
+
+.introNotices {
+  display: grid;
+  gap: var(--cioos-space-sm);
+  margin: 0 0 var(--cioos-space-md);
+  padding: 0;
+  list-style: none;
+}
+
+/* Nested in the window, so a card corner rather than a floating panel's, and
+   a wash rather than white on the white window. A deployment's own background
+   (inline) still wins. */
+.introNotices .notice {
+  --notice-bg: var(--cioos-surface-2);
+
+  border: 1px solid var(--cioos-hairline);
+  border-radius: var(--cioos-radius);
+}
