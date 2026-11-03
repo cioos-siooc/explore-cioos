@@ -424,6 +424,9 @@ class Dataset:
         # Every column, coordinates and cf_role variables included: the preview
         # needs those to choose a shared axis and to exclude them from panels.
         self.table_variables = extract_variables(df_variables)
+        eov_variables = self.get_eov_variables()
+        for variable in self.table_variables:
+            variable["eovs"] = list(eov_variables.get(variable["name"], []))
         self.eovs = self.get_eovs()
 
         # https://wiki.esipfed.org/Attribute_Convention_for_Data_Discovery_1-3

@@ -260,6 +260,12 @@ class TestTableVariables:
         by_name = {v["name"]: v for v in ds.table_variables}
         assert by_name["chlorophyll"]["ancillary_variables"] == "chlorophyll_qc"
 
+    def test_eovs_mark_the_variables_mapped_to_an_eov(self, mock_erddap_server):
+        ds = _make_dataset(mock_erddap_server)
+        by_name = {v["name"]: v for v in ds.table_variables}
+        assert by_name["temperature"]["eovs"] == ds.get_eov_variables()["temperature"]
+        assert by_name["latitude"]["eovs"] == []
+
     def test_entries_are_json_serialisable(self, mock_erddap_server):
         # It lands in a jsonb column via a Python-repr CSV round trip, so a
         # numpy scalar leaking in here fails far downstream in the loader.
