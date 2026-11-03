@@ -781,6 +781,27 @@ test("columns repeating another's values open once", () => {
   ]);
 });
 
+test("a second column of a picked standard_name is left out of the default panels", () => {
+  const table = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) =>
+      meta.name === "CNDC_01"
+        ? { ...meta, standard_name: "sea_water_temperature" }
+        : meta,
+    ),
+  };
+  const dataset = { ...VIKING_DATASET, cdm_data_type: "Profile" };
+  const rows = vikingRows({
+    curved: ["TE90_01", "CNDC_01", "PSAL_01", "DOXY_01"],
+  });
+  const variables = withDataPresence(variablesFrom(table, dataset), rows);
+  assert.deepEqual(facetPlanFor(dataset, variables, rows).panelDefaults, [
+    "TE90_01",
+    "PSAL_01",
+    "DOXY_01",
+  ]);
+});
+
 test("with no measurement varying, the usual single default stays", () => {
   assert.deepEqual(defaultsFor("Profile", {}), ["TE90_01"]);
 });

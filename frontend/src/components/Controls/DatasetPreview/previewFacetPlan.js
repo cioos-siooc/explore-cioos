@@ -321,8 +321,9 @@ function isLinearIn(data, variable, shared) {
 
 // An EOV first: the dataset's first_eov_column when plottable, else any column
 // mapped to an EOV, else the first candidate. Up to `count` of them when the
-// rows show which vary — leaving out depth, pressure and straight lines;
-// otherwise, or when none is left, the single first pick.
+// rows show which vary — leaving out depth, pressure, straight lines and a
+// second column of an already-picked standard_name (a backup sensor, a second
+// calibration); otherwise, or when none is left, the single first pick.
 function defaultPanelsFor(dataset, variables, data, shared, count) {
   const candidates = defaultPanelCandidatesFor(
     variables,
@@ -349,7 +350,12 @@ function defaultPanelsFor(dataset, variables, data, shared, count) {
     if (
       variable.varies &&
       !isVerticalLike(variable) &&
-      !varying.some((picked) => sameValuesIn(data, picked, variable)) &&
+      !varying.some(
+        (picked) =>
+          (variable.standardName &&
+            picked.standardName === variable.standardName) ||
+          sameValuesIn(data, picked, variable),
+      ) &&
       !isLinearIn(data, variable, shared)
     ) {
       varying.push(variable);
