@@ -500,7 +500,7 @@ export default function DatasetPreviewPlot() {
     />
   );
   const sharingScale = sharedColorScale && colorColumns.length > 1;
-  // The colour plot keeps each panel's own picker under Labels & colours, so
+  // The colour plot keeps each panel's own picker under More options, so
   // here it only needs the row to share one.
   const colorScaleRow = (isColorLayout
     ? colorColumns.length > 1
@@ -706,21 +706,6 @@ export default function DatasetPreviewPlot() {
         </ControlRow>
       )}
 
-      {!isColorLayout && (
-        <ControlRow caption={t("datasetPreviewPlotCurves")}>
-          <SegmentedToggle
-            label={t("datasetPreviewPlotCurves")}
-            data-testid="preview-stack-toggle"
-            options={[
-              { value: "panels", label: t("datasetPreviewPlotCurvesPanels") },
-              { value: "stacked", label: t("datasetPreviewPlotCurvesStacked") },
-            ]}
-            value={stacked ? "stacked" : "panels"}
-            onChange={(value) => setStacked(value === "stacked")}
-          />
-        </ControlRow>
-      )}
-
       {isColorLayout ? (
         <>
           <ControlRow caption={t("datasetPreviewPlotXAxis")}>
@@ -810,6 +795,26 @@ export default function DatasetPreviewPlot() {
       </button>
       {showLabels && (
         <div className="labelEditor">
+          {!isColorLayout && (
+            <ControlRow caption={t("datasetPreviewPlotCurves")}>
+              <SegmentedToggle
+                label={t("datasetPreviewPlotCurves")}
+                data-testid="preview-stack-toggle"
+                options={[
+                  {
+                    value: "panels",
+                    label: t("datasetPreviewPlotCurvesPanels"),
+                  },
+                  {
+                    value: "stacked",
+                    label: t("datasetPreviewPlotCurvesStacked"),
+                  },
+                ]}
+                value={stacked ? "stacked" : "panels"}
+                onChange={(value) => setStacked(value === "stacked")}
+              />
+            </ControlRow>
+          )}
           {isColorLayout
             ? [...colorXs, ...colorYs].map((columnName) =>
                 customizeRow(columnName, null),

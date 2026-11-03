@@ -236,10 +236,10 @@ describe("DatasetPreviewPlot", () => {
     expect(document.querySelector(".pinnedAxis")).toBeNull();
   });
 
-  it("offers a scale per colour variable in Labels & colours, not a colour", async () => {
+  it("offers a scale per colour variable in More options, not a colour", async () => {
     const user = open("/?playout=color", STATION);
     await plotted();
-    await user.click(screen.getByRole("button", { name: "Labels & colours" }));
+    await user.click(screen.getByRole("button", { name: "More options" }));
     const row = document
       .querySelector('label[for="rename-temperature"]')
       .closest(".labelEditorRow");
@@ -262,14 +262,14 @@ describe("DatasetPreviewPlot", () => {
     expect(screen.getByTestId("plotly")).not.toHaveAttribute(
       "data-y-autorange",
     );
-    // One axis, one control: Labels & colours repeats no checkbox for it.
-    await user.click(screen.getByRole("button", { name: "Labels & colours" }));
+    // One axis, one control: More options repeats no checkbox for it.
+    await user.click(screen.getByRole("button", { name: "More options" }));
     expect(
       screen.queryByRole("checkbox", { name: /Invert Y axis/ }),
     ).not.toBeInTheDocument();
   });
 
-  it("inverts each panel's own Y axis from Labels & colours once there are several", async () => {
+  it("inverts each panel's own Y axis from More options once there are several", async () => {
     const user = open("/?pvars=temperature,salinity", {
       ...DATASET,
       cdm_data_type: "TimeSeries",
@@ -280,7 +280,7 @@ describe("DatasetPreviewPlot", () => {
         name: /Invert Y axis/,
       }),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Labels & colours" }));
+    await user.click(screen.getByRole("button", { name: "More options" }));
     expect(
       screen.getAllByRole("checkbox", { name: /Invert Y axis/ }),
     ).toHaveLength(2);
@@ -595,7 +595,7 @@ describe("DatasetPreviewPlot", () => {
   it("resets every plot setting and rename, disabled until there is one", async () => {
     const user = open("/?pz=salinity&pmode=lines");
     await plotted();
-    await user.click(screen.getByRole("button", { name: "Labels & colours" }));
+    await user.click(screen.getByRole("button", { name: "More options" }));
     await user.type(screen.getByLabelText("temperature ( degree_C )"), "Temp");
 
     await user.click(screen.getByRole("button", { name: "Reset plot" }));
@@ -656,13 +656,13 @@ describe("DatasetPreviewPlot", () => {
   it("keeps a rename across the Table/Plot flip that unmounts the plot", async () => {
     const user = open();
     await plotted();
-    await user.click(screen.getByRole("button", { name: "Labels & colours" }));
+    await user.click(screen.getByRole("button", { name: "More options" }));
     await user.type(screen.getByLabelText("temperature ( degree_C )"), "Temp");
 
     await user.click(screen.getByRole("button", { name: "Table" }));
     await user.click(screen.getByRole("button", { name: "Plot" }));
     await plotted();
-    await user.click(screen.getByRole("button", { name: "Labels & colours" }));
+    await user.click(screen.getByRole("button", { name: "More options" }));
 
     // Held by the provider, which outlives the component that was unmounted.
     expect(screen.getByLabelText("temperature ( degree_C )")).toHaveValue(

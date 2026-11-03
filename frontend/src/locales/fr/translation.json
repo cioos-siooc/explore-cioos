@@ -545,7 +545,7 @@
   "datasetPreviewPlotWantedTime": "une colonne de temps",
   "datasetPreviewPlotWantedTrack": "une colonne de longitude, de latitude ou de temps",
   "datasetPreviewPlotWantedMeasurement": "au moins une colonne de mesure",
-  "datasetPreviewPlotCustomizePlot": "Libellés et couleurs",
+  "datasetPreviewPlotCustomizePlot": "Plus d'options",
   "datasetPreviewPlotReset": "Réinitialiser le graphique",
   "datasetPreviewPlotInvertYAxis": "Inverser l'axe Y",
   "datasetPreviewPlotDownloadPng": "Télécharger le graphique en PNG",

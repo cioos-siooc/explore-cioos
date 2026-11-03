@@ -544,7 +544,7 @@
   "datasetPreviewPlotWantedTime": "a time column",
   "datasetPreviewPlotWantedTrack": "a longitude, latitude or time column",
   "datasetPreviewPlotWantedMeasurement": "at least one measurement column",
-  "datasetPreviewPlotCustomizePlot": "Labels & colours",
+  "datasetPreviewPlotCustomizePlot": "More options",
   "datasetPreviewPlotReset": "Reset plot",
   "datasetPreviewPlotInvertYAxis": "Invert Y axis",
   "datasetPreviewPlotDownloadPng": "Download plot as a PNG",
