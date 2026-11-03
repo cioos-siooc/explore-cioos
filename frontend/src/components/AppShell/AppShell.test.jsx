@@ -373,3 +373,54 @@ describe("AppShell (composition)", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("AppShell deployment notices", () => {
+  const notice = { id: "beta", en: "This is a beta version.", fr: "Bêta." };
+
+  let served;
+  function serveNotices(notices) {
+    served = 0;
+    installMockFetch();
+    const realFetch = global.fetch;
+    global.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input.url;
+      if (url.endsWith("/notices.json")) {
+        served += 1;
+        return Promise.resolve(Response.json(notices));
+      }
+      return realFetch(input, init);
+    };
+  }
+
+  it("shows the notice in the About window, not as a toast over it", async () => {
+    serveNotices([notice]);
+    renderWithProviders(<AppShell />, { providers: "app" });
+    expect(
+      await screen.findByText(notice.en, { selector: ".introNotices p" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("notice-toast")).not.toBeInTheDocument();
+  });
+
+  it("toasts a returning visitor and remembers when it is closed", async () => {
+    const user = userEvent.setup();
+    serveNotices([notice]);
+    window.localStorage.setItem("cde.introSeen", "true");
+    const { unmount } = renderWithProviders(<AppShell />, {
+      providers: "app",
+    });
+    const toast = await screen.findByTestId("notice-toast");
+    expect(toast).toHaveTextContent(notice.en);
+
+    await user.click(screen.getByRole("button", { name: "Close notice" }));
+    expect(screen.queryByTestId("notice-toast")).not.toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem("cde.dismissedNotices")),
+    ).toEqual(["beta"]);
+
+    unmount();
+    renderWithProviders(<AppShell />, { providers: "app" });
+    await waitFor(() => expect(served).toBe(2));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(screen.queryByTestId("notice-toast")).not.toBeInTheDocument();
+  });
+});

@@ -1,0 +1,172 @@
+/* Deployment notices: white like every instrument on the map unless the
+   deployment sets a background (NOTICES), which noticeStyle() applies with
+   matching text. */
+.notice {
+  --notice-bg: var(--cioos-white);
+  --notice-fg: var(--cioos-ink);
+  --notice-link: var(--cioos-primary-700);
+  --notice-accent: currentcolor;
+
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cioos-space-md);
+  padding: var(--cioos-space-md) var(--cioos-space-sm) var(--cioos-space-md)
+    var(--cioos-space-md);
+  background-color: var(--notice-bg);
+  color: var(--notice-fg);
+  border-radius: var(--cioos-radius-lg);
+  font-size: var(--cioos-font-size-sm);
+  line-height: 1.5;
+}
+
+.noticeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--cioos-radius-pill);
+  background-color: color-mix(in srgb, var(--notice-accent) 16%, transparent);
+  color: var(--notice-accent);
+}
+
+/* Status tones from the theme's own status colours. Warning links stay ink:
+   --cioos-warn on its ground is ~3.4:1, enough for the icon, not for text. */
+.notice[data-tone="info"] {
+  --notice-bg: color-mix(in srgb, var(--cioos-info) 12%, var(--cioos-white));
+  --notice-link: var(--cioos-info);
+  --notice-accent: var(--cioos-info);
+}
+
+.notice[data-tone="warning"] {
+  --notice-bg: var(--cioos-warn-bg);
+  --notice-link: var(--cioos-ink);
+  --notice-accent: var(--cioos-warn);
+}
+
+.notice[data-tone="critical"] {
+  --notice-bg: var(--cioos-error-bg);
+  --notice-link: var(--cioos-error-700);
+  --notice-accent: var(--cioos-error-700);
+}
+
+.noticeText {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  /* Puts the first line's centre on the 28px icon's and close button's, at
+     whatever line height the type ladder gives this breakpoint. */
+  padding-block: calc((28px - 1lh) / 2);
+  overflow-wrap: anywhere;
+}
+
+.noticeText p {
+  margin: 0;
+}
+
+.noticeText p + p,
+.noticeText ul,
+.noticeText ol {
+  margin: var(--cioos-space-xs) 0 0;
+}
+
+.noticeText ul,
+.noticeText ol {
+  padding-left: 1.25em;
+}
+
+.noticeText strong {
+  font-weight: 700;
+}
+
+.noticeText a {
+  color: var(--notice-link);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.noticeText a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.noticeText a:focus-visible {
+  outline: none;
+  border-radius: 2px;
+  box-shadow: var(--cioos-focus);
+}
+
+.noticeText code {
+  padding: 1px 5px;
+  border-radius: var(--cioos-radius-sm);
+  background-color: color-mix(in srgb, currentcolor 14%, transparent);
+  font-size: var(--cioos-font-size-xs);
+}
+
+.notice .closeButton {
+  align-self: flex-start;
+  color: inherit;
+  opacity: 0.72;
+}
+
+@media (hover: hover) {
+  .notice .closeButton:hover {
+    background-color: color-mix(in srgb, currentcolor 14%, transparent);
+    color: inherit;
+    opacity: 1;
+  }
+}
+
+.notice .closeButton:focus-visible {
+  color: inherit;
+  opacity: 1;
+}
+
+/* Rests on the map: the raised lift, in the error banner's bottom-centre slot
+   and stacked above it when both show. */
+.noticeToast {
+  position: fixed;
+  left: 50%;
+  bottom: max(
+    calc(12px + var(--cioos-time-bar-space, 0px)),
+    var(--cioos-api-error-space, 0px)
+  );
+  z-index: var(--cioos-z-shell, 30);
+  width: max-content;
+  max-width: min(520px, calc(100vw - 24px));
+  box-shadow: var(--cioos-shadow-3d);
+  transform: translateX(-50%);
+  animation: notice-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes notice-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.98);
+  }
+}
+
+/* Phones: the bottom edge belongs to the legend, so the toast hangs under the
+   top bar instead (its footprint already includes the quick filters). */
+@media (max-width: 700px) {
+  .noticeToast {
+    top: var(--cioos-top-bar-space, 12px);
+    bottom: auto;
+    animation-name: notice-drop;
+  }
+}
+
+@keyframes notice-drop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -16px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noticeToast {
+    animation: none;
+  }
+}

@@ -64,6 +64,13 @@ The SPA calls `/api` relative to its own host, so changing the URL never needs a
 frontend rebuild. `DB_HOST` and `REDIS_HOST` are pinned to the compose service
 names; setting them in `.env` does nothing.
 
+`NOTICES` puts per-deployment messages (such as a beta notice) in a toast and
+in the About window: a JSON array of `{"id", "en", "fr"?, "starts"?, "expires"?,
+"tone"?, "background"?, "icon"?, "css"?}` with markdown text, example
+in `.env.sample`. The frontend container writes it to `/notices.json` at start,
+so changing it needs a restart, not a rebuild. Closing a toast is remembered
+per `id`; it shows from `starts` and is hidden from `expires` (both optional).
+
 ## Harvesting
 
 Harvests are Prefect flows run **in-process** by the `prefect_worker` container
