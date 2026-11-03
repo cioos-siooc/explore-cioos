@@ -6,12 +6,15 @@ import { renderWithProviders } from "../../../test/renderWithProviders.jsx";
 import { installMockFetch } from "../../../test/mockFetch.js";
 import { MOBILE_WIDTH, setViewportWidth } from "../../../test/viewport.js";
 import { useSelection } from "../../../state/selection/SelectionProvider.jsx";
+import { useUI } from "../../../state/ui/UIProvider.jsx";
 import pointQueryFixture from "../../../../e2e/fixtures/api/pointQuery.json";
 import Sidebar from "./Sidebar.jsx";
 
 let latestSelection;
+let latestUI;
 function Probe() {
   latestSelection = useSelection();
+  latestUI = useUI();
   return (
     <span data-testid="state">
       {latestSelection.initialPointsQueryComplete ? "ready" : "loading"}
@@ -146,6 +149,7 @@ describe("Sidebar wide view", () => {
     await waitFor(() =>
       expect(screen.getByTestId("state")).toHaveTextContent("ready"),
     );
+    act(() => latestUI.setSidebarOpen(true));
     await user.click(screen.getByTestId("sidebar-wide-toggle"));
     await waitFor(() => expect(window.location.search).toContain("wide=1"));
     expect(screen.getByTestId("sidebar")).toHaveClass("wide");

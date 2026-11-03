@@ -33,13 +33,6 @@ const EMPTY = { lon: -105, lat: 60 };
 const openAt = async (page, { lon, lat }, extra = "", zoom = 2.75) => {
   await page.goto(`/?lat=${lat}&lon=${lon}&zoom=${zoom}&lang=en${extra}`);
   await waitForMapReady(page);
-  // The card stands aside while the datasets sidebar is open, and the sidebar
-  // starts open on a wide screen.
-  const sidebar = page.getByTestId("sidebar-datasets");
-  if ((await sidebar.getAttribute("data-expanded")) === "true") {
-    await page.getByTestId("topbar-datasets-button").click();
-    await expect(sidebar).toHaveAttribute("data-expanded", "false");
-  }
 };
 
 const canvasCentre = async (page) => {
