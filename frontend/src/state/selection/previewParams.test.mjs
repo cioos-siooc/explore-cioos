@@ -15,6 +15,7 @@ test("the preview owns the record param and the plot params", () => {
     "vis",
     "pvars",
     "paxis",
+    "porient",
     "pmode",
     "pcolors",
     "pz",
@@ -24,8 +25,11 @@ test("the preview owns the record param and the plot params", () => {
     "pcy",
     "pzscales",
     "pzshare",
+    "pstack",
     "pyflip",
     "pstep",
+    "pmapz",
+    "pdepth",
   ]);
   for (const param of [RECORD_PARAM, ...PLOT_PARAMS]) {
     assert.ok(PREVIEW_PARAMS.includes(param), param);

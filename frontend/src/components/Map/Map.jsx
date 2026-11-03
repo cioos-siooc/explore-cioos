@@ -50,6 +50,7 @@ import {
   clickHighlightColor,
   colorScale,
   defaultBathymetryPalette,
+  defaultMapBounds,
   hexOutlineColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
@@ -303,6 +304,14 @@ const MAP_VIEW_DEBOUNCE_MS = 250;
 // Partial opacity so coincident tracks compound: 27 St. Lawrence voyages in
 // 90 days render as ONE line at full opacity.
 const TRACK_LINE_OPACITY = 0.55;
+// A head last seen before the window's final week (the server's `active`).
+const TRACK_HEAD_INACTIVE_OPACITY = 0.35;
+const trackHeadOpacity = (scale) => [
+  "case",
+  ["to-boolean", ["get", "active"]],
+  scale,
+  TRACK_HEAD_INACTIVE_OPACITY * scale,
+];
 const DATA_STALE_OPACITY = 0.25;
 // direct_select fires draw.update on every drag tick, and setPolygon feeds
 // the /pointQuery fetch.
@@ -368,8 +377,8 @@ function buildHeadArrowImage(fillColor, strokeColor = "#ffffff") {
   return ctx.getImageData(0, 0, size, size);
 }
 
-// While a WMS overlay is active every other data layer is hidden so the
-// gridded field reads cleanly.
+// While a WMS overlay or the preview's map view is shown every other data
+// layer is hidden, so the field or the record reads cleanly.
 const observationLayerIds = [
   "hexes",
   "points",
@@ -461,6 +470,8 @@ export default function CreateMap({
   trailingDays,
   selectedTrajectory,
   mappedRecord,
+  // previewMapLayerFor's answer while the preview's map view is shown.
+  previewMapLayer,
   dataLayers,
   griddapCoverage,
   dataLayersVisible = true,
@@ -618,7 +629,7 @@ export default function CreateMap({
   function applyLayerVisibility() {
     if (!map.current || !map.current.getLayer("track-lines")) return;
     const trajOn = anyTrajectoryLayerOn(dataLayersRef.current);
-    const showTracks = trajOn && tracksModeRef.current;
+    const showTracks = trajOn && tracksModeRef.current && !dataLayersHidden();
     ["track-lines", "track-heads", "track-heads-fixed"].forEach((id) =>
       map.current.setLayoutProperty(
         id,
@@ -756,12 +767,17 @@ export default function CreateMap({
       "line-opacity",
       TRACK_LINE_OPACITY * scale,
     );
-    map.current.setPaintProperty("track-heads", "icon-opacity", scale);
-    map.current.setPaintProperty("track-heads-fixed", "circle-opacity", scale);
+    const headOpacity = trackHeadOpacity(scale);
+    map.current.setPaintProperty("track-heads", "icon-opacity", headOpacity);
+    map.current.setPaintProperty(
+      "track-heads-fixed",
+      "circle-opacity",
+      headOpacity,
+    );
     map.current.setPaintProperty(
       "track-heads-fixed",
       "circle-stroke-opacity",
-      scale,
+      headOpacity,
     );
   }
 
@@ -1298,6 +1314,7 @@ export default function CreateMap({
   const selectionRing = useRef(polygon);
   // An overlay set before the style loaded hid layers that did not exist yet.
   const activeWmsOverlayRef = useRef(null);
+  const previewMapShownRef = useRef(false);
   const revealedWmsPk = useRef();
   // A marker so it follows the region being fetched through a pan, not the
   // map centre: a spatial filter can clip the overlay to part of the view.
@@ -1450,12 +1467,22 @@ export default function CreateMap({
   // Restoring hands each group back to its owner: the switches for hex/point
   // layers and the depth wash, applyLayerVisibility for the tracks. The depth
   // wash goes too: its colours would read as the overlay's own.
-  function setDataLayersVisibility(visible) {
+  function dataLayersHidden() {
+    return Boolean(activeWmsOverlayRef.current || previewMapShownRef.current);
+  }
+
+  // A restore while the other hider is still on keeps them hidden.
+  function setDataLayersVisibility(requested) {
+    const visible = requested && !dataLayersHidden();
     setLayersVisibility(griddapLayerIds, visible);
     if (!visible) {
       setLayersVisibility(observationLayerIds, false);
       setLayersVisibility(trackLayerIds, false);
-      setLayersVisibility(bathymetryLayerIds, false);
+      // Only the overlay's colours compete with the depth wash.
+      setLayersVisibility(
+        bathymetryLayerIds,
+        !activeWmsOverlayRef.current && bathymetryVisibleRef.current,
+      );
       return;
     }
     setLayersVisibility(observationLayerIds, dataLayersVisibleRef.current);
@@ -1624,9 +1651,8 @@ export default function CreateMap({
   // overlay.
   useEffect(() => {
     dataLayersVisibleRef.current = dataLayersVisible;
-    if (!map.current || activeWmsOverlay) return;
+    if (!map.current || dataLayersHidden()) return;
     setLayersVisibility(observationLayerIds, dataLayersVisible);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataLayersVisible]);
 
   // The ref keeps the choice through a WMS overlay, which hides the depth wash.
@@ -2101,6 +2127,46 @@ export default function CreateMap({
       map.current?.off("style.load", renderMappedRecord);
     };
   }, [mappedRecord]);
+
+  // Framed once per record: recolouring or a depth drag must not throw the
+  // reader's pan away.
+  const framedPreviewRef = useRef();
+  useEffect(() => {
+    function renderPreviewMap() {
+      if (!map.current) return;
+      const source = map.current.getSource("preview-map");
+      if (!source) {
+        map.current.once("style.load", renderPreviewMap);
+        return;
+      }
+      const shown = Boolean(previewMapLayer);
+      if (previewMapShownRef.current !== shown) {
+        previewMapShownRef.current = shown;
+        setDataLayersVisibility(!shown);
+      }
+      if (!previewMapLayer) {
+        source.setData(emptyFeatureCollection);
+        framedPreviewRef.current = undefined;
+        return;
+      }
+      source.setData(previewMapLayer.data);
+      map.current.setPaintProperty(
+        "preview-map-points",
+        "circle-color",
+        previewMapLayer.circleColor,
+      );
+      if (framedPreviewRef.current === previewMapLayer.frameKey) return;
+      framedPreviewRef.current = previewMapLayer.frameKey;
+      // Not revealBounds: a track already in view still gets zoomed onto.
+      map.current.fitBounds(
+        previewMapLayer.bounds,
+        zoomToDatasetCamera(map.current),
+      );
+    }
+    renderPreviewMap();
+    return () => map.current?.off("style.load", renderPreviewMap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewMapLayer]);
 
   function addObservationLayers() {
     const { tileQuery, cellTileQuery } = tileUrls(mapQueryRef.current);
@@ -2637,6 +2703,7 @@ export default function CreateMap({
         // When culling, keep the most recent heads deterministically.
         "symbol-sort-key": ["-", 0, ["coalesce", ["get", "head_time"], 0]],
       },
+      paint: { "icon-opacity": trackHeadOpacity(1) },
     });
 
     map.current.addLayer({
@@ -2649,7 +2716,9 @@ export default function CreateMap({
       paint: {
         "circle-color": trackLineColor,
         "circle-radius": 4.5,
+        "circle-opacity": trackHeadOpacity(1),
         "circle-stroke-color": "#ffffff",
+        "circle-stroke-opacity": trackHeadOpacity(1),
         "circle-stroke-width": 1.5,
       },
     });
@@ -2732,6 +2801,36 @@ export default function CreateMap({
         "circle-radius": 3,
         "circle-stroke-color": clickHighlightColor,
         "circle-stroke-width": 1.5,
+      },
+    });
+  }
+
+  // Above everything else on the map: it is what the reader asked to see.
+  function addPreviewMapLayers() {
+    map.current.addSource("preview-map", {
+      type: "geojson",
+      data: emptyFeatureCollection,
+    });
+    map.current.addLayer({
+      id: "preview-map-line",
+      type: "line",
+      source: "preview-map",
+      filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "#36454f",
+        "line-width": 1.5,
+        "line-opacity": 0.7,
+      },
+    });
+    map.current.addLayer({
+      id: "preview-map-points",
+      type: "circle",
+      source: "preview-map",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 3, 10, 6],
+        "circle-color": "rgba(0, 0, 0, 0)",
       },
     });
   }
@@ -3226,12 +3325,24 @@ export default function CreateMap({
       locale: { "Map.Title": t("mapCanvasLabel") },
       // The legend card builds the attribution control (see LegendFooter.jsx).
       attributionControl: false,
-      center: [initialView.lon, initialView.lat],
-      zoom: initialView.zoom,
+      ...(initialView.lat === undefined
+        ? {}
+        : {
+            center: [initialView.lon, initialView.lat],
+            zoom: initialView.zoom,
+          }),
       // Esri serves a grey "not yet available" tile past its coverage, which is
       // z17 on remote Arctic coasts.
       maxZoom: 17,
     });
+    // Not the constructor's `bounds`: the padding that keeps the box clear of
+    // the sidebar needs the canvas.
+    if (initialView.lat === undefined) {
+      map.current.fitBounds(defaultMapBounds, {
+        padding: mapCoverPadding(map.current),
+        animate: false,
+      });
+    }
     onMapReady(map.current);
 
     map.current.dragRotate.disable();
@@ -3247,6 +3358,7 @@ export default function CreateMap({
       addClickHighlightLayers();
       addTrackLayers();
       addSelectedTrackLayers();
+      addPreviewMapLayers();
       applySelectionFilter();
 
       applyLayerVisibility();
@@ -3256,7 +3368,7 @@ export default function CreateMap({
         setLayersVisibility(observationLayerIds, false);
       }
       // A share link's WMS overlay can go up before there were layers to hide.
-      if (activeWmsOverlayRef.current) setDataLayersVisibility(false);
+      if (dataLayersHidden()) setDataLayersVisibility(false);
       // The style creates the depth rasters visible.
       if (!bathymetryVisibleRef.current) {
         setLayersVisibility(bathymetryLayerIds, false);

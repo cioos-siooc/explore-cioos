@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Check2,
+  GeoAlt,
   GraphUp,
   Link45deg,
   Table as TableIcon,
@@ -14,6 +15,7 @@ import useElementSize from "../../ui/useElementSize.js";
 
 import PreviewBody from "./PreviewBody.jsx";
 import PreviewPlotProvider from "./PreviewPlotProvider.jsx";
+import PreviewMapPanel from "./PreviewMapPanel.jsx";
 import usePreviewPlotParams from "./usePreviewPlotParams.js";
 import usePreviewProfiles from "./usePreviewProfiles.js";
 import { previewSampleFor } from "./previewSample.js";
@@ -60,7 +62,14 @@ export default function DatasetPreview({
     datasetPreview?.table,
     rows,
   );
-  const { selectedVis, setSelectedVis, linkKey, plotLayout, step } = plotParams;
+  const {
+    selectedVis,
+    setSelectedVis,
+    mapAvailable,
+    linkKey,
+    plotLayout,
+    step,
+  } = plotParams;
 
   // Fetched separately from the rows and independent of them: a record whose
   // list fails simply gets no slider.
@@ -140,102 +149,119 @@ export default function DatasetPreview({
     setRecordLoading(false);
   };
   const dataIsReady = !recordLoading && datasetPreview?.table?.rows;
+  // A refusal is explained in the modal, which the map panel has no room for.
+  const showMap =
+    selectedVis === "map" && (recordLoading || dataIsReady) && showModal;
+
+  const viewToggle = (
+    <SegmentedToggle
+      className="previewViewToggle"
+      options={[
+        {
+          value: "plot",
+          icon: GraphUp,
+          label: t("datasetPreviewPlotText"),
+        },
+        ...(mapAvailable
+          ? [{ value: "map", icon: GeoAlt, label: t("datasetPreviewMapText") }]
+          : []),
+        {
+          value: "table",
+          icon: TableIcon,
+          label: t("datasetPreviewTableText"),
+        },
+      ]}
+      value={selectedVis}
+      onChange={setSelectedVis}
+    />
+  );
+
+  if (!inspectDataset || !inspectRecordID) {
+    return <Modal className="dataPreviewModal" show={false} size="xl" />;
+  }
 
   return (
-    <Modal
-      className="dataPreviewModal"
-      show={showModal}
-      size="xl"
-      onHide={onModalClose}
-      centered
-    >
-      {inspectDataset && inspectRecordID && (
-        <PreviewPlotProvider value={plotValue}>
-          <Modal.Header closeButton className="tableAndPlotGridContainer">
-            {dataIsReady && (
-              <SegmentedToggle
-                className="previewViewToggle"
-                options={[
-                  {
-                    value: "plot",
-                    icon: GraphUp,
-                    label: t("datasetPreviewPlotText"),
-                  },
-                  {
-                    value: "table",
-                    icon: TableIcon,
-                    label: t("datasetPreviewTableText"),
-                  },
-                ]}
-                value={selectedVis}
-                onChange={setSelectedVis}
-              />
-            )}
-
-            <h4 className="datasetTitle">
-              <span
-                className="datasetPreviewDatasetTitle"
-                title={inspectDataset.title}
-              >
-                {inspectDataset.title}:
-              </span>{" "}
-              <i className="datasetPreviewRecord">{inspectRecordID}</i>
-              {inspectRecordPeriod && (
-                <span className="datasetPreviewPeriod">
-                  {t("datasetPreviewPeriodText", inspectRecordPeriod)}
-                </span>
-              )}
-              {dataIsReady && sample && (
-                <span className="datasetPreviewSample">
-                  {t(
-                    sample.profileCount === null
-                      ? "datasetPreviewSampleRows"
-                      : plotLayout === COLOR_LAYOUT
-                        ? "datasetPreviewSampleAllProfiles" // the colour plot draws every profile it loaded
-                        : "datasetPreviewSampleProfiles",
-                    {
-                      rows: formatCount(sample.rowCount),
-                      totalRows: formatCount(sample.totalRowCount),
-                      profiles: formatCount(sample.profileCount ?? 0),
-                      totalProfiles: formatCount(sample.totalProfileCount ?? 0),
-                    },
-                  )}
-                </span>
-              )}
-            </h4>
-
-            {dataIsReady && (
-              // The URL mirrors the whole app state, so it is the share link.
-              <button
-                type="button"
-                className="copyLinkButton"
-                aria-label={copyLinkText}
-                title={copyLinkText}
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  setCopiedLinkKey(linkKey);
-                }}
-              >
-                {linkCopied ? (
-                  <Check2 size={18} aria-hidden="true" />
-                ) : (
-                  <Link45deg size={18} aria-hidden="true" />
-                )}
-              </button>
-            )}
-          </Modal.Header>
-          <Modal.Body>
-            <div className="tableAndPlotGridItem tableAndPlot" ref={scrollRef}>
-              <PreviewBody
-                recordLoading={recordLoading}
-                datasetPreview={datasetPreview}
-                rows={rows}
-                previewError={previewError}
-              />
-            </div>
-          </Modal.Body>
-        </PreviewPlotProvider>
+    <PreviewPlotProvider value={plotValue}>
+      {showMap && (
+        <PreviewMapPanel
+          viewToggle={dataIsReady && viewToggle}
+          loading={recordLoading}
+          onClose={onModalClose}
+        />
       )}
-    </Modal>
+      <Modal
+        className="dataPreviewModal"
+        show={showModal && !showMap}
+        size="xl"
+        onHide={onModalClose}
+        centered
+      >
+        <Modal.Header closeButton className="tableAndPlotGridContainer">
+          {dataIsReady && viewToggle}
+
+          <h4 className="datasetTitle">
+            <span
+              className="datasetPreviewDatasetTitle"
+              title={inspectDataset.title}
+            >
+              {inspectDataset.title}:
+            </span>{" "}
+            <i className="datasetPreviewRecord">{inspectRecordID}</i>
+            {inspectRecordPeriod && (
+              <span className="datasetPreviewPeriod">
+                {t("datasetPreviewPeriodText", inspectRecordPeriod)}
+              </span>
+            )}
+            {dataIsReady && sample && (
+              <span className="datasetPreviewSample">
+                {t(
+                  sample.profileCount === null
+                    ? "datasetPreviewSampleRows"
+                    : plotLayout === COLOR_LAYOUT
+                      ? "datasetPreviewSampleAllProfiles" // the colour plot draws every profile it loaded
+                      : "datasetPreviewSampleProfiles",
+                  {
+                    rows: formatCount(sample.rowCount),
+                    totalRows: formatCount(sample.totalRowCount),
+                    profiles: formatCount(sample.profileCount ?? 0),
+                    totalProfiles: formatCount(sample.totalProfileCount ?? 0),
+                  },
+                )}
+              </span>
+            )}
+          </h4>
+
+          {dataIsReady && (
+            // The URL mirrors the whole app state, so it is the share link.
+            <button
+              type="button"
+              className="copyLinkButton"
+              aria-label={copyLinkText}
+              title={copyLinkText}
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                setCopiedLinkKey(linkKey);
+              }}
+            >
+              {linkCopied ? (
+                <Check2 size={18} aria-hidden="true" />
+              ) : (
+                <Link45deg size={18} aria-hidden="true" />
+              )}
+            </button>
+          )}
+        </Modal.Header>
+        <Modal.Body>
+          <div className="tableAndPlotGridItem tableAndPlot" ref={scrollRef}>
+            <PreviewBody
+              recordLoading={recordLoading}
+              datasetPreview={datasetPreview}
+              rows={rows}
+              previewError={previewError}
+            />
+          </div>
+        </Modal.Body>
+      </Modal>
+    </PreviewPlotProvider>
   );
 }

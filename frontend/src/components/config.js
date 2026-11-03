@@ -17,10 +17,13 @@ export const defaultObisNodesSelected = [];
 // around; the others only contribute datasets inside Canadian waters.
 export const featuredObisNodes = ["OBIS Canada", "OTN-OBIS"];
 
-// Also seeds MapStateProvider's view state: the map only reports its camera
-// once loaded, and zoom-keyed consumers (the legend) would read "no zoom".
-export const defaultMapCenter = { lat: 63.3, lon: -95.9 };
-export const defaultMapZoom = 2.75;
+// [[west, south], [east, north]]: most of Canada with some of all three
+// oceans. A box, not a centre and zoom, so every screen size frames the same
+// area.
+export const defaultMapBounds = [
+  [-145, 40],
+  [-45, 78],
+];
 
 export const defaultQuery = {
   startDate: defaultStartDate,

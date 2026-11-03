@@ -22,11 +22,13 @@ import {
   datasetMatchesUrlKey,
   datasetUrlKey,
   selectionFromSearchParams,
+  useChanged,
   useDebounce,
 } from "../../utilities.jsx";
 import { useFilters } from "../filters/FilterProvider.jsx";
 import { useMapState, useViewportBounds } from "../map/MapStateProvider.jsx";
 import { GROUP_NONE, isGroupDimension } from "../datasetGroups.js";
+import { DEFAULT_SORT, GROUP_SIZE_SORT } from "../datasetSort.js";
 import { allDataLayersOn, datasetInDataLayers } from "../dataLayers.js";
 import {
   COLOR_LAYOUT,
@@ -125,6 +127,9 @@ export default function SelectionProvider({ children }) {
   // {datasetPk, recordId, frameView} | undefined.
   const [mappedRecord, setMappedRecord] = useState();
 
+  // What the preview's map view draws (previewMapLayerFor), while it is shown.
+  const [previewMapLayer, setPreviewMapLayer] = useState();
+
   // A share link's ?record= / ?track= / ?onMap= waits here until its dataset
   // resolves out of pointsData. Consumed once, by the effect below.
   const [pendingHighlight, setPendingHighlight] = useState(() => {
@@ -173,6 +178,13 @@ export default function SelectionProvider({ children }) {
     const initialGroupBy = initialParams.get("groupBy");
     return isGroupDimension(initialGroupBy) ? initialGroupBy : GROUP_NONE;
   });
+  // Here too so the "what's here" card can follow the list's order.
+  const grouped = isGroupDimension(groupBy);
+  const [listSort, setListSort] = useState(
+    grouped ? GROUP_SIZE_SORT : DEFAULT_SORT,
+  );
+  if (useChanged(grouped))
+    setListSort(grouped ? GROUP_SIZE_SORT : DEFAULT_SORT);
 
   // Falls back to the coverage bbox, the only one grids carry.
   const datasetBounds = useMemo(
@@ -669,8 +681,10 @@ export default function SelectionProvider({ children }) {
   // usePreviewPlotParams: they change what is fetched, not how the rows are
   // drawn, so they ride this fetch instead of a second one — one request, one
   // previewError, one recordLoading.
+  // The map view colours one marker per profile, so it needs them all too.
   const inspectAllProfiles =
-    searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT &&
+    (searchParams.get(LAYOUT_PARAM) === COLOR_LAYOUT ||
+      searchParams.get("vis") === "map") &&
     hasColorPlotFor(inspectDataset);
   const inspectRecordStep = inspectAllProfiles
     ? undefined
@@ -747,6 +761,8 @@ export default function SelectionProvider({ children }) {
     setHighlightedRecord,
     mappedRecord,
     setMappedRecord,
+    previewMapLayer,
+    setPreviewMapLayer,
     pointsData,
     inspectDataset,
     inspectDatasetExcluded,
@@ -780,6 +796,8 @@ export default function SelectionProvider({ children }) {
     setOnlyInView,
     groupBy,
     setGroupBy,
+    listSort,
+    setListSort,
     combinedQueries,
     handleSelectDataset,
   };
