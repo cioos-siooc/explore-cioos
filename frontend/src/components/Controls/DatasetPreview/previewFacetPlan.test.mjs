@@ -678,6 +678,26 @@ test("an empty first_eov_column gives way to a measurement that has data", () =>
   assert.deepEqual(facetPlanFor(dataset, variables).panelDefaults, ["PSAL_01"]);
 });
 
+test("without a usable first_eov_column, a column mapped to an EOV opens first", () => {
+  const dataset = {
+    ...VIKING_DATASET,
+    cdm_data_type: "TimeSeriesProfile",
+    first_eov_column: null,
+  };
+  const table = {
+    ...VIKING,
+    columnMeta: VIKING.columnMeta.map((meta) =>
+      meta && meta.name === "DOXY_01"
+        ? { ...meta, eovs: ["subsurfaceOxygen"] }
+        : meta,
+    ),
+  };
+  assert.deepEqual(
+    facetPlanFor(dataset, variablesFrom(table, dataset)).panelDefaults,
+    ["DOXY_01"],
+  );
+});
+
 test("a record with no data anywhere opens on the usual default", () => {
   const dataset = { ...VIKING_DATASET, cdm_data_type: "TimeSeriesProfile" };
   const variables = vikingWithDataIn(dataset, []);

@@ -267,7 +267,8 @@ function defaultPanelCandidatesFor(variables, sharedAxis) {
   );
 }
 
-// The dataset's first EOV column when plottable, else the first candidate.
+// An EOV first: the dataset's first_eov_column when plottable, else any column
+// mapped to an EOV, else the first candidate.
 function defaultPanelsFor(dataset, variables, shared) {
   const candidates = defaultPanelCandidatesFor(
     variables,

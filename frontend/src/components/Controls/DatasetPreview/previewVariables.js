@@ -162,6 +162,8 @@ export function variablesFrom(table, dataset) {
         (meta && trimmed(meta.positive)) ||
         (columnName === altitudeProxyColumn ? "down" : null), // ERDDAP's cdm_altitude_proxy stands in for depth
       ioosCategory: meta && trimmed(meta.ioos_category),
+      // The EOVs this column measures; empty until the dataset is reharvested.
+      eovs: (meta && Array.isArray(meta.eovs) && meta.eovs) || [],
       palette: meta && trimmed(meta.colorBarPalette),
       // Read by previewColorScales.js for the colour dimension's ramp.
       colorBarScale: meta && trimmed(meta.colorBarScale),
