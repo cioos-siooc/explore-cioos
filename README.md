@@ -257,7 +257,7 @@ name picks the target and any other name is rejected:
 | Tag | Release type | Target | Commit must be on |
 |---|---|---|---|
 | `beta*` | prerelease | beta | `development*` or `master` |
-| `vX.Y.Z-rc.N` | prerelease | staging | `master` |
+| `vX.Y.Z-rc.N[-fresh]` | prerelease | staging | `master` |
 | `vX.Y.Z` | full release | production | `master`, with a successful staging deployment of the same commit |
 
 Before any deploy, `release` also requires a non-draft release and the
@@ -285,9 +285,13 @@ production settings there, not on the box.
 `.env.staging` is the beta/staging template. Create its referenced
 `explore-cioos-staging` 1Password item with the listed fields.
 `docker-compose.staging.yaml` suffixes the Postgres and harvester volumes
-(`harvest_data`, `harvester_cache`, `obis_cache`) with the tag: a new tag starts
-empty (schema + `RUN_ON_DEPLOY` harvest), redeploying the same tag keeps its
-data. Superseded volumes are not removed; list them with
+(`harvest_data`, `harvester_cache`, `obis_cache`) with a data tag. A deploy
+keeps the live data (the newest successful beta/staging deployment's data tag,
+recorded in its environment URL) unless its tag ends in `-fresh`
+(`beta7-fresh`, `v1.2.0-rc.2-fresh`) or a dispatch ticks `fresh_database`; then
+the release tag becomes the data tag and the stack starts empty (schema +
+`RUN_ON_DEPLOY` harvest). Ship a schema change as a `-fresh` tag, or run
+Rebuild Database afterwards. Superseded volumes are not removed; list them with
 `docker volume ls -f name=explore-cioos-staging_` and `docker volume rm` the old
 tags'. The host has 2 CPU / 8 GB, so `HARVESTER_MEM_LIMIT` is 3g.
 
