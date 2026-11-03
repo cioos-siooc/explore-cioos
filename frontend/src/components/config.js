@@ -52,7 +52,8 @@ export const colorScale = [
 ];
 
 // Semi-transparent navy: white vanished against the pale low-count cells.
-export const hexOutlineColor = "rgba(21, 47, 55, 0.25)";
+export const hexOutlineColor = "rgba(21, 47, 55, 0.1)";
+export const hexOutlinePalestColor = "rgba(21, 47, 55, 0.2)";
 
 // Click answers (click-highlight-* and selected-track-* layers, highlighted
 // rows). Goldenrod because greens, purple and amber already mean data layers.

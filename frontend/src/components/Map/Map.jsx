@@ -51,6 +51,7 @@ import {
   colorScale,
   defaultBathymetryPalette,
   hexOutlineColor,
+  hexOutlinePalestColor,
   MARKER_MIN_ZOOM,
   trackLineColor,
 } from "../config";
@@ -91,7 +92,11 @@ import {
   trackItemsIn,
 } from "./hitTest.js";
 import { radiusExpression } from "./pointRadius.js";
-import { rampExpression, toRampStops } from "./hexRamp.js";
+import {
+  outlineRampExpression,
+  rampExpression,
+  toRampStops,
+} from "./hexRamp.js";
 import { focusedPointFeatures } from "./focusedPoints.js";
 import { selectionLayerFilter } from "./selectionFilter.js";
 import { createTileRetry } from "./tileRetry.js";
@@ -957,6 +962,13 @@ export default function CreateMap({
     ["click-highlight-point-glow", 6],
   ];
   // Own domain: sharing the main tier's min/max flattened them.
+  const hexOutlineRampColor = () =>
+    outlineRampExpression(
+      colorStops.current,
+      "count",
+      hexOutlinePalestColor,
+      hexOutlineColor,
+    );
   const coverageHexFillColor = () =>
     rampExpression(coverageColorStops.current, "count");
 
@@ -1059,6 +1071,13 @@ export default function CreateMap({
           "hexes",
           "fill-color",
           dimmable(hexFillColor()),
+        );
+      }
+      if (map.current.getLayer("hex-outlines")) {
+        map.current.setPaintProperty(
+          "hex-outlines",
+          "line-color",
+          hexOutlineRampColor(),
         );
       }
     }
@@ -2266,7 +2285,7 @@ export default function CreateMap({
         source: "cde-tiles",
         "source-layer": "internal-layer-name",
         paint: {
-          "line-color": hexOutlineColor,
+          "line-color": hexOutlineRampColor(),
           "line-opacity": dataRevealed.current ? 1 : 0,
           "line-opacity-transition": NO_TRANSITION,
           "line-width": 1,
