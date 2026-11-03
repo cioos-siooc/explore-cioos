@@ -20,7 +20,7 @@ from cde_harvester.core.errors import (
     RESPONSE_TOO_LARGE,
     UNCHANGED,
     UNKNOWN_ERROR,
-    ResponseTooLargeError,
+    DatasetDataError,
 )
 from cde_harvester.core.frame_spill import SpillSet
 from cde_harvester.core.harvest_warnings import FEATURES_HIDDEN, TRACKS_UNAVAILABLE
@@ -519,20 +519,20 @@ def harvest_dataset(erddap, dataset_id, previous_hashes=None, skip_unchanged=Fal
             skipped_reason_code=HTTP_ERROR,
             message=f"{detail} harvesting {dataset_id}",
         ) from e
-    except ResponseTooLargeError as e:
+    except DatasetDataError as e:
         duration_ms = int((time.monotonic() - t0) * 1000)
-        log.error("Response too large: %s", e)
+        log.error("%s: %s", e.reason_code, e)
         raise DatasetHarvestError(
             attempt=_build_attempt(
                 run_id, erddap_url, dataset_id,
                 status="error",
-                reason_code=RESPONSE_TOO_LARGE,
+                reason_code=e.reason_code,
                 error_message=str(e),
                 duration_ms=duration_ms,
                 query_urls=_attempt_urls(erddap_url, dataset, dataset_id),
             ),
-            skipped_reason_code=RESPONSE_TOO_LARGE,
-            message=f"Response too large harvesting {dataset_id}: {e}",
+            skipped_reason_code=e.reason_code,
+            message=f"{e.reason_code} harvesting {dataset_id}: {e}",
         ) from e
     except Exception as e:
         duration_ms = int((time.monotonic() - t0) * 1000)
