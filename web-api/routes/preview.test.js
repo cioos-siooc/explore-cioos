@@ -100,9 +100,9 @@ test("omits altitudeProxyColumn when the dataset declares no proxy", async () =>
   assert.equal("altitudeProxyColumn" in res.body.table, false);
 });
 
-test("truncates rows to 1000 even when ERDDAP returns more", async () => {
+test("truncates rows to 5000 even when ERDDAP returns more", async () => {
   db.queueRaw([FEATURE_ROW]);
-  const manyRows = Array.from({ length: 1500 }, (_, i) => [i]);
+  const manyRows = Array.from({ length: 7500 }, (_, i) => [i]);
   axios.queueResponse({
     data: { table: { columnNames: ["i"], rows: manyRows } },
   });
@@ -112,7 +112,7 @@ test("truncates rows to 1000 even when ERDDAP returns more", async () => {
     .query({ dataset: "obs_270", profile: "1" });
 
   assert.equal(res.status, 200);
-  assert.equal(res.body.table.rows.length, 1000);
+  assert.equal(res.body.table.rows.length, 5000);
 });
 
 test("404s RECORD_NOT_FOUND when the feature query resolves nothing", async () => {
@@ -451,7 +451,7 @@ test("a whole record is all of itself, even when the harvest counted fewer", asy
 
 test("one cast cut at the row cap is counted from what ERDDAP sent", async () => {
   db.queueRaw([STEPPED_ROW]);
-  const manyRows = Array.from({ length: 1500 }, (_, i) => [i]);
+  const manyRows = Array.from({ length: 7500 }, (_, i) => [i]);
   axios.queueResponse({
     data: { table: { columnNames: ["depth"], rows: manyRows } },
   });
@@ -462,7 +462,7 @@ test("one cast cut at the row cap is counted from what ERDDAP sent", async () =>
     at: "AZMP-ESG-21/05/20-23:01:41",
   });
 
-  assert.deepEqual(res.body.sample, { rowCount: 1000, totalRowCount: 1500 });
+  assert.deepEqual(res.body.sample, { rowCount: 5000, totalRowCount: 7500 });
 });
 
 // --- /preview/profiles -------------------------------------------------------

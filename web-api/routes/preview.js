@@ -9,7 +9,7 @@ const Sentry = require("@sentry/node");
  *     summary: Preview sample records for a dataset record
  *     tags: [Preview]
  *     description: >
- *       Returns up to 1000 representative rows for one record of an ERDDAP
+ *       Returns up to 5000 representative rows for one record of an ERDDAP
  *       dataset. A "record" is the dataset's CF discrete-sampling feature: a
  *       station for TimeSeries/TimeSeriesProfile, a cast for Profile, a
  *       mission/deployment for Trajectory/TrajectoryProfile.
@@ -96,7 +96,7 @@ const steppedRecord = (recordColumn, stepColumn) =>
 
 // How many rows one preview draws. Module level because both handlers bind it
 // into FEATURE_SQL, which sizes its time window against it.
-const PREVIEW_ROW_LIMIT = 1000;
+const PREVIEW_ROW_LIMIT = 5000;
 
 // Every profile of a record, past this, is more than a slider can address and
 // more than is worth sending: mpoSgdoADCP's longest record has 48166 of them,
@@ -399,7 +399,7 @@ router.get(
  *     description: >
  *       A TimeSeriesProfile record is a station holding many casts, and a
  *       TrajectoryProfile record is a track holding many profiles; /preview
- *       returns a 1000-row window of one, which is the tail of the record and
+ *       returns a 5000-row window of one, which is the tail of the record and
  *       may hold a handful of them. This lists what is there, so the preview can
  *       step to any of them with /preview?at=.
  *
