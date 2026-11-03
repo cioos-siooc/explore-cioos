@@ -273,6 +273,13 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Where something does have to scroll, a thin, quiet bar rather than the
+   system's full-width one. Not inherited, hence every element. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cioos-ink-40) transparent;
+}
+
 p,
 ul,
 ol {
