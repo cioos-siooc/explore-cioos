@@ -14,7 +14,6 @@ export const NOTICE_ICONS = [
   "info",
   "warning",
   "maintenance",
-  "cone",
   "new",
   "event",
   "none",

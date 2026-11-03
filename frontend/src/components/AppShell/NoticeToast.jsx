@@ -2,7 +2,6 @@ import * as React from "react";
 import classNames from "classnames";
 import {
   CalendarEvent,
-  ConeStriped,
   ExclamationTriangle,
   InfoCircle,
   Megaphone,
@@ -28,7 +27,6 @@ const ICONS = {
   info: InfoCircle,
   warning: ExclamationTriangle,
   maintenance: Wrench,
-  cone: ConeStriped,
   new: Stars,
   event: CalendarEvent,
 };
