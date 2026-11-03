@@ -111,6 +111,12 @@ export function panelPitch(n, gapRatio) {
   return n <= 0 ? 0 : n + (n - 1) * gapRatio;
 }
 
+// Rows top-down, in the order the variables were picked: Plotly counts a y
+// domain up from the bottom, so the first row takes the last domain.
+export function rowDomainsFor(n) {
+  return domainsFor(n, ROW_GAP).reverse();
+}
+
 // n evenly spaced [start, end] pairs over 0..1.
 export function domainsFor(n, gapRatio) {
   if (n <= 0) return [];

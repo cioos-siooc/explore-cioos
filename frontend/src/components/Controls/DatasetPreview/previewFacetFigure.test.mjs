@@ -191,10 +191,11 @@ test("every timeseries trace shares x and takes its own y", () => {
   );
 });
 
-test("the first selected variable is drawn at the bottom", () => {
-  // Variable 1 is drawn lowest, so domain order runs opposite to panel order.
+test("the first selected variable is drawn at the top", () => {
+  // Rows read down in the order picked, and the shared axis sits under the last.
   const { layout } = figure("TimeSeries", ["TE90_01", "PSAL_01", "DOXY_01"]);
-  assert.ok(layout.yaxis.domain[0] < layout.yaxis3.domain[0]);
+  assert.ok(layout.yaxis.domain[0] > layout.yaxis3.domain[0]);
+  assert.equal(layout.xaxis.anchor, "y3");
   assert.equal(
     layout.yaxis.title.text,
     "Temperature (1990 scale) ( degree_C )",
@@ -1306,7 +1307,7 @@ function gridFigure(extra = {}) {
   });
 }
 
-test("a grid draws one panel per X and Y pair, X across and Y up", () => {
+test("a grid draws one panel per X and Y pair, X across and Y down", () => {
   const { data, layout, pinnable } = gridFigure();
   assert.equal(pinnable, false);
   assert.equal(data.length, 4);
@@ -1320,11 +1321,12 @@ test("a grid draws one panel per X and Y pair, X across and Y up", () => {
     ],
   );
   // A column shares its X axis, a row its Y axis, so only the edges tick.
-  assert.equal(layout.xaxis2.anchor, "y");
+  // The X axes run under the bottom row, the last Y picked.
+  assert.equal(layout.xaxis2.anchor, "y2");
   assert.equal(layout.yaxis2.anchor, "x");
   assert.equal(layout.hovermode, "closest");
   assert.ok(layout.xaxis.domain[1] < layout.xaxis2.domain[0]);
-  assert.ok(layout.yaxis.domain[1] < layout.yaxis2.domain[0]);
+  assert.ok(layout.yaxis.domain[0] > layout.yaxis2.domain[1]);
 });
 
 test("a grid draws its panels' missing edges, and only those", () => {
@@ -1422,7 +1424,7 @@ test("a colour plot with one X stays the pinnable stack", () => {
   assert.equal(pinnable, true);
 });
 
-test("a colour plot grids several X across and several Y up each colour", () => {
+test("a colour plot grids several X across and several Y down each colour", () => {
   const { data, layout, pinnable } = colorFigure(["TE90_01", "PSAL_01"], {
     xAxes: ["time", "PRES_01"],
     yAxes: ["depth", "DOXY_01"],
@@ -1438,7 +1440,7 @@ test("a colour plot grids several X across and several Y up each colour", () => 
   assert.equal(layout.yaxis4.matches, "y2");
   // Each colour's bar spans both of its rows.
   const bar = layout.coloraxis.colorbar;
-  assert.equal(bar.len, layout.yaxis2.domain[1] - layout.yaxis.domain[0]);
+  assert.equal(bar.len, layout.yaxis.domain[1] - layout.yaxis2.domain[0]);
 });
 
 // --- one plot, an axis per variable (pstack) -------------------------------

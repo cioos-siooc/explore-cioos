@@ -36,6 +36,7 @@ import {
 import {
   boxBudgetFor,
   domainsFor,
+  rowDomainsFor,
   gridMarginFor,
   gridSizeFor,
   heightBudgetFor,
@@ -266,10 +267,11 @@ const AXIS_LINE = {
 };
 
 // Plotly draws the shared axis's line once, beside the panel it is anchored
-// to; every other panel gets the same edge as a shape.
+// to — a profile's first, a stack's last — and every other panel gets the same
+// edge as a shape.
 const sharedAxisEdgesFor = (panelLetter, panelCount) =>
   Array.from({ length: panelCount - 1 }, (_, i) => {
-    const panel = `${axisRef(panelLetter, i + 1)} domain`;
+    const panel = `${axisRef(panelLetter, panelLetter === "x" ? i + 1 : i)} domain`;
     return {
       type: "line",
       layer: "below",
@@ -280,7 +282,7 @@ const sharedAxisEdgesFor = (panelLetter, panelCount) =>
     };
   });
 
-// A grid draws each axis line once, on the bottom row and the left column;
+// A grid draws each axis line once, on the bottom (last) row and the left column;
 // every other panel gets the same two edges as shapes.
 const edgeLine = {
   type: "line",
@@ -293,7 +295,7 @@ function gridEdgesFor(columns, rows) {
     for (let column = 0; column < columns; column += 1) {
       const xref = `${axisRef("x", column)} domain`;
       const yref = `${axisRef("y", row)} domain`;
-      if (row > 0) {
+      if (row < rows - 1) {
         edges.push({ ...edgeLine, xref, x0: 0, x1: 1, yref, y0: 0, y1: 0 });
       }
       if (column > 0) {
@@ -384,7 +386,10 @@ export function buildFigure({
 
   const arrangement = ARRANGEMENTS[plan.orientation] || ROWS_LAYOUT;
   const { shared: sharedLetter, panel: panelLetter } = arrangement;
-  const domains = domainsFor(panels.length, arrangement.gap);
+  const domains =
+    panelLetter === "y"
+      ? rowDomainsFor(panels.length)
+      : domainsFor(panels.length, arrangement.gap);
 
   const wrappedTitle = wrapTitleFor(title, size.width);
   const titleLines = wrappedTitle ? wrappedTitle.split("<br>").length : 0;
@@ -493,7 +498,8 @@ export function buildFigure({
     ...AXIS_LINE,
     automargin: true,
     domain: [0, 1],
-    anchor: panelLetter,
+    // A stack's shared axis runs under its bottom panel, the last picked.
+    anchor: panelLetter === "y" ? axisRef("y", panels.length - 1) : panelLetter,
     ...sharedAxisSpike,
     ...tickOverride,
     ...(arrangement.unifiedHover
@@ -518,8 +524,6 @@ export function buildFigure({
     const domain = domains[index];
     const panelTitle = titleFor(columnName);
 
-    // In a stack, y domains count up from the bottom, so the first variable is
-    // lowest.
     layout[axisKey(panelLetter, index)] = {
       ...AXIS_LINE,
       domain,
@@ -789,7 +793,7 @@ export function buildOverlayFigure({
  * Several variables on BOTH axes, and optionally several colour columns: one
  * panel per (X, Y, colour) triple. Columns are the X variables, each repeated
  * once per colour column side by side; rows are the Y variables, the first at
- * the bottom like a stack. A row shares its Y axis and a column its X axis, so
+ * the top like a stack. A row shares its Y axis and a column its X axis, so
  * only the left column and the bottom row carry tick labels.
  *
  * @param xAxes, yAxes  the column names on each axis
@@ -847,7 +851,7 @@ export function buildGridFigure({
     ? Math.max(size.height - margin.t - margin.b, 0)
     : 0;
   const columnDomains = domainsFor(columnCount, COLUMN_GAP);
-  const rowDomains = domainsFor(rowCount, ROW_GAP);
+  const rowDomains = rowDomainsFor(rowCount);
   const wrapAlong = (text, pixels, maxLines) =>
     wrapLabel(text, maxCharsFor(pixels), maxLines);
   const coloredLine = mode.includes("lines");
@@ -898,7 +902,7 @@ export function buildGridFigure({
     layout[axisKey("x", column)] = {
       ...AXIS_LINE,
       domain,
-      anchor: "y",
+      anchor: axisRef("y", rowCount - 1), // the bottom row
       automargin: true,
       zeroline: false,
       ...(matches ? { matches } : {}),
@@ -1093,7 +1097,7 @@ export function buildColorFigure({
   };
   const gridded = xAxes.length > 1;
   const rowCount = panels.length * yAxes.length;
-  const domains = domainsFor(rowCount, ROW_GAP);
+  const domains = rowDomainsFor(rowCount);
   const columnDomains = domainsFor(xAxes.length, COLUMN_GAP);
 
   const wrappedTitle = wrapTitleFor(title, size.width);
@@ -1143,7 +1147,7 @@ export function buildColorFigure({
       ...AXIS_LINE,
       automargin: true,
       domain,
-      anchor: "y",
+      anchor: axisRef("y", rowCount - 1), // the bottom row
       ...(column === 0 && sharedTicks
         ? {
             tickmode: "array",
@@ -1170,8 +1174,8 @@ export function buildColorFigure({
     const fallbackColor = defaultColorFor(variable, index);
     const firstRow = index * yAxes.length;
     const barDomain = [
-      domains[firstRow][0],
-      domains[firstRow + yAxes.length - 1][1],
+      domains[firstRow + yAxes.length - 1][0],
+      domains[firstRow][1],
     ];
 
     if (dimension) {
