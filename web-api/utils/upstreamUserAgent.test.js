@@ -18,3 +18,27 @@ test("upstream requests identify as the CDE, not as axios", async (t) => {
   assert.strictEqual(data.userAgent, USER_AGENT);
   assert.doesNotMatch(data.userAgent, /axios/i);
 });
+
+test("the agent names the deployment and build compose passes in", (t) => {
+  const path = require.resolve("./upstreamUserAgent");
+  const saved = { url: process.env.APP_URL, version: process.env.APP_VERSION };
+  t.after(() => {
+    for (const [key, value] of [
+      ["APP_URL", saved.url],
+      ["APP_VERSION", saved.version],
+    ]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    delete require.cache[path];
+    require(path);
+  });
+  process.env.APP_URL = "https://explore.example.ca";
+  process.env.APP_VERSION = "v1.2.3";
+  delete require.cache[path];
+
+  assert.strictEqual(
+    require(path).USER_AGENT,
+    "CIOOS-CDE-WebAPI/v1.2.3 (+https://explore.example.ca)",
+  );
+});
