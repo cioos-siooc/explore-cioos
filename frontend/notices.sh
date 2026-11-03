@@ -17,14 +17,14 @@ valid='
     and ((.background // "#000") | type == "string"
       and test("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"))
     and ((.icon // "megaphone") | IN("megaphone", "info", "warning",
-      "maintenance", "new", "event", "none"))
+      "maintenance", "cone", "new", "event", "none"))
     and ((.css // "") | type == "string")
     and ((.tone // "info") | IN("info", "warning", "critical")))
 '
 
 if ! printf '%s' "$notices" | jq -e "$valid" >/dev/null 2>&1; then
   echo "notices.sh: NOTICES must be a JSON array of" \
-    '{"id", "en", "fr"?, "starts"?/"expires"?: "YYYY-MM-DD[THH:MM...]", "background"?: "#rrggbb", "icon"?: megaphone|info|warning|maintenance|new|event|none, "css"?: "prop: value; ...", "tone"?: info|warning|critical}' \
+    '{"id", "en", "fr"?, "starts"?/"expires"?: "YYYY-MM-DD[THH:MM...]", "background"?: "#rrggbb", "icon"?: megaphone|info|warning|maintenance|cone|new|event|none, "css"?: "prop: value; ...", "tone"?: info|warning|critical}' \
     "with non-empty id and en; got: $notices" >&2
   exit 1
 fi
